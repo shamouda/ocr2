@@ -94,25 +94,37 @@ ocrGuid_t hc_event_get (struct ocr_event_struct* event) {
 }
 
 register_list_node_t* hc_event_compete_for_put ( hc_event_t* derived, ocrGuid_t data_for_put_id ) {
+    // TODO don't think this is enough to detect concurrent puts.
     assert ( derived->datum == UNINITIALIZED_GUID && "violated single assignment property for EDFs");
 
     volatile register_list_node_t* registerListOfEDF = NULL;
 
     derived->datum = data_for_put_id;
     registerListOfEDF = derived->register_list;
+    // 'put' may be concurrent to an another edt trying to register a task to this event.
+    // Try to cas the registration list to EMPTY_REGISTER_LIST to let other know the 'put' has occurred.
     while ( !__sync_bool_compare_and_swap( &(derived->register_list), registerListOfEDF, EMPTY_REGISTER_LIST)) {
+        // If we failed to cas, it means a new node has been inserted
+        // in front of the registration list, so update our pointer and try again.
         registerListOfEDF = derived->register_list;
     }
+    // return the most up to date head on the registration list
+    // (no more adds possible once EMPTY_REGISTER_LIST has been set)
     return (register_list_node_t*) registerListOfEDF;
 }
 
+/**
+ * @brief Signal edts waiting on an event a put has occurred
+ */
 void hc_event_signal_waiters( register_list_node_t* task_id_list ) {
     register_list_node_t* curr = task_id_list;
-
-    while ( UNINITIALIZED_REGISTER_LIST != curr ) {
+    // Only try to notify if someone is waiting on the event
+    if (UNINITIALIZED_REGISTER_LIST != curr) {
+        // Lookup current worker id outside of the
+        // loop to avoid multiple pthread lookups
+        register_list_node_t* next = NULL;
         ocrGuid_t wid = ocr_get_current_worker_guid();
         ocrGuid_t curr_task_guid = curr->task_guid;
-
         ocr_task_t* curr_task = NULL;
         globalGuidProvider->getVal(globalGuidProvider, curr_task_guid, (u64*)&curr_task, NULL);
 
@@ -123,16 +135,21 @@ void hc_event_signal_waiters( register_list_node_t* task_id_list ) {
             ocr_scheduler_t * scheduler = get_worker_scheduler(w);
             scheduler->give(scheduler, wid, curr_task_guid);
         }
-        curr = curr->next;
+
     }
 }
 
 void hc_event_put (struct ocr_event_struct* event, ocrGuid_t db) {
     hc_event_t* derived = (hc_event_t*)event;
     register_list_node_t* task_list = hc_event_compete_for_put(derived, db);
+    // At this point, task_list cannot be modified anymore
     hc_event_signal_waiters(task_list);
 }
 
+/**
+ * @brief Add a task to an event registration list.
+ * @return true if the event has been registered. false indicates the event has been satisfied
+ */
 bool hc_event_register_if_not_ready(struct ocr_event_struct* event, ocrGuid_t polling_task_id ) {
     hc_event_t* derived = (hc_event_t*)event;
     bool success = false;
@@ -142,16 +159,22 @@ bool hc_event_register_if_not_ready(struct ocr_event_struct* event, ocrGuid_t po
         register_list_node_t* new_node = (register_list_node_t*)malloc(sizeof(register_list_node_t));
         new_node->task_guid = polling_task_id;
 
+        // Try to add the polling task registration in front of the event registration list.
         while ( registerListOfEDF != EMPTY_REGISTER_LIST && !success ) {
             new_node -> next = (register_list_node_t*) registerListOfEDF;
 
+            // compete with 'put' and other tasks trying to register on the event
             success = __sync_bool_compare_and_swap(&(derived -> register_list), registerListOfEDF, new_node);
 
             if ( !success ) {
                 registerListOfEDF = derived -> register_list;
             }
         }
-
+        if (!success) {
+            // The task became ready while we were trying to register.
+            // Since we couldn't, discard the newly created registration node.
+            free(new_node);
+        }
     }
     return success;
 }
@@ -178,6 +201,7 @@ hc_await_list_t* hc_await_list_constructor_with_event_list ( event_list_t* el) {
 }
 
 void hc_await_list_destructor( hc_await_list_t* derived ) {
+    free(derived->array);
     free(derived);
 }
 
@@ -225,7 +249,10 @@ bool hc_task_iterate_waiting_frontier ( ocr_task_t* base ) {
 
     ocrGuid_t my_guid = base->guid;
 
+    // Try to register current task to events only if they are not ready
     while (*currEventToWaitOn && !(*currEventToWaitOn)->registerIfNotReady (*currEventToWaitOn, my_guid) ) {
+        // Couldn't register to the event. Event must have been satisfied already.
+        // Go on with the task's next event dependency
         ++currEventToWaitOn;
     }
     derived->awaitList->waitingFrontier = currEventToWaitOn;
@@ -273,6 +300,7 @@ void hc_task_execute ( ocr_task_t* base ) {
             globalGuidProvider->getVal(globalGuidProvider, derived->depv[i].guid, (u64*)&db, NULL);
             RESULT_ASSERT(db->release(db, base->guid, true), ==, 0);
         }
+        free(depv);
     }
 }
 
