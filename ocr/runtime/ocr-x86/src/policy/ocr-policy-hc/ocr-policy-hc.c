@@ -29,6 +29,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
  */
 
+#include "ocr-macros.h"
 #include "hc.h"
 #include "ocr-policy.h"
 
@@ -119,11 +120,10 @@ ocr_policy_domain_t * hc_policy_domain_constructor(size_t nb_workpiles,
         size_t nb_workers,
         size_t nb_executors,
         size_t nb_schedulers) {
-    ocr_policy_domain_t * policy = (ocr_policy_domain_t *) malloc(sizeof(ocr_policy_domain_t));
+    ocr_policy_domain_t * policy = (ocr_policy_domain_t *) checked_malloc(policy, sizeof(ocr_policy_domain_t));
     // Get a GUID
     policy->guid = UNINITIALIZED_GUID;
     globalGuidProvider->getGuid(globalGuidProvider, &(policy->guid), (u64)policy, OCR_GUID_POLICY);
-
     policy->nb_executors = nb_executors;
     policy->nb_workpiles = nb_workpiles;
     policy->nb_workers = nb_workers;
