@@ -132,6 +132,4 @@ void ocrElsSet(u8 offset, ocrGuid_t data) {
 #else
     assert("OCR runtime has not been compiled with ELS support" && 0);
 #endif
-
-
 }
