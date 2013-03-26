@@ -46,12 +46,8 @@ void hc_policy_domain_create(ocr_policy_domain_t * policy, void * configuration,
 
 void hc_policy_domain_start(ocr_policy_domain_t * policy) {
     // Create Task and Event Factories
-    if (taskFactory == NULL) {
-        taskFactory = hc_task_factory_constructor();
-    }
-    if (eventFactory == NULL) {
-        eventFactory = hc_event_factory_constructor();
-    }
+    policy->taskFactory = hc_task_factory_constructor();
+    policy->eventFactory = hc_event_factory_constructor();
 
     // WARNING: Threads start should be the last thing we do here after
     //          all data-structures have been initialized.
@@ -97,8 +93,8 @@ void hc_policy_domain_stop(ocr_policy_domain_t * policy) {
 }
 
 void hc_policy_domain_destruct(ocr_policy_domain_t * policy) {
-    taskFactory->destruct(taskFactory);
-    eventFactory->destruct(eventFactory);
+    policy->taskFactory->destruct(policy->taskFactory);
+    policy->eventFactory->destruct(policy->eventFactory);
 }
 
 ocrGuid_t hc_policy_getAllocator(ocr_policy_domain_t * policy, ocrLocation_t* location) {
