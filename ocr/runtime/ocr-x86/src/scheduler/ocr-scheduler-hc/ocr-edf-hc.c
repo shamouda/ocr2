@@ -183,7 +183,7 @@ void hc_await_list_destructor( hc_await_list_t* derived ) {
     free(derived);
 }
 
-static void hc_task_construct_internal (hc_task_t* derived, ocrEdt_t funcPtr, u32 paramc, u64 * params, void** paramv) {
+void hc_task_construct_internal (hc_task_t* derived, ocrEdt_t funcPtr, u32 paramc, u64 * params, void** paramv) {
     derived->nbdeps = 0;
     derived->depv = NULL;
     derived->p_function = funcPtr;

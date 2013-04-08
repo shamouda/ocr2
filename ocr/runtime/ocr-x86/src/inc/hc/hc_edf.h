@@ -96,6 +96,7 @@ typedef struct hc_task_struct_t {
     ocrEdt_t p_function;
 } hc_task_t;
 
+void hc_task_construct_internal (hc_task_t* derived, ocrEdt_t funcPtr, u32 paramc, u64 * params, void** paramv);
 hc_task_t* hc_task_construct_with_event_list (ocrEdt_t funcPtr, u32 paramc, u64 * params, void ** paramv, event_list_t* al);
 hc_task_t* hc_task_construct (ocrEdt_t funcPtr, u32 paramc, u64 * params, void ** paramv, size_t l_size);
 
