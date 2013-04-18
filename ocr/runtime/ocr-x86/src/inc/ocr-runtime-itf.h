@@ -68,10 +68,4 @@ void * deguidify(ocrGuid_t id);
  **/
 ocrGuid_t getCurrentEdt();
 
-/**
- * @brief Executes an edt on top of the current edt stack.
- * Useful for blocking runtimes built on top of OCR.
- */
-void ocrRtBlockedHelp();
-
 #endif /* OCR_RUNTIME_ITF_H_ */
