@@ -52,3 +52,9 @@ ocrGuid_t getCurrentEdt() {
     return worker->getCurrentEDT(worker);
 }
 
+void ocrRtBlockedHelp() {
+    ocrGuid_t workerGuid = ocr_get_current_worker_guid();
+    ocr_worker_t *worker = NULL;
+    globalGuidProvider->getVal(globalGuidProvider, workerGuid, (u64*)&(worker), NULL);
+    worker_blocked_help(worker);
+}
