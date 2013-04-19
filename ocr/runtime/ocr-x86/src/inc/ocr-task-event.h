@@ -35,6 +35,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "ocr-guid.h"
 #include "ocr-edt.h"
 
+#ifdef OCR_ENABLE_STATISTICS
+#include "ocr-statistics.h"
+#endif
+
 struct ocr_event_struct;
 typedef void (*event_destruct_fct)(struct ocr_event_struct* event);
 typedef ocrGuid_t (*event_get_fct)(struct ocr_event_struct* event);
@@ -49,6 +53,9 @@ typedef bool (*event_register_if_not_ready_fct)(struct ocr_event_struct* event, 
  */
 typedef struct ocr_event_struct {
     ocrGuid_t guid; /**< GUID for this event */
+#ifdef OCR_ENABLE_STATISTICS
+    ocrStatsProcess_t statProcess;
+#endif
 
     /*! \brief Virtual destructor for the Event interface
      *  As this class does not have any state, the virtual destructor does not do anything
@@ -189,6 +196,9 @@ typedef void (*task_add_dependence_fct) ( struct ocr_task_struct_t* base, ocr_ev
  */
 typedef struct ocr_task_struct_t {
     ocrGuid_t guid; /**< GUID for this task (EDT) */
+#ifdef OCR_ENABLE_STATISTICS
+    ocrStatsProcess_t statProcess;
+#endif
     u32 paramc;
     u64 * params;
     void ** paramv;
