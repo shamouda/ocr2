@@ -52,6 +52,7 @@ u8 ocrEventDestroy(ocrGuid_t eventGuid) {
 }
 
 u8 ocrEventSatisfy(ocrGuid_t eventGuid, ocrGuid_t dataGuid /*= INVALID_GUID*/) {
+    //TODO shall we check for eventGuid being NULL_GUID ?
     ocr_event_t * event = NULL;
     globalGuidProvider->getVal(globalGuidProvider, eventGuid, (u64*)&event, NULL);
     ocr_event_t * event = (ocr_event_t*) deguidify(eventGuid);
@@ -62,7 +63,13 @@ u8 ocrEventSatisfy(ocrGuid_t eventGuid, ocrGuid_t dataGuid /*= INVALID_GUID*/) {
 u8 ocrEdtCreate(ocrGuid_t* edtGuid, ocrEdt_t funcPtr,
         u32 paramc, u64 * params, void** paramv,
         u16 properties, u32 depc, ocrGuid_t* depv /*= NULL*/) {
-    *edtGuid = taskFactory->create(taskFactory, funcPtr, paramc, params, paramv, depc);
+    return ocrEdtCreateWithOutput(edtGuid, funcPtr, paramc, params, paramv, properties, depc, depv, NULL_GUID)
+;}
+
+u8 ocrEdtCreateWithOutput(ocrGuid_t* edtGuid, ocrEdt_t funcPtr,
+        u32 paramc, u64 * params, void** paramv,
+        u16 properties, u32 depc, ocrGuid_t* depv /*= NULL*/, ocrGuid_t outputEvent) {
+    *edtGuid = taskFactory->create(taskFactory, funcPtr, paramc, params, paramv, depc, outputEvent);
     // If guids dependencies were provided, add them now
     if(depv != NULL) {
         assert(depc != 0);
@@ -73,6 +80,7 @@ u8 ocrEdtCreate(ocrGuid_t* edtGuid, ocrEdt_t funcPtr,
         }
     }
     return 0;
+
 }
 
 u8 ocrEdtSchedule(ocrGuid_t edtGuid) {
