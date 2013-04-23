@@ -179,6 +179,7 @@ void * worker_computation_routine(void * arg) {
             worker->setCurrentEDT(worker,taskGuid);
             curr_task->execute(curr_task);
             worker->setCurrentEDT(worker, NULL_GUID);
+            curr_task->destruct(curr_task);
         }
     }
     return NULL;

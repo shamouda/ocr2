@@ -37,6 +37,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "ocr-utils.h"
 #include "debug.h"
 
+#ifdef OCR_ENABLE_STATISTICS
+#include "ocr-statistics.h"
+#endif
+
 struct ocr_event_factory_struct* hc_event_factory_constructor(void) {
     hc_event_factory* derived = (hc_event_factory*) malloc(sizeof(hc_event_factory));
     ocr_event_factory* base = (ocr_event_factory*) derived;
@@ -217,6 +221,9 @@ hc_task_t* hc_task_construct (ocrEdt_t funcPtr, u32 paramc, u64 * params, void**
 void hc_task_destruct ( ocr_task_t* base ) {
     hc_task_t* derived = (hc_task_t*)base;
     hc_await_list_destructor(derived->awaitList);
+#ifdef OCR_ENABLE_STATISTICS
+    ocrStatsProcessDestruct(&(base->statProcess));
+#endif
     globalGuidProvider->releaseGuid(globalGuidProvider, base->guid);
     free(derived);
 }
