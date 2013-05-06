@@ -284,7 +284,7 @@ void finishLatchEventSatisfy(ocr_event_t * base, ocrGuid_t data, int slot) {
         // Important to void the ELS at that point, to make sure there's no 
         // side effect on code executing downwards.
         ocr_task_t * task = getCurrentTask();
-        task->els[0] = NULL_GUID;
+        task->els[ELS_SLOT_FINISH_LATCH] = NULL_GUID;
         // Notify waiters the latch is satisfied (We can extend that to a list // of waiters if we need to. (see R1))
         // Notify output event if any associated with the finish-edt
         reg_node_t * outputEventWaiter = &(self->outputEventWaiter);
@@ -578,7 +578,7 @@ void taskExecute ( ocr_task_t* base ) {
         derived->signalers = END_OF_LIST;
     }
 
-    derived->p_function(base->paramc, base->params, base->paramv, nbdeps, depv);
+    ocrGuid_t retGuid = derived->p_function(base->paramc, base->params, base->paramv, nbdeps, depv);
 
     // edt user code is done, if any deps, release data-blocks
     if (nbdeps != 0) {
@@ -603,7 +603,7 @@ void taskExecute ( ocr_task_t* base ) {
     if ((base->outputEvent != NULL_GUID) && !isFinishLatchOwner(curLatch, base->guid)) {
         ocr_event_t * outputEvent;
         globalGuidProvider->getVal(globalGuidProvider, base->outputEvent, (u64*)&outputEvent, NULL);
-        outputEvent->fct_ptrs->put(outputEvent, NULL_GUID);
+        outputEvent->fct_ptrs->satisfy(outputEvent, retGuid, 0);
     }
 }
 
