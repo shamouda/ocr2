@@ -173,7 +173,7 @@ typedef struct ocr_event_factory_struct {
  * OCR tasks factories declarations
  */
 struct ocr_task_factory_struct;
-typedef ocrGuid_t (*task_fact_create_fct) ( struct ocr_task_factory_struct* factory, ocrEdt_t fctPtr, u32 paramc, u64 * params, void** paramv, u16 properties, size_t l_size, ocrGuid_t outputEvent);
+typedef ocrGuid_t (*task_fact_create_fct) ( struct ocr_task_factory_struct* factory, ocrEdt_t fctPtr, u32 paramc, u64 * params, void** paramv, u16 properties, size_t l_size, ocrGuid_t * outputEvent);
 typedef void (*task_fact_destruct_fct)(struct ocr_task_factory_struct* factory);
 
 // Fwd declaration
