@@ -32,6 +32,7 @@
  */
 
 #include "ptr.h"
+#include "debug.h"
 #include "stdlib.h"
 
 
@@ -45,19 +46,21 @@ void ptrDestruct(ocrGuidProvider_t* self) {
 }
 
 u8 ptrGetGuid(ocrGuidProvider_t* self, ocrGuid_t* guid, u64 val, ocrGuidKind type) {
-    *guid = (ocrGuid_t)val;
+    ASSERT((val & 0x7) == 0); // 8 byte aligned gives us 3 bits -> 7 values
+    ASSERT(type <= 7);
+    *guid = (ocrGuid_t)(val | type);
     return 0;
 }
 
 u8 ptrGetVal(ocrGuidProvider_t* self, ocrGuid_t guid, u64* val, ocrGuidKind* kind) {
-    *val = (u64)guid;
+    *val = (u64)guid & ~0x7ULL;
     if(kind)
-        *kind = OCR_GUID_NONE;
+        *kind = (ocrGuidKind)((u64)(guid) & 0x7);
     return 0;
 }
 
 u8 ptrGetKind(ocrGuidProvider_t* self, ocrGuid_t guid, ocrGuidKind* kind) {
-    *kind = OCR_GUID_NONE;
+    *kind = (ocrGuidKind)((u64)(guid) & 0x7);
     return 0;
 }
 
