@@ -53,16 +53,6 @@ ocrGuid_t ocrElsUserGet(u8 offset);
 void ocrElsUserSet(u8 offset, ocrGuid_t data);
 
 /**
- *  \relates Part of ocr-guid.h
- **/
-ocrGuid_t guidify(void * p);
-
-/**
- *  \relates Part of ocr-guid.h
- **/
-void * deguidify(ocrGuid_t id);
-
-/**
  *  @brief Get the currently executing edt.
  *  \return NULL_GUID if there's no edt running.
  **/

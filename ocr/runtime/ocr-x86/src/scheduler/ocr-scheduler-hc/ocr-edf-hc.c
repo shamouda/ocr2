@@ -496,7 +496,7 @@ ocrGuid_t hcEventFactoryCreate ( struct ocr_event_factory_struct* factory, ocrEv
 static void taskSchedule( ocrGuid_t this_guid, ocr_task_t* base, ocrGuid_t wid );
 
 static void hcTaskConstructInternal (hc_task_t* derived, ocrEdt_t funcPtr,
-        u32 paramc, u64 * params, void** paramv, size_t nbDeps, ocr_task_fcts_t * taskFctPtrs) {
+        u32 paramc, u64 * params, void** paramv, size_t nbDeps, ocrGuid_t outputEvent, ocr_task_fcts_t * taskFctPtrs) {
     if (nbDeps == 0) {
         derived->signalers = END_OF_LIST;
     } else {
@@ -513,6 +513,7 @@ static void hcTaskConstructInternal (hc_task_t* derived, ocrEdt_t funcPtr,
     base->paramc = paramc;
     base->params = params;
     base->paramv = paramv;
+    base->outputEvent = outputEvent;
     base->fct_ptrs = taskFctPtrs;
     // Initialize ELS
     int i = 0;
