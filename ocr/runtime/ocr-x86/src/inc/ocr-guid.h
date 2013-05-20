@@ -35,7 +35,6 @@
 #define __OCR_GUID_H__
 
 #include "ocr-types.h"
-#include "ocr-utils.h"
 
 typedef enum {
     OCR_GUID_NONE = 0,
@@ -98,7 +97,7 @@ typedef struct _ocrGuidProvider_t {
      * @param self          Pointer to this GUID provider
      * @param guid          GUID to "translate"
      * @param val           Value to return
-     * @param kind          Kind to return
+     * @param kind          Kind to return. Can be NULL if the user does not care about the kind
      *
      * @return 0 on success or an error code
      */

@@ -35,6 +35,7 @@
 #include "ocr-runtime.h"
 #include "ocr-guid.h"
 
+
 // sagnak: I had to replicate this is in two files, we may need to expose this
 static inline ocr_policy_domain_t* get_current_policy_domain () {
     ocrGuid_t worker_guid = ocr_get_current_worker_guid();
@@ -47,6 +48,10 @@ static inline ocr_policy_domain_t* get_current_policy_domain () {
     return policy_domain;
 }
 
+/*
+ * @file This file contains OCR EDTs public API implementation.
+ */
+
 u8 ocrEventCreate(ocrGuid_t *guid, ocrEventTypes_t eventType, bool takesArg) {
     ocr_policy_domain_t* policy_domain = get_current_policy_domain();
     ocr_event_factory * eventFactory = policy_domain->getEventFactoryForUserEvents(policy_domain);
@@ -57,56 +62,92 @@ u8 ocrEventCreate(ocrGuid_t *guid, ocrEventTypes_t eventType, bool takesArg) {
 u8 ocrEventDestroy(ocrGuid_t eventGuid) {
     ocr_event_t * event = NULL;
     globalGuidProvider->getVal(globalGuidProvider, eventGuid, (u64*)&event, NULL);
+    event->fct_ptrs->destruct(event);
+    return 0;
+}
 
-    event->destruct(event);
+u8 ocrEventSatisfySlot(ocrGuid_t eventGuid, ocrGuid_t dataGuid /*= INVALID_GUID*/, int slot) {
+    assert(eventGuid != NULL_GUID);
+    ocr_event_t * event = NULL;
+    globalGuidProvider->getVal(globalGuidProvider, eventGuid, (u64*)&event, NULL);
+    event->fct_ptrs->satisfy(event, dataGuid, slot);
     return 0;
 }
 
 u8 ocrEventSatisfy(ocrGuid_t eventGuid, ocrGuid_t dataGuid /*= INVALID_GUID*/) {
-    ocr_event_t * event = NULL;
-    globalGuidProvider->getVal(globalGuidProvider, eventGuid, (u64*)&event, NULL);
-
-    event->put(event, dataGuid);
-    return 0;
+    return ocrEventSatisfySlot(eventGuid, dataGuid, 0);
 }
 
 u8 ocrEdtCreate(ocrGuid_t* edtGuid, ocrEdt_t funcPtr,
                 u32 paramc, u64 * params, void** paramv,
-                u16 properties, u32 depc, ocrGuid_t* depv /*= NULL*/) {
+                u16 properties, u32 depc, ocrGuid_t* depv /*= NULL*/, ocrGuid_t * outputEvent) {
 
     ocr_policy_domain_t* policy_domain = get_current_policy_domain();
     ocr_task_factory* taskFactory = policy_domain->getTaskFactoryForUserTasks(policy_domain);
-
     //TODO LIMITATION handle pre-built dependence vector
-    *edtGuid = taskFactory->create(taskFactory, funcPtr, paramc, params, paramv, depc);
+    *edtGuid = taskFactory->create(taskFactory, funcPtr, paramc, params, paramv, properties, depc, outputEvent);
+    // If guids dependencies were provided, add them now
+    if(depv != NULL) {
+        assert(depc != 0);
+        u32 i = 0;
+        while(i < depc) {
+            // TODO replace with a single runtime call with all dependencies
+            ocrAddDependence(depv[i], *edtGuid, i);
+            i++;
+        }
+    }
     return 0;
 }
 
-    u8 ocrEdtSchedule(ocrGuid_t edtGuid) {
+//TODO DEPR: impacts edtCreate and addDependence
+u8 ocrEdtSchedule(ocrGuid_t edtGuid) {
     ocrGuid_t worker_guid = ocr_get_current_worker_guid();
     ocr_task_t * task = NULL;
     globalGuidProvider->getVal(globalGuidProvider, edtGuid, (u64*)&task, NULL);
-
-    task->schedule(task, worker_guid);
+    task->fct_ptrs->schedule(task, worker_guid);
     return 0;
 }
 
-    u8 ocrEdtDestroy(ocrGuid_t edtGuid) {
+u8 ocrEdtDestroy(ocrGuid_t edtGuid) {
     ocr_task_t * task = NULL;
     globalGuidProvider->getVal(globalGuidProvider, edtGuid, (u64*)&task, NULL);
-
-    task->destruct(task);
+    task->fct_ptrs->destruct(task);
     return 0;
 }
 
-    u8 ocrAddDependence(ocrGuid_t source, ocrGuid_t destination, u32 slot) {
-    //TODO LIMITATION only support event as a guid source
-    ocr_event_t * event = NULL;
-    globalGuidProvider->getVal(globalGuidProvider, source, (u64*)&event, NULL);
-    ocr_task_t * task = NULL;
-    globalGuidProvider->getVal(globalGuidProvider, destination, (u64*)&task, NULL);
-
-    task->add_dependence(task, event, slot);
-
+u8 ocrAddDependence(ocrGuid_t source, ocrGuid_t destination, u32 slot) {
+    registerDependence(source, destination, slot);
     return 0;
+}
+
+/**
+   @brief Get @ offset in the currently running edt's local storage
+   Note: not visible from the ocr user interface
+ **/
+ocrGuid_t ocrElsUserGet(u8 offset) {
+    // User indexing start after runtime-reserved ELS slots
+    offset = ELS_RUNTIME_SIZE + offset;
+    ocrGuid_t workerGuid = ocr_get_current_worker_guid();
+    ocr_worker_t * worker = NULL;
+    globalGuidProvider->getVal(globalGuidProvider, workerGuid, (u64*)&(worker), NULL);
+    ocrGuid_t edtGuid = worker->getCurrentEDT(worker);
+    ocr_task_t * edt = NULL;
+    globalGuidProvider->getVal(globalGuidProvider, edtGuid, (u64*)&(edt), NULL);
+    return edt->els[offset];
+}
+
+/**
+   @brief Set data @ offset in the currently running edt's local storage
+   Note: not visible from the ocr user interface
+ **/
+void ocrElsUserSet(u8 offset, ocrGuid_t data) {
+    // User indexing start after runtime-reserved ELS slots
+    offset = ELS_RUNTIME_SIZE + offset;
+    ocrGuid_t workerGuid = ocr_get_current_worker_guid();
+    ocr_worker_t * worker = NULL;
+    globalGuidProvider->getVal(globalGuidProvider, workerGuid, (u64*)&(worker), NULL);
+    ocrGuid_t edtGuid = worker->getCurrentEDT(worker);
+    ocr_task_t * edt = NULL;
+    globalGuidProvider->getVal(globalGuidProvider, edtGuid, (u64*)&(edt), NULL);
+    edt->els[offset] = data;
 }

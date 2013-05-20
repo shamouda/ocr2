@@ -42,5 +42,4 @@
 #include "ocr-task-event.h"
 #include "ocr-runtime-model.h"
 
-
 #endif /* __OCR_RUNTIME_H_ */

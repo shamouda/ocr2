@@ -62,6 +62,26 @@ AS_IF([test "x$with_mpi" != xno],
       [ AC_DEFINE([HAVE_COMM], [1], [Have communication support]) ], 
       [ AC_MSG_NOTICE([No communication support built for OCR]) ]) 
 
+
+# Check if ELS support is requested
+
+AC_ARG_ENABLE(els, 
+    AS_HELP_STRING([--enable-els],
+    [enable user edt local storage, takes storage size as argument]),
+    [with_els=$enableval], 
+    [with_els=no;])
+    
+# note: does not check els' argument is legal
+AS_IF([test "x$with_els" != xno],
+      [ AC_MSG_NOTICE([ELS support size $with_els requested]) 
+        AC_DEFINE_UNQUOTED([ELS_USER_SIZE], [$with_els], [Set User-ELS size]) ], 
+      [ AC_MSG_NOTICE([No ELS support requested])
+        AC_DEFINE_UNQUOTED([ELS_USER_SIZE], [0], [Set User-ELS size])
+      ]) 
+
+# Check if we need to distribute runtime headers
+AM_CONDITIONAL([INCLUDE_RUNTIME_ITF_HEADERS], [test x$with_els != xno])
+
 #
 # Config file to process
 #

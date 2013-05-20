@@ -37,7 +37,6 @@
 #define __OCR_EDT_H__
 
 #include "ocr-types.h"
-#include "ocr-guid.h"
 
 /**
    @defgroup OCREvents Event Management for OCR
@@ -60,8 +59,17 @@ typedef enum {
     OCR_EVENT_STICKY_T,  /**< The event exists until explicitly destroyed with
                           * ocrEventDestroy. Multiple satisfactions result
                           * in an error */
+    OCR_EVENT_LATCH_T,   /**< The latch event can't be satisfied on either 
+                          * its the DECR or INCR slot. When it reaches zero, 
+                          * it is satisfied. */
     OCR_EVENT_T_MAX      /**< Marker */
 } ocrEventTypes_t;
+
+
+typedef enum {
+  OCR_EVENT_LATCH_DECR_SLOT = 0,
+  OCR_EVENT_LATCH_INCR_SLOT = 1
+} ocrLatchEventSlot_t;
 
 /**
  * @brief Creates an event
@@ -110,14 +118,16 @@ u8 ocrEventDestroy(ocrGuid_t guid);
  * the event will be satisfied for all EDTs/Events currently waiting on it
  * as well as any future EDT/Event that adds it as a dependence.
  **/
-u8 ocrEventSatisfy(ocrGuid_t eventGuid, ocrGuid_t dataGuid /*= INVALID_GUID*/);
+u8 ocrEventSatisfy(ocrGuid_t eventGuid, ocrGuid_t dataGuid /*=INVALID_GUID*/);
+
+u8 ocrEventSatisfySlot(ocrGuid_t eventGuid, ocrGuid_t dataGuid /*=INVALID_GUID*/, int slot /*=0*/);
 
 /**
    @}
 **/
 
 /**
- * @defgroup OCREDT Event Driven Task Management
+ * @defgroup OCR EDT Event Driven Task Management
  * @brief APIs to manage the EDT in OCR
  *
  * @todo Re-evaluate the notion of event types (post 0.7 version)
@@ -135,6 +145,14 @@ typedef struct {
     void* ptr;
 } ocrEdtDep_t;
 
+
+//
+// EDTs properties bits
+//
+
+#define EDT_PROP_NONE   ((u16) 0)
+#define EDT_PROP_FINISH ((u16) 1)
+
 /**
  * @brief Type for an EDT
  *
@@ -146,8 +164,8 @@ typedef struct {
  *                        was used as a dependence
  * @return Error code (0 on success)
  **/
-typedef u8 (*ocrEdt_t )( u32 paramc, u64 * params, void* paramv[],
-                         u32 depc, ocrEdtDep_t depv[]);
+typedef ocrGuid_t (*ocrEdt_t )( u32 paramc, u64 * params, void* paramv[],
+                   u32 depc, ocrEdtDep_t depv[]);
 
 /**
  * @brief Creates an EDT instance
@@ -161,11 +179,12 @@ typedef u8 (*ocrEdt_t )( u32 paramc, u64 * params, void* paramv[],
  * @param depc              Number of dependences for this EDT
  * @param depv              Values for the GUIDs of the dependences (if known)
  *                          If NULL, use ocrAddDependence
+ * @param outputEvent       Event satisfied by the runtime when the edt has been executed.
  * @return 0 on success and an error code on failure: TODO
  **/
 u8 ocrEdtCreate(ocrGuid_t * guid, ocrEdt_t funcPtr,
                 u32 paramc, u64 * params, void** paramv,
-                u16 properties, u32 depc, ocrGuid_t * depv);
+                u16 properties, u32 depc, ocrGuid_t * depv, ocrGuid_t * outputEvent);
 
 /**
  * @brief Makes the EDT available for scheduling to the runtime

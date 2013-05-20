@@ -27,20 +27,20 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-*/
+ */
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <assert.h>
 
 #include "ocr.h"
-
 
 #define FLAGS 0xdead
 
 ocrGuid_t task_for_edt ( u32 paramc, u64 * params, void* paramv[], u32 depc, ocrEdtDep_t depv[]) {
     int* res = (int*)depv[0].ptr;
     printf("In the task_for_edt with value %d\n", (*res));
-
+    assert(*res == 42);
     // This is the last EDT to execute, terminate
     ocrFinish();
     return NULL_GUID;
@@ -52,28 +52,41 @@ int main (int argc, char ** argv) {
     ocrInit(&argc, argv, 1, fctPtrArray);
 
     // Current thread is '0' and goes on with user code.
-    ocrGuid_t event_guid;
-    ocrEventCreate(&event_guid, OCR_EVENT_STICKY_T, true);
+    ocrGuid_t e0;
+    ocrEventCreate(&e0, OCR_EVENT_STICKY_T, true);
+
+    ocrGuid_t e1;
+    ocrEventCreate(&e1, OCR_EVENT_STICKY_T, true);
+
+    ocrGuid_t e2;
+    ocrEventCreate(&e2, OCR_EVENT_STICKY_T, true);
+
+    // Event chaining
+    ocrAddDependence(e0, e1, 0);
+    ocrAddDependence(e1, e2, 0);
 
     // Creates the EDT
     ocrGuid_t edt_guid;
 
     ocrEdtCreate(&edt_guid, task_for_edt, /*paramc=*/0, /*params=*/ NULL,
-                 /*paramv=*/NULL, /*properties=*/0,
-                 /*depc=*/1, /*depv=*/NULL, /*outEvent=*/NULL_GUID);
+            /*paramv=*/NULL, /*properties=*/0,
+            /*depc=*/1, /*depv=*/NULL, /*outEvent=*/NULL_GUID);
 
     // Register a dependence between an event and an edt
-    ocrAddDependence(event_guid, edt_guid, 0);
+    ocrAddDependence(e2, edt_guid, 0);
     // Schedule the EDT (will run when dependences satisfied)
     ocrEdtSchedule(edt_guid);
 
     int *k;
     ocrGuid_t db_guid;
-    ocrDbCreate(&db_guid, (void **) &k, sizeof(int), /*flags=*/FLAGS,
-                /*location=*/NULL, NO_ALLOC);
+    ocrDbCreate(&db_guid,(void **) &k,
+            sizeof(int), /*flags=*/FLAGS,
+            /*location=*/NULL,
+            NO_ALLOC);
     *k = 42;
 
-    ocrEventSatisfy(event_guid, db_guid);
+    // Satisfy event's chain head
+    ocrEventSatisfy(e0, db_guid);
 
     ocrCleanup();
 

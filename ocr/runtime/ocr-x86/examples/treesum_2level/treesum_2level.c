@@ -40,7 +40,7 @@
 #include "ocr.h"
 
 /* Do the addition */
-u8 summer(u32 paramc, u64 * params, void* paramv[], u32 depc, ocrEdtDep_t depv[]) {
+ocrGuid_t summer(u32 paramc, u64 * params, void* paramv[], u32 depc, ocrEdtDep_t depv[]) {
     int *result;
     ocrGuid_t resultGuid;
 
@@ -66,11 +66,11 @@ u8 summer(u32 paramc, u64 * params, void* paramv[], u32 depc, ocrEdtDep_t depv[]
     ocrDbDestroy(depv[0].guid);
     ocrDbDestroy(depv[1].guid);
     ocrDbDestroy(depv[2].guid);
-    return 0;
+    return NULL_GUID;
 }
 
 /* Print the result */
-u8 autumn(u32 paramc, u64 * params, void* paramv[], u32 depc, ocrEdtDep_t depv[]) {
+ocrGuid_t autumn(u32 paramc, u64 * params, void* paramv[], u32 depc, ocrEdtDep_t depv[]) {
     int * result = (int*)depv[0].ptr;
 
     printf("Got result: %d (0x%lx)\n", *result, (u64)depv[0].guid);
@@ -80,7 +80,7 @@ u8 autumn(u32 paramc, u64 * params, void* paramv[], u32 depc, ocrEdtDep_t depv[]
 
     /* Last codelet to execute */
     ocrFinish();
-    return 0;
+    return NULL_GUID;
 }
 
 
@@ -106,18 +106,18 @@ int main (int argc, char ** argv) {
 
     /* Create final EDT (autumn) */
     ocrEdtCreate(&autumnEdt, autumn, /*paramc=*/0, /*params=*/NULL,
-                 /*paramv=*/NULL, /*properties=*/0, /*depc=*/1, /*depv=*/NULL);
+                 /*paramv=*/NULL, /*properties=*/0, /*depc=*/1, /*depv=*/NULL, /*outEvent=*/NULL_GUID);
 
     /* Create event */
     ocrEventCreate(&autumnEvt, OCR_EVENT_STICKY_T, true);
 
     /* Create summers */
     ocrEdtCreate(&summer1Edt, summer, /*paramc=*/0, /*params=*/NULL,
-                 /*paramv=*/NULL, /*properties=*/0, /*depc=*/3, /*depv=*/NULL);
+                 /*paramv=*/NULL, /*properties=*/0, /*depc=*/3, /*depv=*/NULL, /*outEvent=*/NULL_GUID);
     ocrEdtCreate(&summer2Edt, summer, /*paramc=*/0, /*params=*/NULL,
-                 /*paramv=*/NULL, /*properties=*/0, /*depc=*/3, /*depv=*/NULL);
+                 /*paramv=*/NULL, /*properties=*/0, /*depc=*/3, /*depv=*/NULL, /*outEvent=*/NULL_GUID);
     ocrEdtCreate(&summer3Edt, summer, /*paramc=*/0, /*params=*/NULL,
-                 /*paramv=*/NULL, /*properties=*/0, /*depc=*/3, /*depv=*/NULL);
+                 /*paramv=*/NULL, /*properties=*/0, /*depc=*/3, /*depv=*/NULL, /*outEvent=*/NULL_GUID);
 
     /* Create events for summers */
     for(i = 0; i < 3; ++i) {

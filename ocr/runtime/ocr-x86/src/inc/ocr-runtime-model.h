@@ -78,6 +78,8 @@ ocr_model_policy_t * createCeMasteredModelPolicy ( size_t nb_XE_per_CEs );
 
 ocr_policy_domain_t ** instantiateModel(ocr_model_policy_t * model);
 
+void destructOcrModelPolicy(ocr_model_policy_t *);
+
 // THIS IS A HACK RIGHT NOW TO GET THE MEMORY SIZE IN ONE LARGE CHUNK
 extern u64 gHackTotalMemSize;
 

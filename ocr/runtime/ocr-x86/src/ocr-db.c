@@ -39,6 +39,13 @@
 #include "debug.h"
 #include "ocr-guid.h"
 #include <errno.h>
+#if (__STDC_HOSTED__ == 1)
+#include <string.h>
+#endif
+
+#include "ocr.h"
+#include "ocr-runtime.h"
+
 
 
 u8 ocrDbCreate(ocrGuid_t *db, void** addr, u64 len, u16 flags,
@@ -108,6 +115,78 @@ u8 ocrDbMalloc(ocrGuid_t guid, u64 size, void** addr) {
 
 u8 ocrDbMallocOffset(ocrGuid_t guid, u64 size, u64* offset) {
     return EINVAL; /* not yet implemented */
+}
+
+struct ocrDbCopy_args {
+	ocrGuid_t destination;
+	u64 destinationOffset; 
+	ocrGuid_t source; 
+	u64 sourceOffset; 
+	u64 size;
+} ocrDbCopy_args;
+
+ocrGuid_t ocrDbCopy_edt ( u32 paramc, u64 * params, void* paramv[], u32 depc, ocrEdtDep_t depv[]) {
+	char *sptr, *dptr;
+
+	struct ocrDbCopy_args * pv = (struct ocrDbCopy_args *) depv[0].ptr;
+	ocrGuid_t destination = pv->destination;
+	u64 destinationOffset = pv->destinationOffset;
+	ocrGuid_t source = pv->source;
+	u64 sourceOffset = pv->sourceOffset;
+	u64 size = pv->size;
+
+	ocrDbAcquire(source, (void *) &sptr, 0);
+	ocrDbAcquire(destination, (void *) &dptr, 0);
+
+	sptr += sourceOffset;
+	dptr += destinationOffset;
+
+#if (__STDC_HOSTED__ == 1)
+	memcpy((void *)dptr, (const void *)sptr, size);
+#else
+	int i;
+	for (i = 0; i < size; i++) {
+		dptr[i] = sptr[i];
+	}
+#endif
+
+	ocrDbRelease(source);
+	ocrDbRelease(destination);
+
+    ocrGuid_t param_db_guid = (ocrGuid_t)depv[0].guid;
+	ocrDbDestroy(param_db_guid);
+
+    return NULL_GUID;
+}
+
+u8 ocrDbCopy(ocrGuid_t destination,u64 destinationOffset, ocrGuid_t source, u64 sourceOffset, u64 size, u64 copyType, ocrGuid_t * completionEvt) {
+    // Create the event
+	ocrGuid_t event_guid;
+    ocrEventCreate(&event_guid, OCR_EVENT_STICKY_T, true); /*TODO: Replace with ONCE after that is supported */
+
+    // Create the EDT
+    ocrGuid_t edt_guid;
+    ocrEdtCreate(&edt_guid, ocrDbCopy_edt, 0, NULL, NULL, 0, 1, &event_guid, completionEvt);
+	ocrEdtSchedule(edt_guid);
+
+	// Create the copy params
+	ocrGuid_t param_db_guid;
+    struct ocrDbCopy_args * db_args = NULL;
+    void * ptr = (void *) db_args;
+    // Warning: directly casting db_args to (void **) causes a type-punning warning with gcc-4.1.2
+    ocrDbCreate(&param_db_guid, &ptr, sizeof(ocrDbCopy_args), 0xdead, NULL, NO_ALLOC);
+
+	db_args->destination = destination;
+	db_args->destinationOffset = destinationOffset;
+	db_args->source = source;
+	db_args->sourceOffset = sourceOffset;
+	db_args->size = size;
+
+	ocrEventSatisfy(event_guid, param_db_guid);
+
+	/* ocrDbRelease(param_db_guid); TODO: BUG: Release tries to free */
+
+	return 0;
 }
 
 u8 ocrDbFree(ocrGuid_t guid, void* addr) {

@@ -1,9 +1,9 @@
 OCR_INPUT_HOME=.
 PROG=cholesky
 SUFFIX=.exe
-CFLAGS= -g
+CFLAGS= -O2
 OCR_FLAGS=-L${OCR_INSTALL}/lib -I${OCR_INSTALL}/include -locr -lm
-OCR_INPUT=${OCR_INPUT_HOME}
+OCR_INPUT=${OCR_INPUT_HOME}/cholesky
 
 all: compile run
 all-test: compile run verify
@@ -17,11 +17,17 @@ OUTPUT_FILE=cholesky_out_${MATRIX_SIZE}.txt
 compile:
 	gcc $(CFLAGS) $(OCR_FLAGS) -I. $(PROG).c -o $(PROG)$(SUFFIX)
 
+compile.omp.task:
+	gcc -fopenmp $(CFLAGS) $(PROG).omp.task.c -o $(PROG).omp.task$(SUFFIX) -lm
+
 compile_pp:
 	g++ $(CFLAGS) $(OCR_FLAGS) -I. $(PROG).cpp -o $(PROG)$(SUFFIX)
 
 run:
 	./$(PROG)$(SUFFIX) ${MATRIX_SIZE} ${TILE_SIZE} ${OCR_INPUT}/${INPUT_FILE}
+
+run.omp.task:
+	./$(PROG).omp.task$(SUFFIX) ${MATRIX_SIZE} ${TILE_SIZE} ${OCR_INPUT}/${INPUT_FILE}
 
 clean:
 	-rm -Rf *.o $(PROG)$(SUFFIX) cholesky.out

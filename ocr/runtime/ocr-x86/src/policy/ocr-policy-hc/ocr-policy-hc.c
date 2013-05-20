@@ -29,6 +29,7 @@
 
 */
 
+#include "ocr-macros.h"
 #include "hc.h"
 #include "ocr-policy.h"
 
@@ -103,7 +104,6 @@ void hc_policy_domain_destruct(ocr_policy_domain_t * policy) {
     ocr_event_factory** eventFactories = policy->eventFactories;
     eventFactories[0]->destruct(eventFactories[0]);
     free(eventFactories);
-
 }
 
 ocrGuid_t hc_policy_getAllocator(ocr_policy_domain_t * policy, ocrLocation_t* location) {
@@ -136,14 +136,12 @@ ocr_policy_domain_t * hc_policy_domain_constructor(size_t nb_workpiles,
                                                    size_t nb_workers,
                                                    size_t nb_executors,
                                                    size_t nb_schedulers) {
-    ocr_policy_domain_t * policy = (ocr_policy_domain_t *) malloc(sizeof(ocr_policy_domain_t));
+  ocr_policy_domain_t * policy = (ocr_policy_domain_t *) checked_malloc(policy, sizeof(ocr_policy_domain_t));
     // Get a GUID
     policy->guid = UNINITIALIZED_GUID;
     globalGuidProvider->getGuid(globalGuidProvider, &(policy->guid), (u64)policy, OCR_GUID_POLICY);
-
     ocr_module_t * module_base = (ocr_module_t *) policy;
     module_base->map_fct = hc_ocr_module_map_schedulers_to_policy;
-
     policy->nb_executors = nb_executors;
     policy->nb_workpiles = nb_workpiles;
     policy->nb_workers = nb_workers;

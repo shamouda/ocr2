@@ -1,4 +1,4 @@
-/* Copyright (c) 2012, Rice University
+/* Copyright (c) 2013, Rice University
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are
@@ -10,7 +10,7 @@ met:
      copyright notice, this list of conditions and the following
      disclaimer in the documentation and/or other materials provided
      with the distribution.
-3.  Neither the name of Intel Corporation
+3.  Neither the name of Rice University
      nor the names of its contributors may be used to endorse or
      promote products derived from this software without specific
      prior written permission.
@@ -29,53 +29,33 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 */
 
-#include <stdio.h>
-#include <stdlib.h>
+#ifndef OCR_RUNTIME_ITF_H_
+#define OCR_RUNTIME_ITF_H_
 
-#include "ocr.h"
+#include "ocr-types.h"
+#include "ocr-guid.h"
 
+/**
+ * @file OCR Runtime interface: Defines additional API for runtime implementers.
+ */
 
-#define FLAGS 0xdead
+/**
+ *  @brief Get @ offset in the currently running edt's local storage
+ *  \return NULL_GUID if there's no ELS support.
+ *  \attention Must be call from within an edt code.
+ **/
+ocrGuid_t ocrElsUserGet(u8 offset);
 
-ocrGuid_t task_for_edt ( u32 paramc, u64 * params, void* paramv[], u32 depc, ocrEdtDep_t depv[]) {
-    int* res = (int*)depv[0].ptr;
-    printf("In the task_for_edt with value %d\n", (*res));
+/**
+ *  @brief Set data @ offset in the currently running edt's local storage
+ *  \remark no-op if there's no ELS support
+ **/
+void ocrElsUserSet(u8 offset, ocrGuid_t data);
 
-    // This is the last EDT to execute, terminate
-    ocrFinish();
-    return NULL_GUID;
-}
+/**
+ *  @brief Get the currently executing edt.
+ *  \return NULL_GUID if there's no edt running.
+ **/
+ocrGuid_t getCurrentEdt();
 
-int main (int argc, char ** argv) {
-    ocrEdt_t fctPtrArray [1];
-    fctPtrArray[0] = &task_for_edt;
-    ocrInit(&argc, argv, 1, fctPtrArray);
-
-    // Current thread is '0' and goes on with user code.
-    ocrGuid_t event_guid;
-    ocrEventCreate(&event_guid, OCR_EVENT_STICKY_T, true);
-
-    // Creates the EDT
-    ocrGuid_t edt_guid;
-
-    ocrEdtCreate(&edt_guid, task_for_edt, /*paramc=*/0, /*params=*/ NULL,
-                 /*paramv=*/NULL, /*properties=*/0,
-                 /*depc=*/1, /*depv=*/NULL, /*outEvent=*/NULL_GUID);
-
-    // Register a dependence between an event and an edt
-    ocrAddDependence(event_guid, edt_guid, 0);
-    // Schedule the EDT (will run when dependences satisfied)
-    ocrEdtSchedule(edt_guid);
-
-    int *k;
-    ocrGuid_t db_guid;
-    ocrDbCreate(&db_guid, (void **) &k, sizeof(int), /*flags=*/FLAGS,
-                /*location=*/NULL, NO_ALLOC);
-    *k = 42;
-
-    ocrEventSatisfy(event_guid, db_guid);
-
-    ocrCleanup();
-
-    return 0;
-}
+#endif /* OCR_RUNTIME_ITF_H_ */

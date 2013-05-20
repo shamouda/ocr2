@@ -31,16 +31,17 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <assert.h>
 
 #include "ocr.h"
-
 
 #define FLAGS 0xdead
 
 ocrGuid_t task_for_edt ( u32 paramc, u64 * params, void* paramv[], u32 depc, ocrEdtDep_t depv[]) {
-    int* res = (int*)depv[0].ptr;
-    printf("In the task_for_edt with value %d\n", (*res));
-
+    printf("In the task_for_edt with value %d\n", *((int *)(paramv[0])));
+    assert(paramc == 1);
+    assert(params[0] == sizeof(int));
+    assert(*((int *)(paramv[0])) == 32);
     // This is the last EDT to execute, terminate
     ocrFinish();
     return NULL_GUID;
@@ -52,28 +53,34 @@ int main (int argc, char ** argv) {
     ocrInit(&argc, argv, 1, fctPtrArray);
 
     // Current thread is '0' and goes on with user code.
+    ocrGuid_t depv[1];
     ocrGuid_t event_guid;
     ocrEventCreate(&event_guid, OCR_EVENT_STICKY_T, true);
+    depv[0] = event_guid;
 
     // Creates the EDT
+    u32 paramc = 1;
+    u64 params[1];
+    params[0] = sizeof(int);
+    int * paramv = (int *) malloc(sizeof(int));
+    paramv[0] = 32;
     ocrGuid_t edt_guid;
 
-    ocrEdtCreate(&edt_guid, task_for_edt, /*paramc=*/0, /*params=*/ NULL,
-                 /*paramv=*/NULL, /*properties=*/0,
-                 /*depc=*/1, /*depv=*/NULL, /*outEvent=*/NULL_GUID);
-
-    // Register a dependence between an event and an edt
-    ocrAddDependence(event_guid, edt_guid, 0);
-    // Schedule the EDT (will run when dependences satisfied)
-    ocrEdtSchedule(edt_guid);
+    // 'depv' stores dependencies, so no need to call
+    // ocrAddDependence later on to register events.
+    ocrEdtCreate(&edt_guid, task_for_edt, paramc, params, (void**) &paramv, 0, 1, depv, NULL_GUID);
 
     int *k;
     ocrGuid_t db_guid;
-    ocrDbCreate(&db_guid, (void **) &k, sizeof(int), /*flags=*/FLAGS,
-                /*location=*/NULL, NO_ALLOC);
+    ocrDbCreate(&db_guid,(void **) &k,
+            sizeof(int), /*flags=*/FLAGS,
+            /*location=*/NULL,
+            NO_ALLOC);
     *k = 42;
 
     ocrEventSatisfy(event_guid, db_guid);
+
+    ocrEdtSchedule(edt_guid);
 
     ocrCleanup();
 

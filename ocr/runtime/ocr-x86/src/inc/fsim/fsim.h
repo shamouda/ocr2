@@ -109,7 +109,7 @@ typedef struct fsim_task_struct_t {
     fsim_task_base_t fsimBase;
 } fsim_task_t;
 
-fsim_task_t* fsim_task_construct (ocrEdt_t funcPtr, u32 paramc, u64 * params, void ** paramv, size_t l_size);
+fsim_task_t* fsim_task_construct (ocrEdt_t funcPtr, u32 paramc, u64 * params, void ** paramv, u16 properties, size_t depc, ocrGuid_t outputEvent, ocr_task_fcts_t * task_fct_ptrs);
 
 typedef enum message_type_enum { PICK_MY_WORK_UP, GIVE_ME_WORK } message_type;
 
@@ -119,7 +119,7 @@ typedef struct fsim_message_task_struct_t {
     ocrGuid_t from_worker_guid;
 } fsim_message_task_t;
 
-fsim_message_task_t* fsim_message_task_construct (ocrEdt_t funcPtr);
+fsim_message_task_t* fsim_message_task_construct (ocrEdt_t funcPtr, ocr_task_fcts_t * task_fct_ptrs);
 
 typedef hc_event_t fsim_event_t;
 

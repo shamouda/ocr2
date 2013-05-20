@@ -27,22 +27,28 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-*/
+ */
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <assert.h>
 
 #include "ocr.h"
 
-
 #define FLAGS 0xdead
 
-ocrGuid_t task_for_edt ( u32 paramc, u64 * params, void* paramv[], u32 depc, ocrEdtDep_t depv[]) {
-    int* res = (int*)depv[0].ptr;
-    printf("In the task_for_edt with value %d\n", (*res));
+/**
+ * DESC: Chain an edt to another edt's output event.
+ */
 
-    // This is the last EDT to execute, terminate
-    ocrFinish();
+// This edt is triggered when the output event of the other edt is satisfied by the runtime
+ocrGuid_t chained_edt ( u32 paramc, u64 * params, void* paramv[], u32 depc, ocrEdtDep_t depv[]) {
+    ocrFinish(); // This is the last EDT to execute, terminate
+    return NULL_GUID;
+}
+
+ocrGuid_t task_for_edt ( u32 paramc, u64 * params, void* paramv[], u32 depc, ocrEdtDep_t depv[]) {
+    // When this edt terminates, the runtime will satisfy its output event automatically
     return NULL_GUID;
 }
 
@@ -55,25 +61,46 @@ int main (int argc, char ** argv) {
     ocrGuid_t event_guid;
     ocrEventCreate(&event_guid, OCR_EVENT_STICKY_T, true);
 
-    // Creates the EDT
+    // Setup output event
+    ocrGuid_t output_event_guid;
+    // Creates the parent EDT
     ocrGuid_t edt_guid;
-
     ocrEdtCreate(&edt_guid, task_for_edt, /*paramc=*/0, /*params=*/ NULL,
-                 /*paramv=*/NULL, /*properties=*/0,
-                 /*depc=*/1, /*depv=*/NULL, /*outEvent=*/NULL_GUID);
+            /*paramv=*/NULL, /*properties=*/0, /*depc=*/1, /*depv=*/NULL, &output_event_guid);
 
-    // Register a dependence between an event and an edt
+    // Setup edt input event
+    ocrGuid_t input_event_guid;
+    ocrEventCreate(&input_event_guid, OCR_EVENT_STICKY_T, true);
+
+    // Create the chained EDT and add input and output events as dependences.
+    ocrGuid_t chained_edt_guid;
+    ocrEdtCreate(&chained_edt_guid, chained_edt, /*paramc=*/0, /*params=*/ NULL,
+            /*paramv=*/NULL, /*properties=*/0, /*depc=*/2, /*depv=*/NULL, NULL_GUID);
+    ocrAddDependence(output_event_guid, chained_edt_guid, 0);
+    ocrAddDependence(input_event_guid, chained_edt_guid, 1);
+    ocrEdtSchedule(chained_edt_guid);
+
+    // parent edt: Add dependence, schedule and trigger
+    // Note: we don't strictly need to have a dependence here, it's just
+    // to get a little bit more control so as to when the root edt gets
+    // a chance to be scheduled.
     ocrAddDependence(event_guid, edt_guid, 0);
-    // Schedule the EDT (will run when dependences satisfied)
     ocrEdtSchedule(edt_guid);
 
-    int *k;
+    // Transmit the parent edt's guid as a parameter to the chained edt
+    // Build input db for the chained edt
+    ocrGuid_t * guid_ref;
     ocrGuid_t db_guid;
-    ocrDbCreate(&db_guid, (void **) &k, sizeof(int), /*flags=*/FLAGS,
-                /*location=*/NULL, NO_ALLOC);
-    *k = 42;
+    ocrDbCreate(&db_guid,(void **) &guid_ref, sizeof(ocrGuid_t), /*flags=*/FLAGS, /*loc=*/NULL, NO_ALLOC);
+    *guid_ref = edt_guid;
+    // Satisfy the input slot of the chained edt
+    ocrEventSatisfy(input_event_guid, db_guid);
 
-    ocrEventSatisfy(event_guid, db_guid);
+    // Satisfy the parent edt. At this point it should run
+    // to completion and satisfy its output event with its guid
+    // which should trigger the chained edt since all its input
+    // dependencies will be satisfied.
+    ocrEventSatisfy(event_guid, NULL_GUID);
 
     ocrCleanup();
 

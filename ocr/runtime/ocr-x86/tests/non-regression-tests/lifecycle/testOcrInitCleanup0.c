@@ -37,7 +37,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #define FLAGS 0xdead
 
-u8 task_for_edt ( u32 paramc, u64 * params, void* paramv[], u32 depc, ocrEdtDep_t depv[]) {
+ocrGuid_t task_for_edt ( u32 paramc, u64 * params, void* paramv[], u32 depc, ocrEdtDep_t depv[]) {
     int* res = (int*)depv[0].ptr;
     printf("In the task_for_edt with value %d\n", (*res));
     assert(*res == 42);
@@ -60,7 +60,7 @@ void test (int argc, char ** argv) {
 
     ocrEdtCreate(&edt_guid, task_for_edt, /*paramc=*/0, /*params=*/ NULL,
             /*paramv=*/NULL, /*properties=*/0,
-            /*depc=*/1, /*depv=*/NULL);
+            /*depc=*/1, /*depv=*/NULL, /*outEvent=*/NULL_GUID);
 
     // Register a dependence between an event and an edt
     ocrAddDependence(event_guid, edt_guid, 0);

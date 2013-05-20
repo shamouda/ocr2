@@ -27,53 +27,48 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-*/
+ */
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <assert.h>
 
 #include "ocr.h"
 
-
 #define FLAGS 0xdead
+#define N 100
+/**
+ * DESC:
+ */
 
-ocrGuid_t task_for_edt ( u32 paramc, u64 * params, void* paramv[], u32 depc, ocrEdtDep_t depv[]) {
-    int* res = (int*)depv[0].ptr;
-    printf("In the task_for_edt with value %d\n", (*res));
+// This edt is triggered when the output event of the other edt is satisfied by the runtime
+ocrGuid_t terminate_edt ( u32 paramc, u64 * params, void* paramv[], u32 depc, ocrEdtDep_t depv[]) {
+    printf("Terminate\n");
+    ocrFinish(); // This is the last EDT to execute, terminate
+    return NULL_GUID;
+}
 
-    // This is the last EDT to execute, terminate
-    ocrFinish();
+ocrGuid_t main_edt ( u32 paramc, u64 * params, void* paramv[], u32 depc, ocrEdtDep_t depv[]) {
+    printf("Running Main\n");
     return NULL_GUID;
 }
 
 int main (int argc, char ** argv) {
-    ocrEdt_t fctPtrArray [1];
-    fctPtrArray[0] = &task_for_edt;
-    ocrInit(&argc, argv, 1, fctPtrArray);
+    ocrEdt_t fctPtrArray [2];
+    fctPtrArray[0] = &main_edt;
+    fctPtrArray[1] = &terminate_edt;
+    ocrInit(&argc, argv, 2, fctPtrArray);
 
-    // Current thread is '0' and goes on with user code.
-    ocrGuid_t event_guid;
-    ocrEventCreate(&event_guid, OCR_EVENT_STICKY_T, true);
+    ocrGuid_t outputEventGuid;
+    ocrGuid_t mainEdtGuid;
+    ocrEdtCreate(&mainEdtGuid, main_edt, /*paramc=*/0, /*params=*/ NULL,
+            /*paramv=*/NULL, /*properties=*/ EDT_PROP_FINISH, /*depc=*/0, NULL, &outputEventGuid);
 
-    // Creates the EDT
-    ocrGuid_t edt_guid;
-
-    ocrEdtCreate(&edt_guid, task_for_edt, /*paramc=*/0, /*params=*/ NULL,
-                 /*paramv=*/NULL, /*properties=*/0,
-                 /*depc=*/1, /*depv=*/NULL, /*outEvent=*/NULL_GUID);
-
-    // Register a dependence between an event and an edt
-    ocrAddDependence(event_guid, edt_guid, 0);
-    // Schedule the EDT (will run when dependences satisfied)
-    ocrEdtSchedule(edt_guid);
-
-    int *k;
-    ocrGuid_t db_guid;
-    ocrDbCreate(&db_guid, (void **) &k, sizeof(int), /*flags=*/FLAGS,
-                /*location=*/NULL, NO_ALLOC);
-    *k = 42;
-
-    ocrEventSatisfy(event_guid, db_guid);
+    ocrGuid_t terminateEdtGuid;
+    ocrEdtCreate(&terminateEdtGuid, terminate_edt, /*paramc=*/0, /*params=*/ NULL, /*paramv=*/NULL, /*properties=*/0, /*depc=*/1, /*depv=*/NULL, NULL_GUID);
+    ocrAddDependence(outputEventGuid, terminateEdtGuid, 0);
+    ocrEdtSchedule(terminateEdtGuid);
+    ocrEdtSchedule(mainEdtGuid);
 
     ocrCleanup();
 

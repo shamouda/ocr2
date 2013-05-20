@@ -36,11 +36,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 int edtCalled = 0;
 
-u8 task_for_edt ( u32 paramc, u64 * params, void* paramv[], u32 depc, ocrEdtDep_t depv[]) {
+ocrGuid_t task_for_edt ( u32 paramc, u64 * params, void* paramv[], u32 depc, ocrEdtDep_t depv[]) {
     edtCalled = 1;
     // This is the last EDT to execute, terminate
     ocrFinish();
-    return 0;
+    return NULL_GUID;
 }
 
 int main (int argc, char ** argv) {
@@ -54,7 +54,7 @@ int main (int argc, char ** argv) {
 
     // Creates the EDT
     ocrGuid_t edt_guid;
-    ocrEdtCreate(&edt_guid, task_for_edt, 0, NULL, NULL, 0, 1, NULL);
+    ocrEdtCreate(&edt_guid, task_for_edt, 0, NULL, NULL, 0, 1, NULL, NULL_GUID);
 
     // Register a dependence between an event and an edt
     ocrAddDependence(event_guid, edt_guid, 0);

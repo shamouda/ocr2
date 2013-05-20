@@ -3,9 +3,6 @@
 #include <time.h>
 #include "ocr.h"
 
-//TODO need this because we don't use the user api yet
-#include "ocr-runtime.h"
-
 #define GAP_PENALTY -1
 #define TRANSITION_PENALTY -2
 #define TRANSVERSION_PENALTY -4
@@ -74,7 +71,7 @@ typedef struct {
     ocrGuid_t bottom_right_event_guid;
 } Tile_t;
 
-u8 smith_waterman_task ( u32 paramc, u64 * params, void* paramv[], u32 depc, ocrEdtDep_t depv[]) {
+ocrGuid_t smith_waterman_task ( u32 paramc, u64 * params, void* paramv[], u32 depc, ocrEdtDep_t depv[]) {
     int index, ii, jj;
 
     /* Unbox parameters */
@@ -175,6 +172,7 @@ u8 smith_waterman_task ( u32 paramc, u64 * params, void* paramv[], u32 depc, ocr
         fprintf(stdout, "score: %d\n", curr_bottom_row[tile_width-1]);
         ocrFinish();
     }
+    return NULL_GUID;
 }
 
 static void initialize_border_values( Tile_t** tile_matrix, int n_tiles_width, int n_tiles_height, int tile_width, int tile_height ) {
@@ -319,7 +317,7 @@ int main ( int argc, char* argv[] ) {
             /* Create an event-driven tasks of smith_waterman tasks */
             ocrGuid_t task_guid;
 
-            ocrEdtCreate(&task_guid, smith_waterman_task, 9, NULL, (void **) p_paramv, PROPERTIES, 3, NULL);
+            ocrEdtCreate(&task_guid, smith_waterman_task, 9, NULL, (void **) p_paramv, PROPERTIES, 3, NULL, NULL_GUID);
 
             /* add dependency to the EDT from the west tile's right column ready event */
             ocrAddDependence(tile_matrix[i][j-1].right_column_event_guid, task_guid, 0);

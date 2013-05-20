@@ -31,37 +31,67 @@
 
 #include <stdlib.h>
 
+#include "ocr-macros.h"
 #include "ocr-runtime.h"
 #include "ocr-guid.h"
 
-event_list_node_t* event_list_node_constructor () {
-    event_list_node_t* node = (event_list_node_t*)malloc(sizeof(event_list_node_t));
-    node->next = NULL;
-    return node;
-}
-void event_list_node_destructor (event_list_node_t* node) {
+/*
+ * @file This file contains OCR Event list construction public API implementation.
+ */
+
+/*! \brief A linked list data-structure constructor
+ * It sets the size to be 0 and head and tail members to be NULL
+ * \return  An empty linked list instance
+ */
+
+// DEPRECATED
+// static event_list_node_t* event_list_node_constructor () {
+//     event_list_node_t* node = (event_list_node_t*)checked_malloc(node, sizeof(event_list_node_t));
+//     node->event = NULL;
+//     node->next = NULL;
+//     return node;
+// }
+
+/*! \brief Shallow destructor for event list nodes
+ *  \param[in] node The node to free.
+ */
+static void event_list_node_destructor (event_list_node_t* node) {
     free(node);
 }
 
+/*! \brief Append an Event guid to the event list
+ *  \param[in]  list An event list
+ *  \param[in]  event_guid  GUID of the event to be appended
+ */
 void event_list_enlist ( event_list_t* list, ocrGuid_t event_guid ) {
-    ocr_event_t * event = NULL;
-    globalGuidProvider->getVal(globalGuidProvider, event_guid, (u64*)&event, NULL);
+    assert(false);
+    //DISABLE to build on hudson
+    // ocr_event_t * event = NULL;
+    // globalGuidProvider->getVal(globalGuidProvider, event_guid, (u64*)&event, NULL);
 
-    ++list->size;
-    event_list_node_t* node = event_list_node_constructor();
-    node->event = event;
-    if ( NULL != list->head ) { list->tail->next = node; list->tail = node; }
-    else list->tail = list->head = node;
+    // ++list->size;
+    // event_list_node_t* node = event_list_node_constructor();
+    // node->event = event;
+    // if ( NULL != list->head ) { list->tail->next = node; list->tail = node; }
+    // else list->tail = list->head = node;
 }
 
+/*! \brief Default constructor for event list
+ * Initializes an empty list and register the enlist protocol
+ * through a function pointer to 'event_list_enlist'
+ */
 event_list_t* event_list_constructor () {
-    event_list_t* list = (event_list_t*)malloc(sizeof(event_list_t));
+    event_list_t* list = (event_list_t*)checked_malloc(list, sizeof(event_list_t));
     list->size = 0;
     list->head = list->tail = NULL;
     list->enlist = event_list_enlist;
     return list;
 }
 
+/*! \brief free an event list
+ * Goes over the list and free each of the node.
+ * Warning: the 'list' parameter is freed too !
+ */
 void event_list_destructor ( event_list_t* list ) {
     event_list_node_t* curr = list->head->next;
     while ( NULL != list->head ) {
@@ -69,4 +99,5 @@ void event_list_destructor ( event_list_t* list ) {
         list->head = curr;
         curr = curr->next;
     }
+    free(list);
 }

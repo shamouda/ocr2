@@ -36,6 +36,36 @@
 #include "ocr-datablock.h"
 #include "ocr-utils.h"
 #include "debug.h"
+#include "ocr-macros.h"
+
+#define END_OF_LIST NULL
+
+void hcTaskConstructInternal2 (hc_task_t* derived, ocrEdt_t funcPtr,
+        u32 paramc, u64 * params, void** paramv, size_t nbDeps, ocrGuid_t outputEvent, ocr_task_fcts_t * taskFctPtrs) {
+    if (nbDeps == 0) {
+        derived->signalers = END_OF_LIST;
+    } else {
+        // Since we know how many dependences we have, preallocate signalers
+        derived->signalers = checked_malloc(derived->signalers, sizeof(reg_node_t)*nbDeps);
+    }
+    derived->waiters = END_OF_LIST;
+    derived->nbdeps = nbDeps;
+    derived->p_function = funcPtr;
+    // Initialize base
+    ocr_task_t* base = (ocr_task_t*) derived;
+    base->guid = UNINITIALIZED_GUID;
+    globalGuidProvider->getGuid(globalGuidProvider, &(base->guid), (u64)base, OCR_GUID_EDT);
+    base->paramc = paramc;
+    base->params = params;
+    base->paramv = paramv;
+    base->outputEvent = outputEvent;
+    base->fct_ptrs = taskFctPtrs;
+    // Initialize ELS
+    int i = 0;
+    while (i < ELS_SIZE) {
+        base->els[i++] = NULL_GUID;
+    }
+}
 
 int fsim_task_is_message ( fsim_message_interface_t* fsim_base ) {
     return 0;
@@ -46,18 +76,15 @@ void fsim_task_destruct ( ocr_task_t* base ) {
     free(derived);
 }
 
-fsim_task_t* fsim_task_construct (ocrEdt_t funcPtr, u32 paramc, u64 * params, void** paramv, size_t dep_list_size) {
+fsim_task_t* fsim_task_construct (ocrEdt_t funcPtr, u32 paramc, u64 * params, void ** paramv, u16 properties, size_t depc, ocrGuid_t outputEvent, ocr_task_fcts_t * task_fct_ptrs) {
     fsim_task_t* derived = (fsim_task_t*) malloc(sizeof(fsim_task_t));
     hc_task_t* hcTaskBase = &(derived->fsimBase.base);
 
-    hcTaskBase->awaitList = hc_await_list_constructor(dep_list_size);
-    hc_task_construct_internal(hcTaskBase, funcPtr, paramc, params, paramv);
+    hcTaskConstructInternal2(hcTaskBase, funcPtr, paramc, params, paramv, depc, outputEvent, task_fct_ptrs);
 
     fsim_message_interface_t* fsimMessage = &(derived->fsimBase.message_interface);
     fsimMessage->is_message = fsim_task_is_message;
 
-    ocr_task_t* ocrTaskBase = (ocr_task_t*) hcTaskBase;
-    ocrTaskBase->destruct = fsim_task_destruct;
     return derived;
 }
 
@@ -66,8 +93,8 @@ void fsim_task_factory_destructor ( struct ocr_task_factory_struct* base ) {
     free(derived);
 }
 
-ocrGuid_t fsim_task_factory_create ( struct ocr_task_factory_struct* factory, ocrEdt_t fctPtr, u32 paramc, u64 * params, void** paramv, size_t dep_l_size) {
-    fsim_task_t* edt = fsim_task_construct(fctPtr, paramc, params, paramv, dep_l_size);
+ocrGuid_t fsim_task_factory_create ( struct ocr_task_factory_struct* factory, ocrEdt_t fctPtr, u32 paramc, u64 * params, void** paramv, u16 properties, size_t depc, ocrGuid_t * outputEventPtr) {
+    fsim_task_t* edt = fsim_task_construct(fctPtr, paramc, params, paramv, properties, depc, NULL_GUID, factory->task_fct_ptrs);
     ocr_task_t* base = (ocr_task_t*) edt;
     return base->guid;
 }
@@ -77,6 +104,11 @@ struct ocr_task_factory_struct* fsim_task_factory_constructor(void) {
     ocr_task_factory* base = (ocr_task_factory*) derived;
     base->create = fsim_task_factory_create;
     base->destruct =  fsim_task_factory_destructor;
+    // initialize singleton instance that carries implementation function pointers
+    base->task_fct_ptrs = (ocr_task_fcts_t *) checked_malloc(base->task_fct_ptrs, sizeof(ocr_task_fcts_t));
+    base->task_fct_ptrs->destruct = fsim_task_destruct;
+    base->task_fct_ptrs->execute = taskExecute;
+    base->task_fct_ptrs->schedule = tryScheduleTask;
     return base;
 }
 
@@ -94,24 +126,19 @@ void fsim_message_task_destruct ( ocr_task_t* base ) {
     free(derived);
 }
 
-fsim_message_task_t* fsim_message_task_construct (ocrEdt_t funcPtr) {
+fsim_message_task_t* fsim_message_task_construct (ocrEdt_t funcPtr, ocr_task_fcts_t * task_fct_ptrs) {
     fsim_message_task_t* derived = (fsim_message_task_t*) malloc(sizeof(fsim_message_task_t));
     hc_task_t* hcTaskBase = &(derived->fsimBase.base);
 
-    hcTaskBase->awaitList = NULL;
-    hc_task_construct_internal(hcTaskBase, NULL, 0, NULL, NULL);
+    hcTaskConstructInternal2(hcTaskBase, NULL, 0, NULL, NULL, 0, NULL_GUID, task_fct_ptrs);
 
     fsim_message_interface_t* fsimMessage = &(derived->fsimBase.message_interface);
     fsimMessage->is_message = fsim_message_task_is_message;
-
-    ocr_task_t* ocrTaskBase = (ocr_task_t*) hcTaskBase;
-    ocrTaskBase->destruct = fsim_message_task_destruct;
-
     return derived;
 }
 
-ocrGuid_t fsim_message_task_factory_create ( struct ocr_task_factory_struct* factory, ocrEdt_t fctPtr, u32 paramc, u64 * params, void** paramv, size_t dep_l_size) {
-    fsim_message_task_t* edt = fsim_message_task_construct(fctPtr);
+ocrGuid_t fsim_message_task_factory_create ( struct ocr_task_factory_struct* factory, ocrEdt_t fctPtr, u32 paramc, u64 * params, void** paramv, u16 properties, size_t depc, ocrGuid_t * outputEventPtr) {
+    fsim_message_task_t* edt = fsim_message_task_construct(fctPtr, factory->task_fct_ptrs);
     ocr_task_t* base = (ocr_task_t*) edt;
     return base->guid;
 }
@@ -121,6 +148,11 @@ struct ocr_task_factory_struct* fsim_message_task_factory_constructor(void) {
     ocr_task_factory* base = (ocr_task_factory*) derived;
     base->create = fsim_message_task_factory_create;
     base->destruct =  fsim_message_task_factory_destructor;
+    // initialize singleton instance that carries implementation function pointers
+    base->task_fct_ptrs = (ocr_task_fcts_t *) checked_malloc(base->task_fct_ptrs, sizeof(ocr_task_fcts_t));
+    base->task_fct_ptrs->destruct = fsim_message_task_destruct;
+    base->task_fct_ptrs->execute = taskExecute;
+    base->task_fct_ptrs->schedule = tryScheduleTask;
     return base;
 }
 
@@ -146,7 +178,7 @@ void * xe_worker_computation_routine (void * arg) {
             ocr_task_t* currTask = NULL;
             globalGuidProvider->getVal(globalGuidProvider, taskGuid, (u64*)&(currTask), NULL);
             baseWorker->setCurrentEDT(baseWorker,taskGuid);
-            currTask->execute(currTask);
+            currTask->fct_ptrs->execute(currTask);
             baseWorker->setCurrentEDT(baseWorker, NULL_GUID);
         } else {
             // TODO sagnak, this assumes (*A LOT*) the structure below, is this fair?
@@ -154,9 +186,8 @@ void * xe_worker_computation_routine (void * arg) {
             // by using our policy domain's message task factory
             ocr_policy_domain_t* policy_domain = xeScheduler->domain;
             ocr_task_factory* message_task_factory = policy_domain->taskFactories[1];
-
             // the message to the CE says 'give me work' and notes who is asking for it
-            ocrGuid_t messageTaskGuid = message_task_factory->create(message_task_factory, NULL, 0, NULL, NULL, 0);
+            ocrGuid_t messageTaskGuid = message_task_factory->create(message_task_factory, NULL, 0, NULL, NULL, 0, 0, NULL);
             fsim_message_task_t* derived = NULL;
             globalGuidProvider->getVal(globalGuidProvider, messageTaskGuid, (u64*)&(derived), NULL);
             derived -> type = GIVE_ME_WORK;

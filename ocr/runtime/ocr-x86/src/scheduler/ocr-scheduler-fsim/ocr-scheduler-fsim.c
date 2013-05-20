@@ -156,7 +156,7 @@ void xe_scheduler_give_fsim_faithful (ocr_scheduler_t* base, ocrGuid_t wid, ocrG
             ocr_task_factory* message_task_factory = policy_domain->taskFactories[1];
 
             // the message to the CE says 'give me work' and notes who is asking for it
-            ocrGuid_t messageTaskGuid = message_task_factory->create(message_task_factory, NULL, 0, NULL, NULL, 0);
+            ocrGuid_t messageTaskGuid = message_task_factory->create(message_task_factory, NULL, 0, NULL, NULL, 0, 0, NULL);
             fsim_message_task_t* derivedMessage = NULL;
             globalGuidProvider->getVal(globalGuidProvider, messageTaskGuid, (u64*)&(derivedMessage), NULL);
             derivedMessage -> type = PICK_MY_WORK_UP;
