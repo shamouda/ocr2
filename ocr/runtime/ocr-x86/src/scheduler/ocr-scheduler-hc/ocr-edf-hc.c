@@ -32,6 +32,7 @@
 #include <stdlib.h>
 #include <assert.h>
 #include "ocr-macros.h"
+#include "hc.h"
 #include "hc_edf.h"
 #include "ocr-datablock.h"
 #include "ocr-utils.h"
@@ -43,18 +44,6 @@
 #define END_OF_LIST NULL
 #define UNINITIALIZED_DATA ((ocrGuid_t) -2)
 
-
-// sagnak: I had to replicate this is in two files, we may need to expose this                                                                                                                                
-static inline ocr_policy_domain_t* get_current_policy_domain () {
-  ocrGuid_t worker_guid = ocr_get_current_worker_guid();
-  ocr_worker_t * worker = NULL;
-  globalGuidProvider->getVal(globalGuidProvider, worker_guid, (u64*)&worker, NULL);
-
-  ocr_scheduler_t * scheduler = get_worker_scheduler(worker);
-  ocr_policy_domain_t* policy_domain = scheduler -> domain;
-
-  return policy_domain;
-}
 
 //
 // Guid-kind checkers for convenience
@@ -91,8 +80,8 @@ static bool isEventSingleGuid(ocrGuid_t guid) {
     if(isEventGuid(guid)) {
         hc_event_t * event = NULL;
         globalGuidProvider->getVal(globalGuidProvider, guid, (u64*)&event, NULL);
-        return ((event->kind == OCR_EVENT_ONCE_T) 
-            || (event->kind == OCR_EVENT_IDEM_T) 
+        return ((event->kind == OCR_EVENT_ONCE_T)
+            || (event->kind == OCR_EVENT_IDEM_T)
             || (event->kind == OCR_EVENT_STICKY_T));
     }
     return false;
@@ -118,7 +107,7 @@ static bool hasProperty(u16 properties, u16 property) {
 #define ELS_SLOT_FINISH_LATCH 0
 
 static ocr_task_t * getCurrentTask() {
-    // TODO: we should be able to assert there must be an edt when we'll have a main OCR EDT 
+    // TODO: we should be able to assert there must be an edt when we'll have a main OCR EDT
     ocrGuid_t edtGuid = getCurrentEDT();
     if (edtGuid != NULL_GUID) {
         ocr_task_t * event = NULL;
@@ -158,10 +147,10 @@ static struct ocr_event_struct* eventConstructor(ocr_event_factory * factory, oc
     ocr_event_t* base = NULL;
     ocr_event_fcts_t * eventFctPtrs = NULL;
     if (eventType == OCR_EVENT_FINISH_LATCH_T) {
-    	hc_event_finishlatch_t * eventImpl = (hc_event_finishlatch_t*) checked_malloc(eventImpl, sizeof(hc_event_finishlatch_t));
-    	eventImpl->counter = 0;
-    	//Note: waiters are initialized afterwards
-    	eventFctPtrs = ((hc_event_factory*)factory)->event_fct_ptrs_finishlatch;
+        hc_event_finishlatch_t * eventImpl = (hc_event_finishlatch_t*) checked_malloc(eventImpl, sizeof(hc_event_finishlatch_t));
+        eventImpl->counter = 0;
+        //Note: waiters are initialized afterwards
+        eventFctPtrs = ((hc_event_factory*)factory)->event_fct_ptrs_finishlatch;
         base = (ocr_event_t*)eventImpl;
     } else if (eventType == OCR_EVENT_LATCH_T) {
         hc_event_latch_t * eventImpl = (hc_event_latch_t*) checked_malloc(eventImpl, sizeof(hc_event_latch_t));
@@ -265,14 +254,14 @@ void singleEventSatisfy(ocr_event_t * base, ocrGuid_t data, int slotEvent) {
     hc_event_awaitable_t * self = (hc_event_awaitable_t *) base;
 
     // Whether it is a once, idem or sticky, unitialized means it's the first
-    // time we try to satisfy the event. Note: It's a very loose check, the 
+    // time we try to satisfy the event. Note: It's a very loose check, the
     // 'Put' implementation must do more work to detect races on data.
     if (self->data == UNINITIALIZED_DATA) {
         // Single events don't have slots, just put the data
         reg_node_t * waiters = singleEventPut(self, data);
         // Put must have sealed the waiters list and returned it
-        // Note: Here the design is not great, 'put' CAS and returns the 
-        //       waiters list but does not handle the signaler list which 
+        // Note: Here the design is not great, 'put' CAS and returns the
+        //       waiters list but does not handle the signaler list which
         //       is ok for now because it's not used.
         assert(waiters != SEALED_LIST);
         assert(self->data != UNINITIALIZED_DATA);
@@ -388,7 +377,7 @@ void finishLatchEventSatisfy(ocr_event_t * base, ocrGuid_t data, int slot) {
 
     // No possible race when we reached 0 (see R2)
     if ((count+incr) == 0) {
-        // Important to void the ELS at that point, to make sure there's no 
+        // Important to void the ELS at that point, to make sure there's no
         // side effect on code executing downwards.
         ocr_task_t * task = getCurrentTask();
         task->els[ELS_SLOT_FINISH_LATCH] = NULL_GUID;
@@ -439,7 +428,7 @@ static ocr_event_t * getFinishLatch(ocr_task_t * edt) {
         ocrGuid_t latchGuid = edt->els[ELS_SLOT_FINISH_LATCH];
         if (latchGuid != NULL_GUID) {
             ocr_event_t * event = NULL;
-            globalGuidProvider->getVal(globalGuidProvider, latchGuid, (u64*)&event, NULL);        
+            globalGuidProvider->getVal(globalGuidProvider, latchGuid, (u64*)&event, NULL);
             return event;
         }
     }
@@ -472,7 +461,7 @@ struct ocr_event_factory_struct* hc_event_factory_constructor(void) {
     base->event_fct_ptrs_latch->get = latchEventGet;
     base->event_fct_ptrs_latch->satisfy = latchEventSatisfy;
 
-    //Note: Just store finish-latch function ptrs in a static since this is 
+    //Note: Just store finish-latch function ptrs in a static since this is
     //      runtime implementation specific
     derived->event_fct_ptrs_finishlatch = (ocr_event_fcts_t *) checked_malloc(derived->event_fct_ptrs_finishlatch, sizeof(ocr_event_fcts_t));
     derived->event_fct_ptrs_finishlatch->destruct = eventDestructor;
@@ -501,8 +490,6 @@ ocrGuid_t hcEventFactoryCreate ( struct ocr_event_factory_struct* factory, ocrEv
 /* OCR-HC Task Implementation                         */
 /******************************************************/
 
-// Forward declaration to keep related definitions together
-static void taskSchedule( ocrGuid_t this_guid, ocr_task_t* base, ocrGuid_t wid );
 
 
 void hcTaskConstructInternal (hc_task_t* derived, ocrEdt_t funcPtr,
@@ -543,7 +530,7 @@ hc_task_t* hcTaskConstruct (ocrEdt_t funcPtr, u32 paramc, u64 * params, void ** 
         ocr_event_factory * eventFactory = policy_domain->getEventFactoryForUserEvents(policy_domain);
         ocr_event_t * latch = eventConstructor(eventFactory, OCR_EVENT_FINISH_LATCH_T, false);
         hc_event_finishlatch_t * hcLatch = (hc_event_finishlatch_t *) latch;
-        // Set the owner of the latch 
+        // Set the owner of the latch
         hcLatch->ownerGuid = newEdtBase->guid;
         ocr_event_t * parentLatch = getFinishLatch(getCurrentTask());
         if (parentLatch != NULL) {
@@ -568,7 +555,7 @@ hc_task_t* hcTaskConstruct (ocrEdt_t funcPtr, u32 paramc, u64 * params, void ** 
         hcLatch->outputEventWaiter.guid = outputEvent;
         hcLatch->outputEventWaiter.slot = 0;
     } else {
-        // If the currently executing edt is in a finish scope, 
+        // If the currently executing edt is in a finish scope,
         // but is not a finish-edt itself, just register to the scope
         ocr_event_t * curLatch = getFinishLatch(getCurrentTask());
         if (curLatch != NULL) {
@@ -587,12 +574,12 @@ void hcTaskDestruct ( ocr_task_t* base ) {
     free(derived);
 }
 
-// Signals an edt one of its dependence slot is satisfied 
+// Signals an edt one of its dependence slot is satisfied
 void taskSignaled(ocr_task_t * base, ocrGuid_t data, int slot) {
     // An EDT has a list of signalers, but only register
     // incrementally as signals arrive.
     // Assumption: signal frontier is initialized at slot zero
-    // Whenever we receive a signal, it can only be from the 
+    // Whenever we receive a signal, it can only be from the
     // current signal frontier, since it is the only signaler
     // the edt is registered with at that time.
     hc_task_t * self = (hc_task_t *) base;
@@ -625,7 +612,7 @@ static void edtRegisterSignaler(ocr_task_t * base, ocrGuid_t signalerGuid, int s
     node->guid = signalerGuid;
     node->slot = slot;
     // No need to chain nodes here, will use index
-    node->next = NULL; 
+    node->next = NULL;
 }
 
 
@@ -638,7 +625,7 @@ static void edtRegisterSignaler(ocr_task_t * base, ocrGuid_t signalerGuid, int s
  * Warning: The caller must ensure all dependencies have been satisfied
  * Note: static function only meant to factorize code.
  */
-static void taskSchedule( ocrGuid_t guid, ocr_task_t* base, ocrGuid_t wid ) {
+void taskSchedule( ocrGuid_t guid, ocr_task_t* base, ocrGuid_t wid ) {
     ocr_worker_t* w = NULL;
     globalGuidProvider->getVal(globalGuidProvider, wid, (u64*)&w, NULL);
     ocr_scheduler_t * scheduler = get_worker_scheduler(w);
@@ -647,7 +634,7 @@ static void taskSchedule( ocrGuid_t guid, ocr_task_t* base, ocrGuid_t wid ) {
 
 /**
  * @brief Tries to schedules a task by registering to its first dependence.
- * If no dependence, schedule the task right-away 
+ * If no dependence, schedule the task right-away
  * Warning: This method is to be called ONCE per task and there's no safeguard !
  */
 void tryScheduleTask( ocr_task_t* base, ocrGuid_t wid ) {
@@ -725,7 +712,7 @@ void taskExecute ( ocr_task_t* base ) {
         finishLatchCheckout(curLatch);
         // If the edt is the last to checkout from the current finish scope,
         // the latch event automatically satisfies the parent latch (if any) // and the output event associated with the current finish-edt (if any)
-    } 
+    }
     // When the edt is not a finish-edt, nobody signals its output
     // event but himself, do that now.
     if ((base->outputEvent != NULL_GUID) && !isFinishLatchOwner(curLatch, base->guid)) {
@@ -769,7 +756,7 @@ ocrGuid_t hc_task_factory_create ( struct ocr_task_factory_struct* factory, ocrE
     if (outputEvent != NULL_GUID) {
         ocr_policy_domain_t* policy_domain = get_current_policy_domain();
         ocr_event_factory * eventFactory = policy_domain->getEventFactoryForUserEvents(policy_domain);
-        outputEvent = hcEventFactoryCreate(eventFactory, OCR_EVENT_STICKY_T, false);    
+        outputEvent = hcEventFactoryCreate(eventFactory, OCR_EVENT_STICKY_T, false);
         *outputEventPtr = outputEvent;
     }
     hc_task_t* edt = hcTaskConstruct(fctPtr, paramc, params, paramv, properties, depc, outputEvent, factory->task_fct_ptrs);
@@ -786,7 +773,7 @@ ocrGuid_t hc_task_factory_create ( struct ocr_task_factory_struct* factory, ocrE
 
 void registerDependence(ocrGuid_t signalerGuid, ocrGuid_t waiterGuid, int slot) {
     // WAIT MODE: event-to-event registration
-    // Note: do not call 'registerWaiter' here as it triggers event-to-edt 
+    // Note: do not call 'registerWaiter' here as it triggers event-to-edt
     // registration, which should only be done on edtSchedule.
     if (isEventGuid(signalerGuid) && isEventGuid(waiterGuid)) {
         hc_event_awaitable_t * target;
@@ -837,7 +824,7 @@ static void registerSignaler(ocrGuid_t signalerGuid, ocrGuid_t waiterGuid, int s
             singleEventSatisfy(target, signalerGuid, slot);
         } else {
             assert(isEventLatchGuid(waiterGuid));
-            latchEventSatisfy(target, signalerGuid, slot);            
+            latchEventSatisfy(target, signalerGuid, slot);
         }
         return;
     }

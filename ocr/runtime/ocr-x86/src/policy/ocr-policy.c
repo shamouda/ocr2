@@ -54,6 +54,14 @@ ocr_policy_domain_t * newPolicy(ocr_policy_kind policyType,
     case OCR_POLICY_MASTERED_CE:
         return ce_mastered_policy_domain_constructor(nb_workpiles, nb_workers,
                                                      nb_executors, nb_schedulers);
+    case OCR_PLACE_POLICY:
+        return place_policy_domain_constructor();
+    case OCR_LEAF_PLACE_POLICY:
+        return leaf_place_policy_domain_constructor(nb_workpiles, nb_workers,
+                                                    nb_executors, nb_schedulers);
+    case OCR_MASTERED_LEAF_PLACE_POLICY:
+        return mastered_leaf_place_policy_domain_constructor(nb_workpiles, nb_workers,
+                                                             nb_executors, nb_schedulers);
 /* sagnak end*/
     default:
         assert(false && "Unrecognized policy domain kind");
@@ -87,4 +95,33 @@ void ocr_policy_domain_destruct(ocr_policy_domain_t * policy) {
     // Destroy the GUID
     globalGuidProvider->releaseGuid(globalGuidProvider, policy->guid);
     free(policy);
+}
+
+ocr_policy_domain_t* get_current_policy_domain () {
+    ocrGuid_t worker_guid = ocr_get_current_worker_guid();
+    ocr_worker_t * worker = NULL;
+    globalGuidProvider->getVal(globalGuidProvider, worker_guid, (u64*)&worker, NULL);
+
+    ocr_scheduler_t * scheduler = get_worker_scheduler(worker);
+    ocr_policy_domain_t* policy_domain = scheduler -> domain;
+
+    return policy_domain;
+}
+
+ocrGuid_t policy_domain_handIn_assert ( ocr_policy_domain_t * this, ocr_policy_domain_t * takingPolicy, ocrGuid_t takingWorkerGuid ) {
+    assert(0 && "postponed policy handIn implementation");
+    return NULL_GUID;
+}
+
+ocrGuid_t policy_domain_extract_assert ( ocr_policy_domain_t * this, ocr_policy_domain_t * takingPolicy, ocrGuid_t takingWorkerGuid ) {
+    assert(0 && "postponed policy extract implementation");
+    return NULL_GUID;
+}
+
+void policy_domain_handOut_assert ( ocr_policy_domain_t * this, ocrGuid_t giverWorkerGuid, ocrGuid_t givenTaskGuid ) {
+    assert(0 && "postponed policy handOut implementation");
+}
+
+void policy_domain_receive_assert ( ocr_policy_domain_t * this, ocrGuid_t giverWorkerGuid, ocrGuid_t givenTaskGuid ) {
+    assert(0 && "postponed policy receive implementation");
 }

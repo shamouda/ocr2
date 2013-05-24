@@ -39,7 +39,13 @@
 /* OCR-HC SCHEDULER                                   */
 /******************************************************/
 
-void hc_scheduler_create(ocr_scheduler_t * scheduler, void * per_type_configuration, void * per_instance_configuration) {
+void hc_scheduler_create(ocr_scheduler_t * base, void * per_type_configuration, void * per_instance_configuration) {
+    hc_scheduler_t* derived = (hc_scheduler_t*) base;
+    scheduler_configuration *mapper = (scheduler_configuration*)per_instance_configuration;
+
+    derived->worker_id_begin = mapper->worker_id_begin;
+    derived->worker_id_end = mapper->worker_id_end;
+    derived->n_workers_per_scheduler = 1 + derived->worker_id_end - derived->worker_id_begin;
 }
 
 void hc_scheduler_destruct(ocr_scheduler_t * scheduler) {
@@ -59,12 +65,12 @@ void hc_scheduler_destruct(ocr_scheduler_t * scheduler) {
 
 ocr_workpile_t * hc_scheduler_pop_mapping_one_to_one (ocr_scheduler_t* base, ocr_worker_t* w ) {
     hc_scheduler_t* derived = (hc_scheduler_t*) base;
-    return derived->pools[get_worker_id(w)];
+    return derived->pools[get_worker_id(w) % derived->n_workers_per_scheduler ];
 }
 
 ocr_workpile_t * hc_scheduler_push_mapping_one_to_one (ocr_scheduler_t* base, ocr_worker_t* w ) {
     hc_scheduler_t* derived = (hc_scheduler_t*) base;
-    return derived->pools[get_worker_id(w)];
+    return derived->pools[get_worker_id(w) % derived->n_workers_per_scheduler];
 }
 
 workpile_iterator_t* hc_scheduler_steal_mapping_one_to_all_but_self (ocr_scheduler_t* base, ocr_worker_t* w ) {
@@ -135,5 +141,61 @@ ocr_scheduler_t* hc_scheduler_constructor() {
     base -> steal_mapping = hc_scheduler_steal_mapping_one_to_all_but_self;
     base -> take = hc_scheduler_take;
     base -> give = hc_scheduler_give;
+    return base;
+}
+
+workpile_iterator_t* hc_scheduler_steal_mapping_assert (ocr_scheduler_t* base, ocr_worker_t* w ) {
+    assert ( 0 && "We should not ask for a steal mapping from this scheduler");
+    return NULL;
+}
+
+ocrGuid_t hc_placed_scheduler_take (ocr_scheduler_t* base, ocrGuid_t wid ) {
+    ocr_worker_t* w = NULL;
+    globalGuidProvider->getVal(globalGuidProvider, wid, (u64*)&w, NULL);
+
+    ocrGuid_t popped = NULL_GUID;
+
+    int worker_id = get_worker_id(w);
+
+    hc_scheduler_t* derived = (hc_scheduler_t*) base;
+    if ( worker_id >= derived->worker_id_begin && worker_id <= derived->worker_id_end ) {
+        ocr_workpile_t * wp_to_pop = base->pop_mapping(base, w);
+        popped = wp_to_pop->pop(wp_to_pop);
+        /*TODO sagnak I hard-coded a no intra-scheduler stealing here; BAD */
+        if ( NULL_GUID == popped ) {
+            // TODO sagnak steal from places
+            ocr_policy_domain_t* policyDomain = base->domain;
+            popped = policyDomain->handIn(policyDomain, policyDomain, wid);
+        }
+    } else {
+        // TODO sagnak oooh BAD BAD hardcoding yet again
+        ocr_workpile_t* victim = derived->pools[0];
+        popped = victim->steal(victim);
+    }
+
+    return popped;
+}
+
+void hc_placed_scheduler_give (ocr_scheduler_t* base, ocrGuid_t wid, ocrGuid_t tid ) {
+    ocr_worker_t* w = NULL;
+    globalGuidProvider->getVal(globalGuidProvider, wid, (u64*)&w, NULL);
+
+    // TODO sagnak calculate which 'place' to push
+    ocr_workpile_t * wp_to_push = base->push_mapping(base, w);
+    wp_to_push->push(wp_to_push,tid);
+}
+
+ocr_scheduler_t* hc_placed_scheduler_constructor() {
+    hc_scheduler_t* derived = (hc_scheduler_t*) malloc(sizeof(hc_scheduler_t));
+    ocr_scheduler_t* base = (ocr_scheduler_t*)derived;
+    ocr_module_t * module_base = (ocr_module_t *) base;
+    module_base->map_fct = hc_ocr_module_map_workpiles_to_schedulers;
+    base -> create = hc_scheduler_create;
+    base -> destruct = hc_scheduler_destruct;
+    base -> pop_mapping = hc_scheduler_pop_mapping_one_to_one;
+    base -> push_mapping = hc_scheduler_push_mapping_one_to_one;
+    base -> steal_mapping = hc_scheduler_steal_mapping_assert;
+    base -> take = hc_placed_scheduler_take;
+    base -> give = hc_placed_scheduler_give;
     return base;
 }

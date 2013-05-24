@@ -178,14 +178,6 @@ ocr_event_factory* fsim_policy_getEventFactoryForUserEvents(ocr_policy_domain_t 
     return policy->eventFactories[0];
 }
 
-ocrGuid_t policy_domain_take_assert ( ocr_policy_domain_t * thisPolicy, ocr_policy_domain_t * policyTakenFrom, ocrGuid_t takingWorkerGuid ) {
-    assert(0 && "postponed xe policy take implementation");
-}
-
-void policy_domain_give_assert ( ocr_policy_domain_t * thisPolicy, ocr_policy_domain_t * policyToGiveTo, ocrGuid_t giverWorkerGuid, ocrGuid_t givenTaskGuid ) {
-    assert(0 && "postponed xe policy take implementation");
-}
-
 static inline void fsim_policy_domain_constructor_helper ( ocr_policy_domain_t * policy, size_t nb_workpiles,
                                                            size_t nb_workers,
                                                            size_t nb_executors,
@@ -209,9 +201,8 @@ static inline void fsim_policy_domain_constructor_helper ( ocr_policy_domain_t *
     policy->getTaskFactoryForUserTasks = fsim_policy_getTaskFactoryForUserTasks;
     policy->getEventFactoryForUserEvents = fsim_policy_getEventFactoryForUserEvents;
 
-    policy->take = policy_domain_take_assert;
-    policy->give = policy_domain_give_assert;
-    policy->handIn = NULL;
+    policy->handIn = policy_domain_handIn_assert;
+    policy->extract = policy_domain_extract_assert;
 }
 
 void xe_policy_domain_hand_out ( ocr_policy_domain_t * thisPolicy, ocrGuid_t giverWorkerGuid, ocrGuid_t givenTaskGuid ) {
@@ -241,7 +232,7 @@ ocr_policy_domain_t * xe_policy_domain_constructor (size_t nb_workpiles,
     policy->stop = fsim_policy_domain_stop;
 
     policy->handOut = xe_policy_domain_hand_out;
-    policy->receive = NULL;
+    policy->receive = policy_domain_receive_assert;
 
     return policy;
 }
@@ -259,7 +250,7 @@ ocr_policy_domain_t * ce_policy_domain_constructor (size_t nb_workpiles,
     policy->finish = fsim_policy_domain_finish;
     policy->stop = fsim_policy_domain_stop;
 
-    policy->handOut = NULL;
+    policy->handOut = policy_domain_handOut_assert;
     policy->receive = ce_policy_domain_receive;
 
     return policy;
@@ -278,7 +269,7 @@ ocr_policy_domain_t * ce_mastered_policy_domain_constructor (size_t nb_workpiles
     policy->finish = fsim_mastered_policy_domain_finish;
     policy->stop = fsim_mastered_policy_domain_stop;
 
-    policy->handOut = NULL;
+    policy->handOut = policy_domain_handOut_assert;
     policy->receive = ce_policy_domain_receive;
 
     return policy;

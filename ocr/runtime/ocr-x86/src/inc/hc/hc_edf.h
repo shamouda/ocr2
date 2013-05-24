@@ -89,19 +89,6 @@ struct ocr_event_struct* hc_event_constructor(ocrEventTypes_t eventType, bool ta
 void hc_event_destructor ( struct ocr_event_struct* base );
 
 
-/******************************************************/
-/* OCR-HC Task Factory                                */
-/******************************************************/
-
-typedef struct hc_task_factory {
-    ocr_task_factory base_factory;
-} hc_task_factory;
-
-struct ocr_task_factory_struct* hc_task_factory_constructor(void);
-void hc_task_factory_destructor ( struct ocr_task_factory_struct* base );
-
-ocrGuid_t hc_task_factory_create ( struct ocr_task_factory_struct* factory, ocrEdt_t fctPtr, u32 paramc, u64 * params, void ** paramv, u16 properties, size_t depc, ocrGuid_t * outputEvent);
-
 /*! \brief Event Driven Task(EDT) implementation for OCR Tasks
  */
 typedef struct hc_task_struct_t {
