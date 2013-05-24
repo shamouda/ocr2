@@ -32,6 +32,7 @@ include executor/Makefile.inc
 include guid/Makefile.inc
 include low-workers/Makefile.inc
 include mem-platform/Makefile.inc
+include mem-target/Makefile.inc
 include machine/Makefile.inc
 include policy-domain/Makefile.inc
 include scheduler/Makefile.inc
