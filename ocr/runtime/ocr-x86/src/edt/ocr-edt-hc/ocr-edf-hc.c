@@ -37,7 +37,7 @@
 #include "ocr-datablock.h"
 #include "ocr-utils.h"
 #include "ocr-task-event.h"
-#include "ocr-low-workers.h"
+#include "ocr-worker.h"
 #include "debug.h"
 
 #define SEALED_LIST ((void *) -1)
