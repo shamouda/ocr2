@@ -91,18 +91,14 @@ void hc_event_destructor ( struct ocr_event_struct* base );
 
 /*! \brief Event Driven Task(EDT) implementation for OCR Tasks
  */
-typedef struct hc_task_struct_t {
-    ocr_task_t base;
+typedef struct {
+    ocrTask_t base;
     reg_node_t * waiters;
     reg_node_t * signalers; // Does not grow, set once when the task is created
     size_t nbdeps;
     ocrEdt_t p_function;
-} hc_task_t;
+} ocrTaskHc_t;
 
-void hcTaskDestruct ( ocr_task_t* base );
-void taskExecute ( ocr_task_t* base );
-
-u64 hc_task_add_acquired(ocr_task_t* base, u64 edtId, ocrGuid_t db);
-void hc_task_remove_acquired(ocr_task_t* base, ocrGuid_t db, u64 dbId);
+void taskExecute ( ocrTask_t* base );
 
 #endif

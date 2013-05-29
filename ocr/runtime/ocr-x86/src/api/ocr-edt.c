@@ -66,9 +66,9 @@ u8 ocrEdtCreate(ocrGuid_t* edtGuid, ocrEdt_t funcPtr,
                 u16 properties, u32 depc, ocrGuid_t* depv /*= NULL*/, ocrGuid_t * outputEvent) {
 
     ocr_policy_domain_t* policy_domain = get_current_policy_domain();
-    ocr_task_factory* taskFactory = policy_domain->getTaskFactoryForUserTasks(policy_domain);
+    ocrTaskFactory_t* taskFactory = policy_domain->getTaskFactoryForUserTasks(policy_domain);
     //TODO LIMITATION handle pre-built dependence vector
-    *edtGuid = taskFactory->create(taskFactory, funcPtr, paramc, params, paramv, properties, depc, outputEvent);
+    *edtGuid = taskFactory->instantiate(taskFactory, funcPtr, paramc, params, paramv, properties, depc, outputEvent);
     // If guids dependencies were provided, add them now
     if(depv != NULL) {
         assert(depc != 0);
@@ -85,14 +85,14 @@ u8 ocrEdtCreate(ocrGuid_t* edtGuid, ocrEdt_t funcPtr,
 //TODO DEPR: impacts edtCreate and addDependence
 u8 ocrEdtSchedule(ocrGuid_t edtGuid) {
     ocrGuid_t worker_guid = ocr_get_current_worker_guid();
-    ocr_task_t * task = NULL;
+    ocrTask_t * task = NULL;
     globalGuidProvider->getVal(globalGuidProvider, edtGuid, (u64*)&task, NULL);
     task->fct_ptrs->schedule(task, worker_guid);
     return 0;
 }
 
 u8 ocrEdtDestroy(ocrGuid_t edtGuid) {
-    ocr_task_t * task = NULL;
+    ocrTask_t * task = NULL;
     globalGuidProvider->getVal(globalGuidProvider, edtGuid, (u64*)&task, NULL);
     task->fct_ptrs->destruct(task);
     return 0;
@@ -114,7 +114,7 @@ ocrGuid_t ocrElsUserGet(u8 offset) {
     ocr_worker_t * worker = NULL;
     globalGuidProvider->getVal(globalGuidProvider, workerGuid, (u64*)&(worker), NULL);
     ocrGuid_t edtGuid = worker->getCurrentEDT(worker);
-    ocr_task_t * edt = NULL;
+    ocrTask_t * edt = NULL;
     globalGuidProvider->getVal(globalGuidProvider, edtGuid, (u64*)&(edt), NULL);
     return edt->els[offset];
 }
@@ -130,7 +130,7 @@ void ocrElsUserSet(u8 offset, ocrGuid_t data) {
     ocr_worker_t * worker = NULL;
     globalGuidProvider->getVal(globalGuidProvider, workerGuid, (u64*)&(worker), NULL);
     ocrGuid_t edtGuid = worker->getCurrentEDT(worker);
-    ocr_task_t * edt = NULL;
+    ocrTask_t * edt = NULL;
     globalGuidProvider->getVal(globalGuidProvider, edtGuid, (u64*)&(edt), NULL);
     edt->els[offset] = data;
 }
