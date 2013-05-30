@@ -59,7 +59,7 @@ u8 ocrDbCreate(ocrGuid_t *db, void** addr, u64 len, u16 flags,
     // Replace with allocator that is gotten from policy
 
     ocrGuid_t worker_guid = ocr_get_current_worker_guid();
-    ocr_worker_t * worker = NULL;
+    ocrWorker_t * worker = NULL;
     globalGuidProvider->getVal(globalGuidProvider, worker_guid, (u64*)&worker, NULL);
 
     ocrScheduler_t * scheduler = get_worker_scheduler(worker);
@@ -79,7 +79,7 @@ u8 ocrDbDestroy(ocrGuid_t db) {
     globalGuidProvider->getVal(globalGuidProvider, db, (u64*)&dataBlock, NULL);
 
     ocrGuid_t workerGuid = ocr_get_current_worker_guid();
-    ocr_worker_t *worker = NULL;
+    ocrWorker_t *worker = NULL;
     globalGuidProvider->getVal(globalGuidProvider, workerGuid, (u64*)&worker, NULL);
 
     u8 status = dataBlock->free(dataBlock, worker->getCurrentEDT(worker));
@@ -91,7 +91,7 @@ u8 ocrDbAcquire(ocrGuid_t db, void** addr, u16 flags) {
     globalGuidProvider->getVal(globalGuidProvider, db, (u64*)&dataBlock, NULL);
 
     ocrGuid_t workerGuid = ocr_get_current_worker_guid();
-    ocr_worker_t *worker = NULL;
+    ocrWorker_t *worker = NULL;
     globalGuidProvider->getVal(globalGuidProvider, workerGuid, (u64*)&worker, NULL);
 
     *addr = dataBlock->acquire(dataBlock, worker->getCurrentEDT(worker), false);
@@ -104,7 +104,7 @@ u8 ocrDbRelease(ocrGuid_t db) {
     globalGuidProvider->getVal(globalGuidProvider, db, (u64*)&dataBlock, NULL);
 
     ocrGuid_t workerGuid = ocr_get_current_worker_guid();
-    ocr_worker_t *worker = NULL;
+    ocrWorker_t *worker = NULL;
     globalGuidProvider->getVal(globalGuidProvider, workerGuid, (u64*)&worker, NULL);
 
     return dataBlock->release(dataBlock, worker->getCurrentEDT(worker), false);
