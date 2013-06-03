@@ -39,7 +39,7 @@
 #include "ocr-guid.h"
 
 size_t n_root_policy_nodes;
-ocr_policy_domain_t ** root_policies;
+ocrPolicyDomain_t ** root_policies;
 
 // the runtime fork/join-er
 ocrWorker_t* master_worker;
@@ -106,7 +106,7 @@ void ocrFinish() {
     master_worker->stop(master_worker);
 }
 
-static void recursive_policy_finish_helper ( ocr_policy_domain_t* curr ) {
+static void recursive_policy_finish_helper ( ocrPolicyDomain_t* curr ) {
     if ( curr ) {
         int index = 0; // successor index
         for ( ; index < curr->n_successors; ++index ) {
@@ -116,7 +116,7 @@ static void recursive_policy_finish_helper ( ocr_policy_domain_t* curr ) {
     }
 }
 
-static void recursive_policy_stop_helper ( ocr_policy_domain_t* curr ) {
+static void recursive_policy_stop_helper ( ocrPolicyDomain_t* curr ) {
     if ( curr ) {
         int index = 0; // successor index
         for ( ; index < curr->n_successors; ++index ) {
@@ -126,7 +126,7 @@ static void recursive_policy_stop_helper ( ocr_policy_domain_t* curr ) {
     }
 }
 
-static void recursive_policy_destruct_helper ( ocr_policy_domain_t* curr ) {
+static void recursive_policy_destruct_helper ( ocrPolicyDomain_t* curr ) {
     if ( curr ) {
         int index = 0; // successor index
         for ( ; index < curr->n_successors; ++index ) {
