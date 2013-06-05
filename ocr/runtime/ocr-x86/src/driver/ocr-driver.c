@@ -38,7 +38,7 @@
 #include "ocr-config.h"
 #include "ocr-guid.h"
 
-size_t n_root_policy_nodes;
+u64 n_root_policy_nodes;
 ocrPolicyDomain_t ** root_policies;
 
 // the runtime fork/join-er

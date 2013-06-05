@@ -60,7 +60,7 @@ void unlockX86(ocrLock_t* self) {
 }
 
 ocrLock_t* newLockX86() {
-    ocrLockX86_t *result = (ocrLockX86_t*)checked_malloc(result, sizeof(ocrLockX86_t));
+    ocrLockX86_t *result = (ocrLockX86_t*)checkedMalloc(result, sizeof(ocrLockX86_t));
 
     result->base.create = &createX86;
     result->base.destruct = &destructX86;
