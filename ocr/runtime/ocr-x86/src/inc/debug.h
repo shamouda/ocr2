@@ -37,42 +37,79 @@
 #define __DEBUG_H__
 
 #include <pthread.h>
-#include <time.h>
 #include <stdio.h>
 #include <assert.h>
-#include <stdarg.h>
+
+#define PRINTF(format, ...) fprintf(stderr, "T %p: " format, (void*)pthread_self(), ## __VA_ARGS__)
 
 #ifdef OCR_DEBUG
-// Imply OCR_STATUS
-#ifndef OCR_STATUS
-#define OCR_STATUS
-#endif /* OCR_STATUS */
+/**
+ * @brief No debugging messages are printed
+ *
+ * Note that you can still be in debugging mode
+ * and have no messages printed as this would allow
+ * all ASSERTs to be checked
+ */
+#define DEBUG_LVL_NONE      0
 
+/**
+ * @brief Only warnings are printed
+ */
+#define DEBUG_LVL_WARN      1
 
-#ifndef DEBUG_LEVEL
-#define DEBUG_LEVEL 20
+/**
+ * @brief Warnings and informational
+ * messages are printed
+ *
+ * Default debug level if nothing is specified
+ * for #OCR_DEBUG_LEVEL (compile time)
+ */
+#define DEBUG_LVL_INFO      2
+
+/**
+ * @brief Warnings, informational
+ * messages and verbose messages are printed
+ */
+#define DEBUG_LVL_VERB      3
+
+/**
+ * @brief Everything is printed
+ */
+#define DEBUG_LVL_VVERB     4
+
+#ifndef OCR_DEBUG_LEVEL
+/**
+ * @brief Debug level
+ *
+ * This controls the verbosity of the
+ * debug messages in debug mode
+ */
+#define OCR_DEBUG_LEVEL DEBUG_LVL_INFO
 #endif
 
-#define TIMING_CLOCK CLOCK_REALTIME
+// Imply OCR_STATUS
+#define OCR_STATUS
+// Imply ASSERTs
+#define OCR_ASSERT
 
-#define DEBUG(level, format , ...)                                      \
+#define DO_DEBUG(level) if(level <= OCR_DEBUG_LEVEL)
+
+// #define TIMING_CLOCK CLOCK_REALTIME
+/* #define DEBUG(level, format , ...)                                    \
     if(level <= DEBUG_LEVEL) {                                          \
         struct timespec __curtime;                                      \
         clock_gettime(TIMING_CLOCK, &__curtime);                        \
         fprintf(stderr, "\t--%ld.%ld T %p %s:%d "  format, __curtime.tv_sec, __curtime.tv_nsec, (void*)pthread_self(), __FILE__, __LINE__,##__VA_ARGS__); \
     }
-
-// Imply ASSERTs
-#define OCR_ASSERT
+*/
 #else
-#define DEBUG(level, format , ...)
+#define DO_DEBUG(level) if(0)
 #endif /* OCR_DEBUG */
 
-#define DEBUG0(level, format) DEBUG(level, "%s" format, "")
 
 #ifdef OCR_STATUS
 #define STATUS(format, ...)                                             \
-    fprintf(stderr, "##OCR-STATUS %s:%d " format, __FILE__, __LINE__,##__VA_ARGS__);
+    PRINTF"##OCR-STATUS %s:%d " format, __FILE__, __LINE__,##__VA_ARGS__);
 #else
 #define STATUS(format, ...)
 #endif /* OCR_STATUS */
@@ -88,6 +125,5 @@
 #define RESULT_ASSERT(a, op, b) do { a; } while(0);
 #define RESULT_TRUE(a) do { a; } while(0);
 #endif /* OCR_ASSERT */
-
 
 #endif /* __DEBUG_H__ */
