@@ -40,6 +40,11 @@
 #include "ocr-worker.h"
 #include "debug.h"
 
+#ifdef OCR_ENABLE_STATISTICS
+#include "ocr-statistics.h"
+#endif
+
+
 #define SEALED_LIST ((void *) -1)
 #define END_OF_LIST NULL
 #define UNINITIALIZED_DATA ((ocrGuid_t) -2)
@@ -568,6 +573,9 @@ ocrTaskHc_t* hcTaskConstruct (ocrEdt_t funcPtr, u32 paramc, u64 * params, void *
 
 void destructTaskHc ( ocrTask_t* base ) {
     ocrTaskHc_t* derived = (ocrTaskHc_t*)base;
+#ifdef OCR_ENABLE_STATISTICS
+    ocrStatsProcessDestruct(&(base->statProcess));
+#endif
     globalGuidProvider->releaseGuid(globalGuidProvider, base->guid);
     free(derived);
 }

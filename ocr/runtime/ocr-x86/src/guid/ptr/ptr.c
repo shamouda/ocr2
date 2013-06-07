@@ -32,6 +32,7 @@
  */
 
 #include "ptr.h"
+#include "debug.h"
 #include "stdlib.h"
 
 typedef struct {

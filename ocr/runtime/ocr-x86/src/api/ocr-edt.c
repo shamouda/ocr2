@@ -35,6 +35,13 @@
 #include "ocr-runtime.h"
 #include "ocr-guid.h"
 
+#ifdef OCR_ENABLE_STATISTICS
+#include "ocr-statistics.h"
+#include "ocr-stat-user.h"
+#include "ocr-config.h"
+#endif
+
+
 u8 ocrEventCreate(ocrGuid_t *guid, ocrEventTypes_t eventType, bool takesArg) {
     ocrPolicyDomain_t* policy_domain = get_current_policy_domain();
     ocrEventFactory_t * eventFactory = policy_domain->getEventFactoryForUserEvents(policy_domain);
@@ -69,6 +76,31 @@ u8 ocrEdtCreate(ocrGuid_t* edtGuid, ocrEdt_t funcPtr,
     ocrTaskFactory_t* taskFactory = policy_domain->getTaskFactoryForUserTasks(policy_domain);
     //TODO LIMITATION handle pre-built dependence vector
     *edtGuid = taskFactory->instantiate(taskFactory, funcPtr, paramc, params, paramv, properties, depc, outputEvent);
+#ifdef OCR_ENABLE_STATISTICS
+    // Create the statistics process for this EDT and also update clocks properly
+    ocr_task_t *task = NULL;
+    globalGuidProvider->getVal(globalGuidProvider, *edtGuid, (u64*)&task, NULL);
+    ocrStatsProcessCreate(&(task->statProcess), *edtGuid);
+    ocrStatsFilter_t *t = NEW_FILTER(simple);
+    t->create(t, GocrFilterAggregator, NULL);
+    ocrStatsProcessRegisterFilter(&(task->statProcess), (0x1F), t);
+
+    // Now send the message that the EDT was created
+    {
+        ocr_worker_t *worker = NULL;
+        ocr_task_t *curTask = NULL;
+
+        globalGuidProvider->getVal(globalGuidProvider, ocr_get_current_worker_guid(), (u64*)&worker, NULL);
+        ocrGuid_t curTaskGuid = worker->getCurrentEDT(worker);
+        globalGuidProvider->getVal(globalGuidProvider, curTaskGuid, (u64*)&curTask, NULL);
+
+        ocrStatsProcess_t *srcProcess = curTaskGuid==0?&GfakeProcess:&(curTask->statProcess);
+        ocrStatsMessage_t *mess = NEW_MESSAGE(simple);
+        mess->create(mess, STATS_EDT_CREATE, 0, curTaskGuid, *edtGuid, NULL);
+        ocrStatsAsyncMessage(srcProcess, &(task->statProcess), mess);
+    }
+#endif
+
     // If guids dependencies were provided, add them now
     if(depv != NULL) {
         assert(depc != 0);

@@ -37,6 +37,11 @@
 #include "ocr-runtime.h"
 #include "ocr-config.h"
 #include "ocr-guid.h"
+#include "sync/x86/x86.h"
+
+#ifdef OCR_ENABLE_STATISTICS
+#include "ocr-stat-user.h"
+#endif
 
 u64 n_root_policy_nodes;
 ocrPolicyDomain_t ** root_policies;
@@ -86,6 +91,21 @@ static char * parseOcrOptions_MachineDescription(int * argc, char ** argv) {
  * Note: removes OCR options from argc / argv
  */
 void ocrInit(int * argc, char ** argv, u32 fnc, ocrEdt_t funcs[]) {
+    // REC: Hack, for now we just initialize the factories here.
+    // See if we need to move some into policy domains and how to
+    // initialize them
+    // Do this first to make sure that stuff that depends on it works :)
+    GocrLockFactory = newLockFactoryX86(NULL);
+    GocrAtomic64Factory = newAtomic64FactoryX86(NULL);
+    GocrQueueFactory = newQueueFactoryX86(NULL);
+
+#ifdef OCR_ENABLE_STATISTICS
+    GocrFilterAggregator = NEW_FILTER(filedump);
+    GocrFilterAggregator->create(GocrFilterAggregator, NULL, NULL);
+
+    // HUGE HUGE Hack
+    ocrStatsProcessCreate(&GfakeProcess, 0);
+#endif
 
     // Intialize the GUID provider
     globalGuidProvider = newGuidProvider(OCR_GUIDPROVIDER_DEFAULT);
@@ -158,7 +178,11 @@ static inline void unravel () {
 
 void ocrCleanup() {
     master_worker->routine(master_worker);
-    // master_worker is done executing. 
+    // master_worker is done executing.
     // Proceed and stop other workers and the runtime.
     unravel();
+#ifdef OCR_ENABLE_STATISTICS
+    ocrStatsProcessDestruct(&GfakeProcess);
+    GocrFilterAggregator->destruct(GocrFilterAggregator);
+#endif
 }

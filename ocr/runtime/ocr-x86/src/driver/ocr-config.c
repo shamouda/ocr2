@@ -41,7 +41,7 @@ ocrWorkpileKind ocr_workpile_default_kind = OCR_DEQUE;
 ocrAllocatorKind ocrAllocatorDefaultKind = OCR_ALLOCATOR_TLSF;
 ocrMemPlatformKind ocrMemPlatformDefaultKind = OCR_MEMPLATFORM_MALLOC;
 ocrDataBlockKind ocrDataBlockDefaultKind = OCR_DATABLOCK_REGULAR;
-ocrLockKind ocrLockDefaultKind = OCR_LOCK_X86;
+//ocrLockKind ocrLockDefaultKind = OCR_LOCK_X86;
 ocrGuidProviderKind ocrGuidProviderDefaultKind = OCR_GUIDPROVIDER_PTR;
 
 u32 ocr_config_default_nb_hardware_threads = 8;
@@ -55,7 +55,7 @@ ocrWorkpileKind	ocr_workpile_xe_kind	= OCR_DEQUE;
 ocrAllocatorKind	ocrAllocatorXEKind	= OCR_ALLOCATOR_TLSF;
 ocrMemPlatformKind	ocrMemPlatformXEKind	= OCR_MEMPLATFORM_MALLOC;
 ocrDataBlockKind	ocrDataBlockXEKind	= OCR_DATABLOCK_REGULAR;
-ocrLockKind		ocrLockXEKind		= OCR_LOCK_X86;
+//ocrLockKind		ocrLockXEKind		= OCR_LOCK_X86;
 ocrGuidProviderKind	ocrGuidProviderXEKind	= OCR_GUIDPROVIDER_PTR;
 
 // CE kinds of ocr modules
@@ -69,5 +69,5 @@ ocrWorkpileKind	ocr_workpile_ce_message_kind = OCR_MESSAGE_QUEUE;
 ocrAllocatorKind	ocrAllocatorCEKind	= OCR_ALLOCATOR_TLSF;
 ocrMemPlatformKind	ocrMemPlatformCEKind	= OCR_MEMPLATFORM_MALLOC;
 ocrDataBlockKind	ocrDataBlockCEKind	= OCR_DATABLOCK_REGULAR;
-ocrLockKind		ocrLockCEKind		= OCR_LOCK_X86;
+//ocrLockKind		ocrLockCEKind		= OCR_LOCK_X86;
 ocrGuidProviderKind	ocrGuidProviderCEKind	= OCR_GUIDPROVIDER_PTR;

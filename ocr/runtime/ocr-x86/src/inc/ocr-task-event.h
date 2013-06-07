@@ -34,7 +34,9 @@
 
 #include "ocr-guid.h"
 #include "ocr-edt.h"
-
+#ifdef OCR_ENABLE_STATISTICS
+#include "ocr-statistics.h"
+#endif
 
 /*******************************************
  * Dependence Registration
@@ -48,27 +50,33 @@ void registerDependence(ocrGuid_t signalerGuid, ocrGuid_t waiterGuid, int slot);
 /*
  * Event's function pointers typedef
  */
-struct ocr_event_struct;
+
+struct _ocrEventFcts_t;
 
 /*! \brief Abstract class to represent OCR events function pointers
  *
  *  This class provides the interface for the underlying implementation to conform.
  */
-typedef struct ocr_event_fcts_struct {
+typedef struct _ocrEventFcts_t {
+    ocrGuid_t guid; /**< GUID for this event */
+#ifdef OCR_ENABLE_STATISTICS
+    ocrStatsProcess_t statProcess;
+#endif
+
     /*! \brief Virtual destructor for the Event interface
      */
-    void (*destruct)(struct ocr_event_struct* event);
+    void (*destruct)(struct _ocrEventFcts_t* event);
 
     /*! \brief Interface to get the GUID of the entity that satisfied an event.
      *  \return GUID of the entity that satisfied this event
      */
-    ocrGuid_t (*get) (struct ocr_event_struct* event);
+    ocrGuid_t (*get) (struct _ocrEventFcts_t* event);
 
     /*! \brief Interface to satisfy the event
      *  \param[in]  db  GUID to satisfy this event
      *  \param[in]  w   GUID of the Worker instance satisfying this event
      */
-    void (*satisfy)(struct ocr_event_struct* event, ocrGuid_t db, int slot);
+    void (*satisfy)(struct _ocrEventFcts_t* event, ocrGuid_t db, int slot);
 } ocrEventFcts_t;
 
 /*! \brief Abstract class to represent OCR events.
@@ -77,7 +85,7 @@ typedef struct ocr_event_fcts_struct {
  *  Events can be satisfied once with a GUID, can be polled for what GUID satisfied the event,
  *  and can be registered to by a task.
  */
-typedef struct ocr_event_struct {
+typedef struct _ocrEventFcts_t {
     ocrGuid_t guid; /**< GUID for this event */
     /*! \brief Holds function pointer to the event interface
      */
@@ -228,6 +236,9 @@ typedef struct ocrTaskFcts_t {
  */
 typedef struct ocrTask_t {
     ocrGuid_t guid; /**< GUID for this task (EDT) */
+#ifdef OCR_ENABLE_STATISTICS
+    ocrStatsProcess_t statProcess;
+#endif
     u32 paramc;
     u64 * params;
     void ** paramv;

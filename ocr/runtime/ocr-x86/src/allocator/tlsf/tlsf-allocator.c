@@ -37,6 +37,7 @@
 #include "ocr-types.h"
 #include "ocr-utils.h"
 #include "ocr-guid.h"
+#include "ocr-config.h"
 #include "debug.h"
 
 #include <string.h>
@@ -865,14 +866,18 @@ u32 tlsf_init(u64 pg_start, u64 size) {
         ((poolHeaderSize + ELEMENT_SIZE_BYTES - 1) >> ELEMENT_SIZE_LOG2);
 
     if(poolRealSize < GminBlockRealSize || poolRealSize > GmaxBlockRealSize) {
-        DEBUG(5, "WARN: Space mismatch allocating TLSF pool at 0x%lx of sz %d (user sz: %d)\n",
-              pg_start, (u32)poolRealSize, (u32)(poolRealSize << ELEMENT_SIZE_LOG2));
-        DEBUG(5, "WARN: Sz must be at least %d and at most %d\n", GminBlockRealSize, GmaxBlockRealSize);
+        DO_DEBUG(DEBUG_LVL_WARN) {
+            PRINTF("WARN: Space mismatch allocating TLSF pool at 0x%lx of sz %d (user sz: %d)\n",
+                   pg_start, (u32)poolRealSize, (u32)(poolRealSize << ELEMENT_SIZE_LOG2));
+            PRINTF("WARN: Sz must be at least %d and at most %d\n", GminBlockRealSize, GmaxBlockRealSize);
+        }
         return -1; // Can't allocate pool
     }
 
-    DEBUG(10, "INFO: Allocating a TLSF pool at 0x%lx of sz %d (user sz: %d)\n",
-          pg_start, (u32)poolRealSize, (u32)(poolRealSize << ELEMENT_SIZE_LOG2));
+    DO_DEBUG(DEBUG_LVL_INFO) {
+        PRINTF("INFO: Allocating a TLSF pool at 0x%lx of sz %d (user sz: %d)\n",
+               pg_start, (u32)poolRealSize, (u32)(poolRealSize << ELEMENT_SIZE_LOG2));
+    }
 
     initializePool(pg_start, poolRealSize);
 
@@ -893,14 +898,17 @@ u64 tlsf_malloc(u64 pg_start, u64 size) {
     allocSize = getRealSizeOfRequest(size);
 
     freeBlock = findFreeBlockForRealSize(pg_start, allocSize, &flIndex, &slIndex);
-    DEBUG(15, "tslf_malloc @0x%lx found a free block at 0x%lx\n", pg_start,
-          addressForBlock(GET_ADDRESS(freeBlock)));
-
+    DO_DEBUG(DEBUG_LVL_VERB) {
+        PRINTF("VERB: tslf_malloc @0x%lx found a free block at 0x%lx\n", pg_start,
+               addressForBlock(GET_ADDRESS(freeBlock)));
+    }
     /* header_t * */ u64 freeBlockPtr = GET_ADDRESS(freeBlock);
 
     if(IS_NULL(freeBlockPtr)) {
-        DEBUG(15, "tlsf_malloc @ 0x%lx returning NULL for size %ld\n",
-              pg_start, size);
+        DO_DEBUG(DEBUG_LVL_VERB) {
+            PRINTF("VERB: tlsf_malloc @ 0x%lx returning NULL for size %ld\n",
+                   pg_start, size);
+        }
         return _NULL;
     }
     removeFreeBlock(pg_start, freeBlock);
@@ -909,24 +917,30 @@ u64 tlsf_malloc(u64 pg_start, u64 size) {
 
     if(returnedSize > allocSize + GminBlockRealSize) {
         remainingBlock = splitBlock(pg_start, freeBlock, allocSize);
-        DEBUG(15, "tlsf_malloc @0x%lx split block and re-added to free list 0x%lx\n", pg_start,
-              addressForBlock(GET_ADDRESS(remainingBlock)));
+        DO_DEBUG(DEBUG_LVL_VERB) {
+            PRINTF("VERB: tlsf_malloc @0x%lx split block and re-added to free list 0x%lx\n", pg_start,
+                   addressForBlock(GET_ADDRESS(remainingBlock)));
+        }
         addFreeBlock(pg_start, remainingBlock);
     }
 
     markBlockUsed(pg_start, freeBlockPtr);
 
     result = addressForBlock(freeBlockPtr);
-    DEBUG(15, "tlsf_malloc @ 0x%lx returning 0x%lx for size %ld\n",
-          pg_start, result, size);
+    DO_DEBUG(DEBUG_LVL_VERB) {
+        PRINTF("VERB: tlsf_malloc @ 0x%lx returning 0x%lx for size %ld\n",
+               pg_start, result, size);
+    }
     return result;
 }
 
 void tlsf_free(u64 pg_start, u64 ptr) {
     header_addr_t bl;
 
-    DEBUG(15, "tlsf_free @ 0x%lx going to free 0x%lx\n",
-          pg_start, ptr);
+    DO_DEBUG(DEBUG_LVL_VERB) {
+        PRINTF("VERB: tlsf_free @ 0x%lx going to free 0x%lx\n",
+               pg_start, ptr);
+    }
 
     bl = blockForAddress(pg_start, ptr);
 
@@ -1058,7 +1072,7 @@ ocrAllocator_t * newAllocatorTlsf(ocrAllocatorFactory_t * factory, u64 size, voi
     result->memories = NULL;
     result->numMemories = 0ULL;
     result->addr = result->totalSize = result->poolAddr = result->poolSize = 0ULL;
-    result->lock = newLock(OCR_LOCK_DEFAULT);
+    result->lock = NULL;
 
     result->base.module.mapFct = &tlsfMap;
 

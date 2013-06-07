@@ -45,6 +45,11 @@
 #include "ocr-policy-domain.h"
 #include "ocr-workpile.h"
 #include "ocr-guid.h"
+#include "ocr-sync.h"
+
+#ifdef OCR_ENABLE_STATISTICS
+#include "ocr-statistics.h"
+#endif
 
 // Default kinds of ocr modules
 extern ocr_comp_target_kind ocr_comp_target_default_kind;
@@ -55,7 +60,7 @@ extern ocrWorkpileKind ocr_workpile_default_kind;
 extern ocrAllocatorKind ocrAllocatorDefaultKind;
 extern ocrMemPlatformKind ocrMemPlatformDefaultKind;
 extern ocrDataBlockKind ocrDataBlockDefaultKind;
-extern ocrLockKind ocrLockDefaultKind;
+//extern ocrLockKind ocrLockDefaultKind;
 extern ocrGuidProviderKind ocrGuidProviderDefaultKind;
 
 // Default values to configure ocr
@@ -70,7 +75,7 @@ extern ocrWorkpileKind	ocr_workpile_xe_kind;
 extern ocrAllocatorKind		ocrAllocatorXEKind;
 extern ocrMemPlatformKind		ocrMemPlatformXEKind;
 extern ocrDataBlockKind		ocrDataBlockXEKind;
-extern ocrLockKind		ocrLockXEKind;
+//extern ocrLockKind		ocrLockXEKind;
 extern ocrGuidProviderKind	ocrGuidProviderXEKind;
 
 // CE kinds of ocr modules
@@ -84,7 +89,25 @@ extern ocrWorkpileKind	ocr_workpile_ce_message_kind;
 extern ocrAllocatorKind		ocrAllocatorCEKind;
 extern ocrMemPlatformKind		ocrMemPlatformCEKind;
 extern ocrDataBlockKind		ocrDataBlockCEKind;
-extern ocrLockKind		ocrLockCEKind;
+//extern ocrLockKind		ocrLockCEKind;
 extern ocrGuidProviderKind	ocrGuidProviderCEKind;
+
+// Factories
+ocrLockFactory_t        *GocrLockFactory;
+ocrAtomic64Factory_t    *GocrAtomic64Factory;
+ocrQueueFactory_t       *GocrQueueFactory;
+
+#ifdef OCR_ENABLE_STATISTICS
+// For now have a central statistics aggregator filter
+ocrStatsFilter_t   *GocrFilterAggregator;
+
+// HUGE HUGE HACK: it seems that currently we can run code outside of EDTs
+// which is a big problem since then we don't have a source "process" for Lamport's
+// clock. This should *NEVER* be the case and there should be no non-EDT code
+// except for the bootstrap. For now, and for expediency, this is a hack where I have
+// a fake Lamport process for the initial non-EDT code
+ocrStatsProcess_t GfakeProcess;
+
+#endif
 
 #endif /* __OCR_CONFIG_H__ */
