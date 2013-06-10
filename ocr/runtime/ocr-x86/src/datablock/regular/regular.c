@@ -170,16 +170,6 @@ u8 regularFree(ocrDataBlock_t *self, ocrGuid_t edt) {
     }
     // Now check if we can actually free the block
 
-    // Critical section
-    rself->lock->lock(rself->lock);
-    if(rself->attributes.numUsers == 0) {
-        rself->lock->unlock(rself->lock);
-        self->destruct(self);
-    } else {
-        rself->lock->unlock(rself->lock);
-    }
-    // End critical section
-
     return 0;
 }
 
