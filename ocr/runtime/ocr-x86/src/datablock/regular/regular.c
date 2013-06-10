@@ -167,9 +167,20 @@ u8 regularFree(ocrDataBlock_t *self, ocrGuid_t edt) {
     // We can call free without having acquired the block
     if(id < 64) {
         self->release(self, edt, false);
-    }
-    // Now check if we can actually free the block
+    } else {
+        // We can call free without having acquired the block
+        // Now check if we can actually free the block
 
+        // Critical section
+        rself->lock->lock(rself->lock);
+        if(rself->attributes.numUsers == 0 && rself->attributes.internalUsers == 0) {
+            rself->lock->unlock(rself->lock);
+            self->destruct(self);
+        } else {
+            rself->lock->unlock(rself->lock);
+        }
+        // End critical section
+    }
     return 0;
 }
 
