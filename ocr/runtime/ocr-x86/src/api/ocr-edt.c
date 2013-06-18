@@ -78,7 +78,7 @@ u8 ocrEdtCreate(ocrGuid_t* edtGuid, ocrEdt_t funcPtr,
     *edtGuid = taskFactory->instantiate(taskFactory, funcPtr, paramc, params, paramv, properties, depc, outputEvent);
 #ifdef OCR_ENABLE_STATISTICS
     // Create the statistics process for this EDT and also update clocks properly
-    ocr_task_t *task = NULL;
+    ocrTask_t *task = NULL;
     globalGuidProvider->getVal(globalGuidProvider, *edtGuid, (u64*)&task, NULL);
     ocrStatsProcessCreate(&(task->statProcess), *edtGuid);
     ocrStatsFilter_t *t = NEW_FILTER(simple);
@@ -87,8 +87,8 @@ u8 ocrEdtCreate(ocrGuid_t* edtGuid, ocrEdt_t funcPtr,
 
     // Now send the message that the EDT was created
     {
-        ocr_worker_t *worker = NULL;
-        ocr_task_t *curTask = NULL;
+        ocrWorker_t *worker = NULL;
+        ocrTask_t *curTask = NULL;
 
         globalGuidProvider->getVal(globalGuidProvider, ocr_get_current_worker_guid(), (u64*)&worker, NULL);
         ocrGuid_t curTaskGuid = worker->getCurrentEDT(worker);
