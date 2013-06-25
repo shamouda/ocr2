@@ -108,6 +108,7 @@ void ocrInit(int * argc, char ** argv, u32 fnc, ocrEdt_t funcs[]) {
 #endif
 
     // Intialize the GUID provider
+    // TODO this would go in the root policy
     globalGuidProvider = newGuidProvider(OCR_GUIDPROVIDER_DEFAULT);
     gHackTotalMemSize = 512*1024*1024; /* 64 MB default */
     char * md_file = parseOcrOptions_MachineDescription(argc, argv);
@@ -171,7 +172,7 @@ static inline void unravel () {
     for ( index = 0; index < n_root_policy_nodes; ++index ) {
         recursive_policy_destruct_helper(root_policies[index]);
     }
-
+    // TODO this would be destroyed as part of the root policy
     globalGuidProvider->destruct(globalGuidProvider);
     free(root_policies);
 }

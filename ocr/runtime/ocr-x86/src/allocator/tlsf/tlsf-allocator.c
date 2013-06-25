@@ -1022,7 +1022,8 @@ void tlsfDestruct(ocrAllocator_t *self) {
     if(rself->numMemories)
         rself->memories[0]->free(rself->memories[0], (void*)rself->addr);
     rself->lock->destruct(rself->lock);
-    globalGuidProvider->releaseGuid(globalGuidProvider, self->guid);
+    ocrGuidProvider_t * guidProvider = getCurrentPD()->guidProvider();
+    guidProvider->releaseGuid(guidProvider, self->guid);
     free(rself);
 }
 
@@ -1055,7 +1056,7 @@ ocrAllocator_t * newAllocatorTlsf(ocrAllocatorFactory_t * factory, ocrParamList_
     ocrAllocatorTlsf_t *result = (ocrAllocatorTlsf_t*)
         checkedMalloc(result, sizeof(ocrAllocatorTlsf_t));
     result->base.guid = UNINITIALIZED_GUID;
-    globalGuidProvider->getGuid(globalGuidProvider, &(result->base.guid), (u64)result, OCR_GUID_ALLOCATOR);
+    guidify(getCurrentPD(), &(result->base.guid), (u64)result, OCR_GUID_ALLOCATOR);
     result->base.fctPtrs = &(factory->allocFcts);
     result->base.memories = NULL;
     result->base.memoryCount = 0;

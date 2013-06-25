@@ -143,6 +143,7 @@ static ocrCompPlatform_t* newCompPlatformPthread(ocrCompPlatformFactory_t *facto
 /******************************************************/
 /* OCR COMP PLATFORM PTHREAD FACTORY                  */
 /******************************************************/
+
 static ocrGuid_t getCurrentComputePthread() {
     perThreadStorage_t *vals = pthread_getspecific(selfKey);
     return vals->compTarget;
@@ -154,7 +155,7 @@ static ocrGuid_t getCurrentEDTPthread() {
 }
 
 struct _ocrPolicyDomain_t;
-static struct _ocrPolicyDomain_t * getCurrentPDPthread() {
+struct _ocrPolicyDomain_t * getCurrentPDPthread() {
     perThreadStorage_t *vals = pthread_getspecific(selfKey);
     return vals->policyDomain;
 }
