@@ -39,8 +39,8 @@ struct _ocrPolicyDomain_t;
 ocrGuid_t (*getCurrentCompTarget)() = NULL;
 ocrGuid_t (*getCurrentEDT)() = NULL;
 void (*setCurrentCompTarget)(ocrGuid_t) = NULL;
-void (*setCurrentEDT)(ocrGuid_t) = NULL;
-void (*setCurrentPD)(ocrGuid_t) = NULL;
+// void (*setCurrentEDT)(ocrGuid_t) = NULL;
+void (*setCurrentPD)(struct _ocrPolicyDomain_t*) = NULL;
 
 // Directly bind to pthread in this implementation 
 extern struct _ocrPolicyDomain_t * getCurrentPDPthread();
