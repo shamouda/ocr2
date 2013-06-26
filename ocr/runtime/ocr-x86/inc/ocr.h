@@ -62,24 +62,6 @@ void ocrInit(int * argc, char ** argv, u32 fnc, ocrEdt_t funcs[] );
  *
  * This call will cause the OCR runtime to terminate
  */
-void ocrFinish();
-
-/**
- * Called by the last executing EDT to signal the runtime
- * the user program is done.
- *
- * Warning: ocr_finalize() must be called at the end of the program !
- */
-/**
- * @brief Called by the "main" program to clean-up the OCR
- * environment
- *
- * @note This call *waits* for the ocrFinish function to be called
- * before completing. In other words, time-wise, ocrInit will be called,
- * then ocrCleanup which will wait until ocrFinish is called and then
- * ocrCleanup will finish cleaning up and control will be returned
- * to the main program
- */
-void ocrCleanup();
+void ocrFinalize();
 
 #endif /* __OCR_H__ */

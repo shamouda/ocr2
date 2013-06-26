@@ -38,6 +38,8 @@
 
 #include "ocr-types.h"
 
+#define OCR_DB_CREATE_NO_ACQUIRE 0x1
+
 /**
  * @defgroup OCRDataBlock Data-block management for OCR
  * @brief Describes the data-block API for OCR
@@ -65,7 +67,9 @@
  *                  Will be NULL if the call fails
  * @param addr      On successful creation, contains the 64 bit address
  * @param len       Size in bytes of the block to allocate.
- * @param flags     e.g. "must be in this location" or "prefer this location" or "immovable"
+ * @param flags     If OCR_DB_CREATE_NO_ACQUIRE, the DB will be created but not
+ *                  acquired (addr will be NULL). Future use are reserved
+ * @param affinity  GUID to indicate the affinity of this created data-block
  * @param location  Used as input to determine where to allocate memory and
  *                  on successful allocation will contain the location of
  *                  the actual allocation RAM, SP, or something NUMA. If NULL,
@@ -74,19 +78,18 @@
  * @param allocator Allocator to use to allocate within the data-block
  *
  * @return a status code on failure and 0 on success. On failure will return one of:
- *      - ENXIO:  location does not exist
- *      - ENOMEM: allocation failed because of insufficient memory or too constraining constraints
+ *      - ENXIO : Affinity is invalid
+ *      - ENOMEM: allocation failed because of insufficient memory
  *      - EINVAL: invalid arguments (flags or something else)
  *      - EBUSY : the agent that is needed to process this request is busy. Retry is possible.
  *      - EPERM : trying to allocate in an area of memory that is not allowed
  *
- * @note The flags are currently unused but are reserved for future use
  * @note The default allocator (NO_ALLOC) will disallow calls to ocrDbMalloc and ocrDbFree.
  * If an allocator is used, part of the data-block's space will be taken up by the
  * allocator's management overhead
  **/
 u8 ocrDbCreate(ocrGuid_t *db, void** addr, u64 len, u16 flags,
-               ocrLocation_t *location, ocrInDbAllocator_t allocator);
+               ocrGuid_t affinity, ocrInDbAllocator_t allocator);
 
 /**
  * @brief Request for the destruction of a data-block
@@ -100,7 +103,6 @@ u8 ocrDbCreate(ocrGuid_t *db, void** addr, u64 len, u16 flags,
  *
  * Once a DB has been marked as 'to-be-destroyed' by this call, the following
  * operations will result in an error:
- *      - acquiring the DB (will return EPERM)
  *      - re-destroying the DB (will return EPERM)
  * The following operations will produce undefined behavior:
  *      - accessing the actual location of the DB (through a pointer)
@@ -114,51 +116,18 @@ u8 ocrDbCreate(ocrGuid_t *db, void** addr, u64 len, u16 flags,
 u8 ocrDbDestroy(ocrGuid_t db);
 
 /**
- * @brief To access a DB, an EDT needs to "acquire" it to
- * obtain a physical address (pointer) through which it should access
- * the DB.
- *
- * ocrDbAcquire performs this function and returns a pointer to the
- * base of the DB that is valid until either:
- *      - the EDT calls ocrDbRelease()
- *      - the EDT calls ocrDbDestroy()
- *
- * The functionality of ocrDbAcquire is implicitly contained in:
- *      - ocrDbCreate()
- *      - EDT entry for the input data-blocks
- *
- * Multiple calls to this function are equivalent to a single call (provided
- * there are no intervening releases).
- *
- * @param db        DB to acquire an address to
- * @param addr      On successful completion, contains the address to use for the data-block
- * @param mode      Flags specifying how the DB will be accessed (unused for now)
- *
- * @return The status of the operation:
- *      - 0: successful
- *      - EPERM: DB cannot be registered as it has been destroyed
- *      - EINVAL: The 'db' parameter does not refer to a valid data-block
- *
- * @warning No exclusivity of access is guaranteed by the call
- */
-u8 ocrDbAcquire(ocrGuid_t db, void** addr, u16 flags);
-
-/**
  * @brief Release the DB (indicates that the EDT no longer needs to access it)
  *
- * Call should be used with ocrDbAcquire() to indicate an early release
- * of the DB (ie: it is not needed in the rest of the EDT or at least
- * for sometime). Once the DB is released, pointers that were previously
- * associated with it are invalid and should not be used to access the data. If needed,
- * a new pointer should be acquired through another call to ocrDbAcquire().
+ * Call should be used to indicate an early release
+ * of the DB (ie: it is not needed in the rest of the EDT).
+ * Once the DB is released, pointers that were previously
+ * associated with it are invalid and should not be used to access the data.
  *
  * The functionality of ocrDbRelease is implicitly contained in:
  *      - ocrDbDestroy()
  *      - EDT exit (only for EDTs implicitly acquired on entry)
  *
- * Note that since multiple calls to ocrDbAcquire effectively result
- * in a single call to ocrDbAcquire (ie: ocrDbAcquire is idempotent),
- * you should only call ocrDbRelease *once*.
+ * @note ocrDbRelease should only be called *once* at most.
  *
  * @param db DB to release
  *
@@ -188,6 +157,8 @@ u8 ocrDbRelease(ocrGuid_t db);
  * @warning The address returned is valid *only* between the innermost
  * ocrAcquire/ocrRelease pair. Use ocrDbMallocOffset to get a more
  * stable 'pointer'
+ *
+ * @todo Not supported at this point
  */
 u8 ocrDbMalloc(ocrGuid_t guid, u64 size, void** addr);
 
@@ -207,6 +178,7 @@ u8 ocrDbMalloc(ocrGuid_t guid, u64 size, void** addr);
  *      - ENOMEM: Not enough space to allocate
  *      - EINVAL: DB does not support allocation
  *
+ * @todo Not supported at this point
  */
 u8 ocrDbMallocOffset(ocrGuid_t guid, u64 size, u64* offset);
 
@@ -227,8 +199,11 @@ u8 ocrDbMallocOffset(ocrGuid_t guid, u64 size, u64* offset);
  *    - EINVAL: Invalid values for one of the arguments
  *    - EPERM: Overlapping data-blocks
  *    - ENOMEM: Destination too small to copy into or source too small to copy from
+ *
+ * @todo Not supported at this point
  */
-u8 ocrDbCopy(ocrGuid_t destination,u64 destinationOffset, ocrGuid_t source, u64 sourceOffset, u64 size, u64 copyType, ocrGuid_t * completionEvt);
+u8 ocrDbCopy(ocrGuid_t destination,u64 destinationOffset, ocrGuid_t source,
+             u64 sourceOffset, u64 size, u64 copyType, ocrGuid_t * completionEvt);
 
 /**
  * @brief Frees memory allocated through ocrDbMalloc
@@ -240,6 +215,8 @@ u8 ocrDbCopy(ocrGuid_t destination,u64 destinationOffset, ocrGuid_t source, u64 
  * allocated in the same ocrAcquire/ocrRelease block. Use
  * ocrDbFreeOffset if allocating and freeing across EDTs for
  * example
+ *
+ * @todo Not supported at this point
  */
 u8 ocrDbFree(ocrGuid_t guid, void* addr);
 
@@ -248,6 +225,8 @@ u8 ocrDbFree(ocrGuid_t guid, void* addr);
  *
  * @param guid              DB to free from
  * @param offset            Offset to free
+ *
+ * @todo Not supported at this point
  */
 u8 ocrDbFreeOffset(ocrGuid_t guid, u64 offset);
 
