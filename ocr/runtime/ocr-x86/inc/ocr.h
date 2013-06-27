@@ -45,8 +45,8 @@
  * The user needs to pass along the argc, argv arguments from the main function, as well as the list of pointers to all the functions
  * in the program that are used as EDTs
  */
-#define OCR_INIT(argc, argv, ...)					\
-    ({ocrEdt_t _fn_array[] = {__VA_ARGS__}; ocrInit(argc, argv, sizeof(_fn_array)/sizeof(_fn_array[0]), _fn_array);})
+#define OCR_INIT(argc, argv, mainEdt)					\
+    do { ocrInit(argc, argv, mainEdt); } while(0);
 
 /**
  * @brief Initial function called by the "main" program to set-up the OCR
@@ -54,7 +54,7 @@
  *
  * This call should be paired with an ocrCleanup call
  */
-void ocrInit(int * argc, char ** argv, u32 fnc, ocrEdt_t funcs[] );
+void ocrInit(int * argc, char ** argv, ocrEdt_t mainEdt);
 
 /**
  * @brief Called by an EDT to indicate the end of an OCR
