@@ -36,32 +36,12 @@
 #include "ocr-runtime.h"
 #include "hc.h"
 #include "ocr-guid.h"
+#include "ocr-comp-platform.h"
 
 
 /******************************************************/
 /* OCR-HC WORKER                                      */
 /******************************************************/
-
-// Fwd declaration
-ocrWorker_t* newWorkerHc(ocrWorkerFactory_t * factory, ocrParamList_t * perInstance);
-
-void destructWorkerFactoryHc(ocrWorkerFactory_t * factory) {
-    free(factory);
-}
-
-ocrWorkerFactory_t * newOcrWorkerFactoryHc(ocrParamList_t * perType) {
-    ocrWorkerFactoryHc_t* derived = (ocrWorkerFactoryHc_t*) checkedMalloc(derived, sizeof(ocrWorkerFactoryHc_t));
-    ocrWorkerFactory_t* base = (ocrWorkerFactory_t*) derived;
-    base->instantiate = newWorkerHc;
-    base->destruct =  destructWorkerFactoryHc;
-    base->workerFcts.destruct = destructWorkerHc;
-    base->workerFcts.start = hc_start_worker;
-    base->workerFcts.stop = hc_stop_worker;
-    base->workerFcts.isRunning = hc_is_running_worker;
-    base->workerFcts.getCurrentEDT = hc_getCurrentEDT;
-    base->workerFcts.setCurrentEDT = hc_setCurrentEDT;
-    return base;
-}
 
 void destructWorkerHc ( ocrWorker_t * base ) {
     ocrGuidProvider_t * guidProvider = getCurrentPD()->guidProvider;
@@ -69,12 +49,12 @@ void destructWorkerHc ( ocrWorker_t * base ) {
     free(base);
 }
 
-void hc_start_worker(ocrWorker_t * base) {
+void hcStartWorker(ocrWorker_t * base) {
     ocrWorkerHc_t * hcWorker = (ocrWorkerHc_t *) base;
     hcWorker->run = true;
 }
 
-void hc_stop_worker(ocrWorker_t * base) {
+void hcStopWorker(ocrWorker_t * base) {
     ocrWorkerHc_t * hcWorker = (ocrWorkerHc_t *) base;
     hcWorker->run = false;
     log_worker(INFO, "Stopping worker %d\n", hcWorker->id);
@@ -123,24 +103,28 @@ int get_worker_id(ocrWorker_t * worker) {
     return hcWorker->id;
 }
 
+static void associate_comp_platform_and_worker(ocrPolicyDomain_t * policy, ocrWorker_t * worker) {
+    // This function must only be used when the contextFactory has its PD set
+    ocrPolicyCtx_t * ctx = policy->contextFactory->instantiate(policy->contextFactory);
+    ctx->sourceObj = worker->guid;
+    ctx->sourceId = 0;
+    setCurrentPD(policy);
+    setCurrentWorkerContext(ctx);
+}
+
 void * worker_computation_routine(void * arg) {
+    //TODO arg needs to be the worker as well as the PD
+    // Need to pass down a data-structure
     ocrWorker_t * worker = (ocrWorker_t *) arg;
+    ocrPolicyDomain_t * pd = NULL; //TODO
+    ASSERT(false && "Policy domain not yet set");
     // associate current thread with the worker
-    associate_comp_platform_and_worker(worker);
-    ocrGuid_t workerGuid = worker->guid;
-    //TODO assume someone did set that beforehand or shall we fetch it from mappable or something ?
-    ocrPolicyDomain_t * pd = getCurrentPD();
+    associate_comp_platform_and_worker(pd, worker);
     // Setting up this worker context to takeEdts
     // This assumes workers are not relocatable
-    ocrPolicyCtxFactory_t * ctxFactory = pd->contextFactory;
-    ocrPolicyCtx_t * contextTake = ctxFactory->instantiate(ctxFactory);
-    contextTake->sourcePD = pd->guid;
-    contextTake->sourceObj = workerGuid;
-    contextTake->sourceId = get_worker_id(worker);
-    contextTake->destPD = pd->guid;
-    contextTake->destObj = NULL_GUID;
-    contextTake->type = PD_MSG_EDT_TAKE;
     log_worker(INFO, "Starting scheduler routine of worker %d\n", get_worker_id(worker));
+    ocrPolicyCtx_t * contextTake = pd->contextFactory->instantiate(pd->contextFactory);
+    contextTake->type = PD_MSG_EDT_TAKE;
     // Entering the worker loop
     while(worker->fctPtrs->isRunning(worker)) {
         ocrGuid_t taskGuid;
@@ -160,4 +144,27 @@ void * worker_computation_routine(void * arg) {
         }
     }
     return NULL;
+}
+
+
+/******************************************************/
+/* OCR-HC WORKER FACTORY                              */
+/******************************************************/
+
+void destructWorkerFactoryHc(ocrWorkerFactory_t * factory) {
+    free(factory);
+}
+
+ocrWorkerFactory_t * newOcrWorkerFactoryHc(ocrParamList_t * perType) {
+    ocrWorkerFactoryHc_t* derived = (ocrWorkerFactoryHc_t*) checkedMalloc(derived, sizeof(ocrWorkerFactoryHc_t));
+    ocrWorkerFactory_t* base = (ocrWorkerFactory_t*) derived;
+    base->instantiate = newWorkerHc;
+    base->destruct =  destructWorkerFactoryHc;
+    base->workerFcts.destruct = destructWorkerHc;
+    base->workerFcts.start = hcStartWorker;
+    base->workerFcts.stop = hcStopWorker;
+    base->workerFcts.isRunning = hc_is_running_worker;
+    base->workerFcts.getCurrentEDT = hc_getCurrentEDT;
+    base->workerFcts.setCurrentEDT = hc_setCurrentEDT;
+    return base;
 }
