@@ -111,7 +111,7 @@ typedef struct _ocrEventFactory_t {
      *  \return Event metadata for the instantiated event
      */
     ocrEvent_t* (*instantiate)(struct _ocrEventFactory_t* factory, ocrEventTypes_t eventType,
-        bool takesArg);
+                               bool takesArg, ocrParamList_t *perInstance);
 
     /*! \brief Virtual destructor for the ocrEventFactory_t interface
      */

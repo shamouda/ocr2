@@ -174,7 +174,7 @@ typedef struct {
  *                        was used as a dependence
  * @return Error code (0 on success)
  **/
-typedef ocrGuid_t (*ocrEdt_t )( u32 paramc, u64* paramv[],
+typedef ocrGuid_t (*ocrEdt_t )( u32 paramc, u64* paramv,
                    u32 depc, ocrEdtDep_t depv[]);
 
 
