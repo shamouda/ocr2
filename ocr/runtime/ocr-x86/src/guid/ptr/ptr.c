@@ -33,19 +33,19 @@
 
 #include "ptr.h"
 #include "debug.h"
-#include "stdlib.h"
+#include "ocr-macros.h"
 
 typedef struct {
     ocrGuid_t guid;
     ocrGuidKind kind;
 } ocrGuidImpl_t;
 
-void ptrDestruct(ocrGuidProvider_t* self) {
+static void ptrDestruct(ocrGuidProvider_t* self) {
     free(self);
     return;
 }
 
-u8 ptrGetGuid(ocrGuidProvider_t* self, ocrGuid_t* guid, u64 val, ocrGuidKind kind) {
+static u8 ptrGetGuid(ocrGuidProvider_t* self, ocrGuid_t* guid, u64 val, ocrGuidKind kind) {
     ocrGuidImpl_t * guidInst = malloc(sizeof(ocrGuidImpl_t));
     guidInst->guid = (ocrGuid_t)val;
     guidInst->kind = kind;
@@ -53,7 +53,7 @@ u8 ptrGetGuid(ocrGuidProvider_t* self, ocrGuid_t* guid, u64 val, ocrGuidKind kin
     return 0;
 }
 
-u8 ptrGetVal(ocrGuidProvider_t* self, ocrGuid_t guid, u64* val, ocrGuidKind* kind) {
+static u8 ptrGetVal(ocrGuidProvider_t* self, ocrGuid_t guid, u64* val, ocrGuidKind* kind) {
     ocrGuidImpl_t * guidInst = (ocrGuidImpl_t *) guid;
     *val = (u64) guidInst->guid;
     if(kind)
@@ -61,24 +61,43 @@ u8 ptrGetVal(ocrGuidProvider_t* self, ocrGuid_t guid, u64* val, ocrGuidKind* kin
     return 0;
 }
 
-u8 ptrGetKind(ocrGuidProvider_t* self, ocrGuid_t guid, ocrGuidKind* kind) {
+static u8 ptrGetKind(ocrGuidProvider_t* self, ocrGuid_t guid, ocrGuidKind* kind) {
     ocrGuidImpl_t * guidInst = (ocrGuidImpl_t *) guid;
     *kind = guidInst->kind;
     return 0;
 }
 
-u8 ptrReleaseGuid(ocrGuidProvider_t *self, ocrGuid_t guid) {
+static u8 ptrReleaseGuid(ocrGuidProvider_t *self, ocrGuid_t guid) {
     free((ocrGuidImpl_t*) guid);
     return 0;
 }
 
-ocrGuidProvider_t* newGuidProviderPtr() {
-    ocrGuidProviderPtr_t *result = (ocrGuidProviderPtr_t*)malloc(sizeof(ocrGuidProviderPtr_t));
-    result->base.fctPtrs->destruct = &ptrDestruct;
-    result->base.fctPtrs->getGuid = &ptrGetGuid;
-    result->base.fctPtrs->getVal = &ptrGetVal;
-    result->base.fctPtrs->getKind = &ptrGetKind;
-    result->base.fctPtrs->releaseGuid = &ptrReleaseGuid;
+static ocrGuidProvider_t* newGuidProviderPtr(ocrGuidProviderFactory_t *factory,
+                                             ocrParamList_t *perInstance) {
+    ocrGuidProvider_t *base = (ocrGuidProvider_t*)checkedMalloc(
+        base, sizeof(ocrGuidProviderPtr_t));
+    base->fctPtrs = &(factory->providerFcts);
+    return base;
+}
 
-    return (ocrGuidProvider_t*)result;
+/****************************************************/
+/* OCR GUID PROVIDER PTR FACTORY                    */
+/****************************************************/
+
+static void destructGuidProviderFactoryPtr(ocrGuidProviderFactory_t *factory) {
+    free(factory);
+}
+
+ocrGuidProviderFactory_t *newGuidProviderFactoryPtr(ocrParamList_t *typeArg) {
+    ocrGuidProviderFactory_t *base = (ocrGuidProviderFactory_t*)
+        checkedMalloc(base, sizeof(ocrGuidProviderFactoryPtr_t));
+    base->instantiate = &newGuidProviderPtr;
+    base->destruct = &destructGuidProviderFactoryPtr;
+    base->providerFcts.destruct = &ptrDestruct;
+    base->providerFcts.getGuid = &ptrGetGuid;
+    base->providerFcts.getVal = &ptrGetVal;
+    base->providerFcts.getKind = &ptrGetKind;
+    base->providerFcts.releaseGuid = &ptrReleaseGuid;
+
+    return base;
 }
