@@ -233,7 +233,7 @@ ocrGuid_t wrap_up_task ( u32 paramc, u64 * params, void* paramv[], u32 depc, ocr
                         }
                 }
         }
-        ocrFinish();
+        ocrShutdown();
 
         gettimeofday(&b,0);
         printf("The computation took %f seconds\r\n",((b.tv_sec - a.tv_sec)*1000000+(b.tv_usec - a.tv_usec))*1.0/1000000);
