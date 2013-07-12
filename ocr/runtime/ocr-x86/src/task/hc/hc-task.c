@@ -53,7 +53,7 @@
 // Guid-kind checkers for convenience
 //
 
-static bool isDatablockGuid(ocrGuid_t guid) {
+bool isDatablockGuid(ocrGuid_t guid) {
     if (NULL_GUID == guid) { 
         return false;
     }
@@ -62,7 +62,7 @@ static bool isDatablockGuid(ocrGuid_t guid) {
     return kind == OCR_GUID_DB;
 }
 
-static bool isEventGuid(ocrGuid_t guid) {
+bool isEventGuid(ocrGuid_t guid) {
     if (NULL_GUID == guid) { 
         return false;
     }
@@ -71,7 +71,7 @@ static bool isEventGuid(ocrGuid_t guid) {
     return kind == OCR_GUID_EVENT;
 }
 
-static bool isEdtGuid(ocrGuid_t guid) {
+bool isEdtGuid(ocrGuid_t guid) {
     if (NULL_GUID == guid) { 
         return false;
     }
@@ -80,7 +80,7 @@ static bool isEdtGuid(ocrGuid_t guid) {
     return kind == OCR_GUID_EDT;
 }
 
-static bool isEventLatchGuid(ocrGuid_t guid) {
+bool isEventLatchGuid(ocrGuid_t guid) {
     if(isEventGuid(guid)) {
         ocrEventHc_t * event = NULL;
         deguidify(getCurrentPD(), guid, (u64*)&event, NULL);
@@ -89,7 +89,7 @@ static bool isEventLatchGuid(ocrGuid_t guid) {
     return false;
 }
 
-static bool isEventSingleGuid(ocrGuid_t guid) {
+bool isEventSingleGuid(ocrGuid_t guid) {
     if(isEventGuid(guid)) {
         ocrEventHc_t * event = NULL;
         deguidify(getCurrentPD(), guid, (u64*)&event, NULL);
