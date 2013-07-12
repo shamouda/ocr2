@@ -56,7 +56,7 @@ typedef u8 bool;
  * @brief Type describing the unique identifier of most
  * objects in OCR (EDTs, data-blocks, etc).
  **/
-typedef intptr_t ocrGuid_t;
+typedef intptr_t ocrGuid_t; /**< GUID type */
 //typedef u64 ocrGuid_t;
 
 #define NULL_GUID ((ocrGuid_t)0x0)
@@ -66,7 +66,7 @@ typedef intptr_t ocrGuid_t;
  * within a data-block
  */
 typedef enum {
-    NO_ALLOC = 0
+    NO_ALLOC = 0 /**< No allocation inside data-blocks
     /* Add others */
 } ocrInDbAllocator_t;
 
