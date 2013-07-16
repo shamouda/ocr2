@@ -35,37 +35,38 @@
 #ifndef __OCR_DATABLOCK_H__
 #define __OCR_DATABLOCK_H__
 
-#include "ocr-types.h"
-#include "ocr-guid.h"
 #include "ocr-allocator.h"
+#include "ocr-types.h"
+#include "ocr-utils.h"
 
-/**
- * @brief Internal description of a data-block.
- *
- * This describes the internal representation of
- * a data-block and the meta-data that is associated
- * with it for book-keeping
- *
- **/
-typedef struct _ocrDataBlock_t {
-    ocrGuid_t guid;
-    /**
-     * @brief Creates a data-block to represent the memory of size 'size'
-     * at address 'address'
-     *
-     * The constructor does not allocate any memory nor will
-     * any memory be freed on destruction. This just creates the
-     * meta-data associated with the data-block and gets a GUID for it
-     *
-     * @param self          Pointer for this data-block
-     * @param allocator     Allocator from where this data-block was created (its GUID)
-     * @param size          Size in bytes of the data-block
-     * @param flags         Data-block flags (unused)
-     */
-    void (*create)(struct _ocrDataBlock_t *self,
-                   ocrGuid_t allocator,
-                   u64 size, u16 flags, void* configuration);
+#ifdef OCR_ENABLE_STATISTICS
+#include "ocr-statistics.h"
+#endif
 
+/****************************************************/
+/* OCR PARAMETER LISTS                              */
+/****************************************************/
+
+typedef struct _paramListDataBlockFact_t {
+    ocrParamList_t base;
+} paramListDataBlockFact_t;
+
+typedef struct _paramListDataBlockInst_t {
+    ocrParamList_t base;
+    ocrGuid_t allocator;    /**< Allocator that created this data-block */
+    ocrGuid_t allocPD;      /**< Policy-domain of the allocator */
+    u64 size;
+    void* ptr;              /**< Initial location for the data-block */
+    u16 flags;
+} paramListDataBlockInst_t;
+
+/****************************************************/
+/* OCR DATABLOCK                                    */
+/****************************************************/
+
+struct _ocrDataBlock_t;
+
+typedef struct _ocrDataBlockFcts_t {
     /**
      * @brief Destroys a data-block
      *
@@ -75,6 +76,7 @@ typedef struct _ocrDataBlock_t {
      * is no longer used
      *
      * @param self          Pointer for this data-block
+     * @todo: FIXME. This does perform a free!!!!
      */
     void (*destruct)(struct _ocrDataBlock_t *self);
 
@@ -119,32 +121,46 @@ typedef struct _ocrDataBlock_t {
      * @return 0 on success and an error code on failure (see ocr-db.h)
      */
     u8 (*free)(struct _ocrDataBlock_t *self, ocrGuid_t edt);
+} ocrDataBlockFcts_t;
+
+/**
+ * @brief Internal description of a data-block.
+ *
+ * This describes the internal representation of
+ * a data-block and the meta-data that is associated
+ * with it for book-keeping
+ *
+ **/
+typedef struct _ocrDataBlock_t {
+    ocrGuid_t guid;
+#ifdef OCR_ENABLE_STATISTICS
+    ocrStatsProcess_t statProcess;
+#endif
+    ocrGuid_t allocator;    /**< Allocator that created this data-block */
+    ocrGuid_t allocatorPD;  /**< Policy domain of the creating allocator */
+    u64 size;               /**< Size of the data-block */
+    void* ptr;              /**< Current location for this data-block */
+    u16 properties;         /**< Properties for the data-block */
+    ocrDataBlockFcts_t *fctPtrs;
 } ocrDataBlock_t;
 
-/**
- * @brief Enum defining the type of data-blocks supported
- * by the runtime
- *
- * If extending the runtime, add your type here and
- * modify the newDataBlock function as well
- */
-typedef enum _ocrDataBlockKind {
-    OCR_DATABLOCK_DEFAULT = 0,
-    OCR_DATABLOCK_REGULAR = 1,
-    OCR_DATABLOCK_PLACED  = 2
-} ocrDataBlockKind;
+/****************************************************/
+/* OCR DATABLOCK FACTORY                            */
+/****************************************************/
 
-extern ocrDataBlockKind ocrDataBlockDefaultKind;
+typedef struct _ocrDataBlockFactory_t {
+    ocrMappable_t module;
+    /**
+     * @brief Creates a data-block to represent the memory of size 'size'
+     *
+     */
+    ocrDataBlock_t* (*instantiate)(struct _ocrDataBlockFactory_t *factory,
+                                   ocrGuid_t allocator, ocrGuid_t allocatorPD,
+                                   u64 size, void* ptr, u16 properties,
+                                   ocrParamList_t *perInstance);
+    void (*destruct)(struct _ocrDataBlockFactory_t *factory);
 
-/**
- * @brief Allocats a new data-block of the type specified
- *
- * The user will need to call "create" on the data-block to
- * properly initialize it
- *
- * @param type              Type of the data-block to return
- * @return A pointer to the meta-data for the data-block
- */
-ocrDataBlock_t* newDataBlock(ocrDataBlockKind type);
+    ocrDataBlockFcts_t dataBlockFcts;
+} ocrDataBlockFactory_t;
 
 #endif /* __OCR_DATABLOCK_H__ */

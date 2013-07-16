@@ -29,66 +29,44 @@
 
 */
 
-#include <stdlib.h>
-#include <assert.h>
-
 #include "ocr-macros.h"
 #include "ocr-types.h"
 #include "ocr-workpile.h"
 
-//TODO don't like that: I think we should have some kind of a plugin
-// mechanism where an implementation can associate its string to a function pointer.
-// i.e HC_WORKPOOL -> hc_workpile_constructor
-extern ocr_workpile_t * hc_workpile_constructor();
-extern ocr_workpile_t * ce_message_workpile_constructor();
-
-ocr_workpile_t * newWorkpile(ocr_workpile_kind workpileType) {
-    switch(workpileType) {
-    case OCR_DEQUE:
-        return hc_workpile_constructor();
-    case OCR_MESSAGE_QUEUE:
-        return ce_message_workpile_constructor();
-    default:
-        assert(false && "Unrecognized workpile kind");
-        break;
-    }
-
-    return NULL;
-}
-
+#include <stdlib.h>
 
 /******************************************************/
 /* OCR Workpile iterator                              */
 /******************************************************/
 
-void workpile_iterator_reset (workpile_iterator_t * base) {
+void workpileIteratorReset (ocrWorkpileIterator_t * base) {
     base->curr = ((base->id) + 1) % base->mod;
 }
 
-bool workpile_iterator_hasNext (workpile_iterator_t * base) {
+bool workpileIteratorHasNext (ocrWorkpileIterator_t * base) {
     return base->id != base->curr;
 }
 
-ocr_workpile_t * workpile_iterator_next (workpile_iterator_t * base) {
-    int current = base->curr;
-    ocr_workpile_t * to_be_returned = base->array[current];
+ocrWorkpile_t * workpileIteratorNext (ocrWorkpileIterator_t * base) {
+    u64 current = base->curr;
+    ocrWorkpile_t * toBeReturned = base->array[current];
     base->curr = (current+1) % base->mod;
-    return to_be_returned;
+    return toBeReturned;
 }
 
-workpile_iterator_t* workpile_iterator_constructor ( int i, size_t n_pools, ocr_workpile_t ** pools ) {
-    workpile_iterator_t* it = (workpile_iterator_t *) checked_malloc(it, sizeof(workpile_iterator_t));
-    it->array = pools;
-    it->id = i;
-    it->mod = n_pools;
-    it->hasNext = workpile_iterator_hasNext;
-    it->next = workpile_iterator_next;
-    it->reset = workpile_iterator_reset;
+ocrWorkpileIterator_t* newWorkpileIterator ( u64 id, u64 workpileCount, ocrWorkpile_t ** workpiles ) {
+    ocrWorkpileIterator_t* it = (ocrWorkpileIterator_t *) checkedMalloc(it, sizeof(ocrWorkpileIterator_t));
+    it->array = workpiles;
+    it->id = id;
+    it->mod = workpileCount;
+    it->hasNext = workpileIteratorHasNext;
+    it->next = workpileIteratorNext;
+    it->reset = workpileIteratorReset;
     // The 'curr' field is initialized by reset
     it->reset(it);
     return it;
 }
 
-void workpile_iterator_destructor (workpile_iterator_t* base) {
+void workpileIteratorDestruct (ocrWorkpileIterator_t* base) {
     free(base);
 }
