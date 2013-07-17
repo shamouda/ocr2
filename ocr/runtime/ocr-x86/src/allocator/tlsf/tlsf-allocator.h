@@ -35,17 +35,20 @@
 #ifndef __ALLOCATOR_TLSF_H__
 #define __ALLOCATOR_TLSF_H__
 
-#include "ocr-types.h"
 #include "ocr-allocator.h"
 #include "ocr-sync.h"
+#include "ocr-types.h"
+#include "ocr-utils.h"
+
+typedef struct {
+    ocrAllocatorFactory_t base;
+} ocrAllocatorFactoryTlsf_t;
 
 typedef struct {
     ocrAllocator_t base;
-    ocrLowMemory_t **memories;
-    u64 numMemories, addr, totalSize, poolAddr, poolSize;
+    u64 addr, totalSize, poolAddr, poolSize;
     ocrLock_t* lock; /**< Currently needs a lock. The idea is to have multiple allocators but currently only one */
-
 } ocrAllocatorTlsf_t;
 
-ocrAllocator_t* newAllocatorTlsf();
+extern ocrAllocatorFactory_t* newAllocatorFactoryTlsf(ocrParamList_t *perType);
 #endif /* __TLSF_ALLOCATOR_H__ */

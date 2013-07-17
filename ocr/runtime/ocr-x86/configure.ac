@@ -2,14 +2,14 @@
 AC_PREREQ([2.59])
 
 # define distribution properties
-AC_INIT([ocr], [0.7], [ocr-dev@lists.01.org])
+AC_INIT([ocr], [0.8], [ocr-dev@lists.01.org])
 
 # check if srcdir is correct
 AC_CONFIG_SRCDIR([inc/ocr.h])
 
 AC_CONFIG_AUX_DIR([config])
 
-AM_INIT_AUTOMAKE([1.9 tar-ustar no-define foreign dist-bzip2])
+AM_INIT_AUTOMAKE([1.9 tar-ustar no-define foreign dist-bzip2 subdir-objects])
 
 AC_COPYRIGHT([todo_copyright_info])
 
@@ -31,7 +31,7 @@ PKG_CHECK_MODULES(XML, libxml-2.0 >= 2.4)
 #   - mpi
 #
 
-# BEGIN MPI support
+# BEGIN MPI support 
 
 # Specify which MPI installation should be used
 AC_ARG_WITH([mpi], [AS_HELP_STRING([--with-mpi=PATH], [ Specify the MPI installation to use. ])], 
@@ -79,14 +79,41 @@ AS_IF([test "x$with_els" != xno],
         AC_DEFINE_UNQUOTED([ELS_USER_SIZE], [0], [Set User-ELS size])
       ]) 
 
+# Check if Runtime headers are requested
+
+AC_ARG_ENABLE(rtapi, 
+    AS_HELP_STRING([--enable-rtapi],
+    [enable runtime API header distribution]),
+    [with_rtapi=$enableval], 
+    [with_rtapi=no;])
+
+AS_IF([test "x$with_rtapi" != xno],
+      [ AC_MSG_NOTICE([OCR Runtime API header requested]) ], 
+      [ ]) 
+
 # Check if we need to distribute runtime headers
-AM_CONDITIONAL([INCLUDE_RUNTIME_ITF_HEADERS], [test x$with_els != xno])
+AM_CONDITIONAL([INCLUDE_RUNTIME_ITF_HEADERS], [test x$with_els != xno -o x$with_rtapi != xno])
+
+AC_ARG_ENABLE(ocrlib, 
+    AS_HELP_STRING([--enable-ocrlib],
+    [enable OCR library headers]),
+    [with_ocrlib=$enableval], 
+    [with_ocrlib=no;])
+
+AS_IF([test "x$with_ocrlib" != xno],
+      [ AC_MSG_NOTICE([OCR-lib header requested]) ], 
+      [ ]) 
+
+# Check if we need to distribute OCR library headers
+AM_CONDITIONAL([INCLUDE_OCR_LIBRARY_ITF_HEADERS], [test x$with_ocrlib != xno])
+
 
 #
 # Config file to process
 #
 AC_CONFIG_FILES([
 Makefile
+machine-configs/Makefile
 src/Makefile
 ])
 

@@ -35,35 +35,38 @@
 #define __OCR_GUID_H__
 
 #include "ocr-types.h"
+#include "ocr-mappable.h"
+#include "ocr-utils.h"
 
 typedef enum {
     OCR_GUID_NONE = 0,
     OCR_GUID_ALLOCATOR = 1,
     OCR_GUID_DB = 2,
     OCR_GUID_EDT = 3,
-    OCR_GUID_EVENT = 4,
-    OCR_GUID_POLICY = 5,
-    OCR_GUID_WORKER = 6
+    OCR_GUID_EDT_TEMPLATE = 4,
+    OCR_GUID_EVENT = 5,
+    OCR_GUID_POLICY = 6,
+    OCR_GUID_WORKER = 7
 } ocrGuidKind;
 
-/**
- * @brief Provider for GUIDs for the system
- *
- * GUIDs should be unique and are used to
- * identify and locate objects (and their associated
- * metadata mostly). GUIDs serve as a level of indirection
- * to allow objects to move around in the system and
- * support different address spaces (in the future)
- */
-typedef struct _ocrGuidProvider_t {
-    /**
-     * @brief Constructor equivalent
-     *
-     * @param self          Pointer to this GUID provider
-     * @param config        And optional configuration (not currently used)
-     */
-    void (*create)(struct _ocrGuidProvider_t* self, void* config);
+/****************************************************/
+/* OCR PARAMETER LISTS                              */
+/****************************************************/
+typedef struct _paramListGuidProviderFact_t {
+    ocrParamList_t base;
+} paramListGuidProviderFact_t;
 
+typedef struct _paramListGuidProviderInst_t {
+    ocrParamList_t base;
+} paramListGuidProviderInst_t;
+
+/****************************************************/
+/* OCR GUID PROVIDER                                */
+/****************************************************/
+
+struct _ocrGuidProvider_t;
+
+typedef struct _ocrGuidProviderFcts_t {
     /**
      * @brief Destructor equivalent
      *
@@ -124,21 +127,56 @@ typedef struct _ocrGuidProvider_t {
      * @return 0 on success or an error code
      */
     u8 (*releaseGuid)(struct _ocrGuidProvider_t *self, ocrGuid_t guid);
+} ocrGuidProviderFcts_t;
+
+/**
+ * @brief Provider for GUIDs for the system
+ *
+ * GUIDs should be unique and are used to
+ * identify and locate objects (and their associated
+ * metadata mostly). GUIDs serve as a level of indirection
+ * to allow objects to move around in the system and
+ * support different address spaces (in the future)
+ */
+typedef struct _ocrGuidProvider_t {
+    ocrMappable_t module;
+
+    ocrGuidProviderFcts_t *fctPtrs;
 } ocrGuidProvider_t;
 
-typedef enum _ocrGuidProviderKind {
-    OCR_GUIDPROVIDER_DEFAULT = 0,
-    OCR_GUIDPROVIDER_PTR = 1
-} ocrGuidProviderKind;
+/****************************************************/
+/* OCR GUID PROVIDER FACTORY                        */
+/****************************************************/
 
-extern ocrGuidProviderKind ocrGuidProviderDefaultKind;
+typedef struct _ocrGuidProviderFactory_t {
+    ocrMappable_t base;
 
-extern ocrGuidProvider_t *globalGuidProvider;
+    ocrGuidProvider_t* (*instantiate)(struct _ocrGuidProviderFactory_t *factory, ocrParamList_t* perInstance);
 
-ocrGuidProvider_t* newGuidProvider(ocrGuidProviderKind type);
+    void (*destruct)(struct _ocrGuidProviderFactory_t *factory);
+
+    ocrGuidProviderFcts_t providerFcts;
+} ocrGuidProviderFactory_t;
 
 #define UNINITIALIZED_GUID ((ocrGuid_t)-2)
 
 #define ERROR_GUID ((ocrGuid_t)-1)
+
+/****************************************************/
+/* OCR GUID CONVENIENCE FUNCTIONS                   */
+/****************************************************/
+
+static inline u8 guidKind(struct _ocrPolicyDomain_t * pd, ocrGuid_t guid,
+                          ocrGuidKind* kindRes) __attribute__((unused));
+// TODO: REC: Actually pass a context
+static inline u8 guidify(struct _ocrPolicyDomain_t * pd, u64 ptr, ocrGuid_t * guidRes,
+                         ocrGuidKind kind) __attribute__((unused));
+static inline u8 deguidify(struct _ocrPolicyDomain_t * pd, ocrGuid_t guid, u64* ptrRes,
+                           ocrGuidKind* kindRes) __attribute__((unused));
+static inline bool isDatablockGuid(ocrGuid_t guid) __attribute__((unused));
+static inline bool isEventGuid(ocrGuid_t guid) __attribute__((unused));
+static inline bool isEdtGuid(ocrGuid_t guid) __attribute__((unused));
+static inline bool isEventLatchGuid(ocrGuid_t guid) __attribute__((unused));
+static inline bool isEventSingleGuid(ocrGuid_t guid) __attribute__((unused));
 
 #endif /* __OCR_GUID__H_ */

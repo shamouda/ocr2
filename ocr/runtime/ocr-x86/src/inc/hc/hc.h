@@ -32,92 +32,12 @@
 #ifndef HC_H_
 #define HC_H_
 
-#include <stdlib.h>
-#include <assert.h>
-#include <pthread.h>
+#include "ocr-types.h"
 
-#include "ocr-runtime.h"
-#include "deque.h"
-#include "hc_edf.h"
-
-/******************************************************/
-/* OCR-HC WORKER                                      */
-/******************************************************/
-
-typedef struct {
-    ocr_worker_t worker;
-    //TODO this is a convenience to map workers to workpiles
-    int id;
-    //TODO shall these stay here or go up ?
-    bool run;
-    // reference to the EDT this worker is currently executing
-    ocrGuid_t currentEDT_guid;
-} hc_worker_t;
-
-ocr_worker_t* hc_worker_constructor(void);
-
-
-/******************************************************/
-/* OCR-HC WorkPool                                    */
-/******************************************************/
-
-typedef struct hc_workpile {
-    ocr_workpile_t base;
-    deque_t * deque;
-} hc_workpile;
-
-ocr_workpile_t * hc_workpile_constructor(void);
-
-
-/******************************************************/
-/* OCR-HC SCHEDULER                                   */
-/******************************************************/
-
-typedef struct {
-    ocr_scheduler_t scheduler;
-    size_t n_pools;
-    ocr_workpile_t ** pools;
-    // Note: cache steal iterators in hc's scheduler
-    // Each worker has its own steal iterator instantiated
-    // a sheduler's construction time.
-    workpile_iterator_t ** steal_iterators;
-
-    int n_workers_per_scheduler;
-    size_t worker_id_begin;
-    size_t worker_id_end;
-} hc_scheduler_t;
-
-ocr_scheduler_t * hc_scheduler_constructor(void);
-
-void hc_scheduler_create(ocr_scheduler_t * base, void * per_type_configuration, void * per_instance_configuration);
-
-/******************************************************/
-/* OCR-HC Task Factory                                */
-/******************************************************/
-
-typedef struct hc_task_factory {
-    ocr_task_factory base_factory;
-} hc_task_factory;
-
-struct ocr_task_factory_struct* hc_task_factory_constructor(void);
-void hc_task_factory_destructor ( struct ocr_task_factory_struct* base );
-
-ocrGuid_t hc_task_factory_create_with_event_list ( struct ocr_task_factory_struct* factory, ocrEdt_t fctPtr, u32 paramc, u64 * params, void ** paramv, event_list_t* l);
-ocrGuid_t hc_task_factory_create ( struct ocr_task_factory_struct* factory, ocrEdt_t fctPtr, u32 paramc, u64 * params, void ** paramv, u16 properties, size_t depc, ocrGuid_t * outputEvent);
-
-/**
- * The computation worker routine that asks work to the scheduler
- */
-extern void * worker_computation_routine(void * arg);
-
-/*
- * TODO HC implementation exposed to support FSIM
- */
-extern void hcTaskConstructInternal (hc_task_t* derived, ocrEdt_t funcPtr,
-        u32 paramc, u64 * params, void** paramv, size_t nbDeps, ocrGuid_t outputEvent, ocr_task_fcts_t * taskFctPtrs);
-
-extern void taskSchedule( ocrGuid_t guid, ocr_task_t* base, ocrGuid_t wid );
-
-extern void tryScheduleTask( ocr_task_t* base, ocrGuid_t wid );
+typedef struct _regNode_t {
+    ocrGuid_t guid;
+    u32 slot;
+    struct _regNode_t* next ;
+} regNode_t;
 
 #endif /* HC_H_ */

@@ -41,69 +41,48 @@
 #include "ocr-edt.h"
 
 /**
- * @defgroup OCRBoot Initialization and cleanup routines for OCR
- * @brief Describes how to instantiate and tear-down the runtime
- *
- * @{
- **/
-
-/**
- * @brief A convenience macro to initialize the runtime
- *
- * This macro will initialize the runtime and call the first 'main' EDT to be
- * invoked with the provided 'argc' and 'argv' argument. The user must also
- * provide all root C functions that will be called as EDTs
- *
- * @note 'argc' and 'argv' include both the arguments to be passed to
- * the main EDT as well as the OCR runtime arguments (if any). 'argc' and
- * 'argv' will be processed to remove OCR runtime arguments before they are
- * passed to the main EDT.
- *
- * @param argc      Pointer to the number of arguments (OCR + main EDT)
- * @param argv      Array of arguments (argc count)
- * @param ...       Function pointers that will be used as EDTs
- **/
-#define OCR_INIT(argc, argv, ...)					\
-    ({ocrEdt_t _fn_array[] = {__VA_ARGS__}; ocrInit(argc, argv, sizeof(_fn_array)/sizeof(_fn_array[0]), _fn_array);})
-
-/**
- * @brief Initial function called by the C program to set-up the OCR
- * environment.
- *
- * This call is called by #OCR_INIT. It should be paired with
- * an ocrCleanup() call
- *
- * @param argc      Pointer to the number of arguments (OCR + main EDT)
- * @param argv      Array of arguments (argc count)
- * @param fnc       Number of function pointers (UNUSED)
- * @param funcs     Array of function pointers to be used as EDTs (UNUSED)
- *
- **/
-void ocrInit(int * argc, char ** argv, u32 fnc, ocrEdt_t funcs[] );
-
-/**
  * @brief Called by an EDT to indicate the end of an OCR
  * execution
  *
- * This should be called by the last EDT to execute (it is
- * up to the user to determine this). It should only be called
- * once and will call the runtime to be torn down
+ * This call will cause the OCR runtime to shutdown
  *
+ * @note This call is not necessarily required if using ocrWait on
+ * a finish EDT from a sequential C code (ie: the ocrShutdown call will
+ * implicitly be encapsulated in the fact that the finish EDT returns)
  */
-void ocrFinish();
+void ocrShutdown();
 
 /**
- * @brief Called by the 'main' program to clean-up the OCR
- * environment
+ * @brief Gets the number of arguments packed in the
+ * single data-block passed to the first EDT
  *
- * This call is the symmetric of ocrInit() and *waits* for the ocrFinish()
- * function to be called before completing. In other words, time-wise,
- * ocrInit() will be called, then ocrCleanup() which will wait until
- * ocrFinish() is called and then
- * ocrCleanup() will finish cleaning up and control will be returned
- * to the main program
+ * When starting, the first EDT gets passed a single data-block that contains
+ * all the arguments passed to the program. These arguments are packed in the
+ * following format:
+ *     - first 8 bytes: argc
+ *     - argc count of 8 byte values indicating the offsets from
+ *       the start of the data-block to the argument (ie: the first
+ *       8 byte value indicates the offset in bytes to the first argument)
+ *     - the arguments (NULL terminated character arrays)
+ *
+ * This call will extract the number of arguments
+ *
+ * @param dbPtr    Pointer to the start of the argument data-block
+ * @return Number of arguments
  */
-void ocrCleanup();
+u64 getArgc(void* dbPtr);
+
+/**
+ * @brief Gets the argument 'count' from the data-block containing the
+ * arguments
+ *
+ * @see getArgc() for an explanation
+ *
+ * @param dbPtr    Pointer to the start of the argument data-block
+ * @param count    Index of the argument to extract
+ * @return A NULL terminated string
+ */
+char* getArgv(void* dbPtr, u64 count);
 
 /**
  * @}

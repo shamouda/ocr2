@@ -66,10 +66,11 @@ typedef enum {
 
 
 /**
- * @brief 'Slots' for latch events
+ * @brief "Slots" for latch events
  *
- * A #OCR_EVENT_LATCH_T has two slots, a 'decrement' slot
- * and an 'increment' slot which are defined here
+ * A latch event will be satisfied when it has received a number of
+ * "satisfactions" on its DECR_SLOT equal to 1 + the number of "satisfactions"
+ * on its INCR_SLOT
  */
 typedef enum {
     OCR_EVENT_LATCH_DECR_SLOT = 0, /**< The decrement slot */
@@ -114,8 +115,7 @@ u8 ocrEventDestroy(ocrGuid_t guid);
  *       using ocrAddDependence with a data-block as the source
  *
  * @param eventGuid       GUID of event to satisfy
- * @param dataGuid        GUID of data to pass along or INVALID_GUID if no data
- *
+ * @param dataGuid        GUID of data to pass along or NULL_GUID if no data
  * @return 0 on success and an error code on failure:
  *     - ENOMEM: Returned if there is not enough memory. This is usually caused by
  *               a programmer error (two events to a unique slot and both events are
@@ -124,37 +124,28 @@ u8 ocrEventDestroy(ocrGuid_t guid);
  *     - ENOPERM: If the event has already been satisfied or if the event does not take
  *                an argument and one is given or if the event takes an argument and none
  *                is given
+ *
+ * An event satisfaction without the optional data-block can be viewed as a pure
+ * control dependence whereas one with a data-block is a control+data dependence
  *
  * @note On satisfaction, a OCR_EVENT_ONCE_T event will pass the GUID of the
  * optional attached data-block to all EDTs/Events waiting on it at that time
  * and the event will destroy itself. For OCR_EVENT_IDEM_T and OCR_EVENT_STICKY_T,
  * the event will be satisfied for all EDTs/Events currently waiting on it
- * as well as any future EDT/Event that adds it as a dependence.
+ * as well as any future EDT/Event that adds it as a dependence until it is destroyed
  **/
-u8 ocrEventSatisfy(ocrGuid_t eventGuid, ocrGuid_t dataGuid /*=INVALID_GUID*/);
+u8 ocrEventSatisfy(ocrGuid_t eventGuid, ocrGuid_t dataGuid /*=NULL_GUID*/);
 
 /**
- * @brief Satisfy an event and optionally pass a data-block using event slots
+ * @brief Similar to ocrEventSatisfy() but with the slot information
  *
- * Most events only have one input slot; latch events though have multiple
- * input slots for example and this call is similar to ocrEventSatisfy() except
- * that the slot can be specified. In other words, ocrEventSatisfy() is a special
- * case of this call where slot is 0
+ * This call is used primarily for latch events.
+ * ocrEventSatisfySlot(eventGuid, dataGuid, 0) is equivalent to
+ * ocrEventSatisfy(eventGuid, dataGuid)
  *
- * @param eventGuid       GUID of event to satisfy
- * @param dataGuid        GUID of data to pass along or INVALID_GUID if no data
- * @param slot            Slot of the event to satisfy
- *
- * @return 0 on success and an error code on failure:
- *     - ENOMEM: Returned if there is not enough memory. This is usually caused by
- *               a programmer error (two events to a unique slot and both events are
- *               satisfied)
- *     - EINVAL: If the GUIDs do not refer to valid events/data-blocks
- *     - ENOPERM: If the event has already been satisfied or if the event does not take
- *                an argument and one is given or if the event takes an argument and none
- *                is given
- **/
-u8 ocrEventSatisfySlot(ocrGuid_t eventGuid, ocrGuid_t dataGuid /*=INVALID_GUID*/, u32 slot /*=0*/);
+ * @see ocrEventSatisfy()
+ */
+u8 ocrEventSatisfySlot(ocrGuid_t eventGuid, ocrGuid_t dataGuid /*=NULL_GUID*/, u32 slot /*=0*/);
 
 /**
    @}
@@ -164,7 +155,6 @@ u8 ocrEventSatisfySlot(ocrGuid_t eventGuid, ocrGuid_t dataGuid /*=INVALID_GUID*/
  * @defgroup OCREDT Event Driven Task Management
  * @brief APIs to manage the EDT in OCR
  *
- * @todo Re-evaluate the notion of event types (post 0.7 version)
  * @{
  **/
 
@@ -179,88 +169,94 @@ typedef struct {
 } ocrEdtDep_t;
 
 
+#define EDT_PROP_NONE   ((u16) 0x0) /**< Property bits indicating a regular EDT */
+#define EDT_PROP_FINISH ((u16) 0x1) /**< Property bits indicating a FINISH EDT */
+
 /**
- * @defgroup OCREDTProp EDT Property values
- * @brief Values for the 'properties' value in ocrEdtCreate
- * @{
- **/
-#define EDT_PROP_NONE   ((u16) 0) /**< Default value */
-#define EDT_PROP_FINISH ((u16) 1) /**< Indicates that the EDT is a finish EDT */
+ * @brief Constant indicating that the number of parameters to an EDT template
+ * is unknown
+ */
+#define EDT_PARAM_UNK   ((u32)-1)
+
 /**
- * @}
- **/
+ * @brief Constant indicating that the number of parameters to an EDT
+ * is the same as the one specified in its template
+ */
+#define EDT_PARAM_DEF   ((u32)-1)
 
 /**
  * @brief Type for an EDT
  *
- * @param paramc          Number of non-DB or non-event parameters. Use for simple types
- * @param params          Sizes for the parameters (to allow marshalling)
- * @param paramv          Values for non-DB and non-event parameters
+ * @param paramc          Number of non-DB or non-event parameters. Can be used to pass u64 values
+ * @param paramv          Values for the u64 values
  * @param depc            Number of dependences (either DBs or events)
- * @param depv            Values of the dependences. Can be INVAL_GUID/NULL if not known at
- *                        this point
- *
- * @return A GUID that will be passed to anyone waiting on the completion of the EDT
- *
- * @warning The variable number of input parameters (paramc) may change in the future.
+ * @param depv            Values of the dependences. Can be NULL_GUID if a pure control-flow event
+ *                        was used as a dependence
+ * @return The GUID of a data-block to pass along on the output event of
+ * the EDT (or NULL_GUID)
  **/
-typedef ocrGuid_t (*ocrEdt_t )( u32 paramc, u64 * params, void* paramv[],
+typedef ocrGuid_t (*ocrEdt_t )( u32 paramc, u64* paramv,
                    u32 depc, ocrEdtDep_t depv[]);
+
+
+/**
+ * @brief Creates an EDT template
+ *
+ * An EDT template encapsulates the code that will be executed
+ * by the EDT. It needs to be created only once for each function that will serve
+ * as an EDT.
+ *
+ * @param guid              Returned value: GUID of the newly created EDT Template
+ * @param funcPtr           Function to execute as the EDT
+ * @param paramc            Number of u64 non-DB values or EDT_PARAM_UNK
+ * @param depc              Number of data-blocks or EDT_PARAM_UNK
+ *
+ * @return 0 on success and an error code on failure: TODO
+ */
+u8 ocrEdtTemplateCreate(ocrGuid_t *guid, ocrEdt_t funcPtr, u32 paramc, u32 depc);
+
+/**
+ * @brief Destroy an EDT template
+ *
+ * This function can be called if no further EDTs will be created based on this
+ * template
+ *
+ * @param guid              GUID of the EDT template to destroy
+ * @return 0 if successful
+ */
+u8 ocrEdtTemplateDestroy(ocrGuid_t guid);
 
 /**
  * @brief Creates an EDT instance
  *
- * This call will create an EDT object. An EDT is a small piece of computation
- * that will only start once all its dependences have been satisfied and will
- * then run to completion (an EDT never contains synchronization primitives).
- *
- * On completion, the EDT will satisfy an optional completion event (to
- * indicate to other objects that it has finished executing). This behavior
- * is modified slightly for finish EDTs which will only satisfy their
- * completion event when they have completed AND all EDTs transitively created
- * within the finish EDT have also signaled their completion events.
- *
  * @param guid              Returned value: GUID of the newly created EDT type
- * @param funcPtr           Function to execute as the EDT
- * @param paramc            Number of non-DB and non-event parameters
- * @param params            Sizes for these parameters (to allow marshalling)
+ * @param templateGuid      GUID of the template to use for this EDT
+ * @param paramc            Number of non-DB 64 bit values. Set to 'EDT_PARAM_DEF' if
+ *                          follows the 'paramc' template specification. Set to the
+ *                          actual number of arguments to be passed if 'EDT_PARAM_UNK'
+ *                          has been given as the template's 'paramc' value.
  * @param paramv            Values for those parameters (copied in)
- * @param properties        Currently indicates a finish-EDT or a normal one.
- * @param depc              Number of dependences for this EDT
+ * @param properties        Used to indicate if this is a finish EDT (EDT_PROP_FINISH).
+ *                          Other uses reserved.
+ * @param affinity          Affinity container for this EDT. Can be NULL_GUID
+ * @param depc              Number of dependences for this EDT. Set to 'EDT_PARAM_DEF' if
+ *                          it follows the 'depc' template specification. Set to the actual
+ *                          number of arguments to be passed if 'EDT_PARAM_UNK' has been
+ *                          given as the template's 'depc' value.
  * @param depv              Values for the GUIDs of the dependences (if known)
- *                          If NULL, use ocrAddDependence
- * @param outputEvent       Event satisfied by the runtime when the EDT completes
- *                          execution. If NULL, no event will be created.
- *
+ *                          Use ocrAddDependence to add unknown ones or ones with
+ *                          a mode other than the default DB_MODE_ITW
+ * @param outputEvent       Returned value: If not NULL, will return the GUID
+ *                          of the event that will be satisfied when this EDT
+ *                          completes. In the case of a finish EDT, this event
+ *                          will be satisfied *only* if all transitively created
+ *                          EDTs inside this EDT have also completed. If NULL,
+ *                          no output event will be created or satisfied
  * @return 0 on success and an error code on failure: TODO
  **/
-u8 ocrEdtCreate(ocrGuid_t * guid, ocrEdt_t funcPtr,
-                u32 paramc, u64 * params, void** paramv,
-                u16 properties, u32 depc, ocrGuid_t * depv, ocrGuid_t * outputEvent);
-
-/**
- * @brief Makes the EDT available for scheduling to the runtime
- *
- * This call should be called after ocrEdtCreate to signal to the runtime
- * that the EDT is ready to be scheduled. Note that this does *not* imply
- * that its dependences are satisfied. Instead, the runtime will start
- * considering the EDT for potential scheduling once its dependences are
- * satisfied. This call brings it to the attention of the runtime
- *
- * @param guid              GUID of the EDT to schedule
- * @return Status:
- *      - 0: Successful
- *      - EINVAL: The GUID is not an EDT
- *      - ENOPERM: The EDT does not have all its dependences known
- *
- * @warning In the current implementation, this call should only be called
- * after all dependences have been added using ocrAddDependence. This may
- * be relaxed in future versions
- *
- * @deprecated This call is still required but will be deprecated in the future
- * when its functionality will be implicitly included in ocrAddDependence()
- */
-u8 ocrEdtSchedule(ocrGuid_t guid);
+u8 ocrEdtCreate(ocrGuid_t * guid, ocrGuid_t templateGuid,
+                u32 paramc, u64* paramv, u32 depc, ocrGuid_t *depv,
+                u16 properties, ocrGuid_t affinity, ocrGuid_t *outputEvent);
 
 /**
  * @brief Destroy an EDT
@@ -286,7 +282,31 @@ u8 ocrEdtDestroy(ocrGuid_t guid);
    @{
 **/
 
+/**
+ * @brief Data-block access modes
+ *
+ * These are the modes with which an EDT can access a DB. We currently support
+ * three modes:
+ *     - Read Only: The EDT is stating that it will only read from the DB.
+ *       This enables the runtime to provide a copy for example with no need
+ *       to "merge" things back together as there is no write. Note that
+ *       any writes to the DB will potentially be disgarded
+ *     - Intent to write (default mode): The EDT is possibly going to write
+ *       to the DB but does not require an exclusive access to it. The user
+ *       is responsible for synchronizing between EDTs that can potentially
+ *       write to the same DB at the same time.
+ *     - Exclusive write: The EDT requires that it be the only one accessing
+ *       the DB. The runtime will not schedule any other EDT that accesses
+ *       the same DB while the EDT with an exclusive write access is running.
+ *       This potentially limites parallelism
+ */
+typedef enum {
+    DB_MODE_RO,     /**< Read-only mode */
+    DB_MODE_ITW,    /**< Intent-to-write mode (default mode) */
+    DB_MODE_EW      /**< Exclusive write mode */
+} ocrDbAccessMode_t;
 
+#define DB_DEFAULT_MODE (ocrDbAccessMode_t)DB_MODE_ITW
 /**
  * @brief Adds a dependence between entities in OCR:
  *
@@ -312,7 +332,8 @@ u8 ocrEdtDestroy(ocrGuid_t guid);
  *                 a dependence
  */
 u8 ocrAddDependence(ocrGuid_t source,
-                    ocrGuid_t destination, u32 slot);
+                    ocrGuid_t destination, u32 slot,
+                    ocrDbAccessMode_t mode /* = DB_DEFAULT_MODE */);
 
 /**
    @}

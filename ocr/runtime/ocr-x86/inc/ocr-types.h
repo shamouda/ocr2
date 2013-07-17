@@ -53,13 +53,10 @@ typedef u8 bool;
 #endif /* __cplusplus */
 
 /**
- * @brief Opaque type uniquely identifying objects in OCR
- *
- * A globally-unique identifier used by the runtime to identify
- * objects. The type is convertible to a 64 bit value but its exact
- * meaning may change depending on the specific implementation.
-  **/
-typedef intptr_t ocrGuid_t;
+ * @brief Type describing the unique identifier of most
+ * objects in OCR (EDTs, data-blocks, etc).
+ **/
+typedef intptr_t ocrGuid_t; /**< GUID type */
 //typedef u64 ocrGuid_t;
 
 /**
@@ -68,25 +65,11 @@ typedef intptr_t ocrGuid_t;
 #define NULL_GUID ((ocrGuid_t)0x0)
 
 /**
- * @brief Description of a "location" for OCR
- *
- * A place is a logical (ie: not necessarily hardware
- * related) identification of proximity. It is used
- * to give hints/suggestions about scheduling and data-placement
- *
- * @warning This aspect of the runtime is still undefined (part of
- * tuning). Do not use: the name may also change.
- **/
-typedef struct {
-    ocrGuid_t locationId;
-} ocrLocation_t;
-
-/**
  * @brief Allocators that can be used to allocate
  * within a data-block
  */
 typedef enum {
-    NO_ALLOC = 0
+    NO_ALLOC = 0 /**< No allocation inside data-blocks */
     /* Add others */
 } ocrInDbAllocator_t;
 
