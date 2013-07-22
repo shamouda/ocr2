@@ -19,7 +19,9 @@ OCR_RUN_FLAGS=-ocr:cfg ${OCR_CONFIG}
 all: compile run
 
 compile:
-	gcc $(CFLAGS) $(OCR_FLAGS) -I. $(PROG).c -o $(PROG)$(SUFFIX)
+	gcc $(CFLAGS) $(OCR_FLAGS) -c -I. $(PROG).c
+	g++ -lpthread $(OCR_FLAGS) custom_map.cpp smithwaterman.o -o $(PROG)$(SUFFIX)
+
 
 compile_omp:
 	gcc -fopenmp $(CFLAGS) $(OCR_FLAGS) -I. $(OMP_PROG).c -o $(OMP_PROG)$(SUFFIX)

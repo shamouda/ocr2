@@ -1,7 +1,11 @@
 /**
- * @brief Basic types used throughout the OCR library
+ * @brief Very simple GUID implementation that basically considers
+ * pointers to be GUIDs
+ *
  * @authors Romain Cledat, Intel Corporation
- * @date 2012-09-21
+ * @date 2012-11-13
+ * @warning GUIDs should *not* in general, be considered analogous to
+ * pointers. This is just a sample implementation for illustration purposes
  * Copyright (c) 2012, Intel Corporation
  *
  * Redistribution and use in source and binary forms, with or without
@@ -29,58 +33,30 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- **/
-
-#ifndef __OCR_TYPES_H__
-#define __OCR_TYPES_H__
-
-#include <stddef.h>
-#include <stdint.h>
-
-typedef uint64_t u64;
-typedef uint32_t u32;
-typedef uint16_t u16;
-typedef uint8_t  u8;
-typedef int64_t  s64;
-typedef int32_t  s32;
-typedef int8_t   s8;
-
-/* boolean support in C */
-#ifndef __cplusplus
-#define true 1
-#define TRUE 1
-#define false 0
-#define FALSE 0
-typedef u8 bool;
-#endif /* __cplusplus */
-#ifdef __cplusplus
-#define TRUE true
-#define FALSE false
-extern "C" {
-#endif
-
-/**
- * @brief Type describing the unique identifier of most
- * objects in OCR (EDTs, data-blocks, etc).
- **/
-//typedef intptr_t ocrGuid_t; /**< GUID type */
-typedef u64 ocrGuid_t;
-
-/**
- * @brief An invalid ocrGuid_t
  */
-#define NULL_GUID ((ocrGuid_t)0x0)
+
+#ifndef __OCR_GUIDPROVIDER_ATOMIC_H__
+#define __OCR_GUIDPROVIDER_ATOMIC_H__
+
+#include "ocr-types.h"
+#include "ocr-guid.h"
 
 /**
- * @brief Allocators that can be used to allocate
- * within a data-block
+ * @brief Monotonic GUID provider relying on an atomic counter (not scalable)
+ * 
  */
-typedef enum {
-    NO_ALLOC = 0 /**< No allocation inside data-blocks */
-    /* Add others */
-} ocrInDbAllocator_t;
+typedef struct {
+    ocrGuidProvider_t base;
+} ocrGuidProviderAtomic_t;
 
-#ifdef __cplusplus
-}
-#endif
-#endif /* __OCR_TYPES_H__ */
+typedef struct {
+    ocrGuidProviderFactory_t base;
+} ocrGuidProviderFactoryAtomic_t;
+
+ocrGuidProviderFactory_t* newGuidProviderFactoryAtomic(ocrParamList_t *typeArg);
+
+#define __GUID_END_MARKER__
+#include "ocr-guid-end.h"
+#undef __GUID_END_MARKER__
+
+#endif /* __OCR_GUIDPROVIDER_ATOMIC_H__ */

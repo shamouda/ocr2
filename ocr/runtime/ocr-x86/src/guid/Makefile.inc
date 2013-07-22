@@ -1,6 +1,9 @@
 
-noinst_LTLIBRARIES += libocr_guid_ptr.la
-libocr_la_LIBADD += libocr_guid_ptr.la
+noinst_LTLIBRARIES += libocr_guid_ptr.la libocr_guid_atomic.la
+libocr_la_LIBADD += libocr_guid_ptr.la libocr_guid_atomic.la
 
 libocr_guid_ptr_la_SOURCES = \
 guid/ptr/ptr-guid.c
+
+libocr_guid_atomic_la_SOURCES = \
+guid/counter/atomic-guid.c
