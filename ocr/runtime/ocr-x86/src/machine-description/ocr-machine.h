@@ -1,8 +1,14 @@
+/*
+ * This file is subject to the license agreement located in the file LICENSE
+ * and cannot be distributed without it. This notice cannot be
+ * removed or modified.
+ */
+
 #ifndef __OCR_MACHINE_H_
 
 #define __OCR_MACHINE_H_
 
-#include "iniparser.h"
+#include "external/iniparser.h"
 #include "ocr-allocator.h"
 #include "ocr-comp-platform.h"
 #include "ocr-comp-target.h"

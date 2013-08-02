@@ -1,33 +1,8 @@
-/* Copyright (c) 2012, Rice University
-
-   Redistribution and use in source and binary forms, with or without
-   modification, are permitted provided that the following conditions are
-   met:
-
-   1.  Redistributions of source code must retain the above copyright
-   notice, this list of conditions and the following disclaimer.
-   2.  Redistributions in binary form must reproduce the above
-   copyright notice, this list of conditions and the following
-   disclaimer in the documentation and/or other materials provided
-   with the distribution.
-   3.  Neither the name of Intel Corporation
-   nor the names of its contributors may be used to endorse or
-   promote products derived from this software without specific
-   prior written permission.
-
-   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-   "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-   LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-   A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-   OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-   SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-   LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-   DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-   THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-   (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-   OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-*/
+/*
+ * This file is subject to the license agreement located in the file LICENSE
+ * and cannot be distributed without it. This notice cannot be
+ * removed or modified.
+ */
 
 #include "debug.h"
 #include "event/hc/hc-event.h"
@@ -126,7 +101,14 @@ static ocrEvent_t* eventConstructorInternal(ocrPolicyDomain_t * pd, ocrEventFact
                 (eventType == OCR_EVENT_IDEM_T) ||
                 (eventType == OCR_EVENT_STICKY_T)) &&
                 "error: Unsupported type of event");
-        ocrEventHcSingle_t* eventImpl = (ocrEventHcSingle_t*) checkedMalloc(eventImpl, sizeof(ocrEventHcSingle_t));
+        ocrEventHcSingle_t* eventImpl;
+        if (eventType == OCR_EVENT_ONCE_T) {
+            ocrEventHcOnce_t* onceImpl = (ocrEventHcOnce_t*) checkedMalloc(eventImpl, sizeof(ocrEventHcOnce_t));        
+            onceImpl->nbEdtRegistered = pd->getAtomic64(pd, NULL);
+            eventImpl = (ocrEventHcSingle_t*) onceImpl;
+        } else {
+            eventImpl = (ocrEventHcSingle_t*) checkedMalloc(eventImpl, sizeof(ocrEventHcSingle_t));
+        }
         (eventImpl->base).waiters = END_OF_LIST;
         (eventImpl->base).signalers = END_OF_LIST;
         (eventImpl->base).data = UNINITIALIZED_DATA;
@@ -155,6 +137,10 @@ static void destructEventHc ( ocrEvent_t* base ) {
     ocrPolicyCtx_t * ctx = orgCtx->clone(orgCtx);
     ctx->type = PD_MSG_GUID_REL;
     pd->inform(pd, base->guid, ctx);
+    if(base->kind == OCR_EVENT_ONCE_T) {
+        ocrEventHcOnce_t * onceEvent = (ocrEventHcOnce_t *) base;
+        onceEvent->nbEdtRegistered->fctPtrs->destruct(onceEvent->nbEdtRegistered);
+    }
     ctx->destruct(ctx);
     free(derived);
 }
@@ -212,10 +198,6 @@ static void singleEventSatisfy(ocrEvent_t * base, ocrGuid_t data, u32 slotEvent)
             waiters = waiter;
             waiter = waiter->next;
             free(waiters); // Release waiter node
-        }
-        if (base->kind == OCR_EVENT_ONCE_T) {
-            // once-events die after satisfy has been called
-            destructEventHc(base);
         }
     } else {
         // once-events cannot survive down here

@@ -1,40 +1,19 @@
 /**
  * @brief Data-block management API for OCR
- * @authors Romain Cledat, Intel Corporation
- * @date 2012-09-21
- *
- * Copyright (c) 2012, Intel Corporation
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- *    1. Redistributions of source code must retain the above copyright
- *       notice, this list of conditions and the following disclaimer.
- *    2. Redistributions in binary form must reproduce the above copyright
- *       notice, this list of conditions and the following disclaimer in the
- *       documentation and/or other materials provided with the
- *       distribution.
- *    3. Neither the name of Intel Corporation nor the names
- *       of its contributors may be used to endorse or promote products
- *       derived from this software without specific prior written
- *       permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
- * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
- * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
- * OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
- * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
- * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
- * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  **/
+
+/*
+ * This file is subject to the license agreement located in the file LICENSE
+ * and cannot be distributed without it. This notice cannot be
+ * removed or modified.
+ */
 
 
 #ifndef __OCR_DB_H__
 #define __OCR_DB_H__
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #include "ocr-types.h"
 
@@ -191,6 +170,31 @@ u8 ocrDbMalloc(ocrGuid_t guid, u64 size, void** addr);
 u8 ocrDbMallocOffset(ocrGuid_t guid, u64 size, u64* offset);
 
 /**
+ * @brief Frees memory allocated through ocrDbMalloc
+ *
+ * @param guid              DB to free from
+ * @param addr              Address to free
+ *
+ * @warning The address passed here must have been
+ * allocated before the release of the containing data-block. Use
+ * ocrDbFreeOffset if allocating and freeing across EDTs for
+ * example
+ *
+ * @todo Not supported at this point
+ */
+u8 ocrDbFree(ocrGuid_t guid, void* addr);
+
+/**
+ * @brief Frees memory allocated through ocrDbMallocOffset
+ *
+ * @param guid              DB to free from
+ * @param offset            Offset to free
+ *
+ * @todo Not supported at this point
+ */
+u8 ocrDbFreeOffset(ocrGuid_t guid, u64 offset);
+
+/**
  * @brief Copies data between two data-blocks in an asynchronous manner
  *
  * This call will trigger the creation of an EDT which will perform a copy from
@@ -226,59 +230,10 @@ u8 ocrDbCopy(ocrGuid_t destination, u64 destinationOffset, ocrGuid_t source,
              u64 sourceOffset, u64 size, u64 copyType, ocrGuid_t * completionEvt);
 
 /**
- * @brief Frees memory allocated through ocrDbMalloc
- *
- * @param guid              DB to free from
- * @param addr              Address to free
- *
- * @warning The address passed here must have been
- * allocated before the release of the containing data-block. Use
- * ocrDbFreeOffset if allocating and freeing across EDTs for
- * example
- *
- * @todo Not supported at this point
- */
-u8 ocrDbFree(ocrGuid_t guid, void* addr);
-
-/**
- * @brief Frees memory allocated through ocrDbMallocOffset
- *
- * @param guid              DB to free from
- * @param offset            Offset to free
- *
- * @todo Not supported at this point
- */
-u8 ocrDbFreeOffset(ocrGuid_t guid, u64 offset);
-
-/**
- * @brief Copies data between two data-blocks in an asynchronous manner
- *
- * This call will trigger the creation of an EDT which will perform a copy from a source data-block
- * into a destination data-block. Once the copy is complete,
- * the event with GUID 'completionEvt'' will be satisfied. That event will carry the destination data-block.
- *
- * The type of GUID passed in as source also determines the starting point of the copy:
- *    - if it is an event GUID, the EDT will be available to run when that event is satisfied. The data-block carried by
- *       that event will be used as the source data-block
- *    - if it is a data-block GUID, the EDT is immediately available to run.
- *
- * @param destination           GUID of the data-block to copy to
- * @param destinationOffset     Starting offset within the destination to copy to
- * @param source                GUID of an event or data-block to copy from
- * @param sourceOffset          Starting offset within the source to copy from
- * @param size                  Number of bytes to copy
- * @param copyType              Reserved for future use
- * @param completionEvt         If non NULL, returns the GUID of the event that will be
- *                              satisfied when the copy is completed.
- *
- * @return 0 on success or the following error codes:
- *    - EINVAL: Invalid values for one of the arguments
- *    - EPERM: Overlapping data-blocks
- *    - ENOMEM: Destination too small to copy into or source too small to copy from
- */
-u8 ocrDbCopy(ocrGuid_t destination, u64 destinationOffset, ocrGuid_t source, u64 sourceOffset, u64 size, u64 copyType, ocrGuid_t * completionEvt);
-
-/**
  * @}
  */
+#ifdef __cplusplus
+}
+#endif
+
 #endif /* __OCR_DB_H__ */

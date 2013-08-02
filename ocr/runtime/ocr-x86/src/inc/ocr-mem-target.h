@@ -1,37 +1,12 @@
 /**
  * @brief OCR interface to the target level memory interface
- * @authors Romain Cledat, Intel Corporation
- * @date 2012-09-21
- * Copyright (c) 2012, Intel Corporation
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- *    1. Redistributions of source code must retain the above copyright
- *       notice, this list of conditions and the following disclaimer.
- *    2. Redistributions in binary form must reproduce the above copyright
- *       notice, this list of conditions and the following disclaimer in the
- *       documentation and/or other materials provided with the
- *       distribution.
- *    3. Neither the name of Intel Corporation nor the names
- *       of its contributors may be used to endorse or promote products
- *       derived from this software without specific prior written
- *       permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
- * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
- * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
- * OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
- * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
- * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
- * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  **/
 
-
+/*
+ * This file is subject to the license agreement located in the file LICENSE
+ * and cannot be distributed without it. This notice cannot be
+ * removed or modified.
+ */
 
 #ifndef __OCR_MEM_TARGET_H__
 #define __OCR_MEM_TARGET_H__
@@ -40,13 +15,21 @@
 #include "ocr-types.h"
 #include "ocr-utils.h"
 
+
 /****************************************************/
 /* PARAMETER LISTS                                  */
 /****************************************************/
+
+/**
+ * @brief Parameter list to create a mem-target factory
+ */
 typedef struct _paramListMemTargetFact_t {
     ocrParamList_t base;
 } paramListMemTargetFact_t;
 
+/**
+ * @brief Parameter list to create a mem-target instance
+ */
 typedef struct _paramListMemTargetInst_t {
     ocrParamList_t base;
 } paramListMemTargetInst_t;
@@ -60,16 +43,22 @@ struct _ocrMemTarget_t;
 struct _ocrPolicyDomain_t;
 
 typedef struct _ocrMemTargetFcts_t {
-    /**
-     * @brief Destructor equivalent
-     *
-     * @param self          Pointer to this low-memory provider
+    /*! \brief Destroys a mem-target
+     *  \param[in] self          Pointer to this mem-target
      */
     void (*destruct)(struct _ocrMemTarget_t* self);
 
+    /*! \brief Starts the mem-target
+     *  \param[in] self          Pointer to this mem-target
+     *  \param[in] PD            Current policy domain
+     */
     void (*start)(struct _ocrMemTarget_t* self, struct _ocrPolicyDomain_t * PD);
 
+    /*! \brief Stops the mem-target
+     *  \param[in] self          Pointer to this mem-target
+     */
     void (*stop)(struct _ocrMemTarget_t* self);
+
     /**
      * @brief Allocates a chunk of memory for the higher-level
      * allocators to manage
@@ -91,32 +80,44 @@ typedef struct _ocrMemTargetFcts_t {
 } ocrMemTargetFcts_t;
 
 struct _ocrMemPlatform_t;
+
 /**
  * @brief Target-level memory provider.
  *
  * This represents the target's memories (such as scratchpads)
- *
  */
 typedef struct _ocrMemTarget_t {
     ocrMappable_t module; /**< Base "class" for ocrMemTarget */
-    ocrGuid_t guid;
-
-    struct _ocrMemPlatform_t **memories;
-    u64 memoryCount;
-
-    ocrMemTargetFcts_t *fctPtrs;
+    ocrGuid_t guid; /**< GUID for this mem-target */
+    struct _ocrMemPlatform_t **memories; /**< Pointers to underlying mem-target */
+    u64 memoryCount; /**< Number of mem-targets */
+    ocrMemTargetFcts_t *fctPtrs; /**< Function pointers for this instance */
 } ocrMemTarget_t;
+
 
 /****************************************************/
 /* OCR MEMORY TARGET FACTORY                        */
 /****************************************************/
-
+    
+/**
+ * @brief mem-target factory
+ */
 typedef struct _ocrMemTargetFactory_t {
+    /**
+     * @brief Instantiate a new mem-target and returns a pointer to it.
+     *
+     * @param factory       Pointer to this factory
+     * @param instanceArg   Arguments specific for this instance
+     */
     ocrMemTarget_t * (*instantiate) (struct _ocrMemTargetFactory_t * factory,
                                      ocrParamList_t* perInstance);
+    /**
+     * @brief mem-target factory destructor
+     * @param factory       Pointer to the factory to destroy.
+     */
     void (*destruct)(struct _ocrMemTargetFactory_t * factory);
 
-    ocrMemTargetFcts_t targetFcts;
+    ocrMemTargetFcts_t targetFcts; /**< Function pointers created instances should use */
 } ocrMemTargetFactory_t;
 
 #endif /* __OCR_MEM_TARGET_H__ */

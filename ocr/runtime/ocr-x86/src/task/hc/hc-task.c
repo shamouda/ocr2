@@ -1,33 +1,8 @@
-/* Copyright (c) 2012, Rice University
-
-   Redistribution and use in source and binary forms, with or without
-   modification, are permitted provided that the following conditions are
-   met:
-
-   1.  Redistributions of source code must retain the above copyright
-   notice, this list of conditions and the following disclaimer.
-   2.  Redistributions in binary form must reproduce the above
-   copyright notice, this list of conditions and the following
-   disclaimer in the documentation and/or other materials provided
-   with the distribution.
-   3.  Neither the name of Intel Corporation
-   nor the names of its contributors may be used to endorse or
-   promote products derived from this software without specific
-   prior written permission.
-
-   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-   "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-   LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-   A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-   OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-   SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-   LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-   DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-   THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-   (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-   OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-*/
+/*
+ * This file is subject to the license agreement located in the file LICENSE
+ * and cannot be distributed without it. This notice cannot be
+ * removed or modified.
+ */
 
 #include "debug.h"
 #include "event/hc/hc-event.h"
@@ -45,17 +20,13 @@
 #include "ocr-statistics.h"
 #endif
 
+#include <string.h>
+
 #define SEALED_LIST ((void *) -1)
 #define END_OF_LIST NULL
 #define UNINITIALIZED_DATA ((ocrGuid_t) -2)
 
-
 #define DEBUG_TYPE TASK
-
-//
-// Guid-kind checkers for convenience
-//
-
 
 //
 // Convenience functions to get the EDT and deguidify it
@@ -171,7 +142,12 @@ static void newTaskHcInternalCommon (ocrPolicyDomain_t * pd, ocrTaskHc_t* derive
     guidify(pd, (u64)base, &(base->guid), OCR_GUID_EDT);
     base->templateGuid = taskTemplate->guid;
     base->paramc = paramc;
-    base->paramv = paramv;
+    if(paramc) {
+        base->paramv = checkedMalloc(base->paramv, sizeof(u64)*base->paramc);
+        memcpy(base->paramv, paramv, sizeof(u64)*base->paramc);
+    } else {
+        base->paramv = NULL;
+    }
     base->outputEvent = outputEvent;
     base->depc = depc;
     base->addedDepCounter = pd->getAtomic64(pd, NULL /*Context*/);
@@ -265,6 +241,19 @@ static void taskSignaled(ocrTask_t * base, ocrGuid_t data, u32 slot) {
     // current signal frontier, since it is the only signaler
     // the edt is registered with at that time.
     ocrTaskHc_t * self = (ocrTaskHc_t *) base;
+    ocrGuid_t signalerGuid = self->signalers[slot].guid;
+
+    if (isEventGuidOfKind(signalerGuid, OCR_EVENT_ONCE_T)) {
+        ocrEventHcOnce_t * onceEvent = NULL;
+        deguidify(getCurrentPD(), signalerGuid, (u64*)&onceEvent, NULL);
+        DPRINTF(DEBUG_LVL_INFO, "Decrement ONCE event reference %lx \n", signalerGuid);
+        onceEvent->nbEdtRegistered->fctPtrs->xadd(onceEvent->nbEdtRegistered, -1);
+        if(onceEvent->nbEdtRegistered->fctPtrs->val(onceEvent->nbEdtRegistered) == 0) {
+            // deallocate once event
+            ocrEvent_t * base = (ocrEvent_t *) onceEvent;
+            base->fctPtrs->destruct(base);
+        }
+    }
     // Replace the signaler's guid by the data guid, this to avoid
     // further references to the event's guid, which is good in general
     // and crucial for once-event since they are being destroyed on satisfy.
@@ -399,6 +388,8 @@ static void taskExecute ( ocrTask_t* base ) {
         }
         free(depv);
     }
+    if(paramv)
+        free(paramv); // Free the parameter array (we copied them in)
     bool satisfyOutputEvent = (base->outputEvent != NULL_GUID);
     // check out from current finish scope
     ocrEvent_t * curLatch = getFinishLatch(base);
@@ -538,6 +529,15 @@ static void awaitableEventRegisterWaiter(ocrEventHcAwaitable_t * self, ocrGuid_t
     signalWaiter(waiter, self->data, slot);
 }
 
+// Registers an edt to a once event by incrementing an atomic counter
+// The event is deallocated only after being satisfied and all waiters 
+// have been notified
+static void onceEventRegisterEdtWaiter(ocrEvent_t * self, ocrGuid_t waiter, int slot) {
+    ocrEventHcOnce_t* onceImpl = (ocrEventHcOnce_t*) self;
+    DPRINTF(DEBUG_LVL_INFO, "Increment ONCE event reference %lx \n", self->guid);
+    onceImpl->nbEdtRegistered->fctPtrs->xadd(onceImpl->nbEdtRegistered, 1);
+}
+
 //These are essentially switches to dispatch call to the correct implementation
 
 void registerDependence(ocrGuid_t signalerGuid, ocrGuid_t waiterGuid, int slot) {
@@ -553,6 +553,13 @@ void registerDependence(ocrGuid_t signalerGuid, ocrGuid_t waiterGuid, int slot) 
         deguidify(getCurrentPD(), signalerGuid, (u64*)&target, NULL);
         awaitableEventRegisterWaiter(target, waiterGuid, slot);
         return;
+    }
+    // ONCE event must know who are consuming them so that 
+    // they are not deallocated prematurely 
+    if (isEventGuidOfKind(signalerGuid, OCR_EVENT_ONCE_T) && isEdtGuid(waiterGuid)) {
+        ocrEvent_t * signalerEvent;
+        deguidify(getCurrentPD(), signalerGuid, (u64*)&signalerEvent, NULL);
+        onceEventRegisterEdtWaiter(signalerEvent, waiterGuid, slot);
     }
 
     // SIGNAL MODE:

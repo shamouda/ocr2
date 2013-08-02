@@ -1,9 +1,17 @@
+/*
+ * This file is subject to the license agreement located in the file LICENSE
+ * and cannot be distributed without it. This notice cannot be
+ * removed or modified.
+ */
+
+
 #include "allocator/allocator-all.h"
 #include "comp-platform/comp-platform-all.h"
 #include "comp-target/comp-target-all.h"
 #include "datablock/datablock-all.h"
 #include "debug.h"
 #include "event/event-all.h"
+#include "external/iniparser.h"
 #include "guid/guid-all.h"
 #include "machine-description/ocr-machine.h"
 #include "mem-platform/mem-platform-all.h"
@@ -18,7 +26,6 @@
 
 #include <stdio.h>
 #include <string.h>
-#include <iniparser.h>
 #include <signal.h>
 
 

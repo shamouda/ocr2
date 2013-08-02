@@ -1,37 +1,12 @@
 /**
  * @brief OCR interface to the low level memory interface
- * @authors Romain Cledat, Intel Corporation
- * @date 2012-09-21
- * Copyright (c) 2012, Intel Corporation
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- *    1. Redistributions of source code must retain the above copyright
- *       notice, this list of conditions and the following disclaimer.
- *    2. Redistributions in binary form must reproduce the above copyright
- *       notice, this list of conditions and the following disclaimer in the
- *       documentation and/or other materials provided with the
- *       distribution.
- *    3. Neither the name of Intel Corporation nor the names
- *       of its contributors may be used to endorse or promote products
- *       derived from this software without specific prior written
- *       permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
- * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
- * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
- * OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
- * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
- * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
- * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  **/
 
-
+/*
+ * This file is subject to the license agreement located in the file LICENSE
+ * and cannot be distributed without it. This notice cannot be
+ * removed or modified.
+ */
 
 #ifndef __OCR_MEM_PLATFORM_H__
 #define __OCR_MEM_PLATFORM_H__
@@ -40,13 +15,21 @@
 #include "ocr-types.h"
 #include "ocr-utils.h"
 
+
 /****************************************************/
 /* PARAMETER LISTS                                  */
 /****************************************************/
+
+/**
+ * @brief Parameter list to create a mem-platform factory
+ */
 typedef struct _paramListMemPlatformFact_t {
     ocrParamList_t base;
 } paramListMemPlatformFact_t;
 
+/**
+ * @brief Parameter list to create a mem-platform instance
+ */
 typedef struct _paramListMemPlatformInst_t {
     ocrParamList_t base;
 } paramListMemPlatformInst_t;
@@ -59,23 +42,34 @@ typedef struct _paramListMemPlatformInst_t {
 struct _ocrMemPlatform_t;
 struct _ocrPolicyDomain_t;
 
+/**
+ * @brief mem-platform function pointers
+ *
+ * The function pointers are separate from the mem-platform instance to allow for
+ * the sharing of function pointers for mem-platform from the same factory
+ */
 typedef struct _ocrMemPlatformFcts_t {
-    /**
-     * @brief Destructor equivalent
-     *
-     * @param self          Pointer to this low-memory provider
+    /*! \brief Destroys a mem-platform
+     *  \param[in] self          Pointer to this mem-platform
      */
     void (*destruct)(struct _ocrMemPlatform_t* self);
 
+    /*! \brief Starts the mem-platform
+     *  \param[in] self          Pointer to this mem-platform
+     *  \param[in] PD            Current policy domain
+     */
     void (*start)(struct _ocrMemPlatform_t* self, struct _ocrPolicyDomain_t * PD);
 
+    /*! \brief Stops the mem-platform
+     *  \param[in] self          Pointer to this mem-platform
+     */
     void (*stop)(struct _ocrMemPlatform_t* self);
 
     /**
      * @brief Allocates a chunk of memory for the higher-level
      * allocators to manage
      *
-     * @param self          Pointer to this low-memory provider
+     * @param self          Pointer to this mem-platform
      * @param size          Size of the chunk to allocate
      * @return Pointer to the chunk of memory allocated
      */
@@ -85,14 +79,14 @@ typedef struct _ocrMemPlatformFcts_t {
      * @brief Frees a chunk of memory previously allocated
      * by self using allocate
      *
-     * @param self          Pointer to this low-memory provider
+     * @param self          Pointer to this mem-platform
      * @param addr          Address to free
      */
     void (*free)(struct _ocrMemPlatform_t* self, void* addr);
 } ocrMemPlatformFcts_t;
 
 /**
- * @brief Low-level memory provider.
+ * @brief Memory-platform
  *
  * This allows low-level memory allocation (such as malloc)
  *
@@ -102,18 +96,33 @@ typedef struct _ocrMemPlatformFcts_t {
  */
 typedef struct _ocrMemPlatform_t {
     ocrMappable_t module; /**< Base "class" for ocrMemPlatform */
-
-    ocrMemPlatformFcts_t *fctPtrs;
+    ocrMemPlatformFcts_t *fctPtrs; /**< Function pointers for this instance */
 } ocrMemPlatform_t;
+
 
 /****************************************************/
 /* OCR MEMORY PLATFORM FACTORY                      */
 /****************************************************/
+
+/**
+ * @brief mem-platform factory
+ */
 typedef struct _ocrMemPlatformFactory_t {
+    /**
+     * @brief Instantiate a new mem-platform and returns a pointer to it.
+     *
+     * @param factory       Pointer to this factory
+     * @param instanceArg   Arguments specific for this instance
+     */
     ocrMemPlatform_t * (*instantiate) (struct _ocrMemPlatformFactory_t * factory,
-                                       ocrParamList_t* perInstance);
+                                       ocrParamList_t* instanceArg);
+    /**
+     * @brief mem-platform factory destructor
+     * @param factory       Pointer to the factory to destroy.
+     */
     void (*destruct)(struct _ocrMemPlatformFactory_t * factory);
 
-    ocrMemPlatformFcts_t platformFcts;
+    ocrMemPlatformFcts_t platformFcts; /**< Function pointers created instances should use */
 } ocrMemPlatformFactory_t;
+
 #endif /* __OCR_MEM_PLATFORM_H__ */

@@ -1,33 +1,13 @@
-/* Copyright (c) 2012, Rice University
+/**
+ * @brief OCR interface to computation platforms
+ **/
 
-   Redistribution and use in source and binary forms, with or without
-   modification, are permitted provided that the following conditions are
-   met:
+/*
+ * This file is subject to the license agreement located in the file LICENSE
+ * and cannot be distributed without it. This notice cannot be
+ * removed or modified.
+ */
 
-   1.  Redistributions of source code must retain the above copyright
-   notice, this list of conditions and the following disclaimer.
-   2.  Redistributions in binary form must reproduce the above
-   copyright notice, this list of conditions and the following
-   disclaimer in the documentation and/or other materials provided
-   with the distribution.
-   3.  Neither the name of Intel Corporation
-   nor the names of its contributors may be used to endorse or
-   promote products derived from this software without specific
-   prior written permission.
-
-   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-   "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-   LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-   A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-   OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-   SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-   LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-   DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-   THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-   (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-   OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-*/
 
 #ifndef __OCR_COMP_PLATFORM_H__
 #define __OCR_COMP_PLATFORM_H__
@@ -42,12 +22,18 @@
 /* PARAMETER LISTS                                  */
 /****************************************************/
 
+/**
+ * @brief Parameter list to create a comp-platform factory
+ */
 typedef struct _paramListCompPlatformFact_t {
-    ocrParamList_t base;
+    ocrParamList_t base;    /**< Base class */
 } paramListCompPlatformFact_t;
 
+/**
+ * @brief Parameter list to create a comp-platform instance
+ */
 typedef struct _paramListCompPlatformInst_t {
-    ocrParamList_t base;
+    ocrParamList_t base;    /**< Base class */
 } paramListCompPlatformInst_t;
 
 
@@ -57,26 +43,41 @@ typedef struct _paramListCompPlatformInst_t {
 
 struct _ocrCompPlatform_t;
 
+/**
+ * @brief Comp-platform function pointers
+ *
+ * The function pointers are separate from the comp-platform instance to allow for
+ * the sharing of function pointers for comp-platform from the same factory
+ */
 typedef struct _ocrCompPlatformFcts_t {
+    /*! \brief Destroys a comp-platform
+     */
     void (*destruct)(struct _ocrCompPlatform_t *self);
+
     /**
-     * @brief Starts a thread of execution.
+     * @brief Starts a comp-platform (a thread of execution).
      *
-     * The function started will be 'routine' and it will be passed 'routineArg'
-     * @todo There was something about a stack size...
+     * @param self          Pointer to this comp-platform
+     * @param PD            The policy domain bringing up the runtime
+     * @param launchArgs    Arguments to be passed down to the comp-platform
      */
     void (*start)(struct _ocrCompPlatform_t *self, struct _ocrPolicyDomain_t * PD, launchArg_t * launchArg);
 
     /**
-     * @brief Stops this tread of execution
+     * @brief Stops this comp-platform
+     * @param self          Pointer to this comp-platform
      */
     void (*stop)(struct _ocrCompPlatform_t *self);
 
 } ocrCompPlatformFcts_t;
 
+/**
+ * @brief Interface to a comp-platform representing a
+ * resource able to perform computation.
+ */
 typedef struct _ocrCompPlatform_t {
-    ocrMappable_t module;
-    ocrCompPlatformFcts_t *fctPtrs;
+    ocrMappable_t module; /**< Base "class" */
+    ocrCompPlatformFcts_t *fctPtrs; /**< Function pointers for this instance */
 } ocrCompPlatform_t;
 
 
@@ -84,15 +85,32 @@ typedef struct _ocrCompPlatform_t {
 /* OCR COMPUTE PLATFORM FACTORY                     */
 /****************************************************/
 
+/**
+ * @brief comp-platform factory
+ */
 typedef struct _ocrCompPlatformFactory_t {
+    /**
+     * @brief Instantiate a new comp-platform and returns a pointer to it.
+     *
+     * @param factory       Pointer to this factory
+     * @param instanceArg   Arguments specific for this instance
+     */
     ocrCompPlatform_t* (*instantiate)(struct _ocrCompPlatformFactory_t *factory,
-                                      ocrParamList_t *perInstance);
+                                      ocrParamList_t *instanceArg);
 
+    /**
+     * @brief comp-platform factory destructor
+     * @param factory       Pointer to the factory to destroy.
+     */
     void (*destruct)(struct _ocrCompPlatformFactory_t *factory);
 
+    /**
+     * @brief Allows to setup global function pointers
+     * @param factory       Pointer to this factory
+     */
     void (*setIdentifyingFunctions)(struct _ocrCompPlatformFactory_t *factory);
 
-    ocrCompPlatformFcts_t platformFcts;
+    ocrCompPlatformFcts_t platformFcts; /**< Function pointers created instances should use */
 } ocrCompPlatformFactory_t;
 
 #endif /* __OCR_COMP_PLATFORM_H__ */
