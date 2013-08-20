@@ -35,10 +35,13 @@
 
 #ifndef __OCR_H__
 #define __OCR_H__
-
+#ifdef __cplusplus
+extern "C" {
+#endif
 #include "ocr-types.h"
 #include "ocr-db.h"
 #include "ocr-edt.h"
+#include "compat.h"
 
 /**
  * @brief Called by an EDT to indicate the end of an OCR
@@ -83,7 +86,9 @@ u64 getArgc(void* dbPtr);
  * @return A NULL terminated string
  */
 char* getArgv(void* dbPtr, u64 count);
-
+#ifdef __cplusplus
+}
+#endif
 /**
  * @}
  **/

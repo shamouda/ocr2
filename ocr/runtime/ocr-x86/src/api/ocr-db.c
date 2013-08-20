@@ -43,11 +43,13 @@ u8 ocrDbCreate(ocrGuid_t *db, void** addr, u64 len, u16 flags,
     ocrPolicyDomain_t* policy = getCurrentPD();
     ocrPolicyCtx_t* ctx = getCurrentWorkerContext();
     // TODO: Pass ocrInDbAllocator_t down to the DB factory
-    policy->allocateDb(
-        policy, db, addr, len, flags, affinity, allocator, ctx);
+    if(policy->allocateDb(
+           policy, db, addr, len, flags, affinity, allocator, ctx) == 0) {
 
-    ocrDataBlock_t* createdDb;
-    deguidify(policy, *db, (u64*)&createdDb, NULL);
+        ocrDataBlock_t* createdDb;
+        deguidify(policy, *db, (u64*)&createdDb, NULL);
+        
+        *db = createdDb->guid;
 
 #ifdef OCR_ENABLE_STATISTICS
     ocrStats_t * stats = policy->getStats(policy);
@@ -56,7 +58,7 @@ u8 ocrDbCreate(ocrGuid_t *db, void** addr, u64 len, u16 flags,
                                        &(createdDb->statProcess));
 #endif
 
-    ocrGuid_t edtGuid = getCurrentEDT();
+        ocrGuid_t edtGuid = getCurrentEDT();
 #ifdef OCR_ENABLE_STATISTICS
     {
         ocrTask_t *task = NULL;
@@ -78,11 +80,12 @@ u8 ocrDbCreate(ocrGuid_t *db, void** addr, u64 len, u16 flags,
         ocrStatsSyncMessage(srcProcess, &(createdDb->statProcess), mess2);
     }
 #else
-    *addr = createdDb->fctPtrs->acquire(createdDb, edtGuid, false);
+        *addr = createdDb->fctPtrs->acquire(createdDb, edtGuid, false);
 #endif
+    } else {
+        *addr = NULL;
+    }
     if(*addr == NULL) return ENOMEM;
-
-    *db = createdDb->guid;
 
     // if(startMemStat)
     // {

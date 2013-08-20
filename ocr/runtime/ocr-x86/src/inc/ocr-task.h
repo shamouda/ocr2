@@ -12,6 +12,7 @@
 #include "ocr-sync.h"
 #include "ocr-types.h"
 #include "ocr-utils.h"
+#include "ocr-mappable.h"
 
 #ifdef OCR_ENABLE_STATISTICS
 #include "ocr-statistics.h"
@@ -158,3 +159,4 @@ typedef struct _ocrTaskFactory_t {
     ocrTaskFcts_t taskFcts;
 } ocrTaskFactory_t;
 #endif /* __OCR_TASK_H__ */
+

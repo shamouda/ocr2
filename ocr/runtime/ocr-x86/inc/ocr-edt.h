@@ -12,7 +12,9 @@
 
 #ifndef __OCR_EDT_H__
 #define __OCR_EDT_H__
-
+#ifdef __cplusplus
+extern "C" {
+#endif
 #include "ocr-types.h"
 
 /**
@@ -159,7 +161,7 @@ typedef struct {
  * @brief Constant indicating that the number of parameters to an EDT
  * is the same as the one specified in its template
  */
-#define EDT_PARAM_DEF   ((u32)-1)
+#define EDT_PARAM_DEF   ((u32)-2)
 
 /**
  * @brief Type for an EDT
@@ -213,9 +215,6 @@ u8 ocrEdtTemplateDestroy(ocrGuid_t guid);
  *                          actual number of arguments to be passed if 'EDT_PARAM_UNK'
  *                          has been given as the template's 'paramc' value.
  * @param paramv            Values for those parameters (copied in)
- * @param properties        Used to indicate if this is a finish EDT (EDT_PROP_FINISH).
- *                          Other uses reserved.
- * @param affinity          Affinity container for this EDT. Can be NULL_GUID
  * @param depc              Number of dependences for this EDT. Set to 'EDT_PARAM_DEF' if
  *                          it follows the 'depc' template specification. Set to the actual
  *                          number of arguments to be passed if 'EDT_PARAM_UNK' has been
@@ -223,6 +222,9 @@ u8 ocrEdtTemplateDestroy(ocrGuid_t guid);
  * @param depv              Values for the GUIDs of the dependences (if known)
  *                          Use ocrAddDependence to add unknown ones or ones with
  *                          a mode other than the default DB_MODE_ITW
+ * @param properties        Used to indicate if this is a finish EDT (EDT_PROP_FINISH).
+ *                          Other uses reserved.
+ * @param affinity          Affinity container for this EDT. Can be NULL_GUID
  * @param outputEvent       Returned value: If not NULL, will return the GUID
  *                          of the event that will be satisfied when this EDT
  *                          completes. In the case of a finish EDT, this event
@@ -317,4 +319,8 @@ u8 ocrAddDependence(ocrGuid_t source,
 /**
    @}
 **/
+#ifdef __cplusplus
+}
+#endif
+
 #endif /* __OCR_EDT_H__ */

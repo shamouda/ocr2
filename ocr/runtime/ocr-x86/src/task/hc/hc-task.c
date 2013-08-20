@@ -20,6 +20,8 @@
 #include "ocr-statistics.h"
 #endif
 
+#include <string.h>
+
 #define SEALED_LIST ((void *) -1)
 #define END_OF_LIST NULL
 #define UNINITIALIZED_DATA ((ocrGuid_t) -2)
@@ -140,7 +142,12 @@ static void newTaskHcInternalCommon (ocrPolicyDomain_t * pd, ocrTaskHc_t* derive
     guidify(pd, (u64)base, &(base->guid), OCR_GUID_EDT);
     base->templateGuid = taskTemplate->guid;
     base->paramc = paramc;
-    base->paramv = paramv;
+    if(paramc) {
+        base->paramv = checkedMalloc(base->paramv, sizeof(u64)*base->paramc);
+        memcpy(base->paramv, paramv, sizeof(u64)*base->paramc);
+    } else {
+        base->paramv = NULL;
+    }
     base->outputEvent = outputEvent;
     base->depc = depc;
     base->addedDepCounter = pd->getAtomic64(pd, NULL /*Context*/);
@@ -381,6 +388,8 @@ static void taskExecute ( ocrTask_t* base ) {
         }
         free(depv);
     }
+    if(paramv)
+        free(paramv); // Free the parameter array (we copied them in)
     bool satisfyOutputEvent = (base->outputEvent != NULL_GUID);
     // check out from current finish scope
     ocrEvent_t * curLatch = getFinishLatch(base);
@@ -413,7 +422,11 @@ static void taskExecute ( ocrTask_t* base ) {
 /* OCR-HC Task Template Factory                       */
 /******************************************************/
 
-ocrTaskTemplate_t * newTaskTemplateHc(ocrTaskTemplateFactory_t* factory,
+static void destructTaskTemplateHc(ocrTaskTemplate_t *self) {
+    free(self);
+}
+
+static ocrTaskTemplate_t * newTaskTemplateHc(ocrTaskTemplateFactory_t* factory,
                                       ocrEdt_t executePtr, u32 paramc, u32 depc, ocrParamList_t *perInstance) {
     ocrTaskTemplateHc_t* template = (ocrTaskTemplateHc_t*) checkedMalloc(template, sizeof(ocrTaskTemplateHc_t));
     ocrTaskTemplate_t * base = (ocrTaskTemplate_t *) template;
@@ -421,11 +434,12 @@ ocrTaskTemplate_t * newTaskTemplateHc(ocrTaskTemplateFactory_t* factory,
     base->depc = depc;
     base->executePtr = executePtr;
     base->guid = UNINITIALIZED_GUID;
+    base->fctPtrs = &(factory->taskTemplateFcts);
     guidify(getCurrentPD(), (u64)base, &(base->guid), OCR_GUID_EDT_TEMPLATE);
     return base;
 }
 
-void destructTaskTemplateFactoryHc(ocrTaskTemplateFactory_t* base) {
+static void destructTaskTemplateFactoryHc(ocrTaskTemplateFactory_t* base) {
     ocrTaskTemplateFactoryHc_t* derived = (ocrTaskTemplateFactoryHc_t*) base;
     free(derived);
 }
@@ -435,6 +449,7 @@ ocrTaskTemplateFactory_t * newTaskTemplateFactoryHc(ocrParamList_t* perType) {
     ocrTaskTemplateFactory_t* base = (ocrTaskTemplateFactory_t*) derived;
     base->instantiate = newTaskTemplateHc;
     base->destruct =  destructTaskTemplateFactoryHc;
+    base->taskTemplateFcts.destruct = &destructTaskTemplateHc;
     //TODO What taskTemplateFcts is supposed to do ?
     return base;
 }
@@ -461,7 +476,7 @@ ocrTask_t * newTaskHc(ocrTaskFactory_t* factory, ocrTaskTemplate_t * taskTemplat
     ocrTaskHc_t* edt = newTaskHcInternal(factory, pd, taskTemplate, paramc, paramv,
                                          depc, properties, affinity, outputEvent);
     ocrTask_t* base = (ocrTask_t*) edt;
-    base->fctPtrs = &(((ocrTaskFactoryHc_t *) factory)->taskFctPtrs);
+    base->fctPtrs = &(factory->taskFcts);
     DPRINTF(DEBUG_LVL_INFO, "Create 0x%lx depc %d outputEvent 0x%lx\n", base->guid, depc, outputEvent);
     return base;
 }
@@ -479,9 +494,9 @@ ocrTaskFactory_t * newTaskFactoryHc(ocrParamList_t* perInstance) {
     // initialize singleton instance that carries hc implementation
     // function pointers. Every instantiated task template will use
     // this pointer to resolve functions implementations.
-    derived->taskFctPtrs.destruct = destructTaskHc;
-    derived->taskFctPtrs.execute = taskExecute;
-    derived->taskFctPtrs.schedule = tryScheduleTask;
+    base->taskFcts.destruct = destructTaskHc;
+    base->taskFcts.execute = taskExecute;
+    base->taskFcts.schedule = tryScheduleTask;
     return base;
 }
 
@@ -584,11 +599,10 @@ void registerSignaler(ocrGuid_t signalerGuid, ocrGuid_t waiterGuid, int slot) {
         // edt waiting for a signal from an event or a datablock
         ASSERT((signalerGuid == NULL_GUID) || isEventGuid(signalerGuid) || isDatablockGuid(signalerGuid));
         ocrTask_t * target = NULL;
+
         deguidify(getCurrentPD(), waiterGuid, (u64*)&target, NULL);
         edtRegisterSignaler(target, signalerGuid, slot);
-        ocrTaskTemplate_t * template = NULL;
-        deguidify(getCurrentPD(), target->templateGuid, (u64*)&template, NULL);
-        if ( template->depc == target->addedDepCounter->fctPtrs->xadd(target->addedDepCounter,1) ) {
+        if ( target->depc == target->addedDepCounter->fctPtrs->xadd(target->addedDepCounter,1) ) {
             // This function pointer is called once, when all the dependence have been added
             target->fctPtrs->schedule(target);
         }
