@@ -41,10 +41,17 @@
 extern ocr_workpile_t * hc_workpile_constructor();
 extern ocr_workpile_t * ce_message_workpile_constructor();
 
+extern ocr_workpile_t * dequeish_priority_workpile_constructor();
+extern ocr_workpile_t * priority_workpile_constructor();
+
 ocr_workpile_t * newWorkpile(ocr_workpile_kind workpileType) {
     switch(workpileType) {
     case OCR_DEQUE:
         return hc_workpile_constructor();
+    case OCR_DEQUEISH_PRIORITY_QUEUE:
+        return dequeish_priority_workpile_constructor();
+    case OCR_PRIORITY_QUEUE:
+        return priority_workpile_constructor();
     case OCR_MESSAGE_QUEUE:
         return ce_message_workpile_constructor();
     default:

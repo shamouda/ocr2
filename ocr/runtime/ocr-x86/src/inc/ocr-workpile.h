@@ -87,7 +87,9 @@ typedef struct ocr_workpile_struct {
 
 typedef enum ocr_workpile_kind_enum {
     OCR_DEQUE = 1,
-    OCR_MESSAGE_QUEUE = 2
+    OCR_MESSAGE_QUEUE = 2,
+    OCR_DEQUEISH_PRIORITY_QUEUE = 3,
+    OCR_PRIORITY_QUEUE = 4
 } ocr_workpile_kind;
 
 ocr_workpile_t * newWorkpile(ocr_workpile_kind workpileType);

@@ -37,6 +37,7 @@
 #include "ocr-task-event.h"
 #include "ocr-guid.h"
 // TODO sagnak it feels as the policy exposure here should not have happened
+#include "hc.h"
 #include "ocr-policy.h"
 
 void regularCreate(ocrDataBlock_t *self, ocrGuid_t allocatorGuid, u64 size,
@@ -203,7 +204,7 @@ void placedCreate(ocrDataBlock_t *self, ocrGuid_t allocatorGuid, u64 size,
     regularCreate(self, allocatorGuid, size, flags, configuration);
 
     ocrDataBlockPlaced_t *derived = (ocrDataBlockPlaced_t*)self;
-    ocrPlaceTrackerInit(derived->placeTracker);
+    ocrPlaceTrackerInit(&(derived->placeTracker));
 }
 
 void placedDestruct(ocrDataBlock_t *self) {
@@ -227,8 +228,12 @@ void placedDestruct(ocrDataBlock_t *self) {
 void* placedAcquire(ocrDataBlock_t *self, ocrGuid_t edt, bool isInternal) {
     ocrDataBlockPlaced_t *derived = (ocrDataBlockPlaced_t*)self;
 
-    unsigned char currPlace = get_current_policy_domain()->id;
-    ocrPlaceTrackerInsert(derived->placeTracker, currPlace);
+    ocrGuid_t worker_guid = ocr_get_current_worker_guid();
+    ocr_worker_t * worker = NULL;
+    globalGuidProvider->getVal(globalGuidProvider, worker_guid, (u64*)&worker, NULL);
+    hc_worker_t * hcWorker = (hc_worker_t *) worker;
+
+    ocrPlaceTrackerInsert(&(derived->placeTracker), hcWorker->id);
     return regularAcquire(self, edt, isInternal);
 }
 
@@ -236,13 +241,13 @@ u8 placedRelease(ocrDataBlock_t *self, ocrGuid_t edt,
                   bool isInternal) {
     // ocrDataBlockPlaced_t *derived = (ocrDataBlockPlaced_t*)self;
     // unsigned char currPlace = get_current_policy_domain()->id;
-    // ocrPlaceTrackerRemove(derived->placeTracker, currPlace);
+    // ocrPlaceTrackerRemove(&(derived->placeTracker), currPlace);
     return regularRelease(self, edt, isInternal);
 }
 
 ocrDataBlock_t* newDataBlockPlaced() {
     ocrDataBlockPlaced_t *result = (ocrDataBlockPlaced_t*)malloc(sizeof(ocrDataBlockPlaced_t));
-    ocrPlaceTrackerAllocate(&(result->placeTracker));
+    /* ocrPlaceTrackerAllocate(&(result->placeTracker)); */
 
     ocrDataBlockRegular_t *regular = &(result->base);
     regular->base.guid = UNINITIALIZED_GUID;

@@ -169,14 +169,7 @@ ocr_model_t* newModel ( int kind, int nInstances, void * per_type_configuration,
     return model;
 }
 
-/**
- * Default policy has one scheduler and a configurable
- * number of workers, executors and workpiles
- */
-ocr_model_policy_t * defaultOcrModelPolicy(size_t nb_policy_domains, size_t nb_schedulers,
-                                           size_t nb_workers, size_t nb_executors, size_t nb_workpiles) {
-
-    // Default policy
+static ocr_model_policy_t* defaultModelPolicyConstructor ( size_t nb_policy_domains ) {
     ocr_model_policy_t * defaultPolicy =
         (ocr_model_policy_t *) malloc(sizeof(ocr_model_policy_t));
     defaultPolicy->model.kind = ocr_policy_default_kind;
@@ -202,6 +195,10 @@ ocr_model_policy_t * defaultOcrModelPolicy(size_t nb_policy_domains, size_t nb_s
 
     defaultPolicy->allocators = defaultAllocator;
 
+    return defaultPolicy;
+}
+
+static void setDefaultModelSchedulers ( ocr_model_policy_t * defaultPolicy, size_t nb_policy_domains, size_t nb_schedulers, size_t nb_workers ) {
     size_t index_config = 0, n_all_schedulers = nb_schedulers*nb_policy_domains;
 
     void** scheduler_configurations = malloc(sizeof(scheduler_configuration*)*n_all_schedulers);
@@ -211,24 +208,34 @@ ocr_model_policy_t * defaultOcrModelPolicy(size_t nb_policy_domains, size_t nb_s
         curr_config->worker_id_begin = ( index_config / nb_schedulers ) * nb_workers;
         curr_config->worker_id_end = ( index_config / nb_schedulers ) * nb_workers + nb_workers - 1;
     }
+    defaultPolicy->schedulers = newModel( ocr_scheduler_default_kind, nb_schedulers, NULL, scheduler_configurations );
+}
 
-    size_t n_all_workers = nb_workers*nb_policy_domains;
-
-    index_config = 0;
+static void setDefaultModelWorkers ( ocr_model_policy_t * defaultPolicy, size_t nb_policy_domains, size_t nb_workers ) {
+    size_t index_config = 0, n_all_workers = nb_workers*nb_policy_domains;
     void** worker_configurations = malloc(sizeof(worker_configuration*)*n_all_workers );
     for ( index_config = 0; index_config < n_all_workers; ++index_config ) {
         worker_configurations[index_config] = (worker_configuration*) malloc(sizeof(worker_configuration));
         worker_configuration* curr_config = (worker_configuration*)worker_configurations[index_config];
         curr_config->worker_id = index_config;
     }
-
-    defaultPolicy->schedulers = newModel( ocr_scheduler_default_kind, nb_schedulers, NULL, scheduler_configurations );
-    defaultPolicy->executors  = newModel( ocr_executor_default_kind, nb_executors, NULL, NULL );
-    defaultPolicy->workpiles  = newModel( ocr_workpile_default_kind, nb_workpiles, NULL, NULL );
-    defaultPolicy->memories   = newModel( OCR_LOWMEMORY_DEFAULT, 1, NULL, NULL );
     defaultPolicy->workers    = newModel( ocr_worker_default_kind, nb_workers, NULL, worker_configurations);
+}
 
 
+static inline void setDefaultModelWorkpiles ( ocr_model_policy_t * defaultPolicy, size_t nb_workpiles ) {
+    defaultPolicy->workpiles  = newModel( ocr_workpile_default_kind, nb_workpiles, NULL, NULL );
+}
+
+static inline void setDefaultModelWorkpilesDequishHeap ( ocr_model_policy_t * defaultPolicy, size_t nb_workpiles ) {
+    defaultPolicy->workpiles  = newModel( ocr_workpile_dequeish_heap_kind, nb_workpiles, NULL, NULL );
+}
+
+static inline void setDefaultModelWorkpilesPriorityHeap ( ocr_model_policy_t * defaultPolicy, size_t nb_workpiles ) {
+    defaultPolicy->workpiles  = newModel( ocr_workpile_heap_kind, nb_workpiles, NULL, NULL );
+}
+
+static inline void setDefaultModelMappings ( ocr_model_policy_t * defaultPolicy ) {
     // Defines how ocr modules are bound together
     size_t nb_module_mappings = 5;
     ocr_module_mapping_t * defaultMapping =
@@ -243,9 +250,60 @@ ocr_model_policy_t * defaultOcrModelPolicy(size_t nb_policy_domains, size_t nb_s
     defaultMapping[4] = build_ocr_module_mapping(MANY_TO_ONE_MAPPING, OCR_SCHEDULER, OCR_POLICY);
     defaultPolicy->nb_mappings = nb_module_mappings;
     defaultPolicy->mappings = defaultMapping;
+}
 
+/**
+ * Default policy has one scheduler and a configurable
+ * number of workers, executors and workpiles
+ */
+ocr_model_policy_t * defaultOcrModelPolicy(size_t nb_policy_domains, size_t nb_schedulers,
+                                           size_t nb_workers, size_t nb_executors, size_t nb_workpiles) {
+
+    ocr_model_policy_t * defaultPolicy = defaultModelPolicyConstructor(nb_policy_domains);
+
+    setDefaultModelSchedulers (defaultPolicy, nb_policy_domains, nb_schedulers, nb_workers);
+    setDefaultModelWorkers (defaultPolicy, nb_policy_domains, nb_workers);
+    setDefaultModelWorkpiles (defaultPolicy, nb_workpiles);
+
+    defaultPolicy->executors  = newModel( ocr_executor_default_kind, nb_executors, NULL, NULL );
+    defaultPolicy->memories   = newModel( OCR_LOWMEMORY_DEFAULT, 1, NULL, NULL );
+
+    setDefaultModelMappings(defaultPolicy);
     return defaultPolicy;
 }
+
+ocr_model_policy_t * defaultOcrModelPolicyDequishHeap(size_t nb_policy_domains, size_t nb_schedulers,
+                                           size_t nb_workers, size_t nb_executors, size_t nb_workpiles) {
+
+    ocr_model_policy_t * defaultPolicy = defaultModelPolicyConstructor(nb_policy_domains);
+
+    setDefaultModelSchedulers (defaultPolicy, nb_policy_domains, nb_schedulers, nb_workers);
+    setDefaultModelWorkers (defaultPolicy, nb_policy_domains, nb_workers);
+    setDefaultModelWorkpilesDequishHeap (defaultPolicy, nb_workpiles);
+
+    defaultPolicy->executors  = newModel( ocr_executor_default_kind, nb_executors, NULL, NULL );
+    defaultPolicy->memories   = newModel( OCR_LOWMEMORY_DEFAULT, 1, NULL, NULL );
+
+    setDefaultModelMappings(defaultPolicy);
+    return defaultPolicy;
+}
+
+ocr_model_policy_t * defaultOcrModelPolicyPriorityHeap(size_t nb_policy_domains, size_t nb_schedulers,
+                                           size_t nb_workers, size_t nb_executors, size_t nb_workpiles) {
+
+    ocr_model_policy_t * defaultPolicy = defaultModelPolicyConstructor(nb_policy_domains);
+
+    setDefaultModelSchedulers (defaultPolicy, nb_policy_domains, nb_schedulers, nb_workers);
+    setDefaultModelWorkers (defaultPolicy, nb_policy_domains, nb_workers);
+    setDefaultModelWorkpilesPriorityHeap (defaultPolicy, nb_workpiles);
+
+    defaultPolicy->executors  = newModel( ocr_executor_default_kind, nb_executors, NULL, NULL );
+    defaultPolicy->memories   = newModel( OCR_LOWMEMORY_DEFAULT, 1, NULL, NULL );
+
+    setDefaultModelMappings(defaultPolicy);
+    return defaultPolicy;
+}
+
 
 /**
  * FSIM XE policy domain has:

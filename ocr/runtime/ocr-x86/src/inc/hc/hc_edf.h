@@ -94,6 +94,7 @@ typedef struct hc_task_struct_t {
     size_t nbdeps;
     ocrEdtDep_t * depv;
     ocrEdt_t p_function;
+    double cost;
 } hc_task_t;
 
 void hc_task_construct_internal (hc_task_t* derived, ocrEdt_t funcPtr, u32 paramc, u64 * params, void** paramv);

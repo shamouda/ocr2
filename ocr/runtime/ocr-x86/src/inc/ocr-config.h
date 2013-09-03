@@ -87,4 +87,7 @@ extern ocrDataBlockKind		ocrDataBlockCEKind;
 extern ocrLockKind		ocrLockCEKind;
 extern ocrGuidProviderKind	ocrGuidProviderCEKind;
 
+
+extern ocr_workpile_kind	ocr_workpile_dequeish_heap_kind;
+extern ocr_workpile_kind	ocr_workpile_heap_kind;
 #endif /* __OCR_CONFIG_H__ */

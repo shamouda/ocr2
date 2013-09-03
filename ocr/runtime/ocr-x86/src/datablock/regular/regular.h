@@ -67,7 +67,7 @@ typedef struct _ocrDataBlockRegular_t {
 
 typedef struct ocrDataBlockPlacedStruct_t {
     ocrDataBlockRegular_t base;
-    ocrPlaceTracker_t* placeTracker;
+    ocrPlaceTracker_t placeTracker;
 } ocrDataBlockPlaced_t;
 
 ocrDataBlock_t* newDataBlockRegular();

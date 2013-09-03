@@ -42,7 +42,7 @@ ocrDataBlockKind ocrDataBlockDefaultKind = OCR_DATABLOCK_REGULAR;
 ocrLockKind ocrLockDefaultKind = OCR_LOCK_X86;
 ocrGuidProviderKind ocrGuidProviderDefaultKind = OCR_GUIDPROVIDER_PTR;
 
-u32 ocr_config_default_nb_hardware_threads = 8;
+u32 ocr_config_default_nb_hardware_threads = 16;
 
 // XE kinds of ocr modules
 ocr_executor_kind	ocr_executor_xe_kind    = OCR_EXECUTOR_XE;
@@ -69,3 +69,6 @@ ocrLowMemoryKind	ocrLowMemoryCEKind	= OCR_LOWMEMORY_MALLOC;
 ocrDataBlockKind	ocrDataBlockCEKind	= OCR_DATABLOCK_REGULAR;
 ocrLockKind		ocrLockCEKind		= OCR_LOCK_X86;
 ocrGuidProviderKind	ocrGuidProviderCEKind	= OCR_GUIDPROVIDER_PTR;
+
+ocr_workpile_kind	ocr_workpile_dequeish_heap_kind = OCR_DEQUEISH_PRIORITY_QUEUE;
+ocr_workpile_kind	ocr_workpile_heap_kind = OCR_PRIORITY_QUEUE;

@@ -37,6 +37,7 @@
 #include <pthread.h>
 
 #include "ocr-runtime.h"
+#include "heap.h"
 #include "deque.h"
 #include "hc_edf.h"
 
@@ -67,6 +68,14 @@ typedef struct hc_workpile {
 } hc_workpile;
 
 ocr_workpile_t * hc_workpile_constructor(void);
+
+typedef struct priority_workpile {
+    ocr_workpile_t base;
+    heap_t * heap;
+} priority_workpile;
+
+ocr_workpile_t * priority_workpile_constructor(void);
+ocr_workpile_t * dequeish_priority_workpile_constructor(void);
 
 
 /******************************************************/

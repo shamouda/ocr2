@@ -139,6 +139,7 @@ void ocrPlaceTrackerAllocate ( ocrPlaceTracker_t** toFill ) {
 
 void ocrPlaceTrackerInsert ( ocrPlaceTracker_t* self, unsigned char currPlace ) {
     self->existInPlaces |= (1ULL << currPlace);
+    self->existInPlaces |= (1ULL << (16+currPlace/8));
 }
 
 void ocrPlaceTrackerRemove ( ocrPlaceTracker_t* self, unsigned char currPlace ) {
