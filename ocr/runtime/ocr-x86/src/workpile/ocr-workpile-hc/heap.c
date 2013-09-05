@@ -176,32 +176,40 @@ static void removeFixHeap ( heap_t* heap ) {
         int currHeapIndex = (heapFixIndex + firstElementIndex) % heap->buffer->capacity;
         double currCost = extractCost(heap->buffer->data[currHeapIndex]);
 
-        if ( heapFixIndex*2+1 < nElements ) {
-
-            int currLeftHeapIndex = (heapFixIndex*2+1 + firstElementIndex) % heap->buffer->capacity;
+        int heapLeftChildIndex = heapFixIndex*2+1;
+        if ( heapLeftChildIndex < nElements ) {
+            int currLeftHeapIndex = (heapLeftChildIndex + firstElementIndex) % heap->buffer->capacity;
             double leftCost = extractCost(heap->buffer->data[currLeftHeapIndex]);
 
-            if ( heapFixIndex*2+2 < nElements ) {
+            int heapRightChildIndex = heapFixIndex*2+2;
+
+            if ( heapRightChildIndex < nElements ) {
                 /*has left and right children */
-                int currRightHeapIndex = (heapFixIndex*2+2 + firstElementIndex) % heap->buffer->capacity;
+                int currRightHeapIndex = (heapRightChildIndex + firstElementIndex) % heap->buffer->capacity;
                 double rightCost = extractCost(heap->buffer->data[currRightHeapIndex]);
 
                 if ( leftCost < rightCost ) {
                     if ( leftCost < currCost ) {
                         swapAtIndices(heap, currLeftHeapIndex, currHeapIndex);
-                        heapFixIndex = heapFixIndex*2+1;
+                        heapFixIndex = heapLeftChildIndex;
+                    } else {
+                        /*nothing to fix; break the loop*/
+                        heapFixIndex = nElements;
                     }
                 } else {
                     if ( rightCost < currCost ) {
                         swapAtIndices(heap, currRightHeapIndex, currHeapIndex);
-                        heapFixIndex = heapFixIndex*2+2;
+                        heapFixIndex = heapRightChildIndex;
+                    } else {
+                        /*nothing to fix; break the loop*/
+                        heapFixIndex = nElements;
                     }
                 }
             } else {
                 /*has only left child */
                 if ( leftCost < currCost ) {
                     swapAtIndices(heap, currLeftHeapIndex, currHeapIndex);
-                    heapFixIndex = heapFixIndex*2+2;
+                    heapFixIndex = heapLeftChildIndex;
                 }
             }
         } else {
@@ -209,6 +217,7 @@ static void removeFixHeap ( heap_t* heap ) {
             heapFixIndex = nElements;
         }
     }
+
 }
 
 static void insertFixHeap ( heap_t* heap ) {
@@ -261,7 +270,6 @@ void locked_heap_push_priority (heap_t* heap, void* entry) {
             insertFixHeap(heap);
             verifyHeap(heap);
 
-            fprintf(stderr, "pushed %p, head:%d, tail:%d\n", entry,heap->head, heap->tail);
             heap->lock = 0;
         }
     }
@@ -273,17 +281,16 @@ void* locked_heap_pop_priority_best ( heap_t* heap ) {
     while (!success) {
         if ( hc_cas(&heap->lock, 0, 1) ) {
             success = 1;
-            rt = (void*) heap->buffer->data[ heap->head % heap->buffer->capacity];
 
             int size = heap->tail - heap->head;
             if ( size <= 0 ) {
-                heap->head = heap->tail;
+                heap->tail = heap->head;
                 rt = NULL;
             } else {
+                rt = (void*) heap->buffer->data[ heap->head % heap->buffer->capacity];
                 removeFixHeap(heap);
                 verifyHeap(heap);
             }
-            if (rt) fprintf(stderr, "popped %p\n", rt);
             heap->lock = 0;
         }
     }
@@ -306,7 +313,6 @@ void* locked_heap_pop_priority_worst ( heap_t* heap ) {
                 rt = (void*) heap->buffer->data[heap->tail % heap->buffer->capacity];
                 verifyHeap(heap);
             }
-            if (rt) fprintf(stderr, "stole %p\n", rt);
             heap->lock = 0;
         }
     }
