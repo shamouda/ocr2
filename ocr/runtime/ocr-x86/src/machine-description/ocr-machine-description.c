@@ -59,10 +59,30 @@
 #define INI_IS_RANGE(KEY) \
     strstr((char *) iniparser_getstring(dict, KEY, ""), "-")
 
+#define INI_IS_CSV(KEY) \
+    strstr((char *) iniparser_getstring(dict, KEY, ""), ",")
+
 #define INI_GET_RANGE(KEY, LOW, HIGH) \
     sscanf(iniparser_getstring(dict, KEY, ""), "%d-%d", &LOW, &HIGH)
 
+typedef enum value_type_t {
+    TYPE_UNKNOWN,
+    TYPE_CSV,
+    TYPE_RANGE,
+    TYPE_INT
+} value_type;
+
 extern const char *inst_str[];
+
+bool key_exists(dictionary *dict, char *sec, char *field) {
+    char key[MAX_KEY_SZ];
+    
+    snprintf(key, MAX_KEY_SZ, "%s:%s", sec, field);
+    if(iniparser_getstring(dict, key, NULL) != NULL)
+        return true;
+    else
+        return false;
+}
 
 // TODO: expand to parse comma separated values & ranges iterating the below thru strtok with ,
 // TODO: stretch goal, extend this to expressions: surely you're joking, Mr. Feynman
@@ -83,6 +103,52 @@ s32 read_range(dictionary *dict, char *sec, char *field, s32 *low, s32 *high) {
     }
     *low = lo; *high = hi;
     return count;
+}
+
+/*  This function, when called with the section name & field, gives the first token, followed by subsequent calls that give other ones */
+s32 read_next_csv_value(dictionary *dict, char *key) {
+    static char *parsestr = NULL; // This gives the current string that's parsed
+    static char *currentfield = NULL;
+    static char *saveptr = NULL;
+
+    if ((parsestr != NULL) && (!strcmp(currentfield, iniparser_getstring(dict, key, "")))) {
+        parsestr = strtok_r(NULL, ",", &saveptr);
+    } else {
+        currentfield = iniparser_getstring(dict, key, "");
+        parsestr = strtok_r(currentfield, ",", &saveptr);
+    }
+
+    if (parsestr == NULL) return -1;
+    else return atoi(parsestr); 
+}
+
+s32 get_key_value(dictionary *dict, char *sec, char *field, s32 offset) {
+    char key[MAX_KEY_SZ];
+    s32 lo, hi;
+    s32 retval;
+    static value_type key_value_type = TYPE_UNKNOWN;
+
+    snprintf(key, MAX_KEY_SZ, "%s:%s", sec, field);
+    if (key_value_type == TYPE_UNKNOWN) {
+        if (INI_IS_CSV(key)) {
+            key_value_type = TYPE_CSV;
+        } else if (INI_IS_RANGE(key)) {
+            key_value_type = TYPE_RANGE;
+        } else {
+            key_value_type = TYPE_INT; // Big assumption, could break
+        }
+    }
+
+    if (key_value_type == TYPE_CSV) {
+        retval = read_next_csv_value(dict, key);
+        if (retval == -1) key_value_type = TYPE_UNKNOWN;        
+    } else {
+        read_range(dict, sec, field, &lo, &hi);
+        retval = lo+offset;
+        key_value_type = TYPE_UNKNOWN;        
+    }
+
+    return retval;
 }
 
 char* populate_type(ocrParamList_t **type_param, type_enum index, dictionary *dict, char *secname) {
@@ -459,6 +525,7 @@ s32 populate_inst(ocrParamList_t **inst_param, ocrMappable_t **instance, s32 *ty
         for (j = low; j<=high; j++) {
 
             compPlatformType_t mytype = -1;
+            
             TO_ENUM (mytype, inststr, compPlatformType_t, compplatform_types, compPlatformMax_id);
             switch (mytype) {
                 case compPlatformPthread_id: {
@@ -466,9 +533,15 @@ s32 populate_inst(ocrParamList_t **inst_param, ocrMappable_t **instance, s32 *ty
                     snprintf(key, MAX_KEY_SZ, "%s:%s", secname, "ismasterthread");
                     INI_GET_BOOL (key, value, -1);
                     ((paramListCompPlatformPthread_t *)inst_param[j])->isMasterThread = value;
+
                     snprintf(key, MAX_KEY_SZ, "%s:%s", secname, "stacksize");
                     INI_GET_INT (key, value, -1);
                     ((paramListCompPlatformPthread_t *)inst_param[j])->stackSize = (value==-1)?0:value;
+                  
+                    if (key_exists(dict, secname, "binding")) {
+                       value = get_key_value(dict, secname, "binding", j-low);
+                      // printf("Binding value for %s;%d is %d\n", secname, j-low, value);
+                    } // else printf("No binding for %s\n", secname);
                 }
                 break;
                 default:
@@ -673,7 +746,7 @@ void add_dependence (type_enum fromtype, type_enum totype, ocrMappable_t *fromin
 
         if (f->memoryCount == 0) {
             f->memoryCount = dependence_count;
-            f->memories = (ocrMemPlatform_t **)calloc(1, sizeof(ocrMemPlatform_t *) * dependence_count);
+            f->memories = (ocrMemPlatform_t **)calloc(dependence_count, sizeof(ocrMemPlatform_t *));
         }
         f->memories[dependence_index] = (ocrMemPlatform_t *)toinstance;
         break;
@@ -683,7 +756,7 @@ void add_dependence (type_enum fromtype, type_enum totype, ocrMappable_t *fromin
         DPRINTF(DEBUG_LVL_INFO, "Allocator %d to %d\n", fromtype, totype);
         if (f->memoryCount == 0) {
             f->memoryCount = dependence_count;
-            f->memories = (ocrMemTarget_t **)calloc(1, sizeof(ocrMemTarget_t *) * dependence_count);
+            f->memories = (ocrMemTarget_t **)calloc(dependence_count, sizeof(ocrMemTarget_t *));
         }
         f->memories[dependence_index] = (ocrMemTarget_t *)toinstance;
         break;
@@ -694,7 +767,7 @@ void add_dependence (type_enum fromtype, type_enum totype, ocrMappable_t *fromin
 
         if (f->platformCount == 0) {
             f->platformCount = dependence_count;
-            f->platforms = (ocrCompPlatform_t **)calloc(1, sizeof(ocrCompPlatform_t *) * dependence_count);
+            f->platforms = (ocrCompPlatform_t **)calloc(dependence_count, sizeof(ocrCompPlatform_t *));
         }
         f->platforms[dependence_index] = (ocrCompPlatform_t *)toinstance;
         break;
@@ -705,7 +778,7 @@ void add_dependence (type_enum fromtype, type_enum totype, ocrMappable_t *fromin
 
         if (f->computeCount == 0) {
             f->computeCount = dependence_count;
-            f->computes = (ocrCompTarget_t **)calloc(1, sizeof(ocrCompTarget_t *) * dependence_count);
+            f->computes = (ocrCompTarget_t **)calloc(dependence_count, sizeof(ocrCompTarget_t *));
         }
         f->computes[dependence_index] = (ocrCompTarget_t *)toinstance;
         break;
@@ -717,7 +790,7 @@ void add_dependence (type_enum fromtype, type_enum totype, ocrMappable_t *fromin
         case workpile_type: {
             if (f->workpileCount == 0) {
                 f->workpileCount = dependence_count;
-                f->workpiles = (ocrWorkpile_t **)calloc(1, sizeof(ocrWorkpile_t *) * dependence_count);
+                f->workpiles = (ocrWorkpile_t **)calloc(dependence_count, sizeof(ocrWorkpile_t *));
             }
             f->workpiles[dependence_index] = (ocrWorkpile_t *)toinstance;
             break;
@@ -725,7 +798,7 @@ void add_dependence (type_enum fromtype, type_enum totype, ocrMappable_t *fromin
         case worker_type: {
             if (f->workerCount == 0) {
                 f->workerCount = dependence_count;
-                f->workers = (ocrWorker_t **)calloc(1, sizeof(ocrWorker_t *) * dependence_count);
+                f->workers = (ocrWorker_t **)calloc(dependence_count, sizeof(ocrWorker_t *));
             }
             f->workers[dependence_index] = (ocrWorker_t *)toinstance;
             break;
@@ -747,7 +820,7 @@ void add_dependence (type_enum fromtype, type_enum totype, ocrMappable_t *fromin
         case memtarget_type: {
             if (f->memories == NULL) {
                 ASSERT(f->memoryCount == dependence_count);
-                f->memories = (ocrMemTarget_t **)calloc(1, sizeof(ocrMemTarget_t *) * dependence_count);
+                f->memories = (ocrMemTarget_t **)calloc(dependence_count, sizeof(ocrMemTarget_t *));
             }
             f->memories[dependence_index] = (ocrMemTarget_t *)toinstance;
             break;
@@ -755,7 +828,7 @@ void add_dependence (type_enum fromtype, type_enum totype, ocrMappable_t *fromin
         case allocator_type: {
             if (f->allocators == NULL) {
                 ASSERT(f->allocatorCount == dependence_count);
-                f->allocators = (ocrAllocator_t **)calloc(1, sizeof(ocrAllocator_t *) * dependence_count);
+                f->allocators = (ocrAllocator_t **)calloc(dependence_count, sizeof(ocrAllocator_t *));
             }
             f->allocators[dependence_index] = (ocrAllocator_t *)toinstance;
             break;
@@ -763,7 +836,7 @@ void add_dependence (type_enum fromtype, type_enum totype, ocrMappable_t *fromin
         case comptarget_type: {
             if (f->computes == NULL) {
                 ASSERT(f->computeCount == dependence_count);
-                f->computes = (ocrCompTarget_t **)calloc(1, sizeof(ocrCompTarget_t *) * dependence_count);
+                f->computes = (ocrCompTarget_t **)calloc(dependence_count, sizeof(ocrCompTarget_t *));
             }
             f->computes[dependence_index] = (ocrCompTarget_t *)toinstance;
             break;
@@ -771,7 +844,7 @@ void add_dependence (type_enum fromtype, type_enum totype, ocrMappable_t *fromin
         case workpile_type: {
             if (f->workpiles == NULL) {
                 ASSERT(f->workpileCount == dependence_count);
-                f->workpiles = (ocrWorkpile_t **)calloc(1, sizeof(ocrWorkpile_t *) * dependence_count);
+                f->workpiles = (ocrWorkpile_t **)calloc(dependence_count, sizeof(ocrWorkpile_t *));
             }
             f->workpiles[dependence_index] = (ocrWorkpile_t *)toinstance;
             break;
@@ -779,7 +852,7 @@ void add_dependence (type_enum fromtype, type_enum totype, ocrMappable_t *fromin
         case worker_type: {
             if (f->workers == NULL) {
                 ASSERT(f->workerCount == dependence_count);
-                f->workers = (ocrWorker_t **)calloc(1, sizeof(ocrWorker_t *) * dependence_count);
+                f->workers = (ocrWorker_t **)calloc(dependence_count, sizeof(ocrWorker_t *));
             }
             f->workers[dependence_index] = (ocrWorker_t *)toinstance;
             break;
@@ -787,7 +860,7 @@ void add_dependence (type_enum fromtype, type_enum totype, ocrMappable_t *fromin
         case scheduler_type: {
             if (f->schedulers == NULL) {
                 ASSERT(f->schedulerCount == dependence_count);
-                f->schedulers = (ocrScheduler_t **)calloc(1, sizeof(ocrScheduler_t *) * dependence_count);
+                f->schedulers = (ocrScheduler_t **)calloc(dependence_count, sizeof(ocrScheduler_t *));
             }
             f->schedulers[dependence_index] = (ocrScheduler_t *)toinstance;
             break;
