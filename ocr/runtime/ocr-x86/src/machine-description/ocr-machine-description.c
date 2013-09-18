@@ -74,6 +74,16 @@ typedef enum value_type_t {
 
 extern const char *inst_str[];
 
+bool key_exists(dictionary *dict, char *sec, char *field) {
+    char key[MAX_KEY_SZ];
+    
+    snprintf(key, MAX_KEY_SZ, "%s:%s", sec, field);
+    if(iniparser_getstring(dict, key, NULL) != NULL)
+        return true;
+    else
+        return false;
+}
+
 // TODO: expand to parse comma separated values & ranges iterating the below thru strtok with ,
 // TODO: stretch goal, extend this to expressions: surely you're joking, Mr. Feynman
 s32 read_range(dictionary *dict, char *sec, char *field, s32 *low, s32 *high) {
@@ -523,13 +533,15 @@ s32 populate_inst(ocrParamList_t **inst_param, ocrMappable_t **instance, s32 *ty
                     snprintf(key, MAX_KEY_SZ, "%s:%s", secname, "ismasterthread");
                     INI_GET_BOOL (key, value, -1);
                     ((paramListCompPlatformPthread_t *)inst_param[j])->isMasterThread = value;
-
                     snprintf(key, MAX_KEY_SZ, "%s:%s", secname, "stacksize");
                     INI_GET_INT (key, value, -1);
                     ((paramListCompPlatformPthread_t *)inst_param[j])->stackSize = (value==-1)?0:value;
-                   
-                    value = get_key_value(dict, secname, "binding", j-low);
-                    //printf("Binding value for %s;%d is %d\n", key, j-low, value);
+                    if (key_exists(dict, secname, "binding")) {
+                        value = get_key_value(dict, secname, "binding", j-low);
+                        ((paramListCompPlatformPthread_t *)inst_param[j])->binding = value;
+                    } else {
+                        ((paramListCompPlatformPthread_t *)inst_param[j])->binding = -1;
+                    }
                 }
                 break;
                 default:
