@@ -34,11 +34,12 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/time.h>
+#include "assert.h"
 
 #define FLAGS 0xdead
 #define PROPERTIES 0xdead
 
-
+struct timeval a,b;
 
 u8 sequential_cholesky_task ( u32 paramc, u64 * params, void* paramv[], u32 depc, ocrEdtDep_t depv[]) {
 	int index = 0, iB = 0, jB = 0, kB = 0, jBB = 0;
@@ -48,6 +49,7 @@ u8 sequential_cholesky_task ( u32 paramc, u64 * params, void* paramv[], u32 depc
 	int tileSize = (int) func_args[1];
 	ocrGuid_t out_lkji_kkkp1_event_guid = (ocrGuid_t) func_args[2];
 
+//fprintf(stderr, "in sequential_cholesky_task %d  gets %d,%d,%d  puts %d,%d,%d\n",k, k,k,k, k,k,k+1);
 	double* aBlock = (double*) (depv[0].ptr);
 	double** aBlock2D = (double**) malloc(sizeof(double*)*tileSize);
 	for( index = 0; index < tileSize; ++index )
@@ -92,6 +94,7 @@ u8 trisolve_task ( u32 paramc, u64 * params, void* paramv[], u32 depc, ocrEdtDep
 	int tileSize = (int) func_args[2];
 	ocrGuid_t out_lkji_jkkp1_event_guid = (ocrGuid_t) func_args[3];
 
+//fprintf(stderr, "in trisolve_task %d,%d gets %d,%d,%d gets %d,%d,%d puts %d,%d,%d\n",k,j, j,k,k, k,k,k+1,  j,k,k+1);
 	double* aBlock = (double*) (depv[0].ptr);
 	double** aBlock2D = (double**) malloc(sizeof(double*)*tileSize);
 	for( index = 0; index < tileSize; ++index )
@@ -138,6 +141,7 @@ u8 update_diagonal_task ( u32 paramc, u64 * params, void* paramv[], u32 depc, oc
 	int tileSize = (int) func_args[3];
 	ocrGuid_t out_lkji_jjkp1_event_guid = (ocrGuid_t) func_args[4];
 
+//fprintf(stderr, "in update_diagonal_task %d,%d,%d gets %d,%d,%d gets %d,%d,%d puts %d,%d,%d\n",k,j,i ,j,j,k ,j,k,k+1  ,j,j,k+1);
 	double* aBlock = (double*) (depv[0].ptr);
 	double** aBlock2D = (double**) malloc(sizeof(double*)*tileSize);
 	for( index = 0; index < tileSize; ++index )
@@ -157,6 +161,7 @@ u8 update_diagonal_task ( u32 paramc, u64 * params, void* paramv[], u32 depc, oc
 	}
 
 	ocrEventSatisfy(out_lkji_jjkp1_event_guid, depv[0].guid);
+//fprintf(stderr, "in update_diagonal_task %d,%d,%d gets %d,%d,%d gets %d,%d,%d puts %d,%d,%d at %p with %p\n",k,j,i ,j,j,k ,j,k,k+1  ,j,j,k+1, (void*)out_lkji_jjkp1_event_guid, (void*)depv[0].guid);
 
 	free(l2Block2D);
 	free(aBlock2D);
@@ -173,6 +178,7 @@ u8 update_nondiagonal_task ( u32 paramc, u64 * params, void* paramv[], u32 depc,
 	int tileSize = (int) func_args[3];
 	ocrGuid_t out_lkji_jikp1_event_guid = (ocrGuid_t) func_args[4];
 
+//fprintf(stderr, "in update_nondiagonal_task %d,%d,%d gets %d,%d,%d gets %d,%d,%d gets %d,%d,%d puts %d,%d,%d\n" ,k,j,i ,j,i,k ,j,k,k+1 ,i,k,k+1 ,j,i,k+1);
 	double* aBlock = (double*) (depv[0].ptr);
 	double** aBlock2D = (double**) malloc(sizeof(double*)*tileSize);
 	for( index = 0; index < tileSize; ++index )
@@ -196,7 +202,9 @@ u8 update_nondiagonal_task ( u32 paramc, u64 * params, void* paramv[], u32 depc,
 		}
 	}
 
+assert(depv[0].guid != -2 && "guid nullified in non-diag");
 	ocrEventSatisfy(out_lkji_jikp1_event_guid, depv[0].guid);
+//fprintf(stderr, "in update_nondiagonal_task %d,%d,%d gets %d,%d,%d gets %d,%d,%d gets %d,%d,%d puts %d,%d,%d at %p with %p\n" ,k,j,i ,j,i,k ,j,k,k+1 ,i,k,k+1 ,j,i,k+1, (void*)out_lkji_jikp1_event_guid, (void*)depv[0].guid);
 
 	free(l2Block2D);
 	free(l1Block2D);
@@ -206,6 +214,10 @@ u8 update_nondiagonal_task ( u32 paramc, u64 * params, void* paramv[], u32 depc,
 u8 wrap_up_task ( u32 paramc, u64 * params, void* paramv[], u32 depc, ocrEdtDep_t depv[]) {
 	int i, j, i_b, j_b;
 	double* temp;
+        gettimeofday(&b,0);
+        printf("The computation took %f seconds\r\n",((b.tv_sec - a.tv_sec)*1000000+(b.tv_usec - a.tv_usec))*1.0/1000000);
+
+/*
 	FILE* out = fopen("cholesky.out", "w");
 
 	intptr_t *func_args = *paramv;
@@ -228,6 +240,7 @@ u8 wrap_up_task ( u32 paramc, u64 * params, void* paramv[], u32 depc, ocrEdtDep_
 			}
 		}
 	}
+*/
 	ocrFinish();
 }
 
@@ -429,6 +442,9 @@ int main( int argc, char* argv[] ) {
 	matrix = readMatrix( matrixSize, in );
 
 	satisfyInitialTiles( numTiles, tileSize, matrix, lkji_event_guids);
+
+fprintf(stderr, "lkji_event_guids: %p\n", lkji_event_guids);
+        gettimeofday(&a,0);
 
 	for ( k = 0; k < numTiles; ++k ) {
 		sequential_cholesky_task_prescriber ( k, tileSize, lkji_event_guids);

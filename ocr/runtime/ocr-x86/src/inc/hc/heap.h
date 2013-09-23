@@ -33,9 +33,10 @@
 #define HEAP_H
 
 #include "deque.h"
+#include "pthread.h"
 
 typedef struct heap {
-        volatile int lock;
+        pthread_mutex_t lock;
         volatile int head;
         volatile int tail;
         buffer_t * buffer;

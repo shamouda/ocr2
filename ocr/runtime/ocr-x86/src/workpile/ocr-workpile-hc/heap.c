@@ -42,7 +42,8 @@
 #include "stdio.h"
 
 void heap_init(heap_t * heap, void * init_value) {
-    heap->lock = 0;
+    // heap->lock = 0;
+    pthread_mutex_init(&(heap->lock), NULL);
     heap->head = 0;
     heap->tail = 0;
     heap->buffer = (buffer_t *) malloc(sizeof(buffer_t));
@@ -57,10 +58,12 @@ void heap_init(heap_t * heap, void * init_value) {
 }
 
 void locked_heap_tail_push_no_priority (heap_t* heap, void* entry) {
-    int success = 0;
-    while (!success) {
-        if ( hc_cas(&heap->lock, 0, 1) ) { 
-            success = 1;
+    // int success = 0;
+    // while (!success) {
+    pthread_mutex_lock(&heap->lock);    
+    __asm__ __volatile__ ("" ::: "memory");
+    //    if ( hc_cas(&heap->lock, 0, 1) ) { 
+            // success = 1;
             int size = heap->tail - heap->head;
             if (size == heap->buffer->capacity) { 
                 assert("heap full, increase heap size" && 0);
@@ -71,9 +74,11 @@ void locked_heap_tail_push_no_priority (heap_t* heap, void* entry) {
             hc_mfence();
 #endif 
             ++heap->tail;
-            heap->lock = 0;
-        }
-    }
+    //        heap->lock = 0;
+    //    }
+    __asm__ __volatile__ ("" ::: "memory");
+    pthread_mutex_unlock(&heap->lock);    
+    // }
 }
 
 #define MISS 1000
@@ -108,7 +113,7 @@ static void setCost ( volatile void* entry, int wid ) {
     ocrGuid_t dbGuid = UNINITIALIZED_GUID;
 
     int i = 0;
-    ocr_event_t* curr = derived->awaitList->array[0];
+    ocr_event_t* curr = (ocr_event_t*)derived->awaitList->array[0];
     while ( NULL != curr ) {
         dbGuid = curr->get(curr);
         if(dbGuid != NULL_GUID) {
@@ -117,7 +122,7 @@ static void setCost ( volatile void* entry, int wid ) {
             totalCost += costToAcquire(wid, placeTracker);
         }
 
-        curr = derived->awaitList->array[++i];
+        curr = (ocr_event_t*)derived->awaitList->array[++i];
     };
     derived->cost = totalCost;
 }
@@ -245,10 +250,12 @@ static void insertFixHeap ( heap_t* heap ) {
 }
 
 void locked_heap_push_priority (heap_t* heap, void* entry) {
-    int success = 0;
-    while (!success) {
-        if ( hc_cas(&heap->lock, 0, 1) ) { 
-            success = 1;
+    // int success = 0;
+    // while (!success) {
+    pthread_mutex_lock(&heap->lock);    
+    __asm__ __volatile__ ("" ::: "memory");
+    //    if ( hc_cas(&heap->lock, 0, 1) ) { 
+            //success = 1;
             int size = heap->tail - heap->head;
             if (size == heap->buffer->capacity) { 
                 assert("heap full, increase heap size" && 0);
@@ -270,17 +277,21 @@ void locked_heap_push_priority (heap_t* heap, void* entry) {
             insertFixHeap(heap);
             verifyHeap(heap);
 
-            heap->lock = 0;
-        }
-    }
+            //heap->lock = 0;
+    //    }
+    __asm__ __volatile__ ("" ::: "memory");
+    pthread_mutex_unlock(&heap->lock);    
+    //}
 }
 
 void* locked_heap_pop_priority_best ( heap_t* heap ) {
     void * rt = NULL;
-    int success = 0;
-    while (!success) {
-        if ( hc_cas(&heap->lock, 0, 1) ) {
-            success = 1;
+    //int success = 0;
+    //while (!success) {
+    pthread_mutex_lock(&heap->lock);    
+    __asm__ __volatile__ ("" ::: "memory");
+    //    if ( hc_cas(&heap->lock, 0, 1) ) {
+            //success = 1;
 
             int size = heap->tail - heap->head;
             if ( size <= 0 ) {
@@ -291,18 +302,22 @@ void* locked_heap_pop_priority_best ( heap_t* heap ) {
                 removeFixHeap(heap);
                 verifyHeap(heap);
             }
-            heap->lock = 0;
-        }
-    }
+     //       heap->lock = 0;
+     //   }
+    __asm__ __volatile__ ("" ::: "memory");
+    pthread_mutex_unlock(&heap->lock);    
+    //}
     return rt;
 }
 
 void* locked_heap_pop_priority_worst ( heap_t* heap ) {
     void * rt = NULL;
-    int success = 0;
-    while (!success) {
-        if ( hc_cas(&heap->lock, 0, 1) ) {
-            success = 1;
+    //int success = 0;
+    //while (!success) {
+    pthread_mutex_lock(&heap->lock);    
+    __asm__ __volatile__ ("" ::: "memory");
+     //   if ( hc_cas(&heap->lock, 0, 1) ) {
+            //success = 1;
 
             int size = heap->tail - heap->head;
             if ( size <= 0 ) {
@@ -313,18 +328,22 @@ void* locked_heap_pop_priority_worst ( heap_t* heap ) {
                 rt = (void*) heap->buffer->data[heap->tail % heap->buffer->capacity];
                 verifyHeap(heap);
             }
-            heap->lock = 0;
-        }
-    }
+      //      heap->lock = 0;
+      //  }
+    __asm__ __volatile__ ("" ::: "memory");
+    pthread_mutex_unlock(&heap->lock);    
+    //}
     return rt;
 }
 
 void* locked_heap_tail_pop_no_priority ( heap_t* heap ) {
     void * rt = NULL;
-    int success = 0;
-    while (!success) {
-        if ( hc_cas(&heap->lock, 0, 1) ) {
-            success = 1;
+    //int success = 0;
+    // while (!success) {
+    pthread_mutex_lock(&heap->lock);    
+    __asm__ __volatile__ ("" ::: "memory");
+    //    if ( hc_cas(&heap->lock, 0, 1) ) {
+            //success = 1;
 
             int tail = heap->tail;
             heap->tail = --tail;
@@ -335,18 +354,22 @@ void* locked_heap_tail_pop_no_priority ( heap_t* heap ) {
                 heap->tail = heap->head;
                 rt = NULL;
             } 
-            heap->lock = 0;
-        }
-    }
+            //heap->lock = 0;
+    __asm__ __volatile__ ("" ::: "memory");
+    pthread_mutex_unlock(&heap->lock);    
+        //}
+    //}
     return rt;
 }
 
 void* locked_heap_head_pop_no_priority ( heap_t* heap ) {
     void * rt = NULL;
-    int success = 0;
-    while (!success) {
-        if ( hc_cas(&heap->lock, 0, 1) ) {
-            success = 1;
+    //int success = 0;
+    // while (!success) {
+    pthread_mutex_lock(&heap->lock);    
+    __asm__ __volatile__ ("" ::: "memory");
+    //    if ( hc_cas(&heap->lock, 0, 1) ) {
+            //success = 1;
 
             int head = heap->head;
             heap->head= 1 + head;
@@ -357,8 +380,10 @@ void* locked_heap_head_pop_no_priority ( heap_t* heap ) {
                 heap->head = heap->tail;
                 rt = NULL;
             } 
-            heap->lock = 0;
-        }
-    }
+     //       heap->lock = 0;
+    __asm__ __volatile__ ("" ::: "memory");
+    pthread_mutex_unlock(&heap->lock);    
+     //   }
+    //}
     return rt;
 }

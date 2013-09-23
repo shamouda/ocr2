@@ -38,8 +38,8 @@
 struct ocr_event_struct;
 typedef void (*event_destruct_fct)(struct ocr_event_struct* event);
 typedef ocrGuid_t (*event_get_fct)(struct ocr_event_struct* event);
-typedef void (*event_put_fct)(struct ocr_event_struct* event, ocrGuid_t db);
-typedef bool (*event_register_if_not_ready_fct)(struct ocr_event_struct* event, ocrGuid_t polling_task_id );
+typedef void (*event_put_fct)(struct ocr_event_struct volatile* volatile event, ocrGuid_t db);
+typedef bool (*event_register_if_not_ready_fct)(struct ocr_event_struct volatile* volatile event, ocrGuid_t polling_task_id );
 
 /*! \brief Abstract class to represent OCR events.
  *

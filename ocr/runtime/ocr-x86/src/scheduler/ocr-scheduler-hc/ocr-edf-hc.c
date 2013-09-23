@@ -36,6 +36,8 @@
 #include "ocr-datablock.h"
 #include "ocr-utils.h"
 #include "debug.h"
+ 
+#include "hc_sysdep.h"
 
 struct ocr_event_factory_struct* hc_event_factory_constructor(void) {
     hc_event_factory* derived = (hc_event_factory*) malloc(sizeof(hc_event_factory));
@@ -59,25 +61,32 @@ ocrGuid_t hc_event_factory_create ( struct ocr_event_factory_struct* factory, oc
     // If not one can provide a more compact implementation
     //This would have to be different for different types of events
     //We can have a switch here and dispatch call to different event constructors
-    ocr_event_t * res = hc_event_constructor(eventType, takesArg);
+    ocr_event_t volatile* res = hc_event_constructor(eventType, takesArg);
     return res->guid;
 }
 
 #define UNINITIALIZED_REGISTER_LIST ((register_list_node_t*) -1)
-#define EMPTY_REGISTER_LIST (NULL)
+#define EMPTY_REGISTER_LIST ((register_list_node_t volatile *)-3)
 
-struct ocr_event_struct* hc_event_constructor(ocrEventTypes_t eventType, bool takesArg) {
-    hc_event_t* derived = (hc_event_t*) malloc(sizeof(hc_event_t));
+void hc_event_put_2 (struct ocr_event_struct volatile * volatile event, ocrGuid_t db);
+struct ocr_event_struct volatile* hc_event_constructor(ocrEventTypes_t eventType, bool takesArg) {
+    hc_event_t volatile*volatile derived = (hc_event_t volatile*volatile) malloc(sizeof(hc_event_t));
+    __asm__ __volatile__ ("" ::: "memory");
     derived->datum = UNINITIALIZED_GUID;
+    __asm__ __volatile__ ("" ::: "memory");
     derived->register_list = UNINITIALIZED_REGISTER_LIST;
-    ocr_event_t* base = (ocr_event_t*)derived;
+    __asm__ __volatile__ ("" ::: "memory");
+    pthread_mutex_t* lock = &(((hc_event_t*)derived)->lock);
+    pthread_mutex_init(lock , NULL);
+    ocr_event_t volatile*volatile base = (ocr_event_t volatile*volatile)derived;
     base->guid = UNINITIALIZED_GUID;
 
-    globalGuidProvider->getGuid(globalGuidProvider, &(base->guid), (u64)base, OCR_GUID_EVENT);
+    globalGuidProvider->getGuid(globalGuidProvider, &(((ocr_event_t*)base)->guid), (u64)base, OCR_GUID_EVENT);
     base->destruct = hc_event_destructor;
     base->get = hc_event_get;
-    base->put = hc_event_put;
-    base->registerIfNotReady = hc_event_register_if_not_ready;
+    base->put = hc_event_put_2;
+    //base->registerIfNotReady = hc_event_register_if_not_ready;
+    base->registerIfNotReady = NULL;
     return base;
 }
 
@@ -93,6 +102,7 @@ ocrGuid_t hc_event_get (struct ocr_event_struct* event) {
     return derived->datum;
 }
 
+/*
 register_list_node_t* hc_event_compete_for_put ( hc_event_t* derived, ocrGuid_t data_for_put_id ) {
     assert ( derived->datum == UNINITIALIZED_GUID && "violated single assignment property for EDFs");
 
@@ -105,9 +115,24 @@ register_list_node_t* hc_event_compete_for_put ( hc_event_t* derived, ocrGuid_t 
     }
     return (register_list_node_t*) registerListOfEDF;
 }
+*/
 
-void hc_event_signal_waiters( register_list_node_t* task_id_list ) {
-    register_list_node_t* curr = task_id_list;
+register_list_node_t volatile* hc_event_compete_for_put_2 ( hc_event_t volatile*volatile derived, ocrGuid_t data_for_put_id ) {
+    assert ( derived->datum == UNINITIALIZED_GUID && "violated single assignment property for EDFs");
+    assert ( data_for_put_id != UNINITIALIZED_GUID && "should not put UNINITIALIZED_GUID");
+
+    __asm__ __volatile__ ("" ::: "memory");
+    derived->datum = data_for_put_id;
+    __asm__ __volatile__ ("" ::: "memory");
+    register_list_node_t volatile*volatile registerListOfEDF = derived->register_list;
+    __asm__ __volatile__ ("" ::: "memory");
+    derived->register_list = EMPTY_REGISTER_LIST;
+    __asm__ __volatile__ ("" ::: "memory");
+    return registerListOfEDF;
+}
+
+void hc_event_signal_waiters( register_list_node_t volatile*volatile task_id_list ) {
+    register_list_node_t volatile*volatile curr = task_id_list;
 
     while ( UNINITIALIZED_REGISTER_LIST != curr ) {
         ocrGuid_t wid = ocr_get_current_worker_guid();
@@ -127,12 +152,34 @@ void hc_event_signal_waiters( register_list_node_t* task_id_list ) {
     }
 }
 
+void hc_event_put_2 (struct ocr_event_struct volatile *volatile event, ocrGuid_t data_for_put_id) {
+    hc_event_t volatile * volatile v_derived = (hc_event_t volatile *volatile )event;
+    hc_event_t* derived = (hc_event_t*)v_derived;
+    pthread_mutex_lock(&derived->lock);
+    __asm__ __volatile__ ("" ::: "memory");
+    assert ( v_derived->datum == UNINITIALIZED_GUID && "violated single assignment property for EDFs");
+    assert ( data_for_put_id != UNINITIALIZED_GUID && "should not put UNINITIALIZED_GUID");
+
+    v_derived->datum = data_for_put_id;
+    __asm__ __volatile__ ("" ::: "memory");
+    register_list_node_t volatile*volatile registerListOfEDF = v_derived->register_list;
+    v_derived->register_list = EMPTY_REGISTER_LIST;
+    register_list_node_t volatile*volatile task_list = registerListOfEDF;
+    __asm__ __volatile__ ("" ::: "memory");
+    pthread_mutex_unlock(&derived->lock);
+    hc_event_signal_waiters(task_list);
+    __asm__ __volatile__ ("" ::: "memory");
+}
+
+/*
 void hc_event_put (struct ocr_event_struct* event, ocrGuid_t db) {
     hc_event_t* derived = (hc_event_t*)event;
     register_list_node_t* task_list = hc_event_compete_for_put(derived, db);
     hc_event_signal_waiters(task_list);
 }
+*/
 
+/*
 bool hc_event_register_if_not_ready(struct ocr_event_struct* event, ocrGuid_t polling_task_id ) {
     hc_event_t* derived = (hc_event_t*)event;
     bool success = false;
@@ -155,13 +202,37 @@ bool hc_event_register_if_not_ready(struct ocr_event_struct* event, ocrGuid_t po
     }
     return success;
 }
+*/
 
-hc_await_list_t* hc_await_list_constructor( size_t al_size ) {
-    hc_await_list_t* derived = (hc_await_list_t*)malloc(sizeof(hc_await_list_t));
+bool hc_event_register_if_not_ready_2 (ocr_event_t volatile*volatile event, ocrGuid_t polling_task_id ) {
+    hc_event_t volatile*volatile v_derived = (hc_event_t volatile *volatile)event;
+    hc_event_t* derived = (hc_event_t*)event;
+    volatile bool registered = false;
+    pthread_mutex_lock(&derived->lock);
+    __asm__ __volatile__ ("" ::: "memory");
+    if ( v_derived -> register_list != EMPTY_REGISTER_LIST ) {
+	register_list_node_t volatile *volatile  new_node = (register_list_node_t*)malloc(sizeof(register_list_node_t));
+	new_node->task_guid = polling_task_id;
+	new_node -> next = v_derived -> register_list;
+	__asm__ __volatile__ ("" ::: "memory");
+	v_derived -> register_list = new_node;
+	__asm__ __volatile__ ("" ::: "memory");
+	registered = true;
+    }
+    __asm__ __volatile__ ("" ::: "memory");
+    pthread_mutex_unlock(&derived->lock);
+    return registered;
+}
+
+hc_await_list_t volatile* hc_await_list_constructor( size_t al_size ) {
+    hc_await_list_t volatile* derived = (hc_await_list_t volatile*)malloc(sizeof(hc_await_list_t));
 
     derived->array = malloc(sizeof(ocr_event_t*) * (al_size+1));
     derived->array[al_size] = NULL;
+    pthread_mutex_t* lock = &(((hc_await_list_t *)derived)->lock);
+    pthread_mutex_init(lock , NULL);
     derived->waitingFrontier = &derived->array[0];
+    __asm__ __volatile__ ("" ::: "memory");
     return derived;
 }
 
@@ -169,6 +240,7 @@ hc_await_list_t* hc_await_list_constructor_with_event_list ( event_list_t* el) {
     hc_await_list_t* derived = (hc_await_list_t*)malloc(sizeof(hc_await_list_t));
 
     derived->array = malloc(sizeof(ocr_event_t*)*(el->size+1));
+    pthread_mutex_init(&(derived->lock) , NULL);
     derived->waitingFrontier = &derived->array[0];
     size_t i, size = el->size;
     event_list_node_t* curr = el->head;
@@ -176,6 +248,7 @@ hc_await_list_t* hc_await_list_constructor_with_event_list ( event_list_t* el) {
         derived->array[i] = curr->event;
     }
     derived->array[el->size] = NULL;
+    __asm__ __volatile__ ("" ::: "memory");
     return derived;
 }
 
@@ -183,6 +256,7 @@ void hc_await_list_destructor( hc_await_list_t* derived ) {
     free(derived);
 }
 
+bool hc_task_iterate_waiting_frontier_2 ( ocr_task_t* base );
 void hc_task_construct_internal (hc_task_t* derived, ocrEdt_t funcPtr, u32 paramc, u64 * params, void** paramv) {
     derived->nbdeps = 0;
     derived->depv = NULL;
@@ -194,7 +268,7 @@ void hc_task_construct_internal (hc_task_t* derived, ocrEdt_t funcPtr, u32 param
     base->params = params;
     base->paramv = paramv;
     base->destruct = hc_task_destruct;
-    base->iterate_waiting_frontier = hc_task_iterate_waiting_frontier;
+    base->iterate_waiting_frontier = hc_task_iterate_waiting_frontier_2;
     base->execute = hc_task_execute;
     base->schedule = hc_task_schedule;
     base->add_dependence = hc_task_add_dependence;
@@ -204,6 +278,7 @@ hc_task_t* hc_task_construct_with_event_list (ocrEdt_t funcPtr, u32 paramc, u64 
     hc_task_t* derived = (hc_task_t*)malloc(sizeof(hc_task_t));
     derived->awaitList = hc_await_list_constructor_with_event_list(el);
     hc_task_construct_internal(derived, funcPtr, paramc, params, paramv);
+    __asm__ __volatile__ ("" ::: "memory");
     return derived;
 }
 
@@ -211,30 +286,50 @@ hc_task_t* hc_task_construct (ocrEdt_t funcPtr, u32 paramc, u64 * params, void**
     hc_task_t* derived = (hc_task_t*)malloc(sizeof(hc_task_t));
     derived->awaitList = hc_await_list_constructor(dep_list_size);
     hc_task_construct_internal(derived, funcPtr, paramc, params, paramv);
+    __asm__ __volatile__ ("" ::: "memory");
     return derived;
 }
 
 void hc_task_destruct ( ocr_task_t* base ) {
     hc_task_t* derived = (hc_task_t*)base;
-    hc_await_list_destructor(derived->awaitList);
+    hc_await_list_destructor((hc_await_list_t*)derived->awaitList);
     globalGuidProvider->releaseGuid(globalGuidProvider, base->guid);
     free(derived);
 }
 
+bool hc_task_iterate_waiting_frontier_2 ( ocr_task_t* base ) {
+    hc_task_t* derived = (hc_task_t*)base;
+    pthread_mutex_lock(&((hc_await_list_t*)derived->awaitList)->lock);
+    __asm__ __volatile__ ("" ::: "memory");
+    //ocr_event_t volatile* volatile* currEventToWaitOn = derived->awaitList->waitingFrontier;
+    ocr_event_t volatile* volatile* currEventToWaitOn = &(derived->awaitList->array[0]);
+
+    ocrGuid_t my_guid = base->guid;
+
+    while (*currEventToWaitOn && !hc_event_register_if_not_ready_2(*currEventToWaitOn, my_guid) ) {
+        ++currEventToWaitOn;
+    }
+    // derived->awaitList->waitingFrontier = currEventToWaitOn;
+    __asm__ __volatile__ ("" ::: "memory");
+    pthread_mutex_unlock(&((hc_await_list_t*)derived->awaitList)->lock);
+    return *currEventToWaitOn == NULL;
+}
+
 bool hc_task_iterate_waiting_frontier ( ocr_task_t* base ) {
     hc_task_t* derived = (hc_task_t*)base;
-    ocr_event_t** currEventToWaitOn = derived->awaitList->waitingFrontier;
+    ocr_event_t ** currEventToWaitOn = (ocr_event_t **)derived->awaitList->waitingFrontier;
 
     ocrGuid_t my_guid = base->guid;
 
     while (*currEventToWaitOn && !(*currEventToWaitOn)->registerIfNotReady (*currEventToWaitOn, my_guid) ) {
         ++currEventToWaitOn;
     }
-    derived->awaitList->waitingFrontier = currEventToWaitOn;
+    derived->awaitList->waitingFrontier = (ocr_event_t volatile**)currEventToWaitOn;
     return *currEventToWaitOn == NULL;
 }
 
 void hc_task_schedule( ocr_task_t* base, ocrGuid_t wid ) {
+    __asm__ __volatile__ ("" ::: "memory");
     if ( base->iterate_waiting_frontier(base) ) {
 
         ocrGuid_t this_guid = base->guid;
@@ -245,11 +340,12 @@ void hc_task_schedule( ocr_task_t* base, ocrGuid_t wid ) {
         ocr_scheduler_t * scheduler = get_worker_scheduler(w);
         scheduler->give(scheduler, wid, this_guid);
     }
+    __asm__ __volatile__ ("" ::: "memory");
 }
 
 void hc_task_execute ( ocr_task_t* base ) {
     hc_task_t* derived = (hc_task_t*)base;
-    ocr_event_t* curr = derived->awaitList->array[0];
+    ocr_event_t* curr = (ocr_event_t*)derived->awaitList->array[0];
     ocrDataBlock_t *db = NULL;
     ocrGuid_t dbGuid = UNINITIALIZED_GUID;
     size_t i = 0;
@@ -257,7 +353,7 @@ void hc_task_execute ( ocr_task_t* base ) {
     //we will have to have the size when constructing the edt
     ocr_event_t* ptr = curr;
     while ( NULL != ptr ) {
-        ptr = derived->awaitList->array[++i];
+        ptr = (ocr_event_t*)derived->awaitList->array[++i];
     };
     derived->nbdeps = i; i = 0;
     derived->depv = (ocrEdtDep_t *) malloc(sizeof(ocrEdtDep_t) * derived->nbdeps);
@@ -271,7 +367,7 @@ void hc_task_execute ( ocr_task_t* base ) {
         } else
             derived->depv[i].ptr = NULL;
 
-        curr = derived->awaitList->array[++i];
+        curr = (ocr_event_t*)derived->awaitList->array[++i];
     };
     derived->p_function(base->paramc, base->params, base->paramv, derived->nbdeps, derived->depv);
 
@@ -287,4 +383,5 @@ void hc_task_execute ( ocr_task_t* base ) {
 void hc_task_add_dependence ( ocr_task_t* base, ocr_event_t* dep, size_t index ) {
     hc_task_t* derived = (hc_task_t*)base;
     derived->awaitList->array[index] = dep;
+    __asm__ __volatile__ ("" ::: "memory");
 }

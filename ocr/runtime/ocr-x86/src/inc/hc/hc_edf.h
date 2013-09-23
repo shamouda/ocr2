@@ -53,17 +53,18 @@ void hc_event_factory_destructor ( struct ocr_event_factory_struct* base );
 ocrGuid_t hc_event_factory_create ( struct ocr_event_factory_struct* factory, ocrEventTypes_t eventType, bool takesArg );
 
 typedef struct register_list_node_t {
-    ocrGuid_t task_guid;
-    struct register_list_node_t* next ;
+    volatile ocrGuid_t task_guid;
+    struct register_list_node_t volatile * volatile next ;
 } register_list_node_t;
 
 typedef struct hc_event_t {
     ocr_event_t base;
-    ocrGuid_t datum;
-    volatile register_list_node_t* register_list;
+    ocrGuid_t volatile datum;
+    register_list_node_t volatile * volatile register_list;
+    pthread_mutex_t lock;
 } hc_event_t;
 
-struct ocr_event_struct* hc_event_constructor(ocrEventTypes_t eventType, bool takesArg);
+struct ocr_event_struct volatile * hc_event_constructor(ocrEventTypes_t eventType, bool takesArg);
 void hc_event_destructor ( struct ocr_event_struct* base );
 ocrGuid_t hc_event_get (struct ocr_event_struct* event);
 void hc_event_put (struct ocr_event_struct* event, ocrGuid_t db );
@@ -73,9 +74,10 @@ bool hc_event_register_if_not_ready(struct ocr_event_struct* event, ocrGuid_t po
  */
 typedef struct {
     /*! Public member for array head*/
-    ocr_event_t** array;
+    ocr_event_t volatile * volatile * volatile array;
     /*! Public member for waiting frontier*/
-    ocr_event_t** waitingFrontier;
+    ocr_event_t volatile * volatile * volatile waitingFrontier;
+    pthread_mutex_t lock;
 } hc_await_list_t;
 
 /*! \brief Gets the GUID for an OCR entity instance
@@ -83,14 +85,14 @@ typedef struct {
  *  \return AwaitList that is a copy of the EventList
  *  Our current implementation copies the linked list into an array
  */
-hc_await_list_t* hc_await_list_constructor( size_t al_size );
+hc_await_list_t volatile * hc_await_list_constructor( size_t al_size );
 void hc_await_list_destructor(hc_await_list_t*);
 
 /*! \brief Event Driven Task(EDT) implementation for OCR Tasks
  */
 typedef struct hc_task_struct_t {
     ocr_task_t base;
-    hc_await_list_t* awaitList;
+    hc_await_list_t volatile * volatile awaitList;
     size_t nbdeps;
     ocrEdtDep_t * depv;
     ocrEdt_t p_function;

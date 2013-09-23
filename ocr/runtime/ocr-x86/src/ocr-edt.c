@@ -54,7 +54,9 @@ u8 ocrEventSatisfy(ocrGuid_t eventGuid, ocrGuid_t dataGuid /*= INVALID_GUID*/) {
     ocr_event_t * event = NULL;
     globalGuidProvider->getVal(globalGuidProvider, eventGuid, (u64*)&event, NULL);
 
+    __asm__ __volatile__ ("" ::: "memory");
     event->put(event, dataGuid);
+    __asm__ __volatile__ ("" ::: "memory");
     return 0;
 }
 

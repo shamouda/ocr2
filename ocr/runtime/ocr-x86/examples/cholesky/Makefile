@@ -1,10 +1,12 @@
-OCR_INPUT_HOME=.
+OCR_INPUT_HOME=${HOME}/Cholesky
 PROG=cholesky
 SUFFIX=.exe
-CFLAGS= -g
+CFLAGS= -O3 -g
 OCR_FLAGS=-L${OCR_INSTALL}/lib -I${OCR_INSTALL}/include -locr -lm
 OCR_INPUT=${OCR_INPUT_HOME}
 
+CC=/opt/intel/bin/icc
+#CC=gcc
 all: compile run
 all-test: compile run verify
 
@@ -15,7 +17,7 @@ INPUT_FILE=m_${MATRIX_SIZE}.in
 OUTPUT_FILE=cholesky_out_${MATRIX_SIZE}.txt
 
 compile:
-	gcc $(CFLAGS) $(OCR_FLAGS) -I. $(PROG).c -o $(PROG)$(SUFFIX)
+	${CC} $(CFLAGS) $(OCR_FLAGS) -I. $(PROG).c -o $(PROG)$(SUFFIX)
 
 compile_pp:
 	g++ $(CFLAGS) $(OCR_FLAGS) -I. $(PROG).cpp -o $(PROG)$(SUFFIX)
