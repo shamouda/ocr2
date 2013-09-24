@@ -38,7 +38,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define FLAGS 0xdead
 #define PROPERTIES 0xdead
 
-
+struct timeval a,b;
 
 u8 sequential_cholesky_task ( u32 paramc, u64 * params, void* paramv[], u32 depc, ocrEdtDep_t depv[]) {
 	int index = 0, iB = 0, jB = 0, kB = 0, jBB = 0;
@@ -206,6 +206,9 @@ u8 update_nondiagonal_task ( u32 paramc, u64 * params, void* paramv[], u32 depc,
 u8 wrap_up_task ( u32 paramc, u64 * params, void* paramv[], u32 depc, ocrEdtDep_t depv[]) {
 	int i, j, i_b, j_b;
 	double* temp;
+        gettimeofday(&b,0);
+        printf("The computation took %f seconds\r\n",((b.tv_sec - a.tv_sec)*1000000+(b.tv_usec - a.tv_usec))*1.0/1000000);
+
 	FILE* out = fopen("cholesky.out", "w");
 
 	intptr_t *func_args = *paramv;
@@ -430,6 +433,8 @@ int main( int argc, char* argv[] ) {
 
 	satisfyInitialTiles( numTiles, tileSize, matrix, lkji_event_guids);
 
+        gettimeofday(&a,0);
+        
 	for ( k = 0; k < numTiles; ++k ) {
 		sequential_cholesky_task_prescriber ( k, tileSize, lkji_event_guids);
 

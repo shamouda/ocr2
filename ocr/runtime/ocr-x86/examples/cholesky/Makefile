@@ -1,7 +1,7 @@
-OCR_INPUT_HOME=.
+OCR_INPUT_HOME=${HOME}/Cholesky/
 PROG=cholesky
 SUFFIX=.exe
-CFLAGS= -g
+CFLAGS= -O3 -g
 OCR_FLAGS=-L${OCR_INSTALL}/lib -I${OCR_INSTALL}/include -locr -lm
 OCR_INPUT=${OCR_INPUT_HOME}
 
