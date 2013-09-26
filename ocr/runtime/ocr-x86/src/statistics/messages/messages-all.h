@@ -12,6 +12,8 @@
 
 #include "debug.h"
 #include "ocr-statistics.h"
+#include "messages-macros.h"
+
 
 #define STATS_MESSAGE_DECLARE(name)                                              \
     extern ocrStatsMessage_t* newStatsMessage ## name(ocrStatsEvt_t type, ocrGuid_t src, \
@@ -24,11 +26,13 @@
 // Add your filter identifier here
 typedef enum _ocrStatsEvtInt_t {
     STATS_MESSAGE_TRIVIAL,       /**< Trivial message that logs source and destination */
+    STATS_MESSAGE_ENERGY,
 } ocrStatsEvtInt_t;
 
 
 // Add your message here
 STATS_MESSAGE_DECLARE(TRIVIAL);
+STATS_MESSAGE_DECLARE(ENERGY);
 
 // Finally, add your message in this switch statement
 static inline ocrStatsMessage_t* newStatsMessage(ocrStatsEvtInt_t implType, ocrStatsEvt_t type,
@@ -36,6 +40,7 @@ static inline ocrStatsMessage_t* newStatsMessage(ocrStatsEvtInt_t implType, ocrS
                                                  ocrStatsParam_t *instanceArg) {
     switch(implType) {
     STATS_MESSAGE_CASE(TRIVIAL, type, src, dest, instanceArg);
+    STATS_MESSAGE_CASE(ENERGY, type, src, dest, instanceArg);
     default:
         ASSERT(0);
         return NULL;

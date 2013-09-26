@@ -19,12 +19,22 @@ statistics/default/default-statistics.c
 
 libocr_statistics_default_la_CFLAGS = $(AM_CFLAGS)
 
+# Energy statistics provider
+noinst_LTLIBRARIES += libocr_statistics_energy.la
+libocr_la_LIBADD += libocr_statistics_energy.la
+
+libocr_statistics_energy_la_SOURCES = \
+statistics/energy/energy-statistics.c
+
+libocr_statistics_energy_la_CFLAGS = $(AM_CFLAGS)
+
 # Filters
 noinst_LTLIBRARIES += libocr_statistics_filters.la
 libocr_la_LIBADD += libocr_statistics_filters.la
 
 libocr_statistics_filters_la_SOURCES = \
 statistics/filters/filter-dump.c       \
+statistics/filters/filter-energy.c     \
 statistics/filters/filter-trivial.c
 
 libocr_statistics_filters_la_CFLAGS = $(AM_CFLAGS)
@@ -34,6 +44,7 @@ noinst_LTLIBRARIES += libocr_statistics_messages.la
 libocr_la_LIBADD += libocr_statistics_messages.la
 
 libocr_statistics_messages_la_SOURCES = \
+statistics/messages/message-energy.c    \
 statistics/messages/message-trivial.c
 
 libocr_statistics_messages_la_CFLAGS = $(AM_CFLAGS)

@@ -619,7 +619,7 @@ s32 populate_inst(ocrParamList_t **inst_param, ocrMappable_t **instance, s32 *ty
 #ifdef OCR_ENABLE_STATISTICS
             // HUGE HUGE HUGE HUGE HUGE HACK. This needs to be parsed
             // but for now just passing some default one
-            ocrStatsFactory_t *sf = newStatsFactory(statisticsDefault_id, NULL);
+            ocrStatsFactory_t *sf = newStatsFactory(statisticsEnergy_id, NULL);
 #endif
             ALLOC_PARAM_LIST(inst_param[j], paramListPolicyDomainInst_t);
             instance[j] = (ocrMappable_t *)((ocrPolicyDomainFactory_t *)factory)->instantiate(

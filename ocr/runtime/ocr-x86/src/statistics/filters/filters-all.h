@@ -24,13 +24,15 @@
 // Add your filter identifier here
 typedef enum _ocrStatsFilterType_t {
     STATS_FILTER_TRIVIAL,       /**< Trivial filter that keeps everything */
-    STATS_FILTER_FILE_DUMP      /**< Trivial filter that dumps everything to a file */
+    STATS_FILTER_FILE_DUMP,     /**< Trivial filter that dumps everything to a file */
+    STATS_FILTER_ENERGY,
 } ocrStatsFilterType_t;
 
 
 // Add your filter here
 STATS_FILTER_DECLARE(TRIVIAL);
 STATS_FILTER_DECLARE(FILE_DUMP);
+STATS_FILTER_DECLARE(ENERGY);
 
 // Finally, add your filter in this switch statement
 static inline ocrStatsFilter_t* newStatsFilter(ocrStatsFilterType_t type,
@@ -39,6 +41,7 @@ static inline ocrStatsFilter_t* newStatsFilter(ocrStatsFilterType_t type,
     switch(type) {
     STATS_FILTER_CASE(TRIVIAL, parent, instanceArg);
     STATS_FILTER_CASE(FILE_DUMP, parent, instanceArg);
+    STATS_FILTER_CASE(ENERGY, parent, instanceArg);
     default:
         ASSERT(0);
         return NULL;

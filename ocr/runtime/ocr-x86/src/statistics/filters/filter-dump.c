@@ -65,6 +65,7 @@ if(rself->outFile) {
             nextChunk = other->fcts.dump(other, &outString, nextChunk, NULL);
             if(outString) {
                 fprintf(rself->outFile, "%s\n", outString);
+                fflush(rself->outFile);
                 free(outString);
             }
         } while(nextChunk);

@@ -16,7 +16,7 @@ endif
 
 OCR_RUN_FLAGS=-ocr:cfg ${OCR_CONFIG}
 
-all-test: compile run
+all: compile run
 
 compile:
 	gcc $(CFLAGS) $(OCR_FLAGS) -I. $(PROG).c -o $(PROG)$(SUFFIX)
@@ -40,7 +40,7 @@ EXPECTED_RESULT=12
 endif
 
 run:
-	./$(PROG)$(SUFFIX) $(OCR_RUN_FLAGS) ${OCR_INPUT}/string1-${SIZE}.txt ${OCR_INPUT}/string2-${SIZE}.txt ${TILE_WIDTH} ${TILE_HEIGHT}
+	./$(PROG)$(SUFFIX) $(OCR_RUN_FLAGS) ${OCR_INPUT}/string1-${SIZE}.txt ${OCR_INPUT}/string2-${SIZE}.txt ${TILE_WIDTH} ${TILE_HEIGHT} 2>&1
 
 run_omp:
 	./$(OMP_PROG)$(SUFFIX) ${OCR_INPUT}/string1-${SIZE}.txt ${OCR_INPUT}/string2-${SIZE}.txt ${TILE_WIDTH} ${TILE_HEIGHT}

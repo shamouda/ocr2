@@ -1,5 +1,5 @@
 PROG=helloworld
-CFLAGS=-O0 -g -Werror
+CFLAGS=-O0 -g -Werror -DOCR_ENABLE_EDT_NAMING
 OCR_FLAGS=-L${OCR_INSTALL}/lib -I${OCR_INSTALL}/include -locr
 
 ifndef OCR_INSTALL
@@ -13,10 +13,10 @@ endif
 
 OCR_RUN_FLAGS=-ocr:cfg ${OCR_CONFIG}
 
-all-test: compile run
+all: compile run
 
 compile:
-	gcc -g $(OCR_FLAGS) -I. $(PROG).c -o $(PROG).exe
+	gcc -g $(CFLAGS) $(OCR_FLAGS) -I. $(PROG).c -o $(PROG).exe
 
 run:
 	./$(PROG).exe $(OCR_RUN_FLAGS)

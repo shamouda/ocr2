@@ -19,11 +19,13 @@
 
 typedef enum _statisticsType_t {
     statisticsDefault_id,
+    statisticsEnergy_id,
     statisticsMax_id
 } statisticsType_t;
 
 const char * statistics_types[] = {
     "default",
+    "energy",
     NULL
 };
 
@@ -31,11 +33,14 @@ const char * statistics_types[] = {
 #include "statistics/default/default-statistics.h"
 
 // Add other statistics provider using the same pattern as above
+#include "statistics/energy/energy-statistics.h"
 
 inline ocrStatsFactory_t *newStatsFactory(statisticsType_t type, ocrParamList_t *typeArg) {
     switch(type) {
     case statisticsDefault_id:
         return newStatsFactoryDefault(typeArg);
+    case statisticsEnergy_id:
+        return newStatsFactoryEnergy(typeArg);
     case statisticsMax_id:
     default:
         ASSERT(0);
