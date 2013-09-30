@@ -113,6 +113,7 @@ ocr_scheduler_t * get_worker_scheduler(ocr_worker_t * worker);
  *  An executor that calls this function should be
  */
 void associate_executor_and_worker(ocr_worker_t * worker);
+void bind_worker ( int worker_id, int cpu_id );
 
 /*! \brief Get current calling context Worker's GUID
  *  \return GUID for the Worker instance that is executing the code context this function is called in
@@ -138,6 +139,7 @@ ocr_worker_t* hc_worker_constructor(void);
  * I do not know if abstract factories may help with this situation */
 typedef struct worker_configuration {
     size_t worker_id;
+    int cpu_id;
 } worker_configuration;
 
 

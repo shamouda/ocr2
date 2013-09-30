@@ -69,15 +69,15 @@ typedef struct {
 
 ocr_model_policy_t * defaultOcrModelPolicy(size_t nb_policy_domain,
                                            size_t nb_schedulers, size_t nb_workers,
-                                           size_t nb_executors, size_t nb_workpiles);
+                                           size_t nb_executors, size_t nb_workpiles, int* bind_map);
 
 ocr_model_policy_t * defaultOcrModelPolicyDequishHeap(size_t nb_policy_domain,
                                            size_t nb_schedulers, size_t nb_workers,
-                                           size_t nb_executors, size_t nb_workpiles);
+                                           size_t nb_executors, size_t nb_workpiles, int* bind_map);
 
 ocr_model_policy_t * defaultOcrModelPolicyPriorityHeap(size_t nb_policy_domain,
                                            size_t nb_schedulers, size_t nb_workers,
-                                           size_t nb_executors, size_t nb_workpiles);
+                                           size_t nb_executors, size_t nb_workpiles, int* bind_map);
 
 
 ocr_model_policy_t * createXeModelPolicies ( size_t nb_CEs, size_t nb_XE_per_CEs );

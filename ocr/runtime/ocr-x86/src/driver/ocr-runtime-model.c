@@ -211,13 +211,14 @@ static void setDefaultModelSchedulers ( ocr_model_policy_t * defaultPolicy, size
     defaultPolicy->schedulers = newModel( ocr_scheduler_default_kind, nb_schedulers, NULL, scheduler_configurations );
 }
 
-static void setDefaultModelWorkers ( ocr_model_policy_t * defaultPolicy, size_t nb_policy_domains, size_t nb_workers ) {
+static void setDefaultModelWorkers ( ocr_model_policy_t * defaultPolicy, size_t nb_policy_domains, size_t nb_workers, int* bind_map ) {
     size_t index_config = 0, n_all_workers = nb_workers*nb_policy_domains;
     void** worker_configurations = malloc(sizeof(worker_configuration*)*n_all_workers );
     for ( index_config = 0; index_config < n_all_workers; ++index_config ) {
         worker_configurations[index_config] = (worker_configuration*) malloc(sizeof(worker_configuration));
         worker_configuration* curr_config = (worker_configuration*)worker_configurations[index_config];
         curr_config->worker_id = index_config;
+        curr_config->cpu_id = (( NULL != bind_map ) ? bind_map[index_config]: -1); 
     }
     defaultPolicy->workers    = newModel( ocr_worker_default_kind, nb_workers, NULL, worker_configurations);
 }
@@ -257,12 +258,12 @@ static inline void setDefaultModelMappings ( ocr_model_policy_t * defaultPolicy 
  * number of workers, executors and workpiles
  */
 ocr_model_policy_t * defaultOcrModelPolicy(size_t nb_policy_domains, size_t nb_schedulers,
-                                           size_t nb_workers, size_t nb_executors, size_t nb_workpiles) {
+                                           size_t nb_workers, size_t nb_executors, size_t nb_workpiles, int* bind_map) {
 
     ocr_model_policy_t * defaultPolicy = defaultModelPolicyConstructor(nb_policy_domains);
 
     setDefaultModelSchedulers (defaultPolicy, nb_policy_domains, nb_schedulers, nb_workers);
-    setDefaultModelWorkers (defaultPolicy, nb_policy_domains, nb_workers);
+    setDefaultModelWorkers (defaultPolicy, nb_policy_domains, nb_workers, bind_map);
     setDefaultModelWorkpiles (defaultPolicy, nb_workpiles);
 
     defaultPolicy->executors  = newModel( ocr_executor_default_kind, nb_executors, NULL, NULL );
@@ -273,12 +274,12 @@ ocr_model_policy_t * defaultOcrModelPolicy(size_t nb_policy_domains, size_t nb_s
 }
 
 ocr_model_policy_t * defaultOcrModelPolicyDequishHeap(size_t nb_policy_domains, size_t nb_schedulers,
-                                           size_t nb_workers, size_t nb_executors, size_t nb_workpiles) {
+                                           size_t nb_workers, size_t nb_executors, size_t nb_workpiles, int* bind_map) {
 
     ocr_model_policy_t * defaultPolicy = defaultModelPolicyConstructor(nb_policy_domains);
 
     setDefaultModelSchedulers (defaultPolicy, nb_policy_domains, nb_schedulers, nb_workers);
-    setDefaultModelWorkers (defaultPolicy, nb_policy_domains, nb_workers);
+    setDefaultModelWorkers (defaultPolicy, nb_policy_domains, nb_workers, bind_map);
     setDefaultModelWorkpilesDequishHeap (defaultPolicy, nb_workpiles);
 
     defaultPolicy->executors  = newModel( ocr_executor_default_kind, nb_executors, NULL, NULL );
@@ -289,12 +290,12 @@ ocr_model_policy_t * defaultOcrModelPolicyDequishHeap(size_t nb_policy_domains, 
 }
 
 ocr_model_policy_t * defaultOcrModelPolicyPriorityHeap(size_t nb_policy_domains, size_t nb_schedulers,
-                                           size_t nb_workers, size_t nb_executors, size_t nb_workpiles) {
+                                           size_t nb_workers, size_t nb_executors, size_t nb_workpiles, int* bind_map) {
 
     ocr_model_policy_t * defaultPolicy = defaultModelPolicyConstructor(nb_policy_domains);
 
     setDefaultModelSchedulers (defaultPolicy, nb_policy_domains, nb_schedulers, nb_workers);
-    setDefaultModelWorkers (defaultPolicy, nb_policy_domains, nb_workers);
+    setDefaultModelWorkers (defaultPolicy, nb_policy_domains, nb_workers, bind_map);
     setDefaultModelWorkpilesPriorityHeap (defaultPolicy, nb_workpiles);
 
     defaultPolicy->executors  = newModel( ocr_executor_default_kind, nb_executors, NULL, NULL );

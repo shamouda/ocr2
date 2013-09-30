@@ -52,6 +52,7 @@ ocr_scheduler_t * get_worker_scheduler(ocr_worker_t * worker) { return worker->s
 void hc_worker_create ( ocr_worker_t * base, void * per_type_configuration, void * per_instance_configuration) {
     hc_worker_t * hc_worker = (hc_worker_t *) base;
     hc_worker->id = ((worker_configuration*)per_instance_configuration)->worker_id;
+    hc_worker->cpu_id = ((worker_configuration*)per_instance_configuration)->cpu_id;
 }
 
 void hc_worker_destruct ( ocr_worker_t * base ) {
@@ -130,6 +131,11 @@ int get_worker_id(ocr_worker_t * worker) {
     return hcWorker->id;
 }
 
+int get_worker_cpu_id(ocr_worker_t * worker) {
+    hc_worker_t * hcWorker = (hc_worker_t *) worker;
+    return hcWorker->cpu_id;
+}
+
 ocrGuid_t get_worker_guid(ocr_worker_t * worker) {
     return worker->guid;
 }
@@ -168,6 +174,8 @@ void * worker_computation_routine(void * arg) {
     ocr_worker_t * worker = (ocr_worker_t *) arg;
     /* associate current thread with the worker */
     associate_executor_and_worker(worker);
+    int worker_cpu_id = get_worker_cpu_id(worker);
+    if ( -1 != worker_cpu_id ) bind_worker ( get_worker_id(worker), worker_cpu_id );
     ocrGuid_t workerGuid = get_worker_guid(worker);
     ocr_scheduler_t * scheduler = get_worker_scheduler(worker);
     log_worker(INFO, "Starting scheduler routine of worker %d\n", get_worker_id(worker));

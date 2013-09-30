@@ -49,6 +49,7 @@ typedef struct {
     ocr_worker_t worker;
     //TODO this is a convenience to map workers to workpiles
     int id;
+    int cpu_id;
     //TODO shall these stay here or go up ?
     bool run;
     // reference to the EDT this worker is currently executing

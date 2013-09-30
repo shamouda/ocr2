@@ -28,12 +28,18 @@
    OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 */
+#define _GNU_SOURCE
+#define __USE_GNU
+#include <sched.h>
 
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 
 #include "ocr-executor.h"
+
+#include <errno.h>
+#include <assert.h>
 
 /******************************************************/
 /* PTHREAD executor                                   */
@@ -112,6 +118,44 @@ ocr_executor_t * ocr_executor_pthread_constructor () {
 void associate_executor_and_worker(ocr_worker_t * worker) {
     int rt = pthread_setspecific(worker_key, worker);
     if (rt != 0) { printf("[PTHREAD] - ERROR in pthread_setspecific\n"); exit(1); }
+}
+
+static void bind_thread_with_mask(int * mask, int lg) {
+#ifdef __linux
+    int i = 0;
+    cpu_set_t cpuset;
+    if (mask != NULL) {
+        CPU_ZERO(&cpuset);
+
+        /* Copy the mask from the int array to the cpuset */
+        for (i=0; i<lg; i++) {
+            CPU_SET(mask[i], &cpuset);
+        }
+
+        /* Set affinity */
+        int res = sched_setaffinity(0, sizeof(cpu_set_t), &cpuset);
+        if (res != 0) {
+            printf("ERROR: ");
+            if (errno == ESRCH) {
+                assert("THREADBINDING ERROR: ESRCH: Process not found!\n");
+            }
+            if (errno == EINVAL) {
+                assert("THREADBINDING ERROR: EINVAL: CPU mask does not contain any actual physical processor\n");
+            }
+            if (errno == EFAULT) {
+                assert("THREADBINDING ERROR: EFAULT: memory address was invalid\n");
+            }
+            if (errno == EPERM) {
+                assert("THREADBINDING ERROR: EPERM: process does not have appropriate privileges\n");
+            }
+        }
+    }
+#endif
+}
+
+void bind_worker ( int worker_id, int cpu_id ) {
+    int mask = cpu_id;
+    bind_thread_with_mask(&mask, 1);
 }
 
 ocrGuid_t ocr_get_current_worker_guid() {

@@ -210,6 +210,9 @@ static void removeFixHeap ( heap_t* heap ) {
                 if ( leftCost < currCost ) {
                     swapAtIndices(heap, currLeftHeapIndex, currHeapIndex);
                     heapFixIndex = heapLeftChildIndex;
+                } else {
+                    /*nothing to fix; break the loop*/
+                    heapFixIndex = nElements;
                 }
             }
         } else {
@@ -268,7 +271,7 @@ void locked_heap_push_priority (heap_t* heap, void* entry) {
             setCost(entry, hcWorker->id);
 
             insertFixHeap(heap);
-            verifyHeap(heap);
+            if(DEBUG)verifyHeap(heap);
 
             heap->lock = 0;
         }
@@ -289,7 +292,7 @@ void* locked_heap_pop_priority_best ( heap_t* heap ) {
             } else {
                 rt = (void*) heap->buffer->data[ heap->head % heap->buffer->capacity];
                 removeFixHeap(heap);
-                verifyHeap(heap);
+                if(DEBUG)verifyHeap(heap);
             }
             heap->lock = 0;
         }
@@ -311,7 +314,7 @@ void* locked_heap_pop_priority_worst ( heap_t* heap ) {
             } else { 
                 --heap->tail;
                 rt = (void*) heap->buffer->data[heap->tail % heap->buffer->capacity];
-                verifyHeap(heap);
+                if(DEBUG)verifyHeap(heap);
             }
             heap->lock = 0;
         }

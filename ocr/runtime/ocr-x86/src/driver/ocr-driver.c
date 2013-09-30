@@ -76,6 +76,35 @@ static char * parseOcrOptions_MachineDescription(int * argc, char ** argv) {
     return md_file;
 }
 
+static char * parseOcrOptions_Binding (int * argc, char ** argv) {
+    int i = 0;
+    char * bind_file = NULL;
+    while(i < *argc) {
+        if (strcmp(argv[i], "-bind") == 0) {
+            bind_file = argv[i+1];
+            shift_arguments(argc, argv, i, i+2);
+        }
+        i++;
+    }
+    return bind_file;
+}
+
+static int * read_bind_file ( char * bind_file ) {
+    FILE *fp;
+    int temp_map[1024];
+    int cpu, n = 0;
+
+    fp=fopen(bind_file, "r");
+    while(fscanf(fp, "%d", &cpu) != EOF) {
+        temp_map[n] = cpu;
+        n++;
+        assert((n < 1024) && "cpu set limit reached. Ignoring thread binding.");
+    }
+    int *bind_map = (int *)malloc(sizeof(int) * n);
+    memcpy(bind_map, temp_map, sizeof(int) * n);
+    return bind_map;
+}
+
 /**!
  * Initialize the OCR runtime.
  * @param argc number of command line options
@@ -93,6 +122,13 @@ void ocrInit(int * argc, char ** argv, u32 fnc, ocrEdt_t funcs[]) {
     u32 nbHardThreads = ocr_config_default_nb_hardware_threads;
     gHackTotalMemSize = 512*1024*1024; /* 64 MB default */
     char * md_file = parseOcrOptions_MachineDescription(argc, argv);
+
+    char * bind_file = parseOcrOptions_Binding (argc, argv);
+    int* bind_map = NULL;
+    
+    if ( NULL != bind_file ) {
+        bind_map = read_bind_file(bind_file);
+    }
 
     /* sagnak begin */
     if ( md_file != NULL && !strncmp(md_file,"fsim",5) ) {
@@ -305,7 +341,7 @@ void ocrInit(int * argc, char ** argv, u32 fnc, ocrEdt_t funcs[]) {
 
         ocr_model_policy_t * policy_model = defaultOcrModelPolicy(nb_policy_domain,
                 nb_schedulers_per_policy_domain, nb_workers_per_policy_domain,
-                nb_executors_per_policy_domain, nb_workpiles_per_policy_domain);
+                nb_executors_per_policy_domain, nb_workpiles_per_policy_domain, bind_map);
 
         //TODO LIMITATION for now support only one policy
         n_root_policy_nodes = nb_policy_domain;
@@ -328,7 +364,7 @@ void ocrInit(int * argc, char ** argv, u32 fnc, ocrEdt_t funcs[]) {
 
         ocr_model_policy_t * policy_model = defaultOcrModelPolicyDequishHeap(nb_policy_domain,
                 nb_schedulers_per_policy_domain, nb_workers_per_policy_domain,
-                nb_executors_per_policy_domain, nb_workpiles_per_policy_domain);
+                nb_executors_per_policy_domain, nb_workpiles_per_policy_domain, bind_map);
 
         //TODO LIMITATION for now support only one policy
         n_root_policy_nodes = nb_policy_domain;
@@ -351,7 +387,7 @@ void ocrInit(int * argc, char ** argv, u32 fnc, ocrEdt_t funcs[]) {
 
         ocr_model_policy_t * policy_model = defaultOcrModelPolicyPriorityHeap(nb_policy_domain,
                 nb_schedulers_per_policy_domain, nb_workers_per_policy_domain,
-                nb_executors_per_policy_domain, nb_workpiles_per_policy_domain);
+                nb_executors_per_policy_domain, nb_workpiles_per_policy_domain, bind_map);
 
         //TODO LIMITATION for now support only one policy
         n_root_policy_nodes = nb_policy_domain;
@@ -388,7 +424,7 @@ void ocrInit(int * argc, char ** argv, u32 fnc, ocrEdt_t funcs[]) {
 
         ocr_model_policy_t * policy_model = defaultOcrModelPolicy(nb_policy_domain,
                                                                   nb_schedulers_per_policy_domain, nb_workers_per_policy_domain,
-                                                                  nb_executors_per_policy_domain, nb_workpiles_per_policy_domain);
+                                                                  nb_executors_per_policy_domain, nb_workpiles_per_policy_domain, bind_map);
 
         //TODO LIMITATION for now support only one policy
         n_root_policy_nodes = nb_policy_domain;
@@ -403,6 +439,9 @@ void ocrInit(int * argc, char ** argv, u32 fnc, ocrEdt_t funcs[]) {
         root_policies[0]->start(root_policies[0]);
     }
     associate_executor_and_worker(master_worker);
+    if ( NULL != bind_file ) {
+        free(bind_map);
+    }
 }
 
 static void recursive_policy_finish_helper ( ocr_policy_domain_t* curr ) {
