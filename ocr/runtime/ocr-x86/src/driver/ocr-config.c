@@ -42,7 +42,7 @@ ocrDataBlockKind ocrDataBlockDefaultKind = OCR_DATABLOCK_REGULAR;
 ocrLockKind ocrLockDefaultKind = OCR_LOCK_X86;
 ocrGuidProviderKind ocrGuidProviderDefaultKind = OCR_GUIDPROVIDER_PTR;
 
-u32 ocr_config_default_nb_hardware_threads = 16;
+u32 ocr_config_default_nb_hardware_threads = 12;
 
 // XE kinds of ocr modules
 ocr_executor_kind	ocr_executor_xe_kind    = OCR_EXECUTOR_XE;

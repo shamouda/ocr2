@@ -1,4 +1,4 @@
-OCR_INPUT_HOME=${HOME}/Cholesky/
+OCR_INPUT_HOME=/scratch/st6/Cholesky
 PROG=cholesky
 SUFFIX=.exe
 CFLAGS= -O3 -g
@@ -8,7 +8,7 @@ OCR_INPUT=${OCR_INPUT_HOME}
 all: compile run
 all-test: compile run verify
 
-MATRIX_SIZE=2000
+MATRIX_SIZE=6000
 TILE_SIZE=80
 
 INPUT_FILE=m_${MATRIX_SIZE}.in

@@ -137,9 +137,35 @@ void ocrPlaceTrackerAllocate ( ocrPlaceTracker_t** toFill ) {
     *toFill = (ocrPlaceTracker_t*) malloc(sizeof(ocrPlaceTracker_t));
 }
 
+#define DAVINCI
 void ocrPlaceTrackerInsert ( ocrPlaceTracker_t* self, unsigned char currPlace ) {
-    self->existInPlaces |= (1ULL << currPlace);
-    self->existInPlaces |= (1ULL << (16+currPlace/8));
+#ifdef DAVINCI
+    static int n_sockets = 2;
+    static int n_L3s_per_socket = 1;
+    static int n_L2s_per_socket = 6;
+    static int n_L1s_per_socket = 6;
+    const int n_total_L1s = n_sockets*n_L1s_per_socket;
+    const int n_total_L2s = n_sockets*n_L2s_per_socket;
+    const int n_total_L3s = n_sockets*n_L3s_per_socket;
+    
+    unsigned char socket_id = currPlace/n_L1s_per_socket;
+    unsigned char l2_within_socket_id = currPlace%n_L2s_per_socket;
+    unsigned char l3_within_socket_id = 0;
+    unsigned char core_within_socket_id = currPlace%n_L1s_per_socket;
+    // mark the 'worker'/L1 place
+    self->existInPlaces |= (1ULL << (socket_id*n_L1s_per_socket+core_within_socket_id));
+    
+    // mark the L2 place
+    self->existInPlaces |= (1ULL << ( n_total_L1s + socket_id*n_L2s_per_socket + l2_within_socket_id ));
+    
+    // mark the L3 place
+    self->existInPlaces |= (1ULL << ( n_total_L1s + n_total_L2s + socket_id*n_L3s_per_socket + l3_within_socket_id ));
+    
+    // mark the socket place
+    self->existInPlaces |= (1ULL << ( n_total_L1s + n_total_L2s + n_total_L3s + socket_id));
+#else
+	assert(0);
+#endif
 }
 
 void ocrPlaceTrackerRemove ( ocrPlaceTracker_t* self, unsigned char currPlace ) {

@@ -206,9 +206,10 @@ u8 update_nondiagonal_task ( u32 paramc, u64 * params, void* paramv[], u32 depc,
 u8 wrap_up_task ( u32 paramc, u64 * params, void* paramv[], u32 depc, ocrEdtDep_t depv[]) {
 	int i, j, i_b, j_b;
 	double* temp;
-        gettimeofday(&b,0);
-        printf("The computation took %f seconds\r\n",((b.tv_sec - a.tv_sec)*1000000+(b.tv_usec - a.tv_usec))*1.0/1000000);
-
+	gettimeofday(&b,0);
+	printf("The computation took %f seconds\r\n",((b.tv_sec - a.tv_sec)*1000000+(b.tv_usec - a.tv_usec))*1.0/1000000);
+	ocrFinish();
+/*
 	FILE* out = fopen("cholesky.out", "w");
 
 	intptr_t *func_args = *paramv;
@@ -231,7 +232,7 @@ u8 wrap_up_task ( u32 paramc, u64 * params, void* paramv[], u32 depc, ocrEdtDep_
 			}
 		}
 	}
-	ocrFinish();
+*/
 }
 
 inline static void sequential_cholesky_task_prescriber ( int k, int tileSize, ocrGuid_t*** lkji_event_guids) {

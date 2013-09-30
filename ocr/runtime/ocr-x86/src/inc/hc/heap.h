@@ -41,7 +41,7 @@ typedef struct heap {
         buffer_t * buffer;
 } heap_t;
 
-#define INIT_HEAP_CAPACITY 128
+#define INIT_HEAP_CAPACITY 512
 
 void heap_init(heap_t * heap, void * init_value);
 
