@@ -39,6 +39,14 @@
  
 #include "hc_sysdep.h"
 
+#define WEAK_ORDERING
+
+#ifdef WEAK_ORDERING
+#define MY_FENCE hc_mfence();
+#else 
+#define MY_FENCE __asm__ __volatile__ ("" ::: "memory");
+#endif
+
 struct ocr_event_factory_struct* hc_event_factory_constructor(void) {
     hc_event_factory* derived = (hc_event_factory*) malloc(sizeof(hc_event_factory));
     ocr_event_factory* base = (ocr_event_factory*) derived;
@@ -71,11 +79,11 @@ ocrGuid_t hc_event_factory_create ( struct ocr_event_factory_struct* factory, oc
 void hc_event_put_2 (struct ocr_event_struct volatile * volatile event, ocrGuid_t db);
 struct ocr_event_struct volatile* hc_event_constructor(ocrEventTypes_t eventType, bool takesArg) {
     hc_event_t volatile*volatile derived = (hc_event_t volatile*volatile) malloc(sizeof(hc_event_t));
-    __asm__ __volatile__ ("" ::: "memory");
+    MY_FENCE;
     derived->datum = UNINITIALIZED_GUID;
-    __asm__ __volatile__ ("" ::: "memory");
+    MY_FENCE;
     derived->register_list = UNINITIALIZED_REGISTER_LIST;
-    __asm__ __volatile__ ("" ::: "memory");
+    MY_FENCE;
     pthread_mutex_t* lock = &(((hc_event_t*)derived)->lock);
     pthread_mutex_init(lock , NULL);
     ocr_event_t volatile*volatile base = (ocr_event_t volatile*volatile)derived;
@@ -121,13 +129,13 @@ register_list_node_t volatile* hc_event_compete_for_put_2 ( hc_event_t volatile*
     assert ( derived->datum == UNINITIALIZED_GUID && "violated single assignment property for EDFs");
     assert ( data_for_put_id != UNINITIALIZED_GUID && "should not put UNINITIALIZED_GUID");
 
-    __asm__ __volatile__ ("" ::: "memory");
+    MY_FENCE;
     derived->datum = data_for_put_id;
-    __asm__ __volatile__ ("" ::: "memory");
+    MY_FENCE;
     register_list_node_t volatile*volatile registerListOfEDF = derived->register_list;
-    __asm__ __volatile__ ("" ::: "memory");
+    MY_FENCE;
     derived->register_list = EMPTY_REGISTER_LIST;
-    __asm__ __volatile__ ("" ::: "memory");
+    MY_FENCE;
     return registerListOfEDF;
 }
 
@@ -156,19 +164,20 @@ void hc_event_put_2 (struct ocr_event_struct volatile *volatile event, ocrGuid_t
     hc_event_t volatile * volatile v_derived = (hc_event_t volatile *volatile )event;
     hc_event_t* derived = (hc_event_t*)v_derived;
     pthread_mutex_lock(&derived->lock);
-    __asm__ __volatile__ ("" ::: "memory");
+    MY_FENCE;
     assert ( v_derived->datum == UNINITIALIZED_GUID && "violated single assignment property for EDFs");
     assert ( data_for_put_id != UNINITIALIZED_GUID && "should not put UNINITIALIZED_GUID");
 
     v_derived->datum = data_for_put_id;
-    __asm__ __volatile__ ("" ::: "memory");
+    MY_FENCE;
     register_list_node_t volatile*volatile registerListOfEDF = v_derived->register_list;
     v_derived->register_list = EMPTY_REGISTER_LIST;
     register_list_node_t volatile*volatile task_list = registerListOfEDF;
-    __asm__ __volatile__ ("" ::: "memory");
+    MY_FENCE;
     pthread_mutex_unlock(&derived->lock);
+    MY_FENCE;
     hc_event_signal_waiters(task_list);
-    __asm__ __volatile__ ("" ::: "memory");
+    MY_FENCE;
 }
 
 /*
@@ -209,17 +218,17 @@ bool hc_event_register_if_not_ready_2 (ocr_event_t volatile*volatile event, ocrG
     hc_event_t* derived = (hc_event_t*)event;
     volatile bool registered = false;
     pthread_mutex_lock(&derived->lock);
-    __asm__ __volatile__ ("" ::: "memory");
+    MY_FENCE;
     if ( v_derived -> register_list != EMPTY_REGISTER_LIST ) {
 	register_list_node_t volatile *volatile  new_node = (register_list_node_t*)malloc(sizeof(register_list_node_t));
 	new_node->task_guid = polling_task_id;
 	new_node -> next = v_derived -> register_list;
-	__asm__ __volatile__ ("" ::: "memory");
+	MY_FENCE;
 	v_derived -> register_list = new_node;
-	__asm__ __volatile__ ("" ::: "memory");
+	MY_FENCE;
 	registered = true;
     }
-    __asm__ __volatile__ ("" ::: "memory");
+    MY_FENCE;
     pthread_mutex_unlock(&derived->lock);
     return registered;
 }
@@ -232,7 +241,7 @@ hc_await_list_t volatile* hc_await_list_constructor( size_t al_size ) {
     pthread_mutex_t* lock = &(((hc_await_list_t *)derived)->lock);
     pthread_mutex_init(lock , NULL);
     derived->waitingFrontier = &derived->array[0];
-    __asm__ __volatile__ ("" ::: "memory");
+    MY_FENCE;
     return derived;
 }
 
@@ -248,7 +257,7 @@ hc_await_list_t* hc_await_list_constructor_with_event_list ( event_list_t* el) {
         derived->array[i] = curr->event;
     }
     derived->array[el->size] = NULL;
-    __asm__ __volatile__ ("" ::: "memory");
+    MY_FENCE;
     return derived;
 }
 
@@ -278,7 +287,7 @@ hc_task_t* hc_task_construct_with_event_list (ocrEdt_t funcPtr, u32 paramc, u64 
     hc_task_t* derived = (hc_task_t*)malloc(sizeof(hc_task_t));
     derived->awaitList = hc_await_list_constructor_with_event_list(el);
     hc_task_construct_internal(derived, funcPtr, paramc, params, paramv);
-    __asm__ __volatile__ ("" ::: "memory");
+    MY_FENCE;
     return derived;
 }
 
@@ -286,7 +295,7 @@ hc_task_t* hc_task_construct (ocrEdt_t funcPtr, u32 paramc, u64 * params, void**
     hc_task_t* derived = (hc_task_t*)malloc(sizeof(hc_task_t));
     derived->awaitList = hc_await_list_constructor(dep_list_size);
     hc_task_construct_internal(derived, funcPtr, paramc, params, paramv);
-    __asm__ __volatile__ ("" ::: "memory");
+    MY_FENCE;
     return derived;
 }
 
@@ -300,7 +309,7 @@ void hc_task_destruct ( ocr_task_t* base ) {
 bool hc_task_iterate_waiting_frontier_2 ( ocr_task_t* base ) {
     hc_task_t* derived = (hc_task_t*)base;
     pthread_mutex_lock(&((hc_await_list_t*)derived->awaitList)->lock);
-    __asm__ __volatile__ ("" ::: "memory");
+    MY_FENCE;
     //ocr_event_t volatile* volatile* currEventToWaitOn = derived->awaitList->waitingFrontier;
     ocr_event_t volatile* volatile* currEventToWaitOn = &(derived->awaitList->array[0]);
 
@@ -310,7 +319,7 @@ bool hc_task_iterate_waiting_frontier_2 ( ocr_task_t* base ) {
         ++currEventToWaitOn;
     }
     // derived->awaitList->waitingFrontier = currEventToWaitOn;
-    __asm__ __volatile__ ("" ::: "memory");
+    MY_FENCE;
     pthread_mutex_unlock(&((hc_await_list_t*)derived->awaitList)->lock);
     return *currEventToWaitOn == NULL;
 }
@@ -329,7 +338,7 @@ bool hc_task_iterate_waiting_frontier ( ocr_task_t* base ) {
 }
 
 void hc_task_schedule( ocr_task_t* base, ocrGuid_t wid ) {
-    __asm__ __volatile__ ("" ::: "memory");
+    MY_FENCE;
     if ( base->iterate_waiting_frontier(base) ) {
 
         ocrGuid_t this_guid = base->guid;
@@ -340,7 +349,7 @@ void hc_task_schedule( ocr_task_t* base, ocrGuid_t wid ) {
         ocr_scheduler_t * scheduler = get_worker_scheduler(w);
         scheduler->give(scheduler, wid, this_guid);
     }
-    __asm__ __volatile__ ("" ::: "memory");
+    MY_FENCE;
 }
 
 void hc_task_execute ( ocr_task_t* base ) {
@@ -383,5 +392,5 @@ void hc_task_execute ( ocr_task_t* base ) {
 void hc_task_add_dependence ( ocr_task_t* base, ocr_event_t* dep, size_t index ) {
     hc_task_t* derived = (hc_task_t*)base;
     derived->awaitList->array[index] = dep;
-    __asm__ __volatile__ ("" ::: "memory");
+    MY_FENCE;
 }

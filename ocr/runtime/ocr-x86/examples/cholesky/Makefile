@@ -17,7 +17,7 @@ INPUT_FILE=m_${MATRIX_SIZE}.in
 OUTPUT_FILE=cholesky_out_${MATRIX_SIZE}.txt
 
 compile:
-	${CC} $(CFLAGS) $(OCR_FLAGS) -I. $(PROG).c -o $(PROG)$(SUFFIX)
+	${CC} $(CFLAGS) -I. $(PROG).c -o $(PROG)$(SUFFIX) $(OCR_FLAGS) 
 
 compile_pp:
 	g++ $(CFLAGS) $(OCR_FLAGS) -I. $(PROG).cpp -o $(PROG)$(SUFFIX)

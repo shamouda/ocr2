@@ -41,6 +41,14 @@
 
 #include "stdio.h"
 
+#define WEAK_ORDERING
+
+#ifdef WEAK_ORDERING
+#define MY_FENCE hc_mfence();
+#else 
+#define MY_FENCE __asm__ __volatile__ ("" ::: "memory");
+#endif
+
 void heap_init(heap_t * heap, void * init_value) {
     // heap->lock = 0;
     pthread_mutex_init(&(heap->lock), NULL);
@@ -61,7 +69,7 @@ void locked_heap_tail_push_no_priority (heap_t* heap, void* entry) {
     // int success = 0;
     // while (!success) {
     pthread_mutex_lock(&heap->lock);    
-    __asm__ __volatile__ ("" ::: "memory");
+    MY_FENCE;
     //    if ( hc_cas(&heap->lock, 0, 1) ) { 
             // success = 1;
             int size = heap->tail - heap->head;
@@ -70,13 +78,11 @@ void locked_heap_tail_push_no_priority (heap_t* heap, void* entry) {
             }
             int index = heap->tail % heap->buffer->capacity;
             heap->buffer->data[index] = entry;
-#ifdef __powerpc64__
-            hc_mfence();
-#endif 
+            MY_FENCE;
             ++heap->tail;
     //        heap->lock = 0;
     //    }
-    __asm__ __volatile__ ("" ::: "memory");
+    MY_FENCE;
     pthread_mutex_unlock(&heap->lock);    
     // }
 }
@@ -215,6 +221,9 @@ static void removeFixHeap ( heap_t* heap ) {
                 if ( leftCost < currCost ) {
                     swapAtIndices(heap, currLeftHeapIndex, currHeapIndex);
                     heapFixIndex = heapLeftChildIndex;
+                } else {
+                    /*nothing to fix; break the loop*/
+                    heapFixIndex = nElements;
                 }
             }
         } else {
@@ -253,7 +262,7 @@ void locked_heap_push_priority (heap_t* heap, void* entry) {
     // int success = 0;
     // while (!success) {
     pthread_mutex_lock(&heap->lock);    
-    __asm__ __volatile__ ("" ::: "memory");
+    MY_FENCE;
     //    if ( hc_cas(&heap->lock, 0, 1) ) { 
             //success = 1;
             int size = heap->tail - heap->head;
@@ -262,9 +271,7 @@ void locked_heap_push_priority (heap_t* heap, void* entry) {
             }
             int index = heap->tail % heap->buffer->capacity;
             heap->buffer->data[index] = entry;
-#ifdef __powerpc64__
-            hc_mfence();
-#endif 
+	    MY_FENCE;
             ++heap->tail;
 
             ocrGuid_t worker_guid = ocr_get_current_worker_guid();
@@ -279,7 +286,7 @@ void locked_heap_push_priority (heap_t* heap, void* entry) {
 
             //heap->lock = 0;
     //    }
-    __asm__ __volatile__ ("" ::: "memory");
+    MY_FENCE;
     pthread_mutex_unlock(&heap->lock);    
     //}
 }
@@ -289,7 +296,7 @@ void* locked_heap_pop_priority_best ( heap_t* heap ) {
     //int success = 0;
     //while (!success) {
     pthread_mutex_lock(&heap->lock);    
-    __asm__ __volatile__ ("" ::: "memory");
+    MY_FENCE;
     //    if ( hc_cas(&heap->lock, 0, 1) ) {
             //success = 1;
 
@@ -304,7 +311,7 @@ void* locked_heap_pop_priority_best ( heap_t* heap ) {
             }
      //       heap->lock = 0;
      //   }
-    __asm__ __volatile__ ("" ::: "memory");
+    MY_FENCE;
     pthread_mutex_unlock(&heap->lock);    
     //}
     return rt;
@@ -315,7 +322,7 @@ void* locked_heap_pop_priority_worst ( heap_t* heap ) {
     //int success = 0;
     //while (!success) {
     pthread_mutex_lock(&heap->lock);    
-    __asm__ __volatile__ ("" ::: "memory");
+    MY_FENCE;
      //   if ( hc_cas(&heap->lock, 0, 1) ) {
             //success = 1;
 
@@ -330,7 +337,7 @@ void* locked_heap_pop_priority_worst ( heap_t* heap ) {
             }
       //      heap->lock = 0;
       //  }
-    __asm__ __volatile__ ("" ::: "memory");
+    MY_FENCE;
     pthread_mutex_unlock(&heap->lock);    
     //}
     return rt;
@@ -341,7 +348,7 @@ void* locked_heap_tail_pop_no_priority ( heap_t* heap ) {
     //int success = 0;
     // while (!success) {
     pthread_mutex_lock(&heap->lock);    
-    __asm__ __volatile__ ("" ::: "memory");
+    MY_FENCE;
     //    if ( hc_cas(&heap->lock, 0, 1) ) {
             //success = 1;
 
@@ -355,7 +362,7 @@ void* locked_heap_tail_pop_no_priority ( heap_t* heap ) {
                 rt = NULL;
             } 
             //heap->lock = 0;
-    __asm__ __volatile__ ("" ::: "memory");
+    MY_FENCE;
     pthread_mutex_unlock(&heap->lock);    
         //}
     //}
@@ -367,7 +374,7 @@ void* locked_heap_head_pop_no_priority ( heap_t* heap ) {
     //int success = 0;
     // while (!success) {
     pthread_mutex_lock(&heap->lock);    
-    __asm__ __volatile__ ("" ::: "memory");
+    MY_FENCE;
     //    if ( hc_cas(&heap->lock, 0, 1) ) {
             //success = 1;
 
@@ -381,7 +388,7 @@ void* locked_heap_head_pop_no_priority ( heap_t* heap ) {
                 rt = NULL;
             } 
      //       heap->lock = 0;
-    __asm__ __volatile__ ("" ::: "memory");
+    MY_FENCE;
     pthread_mutex_unlock(&heap->lock);    
      //   }
     //}
