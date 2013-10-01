@@ -1,8 +1,8 @@
 OCR_INPUT_HOME=/scratch/st6/Cholesky
 PROG=cholesky
 SUFFIX=.exe
-CFLAGS= -O3 -g
-OCR_FLAGS=-L${OCR_INSTALL}/lib -I${OCR_INSTALL}/include -locr -lm
+CFLAGS= -g -O3
+OCR_FLAGS=-L${OCR_INSTALL}/lib -L${HPCTOOLKIT_PATH}/lib/hpctoolkit -I${OCR_INSTALL}/include -I${HPCTOOLKIT_PATH}/include -locr -lm -lhpctoolkit
 OCR_INPUT=${OCR_INPUT_HOME}
 
 all: compile run

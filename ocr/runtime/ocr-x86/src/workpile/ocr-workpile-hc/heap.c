@@ -39,7 +39,7 @@
 #include "datablock/regular/regular.h"
 #include "hc.h"
 
-#include "stdio.h"
+#define DEBUG 0
 
 void heap_init(heap_t * heap, void * init_value) {
     heap->lock = 0;

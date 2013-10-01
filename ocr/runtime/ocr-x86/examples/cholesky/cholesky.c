@@ -34,6 +34,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/time.h>
+#include <hpctoolkit.h>
 
 #define FLAGS 0xdead
 #define PROPERTIES 0xdead
@@ -208,6 +209,7 @@ u8 wrap_up_task ( u32 paramc, u64 * params, void* paramv[], u32 depc, ocrEdtDep_
 	double* temp;
 	gettimeofday(&b,0);
 	printf("The computation took %f seconds\r\n",((b.tv_sec - a.tv_sec)*1000000+(b.tv_usec - a.tv_usec))*1.0/1000000);
+	hpctoolkit_sampling_stop();
 	ocrFinish();
 /*
 	FILE* out = fopen("cholesky.out", "w");
@@ -434,6 +436,7 @@ int main( int argc, char* argv[] ) {
 
 	satisfyInitialTiles( numTiles, tileSize, matrix, lkji_event_guids);
 
+	hpctoolkit_sampling_start();
         gettimeofday(&a,0);
         
 	for ( k = 0; k < numTiles; ++k ) {
