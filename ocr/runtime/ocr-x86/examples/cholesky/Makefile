@@ -1,4 +1,4 @@
-OCR_INPUT_HOME=.
+OCR_INPUT_HOME=../../../../../apps
 PROG=cholesky
 SUFFIX=.exe
 CFLAGS= -O0 -g -DOCR_ENABLE_EDT_NAMING
@@ -23,8 +23,8 @@ OCR_RUN_FLAGS=-ocr:cfg ${OCR_CONFIG}
 all: compile run
 all-test: compile run verify
 
-MATRIX_SIZE=2000
-TILE_SIZE=80
+MATRIX_SIZE=1000
+TILE_SIZE=40
 
 INPUT_FILE=m_${MATRIX_SIZE}.in
 OUTPUT_FILE=cholesky_out_${MATRIX_SIZE}.txt

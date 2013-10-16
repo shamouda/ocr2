@@ -9,7 +9,7 @@
 #include "ocr.h"
 
 /**
- * DESC: Test EDT_PARAM_UNK usage in EDT templates
+ * DESC: Test runtime checks paramv is set when paramc > 0
  */
 
 ocrGuid_t terminateEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
@@ -21,7 +21,7 @@ ocrGuid_t terminateEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
 ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrGuid_t terminateEdtGuid;
     ocrGuid_t terminateEdtTemplateGuid;
-    ocrEdtTemplateCreate(&terminateEdtTemplateGuid, terminateEdt, 0 /*paramc*/, EDT_PARAM_UNK /*depc*/);
+    ocrEdtTemplateCreate(&terminateEdtTemplateGuid, terminateEdt, 1 /*paramc*/, 0 /*depc*/);
     ocrEdtCreate(&terminateEdtGuid, terminateEdtTemplateGuid, EDT_PARAM_DEF, NULL, 0, NULL_GUID,
                     /*properties=*/EDT_PROP_FINISH, NULL_GUID, /*outEvent=*/ NULL);
     return NULL_GUID;
