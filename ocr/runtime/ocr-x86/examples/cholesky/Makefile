@@ -31,7 +31,8 @@ INPUT_FILE=m_${MATRIX_SIZE}.in
 OUTPUT_FILE=cholesky_out_${MATRIX_SIZE}.txt
 
 compile:
-	gcc -g $(CFLAGS) $(OCR_FLAGS) -I. $(PROG).c -o $(PROG)$(SUFFIX) $(OCR_LIBS)
+	gcc -g $(CFLAGS) $(OCR_FLAGS) -I. -c $(PROG).c $(OCR_LIBS)
+	g++ -std=c++0x -g $(CFLAGS) $(OCR_FLAGS) -I. $(PROG).o custom_map.cpp -o $(PROG)$(SUFFIX) $(OCR_LIBS)
 
 compile.omp.task:
 	gcc -fopenmp $(CFLAGS) $(PROG).omp.task.c -o $(PROG).omp.task$(SUFFIX) -lm
