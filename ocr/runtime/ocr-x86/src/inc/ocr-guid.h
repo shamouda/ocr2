@@ -24,7 +24,9 @@ typedef enum {
     OCR_GUID_EDT_TEMPLATE = 4,
     OCR_GUID_EVENT = 5,
     OCR_GUID_POLICY = 6,
-    OCR_GUID_WORKER = 7
+    OCR_GUID_WORKER = 7,
+    OCR_GUID_MEM_TARGET = 8,
+    OCR_GUID_COMP_TARGET = 9
 } ocrGuidKind;
 
 

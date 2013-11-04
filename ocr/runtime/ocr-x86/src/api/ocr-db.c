@@ -1,4 +1,4 @@
-/**
+ /**
  * @brief Data-block implementation for OCR
  */
 
@@ -62,7 +62,7 @@ u8 ocrDbCreate(ocrGuid_t *db, void** addr, u64 len, u16 flags,
         {
             ocrTask_t *task = NULL;
             deguidify(getCurrentPD(), edtGuid, (u64*)&task, NULL);
-            ocrStatsProcess_t *srcProcess = edtGuid==0?&GfakeProcess:&(task->statProcess);
+            ocrStatsProcess_t *srcProcess = edtGuid==0?&GfakePxrocess:&(task->statProcess);
             
             ocrStatsMessage_t *mess = NEW_MESSAGE(simple);
             mess->create(mess, STATS_DB_CREATE, 0, edtGuid, createdDb->guid, NULL);
