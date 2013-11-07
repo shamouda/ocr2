@@ -26,8 +26,8 @@
 u64 transfer_db(ocrDataBlock_t *db)
 {
     // TODO: Do this more intelligently.
-    // Current estimate is 2 pJ per bit for DRAM transfer.
-    return db->size * 2;
+    // Current estimate is 2 pJ per bit (NOT PER BYTE) for DRAM transfer.
+    return db->size * 8 * 2;
 }
 
 MESSAGE_DESTRUCT {
