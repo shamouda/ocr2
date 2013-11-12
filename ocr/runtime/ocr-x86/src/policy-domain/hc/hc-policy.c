@@ -12,6 +12,8 @@
 #include "ocr-policy-domain.h"
 #include "policy-domain/hc/hc-policy.h"
 
+#define DEBUG_TYPE POLICY
+
 static void destructOcrPolicyCtxHC ( ocrPolicyCtx_t* self ) {
     free(self);
 }
@@ -275,6 +277,47 @@ static u8 hcGiveEdt(ocrPolicyDomain_t *self, u32 count, ocrGuid_t *edts, ocrPoli
     return 0;
 }
 
+static void hcPolicyDomainThrottle(ocrPolicyDomain_t *self, u64 factor) {
+    // Warning: Not thread safe !
+    // factor is percent of PD's number of workers to throttle up or down
+    int nbThrottle = (int) factor;
+    u64 nbWorkers = self->workerCount;
+    if (nbWorkers != 1) {
+        double percent = ((nbThrottle - 100.0)/100);
+        nbThrottle = (int) (nbWorkers * percent);
+        // There's no fine grain throttling for now, just go over 'x' workers 
+        // and finish them
+        ocrWorker_t ** workers = self->workers;
+        int idx = 1; // skip master worker
+        // throttle down
+        while ((nbThrottle < 0) && (idx < nbWorkers)) {
+            // Go over workers and call their finish
+            ocrWorker_t * worker = workers[idx];
+            if (worker->fctPtrs->isRunning(worker)) {
+                worker->fctPtrs->finish(worker);
+                DPRINTF(DEBUG_LVL_INFO, "throttle: shutting down worker %d\n", idx);
+                nbThrottle++;
+            }
+            idx++;
+        }
+        // throttle up
+        while ((nbThrottle > 0) && (idx < nbWorkers)) {
+            // Go over workers and call their finish
+            ocrWorker_t * worker = workers[idx];
+            if (!worker->fctPtrs->isRunning(worker)) {
+                worker->fctPtrs->start(worker, self);
+                DPRINTF(DEBUG_LVL_INFO, "throttle: resurrecting worker %d\n", idx);
+                nbThrottle--;
+            }
+            idx++;
+        }
+    } else {
+        // throttling down a pd with one worker is likely to be an error
+        // as the whole runtime would shutdown in this implementation
+        assert(false && "error: throttling down a single worker policy-domain");
+    }
+}
+ 
 
 ocrPolicyDomain_t * newPolicyDomainHc(ocrPolicyDomainFactory_t * policy,
                                       u64 schedulerCount, u64 workerCount, u64 computeCount,
@@ -325,6 +368,7 @@ ocrPolicyDomain_t * newPolicyDomainHc(ocrPolicyDomainFactory_t * policy,
     base->processResponse = NULL;
     base->getLock = hcGetLock;
     base->getAtomic64 = hcGetAtomic64;
+    base->throttle = hcPolicyDomainThrottle;
     base->getContext = hcGetContext;
 
     // no inter-policy domain for simple HC

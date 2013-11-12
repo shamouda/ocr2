@@ -59,6 +59,12 @@ u64 ocrNbWorkers();
 u64 ocrCurrentWorkerId();
 
 /**
+ *  @brief Throttle the runtime by some factor
+ *  Note: API to be deprecated anytime.
+ **/
+void ocrThrottle(u64 factor);
+
+/**
  * @}
  */
 #ifdef __cplusplus

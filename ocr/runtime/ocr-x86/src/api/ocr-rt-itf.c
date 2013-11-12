@@ -53,3 +53,8 @@ u64 ocrCurrentWorkerId() {
   ocrPolicyCtx_t * ctx = getCurrentWorkerContext();
   return ctx->sourceId;
 }
+
+void ocrThrottle(u64 factor) {
+    ocrPolicyDomain_t * pd = getCurrentPD();
+    pd->throttle(pd, factor);
+}

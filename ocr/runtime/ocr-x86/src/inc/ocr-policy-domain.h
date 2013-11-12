@@ -375,6 +375,16 @@ typedef struct _ocrPolicyDomain_t {
      * @brief Gets an atomic to use
      */
     ocrAtomic64_t* (*getAtomic64)(struct _ocrPolicyDomain_t *self, ocrPolicyCtx_t *context);
+ 
+    /**
+     * @brief Throttle the PD by some factor
+     *
+     * This API is intentionally vague and will be refined
+     *
+     * @param self                This policy domain
+     * @param factor              Throttle factor
+     */
+    void (*throttle)(struct _ocrPolicyDomain_t *self, u64 factor);
 
     /**
      * @brief Gets a context for this policy domain
