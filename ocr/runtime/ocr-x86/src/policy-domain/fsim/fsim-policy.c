@@ -409,6 +409,7 @@ ocrPolicyDomain_t * newPolicyDomainXE(ocrPolicyDomainFactory_t * policy,
     base->getLock = fsimGetLock;
     base->getAtomic64 = fsimGetAtomic64;
     base->throttle = NULL;
+    base->getAdaptObjective = NULL;
     base->setAdaptObjective = NULL;
     base->registerAdaptObjectiveFct = NULL;
     base->getContext = fsimGetContext;
@@ -479,6 +480,7 @@ ocrPolicyDomain_t * newPolicyDomainCE(ocrPolicyDomainFactory_t * policy,
     base->getLock = fsimGetLock;
     base->getAtomic64 = fsimGetAtomic64;
     base->throttle = NULL;
+    base->getAdaptObjective = NULL;
     base->setAdaptObjective = NULL;
     base->registerAdaptObjectiveFct = NULL;
     base->getContext = fsimGetContext;
@@ -549,6 +551,7 @@ ocrPolicyDomain_t * newPolicyDomainMasteredCE(ocrPolicyDomainFactory_t * policy,
     base->getLock = fsimGetLock;
     base->getAtomic64 = fsimGetAtomic64;
     base->throttle = NULL;
+    base->getAdaptObjective = NULL;
     base->setAdaptObjective = NULL;
     base->registerAdaptObjectiveFct = NULL;
     base->getContext = fsimGetContext;

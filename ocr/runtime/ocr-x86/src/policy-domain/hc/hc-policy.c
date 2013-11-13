@@ -339,12 +339,31 @@ static void hcRegisterAdaptObjectiveFct(ocrPolicyDomain_t *self, adaptObjectiveF
     hcSelf->adaptObjectiveFct = adaptFct;
 }
 
-static void hcSetAdaptObjective(ocrPolicyDomain_t *self, ocrTask_t* edt) {
+static u64 hcGetAdaptObjective(ocrPolicyDomain_t *self) {
     // Current implementation adapts in function of the number of active workers
     ocrPolicyDomainHc_t * hcSelf = (ocrPolicyDomainHc_t *) self;
     if (hcSelf->adaptObjectiveFct != NULL) {
-        edt->els[ELS_SLOT_ADAPT_OBJECTIVE] = hcSelf->adaptObjectiveFct(getNbActiveWorkers());  
+        return hcSelf->adaptObjectiveFct(getNbActiveWorkers());
     }
+    // when there's no adaptation function set
+    return 0;
+}
+
+static u64 hcGetCurrentEdtAdaptObjective(ocrPolicyDomain_t *self) {
+    ocrGuid_t edtGuid = getCurrentEDT();
+    if (edtGuid != NULL_GUID) {
+      ocrTask_t * edt = NULL;
+      deguidify(self, edtGuid, (u64*)&(edt), NULL);
+      return (u64) edt->els[ELS_SLOT_ADAPT_OBJECTIVE];
+    } else {
+        // This is to accomodate calls outside of an EDT
+      return hcGetAdaptObjective(self);
+    }
+}
+
+static void hcSetAdaptObjective(ocrPolicyDomain_t *self, ocrTask_t* edt) {
+    // Current implementation adapts in function of the number of active workers
+    edt->els[ELS_SLOT_ADAPT_OBJECTIVE] = hcGetAdaptObjective(self);
 }
 
 ocrPolicyDomain_t * newPolicyDomainHc(ocrPolicyDomainFactory_t * policy,
@@ -399,6 +418,7 @@ ocrPolicyDomain_t * newPolicyDomainHc(ocrPolicyDomainFactory_t * policy,
     base->getLock = hcGetLock;
     base->getAtomic64 = hcGetAtomic64;
     base->throttle = hcPolicyDomainThrottle;
+    base->getAdaptObjective = hcGetCurrentEdtAdaptObjective;
     base->setAdaptObjective = hcSetAdaptObjective;
     base->registerAdaptObjectiveFct = hcRegisterAdaptObjectiveFct;
     ((ocrPolicyDomainHc_t *)base)->adaptObjectiveFct = NULL;

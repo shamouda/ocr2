@@ -395,6 +395,12 @@ typedef struct _ocrPolicyDomain_t {
     void (*setAdaptObjective)(struct _ocrPolicyDomain_t *self, ocrTask_t * edt);
 
     /**
+     * @brief Get the adaptation objective of the currently executing EDT
+     * @param self                This policy domain
+     */
+    u64 (*getAdaptObjective)(struct _ocrPolicyDomain_t *self);
+
+    /**
      * @brief Register and adaptation objective function
      * @param self                This policy domain
      * @param adaptFct            The objective function

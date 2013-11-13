@@ -66,11 +66,5 @@ void ocrRegisterAdaptFct(u64 (*adaptObjectiveFct)(u64)) {
 
 u64 ocrGetAdaptObjective() {
     ocrPolicyDomain_t * pd = getCurrentPD();
-    ocrGuid_t edtGuid = currentEdtUserGet();
-    if (edtGuid != NULL_GUID) {
-      ocrTask_t * edt = NULL;
-      deguidify(pd, edtGuid, (u64*)&(edt), NULL);
-      return (u64) edt->els[ELS_SLOT_ADAPT_OBJECTIVE];
-    }
-  return 0;
+    return pd->getAdaptObjective(pd);
 }
