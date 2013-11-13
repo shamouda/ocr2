@@ -277,6 +277,18 @@ static u8 hcGiveEdt(ocrPolicyDomain_t *self, u32 count, ocrGuid_t *edts, ocrPoli
     return 0;
 }
 
+// Adaptation and throttling API
+
+static u64 activeWorkerCount;
+
+static u64 getNbActiveWorkers() {
+    return activeWorkerCount;
+}
+
+static void upNbActiveWorkers(int newValue) {
+    activeWorkerCount += newValue;
+}
+
 static void hcPolicyDomainThrottle(ocrPolicyDomain_t *self, u64 factor) {
     // Warning: Not thread safe !
     // factor is percent of PD's number of workers to throttle up or down
@@ -311,13 +323,29 @@ static void hcPolicyDomainThrottle(ocrPolicyDomain_t *self, u64 factor) {
             }
             idx++;
         }
+        // updating remaining active workers
+        upNbActiveWorkers((nbWorkers * percent) - nbThrottle);
     } else {
         // throttling down a pd with one worker is likely to be an error
         // as the whole runtime would shutdown in this implementation
         assert(false && "error: throttling down a single worker policy-domain");
     }
 }
- 
+
+typedef u64 adaptObjectiveFct_t(u64 tuning);
+
+static void hcRegisterAdaptObjectiveFct(ocrPolicyDomain_t *self, adaptObjectiveFct_t adaptFct) {
+    ocrPolicyDomainHc_t * hcSelf = (ocrPolicyDomainHc_t *) self;
+    hcSelf->adaptObjectiveFct = adaptFct;
+}
+
+static void hcSetAdaptObjective(ocrPolicyDomain_t *self, ocrTask_t* edt) {
+    // Current implementation adapts in function of the number of active workers
+    ocrPolicyDomainHc_t * hcSelf = (ocrPolicyDomainHc_t *) self;
+    if (hcSelf->adaptObjectiveFct != NULL) {
+        edt->els[ELS_SLOT_ADAPT_OBJECTIVE] = hcSelf->adaptObjectiveFct(getNbActiveWorkers());  
+    }
+}
 
 ocrPolicyDomain_t * newPolicyDomainHc(ocrPolicyDomainFactory_t * policy,
                                       u64 schedulerCount, u64 workerCount, u64 computeCount,
@@ -338,6 +366,8 @@ ocrPolicyDomain_t * newPolicyDomainHc(ocrPolicyDomainFactory_t * policy,
     base->workpileCount = workpileCount;
     base->allocatorCount = allocatorCount;
     base->memoryCount = memoryCount;
+    // keep track of throttling
+    activeWorkerCount = workerCount;
 
     base->taskFactory = taskFactory;
     base->taskTemplateFactory = taskTemplateFactory;
@@ -369,6 +399,9 @@ ocrPolicyDomain_t * newPolicyDomainHc(ocrPolicyDomainFactory_t * policy,
     base->getLock = hcGetLock;
     base->getAtomic64 = hcGetAtomic64;
     base->throttle = hcPolicyDomainThrottle;
+    base->setAdaptObjective = hcSetAdaptObjective;
+    base->registerAdaptObjectiveFct = hcRegisterAdaptObjectiveFct;
+    ((ocrPolicyDomainHc_t *)base)->adaptObjectiveFct = NULL;
     base->getContext = hcGetContext;
 
     // no inter-policy domain for simple HC

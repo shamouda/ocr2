@@ -101,10 +101,14 @@ typedef struct _ocrTaskFcts_t {
     void (*schedule) (struct _ocrTask_t* self);
 } ocrTaskFcts_t;
 
-// ELS runtime size is one to support finish-edt
+//TODO this whole ELS runtime business is kind of runtime independent
+//and should be in a impl-specific header that is ifdef here
+
+// ELS runtime size is to support finish-edt and adaptation objective
 // ELS_USER_SIZE is defined by configure
-#define ELS_RUNTIME_SIZE 1
+#define ELS_RUNTIME_SIZE 2
 #define ELS_SIZE (ELS_RUNTIME_SIZE + ELS_USER_SIZE)
+#define ELS_SLOT_ADAPT_OBJECTIVE    1
 
 /*! \brief Abstract class to represent OCR tasks.
  *

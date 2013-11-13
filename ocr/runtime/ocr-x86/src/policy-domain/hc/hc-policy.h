@@ -28,6 +28,7 @@ typedef struct {
 
 typedef struct {
     ocrPolicyDomain_t base;
+    u64 (*adaptObjectiveFct)(u64);
 } ocrPolicyDomainHc_t;
 
 ocrPolicyDomainFactory_t *newPolicyDomainFactoryHc(ocrParamList_t *perType);

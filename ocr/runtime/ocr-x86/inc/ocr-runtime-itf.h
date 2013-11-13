@@ -58,11 +58,26 @@ u64 ocrNbWorkers();
  **/
 u64 ocrCurrentWorkerId();
 
+
+/*********************************************/
+/* Adaptive API                              */  
+/* Warning !! API to be deprecated anytime   */
+/*********************************************/
+
 /**
  *  @brief Throttle the runtime by some factor
- *  Note: API to be deprecated anytime.
  **/
 void ocrThrottle(u64 factor);
+
+/**
+ *  @brief Register a user-defined adaptation function
+ **/
+void ocrRegisterAdaptFct(u64 (*adaptObjectiveFct)(u64));
+
+/**
+ *  @brief Get the current adaptation objective
+ **/
+u64 ocrGetAdaptObjective();
 
 /**
  * @}

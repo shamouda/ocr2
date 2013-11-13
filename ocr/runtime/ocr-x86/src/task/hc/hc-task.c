@@ -59,7 +59,8 @@ static bool hasProperty(u16 properties, u16 property) {
 /******************************************************/
 
 // This must be consistent with the ELS size the runtime is compiled with
-#define ELS_SLOT_FINISH_LATCH 0
+#define ELS_SLOT_FINISH_LATCH   0
+
 
 //
 // forward declarations
@@ -342,7 +343,8 @@ static void taskExecute ( ocrTask_t* base ) {
     u32 paramc = base->paramc;
     u64 * paramv = base->paramv;
     u64 depc = base->depc;
-
+    ocrPolicyDomain_t * pd = getCurrentPD();
+    pd->setAdaptObjective(pd, base);
     ocrEdtDep_t * depv = NULL;
     // If any dependencies, acquire their data-blocks
     if (depc != 0) {
@@ -359,7 +361,7 @@ static void taskExecute ( ocrTask_t* base ) {
             if(dbGuid != NULL_GUID) {
                 ASSERT(isDatablockGuid(dbGuid));
                 ocrDataBlock_t * db = NULL;
-                deguidify(getCurrentPD(), dbGuid, (u64*)&db, NULL);
+                deguidify(pd, dbGuid, (u64*)&db, NULL);
                 depv[i].ptr = db->fctPtrs->acquire(db, base->guid, true);
             } else {
                 depv[i].ptr = NULL;
@@ -371,7 +373,7 @@ static void taskExecute ( ocrTask_t* base ) {
     }
 
     ocrTaskTemplate_t * taskTemplate;
-    deguidify(getCurrentPD(), base->templateGuid, (u64*)&taskTemplate, NULL);
+    deguidify(pd, base->templateGuid, (u64*)&taskTemplate, NULL);
     //TODO: define when task template is resolved from its guid
     ocrGuid_t retGuid = taskTemplate->executePtr(paramc, paramv,
                                                  depc, depv);
@@ -382,7 +384,7 @@ static void taskExecute ( ocrTask_t* base ) {
         for(i=0; i<depc; ++i) {
             if(depv[i].guid != NULL_GUID) {
                 ocrDataBlock_t * db = NULL;
-                deguidify(getCurrentPD(), depv[i].guid, (u64*)&db, NULL);
+                deguidify(pd, depv[i].guid, (u64*)&db, NULL);
                 RESULT_ASSERT(db->fctPtrs->release(db, base->guid, true), ==, 0);
             }
         }
@@ -410,7 +412,7 @@ static void taskExecute ( ocrTask_t* base ) {
 
     if (satisfyOutputEvent) {
         ocrEvent_t * outputEvent;
-        deguidify(getCurrentPD(), base->outputEvent, (u64*)&outputEvent, NULL);
+        deguidify(pd, base->outputEvent, (u64*)&outputEvent, NULL);
         // We know the output event must be of type single sticky since it is
         // internally allocated by the runtime
         ASSERT(isEventSingleGuid(base->outputEvent));

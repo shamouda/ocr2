@@ -387,6 +387,21 @@ typedef struct _ocrPolicyDomain_t {
     void (*throttle)(struct _ocrPolicyDomain_t *self, u64 factor);
 
     /**
+     * @brief Set the adaptation objective of an edt
+     * Callback from an edt to the PD to set its objective.
+     * @param self                This policy domain
+     * @param edt                 The edt to set the value
+     */
+    void (*setAdaptObjective)(struct _ocrPolicyDomain_t *self, ocrTask_t * edt);
+
+    /**
+     * @brief Register and adaptation objective function
+     * @param self                This policy domain
+     * @param adaptFct            The objective function
+     */
+    void (*registerAdaptObjectiveFct)(struct _ocrPolicyDomain_t *self, u64 (*adaptObjectiveFct)(u64));
+
+    /**
      * @brief Gets a context for this policy domain
      *
      * This returns a new instance of a context. Another method of getting a
