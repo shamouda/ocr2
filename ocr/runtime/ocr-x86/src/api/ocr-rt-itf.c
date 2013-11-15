@@ -59,7 +59,7 @@ void ocrThrottle(u64 factor) {
     pd->throttle(pd, factor);
 }
 
-void ocrRegisterAdaptFct(u64 (*adaptObjectiveFct)(u64)) {
+void ocrRegisterAdaptFct(u64 (*adaptObjectiveFct)(int)) {
     ocrPolicyDomain_t * pd = getCurrentPD();
     pd->registerAdaptObjectiveFct(pd, adaptObjectiveFct);
 }

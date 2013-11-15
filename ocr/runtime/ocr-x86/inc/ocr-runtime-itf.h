@@ -65,14 +65,14 @@ u64 ocrCurrentWorkerId();
 /*********************************************/
 
 /**
- *  @brief Throttle the runtime by some factor
+ *  @brief Throttle the runtime by some metric
  **/
-void ocrThrottle(u64 factor);
+void ocrThrottle(int metric);
 
 /**
  *  @brief Register a user-defined adaptation function
  **/
-void ocrRegisterAdaptFct(u64 (*adaptObjectiveFct)(u64));
+void ocrRegisterAdaptFct(u64 (*adaptObjectiveFct)(int));
 
 /**
  *  @brief Get the current adaptation objective

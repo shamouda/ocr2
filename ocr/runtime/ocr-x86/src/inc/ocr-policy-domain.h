@@ -382,9 +382,9 @@ typedef struct _ocrPolicyDomain_t {
      * This API is intentionally vague and will be refined
      *
      * @param self                This policy domain
-     * @param factor              Throttle factor
+     * @param factor              Throttle metric
      */
-    void (*throttle)(struct _ocrPolicyDomain_t *self, u64 factor);
+    void (*throttle)(struct _ocrPolicyDomain_t *self, int metric);
 
     /**
      * @brief Set the adaptation objective of an edt
@@ -405,7 +405,15 @@ typedef struct _ocrPolicyDomain_t {
      * @param self                This policy domain
      * @param adaptFct            The objective function
      */
-    void (*registerAdaptObjectiveFct)(struct _ocrPolicyDomain_t *self, u64 (*adaptObjectiveFct)(u64));
+    void (*registerAdaptObjectiveFct)(struct _ocrPolicyDomain_t *self, u64 (*adaptObjectiveFct)(int));
+   
+    /**
+     * @brief Register a user hook to be ran just before the edt executes
+     * This is to provide some form of information to display back
+     * @param self                This policy domain
+     * @param adaptFct            The objective function
+     */
+    void (*registerEDTPreCallFct)(struct _ocrPolicyDomain_t *self, void (*preEdtHook)(void));
 
     /**
      * @brief Gets a context for this policy domain

@@ -286,17 +286,16 @@ static u64 getNbActiveWorkers() {
 }
 
 static void upNbActiveWorkers(int newValue) {
-    activeWorkerCount += newValue;
+    activeWorkerCount = newValue;
 }
 
-static void hcPolicyDomainThrottle(ocrPolicyDomain_t *self, u64 factor) {
+static void hcPolicyDomainThrottle(ocrPolicyDomain_t *self, int metric) {
     // Warning: Not thread safe !
-    // factor is percent of PD's number of workers to throttle up or down
-    int nbThrottle = (int) factor;
+    // metric is the number of workers we want active on the PD
+    int newNbActiveWorker = (int) metric;
+    int nbThrottle = newNbActiveWorker - getNbActiveWorkers();
     u64 nbWorkers = self->workerCount;
     if (nbWorkers != 1) {
-        double percent = ((nbThrottle - 100.0)/100);
-        nbThrottle = (int) (nbWorkers * percent);
         // There's no fine grain throttling for now, just go over 'x' workers 
         // and finish them
         ocrWorker_t ** workers = self->workers;
@@ -324,7 +323,8 @@ static void hcPolicyDomainThrottle(ocrPolicyDomain_t *self, u64 factor) {
             idx++;
         }
         // updating remaining active workers
-        upNbActiveWorkers((nbWorkers * percent) - nbThrottle);
+        upNbActiveWorkers(metric-nbThrottle);
+        printf("Runtime throttled to %d workers\n", (int) getNbActiveWorkers());
     } else {
         // throttling down a pd with one worker is likely to be an error
         // as the whole runtime would shutdown in this implementation
@@ -332,7 +332,7 @@ static void hcPolicyDomainThrottle(ocrPolicyDomain_t *self, u64 factor) {
     }
 }
 
-typedef u64 adaptObjectiveFct_t(u64 tuning);
+typedef u64 adaptObjectiveFct_t(int metric);
 
 static void hcRegisterAdaptObjectiveFct(ocrPolicyDomain_t *self, adaptObjectiveFct_t adaptFct) {
     ocrPolicyDomainHc_t * hcSelf = (ocrPolicyDomainHc_t *) self;
@@ -343,7 +343,7 @@ static u64 hcGetAdaptObjective(ocrPolicyDomain_t *self) {
     // Current implementation adapts in function of the number of active workers
     ocrPolicyDomainHc_t * hcSelf = (ocrPolicyDomainHc_t *) self;
     if (hcSelf->adaptObjectiveFct != NULL) {
-        return hcSelf->adaptObjectiveFct(getNbActiveWorkers());
+        return hcSelf->adaptObjectiveFct((int) getNbActiveWorkers());
     }
     // when there's no adaptation function set
     return 0;
