@@ -19,8 +19,8 @@ sleep 2
 # Create the gnuplot script
 
 echo "set xlabel 'Worker Number'" > plot.plt
-echo "set ylabel '#Nodes Processed'" >> plot.plt
-echo "set y2label 'Chunk Size'" >> plot.plt
+echo "set ylabel 'Chunk size'" >> plot.plt
+echo "set y2label 'Processed Nodes'" >> plot.plt
 echo "set y2tics" >> plot.plt
 echo "unset ytics" >> plot.plt
 echo "set yrange [0:10]" >> plot.plt
