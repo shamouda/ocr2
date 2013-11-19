@@ -299,9 +299,9 @@ static void hcPolicyDomainThrottle(ocrPolicyDomain_t *self, int metric) {
         // There's no fine grain throttling for now, just go over 'x' workers 
         // and finish them
         ocrWorker_t ** workers = self->workers;
-        int idx = 1; // skip master worker
+        int idx = nbWorkers-1; // skip master worker
         // throttle down
-        while ((nbThrottle < 0) && (idx < nbWorkers)) {
+        while ((nbThrottle < 0) && (idx > 1)) {
             // Go over workers and call their finish
             ocrWorker_t * worker = workers[idx];
             if (worker->fctPtrs->isRunning(worker)) {
@@ -309,10 +309,10 @@ static void hcPolicyDomainThrottle(ocrPolicyDomain_t *self, int metric) {
                 DPRINTF(DEBUG_LVL_INFO, "throttle: shutting down worker %d\n", idx);
                 nbThrottle++;
             }
-            idx++;
+            idx--;
         }
         // throttle up
-        while ((nbThrottle > 0) && (idx < nbWorkers)) {
+        while ((nbThrottle > 0) && (idx > 1)) {
             // Go over workers and call their finish
             ocrWorker_t * worker = workers[idx];
             if (!worker->fctPtrs->isRunning(worker)) {
@@ -320,7 +320,7 @@ static void hcPolicyDomainThrottle(ocrPolicyDomain_t *self, int metric) {
                 DPRINTF(DEBUG_LVL_INFO, "throttle: resurrecting worker %d\n", idx);
                 nbThrottle--;
             }
-            idx++;
+            idx--;
         }
         // updating remaining active workers
         upNbActiveWorkers(metric-nbThrottle);
