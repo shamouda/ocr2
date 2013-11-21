@@ -179,6 +179,8 @@ typedef struct _ocrPolicyDomain_t {
                                                  * Currently a placeholder for future
                                                  * objective driven scheduling */
 
+    ocrDataBlockList_t db_list;
+
     /**
      * @brief Destroys (and frees any associated memory) this
      * policy domain

@@ -43,6 +43,8 @@ typedef struct _paramListDataBlockInst_t {
 /****************************************************/
 
 struct _ocrDataBlock_t;
+struct _ocrDataBlockList_t;
+struct _ocrWorker_t;
 
 typedef struct _ocrDataBlockFcts_t {
     /**
@@ -119,7 +121,20 @@ typedef struct _ocrDataBlock_t {
     void* ptr;              /**< Current location for this data-block */
     u16 properties;         /**< Properties for the data-block */
     ocrDataBlockFcts_t *fctPtrs; /**< Function Pointers for this data-block */
+    struct _ocrDataBlockList_t *location;
+    u64 last_access;
 } ocrDataBlock_t;
+
+typedef struct _ocrDataBlockNode_t {
+    ocrDataBlock_t *db;
+    struct _ocrDataBlockNode_t *next;
+} ocrDataBlockNode_t;
+
+typedef struct _ocrDataBlockList_t {
+    ocrDataBlockNode_t *head;
+    u64 total_size;
+    u64 used_size;
+} ocrDataBlockList_t;
 
 
 /****************************************************/

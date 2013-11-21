@@ -10,6 +10,7 @@
 #include "debug.h"
 #include "ocr-macros.h"
 #include "ocr-policy-domain.h"
+#include <pthread.h>
 
 #ifdef OCR_ENABLE_STATISTICS
 #include "ocr-statistics.h"
@@ -287,6 +288,7 @@ static u8 hcGiveEdt(ocrPolicyDomain_t *self, u32 count, ocrGuid_t *edts, ocrPoli
     return 0;
 }
 
+extern pthread_mutex_t db_lock;
 
 ocrPolicyDomain_t * newPolicyDomainHc(ocrPolicyDomainFactory_t * policy,
                                       u64 schedulerCount, u64 workerCount, u64 computeCount,
@@ -362,6 +364,15 @@ ocrPolicyDomain_t * newPolicyDomainHc(ocrPolicyDomainFactory_t * policy,
     base->workpiles = NULL;
     base->allocators = NULL;
     base->memories = NULL;
+
+    base->db_list.used_size = 0;
+    base->db_list.total_size = UINT64_MAX;
+    base->db_list.head = NULL;
+
+    pthread_mutexattr_t attr;
+    pthread_mutexattr_init(&attr);
+    pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE);
+    pthread_mutex_init(&db_lock, &attr);
 
     base->guid = UNINITIALIZED_GUID;
     guidify(base, (u64)base, &(base->guid), OCR_GUID_POLICY);

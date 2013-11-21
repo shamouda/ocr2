@@ -9,6 +9,7 @@
 #define __OCR_WORKER_H__
 
 #include "ocr-comp-target.h"
+#include "ocr-datablock.h"
 #include "ocr-mappable.h"
 #include "ocr-scheduler.h"
 #include "ocr-types.h"
@@ -89,6 +90,8 @@ typedef struct _ocrWorker_t {
     ocrCompTarget_t **computes; /**< Compute node(s) associated with this worker */
     u64 computeCount;          /**< Number of compute node(s) associated */
 
+    ocrDataBlockList_t db_list;
+
     /*! \brief Routine the worker executes
      */
     void * (*routine)(void *);
@@ -118,5 +121,11 @@ extern void (*setCurrentEDT)(ocrGuid_t guid);
 // Get/Set CurrentEDT relying on the worker caching the info
 extern ocrGuid_t getCurrentEDTFromWorker();
 extern void setCurrentEDTToWorker(ocrGuid_t edtGuid);
+extern ocrWorker_t *getCurrentWorker();
+
+extern void storeDB(ocrDataBlockList_t *list, ocrDataBlock_t *db);
+extern void evictLRU(ocrGuid_t edt, ocrDataBlockList_t *list);
+extern void moveDB(ocrGuid_t edt, ocrDataBlockList_t *dst, ocrDataBlock_t *db);
+extern void deleteDB(ocrDataBlock_t *db);
 
 #endif /* __OCR_WORKER_H__ */

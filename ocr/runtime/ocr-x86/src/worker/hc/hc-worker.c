@@ -130,6 +130,9 @@ ocrWorker_t* newWorkerHc (ocrWorkerFactory_t * factory, ocrParamList_t * perInst
     guidify(getCurrentPD(), (u64)base, &(base->guid), OCR_GUID_WORKER);
     base->routine = worker_computation_routine;
     base->fctPtrs = &(factory->workerFcts);
+    base->db_list.used_size = 0;
+    base->db_list.total_size = 256*1024;
+    base->db_list.head = NULL;
     return base;
 }
 

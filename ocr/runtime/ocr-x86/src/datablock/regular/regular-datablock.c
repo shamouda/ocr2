@@ -17,6 +17,7 @@
 #include "ocr-policy-domain.h"
 #include "ocr-sync.h"
 #include "ocr-utils.h"
+#include "ocr-worker.h"
 
 #ifdef OCR_ENABLE_STATISTICS
 #include "ocr-statistics.h"
@@ -58,6 +59,9 @@ void* regularAcquire(ocrDataBlock_t *self, ocrGuid_t edt, bool isInternal) {
     rself->attributes.numUsers += 1;
     if(isInternal)
         rself->attributes.internalUsers += 1;
+
+    ocrDataBlockList_t *dst = &(getCurrentWorker()->db_list);
+    moveDB(edt, dst, self);
 
     rself->lock->fctPtrs->unlock(rself->lock);
     // End critical section
@@ -191,6 +195,8 @@ u8 regularFree(ocrDataBlock_t *self, ocrGuid_t edt) {
         // End critical section
     }
 
+    deleteDB(self);
+
     return 0;
 }
 
@@ -222,6 +228,8 @@ ocrDataBlock_t* newDataBlockRegular(ocrDataBlockFactory_t *factory, ocrGuid_t al
     result->attributes.freeRequested = 0;
     ocrGuidTrackerInit(&(result->usersTracker));
 
+    ocrWorker_t *worker = getCurrentWorker();
+    storeDB(&worker->db_list, (ocrDataBlock_t*)result);
 #ifdef OCR_ENABLE_STATISTICS
     ocrGuid_t edtGuid = getCurrentEDT();
     statsDB_CREATE(pd, edtGuid, NULL, allocator, NULL, result->base.guid, &(result->base));
