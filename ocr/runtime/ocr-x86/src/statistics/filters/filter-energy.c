@@ -29,7 +29,7 @@ typedef struct {
     ocrGuid_t src, dest;
     ocrGuidKind srcK, destK;
     ocrStatsEvt_t type;
-    u64 time_usecs;
+    u64 time_nsecs;
     ocrGuid_t worker;
     const char * edt_name;
     ocrGuid_t edt_guid;
@@ -71,13 +71,13 @@ FILTER_DUMP {
     if (tmess->type == STATS_EDT_START || tmess->type == STATS_EDT_END)
     {
         snprintf(*out, max_msg_len, "%lu EDT %s: %#lx -> %s (%#lx), %lu",
-                 tmess->time_usecs, tmess->type == STATS_EDT_START ? "start" : "end",
+                 tmess->time_nsecs, tmess->type == STATS_EDT_START ? "start" : "end",
                  tmess->worker, tmess->edt_name, tmess->edt_guid, tmess->energy_pJ);
     }
     else if (tmess->type == STATS_DB_ACQ || tmess->type == STATS_DB_REL)
     {
         snprintf(*out, max_msg_len, "%lu DB %s: %s (%#lx) -> %#lx (%lu), %lu",
-                 tmess->time_usecs, tmess->type == STATS_DB_ACQ ? "acquire" : "release",
+                 tmess->time_nsecs, tmess->type == STATS_DB_ACQ ? "acquire" : "release",
                  tmess->edt_name, tmess->edt_guid, tmess->db_guid, tmess->db_size, tmess->energy_pJ);
     }
 
@@ -110,7 +110,7 @@ FILTER_NOTIFY {
     tmess->destK = emess->base.destK;
     tmess->type = emess->base.type;
 
-    tmess->time_usecs = emess->time_usecs;
+    tmess->time_nsecs = emess->time_nsecs;
     tmess->worker = emess->worker;
     tmess->edt_name = emess->edt_name;
     tmess->edt_guid = emess->edt_guid;

@@ -2,7 +2,7 @@
 
 #define MESSAGE_NAME ENERGY
 START_MESSAGE
-u64 time_usecs;
+u64 time_nsecs;
 ocrGuid_t worker;
 const char * edt_name;
 ocrGuid_t edt_guid;

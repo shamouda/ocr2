@@ -42,10 +42,9 @@ MESSAGE_CREATE {
     MESSAGE_MALLOC(rself);
     MESSAGE_SETUP(rself);
 
-    struct timeval tv;
-    gettimeofday(&tv, NULL);
-    u64 usecs = tv.tv_sec * 1000000 + tv.tv_usec;
-    rself->time_usecs = usecs;
+    struct timespec t;
+    clock_gettime(CLOCK_MONOTONIC, &t);
+    rself->time_nsecs =  t.tv_sec*1000000000 + t.tv_nsec;
 
     ocrPolicyDomain_t* policy = getCurrentPD();
 
