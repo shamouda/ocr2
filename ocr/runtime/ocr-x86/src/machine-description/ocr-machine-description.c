@@ -19,6 +19,9 @@
 #include "ocr-types.h"
 #include "policy-domain/policy-domain-all.h"
 #include "scheduler/scheduler-all.h"
+#ifdef OCR_ENABLE_STATISTICS
+#include "statistics/statistics-all.h"
+#endif
 #include "sync/sync-all.h"
 #include "task/task-all.h"
 #include "worker/worker-all.h"
@@ -214,10 +217,9 @@ char* populate_type(ocrParamList_t **type_param, type_enum index, dictionary *di
 }
 
 ocrCompPlatformFactory_t *create_factory_compplatform (char *name, ocrParamList_t *paramlist) {
-    compPlatformType_t mytype = -1;
+    compPlatformType_t mytype = compPlatformMax_id;
     TO_ENUM (mytype, name, compPlatformType_t, compplatform_types, compPlatformMax_id);
-
-    if (mytype == -1) {
+    if (mytype == compPlatformMax_id) {
         DPRINTF(DEBUG_LVL_WARN, "Unrecognized type %s\n", name);
         return NULL;
     } else {
@@ -227,10 +229,10 @@ ocrCompPlatformFactory_t *create_factory_compplatform (char *name, ocrParamList_
 }
 
 ocrMemPlatformFactory_t *create_factory_memplatform (char *name, ocrParamList_t *paramlist) {
-    memPlatformType_t mytype = -1;
+    memPlatformType_t mytype = memPlatformMax_id;
     TO_ENUM (mytype, name, memPlatformType_t, memplatform_types, memPlatformMax_id);
 
-    if (mytype == -1) {
+    if (mytype == memPlatformMax_id) {
         DPRINTF(DEBUG_LVL_WARN, "Unrecognized type %s\n", name);
         return NULL;
     } else {
@@ -240,9 +242,9 @@ ocrMemPlatformFactory_t *create_factory_memplatform (char *name, ocrParamList_t 
 }
 
 ocrMemPlatformFactory_t *create_factory_memtarget(char *name, ocrParamList_t *paramlist) {
-    memTargetType_t mytype = -1;
+    memTargetType_t mytype = memTargetMax_id;
     TO_ENUM (mytype, name, memTargetType_t, memtarget_types, memTargetMax_id);
-    if (mytype == -1) {
+    if (mytype == memTargetMax_id) {
         DPRINTF(DEBUG_LVL_WARN, "Unrecognized type %s\n", name);
         return NULL;
     } else {
@@ -252,9 +254,9 @@ ocrMemPlatformFactory_t *create_factory_memtarget(char *name, ocrParamList_t *pa
 }
 
 ocrAllocatorFactory_t *create_factory_allocator(char *name, ocrParamList_t *paramlist) {
-    allocatorType_t mytype = -1;
+    allocatorType_t mytype = allocatorMax_id;
     TO_ENUM (mytype, name, allocatorType_t, allocator_types, allocatorMax_id);
-    if (mytype == -1) {
+    if (mytype == allocatorMax_id) {
         DPRINTF(DEBUG_LVL_WARN, "Unrecognized type %s\n", name);
         return NULL;
     } else {
@@ -264,9 +266,9 @@ ocrAllocatorFactory_t *create_factory_allocator(char *name, ocrParamList_t *para
 }
 
 ocrCompTargetFactory_t *create_factory_comptarget(char *name, ocrParamList_t *paramlist) {
-    compTargetType_t mytype = -1;
+    compTargetType_t mytype = compTargetMax_id;
     TO_ENUM (mytype, name, compTargetType_t, comptarget_types, compTargetMax_id);
-    if (mytype == -1) {
+    if (mytype == compTargetMax_id) {
         DPRINTF(DEBUG_LVL_WARN, "Unrecognized type %s\n", name);
         return NULL;
     } else {
@@ -276,9 +278,9 @@ ocrCompTargetFactory_t *create_factory_comptarget(char *name, ocrParamList_t *pa
 }
 
 ocrWorkpileFactory_t *create_factory_workpile(char *name, ocrParamList_t *paramlist) {
-    workpileType_t mytype = -1;
+    workpileType_t mytype = workpileMax_id;
     TO_ENUM (mytype, name, workpileType_t, workpile_types, workpileMax_id);
-    if (mytype == -1) {
+    if (mytype == workpileMax_id) {
         DPRINTF(DEBUG_LVL_WARN, "Unrecognized type %s\n", name);
         return NULL;
     } else {
@@ -288,9 +290,9 @@ ocrWorkpileFactory_t *create_factory_workpile(char *name, ocrParamList_t *paraml
 }
 
 ocrWorkerFactory_t *create_factory_worker(char *name, ocrParamList_t *paramlist) {
-    workerType_t mytype = -1;
+    workerType_t mytype = workerMax_id;
     TO_ENUM (mytype, name, workerType_t, worker_types, workerMax_id);
-    if (mytype == -1) {
+    if (mytype == workerMax_id) {
         DPRINTF(DEBUG_LVL_WARN, "Unrecognized type %s\n", name);
         return NULL;
     } else {
@@ -300,9 +302,9 @@ ocrWorkerFactory_t *create_factory_worker(char *name, ocrParamList_t *paramlist)
 }
 
 ocrSchedulerFactory_t *create_factory_scheduler(char *name, ocrParamList_t *paramlist) {
-    schedulerType_t mytype = -1;
+    schedulerType_t mytype = schedulerMax_id;
     TO_ENUM (mytype, name, schedulerType_t, scheduler_types, schedulerMax_id);
-    if (mytype == -1) {
+    if (mytype == schedulerMax_id) {
         DPRINTF(DEBUG_LVL_WARN, "Unrecognized type %s\n", name);
         return NULL;
     } else {
@@ -312,9 +314,9 @@ ocrSchedulerFactory_t *create_factory_scheduler(char *name, ocrParamList_t *para
 }
 
 ocrPolicyDomainFactory_t *create_factory_policydomain(char *name, ocrParamList_t *paramlist) {
-    policyDomainType_t mytype = -1;
+    policyDomainType_t mytype = policyDomainMax_id;
     TO_ENUM (mytype, name, policyDomainType_t, policyDomain_types, policyDomainMax_id);
-    if (mytype == -1) {
+    if (mytype == policyDomainMax_id) {
         DPRINTF(DEBUG_LVL_WARN, "Unrecognized type %s\n", name);
         return NULL;
     } else {
@@ -324,9 +326,9 @@ ocrPolicyDomainFactory_t *create_factory_policydomain(char *name, ocrParamList_t
 }
 
 ocrTaskFactory_t *create_factory_task(char *name, ocrParamList_t *paramlist) {
-    taskType_t mytype = -1;
+    taskType_t mytype = taskMax_id;
     TO_ENUM (mytype, name, taskType_t, task_types, taskMax_id);
-    if (mytype == -1) {
+    if (mytype == taskMax_id) {
         DPRINTF(DEBUG_LVL_INFO, "Unrecognized type %s\n", name);
         return NULL;
     } else {
@@ -336,9 +338,9 @@ ocrTaskFactory_t *create_factory_task(char *name, ocrParamList_t *paramlist) {
 }
 
 ocrTaskTemplateFactory_t *create_factory_tasktemplate(char *name, ocrParamList_t *paramlist) {
-    taskTemplateType_t mytype = -1;
+    taskTemplateType_t mytype = taskTemplateMax_id;
     TO_ENUM (mytype, name, taskTemplateType_t, taskTemplate_types, taskTemplateMax_id);
-    if (mytype == -1) {
+    if (mytype == taskTemplateMax_id) {
         DPRINTF(DEBUG_LVL_WARN, "Unrecognized type %s\n", name);
         return NULL;
     } else {
@@ -348,9 +350,9 @@ ocrTaskTemplateFactory_t *create_factory_tasktemplate(char *name, ocrParamList_t
 }
 
 ocrDataBlockFactory_t *create_factory_datablock(char *name, ocrParamList_t *paramlist) {
-    dataBlockType_t mytype = -1;
+    dataBlockType_t mytype = dataBlockMax_id;
     TO_ENUM (mytype, name, dataBlockType_t, dataBlock_types, dataBlockMax_id);
-    if (mytype == -1) {
+    if (mytype == dataBlockMax_id) {
         DPRINTF(DEBUG_LVL_WARN, "Unrecognized type %s\n", name);
         return NULL;
     } else {
@@ -360,9 +362,9 @@ ocrDataBlockFactory_t *create_factory_datablock(char *name, ocrParamList_t *para
 }
 
 ocrEventFactory_t *create_factory_event(char *name, ocrParamList_t *paramlist) {
-    eventType_t mytype = -1;
+    eventType_t mytype = eventMax_id;
     TO_ENUM (mytype, name, eventType_t, event_types, eventMax_id);
-    if (mytype == -1) {
+    if (mytype == eventMax_id) {
         DPRINTF(DEBUG_LVL_WARN, "Unrecognized type %s\n", name);
         return NULL;
     } else {
@@ -372,9 +374,9 @@ ocrEventFactory_t *create_factory_event(char *name, ocrParamList_t *paramlist) {
 }
 
 ocrPolicyCtxFactory_t *create_factory_context(char *name, ocrParamList_t *paramlist) {
-    policyCtxType_t mytype = -1;
+    policyCtxType_t mytype = policyCtxMax_id;
     TO_ENUM (mytype, name, policyCtxType_t, policyCtx_types, policyCtxMax_id);
-    if (mytype == -1) {
+    if (mytype == policyCtxMax_id) {
         DPRINTF(DEBUG_LVL_WARN, "Unrecognized type %s\n", name);
         return NULL;
     } else {
@@ -384,9 +386,9 @@ ocrPolicyCtxFactory_t *create_factory_context(char *name, ocrParamList_t *paraml
 }
 
 ocrGuidProviderFactory_t *create_factory_guid(char *name, ocrParamList_t *paramlist) {
-    guidType_t mytype = -1;
+    guidType_t mytype = guidMax_id;
     TO_ENUM (mytype, name, guidType_t, guid_types, guidMax_id);
-    if (mytype == -1) {
+    if (mytype == guidMax_id) {
         DPRINTF(DEBUG_LVL_WARN, "Unrecognized type %s\n", name);
         return NULL;
     } else {
@@ -396,9 +398,9 @@ ocrGuidProviderFactory_t *create_factory_guid(char *name, ocrParamList_t *paraml
 }
 
 ocrLockFactory_t *create_factory_lock(char *name, ocrParamList_t *paramlist) {
-    syncType_t mytype = -1;
+    syncType_t mytype = syncMax_id;
     TO_ENUM (mytype, name, syncType_t, sync_types, syncMax_id);
-    if (mytype == -1) {
+    if (mytype == syncMax_id) {
         DPRINTF(DEBUG_LVL_WARN, "Unrecognized type %s\n", name);
         return NULL;
     } else {
@@ -408,9 +410,9 @@ ocrLockFactory_t *create_factory_lock(char *name, ocrParamList_t *paramlist) {
 }
 
 ocrAtomic64Factory_t *create_factory_atomic64(char *name, ocrParamList_t *paramlist) {
-    syncType_t mytype = -1;
+    syncType_t mytype = syncMax_id;
     TO_ENUM (mytype, name, syncType_t, sync_types, syncMax_id);
-    if (mytype == -1) {
+    if (mytype == syncMax_id) {
         DPRINTF(DEBUG_LVL_WARN, "Unrecognized type %s\n", name);
         return NULL;
     } else {
@@ -418,6 +420,20 @@ ocrAtomic64Factory_t *create_factory_atomic64(char *name, ocrParamList_t *paraml
         return (ocrAtomic64Factory_t *)newAtomic64Factory(mytype, paramlist);
     }
 }
+
+ocrQueueFactory_t *create_factory_queue(char *name, ocrParamList_t *paramlist) {
+    syncType_t mytype = -1;
+    TO_ENUM (mytype, name, syncType_t, sync_types, syncMax_id);
+    if (mytype == -1) {
+        DPRINTF(DEBUG_LVL_WARN, "Unrecognized type %s\n", name);
+        return NULL;
+    } else {
+        DPRINTF(DEBUG_LVL_INFO, "Creating a queue factory of type %d\n", mytype);
+        // HACK: FIXME: Passing static size
+        return (ocrQueueFactory_t *)newQueueFactory(mytype, 32, paramlist);
+    }
+}
+
 
 void *create_factory (type_enum index, char *factory_name, ocrParamList_t *paramlist) {
     void *new_factory = NULL;
@@ -627,6 +643,7 @@ s32 populate_inst(ocrParamList_t **inst_param, ocrMappable_t **instance, s32 *ty
             ocrGuidProvider_t *gf;
             ocrLockFactory_t *lf;
             ocrAtomic64Factory_t *af;
+            ocrQueueFactory_t *qf;
             s32 low, high;
 
             s32 schedulerCount, workerCount, computeCount, workpileCount, allocatorCount, memoryCount;
@@ -665,16 +682,30 @@ s32 populate_inst(ocrParamList_t **inst_param, ocrMappable_t **instance, s32 *ty
             INI_GET_STR (key, inststr, "");
             af = create_factory_atomic64(inststr, NULL);
 
+            snprintf(key, MAX_KEY_SZ, "%s:%s", secname, "sync");
+            INI_GET_STR (key, inststr, "");
+            qf = create_factory_queue(inststr, NULL);
+
             // Ugly but special case
             read_range(dict, secname, "guid", &low, &high);
             ASSERT (low == high);  // We don't expect more than one guid provider
             gf = (ocrGuidProvider_t *)(all_instances[guid_type][low]);
             ASSERT (gf);
 
+#ifdef OCR_ENABLE_STATISTICS
+            // HUGE HUGE HUGE HUGE HUGE HACK. This needs to be parsed
+            // but for now just passing some default one
+            ocrStatsFactory_t *sf = newStatsFactory(statisticsDefault_id, NULL);
+#endif
             ALLOC_PARAM_LIST(inst_param[j], paramListPolicyDomainInst_t);
-            instance[j] = (ocrMappable_t *)((ocrPolicyDomainFactory_t *)factory)->instantiate(factory, schedulerCount,
-                            workerCount, computeCount, workpileCount, allocatorCount, memoryCount,
-                            tf, ttf, dbf, ef, cf, gf, lf, af, NULL, inst_param[j]);
+            instance[j] = (ocrMappable_t *)((ocrPolicyDomainFactory_t *)factory)->instantiate(
+                factory, schedulerCount, workerCount, computeCount, workpileCount,
+                allocatorCount, memoryCount,
+                tf, ttf, dbf, ef, cf, gf, lf, af, qf,
+#ifdef OCR_ENABLE_STATISTICS
+                sf->instantiate(sf, NULL), /* TODO: BALA, please get a statistics INSTANCE (like GUID provider)*/
+#endif
+                NULL, inst_param[j]);
             if (instance[j])
                 DPRINTF(DEBUG_LVL_INFO, "Created policy domain of index %d\n", j);
             setBootPD((ocrPolicyDomain_t *)instance[j]);

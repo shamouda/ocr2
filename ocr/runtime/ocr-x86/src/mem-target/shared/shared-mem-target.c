@@ -17,6 +17,11 @@
 #include "ocr-policy-domain.h"
 #include "ocr-sysboot.h"
 
+#ifdef OCR_ENABLE_STATISTICS
+#include "ocr-statistics.h"
+#include "ocr-statistics-callbacks.h"
+#endif
+
 #include <stdlib.h>
 
 
@@ -26,8 +31,11 @@
 /******************************************************/
 
 void sharedDestruct(ocrMemTarget_t *self) {
+#ifdef OCR_ENABLE_STATISTICS
+    statsMEMTARGET_STOP(getCurrentPD(), self->guid, self);
+#endif
     runtimeChunkFree((u64)self->memories, NULL);
-    runtimeChunkFree((u64)self, NULL);
+    runtimeChunkFree((u64)self, NULL);    
 }
 
 struct _ocrPolicyDomain_t;
@@ -81,13 +89,17 @@ ocrMemTarget_t* newMemTargetShared(ocrMemTargetFactory_t * factory,
     ocrMemTarget_t *result = (ocrMemTarget_t*)
         runtimeChunkAlloc(sizeof(ocrMemTargetShared_t), NULL);
 
-    guidify(getCurrentPD(), (u64)result, &(result->guid), OCR_GUID_MEM_TARGET);
+    result->guid = NULL_GUID;
+    guidify(getCurrentPD(), (u64)result, &(result->guid), OCR_GUID_MEMTARGET);
+
     result->size = size;
     result->startAddr = result->endAddr = 0ULL;
     result->memories = NULL;
     result->memoryCount = 0;
     result->fctPtrs = &(factory->targetFcts);
-
+#ifdef OCR_ENABLE_STATISTICS
+    statsMEMTARGET_START(getCurrentPD(), result->guid, result);
+#endif
     return result;
 }
 

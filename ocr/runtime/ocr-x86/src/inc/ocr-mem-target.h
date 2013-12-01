@@ -15,6 +15,10 @@
 #include "ocr-types.h"
 #include "ocr-utils.h"
 
+#ifdef OCR_ENABLE_STATISTICS
+#include "ocr-statistics.h"
+#endif
+
 
 /****************************************************/
 /* PARAMETER LISTS                                  */
@@ -167,6 +171,9 @@ typedef struct _ocrMemTarget_t {
     ocrMappable_t base;
     ocrGuid_t guid; /**< GUID for this mem-target */
     u64 size, startAddr, endAddr;
+#ifdef OCR_ENABLE_STATISTICS
+    ocrStatsProcess_t *statProcess;
+#endif
     struct _ocrMemPlatform_t **memories; /**< Pointers to underlying mem-target */
     u64 memoryCount; /**< Number of mem-targets */
     ocrMemTargetFcts_t *fctPtrs; /**< Function pointers for this instance */
