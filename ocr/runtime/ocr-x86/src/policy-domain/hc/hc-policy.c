@@ -10,6 +10,11 @@
 #include "debug.h"
 #include "ocr-macros.h"
 #include "ocr-policy-domain.h"
+
+#ifdef OCR_ENABLE_STATISTICS
+#include "ocr-statistics.h"
+#endif
+
 #include "policy-domain/hc/hc-policy.h"
 
 static void destructOcrPolicyCtxHC ( ocrPolicyCtx_t* self ) {
@@ -150,6 +155,7 @@ static void hcPolicyDomainDestruct(ocrPolicyDomain_t * policy) {
     policy->eventFactory->destruct(policy->eventFactory);
     policy->lockFactory->destruct(policy->lockFactory);
     policy->atomicFactory->destruct(policy->atomicFactory);
+    policy->queueFactory->destruct(policy->queueFactory);
 
     //Anticipate those to be null-impl for some time
     ASSERT(policy->costFunction == NULL);
@@ -203,11 +209,12 @@ static u8 hcCreateEdt(ocrPolicyDomain_t *self, ocrGuid_t *guid,
 }
 
 static u8 hcCreateEdtTemplate(ocrPolicyDomain_t *self, ocrGuid_t *guid,
-                              ocrEdt_t func, u32 paramc, u32 depc, ocrPolicyCtx_t *context) {
+                              ocrEdt_t func, u32 paramc, u32 depc, const char* funcName,
+                              ocrPolicyCtx_t *context) {
 
 
     ocrTaskTemplate_t *base = self->taskTemplateFactory->instantiate(self->taskTemplateFactory,
-                                                                     func, paramc, depc, NULL);
+                                                                     func, paramc, depc, funcName, NULL);
     *guid = base->guid;
     return 0;
 }
@@ -235,6 +242,16 @@ static ocrLock_t* hcGetLock(ocrPolicyDomain_t *self, ocrPolicyCtx_t *context) {
 static ocrAtomic64_t* hcGetAtomic64(ocrPolicyDomain_t *self, ocrPolicyCtx_t *context) {
     return self->atomicFactory->instantiate(self->atomicFactory, NULL);
 }
+
+static ocrQueue_t* hcGetQueue(ocrPolicyDomain_t *self, u64 maxQueueSize, ocrPolicyCtx_t *context) {
+    return self->queueFactory->instantiate(self->queueFactory, maxQueueSize, NULL);
+}
+
+#ifdef OCR_ENABLE_STATISTICS
+static ocrStats_t* hcGetStats(ocrPolicyDomain_t *self) {
+    return self->statsObject;
+}
+#endif
 
 static ocrPolicyCtx_t* hcGetContext(ocrPolicyDomain_t *self) {
     return self->contextFactory->instantiate(self->contextFactory, NULL);
@@ -283,6 +300,10 @@ ocrPolicyDomain_t * newPolicyDomainHc(ocrPolicyDomainFactory_t * policy,
                                       ocrDataBlockFactory_t *dbFactory, ocrEventFactory_t *eventFactory,
                                       ocrPolicyCtxFactory_t *contextFactory, ocrGuidProvider_t *guidProvider,
                                       ocrLockFactory_t* lockFactory, ocrAtomic64Factory_t* atomicFactory,
+                                      ocrQueueFactory_t *queueFactory,
+#ifdef OCR_ENABLE_STATISTICS
+                                      ocrStats_t *statsObject,
+#endif
                                       ocrCost_t *costFunction, ocrParamList_t *perInstance) {
 
     ocrPolicyDomainHc_t * derived = (ocrPolicyDomainHc_t *) checkedMalloc(policy, sizeof(ocrPolicyDomainHc_t));
@@ -304,6 +325,10 @@ ocrPolicyDomain_t * newPolicyDomainHc(ocrPolicyDomainFactory_t * policy,
     base->guidProvider = guidProvider;
     base->lockFactory = lockFactory;
     base->atomicFactory = atomicFactory;
+    base->queueFactory = queueFactory;
+#ifdef OCR_ENABLE_STATISTICS
+    base->statsObject = statsObject;
+#endif
     base->costFunction = costFunction;
 
     base->destruct = hcPolicyDomainDestruct;
@@ -325,6 +350,10 @@ ocrPolicyDomain_t * newPolicyDomainHc(ocrPolicyDomainFactory_t * policy,
     base->processResponse = NULL;
     base->getLock = hcGetLock;
     base->getAtomic64 = hcGetAtomic64;
+    base->getQueue = hcGetQueue;
+#ifdef OCR_ENABLE_STATISTICS
+    base->getStats = hcGetStats;
+#endif
     base->getContext = hcGetContext;
 
     // no inter-policy domain for simple HC

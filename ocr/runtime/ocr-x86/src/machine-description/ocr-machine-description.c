@@ -19,6 +19,9 @@
 #include "ocr-types.h"
 #include "policy-domain/policy-domain-all.h"
 #include "scheduler/scheduler-all.h"
+#ifdef OCR_ENABLE_STATISTICS
+#include "statistics/statistics-all.h"
+#endif
 #include "sync/sync-all.h"
 #include "task/task-all.h"
 #include "worker/worker-all.h"
@@ -418,6 +421,20 @@ ocrAtomic64Factory_t *create_factory_atomic64(char *name, ocrParamList_t *paraml
     }
 }
 
+ocrQueueFactory_t *create_factory_queue(char *name, ocrParamList_t *paramlist) {
+    syncType_t mytype = -1;
+    TO_ENUM (mytype, name, syncType_t, sync_types, syncMax_id);
+    if (mytype == -1) {
+        DPRINTF(DEBUG_LVL_WARN, "Unrecognized type %s\n", name);
+        return NULL;
+    } else {
+        DPRINTF(DEBUG_LVL_INFO, "Creating a queue factory of type %d\n", mytype);
+        // HACK: FIXME: Passing static size
+        return (ocrQueueFactory_t *)newQueueFactory(mytype, 32, paramlist);
+    }
+}
+
+
 void *create_factory (type_enum index, char *factory_name, ocrParamList_t *paramlist) {
     void *new_factory = NULL;
 
@@ -622,6 +639,7 @@ s32 populate_inst(ocrParamList_t **inst_param, ocrMappable_t **instance, s32 *ty
             ocrGuidProvider_t *gf;
             ocrLockFactory_t *lf;
             ocrAtomic64Factory_t *af;
+            ocrQueueFactory_t *qf;
             s32 low, high;
 
             s32 schedulerCount, workerCount, computeCount, workpileCount, allocatorCount, memoryCount;
@@ -660,16 +678,30 @@ s32 populate_inst(ocrParamList_t **inst_param, ocrMappable_t **instance, s32 *ty
             INI_GET_STR (key, inststr, "");
             af = create_factory_atomic64(inststr, NULL);
 
+            snprintf(key, MAX_KEY_SZ, "%s:%s", secname, "sync");
+            INI_GET_STR (key, inststr, "");
+            qf = create_factory_queue(inststr, NULL);
+
             // Ugly but special case
             read_range(dict, secname, "guid", &low, &high);
             ASSERT (low == high);  // We don't expect more than one guid provider
             gf = (ocrGuidProvider_t *)(all_instances[guid_type][low]);
             ASSERT (gf);
 
+#ifdef OCR_ENABLE_STATISTICS
+            // HUGE HUGE HUGE HUGE HUGE HACK. This needs to be parsed
+            // but for now just passing some default one
+            ocrStatsFactory_t *sf = newStatsFactory(statisticsDefault_id, NULL);
+#endif
             ALLOC_PARAM_LIST(inst_param[j], paramListPolicyDomainInst_t);
-            instance[j] = (ocrMappable_t *)((ocrPolicyDomainFactory_t *)factory)->instantiate(factory, schedulerCount,
-                            workerCount, computeCount, workpileCount, allocatorCount, memoryCount,
-                            tf, ttf, dbf, ef, cf, gf, lf, af, NULL, inst_param[j]);
+            instance[j] = (ocrMappable_t *)((ocrPolicyDomainFactory_t *)factory)->instantiate(
+                factory, schedulerCount, workerCount, computeCount, workpileCount,
+                allocatorCount, memoryCount,
+                tf, ttf, dbf, ef, cf, gf, lf, af, qf,
+#ifdef OCR_ENABLE_STATISTICS
+                sf->instantiate(sf, NULL), /* TODO: BALA, please get a statistics INSTANCE (like GUID provider)*/
+#endif
+                NULL, inst_param[j]);
             if (instance[j])
                 DPRINTF(DEBUG_LVL_INFO, "Created policy domain of index %d\n", j);
             setBootPD((ocrPolicyDomain_t *)instance[j]);

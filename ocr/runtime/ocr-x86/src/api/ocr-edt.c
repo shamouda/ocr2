@@ -11,11 +11,6 @@
 #include "ocr-policy-domain.h"
 #include "ocr-runtime.h"
 
-#ifdef OCR_ENABLE_STATISTICS
-#include "ocr-statistics.h"
-#include "ocr-stat-user.h"
-#endif
-
 u8 ocrEventCreate(ocrGuid_t *guid, ocrEventTypes_t eventType, bool takesArg) {
     ocrPolicyDomain_t * pd = getCurrentPD();
     ocrPolicyCtx_t *context = getCurrentWorkerContext();
@@ -42,10 +37,13 @@ u8 ocrEventSatisfy(ocrGuid_t eventGuid, ocrGuid_t dataGuid /*= INVALID_GUID*/) {
     return ocrEventSatisfySlot(eventGuid, dataGuid, 0);
 }
 
-u8 ocrEdtTemplateCreate(ocrGuid_t *guid, ocrEdt_t funcPtr, u32 paramc, u32 depc) {
+u8 ocrEdtTemplateCreate_internal(ocrGuid_t *guid, ocrEdt_t funcPtr, u32 paramc, u32 depc, const char* funcName) {
+#ifdef OCR_ENABLE_EDT_NAMING
+    ASSERT(funcName);
+#endif
     ocrPolicyDomain_t *pd = getCurrentPD();
     ocrPolicyCtx_t *context = getCurrentWorkerContext();
-    pd->createEdtTemplate(pd, guid, funcPtr, paramc, depc, context);
+    pd->createEdtTemplate(pd, guid, funcPtr, paramc, depc, funcName, context);
 
     return 0;
 }
@@ -85,32 +83,7 @@ u8 ocrEdtCreate(ocrGuid_t* edtGuid, ocrGuid_t templateGuid,
     pd->createEdt(pd, edtGuid, taskTemplate, paramc, paramv, depc,
                   properties, affinity, outputEvent, context);
 
-#ifdef OCR_ENABLE_STATISTICS
-    ocrTask_t * task = NULL;
-    deguidify(pd, *edtGuid, (u64*)&task, NULL);
-    // Create the statistics process for this EDT and also update clocks properly
-    ocrStatsProcessCreate(&(task->statProcess), *edtGuid);
-    ocrStatsFilter_t *t = NEW_FILTER(simple);
-    t->create(t, GocrFilterAggregator, NULL);
-    ocrStatsProcessRegisterFilter(&(task->statProcess), (0x1F), t);
-
-    // Now send the message that the EDT was created
-    {
-        ocrWorker_t *worker = NULL;
-        ocrTask_t *curTask = NULL;
-
-        deguidify(pd, getCurrentWorkerContext()->sourceObj, (u64*)&worker, NULL);
-        ocrGuid_t curTaskGuid = worker->fctPtrs->getCurrentEDT(worker);
-        deguidify(pd, curTaskGuid, (u64*)&curTask, NULL);
-
-        ocrStatsProcess_t *srcProcess = curTaskGuid==0?&GfakeProcess:&(curTask->statProcess);
-        ocrStatsMessage_t *mess = NEW_MESSAGE(simple);
-        mess->create(mess, STATS_EDT_CREATE, 0, curTaskGuid, *edtGuid, NULL);
-        ocrStatsAsyncMessage(srcProcess, &(task->statProcess), mess);
-    }
-#endif
-
-    // If guids dependencies were provided, add them now
+    // If guids dependences were provided, add them now
     if(depv != NULL) {
         ASSERT(depc != 0);
         u32 i = 0;

@@ -20,10 +20,7 @@
 #include <stdio.h>
 #include <string.h>
 
-
-#ifdef OCR_ENABLE_STATISTICS
-#include "ocr-stat-user.h"
-#endif
+u8 startMemStat = 0;
 
 #define DEBUG_TYPE INIPARSING
 
@@ -187,6 +184,9 @@ void bringUpRuntime(const char *inifile) {
     if (inst_counts[policydomain_type] != 1) {
         DPRINTF(DEBUG_LVL_WARN, "Only the first policy domain is started for execution. Rest is currently ignored!\n");
     }
+#ifdef OCR_ENABLE_STATISTICS
+    setCurrentPD(rootPolicy); // Statistics needs to know the current PD so we set it for this main thread
+#endif
     rootPolicy->start(rootPolicy);
 }
 
@@ -297,6 +297,7 @@ int __attribute__ ((weak)) main(int argc, const char* argv[]) {
                 /* depc = */ EDT_PARAM_DEF, /* depv = */ &userArgsDbGuid,
                 EDT_PROP_NONE, NULL_GUID, NULL);
 
+    startMemStat = 1;
     ocrFinalize();
 
     return 0;
