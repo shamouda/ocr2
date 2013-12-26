@@ -115,17 +115,12 @@ typedef struct _ocrWorkerFactory_t {
 /**
  * @brief Gets the current EDT executing
  */
-extern ocrGuid_t (*getCurrentEDT)();
-extern void (*setCurrentEDT)(ocrGuid_t guid);
+ocrGuid_t (*getCurrentEDT)();
+void (*setCurrentEDT)(ocrGuid_t guid);
 
 // Get/Set CurrentEDT relying on the worker caching the info
-extern ocrGuid_t getCurrentEDTFromWorker();
-extern void setCurrentEDTToWorker(ocrGuid_t edtGuid);
-extern ocrWorker_t *getCurrentWorker();
-
-extern void storeDB(ocrDataBlockList_t *list, ocrDataBlock_t *db);
-extern void evictLRU(ocrGuid_t edt, ocrDataBlockList_t *list);
-extern void moveDB(ocrGuid_t edt, ocrDataBlockList_t *dst, ocrDataBlock_t *db);
-extern void deleteDB(ocrDataBlock_t *db);
+ocrGuid_t getCurrentEDTFromWorker();
+void setCurrentEDTToWorker(ocrGuid_t edtGuid);
+ocrWorker_t *getCurrentWorker();
 
 #endif /* __OCR_WORKER_H__ */

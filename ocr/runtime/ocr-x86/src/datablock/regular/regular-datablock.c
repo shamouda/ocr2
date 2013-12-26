@@ -18,6 +18,7 @@
 #include "ocr-sync.h"
 #include "ocr-utils.h"
 #include "ocr-worker.h"
+#include "data-movement.h"
 
 #ifdef OCR_ENABLE_STATISTICS
 #include "ocr-statistics.h"
