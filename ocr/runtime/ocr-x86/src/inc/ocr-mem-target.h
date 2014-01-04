@@ -13,7 +13,7 @@
 
 #include "ocr-runtime-types.h"
 #include "ocr-types.h"
-#include "ocr-utils.h"
+#include "utils/ocr-utils.h"
 
 #ifdef OCR_ENABLE_STATISTICS
 #include "ocr-statistics.h"
@@ -186,8 +186,8 @@ typedef struct _ocrMemTarget_t {
     ocrStatsProcess_t *statProcess;
 #endif
     struct _ocrMemPlatform_t **memories; /**< Pointers to underlying mem-target */
-    u64 memoryCount; /**< Number of mem-targets */
-    ocrMemTargetFcts_t *fctPtrs; /**< Function pointers for this instance */
+    u64 memoryCount;                     /**< Number of mem-targets */
+    ocrMemTargetFcts_t fcts;             /**< Functions for this instance */
 } ocrMemTarget_t;
 
 
