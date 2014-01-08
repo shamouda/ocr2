@@ -131,8 +131,9 @@ ocrWorker_t* newWorkerHc (ocrWorkerFactory_t * factory, ocrParamList_t * perInst
     base->routine = worker_computation_routine;
     base->fctPtrs = &(factory->workerFcts);
     base->db_list.used_size = 0;
-    base->db_list.total_size = 256*1024;
+    base->db_list.total_size = L1SPAD_SIZE;
     base->db_list.head = NULL;
+    base->db_list.location = NULL;
     return base;
 }
 

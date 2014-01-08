@@ -69,6 +69,53 @@ static u64 get_time()
     return t.tv_sec*1000000000 + t.tv_nsec;
 }
 
+const static ocrMemoryBlock_t DEFAULT_MEMORY_BLOCK = {/*db_list*/ {NULL, 0, 0}, /*parent*/ NULL};
+u64 createMemoryBlocks(ocrPolicyDomain_t* policy)
+{
+    u64 chipCount = policy->chipsPerBoard;
+    u64 unitCount = policy->unitsPerChip * chipCount;
+    u64 blockCount = policy->blocksPerUnit * unitCount;
+
+    u64 totalCount = 1 + chipCount + unitCount + blockCount;
+
+    policy->memoryBlocks = malloc(totalCount * sizeof(ocrMemoryBlock_t*));
+    ocrMemoryBlock_t ** chunks = policy->memoryBlocks;
+    int i;
+    for (i = 0; i < totalCount; i++)
+    {
+        chunks[i] = malloc(sizeof(ocrMemoryBlock_t));
+        *chunks[i] = DEFAULT_MEMORY_BLOCK;
+        chunks[i]->db_list.location = chunks[i];
+    }
+
+    // Set the parents for everything. DRAM's will be null.
+    // DRAM
+    chunks[0]->db_list.total_size = UINT64_MAX;
+    chunks[0]->parent = NULL;
+    // chips
+    int chipOffset = 1;
+    for (i = 0; i < chipCount; i++)
+    {
+        chunks[i + chipOffset]->db_list.total_size = L4SPAD_SIZE;
+        chunks[i + chipOffset]->parent = chunks[i / policy->chipsPerBoard];
+    }
+    // units
+    int unitOffset = chipOffset + chipCount;
+    for (i = 0; i < unitCount; i++)
+    {
+        chunks[i + unitOffset]->db_list.total_size = L3SPAD_SIZE;
+        chunks[i + unitOffset]->parent = chunks[chipOffset + i/policy->unitsPerChip];
+    }
+    // blocks
+    int blockOffset = unitOffset + unitCount;
+    for (i = 0; i < blockCount; i++) {
+        chunks[i + blockOffset]->db_list.total_size = L2SPAD_SIZE;
+        chunks[i + blockOffset]->parent = chunks[unitOffset + i/policy->blocksPerUnit];
+    }
+
+    return totalCount;
+}
+
 double get_movement_energy(ocrDataBlockList_t *src, ocrDataBlockList_t *dst, ocrDataBlock_t *db)
 {
     ocrPolicyDomain_t *pd = getCurrentPD();

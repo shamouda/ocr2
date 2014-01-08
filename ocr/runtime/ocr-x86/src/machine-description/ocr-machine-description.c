@@ -569,6 +569,7 @@ s32 populate_inst(ocrParamList_t **inst_param, ocrMappable_t **instance, s32 *ty
             ocrAtomic64Factory_t *af;
             ocrQueueFactory_t *qf;
             s32 low, high;
+            u32 workersPerBlock, blocksPerUnit, unitsPerChip, chipsPerBoard;
 
             s32 schedulerCount, workerCount, computeCount, workpileCount, allocatorCount, memoryCount;
             schedulerCount = read_range(dict, secname, "scheduler", &low, &high);
@@ -577,6 +578,18 @@ s32 populate_inst(ocrParamList_t **inst_param, ocrMappable_t **instance, s32 *ty
             workpileCount = read_range(dict, secname, "workpile", &low, &high);
             allocatorCount = read_range(dict, secname, "allocator", &low, &high);
             memoryCount = read_range(dict, secname, "memtarget", &low, &high);
+
+            snprintf(key, MAX_KEY_SZ, "%s:%s", secname, "workersperblock");
+            INI_GET_INT(key, workersPerBlock, 8);
+
+            snprintf(key, MAX_KEY_SZ, "%s:%s", secname, "blocksperunit");
+            INI_GET_INT(key, blocksPerUnit, 16);
+
+            snprintf(key, MAX_KEY_SZ, "%s:%s", secname, "unitsperchip");
+            INI_GET_INT(key, unitsPerChip, 16);
+
+            snprintf(key, MAX_KEY_SZ, "%s:%s", secname, "chipsperboard");
+            INI_GET_INT(key, chipsPerBoard, 4);
 
             snprintf(key, MAX_KEY_SZ, "%s:%s", secname, "taskfactory");
             INI_GET_STR (key, inststr, "");
@@ -631,7 +644,15 @@ s32 populate_inst(ocrParamList_t **inst_param, ocrMappable_t **instance, s32 *ty
 #endif
                 NULL, inst_param[j]);
             if (instance[j])
+            {
+                ocrPolicyDomain_t* pd = (ocrPolicyDomain_t*)instance[j];
+                pd->workersPerBlock = workersPerBlock;
+                pd->blocksPerUnit = blocksPerUnit;
+                pd->unitsPerChip = unitsPerChip;
+                pd->chipsPerBoard = chipsPerBoard;
+                pd->memoryBlockCount = createMemoryBlocks(pd);
                 DPRINTF(DEBUG_LVL_INFO, "Created policy domain of index %d\n", j);
+            }
             setBootPD((ocrPolicyDomain_t *)instance[j]);
         }
         break;

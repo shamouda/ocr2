@@ -10,6 +10,7 @@
 #include "debug.h"
 #include "ocr-macros.h"
 #include "ocr-policy-domain.h"
+#include "worker/hc/hc-worker.h"
 #include <pthread.h>
 
 #ifdef OCR_ENABLE_STATISTICS
@@ -57,6 +58,14 @@ static void hcPolicyDomainStart(ocrPolicyDomain_t * policy) {
     u64 computeCount = policy->computeCount;
     u64 schedulerCount = policy->schedulerCount;
     ASSERT(workerCount == computeCount);
+
+    // Give all the workers' db lists parents
+    u64 blockOffset = 1 + policy->chipsPerBoard + policy->unitsPerChip;
+    for (i = 0; i < workerCount; i++) {
+        u32 worker = ((ocrWorkerHc_t*)policy->workers[i])->id;
+//FIXME: Give workers an ocrMemoryBlock and update the parent to this value
+        policy->workers[i]->db_list.location = policy->memoryBlocks[blockOffset + worker / policy->workersPerBlock];
+    }
 
     // Start the allocators
     for(i = 0; i < policy->allocatorCount; ++i) {
@@ -365,9 +374,11 @@ ocrPolicyDomain_t * newPolicyDomainHc(ocrPolicyDomainFactory_t * policy,
     base->allocators = NULL;
     base->memories = NULL;
 
+    // Initialize the datablock list to be empty
     base->db_list.used_size = 0;
     base->db_list.total_size = UINT64_MAX;
     base->db_list.head = NULL;
+    base->db_list.location = NULL;
 
     pthread_mutexattr_t attr;
     pthread_mutexattr_init(&attr);

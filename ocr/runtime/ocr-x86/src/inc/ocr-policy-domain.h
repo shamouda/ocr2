@@ -11,6 +11,7 @@
 #include "ocr-allocator.h"
 #include "ocr-comp-target.h"
 #include "ocr-datablock.h"
+#include "data-movement.h"
 #include "ocr-event.h"
 #include "ocr-guid.h"
 #include "ocr-mappable.h"
@@ -179,7 +180,11 @@ typedef struct _ocrPolicyDomain_t {
                                                  * Currently a placeholder for future
                                                  * objective driven scheduling */
 
-    ocrDataBlockList_t db_list;
+    /* Information needed for memory block hierarchy*/
+    u32 workersPerBlock, blocksPerUnit, unitsPerChip, chipsPerBoard;
+    ocrDataBlockList_t db_list;                 /**< List of data blocks in DRAM */
+    u64 memoryBlockCount;                       /**< Number of shared memories */
+    ocrMemoryBlock_t ** memoryBlocks;           /**< All the shared memories */
 
     /**
      * @brief Destroys (and frees any associated memory) this

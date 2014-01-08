@@ -130,8 +130,10 @@ typedef struct _ocrDataBlockNode_t {
     struct _ocrDataBlockNode_t *next;
 } ocrDataBlockNode_t;
 
+struct _ocrMemoryBlock_t;
 typedef struct _ocrDataBlockList_t {
     ocrDataBlockNode_t *head;
+    struct _ocrMemoryBlock_t *location; // NULL if policy domain (representing DRAM)
     u64 total_size;
     u64 used_size;
 } ocrDataBlockList_t;
