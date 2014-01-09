@@ -61,7 +61,7 @@ void* regularAcquire(ocrDataBlock_t *self, ocrGuid_t edt, bool isInternal) {
     if(isInternal)
         rself->attributes.internalUsers += 1;
 
-    ocrDataBlockList_t *dst = &(getCurrentWorker()->db_list);
+    ocrDataBlockList_t *dst = &(getCurrentWorker()->memory.db_list);
     moveDB(edt, dst, self);
 
     rself->lock->fctPtrs->unlock(rself->lock);
@@ -230,7 +230,7 @@ ocrDataBlock_t* newDataBlockRegular(ocrDataBlockFactory_t *factory, ocrGuid_t al
     ocrGuidTrackerInit(&(result->usersTracker));
 
     ocrWorker_t *worker = getCurrentWorker();
-    storeDB(&worker->db_list, (ocrDataBlock_t*)result);
+    storeDB(&worker->memory.db_list, (ocrDataBlock_t*)result);
 #ifdef OCR_ENABLE_STATISTICS
     ocrGuid_t edtGuid = getCurrentEDT();
     statsDB_CREATE(pd, edtGuid, NULL, allocator, NULL, result->base.guid, &(result->base));

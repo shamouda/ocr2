@@ -182,7 +182,6 @@ typedef struct _ocrPolicyDomain_t {
 
     /* Information needed for memory block hierarchy*/
     u32 workersPerBlock, blocksPerUnit, unitsPerChip, chipsPerBoard;
-    ocrDataBlockList_t db_list;                 /**< List of data blocks in DRAM */
     u64 memoryBlockCount;                       /**< Number of shared memories */
     ocrMemoryBlock_t ** memoryBlocks;           /**< All the shared memories */
 

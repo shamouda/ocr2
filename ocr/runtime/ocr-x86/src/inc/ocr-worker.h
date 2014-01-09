@@ -9,7 +9,7 @@
 #define __OCR_WORKER_H__
 
 #include "ocr-comp-target.h"
-#include "ocr-datablock.h"
+#include "data-movement.h"
 #include "ocr-mappable.h"
 #include "ocr-scheduler.h"
 #include "ocr-types.h"
@@ -90,7 +90,7 @@ typedef struct _ocrWorker_t {
     ocrCompTarget_t **computes; /**< Compute node(s) associated with this worker */
     u64 computeCount;          /**< Number of compute node(s) associated */
 
-    ocrDataBlockList_t db_list;
+    ocrMemoryBlock_t memory;
 
     /*! \brief Routine the worker executes
      */

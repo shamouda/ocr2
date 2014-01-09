@@ -124,7 +124,7 @@ double get_movement_energy(ocrDataBlockList_t *src, ocrDataBlockList_t *dst, ocr
     {
         energy = 0.0;
     }
-    else if ((src == &pd->db_list) || (dst == &pd->db_list)) /* Moving to/from DRAM */
+    else if ((src == &pd->memoryBlocks[0]->db_list) || (dst == &pd->memoryBlocks[0]->db_list)) /* Moving to/from DRAM (memoryBlocks[0] is DRAM) */
     {
         energy = db->size * 8 * 2;  /* Currently hardcoded as 2 pJ/bit */
     }
@@ -183,7 +183,7 @@ void evictLRU(ocrGuid_t edt, ocrDataBlockList_t *list)
     ocrDataBlock_t *lru = getLRU(list);
     ocrPolicyDomain_t *pd = getCurrentPD();
     printf("%p evicting db %p\n", getCurrentWorker(), lru);
-    moveDB(edt, &pd->db_list, lru);
+    moveDB(edt, &pd->memoryBlocks[0]->db_list, lru);
 }
 
 void moveDB(ocrGuid_t edt, ocrDataBlockList_t *dst, ocrDataBlock_t *db)
@@ -209,7 +209,7 @@ void moveDB(ocrGuid_t edt, ocrDataBlockList_t *dst, ocrDataBlock_t *db)
         dblist_insert(dst, db);
         db->location = dst;
         double energy = get_movement_energy(src, dst, db);
-        char * type = (dst == &getCurrentPD()->db_list) ? "evict" : "acquire";
+        char * type = (dst == &getCurrentPD()->memoryBlocks[0]->db_list) ? "evict" : "acquire";
         printf("%lu DB %s: EDT_NAME (%#lx) -> %#lx (%lu), %f\n", get_time(), type, edt, db->guid, db->size, energy);
     }
     db->last_access = get_time();
