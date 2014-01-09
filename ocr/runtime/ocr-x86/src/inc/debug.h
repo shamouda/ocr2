@@ -11,12 +11,12 @@
 #ifndef __DEBUG_H__
 #define __DEBUG_H__
 
-#include <pthread.h>
-#include <stdio.h>
-#include <assert.h>
+// TODO: Rework this to make it more platform independent
+#include "ocr-hal.h"
+#include "ocr-sal.h"
 
 
-#define PRINTF(format, ...) do { fprintf(stderr, format, ## __VA_ARGS__); } while(0);
+#define PRINTF(format, ...) do { sal_printf(format, ## __VA_ARGS__); } while(0);
 
 
 #ifdef OCR_DEBUG
@@ -239,6 +239,16 @@
 #define DEBUG_LVL_WORKPILE OCR_DEBUG_LVL
 #endif
 
+#ifdef OCR_DEBUG_UTIL
+#define OCR_DEBUG_UTIL 1
+#else
+#define OCR_DEBUG_UTIL 0
+#endif
+#define OCR_DEBUG_UTIL_STR "UTIL"
+#ifndef DEBUG_LVL_UTIL
+#define DEBUG_LVL_UTIL OCR_DEBUG_LVL
+#endif
+
 
 // Imply OCR_STATUS
 #define OCR_STATUS
@@ -252,11 +262,15 @@
 
 
 // TODO: Re-add the worker thing once I figure out a way to not make it segfault
-#define DEBUG(format, ...) do { fprintf(stderr, "%s(%s) W -: " format, __type, __level, /*(u64)getCurrentWorkerContext()->sourceObj,*/ ## __VA_ARGS__); } while(0);
+#define DEBUG(format, ...) do { sal_printf("%s(%s) W 0x%lx: " format,   \
+                                           __type, __level, (u64)0/*pthread_self()*/, \
+                                           /*(u64)getCurrentWorkerContext()->sourceObj,*/ \
+                                           ## __VA_ARGS__); } while(0);
+
 #define DPRINTF_TYPE(type, level, format, ...) do {                                              \
         if(OCR_DEBUG_##type && level <= DEBUG_LVL_##type) {                                      \
-            fprintf(stderr, OCR_DEBUG_##type##_STR "(" OCR_DEBUG_##level##_STR ") W 0: " format, \
-                    /*(u64)getCurrentWorkerContext()->sourceObj, */ ## __VA_ARGS__);             \
+            sal_printf(OCR_DEBUG_##type##_STR "(" OCR_DEBUG_##level##_STR ") W 0x%lx: " format, \
+                       (u64)0/*pthread_self()*/,/*(u64)getCurrentWorkerContext()->sourceObj, */ ## __VA_ARGS__); \
         }                                                                                        \
     } while(0);
 
@@ -284,9 +298,9 @@
 #define STATUS0(format) STATUS("%s" format, "")
 
 #ifdef OCR_ASSERT
-#define ASSERT(a) do { assert(a); } while(0);
-#define RESULT_ASSERT(a, op, b) do { assert((a) op (b)); } while(0);
-#define RESULT_TRUE(a) do { assert(a); } while(0);
+#define ASSERT(a) do { sal_assert((a) == 0); } while(0);
+#define RESULT_ASSERT(a, op, b) do { sal_assert((a) op (b)); } while(0);
+#define RESULT_TRUE(a) do { sal_assert((a) != 0); } while(0);
 #else
 #define ASSERT(a)
 #define RESULT_ASSERT(a, op, b) do { a; } while(0);

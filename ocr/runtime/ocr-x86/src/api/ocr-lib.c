@@ -7,7 +7,6 @@
 #include "debug.h"
 #include "machine-description/ocr-machine.h"
 #include "ocr-lib.h"
-#include "ocr-policy-domain-getter.h"
 #include "ocr-policy-domain.h"
 #include "ocr-types.h"
 
@@ -156,14 +155,6 @@ void ocrInit(ocrConfig_t * ocrConfig) {
 
     bringUpRuntime(iniFile);
 
-    // At this point the runtime is up
-#ifdef OCR_ENABLE_STATISTICS
-    GocrFilterAggregator = NEW_FILTER(filedump);
-    GocrFilterAggregator->create(GocrFilterAggregator, NULL, NULL);
-
-    // HUGE HUGE Hack
-    ocrStatsProcessCreate(&GfakeProcess, 0);
-#endif
 }
 
 void ocrParseArgs(s32 argc, const char* argv[], ocrConfig_t * ocrConfig) {
@@ -200,6 +191,7 @@ void ocrParseArgs(s32 argc, const char* argv[], ocrConfig_t * ocrConfig) {
 }
 
 void ocrFinalize() {
+    /** REC: TODO
     ocrPolicyDomain_t* masterPD = getMasterPD();
     stopAllPD(masterPD);
     masterPD->destruct(masterPD);
@@ -210,9 +202,12 @@ void ocrFinalize() {
 //     ocrStatsProcessDestruct(&GfakeProcess);
 //     GocrFilterAggregator->destruct(GocrFilterAggregator);
 // #endif
+*/
 }
 
 ocrGuid_t ocrWait(ocrGuid_t eventToYieldForGuid) {
+    // TODO: Re-enable this
+    /*
     ocrPolicyCtx_t * ctx = getCurrentWorkerContext();
     ocrPolicyDomain_t * pd = ctx->PD;
 
@@ -222,6 +217,9 @@ ocrGuid_t ocrWait(ocrGuid_t eventToYieldForGuid) {
     ocrGuid_t returnGuid;
     // This call should return only when the event 'eventToYieldForGuid' is satisfied
     pd->waitForEvent(pd, workerGuid, yieldingEdtGuid, eventToYieldForGuid, &returnGuid, ctx);
-
+    
     return returnGuid;
+    */
+    return NULL_GUID;
 }
+

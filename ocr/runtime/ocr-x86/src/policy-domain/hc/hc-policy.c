@@ -1,3 +1,4 @@
+
 /*
  * This file is subject to the license agreement located in the file LICENSE
  * and cannot be distributed without it. This notice cannot be
@@ -5,249 +6,269 @@
  */
 
 
+#include "ocr-config.h"
+#ifdef ENABLE_POLICY_DOMAIN_HC
+
+// TODO: Figure out why I need string.h. Should be removed
 #include <string.h>
 
 #include "debug.h"
-#include "ocr-macros.h"
 #include "ocr-policy-domain.h"
+#include "ocr-sysboot.h"
+
+#ifdef OCR_ENABLE_STATISTICS
+#include "ocr-statistics.h"
+#endif
+
 #include "policy-domain/hc/hc-policy.h"
 
-static void destructOcrPolicyCtxHC ( ocrPolicyCtx_t* self ) {
-    free(self);
-}
+#define DEBUG_TYPE POLICY
 
-static ocrPolicyCtx_t * cloneOcrPolicyCtxHC (ocrPolicyCtx_t * ctxIn) {
-    ocrPolicyCtxHc_t* ctxOut = checkedMalloc (ctxOut, sizeof(ocrPolicyCtxHc_t));
-    memcpy(ctxOut, ctxIn, sizeof(ocrPolicyCtxHc_t));
-    return (ocrPolicyCtx_t*) ctxOut;
-}
-
-static ocrPolicyCtx_t * instantiateOcrPolicyCtxHC ( ocrPolicyCtxFactory_t *factory, ocrParamList_t *perInstance) {
-    ocrPolicyCtxHc_t* derived = checkedMalloc (derived, sizeof(ocrPolicyCtxHc_t));
-    ocrPolicyCtx_t * base = (ocrPolicyCtx_t *) derived;
-    base->clone = cloneOcrPolicyCtxHC;
-    base->destruct = destructOcrPolicyCtxHC;
-    return (ocrPolicyCtx_t*) derived;
-}
-
-
-static void destructOcrPolicyCtxFactoryHC ( ocrPolicyCtxFactory_t* self ) {
-}
-
-ocrPolicyCtxFactory_t* newPolicyCtxFactoryHc ( ocrParamList_t* params ) {
-    ocrPolicyCtxFactoryHc_t* derived = (ocrPolicyCtxFactoryHc_t*) checkedMalloc(derived, sizeof(ocrPolicyCtxFactoryHc_t));
-    ocrPolicyCtxFactory_t * base = (ocrPolicyCtxFactory_t *) derived;
-    base->instantiate = instantiateOcrPolicyCtxHC;
-    base->destruct = destructOcrPolicyCtxFactoryHC;
-    return base;
-}
-
-static void hcPolicyDomainStart(ocrPolicyDomain_t * policy) {
+void hcPolicyDomainStart(ocrPolicyDomain_t * policy) {
     // The PD should have been brought up by now and everything instantiated
     // WARNING: Threads start should be the last thing we do here after
     //          all data-structures have been initialized.
     u64 i = 0;
-    u64 workerCount = policy->workerCount;
-    u64 computeCount = policy->computeCount;
-    u64 schedulerCount = policy->schedulerCount;
-    ASSERT(workerCount == computeCount);
+    u64 maxCount = 0;
 
-    // Start the allocators
-    for(i = 0; i < policy->allocatorCount; ++i) {
-        policy->allocators[i]->fctPtrs->start(policy->allocators[i], policy);
+    // TODO: Add GUIDIFY and put release GUID in stop
+
+    maxCount = policy->guidProviderCount;
+    for(i = 0; i < maxCount; ++i) {
+        policy->guidProviders[i]->fcts.start(policy->guidProviders[i], policy);
+    }
+    
+    maxCount = policy->allocatorCount;
+    for(i = 0; i < maxCount; ++i) {
+        policy->allocators[i]->fcts.start(policy->allocators[i], policy);
+    }
+    
+    maxCount = policy->schedulerCount;
+    for(i = 0; i < maxCount; ++i) {
+        policy->schedulers[i]->fcts.start(policy->schedulers[i], policy);
     }
 
-    // Start schedulers
-    for(i = 0; i < schedulerCount; i++) {
-        policy->schedulers[i]->fctPtrs->start(policy->schedulers[i], policy);
-    }
-
-    //TODO workers could be responsible for starting the underlying target
+        
     // Note: it's important to first logically start all workers.
-    // Once they are all up, start the runtime
-    // Only start (N-1) workers as worker '0' is the current thread.
-    for(i = 1; i < workerCount; i++) {
-        policy->workers[i]->fctPtrs->start(policy->workers[i], policy);
+    // Once they are all up, start the runtime.
+    // It is assumed that the current worker (executing this code) is
+    // worker 0 and it will be started last.
+    // Workers should start the underlying target and platforms
+    maxCount = policy->workerCount;
+    for(i = 1; i < maxCount; i++) {
+        policy->workers[i]->fcts.start(policy->workers[i], policy);
     }
 
     // Need to associate thread and worker here, as current thread fall-through
     // in user code and may need to know which Worker it is associated to.
     // Handle target '0'
-    policy->workers[0]->fctPtrs->start(policy->workers[0], policy);
+    policy->workers[0]->fcts.start(policy->workers[0], policy);
 }
 
 
-static void hcPolicyDomainFinish(ocrPolicyDomain_t * policy) {
-    u64 i;
-    //TODO we should ask the scheduler to finish too
-    // Note: As soon as worker '0' is stopped its thread is
-    // free to fall-through and continue shutting down the policy domain
-    for ( i = 0; i < policy->workerCount; ++i ) {
-        policy->workers[i]->fctPtrs->finish(policy->workers[i]);
+void hcPolicyDomainFinish(ocrPolicyDomain_t * policy) {
+    // Finish everything in reverse order
+    u64 i = 0;
+    u64 maxCount = 0;
+    
+    // Note: As soon as worker '0' is stopped; its thread is
+    // free to fall-through and continue shutting down the
+    // policy domain
+    maxCount = policy->workerCount;
+    for(i = 0; i < maxCount; i++) {
+        policy->workers[i]->fcts.finish(policy->workers[i]);
     }
+    
+    maxCount = policy->schedulerCount;
+    for(i = 0; i < maxCount; ++i) {
+        policy->schedulers[i]->fcts.finish(policy->schedulers[i]);
+    }
+    
+    maxCount = policy->allocatorCount;
+    for(i = 0; i < maxCount; ++i) {
+        policy->allocators[i]->fcts.finish(policy->allocators[i]);
+    }
+
+    maxCount = policy->guidProviderCount;
+    for(i = 0; i < maxCount; ++i) {
+        policy->guidProviders[i]->fcts.finish(policy->guidProviders[i]);
+    }
+    policy->sysProvider->fctPtrs->finish(policy->sysProvider);
 }
 
-static void hcPolicyDomainStop(ocrPolicyDomain_t * policy) {
+void hcPolicyDomainStop(ocrPolicyDomain_t * policy) {
+
+    // Finish everything in reverse order
     // In HC, we MUST call stop on the master worker first.
     // The master worker enters its work routine loop and will
     // be unlocked by ocrShutdown
-
-    policy->workers[0]->fctPtrs->stop(policy->workers[0]);
+    u64 i = 0;
+    u64 maxCount = 0;
+    
+    // Note: As soon as worker '0' is stopped; its thread is
+    // free to fall-through and continue shutting down the
+    // policy domain
+    maxCount = policy->workerCount;
+    for(i = 0; i < maxCount; i++) {
+        policy->workers[i]->fcts.stop(policy->workers[i]);
+    }
     // WARNING: Do not add code here unless you know what you're doing !!
     // If we are here, it means an EDT called ocrShutdown which
     // logically finished workers and can make thread '0' executes this
     // code before joining the other threads.
 
     // Thread '0' joins the other (N-1) threads.
-
-    u64 i;
-    for (i = 1; i < policy->workerCount; i++) {
-        policy->workers[i]->fctPtrs->stop(policy->workers[i]);
+    
+    maxCount = policy->schedulerCount;
+    for(i = 0; i < maxCount; ++i) {
+        policy->schedulers[i]->fcts.stop(policy->schedulers[i]);
+    }
+    
+    maxCount = policy->allocatorCount;
+    for(i = 0; i < maxCount; ++i) {
+        policy->allocators[i]->fcts.stop(policy->allocators[i]);
     }
 
-    // shutdown schedulers
-    for(i = 0; i < policy->schedulerCount; i++) {
-        policy->schedulers[i]->fctPtrs->stop(policy->schedulers[i]);
+    maxCount = policy->guidProviderCount;
+    for(i = 0; i < maxCount; ++i) {
+        policy->guidProviders[i]->fcts.stop(policy->guidProviders[i]);
     }
+    policy->sysProvider->fctPtrs->stop(policy->sysProvider);
 }
 
-static void hcPolicyDomainDestruct(ocrPolicyDomain_t * policy) {
+void hcPolicyDomainDestruct(ocrPolicyDomain_t * policy) {
     // Destroying instances
-    int i = 0;
-    ocrScheduler_t ** schedulers = policy->schedulers;
-    for ( i = 0; i < policy->schedulerCount; ++i ) {
-        schedulers[i]->fctPtrs->destruct(schedulers[i]);
+    u64 i = 0;
+    u64 maxCount = 0;
+    
+    // Note: As soon as worker '0' is stopped; its thread is
+    // free to fall-through and continue shutting down the
+    // policy domain
+    maxCount = policy->workerCount;
+    for(i = 0; i < maxCount; i++) {
+        policy->workers[i]->fcts.destruct(policy->workers[i]);
     }
-    ocrWorker_t ** workers = policy->workers;
-    for ( i = 0; i < policy->workerCount; ++i ) {
-        workers[i]->fctPtrs->destruct(workers[i]);
+    
+    maxCount = policy->schedulerCount;
+    for(i = 0; i < maxCount; ++i) {
+        policy->schedulers[i]->fcts.destruct(policy->schedulers[i]);
     }
-    ocrCompTarget_t ** computes = policy->computes;
-    for ( i = 0; i < policy->computeCount; ++i ) {
-        computes[i]->fctPtrs->destruct(computes[i]);
-    }
-    ocrWorkpile_t ** workpiles = policy->workpiles;
-    for ( i = 0; i < policy->workpileCount; ++i ) {
-        workpiles[i]->fctPtrs->destruct(workpiles[i]);
-    }
-    ocrAllocator_t ** allocators = policy->allocators;
-    for ( i = 0; i < policy->allocatorCount; ++i ) {
-        allocators[i]->fctPtrs->destruct(allocators[i]);
-    }
-    ocrMemTarget_t ** memories = policy->memories;
-    for ( i = 0; i < policy->memoryCount; ++i ) {
-        memories[i]->fctPtrs->destruct(memories[i]);
+    
+    maxCount = policy->allocatorCount;
+    for(i = 0; i < maxCount; ++i) {
+        policy->allocators[i]->fcts.destruct(policy->allocators[i]);
     }
 
+    
     // Simple hc policies don't have neighbors
     ASSERT(policy->neighbors == NULL);
 
-    // Destruct factories after instances as the instances
-    // rely on a structure in the factory (the function pointers)
-    policy->taskFactory->destruct(policy->taskFactory);
-    policy->taskTemplateFactory->destruct(policy->taskTemplateFactory);
-    policy->dbFactory->destruct(policy->dbFactory);
-    policy->eventFactory->destruct(policy->eventFactory);
-    policy->lockFactory->destruct(policy->lockFactory);
-    policy->atomicFactory->destruct(policy->atomicFactory);
+    // Destruct factories
+    maxCount = policy->taskFactoryCount;
+    for(i = 0; i < maxCount; ++i) {
+        policy->taskFactories[i]->destruct(policy->taskFactories[i]);
+    }
+
+    maxCount = policy->taskTemplateFactoryCount;
+    for(i = 0; i < maxCount; ++i) {
+        policy->taskTemplateFactories[i]->destruct(policy->taskTemplateFactories[i]);
+    }
+
+    maxCount = policy->dbFactoryCount;
+    for(i = 0; i < maxCount; ++i) {
+        policy->dbFactories[i]->destruct(policy->dbFactories[i]);
+    }
+
+    maxCount = policy->eventFactoryCount;
+    for(i = 0; i < maxCount; ++i) {
+        policy->eventFactories[i]->destruct(policy->eventFactories[i]);
+    }
 
     //Anticipate those to be null-impl for some time
     ASSERT(policy->costFunction == NULL);
 
-    // Finish with those in case destruct implementation needs
-    // to releaseGuids or access context for some reasons
-    policy->contextFactory->destruct(policy->contextFactory);
-    policy->guidProvider->fctPtrs->destruct(policy->guidProvider);
+    // Destroy these last in case some of the other destructs make use of them
+    maxCount = policy->guidProviderCount;
+    for(i = 0; i < maxCount; ++i) {
+        policy->guidProviders[i]->fcts.destruct(policy->guidProviders[i]);
+    }
+    policy->sysProvider->fctPtrs->destruct(policy->sysProvider);
 
-    free(policy);
+    // Destroy self
+    runtimeChunkFree((u64)policy, NULL);
 }
 
-static u8 hcAllocateDb(ocrPolicyDomain_t *self, ocrGuid_t *guid, void** ptr, u64 size,
-                       u16 properties, ocrGuid_t affinity, ocrInDbAllocator_t allocator,
-                       ocrPolicyCtx_t *context) {
+static u8 hcAllocateDb(ocrPolicyDomain_t *self, ocrFatGuid_t *guid, void** ptr, u64 size,
+                       u32 properties, ocrFatGuid_t affinity, ocrInDbAllocator_t allocator) {
 
     // Currently a very simple model of just going through all allocators
     u64 i;
     void* result;
     for(i=0; i < self->allocatorCount; ++i) {
-        result = self->allocators[i]->fctPtrs->allocate(self->allocators[i],
+        result = self->allocators[i]->fcts.allocate(self->allocators[i],
                                                         size);
         if(result) break;
     }
     // TODO: return error code. Requires our own errno to be clean
     if(i < self->allocatorCount) {
-        ocrDataBlock_t *block = self->dbFactory->instantiate(self->dbFactory,
-                                                             self->allocators[i]->guid, self->guid,
-                                                             size, result, properties, NULL);
+        ocrDataBlock_t *block = self->dbFactories[0]->instantiate(
+            self->dbFactories[0], self->allocators[i]->fguid, self->fguid,
+            size, result, properties, NULL);
         *ptr = result;
-        *guid = block->guid;
+        (*guid).guid = block->guid;
+        (*guid).metaDataPtr = block;
         return 0;
     } 
     return 1; // TODO: Return ENOMEM
 }
 
-static u8 hcCreateEdt(ocrPolicyDomain_t *self, ocrGuid_t *guid,
+static u8 hcCreateEdt(ocrPolicyDomain_t *self, ocrFatGuid_t *guid,
                       ocrTaskTemplate_t * edtTemplate, u32 paramc, u64* paramv,
-                      u32 depc, u16 properties, ocrGuid_t affinity,
-                      ocrGuid_t * outputEvent, ocrPolicyCtx_t *context) {
+                      u32 depc, u16 properties, ocrFatGuid_t affinity,
+                      ocrFatGuid_t * outputEvent) {
 
-    ocrTask_t * base = self->taskFactory->instantiate(self->taskFactory, edtTemplate, paramc,
-                                                      paramv, depc, properties, affinity,
-                                                      outputEvent, NULL);
+    ocrTask_t * base = self->taskFactories[0]->instantiate(
+        self->taskFactories[0], edtTemplate, paramc,paramv,
+        depc, properties, affinity, outputEvent, NULL);
     // Check if the edt is ready to be scheduled
     if (base->depc == 0) {
-        base->fctPtrs->schedule(base);
+        // FIXME
+        self->taskFactory->fctPtrs.schedule(base);
     }
-    *guid = base->guid;
+    (*guid).guid = base->guid;
+    (*guid).metaDataPtr = base;
     return 0;
 }
 
-static u8 hcCreateEdtTemplate(ocrPolicyDomain_t *self, ocrGuid_t *guid,
-                              ocrEdt_t func, u32 paramc, u32 depc, ocrPolicyCtx_t *context) {
+static u8 hcCreateEdtTemplate(ocrPolicyDomain_t *self, ocrFatGuid_t *guid,
+                              ocrEdt_t func, u32 paramc, u32 depc, const char* funcName) {
 
 
-    ocrTaskTemplate_t *base = self->taskTemplateFactory->instantiate(self->taskTemplateFactory,
-                                                                     func, paramc, depc, NULL);
-    *guid = base->guid;
+    ocrTaskTemplate_t *base = self->taskTemplateFactories[0]->instantiate(
+        self->taskTemplateFactories[0], func, paramc, depc, funcName, NULL);
+    (*guid).guid = base->guid;
+    (*guid).metaDataPtr = base;
     return 0;
 }
 
-static u8 hcCreateEvent(ocrPolicyDomain_t *self, ocrGuid_t *guid,
-                        ocrEventTypes_t type, bool takesArg, ocrPolicyCtx_t *context) {
+static u8 hcCreateEvent(ocrPolicyDomain_t *self, ocrFatGuid_t *guid,
+                        ocrEventTypes_t type, bool takesArg) {
 
 
-    ocrEvent_t *base = self->eventFactory->instantiate(self->eventFactory,
-                                                              type, takesArg, NULL);
-    *guid = base->guid;
+    ocrEvent_t *base = self->eventFactories[0]->instantiate(
+        self->eventFactories[0], type, takesArg, NULL);
+    (*guid).guid = base->guid;
+    (*guid).metaDataPtr = base;
     return 0;
 }
 
-static u8 hcWaitForEvent(ocrPolicyDomain_t *self, ocrGuid_t workerGuid,
-                       ocrGuid_t yieldingEdtGuid, ocrGuid_t eventToYieldForGuid,
-                       ocrGuid_t * returnGuid, ocrPolicyCtx_t *context) {
-    return self->schedulers[0]->fctPtrs->yield(self->schedulers[0], workerGuid, yieldingEdtGuid, eventToYieldForGuid, returnGuid, context);
-}
 
-static ocrLock_t* hcGetLock(ocrPolicyDomain_t *self, ocrPolicyCtx_t *context) {
-    return self->lockFactory->instantiate(self->lockFactory, NULL);
+#ifdef OCR_ENABLE_STATISTICS
+static ocrStats_t* hcGetStats(ocrPolicyDomain_t *self) {
+    return self->statsObject;
 }
+#endif
 
-static ocrAtomic64_t* hcGetAtomic64(ocrPolicyDomain_t *self, ocrPolicyCtx_t *context) {
-    return self->atomicFactory->instantiate(self->atomicFactory, NULL);
-}
-
-static ocrPolicyCtx_t* hcGetContext(ocrPolicyDomain_t *self) {
-    return self->contextFactory->instantiate(self->contextFactory, NULL);
-}
-
-static void hcInform(ocrPolicyDomain_t *self, ocrGuid_t obj, const ocrPolicyCtx_t *context) {
-    if(context->type == PD_MSG_GUID_REL) {
-        self->guidProvider->fctPtrs->releaseGuid(self->guidProvider, obj);
-        return;
-    }
-    //TODO not yet implemented
-    ASSERT(false);
-}
 
 static u8 hcGetGuid(ocrPolicyDomain_t *self, ocrGuid_t *guid, u64 val, ocrGuidKind type,
                     ocrPolicyCtx_t *ctx) {
@@ -275,57 +296,251 @@ static u8 hcGiveEdt(ocrPolicyDomain_t *self, u32 count, ocrGuid_t *edts, ocrPoli
     return 0;
 }
 
+u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlocking) {
+
+    u8 returnCode = 0;
+    ASSERT((msg->type & PD_MSG_REQUEST) && !(msg->type & PD_MSG_RESPONSE))
+    switch(msg->type & PD_MSG_TYPE_ONLY) {
+    case PD_MSG_MEM_CREATE:
+    {
+#define PD_MSG msg
+#define PD_TYPE PD_MSG_MEM_CREATE
+        ASSERT(PD_MSG_FIELD(dbType) == USER_DBTYPE);
+        returnCode = hcAllocateDb(self, &(PD_MSG_FIELD(guid)),
+                                  &(PD_MSG_FIELD(ptr)), PD_MSG_FIELD(size),
+                                  PD_MSG_FIELD(properties),
+                                  PD_MSG_FIELD(affinity),
+                                  PD_MSG_FIELD(allocator));
+        if(returnCode == 0) {
+            ocrDataBlock_t *db= PD_MSG_FIELD(guid.metaDataPtr);
+            ASSERT(db);
+            // TODO: Check if properties want DB acquired
+            ASSERT(db->funcId == self->dbFactories[0]->factoryId);
+            PD_MSG_FIELD(ptr) = self->dbFactories[0]->fcts.acquire(
+                db, PD_MSG_FIELD(edt), false);
+        } else {
+            // Cannot acquire
+            PD_MSG_FIELD(ptr) = NULL;
+        }
+        msg->type &= (~PD_MSG_REQUEST | PD_MSG_RESPONSE);
+#undef PD_MSG
+#undef PD_TYPE
+        break;
+    }
+    
+    case PD_MSG_MEM_DESTROY:
+    {
+        // Here, we just need to free the data-block. Note that GUID
+        // destruction is a separate message so we don't worry about that
+        // For now, we make sure that we own the allocator and what not
+#define PD_MSG msg
+#define PD_TYPE PD_MSG_MEM_DESTROY
+        ASSERT(PD_MSG_FIELD(allocatingPD.guid) == self->guid);
+        ASSERT(PD_MSG_FIELD(allocator.guid) == self->allocators[0]->fguid.guid);
+        DPRINTF(DEBUG_LVL_VERB, "Freeing DB @ 0x%lx (GUID: 0x%lx)\n",
+                (u64)(PD_MSG_FIELD(ptr)), PD_MSG_FIELD(guid.guid));
+        self->allocators[0]->fctPtrs->free(self->allocators[0], PD_MSG_FIELD(ptr));
+#undef PD_MSG
+#undef PD_TYPE
+        break;
+    }
+
+    case PD_MSG_MEM_ACQUIRE:
+    {
+        // Call the appropriate acquire function
+#define PD_MSG msg
+#define PD_TYPE PD_MSG_MEM_ACQUIRE
+        ocrDataBlock_t *db = (ocrDataBlock_t*)(PD_MSG_FIELD(guid.metaDataPtr));
+        if(db == NULL) {
+            deguidify(self, PD_MSG_FIELD(guid.guid), (u64*)&db, NULL);
+        }
+        ASSERT(db->funcId == self->dbFactories[0]->factoryId);
+        ASSERT(!(msg->type & PD_MSG_REQ_RESPONSE));
+        self->dbFactories[0]->fcts.acquire(db, PD_MSG_FIELD(edt), false);
+        
+#undef PD_MSG
+#undef PD_TYPE
+    }
+    case PD_MSG_WORK_CREATE:
+    {
+#define PD_MSG msg
+#define PD_TYPE PD_MSG_WORK_CREATE
+        if(PD_MSG_FIELD(templateGuid.metaDataPtr) == NULL) {
+            deguidify(self, PD_MSG_FIELD(templateGuid.guid),
+                      (u64*)&(PD_MSG_FIELD(templateGuid.metaDataPtr)), NULL);
+        }
+        ASSERT(PD_MSG_FIELD(workType) == EDT_WORKTYPE);
+        returnCode = hcCreateEdt(self, &(PD_MSG_FIELD(guid)),
+                                 (ocrTaskTemplate_t*)PD_MSG_FIELD(templateGuid.metaDataPtr),
+                                 PD_MSG_FIELD(paramc), PD_MSG_FIELD(paramv), PD_MSG_FIELD(depc),
+                                 PD_MSG_FIELD(properties), PD_MSG_FIELD(affinity),
+                                 &(PD_MSG_FIELD(outputEvent)));
+        msg->type &= (~PD_MSG_REQUEST | PD_MSG_RESPONSE);
+#undef PD_MSG
+#undef PD_TYPE
+        break;
+    }
+    
+    case PD_MSG_WORK_DESTROY:
+        ASSERT(0); // Should not be called for now
+        break;
+        
+    case PD_MSG_EDTTEMP_CREATE:
+    {
+#define PD_MSG msg
+#define PD_TYPE PD_MSG_EDTTEMP_CREATE
+        
+        returnCode = hcCreateEdtTemplate(self, &(PD_MSG_FIELD(guid)),
+                                         PD_MSG_FIELD(funcPtr), PD_MSG_FIELD(paramc),
+                                         PD_MSG_FIELD(depc), PD_MSG_FIELD(funcName));
+                                 
+        msg->type &= (~PD_MSG_REQUEST | PD_MSG_RESPONSE);
+#undef PD_MSG
+#undef PD_TYPE
+        break;
+    }
+    
+    case PD_MSG_EDTTEMP_DESTROY:
+        ASSERT(0); // Should not be called for now
+        break;
+        
+    case PD_MSG_EVT_CREATE:
+        // Event create
+        break;
+        
+    case PD_MSG_EVT_DESTROY:
+        ASSERT(0);
+        break;
+        
+    case PD_MSG_EVT_SATISFY:
+        // TODO
+        break;
+
+    case PD_MSG_GUID_CREATE:
+        // TODO
+        break;
+
+    case PD_MSG_GUID_INFO:
+        // TODO
+        break;
+
+    case PD_MSG_GUID_DESTROY:
+        // TODO
+        break;
+        
+    case PD_MSG_COMM_TAKE:
+        ASSERT(0);
+        break;
+        
+    case PD_MSG_COMM_GIVE:
+        ASSERT(0);
+        break;
+        
+    case PD_MSG_SYS_PRINT:
+#define PD_MSG msg
+#define PD_TYPE PD_MSG_SYS_PRINT
+        
+        self->sysProvider->print(self->sysProvider,
+                                 PD_MSG_FIELD(buffer), PD_MSG_FIELD(length));
+        msg->type &= (~PD_MSG_REQUEST | PD_MSG_RESPONSE);
+        break;
+#undef PD_MSG
+#undef PD_TYPE
+        
+    case PD_MSG_SYS_READ:
+#define PD_MSG msg
+#define PD_TYPE PD_MSG_SYS_READ
+        
+        self->sysProvider->read(self->sysProvider, PD_MSG_FIELD(buffer),
+                                PD_MSG_FIELD(length),
+                                PD_MSG_FIELD(inputId));
+        msg->type &= (~PD_MSG_REQUEST | PD_MSG_RESPONSE);
+        break;
+#undef PD_MSG
+#undef PD_TYPE
+        
+    case PD_MSG_SYS_WRITE:
+#define PD_MSG msg
+#define PD_TYPE PD_MSG_SYS_WRITE
+        
+        self->sysProvider->write(self->sysProvider, PD_MSG_FIELD(buffer),
+                                 PD_MSG_FIELD(length), PD_MSG_FIELD(outputId));
+        msg->type &= (~PD_MSG_REQUEST | PD_MSG_RESPONSE);
+        break;
+#undef PD_MSG
+#undef PD_TYPE
+        
+    case PD_MSG_SYS_SHUTDOWN:
+        self->stop(self);
+        msg->type &= (~PD_MSG_REQUEST | PD_MSG_RESPONSE);
+        break;
+        
+    case PD_MSG_SYS_FINISH:
+        self->finish(self);
+        msg->type &= (~PD_MSG_REQUEST | PD_MSG_RESPONSE);
+        break;
+    default:
+        // Not handled
+        ASSERT(0);
+    }
+
+    // This code is not needed but just shows how things would be handled (probably
+    // done by sub-functions)
+    if(isBlocking && (msg->type & PD_MSG_REQ_RESPONSE)) {
+        ASSERT(msg->type & PD_MSG_RESPONSE); // If we were blocking and needed a response
+                                             // we need to make sure there is one
+    }
+
+    return returnCode;
+}
 
 ocrPolicyDomain_t * newPolicyDomainHc(ocrPolicyDomainFactory_t * policy,
-                                      u64 schedulerCount, u64 workerCount, u64 computeCount,
-                                      u64 workpileCount, u64 allocatorCount, u64 memoryCount,
                                       ocrTaskFactory_t *taskFactory, ocrTaskTemplateFactory_t *taskTemplateFactory,
                                       ocrDataBlockFactory_t *dbFactory, ocrEventFactory_t *eventFactory,
-                                      ocrPolicyCtxFactory_t *contextFactory, ocrGuidProvider_t *guidProvider,
-                                      ocrLockFactory_t* lockFactory, ocrAtomic64Factory_t* atomicFactory,
+                                      ocrGuidProvider_t *guidProvider,
+                                      ocrSys_t *sysProvider,
+#ifdef OCR_ENABLE_STATISTICS
+                                      ocrStats_t *statsObject,
+#endif
                                       ocrCost_t *costFunction, ocrParamList_t *perInstance) {
 
-    ocrPolicyDomainHc_t * derived = (ocrPolicyDomainHc_t *) checkedMalloc(policy, sizeof(ocrPolicyDomainHc_t));
+    ocrPolicyDomainHc_t * derived = (ocrPolicyDomainHc_t *) runtimeChunkAlloc(sizeof(ocrPolicyDomainHc_t), NULL);
     ocrPolicyDomain_t * base = (ocrPolicyDomain_t *) derived;
 
-    base->schedulerCount = schedulerCount;
-    ASSERT(schedulerCount == 1); // Simplest HC PD implementation
-    base->workerCount = workerCount;
-    base->computeCount = computeCount;
-    base->workpileCount = workpileCount;
-    base->allocatorCount = allocatorCount;
-    base->memoryCount = memoryCount;
+    ASSERT(base);
 
-    base->taskFactory = taskFactory;
-    base->taskTemplateFactory = taskTemplateFactory;
-    base->dbFactory = dbFactory;
-    base->eventFactory = eventFactory;
-    base->contextFactory = contextFactory;
-    base->guidProvider = guidProvider;
-    base->lockFactory = lockFactory;
-    base->atomicFactory = atomicFactory;
+    base->schedulerCount = 0;
+    base->allocatorCount = 0;
+    base->workerCount = 0;
+
+    base->taskFactoryCount = 0;
+    base->taskTemplateFactoryCount = 0;
+    base->eventFactoryCount = 0;
+    base->guidProviderCount = 0;
+    
+    base->taskFactories = NULL;
+    base->taskTemplateFactories = NULL;
+    base->dbFactories = NULL;
+    base->eventFactories = NULL;
+    base->guidProviders = NULL;
+    
+    base->sysProvider = sysProvider;
+#ifdef OCR_ENABLE_STATISTICS
+    base->statsObject = statsObject;
+#endif
     base->costFunction = costFunction;
 
     base->destruct = hcPolicyDomainDestruct;
     base->start = hcPolicyDomainStart;
     base->stop = hcPolicyDomainStop;
     base->finish = hcPolicyDomainFinish;
-    base->allocateDb = hcAllocateDb;
-    base->createEdt = hcCreateEdt;
-    base->createEdtTemplate = hcCreateEdtTemplate;
-    base->createEvent = hcCreateEvent;
-    base->inform = hcInform;
-    base->getGuid = hcGetGuid;
-    base->getInfoForGuid = hcGetInfoForGuid;
-    base->waitForEvent = hcWaitForEvent;
-    base->takeEdt = hcTakeEdt;
-    base->takeDb = NULL;
-    base->giveEdt = hcGiveEdt;
-    base->giveDb = NULL;
-    base->processResponse = NULL;
-    base->getLock = hcGetLock;
-    base->getAtomic64 = hcGetAtomic64;
-    base->getContext = hcGetContext;
+    base->processMessage = hcPolicyDomainProcessMessage;
+    base->sendMessage = hcPolicyDomainSendMessage;
+    base->receiveMessage = hcPolicyDomainReceiveMessage;
+    base->getSys = hcPolicyDomainGetSys;
+#ifdef OCR_ENABLE_STATISTICS
+    base->getStats = hcGetStats;
+#endif
 
     // no inter-policy domain for simple HC
     base->neighbors = NULL;
@@ -333,25 +548,25 @@ ocrPolicyDomain_t * newPolicyDomainHc(ocrPolicyDomainFactory_t * policy,
 
     //TODO populated by ini file factories. Need setters or something ?
     base->schedulers = NULL;
-    base->workers = NULL;
-    base->computes = NULL;
-    base->workpiles = NULL;
     base->allocators = NULL;
-    base->memories = NULL;
-
+    
     base->guid = UNINITIALIZED_GUID;
-    guidify(base, (u64)base, &(base->guid), OCR_GUID_POLICY);
     return base;
 }
 
 static void destructPolicyDomainFactoryHc(ocrPolicyDomainFactory_t * factory) {
-    free(factory);
+    runtimeChunkFree((u64)factory, NULL);
 }
 
 ocrPolicyDomainFactory_t * newPolicyDomainFactoryHc(ocrParamList_t *perType) {
-    ocrPolicyDomainFactoryHc_t* derived = (ocrPolicyDomainFactoryHc_t*) checkedMalloc(derived, sizeof(ocrPolicyDomainFactoryHc_t));
+    ocrPolicyDomainFactoryHc_t* derived = (ocrPolicyDomainFactoryHc_t*) runtimeChunkAlloc(sizeof(ocrPolicyDomainFactoryHc_t), NULL);
     ocrPolicyDomainFactory_t* base = (ocrPolicyDomainFactory_t*) derived;
+    
+    ASSERT(base); // Check allocation
+    
     base->instantiate = newPolicyDomainHc;
     base->destruct =  destructPolicyDomainFactoryHc;
     return base;
 }
+
+#endif /* ENABLE_POLICY_DOMAIN_HC */

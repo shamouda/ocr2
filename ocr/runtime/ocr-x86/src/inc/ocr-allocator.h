@@ -12,11 +12,16 @@
 #ifndef __OCR_ALLOCATOR_H__
 #define __OCR_ALLOCATOR_H__
 
-#include "ocr-mappable.h"
 #include "ocr-mem-target.h"
 #include "ocr-types.h"
-#include "ocr-utils.h"
+#include "utils/ocr-utils.h"
 
+#ifdef OCR_ENABLE_STATISTICS
+#include "ocr-statistics.h"
+#endif
+
+
+struct _ocrPolicyDomain_t;
 
 /****************************************************/
 /* PARAMETER LISTS                                  */
@@ -67,6 +72,8 @@ typedef struct _ocrAllocatorFcts_t {
 
     void (*stop)(struct _ocrAllocator_t* self);
 
+    void (*finish)(struct _ocrAllocator_t* self);
+
     /**
      * @brief Actual allocation
      *
@@ -116,14 +123,17 @@ struct _ocrMemTarget_t;
  * modeling of scratchpads and makes NUMA memory explicit
  */
 typedef struct _ocrAllocator_t {
-    ocrMappable_t module;     /**< Base "class" for the allocator */
-    ocrGuid_t guid;           /**< The allocator also has a GUID so that
+    ocrFatGuid_t fguid;       /**< The allocator also has a GUID so that
                                * data-blocks can know what allocated/freed them */
+    struct _ocrPolicyDomain_t *pd; /**< The PD this allocator belongs to */
+#ifdef OCR_ENABLE_STATISTICS
+    ocrStatsProcess_t *statProcess;
+#endif
 
     struct _ocrMemTarget_t **memories; /**< Allocators are mapped to ocrMemTarget_t (0+) */
     u64 memoryCount;          /**< Number of memories associated */
 
-    ocrAllocatorFcts_t *fctPtrs;
+    ocrAllocatorFcts_t fcts;
 } ocrAllocator_t;
 
 

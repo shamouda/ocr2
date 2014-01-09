@@ -4,8 +4,6 @@
  * removed or modified.
  */
 
-#include "ocr-macros.h"
-#include "ocr-policy-domain-getter.h"
 #include "ocr-policy-domain.h"
 #include "ocr-workpile.h"
 
@@ -34,8 +32,7 @@ static void ceMessageWorkpilePush (ocrWorkpile_t * base, ocrGuid_t g ) {
 ocrWorkpile_t * newWorkpileFsimMessage(ocrWorkpileFactory_t * factory, ocrParamList_t *perInstance) {
     ocrWorkpileFsimMessage_t* derived = (ocrWorkpileFsimMessage_t*) malloc(sizeof(ocrWorkpileFsimMessage_t));
     ocrWorkpile_t * base = (ocrWorkpile_t *) derived;
-    ocrMappable_t * module_base = (ocrMappable_t *) base;
-    module_base->mapFct = NULL;
+        
     base->fctPtrs = &(factory->workpileFcts);
     derived->deque = (semiConcDeque_t *) malloc(sizeof(semiConcDeque_t));
     semiConcDequeInit(derived->deque, (void *) NULL_GUID);

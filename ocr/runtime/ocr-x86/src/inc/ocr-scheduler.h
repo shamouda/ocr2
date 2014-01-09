@@ -8,10 +8,11 @@
 #ifndef __OCR_SCHEDULER_H__
 #define __OCR_SCHEDULER_H__
 
-#include "ocr-mappable.h"
 #include "ocr-types.h"
-#include "ocr-utils.h"
+#include "utils/ocr-utils.h"
 
+
+struct _ocrPolicyDomain_t;
 
 /****************************************************/
 /* PARAMETER LISTS                                  */
@@ -41,23 +42,52 @@ typedef struct _ocrSchedulerFcts_t {
 
     void (*stop)(struct _ocrScheduler_t *self);
 
-    u8 (*yield)(struct _ocrScheduler_t *self, ocrGuid_t workerGuid,
-                       ocrGuid_t yieldingEdtGuid, ocrGuid_t eventToYieldForGuid,
-                       ocrGuid_t * returnGuid, struct _ocrPolicyCtx_t *context);
+    void (*finish)(struct _ocrScheduler_t *self);
+
+    // TODO: Check these calls
+    // u8 (*yield)(struct _ocrScheduler_t *self, ocrGuid_t workerGuid,
+    //                    ocrGuid_t yieldingEdtGuid, ocrGuid_t eventToYieldForGuid,
+    //                    ocrGuid_t * returnGuid, struct _ocrPolicyCtx_t *context);
+    
     /**
      * @brief Requests EDTs from this scheduler
-     * @see ocrPolicyDomain_t
+     *
+     * This call requests EDTs from the scheduler. The EDTs are returned in the
+     * EDTs array.
+     *
+     * @param self[in]          Pointer to this scheduler
+     * @param count[in/out]     As input contains either:
+     *                            - the maximum number of EDTs requested if edts[0] is NULL_GUID
+     *                            - the number of EDTs in edts (requested GUIDs). This
+     *                              is also the maximum number of EDTs to be returned
+     *                          As output, contains the number of EDTs returned
+     * @param edts[in/out]      As input contains the GUIDs of the EDTs requested or NULL_GUID.
+     *                          As output, contains the EDTs given by the scheduler to the
+     *                          caller. Note that the array needs to be allocated by
+     *                          the caller and of sufficient size
+     * @return 0 on success and a non-zero value on failure
      */
-    u8 (*takeEdt)(struct _ocrScheduler_t *self, struct _ocrCost_t *cost, u32 *count,
-                  ocrGuid_t *edts, struct _ocrPolicyCtx_t *context);
+    u8 (*takeEdt)(struct _ocrScheduler_t *self, u32 *count, ocrFatGuid_t *edts);
 
-    u8 (*giveEdt)(struct _ocrScheduler_t *self, u32 count,
-                  ocrGuid_t *edts, struct _ocrPolicyCtx_t *context);
+    /**
+     * @brief Gives EDTs to this scheduler
+     *
+     * This call requests that the scheduler now handles the EDTs passed to it. The
+     * scheduler may refuse some of the EDTs passed to it
+     *
+     * @param self[in]          Pointer to this scheduler
+     * @param count[in/out]     As input, contains the number of EDTs passed to the scheduler
+     *                          As output, contains the number of EDTs still left in the array
+     * @param edts[in/out]      As input, contains the EDTs passed to the scheduler. As output,
+     *                          contains the EDTs that have not been accepted by the
+     *                          scheduler
+     * @return 0 on success and a non-zero value on failure
+     */
+    u8 (*giveEdt)(struct _ocrScheduler_t *self, u32 *count, ocrFatGuid_t *edts);
 
     // TODO: We will need to add the DB functions here
 } ocrSchedulerFcts_t;
 
-struct _ocrWorker_t;
 struct _ocrWorkpile_t;
 
 /*! \brief Represents OCR schedulers.
@@ -65,15 +95,13 @@ struct _ocrWorkpile_t;
  *  Currently, we allow scheduler interface to have work taken from them or given to them
  */
 typedef struct _ocrScheduler_t {
-    ocrMappable_t module;
-    ocrGuid_t guid;
-
-    struct _ocrWorker_t **workers;
+    ocrFatGuid_t fguid;
+    struct _ocrPolicyDomain_t *pd;
+    
     struct _ocrWorkpile_t **workpiles;
-    u64 workerCount;
     u64 workpileCount;
 
-    ocrSchedulerFcts_t *fctPtrs;
+    ocrSchedulerFcts_t fcts;
 } ocrScheduler_t;
 
 
@@ -82,7 +110,6 @@ typedef struct _ocrScheduler_t {
 /****************************************************/
 
 typedef struct _ocrSchedulerFactory_t {
-    ocrMappable_t module;
     ocrScheduler_t* (*instantiate) (struct _ocrSchedulerFactory_t * factory,
                                     ocrParamList_t *perInstance);
 

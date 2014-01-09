@@ -14,7 +14,6 @@
 #include <string.h>
 
 #include "debug.h"
-#include "ocr-macros.h"
 #include "ocr-policy-domain.h"
 #include "policy-domain/fsim/fsim-policy.h"
 
@@ -274,11 +273,12 @@ static u8 fsimCreateEdt(ocrPolicyDomain_t *self, ocrGuid_t *guid,
 }
 
 static u8 fsimCreateEdtTemplate(ocrPolicyDomain_t *self, ocrGuid_t *guid,
-                              ocrEdt_t func, u32 paramc, u32 depc, ocrPolicyCtx_t *context) {
+                                ocrEdt_t func, u32 paramc, u32 depc, const char* funcName,
+                                ocrPolicyCtx_t *context) {
 
 
     ocrTaskTemplate_t *base = self->taskTemplateFactory->instantiate(self->taskTemplateFactory,
-                                                                     func, paramc, depc, NULL);
+                                                                     func, paramc, depc, funcName, NULL);
     *guid = base->guid;
     return 0;
 }
@@ -366,6 +366,10 @@ ocrPolicyDomain_t * newPolicyDomainXE(ocrPolicyDomainFactory_t * policy,
                                       ocrDataBlockFactory_t *dbFactory, ocrEventFactory_t *eventFactory,
                                       ocrPolicyCtxFactory_t *contextFactory, ocrGuidProvider_t *guidProvider,
                                       ocrLockFactory_t* lockFactory, ocrAtomic64Factory_t* atomicFactory,
+                                      ocrQueueFactory_t *queueFactory,
+#ifdef OCR_ENABLE_STATISTICS
+                                      ocrStats_t *statsObject,
+#endif
                                       ocrCost_t *costFunction, ocrParamList_t *perInstance) {
 
     ocrPolicyDomainXE_t * derived = (ocrPolicyDomainXE_t *) checkedMalloc(policy, sizeof(ocrPolicyDomainXE_t));
@@ -433,6 +437,10 @@ ocrPolicyDomain_t * newPolicyDomainCE(ocrPolicyDomainFactory_t * policy,
                                       ocrDataBlockFactory_t *dbFactory, ocrEventFactory_t *eventFactory,
                                       ocrPolicyCtxFactory_t *contextFactory, ocrGuidProvider_t *guidProvider,
                                       ocrLockFactory_t* lockFactory, ocrAtomic64Factory_t* atomicFactory,
+                                      ocrQueueFactory_t *queueFactory,
+#ifdef OCR_ENABLE_STATISTICS
+                                      ocrStats_t *statsObject,
+#endif
                                       ocrCost_t *costFunction, ocrParamList_t *perInstance) {
 
     ocrPolicyDomainCE_t * derived = (ocrPolicyDomainCE_t *) checkedMalloc(policy, sizeof(ocrPolicyDomainCE_t));
@@ -494,13 +502,17 @@ ocrPolicyDomain_t * newPolicyDomainCE(ocrPolicyDomainFactory_t * policy,
 }
 
 ocrPolicyDomain_t * newPolicyDomainMasteredCE(ocrPolicyDomainFactory_t * policy,
-                                      u64 schedulerCount, u64 workerCount, u64 computeCount,
-                                      u64 workpileCount, u64 allocatorCount, u64 memoryCount,
-                                      ocrTaskFactory_t *taskFactory, ocrTaskTemplateFactory_t *taskTemplateFactory,
-                                      ocrDataBlockFactory_t *dbFactory, ocrEventFactory_t *eventFactory,
-                                      ocrPolicyCtxFactory_t *contextFactory, ocrGuidProvider_t *guidProvider,
-                                      ocrLockFactory_t* lockFactory, ocrAtomic64Factory_t* atomicFactory,
-                                      ocrCost_t *costFunction, ocrParamList_t *perInstance) {
+                                              u64 schedulerCount, u64 workerCount, u64 computeCount,
+                                              u64 workpileCount, u64 allocatorCount, u64 memoryCount,
+                                              ocrTaskFactory_t *taskFactory, ocrTaskTemplateFactory_t *taskTemplateFactory,
+                                              ocrDataBlockFactory_t *dbFactory, ocrEventFactory_t *eventFactory,
+                                              ocrPolicyCtxFactory_t *contextFactory, ocrGuidProvider_t *guidProvider,
+                                              ocrLockFactory_t* lockFactory, ocrAtomic64Factory_t* atomicFactory,
+                                              ocrQueueFactory_t* queueFactory,
+#ifdef OCR_ENABLE_STATISTICS
+                                              ocrStats_t* statsObject,
+#endif
+                                              ocrCost_t *costFunction, ocrParamList_t *perInstance) {
 
     ocrPolicyDomainMasteredCE_t * derived = (ocrPolicyDomainMasteredCE_t *) checkedMalloc(policy, sizeof(ocrPolicyDomainMasteredCE_t));
     ocrPolicyDomain_t * base = (ocrPolicyDomain_t *) derived;

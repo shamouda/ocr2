@@ -10,10 +10,12 @@
 
 #include "ocr-types.h"
 
+#define SEALED_LIST ((void *) -1)
+#define END_OF_LIST NULL
+
 typedef struct _regNode_t {
     ocrGuid_t guid;
     u32 slot;
-    struct _regNode_t* next ;
 } regNode_t;
 
 #endif /* HC_H_ */

@@ -8,21 +8,26 @@
  * removed or modified.
  */
 
+#include "ocr-config.h"
+#ifdef ENABLE_ALLOCATOR_TLSF
 
+#include "ocr-hal.h"
 #include "debug.h"
-#include "ocr-macros.h"
-#include "ocr-mappable.h"
-#include "ocr-policy-domain-getter.h"
 #include "ocr-policy-domain.h"
+#include "ocr-runtime-types.h"
+#include "ocr-sysboot.h"
 #include "ocr-types.h"
-#include "ocr-utils.h"
+#include "utils/ocr-utils.h"
 #include "tlsf-allocator.h"
 
-#include <inttypes.h>
-#include <stdlib.h>
-#include <string.h>
-
 #define DEBUG_TYPE ALLOCATOR
+
+#ifndef ENABLE_BUILDER_ONLY
+
+#ifdef OCR_ENABLE_STATISTICS
+#include "ocr-statistics.h"
+#include "ocr-statistics-callbacks.h"
+#endif
 
 /******************************************************/
 /* OCR ALLOCATOR TLSF IMPLEMENTATION                  */
@@ -134,7 +139,6 @@ typedef u32 tlsfSize_t;
 #error "Unknown size for tlsfSize_t"
 #endif
 
-#define MALLOC_COPY(dest,src,nbytes) memcpy(dest, src, nbytes)
 
 // Usually no need of any fences on x86 for this
 #define FENCE_LOAD
@@ -832,13 +836,13 @@ static u32 tlsfInit(u64 pgStart, u64 size) {
         ((poolHeaderSize + ELEMENT_SIZE_BYTES - 1) >> ELEMENT_SIZE_LOG2);
 
     if(poolRealSize < GminBlockRealSize || poolRealSize > GmaxBlockRealSize) {
-        DPRINTF(DEBUG_LVL_WARN, "Space mismatch allocating TLSF pool at 0x%"PRIx64" of sz %d (user sz: %d)\n",
+        DPRINTF(DEBUG_LVL_WARN, "Space mismatch allocating TLSF pool at 0x%lx of sz %d (user sz: %d)\n",
                 pgStart, (u32)poolRealSize, (u32)(poolRealSize << ELEMENT_SIZE_LOG2));
         DPRINTF(DEBUG_LVL_WARN, "Sz must be at least %d and at most %d\n", GminBlockRealSize, GmaxBlockRealSize);
         return -1; // Can't allocate pool
     }
 
-    DPRINTF(DEBUG_LVL_INFO,"Allocating a TLSF pool at 0x%"PRIx64" of sz %d (user sz: %d)\n",
+    DPRINTF(DEBUG_LVL_INFO,"Allocating a TLSF pool at 0x%lx of sz %d (user sz: %d)\n",
             pgStart, (u32)poolRealSize, (u32)(poolRealSize << ELEMENT_SIZE_LOG2));
 
     initializePool(pgStart, poolRealSize);
@@ -865,18 +869,18 @@ static u64 tlsfMalloc(u64 pgStart, u64 size) {
     }
 
     if(allocSize == 0 && size != 0) {
-        DPRINTF(DEBUG_LVL_VERB, "tlsfMalloc @0x%"PRIx64" returning NULL for too large size %"PRIu64"\n",
+        DPRINTF(DEBUG_LVL_VERB, "tlsfMalloc @0x%lx returning NULL for too large size %ld\n",
                 pgStart, size);
         return _NULL;
     }
 
     freeBlock = findFreeBlockForRealSize(pgStart, allocSize, &flIndex, &slIndex);
-    DPRINTF(DEBUG_LVL_VERB, "tslf_malloc @0x%"PRIx64" found a free block at 0x%"PRIx64"\n", pgStart,
+    DPRINTF(DEBUG_LVL_VERB, "tslf_malloc @0x%lx found a free block at 0x%lx\n", pgStart,
             addressForBlock(GET_ADDRESS(freeBlock)));
     /* header_t * */ u64 freeBlockPtr = GET_ADDRESS(freeBlock);
 
     if(IS_NULL(freeBlockPtr)) {
-        DPRINTF(DEBUG_LVL_VERB, "tlsfMalloc @ 0x%"PRIx64" returning NULL for size %"PRIu64"\n",
+        DPRINTF(DEBUG_LVL_VERB, "tlsfMalloc @ 0x%lx returning NULL for size %ld\n",
                 pgStart, size);
         return _NULL;
     }
@@ -886,7 +890,7 @@ static u64 tlsfMalloc(u64 pgStart, u64 size) {
 
     if(returnedSize > allocSize + GminBlockRealSize) {
         remainingBlock = splitBlock(pgStart, freeBlock, allocSize);
-        DPRINTF(DEBUG_LVL_VERB, "tlsfMalloc @0x%"PRIx64" split block and re-added to free list 0x%"PRIx64"\n", pgStart,
+        DPRINTF(DEBUG_LVL_VERB, "tlsfMalloc @0x%lx split block and re-added to free list 0x%lx\n", pgStart,
                 addressForBlock(GET_ADDRESS(remainingBlock)));
         addFreeBlock(pgStart, remainingBlock);
     }
@@ -894,7 +898,7 @@ static u64 tlsfMalloc(u64 pgStart, u64 size) {
     markBlockUsed(pgStart, freeBlockPtr);
 
     result = addressForBlock(freeBlockPtr);
-    DPRINTF(DEBUG_LVL_VERB, "tlsfMalloc @ 0x%"PRIx64" returning 0x%"PRIx64" for size %"PRIu64"\n",
+    DPRINTF(DEBUG_LVL_VERB, "tlsfMalloc @ 0x%lx returning 0x%lx for size %ld\n",
             pgStart, result, size);
     return result;
 }
@@ -902,7 +906,7 @@ static u64 tlsfMalloc(u64 pgStart, u64 size) {
 static void tlsfFree(u64 pgStart, u64 ptr) {
     headerAddr_t bl;
 
-    DPRINTF(DEBUG_LVL_VERB, "tlsfFree @ 0x%"PRIx64" going to free 0x%"PRIx64"\n",
+    DPRINTF(DEBUG_LVL_VERB, "tlsfFree @ 0x%lx going to free 0x%lx\n",
             pgStart, ptr);
 
     bl = blockForAddress(pgStart, ptr);
@@ -949,8 +953,8 @@ static u64 tlsfRealloc(u64 pgStart, u64 ptr, u64 size) {
         result = tlsfMalloc(pgStart, size);
         if(result) {
             u64 sizeToCopy = tempSz<realReqSize?tempSz:realReqSize;
-            MALLOC_COPY((void*)result, (void*)ptr, sizeToCopy << ELEMENT_SIZE_LOG2);
-
+            hal_memCopy(result, ptr, sizeToCopy << ELEMENT_SIZE_LOG2, false);
+            
             tlsfFree(pgStart, ptr); // Free the original block
         }
     } else {
@@ -975,65 +979,102 @@ static u64 tlsfRealloc(u64 pgStart, u64 ptr, u64 size) {
     return result;
 }
 
-static void tlsfDestruct(ocrAllocator_t *self) {
+void tlsfDestruct(ocrAllocator_t *self) {
     ocrAllocatorTlsf_t *rself = (ocrAllocatorTlsf_t*)self;
-    if(self->memoryCount)
-        self->memories[0]->fctPtrs->free(self->memories[0], (void*)rself->addr);
-    rself->lock->fctPtrs->destruct(rself->lock);
-    free(self->memories);
+    if(self->memoryCount) {
+        self->memories[0]->fcts.tag(self->memories[0], rself->addr,
+                                    rself->addr + rself->totalSize,
+                                    USER_FREE_TAG);
+        runtimeChunkFree((u64)self->memories, NULL);
+    }
 
-    ocrPolicyDomain_t *pd = getCurrentPD();
-    ocrPolicyCtx_t *orgCtx = getCurrentWorkerContext();
-    ocrPolicyCtx_t * ctx = orgCtx->clone(orgCtx);
-    ctx->type = PD_MSG_GUID_REL;
-    pd->inform(pd, self->guid, ctx);
-    ctx->destruct(ctx);
-    free(rself);
+    runtimeChunkFree((u64)self, NULL);
 }
 
-static void tlsfStart(ocrAllocator_t *self, ocrPolicyDomain_t * PD ) {
+void tlsfStart(ocrAllocator_t *self, ocrPolicyDomain_t * PD ) {
+    // Get a GUID
+    guidify(PD, (u64)self, &(self->fguid), OCR_GUID_ALLOCATOR);
+    self->pd = PD;
+    
     // Do the allocation
     ocrAllocatorTlsf_t *rself = (ocrAllocatorTlsf_t*)self;
     ASSERT(self->memoryCount == 1);
-    rself->addr = rself->poolAddr = (u64)(rself->base.memories[0]->fctPtrs->allocate(
-                                              rself->base.memories[0], rself->totalSize));
+    
+    RESULT_ASSERT(rself->base.memories[0]->fcts.chunkAndTag(
+                      rself->base.memories[0], &(rself->addr), rself->totalSize,
+                      USER_FREE_TAG, USER_USED_TAG), ==, 0);
     ASSERT(rself->addr);
+    rself->poolAddr = rself->addr;
+#ifdef OCR_ENABLE_STATISTICS
+    statsALLOCATOR_START(PD, self->guid, self, self->memories[0]->guid, self->memories[0]);
+#endif
     RESULT_ASSERT(tlsfInit(rself->addr, rself->totalSize), ==, 0);
 }
 
-static void tlsfStop(ocrAllocator_t *self) { }
+void tlsfStop(ocrAllocator_t *self) {
+    ocrPolicyMsg_t msg;
+    getCurrentEnv(&(self->pd), NULL, NULL, &msg);
+    
+#ifdef OCR_ENABLE_STATISTICS
+    statsALLOCATOR_STOP(self->pd, self->guid, self, self->memories[0]->guid,
+                        self->memories[0]);
+#endif
+    
+#define PD_MSG (&msg)
+#define PD_TYPE PD_MSG_GUID_DESTROY
+    msg.type = PD_MSG_GUID_DESTROY | PD_MSG_REQUEST;
+    PD_MSG_FIELD(guid) = self->fguid;
+    PD_MSG_FIELD(properties) = 0;
+    self->pd->sendMessage(self->pd, &msg, false);
+#undef PD_MSG
+#undef PD_TYPE
+    self->fguid.guid = NULL_GUID;
+}
 
-static void* tlsfAllocate(ocrAllocator_t *self, u64 size) {
+void tlsfFinish(ocrAllocator_t *self) {
+    // Nothing to do
+}
+
+void* tlsfAllocate(ocrAllocator_t *self, u64 size) {
     ocrAllocatorTlsf_t *rself = (ocrAllocatorTlsf_t*)self;
-    rself->lock->fctPtrs->lock(rself->lock);
+    
+    hal_lock32(&(rself->lock));
     void* toReturn = (void*)tlsfMalloc(rself->addr, size);
-    rself->lock->fctPtrs->unlock(rself->lock);
+    hal_unlock32(&(rself->lock));
+    
     return toReturn;
 }
 
-static void tlsfDeallocate(ocrAllocator_t *self, void* address) {
+void tlsfDeallocate(ocrAllocator_t *self, void* address) {
     ocrAllocatorTlsf_t *rself = (ocrAllocatorTlsf_t*)self;
-    rself->lock->fctPtrs->lock(rself->lock);
+    
+    hal_lock32(&(rself->lock));
     tlsfFree(rself->addr, (u64)address);
-    rself->lock->fctPtrs->unlock(rself->lock);
+    hal_unlock32(&(rself->lock));
 }
 
-static void* tlsfReallocate(ocrAllocator_t *self, void* address, u64 size) {
+void* tlsfReallocate(ocrAllocator_t *self, void* address, u64 size) {
     ocrAllocatorTlsf_t *rself = (ocrAllocatorTlsf_t*)self;
-    rself->lock->fctPtrs->lock(rself->lock);
+    
+    hal_lock32(&(rself->lock));
     void* toReturn = (void*)(tlsfRealloc(rself->addr, (u64)address, size));
-    rself->lock->fctPtrs->unlock(rself->lock);
+    hal_unlock32(&(rself->lock));
     return toReturn;
 }
+
+#endif /* ENABLE_BUILDER_ONLY */
 
 // Method to create the TLSF allocator
-static ocrAllocator_t * newAllocatorTlsf(ocrAllocatorFactory_t * factory, ocrParamList_t *perInstance) {
+ocrAllocator_t * newAllocatorTlsf(ocrAllocatorFactory_t * factory, ocrParamList_t *perInstance) {
 
     ocrAllocatorTlsf_t *result = (ocrAllocatorTlsf_t*)
-        checkedMalloc(result, sizeof(ocrAllocatorTlsf_t));
-    result->base.guid = UNINITIALIZED_GUID;
-    guidify(getCurrentPD(), (u64) result, &(result->base.guid), OCR_GUID_ALLOCATOR);
-    result->base.fctPtrs = &(factory->allocFcts);
+        runtimeChunkAlloc(sizeof(ocrAllocatorTlsf_t), NULL);
+    
+    result->base.fguid.guid = UNINITIALIZED_GUID;
+    result->base.fguid.metaDataPtr = result;
+    result->base.pd = NULL;
+    
+    result->base.fcts = factory->allocFcts;
     result->base.memories = NULL;
     result->base.memoryCount = 0;
 
@@ -1042,12 +1083,7 @@ static ocrAllocator_t * newAllocatorTlsf(ocrAllocatorFactory_t * factory, ocrPar
     result->addr = result->poolAddr = 0ULL;
     result->totalSize = result->poolSize = perInstanceReal->size;
 
-    ocrPolicyDomain_t *pd = getCurrentPD();
-    ocrPolicyCtx_t *ctx = getCurrentWorkerContext();
-
-    result->lock = pd->getLock(pd, ctx);
-
-    result->base.module.mapFct = NULL;
+    result->lock = 0;
 
     return (ocrAllocator_t*)result;
 }
@@ -1057,20 +1093,22 @@ static ocrAllocator_t * newAllocatorTlsf(ocrAllocatorFactory_t * factory, ocrPar
 /******************************************************/
 
 static void destructAllocatorFactoryTlsf(ocrAllocatorFactory_t * factory) {
-    free(factory);
+    runtimeChunkFree((u64)factory, NULL);
 }
 
 ocrAllocatorFactory_t * newAllocatorFactoryTlsf(ocrParamList_t *perType) {
     ocrAllocatorFactory_t* base = (ocrAllocatorFactory_t*)
-        checkedMalloc(base, sizeof(ocrAllocatorFactoryTlsf_t));
+        runtimeChunkAlloc(sizeof(ocrAllocatorFactoryTlsf_t), NULL);
+    ASSERT(base);
     base->instantiate = newAllocatorTlsf;
     base->destruct =  &destructAllocatorFactoryTlsf;
-    base->allocFcts.destruct = &tlsfDestruct;
-    base->allocFcts.start = &tlsfStart;
-    base->allocFcts.stop = &tlsfStop;
-    base->allocFcts.allocate = &tlsfAllocate;
-    base->allocFcts.free = &tlsfDeallocate;
-    base->allocFcts.reallocate = &tlsfReallocate;
+    base->allocFcts.destruct = FUNC_ADDR(void (*)(ocrAllocator_t*), tlsfDestruct);
+    base->allocFcts.start = FUNC_ADDR(void (*)(ocrAllocator_t*, ocrPolicyDomain_t*), tlsfStart);
+    base->allocFcts.stop = FUNC_ADDR(void (*)(ocrAllocator_t*), tlsfStop);
+    base->allocFcts.finish = FUNC_ADDR(void (*)(ocrAllocator_t*), tlsfFinish);
+    base->allocFcts.allocate = FUNC_ADDR(void* (*)(ocrAllocator_t*, u64), tlsfAllocate);
+    base->allocFcts.free = FUNC_ADDR(void (*)(ocrAllocator_t*, void*), tlsfDeallocate);
+    base->allocFcts.reallocate = FUNC_ADDR(void* (*)(ocrAllocator_t*, void*, u64), tlsfReallocate);
     return base;
 }
 // Deactivated for now. Need to clean-up
@@ -1208,3 +1246,5 @@ int tlsf_check_heap(u64 pgStart, unsigned int *freeRemaining) {
     return errCount;
 }
 #endif /* OCR_DEBUG */
+
+#endif /* ENABLE_TLSF_ALLOCATOR */

@@ -13,9 +13,9 @@
 #define __OCR_EVENT_H__
 
 #include "ocr-edt.h"
-#include "ocr-mappable.h"
+#include "ocr-runtime-types.h"
 #include "ocr-types.h"
-#include "ocr-utils.h"
+#include "utils/ocr-utils.h"
 
 #ifdef OCR_ENABLE_STATISTICS
 #include "ocr-statistics.h"
@@ -24,20 +24,6 @@
 
 // Define internal finish-latch event id after user-level events
 #define OCR_EVENT_FINISH_LATCH_T OCR_EVENT_T_MAX+1
-
-
-/*******************************************
- * Dependence Registration
- ******************************************/
-
-   /**
-    * @brief Registers dependence between two guids.
-    *
-    * @param signalerGuid          Guid 'signaling'
-    * @param waiterGuid            The guid to be satisfied
-    * @param slot                  The slot to signal the waiterGuid on.
-    */
-void registerDependence(ocrGuid_t signalerGuid, ocrGuid_t waiterGuid, int slot);
 
 
 /****************************************************/
@@ -58,44 +44,79 @@ typedef struct _paramListEventFact_t {
 
 struct _ocrEvent_t;
 
-/*! \brief Abstract class to represent OCR events function pointers
+/**
+ * @brief Abstract class to represent OCR events function pointers
  *
- *  This class provides the interface for the underlying implementation to conform with.
+ * This class provides the interface for the underlying implementation to conform with.
  */
 typedef struct _ocrEventFcts_t {
-    /*! \brief Virtual destructor for the Event interface
-     *  \param[in] self          Pointer to this event
+    /**
+     * @brief Virtual destructor for the Event interface
+     * @param[in] self          Pointer to this event
      */
     void (*destruct)(struct _ocrEvent_t* self);
 
-    /*! \brief Interface to get the GUID of the entity that satisfied an event.
-     *  \param[in] self          Pointer to this event
-     *  \param[in] slot          The slot of the event to get from
-     *  \return GUID of the entity the event has been satisfied with
+    /**
+     * @brief Interface to get the GUID of the entity that satisfied an event.
+     * @param[in] self          Pointer to this event
+     * @return GUID of the entity the event has been satisfied with
      */
-    ocrGuid_t (*get) (struct _ocrEvent_t* self, u32 slot);
+    ocrFatGuid_t (*get)(struct _ocrEvent_t* self);
 
-    /*! \brief Interface to satisfy the event
-     *  \param[in] self          Pointer to this event
-     *  \param[in] db            GUID to satisfy this event with (or NULL_GUID)
-     *  \param[in] slot          Input slot for this event
+    /**
+     * @brief Interface to satisfy the event
+     * @param[in] self         Pointer to this event
+     * @param[in] db           GUID to satisfy this event with (or NULL_GUID)
+     * @param[in] slot         Input slot for this event
+     *
+     * @return 0 on success and a non-zero code on failure
      */
-    void (*satisfy)(struct _ocrEvent_t* self, ocrGuid_t db, u32 slot);
+    u8 (*satisfy)(struct _ocrEvent_t* self, ocrFatGuid_t db, u32 slot);
+
+    /**
+     * @brief Register a "signaler" on the event
+     *
+     * A signaler can either be another event or a data-block. If a data-block,
+     * this call is equivalent to calling satisfy.
+     *
+     * @param[in] self          Pointer to this event
+     * @param[in] signaler      GUID of the source (signaler)
+     * @param[in] slot          Slot on self that will be satisfied by the signaler
+     * @return 0 on success and a non-zero value on failure
+     */
+    u8 (*registerSignaler)(struct _ocrEvent_t *self, ocrFatGuid_t signaler, u32 slot);
+    
+    /**
+     * @brief Register a "waiter" (aka a dependence) on the event
+     *
+     * The waiter will be notified on slot 'slot' once this event is satisfid.
+     * In other words, the satisfy() function serves to notify the "front" of
+     * the event and this call serves to determine what happens at the "back"
+     * of the event once the event is satisfied
+     *
+     * @param[in] self          Pointer to this event
+     * @param[in] waiter        EDT/Event to register as a waiter
+     * @param[in] slot          Slot to satisfy waiter on once this event
+     *                          is satisfied
+     * @return 0 on success and a non-zero code on failure
+     */
+    u8 (*registerWaiter)(struct _ocrEvent_t *self, ocrFatGuid_t waiter, u32 slot);
 } ocrEventFcts_t;
 
-/*! \brief Abstract class to represent OCR events.
+/**
+ * @brief Abstract class to represent OCR events.
  *
- *  Events can be satisfied with a GUID, polled for 
- *  what GUID satisfied the event and registered to
- *  other events or edts.
+ * Events can be satisfied with a GUID, polled for 
+ * what GUID satisfied the event and registered to
+ * other events or edts.
  */
 typedef struct _ocrEvent_t {
-    ocrGuid_t guid; /**< GUID for this event */
+    ocrGuid_t guid;         /**< GUID for this event */
 #ifdef OCR_ENABLE_STATISTICS
-    ocrStatsProcess_t statProcess;
+    ocrStatsProcess_t *statProcess;
 #endif
     ocrEventTypes_t kind;  /**< The kind of this event instance */
-    ocrEventFcts_t *fctPtrs;  /**< Function pointers for this instance */
+    u32 fctId;             /**< The functions to use to access this event */
 } ocrEvent_t;
 
 
@@ -107,23 +128,23 @@ typedef struct _ocrEvent_t {
  * @brief events factory
  */
 typedef struct _ocrEventFactory_t {
-    /*! \brief Instantiates an Event and returns its corresponding GUID
-     *  \param[in] factory          Pointer to this factory
-     *  \param[in] eventType        Type of event to instantiate
-     *  \param[in] takesArg         Does the event will take an argument
-     *  \param[in] instanceArg      Arguments specific for this instance
-     *  \return a new instance of an event
+    /** @brief Instantiates an Event and returns its corresponding GUID
+     *  @param[in] factory          Pointer to this factory
+     *  @param[in] eventType        Type of event to instantiate
+     *  @param[in] takesArg         Does the event will take an argument
+     *  @param[in] instanceArg      Arguments specific for this instance
+     *  @return a new instance of an event
      */
     ocrEvent_t* (*instantiate)(struct _ocrEventFactory_t* factory, ocrEventTypes_t eventType,
                                bool takesArg, ocrParamList_t *instanceArg);
 
-    /*! \brief Virtual destructor for the factory
-     *  \param[in] factory          Pointer to this factory
+    /** @brief Virtual destructor for the factory
+     *  @param[in] factory          Pointer to this factory
      */
     void (*destruct)(struct _ocrEventFactory_t* factory);
 
-    ocrEventFcts_t singleFcts; /**< Functions for non-latch events */
-    ocrEventFcts_t latchFcts;  /**< Functions for latch events */
+    u32 factoryId;             /**< Factory ID (matches fctId in event */
+    ocrEventFcts_t fcts[OCR_EVENT_T_MAX]; /**< Functions for all the types of events */
 } ocrEventFactory_t;
 
 #endif /* __OCR_EVENT_H_ */

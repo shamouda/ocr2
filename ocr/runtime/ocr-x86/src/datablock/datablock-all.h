@@ -12,8 +12,9 @@
 #define __DATABLOCK_ALL_H__
 
 #include "debug.h"
+#include "ocr-config.h"
 #include "ocr-datablock.h"
-#include "ocr-utils.h"
+#include "utils/ocr-utils.h"
 
 typedef enum _dataBlockType_t {
     dataBlockRegular_id,
@@ -36,12 +37,16 @@ const char * dataBlock_types [] = {
 
 ocrDataBlockFactory_t* newDataBlockFactory(dataBlockType_t type, ocrParamList_t *typeArg) {
     switch(type) {
+#ifdef ENABLE_DATABLOCK_REGULAR
     case dataBlockRegular_id:
-        return newDataBlockFactoryRegular(typeArg);
+        return newDataBlockFactoryRegular(typeArg, (u32)type);
         break;
+#endif
+#ifdef ENABLE_DATABLOCK_PLACED        
     case dataBlockPlaced_id:
-//        return newDataBlockFactoryPlaced(typeArg);
+//        return newDataBlockFactoryPlaced(typeArg, (u32)type);
 //        break;
+#endif
     default:
         ASSERT(0);
     }
