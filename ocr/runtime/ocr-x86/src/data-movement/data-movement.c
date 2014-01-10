@@ -116,6 +116,18 @@ u64 createMemoryBlocks(ocrPolicyDomain_t* policy)
     return totalCount;
 }
 
+static bool is_direct_descendant(ocrMemoryBlock_t* child, ocrMemoryBlock_t* parent)
+{
+    ocrMemoryBlock_t *p = child->parent;
+    while (p)
+    {
+        if (p == parent)
+            return true;
+        p = p->parent;
+    }
+    return false;
+}
+
 double get_movement_energy(ocrDataBlockList_t *src, ocrDataBlockList_t *dst, ocrDataBlock_t *db)
 {
     ocrPolicyDomain_t *pd = getCurrentPD();
@@ -183,7 +195,7 @@ void evictLRU(ocrGuid_t edt, ocrDataBlockList_t *list)
     ocrDataBlock_t *lru = getLRU(list);
     ocrPolicyDomain_t *pd = getCurrentPD();
     printf("%p evicting db %p\n", getCurrentWorker(), lru);
-    moveDB(edt, &pd->memoryBlocks[0]->db_list, lru);
+    moveDB(edt, &list->location->parent->db_list, lru);
 }
 
 void moveDB(ocrGuid_t edt, ocrDataBlockList_t *dst, ocrDataBlock_t *db)
@@ -201,15 +213,15 @@ void moveDB(ocrGuid_t edt, ocrDataBlockList_t *dst, ocrDataBlock_t *db)
         printf("%p: moving db %p from list %p to list %p\n", getCurrentWorker(), db, src, dst);
         src->used_size -= db->size;
         dblist_remove(src, db);
+        dst->used_size += db->size;
+        dblist_insert(dst, db);
+        db->location = dst;
         while (dst->used_size + db->size > dst->total_size)
         {
             evictLRU(edt, dst);
         }
-        dst->used_size += db->size;
-        dblist_insert(dst, db);
-        db->location = dst;
         double energy = get_movement_energy(src, dst, db);
-        char * type = (dst == &getCurrentPD()->memoryBlocks[0]->db_list) ? "evict" : "acquire";
+        char * type = is_direct_descendant(src->location, dst->location) ? "evict" : "acquire";
         printf("%lu DB %s: EDT_NAME (%#lx) -> %#lx (%lu), %f\n", get_time(), type, edt, db->guid, db->size, energy);
     }
     db->last_access = get_time();
