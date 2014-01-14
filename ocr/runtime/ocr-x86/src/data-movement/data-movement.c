@@ -4,6 +4,8 @@
  * removed or modified.
  */
 
+#ifdef OCR_ENABLE_STATISTICS
+
 #include "ocr-policy-domain.h"
 #include "ocr-types.h"
 #include "ocr-worker.h"
@@ -233,3 +235,5 @@ void deleteDB(ocrDataBlock_t *db)
     /*printf("%lu free %p %#lx\n", get_time(), getCurrentWorker(), db->guid);*/
     moveDB(0, NULL, db);
 }
+
+#endif /* OCR_ENABLE_STATISTICS */

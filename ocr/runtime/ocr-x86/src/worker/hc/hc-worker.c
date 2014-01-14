@@ -130,11 +130,13 @@ ocrWorker_t* newWorkerHc (ocrWorkerFactory_t * factory, ocrParamList_t * perInst
     guidify(getCurrentPD(), (u64)base, &(base->guid), OCR_GUID_WORKER);
     base->routine = worker_computation_routine;
     base->fctPtrs = &(factory->workerFcts);
+#ifdef OCR_ENABLE_STATISTICS
     base->memory.parent = NULL; // This will be properly set in policy domain start
     base->memory.db_list.used_size = 0;
     base->memory.db_list.total_size = L1SPAD_SIZE;
     base->memory.db_list.head = NULL;
     base->memory.db_list.location = &base->memory;
+#endif
     return base;
 }
 

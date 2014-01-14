@@ -11,7 +11,6 @@
 #include "ocr-allocator.h"
 #include "ocr-comp-target.h"
 #include "ocr-datablock.h"
-#include "data-movement.h"
 #include "ocr-event.h"
 #include "ocr-guid.h"
 #include "ocr-mappable.h"
@@ -20,6 +19,7 @@
 
 #ifdef OCR_ENABLE_STATISTICS
 #include "ocr-statistics.h"
+#include "data-movement.h"
 #endif
 
 #include "ocr-sync.h"
@@ -173,17 +173,17 @@ typedef struct _ocrPolicyDomain_t {
 
 #ifdef OCR_ENABLE_STATISTICS
     ocrStats_t *statsObject;                    /**< Statistics object */
+
+    /* Information needed for memory block hierarchy*/
+    u32 workersPerBlock, blocksPerUnit, unitsPerChip, chipsPerBoard;
+    u64 memoryBlockCount;                       /**< Number of shared memories */
+    ocrMemoryBlock_t ** memoryBlocks;           /**< All the shared memories */
 #endif
 
     ocrCost_t *costFunction;                    /**< Cost function used to determine
                                                  * what to schedule/steal/take/etc.
                                                  * Currently a placeholder for future
                                                  * objective driven scheduling */
-
-    /* Information needed for memory block hierarchy*/
-    u32 workersPerBlock, blocksPerUnit, unitsPerChip, chipsPerBoard;
-    u64 memoryBlockCount;                       /**< Number of shared memories */
-    ocrMemoryBlock_t ** memoryBlocks;           /**< All the shared memories */
 
     /**
      * @brief Destroys (and frees any associated memory) this

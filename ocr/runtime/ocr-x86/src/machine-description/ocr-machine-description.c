@@ -645,12 +645,14 @@ s32 populate_inst(ocrParamList_t **inst_param, ocrMappable_t **instance, s32 *ty
                 NULL, inst_param[j]);
             if (instance[j])
             {
+#ifdef OCR_ENABLE_STATISTICS
                 ocrPolicyDomain_t* pd = (ocrPolicyDomain_t*)instance[j];
                 pd->workersPerBlock = workersPerBlock;
                 pd->blocksPerUnit = blocksPerUnit;
                 pd->unitsPerChip = unitsPerChip;
                 pd->chipsPerBoard = chipsPerBoard;
                 pd->memoryBlockCount = createMemoryBlocks(pd);
+#endif /* OCR_ENABLE_STATISTICS */
                 DPRINTF(DEBUG_LVL_INFO, "Created policy domain of index %d\n", j);
             }
             setBootPD((ocrPolicyDomain_t *)instance[j]);

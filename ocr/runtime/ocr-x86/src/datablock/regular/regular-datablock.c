@@ -18,11 +18,11 @@
 #include "ocr-sync.h"
 #include "ocr-utils.h"
 #include "ocr-worker.h"
-#include "data-movement.h"
 
 #ifdef OCR_ENABLE_STATISTICS
 #include "ocr-statistics.h"
 #include "ocr-statistics-callbacks.h"
+#include "data-movement.h"
 #endif
 
 #include <errno.h>
@@ -61,8 +61,10 @@ void* regularAcquire(ocrDataBlock_t *self, ocrGuid_t edt, bool isInternal) {
     if(isInternal)
         rself->attributes.internalUsers += 1;
 
+#ifdef OCR_ENABLE_STATISTICS
     ocrDataBlockList_t *dst = &(getCurrentWorker()->memory.db_list);
     moveDB(edt, dst, self);
+#endif /* OCR_ENABLE_STATISTICS */
 
     rself->lock->fctPtrs->unlock(rself->lock);
     // End critical section
@@ -196,7 +198,9 @@ u8 regularFree(ocrDataBlock_t *self, ocrGuid_t edt) {
         // End critical section
     }
 
+#ifdef OCR_ENABLE_STATISTICS
     deleteDB(self);
+#endif /* OCR_ENABLE_STATISTICS */
 
     return 0;
 }
@@ -229,9 +233,10 @@ ocrDataBlock_t* newDataBlockRegular(ocrDataBlockFactory_t *factory, ocrGuid_t al
     result->attributes.freeRequested = 0;
     ocrGuidTrackerInit(&(result->usersTracker));
 
+#ifdef OCR_ENABLE_STATISTICS
     ocrWorker_t *worker = getCurrentWorker();
     storeDB(&worker->memory.db_list, (ocrDataBlock_t*)result);
-#ifdef OCR_ENABLE_STATISTICS
+
     ocrGuid_t edtGuid = getCurrentEDT();
     statsDB_CREATE(pd, edtGuid, NULL, allocator, NULL, result->base.guid, &(result->base));
 #endif /* OCR_ENABLE_STATISTICS */

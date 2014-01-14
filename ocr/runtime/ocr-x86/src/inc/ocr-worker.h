@@ -9,12 +9,12 @@
 #define __OCR_WORKER_H__
 
 #include "ocr-comp-target.h"
-#include "data-movement.h"
 #include "ocr-mappable.h"
 #include "ocr-scheduler.h"
 #include "ocr-types.h"
 
 #ifdef OCR_ENABLE_STATISTICS
+#include "data-movement.h"
 #include "ocr-statistics.h"
 #endif
 
@@ -90,7 +90,9 @@ typedef struct _ocrWorker_t {
     ocrCompTarget_t **computes; /**< Compute node(s) associated with this worker */
     u64 computeCount;          /**< Number of compute node(s) associated */
 
+#ifdef OCR_ENABLE_STATISTICS
     ocrMemoryBlock_t memory;
+#endif
 
     /*! \brief Routine the worker executes
      */

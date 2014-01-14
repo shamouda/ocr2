@@ -4,6 +4,8 @@
  * removed or modified.
  */
 
+#ifdef OCR_ENABLE_STATISTICS
+
 #ifndef __DATA_MOVEMENT_H__
 #define __DATA_MOVEMENT_H__
 
@@ -25,3 +27,5 @@ void moveDB(ocrGuid_t edt, ocrDataBlockList_t *dst, ocrDataBlock_t *db);
 void deleteDB(ocrDataBlock_t *db);
 
 #endif /* DATA_MOVEMENT_H_ */
+
+#endif /* OCR_ENABLE_STATISTICS */

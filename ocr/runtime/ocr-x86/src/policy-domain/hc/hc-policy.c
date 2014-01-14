@@ -60,11 +60,13 @@ static void hcPolicyDomainStart(ocrPolicyDomain_t * policy) {
     ASSERT(workerCount == computeCount);
 
     // Give all the workers' db lists parents
+#ifdef OCR_ENABLE_STATISTICS
     u64 blockOffset = 1 + policy->chipsPerBoard + policy->unitsPerChip;
     for (i = 0; i < workerCount; i++) {
         u32 worker = ((ocrWorkerHc_t*)policy->workers[i])->id;
         policy->workers[i]->memory.parent = policy->memoryBlocks[blockOffset + worker / policy->workersPerBlock];
     }
+#endif
 
     // Start the allocators
     for(i = 0; i < policy->allocatorCount; ++i) {
