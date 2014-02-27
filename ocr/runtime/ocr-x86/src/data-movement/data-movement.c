@@ -95,11 +95,14 @@ u64 createMemoryBlocks(ocrPolicyDomain_t* policy)
     chunks[0]->db_list.total_size = UINT64_MAX;
     chunks[0]->parent = NULL;
     // chips
+    printf("DATAMOVE hierarchy: %d %d %d %d\n", policy->chipsPerBoard, policy->unitsPerChip, policy->blocksPerUnit, policy->workersPerBlock);
+    printf("DATAMOVE INFO: board 0 %p\n", &chunks[0]->db_list);
     int chipOffset = 1;
     for (i = 0; i < chipCount; i++)
     {
         chunks[i + chipOffset]->db_list.total_size = L4SPAD_SIZE;
         chunks[i + chipOffset]->parent = chunks[i / policy->chipsPerBoard];
+        printf("DATAMOVE INFO: chip %d %p\n", i, &chunks[i + chipOffset]->db_list);
     }
     // units
     int unitOffset = chipOffset + chipCount;
@@ -107,12 +110,14 @@ u64 createMemoryBlocks(ocrPolicyDomain_t* policy)
     {
         chunks[i + unitOffset]->db_list.total_size = L3SPAD_SIZE;
         chunks[i + unitOffset]->parent = chunks[chipOffset + i/policy->unitsPerChip];
+        printf("DATAMOVE INFO: unit %d %p\n", i, &chunks[i + unitOffset]->db_list);
     }
     // blocks
     int blockOffset = unitOffset + unitCount;
     for (i = 0; i < blockCount; i++) {
         chunks[i + blockOffset]->db_list.total_size = L2SPAD_SIZE;
         chunks[i + blockOffset]->parent = chunks[unitOffset + i/policy->blocksPerUnit];
+        printf("DATAMOVE INFO: block %d %p\n", i, &chunks[i + blockOffset]->db_list);
     }
 
     return totalCount;
@@ -213,6 +218,11 @@ void moveDB(ocrGuid_t edt, ocrDataBlockList_t *dst, ocrDataBlock_t *db)
     {
         ocrDataBlockList_t *src = db->location;
         printf("%p: moving db %p from list %p to list %p\n", getCurrentWorker(), db, src, dst);
+        ocrTask_t* task;
+        ocrTaskTemplate_t* template;
+        deguidify(getCurrentPD(), edt, (u64*)&task, NULL);
+        deguidify(getCurrentPD(), task->templateGuid, (u64*)&template, NULL);
+        printf("DATAMOVE: %s %lu bytes %p -> %p\n", template->name, db->size, src, dst);
         src->used_size -= db->size;
         dblist_remove(src, db);
         dst->used_size += db->size;

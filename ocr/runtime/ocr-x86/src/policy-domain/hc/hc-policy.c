@@ -66,6 +66,11 @@ static void hcPolicyDomainStart(ocrPolicyDomain_t * policy) {
         u32 worker = ((ocrWorkerHc_t*)policy->workers[i])->id;
         policy->workers[i]->memory.parent = policy->memoryBlocks[blockOffset + worker / policy->workersPerBlock];
     }
+
+for (i = 0; i < workerCount; i++) {
+    printf("DATAMOVE INFO: worker %d %p\n", i, &policy->workers[i]->memory.db_list);
+}
+
 #endif
 
     // Start the allocators
