@@ -1,0 +1,11 @@
+@CHARSET "UTF-8";
+.tip {
+	background-color: white;
+	border: 1px solid;
+	padding: 5px;
+}
+
+#chart-container {
+	background-color: #F2F2F2;
+	height: 500px;
+}
