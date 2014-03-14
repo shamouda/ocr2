@@ -1,0 +1,129 @@
+This document outlines the changes made to accomodate tracking of data movements
+
+New Types
+---------
+* ocrDataBlockList_t / ocrDataBlockNode_t (ocr-datablock.h)
+These two types represent a singly-linked list of ocrDataBlock_t instances. An
+ocrDataBlockList_t contains a total and used size, as well as a location pointer
+to indicate which scratchpad it represents. In addition, ocrDataBlock_t has a
+location pointer of this type added. The values to be used for the total size
+are defined in data-movement.h.
+
+* ocrMemoryBlock_t (data-movement.h)
+This type represents a scratchpad. It contains an ocrDataBlockList_t for all
+data tracking and a parent pointer. This is used to represent the hierarchy of
+scratchpads on the board. It is not strictly necessary that this be a separate
+type from ocrDataBlockList_t, although that is the current implementation.
+Modifications to existing types
+
+* ocrDataBlock_t (ocr-datablock.h)
+Two fields have been added to this type: location and last_access. Location is a
+pointer to an ocrDataBlockList_t, and last_access is a u64 set by
+clock_gettime(). The last access time is used in determining which data block
+should be evicted from a scratchpad
+
+* ocrWorker_t (ocr-worker.h), ocrPolicyDomain_t (ocr-policy-domain.h)
+Both of these types have had scratchpads added to them. A worker has a single
+ocrMemoryBlock_t, while the policy domain has a full list of them, representing
+scratchpads at the block, unit, chip, and board level. In addition, the policy
+domain has values for the number of workers per block, blocks per unit, units
+per chip, and chips per board. The values for these are read from the
+PolicydomainInstX sections of the machine config file.
+
+Movement-tracking functions
+---------------------------
+Four functions have been created to manage the movement of data blocks.
+
+* evictLRU
+  This function is used to evict the least recently used data block, as
+  determined by ocrDataBlock_t::last_access, up one level in the scratchpad
+  hierarchy. When a data block is acquired, created, or moved, and there is
+  insufficient space for the data block on the target scratchpad, this function
+  will be called.
+
+* storeDB
+  This function adds a data block to a specified list, evicting other data
+  blocks from the list if necessary. If the target scratchpad is not large
+  enough for the data block, OCR will exit with an error. It is called whenever
+  a new regular data block is initialized in newDataBlockRegular
+  (src/datablock/regular/regular-datablock.c, line 238).
+
+* moveDB
+  This removes a data block from its current scratchpad list and adds it to a
+  target. If necessary, it will evict the least recently used data block(s) from
+  the destination scratchpad first. Since evictLRU uses moveDB to perform the
+  actual eviction, this can have a cascading effect. In addition to evictLRU
+  calls, this function is also called when a data block is acquired in
+  regularAcquire (src/datablock/regular/regular-datablock.c, line 66)
+
+* deleteDB
+  This function simply removes a data block from a scratchpad list. It is called
+  when a data block is released in regularFree
+ (src/datablock/regular/regular-datablock.c, line 202)
+
+Other additions
+---------------
+An additional helper function, getCurrentWorker(), now exists in ocr-worker.c.
+It is used to set the destination scratchpad for a call to moveDB during an
+acquire, as well as to display debug information in the storeDB, moveDB, and
+evictLRU functions.
+
+Outline
+-------
+During the initialization of the policy domain and workers, the scratchpads are
+created with memory sizes as defined in src/inc/data-movement.h. When the policy
+domain is started, but before the program begins, the locations of all
+scratchpads are echoed to stdout. This is to facilitate mapping each individual
+data movement when parsing the output. A pthread mutex is also created to
+prevent race conditions among data movement functions.
+
+Once the program starts, each time a data block is initialized, the storeDB
+function is called. This first checks to see if the destination scratchpad has
+room for the new data block. If the scratchpad is not large enough, OCR exits.
+Otherwise, it locks the mutex and proceeds to evict the least recently used data
+blocks and place the new data block on the scratchpad as described above. Each
+eviction is logged as data movement to stdout, but the location assignment of
+the new db is not.
+
+Whenever a data block is acquired by an EDT, the moveDB function is called. This
+locks the mutex and evicts data blocks as necessary before moving the data block
+as described above. The movement is logged to stdout before the eviction process
+begins.
+
+Each time a data block is freed, deleteDB is called. This locks the mutex and
+removes the db from its list. No information is logged, but this action is
+necessary to make eviction decisions accurate.
+
+Issues and To-Dos
+-----------------
+All data movement information is currently logged to stdout as a temporary
+measure. Ideally, the statistics framework would be used instead, placing the
+logged information in ocrStats.log with a timestamp. Instead, a data movement
+log is currently achieved by piping the output into grep DATAMOVE >datamove.log.
+The statistics framework cannot currently accommodate the data movement, as
+there is no handler that uses the new ocrMemoryBlock_t scratchpad.
+
+In the current system, one mutex is used for all data transfers. This is an
+intended temporary measure, as it inhibits performance by preventing multiple
+unrelated data block movements to be performed simultaneously.
+
+The ocrDataBlockList_t and ocrMemoryBlock_t types can easily be combined to
+reduce complexity. Also, while the definitions are mostly consolidated, the
+placement of the instances is currently unnecessarily scattered. Having a single
+data movement struct that contains all the scratchpads and the hierarchical
+structure could simplify the modifications to existing code.
+
+Sample Output
+-------------
+A run of the cholesky example produces the output found in example.log.
+
+The first ten lines are output as the scratch pads are initialized. The first
+line is the values of chipsperboard, unitsperchip, blocksperunit, and
+workersperblock, as defined in the configuration file. The following nine lines
+specify the address of each scratch pad’s data block list. Each individual
+movement of a data block will use these addresses.
+
+Each following line represents a single acquire or evict of a data block. It
+includes, in order, the EDT causing the movement, the size of the data block,
+the address of the source scratch pad, and the address of the destination
+scratch pad.
