@@ -1,9 +1,9 @@
 #!/usr/bin/python
 
-def createHeirarchy(filename):
+def createHierarchy(filename):
     with open(filename) as file:
         line = file.readline()
-        if not (line.startswith("DATAMOVE") and line.find('heirarchy')>=0):
+        if not (line.startswith("DATAMOVE") and line.find('hierarchy')>=0):
             return None
         counts = []
         for token in line.split():
@@ -53,24 +53,24 @@ def createHeirarchy(filename):
         
     return board
 
-def makeIndex(heirarchy):
-    assert heirarchy.__class__ == dict
+def makeIndex(hierarchy):
+    assert hierarchy.__class__ == dict
     idx = dict()
-    idx[heirarchy['addr']] = None
+    idx[hierarchy['addr']] = None
     def addChildren(component):
         print "COMPONENT IS",component
-        c = heirarchy
+        c = hierarchy
         for i in component:
             c = c['children'][component[i]]
         print c['name']
         idx[c['addr']] = component
         for i,j in enumerate(c['children']):
             addChildren(component+[i])
-    for i,j in enumerate(heirarchy['children']):
+    for i,j in enumerate(hierarchy['children']):
         addChildren([i])
     return idx
 
-heirarchy = createHeirarchy('datamove.log')
-print heirarchy
-heirIdx = makeIndex(heirarchy)
-print heirIdx
+hierarchy = createHierarchy('datamove.log')
+print hierarchy
+hierIdx = makeIndex(hierarchy)
+print hierIdx
