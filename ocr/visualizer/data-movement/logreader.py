@@ -2,6 +2,8 @@
 import sqlite3
 import re
 from compiler.ast import TryExcept
+import sys
+import argparse
 
 MACHINE_TABLE = 'layout'
 TABLE_NAME = 'movement'
@@ -85,4 +87,13 @@ def parse_file(filename, outfile):
     conn.commit()
     c.close()
 
-parse_file('datamove.log', 'testing.db')
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-i', '--infile', help='Input log file (default: datamove.log)', default='datamove.log')
+    parser.add_argument('-o', '--outfile', help='Output database file (default: datamove.db)', default='datamove.db')
+    args = vars(parser.parse_args())
+    
+    parse_file(args['infile'], args['outfile'])
+
+if __name__ == "__main__":
+    sys.exit(main())
