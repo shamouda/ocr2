@@ -1,4 +1,5 @@
-This document outlines the changes made to accomodate tracking of data movements
+This document outlines the changes made to accomodate tracking of data movement.
+Please direct any questions to Glen Haber at ghaber@etinternational.com.
 
 New Types
 ---------
@@ -127,3 +128,29 @@ Each following line represents a single acquire or evict of a data block. It
 includes, in order, the EDT causing the movement, the size of the data block,
 the address of the source scratch pad, and the address of the destination
 scratch pad.
+
+Viewing the Logs
+----------------
+The Python script visualizer/data-movement/logreader.py may be used to convert
+stdout, copied to a file, to a SQLite3 database. If file size is a concern, a
+grep of stdout for "DATAMOVE" will isolate the relevant lines. The script will
+ignore everything else. The script will, by default, look for datamove.log and
+produce datamove.db. These file names may be overridden with -i/--infile and
+-o/--outfile flags, respectively. This will produce a file viewable by the
+visualizer in the folder visualizer/data-movement/www.
+
+Running the visualizer requires a PHP-compatible web server, local or otherwise.
+Adding the www folder to the web server's path, whether through copying or a
+soft link, is the only installation step required. For example, the default
+location for shared files for Apache is /var/www. Copying
+ocr/visualizer/data-movement/www to this directory or providing a soft link
+(i.e. ln -s ocr/visualizer/data-movement/www /var/www/data-movement)
+
+When navigated to in a web browser, the visualizer will have a text box in the
+upper-right to allow specifying a database to read. The red box in the center
+will then be replaced to show a tree of scratchpads that expands to the right.
+Clicking on a scratch pad deeper in the hierarchy will navigate to it, showing
+more levels of scratch pad. The thickness of the lines between two scratch pads
+indicates the amount of data movement that scratch pad sends and receives
+outside its subtree. There is also a dropdown menu in the top left that will
+change the graph to reflect the data movement relating to a specific EDT.
