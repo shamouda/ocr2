@@ -14,7 +14,6 @@
 #include "ocr-task.h"
 #include "ocr-policy-domain.h"
 #include "ocr-types.h"
-//#include "ocr-macros.h"
 #include "ocr-runtime-itf.h"
 #include "ocr-statistics-callbacks.h"
 #include "statistics/stats-llvm-callback.h"
@@ -65,6 +64,66 @@ inline void leave_cs(void) {
         edt->dbList[edt->numDbs].writesize = (u64)0;
         edt->numDbs++;
         // printf("Adding DB %p to EDT %p\n", db, edt->task);
+#ifdef ENABLE_OCR_PROFILING
+        // Now revise our prediction based on newly added DB
+        ocrTask_t *task = edt->task;
+        ocrTaskTemplate_t *taskTemp;
+        ocrPolicyDomain_t *pd;
+        ocrPolicyMsg_t msg;
+        u64 newSize = len + (u64)task->els[27];
+        double ic, fp, rd, wr, pow;
+        int i;
+        struct _profileStruct *profile;
+
+        getCurrentEnv(&pd, NULL, NULL, NULL);
+
+#define PD_MSG (&msg)
+#define PD_TYPE PD_MSG_GUID_INFO
+        msg.type = PD_MSG_GUID_INFO | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
+        PD_MSG_FIELD(guid.guid) = task->templateGuid;
+        PD_MSG_FIELD(guid.metaDataPtr) = NULL;
+        PD_MSG_FIELD(properties) = KIND_GUIDPROP | RMETA_GUIDPROP;
+        RESULT_PROPAGATE2(pd->fcts.processMessage(pd, &msg, false), ERROR_GUID);
+        taskTemp = (ocrTaskTemplate_t *)PD_MSG_FIELD(guid.metaDataPtr);
+#undef PD_MSG
+#undef PD_TYPE
+
+        profile = taskTemp->profileData;
+        if(profile) {
+            ic = 0.0; pow = 1;
+            for(i = 0; i<profile->numIcCoeff; i++) {
+                ic += pow*profile->icCoeff[i];
+                pow *= newSize;
+            }
+            fp = 0.0; pow = 1;
+            for(i = 0; i<profile->numFpCoeff; i++) {
+                fp += pow*profile->fpCoeff[i];
+                pow *= newSize;
+            }
+            rd = 0.0; pow = 1;
+            for(i = 0; i<profile->numRdCoeff; i++) {
+                rd += pow*profile->rdCoeff[i];
+                pow *= newSize;
+            }
+            wr = 0.0; pow = 1;
+            for(i = 0; i<profile->numWrCoeff; i++) {
+                wr += pow*profile->wrCoeff[i];
+                pow *= newSize;
+            }
+            printf("REVISEDPREDICTION: at %#lx %p %s SZ %llu IC %f FP %f RD %f WR %f\n",
+                           _threadInstructionCount,
+                           taskTemp->executePtr, taskTemp->profileData->fname,
+                           (unsigned long long)newSize, ic, fp, rd, wr);
+
+           task->els[27] = (ocrGuid_t)(newSize);
+           /* Save these onto ELS */
+           task->els[28] = (ocrGuid_t)(ic);
+           task->els[29] = (ocrGuid_t)(fp);
+           task->els[30] = (ocrGuid_t)(rd);
+           task->els[31] = (ocrGuid_t)(wr);
+       }
+#endif
+
     }
 
     static edtTable_t* ocrStatsAccessInsertEDT(ocrTask_t *task)
@@ -89,8 +148,9 @@ inline void leave_cs(void) {
 
     void ocrStatsAccessRemoveEDT(ocrTask_t *task)
     {
-        s64 i, j;
+        s64 i, j, FP, IC;
         edtTable_t *removeEDT;
+        u64 size, numreads, reads, numwrites, writes;
 
     if(numEdts==1) return;
 
@@ -111,6 +171,44 @@ inline void leave_cs(void) {
                    removeEDT->dbList[j].writecount, removeEDT->dbList[j].writesize);
             }
 
+#ifdef ENABLE_OCR_PROFILING
+            FP = _threadFPInstructionCount;
+            IC = _threadInstructionCount;
+
+            size = numreads = reads = numwrites = writes = 0;
+            for(j = 0; j<removeEDT->numDbs; j++) {
+                size += (removeEDT->dbList[j].end - removeEDT->dbList[j].start);
+                reads += removeEDT->dbList[j].readsize;
+                numreads += removeEDT->dbList[j].readcount;
+                writes += removeEDT->dbList[j].writesize;
+                numwrites += removeEDT->dbList[j].writecount;
+            }
+            printf("OBSERVED: %p SZ %llu IC %lld FP %lld RD %llu WR %llu\n",
+                   removeEDT->task->funcPtr, (long long unsigned int)size,
+                   (long long signed int)IC, (long long signed int)FP,
+                   (long long unsigned int)reads, (long long unsigned int)writes);
+
+            double ic_err, fp_err, rd_err, wr_err;
+            ic_err = (double)removeEDT->task->els[28];
+            fp_err = (double)removeEDT->task->els[29];
+            rd_err = (double)removeEDT->task->els[30];
+            wr_err = (double)removeEDT->task->els[31];
+
+            ic_err = (1.0*IC - ic_err);
+            fp_err = (1.0*FP - fp_err);
+            rd_err = (1.0*reads - rd_err);
+            wr_err = (1.0*writes - wr_err);
+
+            if(ic_err != 0) ic_err = 100*ic_err/IC;
+            if(fp_err != 0) fp_err = 100*fp_err/FP;
+            if(rd_err != 0) rd_err = 100*rd_err/reads;
+            if(wr_err != 0) wr_err = 100*wr_err/writes;
+
+            printf("MISPREDICTION %p SZ %llu IC %f FP %f RD %f WR %f\n",
+                   removeEDT->task->funcPtr, (long long unsigned int)size,
+                   ic_err, fp_err, rd_err, wr_err);
+#endif
+
             removeEDT->task->els[ELS_EDT_INDEX] = (s64)-1;
             if(removeEDT->dbList) free(removeEDT->dbList);
             free(removeEDT);
@@ -130,7 +228,7 @@ void ocrStatsAccessInsertDB(ocrTask_t *task, ocrDataBlock_t *db) {
 
         if(db && db->dbType == USER_DBTYPE) {
             ASSERT(db->size!=0);
-        
+
             ocrStatsAccessInsertDBTable(edt, db, db?db->ptr:0, db?db->size:0);
         }
     }

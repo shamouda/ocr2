@@ -18,6 +18,7 @@
 
 #ifdef OCR_ENABLE_EDT_PROFILING
 #include "ocr-edt-profiling.h"
+struct _profileStruct;
 #endif
 
 struct _ocrTask_t;

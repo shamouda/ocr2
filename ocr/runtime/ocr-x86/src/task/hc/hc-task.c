@@ -32,6 +32,11 @@ extern void ocrStatsAccessInsertDB(ocrTask_t*, ocrDataBlock_t*);
 extern void ocrStatsAccessRemoveEDT(ocrTask_t *);
 #endif
 
+#ifdef ENABLE_OCR_PROFILING
+#include "ocr-profiling.h"
+extern struct _profileStruct gProfilingTable[] __attribute__((weak));
+#endif
+
 #ifdef OCR_ENABLE_STATISTICS
 #include "ocr-statistics.h"
 #include "ocr-statistics-callbacks.h"
@@ -566,7 +571,7 @@ u8 registerSignalerTaskHc(ocrTask_t * base, ocrFatGuid_t signalerGuid, u32 slot,
             hal_lock32(&(self->lock));
             node->guid = signalerGuid.guid;
             while(++self->frontierSlot < base->depc &&
-                    self->signalers[self->frontierSlot].slot != ++slot) ;
+                  self->signalers[self->frontierSlot].slot != ++slot) ;
 
             // We found a slot that is == to slot (so unsatisfied and not once)
             if(self->frontierSlot < base->depc &&
@@ -773,6 +778,45 @@ u8 taskExecute(ocrTask_t* base) {
     statsEDT_START(pd, ctx->sourceObj, curWorker, base->guid, base, depc != 0);
 
 #endif /* OCR_ENABLE_STATISTICS */
+
+#ifdef ENABLE_OCR_PROFILING
+    {
+      u32 i;
+      u64 totSize = 0;
+      ocrTaskTemplate_t *taskTemplate;
+
+#define PD_MSG (&msg)
+#define PD_TYPE PD_MSG_GUID_INFO
+      msg.type = PD_MSG_GUID_INFO | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
+      PD_MSG_FIELD(guid.guid) = base->templateGuid;
+      PD_MSG_FIELD(guid.metaDataPtr) = NULL;
+      PD_MSG_FIELD(properties) = KIND_GUIDPROP | RMETA_GUIDPROP;
+      RESULT_PROPAGATE2(pd->fcts.processMessage(pd, &msg, false), ERROR_GUID);
+      taskTemplate = (ocrTaskTemplate_t *)PD_MSG_FIELD(guid.metaDataPtr);
+#undef PD_MSG
+#undef PD_TYPE
+
+      if(taskTemplate->profileData) {
+	for(i = 0; i<depc; i++) {
+	  ocrDataBlock_t *db = NULL;
+	  if(depv[i].guid) {
+#define PD_MSG (&msg)
+#define PD_TYPE PD_MSG_GUID_INFO
+              msg.type = PD_MSG_GUID_INFO | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
+              PD_MSG_FIELD(guid.guid) = depv[i].guid;
+              PD_MSG_FIELD(guid.metaDataPtr) = NULL;
+              PD_MSG_FIELD(properties) = KIND_GUIDPROP | RMETA_GUIDPROP;
+              RESULT_PROPAGATE2(pd->fcts.processMessage(pd, &msg, false), ERROR_GUID);
+              db = (ocrDataBlock_t *)PD_MSG_FIELD(guid.metaDataPtr);
+#undef PD_MSG
+#undef PD_TYPE
+          }
+	  if(db && db->size) totSize += db->size;
+	  //else ASSERT(0);
+	}
+      }
+    }
+#endif
 
 #ifdef OCR_ENABLE_STATISTICS_TEST
     _threadInstrumentOn = 1;
