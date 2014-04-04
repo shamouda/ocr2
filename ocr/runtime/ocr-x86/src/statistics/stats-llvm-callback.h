@@ -4,11 +4,13 @@
  * removed or modified.
  */
 
-#ifdef OCR_ENABLE_STATISTICS
-#ifdef OCR_ENABLE_PROFILING_STATISTICS
+#include <ocr-config.h>
+#ifdef OCR_ENABLE_STATISTICS_TEST
+#ifdef OCR_ENABLE_PROFILING_STATISTICS_TEST
 #ifndef __STATS_LLVM_CALLBACK_H__
 #define __STATS_LLVM_CALLBACK_H__
 
+#include <ocr-runtime-types.h>
 #include "debug.h"
 #include "ocr-task.h"
 #include "ocr-types.h"
@@ -17,6 +19,7 @@ typedef struct _dbTable_t {
     ocrDataBlock_t *db;
     u64 start;
     u64 end;
+    u64 readcount, readsize, writecount, writesize;
 } dbTable_t;
 
 typedef struct _edtTable_t {

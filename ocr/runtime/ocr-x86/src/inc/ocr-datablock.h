@@ -120,7 +120,8 @@ typedef struct _ocrDataBlock_t {
     ocrGuid_t allocatingPD; /**< Policy domain of the creating allocator */
     u64 size;               /**< Size of the data-block */
     void* ptr;              /**< Current location for this data-block */
-    u32 properties;         /**< Properties for the data-block */
+    u16 properties;         /**< Properties for the data-block */
+    u16 dbType;
     u32 fctId;              /**< ID determining which functions to use */
 } ocrDataBlock_t;
 

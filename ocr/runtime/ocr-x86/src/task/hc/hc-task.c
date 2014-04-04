@@ -20,6 +20,14 @@
 #include "task/hc/hc-task.h"
 #include "utils/ocr-utils.h"
 
+#ifdef OCR_ENABLE_STATISTICS_TEST
+extern __thread u64 _threadInstructionCount;
+extern __thread u64 _threadFPInstructionCount;
+extern __thread u8 _threadInstrumentOn;
+extern void ocrStatsAccessInsertDB(ocrTask_t*, ocrDataBlock_t*);
+extern void ocrStatsAccessRemoveEDT(ocrTask_t *);
+#endif
+
 #ifdef OCR_ENABLE_STATISTICS
 #include "ocr-statistics.h"
 #include "ocr-statistics-callbacks.h"
@@ -291,6 +299,9 @@ u8 destructTaskHc(ocrTask_t* base) {
         statsEDT_DESTROY(pd, base->guid, base, base->guid, base);
     }
 #endif /* OCR_ENABLE_STATISTICS */
+#ifdef OCR_ENABLE_STATISTICS_TEST
+    ocrStatsAccessRemoveEDT(base);
+#endif
 #define PD_MSG (&msg)
 #define PD_TYPE PD_MSG_GUID_DESTROY
     msg.type = PD_MSG_GUID_DESTROY | PD_MSG_REQUEST;
@@ -420,6 +431,9 @@ ocrTask_t * newTaskHc(ocrTaskFactory_t* factory, ocrFatGuid_t edtTemplate,
         }
     }
 #endif /* OCR_ENABLE_STATISTICS */
+#ifdef OCR_ENABLE_STATISTICS_TEST
+    ocrStatsAccessInsertDB(base, NULL);
+#endif
     DPRINTF(DEBUG_LVL_INFO, "Create 0x%lx depc %d outputEvent 0x%lx\n", base->guid, depc, outputEventPtr?outputEventPtr->guid:NULL_GUID);
 
     // Check to see if the EDT can be run
@@ -684,10 +698,21 @@ u8 taskExecute(ocrTask_t* base) {
 
 #endif /* OCR_ENABLE_STATISTICS */
 
+#ifdef OCR_ENABLE_STATISTICS_TEST
+    _threadInstrumentOn = 1;
+    _threadInstructionCount = 0ULL;
+    _threadFPInstructionCount = 0ULL;
+#endif
+
     ocrGuid_t retGuid = NULL_GUID;
     if(depc == 0 || (maxAcquiredDb == depc)) {
         retGuid = base->funcPtr(paramc, paramv, depc, depv);
     }
+
+#ifdef OCR_ENABLE_STATISTICS_TEST
+    _threadInstrumentOn = 0;
+#endif
+
 #ifdef OCR_ENABLE_STATISTICS
     // We now say that the worker is done executing the EDT
     statsEDT_END(pd, ctx->sourceObj, curWorker, base->guid, base);

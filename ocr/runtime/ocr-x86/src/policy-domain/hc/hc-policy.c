@@ -515,6 +515,7 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             PD_MSG_FIELD(ptr) = self->dbFactories[0]->fcts.acquire(
                                     db, PD_MSG_FIELD(edt), false);
             PD_MSG_FIELD(properties) = 0;
+            db->dbType = PD_MSG_FIELD(dbType);
         } else {
             // Cannot acquire
             PD_MSG_FIELD(ptr) = NULL;
