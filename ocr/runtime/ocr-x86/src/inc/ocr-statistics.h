@@ -15,10 +15,10 @@
 #define __OCR_STATISTICS_H__
 
 #include "ocr-guid-kind.h"
-#include "ocr-mappable.h"
-#include "ocr-sync.h"
+//#include "ocr-mappable.h"
+//#include "ocr-sync.h"
 #include "ocr-types.h"
-#include "ocr-utils.h"
+//#include "ocr-utils.h"
 
 
 #ifdef OCR_ENABLE_PROFILING_STATISTICS

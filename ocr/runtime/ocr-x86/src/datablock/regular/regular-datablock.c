@@ -26,6 +26,9 @@
 #include "ocr-statistics-callbacks.h"
 #endif
 
+#ifdef OCR_ENABLE_STATISTICS_TEST
+extern void ocrStatsAccessInsertDB(ocrTask_t*, ocrDataBlock_t *);
+#endif
 
 #define DEBUG_TYPE DATABLOCK
 
@@ -69,6 +72,12 @@ u8 regularAcquire(ocrDataBlock_t *self, void** ptr, ocrFatGuid_t edt,
     // End critical section
     DPRINTF(DEBUG_LVL_VERB, "DB (GUID: 0x%lx) added EDT (GUID: 0x%lx) at position %d. Have %d users (of which %d runtime)\n",
             self->guid, (u64)edt.guid, idForEdt, rself->attributes.numUsers, rself->attributes.internalUsers);
+
+#ifdef OCR_ENABLE_STATISTICS_TEST
+    ocrTask_t *task;
+    getCurrentEnv(NULL, NULL, &task, NULL);
+    if(task) ocrStatsAccessInsertDB(task, self);
+#endif
 
 #ifdef OCR_ENABLE_STATISTICS
     {

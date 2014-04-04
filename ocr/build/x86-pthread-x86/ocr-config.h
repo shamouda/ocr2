@@ -84,5 +84,9 @@
 
 // Build the OCR-lib support
 #define ENABLE_OCR_LIB
+
+#define OCR_ENABLE_STATISTICS_TEST
+#define OCR_ENABLE_PROFILING_STATISTICS_TEST
+
 #endif /* __OCR_CONFIG_H__ */
 
