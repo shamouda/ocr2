@@ -782,7 +782,6 @@ u8 taskExecute(ocrTask_t* base) {
 #ifdef ENABLE_OCR_PROFILING
     {
       u32 i;
-      u64 totSize = 0;
       ocrTaskTemplate_t *taskTemplate;
 
 #define PD_MSG (&msg)
@@ -796,10 +795,9 @@ u8 taskExecute(ocrTask_t* base) {
 #undef PD_MSG
 #undef PD_TYPE
 
-      if(taskTemplate->profileData) {
-	for(i = 0; i<depc; i++) {
-	  ocrDataBlock_t *db = NULL;
-	  if(depv[i].guid) {
+      for(i = 0; i<depc; i++) {
+          ocrDataBlock_t *db = NULL;
+          if(depv[i].guid) {
 #define PD_MSG (&msg)
 #define PD_TYPE PD_MSG_GUID_INFO
               msg.type = PD_MSG_GUID_INFO | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
@@ -811,10 +809,8 @@ u8 taskExecute(ocrTask_t* base) {
 #undef PD_MSG
 #undef PD_TYPE
           }
-	  if(db && db->size) totSize += db->size;
-	  //else ASSERT(0);
+	  ocrStatsAccessSetDBSlot(base, db, i);
 	}
-      }
     }
 #endif
 

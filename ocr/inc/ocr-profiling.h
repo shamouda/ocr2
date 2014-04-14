@@ -11,7 +11,7 @@
 #ifndef __OCR_PROFILING_H__
 #define __OCR_PROFILING_H__
 
-// TODO: Get rid of double; use int
+#include <ocr-types.h>
 
 struct _profileStruct {
     char *fname;
