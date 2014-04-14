@@ -20,6 +20,7 @@ typedef struct _dbTable_t {
     u64 start;
     u64 end;
     u64 readcount, readsize, writecount, writesize;
+    u8  slot;
 } dbTable_t;
 
 typedef struct _edtTable_t {
@@ -31,6 +32,7 @@ typedef struct _edtTable_t {
 
 void ocrStatsAccessInsertDB(ocrTask_t *task, ocrDataBlock_t *db);
 void ocrStatsAccessRemoveEDT(ocrTask_t *task);
+void ocrStatsAccessSetDBSlot(ocrTask_t *task, ocrDataBlock_t *db, u8 slot);
 
 extern void PROFILER_ocrStatsLoadCallback(void* address, u64 size, u64 instrCount, u64 fpInstrCount);
 extern void PROFILER_ocrStatsStoreCallback(void* address, u64 size, u64 instrCount, u64 fpInstrCount);

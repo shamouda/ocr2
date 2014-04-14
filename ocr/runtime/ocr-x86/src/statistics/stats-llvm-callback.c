@@ -56,6 +56,7 @@ inline void leave_cs(void) {
             memset(&edt->dbList[edt->numDbs], 0, (edt->maxDbs-edt->numDbs)*sizeof(dbTable_t));
         }
         edt->dbList[edt->numDbs].db = db;
+        edt->dbList[edt->numDbs].slot = 100;
         edt->dbList[edt->numDbs].start = (u64)addr;
         edt->dbList[edt->numDbs].end = (u64)addr+len;
         edt->dbList[edt->numDbs].readcount = (u64)0;
@@ -135,15 +136,15 @@ inline void leave_cs(void) {
         addedEDT->dbList = (dbTable_t *)realloc(addedEDT->dbList, addedEDT->maxDbs*sizeof(dbTable_t)); // MOREDB to begin with
         addedEDT->numDbs = 0;
 
-    enter_cs();
-    task->els[ELS_EDT_INDEX] = numEdts;
-    edtList[numEdts++] = addedEDT;
-    leave_cs();
+        enter_cs();
+        task->els[ELS_EDT_INDEX] = numEdts;
+        edtList[numEdts++] = addedEDT;
+        leave_cs();
 
-    ASSERT(numEdts<MAXEDTS);  // FIXME: to be made dynamic
+        ASSERT(numEdts<MAXEDTS);  // FIXME: to be made dynamic
 
-    return addedEDT;
-}
+        return addedEDT;
+    }
 
 
     void ocrStatsAccessRemoveEDT(ocrTask_t *task)
@@ -164,8 +165,8 @@ inline void leave_cs(void) {
         leave_cs();
 
             for(j = 0; j<removeEDT->numDbs; j++) {
-                printf("EDT %p DB %p size %llx FP %llx Reads %llx Bytes %llx Writes %llx Bytes %llx\n",
-                   removeEDT->task->funcPtr, removeEDT->dbList[j].db,
+                printf("EDT %p %d DB %p size %llx FP %llx Reads %llx Bytes %llx Writes %llx Bytes %llx\n",
+                   removeEDT->task->funcPtr, removeEDT->dbList[j].slot, removeEDT->dbList[j].db,
                    removeEDT->dbList[j].end - removeEDT->dbList[j].start, _threadFPInstructionCount,
                    removeEDT->dbList[j].readcount, removeEDT->dbList[j].readsize,
                    removeEDT->dbList[j].writecount, removeEDT->dbList[j].writesize);
@@ -215,16 +216,43 @@ inline void leave_cs(void) {
         }
     }
 
-void ocrStatsAccessInsertDB(ocrTask_t *task, ocrDataBlock_t *db) {
-    s64 i;
-    edtTable_t *edt;
+    void ocrStatsAccessSetDBSlot(ocrTask_t *task, ocrDataBlock_t *db, u8 slot) {
+        s64 i;
+        u64 j;
+        dbTable_t *ptr;
+        edtTable_t *edt = NULL;
 
-    enter_cs();
-    i = task->els[ELS_EDT_INDEX];
-    if(i>0) {
-        edt = edtList[i];
+        do {
+            i = task->els[ELS_EDT_INDEX];
+            if (i == 0) {
+                return NULL;
+            }
+            edt = edtList[i];
+        } while(edt->task != task); // To handle slim chance that an EDT insert/remove happened between the 2 lines
+
+        ptr = edt->dbList;
+
+        for (j = 0; j < edt->numDbs; j++) {
+            if(ptr[j].db == db) {
+                ptr[j].slot = slot;
+                break;
+            }
+        }
+ASSERT(ptr[j].slot == slot);
     }
-    leave_cs();
+
+    void ocrStatsAccessInsertDB(ocrTask_t *task, ocrDataBlock_t *db) {
+        s64 i;
+        edtTable_t *edt;
+
+        enter_cs();
+        i = task->els[ELS_EDT_INDEX];
+        if(i>0) {
+            edt = edtList[i];
+        }
+        leave_cs();
+
+        if(i<=0) edt = ocrStatsAccessInsertEDT(task);
 
         if(db && db->dbType == USER_DBTYPE) {
             ASSERT(db->size!=0);
@@ -239,15 +267,6 @@ void ocrStatsAccessInsertDB(ocrTask_t *task, ocrDataBlock_t *db) {
         dbTable_t *ptr;
         ocrTask_t *task;
         edtTable_t *edt = NULL;
-
-    deguidify(getCurrentPD(), getCurrentEDT(), (u64*)&task, NULL);
-    do {
-        i = task->els[ELS_EDT_INDEX];
-        if (i == 0) {
-            return NULL;
-        }
-        edt = edtList[i];
-    } while(edt->task != task); // To handle slim chance that an EDT insert/remove happened between the 2 lines
 
         getCurrentEnv(NULL, NULL, &task, NULL);
         do {
@@ -271,14 +290,8 @@ void ocrStatsAccessInsertDB(ocrTask_t *task, ocrDataBlock_t *db) {
             }
         }
 
-    for (j = 1; j < edt->numDbs; j++) {
-        if((u64)addr >= ptr[j].start && ((u64)addr + size) <= ptr[j].end) {
-            return ptr[j].db;
-        }
+        return NULL; // Returns NULL if address is out of known range (ptr[0] previously used as catch-all but not anymore)
     }
-
-    return NULL; // Returns NULL if address is out of known range (ptr[0] previously used as catch-all but not anymore)
-}
 
     void PROFILER_ocrStatsLoadCallback(void* address, u64 size, u64 count, u64 fpCount) {
        ocrDataBlock_t *db = getDBFromAddress((u64)address, size, 0);
