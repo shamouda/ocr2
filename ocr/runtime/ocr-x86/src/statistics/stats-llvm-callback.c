@@ -35,7 +35,7 @@ __thread u8 _threadInstrumentOn = 0;
 #define MOREDB         8
 
 edtTable_t *edtList[MAXEDTS];
-int numEdts = 1;    // 0 is used as placeholder for uninitialized EDTs
+volatile int numEdts = 1;    // 0 is used as placeholder for uninitialized EDTs
 
 volatile int global_mutex = 0;
 inline void enter_cs(void) {
@@ -161,7 +161,7 @@ inline void leave_cs(void) {
 
         enter_cs();
         edtList[numEdts-1]->task->els[ELS_EDT_INDEX] = i;
-        edtList[i] = edtList[--numEdts];
+        edtList[i] = edtList[--numEdts]; // Move the last element in this EDT's place
         leave_cs();
 
             for(j = 0; j<removeEDT->numDbs; j++) {
@@ -211,6 +211,7 @@ inline void leave_cs(void) {
 #endif
 
             removeEDT->task->els[ELS_EDT_INDEX] = (s64)-1;
+            removeEDT->task = (void *)0xdeadbeef;
             if(removeEDT->dbList) free(removeEDT->dbList);
             free(removeEDT);
         }
