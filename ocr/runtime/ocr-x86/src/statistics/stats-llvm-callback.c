@@ -165,9 +165,10 @@ inline void leave_cs(void) {
         leave_cs();
 
             for(j = 0; j<removeEDT->numDbs; j++) {
-                printf("EDT %p %d DB %p size %llx FP %llx Reads %llx Bytes %llx Writes %llx Bytes %llx\n",
+                printf("EDT %p %d DB %p size %llx IC %llx FP %llx Reads %llx Bytes %llx Writes %llx Bytes %llx\n",
                    removeEDT->task->funcPtr, removeEDT->dbList[j].slot, removeEDT->dbList[j].db,
-                   removeEDT->dbList[j].end - removeEDT->dbList[j].start, _threadFPInstructionCount,
+                   removeEDT->dbList[j].end - removeEDT->dbList[j].start,
+                   _threadInstructionCount, _threadFPInstructionCount,
                    removeEDT->dbList[j].readcount, removeEDT->dbList[j].readsize,
                    removeEDT->dbList[j].writecount, removeEDT->dbList[j].writesize);
             }
