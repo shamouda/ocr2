@@ -26,6 +26,7 @@ extern __thread u64 _threadFPInstructionCount;
 extern __thread u8 _threadInstrumentOn;
 extern void ocrStatsAccessInsertDB(ocrTask_t*, ocrDataBlock_t*);
 extern void ocrStatsAccessRemoveEDT(ocrTask_t *);
+extern void ocrStatsAccessSetDBSlot(ocrTask_t*, ocrDataBlock_t*, u8);
 #endif
 
 #ifdef ENABLE_OCR_PROFILING
@@ -723,18 +724,6 @@ u8 taskExecute(ocrTask_t* base) {
 #ifdef ENABLE_OCR_PROFILING
     {
       u32 i;
-      ocrTaskTemplate_t *taskTemplate;
-
-#define PD_MSG (&msg)
-#define PD_TYPE PD_MSG_GUID_INFO
-      msg.type = PD_MSG_GUID_INFO | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
-      PD_MSG_FIELD(guid.guid) = base->templateGuid;
-      PD_MSG_FIELD(guid.metaDataPtr) = NULL;
-      PD_MSG_FIELD(properties) = KIND_GUIDPROP | RMETA_GUIDPROP;
-      RESULT_PROPAGATE2(pd->fcts.processMessage(pd, &msg, false), ERROR_GUID);
-      taskTemplate = (ocrTaskTemplate_t *)PD_MSG_FIELD(guid.metaDataPtr);
-#undef PD_MSG
-#undef PD_TYPE
 
       for(i = 0; i<depc; i++) {
           ocrDataBlock_t *db = NULL;
@@ -750,7 +739,7 @@ u8 taskExecute(ocrTask_t* base) {
 #undef PD_MSG
 #undef PD_TYPE
           }
-	  ocrStatsAccessSetDBSlot(base, db, i);
+	  if(db) ocrStatsAccessSetDBSlot(base, db, i);
 	}
     }
 #endif
