@@ -122,6 +122,7 @@ typedef struct _ocrDataBlock_t {
     void* ptr;              /**< Current location for this data-block */
     u32 properties;         /**< Properties for the data-block */
     u32 fctId;              /**< ID determining which functions to use */
+    ocrGuid_t component;    /**< component to which this DB belongs to */
 } ocrDataBlock_t;
 
 

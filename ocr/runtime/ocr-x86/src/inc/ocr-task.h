@@ -232,6 +232,7 @@ typedef struct _ocrTask_t {
     ocrEdtState_t state;    /**< State of the EDT */
     u32 paramc, depc;       /**< Number of parameters and dependences */
     u32 fctId;
+    ocrGuid_t component;    /**< component to which this task belongs to */
 } ocrTask_t;
 
 /****************************************************/
