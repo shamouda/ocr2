@@ -152,14 +152,16 @@ extern "C" {
     void ocrStatsAccessRemoveEDT(ocrTask_t *task)
     {
         s64 i, j, FP, IC;
-        volatile edtTable_t *removeEDT;
+        u64 index;
+        edtTable_t *removeEDT;
         u64 size, numreads, reads, numwrites, writes;
 
         if(numEdts==1) return;
 
         do {
-            if(task->els[ELS_EDT_INDEX] == 0) return;
-            removeEDT = edtList[task->els[ELS_EDT_INDEX]];
+            index = *(volatile u64 *)&(task->els[ELS_EDT_INDEX]);
+            if(index == 0) return;
+            removeEDT = edtList[index];
         } while(!removeEDT || removeEDT->task != task); // To handle slim chance that an EDT insert/remove happened between the 2 lines
 
         enter_cs();
@@ -226,11 +228,12 @@ extern "C" {
     void ocrStatsAccessSetDBSlot(ocrTask_t *task, ocrDataBlock_t *db, u8 slot) {
         u64 j;
         dbTable_t *ptr;
-        volatile edtTable_t *edt = NULL;
+        edtTable_t *edt = NULL;
 
         do {
-            ASSERT(task->els[ELS_EDT_INDEX]);
-            edt = edtList[task->els[ELS_EDT_INDEX]];
+            j = *(volatile u64 *)&(task->els[ELS_EDT_INDEX]);
+            ASSERT(j);
+            edt = edtList[j];
         } while(!edt || edt->task != task); // To handle slim chance that an EDT insert/remove happened between the 2 lines
 
         ptr = edt->dbList;
@@ -266,12 +269,13 @@ extern "C" {
         u64 j;
         dbTable_t *ptr;
         ocrTask_t *task;
-        volatile edtTable_t *edt = NULL;
+        edtTable_t *edt = NULL;
 
         getCurrentEnv(NULL, NULL, &task, NULL);
         do {
-            if(task->els[ELS_EDT_INDEX]==0) return NULL;
-            edt = edtList[task->els[ELS_EDT_INDEX]];
+            j = *(volatile u64 *)&(task->els[ELS_EDT_INDEX]);
+            if(j==0) return NULL;
+            edt = edtList[j];
         } while(!edt || edt->task != task); // To handle slim chance that an EDT insert/remove happened between the 2 lines
 
         ptr = edt->dbList;
