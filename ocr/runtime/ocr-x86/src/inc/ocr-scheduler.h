@@ -37,11 +37,9 @@ struct _ocrPolicyCtx_t;
 struct _ocrMsgHandler_t;
 
 /* Scheduler Properties */
-typedef enum {
-    SCHED_PROP_READY = 0x0,
-    SCHED_PROP_NEW   = 0x1,
-    SCHED_PROP_DONE  = 0x2
-} ocrSchedulerProp_t;
+#define SCHED_PROP_READY 0x0
+#define SCHED_PROP_NEW   0x1
+#define SCHED_PROP_DONE  0x2
 
 typedef struct _ocrSchedulerFcts_t {
     void (*destruct)(struct _ocrScheduler_t *self);
@@ -55,95 +53,87 @@ typedef struct _ocrSchedulerFcts_t {
     void (*finish)(struct _ocrScheduler_t *self);
 
     /**
-     * @brief Takes components from this scheduler
+     * @brief Takes a component from this scheduler
      *
-     * This call requests components from the scheduler.
-     * They are returned in the components array.
+     * This call requests a component from the scheduler.
      * The clients of this call could be a worker or another scheduler.
      *
      * @param self[in]           Pointer to this scheduler
-     * @param source[in]         Location that is asking for edts
-     * @param count[in/out]      As input contains the maximum number of components requested.
-     *                           As output, contains the actual number of components returned
-     * @param components[in/out] As input contains the GUIDs of the components requested or NULL_GUID.
-     *                           As output, contains the components given by the scheduler to the
-     *                           caller. Note that the array needs to be allocated by
-     *                           the caller and of sufficient size
+     * @param source[in]         Location that is asking for components
+     * @param component[in/out]  As input contains the GUID of the component requested or NULL_GUID.
+     *                           As output, contains the component given by the scheduler to the caller.
      *                           For DB create, the input GUID will contain a partial metadata without allocation.
      * @param hints[in]          Hints for the take.
      *                           E.g: A scheduler can hint to another scheduler which cost mapper to use.
-     * @param properties[in]     Properties array for the take
+     * @param properties[in]     Properties for the take
      *                           This call can be used with the following properties:
      *                           1> SCHED_PROP_READY:
-     *                              In this mode, the scheduler will return ready components.
-     *                              If the components array has NULL_GUIDs, then the scheduler returns best of available components.
-     *                              If the components array has specific GUIDs, then the scheduler those components.
+     *                              In this mode, the scheduler will return a component with ready elements.
+     *                              If no component input is provided, then the scheduler returns the best component.
+     *                              If a component input GUID is provided, then the scheduler returns that component
+     *                              if it is readily available. An error is thrown if not ready.
      *                              If an input GUID is a DB, then the scheduler acquires it for the requester.
+     *                              An error is thrown if the DB was not acquired.
      *                           2> SCHED_PROP_NEW:
      *                              In this mode, the scheduler will allocate new components.
-     *                              The components array cannot contain a NULL_GUID.
-     *                              The input GUIDs should point to the component metadata.
-     *                              Information regarding allocation size, hints etc, will be taken from the input GUID metadata.
+     *                              The component input cannot contain a NULL_GUID.
+     *                              The input GUID should point to the component metadata.
+     *                              Information regarding allocation size and hints etc, will be taken from the input GUID metadata.
      *
      * @return 0 on success and a non-zero value on failure
      */
-    u8 (*take)(struct _ocrScheduler_t *self, ocrLocation_t source, u32 *count, ocrFatGuid_t *components, ocrFatGuid_t *hints, ocrSchedulerProp_t *properties);
+    u8 (*take)(struct _ocrScheduler_t *self, ocrLocation_t source, ocrFatGuid_t component, ocrFatGuid_t hints, u32 properties);
 
     /**
-     * @brief Gives Components to this scheduler
+     * @brief Gives a component to this scheduler
      *
-     * This call gives Components to the scheduler.
-     * The Components are given in the components array.
+     * This call gives a component to the scheduler.
      * The clients of this call could be a worker or another scheduler.
      *
      * @param self[in]           Pointer to this scheduler
-     * @param source[in]         Location that is asking for edts
-     * @param count[in/out]      As input contains the number of components passed to the scheduler.
-     *                           As output, contains the number of components remaining in the array.
-     * @param components[in/out] As input contains the GUIDs of the components given to the scheduler.
-     *                           As output, contains the GUIDs of components remaining in the array.
+     * @param source[in]         Location that is giving the component
+     * @param component[in]      Contains the GUID of the components given to the scheduler.
      * @param hints[in]          Hints for the give.
      *                           E.g: A client can hint to the schduler which component to associate this entry with.
      *                           Or, a scheduler can be hinted the cost update for a done component.
-     * @param properties[in]     Properties array for the give
+     * @param properties[in]     Properties for the give
      *                           This call can be used with the following properties:
      *                           1> SCHED_PROP_READY:
-     *                              In this mode, the scheduler is handed ready components.
+     *                              In this mode, the scheduler is handed a ready component.
      *                              There could be ready EDTs/DBs/Comms etc.
      *                           2> SCHED_PROP_DONE:
-     *                              In this mode, the scheduler is notified that components have completed execution.
+     *                              In this mode, the scheduler is notified that the component has completed execution.
      *
      * @return 0 on success and a non-zero value on failure
      */
-    u8 (*give)(struct _ocrScheduler_t *self, ocrLocation_t source, u32 *count, ocrFatGuid_t *components, ocrFatGuid_t *hints, ocrSchedulerProp_t *properties);
+    u8 (*give)(struct _ocrScheduler_t *self, ocrLocation_t source, ocrFatGuid_t component, ocrFatGuid_t hints, u32 properties);
 
     /**
-     * @brief Provides a cost update for a scheduler element
+     * @brief Provides a cost update for a component
      *
      * A scheduler element could be an EDT or DB or Comm.
      * The clients of this call could be the statistics/introspection module, or
      * it could be used as the backend of user-level APIs.
      *
      * @param self[in]          Pointer to this scheduler
-     * @param count[in]         The number of elements for which to set cost
-     * @param elements[in]      Array of elements passed to the scheduler
-     * @param elementCosts[in]  Array of costs for each elements passed to the scheduler
+     * @param component[in]     Component whose cost is set
+     * @param cost[in]          Cost to set
+     * @param properties[in]    Properties of the cost
      */
-    u8 (*setCost)(struct _ocrScheduler_t *self, u32 count, ocrFatGuid_t *elements, ocrFatGuid_t *elementCosts);
+    u8 (*setCost)(struct _ocrScheduler_t *self, ocrFatGuid_t component, ocrFatGuid_t cost, u32 properties);
 
     /**
-     * @brief Provides a cost update for a pair of scheduler elements relative to each other
+     * @brief Provides a cost update for a pair of components relative to each other
      *
-     * A scheduler element could be an EDT or DB or Comm.
+     * The component could be an EDT or DB or Comm.
      *
      * @param self[in]          Pointer to this scheduler
-     * @param paircount[in]     The number of pairs for which to set cost
-     * @param pairElements[in]  Array of element pairs passed to the scheduler
-     *                          Each pair is packed into adjacent array indexes
-     *                          (length of array = 2 * paircount)
-     * @param relativeCosts[in] Array of costs for each pair passed to the scheduler
+     * @param componentSrc[in]  Component that is the source of this relation (E.g: for directional affinities)
+     * @param componentDst[in]  Component that is the destination of this relation
+     * @param relativeCost[in]  Relative cost
+     * @param properties[in]    Properties of the cost
      */
-    u8 (*setRelativeCost)(struct _ocrScheduler_t *self, u32 pairCount, ocrFatGuid_t *pairElements, ocrFatGuid_t *relativeCosts);
+    u8 (*setRelativeCost)(struct _ocrScheduler_t *self, ocrFatGuid_t componentSrc, ocrFatGuid_t componentDst, ocrFatGuid_t relativeCost, u32 properties);
 
     /**
      * @brief Scheduler updates itself
@@ -151,8 +141,9 @@ typedef struct _ocrSchedulerFcts_t {
      * This works as a proactive monitoring hook
      *
      * @param self[in]          Pointer to this scheduler
+     * @param properties[in]    Properties of this update
      */
-    void (*update)(struct _ocrScheduler_t *self);
+    void (*update)(struct _ocrScheduler_t *self, u32 properties);
 } ocrSchedulerFcts_t;
 
 struct _ocrWorkpile_t;

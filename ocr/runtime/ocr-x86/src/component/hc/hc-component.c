@@ -4,12 +4,7 @@
  * removed or modified.
  */
 
-
-#ifndef __SHARED_COMPONENT_H__
-#define __SHARED_COMPONENT_H__
-
 #include "ocr-config.h"
-#ifdef ENABLE_COMPONENT_SHARED
+#ifdef ENABLE_COMPONENT_HC
 
-#endif /* ENABLE_COMPONENT_SHARED */
-#endif /* __SHARED_COMPONENT_H__ */
+#endif /* ENABLE_COMPONENT_HC */

@@ -771,6 +771,7 @@ typedef struct _ocrPolicyDomain_t {
     u64 taskTemplateFactoryCount;               /**< Number of task-template factories */
     u64 dbFactoryCount;                         /**< Number of data-block factories */
     u64 eventFactoryCount;                      /**< Number of event factories */
+    u64 componentFactoryCount;                  /**< Number of component factories */
 
     ocrScheduler_t  ** schedulers;              /**< All the schedulers */
     ocrAllocator_t  ** allocators;              /**< All the allocators */
@@ -785,6 +786,7 @@ typedef struct _ocrPolicyDomain_t {
     ocrDataBlockFactory_t ** dbFactories;       /**< Factories to produce
                                                  * data-blocks */
     ocrEventFactory_t ** eventFactories;        /**< Factories to produce events*/
+    ocrComponentFactory_t **componentFactories; /**< Factories to produce components */
     ocrGuidProvider_t ** guidProviders;         /**< GUID generators */
 
 #ifdef OCR_ENABLE_STATISTICS

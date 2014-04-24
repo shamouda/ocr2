@@ -8,15 +8,15 @@
 #include "debug.h"
 
 const char * component_types[] = {
-    "SHARED",
+    "HC",
     NULL
 };
 
 ocrComponentFactory_t * newComponentFactory(componentType_t type, ocrParamList_t *perType) {
     switch(type) {
-#ifdef ENABLE_COMPONENT_SHARED
-    case componentShared_id:
-        return newOcrComponentFactoryShared(perType);
+#ifdef ENABLE_COMPONENT_HC
+    case componentHc_id:
+        return newOcrComponentFactoryHc(perType);
 #endif
     default:
         ASSERT(0);

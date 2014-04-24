@@ -37,79 +37,76 @@ struct _ocrComponent_t;
 struct _ocrPolicyDomain_t;
 
 typedef struct _ocrComponentFcts_t {
-    void (*destruct)(struct _ocrComponent_t *self);
 
-    void (*begin)(struct _ocrComponent_t *self, struct _ocrPolicyDomain_t *PD);
-
-    void (*start)(struct _ocrComponent_t *self, struct _ocrPolicyDomain_t *PD);
-
-    void (*stop)(struct _ocrComponent_t *self);
-
-    void (*finish)(struct _ocrComponent_t *self);
-
-    /** @brief Create new elements inside this component
+    /** @brief Create a new element inside this component
      *
      *  This will create new element components and register them with this component set.
      *
      *  @param[in] self         Pointer to this component
-     *  @param[in] count        Number of components to create
-     *  @param[out] components  Array of new components
+     *  @param[out] component   new component
+     *  @param[in] hints        Hints for the create.
+     *  @param[in] properties   Properties for the create.
      *
      *  @return 0 on success and a non-zero value on failure
      */
-    u8 (*create)(struct _ocrComponent_t *self, u32 count, ocrFatGuid_t *components);
+    u8 (*create)(struct _ocrComponent_t *self, ocrFatGuid_t component, ocrFatGuid_t hints, u32 properties);
 
-    /** @brief Insert elements into this component
+    /** @brief Insert an element into this component
      *
      *  This will insert and register element components with this component set.
      *
      *  @param[in] self         Pointer to this component
-     *  @param[in] count        Number of components to insert
-     *  @param[in] components   Array of components to insert
+     *  @param[in] component    component to insert
+     *  @param[in] hints        Hints for the insert.
+     *  @param[in] properties   Properties for the insert.
      *
      *  @return 0 on success and a non-zero value on failure
      */
-    u8 (*insert)(struct _ocrComponent_t *self, u32 count, ocrFatGuid_t *components);
+    u8 (*insert)(struct _ocrComponent_t *self, ocrFatGuid_t component, ocrFatGuid_t hints, u32 properties);
 
-    /** @brief Removes elements from this component
+    /** @brief Removes an element from this component
      *
      *  This will remove and de-register element components from this component set.
      *
      *  @param[in] self         Pointer to this component
-     *  @param[in] count        Number of components to remove
-     *  @param[in] components   Array of components to remove
+     *  @param[in] component    Component to remove
+     *  @param[in] hints        Hints for the remove.
+     *  @param[in] properties   Properties for the remove.
      *
      *  @return 0 on success and a non-zero value on failure
      */
-    u8 (*remove)(struct _ocrComponent_t *self, u32 count, ocrFatGuid_t *components);
+    u8 (*remove)(struct _ocrComponent_t *self, ocrFatGuid_t component, ocrFatGuid_t hints, u32 properties);
 
-    /** @brief Moves elements from this component
+    /** @brief Moves an element from this component to another component
      *
      *  This will move and de-register element components from this component set.
      *
      *  @param[in] self         Pointer to this (source) component
-     *  @param[in] destination  Pointer to destination component
-     *  @param[in] count        Number of components to move
-     *  @param[in] components   Array of components to move
+     *  @param[in] remote       Pointer to remote component
+     *  @param[in] component    Component to move
+     *  @param[in] hints        Hints for the move.
+     *  @param[in] properties   Properties for the move.
      *
      *  @return 0 on success and a non-zero value on failure
      */
-    u8 (*move)(struct _ocrComponent_t *self, struct _ocrComponent_t *destination, u32 count, ocrFatGuid_t *components);
+    u8 (*move)(struct _ocrComponent_t *self, struct _ocrComponent_t *destination, ocrFatGuid_t *component, ocrFatGuid_t hints, u32 properties);
 
     /** @brief Splits this component
      *
      *  This will split this component into multiple parts.
      *  The current component will be de-registered from the superset component.
-     *  The newly created components will be registered with the superset component.
+     *  The newly created components will be registered with the parent component.
      *
      *  @param[in] self         Pointer to this component
      *  @param[in] count        Number of components to create from split
-     *  @param[in] offsets      Array of offsets in the element array as the start of each part
+     *  @param[in] chunks       Array of chunk sizes (Sum of chunk sizes = numElements)
      *  @param[out] components  Array of components created from the split
+     *  @param[in] hints        Hints for the split.
+     *  @param[in] properties   Properties for the split.
      *
      *  @return 0 on success and a non-zero value on failure
      */
-    u8 (*split)(struct _ocrComponent_t *self, u32 count, u32 *offsets, ocrFatGuid_t *components);
+    u8 (*split)(struct _ocrComponent_t *self, u32 count, u32 *chunks, ocrFatGuid_t *components, ocrFatGuid_t hints, u32 properties);
 
     /** @brief Merges multiple components into this component
      *
@@ -119,22 +116,24 @@ typedef struct _ocrComponentFcts_t {
      *  @param[in] self         Pointer to this component
      *  @param[in] count        Number of components to be merged into this component
      *  @param[in] components   Array of components to be merged into this component
+     *  @param[in] hints        Hints for the merge.
+     *  @param[in] properties   Properties for the merge.
      *
      *  @return 0 on success and a non-zero value on failure
      */
-    u8 (*merge)(struct _ocrComponent_t *self, u32 count, ocrFatGuid_t *components);
+    u8 (*merge)(struct _ocrComponent_t *self, u32 count, ocrFatGuid_t *components, ocrFatGuid_t hints, u32 properties);
 
     /* Get the number of elements */
-    u32 getElementCount();
+    u32 getNumElements(struct _ocrComponent_t *self);
 } ocrComponentFcts_t;
 
 /*! \brief Abstract class to represent OCR component data structures.
  *
  */
 typedef struct _ocrComponent_t {
-    ocrFatGuid_t fguid;
-    struct _ocrPolicyDomain_t *pd;
-    ocrComponentFcts_t fcts;
+    ocrGuid_t guid;         /**< The guid of this component */
+    u64 numElements;        /**< number of component elements in this component */
+    ocrLocation_t mapping;  /**< Location mapping of this component */
 } ocrComponent_t;
 
 
@@ -142,13 +141,23 @@ typedef struct _ocrComponent_t {
 /* OCR COMPONENT FACTORY                            */
 /****************************************************/
 
+/*! \brief Abstract factory class to create OCR components.
+ *
+ *  This class provides an interface to create Component instances with a non-static create function
+ *  to allow runtime implementers to choose to have state in their derived ComponentFactory classes.
+ */
 typedef struct _ocrComponentFactory_t {
-    ocrComponent_t * (*instantiate)(struct _ocrComponentFactory_t * factory, ocrParamList_t *perInstance);
-    void (*initialize) (struct _ocrComponentFactory_t * factory, struct _ocrComponent_t * worker, ocrParamList_t *perInstance);
-    void (*destruct)(struct _ocrComponentFactory_t * factory);
-    ocrComponentFcts_t componentFcts;
-} ocrComponentFactory_t;
+    /*! \brief Instantiates a Component and returns its corresponding GUID
+     *
+     */
+    ocrComponent_t* (*instantiate)(struct _ocrComponentFactory_t * factory, ocrFatGuid_t hints, u32 properties);
 
-void initializeComponentOcr(ocrComponentFactory_t * factory, ocrComponent_t * self, ocrParamList_t *perInstance);
+    /*! \brief Virtual destructor for the ComponentFactory interface
+     */
+    void (*destruct)(struct _ocrComponentFactory_t * factory);
+
+    u32 factoryId;
+    ocrComponentFcts_t fcts;
+} ocrComponentFactory_t;
 
 #endif /* __OCR_COMPONENT_H_ */

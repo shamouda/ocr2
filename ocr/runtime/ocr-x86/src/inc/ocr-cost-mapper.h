@@ -43,16 +43,6 @@ typedef enum {
     OCR_SCHED_COST_TYPE_MAX
 } ocrCostType_t;
 
-typedef struct _ocrSchedCost_t {
-    double cost[OCR_SCHED_COST_TYPE_MAX];
-} ocrSchedCost_t;
-
-/* Provides delta of new mapping to current system mapping */
-typedef struct _ocrSchedMapping_t {
-    ocrFatGuid_t *elements;
-    ocrLocation_t *locations;     /* TODO: Mem locations? */
-} ocrSchedMapping_t;
-
 typedef struct _ocrCostMapperFcts_t {
     void (*destruct)(struct _ocrCostMapper_t *self);
 
@@ -65,50 +55,38 @@ typedef struct _ocrCostMapperFcts_t {
     void (*finish)(struct _ocrCostMapper_t *self);
 
     /**
-     * @brief Takes potential components from this cost mapper
+     * @brief Takes a potential component from this cost mapper
      *
      * This call requests components from the cost mapper.
-     * They are returned in the components array.
      * The client of this call is the scheduler driver heuristic.
      *
      * @param self[in]           Pointer to this cost mapper
      * @param source[in]         Location that is asking for components
-     * @param count[in/out]      As input contains the maximum number of components requested.
-     *                           As output, contains the actual number of components returned
-     * @param components[in/out] As input contains the GUIDs of the components requested or NULL_GUID.
-     *                           As output, contains the components given by the scheduler to the
-     *                           caller. Note that the array needs to be allocated by
-     *                           the caller and of sufficient size
-     *                           For DB create, the input GUID will contain a partial metadata without allocation.
+     * @param component[in/out]  As input contains the GUID of the components requested or NULL_GUID.
+     *                           As output, contains the GUID of component returned by the mapper.
      * @param hints[in]          Hints for the take.
-     * @param properties[in]     Properties array for the take based on scheduler properties
-     * @param costs[out]         Array of costs generated for components
-     * @param mapping[out]       Array of location mappings generated for each element in every component
+     * @param costs[out]         Costs generated for component
+     * @param mapping[out]       Location mappings generated for each element in the component
+     * @param properties[in]     Properties for the take
      *
      * @return 0 on success and a non-zero value on failure
      */
-    u8 (*take)(struct _ocrCostMapper_t *self, ocrLocation_t source, u32 *count, ocrFatGuid_t *components, ocrFatGuid_t *hints, ocrSchedulerProp_t *properties, ocrSchedCost_t *costs, ocrSchedMapping_t *mappings);
+    u8 (*take)(struct _ocrCostMapper_t *self, ocrLocation_t source, ocrFatGuid_t component, ocrFatGuid_t hints, ocrFatGuid_t costs, ocrFatGuid_t mappings, u32 properties);
 
     /**
-     * @brief Gives components to this cost mapper
+     * @brief Gives a components to this cost mapper
      *
-     * The Components are given in the components array.
      * The client of this call is the scheduler driver heuristic.
      *
      * @param self[in]           Pointer to this cost mapper
      * @param source[in]         Location that is asking for components
-     * @param count[in/out]      As input contains the number of components passed to the scheduler.
-     *                           As output, contains the number of components remaining in the array.
-     * @param components[in/out] As input contains the GUIDs of the components given to the cost mapper.
-     *                           As output, contains the GUIDs of components remaining in the array.
+     * @param component[in]      Contains the GUID of the component given to the cost mapper.
      * @param hints[in]          Hints for the give.
-     * @param properties[in]     Properties array for the give based on scheduler properties
-     * @param costs[out]         Array of costs generated for components
-     * @param mapping[out]       Array of location mappings generated for each element in every component
+     * @param properties[in]     Properties for the give
      *
      * @return 0 on success and a non-zero value on failure
      */
-    u8 (*give)(struct _ocrCostMapper_t *self, ocrLocation_t source, u32 *count, ocrFatGuid_t *components, ocrFatGuid_t *hints, ocrSchedulerProp_t *properties);
+    u8 (*give)(struct _ocrCostMapper_t *self, ocrLocation_t source, ocrFatGuid_t component, ocrFatGuid_t hints, u32 properties);
 
     /**
      * @brief Update this cost mapper after scheduler decision
@@ -117,18 +95,16 @@ typedef struct _ocrCostMapperFcts_t {
      * The client of this call is the scheduler driver heuristic.
      *
      * @param self[in]           Pointer to this cost mapper
-     * @param count[in]          Contains the number of components that have been updated.
-     * @param components[in]     Contains the GUIDs of the components that have been updated.
-     * @param mapping[out]       Array of location mappings for each element in every component
+     * @param component[in]      Contains the GUID of the component that has been selected.
+     * @param mapping[out]       Location mappings for each element in the component
+     * @param properties[in]     Properties of this update
      *
      * @return 0 on success and a non-zero value on failure
      */
-    u8 (*update)(struct _ocrCostMapper_t *self, u32 *count, ocrFatGuid_t *components, ocrSchedMapping_t *mappings);
+    u8 (*update)(struct _ocrCostMapper_t *self, ocrFatGuid_t component, ocrFatGuid_t mappings, u32 properties);
 } ocrCostMapperFcts_t;
 
-struct _ocrWorkpile_t;
-
-/*! \brief Represents OCR schedulers.
+/*! \brief Represents OCR cost mappers.
  *
  *  Currently, we allow scheduler interface to have work taken from them or given to them
  */

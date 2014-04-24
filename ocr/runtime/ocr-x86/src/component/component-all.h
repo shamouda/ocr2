@@ -11,10 +11,10 @@
 #include "utils/ocr-utils.h"
 
 #include "ocr-component.h"
-#include "component/shared/shared-component.h"
+#include "component/hc/hc-component.h"
 
 typedef enum _componentType_t {
-    componentShared_id,
+    componentHc_id,
     componentMax_id
 } componentType_t;
 
