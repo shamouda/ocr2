@@ -14,7 +14,8 @@
 #include "component/hc/hc-component.h"
 
 typedef enum _componentType_t {
-    componentHc_id,
+    componentHcState_id,
+    componentHcWork_id,
     componentMax_id
 } componentType_t;
 

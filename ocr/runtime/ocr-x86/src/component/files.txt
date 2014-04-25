@@ -1,1 +1,1 @@
-shared - component state among multiple agents
+hc - components used in HC

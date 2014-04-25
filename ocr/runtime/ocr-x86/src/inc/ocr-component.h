@@ -49,7 +49,7 @@ typedef struct _ocrComponentFcts_t {
      *
      *  @return 0 on success and a non-zero value on failure
      */
-    u8 (*create)(struct _ocrComponent_t *self, ocrFatGuid_t component, ocrFatGuid_t hints, u32 properties);
+    u8 (*create)(struct _ocrComponent_t *self, ocrFatGuid_t* component, ocrFatGuid_t hints, u32 properties);
 
     /** @brief Insert an element into this component
      *
@@ -89,7 +89,7 @@ typedef struct _ocrComponentFcts_t {
      *
      *  @return 0 on success and a non-zero value on failure
      */
-    u8 (*move)(struct _ocrComponent_t *self, struct _ocrComponent_t *destination, ocrFatGuid_t *component, ocrFatGuid_t hints, u32 properties);
+    u8 (*move)(struct _ocrComponent_t *self, struct _ocrComponent_t *destination, ocrFatGuid_t component, ocrFatGuid_t hints, u32 properties);
 
     /** @brief Splits this component
      *
@@ -123,8 +123,17 @@ typedef struct _ocrComponentFcts_t {
      */
     u8 (*merge)(struct _ocrComponent_t *self, u32 count, ocrFatGuid_t *components, ocrFatGuid_t hints, u32 properties);
 
-    /* Get the number of elements */
-    u32 getNumElements(struct _ocrComponent_t *self);
+    /** @brief Get the number of elements
+     *
+     *  This will return the number of elements in the component
+     *  The implementation may expose this as a [0,infinity] function.
+     *
+     *  @param[in] self         Pointer to this component
+     *  @return Returns the number of components or a property
+     *  If return value is: OCR_COMPONENT_SIZE_NON_EMPTY,
+     *  it simply means that more than one component exists
+     */
+    u32 (*count)(struct _ocrComponent_t *self);
 } ocrComponentFcts_t;
 
 /*! \brief Abstract class to represent OCR component data structures.
@@ -132,7 +141,6 @@ typedef struct _ocrComponentFcts_t {
  */
 typedef struct _ocrComponent_t {
     ocrGuid_t guid;         /**< The guid of this component */
-    u64 numElements;        /**< number of component elements in this component */
     ocrLocation_t mapping;  /**< Location mapping of this component */
 } ocrComponent_t;
 
@@ -156,7 +164,6 @@ typedef struct _ocrComponentFactory_t {
      */
     void (*destruct)(struct _ocrComponentFactory_t * factory);
 
-    u32 factoryId;
     ocrComponentFcts_t fcts;
 } ocrComponentFactory_t;
 

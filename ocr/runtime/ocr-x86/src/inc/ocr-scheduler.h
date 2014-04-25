@@ -146,8 +146,6 @@ typedef struct _ocrSchedulerFcts_t {
     void (*update)(struct _ocrScheduler_t *self, u32 properties);
 } ocrSchedulerFcts_t;
 
-struct _ocrWorkpile_t;
-
 /*! \brief Represents OCR schedulers.
  *
  *  Currently, we allow scheduler interface to have work taken from them or given to them
