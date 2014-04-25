@@ -8,15 +8,15 @@
 #include "debug.h"
 
 const char * costMapper_types[] = {
-    "PASSTHROUGH",
+    "HC",
     NULL
 };
 
 ocrCostMapperFactory_t * newCostMapperFactory(costMapperType_t type, ocrParamList_t *perType) {
     switch(type) {
-#ifdef ENABLE_COST_MAPPER_PASSTHROUGH
-    case costMapperPassthrough_id:
-        return newOcrCostMapperFactoryPassthrough(perType);
+#ifdef ENABLE_COST_MAPPER_HC
+    case costMapperHc_id:
+        return newOcrCostMapperFactoryHc(perType);
 #endif
     default:
         ASSERT(0);

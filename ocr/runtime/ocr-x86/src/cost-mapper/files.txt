@@ -1,1 +1,1 @@
-passthrough - zero cost-mapper option
+hc - basic hc cost-mapper

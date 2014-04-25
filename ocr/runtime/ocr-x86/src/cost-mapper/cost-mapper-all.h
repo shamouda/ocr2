@@ -11,10 +11,10 @@
 #include "utils/ocr-utils.h"
 
 #include "ocr-cost-mapper.h"
-#include "cost-mapper/passthrough/passthrough-cost-mapper.h"
+#include "cost-mapper/hc/hc-cost-mapper.h"
 
 typedef enum _costMapperType_t {
-    costMapperPassthrough_id,
+    costMapperHc_id,
     costMapperMax_id
 } costMapperType_t;
 

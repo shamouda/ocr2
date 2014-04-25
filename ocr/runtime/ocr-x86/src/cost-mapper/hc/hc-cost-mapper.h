@@ -4,7 +4,12 @@
  * removed or modified.
  */
 
-#include "ocr-config.h"
-#ifdef ENABLE_COST_MAPPER_PASSTHROUGH
 
-#endif /* ENABLE_COST_MAPPER_PASSTHROUGH */
+#ifndef __HC_COST_MAPPER_H__
+#define __HC_COST_MAPPER_H__
+
+#include "ocr-config.h"
+#ifdef ENABLE_COST_MAPPER_HC
+
+#endif /* ENABLE_COST_MAPPER_HC */
+#endif /* __HC_COST_MAPPER_H__ */

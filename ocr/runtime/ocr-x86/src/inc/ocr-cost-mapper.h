@@ -79,7 +79,7 @@ typedef struct _ocrCostMapperFcts_t {
      * The client of this call is the scheduler driver heuristic.
      *
      * @param self[in]           Pointer to this cost mapper
-     * @param source[in]         Location that is asking for components
+     * @param source[in]         Location that is giving the component
      * @param component[in]      Contains the GUID of the component given to the cost mapper.
      * @param hints[in]          Hints for the give.
      * @param properties[in]     Properties for the give
