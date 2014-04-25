@@ -22,13 +22,13 @@ ocrComponent_t* newComponentHcState(ocrComponentFactory_t * factory, ocrFatGuid_
         component->components[i] = hcWorkFact->instantiate(hcWorkFact, (ocrFatGuid_t)i, 0);
 }
 
-u8 hcStateComponentCreate(struct _ocrComponent_t *self, ocrLocation_t loc, ocrFatGuid_t* component, ocrFatGuid_t hints, u32 properties) {
+u8 hcStateComponentCreate(ocrComponent_t *self, ocrLocation_t loc, ocrFatGuid_t* component, ocrFatGuid_t hints, u32 properties) {
 //TODO
 ASSERT(0);
 return ENOTSUP;
 }
 
-u8 hcStateComponentInsert(struct _ocrComponent_t *self, ocrLocation_t loc, ocrFatGuid_t component, ocrFatGuid_t hints, u32 properties) {
+u8 hcStateComponentInsert(ocrComponent_t *self, ocrLocation_t loc, ocrFatGuid_t component, ocrFatGuid_t hints, u32 properties) {
     ocrComponentHcState_t * compHcState = (ocrComponentHcState_t*)self;
     ASSERT((u32)loc < compHcState->numWorkers);
     ocrComponentHcWork_t * compHcWork = compHcState->components[loc];
@@ -36,7 +36,7 @@ u8 hcStateComponentInsert(struct _ocrComponent_t *self, ocrLocation_t loc, ocrFa
     return 0;
 }
 
-u8 hcStateComponentRemove(struct _ocrComponent_t *self, ocrLocation_t loc, ocrFatGuid_t *component, ocrFatGuid_t hints, u32 properties) {
+u8 hcStateComponentRemove(ocrComponent_t *self, ocrLocation_t loc, ocrFatGuid_t *component, ocrFatGuid_t hints, u32 properties) {
     u32 i;
     ASSERT(component && component->guid == NULL_GUID);
     ocrComponentHcState_t * compHcState = (ocrComponentHcState_t*)self;
@@ -54,25 +54,25 @@ u8 hcStateComponentRemove(struct _ocrComponent_t *self, ocrLocation_t loc, ocrFa
     return 0;
 }
 
-u8 hcStateComponentMove(struct _ocrComponent_t *self, ocrLocation_t loc, struct _ocrComponent_t *destination, ocrFatGuid_t component, ocrFatGuid_t hints, u32 properties) {
+u8 hcStateComponentMove(ocrComponent_t *self, ocrLocation_t loc, ocrComponent_t *destination, ocrFatGuid_t component, ocrFatGuid_t hints, u32 properties) {
 //TODO
 ASSERT(0);
 return ENOTSUP;
 }
 
-u8 hcStateComponentSplit(struct _ocrComponent_t *self, ocrLocation_t loc, u32 count, u32 *chunks, ocrFatGuid_t *components, ocrFatGuid_t hints, u32 properties) {
+u8 hcStateComponentSplit(ocrComponent_t *self, ocrLocation_t loc, u32 count, u32 *chunks, ocrFatGuid_t *components, ocrFatGuid_t hints, u32 properties) {
 //TODO
 ASSERT(0);
 return ENOTSUP;
 }
 
-u8 hcStateComponentMerge(struct _ocrComponent_t *self, ocrLocation_t loc, u32 count, ocrFatGuid_t *components, ocrFatGuid_t hints, u32 properties) {
+u8 hcStateComponentMerge(ocrComponent_t *self, ocrLocation_t loc, u32 count, ocrFatGuid_t *components, ocrFatGuid_t hints, u32 properties) {
 //TODO
 ASSERT(0);
 return ENOTSUP;
 }
 
-u32 hcStateComponentCount(struct _ocrComponent_t *self, ocrLocation_t loc) {
+u32 hcStateComponentCount(ocrComponent_t *self, ocrLocation_t loc) {
 //TODO
 ASSERT(0);
 return ENOTSUP;

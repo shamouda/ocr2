@@ -24,10 +24,3 @@ ocrCostMapperFactory_t * newCostMapperFactory(costMapperType_t type, ocrParamLis
     return NULL;
 }
 
-void initializeCostMapperOcr(ocrCostMapperFactory_t * factory, ocrCostMapper_t * self, ocrParamList_t *perInstance) {
-    self->fguid.guid = UNINITIALIZED_GUID;
-    self->fguid.metaDataPtr = self;
-    self->pd = NULL;
-    self->componentState = NULL;
-    self->fcts = factory->costMapperFcts;
-}

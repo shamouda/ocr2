@@ -14,30 +14,16 @@
 #include "ocr-types.h"
 #include "utils/ocr-utils.h"
 
-/******************************************************/
-/* Support structures (workpile iterator)             */
-/******************************************************/
-
-struct _ocrWorkpile_t;
-
-typedef struct _hcWorkpileIterator_t {
-    struct _ocrWorkpile_t **workpiles;
-    u64 id, curr, mod;
-} hcWorkpileIterator_t;
-
 typedef struct {
     ocrSchedulerFactory_t base;
 } ocrSchedulerFactoryHc_t;
 
 typedef struct {
     ocrScheduler_t scheduler;
-    hcWorkpileIterator_t * stealIterators;
-    u64 workerIdFirst;
 } ocrSchedulerHc_t;
 
 typedef struct _paramListSchedulerHcInst_t {
     paramListSchedulerInst_t base;
-    u64 workerIdFirst;
 } paramListSchedulerHcInst_t;
 
 ocrSchedulerFactory_t * newOcrSchedulerFactoryHc(ocrParamList_t *perType);

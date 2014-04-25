@@ -32,7 +32,6 @@ typedef struct _paramListSchedulerInst_t {
 /****************************************************/
 
 struct _ocrScheduler_t;
-struct _ocrCost_t;
 struct _ocrPolicyCtx_t;
 struct _ocrMsgHandler_t;
 
@@ -82,7 +81,7 @@ typedef struct _ocrSchedulerFcts_t {
      *
      * @return 0 on success and a non-zero value on failure
      */
-    u8 (*take)(struct _ocrScheduler_t *self, ocrLocation_t source, ocrFatGuid_t component, ocrFatGuid_t hints, u32 properties);
+    u8 (*take)(struct _ocrScheduler_t *self, ocrLocation_t source, ocrFatGuid_t *component, ocrFatGuid_t hints, u32 properties);
 
     /**
      * @brief Gives a component to this scheduler

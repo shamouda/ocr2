@@ -71,7 +71,7 @@ typedef struct _ocrCostMapperFcts_t {
      *
      * @return 0 on success and a non-zero value on failure
      */
-    u8 (*take)(struct _ocrCostMapper_t *self, ocrLocation_t source, ocrFatGuid_t component, ocrFatGuid_t hints, ocrFatGuid_t costs, ocrFatGuid_t mappings, u32 properties);
+    u8 (*take)(struct _ocrCostMapper_t *self, ocrLocation_t source, ocrFatGuid_t *component, ocrFatGuid_t hints, ocrFatGuid_t *costs, ocrFatGuid_t *mappings, u32 properties);
 
     /**
      * @brief Gives a components to this cost mapper
@@ -110,10 +110,7 @@ typedef struct _ocrCostMapperFcts_t {
  */
 typedef struct _ocrCostMapper_t {
     ocrFatGuid_t fguid;
-    struct _ocrPolicyDomain_t *pd;
-
     struct _ocrComponent_t *componentState; /**< Component that holds the state of all components under the jurisdiction of this cost mapper */
-
     ocrCostMapperFcts_t fcts;
 } ocrCostMapper_t;
 
@@ -123,14 +120,9 @@ typedef struct _ocrCostMapper_t {
 /****************************************************/
 
 typedef struct _ocrCostMapperFactory_t {
-    ocrCostMapper_t* (*instantiate) (struct _ocrCostMapperFactory_t * factory,
-                                    ocrParamList_t *perInstance);
-    void (*initialize) (struct _ocrCostMapperFactory_t * factory, ocrCostMapper_t *self, ocrParamList_t *perInstance);
+    ocrCostMapper_t* (*instantiate) (struct _ocrCostMapperFactory_t * factory, ocrFatGuid_t hints, u32 properties);
     void (*destruct)(struct _ocrCostMapperFactory_t * factory);
-
-    ocrCostMapperFcts_t costMapperFcts;
+    ocrCostMapperFcts_t fcts;
 } ocrCostMapperFactory_t;
-
-void initializeCostMapperOcr(ocrCostMapperFactory_t * factory, ocrCostMapper_t * self, ocrParamList_t *perInstance);
 
 #endif /* __OCR_COST_MAPPER_H__ */

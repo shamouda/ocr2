@@ -11,5 +11,19 @@
 #include "ocr-config.h"
 #ifdef ENABLE_COST_MAPPER_HC
 
+typedef struct {
+    ocrCostMapperFactory_t base;
+} ocrCostMapperFactoryHc_t;
+
+typedef struct {
+    ocrCostMapper_t scheduler;
+} ocrCostMapperHc_t;
+
+typedef struct _paramListCostMapperHcInst_t {
+    paramListCostMapperInst_t base;
+} paramListCostMapperHcInst_t;
+
+ocrCostMapperFactory_t * newOcrCostMapperFactoryHc(ocrParamList_t *perType);
+
 #endif /* ENABLE_COST_MAPPER_HC */
 #endif /* __HC_COST_MAPPER_H__ */
