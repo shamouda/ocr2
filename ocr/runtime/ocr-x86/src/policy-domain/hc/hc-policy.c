@@ -783,9 +783,16 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             if(PD_MSG_FIELD(properties) == 0)
                 PD_MSG_FIELD(properties) = KIND_GUIDPROP
                     | WMETA_GUIDPROP | RMETA_GUIDPROP;
+        } else if (PD_MSG_FIELD(properties) & LOCATION_GUIDPROP) {
+            PD_MSG_FIELD(properties) = self->guidProviders[0]->fcts.getLocation(
+                self->guidProviders[0], PD_MSG_FIELD(guid.guid), &(PD_MSG_FIELD(location)));
+            if(PD_MSG_FIELD(properties) == 0)
+                PD_MSG_FIELD(properties) = LOCATION_GUIDPROP
+                    | WMETA_GUIDPROP | RMETA_GUIDPROP;
         } else {
             PD_MSG_FIELD(properties) = WMETA_GUIDPROP | RMETA_GUIDPROP;
         }
+
 #undef PD_MSG
 #undef PD_TYPE
         msg->type &= ~PD_MSG_REQUEST;

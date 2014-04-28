@@ -421,6 +421,7 @@ typedef struct _ocrPolicyMsg_t {
                                 * whose information is needed
                                 * Out: Fully resolved information */
             ocrGuidKind kind; /**< Out: Contains the type of the GUID */
+            ocrLocation_t location; /**< Out: Contains the location of the GUID */
             u32 properties;   /**< In: Properties for the info. See ocrGuidInfoProp_t */
         } PD_MSG_STRUCT_NAME(PD_MSG_GUID_INFO);
 

@@ -202,11 +202,12 @@ typedef struct {
 
 typedef enum {
     KIND_GUIDPROP       = 0x1, /**< Request kind of the GUID */
-    WMETA_GUIDPROP      = 0x2, /**< Request the metadata of the GUID in write mode
+    LOCATION_GUIDPROP   = 0x2, /**< Request location of the GUID */
+    WMETA_GUIDPROP      = 0x4, /**< Request the metadata of the GUID in write mode
                                 * Also used when returning the GUID to indicate if
                                 * the returned meta data can be written to */
-    RMETA_GUIDPROP      = 0x4, /**< Request the metadata of the GUID in read mode */
-    CMETA_GUIDPROP      = 0x8, /**< Indicates that the metadata returned is a copy (R/O
+    RMETA_GUIDPROP      = 0x8, /**< Request the metadata of the GUID in read mode */
+    CMETA_GUIDPROP      = 0x10, /**< Indicates that the metadata returned is a copy (R/O
                                 * and should be freed with pdFree) */
 } ocrGuidInfoProp_t;
 
