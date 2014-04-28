@@ -82,11 +82,9 @@ void mallocGetRange(ocrMemPlatform_t *self, u64* startAddr,
 u8 mallocChunkAndTag(ocrMemPlatform_t *self, u64 *startAddr, u64 size,
                      ocrMemoryTag_t oldTag, ocrMemoryTag_t newTag) {
 
-    printf("res %d, %d , %d\n", oldTag, newTag, MAX_TAG);
-    if(oldTag >= MAX_TAG || newTag >= MAX_TAG) {
-        printf("return");
+    if(oldTag >= MAX_TAG || newTag >= MAX_TAG)
         return 3;
-    }
+
     ocrMemPlatformMalloc_t *rself = (ocrMemPlatformMalloc_t *)self;
 
     u64 iterate = 0;
@@ -106,7 +104,6 @@ u8 mallocChunkAndTag(ocrMemPlatform_t *self, u64 *startAddr, u64 size,
     } while(result == 0);
 
     UNLOCK(&(rself->lock));
-    printf("return result %d\n", (int) result);
     return result;
 }
 
