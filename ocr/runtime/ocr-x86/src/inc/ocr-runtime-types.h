@@ -229,7 +229,7 @@ typedef u64 ocrLocation_t;
  * @brief Indicates that a message was returned and available
  * and that more messages are available
  */
-#define POLL_MORE_MESSAGE 0x2
+ #define POLL_MORE_MESSAGE 0x2
 /**
  * @brief AND the return code of pollMessage with this
  * mask to get any real error codes

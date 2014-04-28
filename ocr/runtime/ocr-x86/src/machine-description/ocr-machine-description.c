@@ -662,22 +662,23 @@ s32 populate_inst(ocrParamList_t **inst_param, void **instance, s32 *type_counts
             workerType_t mytype = -1;
             TO_ENUM (mytype, inststr, workerType_t, worker_types, workerMax_id);
             switch (mytype) {
-#ifdef ENABLE_WORKER_HC
-            case workerHc_id: {
-                char *workerstr;
-                char workertypekey[MAX_KEY_SZ];
-                ocrWorkerType_t workertype = MAX_WORKERTYPE;
+#if defined(ENABLE_WORKER_HC) || defined(ENABLE_WORKER_HC_COMM)
+                case workerHc_id:
+                case workerHcComm_id: {
+                    char *workerstr;
+                    char workertypekey[MAX_KEY_SZ];
+                    ocrWorkerType_t workertype = MAX_WORKERTYPE;
 
-                snprintf(workertypekey, MAX_KEY_SZ, "%s:%s", secname, "workertype");
-                INI_GET_STR (workertypekey, workerstr, "");
-                TO_ENUM (workertype, workerstr, ocrWorkerType_t, ocrWorkerType_types, MAX_WORKERTYPE-1);
-                workertype += 1;  // because workertype is 1-indexed, not 0-indexed
-                if (workertype == MAX_WORKERTYPE) workertype = SLAVE_WORKERTYPE; // TODO: is this a reasonable default?
-                ALLOC_PARAM_LIST(inst_param[j], paramListWorkerHcInst_t);
-                ((paramListWorkerHcInst_t *)inst_param[j])->workerType = workertype;
-                ((paramListWorkerHcInst_t *)inst_param[j])->workerId = j; // using "id" for now; TODO: decide if a separate key is needed
-            }
-            break;
+                    snprintf(workertypekey, MAX_KEY_SZ, "%s:%s", secname, "workertype");
+                    INI_GET_STR (workertypekey, workerstr, "");
+                    TO_ENUM (workertype, workerstr, ocrWorkerType_t, ocrWorkerType_types, MAX_WORKERTYPE-1);
+                    workertype += 1;  // because workertype is 1-indexed, not 0-indexed
+                    if (workertype == MAX_WORKERTYPE) workertype = SLAVE_WORKERTYPE; // TODO: is this a reasonable default?
+                    ALLOC_PARAM_LIST(inst_param[j], paramListWorkerHcInst_t);
+                    ((paramListWorkerHcInst_t *)inst_param[j])->workerType = workertype;
+                    ((paramListWorkerHcInst_t *)inst_param[j])->workerId = j; // using "id" for now; TODO: decide if a separate key is needed
+                }
+                break;
 #endif
 #ifdef ENABLE_WORKER_CE
             case workerCe_id: {
@@ -729,8 +730,9 @@ s32 populate_inst(ocrParamList_t **inst_param, void **instance, s32 *type_counts
             schedulerType_t mytype = -1;
             TO_ENUM (mytype, inststr, schedulerType_t, scheduler_types, schedulerMax_id);
             switch (mytype) {
-#ifdef ENABLE_SCHEDULER_HC
-            case schedulerHc_id: {
+#if defined(ENABLE_SCHEDULER_HC) || defined(ENABLE_SCHEDULER_HC_COMM_DELEGATE)
+            case schedulerHc_id:
+            case schedulerHcCommDelegate_id: {
                 ALLOC_PARAM_LIST(inst_param[j], paramListSchedulerHcInst_t);
                 snprintf(key, MAX_KEY_SZ, "%s:%s", secname, "workeridfirst");
                 INI_GET_INT (key, value, -1);

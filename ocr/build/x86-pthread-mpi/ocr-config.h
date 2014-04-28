@@ -8,7 +8,6 @@
  * removed or modified.
  */
 
-
 #ifndef __OCR_CONFIG_H__
 #define __OCR_CONFIG_H__
 
@@ -23,14 +22,15 @@
 #define ENABLE_ALLOCATOR_TLSF
 
 // Comm-api
-#define ENABLE_COMM_API_HANDLELESS
+#define ENABLE_COMM_API_DELEGATE
+#define ENABLE_COMM_API_HC
 
 // Comm-platform
 #define ENABLE_COMM_PLATFORM_NULL
+#define ENABLE_COMM_PLATFORM_MPI
 
 // Comp-platform
 #define ENABLE_COMP_PLATFORM_PTHREAD
-//#define ENABLE_COMP_PLATFORM_FSIM
 
 // Comp-target
 #define ENABLE_COMP_TARGET_PASSTHROUGH
@@ -63,9 +63,11 @@
 
 // Policy domain
 #define ENABLE_POLICY_DOMAIN_HC
+#define ENABLE_POLICY_DOMAIN_HC_DIST
 
 // Scheduler
 #define ENABLE_SCHEDULER_HC
+#define ENABLE_SCHEDULER_HC_COMM_DELEGATE
 
 // Sysboot layer to use
 #define ENABLE_SYSBOOT_LINUX
@@ -78,11 +80,12 @@
 
 // Worker
 #define ENABLE_WORKER_HC
+#define ENABLE_WORKER_HC_COMM
 
 // Workpile
 #define ENABLE_WORKPILE_HC
 
 // Build the OCR-lib support
 #define ENABLE_OCR_LIB
-#endif /* __OCR_CONFIG_H__ */
 
+#endif /* __OCR_CONFIG_H__ */

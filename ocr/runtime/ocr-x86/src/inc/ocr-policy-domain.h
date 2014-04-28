@@ -8,11 +8,6 @@
 #ifndef OCR_POLICY_DOMAIN_H_
 #define OCR_POLICY_DOMAIN_H_
 
-//TODO this is a quick fix to fix header include issues when
-//getCurrentEnv is not declared and cause compilation errors
-//down in ocr-guid-end.h
-#include "ocr-sal.h"
-
 #include "ocr-allocator.h"
 #include "ocr-comm-api.h"
 #include "ocr-datablock.h"
@@ -117,10 +112,14 @@ typedef struct _paramListPolicyDomainInst_t {
 
 /**< Gets information about the GUID */
 #define PD_MSG_GUID_INFO        0x2020
+
+/**< Request a copy of the GUID's metadata */
+#define PD_MSG_GUID_METADATA_CLONE  0x3020
+
 /**< Release the GUID (destroy the association between the u64
  * value and the GUID and optionally destroy the associated
  * metadata */
-#define PD_MSG_GUID_DESTROY     0x3020
+#define PD_MSG_GUID_DESTROY     0x4020
 // TODO: Add stuff about GUID reservation
 
 /**< AND with this and if result non-null, GUID distribution related
@@ -360,6 +359,13 @@ typedef struct _ocrPolicyMsg_t {
             u32 depc;                  /**< In/out: Number of dependence slots; same comment as above */
             u32 properties;            /**< In: properties for the creation */
             ocrWorkType_t workType;    /**< In: Type of work to create */
+            //
+            //DIST-TODO this is until we get somekind of guidCopy
+            //
+            ocrGuid_t t_Guid;     /**< In/Out: GUID of the EDT template */
+            ocrEdt_t t_FuncPtr;      /**< In: Function to execute for this EDT */
+            u32 t_paramc;            /**< In: Number of parameters for EDT */
+            u32 t_depc;              /**< In: Number of dependences for EDT */
         } PD_MSG_STRUCT_NAME(PD_MSG_WORK_CREATE);
 
         struct {
@@ -420,10 +426,17 @@ typedef struct _ocrPolicyMsg_t {
                                 * In: The GUID field should be set to the GUID
                                 * whose information is needed
                                 * Out: Fully resolved information */
-            ocrGuidKind kind; /**< Out: Contains the type of the GUID */
+            ocrGuidKind kind;  /**< Out: Contains the type of the GUID */
             ocrLocation_t location; /**< Out: Contains the location of the GUID */
-            u32 properties;   /**< In: Properties for the info. See ocrGuidInfoProp_t */
+            u32 properties;    /**< In: Properties for the info. See ocrGuidInfoProp_t */
         } PD_MSG_STRUCT_NAME(PD_MSG_GUID_INFO);
+
+        struct {
+            ocrFatGuid_t guid; /**< In/Out:
+                                * In: The GUID we request a metadata copy */
+            //DIST-TODO: hardcoded and we probably need a way to chunk the metadata in multiple messages
+            char metaData[1]; /** Contains the copy of the metadata */
+        } PD_MSG_STRUCT_NAME(PD_MSG_GUID_METADATA_CLONE);
 
         struct {
             ocrFatGuid_t guid; /**< In: GUID to destroy */
@@ -514,8 +527,8 @@ typedef struct _ocrPolicyMsg_t {
         } PD_MSG_STRUCT_NAME(PD_MSG_DEP_UNREGWAITER);
 
         struct {
-            const char* buffer;  /**< In: ASCIIZ character string to print */
-            u64 length;          /**< In: Length to print, including NULL termination */
+            const char* buffer;  /**< In: Character string to print */
+            u64 length;          /**< In: Length to print */
             u32 properties;      /**< In: Properties for the print */
         } PD_MSG_STRUCT_NAME(PD_MSG_SAL_PRINT);
 
@@ -568,13 +581,8 @@ typedef struct _ocrPolicyMsg_t {
  * and destroyed by the user (caller of sendMessage, waitMessage...) using
  * the provided 'destruct' function.
  *
- *
- *
  * The response message will always be contained in handle->response.
- * To check whether a message has:
- *    - been sent: check the 'done' field
- *    - a valid response (response in response->msg), check to the
- *      'response->done' field
+ *
  * If 'msg' is non-NULL after a successful poll (handle->status = HDL_RESPONSE_OK),
  * or a wait, this serves as a reminder to the caller that the message
  * was passed in with PERSIST_MESSAGE_PROP (pointer to original message).
@@ -587,7 +595,6 @@ typedef struct _ocrMsgHandle_t {
     ocrPolicyMsg_t * msg;           /**< The message associated with the communication
                                        the handle represents. */
     ocrPolicyMsg_t * response;      /**< The response (if applicable) */
-
     ocrMsgHandleStatus_t status;   /**< Status of this handle. See ocrMsgHandleState */
     void (*destruct)(struct _ocrMsgHandle_t * self); /**< Destructor for this
                                                        * instance of the message

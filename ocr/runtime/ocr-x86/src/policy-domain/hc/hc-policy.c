@@ -21,6 +21,9 @@
 
 #include "policy-domain/hc/hc-policy.h"
 
+//DIST-TODO hack to support edt templates
+#include "task/hc/hc-task.h"
+
 #define DEBUG_TYPE POLICY
 
 void hcPolicyDomainBegin(ocrPolicyDomain_t * policy) {
@@ -120,19 +123,25 @@ void hcPolicyDomainFinish(ocrPolicyDomain_t * policy) {
 
     // Worker 0 enters here
     ocrPolicyDomainHc_t *rself = (ocrPolicyDomainHc_t*)policy;
-
+    DPRINTF(DEBUG_LVL_VERB,"Begin PD finish wait loop\n");
     u32 oldState = 0;
     // Wait for stop to complete before we start with finish
     do {
         oldState = hal_cmpswap32(&(rself->state), 10, 14);
     } while(oldState != 10);
 
+    DPRINTF(DEBUG_LVL_VERB,"End PD finish wait loop\n");
     // Note: As soon as worker '0' is stopped; its thread is
     // free to fall-through and continue shutting down the
     // policy domain
     maxCount = policy->workerCount;
     for(i = 0; i < maxCount; i++) {
         policy->workers[i]->fcts.finish(policy->workers[i]);
+    }
+
+    maxCount = policy->commApiCount;
+    for(i = 0; i < maxCount; i++) {
+        policy->commApis[i]->fcts.finish(policy->commApis[i]);
     }
 
     maxCount = policy->commApiCount;
@@ -157,11 +166,6 @@ void hcPolicyDomainFinish(ocrPolicyDomain_t * policy) {
 }
 
 void hcPolicyDomainStop(ocrPolicyDomain_t * policy) {
-
-    // Finish everything in reverse order
-    // In HC, we MUST call stop on the master worker first.
-    // The master worker enters its work routine loop and will
-    // be unlocked by ocrShutdown
     u64 i = 0;
     u64 maxCount = 0;
 
@@ -169,6 +173,7 @@ void hcPolicyDomainStop(ocrPolicyDomain_t * policy) {
 
     // We inform people that we want to stop the policy domain
     // We make sure that no one else is using the PD (in processMessage mostly)
+    DPRINTF(DEBUG_LVL_VERB,"Begin PD stop wait loop\n");
     u32 oldState = 0, newState = 0;
     do {
         oldState = rself->state;
@@ -178,21 +183,18 @@ void hcPolicyDomainStop(ocrPolicyDomain_t * policy) {
     // Now we have set the "I want to shut-down" bit so now we need
     // to wait for the users to drain
     // We do something really stupid and just loop for now
-    while(rself->state != 18) ;
-
+    while(rself->state != 18);
+    DPRINTF(DEBUG_LVL_VERB,"End PD stop wait loop\n");
     // Here we can start stopping the PD
     ASSERT(rself->state == 18); // We should have no users and have managed to set
-    // the state to 0010b
 
     // Note: As soon as worker '0' is stopped; its thread is
-    // free to fall-through and enter hcPolicyDomainFinish
+    // free to fall-through from 'start' and call 'finish'.
     maxCount = policy->workerCount;
     for(i = 0; i < maxCount; i++) {
         policy->workers[i]->fcts.stop(policy->workers[i]);
     }
 
-    // Note: As soon as worker '0' is stopped; its thread is
-    // free to fall-through from 'start' and call 'finish'.
     maxCount = policy->commApiCount;
     for(i = 0; i < maxCount; i++) {
         policy->commApis[i]->fcts.stop(policy->commApis[i]);
@@ -649,6 +651,7 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_WORK_CREATE
         localDeguidify(self, &(PD_MSG_FIELD(templateGuid)));
+        ASSERT(PD_MSG_FIELD(templateGuid.metaDataPtr) != NULL);
         localDeguidify(self, &(PD_MSG_FIELD(affinity)));
         ocrFatGuid_t *outputEvent = NULL;
         if(PD_MSG_FIELD(outputEvent.guid) == UNINITIALIZED_GUID) {
@@ -812,12 +815,43 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         } else {
             PD_MSG_FIELD(properties) = WMETA_GUIDPROP | RMETA_GUIDPROP;
         }
-
 #undef PD_MSG
 #undef PD_TYPE
         msg->type &= ~PD_MSG_REQUEST;
         msg->type |= PD_MSG_RESPONSE;
         EXIT_PROFILE;
+        break;
+    }
+
+    case PD_MSG_GUID_METADATA_CLONE:
+    {
+#define PD_MSG msg
+#define PD_TYPE PD_MSG_GUID_METADATA_CLONE
+        ocrFatGuid_t fatGuid = PD_MSG_FIELD(guid);
+        ocrGuidKind kind;
+        guidKind(self, fatGuid, &kind);
+        //IMPL: For now only support edt template cloning
+        ASSERT((kind == OCR_GUID_EDT_TEMPLATE) && "Unsupported GUID kind cloning");
+        localDeguidify(self, &(PD_MSG_FIELD(guid)));
+        ocrTaskTemplate_t * templ = (ocrTaskTemplate_t*) (PD_MSG_FIELD(guid.metaDataPtr));
+        //DIST-TODO: this really sucks but is simpler for now
+        ocrTaskTemplateHc_t * hcTempl = (ocrTaskTemplateHc_t*) templ;
+        //These won't support flat serialization
+        #ifdef OCR_ENABLE_STATISTICS
+            ASSERT(false && "no statistics support in distributed edt templates");
+        #endif
+        #ifdef OCR_ENABLE_EDT_NAMING
+            ASSERT(false && "no serialization of edt template string");
+        #endif
+        //DIST-TODO rough check for message size
+        ASSERT(sizeof(ocrTaskTemplateHc_t) < (sizeof(ocrPolicyMsg_t)-PD_MSG_SIZE_FULL(PD_MSG_GUID_METADATA_CLONE)));
+        u64 copyPtr = (u64) &(PD_MSG_FIELD(metaData));
+        hal_memCopy(copyPtr, hcTempl, sizeof(ocrTaskTemplateHc_t), false);
+        hcTempl = (ocrTaskTemplateHc_t *) copyPtr;
+#undef PD_MSG
+#undef PD_TYPE
+        msg->type &= ~PD_MSG_REQUEST;
+        msg->type |= PD_MSG_RESPONSE;
         break;
     }
 
@@ -895,6 +929,10 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
 #define PD_TYPE PD_MSG_DEP_ADD
         // We first get information about the source and destination
         ocrGuidKind srcKind, dstKind;
+        //TODO here we should not be able to dereference the metaDataPtr
+        //because stuff could be remote, however we should be able to query
+        //the kind through the PD's interface and it's the problem of the guid
+        //provider to give this information
         self->guidProviders[0]->fcts.getVal(
             self->guidProviders[0], PD_MSG_FIELD(source.guid),
             (u64*)(&(PD_MSG_FIELD(source.metaDataPtr))), &srcKind);
@@ -905,26 +943,31 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         ocrFatGuid_t src = PD_MSG_FIELD(source);
         ocrFatGuid_t dest = PD_MSG_FIELD(dest);
         if(srcKind == OCR_GUID_DB) {
+            //TODO: debatable why NULL_GUID is caught in user-to-runtime layer and not this one ?
             // This is equivalent to an immediate satisfy
             PD_MSG_FIELD(properties) = convertDepAddToSatisfy(
                 self, src, dest, PD_MSG_FIELD(slot));
         } else {
             if(srcKind == OCR_GUID_EVENT) {
+                //TODO create a pd-message instead
                 ocrEvent_t *evt = (ocrEvent_t*)(src.metaDataPtr);
                 ASSERT(evt->fctId == self->eventFactories[0]->factoryId);
                 PD_MSG_FIELD(properties) = self->eventFactories[0]->fcts[evt->kind].registerWaiter(
                     evt, dest, PD_MSG_FIELD(slot), true);
             } else {
-                // Some sanity check
+                //NULL_GUID as source is caught early on in the user-to-runtime API layer
+                //TODO there's no edt has source, it would have to be an edt's output event instead
                 ASSERT(srcKind == OCR_GUID_EDT);
             }
             if(!PD_MSG_FIELD(properties)) {
                 if(dstKind == OCR_GUID_EDT) {
+                    //TODO create a pd-message instead
                     ocrTask_t *task = (ocrTask_t*)(dest.metaDataPtr);
                     ASSERT(task->fctId == self->taskFactories[0]->factoryId);
                     PD_MSG_FIELD(properties) = self->taskFactories[0]->fcts.registerSignaler(
                         task, src, PD_MSG_FIELD(slot), true);
                 } else if(dstKind == OCR_GUID_EVENT) {
+                    //TODO create a pd-message instead
                     ocrEvent_t *evt = (ocrEvent_t*)(dest.metaDataPtr);
                     ASSERT(evt->fctId == self->eventFactories[0]->factoryId);
                     PD_MSG_FIELD(properties) = self->eventFactories[0]->fcts[evt->kind].registerSignaler(
@@ -1214,7 +1257,7 @@ void* hcPdMalloc(ocrPolicyDomain_t *self, u64 size) {
     // Just try in the first allocator
     void* toReturn = NULL;
     toReturn = self->allocators[0]->fcts.allocate(self->allocators[0], size);
-
+    ASSERT(toReturn != NULL);
     hcReleasePd((ocrPolicyDomainHc_t*)self);
     RETURN_PROFILE(toReturn);
 }
@@ -1260,7 +1303,9 @@ void initializePolicyDomainHc(ocrPolicyDomainFactory_t * factory, ocrPolicyDomai
 #endif
 
     initializePolicyDomainOcr(factory, self, perInstance);
+
     ocrPolicyDomainHc_t* derived = (ocrPolicyDomainHc_t*) self;
+    //DIST-TODO ((paramListPolicyDomainHcInst_t*)perInstance)->rank;
     derived->rank = ((paramListPolicyDomainHcInst_t*)perInstance)->rank;
     derived->state = 0;
 }
@@ -1271,7 +1316,6 @@ static void destructPolicyDomainFactoryHc(ocrPolicyDomainFactory_t * factory) {
 
 ocrPolicyDomainFactory_t * newPolicyDomainFactoryHc(ocrParamList_t *perType) {
     ocrPolicyDomainFactory_t* base = (ocrPolicyDomainFactory_t*) runtimeChunkAlloc(sizeof(ocrPolicyDomainFactoryHc_t), (void *)1);
-
     // Set factory's methods
 #ifdef OCR_ENABLE_STATISTICS
     base->instantiate = FUNC_ADDR(ocrPolicyDomain_t*(*)(ocrPolicyDomainFactory_t*,ocrStats_t*,

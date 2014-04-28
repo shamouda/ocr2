@@ -34,7 +34,7 @@ typedef struct _paramListSchedulerInst_t {
 struct _ocrScheduler_t;
 struct _ocrCost_t;
 struct _ocrPolicyCtx_t;
-struct _ocrMsgHandler_t;
+struct _ocrMsgHandle_t;
 
 typedef struct _ocrSchedulerFcts_t {
     void (*destruct)(struct _ocrScheduler_t *self);

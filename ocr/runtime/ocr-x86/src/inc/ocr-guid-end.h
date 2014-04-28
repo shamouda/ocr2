@@ -16,6 +16,7 @@
 #error "Do not include ocr-guid-end.h yourself"
 #endif
 
+#include "debug.h"
 #include "ocr-event.h"
 #include "ocr-policy-domain.h"
 

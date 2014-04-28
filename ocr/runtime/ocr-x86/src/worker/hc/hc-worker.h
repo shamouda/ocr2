@@ -24,6 +24,11 @@ typedef struct _paramListWorkerHcInst_t {
     ocrWorkerType_t workerType;
 } paramListWorkerHcInst_t;
 
+typedef enum {
+    HC_WORKER_COMP,
+    HC_WORKER_COMM
+} hcWorkerType_t;
+
 typedef struct {
     ocrWorker_t worker;
     // The HC implementation relies on integer ids to
@@ -34,6 +39,7 @@ typedef struct {
     // Master workers need to be started twice (once by the PD and once
     // when they actually start running. This helps keep track of this
     bool secondStart;
+    hcWorkerType_t hcType;
 } ocrWorkerHc_t;
 
 ocrWorkerFactory_t* newOcrWorkerFactoryHc(ocrParamList_t *perType);

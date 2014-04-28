@@ -19,6 +19,7 @@
 #define GUID_BIT_SIZE 64
 #define GUID_LOCID_SIZE 7 // Warning! 2^7 locId max, bump that up for more.
 #define GUID_KIND_SIZE 4 // Warning! check ocrGuidKind struct definition for correct size
+
 #define GUID_COUNTER_SIZE (GUID_BIT_SIZE-(GUID_KIND_SIZE+GUID_LOCID_SIZE))
 
 #define GUID_LOCID_MASK (((((u64)1)<<GUID_LOCID_SIZE)-1)<<(GUID_COUNTER_SIZE+GUID_KIND_SIZE))
@@ -71,16 +72,18 @@ static u64 extractLocIdFromGuid(ocrGuid_t guid) {
     return (u64) ((guid & GUID_LOCID_MASK) >> GUID_LOCID_SHIFT_RIGHT);
 }
 
+#define HACK_RANK_SHIFT 64
+
 static ocrLocation_t locIdtoLocation(u64 locId) {
     //DIST-TODO: We assume there will be a mapping between a location
     //           and an 'id' stored in the guid.
-    return (ocrLocation_t) (locId);
+    return (ocrLocation_t) (locId + HACK_RANK_SHIFT);
 }
 
 static u64 locationToLocId(ocrLocation_t location) {
-    //DIST-TODO: We assume there will be a mapping between the location
+    //DIST-TODO: We assume there will be a mapping between a location
     //           and an 'id' stored in the guid.
-    u64 locId = (u64) ((int)location);
+    u64 locId = (u64) ((int)location - HACK_RANK_SHIFT);
     // Make sure we're not overflowing location size
     ASSERT((locId < (2^GUID_LOCID_SIZE)) && "GUID location ID overflows");
     return locId;
@@ -117,7 +120,7 @@ static u8 countedMapGetGuid(ocrGuidProvider_t* self, ocrGuid_t* guid, u64 val, o
 
 /**
  * @brief Allocates a piece of memory that embeds both
- * the guid and some meta-data payload behind it the
+ * the guid and some meta-data payload behind it
  * fatGuid's metaDataPtr will point to.
  */
 u8 countedMapCreateGuid(ocrGuidProvider_t* self, ocrFatGuid_t *fguid, u64 size, ocrGuidKind kind) {

@@ -43,10 +43,10 @@ static inline u64 getWorkerId(ocrWorker_t * worker) {
  */
 static void workerLoop(ocrWorker_t * worker) {
     ocrPolicyDomain_t *pd = worker->pd;
-    ocrPolicyMsg_t msg;
-    getCurrentEnv(NULL, NULL, NULL, &msg);
     while(worker->fcts.isRunning(worker)) {
         START_PROFILE(wo_hc_workerLoop);
+        ocrPolicyMsg_t msg;
+        getCurrentEnv(NULL, NULL, NULL, &msg);
         ocrFatGuid_t taskGuid = {.guid = NULL_GUID, .metaDataPtr = NULL};
         u32 count = 1;
 #define PD_MSG (&msg)
@@ -68,6 +68,7 @@ static void workerLoop(ocrWorker_t * worker) {
                 worker->curTask = NULL;
                 // Destroy the work
 #undef PD_TYPE
+
 #define PD_MSG (&msg)
 #define PD_TYPE PD_MSG_WORK_DESTROY
                 msg.type = PD_MSG_WORK_DESTROY | PD_MSG_REQUEST;
@@ -149,14 +150,8 @@ void hcStartWorker(ocrWorker_t * base, ocrPolicyDomain_t * policy) {
 }
 
 void* hcRunWorker(ocrWorker_t * worker) {
-    if (worker->type != MASTER_WORKERTYPE) {
-        // Set who we are
-        ocrPolicyDomain_t *pd = worker->pd;
-        u32 i;
-        for(i = 0; i < worker->computeCount; ++i) {
-            worker->computes[i]->fcts.setCurrentEnv(worker->computes[i], pd, worker);
-        }
-    } else {
+    bool blessedWorker = (worker->type == MASTER_WORKERTYPE);
+    if (blessedWorker) {
         // This is all part of the mainEdt setup
         // and should be executed by the "blessed" worker.
         void * packedUserArgv = userArgsGet();
@@ -179,6 +174,13 @@ void* hcRunWorker(ocrWorker_t * worker) {
         ocrEdtCreate(&edtGuid, edtTemplateGuid, EDT_PARAM_DEF, /* paramv = */ NULL,
                      /* depc = */ EDT_PARAM_DEF, /* depv = */ &dbGuid,
                      EDT_PROP_NONE, NULL_GUID, NULL);
+    } else {
+        // Set who we are
+        ocrPolicyDomain_t *pd = worker->pd;
+        u32 i;
+        for(i = 0; i < worker->computeCount; ++i) {
+            worker->computes[i]->fcts.setCurrentEnv(worker->computes[i], pd, worker);
+        }
     }
 
     DPRINTF(DEBUG_LVL_INFO, "Starting scheduler routine of worker %ld\n", getWorkerId(worker));
@@ -197,6 +199,7 @@ void hcFinishWorker(ocrWorker_t * base) {
 
 void hcStopWorker(ocrWorker_t * base) {
     ocrWorkerHc_t * hcWorker = (ocrWorkerHc_t *) base;
+    // Makes worker threads to exit their routine.
     hcWorker->running = false;
 
     u64 computeCount = base->computeCount;
@@ -246,7 +249,6 @@ ocrWorker_t* newWorkerHc(ocrWorkerFactory_t * factory, ocrParamList_t * perInsta
  */
 void initializeWorkerHc(ocrWorkerFactory_t * factory, ocrWorker_t* self, ocrParamList_t * perInstance) {
     initializeWorkerOcr(factory, self, perInstance);
-
     self->type = ((paramListWorkerHcInst_t*)perInstance)->workerType;
     u64 workerId = ((paramListWorkerHcInst_t*)perInstance)->workerId;;
     ASSERT((workerId && self->type == SLAVE_WORKERTYPE) ||
@@ -256,6 +258,7 @@ void initializeWorkerHc(ocrWorkerFactory_t * factory, ocrWorker_t* self, ocrPara
     workerHc->id = workerId;
     workerHc->running = false;
     workerHc->secondStart = false;
+    workerHc->hcType = HC_WORKER_COMP;
 }
 
 /******************************************************/

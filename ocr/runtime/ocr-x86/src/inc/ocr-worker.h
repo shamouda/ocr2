@@ -65,6 +65,7 @@ typedef struct _ocrWorkerFcts_t {
      *  @return true if the Worker is running, false otherwise
      */
     bool (*isRunning)(struct _ocrWorker_t *self);
+
 } ocrWorkerFcts_t;
 
 typedef struct _ocrWorker_t {
@@ -93,7 +94,6 @@ typedef struct _ocrWorkerFactory_t {
     ocrWorker_t* (*instantiate) (struct _ocrWorkerFactory_t * factory,
                                  ocrParamList_t *perInstance);
     void (*initialize) (struct _ocrWorkerFactory_t * factory, struct _ocrWorker_t * worker, ocrParamList_t *perInstance);
-
     void (*destruct)(struct _ocrWorkerFactory_t * factory);
     ocrWorkerFcts_t workerFcts;
 } ocrWorkerFactory_t;

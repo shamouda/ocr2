@@ -12,11 +12,13 @@
 
 #include "ocr-scheduler.h"
 #include "scheduler/hc/hc-scheduler.h"
+#include "scheduler/hc/hc-comm-delegate-scheduler.h"
 #include "scheduler/ce/ce-scheduler.h"
 #include "scheduler/xe/xe-scheduler.h"
 
 typedef enum _schedulerType_t {
     schedulerHc_id,
+    schedulerHcCommDelegate_id,
     schedulerXe_id,
     schedulerCe_id,
     schedulerHcPlaced_id,

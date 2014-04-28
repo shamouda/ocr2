@@ -9,6 +9,7 @@
 
 const char * policyDomain_types [] = {
     "HC",
+    "HCDist",
     "XE",
     "CE",
     "MasterCE",
@@ -23,6 +24,10 @@ ocrPolicyDomainFactory_t * newPolicyDomainFactory(policyDomainType_t type, ocrPa
 #ifdef ENABLE_POLICY_DOMAIN_HC
     case policyDomainHc_id:
         return newPolicyDomainFactoryHc(perType);
+#endif
+#ifdef ENABLE_POLICY_DOMAIN_HC_DIST
+    case policyDomainHcDist_id:
+        return newPolicyDomainFactoryHcDist(perType);
 #endif
 #ifdef ENABLE_POLICY_DOMAIN_XE
     case policyDomainXe_id:

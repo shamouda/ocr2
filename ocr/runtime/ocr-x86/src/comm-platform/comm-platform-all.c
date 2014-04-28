@@ -13,7 +13,8 @@ const char * commplatform_types[] = {
     "XE",
     "CePthread",
     "XePthread",
-    NULL,
+    "MPI",
+    NULL
 };
 
 ocrCommPlatformFactory_t *newCommPlatformFactory(commPlatformType_t type, ocrParamList_t *typeArg) {
@@ -37,6 +38,10 @@ ocrCommPlatformFactory_t *newCommPlatformFactory(commPlatformType_t type, ocrPar
 #ifdef ENABLE_COMM_PLATFORM_XE_PTHREAD
     case commPlatformXePthread_id:
         return newCommPlatformFactoryXePthread(typeArg);
+#endif
+#ifdef ENABLE_COMM_PLATFORM_MPI
+    case commPlatformMPI_id:
+        return newCommPlatformFactoryMPI(typeArg);
 #endif
     default:
         ASSERT(0);
