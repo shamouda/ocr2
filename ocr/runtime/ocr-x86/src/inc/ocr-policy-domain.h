@@ -19,6 +19,8 @@
 #include "ocr-event.h"
 #include "ocr-guid.h"
 #include "ocr-scheduler.h"
+#include "ocr-cost-mapper.h"
+#include "ocr-component.h"
 
 #ifdef OCR_ENABLE_STATISTICS
 #include "ocr-statistics.h"

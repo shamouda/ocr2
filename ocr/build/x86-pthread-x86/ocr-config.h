@@ -35,6 +35,13 @@
 // Comp-target
 #define ENABLE_COMP_TARGET_PASSTHROUGH
 
+// Component
+#define ENABLE_COMPONENT_HC_STATE
+#define ENABLE_COMPONENT_HC_WORK
+
+// Cost Mapper
+#define ENABLE_COST_MAPPER_HC
+
 // Datablock
 #define ENABLE_DATABLOCK_REGULAR
 

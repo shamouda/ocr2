@@ -4,8 +4,8 @@
  * removed or modified.
  */
 
-#include "component/component-all.h"
 #include "debug.h"
+#include "component/component-all.h"
 
 const char * component_types[] = {
     "HC_STATE",

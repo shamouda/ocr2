@@ -9,7 +9,10 @@
 #define __HC_COMPONENT_H__
 
 #include "ocr-config.h"
+#include "utils/ocr-utils.h"
+#include "utils/deque.h"
 #include "ocr-component.h"
+
 
 /****************************************************/
 /* OCR HC COMPONENT TYPES                           */
@@ -40,7 +43,7 @@ typedef struct _paramListComponentFactHcState_t {
     u32 maxWorkers;
 } paramListComponentFactHcState_t;
 
-ocrComponentFactory_t * newComponentFactoryHcState(ocrParamList_t* perType);
+ocrComponentFactory_t * newOcrComponentFactoryHcState(ocrParamList_t* perType);
 #endif /* ENABLE_COMPONENT_HC_STATE */
 
 /****************************************************/
@@ -63,9 +66,9 @@ typedef struct {
 typedef struct _paramListComponentFactHcWork_t {
     paramListComponentFact_t base;
     u32 dequeInitSize;
-} paramListComponentFactHcState_t;
+} paramListComponentFactHcWork_t;
 
-ocrComponentFactory_t * newComponentFactoryHcWork(ocrParamList_t* perType);
+ocrComponentFactory_t * newOcrComponentFactoryHcWork(ocrParamList_t* perType);
 #endif /* ENABLE_COMPONENT_HC_WORK */
 
 #endif /* __HC_COMPONENT_H__ */

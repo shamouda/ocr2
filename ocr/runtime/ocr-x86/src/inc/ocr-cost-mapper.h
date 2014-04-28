@@ -120,8 +120,11 @@ typedef struct _ocrCostMapper_t {
 /****************************************************/
 
 typedef struct _ocrCostMapperFactory_t {
-    ocrCostMapper_t* (*instantiate) (struct _ocrCostMapperFactory_t * factory, ocrFatGuid_t hints, u32 properties);
+    ocrCostMapper_t* (*instantiate) (struct _ocrCostMapperFactory_t * factory,
+                                    ocrParamList_t *perInstance);
+    //void (*initialize) (struct _ocrCostMapperFactory_t * factory, ocrCostMapper_t *self, ocrParamList_t *perInstance);
     void (*destruct)(struct _ocrCostMapperFactory_t * factory);
+
     ocrCostMapperFcts_t fcts;
 } ocrCostMapperFactory_t;
 

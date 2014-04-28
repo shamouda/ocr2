@@ -731,9 +731,6 @@ s32 populate_inst(ocrParamList_t **inst_param, void **instance, s32 *type_counts
 #ifdef ENABLE_SCHEDULER_HC
                 case schedulerHc_id: {
                     ALLOC_PARAM_LIST(inst_param[j], paramListSchedulerHcInst_t);
-                    snprintf(key, MAX_KEY_SZ, "%s:%s", secname, "workeridfirst");
-                    INI_GET_INT (key, value, -1);
-                    ((paramListSchedulerHcInst_t *)inst_param[j])->workerIdFirst = value;
                 }
                 break;
 #endif
@@ -877,15 +874,10 @@ void add_dependence (type_enum fromtype, type_enum totype, void *frominstance, o
         break;
     }
     case scheduler_type: {
-        ocrScheduler_t *f = (ocrScheduler_t *)frominstance;
+        //ocrScheduler_t *f = (ocrScheduler_t *)frominstance;
         DPRINTF(DEBUG_LVL_INFO, "Scheduler %d to %d\n", fromtype, totype);
         switch (totype) {
         case workpile_type: {
-            if (f->workpileCount == 0) {
-                f->workpileCount = dependence_count;
-                f->workpiles = (ocrWorkpile_t **)runtimeChunkAlloc(dependence_count * sizeof(ocrWorkpile_t *), NULL);
-            }
-            f->workpiles[dependence_index] = (ocrWorkpile_t *)toinstance;
             break;
         }
         default:

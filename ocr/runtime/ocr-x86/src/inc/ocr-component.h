@@ -159,6 +159,7 @@ typedef struct _ocrComponentFcts_t {
 typedef struct _ocrComponent_t {
     ocrGuid_t guid;         /**< The guid of this component */
     ocrLocation_t mapping;  /**< Location mapping of this component */
+    ocrComponentFcts_t fcts;
 } ocrComponent_t;
 
 

@@ -9,14 +9,17 @@
 #define __HC_COST_MAPPER_H__
 
 #include "ocr-config.h"
+
 #ifdef ENABLE_COST_MAPPER_HC
+
+#include "ocr-cost-mapper.h"
 
 typedef struct {
     ocrCostMapperFactory_t base;
 } ocrCostMapperFactoryHc_t;
 
 typedef struct {
-    ocrCostMapper_t scheduler;
+    ocrCostMapper_t base;
 } ocrCostMapperHc_t;
 
 typedef struct _paramListCostMapperHcInst_t {

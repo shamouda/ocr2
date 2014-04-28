@@ -11,7 +11,7 @@
 #include "ocr-policy-domain.h"
 #include "ocr-runtime-types.h"
 #include "ocr-sysboot.h"
-#include "ocr-mapper.h"
+#include "ocr-cost-mapper.h"
 #include "scheduler/hc/hc-scheduler.h"
 
 /******************************************************/
@@ -43,7 +43,6 @@ void hcSchedulerStart(ocrScheduler_t * self, ocrPolicyDomain_t * PD) {
     // Get a GUID
     guidify(PD, (u64)self, &(self->fguid), OCR_GUID_SCHEDULER);
     self->pd = PD;
-    ocrSchedulerHc_t * derived = (ocrSchedulerHc_t *) self;
     
     u64 mapperCount = self->mapperCount;
     u64 i;
@@ -88,12 +87,12 @@ void hcSchedulerFinish(ocrScheduler_t *self) {
 }
 
 u8 hcSchedulerTake(ocrScheduler_t *self, ocrLocation_t source, ocrFatGuid_t *component, ocrFatGuid_t hints, u32 properties) {
-    self->mappers[0]->take(self->mappers[0], source, component, hints, properties);
+    self->mappers[0]->fcts.take(self->mappers[0], source, component, hints, NULL, NULL, properties);
     return 0;
 }
 
 u8 hcSchedulerGive(ocrScheduler_t *self, ocrLocation_t source, ocrFatGuid_t component, ocrFatGuid_t hints, u32 properties) {
-    self->mappers[0]->give(self->mappers[0], source, component, hints, properties);
+    self->mappers[0]->fcts.give(self->mappers[0], source, component, hints, properties);
     return 0;
 }
 
