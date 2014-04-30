@@ -106,7 +106,7 @@ void hcPolicyDomainStart(ocrPolicyDomain_t * policy) {
         policy->commApis[i]->fcts.start(policy->commApis[i], policy);
     }
 
-    // REC: Moved all workers to start here.
+    // REC: Moved all workers to start here. 
     // Note: it's important to first logically start all workers.
     // Once they are all up, start the runtime.
     // Workers should start the underlying target and platforms
@@ -138,12 +138,7 @@ void hcPolicyDomainFinish(ocrPolicyDomain_t * policy) {
     for(i = 0; i < maxCount; i++) {
         policy->workers[i]->fcts.finish(policy->workers[i]);
     }
-
-    maxCount = policy->commApiCount;
-    for(i = 0; i < maxCount; i++) {
-        policy->commApis[i]->fcts.finish(policy->commApis[i]);
-    }
-
+    
     maxCount = policy->commApiCount;
     for(i = 0; i < maxCount; i++) {
         policy->commApis[i]->fcts.finish(policy->commApis[i]);
@@ -163,6 +158,9 @@ void hcPolicyDomainFinish(ocrPolicyDomain_t * policy) {
     for(i = 0; i < maxCount; ++i) {
         policy->guidProviders[i]->fcts.finish(policy->guidProviders[i]);
     }
+
+    //Destruct the policy-domain
+    policy->fcts.destruct(policy);
 }
 
 void hcPolicyDomainStop(ocrPolicyDomain_t * policy) {
@@ -244,49 +242,50 @@ void hcPolicyDomainDestruct(ocrPolicyDomain_t * policy) {
         policy->commApis[i]->fcts.destruct(policy->commApis[i]);
     }
 
-    maxCount = policy->schedulerCount;
-    for(i = 0; i < maxCount; ++i) {
-        policy->schedulers[i]->fcts.destruct(policy->schedulers[i]);
-    }
+    //DIST-TODO: Seems there's a bug when calling destruct
+    //Commenting out for now.
+    // maxCount = policy->schedulerCount;
+    // for(i = 0; i < maxCount; ++i) {
+    //     policy->schedulers[i]->fcts.destruct(policy->schedulers[i]);
+    // }
 
-    maxCount = policy->allocatorCount;
-    for(i = 0; i < maxCount; ++i) {
-        policy->allocators[i]->fcts.destruct(policy->allocators[i]);
-    }
-
-
-    // Simple hc policies don't have neighbors
-    ASSERT(policy->neighbors == NULL);
+    //TODO We need a scheme to deallocate all PDs in the node.
+    //policy->neighbors
 
     // Destruct factories
-    maxCount = policy->taskFactoryCount;
-    for(i = 0; i < maxCount; ++i) {
-        policy->taskFactories[i]->destruct(policy->taskFactories[i]);
-    }
+    // maxCount = policy->taskFactoryCount;
+    // for(i = 0; i < maxCount; ++i) {
+    //     policy->taskFactories[i]->destruct(policy->taskFactories[i]);
+    // }
 
-    maxCount = policy->taskTemplateFactoryCount;
-    for(i = 0; i < maxCount; ++i) {
-        policy->taskTemplateFactories[i]->destruct(policy->taskTemplateFactories[i]);
-    }
+    // maxCount = policy->taskTemplateFactoryCount;
+    // for(i = 0; i < maxCount; ++i) {
+    //     policy->taskTemplateFactories[i]->destruct(policy->taskTemplateFactories[i]);
+    // }
 
-    maxCount = policy->dbFactoryCount;
-    for(i = 0; i < maxCount; ++i) {
-        policy->dbFactories[i]->destruct(policy->dbFactories[i]);
-    }
+    // maxCount = policy->dbFactoryCount;
+    // for(i = 0; i < maxCount; ++i) {
+    //     policy->dbFactories[i]->destruct(policy->dbFactories[i]);
+    // }
 
-    maxCount = policy->eventFactoryCount;
-    for(i = 0; i < maxCount; ++i) {
-        policy->eventFactories[i]->destruct(policy->eventFactories[i]);
-    }
+    // maxCount = policy->eventFactoryCount;
+    // for(i = 0; i < maxCount; ++i) {
+    //     policy->eventFactories[i]->destruct(policy->eventFactories[i]);
+    // }
 
-    //Anticipate those to be null-impl for some time
-    ASSERT(policy->costFunction == NULL);
+    // //Anticipate those to be null-impl for some time
+    // ASSERT(policy->costFunction == NULL);
 
-    // Destroy these last in case some of the other destructs make use of them
-    maxCount = policy->guidProviderCount;
-    for(i = 0; i < maxCount; ++i) {
-        policy->guidProviders[i]->fcts.destruct(policy->guidProviders[i]);
-    }
+    // // Destroy these last in case some of the other destructs make use of them
+    // maxCount = policy->guidProviderCount;
+    // for(i = 0; i < maxCount; ++i) {
+    //     policy->guidProviders[i]->fcts.destruct(policy->guidProviders[i]);
+    // }
+
+    // maxCount = policy->allocatorCount;
+    // for(i = 0; i < maxCount; ++i) {
+    //     policy->allocators[i]->fcts.destruct(policy->allocators[i]);
+    // }
 
     // Destroy self
     runtimeChunkFree((u64)policy->workers, NULL);
