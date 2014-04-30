@@ -140,6 +140,7 @@ u8 waitMessageHcCommApi(ocrCommApi_t *self, ocrMsgHandle_t **handle) {
 }
 
 void hcCommApiDestruct (ocrCommApi_t * base) {
+    base->commPlatform->fcts.destruct(base->commPlatform);
     runtimeChunkFree((u64)base, NULL);
 }
 
