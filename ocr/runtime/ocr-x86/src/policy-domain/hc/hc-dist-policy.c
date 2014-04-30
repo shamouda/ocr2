@@ -315,6 +315,7 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
                     #undef PD_MSG
                     #undef PD_TYPE
                     i++;
+                }
                 //NOTE: We shutdown here otherwise we need to change the state
                 //to spin on from 18 to 34 in hcPolicyDomainStop because the double
                 //acquisition caused by calling the base impl.
@@ -324,7 +325,7 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
                 msg->type &= ~PD_MSG_REQUEST;
                 hcDistReleasePd((ocrPolicyDomainHc_t*)self);
                 return 0;
-            } else if ((msg->srcLocation != curLoc) && (msg->destLocation == curLoc)){
+            } else if ((msg->srcLocation != curLoc) && (msg->destLocation == curLoc)) {
                 // Local processing
                 // Same issues as above regarding the pd's state
                 self->fcts.stop(self);
