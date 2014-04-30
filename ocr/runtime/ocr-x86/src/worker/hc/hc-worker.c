@@ -41,6 +41,7 @@ static void workerLoop(ocrWorker_t * worker) {
     ocrPolicyDomain_t *pd = worker->pd;
     ocrPolicyMsg_t msg;
     getCurrentEnv(NULL, NULL, NULL, &msg);
+    u64 workerId = getWorkerId(worker);
     while(worker->fcts.isRunning(worker)) {
         ocrFatGuid_t taskGuid = {.guid = NULL_GUID, .metaDataPtr = NULL};
         u32 count = 1;
@@ -51,6 +52,7 @@ static void workerLoop(ocrWorker_t * worker) {
         PD_MSG_FIELD(guidCount) = count;
         PD_MSG_FIELD(properties) = 0;
         PD_MSG_FIELD(type) = OCR_GUID_EDT;
+        msg.srcLocation = workerId;
         // TODO: In the future, potentially take more than one)
         if(pd->fcts.processMessage(pd, &msg, true) == 0) {
             // We got a response

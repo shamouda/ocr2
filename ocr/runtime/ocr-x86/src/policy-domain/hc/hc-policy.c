@@ -19,6 +19,7 @@
 #endif
 
 #include "policy-domain/hc/hc-policy.h"
+#include "worker/hc/hc-worker.h"
 
 #define DEBUG_TYPE POLICY
 
@@ -806,6 +807,8 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             PD_MSG_FIELD(properties) = returnCode = self->schedulers[0]->fcts.take(
                 self->schedulers[0], msg->srcLocation,
                 PD_MSG_FIELD(guids), hints, OCR_COMP_PROP_TYPE_EDT);
+            ocrFatGuid_t * component = PD_MSG_FIELD(guids);
+            if (component->guid != NULL_GUID) {
             // For now, we return the execute function for EDTs
             PD_MSG_FIELD(extra) = (u64)(self->taskFactories[0]->fcts.execute);
             // We also consider that the task to be executed is local so we
@@ -813,6 +816,9 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             u64 i = 0, maxCount = PD_MSG_FIELD(guidCount);
             for( ; i < maxCount; ++i) {
                 localDeguidify(self, &(PD_MSG_FIELD(guids)[i]));
+            }
+            } else {
+                PD_MSG_FIELD(guidCount) = 0;
             }
         } else {
             ASSERT(PD_MSG_FIELD(type) == OCR_GUID_COMM);
@@ -832,9 +838,12 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_COMM_GIVE
         ocrFatGuid_t hints = {NULL_GUID, NULL};
+        ocrWorker_t * worker;
+        getCurrentEnv(NULL, &worker, NULL, NULL);
+        ocrWorkerHc_t * hcWorker = (ocrWorkerHc_t *) worker;
         if (PD_MSG_FIELD(type) == OCR_GUID_EDT) {
             PD_MSG_FIELD(properties) = returnCode = self->schedulers[0]->fcts.give(
-                self->schedulers[0], msg->srcLocation,
+                self->schedulers[0], hcWorker->id,
                 *(PD_MSG_FIELD(guids)), hints, OCR_COMP_PROP_TYPE_EDT);
         } else {
             ASSERT(PD_MSG_FIELD(type) == OCR_GUID_COMM);

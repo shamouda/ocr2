@@ -39,12 +39,14 @@ const char *type_str[] = {
     "CompTargetType",
     "WorkPileType",
     "WorkerType",
+    "CostMapperType",
     "SchedulerType",
     "PolicyDomainType",
     "TaskType",
     "TaskTemplateType",
     "DataBlockType",
     "EventType",
+    "ComponentType",
 };
 
 const char *inst_str[] = {
@@ -58,8 +60,10 @@ const char *inst_str[] = {
     "CompTargetInst",
     "WorkPileInst",
     "WorkerInst",
+    "CostMapperInst",
     "SchedulerInst",
     "PolicyDomainInst",
+    "NULL",
     "NULL",
     "NULL",
     "NULL",
@@ -74,7 +78,7 @@ dep_t deps[] = {
     { commapi_type, commplatform_type, "commplatform"},
     { comptarget_type, compplatform_type, "compplatform"},
     { worker_type, comptarget_type, "comptarget"},
-    { scheduler_type, workpile_type, "workpile"},
+    { scheduler_type, costmapper_type, "costmapper"},
     { policydomain_type, guid_type, "guid"},
     { policydomain_type, allocator_type, "allocator"},
     { policydomain_type, worker_type, "worker"},
@@ -85,12 +89,13 @@ dep_t deps[] = {
     { policydomain_type, tasktemplatefactory_type, "tasktemplatefactory"},
     { policydomain_type, datablockfactory_type, "datablockfactory"},
     { policydomain_type, eventfactory_type, "eventfactory"},
+    { policydomain_type, componentfactory_type, "componentfactory"},
 };
 
 extern char* populate_type(ocrParamList_t **type_param, type_enum index, dictionary *dict, char *secname);
 int populate_inst(ocrParamList_t **inst_param, void **instance, int *type_counts, char ***factory_names, void ***all_factories, void ***all_instances, type_enum index, dictionary *dict, char *secname);
 extern int build_deps (dictionary *dict, int A, int B, char *refstr, void ***all_instances, ocrParamList_t ***inst_params);
-extern int build_deps_types (int B, void **pdinst, int pdcount, void ***all_factories, ocrParamList_t ***type_params);
+extern int build_deps_types (int B, void **pdinst, int pdcount, void ***all_factories, ocrParamList_t ***type_params, int *type_counts);
 extern void *create_factory (type_enum index, char *factory_name, ocrParamList_t *paramlist);
 extern int read_range(dictionary *dict, char *sec, char *field, int *low, int *high);
 extern void free_instance(void *instance, type_enum inst_type);
@@ -297,9 +302,9 @@ void bringUpRuntime(const char *inifile) {
     }
 
     // Special case of policy domain pointing to types rather than instances
-    for (i = 12; i <= 15; i++) {
+    for (i = 12; i <= 16; i++) {
         build_deps_types(deps[i].to, all_instances[policydomain_type],
-                         inst_counts[policydomain_type], all_factories, type_params);
+                         inst_counts[policydomain_type], all_factories, type_params, type_counts);
     }
 
     // START EXECUTION

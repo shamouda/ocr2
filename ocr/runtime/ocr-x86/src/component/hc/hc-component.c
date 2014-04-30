@@ -20,7 +20,7 @@ ocrComponent_t* newComponentHcState(ocrComponentFactory_t * factory, ocrFatGuid_
     u32 numWorkers = derivedFactory->maxWorkers;
     ocrPolicyDomain_t *pd = NULL;
     getCurrentEnv(&pd, NULL, NULL, NULL);
-    ocrComponentHcState_t * component = (ocrComponentHcState_t *)pd->fcts.pdMalloc(pd, sizeof(ocrComponentHcState_t) + (numWorkers * sizeof(ocrComponent_t*)));
+    ocrComponentHcState_t * component = (ocrComponentHcState_t *)runtimeChunkAlloc((sizeof(ocrComponentHcState_t) + (numWorkers * sizeof(ocrComponent_t*))), (void *)1);
     component->base.fcts = factory->fcts;
     component->components = (ocrComponent_t **)((u64)component + sizeof(ocrComponentHcState_t));
     component->numWorkers = numWorkers;
@@ -40,6 +40,7 @@ return OCR_ENOTSUP;
 }
 
 u8 hcStateComponentInsert(ocrComponent_t *self, ocrLocation_t loc, ocrFatGuid_t component, ocrFatGuid_t hints, u32 properties) {
+    ASSERT(component.guid != NULL_GUID);
     ocrComponentHcState_t * compHcState = (ocrComponentHcState_t*)self;
     ASSERT((u32)loc < compHcState->numWorkers);
     ocrComponent_t * comp = compHcState->components[loc];
@@ -59,7 +60,9 @@ u8 hcStateComponentRemove(ocrComponent_t *self, ocrLocation_t loc, ocrFatGuid_t 
             u32 victim = ((u32)loc + i) % compHcState->numWorkers;
             ocrComponent_t *compVictim = compHcState->components[victim];
             compVictim->fcts.remove(compVictim, loc, component, hints, properties);
-            if (component->guid != NULL_GUID) break;
+            if (component->guid != NULL_GUID) {
+                break;
+            }
         }
     }
     return 0;
@@ -108,6 +111,7 @@ ocrComponentFactory_t* newOcrComponentFactoryHcState(ocrParamList_t *perType) {
     paramListComponentFactHcState_t * paramDerived = (paramListComponentFactHcState_t*)perType;
     ocrComponentFactoryHcState_t * derived = (ocrComponentFactoryHcState_t*)base;
     derived->maxWorkers = paramDerived->maxWorkers;
+    ASSERT(derived->maxWorkers);
     return base;
 }
 
@@ -120,7 +124,7 @@ ocrComponent_t* newComponentHcWork(ocrComponentFactory_t * factory, ocrFatGuid_t
     //u32 dequeInitSize = derivedFactory->dequeInitSize;
     ocrPolicyDomain_t *pd = NULL;
     getCurrentEnv(&pd, NULL, NULL, NULL);
-    ocrComponentHcWork_t * component = pd->fcts.pdMalloc(pd, sizeof(ocrComponentHcWork_t));
+    ocrComponentHcWork_t * component = (ocrComponentHcWork_t *)runtimeChunkAlloc(sizeof(ocrComponentHcWork_t), (void *)1);
     component->base.fcts = factory->fcts;
     component->base.mapping = (ocrLocation_t)hints.guid;
     component->deque = newWorkStealingDeque(pd, (void *) NULL_GUID);

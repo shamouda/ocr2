@@ -37,6 +37,7 @@ typedef enum {
     comptarget_type,
     workpile_type,
     worker_type,
+    costmapper_type,
     scheduler_type,
     policydomain_type,
     // Everything above is used as instances
@@ -45,6 +46,7 @@ typedef enum {
     tasktemplatefactory_type,
     datablockfactory_type,
     eventfactory_type,
+    componentfactory_type,
 } type_enum;
 
 /* Dependence information (from->to) referenced by refstr */
