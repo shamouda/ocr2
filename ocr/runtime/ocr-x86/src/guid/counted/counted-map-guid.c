@@ -85,7 +85,7 @@ static u64 locationToLocId(ocrLocation_t location) {
     //           and an 'id' stored in the guid.
     u64 locId = (u64) ((int)location - HACK_RANK_SHIFT);
     // Make sure we're not overflowing location size
-    ASSERT((locId < (2^GUID_LOCID_SIZE)) && "GUID location ID overflows");
+    ASSERT((locId < (1<<GUID_LOCID_SIZE)) && "GUID location ID overflows");
     return locId;
 }
 
