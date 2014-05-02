@@ -12,9 +12,11 @@
 
 #include "ocr-cost-mapper.h"
 #include "cost-mapper/hc/hc-cost-mapper.h"
+#include "cost-mapper/ce/ce-cost-mapper.h"
 
 typedef enum _costMapperType_t {
     costMapperHc_id,
+    costMapperCe_id,
     costMapperMax_id
 } costMapperType_t;
 

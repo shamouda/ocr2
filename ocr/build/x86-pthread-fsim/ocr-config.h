@@ -37,6 +37,12 @@
 // Comp-target
 #define ENABLE_COMP_TARGET_PASSTHROUGH
 
+// Component
+#define ENABLE_COMPONENT_CE_STATE
+
+// Cost Mapper
+#define ENABLE_COST_MAPPER_CE
+
 // Datablock
 #define ENABLE_DATABLOCK_REGULAR
 
@@ -82,10 +88,6 @@
 // Worker
 #define ENABLE_WORKER_CE
 #define ENABLE_WORKER_XE
-
-// Workpile
-#define ENABLE_WORKPILE_CE
-#define ENABLE_WORKPILE_XE
 
 #define ENABLE_OCR_LIB
 

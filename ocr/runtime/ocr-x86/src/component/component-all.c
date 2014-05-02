@@ -10,6 +10,7 @@
 const char * component_types[] = {
     "HC_STATE",
     "HC_WORK",
+    "CE_STATE",
     NULL
 };
 
@@ -22,6 +23,10 @@ ocrComponentFactory_t * newComponentFactory(componentType_t type, ocrParamList_t
 #ifdef ENABLE_COMPONENT_HC_WORK
     case componentHcWork_id:
         return newOcrComponentFactoryHcWork(perType);
+#endif
+#ifdef ENABLE_COMPONENT_CE_STATE
+    case componentCeState_id:
+        return newOcrComponentFactoryCeState(perType);
 #endif
     default:
         ASSERT(0);

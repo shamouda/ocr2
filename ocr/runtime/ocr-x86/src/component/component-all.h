@@ -12,10 +12,12 @@
 
 #include "ocr-component.h"
 #include "component/hc/hc-component.h"
+#include "component/ce/ce-component.h"
 
 typedef enum _componentType_t {
     componentHcState_id,
     componentHcWork_id,
+    componentCeState_id,
     componentMax_id
 } componentType_t;
 

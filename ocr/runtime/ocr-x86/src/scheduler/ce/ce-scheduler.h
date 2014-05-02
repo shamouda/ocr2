@@ -20,18 +20,12 @@
 
 struct _ocrWorkpile_t;
 
-typedef struct _ceWorkpileIterator_t {
-    struct _ocrWorkpile_t **workpiles;
-    u64 id, curr, mod;
-} ceWorkpileIterator_t;
-
 typedef struct {
     ocrSchedulerFactory_t base;
 } ocrSchedulerFactoryCe_t;
 
 typedef struct {
     ocrScheduler_t scheduler;
-    ceWorkpileIterator_t * stealIterators;
 } ocrSchedulerCe_t;
 
 typedef struct _paramListSchedulerCeInst_t {

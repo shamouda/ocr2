@@ -525,7 +525,7 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         ocrDataBlock_t *db = (ocrDataBlock_t*)(PD_MSG_FIELD(guid.metaDataPtr));
         //ASSERT(db->fctId == self->dbFactories[0]->factoryId);
         //ASSERT(!(msg->type & PD_MSG_REQ_RESPONSE));
-        PD_MSG_FIELD(properties) = 
+        PD_MSG_FIELD(properties) =
             self->dbFactories[0]->fcts.release(db, PD_MSG_FIELD(edt), PD_MSG_FIELD(properties) & 1);
         returnCode =  ceProcessResponse(self, msg, 0);
 #undef PD_MSG
@@ -664,7 +664,7 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         returnCode =  ceProcessResponse(self, msg, 0);
 #undef PD_MSG
 #undef PD_TYPE
-        break;            
+        break;
     }
 
     case PD_MSG_EVT_GET:
@@ -739,12 +739,16 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
     {
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_COMM_TAKE
+        ocrFatGuid_t hints = {NULL_GUID, NULL};
         ASSERT(PD_MSG_FIELD(type) == OCR_GUID_EDT);
-        PD_MSG_FIELD(properties) = self->schedulers[0]->fcts.takeEdt(
-            self->schedulers[0], &(PD_MSG_FIELD(guidCount)),
-            PD_MSG_FIELD(guids));
-        //DPRINTF(DEBUG_LVL_INFO, "[CE] Sending Edt to XE%lu: guid: %lu metadata: %p\n", 
-        //        (u64)msg->srcLocation, (PD_MSG_FIELD(guids))->guid, 
+        PD_MSG_FIELD(properties) = self->schedulers[0]->fcts.take(
+            self->schedulers[0], msg->srcLocation,
+            PD_MSG_FIELD(guids), hints, OCR_COMP_PROP_TYPE_EDT);
+            ocrFatGuid_t * component = PD_MSG_FIELD(guids);
+            if (component->guid == NULL_GUID)
+                PD_MSG_FIELD(guidCount) = 0;
+        //DPRINTF(DEBUG_LVL_INFO, "[CE] Sending Edt to XE%lu: guid: %lu metadata: %p\n",
+        //        (u64)msg->srcLocation, (PD_MSG_FIELD(guids))->guid,
         //        (PD_MSG_FIELD(guids))->metaDataPtr);
         returnCode = ceProcessResponse(self, msg, 0);
 #undef PD_MSG
@@ -756,13 +760,14 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
     {
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_COMM_GIVE
+        ocrFatGuid_t hints = {NULL_GUID, NULL};
         ASSERT(PD_MSG_FIELD(type) == OCR_GUID_EDT);
-        //DPRINTF(DEBUG_LVL_INFO, "[CE] Received Edt from %lu guid: %lx metadata: %p\n", 
-        //        (u64)msg->srcLocation, (PD_MSG_FIELD(guids))->guid, 
+        //DPRINTF(DEBUG_LVL_INFO, "[CE] Received Edt from %lu guid: %lx metadata: %p\n",
+        //        (u64)msg->srcLocation, (PD_MSG_FIELD(guids))->guid,
         //        (PD_MSG_FIELD(guids))->metaDataPtr);
-        PD_MSG_FIELD(properties) = self->schedulers[0]->fcts.giveEdt(
-            self->schedulers[0], &(PD_MSG_FIELD(guidCount)),
-            PD_MSG_FIELD(guids));
+        PD_MSG_FIELD(properties) = self->schedulers[0]->fcts.give(
+            self->schedulers[0], msg->srcLocation,
+            *(PD_MSG_FIELD(guids)), hints, OCR_COMP_PROP_TYPE_EDT);
         returnCode =  ceProcessResponse(self, msg, 0);
 #undef PD_MSG
 #undef PD_TYPE
@@ -930,7 +935,7 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         returnCode =  ceProcessResponse(self, msg, 0);
 #undef PD_MSG
 #undef PD_TYPE
-        break;            
+        break;
     }
 
     case PD_MSG_DEP_UNREGSIGNALER:
@@ -954,7 +959,7 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         ASSERT(0);
         break;
     }
-    
+
     case PD_MSG_DEP_DYNREMOVE:
     {
         // This is only called from user code and should
@@ -962,7 +967,7 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         ASSERT(0);
         break;
     }
-    
+
     case PD_MSG_SAL_PRINT:
     {
         returnCode =  ceProcessResponse(self, msg, 0);
@@ -1009,7 +1014,7 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             ++(cePolicy->shutdownCount);
         }
 
-        if (cePolicy->shutdownCount == neighborCount) 
+        if (cePolicy->shutdownCount == neighborCount)
             self->fcts.stop(self);
 
         break;
@@ -1045,8 +1050,8 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
     return returnCode;
 }
 
-u8 cePdSendMessage(ocrPolicyDomain_t* self, ocrLocation_t target, ocrPolicyMsg_t *message, 
-                   ocrMsgHandle_t **handle, u32 properties) 
+u8 cePdSendMessage(ocrPolicyDomain_t* self, ocrLocation_t target, ocrPolicyMsg_t *message,
+                   ocrMsgHandle_t **handle, u32 properties)
 {
     return self->commApis[0]->fcts.sendMessage(self->commApis[0], target, message, handle, properties);
 }
@@ -1113,7 +1118,7 @@ static void destructPolicyDomainFactoryCe(ocrPolicyDomainFactory_t * factory) {
 ocrPolicyDomainFactory_t * newPolicyDomainFactoryCe(ocrParamList_t *perType) {
     ocrPolicyDomainFactory_t* base = (ocrPolicyDomainFactory_t*) runtimeChunkAlloc(sizeof(ocrPolicyDomainFactoryCe_t), (void *)1);
     ASSERT(base); // Check allocation
-    
+
     // Set factory's methods
 #ifdef OCR_ENABLE_STATISTICS
     base->instantiate = FUNC_ADDR(ocrPolicyDomain_t*(*)(ocrPolicyDomainFactory_t*,ocrStats_t*,
@@ -1133,18 +1138,18 @@ ocrPolicyDomainFactory_t * newPolicyDomainFactoryCe(ocrParamList_t *perType) {
     base->policyDomainFcts.finish = FUNC_ADDR(void(*)(ocrPolicyDomain_t*), cePolicyDomainFinish);
     base->policyDomainFcts.processMessage = FUNC_ADDR(u8(*)(ocrPolicyDomain_t*,ocrPolicyMsg_t*,u8), cePolicyDomainProcessMessage);
 
-    base->policyDomainFcts.sendMessage = FUNC_ADDR(u8 (*)(ocrPolicyDomain_t*, ocrLocation_t, ocrPolicyMsg_t *, ocrMsgHandle_t**, u32), 
+    base->policyDomainFcts.sendMessage = FUNC_ADDR(u8 (*)(ocrPolicyDomain_t*, ocrLocation_t, ocrPolicyMsg_t *, ocrMsgHandle_t**, u32),
                                                    cePdSendMessage);
     base->policyDomainFcts.pollMessage = FUNC_ADDR(u8 (*)(ocrPolicyDomain_t*, ocrMsgHandle_t**), cePdPollMessage);
     base->policyDomainFcts.waitMessage = FUNC_ADDR(u8 (*)(ocrPolicyDomain_t*, ocrMsgHandle_t**), cePdWaitMessage);
-    
+
     base->policyDomainFcts.pdMalloc = FUNC_ADDR(void*(*)(ocrPolicyDomain_t*,u64), cePdMalloc);
     base->policyDomainFcts.pdFree = FUNC_ADDR(void(*)(ocrPolicyDomain_t*,void*), cePdFree);
 #ifdef OCR_ENABLE_STATISTICS
     base->policyDomainFcts.getStats = FUNC_ADDR(ocrStats_t*(*)(ocrPolicyDomain_t*),ceGetStats);
 #endif
 
-    return base;    
+    return base;
 }
 
 #endif /* ENABLE_POLICY_DOMAIN_CE */
