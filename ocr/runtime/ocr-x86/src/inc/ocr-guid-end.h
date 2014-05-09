@@ -151,7 +151,7 @@ static inline bool isEventGuid(ocrPolicyDomain_t *pd, ocrFatGuid_t guid) {
 
     ocrGuidKind kind = OCR_GUID_NONE;
     if(guidKind(pd, guid, &kind) == 0)
-        return kind == OCR_GUID_EVENT;
+        return (kind & OCR_GUID_EVENT);
     return false;
 }
 

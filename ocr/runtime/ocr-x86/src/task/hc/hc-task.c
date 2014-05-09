@@ -502,13 +502,14 @@ u8 registerSignalerTaskHc(ocrTask_t * base, ocrFatGuid_t signalerGuid, u32 slot,
 
     ocrGuidKind signalerKind = OCR_GUID_NONE;
     deguidify(pd, &signalerGuid, &signalerKind);
-    if(signalerKind == OCR_GUID_EVENT) {
+    //DIST-TODO this is the reason why we need to introduce new kinds of guid
+    //because we don't have support for cloning metadata around yet
+    if(signalerKind & OCR_GUID_EVENT) {
         node->slot = slot;
-        ocrEventTypes_t evtKind = eventType(pd, signalerGuid);
-        if(evtKind == OCR_EVENT_ONCE_T ||
-                evtKind == OCR_EVENT_LATCH_T) {
+        if((signalerKind == OCR_GUID_EVENT_ONCE) ||
+                (signalerKind == OCR_GUID_EVENT_LATCH)) {
 
-            node->slot = (u32)-2; // To signal that this is a once event
+            node->slot = (u32)-2; // To record this slot is for a once event
 
             // We need to move the frontier slot over
             hal_lock32(&(self->lock));

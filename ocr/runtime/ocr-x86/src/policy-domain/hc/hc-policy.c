@@ -947,7 +947,7 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             PD_MSG_FIELD(properties) = convertDepAddToSatisfy(
                 self, src, dest, PD_MSG_FIELD(slot));
         } else {
-            if(srcKind == OCR_GUID_EVENT) {
+            if(srcKind & OCR_GUID_EVENT) {
                 //TODO create a pd-message instead
                 ocrEvent_t *evt = (ocrEvent_t*)(src.metaDataPtr);
                 ASSERT(evt->fctId == self->eventFactories[0]->factoryId);
@@ -965,7 +965,7 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
                     ASSERT(task->fctId == self->taskFactories[0]->factoryId);
                     PD_MSG_FIELD(properties) = self->taskFactories[0]->fcts.registerSignaler(
                         task, src, PD_MSG_FIELD(slot), true);
-                } else if(dstKind == OCR_GUID_EVENT) {
+                } else if(dstKind & OCR_GUID_EVENT) {
                     //TODO create a pd-message instead
                     ocrEvent_t *evt = (ocrEvent_t*)(dest.metaDataPtr);
                     ASSERT(evt->fctId == self->eventFactories[0]->factoryId);
@@ -1005,22 +1005,17 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         ocrFatGuid_t signaler = PD_MSG_FIELD(signaler);
         ocrFatGuid_t dest = PD_MSG_FIELD(dest);
 
-        switch(dstKind) {
-        case OCR_GUID_EVENT: {
+        if (dstKind & OCR_GUID_EVENT) {
             ocrEvent_t *evt = (ocrEvent_t*)(dest.metaDataPtr);
             ASSERT(evt->fctId == self->eventFactories[0]->factoryId);
             PD_MSG_FIELD(properties) = self->eventFactories[0]->fcts[evt->kind].registerSignaler(
                 evt, signaler, PD_MSG_FIELD(slot), false);
-            break;
-        }
-        case OCR_GUID_EDT: {
+        } else if (dstKind == OCR_GUID_EDT) {
             ocrTask_t *edt = (ocrTask_t*)(dest.metaDataPtr);
             ASSERT(edt->fctId == self->taskFactories[0]->factoryId);
             PD_MSG_FIELD(properties) = self->taskFactories[0]->fcts.registerSignaler(
                 edt, signaler, PD_MSG_FIELD(slot), false);
-            break;
-        }
-        default:
+        } else {
             ASSERT(0); // No other things we can register signalers on
         }
 #ifdef OCR_ENABLE_STATISTICS
@@ -1051,7 +1046,7 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         ocrFatGuid_t waiter = PD_MSG_FIELD(waiter);
         ocrFatGuid_t dest = PD_MSG_FIELD(dest);
 
-        ASSERT(dstKind == OCR_GUID_EVENT); // Waiters can only wait on events
+        ASSERT(dstKind & OCR_GUID_EVENT); // Waiters can only wait on events
         ocrEvent_t *evt = (ocrEvent_t*)(dest.metaDataPtr);
         ASSERT(evt->fctId == self->eventFactories[0]->factoryId);
         PD_MSG_FIELD(properties) = self->eventFactories[0]->fcts[evt->kind].registerWaiter(
@@ -1078,7 +1073,7 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             (u64*)(&(PD_MSG_FIELD(guid.metaDataPtr))), &dstKind);
 
         ocrFatGuid_t dst = PD_MSG_FIELD(guid);
-        if(dstKind == OCR_GUID_EVENT) {
+        if(dstKind & OCR_GUID_EVENT) {
             ocrEvent_t *evt = (ocrEvent_t*)(dst.metaDataPtr);
             ASSERT(evt->fctId == self->eventFactories[0]->factoryId);
             PD_MSG_FIELD(properties) = self->eventFactories[0]->fcts[evt->kind].satisfy(

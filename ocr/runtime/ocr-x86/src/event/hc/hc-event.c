@@ -492,7 +492,7 @@ u8 registerWaiterEventHcPersist(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot,
     if(isDepAdd && waiterKind == OCR_GUID_EDT) {
         return 0;
     }
-    ASSERT(waiterKind == OCR_GUID_EDT || waiterKind == OCR_GUID_EVENT);
+    ASSERT(waiterKind == OCR_GUID_EDT || (waiterKind & OCR_GUID_EVENT));
 
     DPRINTF(DEBUG_LVL_INFO, "Register waiter %s: 0x%lx with waiter 0x%lx on slot %d\n",
             eventTypeToString(base), base->guid, waiter.guid, slot);
@@ -749,6 +749,24 @@ ocrEvent_t * newEventHc(ocrEventFactory_t * factory, ocrEventTypes_t eventType,
         sizeOfGuid = sizeof(ocrEventHcPersist_t);
     }
 
+    ocrGuidKind kind;
+    switch(eventType) {
+        case OCR_EVENT_ONCE_T:
+            kind = OCR_GUID_EVENT_ONCE;
+            break;
+        case OCR_EVENT_IDEM_T:
+            kind = OCR_GUID_EVENT_IDEM;
+            break;
+        case OCR_EVENT_STICKY_T:
+            kind = OCR_GUID_EVENT_STICKY;
+            break;
+        case OCR_EVENT_LATCH_T:
+            kind = OCR_GUID_EVENT_LATCH;
+            break;
+        default:
+            ASSERT(false && "Unknown type of event");
+    }
+
 #define PD_MSG (&msg)
 #define PD_TYPE PD_MSG_GUID_CREATE
     msg.type = PD_MSG_GUID_CREATE | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
@@ -756,7 +774,7 @@ ocrEvent_t * newEventHc(ocrEventFactory_t * factory, ocrEventTypes_t eventType,
     PD_MSG_FIELD(guid.metaDataPtr) = NULL;
     // We allocate everything in the meta-data to keep things simple
     PD_MSG_FIELD(size) = sizeOfGuid;
-    PD_MSG_FIELD(kind) = OCR_GUID_EVENT;
+    PD_MSG_FIELD(kind) = kind;
     PD_MSG_FIELD(properties) = 0;
     RESULT_PROPAGATE2(pd->fcts.processMessage(pd, &msg, true), NULL);
     ocrEventHc_t *event = (ocrEventHc_t*)PD_MSG_FIELD(guid.metaDataPtr);
