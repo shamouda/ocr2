@@ -113,6 +113,7 @@ static void postRecvAny(ocrCommPlatform_t * self) {
     int src = MPI_ANY_SOURCE;
     int tag = RECV_ANY_ID;
     MPI_Comm comm = MPI_COMM_WORLD;
+    DPRINTF(DEBUG_LVL_VERB,"[%d][MPI] posting irecv ANY \n", (int) self->pd->myLocation);
     int res = MPI_Irecv(buf, count, datatype, src, tag, comm, &(handle->status));
     ASSERT(res == MPI_SUCCESS);
     mpiComm->incoming->pushFront(mpiComm->incoming, handle);
@@ -165,6 +166,7 @@ u8 MPICommSendMessage(ocrCommPlatform_t * self,
         MPI_Request * status = &(respHandle->status);
         //Post a receive matching the request's msgId.
         //The other end will post a send using msgId as tag
+        DPRINTF(DEBUG_LVL_VERB,"[%d][MPI] posting irecv for msgId %ld\n", (int) self->pd->myLocation, respTag);
         int res = MPI_Irecv(respMsg, respCount, datatype, targetRank, respTag, comm, status);
         if (res != MPI_SUCCESS) {
             //DIST-TODO define error for comm-api
@@ -180,6 +182,7 @@ u8 MPICommSendMessage(ocrCommPlatform_t * self,
     // match the source recv operation that had been posted on the request send.
     int tag = (message->type & PD_MSG_RESPONSE) ? message->msgId : SEND_ANY_ID;
     MPI_Request * status = &(handle->status);
+    DPRINTF(DEBUG_LVL_VERB,"[%d][MPI] posting isend for msgId %ld type %x to rank %d\n", (int) self->pd->myLocation, message->msgId, message->type, targetRank);
     int res = MPI_Isend(message, bufferSize, datatype, targetRank, tag, comm, status);
     if (res == MPI_SUCCESS) {
         mpiComm->outgoing->pushFront(mpiComm->outgoing, handle);
@@ -191,7 +194,6 @@ u8 MPICommSendMessage(ocrCommPlatform_t * self,
 
 u8 MPICommPollMessage_RL2(ocrCommPlatform_t *self, ocrPolicyMsg_t **msg,
                           u64* bufferSize, u32 properties, u32 *mask) {
-
     // NOTE: If one-way were tracked by the comm-api we would need to have
     // this sort of loop there to notify message status.
     ocrCommPlatformMPI_t * mpiComm = ((ocrCommPlatformMPI_t *) self);
@@ -236,7 +238,7 @@ u8 MPICommPollMessage_RL3(ocrCommPlatform_t *self, ocrPolicyMsg_t **msg,
         int ret = MPI_Test(&(handle->status), &completed, MPI_STATUS_IGNORE);
         ASSERT(ret == MPI_SUCCESS);
         if(completed) {
-            DPRINTF(DEBUG_LVL_VERB,"[%d][MPI] successfully sent msgId %ld\n", (int) self->pd->myLocation, handle->msg->msgId);
+            DPRINTF(DEBUG_LVL_VERB,"[%d][MPI] successfully sent msgId %ld type %x\n", (int) self->pd->myLocation, handle->msg->msgId, handle->msg->type);
             u32 msgProperties = handle->properties;
             // By construction, either message are persistent in API's upper levels
             // or they've been made persistent on the send through a copy.
@@ -255,32 +257,34 @@ u8 MPICommPollMessage_RL3(ocrCommPlatform_t *self, ocrPolicyMsg_t **msg,
 
     // Iterate over incoming communications (mpi recvs)
     iterator_t * incomingIt = mpiComm->incoming->iterator(mpiComm->incoming);
-    ASSERT(incomingIt->pd == self->pd);
+    bool debugIts = false;
     while (incomingIt->hasNext(incomingIt)) {
-        ASSERT(incomingIt->pd == self->pd);
+        debugIts = true;
         mpiCommHandle_t * handle = (mpiCommHandle_t *) incomingIt->next(incomingIt);
-        ASSERT(incomingIt->pd == self->pd);
         int completed = 0;
         int ret = MPI_Test(&(handle->status), &completed, MPI_STATUS_IGNORE);
         ASSERT(ret == MPI_SUCCESS);
         if (completed) {
             ocrPolicyMsg_t * receivedMsg = handle->msg;
-            DPRINTF(DEBUG_LVL_VERB,"[%d][MPI] Received a message of type %x with msgId %d\n",
+            u32 needRecvAny = (receivedMsg->type & PD_MSG_REQUEST);
+            DPRINTF(DEBUG_LVL_VERB,"[%d][MPI] Received a message of type %x with msgId %d \n",
                     (int) self->pd->myLocation, receivedMsg->type, (int) receivedMsg->msgId);
-            if (receivedMsg->type & PD_MSG_REQUEST) {
-                // Receiving a request indicates a mpi recv any
-                // has completed. Post a new one.
-                postRecvAny(self);
-            }
             // if request : msg may be reused for the response
             // if response: upper-layer must process and deallocate
             //DIST-TODO there's no convenient way to communicate that to upper layers
             *msg = receivedMsg;
             pd->fcts.pdFree(pd, handle);
             incomingIt->removeCurrent(incomingIt);
+            incomingIt->destruct(incomingIt);
+            if (needRecvAny) {
+                // Receiving a request indicates a mpi recv any
+                // has completed. Post a new one.
+                postRecvAny(self);
+            }
             return POLL_MORE_MESSAGE;
         }
     }
+    ASSERT(debugIts != false); // There should always be an irecv any posted
     incomingIt->destruct(incomingIt);
 
     return POLL_NO_MESSAGE;
@@ -327,7 +331,6 @@ void MPICommBegin(ocrCommPlatform_t * self, ocrPolicyDomain_t * pd, ocrCommApi_t
     //Initialize base
     self->pd = pd;
     //DIST-TODO location: both commPlatform and worker have a location, are the supposed to be the same ?
-    //DIST-HACK3
     int nbRanks=0;
     int rank=0;
     MPI_Comm_size(MPI_COMM_WORLD, &nbRanks);
