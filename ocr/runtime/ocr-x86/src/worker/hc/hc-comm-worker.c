@@ -28,15 +28,26 @@
 #include "ocr-edt.h"
 
 ocrGuid_t processRequestEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
-    // ocrMsgHandle_t * handle = (ocrMsgHandle_t *) paramv[0];
     ocrPolicyMsg_t * requestMsg = (ocrPolicyMsg_t *) paramv[0];
     ocrPolicyDomain_t * pd;
     getCurrentEnv(&pd, NULL, NULL, NULL);
-    DPRINTF(DEBUG_LVL_VERB,"[%d] hc-comm-worker: Process incoming EDT request of type %x\n", (int)pd->myLocation, requestMsg->type);
+    // This is only meant to execute incoming request, not processing responses.
+    // Responses are routed back to requesters by the scheduler and are processed by them.
+    ASSERT(requestMsg->type & PD_MSG_REQUEST);
+    // Important to read this before calling processMessage. If the request requires
+    // a response, the runtime reuses the request's message to post the response.
+    // Hence there's a race between this code and the code posting the response.
+    bool toBeFreed = !(requestMsg->type & PD_MSG_REQ_RESPONSE);
+    DPRINTF(DEBUG_LVL_VVERB,"[%d] hc-comm-worker: Process incoming EDT request of type %p %x\n", (int)pd->myLocation, requestMsg, requestMsg->type);
     pd->fcts.processMessage(pd, requestMsg, true);
-    DPRINTF(DEBUG_LVL_VERB,"[%d] hc-comm-worker: [done] Process incoming EDT request\n", (int)pd->myLocation);
-    if (!(requestMsg->type & PD_MSG_REQ_RESPONSE)) {
-        // if request was an incoming one-way, can delete message
+    DPRINTF(DEBUG_LVL_VVERB,"[%d] hc-comm-worker: [done] Process incoming EDT request %p %x\n", (int)pd->myLocation, requestMsg, requestMsg->type);
+    if (toBeFreed) {
+        // Makes sure the runtime doesn't try to reuse this message
+        // even though it was not supposed to issue a response.
+        // If that's the case, this check is racy
+        ASSERT(!(requestMsg->type & PD_MSG_RESPONSE));
+        DPRINTF(DEBUG_LVL_VVERB,"[%d] hc-comm-worker: Deleted incoming EDT request %p %x\n", (int)pd->myLocation, requestMsg, requestMsg->type);
+        // if request was an incoming one-way we can delete the message now.
         pd->fcts.pdFree(pd, requestMsg);
     }
 
@@ -74,7 +85,8 @@ static u8 takeFromSchedulerAndSend(ocrPolicyDomain_t * pd) {
     #undef PD_TYPE
         if (outgoingHandle != NULL) {
             // This code handles the pd's outgoing messages. They can be requests or responses.
-            DPRINTF(DEBUG_LVL_VERB,"[%d] hc-comm-worker: outgoing handle comm take successful\n", (int) pd->myLocation);
+            DPRINTF(DEBUG_LVL_VVERB,"[%d] hc-comm-worker: outgoing handle comm take successful handle=%p, msg=%p\n", (int) pd->myLocation,
+                outgoingHandle, outgoingHandle->msg);
             //We can never have an outgoing handle with the response ptr set because
             //when we process an incoming request, we lose the handle by calling the
             //pd's process message. Hence, a new handle is created for one-way response.
