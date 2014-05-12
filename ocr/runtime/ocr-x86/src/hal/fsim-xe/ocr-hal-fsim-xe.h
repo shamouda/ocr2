@@ -16,6 +16,7 @@
 #define __OCR_HAL_FSIM_XE_H__
 
 #include "ocr-types.h"
+#include "xe-abi.h"
 
 
 /****************************************************/
@@ -56,6 +57,27 @@
                                 "r" (size));                            \
     } while(0)
 
+
+/**
+ * @brief Atomic swap (64 bit)
+ *
+ * Atomically swap:
+ *
+ * @param atomic        u64*: Pointer to the atomic value (location)
+ * @param newValue      u64: New value to set
+ *
+ * @return Old value of the atomic
+ */
+#define hal_swap64(atomic, newValue)                                    \
+    ({                                                                  \
+        u64 __tmp;                                                      \
+        __asm__ __volatile__("xchg64.any %0, %1, %2\n\t"                \
+                             : "=r" (__tmp)                             \
+                             : "r" (atomic),                            \
+                               "r" (0),                                 \
+                               "0" (newValue));                         \
+        __tmp;                                                          \
+    })
 
 /**
  * @brief Compare and swap (64 bit)
@@ -119,6 +141,27 @@
                          : "=r" (__tmp)                                 \
                          : "r" (atomic),                                \
                            "0" (addValue));
+
+/**
+ * @brief Atomic swap (32 bit)
+ *
+ * Atomically swap:
+ *
+ * @param atomic        u32*: Pointer to the atomic value (location)
+ * @param newValue      u32: New value to set
+ *
+ * @return Old value of the atomic
+ */
+#define hal_swap32(atomic, newValue)                                    \
+    ({                                                                  \
+        u32 __tmp;                                                      \
+        __asm__ __volatile__("xchg32.any %0, %1, %2\n\t"                \
+                             : "=r" (__tmp)                             \
+                             : "r" (atomic),                            \
+                               "r" (0),                                 \
+                               "0" (newValue));                         \
+        __tmp;                                                          \
+    })
 
 /**
  * @brief Compare and swap (32 bit)
@@ -229,7 +272,7 @@
  * This will exit the runtime more cleanly than abort
  */
 #define hal_exit(arg)                           \
-    __asm__ __volatile__(".long 0\n\t")
+    __asm__ __volatile__("alarm %0\n\t" : : "L" (XE_TERMINATE))
 
 
 #endif /* __OCR_HAL_FSIM_XE_H__ */
