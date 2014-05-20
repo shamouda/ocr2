@@ -574,6 +574,7 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             ASSERT(db->fctId == self->dbFactories[0]->factoryId);
             PD_MSG_FIELD(properties) = self->dbFactories[0]->fcts.acquire(
                 db, &(PD_MSG_FIELD(ptr)), PD_MSG_FIELD(edt), false);
+            db->dbType = PD_MSG_FIELD(dbType);
         } else {
             // Cannot acquire
             PD_MSG_FIELD(ptr) = NULL;

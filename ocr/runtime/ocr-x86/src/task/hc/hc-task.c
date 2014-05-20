@@ -33,8 +33,7 @@ extern void ocrStatsAccessRemoveEDT(ocrTask_t *);
 extern void ocrStatsAccessSetDBSlot(ocrTask_t*, ocrDataBlock_t*, u8);
 #endif
 
-#ifdef ENABLE_OCR_PROFILING
-#include "ocr-profiling.h"
+#ifdef OCR_ENABLE_EDT_PROFILING
 extern struct _profileStruct gProfilingTable[] __attribute__((weak));
 #endif
 
@@ -780,7 +779,7 @@ u8 taskExecute(ocrTask_t* base) {
 
 #endif /* OCR_ENABLE_STATISTICS */
 
-#ifdef ENABLE_OCR_PROFILING
+#ifdef OCR_ENABLE_EDT_PROFILING
     {
       u32 i;
 

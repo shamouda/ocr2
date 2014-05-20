@@ -66,7 +66,7 @@ extern "C" {
         edt->dbList[edt->numDbs].writesize = (u64)0;
         edt->numDbs++;
 
-#ifdef ENABLE_OCR_PROFILING
+#ifdef OCR_ENABLE_EDT_PROFILING_AND_PREDICTION
         // Now revise our prediction based on newly added DB
         ocrTask_t *task = edt->task;
         ocrTaskTemplate_t *taskTemp;
@@ -151,10 +151,9 @@ extern "C" {
 
     void ocrStatsAccessRemoveEDT(ocrTask_t *task)
     {
-        s64 i, j, FP, IC;
+        s64 i, j;
         u64 index;
         edtTable_t *removeEDT;
-        u64 size, numreads, reads, numwrites, writes;
 
         if(numEdts==1) return;
 
@@ -182,7 +181,9 @@ extern "C" {
                removeEDT->dbList[j].writecount, removeEDT->dbList[j].writesize);
         }
 
-#ifdef ENABLE_OCR_PROFILING
+        u64 size, numreads, reads, numwrites, writes;
+        s64 IC, FP;
+
         FP = _threadFPInstructionCount;
         IC = _threadInstructionCount;
 
@@ -199,6 +200,7 @@ extern "C" {
                (long long signed int)IC, (long long signed int)FP,
                (long long unsigned int)reads, (long long unsigned int)writes);
 
+#ifdef OCR_ENABLE_EDT_PROFILING_AND_PREDICTION
         double ic_err, fp_err, rd_err, wr_err;
         ic_err = (double)removeEDT->task->els[28];
         fp_err = (double)removeEDT->task->els[29];
