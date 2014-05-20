@@ -35,6 +35,7 @@ extern void ocrStatsAccessSetDBSlot(ocrTask_t*, ocrDataBlock_t*, u8);
 
 #ifdef OCR_ENABLE_EDT_PROFILING
 extern struct _profileStruct gProfilingTable[] __attribute__((weak));
+extern struct _dbWeightStruct gDbWeights[] __attribute__((weak));
 #endif
 
 #ifdef OCR_ENABLE_STATISTICS
@@ -119,6 +120,7 @@ ocrTaskTemplate_t * newTaskTemplateHc(ocrTaskTemplateFactory_t* factory, ocrEdt_
         statsTEMP_CREATE(pd, edtGuid, NULL, base->guid, base);
     }
 #endif /* OCR_ENABLE_STATISTICS */
+
 #ifdef OCR_ENABLE_EDT_PROFILING
     base->profileData = NULL;
     if(gProfilingTable) {
