@@ -653,6 +653,36 @@ s32 populate_inst(ocrParamList_t **inst_param, void **instance, s32 *type_counts
                 snprintf(key, MAX_KEY_SZ, "%s:%s", secname, "stacksize");
                 INI_GET_INT (key, value, -1);
                 ((paramListCompPlatformPthread_t *)inst_param[j])->stackSize = (value==-1)?0:value;
+					if(key_exists(dict, secname, "specialbinding")){
+						value = get_key_value(dict, secname, "specialbinding" , 0);
+						((paramListCompPlatformPthread_t *)inst_param[j])->specialBinding = value;
+					}
+
+					if(key_exists(dict, secname, "corecount")){
+						value = get_key_value(dict, secname, "corecount" , 0);
+						((paramListCompPlatformPthread_t *)inst_param[j])->coreCount = value;
+					}
+
+					if(key_exists(dict, secname, "segmentcount")){
+						value = get_key_value(dict, secname, "segmentcount" , 0);
+						((paramListCompPlatformPthread_t *)inst_param[j])->segmentCount = value;
+					}
+
+					if(key_exists(dict, secname, "freecorespersegment")){
+						value = get_key_value(dict, secname, "freecorespersegment" , 0);
+						((paramListCompPlatformPthread_t *)inst_param[j])->freeCoresPerSegment = value;
+					}
+
+					if(key_exists(dict, secname, "comppercore")){
+						value = get_key_value(dict, secname, "comppercore" ,0);
+						((paramListCompPlatformPthread_t *)inst_param[j])->compPerCore = value;
+					}
+
+					if(key_exists(dict, secname, "threadspercore")){
+						value = get_key_value(dict, secname, "threadspercore" ,0);
+						((paramListCompPlatformPthread_t *)inst_param[j])->threadsPerCore = value;
+					}
+
                 if (key_exists(dict, secname, "binding")) {
                     value = get_key_value(dict, secname, "binding", j-low);
                     ((paramListCompPlatformPthread_t *)inst_param[j])->binding = value;
@@ -684,8 +714,9 @@ s32 populate_inst(ocrParamList_t **inst_param, void **instance, s32 *type_counts
         for (j = low; j<=high; j++) {
             ALLOC_PARAM_LIST(inst_param[j], paramListWorkpileInst_t);
             instance[j] = (void *)((ocrWorkpileFactory_t *)factory)->instantiate(factory, inst_param[j]);
-            if (instance[j])
+            if (instance[j]) {
                 DPRINTF(DEBUG_LVL_INFO, "Created workpile of type %s, index %d\n", inststr, j);
+			}
         }
         break;
     case worker_type:
@@ -775,6 +806,21 @@ s32 populate_inst(ocrParamList_t **inst_param, void **instance, s32 *type_counts
                 ALLOC_PARAM_LIST(inst_param[j], paramListSchedulerCeInst_t);
             }
             break;
+#endif
+#ifdef ENABLE_SCHEDULER_XP
+                case schedulerXp_id: {
+                    ALLOC_PARAM_LIST(inst_param[j], paramListSchedulerXpInst_t);
+                    snprintf(key, MAX_KEY_SZ, "%s:%s", secname, "workeridfirst");
+                    INI_GET_INT (key, value, -1);
+                    ((paramListSchedulerXpInst_t *)inst_param[j])->workerIdFirst = value;
+                    snprintf(key, MAX_KEY_SZ, "%s:%s", secname, "corecount");
+                    INI_GET_INT (key, value, -1);
+                    ((paramListSchedulerXpInst_t *)inst_param[j])->coreCount = value;
+                    snprintf(key, MAX_KEY_SZ, "%s:%s", secname, "threadspercore");
+                    INI_GET_INT (key, value, -1);
+                    ((paramListSchedulerXpInst_t *)inst_param[j])->threadsPerCore = value;
+                }
+                break;
 #endif
             default:
                 ALLOC_PARAM_LIST(inst_param[j], paramListSchedulerInst_t);

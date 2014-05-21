@@ -23,6 +23,9 @@
 #include "ocr-statistics.h"
 #include "ocr-statistics-callbacks.h"
 #endif
+#ifdef OCR_ENABLE_LOGGING
+#include "logging/logging.h"
+#endif
 
 #define SEALED_LIST ((void *) -1)
 #define END_OF_LIST NULL
@@ -78,6 +81,9 @@ u8 destructEventHc(ocrEvent_t *base) {
 
 #ifdef OCR_ENABLE_STATISTICS
     statsEVT_DESTROY(pd, getCurrentEDT(), NULL, base->guid, base);
+#endif
+#ifdef OCR_ENABLE_LOGGING
+    logEVT_DESTROY(pd, curTask, base);
 #endif
 
     // Destroy both of the datablocks linked
@@ -145,6 +151,14 @@ u8 satisfyEventHcOnce(ocrEvent_t *base, ocrFatGuid_t db, u32 slot) {
     ocrGuid_t edt = getCurrentEDT();
     statsDEP_SATISFYToEvt(pd, edt, NULL, base->guid, base, data, slotEvent);
 #endif
+#ifdef OCR_ENABLE_LOGGING
+    {
+        ocrPolicyDomain_t *pd = NULL;
+        ocrTask_t *edt = NULL;
+        getCurrentEnv(&pd, NULL, &edt, NULL);
+        logDEP_SATISFY(pd, edt->guid, base->guid, slot);
+    }
+#endif
 
     ocrPolicyDomain_t *pd = NULL;
     ocrTask_t *curTask = NULL;
@@ -178,6 +192,9 @@ u8 satisfyEventHcOnce(ocrEvent_t *base, ocrFatGuid_t db, u32 slot) {
             // before we can get the message sent
             statsDEP_SATISFYFromEvt(pd, base->guid, base, waiter->guid,
                                     data.guid, waiter->slot);
+#endif
+#ifdef OCR_ENABLE_LOGGING
+            logDEP_SATISFY(pd, base->guid, waiters[i].guid, waiters[i].slot);
 #endif
             msg.type = PD_MSG_DEP_SATISFY | PD_MSG_REQUEST;
             PD_MSG_FIELD(guid.guid) = waiters[i].guid;
@@ -220,6 +237,14 @@ u8 satisfyEventHcPersist(ocrEvent_t *base, ocrFatGuid_t db, u32 slot) {
         ocrPolicyDomain_t *pd = getCurrentPD();
         ocrGuid_t edt = getCurrentEDT();
         statsDEP_SATISFYToEvt(pd, edt, NULL, base->guid, base, data, slotEvent);
+#endif
+#ifdef OCR_ENABLE_LOGGING
+        {
+            ocrPolicyDomain_t *pd = NULL;
+            ocrTask_t *edt = NULL;
+            getCurrentEnv(&pd, NULL, &edt, NULL);
+            logDEP_SATISFY(pd, edt->guid, base->guid, slot);
+        }
 #endif
     }
 
@@ -265,6 +290,9 @@ u8 satisfyEventHcPersist(ocrEvent_t *base, ocrFatGuid_t db, u32 slot) {
             statsDEP_SATISFYFromEvt(pd, base->guid, base, waiter->guid,
                                     data.guid, waiter->slot);
 #endif
+#ifdef OCR_ENABLE_LOGGING
+            logDEP_SATISFY(pd, base->guid, waiters[i].guid, waiters[i].slot);
+#endif
             msg.type = PD_MSG_DEP_SATISFY | PD_MSG_REQUEST;
             PD_MSG_FIELD(guid.guid) = waiters[i].guid;
             PD_MSG_FIELD(guid.metaDataPtr) = NULL;
@@ -307,6 +335,15 @@ u8 satisfyEventHcLatch(ocrEvent_t *base, ocrFatGuid_t db, u32 slot) {
     ocrGuid_t edt = getCurrentEDT();
     statsDEP_SATISFYToEvt(pd, edt, NULL, base->guid, base, data, slot);
 #endif
+#ifdef OCR_ENABLE_LOGGING
+    {
+        ocrPolicyDomain_t *pd = NULL;
+        ocrTask_t *edt = NULL;
+        getCurrentEnv(&pd, NULL, &edt, NULL);
+        logDEP_SATISFY(pd, edt->guid, base->guid, slot);
+    }
+#endif
+
     if(count + incr != 0) {
         return 0;
     }
@@ -345,6 +382,9 @@ u8 satisfyEventHcLatch(ocrEvent_t *base, ocrFatGuid_t db, u32 slot) {
             // before we can get the message sent
             statsDEP_SATISFYFromEvt(pd, base->guid, base, waiter->guid,
                                     data.guid, waiter->slot);
+#endif
+#ifdef OCR_ENABLE_LOGGING
+            logDEP_SATISFY(pd, curTask->guid, waiters[i].guid, waiters[i].slot);
 #endif
             msg.type = PD_MSG_DEP_SATISFY | PD_MSG_REQUEST;
             PD_MSG_FIELD(guid.guid) = waiters[i].guid;
@@ -855,6 +895,14 @@ ocrEvent_t * newEventHc(ocrEventFactory_t * factory, ocrEventTypes_t eventType,
     DPRINTF(DEBUG_LVL_INFO, "Create %s: 0x%lx\n", eventTypeToString(base), base->guid);
 #ifdef OCR_ENABLE_STATISTICS
     statsEVT_CREATE(getCurrentPD(), getCurrentEDT(), NULL, base->guid, base);
+#endif
+#ifdef OCR_ENABLE_LOGGING
+    {
+        ocrPolicyDomain_t *pd = NULL;
+        ocrTask_t *edt = NULL;
+        getCurrentEnv(&pd, NULL, &edt, NULL);
+        logEVT_CREATE(pd, edt, base);
+    }
 #endif
     return base;
 }

@@ -34,6 +34,8 @@ typedef struct {
     // Master workers need to be started twice (once by the PD and once
     // when they actually start running. This helps keep track of this
     bool secondStart;
+
+	u64 backoffUs;
 } ocrWorkerHc_t;
 
 ocrWorkerFactory_t* newOcrWorkerFactoryHc(ocrParamList_t *perType);

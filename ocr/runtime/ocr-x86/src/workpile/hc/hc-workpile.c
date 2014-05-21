@@ -13,6 +13,7 @@
 #include "ocr-workpile.h"
 #include "workpile/hc/hc-workpile.h"
 
+#include <pthread.h>   //<-------------- remove this.... not needed beyond debugs
 
 /******************************************************/
 /* OCR-HC WorkPile                                    */
@@ -33,6 +34,8 @@ void hcWorkpileStart(ocrWorkpile_t *base, ocrPolicyDomain_t *PD) {
     guidify(PD, (u64)base, &(base->fguid), OCR_GUID_WORKPILE);
     ocrWorkpileHc_t* derived = (ocrWorkpileHc_t*)base;
     base->pd = PD;
+	pthread_mutex_init(&derived->mutex, NULL);
+
     derived->deque = newWorkStealingDeque(base->pd, (void *) NULL_GUID);
 }
 
@@ -64,7 +67,9 @@ ocrFatGuid_t hcWorkpilePop(ocrWorkpile_t * base, ocrWorkPopType_t type,
     ocrFatGuid_t fguid;
     switch(type) {
     case POP_WORKPOPTYPE:
+	pthread_mutex_lock(&derived->mutex);
         fguid.guid = (ocrGuid_t)derived->deque->popFromTail(derived->deque, 0);
+	pthread_mutex_unlock(&derived->mutex);
         break;
     case STEAL_WORKPOPTYPE:
         fguid.guid = (ocrGuid_t)derived->deque->popFromHead(derived->deque, 1);
@@ -79,7 +84,9 @@ ocrFatGuid_t hcWorkpilePop(ocrWorkpile_t * base, ocrWorkPopType_t type,
 void hcWorkpilePush(ocrWorkpile_t * base, ocrWorkPushType_t type,
                     ocrFatGuid_t g ) {
     ocrWorkpileHc_t* derived = (ocrWorkpileHc_t*) base;
+    pthread_mutex_lock(&derived->mutex);
     derived->deque->pushAtTail(derived->deque, (void *)(g.guid), 0);
+    pthread_mutex_unlock(&derived->mutex);
 }
 
 ocrWorkpile_t * newWorkpileHc(ocrWorkpileFactory_t * factory, ocrParamList_t *perInstance) {

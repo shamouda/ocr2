@@ -344,4 +344,11 @@
 #define RESULT_TRUE(a) do { a; } while(0);
 #endif /* OCR_ASSERT */
 
+#ifdef OCR_LOG
+// log should be an (ocrLog_t *)
+#define LOG_PRINTF(log, format, ...)    FPRINTF((log), (format), ## __VA_ARGS__)
+#else
+#define LOG_PRINTF(log, format, msg)
+#endif
+
 #endif /* __DEBUG_H__ */

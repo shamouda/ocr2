@@ -19,9 +19,6 @@
 // that does not contribute to building the policy domain
 //#define ENABLE_BUILDER_ONLY
 
-//#define OCR_ENABLE_LOGGING
-#define DEP_LOG_FILE "deplog.xml"
-
 // Allocator
 #define ENABLE_ALLOCATOR_TLSF
 
@@ -68,6 +65,7 @@
 #define ENABLE_POLICY_DOMAIN_HC
 
 // Scheduler
+#define ENABLE_SCHEDULER_XP
 #define ENABLE_SCHEDULER_HC
 
 // Sysboot layer to use

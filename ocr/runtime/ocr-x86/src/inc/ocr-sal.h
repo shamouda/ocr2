@@ -21,10 +21,24 @@ struct _ocrPolicyMsg_t;
 void getCurrentEnv(struct _ocrPolicyDomain_t** pd, struct _ocrWorker_t** worker,
                    struct _ocrTask_t **task, struct _ocrPolicyMsg_t* msg);
 
+// abstract log class
+typedef struct _ocrLog_t
+{
+    u32 (*print)(struct _ocrLog_t *self, char *msg, u32 len);
+    u32 (*destruct)(struct _ocrLog_t *self);
+} ocrLog_t;
+
+typedef struct _ocrLogFactory_t
+{
+    ocrLog_t * (*instantiate)(struct _ocrLogFactory_t *self, char *filename);
+    u32 (*initialize)(struct _ocrLogFactory_t *self, ocrLog_t *log, char *filename);
+    void (*destruct)(struct _ocrLogFactory_t *self);
+} ocrLogFactory_t;
+
 
 u32 SNPRINTF(char * buf, u32 size, char * fmt, ...);
 u32 PRINTF(char * fmt, ...);
-
+u32 FPRINTF(ocrLog_t * log, char * fmt, ...);
 
 #if defined(SAL_FSIM_XE)
 #include "sal/fsim-xe/ocr-sal-fsim-xe.h"

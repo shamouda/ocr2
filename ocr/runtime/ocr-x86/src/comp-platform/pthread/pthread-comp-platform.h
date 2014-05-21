@@ -41,7 +41,15 @@ typedef struct {
 typedef struct {
     paramListCompPlatformInst_t base;
     u64 stackSize;
+
+	s32 coreCount;
+	s32 segmentCount;
+	s32 freeCoresPerSegment;
+	s32 specialBinding;
     s32 binding;
+	s32 threadsPerCore;
+	s32 compPerCore;
+
 } paramListCompPlatformPthread_t;
 
 extern ocrCompPlatformFactory_t* newCompPlatformFactoryPthread(ocrParamList_t *perType);

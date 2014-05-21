@@ -795,6 +795,12 @@ typedef struct _ocrPolicyDomain_t {
     ocrStats_t *statsObject;                    /**< Statistics object */
 #endif
 
+#ifdef OCR_ENABLE_LOGGING
+    FILE **logs;
+    u32 logCount;
+#endif
+
+
     // TODO: What to do about this?
     ocrCost_t *costFunction; /**< Cost function used to determine
                               * what to schedule/steal/take/etc.

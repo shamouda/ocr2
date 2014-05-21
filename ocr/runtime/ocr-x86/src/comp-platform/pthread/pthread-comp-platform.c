@@ -191,11 +191,42 @@ void initializeCompPlatformPthread(ocrCompPlatformFactory_t * factory, ocrCompPl
     initializeCompPlatformOcr(factory, derived, perInstance);
     paramListCompPlatformPthread_t * params =
         (paramListCompPlatformPthread_t *) perInstance;
+	ocrCompPlatformPthread_t * compPlatformPthread = (ocrCompPlatformPthread_t *) derived;
 
-    ocrCompPlatformPthread_t *compPlatformPthread = (ocrCompPlatformPthread_t *)derived;
-    compPlatformPthread->base.fcts = factory->platformFcts;
-    compPlatformPthread->binding = (params != NULL) ? params->binding : -1;
-    compPlatformPthread->stackSize = ((params != NULL) && (params->stackSize > 0)) ? params->stackSize : 8388608;
+	if(params != NULL){
+		if(params->specialBinding){
+
+			int coreCount = params->coreCount;
+			int segmentCount = params->segmentCount;
+			int freeCoresPerSegment = params->freeCoresPerSegment;
+			int segmentSize = coreCount / segmentCount;
+
+			int coreId= params->binding / params->compPerCore;
+
+			int segmentId = coreId / (segmentSize - freeCoresPerSegment);
+			int segmentPosition = coreId % (segmentSize - freeCoresPerSegment);
+			int segmentOffset = (segmentPosition +1)/(segmentSize/freeCoresPerSegment);
+
+			coreId+= segmentOffset + segmentId*freeCoresPerSegment;
+
+			int threadOffset = params->binding % params->compPerCore;
+			int affinity = coreId * params->threadsPerCore + threadOffset;
+
+//			printf("special binding comp %d to %d \n    coreId=%d := %d / %d  \n    threadoffset=%d := %d mod %d \n\n",
+ //                        params->binding , affinity,
+	//													coreId ,params->binding , params->compPerCore,
+		//												threadOffset , params->binding , params->compPerCore );
+
+
+			//printf("binding %d -> affinity %d , coreId %d\n",params->binding ,affinity, coreId);
+			compPlatformPthread->binding = affinity;
+
+		}else
+    		compPlatformPthread->binding =  params->binding ;
+    }else
+		compPlatformPthread->binding =  -1;
+
+	compPlatformPthread->stackSize = ((params != NULL) && (params->stackSize > 0)) ? params->stackSize : 8388608;
     compPlatformPthread->isMaster = false;
 }
 

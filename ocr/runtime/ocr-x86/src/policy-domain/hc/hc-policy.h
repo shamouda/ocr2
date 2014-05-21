@@ -13,6 +13,10 @@
 #include "ocr-policy-domain.h"
 #include "utils/ocr-utils.h"
 
+#ifdef ENABLE_LOGGING
+#include <stdio.h>
+#endif
+
 /******************************************************/
 /* OCR-HC POLICY DOMAIN                               */
 /******************************************************/

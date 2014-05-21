@@ -14,12 +14,14 @@
 #include "scheduler/hc/hc-scheduler.h"
 #include "scheduler/ce/ce-scheduler.h"
 #include "scheduler/xe/xe-scheduler.h"
+#include "scheduler/xp/xp-scheduler.h"
 
 typedef enum _schedulerType_t {
     schedulerHc_id,
     schedulerXe_id,
     schedulerCe_id,
     schedulerHcPlaced_id,
+    schedulerXp_id,
     schedulerNull_id,
     schedulerMax_id
 } schedulerType_t;

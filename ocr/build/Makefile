@@ -69,6 +69,7 @@ clean:
 .PHONY: squeaky
 squeaky:
 	ARCH=x86-pthread-x86 $(MAKE) -C x86-pthread-x86 clean uninstall
+	ARCH=x86-pthread-mic $(MAKE) -C x86-pthread-mic clean uninstall
 	ARCH=x86-pthread-fsim $(MAKE) -C x86-pthread-fsim clean uninstall
 	ARCH=fsim-null-fsim-ce $(MAKE) -C fsim-null-fsim-ce clean uninstall
 	ARCH=fsim-null-fsim-xe $(MAKE) -C fsim-null-fsim-xe clean uninstall

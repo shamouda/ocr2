@@ -15,12 +15,15 @@
 #include "utils/deque.h"
 #include "ocr-workpile.h"
 
+#include <pthread.h>
+
 typedef struct {
     ocrWorkpileFactory_t base;
 } ocrWorkpileFactoryHc_t;
 
 typedef struct {
     ocrWorkpile_t base;
+	pthread_mutex_t mutex;
     deque_t * deque;
 } ocrWorkpileHc_t;
 

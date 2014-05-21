@@ -104,6 +104,12 @@ void hcPolicyDomainStart(ocrPolicyDomain_t * policy) {
         policy->commApis[i]->fcts.start(policy->commApis[i], policy);
     }
 
+    #ifdef OCR_ENABLE_LOGGING
+        policy->logs = (FILE **) runtimeChunkAlloc(sizeof(FILE *), NULL);
+        policy->logs[0] = fopen(DEP_LOG_FILE, "w");
+        ASSERT(policy->logs[0] != NULL && "failed to open log file " DEP_LOG_FILE);
+        fprintf(policy->logs[0], "<Data>\n");
+    #endif
     // REC: Moved all workers to start here.
     // Note: it's important to first logically start all workers.
     // Once they are all up, start the runtime.
@@ -288,6 +294,12 @@ void hcPolicyDomainDestruct(ocrPolicyDomain_t * policy) {
         policy->allocators[i]->fcts.destruct(policy->allocators[i]);
     }
 
+    #ifdef OCR_ENABLE_LOGGING
+        fprintf(policy->logs[0], "</Data>");
+        for(i = 0; i < policy->logCount; i++)
+            fclose(policy->logs[i]);
+        runtimeChunkFree((u64)policy->logs, NULL);
+    #endif
     // Destroy self
     runtimeChunkFree((u64)policy->workers, NULL);
     runtimeChunkFree((u64)policy->commApis, NULL);
@@ -958,6 +970,9 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             ocrFatGuid_t sourceGuid = PD_MSG_FIELD(source);
             ocrFatGuid_t destGuid = PD_MSG_FIELD(dest);
             u32 slot = PD_MSG_FIELD(slot);
+#ifdef OCR_ENABLE_LOGGING
+            logDEP_ADD(self, sourceGuid.guid, destGuid.guid);
+#endif
         #undef PD_MSG
         #undef PD_TYPE
         #define PD_MSG (&registerMsg)

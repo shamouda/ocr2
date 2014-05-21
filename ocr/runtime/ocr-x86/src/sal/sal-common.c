@@ -341,3 +341,26 @@ u32 PRINTF(char * fmt, ...) {
 
     return tmp;
 }
+
+u32 FPRINTF(ocrLog_t * log, char * fmt, ...)
+{
+    u32 tmp;
+    __builtin_va_list ap;
+
+    char printf_buf[PRINTF_MAX] __attribute__((aligned(sizeof(u64))));
+
+
+    __builtin_va_start(ap, fmt);
+
+    tmp = internal_vsnprintf(printf_buf, PRINTF_MAX, fmt, ap);
+
+    __builtin_va_end(ap);
+
+    log->print(log, printf_buf, tmp+1);
+
+    return tmp;
+}
+
+
+
+

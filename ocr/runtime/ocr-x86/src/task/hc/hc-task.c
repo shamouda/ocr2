@@ -34,6 +34,13 @@ extern struct _dbWeightStruct gDbWeights[] __attribute__((weak));
 
 #include "utils/profiler/profiler.h"
 
+#ifdef OCR_ENABLE_LOGGING
+#include "logging/logging.h"
+#endif
+
+#include <time.h>
+#include <pthread.h>
+
 #define DEBUG_TYPE TASK
 
 /******************************************************/
@@ -291,6 +298,10 @@ static u8 taskSchedule(ocrTask_t *self) {
     ocrPolicyMsg_t msg;
     getCurrentEnv(&pd, NULL, NULL, &msg);
 
+#ifdef OCR_ENABLE_LOGGING
+    logEDT_SCHED(pd, self);
+#endif
+
     ocrFatGuid_t toGive = {.guid = self->guid, .metaDataPtr = self};
 
 #define PD_MSG (&msg)
@@ -324,6 +335,9 @@ u8 destructTaskHc(ocrTask_t* base) {
         statsEDT_DESTROY(pd, base->guid, base, base->guid, base);
     }
 #endif /* OCR_ENABLE_STATISTICS */
+#ifdef OCR_ENABLE_LOGGING
+    logEDT_DESTROY(pd, base, base);
+#endif /* OCR_ENABLE_LOGGING */
 #define PD_MSG (&msg)
 #define PD_TYPE PD_MSG_GUID_DESTROY
     msg.type = PD_MSG_GUID_DESTROY | PD_MSG_REQUEST;
@@ -453,6 +467,9 @@ ocrTask_t * newTaskHc(ocrTaskFactory_t* factory, ocrFatGuid_t edtTemplate,
         }
     }
 #endif /* OCR_ENABLE_STATISTICS */
+#ifdef OCR_ENABLE_LOGGING
+        logEDT_CREATE(pd, curEdt, base);
+#endif /* OCR_ENABLE_LOGGING */
     DPRINTF(DEBUG_LVL_INFO, "Create 0x%lx depc %d outputEvent 0x%lx\n", base->guid, depc, outputEventPtr?outputEventPtr->guid:NULL_GUID);
 
     // Check to see if the EDT can be run
@@ -760,6 +777,13 @@ u8 taskExecute(ocrTask_t* base) {
     statsEDT_START(pd, ctx->sourceObj, curWorker, base->guid, base, depc != 0);
 
 #endif /* OCR_ENABLE_STATISTICS */
+#ifdef OCR_ENABLE_LOGGING
+    {
+        ocrWorker_t *worker;
+        getCurrentEnv(NULL, &worker, NULL, NULL);
+        logEDT_START(pd, worker, base);
+    }
+#endif
 
     ocrGuid_t retGuid = NULL_GUID;
     {
@@ -773,6 +797,14 @@ u8 taskExecute(ocrTask_t* base) {
     // We now say that the worker is done executing the EDT
     statsEDT_END(pd, ctx->sourceObj, curWorker, base->guid, base);
 #endif /* OCR_ENABLE_STATISTICS */
+
+#ifdef OCR_ENABLE_LOGGING
+    {
+        ocrWorker_t *worker;
+        getCurrentEnv(NULL, &worker, NULL, NULL);
+        logEDT_END(pd, worker, base);
+    }
+#endif
 
     // edt user code is done, if any deps, release data-blocks
     if(depc != 0) {

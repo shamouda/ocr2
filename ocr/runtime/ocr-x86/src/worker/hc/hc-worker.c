@@ -256,6 +256,7 @@ void initializeWorkerHc(ocrWorkerFactory_t * factory, ocrWorker_t* self, ocrPara
     workerHc->id = workerId;
     workerHc->running = false;
     workerHc->secondStart = false;
+	workerHc->backoffUs = 1;
 }
 
 /******************************************************/

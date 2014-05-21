@@ -19,14 +19,8 @@
 // that does not contribute to building the policy domain
 //#define ENABLE_BUILDER_ONLY
 
-//#define OCR_ENABLE_LOGGING
-#define DEP_LOG_FILE "deplog.xml"
-
 // Allocator
 #define ENABLE_ALLOCATOR_TLSF
-
-// Comm-api
-#define ENABLE_COMM_API_HANDLELESS
 
 // Comm-platform
 #define ENABLE_COMM_PLATFORM_NULL
@@ -50,7 +44,6 @@
 
 // GUID provider
 #define ENABLE_GUID_PTR
-#define ENABLE_GUID_COUNTED_MAP
 
 // HAL layer to use
 #define HAL_X86_64
