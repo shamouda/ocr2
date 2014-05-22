@@ -12,7 +12,7 @@
 //States
 #include "component/wst/wst-component.h"
 #include "component/ce/ce-component.h"
-//#include "component/ce/ce-par-component.h"
+#include "component/ce/ce-par-component.h"
 //Inners
 #include "component/workdeque/workdeque-component.h"
 #include "component/priority/priority-component.h"
