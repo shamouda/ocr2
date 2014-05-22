@@ -12,7 +12,6 @@
 #include "ocr-sysboot.h"
 #include "ocr-policy-domain.h"
 #include "ocr-component.h"
-//#include "component/ce/ce-component.h"
 #include "component/component-all.h"
 #include "cost-mapper/cost-mapper-all.h"
 #include "ce-cost-mapper.h"
@@ -38,7 +37,7 @@ void ceCostMapperBegin(ocrCostMapper_t *self, ocrPolicyDomain_t * PD) {
 
 void ceCostMapperStart(ocrCostMapper_t *self, ocrPolicyDomain_t * PD) {
     ocrCostMapperCe_t * ceCostMapper = (ocrCostMapperCe_t*)self;
-    ocrComponentFactory_t * ceCompStateFact = PD->componentFactories[0];
+    ocrComponentFactory_t * ceCompStateFact = PD->componentFactories[componentCe_id];
     ocrFatGuid_t hints = {NULL_GUID, NULL};
     ceCostMapper->base.componentState = ceCompStateFact->instantiate(ceCompStateFact, hints, 0);
 }
@@ -50,15 +49,11 @@ void ceCostMapperFinish(ocrCostMapper_t *self) {
 }
 
 u8 ceCostMapperTake(ocrCostMapper_t *self, ocrLocation_t source, ocrFatGuid_t *component, ocrFatGuid_t hints, ocrFatGuid_t *costs, ocrFatGuid_t *mappings, u32 properties) {
-    ocrComponent_t *state = self->componentState;
-    state->fcts.remove(state, source, component, hints, properties);
-    return 0;
+    return self->componentState->fcts.remove(self->componentState, source, component, hints, properties);
 }
 
 u8 ceCostMapperGive(ocrCostMapper_t *self, ocrLocation_t source, ocrFatGuid_t component, ocrFatGuid_t hints, u32 properties) {
-    ocrComponent_t *state = self->componentState;
-    state->fcts.insert(state, source, component, hints, properties);
-    return 0;
+    return self->componentState->fcts.insert(self->componentState, source, component, hints, properties);
 }
 
 ocrCostMapperFactory_t * newOcrCostMapperFactoryCe(ocrParamList_t *perType) {

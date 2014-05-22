@@ -5,39 +5,40 @@
  */
 
 
-#ifndef __CE_COMPONENT_H__
-#define __CE_COMPONENT_H__
+#ifndef __CE_PRIORITY_COMPONENT_H__
+#define __CE_PRIORITY_COMPONENT_H__
 
 #include "ocr-config.h"
-#ifdef ENABLE_COMPONENT_CE_BASE
+#ifdef ENABLE_COMPONENT_PRIORITY
 
 #include "utils/ocr-utils.h"
 #include "utils/deque.h"
 #include "ocr-component.h"
 
 /****************************************************/
-/* OCR CE BASE COMPONENT                            */
+/* OCR PRIORITY COMPONENT                           */
 /****************************************************/
 
 /*! \brief CE component implementation for a shared memory workstealing runtime
  */
 typedef struct {
     ocrComponent_t base;
-    deque_t * deque;
-} ocrComponentCeBase_t;
+    deque_t **workpiles;  //deque on each level
+    u32 numLevels;
+} ocrComponentPriority_t;
 
 typedef struct {
     ocrComponentFactory_t baseFactory;
-    u32 dequeInitSize;
-} ocrComponentFactoryCeBase_t;
+    u32 maxLevels;
+} ocrComponentFactoryPriority_t;
 
-typedef struct _paramListComponentFactCeBase_t {
+typedef struct _paramListComponentFactPriority_t {
     paramListComponentFact_t base;
-    u32 dequeInitSize;
-} paramListComponentFactCeBase_t;
+    u32 maxLevels;
+} paramListComponentFactPriority_t;
 
-ocrComponentFactory_t * newOcrComponentFactoryCe(ocrParamList_t* perType);
+ocrComponentFactory_t * newOcrComponentFactoryPriority(ocrParamList_t* perType);
 
-#endif /* ENABLE_COMPONENT_CE_BASE */
+#endif /* ENABLE_COMPONENT_PRIORITY */
 
-#endif /* __CE_COMPONENT_H__ */
+#endif /* __CE_PRIORITY_COMPONENT_H__ */

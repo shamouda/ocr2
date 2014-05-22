@@ -87,13 +87,11 @@ void ceSchedulerFinish(ocrScheduler_t *self) {
 }
 
 u8 ceSchedulerTake(ocrScheduler_t *self, ocrLocation_t source, ocrFatGuid_t *component, ocrFatGuid_t hints, u32 properties) {
-    self->mappers[0]->fcts.take(self->mappers[0], source, component, hints, NULL, NULL, properties);
-    return 0;
+    return self->mappers[0]->fcts.take(self->mappers[0], source, component, hints, NULL, NULL, properties);
 }
 
 u8 ceSchedulerGive(ocrScheduler_t *self, ocrLocation_t source, ocrFatGuid_t component, ocrFatGuid_t hints, u32 properties) {
-    self->mappers[0]->fcts.give(self->mappers[0], source, component, hints, properties);
-    return 0;
+    return self->mappers[0]->fcts.give(self->mappers[0], source, component, hints, properties);
 }
 
 ocrScheduler_t* newSchedulerCe(ocrSchedulerFactory_t * factory, ocrParamList_t *perInstance) {

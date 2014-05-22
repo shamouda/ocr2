@@ -150,7 +150,18 @@ typedef struct _ocrComponentFcts_t {
      *  If return value is: OCR_COMPONENT_SIZE_NON_EMPTY,
      *  it simply means that more than one component exists
      */
-    u32 (*count)(struct _ocrComponent_t *self, ocrLocation_t loc);
+    u64 (*count)(struct _ocrComponent_t *self, ocrLocation_t loc);
+
+    /** @brief Set the location for this component
+     *
+     *  This will set the component's location to which it is mapped.
+     *
+     *  @param[in] self         Pointer to this component
+     *  @param[in] loc          Location mapping
+     *
+     *  @return 0 on success and a non-zero value on failure
+     */
+    u8 (*setLocation)(struct _ocrComponent_t *self, ocrLocation_t loc);
 } ocrComponentFcts_t;
 
 /*! \brief Abstract class to represent OCR component data structures.
@@ -158,8 +169,9 @@ typedef struct _ocrComponentFcts_t {
  */
 typedef struct _ocrComponent_t {
     ocrGuid_t guid;         /**< The guid of this component */
-    ocrLocation_t mapping;  /**< Location mapping of this component */
     ocrComponentFcts_t fcts;
+    ocrLocation_t mapping;  /**< Location mapping of this component */
+    u64 count;
 } ocrComponent_t;
 
 

@@ -377,6 +377,7 @@ typedef struct _ocrPolicyMsg_t {
             ocrEdt_t funcPtr;      /**< In: Function to execute for this EDT */
             u32 paramc;            /**< In: Number of parameters for EDT */
             u32 depc;              /**< In: Number of dependences for EDT */
+            ocrFatGuid_t hints;    /**< In: Hints data */
             u32 properties;        /**< In: Properties */
             const char * funcName; /**< In: Debug help: user identifier */
         } PD_MSG_STRUCT_NAME(PD_MSG_EDTTEMP_CREATE);
@@ -442,7 +443,7 @@ typedef struct _ocrPolicyMsg_t {
                                   * maximum number of GUIDs requested. */
             u32 properties;      /**< In: properties for the take; TODO: define some for extra */
             ocrGuidKind type;    /**< In: Kind of GUIDs requested */
-            // TODO: Add something about cost/choice heuristic
+            ocrFatGuid_t hints;  /**< In: Runtime hints */
         } PD_MSG_STRUCT_NAME(PD_MSG_COMM_TAKE);
 
         struct {
@@ -454,7 +455,7 @@ typedef struct _ocrPolicyMsg_t {
             u32 guidCount;       /**< Number of GUID(s) in guids */
             u32 properties;      /**< In: properties for the give */
             ocrGuidKind type;    /**< In: Kind of GUIDs given */
-            // TODO: Do we need something about cost/choice heuristic here
+            ocrFatGuid_t hints;  /**< In: Runtime hints */
         } PD_MSG_STRUCT_NAME(PD_MSG_COMM_GIVE);
 
         struct {

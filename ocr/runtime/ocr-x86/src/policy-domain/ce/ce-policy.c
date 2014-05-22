@@ -395,11 +395,11 @@ static u8 ceCreateEdt(ocrPolicyDomain_t *self, ocrFatGuid_t *guid,
 }
 
 static u8 ceCreateEdtTemplate(ocrPolicyDomain_t *self, ocrFatGuid_t *guid,
-                              ocrEdt_t func, u32 paramc, u32 depc, const char* funcName) {
+                              ocrEdt_t func, u32 paramc, u32 depc, ocrFatGuid_t hints, const char* funcName) {
 
 
     ocrTaskTemplate_t *base = self->taskTemplateFactories[0]->instantiate(
-        self->taskTemplateFactories[0], func, paramc, depc, funcName, NULL);
+        self->taskTemplateFactories[0], func, paramc, depc, hints.guid, funcName, NULL);
     (*guid).guid = base->guid;
     (*guid).metaDataPtr = base;
     return 0;
@@ -620,7 +620,7 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
 
         returnCode = ceCreateEdtTemplate(self, &(PD_MSG_FIELD(guid)),
                                          PD_MSG_FIELD(funcPtr), PD_MSG_FIELD(paramc),
-                                         PD_MSG_FIELD(depc), PD_MSG_FIELD(funcName));
+                                         PD_MSG_FIELD(depc), PD_MSG_FIELD(hints), PD_MSG_FIELD(funcName));
         returnCode =  ceProcessResponse(self, msg, 0);
 #undef PD_MSG
 #undef PD_TYPE

@@ -11,8 +11,6 @@ const char * scheduler_types[] = {
     "HC",
     "XE",
     "CE",
-    "HC_Placed",
-    "null",
     NULL
 };
 
@@ -30,7 +28,6 @@ ocrSchedulerFactory_t * newSchedulerFactory(schedulerType_t type, ocrParamList_t
     case schedulerXe_id:
         return newOcrSchedulerFactoryXe(perType);
 #endif
-    case schedulerHcPlaced_id:
     default:
         ASSERT(0);
     }

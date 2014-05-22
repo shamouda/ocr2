@@ -92,10 +92,10 @@ dep_t deps[] = {
     { policydomain_type, componentfactory_type, "componentfactory"},
 };
 
-extern char* populate_type(ocrParamList_t **type_param, type_enum index, dictionary *dict, char *secname);
+extern char* populate_type(ocrParamList_t **type_param, int *factory_type, type_enum index, dictionary *dict, char *secname);
 int populate_inst(ocrParamList_t **inst_param, void **instance, int *type_counts, char ***factory_names, void ***all_factories, void ***all_instances, type_enum index, dictionary *dict, char *secname);
 extern int build_deps (dictionary *dict, int A, int B, char *refstr, void ***all_instances, ocrParamList_t ***inst_params);
-extern int build_deps_types (int B, void **pdinst, int pdcount, void ***all_factories, ocrParamList_t ***type_params, int *type_counts);
+extern int build_deps_types (int B, void **pdinst, int pdcount, void ***all_factories, int **factory_types, ocrParamList_t ***type_params, int *type_counts);
 extern void *create_factory (type_enum index, char *factory_name, ocrParamList_t *paramlist);
 extern int read_range(dictionary *dict, char *sec, char *field, int *low, int *high);
 extern void free_instance(void *instance, type_enum inst_type);
@@ -114,6 +114,7 @@ int type_counts[sizeof(type_str)/sizeof(const char *)];
 int inst_counts[sizeof(inst_str)/sizeof(const char *)];
 ocrParamList_t **type_params[sizeof(type_str)/sizeof(const char *)];
 char **factory_names[sizeof(type_str)/sizeof(const char *)];
+int *factory_types[sizeof(type_str)/sizeof(const char *)];
 ocrParamList_t **inst_params[sizeof(inst_str)/sizeof(const char *)];
 
 #ifdef ENABLE_BUILDER_ONLY
@@ -159,7 +160,7 @@ void dumpStructs(void *pd, const char* output_binary, u64 start_address) {
 
     if(fp == NULL) printf("Unable to open file %s for writing\n", output_binary);
     else {
-        
+
         // Write the header
         // Header size
         value = 5*sizeof(u64);
@@ -168,7 +169,7 @@ void dumpStructs(void *pd, const char* output_binary, u64 start_address) {
         // Absolute location - currently read from config file
         fwrite(&start_address, sizeof(u64), 1, fp); totu64++;
 
-        // PD address        
+        // PD address
         offset = (u64)pd - (u64)&persistent_chunk + (u64)start_address;
         fwrite(&offset, sizeof(u64), 1, fp); totu64++;
 
@@ -179,11 +180,11 @@ void dumpStructs(void *pd, const char* output_binary, u64 start_address) {
         offset = (u64)(&((ocrPolicyDomain_t *)pd)->myLocation) - (u64)&persistent_chunk + (u64)start_address;
         fwrite(&offset, sizeof(u64), 1, fp); totu64++;
 
-        // Fix up all the pointers 
+        // Fix up all the pointers
         // (FIXME: potential low-likelihood bug due to address collision; need to be improved upon)
         for(i = 0; i<(persistent_pointer/sizeof(u64)); i++) {
             if((ptrs[i] > (u64)ptrs) && (ptrs[i] < (u64)(ptrs+persistent_pointer))) {
-                ptrs[i] -= (u64)ptrs; 
+                ptrs[i] -= (u64)ptrs;
                 ptrs[i] += start_address;
             }
         }
@@ -218,7 +219,8 @@ void bringUpRuntime(const char *inifile) {
 
     // INIT
     for (j = 0; j < total_types; j++) {
-        type_params[j] = NULL; type_counts[j] = 0; factory_names[j] = NULL;
+        type_params[j] = NULL; type_counts[j] = 0;
+        factory_names[j] = NULL; factory_types[j] = NULL;
         inst_params[j] = NULL; inst_counts[j] = 0;
         all_factories[j] = NULL; all_instances[j] = NULL;
     }
@@ -240,13 +242,12 @@ void bringUpRuntime(const char *inifile) {
             if (strncasecmp(type_str[j], iniparser_getsecname(dict, i), strlen(type_str[j]))==0) {
                 if(type_counts[j] && type_params[j]==NULL) {
                     type_params[j] = (ocrParamList_t **)runtimeChunkAlloc(type_counts[j] * sizeof(ocrParamList_t *), (void *)1);
-//                    factory_names[j] = (char **)calloc(type_counts[j], sizeof(char *));
-//                    all_factories[j] = (void **)calloc(type_counts[j], sizeof(void *));
                     factory_names[j] = (char **)runtimeChunkAlloc(type_counts[j] * sizeof(char *), (void *)1);
+                    factory_types[j] = (int *)runtimeChunkAlloc(type_counts[j] * sizeof(int), 0);
                     all_factories[j] = (void **)runtimeChunkAlloc(type_counts[j] * sizeof(void *), (void *)1);
                     count = 0;
                 }
-                factory_names[j][count] = populate_type(&type_params[j][count], j, dict, iniparser_getsecname(dict, i));
+                factory_names[j][count] = populate_type(&type_params[j][count], &factory_types[j][count], j, dict, iniparser_getsecname(dict, i));
                 all_factories[j][count] = create_factory(j, factory_names[j][count], type_params[j][count]);
                 if (all_factories[j][count] == NULL) {
                     free(factory_names[j][count]);
@@ -270,6 +271,7 @@ void bringUpRuntime(const char *inifile) {
         }
     }
 
+
     for (i = 0; i < nsec; i++) {
         for (j = total_types-1; j >= 0; j--) {
             if (strncasecmp(inst_str[j], iniparser_getsecname(dict, i), strlen(inst_str[j]))==0) {
@@ -277,8 +279,6 @@ void bringUpRuntime(const char *inifile) {
                     DPRINTF(DEBUG_LVL_INFO, "Create %d instances of %s\n", inst_counts[j], inst_str[j]);
                     inst_params[j] = (ocrParamList_t **)runtimeChunkAlloc(inst_counts[j] * sizeof(ocrParamList_t *), (void *)1);
                     all_instances[j] = (void **)runtimeChunkAlloc(inst_counts[j] * sizeof(void *), (void *)1);
-//                    inst_params[j] = (ocrParamList_t **)calloc(inst_counts[j], sizeof(ocrParamList_t *));
-//                    all_instances[j] = (void **)calloc(inst_counts[j], sizeof(void *));
                     count = 0;
                 }
                 populate_inst(inst_params[j], all_instances[j], type_counts, factory_names, all_factories, all_instances, j, dict, iniparser_getsecname(dict, i));
@@ -304,14 +304,14 @@ void bringUpRuntime(const char *inifile) {
     // Special case of policy domain pointing to types rather than instances
     for (i = 12; i <= 16; i++) {
         build_deps_types(deps[i].to, all_instances[policydomain_type],
-                         inst_counts[policydomain_type], all_factories, type_params, type_counts);
+                         inst_counts[policydomain_type], all_factories, factory_types, type_params, type_counts);
     }
 
     // START EXECUTION
     DPRINTF(DEBUG_LVL_INFO, "========= Start execution ==========\n");
     ocrPolicyDomain_t *rootPolicy;
     rootPolicy = (ocrPolicyDomain_t *) all_instances[policydomain_type][0];
-   
+
 #ifdef OCR_ENABLE_STATISTICS
     setCurrentPD(rootPolicy); // Statistics needs to know the current PD so we set it for this main thread
 #endif
@@ -381,7 +381,7 @@ void freeUpRuntime (void)
  * Size of each element:
  *      |u64|u64|u64*argc|strlen(argv[0:argc-1])+1|
  *          ^ -> '0' of the offset calculation
- * Note 
+ * Note
  * - totalLengh:   Total length of the packed arguments (everything minus this u64 part)
  * - argc:         Number of arguments
  * - offsets:      The offsets for each argument where the argv data is located in the chunk
@@ -412,7 +412,7 @@ static void * packUserArguments(int argc, char ** argv) {
     void* ptr = (void *) runtimeChunkAlloc(totalLength + sizeof(u64) + extraOffset, NULL);
 
     // Copy in the values to the ptr. The format is as follows:
-    // - First 4 bytes encode the size of the packed arguments 
+    // - First 4 bytes encode the size of the packed arguments
     //   (stripped out before passing the packed args to the mainEdt)
     // - Next 4 bytes encode the number of arguments (u64) (called argc)
     // - After that, an array of argc u64 offsets is encoded.

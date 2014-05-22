@@ -74,7 +74,7 @@ u8 ocrEventSatisfy(ocrGuid_t eventGuid, ocrGuid_t dataGuid /*= INVALID_GUID*/) {
     return ocrEventSatisfySlot(eventGuid, dataGuid, 0);
 }
 
-u8 ocrEdtTemplateCreate_internal(ocrGuid_t *guid, ocrEdt_t funcPtr, u32 paramc, u32 depc, const char* funcName) {
+u8 ocrEdtTemplateCreate_internal(ocrGuid_t *guid, ocrEdt_t funcPtr, u32 paramc, u32 depc, ocrGuid_t hints, const char* funcName) {
 #ifdef OCR_ENABLE_EDT_NAMING
     ASSERT(funcName);
 #endif
@@ -90,6 +90,8 @@ u8 ocrEdtTemplateCreate_internal(ocrGuid_t *guid, ocrEdt_t funcPtr, u32 paramc, 
     PD_MSG_FIELD(funcPtr) = funcPtr;
     PD_MSG_FIELD(paramc) = paramc;
     PD_MSG_FIELD(depc) = depc;
+    PD_MSG_FIELD(hints.guid) = hints;
+    PD_MSG_FIELD(hints.metaDataPtr) = NULL;
     PD_MSG_FIELD(funcName) = funcName;
 
     returnCode = pd->fcts.processMessage(pd, &msg, true);

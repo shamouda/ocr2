@@ -8,16 +8,21 @@
 #define __COMPONENT_ALL_H__
 
 #include "ocr-config.h"
-#include "utils/ocr-utils.h"
-
 #include "ocr-component.h"
-#include "component/hc/hc-component.h"
+//States
+#include "component/wst/wst-component.h"
 #include "component/ce/ce-component.h"
+//#include "component/ce/ce-par-component.h"
+//Inners
+#include "component/workdeque/workdeque-component.h"
+#include "component/priority/priority-component.h"
 
 typedef enum _componentType_t {
-    componentHcState_id,
-    componentHcWork_id,
-    componentCeState_id,
+    componentWst_id,
+    componentCe_id,
+    componentWorkdeque_id,
+    componentAffinity_id,
+    componentPriority_id,
     componentMax_id
 } componentType_t;
 

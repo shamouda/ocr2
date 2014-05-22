@@ -61,7 +61,7 @@ void xePolicyDomainBegin(ocrPolicyDomain_t * policy) {
         policy->workers[i]->fcts.begin(policy->workers[i], policy);
     }
 
-#ifdef TOOL_CHAIN_XE 
+#ifdef TOOL_CHAIN_XE
     xePolicyDomainStart(policy);
 #endif
 }
@@ -313,11 +313,12 @@ static u8 xeCreateEdt(ocrPolicyDomain_t *self, ocrFatGuid_t *guid,
 }
 
 static u8 xeCreateEdtTemplate(ocrPolicyDomain_t *self, ocrFatGuid_t *guid,
-                              ocrEdt_t func, u32 paramc, u32 depc, const char* funcName) {
+                              ocrEdt_t func, u32 paramc, u32 depc,
+                              ocrFatGuid_t hints, const char* funcName) {
 
 
     ocrTaskTemplate_t *base = self->taskTemplateFactories[0]->instantiate(
-        self->taskTemplateFactories[0], func, paramc, depc, funcName, NULL);
+        self->taskTemplateFactories[0], func, paramc, depc, hints.guid, funcName, NULL);
     (*guid).guid = base->guid;
     (*guid).metaDataPtr = base;
     return 0;
@@ -396,7 +397,7 @@ static u8 xeProcessCeResponse(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg) {
 u8 xePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlocking) {
 
     u8 returnCode = 0;
-    ASSERT((msg->type & PD_MSG_REQUEST) && (!(msg->type & PD_MSG_RESPONSE))); 
+    ASSERT((msg->type & PD_MSG_REQUEST) && (!(msg->type & PD_MSG_RESPONSE)));
     switch(msg->type & PD_MSG_TYPE_ONLY) {
     case PD_MSG_DB_CREATE:
     {
@@ -497,7 +498,7 @@ u8 xePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_WORK_CREATE
         localDeguidify(self, &(PD_MSG_FIELD(templateGuid)));
-        localDeguidify(self, &(PD_MSG_FIELD(affinity)));
+        //localDeguidify(self, &(PD_MSG_FIELD(affinity)));
         ocrFatGuid_t *outputEvent = NULL;
         if(PD_MSG_FIELD(outputEvent.guid) == UNINITIALIZED_GUID) {
             outputEvent = &(PD_MSG_FIELD(outputEvent));
@@ -535,8 +536,8 @@ u8 xePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
 
         returnCode = xeCreateEdtTemplate(self, &(PD_MSG_FIELD(guid)),
                                          PD_MSG_FIELD(funcPtr), PD_MSG_FIELD(paramc),
-                                         PD_MSG_FIELD(depc), PD_MSG_FIELD(funcName));
-                                 
+                                         PD_MSG_FIELD(depc), PD_MSG_FIELD(hints), PD_MSG_FIELD(funcName));
+
 #undef PD_MSG
 #undef PD_TYPE
         msg->type &= ~PD_MSG_REQUEST;
@@ -584,7 +585,7 @@ u8 xePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
 #undef PD_TYPE
         msg->type &= (~PD_MSG_REQUEST);
         msg->type |=  PD_MSG_RESPONSE;
-        break;            
+        break;
     }
 
     case PD_MSG_EVT_GET:
@@ -664,10 +665,15 @@ u8 xePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_COMM_TAKE
         ASSERT(PD_MSG_FIELD(type) == OCR_GUID_EDT);
-        returnCode = xeProcessCeRequest(self, &msg);
+        PD_MSG_FIELD(properties) = self->schedulers[0]->fcts.take(
+            self->schedulers[0], msg->srcLocation,
+            PD_MSG_FIELD(guids), PD_MSG_FIELD(hints), OCR_COMP_PROP_TYPE_EDT);
+        ocrFatGuid_t * component = PD_MSG_FIELD(guids);
+        if (component->guid == NULL_GUID)
+            returnCode = xeProcessCeRequest(self, &msg);
         if (PD_MSG_FIELD(guidCount) > 0) {
-        DPRINTF(DEBUG_LVL_INFO, "[XE%lu] (%lu) Received Edt guid: %lx metadata: %p\n", 
-                (u64)self->myLocation, (u64)msg->srcLocation, (PD_MSG_FIELD(guids))->guid, 
+        DPRINTF(DEBUG_LVL_INFO, "[XE%lu] (%lu) Received Edt guid: %lx metadata: %p\n",
+                (u64)self->myLocation, (u64)msg->srcLocation, (PD_MSG_FIELD(guids))->guid,
                 (PD_MSG_FIELD(guids))->metaDataPtr);
             PD_MSG_FIELD(properties) = 0;
             localDeguidify(self, (PD_MSG_FIELD(guids)));
@@ -689,10 +695,14 @@ u8 xePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         for (i = 0; i < PD_MSG_FIELD(guidCount); i++)
             guidBuf[i] = PD_MSG_FIELD(guids)[i];
         PD_MSG_FIELD(guids) = guidBuf;
-        //DPRINTF(DEBUG_LVL_INFO, "[XE%lu] (%lu) Sending Edt guid: %lx metadata: %p\n", 
-        //        (u64)self->myLocation, (u64)msg->srcLocation, (PD_MSG_FIELD(guids))->guid, 
+        returnCode = self->schedulers[0]->fcts.give(
+            self->schedulers[0], msg->srcLocation,
+            *(PD_MSG_FIELD(guids)), PD_MSG_FIELD(hints), OCR_COMP_PROP_TYPE_EDT); //FIXME Assumes only one EDT given
+        //DPRINTF(DEBUG_LVL_INFO, "[XE%lu] (%lu) Sending Edt guid: %lx metadata: %p\n",
+        //        (u64)self->myLocation, (u64)msg->srcLocation, (PD_MSG_FIELD(guids))->guid,
         //        (PD_MSG_FIELD(guids))->metaDataPtr);
-        returnCode = xeProcessCeRequest(self, &msg);
+        if (returnCode != 0)
+            returnCode = xeProcessCeRequest(self, &msg);
 #undef PD_MSG
 #undef PD_TYPE
         break;
@@ -862,7 +872,7 @@ u8 xePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
 #undef PD_TYPE
         msg->type &= ~PD_MSG_REQUEST;
         msg->type |=  PD_MSG_RESPONSE;
-        break;            
+        break;
     }
 
     case PD_MSG_DEP_UNREGSIGNALER:
@@ -890,7 +900,7 @@ u8 xePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         // Also, this should only happen when there is an actual EDT
         ASSERT(curTask &&
                curTask->guid == PD_MSG_FIELD(edt.guid));
-        
+
         ASSERT(curTask->fctId == self->taskFactories[0]->factoryId);
         PD_MSG_FIELD(properties) = self->taskFactories[0]->fcts.notifyDbAcquire(curTask, PD_MSG_FIELD(db));
         PD_MSG_FIELD(properties) = returnCode;
@@ -912,7 +922,7 @@ u8 xePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         // Also, this should only happen when there is an actual EDT
         ASSERT(curTask &&
                curTask->guid == PD_MSG_FIELD(edt.guid));
-        
+
         ASSERT(curTask->fctId == self->taskFactories[0]->factoryId);
         PD_MSG_FIELD(properties) = self->taskFactories[0]->fcts.notifyDbRelease(curTask, PD_MSG_FIELD(db));
         PD_MSG_FIELD(properties) = returnCode;
@@ -922,7 +932,7 @@ u8 xePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         msg->type |= PD_MSG_RESPONSE;
         break;
     }
-    
+
     case PD_MSG_SAL_PRINT:
     {
         ASSERT(0);
@@ -988,13 +998,13 @@ u8 xePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
     return returnCode;
 }
 
-u8 xePdSendMessage(ocrPolicyDomain_t* self, ocrLocation_t target, ocrPolicyMsg_t *message, 
+u8 xePdSendMessage(ocrPolicyDomain_t* self, ocrLocation_t target, ocrPolicyMsg_t *message,
                    ocrMsgHandle_t **handle, u32 properties) {
     u8 returnCode = self->commApis[0]->fcts.sendMessage(self->commApis[0], target, message, handle, properties);
     if (returnCode == 0) return 0;
     if (handle && *handle) (*handle)->destruct(*handle);
     switch (returnCode) {
-    case OCR_EBUSY: 
+    case OCR_EBUSY:
     case OCR_ECANCELED:
         {
         ocrMsgHandle_t *tempHandle = NULL;
@@ -1084,9 +1094,9 @@ static void destructPolicyDomainFactoryXe(ocrPolicyDomainFactory_t * factory) {
 
 ocrPolicyDomainFactory_t * newPolicyDomainFactoryXe(ocrParamList_t *perType) {
     ocrPolicyDomainFactory_t* base = (ocrPolicyDomainFactory_t*) runtimeChunkAlloc(sizeof(ocrPolicyDomainFactoryXe_t), (void *)1);
-    
+
     ASSERT(base); // Check allocation
-    
+
 #ifdef OCR_ENABLE_STATISTICS
     base->instantiate = FUNC_ADDR(ocrPolicyDomain_t*(*)(ocrPolicyDomainFactory_t*,ocrCost_t*,
                                           ocrParamList_t*), newPolicyDomainXe);
@@ -1106,7 +1116,7 @@ ocrPolicyDomainFactory_t * newPolicyDomainFactoryXe(ocrParamList_t *perType) {
                                                    xePdSendMessage);
     base->policyDomainFcts.pollMessage = FUNC_ADDR(u8(*)(ocrPolicyDomain_t*, ocrMsgHandle_t**), xePdPollMessage);
     base->policyDomainFcts.waitMessage = FUNC_ADDR(u8(*)(ocrPolicyDomain_t*, ocrMsgHandle_t**), xePdWaitMessage);
-    
+
     base->policyDomainFcts.pdMalloc = FUNC_ADDR(void*(*)(ocrPolicyDomain_t*,u64), xePdMalloc);
     base->policyDomainFcts.pdFree = FUNC_ADDR(void(*)(ocrPolicyDomain_t*,void*), xePdFree);
     return base;

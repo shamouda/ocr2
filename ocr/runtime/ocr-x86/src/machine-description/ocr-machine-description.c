@@ -31,7 +31,6 @@
 #include "worker/worker-all.h"
 #include "workpile/workpile-all.h"
 #include "component/component-all.h"
-#include "component/hc/hc-component.h"
 
 #include "ocr-sysboot.h"
 
@@ -168,7 +167,7 @@ s32 get_key_value(dictionary *dict, char *sec, char *field, s32 offset) {
     return retval;
 }
 
-char* populate_type(ocrParamList_t **type_param, type_enum index, dictionary *dict, char *secname) {
+char* populate_type(ocrParamList_t **type_param, int *factory_type, type_enum index, dictionary *dict, char *secname) {
     char *typestr;
     char key[MAX_KEY_SZ];
 
@@ -249,7 +248,7 @@ char* populate_type(ocrParamList_t **type_param, type_enum index, dictionary *di
         componentType_t mytype = -1;
         TO_ENUM (mytype, typestr, componentType_t, component_types, componentMax_id);
         switch (mytype) {
-#ifdef ENABLE_COMPONENT_HC_STATE
+#ifdef ENABLE_COMPONENT_WST
             case componentHcState_id: {
                 int value = 0;
                 ALLOC_PARAM_LIST(*type_param, paramListComponentFactHcState_t);
@@ -259,10 +258,35 @@ char* populate_type(ocrParamList_t **type_param, type_enum index, dictionary *di
             }
             break;
 #endif
+#ifdef ENABLE_COMPONENT_CE_STATE
+            case componentCe_id: {
+                int value = 0;
+                ALLOC_PARAM_LIST(*type_param, paramListComponentFactCeState_t);
+                snprintf(key, MAX_KEY_SZ, "%s:%s", secname, "maxWorkers");
+                INI_GET_INT (key, value, -1);
+                ((paramListComponentFactCeState_t *)(*type_param))->maxWorkers = (value==-1)?0:value;
+                value = 0;
+                snprintf(key, MAX_KEY_SZ, "%s:%s", secname, "maxGroups");
+                INI_GET_INT (key, value, -1);
+                ((paramListComponentFactCeState_t *)(*type_param))->maxGroups = (value==-1)?0:value;
+            }
+            break;
+#endif
+#ifdef ENABLE_COMPONENT_PRIORITY
+            case componentPriority_id: {
+                int value = 0;
+                ALLOC_PARAM_LIST(*type_param, paramListComponentFactPriority_t);
+                snprintf(key, MAX_KEY_SZ, "%s:%s", secname, "maxLevels");
+                INI_GET_INT (key, value, -1);
+                ((paramListComponentFactPriority_t *)(*type_param))->maxLevels = (value==-1)?0:value;
+            }
+            break;
+#endif
             default:
                 ALLOC_PARAM_LIST(*type_param, paramListComponentFact_t);
             break;
         }
+        *factory_type = (int)mytype;
         }
         break;
     default:
@@ -1034,8 +1058,8 @@ void add_dependence (type_enum fromtype, type_enum totype, void *frominstance, o
         }
         case componentfactory_type: {
             if (f->componentFactories == NULL) {
-                f->componentFactoryCount = dependence_count;
-                f->componentFactories = (ocrComponentFactory_t **)runtimeChunkAlloc(dependence_count * sizeof(ocrComponentFactory_t *), NULL);
+                f->componentFactoryCount = componentMax_id;
+                f->componentFactories = (ocrComponentFactory_t **)runtimeChunkAlloc(componentMax_id * sizeof(ocrComponentFactory_t *), NULL);
             }
             f->componentFactories[dependence_index] = (ocrComponentFactory_t *)toinstance;
             break;
@@ -1083,12 +1107,12 @@ s32 build_deps (dictionary *dict, s32 A, s32 B, char *refstr, void ***all_instan
     return 0;
 }
 
-s32 build_deps_types (s32 B, void **pdinst, int pdcount, void ***all_factories, ocrParamList_t ***type_params, int *type_counts) {
+s32 build_deps_types (s32 B, void **pdinst, int pdcount, void ***all_factories, int **factory_types, ocrParamList_t ***type_params, int *type_counts) {
     s32 i, j;
 
     for (i = 0; i < pdcount; i++) {
         for (j = 0; j < type_counts[B]; j++) {
-            add_dependence(policydomain_type, B, pdinst[i], NULL, all_factories[B][j], NULL, j, 1);
+            add_dependence(policydomain_type, B, pdinst[i], NULL, all_factories[B][j], NULL, factory_types[B][j], 1);
         }
     }
 

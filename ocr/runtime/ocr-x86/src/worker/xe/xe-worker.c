@@ -15,6 +15,7 @@
 #include "ocr-types.h"
 #include "ocr-worker.h"
 #include "ocr-db.h"
+#include "ocr-tuning.h"
 #include "worker/xe/xe-worker.h"
 
 #ifdef OCR_ENABLE_STATISTICS
@@ -59,6 +60,11 @@ static void workerLoop(ocrWorker_t * worker) {
                 ASSERT(taskGuid.guid != NULL_GUID && taskGuid.metaDataPtr != NULL);
                 worker->curTask = (ocrTask_t*)taskGuid.metaDataPtr;
                 u8 (*executeFunc)(ocrTask_t *) = (u8 (*)(ocrTask_t*))PD_MSG_FIELD(extra); // Execute is stored in extra
+                //u64 hint = (u64)worker->curTask->hints;
+                //fprintf(stderr, "Task Affinity %ld Priority %ld Access0(%ld, %ld) Access1(%ld, %ld)\n",
+                //          (u64)worker->curTask->affinity, ocrHintGetPriority(hint),
+                //          ocrHintGetAccess0Slot(hint), ocrHintGetAccess0Weight(hint),
+                //          ocrHintGetAccess1Slot(hint), ocrHintGetAccess1Weight(hint));
                 executeFunc(worker->curTask);
                 worker->curTask = NULL;
 #undef PD_MSG
@@ -106,8 +112,8 @@ ocrWorker_t* newWorkerXe (ocrWorkerFactory_t * factory, ocrParamList_t * perInst
 void initializeWorkerXe(ocrWorkerFactory_t * factory, ocrWorker_t* base, ocrParamList_t * perInstance) {
     initializeWorkerOcr(factory, base, perInstance);
     base->type = SLAVE_WORKERTYPE;
-   
-    ocrWorkerXe_t* workerXe = (ocrWorkerXe_t*) base; 
+
+    ocrWorkerXe_t* workerXe = (ocrWorkerXe_t*) base;
     workerXe->id = ((paramListWorkerXeInst_t*)perInstance)->workerId;
     workerXe->running = false;
 }
@@ -153,9 +159,9 @@ void xeStartWorker(ocrWorker_t * base, ocrPolicyDomain_t * policy) {
 void* xeRunWorker(ocrWorker_t * worker) {
     // Need to pass down a data-structure
     ocrPolicyDomain_t *pd = worker->pd;
-    
+
     if (pd->myLocation == 0) { //Blessed worker
-        // This is all part of the mainEdt setup 
+        // This is all part of the mainEdt setup
         // and should be executed by the "blessed" worker.
         void * packedUserArgv = userArgsGet();
         ocrEdt_t mainEdt = mainEdtGet();
@@ -167,7 +173,7 @@ void* xeRunWorker(ocrWorker_t * worker) {
         void* dbPtr;
         ocrDbCreate(&dbGuid, &dbPtr, totalLength,
                     DB_PROP_NONE, NULL_GUID, NO_ALLOC);
-        
+
         // copy packed args to DB
         hal_memCopy(dbPtr, packedUserArgv, totalLength, 0);
 
@@ -179,7 +185,7 @@ void* xeRunWorker(ocrWorker_t * worker) {
         // Call into mainEdt
         mainEdt(0, NULL, 1, &depv);
     }
-    
+
     DPRINTF(DEBUG_LVL_INFO, "Starting scheduler routine of worker %ld\n", getWorkerId(worker));
     workerLoop(worker);
     return NULL;

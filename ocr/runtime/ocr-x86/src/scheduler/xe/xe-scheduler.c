@@ -35,11 +35,11 @@ void xeSchedulerFinish(ocrScheduler_t *self) {
 }
 
 u8 xeSchedulerTake(ocrScheduler_t *self, ocrLocation_t source, ocrFatGuid_t *component, ocrFatGuid_t hints, u32 properties) {
-    return 0;
+    return OCR_ENOTSUP;
 }
 
 u8 xeSchedulerGive(ocrScheduler_t *self, ocrLocation_t source, ocrFatGuid_t component, ocrFatGuid_t hints, u32 properties) {
-    return 0;
+    return OCR_ENOTSUP;
 }
 
 ocrScheduler_t* newSchedulerXe(ocrSchedulerFactory_t * factory, ocrParamList_t *perInstance) {

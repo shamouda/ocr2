@@ -57,6 +57,7 @@ typedef struct _ocrTaskTemplate_t {
 #endif
     u32 paramc;             /**< Number of input parameters */
     u32 depc;               /**< Number of dependences */
+    ocrGuid_t hints;        /**< Hints for EDT template */
     // TODO: This does not really support things like
     // moving code around and/or different ISAs. Is this
     // going to be a problem...
@@ -83,7 +84,7 @@ typedef struct _ocrTaskTemplateFactory_t {
      * @param[in] perInstance Instance specific parameters
      */
     ocrTaskTemplate_t* (*instantiate)(struct _ocrTaskTemplateFactory_t * factory, ocrEdt_t fctPtr,
-                                      u32 paramc, u32 depc, const char* fctName,
+                                      u32 paramc, u32 depc, ocrGuid_t hints, const char* fctName,
                                       ocrParamList_t *perInstance);
 
     /** @brief Destructor for the TaskTemplateFactory interface
@@ -230,6 +231,8 @@ typedef struct _ocrTask_t {
     ocrGuid_t parentLatch;  /**< Inner-most latch event (not of this EDT) */
     ocrGuid_t els[ELS_SIZE];
     ocrEdtState_t state;    /**< State of the EDT */
+    ocrGuid_t affinity;     /**< Affinity group of this EDT */
+    ocrGuid_t hints;        /**< Hints for EDT */
     u32 paramc, depc;       /**< Number of parameters and dependences */
     u32 fctId;
     ocrGuid_t component;    /**< component to which this task belongs to */

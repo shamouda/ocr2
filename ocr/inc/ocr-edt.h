@@ -105,7 +105,7 @@ u8 ocrEventSatisfySlot(ocrGuid_t eventGuid, ocrGuid_t dataGuid /*=NULL_GUID*/, u
  * @{
  **/
 
-u8 ocrEdtTemplateCreate_internal(ocrGuid_t *guid, ocrEdt_t funcPtr, u32 paramc, u32 depc, const char* funcName);
+u8 ocrEdtTemplateCreate_internal(ocrGuid_t *guid, ocrEdt_t funcPtr, u32 paramc, u32 depc, ocrGuid_t hints, const char* funcName);
     
 /**
  * @brief Creates an EDT template
@@ -122,9 +122,11 @@ u8 ocrEdtTemplateCreate_internal(ocrGuid_t *guid, ocrEdt_t funcPtr, u32 paramc, 
  * @return 0 on success and an error code on failure: TODO
  */
 #ifdef OCR_ENABLE_EDT_NAMING
-#define ocrEdtTemplateCreate(guid, funcPtr, paramc, depc) ocrEdtTemplateCreate_internal((guid), (funcPtr), (paramc), (depc), #funcPtr)
+#define ocrEdtTemplateCreate(guid, funcPtr, paramc, depc) ocrEdtTemplateCreate_internal((guid), (funcPtr), (paramc), (depc), NULL_GUID, #funcPtr)
+#define ocrEdtTemplateCreateWithHints(guid, funcPtr, paramc, depc, hints) ocrEdtTemplateCreate_internal((guid), (funcPtr), (paramc), (depc), (hints), #funcPtr)
 #else
-#define ocrEdtTemplateCreate(guid, funcPtr, paramc, depc) ocrEdtTemplateCreate_internal((guid), (funcPtr), (paramc), (depc), NULL)
+#define ocrEdtTemplateCreate(guid, funcPtr, paramc, depc) ocrEdtTemplateCreate_internal((guid), (funcPtr), (paramc), (depc), NULL_GUID, NULL)
+#define ocrEdtTemplateCreateWithHints(guid, funcPtr, paramc, depc, hints) ocrEdtTemplateCreate_internal((guid), (funcPtr), (paramc), (depc), (hints), NULL)
 #endif
 
 /**

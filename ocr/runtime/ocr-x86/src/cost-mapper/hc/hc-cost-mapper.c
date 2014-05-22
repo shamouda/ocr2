@@ -38,7 +38,7 @@ void hcCostMapperBegin(ocrCostMapper_t *self, ocrPolicyDomain_t * PD) {
 
 void hcCostMapperStart(ocrCostMapper_t *self, ocrPolicyDomain_t * PD) {
     ocrCostMapperHc_t * hcCostMapper = (ocrCostMapperHc_t*)self;
-    ocrComponentFactory_t * hcCompStateFact = PD->componentFactories[componentHcState_id];
+    ocrComponentFactory_t * hcCompStateFact = PD->componentFactories[componentWst_id];
     ocrFatGuid_t hints = {NULL_GUID, NULL};
     hcCostMapper->base.componentState = hcCompStateFact->instantiate(hcCompStateFact, hints, 0);
 }

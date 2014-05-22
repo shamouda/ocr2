@@ -19,8 +19,6 @@ typedef enum _schedulerType_t {
     schedulerHc_id,
     schedulerXe_id,
     schedulerCe_id,
-    schedulerHcPlaced_id,
-    schedulerNull_id,
     schedulerMax_id
 } schedulerType_t;
 

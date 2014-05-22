@@ -8,25 +8,35 @@
 #include "component/component-all.h"
 
 const char * component_types[] = {
-    "HC_STATE",
-    "HC_WORK",
-    "CE_STATE",
+    "WST",
+    "CE",
+    "WORKDEQUE",
+    "AFFINITY",
+    "PRIORITY",
     NULL
 };
 
 ocrComponentFactory_t * newComponentFactory(componentType_t type, ocrParamList_t *perType) {
     switch(type) {
-#ifdef ENABLE_COMPONENT_HC_STATE
-    case componentHcState_id:
-        return newOcrComponentFactoryHcState(perType);
+#ifdef ENABLE_COMPONENT_WST
+    case componentWst_id:
+        return newOcrComponentFactoryWst(perType);
 #endif
-#ifdef ENABLE_COMPONENT_HC_WORK
-    case componentHcWork_id:
-        return newOcrComponentFactoryHcWork(perType);
+#ifdef ENABLE_COMPONENT_CE
+    case componentCe_id:
+        return newOcrComponentFactoryCe(perType);
 #endif
-#ifdef ENABLE_COMPONENT_CE_STATE
-    case componentCeState_id:
-        return newOcrComponentFactoryCeState(perType);
+#ifdef ENABLE_COMPONENT_WORKDEQUE
+    case componentWorkdeque_id:
+        return newOcrComponentFactoryWorkdeque(perType);
+#endif
+#ifdef ENABLE_COMPONENT_AFFINITY
+    case componentAffinity_id:
+        return newOcrComponentFactoryAffinity(perType);
+#endif
+#ifdef ENABLE_COMPONENT_PRIORITY
+    case componentPriority_id:
+        return newOcrComponentFactoryPriority(perType);
 #endif
     default:
         ASSERT(0);
