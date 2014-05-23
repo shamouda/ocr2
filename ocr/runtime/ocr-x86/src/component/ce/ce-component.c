@@ -8,7 +8,7 @@
 #include "ocr-config.h"
 #ifdef ENABLE_COMPONENT_CE_BASE
 
-#include "component/ce/ce-base-component.h"
+#include "component/ce/ce-component.h"
 #include "component/component-all.h"
 #include "ocr-errors.h"
 #include "ocr-sysboot.h"
