@@ -23,6 +23,7 @@ ocrComponent_t* newComponentCePar(ocrComponentFactory_t * factory, ocrFatGuid_t 
     ocrComponentCePar_t * component = (ocrComponentCePar_t *)runtimeChunkAlloc(sizeof(ocrComponentCePar_t), (void *)1);
     component->base.fcts = factory->fcts;
     component->base.count = 0;
+    //component->deque = newNonConcurrentQueue(pd, (void *) NULL_GUID);
     component->affinities = (ocrComponent_t**)runtimeChunkAlloc(maxGroups * sizeof(ocrComponent_t*), (void *)1);
     component->workpiles = (ocrComponent_t**)runtimeChunkAlloc(maxWorkers * sizeof(ocrComponent_t*), (void *)1);
     component->numWorkers = maxWorkers;
@@ -43,18 +44,33 @@ return OCR_ENOTSUP;
 }
 
 u8 ceParComponentInsert(ocrComponent_t *self, ocrLocation_t loc, ocrFatGuid_t component, ocrFatGuid_t hints, u32 properties) {
-    ASSERT((properties & OCR_COMP_PROP_TYPE) == OCR_COMP_PROP_TYPE_EDT);
     ocrComponentCePar_t * ceParComp = (ocrComponentCePar_t*)self;
-    ocrTask_t * task = (ocrTask_t*)component.metaDataPtr;
-    u64 affinity = (u64)task->affinity; //TODO: This should be passed through hints
-    u64 hint = (u64)task->hints;
-    ASSERT(affinity < ceParComp->numGroups);
-    ocrComponent_t * ceAffinityComp = ceParComp->affinities[affinity];
-    hints.guid = (ocrGuid_t)ocrHintGetPriority(hint);
+    ocrComponent_t * ceAffinityComp = ceParComp->affinities[0];
     ceAffinityComp->fcts.insert(ceAffinityComp, loc, component, hints, properties);
     return 0;
 }
 
+#if 0
+u8 ceParComponentInsert(ocrComponent_t *self, ocrLocation_t loc, ocrFatGuid_t component, ocrFatGuid_t hints, u32 properties) {
+    ASSERT((properties & OCR_COMP_PROP_TYPE) == OCR_COMP_PROP_TYPE_EDT);
+    ocrComponentCePar_t * ceParComp = (ocrComponentCePar_t*)self;
+    ocrTask_t * task = (ocrTask_t*)component.metaDataPtr;
+    u64 affinity = (u64)task->affinity; //TODO: This should be passed through hints
+    ASSERT(affinity < ceParComp->numGroups);
+    ocrComponent_t * ceAffinityComp = ceParComp->affinities[affinity];
+    ceAffinityComp->fcts.insert(ceAffinityComp, loc, component, hints, properties);
+    return 0;
+}
+#endif
+
+u8 ceParComponentRemove(ocrComponent_t *self, ocrLocation_t loc, ocrFatGuid_t *component, ocrFatGuid_t hints, u32 properties) {
+    ocrComponentCePar_t * ceParComp = (ocrComponentCePar_t*)self;
+    ocrComponent_t * ceAffinityComp = ceParComp->affinities[0];
+    ceAffinityComp->fcts.remove(ceAffinityComp, loc, component, hints, properties);
+    return 0;
+}
+
+#if 0
 u8 ceParComponentRemove(ocrComponent_t *self, ocrLocation_t loc, ocrFatGuid_t *component, ocrFatGuid_t hints, u32 properties) {
     ocrComponentCePar_t * ceParComp = (ocrComponentCePar_t*)self;
     ocrComponent_t * ceAffinityComp = ceParComp->workpiles[loc];
@@ -95,6 +111,7 @@ u8 ceParComponentRemove(ocrComponent_t *self, ocrLocation_t loc, ocrFatGuid_t *c
 
     return 0;
 }
+#endif
 
 u8 ceParComponentMove(ocrComponent_t *self, ocrLocation_t loc, struct _ocrComponent_t *destination, ocrFatGuid_t component, ocrFatGuid_t hints, u32 properties) {
 //TODO

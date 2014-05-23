@@ -39,7 +39,7 @@ return OCR_ENOTSUP;
 u8 priorityComponentInsert(ocrComponent_t *self, ocrLocation_t loc, ocrFatGuid_t component, ocrFatGuid_t hints, u32 properties) {
     ASSERT((properties & OCR_COMP_PROP_TYPE) == OCR_COMP_PROP_TYPE_EDT);
     ocrComponentPriority_t * priorityComp = (ocrComponentPriority_t*)self;
-    u64 level = (u64)hints.guid;
+    u64 level = (u64)ocrHintGetPriority(hints.guid);
     ASSERT(level < priorityComp->numLevels);
     deque_t * deq = priorityComp->workpiles[level];
     deq->pushAtTail(deq, (void*)component.guid, 0);
@@ -52,8 +52,8 @@ u8 priorityComponentRemove(ocrComponent_t *self, ocrLocation_t loc, ocrFatGuid_t
     ocrComponentPriority_t * priorityComp = (ocrComponentPriority_t*)self;
     for (i = 0; i < priorityComp->numLevels; i++) {
         deque_t * deq = priorityComp->workpiles[i];
-        ocrGuid_t el = (ocrGuid_t)deq->popFromTail(deq, 0);
-        //ocrGuid_t el = (ocrGuid_t)deq->popFromHead(deq, 0);
+        //ocrGuid_t el = (ocrGuid_t)deq->popFromTail(deq, 0);
+        ocrGuid_t el = (ocrGuid_t)deq->popFromHead(deq, 0);
         if (el != NULL_GUID) {
             component->guid = el;
             self->count--;
@@ -62,6 +62,7 @@ u8 priorityComponentRemove(ocrComponent_t *self, ocrLocation_t loc, ocrFatGuid_t
     }
     return 0;
 }
+
 
 u8 priorityComponentMove(ocrComponent_t *self, ocrLocation_t loc, struct _ocrComponent_t *destination, ocrFatGuid_t component, ocrFatGuid_t hints, u32 properties) {
 //TODO

@@ -60,11 +60,11 @@ static void workerLoop(ocrWorker_t * worker) {
                 ASSERT(taskGuid.guid != NULL_GUID && taskGuid.metaDataPtr != NULL);
                 worker->curTask = (ocrTask_t*)taskGuid.metaDataPtr;
                 u8 (*executeFunc)(ocrTask_t *) = (u8 (*)(ocrTask_t*))PD_MSG_FIELD(extra); // Execute is stored in extra
-                //u64 hint = (u64)worker->curTask->hints;
-                //fprintf(stderr, "Task Affinity %ld Priority %ld Access0(%ld, %ld) Access1(%ld, %ld)\n",
-                //          (u64)worker->curTask->affinity, ocrHintGetPriority(hint),
-                //          ocrHintGetAccess0Slot(hint), ocrHintGetAccess0Weight(hint),
-                //          ocrHintGetAccess1Slot(hint), ocrHintGetAccess1Weight(hint));
+                /*u64 hint = (u64)worker->curTask->hints;
+                fprintf(stderr, "[%ld] Task Affinity %ld Priority %ld Access0(%ld, %ld) Access1(%ld, %ld)\n",
+                          getWorkerId(worker), (u64)worker->curTask->affinity, ocrHintGetPriority(hint),
+                          ocrHintGetAccess0Slot(hint), ocrHintGetAccess0Weight(hint),
+                          ocrHintGetAccess1Slot(hint), ocrHintGetAccess1Weight(hint));*/
                 executeFunc(worker->curTask);
                 worker->curTask = NULL;
 #undef PD_MSG

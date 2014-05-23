@@ -269,7 +269,7 @@ static u8 taskSchedule(ocrTask_t *self, u32 slot) {
     PD_MSG_FIELD(guidCount) = 1;
     PD_MSG_FIELD(properties) = 0;
     PD_MSG_FIELD(type) = OCR_GUID_EDT;
-    PD_MSG_FIELD(hints).guid = (ocrGuid_t)slot; //FIXME hacky runtime hint
+    PD_MSG_FIELD(hints).guid = self->hints;
     RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, false));
 #undef PD_MSG
 #undef PD_TYPE

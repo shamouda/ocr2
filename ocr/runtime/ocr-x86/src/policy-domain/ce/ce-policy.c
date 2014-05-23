@@ -760,14 +760,13 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
     {
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_COMM_GIVE
-        ocrFatGuid_t hints = {NULL_GUID, NULL};
         ASSERT(PD_MSG_FIELD(type) == OCR_GUID_EDT);
         //DPRINTF(DEBUG_LVL_INFO, "[CE] Received Edt from %lu guid: %lx metadata: %p\n",
         //        (u64)msg->srcLocation, (PD_MSG_FIELD(guids))->guid,
         //        (PD_MSG_FIELD(guids))->metaDataPtr);
         PD_MSG_FIELD(properties) = self->schedulers[0]->fcts.give(
             self->schedulers[0], msg->srcLocation,
-            *(PD_MSG_FIELD(guids)), hints, OCR_COMP_PROP_TYPE_EDT);
+            *(PD_MSG_FIELD(guids)), PD_MSG_FIELD(hints), OCR_COMP_PROP_TYPE_EDT);
         returnCode =  ceProcessResponse(self, msg, 0);
 #undef PD_MSG
 #undef PD_TYPE
