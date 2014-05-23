@@ -258,17 +258,17 @@ char* populate_type(ocrParamList_t **type_param, int *factory_type, type_enum in
             }
             break;
 #endif
-#ifdef ENABLE_COMPONENT_CE_STATE
+#ifdef ENABLE_COMPONENT_CE_PAR
             case componentCe_id: {
                 int value = 0;
-                ALLOC_PARAM_LIST(*type_param, paramListComponentFactCeState_t);
+                ALLOC_PARAM_LIST(*type_param, paramListComponentFactCePar_t);
                 snprintf(key, MAX_KEY_SZ, "%s:%s", secname, "maxWorkers");
                 INI_GET_INT (key, value, -1);
-                ((paramListComponentFactCeState_t *)(*type_param))->maxWorkers = (value==-1)?0:value;
+                ((paramListComponentFactCePar_t *)(*type_param))->maxWorkers = (value==-1)?0:value;
                 value = 0;
                 snprintf(key, MAX_KEY_SZ, "%s:%s", secname, "maxGroups");
                 INI_GET_INT (key, value, -1);
-                ((paramListComponentFactCeState_t *)(*type_param))->maxGroups = (value==-1)?0:value;
+                ((paramListComponentFactCePar_t *)(*type_param))->maxGroups = (value==-1)?0:value;
             }
             break;
 #endif
