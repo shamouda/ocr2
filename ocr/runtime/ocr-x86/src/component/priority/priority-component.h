@@ -19,12 +19,20 @@
 /* OCR PRIORITY COMPONENT                           */
 /****************************************************/
 
+typedef enum {
+    AFFINITY_COMPONENT_STATE_NEW,
+    AFFINITY_COMPONENT_STATE_STAGED,
+    AFFINITY_COMPONENT_STATE_ACTIVE,
+} ocrComponentAffinityState_t;
 /*! \brief CE component implementation for a shared memory workstealing runtime
  */
 typedef struct {
     ocrComponent_t base;
-    deque_t **workpiles;  //deque on each level
-    u32 numLevels;
+    deque_t **workpiles;   //deque on each priority level
+    u32 numLevels;         //number of priority levels
+    ocrGuid_t affinity;    //affinity id of this group
+    u32 startLevel;        //lowest priority level that is active
+    ocrComponentAffinityState_t state;
 } ocrComponentPriority_t;
 
 typedef struct {

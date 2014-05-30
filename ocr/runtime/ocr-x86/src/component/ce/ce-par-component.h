@@ -13,7 +13,10 @@
 
 #include "utils/ocr-utils.h"
 #include "utils/deque.h"
+//#include "utils/list.h"
 #include "ocr-component.h"
+
+//#define MULTIDEQUES
 
 /****************************************************/
 /* OCR CE PAR COMPONENT                           */
@@ -23,8 +26,13 @@
  */
 typedef struct {
     ocrComponent_t base;
-    ocrComponent_t **affinities; //Affinity groups
-    ocrComponent_t **workpiles;  //Active workpile on each worker
+    ocrComponent_t **affinities;  //Affinity groups preallocation
+#ifdef MULTIDEQUES
+    deque_t ** affinityGroups;    //staging queues of affinity groups on each worker
+#else
+    deque_t * affinityGroups;      //shared list of affinity groups
+#endif
+    ocrComponent_t **active;      //Active component on each worker
     u32 numWorkers;
     u32 numGroups;
 } ocrComponentCePar_t;

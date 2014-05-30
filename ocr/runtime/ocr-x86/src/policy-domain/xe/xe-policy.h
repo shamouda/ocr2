@@ -13,7 +13,7 @@
 #include "ocr-policy-domain.h"
 #include "utils/ocr-utils.h"
 
-#define MAX_XE_TASK 4096
+#define MAX_XE_TASK 1048576
 
 /******************************************************/
 /* OCR-XE POLICY DOMAIN                               */

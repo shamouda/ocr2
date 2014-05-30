@@ -216,6 +216,7 @@ typedef enum {
 // processor or memory is identified:  0 == CE, 1-8 == XE; additional bits allow for
 // a differnt number of XE's in other potential TG hardware family members.
 typedef u64 ocrLocation_t;
+#define NULL_LOCATION ((u64)-1)
 #define ocrLocation_getEngineIndex(x) (x & 0xFFul)
 
 /**
