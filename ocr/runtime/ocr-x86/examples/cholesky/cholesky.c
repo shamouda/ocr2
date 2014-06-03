@@ -34,10 +34,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/time.h>
-#include <hpctoolkit.h>
 
 #define FLAGS 0xdead
 #define PROPERTIES 0xdead
+
+#include "instrument.h"
 
 struct timeval a,b;
 
@@ -209,7 +210,9 @@ u8 wrap_up_task ( u32 paramc, u64 * params, void* paramv[], u32 depc, ocrEdtDep_
 	double* temp;
 	gettimeofday(&b,0);
 	printf("The computation took %f seconds\r\n",((b.tv_sec - a.tv_sec)*1000000+(b.tv_usec - a.tv_usec))*1.0/1000000);
-	hpctoolkit_sampling_stop();
+        instrument_end();
+        instrument_print();
+
 	ocrFinish();
 /*
 	FILE* out = fopen("cholesky.out", "w");
@@ -237,7 +240,7 @@ u8 wrap_up_task ( u32 paramc, u64 * params, void* paramv[], u32 depc, ocrEdtDep_
 */
 }
 
-inline static void sequential_cholesky_task_prescriber ( int k, int tileSize, ocrGuid_t*** lkji_event_guids) {
+inline static void sequential_cholesky_task_prescriber ( int k, int tileSize, int socketID, ocrGuid_t*** lkji_event_guids) {
 	ocrGuid_t seq_cholesky_task_guid;
 
 	intptr_t **p_func_args = (intptr_t **)malloc(sizeof(intptr_t*));
@@ -247,13 +250,13 @@ inline static void sequential_cholesky_task_prescriber ( int k, int tileSize, oc
 	func_args[2] = (ocrGuid_t)lkji_event_guids[k][k][k+1];
 	*p_func_args = func_args;
 
-	ocrEdtCreate(&seq_cholesky_task_guid, sequential_cholesky_task, 3, NULL, (void**)p_func_args, PROPERTIES, 1, NULL);
+	ocrEdtCreate(&seq_cholesky_task_guid, sequential_cholesky_task, 3, (u64*)socketID /*paramc=NULL*/, (void**)p_func_args, PROPERTIES, 1, NULL);
 
 	ocrAddDependence(lkji_event_guids[k][k][k], seq_cholesky_task_guid, 0);
 	ocrEdtSchedule(seq_cholesky_task_guid);
 }
 
-inline static void trisolve_task_prescriber ( int k, int j, int tileSize, ocrGuid_t*** lkji_event_guids) {
+inline static void trisolve_task_prescriber ( int k, int j, int tileSize, int socketID, ocrGuid_t*** lkji_event_guids) {
 	ocrGuid_t trisolve_task_guid;
 
 	intptr_t **p_func_args = (intptr_t **)malloc(sizeof(intptr_t*));
@@ -264,14 +267,14 @@ inline static void trisolve_task_prescriber ( int k, int j, int tileSize, ocrGui
 	func_args[3] = (ocrGuid_t)lkji_event_guids[j][k][k+1];
 	*p_func_args = func_args;
 
-	ocrEdtCreate(&trisolve_task_guid, trisolve_task, 4, NULL, (void**)p_func_args, PROPERTIES, 2, NULL);
+	ocrEdtCreate(&trisolve_task_guid, trisolve_task, 4, (u64*)socketID /*paramc=NULL*/, (void**)p_func_args, PROPERTIES, 2, NULL);
 
 	ocrAddDependence(lkji_event_guids[j][k][k], trisolve_task_guid, 0);
 	ocrAddDependence(lkji_event_guids[k][k][k+1], trisolve_task_guid, 1);
 	ocrEdtSchedule(trisolve_task_guid);
 }
 
-inline static void update_nondiagonal_task_prescriber ( int k, int j, int i, int tileSize, ocrGuid_t*** lkji_event_guids) { 
+inline static void update_nondiagonal_task_prescriber ( int k, int j, int i, int tileSize, int socketID, ocrGuid_t*** lkji_event_guids) { 
 	ocrGuid_t update_nondiagonal_task_guid;
 
 	intptr_t **p_func_args = (intptr_t **)malloc(sizeof(intptr_t*));
@@ -283,7 +286,7 @@ inline static void update_nondiagonal_task_prescriber ( int k, int j, int i, int
 	func_args[4] = (ocrGuid_t)lkji_event_guids[j][i][k+1];
 	*p_func_args = func_args;
 
-	ocrEdtCreate(&update_nondiagonal_task_guid, update_nondiagonal_task, 5, NULL, (void**)p_func_args, PROPERTIES, 3, NULL);
+	ocrEdtCreate(&update_nondiagonal_task_guid, update_nondiagonal_task, 5, (u64*)socketID /*paramc=NULL*/, (void**)p_func_args, PROPERTIES, 3, NULL);
 
 	ocrAddDependence(lkji_event_guids[j][i][k], update_nondiagonal_task_guid, 0);
 	ocrAddDependence(lkji_event_guids[j][k][k+1], update_nondiagonal_task_guid, 1);
@@ -293,7 +296,7 @@ inline static void update_nondiagonal_task_prescriber ( int k, int j, int i, int
 }
 
 
-inline static void update_diagonal_task_prescriber ( int k, int j, int i, int tileSize, ocrGuid_t*** lkji_event_guids) { 
+inline static void update_diagonal_task_prescriber ( int k, int j, int i, int tileSize, int socketID, ocrGuid_t*** lkji_event_guids) { 
 	ocrGuid_t update_diagonal_task_guid;
 
 	intptr_t **p_func_args = (intptr_t **)malloc(sizeof(intptr_t*));
@@ -305,7 +308,7 @@ inline static void update_diagonal_task_prescriber ( int k, int j, int i, int ti
 	func_args[4] = (ocrGuid_t)lkji_event_guids[j][j][k+1];
 	*p_func_args = func_args;
 
-	ocrEdtCreate(&update_diagonal_task_guid, update_diagonal_task, 5, NULL, (void**)p_func_args, PROPERTIES, 2, NULL);
+	ocrEdtCreate(&update_diagonal_task_guid, update_diagonal_task, 5, (u64*)socketID /*paramc=NULL*/, (void**)p_func_args, PROPERTIES, 2, NULL);
 
 	ocrAddDependence(lkji_event_guids[j][j][k], update_diagonal_task_guid, 0);
 	ocrAddDependence(lkji_event_guids[j][k][k+1], update_diagonal_task_guid, 1);
@@ -313,7 +316,7 @@ inline static void update_diagonal_task_prescriber ( int k, int j, int i, int ti
 	ocrEdtSchedule(update_diagonal_task_guid);
 }
 
-inline static void wrap_up_task_prescriber ( int numTiles, int tileSize, ocrGuid_t*** lkji_event_guids ) {
+inline static void wrap_up_task_prescriber ( int numTiles, int tileSize, int socketID, ocrGuid_t*** lkji_event_guids ) {
 	int i,j,k;
 	ocrGuid_t wrap_up_task_guid;
 
@@ -323,7 +326,7 @@ inline static void wrap_up_task_prescriber ( int numTiles, int tileSize, ocrGuid
 	func_args[1]=(int)tileSize;
 	*p_func_args = func_args;
 
-	ocrEdtCreate(&wrap_up_task_guid, wrap_up_task, 2, NULL, (void**)p_func_args, PROPERTIES, (numTiles+1)*numTiles/2, NULL);
+	ocrEdtCreate(&wrap_up_task_guid, wrap_up_task, 2, (u64*)socketID /*paramc=NULL*/, (void**)p_func_args, PROPERTIES, (numTiles+1)*numTiles/2, NULL);
 
 	int index = 0;
 	for ( i = 0; i < numTiles; ++i ) {
@@ -436,23 +439,38 @@ int main( int argc, char* argv[] ) {
 
 	satisfyInitialTiles( numTiles, tileSize, matrix, lkji_event_guids);
 
-	hpctoolkit_sampling_start();
         gettimeofday(&a,0);
+
+        instrument_init();
+        instrument_start();
         
+	int socketID = -1;
 	for ( k = 0; k < numTiles; ++k ) {
-		sequential_cholesky_task_prescriber ( k, tileSize, lkji_event_guids);
+		int numRows = numTiles - k;
+		int numTilesInIteration = ((numRows * (numRows + 1))/2) - 1; // the minus 1 is for placing the sequential cholesky step on the root
+		int numTilesPerChild = numTilesInIteration / 2; /*2 is for number of sockets*/
+		int tileCounter = 0;
+		int childCounter = 0;
+
+		sequential_cholesky_task_prescriber ( k, tileSize, /*hardcoded*/ 0,lkji_event_guids);
 
 		for( j = k + 1 ; j < numTiles ; ++j ) {
-			trisolve_task_prescriber ( k, j, tileSize, lkji_event_guids);
+			trisolve_task_prescriber ( k, j, tileSize, childCounter, lkji_event_guids);
+			tileCounter++;
+			if ((tileCounter == ((childCounter+1) * numTilesPerChild)) && (childCounter < 1)) childCounter++;
 
 			for( i = k + 1 ; i < j ; ++i ) {
-				update_nondiagonal_task_prescriber ( k, j, i, tileSize, lkji_event_guids);
+				update_nondiagonal_task_prescriber ( k, j, i, tileSize, childCounter, lkji_event_guids);
+				tileCounter++;
+				if ((tileCounter == ((childCounter+1) * numTilesPerChild)) && (childCounter < 1)) childCounter++;
 			}
-			update_diagonal_task_prescriber ( k, j, i, tileSize, lkji_event_guids);
+			update_diagonal_task_prescriber ( k, j, i, tileSize, childCounter, lkji_event_guids);
+			tileCounter++;
+			if ((tileCounter == ((childCounter+1) * numTilesPerChild)) && (childCounter < 1)) childCounter++;
 		}
 	}
 
-	wrap_up_task_prescriber ( numTiles, tileSize, lkji_event_guids );
+	wrap_up_task_prescriber ( numTiles, tileSize, /*hardcoded*/ 0,lkji_event_guids );
 
 	ocrCleanup();
 	return 0;

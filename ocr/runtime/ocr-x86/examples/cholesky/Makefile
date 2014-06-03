@@ -14,8 +14,14 @@ TILE_SIZE=80
 INPUT_FILE=m_${MATRIX_SIZE}.in
 OUTPUT_FILE=cholesky_out_${MATRIX_SIZE}.txt
 
-compile:
-	gcc $(CFLAGS) $(OCR_FLAGS) -I. $(PROG).c -o $(PROG)$(SUFFIX)
+PAPI_HOME=$(HOME)/HJsvn/papi/BUILD
+LIBS=-L$(HC_HOME)/lib -L$(PAPI_HOME)/lib -lpthread -lhc -lxml2 -lm -lpapi
+
+instrument.o:
+	gcc -O3 -c -I$(PAPI_HOME)/include -I. instrument.c 
+
+compile: instrument.o
+	gcc $(CFLAGS) $(OCR_FLAGS) $(LIBS) -I. instrument.o $(PROG).c -o $(PROG)$(SUFFIX)
 
 compile_pp:
 	g++ $(CFLAGS) $(OCR_FLAGS) -I. $(PROG).cpp -o $(PROG)$(SUFFIX)
