@@ -90,6 +90,39 @@ u8 ptrCreateGuid(ocrGuidProvider_t* self, ocrFatGuid_t *fguid, u64 size, ocrGuid
     return 0;
 }
 
+u8 ptrCreateGuidArray(ocrGuidProvider_t* self, ocrFatGuid_t **fguid, u64 size, u64 count, ocrGuidKind kind) {
+    u64 i;
+    ocrPolicyMsg_t msg;
+    ocrPolicyDomain_t *policy = NULL;
+    ocrTask_t *task = NULL;
+    getCurrentEnv(&policy, NULL, &task, &msg);
+#define PD_MSG (&msg)
+#define PD_TYPE PD_MSG_MEM_ALLOC
+    msg.type = PD_MSG_MEM_ALLOC | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
+    PD_MSG_FIELD(size) = (sizeof(ocrGuidImpl_t) + size + sizeof(ocrFatGuid_t)) * count;
+    PD_MSG_FIELD(properties) = 0; // TODO:  What flags should be defined?  Where are symbolic constants for them defined?
+    PD_MSG_FIELD(type) = GUID_MEMTYPE;
+
+    RESULT_PROPAGATE(policy->fcts.processMessage (policy, &msg, true));
+
+    u64 guidInstBase = (u64)PD_MSG_FIELD(ptr);
+    u64 guidValBase = guidInstBase + (sizeof(ocrGuidImpl_t) * count);
+    u64 fatGuidBase = guidValBase + (size * count);
+    *fguid = (ocrFatGuid_t*)fatGuidBase;
+    ocrGuidImpl_t * guidInst = (ocrGuidImpl_t *)guidInstBase;
+    u64 guidValPtr = guidValBase;
+    ocrFatGuid_t *fguidInst = (ocrFatGuid_t*)fatGuidBase;
+    for (i = 0; i < count; i++, guidInst++, fguidInst++, guidValPtr += size) {
+        guidInst->guid = (ocrGuid_t)guidValPtr;
+        guidInst->kind = kind;
+        fguidInst->guid = (ocrGuid_t)guidInst;
+        fguidInst->metaDataPtr = (void*)guidValPtr;
+    }
+#undef PD_MSG
+#undef PD_TYPE
+    return 0;
+}
+
 u8 ptrGetVal(ocrGuidProvider_t* self, ocrGuid_t guid, u64* val, ocrGuidKind* kind) {
     ocrGuidImpl_t * guidInst = (ocrGuidImpl_t *) guid;
     *val = (u64) guidInst->guid;
@@ -156,6 +189,7 @@ ocrGuidProviderFactory_t *newGuidProviderFactoryPtr(ocrParamList_t *typeArg, u32
     base->providerFcts.finish = FUNC_ADDR(void (*)(ocrGuidProvider_t*), ptrFinish);
     base->providerFcts.getGuid = FUNC_ADDR(u8 (*)(ocrGuidProvider_t*, ocrGuid_t*, u64, ocrGuidKind), ptrGetGuid);
     base->providerFcts.createGuid = FUNC_ADDR(u8 (*)(ocrGuidProvider_t*, ocrFatGuid_t*, u64, ocrGuidKind), ptrCreateGuid);
+    base->providerFcts.createGuidArray = FUNC_ADDR(u8 (*)(ocrGuidProvider_t*, ocrFatGuid_t**, u64, u64, ocrGuidKind), ptrCreateGuidArray);
     base->providerFcts.getVal = FUNC_ADDR(u8 (*)(ocrGuidProvider_t*, ocrGuid_t, u64*, ocrGuidKind*), ptrGetVal);
     base->providerFcts.getKind = FUNC_ADDR(u8 (*)(ocrGuidProvider_t*, ocrGuid_t, ocrGuidKind*), ptrGetKind);
     base->providerFcts.releaseGuid = FUNC_ADDR(u8 (*)(ocrGuidProvider_t*, ocrFatGuid_t, bool), ptrReleaseGuid);

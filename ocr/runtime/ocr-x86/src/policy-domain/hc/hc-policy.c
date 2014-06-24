@@ -22,6 +22,8 @@
 #include "policy-domain/hc/hc-policy.h"
 #include "allocator/allocator-all.h"
 
+#include "worker/hc/hc-worker.h"
+
 #define DEBUG_TYPE POLICY
 
 void hcPolicyDomainBegin(ocrPolicyDomain_t * policy) {
@@ -478,7 +480,7 @@ static u8 hcCreateEvent(ocrPolicyDomain_t *self, ocrFatGuid_t *guid,
 }
 
 static u8 convertDepAddToSatisfy(ocrPolicyDomain_t *self, ocrFatGuid_t dbGuid,
-                                 ocrFatGuid_t destGuid, u32 slot) {
+                                 ocrFatGuid_t destGuid, u32 slot, ocrLocation_t mapping) {
 
     ocrPolicyMsg_t msg;
     getCurrentEnv(NULL, NULL, NULL, &msg);
@@ -489,6 +491,7 @@ static u8 convertDepAddToSatisfy(ocrPolicyDomain_t *self, ocrFatGuid_t dbGuid,
     PD_MSG_FIELD(payload) = dbGuid;
     PD_MSG_FIELD(slot) = slot;
     PD_MSG_FIELD(properties) = 0;
+    PD_MSG_FIELD(mapping) = mapping;
     RESULT_PROPAGATE(self->fcts.processMessage(self, &msg, false));
 #undef PD_MSG
 #undef PD_TYPE
@@ -736,9 +739,9 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_EDTTEMP_CREATE
         PD_MSG_FIELD(returnDetail) = hcCreateEdtTemplate(
-            self, &(PD_MSG_FIELD(guid)),
-            PD_MSG_FIELD(funcPtr), PD_MSG_FIELD(paramc),
-            PD_MSG_FIELD(depc), PD_MSG_FIELD(funcName));
+            self, &(PD_MSG_FIELD(guid)), PD_MSG_FIELD(funcPtr),
+            PD_MSG_FIELD(paramc), PD_MSG_FIELD(depc),
+            PD_MSG_FIELD(funcName));
 
         msg->type &= ~PD_MSG_REQUEST;
         msg->type |= PD_MSG_RESPONSE;
@@ -834,6 +837,24 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         break;
     }
 
+    case PD_MSG_GUID_ARRAY_CREATE: {
+        START_PROFILE(pd_hc_GuidArrayCreate);
+#define PD_MSG msg
+#define PD_TYPE PD_MSG_GUID_ARRAY_CREATE
+        ASSERT(PD_MSG_FIELD(size) != 0);
+        ASSERT(PD_MSG_FIELD(count) != 0);
+        // Here we need to create a metadata area as well
+        PD_MSG_FIELD(properties) = self->guidProviders[0]->fcts.createGuidArray(
+            self->guidProviders[0], PD_MSG_FIELD(guid), PD_MSG_FIELD(size),
+            PD_MSG_FIELD(count), PD_MSG_FIELD(kind));
+#undef PD_MSG
+#undef PD_TYPE
+        msg->type &= ~PD_MSG_REQUEST;
+        msg->type |= PD_MSG_RESPONSE;
+        EXIT_PROFILE;
+        break;
+    }
+
     case PD_MSG_GUID_INFO: {
         START_PROFILE(pd_hc_GuidInfo);
 #define PD_MSG msg
@@ -876,6 +897,7 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         START_PROFILE(pd_hc_Take);
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_COMM_TAKE
+#ifdef OCR_SCHEDULER_0_9
         if (PD_MSG_FIELD(type) == OCR_GUID_EDT) {
             PD_MSG_FIELD(returnDetail) = self->schedulers[0]->fcts.takeEdt(
                 self->schedulers[0], &(PD_MSG_FIELD(guidCount)),
@@ -894,6 +916,29 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
                 self->schedulers[0], &(PD_MSG_FIELD(guidCount)),
                 PD_MSG_FIELD(guids), PD_MSG_FIELD(properties));
         }
+#else
+        if (PD_MSG_FIELD(type) == OCR_GUID_EDT) {
+            ocrGuid_t edtGuid = NULL_GUID;
+            PD_MSG_FIELD(returnDetail) = self->schedulers[0]->fcts.take(
+                self->schedulers[0],
+                PD_MSG_FIELD(extra),
+                &edtGuid,
+                OCR_GUID_EDT,
+                NULL,
+                PD_MSG_FIELD(properties));
+
+            if (edtGuid == NULL_GUID) {
+                PD_MSG_FIELD(guidCount) = 0;
+            } else {
+                PD_MSG_FIELD(guids)->guid = edtGuid;
+                PD_MSG_FIELD(guidCount) = 1;
+                PD_MSG_FIELD(extra) = (u64)(self->taskFactories[0]->fcts.execute);
+                localDeguidify(self, PD_MSG_FIELD(guids));
+            }
+        } else {
+            ASSERT(0);
+        }
+#endif
 #undef PD_MSG
 #undef PD_TYPE
         msg->type &= ~PD_MSG_REQUEST;
@@ -906,6 +951,7 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         START_PROFILE(pd_hc_Give);
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_COMM_GIVE
+#ifdef OCR_SCHEDULER_0_9
         if (PD_MSG_FIELD(type) == OCR_GUID_EDT) {
             PD_MSG_FIELD(returnDetail) = self->schedulers[0]->fcts.giveEdt(
                 self->schedulers[0], &(PD_MSG_FIELD(guidCount)),
@@ -916,6 +962,26 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
                 self->schedulers[0], &(PD_MSG_FIELD(guidCount)),
                 PD_MSG_FIELD(guids), PD_MSG_FIELD(properties));
         }
+#else
+        if (PD_MSG_FIELD(type) == OCR_GUID_EDT) {
+            ASSERT(PD_MSG_FIELD(guidCount) == 1);
+            //FIXME: worker id to location mapping
+            ocrWorker_t *worker = NULL;
+            ocrWorkerHc_t *hcWorker = NULL;
+            getCurrentEnv(NULL, &worker, NULL, NULL);
+            hcWorker = (ocrWorkerHc_t*)worker;
+
+            PD_MSG_FIELD(returnDetail) = self->schedulers[0]->fcts.give(
+                self->schedulers[0],
+                (ocrLocation_t)hcWorker->id,
+                (PD_MSG_FIELD(guids))->guid,
+                OCR_GUID_EDT,
+                NULL,
+                PD_MSG_FIELD(properties));
+        } else {
+            ASSERT(0);
+        }
+#endif
 #undef PD_MSG
 #undef PD_TYPE
         msg->type &= ~PD_MSG_REQUEST;
@@ -950,7 +1016,7 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             //we've already caught it in ocrAddDependence for performance
             // This is equivalent to an immediate satisfy
             PD_MSG_FIELD(returnDetail) = convertDepAddToSatisfy(
-                self, src, dest, PD_MSG_FIELD(slot));
+                self, src, dest, PD_MSG_FIELD(slot), PD_MSG_FIELD(mapping));
         } else {
             // Only left with events as potential source
             ASSERT(srcKind == OCR_GUID_EVENT);
@@ -1122,13 +1188,14 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             ocrEvent_t *evt = (ocrEvent_t*)(dst.metaDataPtr);
             ASSERT(evt->fctId == self->eventFactories[0]->factoryId);
             PD_MSG_FIELD(returnDetail) = self->eventFactories[0]->fcts[evt->kind].satisfy(
-                evt, PD_MSG_FIELD(payload), PD_MSG_FIELD(slot));
+                evt, PD_MSG_FIELD(payload), PD_MSG_FIELD(slot), PD_MSG_FIELD(mapping));
         } else {
             if(dstKind == OCR_GUID_EDT) {
                 ocrTask_t *edt = (ocrTask_t*)(dst.metaDataPtr);
                 ASSERT(edt->fctId == self->taskFactories[0]->factoryId);
+                localDeguidify(self, &PD_MSG_FIELD(payload));
                 PD_MSG_FIELD(returnDetail) = self->taskFactories[0]->fcts.satisfy(
-                    edt, PD_MSG_FIELD(payload), PD_MSG_FIELD(slot));
+                    edt, PD_MSG_FIELD(payload), PD_MSG_FIELD(slot), PD_MSG_FIELD(mapping));
             } else {
                 ASSERT(0); // We can't satisfy anything else
             }
@@ -1345,6 +1412,7 @@ void initializePolicyDomainHc(ocrPolicyDomainFactory_t * factory, ocrPolicyDomai
     ocrPolicyDomainHc_t* derived = (ocrPolicyDomainHc_t*) self;
     derived->rank = ((paramListPolicyDomainHcInst_t*)perInstance)->rank;
     derived->state = 0;
+    self->neighborCount = ((paramListPolicyDomainHcInst_t*)perInstance)->neighborCount;
 }
 
 static void destructPolicyDomainFactoryHc(ocrPolicyDomainFactory_t * factory) {

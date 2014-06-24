@@ -335,10 +335,10 @@ u8 xePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
     case PD_MSG_WORK_CREATE: case PD_MSG_WORK_DESTROY:
     case PD_MSG_EDTTEMP_CREATE: case PD_MSG_EDTTEMP_DESTROY:
     case PD_MSG_EVT_CREATE: case PD_MSG_EVT_DESTROY: case PD_MSG_EVT_GET:
-    case PD_MSG_GUID_CREATE: case PD_MSG_GUID_INFO: case PD_MSG_GUID_DESTROY:
+    case PD_MSG_GUID_CREATE: case PD_MSG_GUID_ARRAY_CREATE: case PD_MSG_GUID_INFO: case PD_MSG_GUID_DESTROY:
     case PD_MSG_COMM_TAKE: case PD_MSG_COMM_GIVE:
-    case PD_MSG_DEP_ADD: case PD_MSG_DEP_REGSIGNALER: case PD_MSG_DEP_REGWAITER:
-    case PD_MSG_DEP_SATISFY: {
+    case PD_MSG_DEP_ADD: case PD_MSG_DEP_REGSIGNALER: case PD_MSG_DEP_REGWAITER: case PD_MSG_DEP_SATISFY:
+    case PD_MSG_HINT_CREATE: case PD_MSG_HINT_OP: case PD_MSG_HINT_SET: case PD_MSG_HINT_GET: {
 
         START_PROFILE(pd_xe_OffloadtoCE);
         if((msg->type & PD_MSG_TYPE_ONLY) == PD_MSG_COMM_GIVE) {
@@ -587,6 +587,7 @@ void initializePolicyDomainXe(ocrPolicyDomainFactory_t * factory, ocrPolicyDomai
 #ifdef OCR_ENABLE_STATISTICS
     self->statsObject = statsObject;
 #endif
+
 
     initializePolicyDomainOcr(factory, self, perInstance);
 }

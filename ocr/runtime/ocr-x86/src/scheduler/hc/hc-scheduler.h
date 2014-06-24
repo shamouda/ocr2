@@ -10,37 +10,8 @@
 #include "ocr-config.h"
 #ifdef ENABLE_SCHEDULER_HC
 
-#include "ocr-scheduler.h"
-#include "ocr-types.h"
-#include "utils/ocr-utils.h"
-
-/******************************************************/
-/* Support structures (workpile iterator)             */
-/******************************************************/
-
-struct _ocrWorkpile_t;
-
-typedef struct _hcWorkpileIterator_t {
-    struct _ocrWorkpile_t **workpiles;
-    u64 id, curr, mod;
-} hcWorkpileIterator_t;
-
-typedef struct {
-    ocrSchedulerFactory_t base;
-} ocrSchedulerFactoryHc_t;
-
-typedef struct {
-    ocrScheduler_t scheduler;
-    hcWorkpileIterator_t * stealIterators;
-    u64 workerIdFirst;
-} ocrSchedulerHc_t;
-
-typedef struct _paramListSchedulerHcInst_t {
-    paramListSchedulerInst_t base;
-    u64 workerIdFirst;
-} paramListSchedulerHcInst_t;
-
-ocrSchedulerFactory_t * newOcrSchedulerFactoryHc(ocrParamList_t *perType);
+#include "v0.9/hc-0-9-scheduler.h"
+#include "v1.0/hc-1-0-scheduler.h"
 
 #endif /* ENABLE_SCHEDULER_HC */
 #endif /* __HC_SCHEDULER_H__ */

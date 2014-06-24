@@ -11,6 +11,8 @@
 #include "ocr-runtime-types.h"
 #include "ocr-types.h"
 #include "utils/ocr-utils.h"
+#include "ocr-guid-kind.h"
+#include "ocr-hint.h"
 
 struct _ocrPolicyDomain_t;
 
@@ -26,7 +28,6 @@ typedef struct _paramListSchedulerInst_t {
     ocrParamList_t base;
 } paramListSchedulerInst_t;
 
-
 /****************************************************/
 /* OCR SCHEDULER                                    */
 /****************************************************/
@@ -35,6 +36,12 @@ struct _ocrScheduler_t;
 struct _ocrCost_t;
 struct _ocrPolicyCtx_t;
 struct _ocrMsgHandler_t;
+
+/* Scheduler Properties */
+#define SCHED_PROP_NONE  0x0
+#define SCHED_PROP_NEW   0x1
+#define SCHED_PROP_READY 0x2
+#define SCHED_PROP_DONE  0x4
 
 typedef struct _ocrSchedulerFcts_t {
     void (*destruct)(struct _ocrScheduler_t *self);
@@ -46,6 +53,8 @@ typedef struct _ocrSchedulerFcts_t {
     void (*stop)(struct _ocrScheduler_t *self);
 
     void (*finish)(struct _ocrScheduler_t *self);
+
+#ifdef OCR_SCHEDULER_0_9
 
     // TODO: Check this call
     // u8 (*yield)(struct _ocrScheduler_t *self, ocrGuid_t workerGuid,
@@ -124,6 +133,74 @@ typedef struct _ocrSchedulerFcts_t {
     u8 (*giveComm)(struct _ocrScheduler_t *self, u32 *count, ocrFatGuid_t * handlers, u32 properties);
 
     // TODO: We will need to add the DB functions here
+#else
+
+    /**
+     * @brief Takes a component from this scheduler
+     *
+     * This call requests a component from the scheduler.
+     * The clients of this call could be a worker or another scheduler.
+     *
+     * @param self[in]           Pointer to this scheduler
+     * @param source[in]         Location that is asking for components
+     * @param component[in/out]  Cannot be NULL.
+     *                           As input contains the GUID of the component requested or NULL_GUID.
+     *                           As output, contains the component given by the scheduler to the caller.
+     * @param hints[in]          Hints for the take.
+     *                           E.g: A scheduler can hint to another scheduler which cost mapper to use.
+     * @param properties[in]     Properties for the take
+     *                           This call can be used with the following properties:
+     *                           1> SCHED_PROP_READY:
+     *                              In this mode, the scheduler will return a component with ready elements.
+     *                              If no component input is provided, then the scheduler returns the best component.
+     *                              If a component input GUID is provided, then the scheduler returns that component
+     *                              if it is ready. An error occurs if not ready.
+     *                              If an input GUID is a DB, then the scheduler acquires it for the requester.
+     *                              An error is thrown if the DB was not acquired.
+     *                           2> SCHED_PROP_NEW:
+     *                              In this mode, the scheduler will allocate new components.
+     *                              The component input has to be a NULL_GUID.
+     *                              Information regarding allocation size, etc. has to be in hints.
+     *
+     * @return 0 on success and a non-zero value on failure
+     */
+    u8 (*take)(struct _ocrScheduler_t *self, ocrLocation_t source, ocrGuid_t *component, ocrGuidKind kind, ocrParamListHint_t *hints, u32 properties);
+
+    /**
+     * @brief Gives a component to this scheduler
+     *
+     * This call gives a component to the scheduler.
+     * The clients of this call could be a worker or another scheduler.
+     *
+     * @param self[in]           Pointer to this scheduler
+     * @param source[in]         Location that is giving the component
+     * @param component[in]      Contains the GUID of the components given to the scheduler.
+     * @param hints[in]          Hints for the give.
+     *                           E.g: A client can hint to the schduler which component to associate this entry with.
+     *                           Or, a scheduler can be hinted the cost update for a done component.
+     * @param properties[in]     Properties for the give
+     *                           This call can be used with the following properties:
+     *                           1> SCHED_PROP_READY:
+     *                              In this mode, the scheduler is handed a ready component.
+     *                              There could be ready EDTs/DBs/Comms etc.
+     *                           2> SCHED_PROP_DONE:
+     *                              In this mode, the scheduler is notified that the component has completed execution.
+     *
+     * @return 0 on success and a non-zero value on failure
+     */
+    u8 (*give)(struct _ocrScheduler_t *self, ocrLocation_t source, ocrGuid_t component, ocrGuidKind kind, ocrParamListHint_t *hints, u32 properties);
+
+    /**
+     * @brief Scheduler updates itself
+     *
+     * This works as a proactive monitoring hook
+     *
+     * @param self[in]          Pointer to this scheduler
+     * @param properties[in]    Properties of this update
+     */
+    void (*update)(struct _ocrScheduler_t *self, u32 properties);
+
+#endif
 } ocrSchedulerFcts_t;
 
 struct _ocrWorkpile_t;
@@ -135,10 +212,10 @@ struct _ocrWorkpile_t;
 typedef struct _ocrScheduler_t {
     ocrFatGuid_t fguid;
     struct _ocrPolicyDomain_t *pd;
-
+    struct _ocrCostMapper_t **costmappers;
+    u32 costmapperCount;
     struct _ocrWorkpile_t **workpiles;
     u64 workpileCount;
-
     ocrSchedulerFcts_t fcts;
 } ocrScheduler_t;
 

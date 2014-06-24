@@ -5,7 +5,7 @@
  */
 
 #include "ocr-config.h"
-#ifdef ENABLE_SCHEDULER_CE
+#ifdef ENABLE_SCHEDULER_CE_0_9
 
 #include "debug.h"
 #include "ocr-errors.h"
@@ -67,7 +67,7 @@ static inline ceWorkpileIterator_t* stealMappingOneToAllButSelf (ocrScheduler_t*
     return stealIterator;
 }
 
-void ceSchedulerDestruct(ocrScheduler_t * self) {
+void ce_0_9_SchedulerDestruct(ocrScheduler_t * self) {
     u64 i;
     // Destruct the workpiles
     u64 count = self->workpileCount;
@@ -79,7 +79,7 @@ void ceSchedulerDestruct(ocrScheduler_t * self) {
     runtimeChunkFree((u64)self, NULL);
 }
 
-void ceSchedulerBegin(ocrScheduler_t * self, ocrPolicyDomain_t * PD) {
+void ce_0_9_SchedulerBegin(ocrScheduler_t * self, ocrPolicyDomain_t * PD) {
     // Nothing to do locally
     u64 workpileCount = self->workpileCount;
     u64 i;
@@ -88,7 +88,7 @@ void ceSchedulerBegin(ocrScheduler_t * self, ocrPolicyDomain_t * PD) {
     }
 }
 
-void ceSchedulerStart(ocrScheduler_t * self, ocrPolicyDomain_t * PD) {
+void ce_0_9_SchedulerStart(ocrScheduler_t * self, ocrPolicyDomain_t * PD) {
 
     // Get a GUID
     guidify(PD, (u64)self, &(self->fguid), OCR_GUID_SCHEDULER);
@@ -122,7 +122,7 @@ void ceSchedulerStart(ocrScheduler_t * self, ocrPolicyDomain_t * PD) {
     derived->stealIterators = stealIteratorsCache;
 }
 
-void ceSchedulerStop(ocrScheduler_t * self) {
+void ce_0_9_SchedulerStop(ocrScheduler_t * self) {
     ocrPolicyDomain_t *pd = NULL;
     ocrPolicyMsg_t msg;
     getCurrentEnv(&pd, NULL, NULL, &msg);
@@ -153,7 +153,7 @@ void ceSchedulerStop(ocrScheduler_t * self) {
     self->fguid.guid = UNINITIALIZED_GUID;
 }
 
-void ceSchedulerFinish(ocrScheduler_t *self) {
+void ce_0_9_SchedulerFinish(ocrScheduler_t *self) {
     u64 i = 0;
     u64 count = self->workpileCount;
     for(i = 0; i < count; ++i) {
@@ -164,7 +164,7 @@ void ceSchedulerFinish(ocrScheduler_t *self) {
 
 // What is this for?
 #if 0
-static u8 ceSchedulerYield (ocrScheduler_t* self, ocrGuid_t workerGuid,
+static u8 ce_0_9_SchedulerYield (ocrScheduler_t* self, ocrGuid_t workerGuid,
                             ocrGuid_t yieldingEdtGuid, ocrGuid_t eventToYieldForGuid,
                             ocrGuid_t * returnGuid,
                             ocrPolicyCtx_t *context) {
@@ -200,13 +200,14 @@ static u8 ceSchedulerYield (ocrScheduler_t* self, ocrGuid_t workerGuid,
 }
 #endif /* if 0 */
 
-u8 ceSchedulerTake (ocrScheduler_t *self, u32 *count, ocrFatGuid_t *edts) {
+u8 ce_0_9_SchedulerTake (ocrScheduler_t *self, u32 *count, ocrFatGuid_t *edts) {
     // Source must be a worker guid and we rely on indices to map
     // workers to workpiles (one-to-one)
     // TODO: This is a non-portable assumption but will do for now.
     ocrWorker_t *worker = NULL;
+    ocrPolicyDomain_t *pd = NULL;
     ocrWorkerCe_t *ceWorker = NULL;
-    getCurrentEnv(NULL, &worker, NULL, NULL);
+    getCurrentEnv(&pd, &worker, NULL, NULL);
     ceWorker = (ocrWorkerCe_t*)worker;
 
     if(*count == 0) return 1; // No room to put anything
@@ -235,6 +236,9 @@ u8 ceSchedulerTake (ocrScheduler_t *self, u32 *count, ocrFatGuid_t *edts) {
     // allocated memory for us since we can return at most one
     // guid (most likely store using the address of a local)
     if(NULL_GUID != popped.guid) {
+        ocrGuidKind kind;
+        pd->guidProviders[0]->fcts.getKind(pd->guidProviders[0], popped.guid, &kind);
+        ASSERT(kind == OCR_GUID_EDT);
         *count = 1;
     } else {
         *count = 0;
@@ -245,7 +249,7 @@ u8 ceSchedulerTake (ocrScheduler_t *self, u32 *count, ocrFatGuid_t *edts) {
     return 0;
 }
 
-u8 ceSchedulerGive (ocrScheduler_t* base, u32* count, ocrFatGuid_t* edts) {
+u8 ce_0_9_SchedulerGive (ocrScheduler_t* base, u32* count, ocrFatGuid_t* edts) {
     // Source must be a worker guid and we rely on indices to map
     // workers to workpiles (one-to-one)
     // TODO: This is a non-portable assumption but will do for now.
@@ -266,26 +270,26 @@ u8 ceSchedulerGive (ocrScheduler_t* base, u32* count, ocrFatGuid_t* edts) {
     return 0;
 }
 
-u8 ceSchedulerTakeComm(ocrScheduler_t *self, u32* count, ocrFatGuid_t* handlers, u32 properties) {
+u8 ce_0_9_SchedulerTakeComm(ocrScheduler_t *self, u32* count, ocrFatGuid_t* handlers, u32 properties) {
     return OCR_ENOSYS;
 }
 
-u8 ceSchedulerGiveComm(ocrScheduler_t *self, u32* count, ocrFatGuid_t* handlers, u32 properties) {
+u8 ce_0_9_SchedulerGiveComm(ocrScheduler_t *self, u32* count, ocrFatGuid_t* handlers, u32 properties) {
     return OCR_ENOSYS;
 }
 
-ocrScheduler_t* newSchedulerCe(ocrSchedulerFactory_t * factory, ocrParamList_t *perInstance) {
+ocrScheduler_t* newSchedulerCe_0_9(ocrSchedulerFactory_t * factory, ocrParamList_t *perInstance) {
     ocrScheduler_t* base = (ocrScheduler_t*) runtimeChunkAlloc(
                                sizeof(ocrSchedulerCe_t), NULL);
     factory->initialize(factory, base, perInstance);
     return base;
 }
 
-void initializeSchedulerCe(ocrSchedulerFactory_t *factory, ocrScheduler_t *self, ocrParamList_t *perInstance) {
+void initializeSchedulerCe_0_9(ocrSchedulerFactory_t *factory, ocrScheduler_t *self, ocrParamList_t *perInstance) {
     initializeSchedulerOcr(factory, self, perInstance);
 }
 
-void destructSchedulerFactoryCe(ocrSchedulerFactory_t * factory) {
+void destructSchedulerFactoryCe_0_9(ocrSchedulerFactory_t * factory) {
     runtimeChunkFree((u64)factory, NULL);
 }
 
@@ -294,20 +298,20 @@ ocrSchedulerFactory_t * newOcrSchedulerFactoryCe(ocrParamList_t *perType) {
                                            sizeof(ocrSchedulerFactoryCe_t), NULL);
 
     ocrSchedulerFactory_t* base = (ocrSchedulerFactory_t*) derived;
-    base->instantiate = &newSchedulerCe;
-    base->initialize  = &initializeSchedulerCe;
-    base->destruct = &destructSchedulerFactoryCe;
-    base->schedulerFcts.begin = FUNC_ADDR(void (*)(ocrScheduler_t*, ocrPolicyDomain_t*), ceSchedulerBegin);
-    base->schedulerFcts.start = FUNC_ADDR(void (*)(ocrScheduler_t*, ocrPolicyDomain_t*), ceSchedulerStart);
-    base->schedulerFcts.stop = FUNC_ADDR(void (*)(ocrScheduler_t*), ceSchedulerStop);
-    base->schedulerFcts.finish = FUNC_ADDR(void (*)(ocrScheduler_t*), ceSchedulerFinish);
-    base->schedulerFcts.destruct = FUNC_ADDR(void (*)(ocrScheduler_t*), ceSchedulerDestruct);
-    base->schedulerFcts.takeEdt = FUNC_ADDR(u8 (*)(ocrScheduler_t*, u32*, ocrFatGuid_t*), ceSchedulerTake);
-    base->schedulerFcts.giveEdt = FUNC_ADDR(u8 (*)(ocrScheduler_t*, u32*, ocrFatGuid_t*), ceSchedulerGive);
-    base->schedulerFcts.takeComm = FUNC_ADDR(u8 (*)(ocrScheduler_t*, u32*, ocrFatGuid_t*, u32), ceSchedulerTakeComm);
-    base->schedulerFcts.giveComm = FUNC_ADDR(u8 (*)(ocrScheduler_t*, u32*, ocrFatGuid_t*, u32), ceSchedulerGiveComm);
+    base->instantiate = &newSchedulerCe_0_9;
+    base->initialize  = &initializeSchedulerCe_0_9;
+    base->destruct = &destructSchedulerFactoryCe_0_9;
+    base->schedulerFcts.begin = FUNC_ADDR(void (*)(ocrScheduler_t*, ocrPolicyDomain_t*), ce_0_9_SchedulerBegin);
+    base->schedulerFcts.start = FUNC_ADDR(void (*)(ocrScheduler_t*, ocrPolicyDomain_t*), ce_0_9_SchedulerStart);
+    base->schedulerFcts.stop = FUNC_ADDR(void (*)(ocrScheduler_t*), ce_0_9_SchedulerStop);
+    base->schedulerFcts.finish = FUNC_ADDR(void (*)(ocrScheduler_t*), ce_0_9_SchedulerFinish);
+    base->schedulerFcts.destruct = FUNC_ADDR(void (*)(ocrScheduler_t*), ce_0_9_SchedulerDestruct);
+    base->schedulerFcts.takeEdt = FUNC_ADDR(u8 (*)(ocrScheduler_t*, u32*, ocrFatGuid_t*), ce_0_9_SchedulerTake);
+    base->schedulerFcts.giveEdt = FUNC_ADDR(u8 (*)(ocrScheduler_t*, u32*, ocrFatGuid_t*), ce_0_9_SchedulerGive);
+    base->schedulerFcts.takeComm = FUNC_ADDR(u8 (*)(ocrScheduler_t*, u32*, ocrFatGuid_t*, u32), ce_0_9_SchedulerTakeComm);
+    base->schedulerFcts.giveComm = FUNC_ADDR(u8 (*)(ocrScheduler_t*, u32*, ocrFatGuid_t*, u32), ce_0_9_SchedulerGiveComm);
 
     return base;
 }
 
-#endif /* ENABLE_SCHEDULER_CE */
+#endif /* ENABLE_SCHEDULER_CE_0_9 */

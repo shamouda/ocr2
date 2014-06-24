@@ -66,7 +66,7 @@ typedef struct _ocrEventFcts_t {
      *
      * @return 0 on success and a non-zero code on failure
      */
-    u8 (*satisfy)(struct _ocrEvent_t* self, ocrFatGuid_t db, u32 slot);
+    u8 (*satisfy)(struct _ocrEvent_t* self, ocrFatGuid_t db, u32 slot, ocrLocation_t mapping);
 
     /**
      * @brief Register a "signaler" on the event
@@ -151,6 +151,7 @@ typedef struct _ocrEvent_t {
     ocrStatsProcess_t *statProcess;
 #endif
     ocrEventTypes_t kind;  /**< The kind of this event instance */
+    ocrLocation_t mapping; /**< Location where event got satisfied */
     u32 fctId;             /**< The functions to use to access this event */
 } ocrEvent_t;
 

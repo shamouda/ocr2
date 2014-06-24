@@ -38,6 +38,7 @@ typedef struct {
 typedef struct {
     paramListPolicyDomainInst_t base;
     u32 rank;
+    u32 neighborCount;
 } paramListPolicyDomainHcInst_t;
 
 ocrPolicyDomainFactory_t *newPolicyDomainFactoryHc(ocrParamList_t *perType);

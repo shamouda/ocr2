@@ -1,11 +1,11 @@
 /*
- * This file is subject to the license agreement located in the file LIXENSE
+ * This file is subject to the license agreement located in the file LICENSE
  * and cannot be distributed without it. This notice cannot be
  * removed or modified.
  */
 
 #include "ocr-config.h"
-#ifdef ENABLE_SCHEDULER_XE
+#ifdef ENABLE_SCHEDULER_XE_NULL
 
 #include "debug.h"
 #include "ocr-errors.h"
@@ -16,7 +16,7 @@
 #include "scheduler/xe/xe-scheduler.h"
 
 /******************************************************/
-/* OCR-XE SCHEDULER                                   */
+/* OCR-XE_NULL SCHEDULER                                   */
 /******************************************************/
 
 void xeSchedulerDestruct(ocrScheduler_t * self) {
@@ -32,22 +32,6 @@ void xeSchedulerStop(ocrScheduler_t * self) {
 }
 
 void xeSchedulerFinish(ocrScheduler_t *self) {
-}
-
-u8 xeSchedulerTake(ocrScheduler_t *self, u32 *count, ocrFatGuid_t *edts) {
-    return 0;
-}
-
-u8 xeSchedulerGive(ocrScheduler_t* base, u32* count, ocrFatGuid_t* edts) {
-    return 0;
-}
-
-u8 xeSchedulerTakeComm(ocrScheduler_t *self, u32* count, ocrFatGuid_t* handlers, u32 properties) {
-    return OCR_ENOSYS;
-}
-
-u8 xeSchedulerGiveComm(ocrScheduler_t *self, u32* count, ocrFatGuid_t* handlers, u32 properties) {
-    return OCR_ENOSYS;
 }
 
 ocrScheduler_t* newSchedulerXe(ocrSchedulerFactory_t * factory, ocrParamList_t *perInstance) {
@@ -78,11 +62,7 @@ ocrSchedulerFactory_t * newOcrSchedulerFactoryXe(ocrParamList_t *perType) {
     base->schedulerFcts.stop = FUNC_ADDR(void (*)(ocrScheduler_t*), xeSchedulerStop);
     base->schedulerFcts.finish = FUNC_ADDR(void (*)(ocrScheduler_t*), xeSchedulerFinish);
     base->schedulerFcts.destruct = FUNC_ADDR(void (*)(ocrScheduler_t*), xeSchedulerDestruct);
-    base->schedulerFcts.takeEdt = FUNC_ADDR(u8 (*)(ocrScheduler_t*, u32*, ocrFatGuid_t*), xeSchedulerTake);
-    base->schedulerFcts.giveEdt = FUNC_ADDR(u8 (*)(ocrScheduler_t*, u32*, ocrFatGuid_t*), xeSchedulerGive);
-    base->schedulerFcts.takeComm = FUNC_ADDR(u8 (*)(ocrScheduler_t*, u32*, ocrFatGuid_t*, u32), xeSchedulerTakeComm);
-    base->schedulerFcts.giveComm = FUNC_ADDR(u8 (*)(ocrScheduler_t*, u32*, ocrFatGuid_t*, u32), xeSchedulerGiveComm);
     return base;
 }
 
-#endif /* ENABLE_SCHEDULER_XE */
+#endif /* ENABLE_SCHEDULER_XE_NULL */

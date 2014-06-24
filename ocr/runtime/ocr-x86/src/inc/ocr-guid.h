@@ -111,6 +111,27 @@ typedef struct _ocrGuidProviderFcts_t {
                      u64 size, ocrGuidKind kind);
 
     /**
+     * @brief Create an array of GUIDs for objects of kind 'kind'
+     * and creates array storage of 'count' objects of size 'size'
+     * associated with the GUIDs.
+     *
+     * A fatGuid array containing information of each guid
+     * is also allocated after the object array
+     *
+     * Storage layout:
+     * |<- GUID * count ->|<----- size * count ----->|<- FGUID * count ->|
+     *
+     *
+     * @param[in] self          Pointer to this GUID provider
+     * @param[out] fguid        GUID returned (with metaDataPtr)
+     * @param[in] size          Size of the storage to be created
+     * @param[in] kind          Kind of the object that will be associated with the GUID
+     * @return 0 on success or an error code
+     */
+    u8 (*createGuidArray)(struct _ocrGuidProvider_t* self, ocrFatGuid_t** fguid,
+                     u64 size, u64 count, ocrGuidKind kind);
+
+    /**
      * @brief Resolve the associated value to the GUID 'guid'
      *
      * \param[in] self          Pointer to this GUID provider

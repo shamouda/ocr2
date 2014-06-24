@@ -30,6 +30,7 @@ typedef struct {
     u64 id;
     // Flag the worker checksto now if he's running
     bool running;
+    u64 hit, miss;
 } ocrWorkerXe_t;
 
 ocrWorkerFactory_t* newOcrWorkerFactoryXe(ocrParamList_t *perType);

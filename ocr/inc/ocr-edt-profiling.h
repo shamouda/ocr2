@@ -13,7 +13,9 @@
 
 #include <ocr-types.h>
 
-struct _profileStruct {
+#define OCR_PROFILE_NUM_SLOTS 2
+
+typedef struct _profileStruct {
     u8     *fname;
     u8     numIcCoeff;  // Num of coefficients for instruction count
     u8     numFpCoeff;  // Num of coefficients for floating point ops
@@ -29,11 +31,11 @@ struct _profileStruct {
     double *wrCoeff;    // Coefficients of writes polynomial
 } profileStruct;
 
-struct _dbWeightStruct {
+typedef struct _dbWeightStruct {
     u8     *fname;
-    u16    slots[2];    // Most dominant slots
-    u8     weights[2];  // Corresponding weights to most dominant slots, %
-    u8     sd[2];       // Corresponding sd to most dominant slots, 0-100
+    u16    slots[OCR_PROFILE_NUM_SLOTS];    // Most dominant slots
+    u8     weights[OCR_PROFILE_NUM_SLOTS];  // Corresponding weights to most dominant slots, %
+    u8     sd[OCR_PROFILE_NUM_SLOTS];       // Corresponding sd to most dominant slots, 0-100
     u8     coverage;    // Coverage of most dominant 2 slots
 } dbWeightStruct;
 

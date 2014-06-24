@@ -28,6 +28,13 @@
 #include "ocr-tuning.h"
 #include "ocr-types.h"
 #include "ocr-worker.h"
+#include "ocr-hint.h"
+#include "ocr-cost-mapper.h"
+#include "ocr-component.h"
+
+#ifdef OCR_ENABLE_EDT_PROFILING
+#include "ocr-edt-profiling.h"
+#endif
 
 /****************************************************/
 /* PARAMETER LISTS                                  */
@@ -123,6 +130,10 @@ typedef struct _paramListPolicyDomainInst_t {
  * value and the GUID and optionally destroy the associated
  * metadata */
 #define PD_MSG_GUID_DESTROY     0x3020
+
+/**< Create a GUID metadata array and associate the element addresses with GUIDs */
+#define PD_MSG_GUID_ARRAY_CREATE 0x4020
+
 // TODO: Add stuff about GUID reservation
 
 /**< AND with this and if result non-null, GUID distribution related
@@ -206,6 +217,21 @@ typedef struct _paramListPolicyDomainInst_t {
 
 /**< Opposite of register */
 #define PD_MSG_MGT_UNREGISTER   0x4200
+
+/**< Hint operation */
+#define PD_MSG_HINT_OP              0x0400
+/**< Create a hint */
+#define PD_MSG_HINT_CREATE          0x1400
+/**< Destroy a hint */
+#define PD_MSG_HINT_DESTROY         0x2400
+/**< Set hint for a guid */
+#define PD_MSG_HINT_SET             0x3400
+/**< Get hint for a guid */
+#define PD_MSG_HINT_GET             0x4400
+/**< Initialize a hint */
+#define PD_MSG_HINT_INITIALIZE      0x5400
+/**< Introspection for a hint */
+#define PD_MSG_HINT_INTROSPECTION   0x6400
 
 #ifdef OCR_ENABLE_STATISTICS
 // TODO: Add statistics messages
@@ -442,6 +468,14 @@ typedef struct _ocrPolicyMsg_t {
         } PD_MSG_STRUCT_NAME(PD_MSG_GUID_CREATE);
 
         struct {
+            ocrFatGuid_t **guid; /**< Out: FatGuid array */
+            u64 size;            /**< In:  Size of each array element object */
+            u64 count;           /**< In:  Number of array element objects */
+            ocrGuidKind kind;    /**< In:  Kind of the GUID to create */
+            u32 properties;      /**< In:  Properties for the creation. */
+        } PD_MSG_STRUCT_NAME(PD_MSG_GUID_ARRAY_CREATE);
+
+        struct {
             ocrFatGuid_t guid; /**< In/Out:
                                 * In: The GUID field should be set to the GUID
                                 * whose information is needed
@@ -459,41 +493,41 @@ typedef struct _ocrPolicyMsg_t {
         } PD_MSG_STRUCT_NAME(PD_MSG_GUID_DESTROY);
 
         struct {
-            ocrFatGuid_t *guids; /**< In/Out: GUID(s) of the work/DB/etc taken:
-                                 * Input (optional): GUID(s) requested
-                                 * Output: GUID(s) given to the caller
-                                 * by the callee */
-            u64 extra;           /**< Additional information on the take (for eg: function
-                                  * pointer to use to execute the returned EDTs */
-            u32 guidCount;       /**< In/Out: Number of GUID(s) in guids. As input,
-                                  * number of GUIDs if guids has requested GUIDs or
-                                  * maximum number of GUIDs requested. */
-            u32 properties;      /**< In: properties for the take; TODO: define some for extra */
-            u32 returnDetail;    /**< Out: Success or error code */
-            ocrGuidKind type;    /**< In: Kind of GUIDs requested */
-            // TODO: Add something about cost/choice heuristic
+            ocrFatGuid_t *guids;    /**< In/Out: GUID(s) of the work/DB/etc taken:
+                                     * Input (optional): GUID(s) requested
+                                     * Output: GUID(s) given to the caller
+                                     * by the callee */
+            u64 extra;              /**< Additional information on the take (for eg: function
+                                     * pointer to use to execute the returned EDTs */
+            u32 guidCount;          /**< In/Out: Number of GUID(s) in guids. As input,
+                                     * number of GUIDs if guids has requested GUIDs or
+                                     * maximum number of GUIDs requested. */
+            u32 properties;         /**< In: properties for the take; TODO: define some for extra */
+            u32 returnDetail;       /**< Out: Success or error code */
+            ocrGuidKind type;       /**< In: Kind of GUIDs requested */
+            ocrFatGuid_t component; /**< Out: The enclosing component of the chosen guid */
         } PD_MSG_STRUCT_NAME(PD_MSG_COMM_TAKE);
 
         struct {
-            ocrFatGuid_t *guids; /**< In/Out: GUID(s) of the work/DB/etc given:
-                                 * Input: GUID(s) the caller wants to hand-off
-                                 * to the callee
-                                 * Output (optional): GUID(s) NOT accepted
-                                 * by callee */
-            u32 guidCount;       /**< Number of GUID(s) in guids */
-            u32 properties;      /**< In: properties for the give */
-            u32 returnDetail;    /**< Out: Success or error code */
-            ocrGuidKind type;    /**< In: Kind of GUIDs given */
-            // TODO: Do we need something about cost/choice heuristic here
+            ocrFatGuid_t *guids;    /**< In/Out: GUID(s) of the work/DB/etc given:
+                                     * Input: GUID(s) the caller wants to hand-off
+                                     * to the callee
+                                     * Output (optional): GUID(s) NOT accepted
+                                     * by callee */
+            u32 guidCount;          /**< Number of GUID(s) in guids */
+            u32 properties;         /**< In: properties for the give */
+            u32 returnDetail;       /**< Out: Success or error code */
+            ocrGuidKind type;       /**< In: Kind of GUIDs given */
         } PD_MSG_STRUCT_NAME(PD_MSG_COMM_GIVE);
 
         struct {
-            ocrFatGuid_t source; /**< In: Source of the dependence */
-            ocrFatGuid_t dest;   /**< In: Destination of the dependence */
+            ocrFatGuid_t source;    /**< In: Source of the dependence */
+            ocrFatGuid_t dest;      /**< In: Destination of the dependence */
             ocrFatGuid_t currentEdt;   /**< In: EDT that is adding dep */
-            u32 slot;            /**< In: Slot of dest to connect the dep to */
-            u32 properties;      /**< In: Properties. Lower 3 bits are access modes */
-            u32 returnDetail;    /**< Out: Success or error code */
+            u32 slot;               /**< In: Slot of dest to connect the dep to */
+            u32 properties;         /**< In: Properties. Lower 3 bits are access modes */
+            u32 returnDetail;       /**< Out: Success or error code */
+            ocrLocation_t mapping;  /**< In: Location mapping of the dep add */
         } PD_MSG_STRUCT_NAME(PD_MSG_DEP_ADD);
 
         struct {
@@ -513,13 +547,14 @@ typedef struct _ocrPolicyMsg_t {
         } PD_MSG_STRUCT_NAME(PD_MSG_DEP_REGWAITER);
 
         struct {
-            ocrFatGuid_t guid;    /**< In: GUID of the event/task to satisfy */
-            ocrFatGuid_t payload; /**< In: GUID of the "payload" to satisfy the
-                                   * event/task with (a DB usually). */
+            ocrFatGuid_t guid;      /**< In: GUID of the event/task to satisfy */
+            ocrFatGuid_t payload;   /**< In: GUID of the "payload" to satisfy the
+                                       * event/task with (a DB usually). */
             ocrFatGuid_t currentEdt;   /**< In: EDT that is satisfying dep */
-            u32 slot;             /**< In: Slot to satisfy the event/task on */
-            u32 properties;       /**< In: Properties for the satisfaction */
-            u32 returnDetail;     /**< Out: Success or error code */
+            u32 slot;               /**< In: Slot to satisfy the event/task on */
+            ocrLocation_t mapping;  /**< In: Location mapping of the satisfy */
+            u32 properties;         /**< In: Properties for the satisfaction */
+            u32 returnDetail;       /**< Out: Success or error code */
         } PD_MSG_STRUCT_NAME(PD_MSG_DEP_SATISFY);
 
         struct {
@@ -582,6 +617,7 @@ typedef struct _ocrPolicyMsg_t {
             u32 properties;    /**< For now: 0 if normal exit, 1 if abort, 2 if assert*/
             u32 returnDetail;  /**< Out: Success or error code */
         } PD_MSG_STRUCT_NAME(PD_MSG_SAL_TERMINATE);
+
         struct {
             ocrFatGuid_t currentEdt;   /**< In: EDT that is calling shutdown */
             u32 properties;
@@ -605,6 +641,58 @@ typedef struct _ocrPolicyMsg_t {
             u32 properties;
             u32 returnDetail;       /**< Out: Success or error code */
         } PD_MSG_STRUCT_NAME(PD_MSG_MGT_UNREGISTER);
+
+        struct {
+            ocrFatGuid_t guid;    /**< In/Out: GUID of the hint to create */
+            ocrHintTypes_t type;  /**< In: Type of the hint created */
+            u32 properties;       /**< In: Properties for this creation */
+            u32 returnDetail;     /**< Out: Success or error code */
+        } PD_MSG_STRUCT_NAME(PD_MSG_HINT_CREATE);
+
+        struct {
+            ocrFatGuid_t guid;    /**< In/Out: GUID of the hint to create */
+            ocrHintTypes_t type;  /**< In: Type of the hint created */
+            u32 properties;       /**< In: Properties for this creation */
+            u32 returnDetail;     /**< Out: Success or error code */
+        } PD_MSG_STRUCT_NAME(PD_MSG_HINT_DESTROY);
+
+        struct {
+            ocrFatGuid_t guid;      /**< In: GUID of the hint */
+            u32 properties;         /**< In: Properties for this operation */
+            ocrFatGuid_t arg1;      /**< In: argument 1 */
+            ocrFatGuid_t arg2;      /**< In: argument 2 */
+            u32 returnDetail;       /**< Out: Success or error code */
+        } PD_MSG_STRUCT_NAME(PD_MSG_HINT_OP);
+
+        struct {
+            ocrFatGuid_t guid;    /**< In/Out: GUID of the hint to create */
+            ocrHintTypes_t type;  /**< In: Type of the hint created */
+            u32 properties;       /**< In: Properties for this creation */
+            ocrFatGuid_t extra;   /**< In: GUID of other hint for initialize operation */
+            u32 returnDetail;     /**< Out: Success or error code */
+        } PD_MSG_STRUCT_NAME(PD_MSG_HINT_INITIALIZE);
+
+        struct {
+            ocrFatGuid_t guid;      /**< In: GUID of the object */
+            ocrFatGuid_t hint;      /**< In: GUID of the hint */
+            u32 properties;         /**< In: Properties for this set */
+            u32 returnDetail;       /**< Out: Success or error code */
+        } PD_MSG_STRUCT_NAME(PD_MSG_HINT_SET);
+
+        struct {
+            ocrFatGuid_t guid;      /**< In: GUID of the object */
+            ocrFatGuid_t hint;      /**< Out: GUID of the hint */
+            u32 properties;         /**< In: Properties for this get */
+            u32 returnDetail;       /**< Out: Success or error code */
+        } PD_MSG_STRUCT_NAME(PD_MSG_HINT_GET);
+
+        struct {
+            ocrFatGuid_t guid;      /**< In: GUID of the object whose hint has to be processed */
+            ocrFatGuid_t arg;       /**< In: GUID arg */
+            ocrLocation_t location; /**< In: Location information */
+            u32 extra;              /**< In: Extra arg */
+            u32 properties;         /**< In: Properties for this get */
+        } PD_MSG_STRUCT_NAME(PD_MSG_HINT_INTROSPECTION);
     } args;
     char _padding[64]; // REC: HACK to be able to fit everything in messages!!
 } ocrPolicyMsg_t;
@@ -829,6 +917,9 @@ typedef struct _ocrPolicyDomain_t {
     u64 taskTemplateFactoryCount;               /**< Number of task-template factories */
     u64 dbFactoryCount;                         /**< Number of data-block factories */
     u64 eventFactoryCount;                      /**< Number of event factories */
+    u64 hintFactoryCount;                       /**< Number of hint factories */
+    u64 costmapperFactoryCount;
+    u64 componentFactoryCount;
 
     ocrScheduler_t  ** schedulers;              /**< All the schedulers */
     ocrAllocator_t  ** allocators;              /**< All the allocators */
@@ -844,6 +935,10 @@ typedef struct _ocrPolicyDomain_t {
                                                  * data-blocks */
     ocrEventFactory_t ** eventFactories;        /**< Factories to produce events*/
     ocrGuidProvider_t ** guidProviders;         /**< GUID generators */
+
+    ocrHintFactory_t  **hintFactories;          /**< Factory to produce hints */
+    ocrCostMapperFactory_t **costmapperFactories;
+    ocrComponentFactory_t **componentFactories;
 
     // TODO: What to do about this?
     ocrCost_t *costFunction; /**< Cost function used to determine

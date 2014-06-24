@@ -19,6 +19,7 @@
 
 #include "policy-domain/ce/ce-policy.h"
 #include "allocator/allocator-all.h"
+#include "ocr-hint.h"
 
 #define DEBUG_TYPE POLICY
 
@@ -332,7 +333,7 @@ static void* allocateDatablock (ocrPolicyDomain_t *self,
 }
 
 static u8 ceAllocateDb(ocrPolicyDomain_t *self, ocrFatGuid_t *guid, void** ptr, u64 size,
-                       u32 properties, u64 engineIndex,
+                       u32 properties, u64 engineIndex, ocrDataBlockType_t dbType,
                        ocrFatGuid_t affinity, ocrInDbAllocator_t allocator,
                        u64 prescription) {
     // This function allocates a data block for the requestor, who is either this computing agent or a
@@ -346,9 +347,24 @@ static u8 ceAllocateDb(ocrPolicyDomain_t *self, ocrFatGuid_t *guid, void** ptr, 
     u64 idx;
     void* result = allocateDatablock (self, size, engineIndex, prescription, &idx);
     if (result) {
+        ocrParamList_t * dbParam = NULL;
+#ifndef OCR_SCHEDULER_0_9
+        paramListDataBlockInst_t dbArgs;
+        dbArgs.affinity = NULL_GUID;
+        if (dbType == USER_DBTYPE) {
+            if (affinity.guid != NULL_GUID) {
+                dbArgs.affinity = affinity.guid;
+            } else {
+                //FIXME: Creating a DB needs to go through the scheduler!
+                ocrComponent_t *comp = self->componentFactories[0]->instantiate(self->componentFactories[0], NULL, COMPONENT_PROP_DB);
+                dbArgs.affinity = comp->guid;
+            }
+        }
+        dbParam = (ocrParamList_t*)(&dbArgs);
+#endif
         ocrDataBlock_t *block = self->dbFactories[0]->instantiate(
             self->dbFactories[0], self->allocators[idx]->fguid, self->fguid,
-            size, result, properties, NULL);
+            size, result, properties, dbParam);
         *ptr = result;
         (*guid).guid = block->guid;
         (*guid).metaDataPtr = block;
@@ -439,9 +455,17 @@ static u8 ceCreateEdt(ocrPolicyDomain_t *self, ocrFatGuid_t *guid,
         return OCR_EINVAL;
     }
 
+    ocrParamList_t *edtParam = NULL;
+#ifndef OCR_SCHEDULER_0_9
+    paramListTask_t paramTask;
+    paramTask.sizeofUHint = self->hintFactories[0]->fcts.sizeofHint(OCR_HINT_EDT, HINT_PROP_USER);
+    paramTask.sizeofIHint = self->hintFactories[0]->fcts.sizeofHint(OCR_HINT_EDT, HINT_PROP_RUNTIME);
+    edtParam = (ocrParamList_t*)&paramTask;
+#endif
+
     ocrTask_t * base = self->taskFactories[0]->instantiate(
         self->taskFactories[0], edtTemplate, *paramc, paramv,
-        *depc, properties, affinity, outputEvent, currentEdt, NULL);
+        *depc, properties, affinity, outputEvent, currentEdt, edtParam);
 
     (*guid).guid = base->guid;
     (*guid).metaDataPtr = base;
@@ -451,9 +475,16 @@ static u8 ceCreateEdt(ocrPolicyDomain_t *self, ocrFatGuid_t *guid,
 static u8 ceCreateEdtTemplate(ocrPolicyDomain_t *self, ocrFatGuid_t *guid,
                               ocrEdt_t func, u32 paramc, u32 depc, const char* funcName) {
 
+    ocrParamList_t *edtTempParam = NULL;
+#ifndef OCR_SCHEDULER_0_9
+    paramListTaskTemplate_t paramTemplate;
+    paramTemplate.sizeofUHint = self->hintFactories[0]->fcts.sizeofHint(OCR_HINT_EDT_TEMPLATE, HINT_PROP_USER);
+    paramTemplate.sizeofIHint = self->hintFactories[0]->fcts.sizeofHint(OCR_HINT_EDT_TEMPLATE, HINT_PROP_RUNTIME);
+    edtTempParam = (ocrParamList_t*)&paramTemplate;
+#endif
 
     ocrTaskTemplate_t *base = self->taskTemplateFactories[0]->instantiate(
-        self->taskTemplateFactories[0], func, paramc, depc, funcName, NULL);
+        self->taskTemplateFactories[0], func, paramc, depc, funcName, edtTempParam);
     (*guid).guid = base->guid;
     (*guid).metaDataPtr = base;
     return 0;
@@ -470,7 +501,7 @@ static u8 ceCreateEvent(ocrPolicyDomain_t *self, ocrFatGuid_t *guid,
 }
 
 static void convertDepAddToSatisfy(ocrPolicyDomain_t *self, ocrFatGuid_t dbGuid,
-                                   ocrFatGuid_t destGuid, u32 slot) {
+                                   ocrFatGuid_t destGuid, u32 slot, ocrLocation_t mapping) {
 
     ocrPolicyMsg_t msg;
     getCurrentEnv(NULL, NULL, NULL, &msg);
@@ -480,6 +511,7 @@ static void convertDepAddToSatisfy(ocrPolicyDomain_t *self, ocrFatGuid_t dbGuid,
     PD_MSG_FIELD(guid) = destGuid;
     PD_MSG_FIELD(payload) = dbGuid;
     PD_MSG_FIELD(slot) = slot;
+    PD_MSG_FIELD(mapping) = mapping;
     PD_MSG_FIELD(properties) = 0;
     RESULT_ASSERT(self->fcts.processMessage(self, &msg, false), ==, 0);
 #undef PD_MSG
@@ -549,7 +581,7 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
 #define PRESCRIPTION 0xFEDCBA9876543210LL
         PD_MSG_FIELD(returnDetail) = ceAllocateDb(
             self, &(PD_MSG_FIELD(guid)), &(PD_MSG_FIELD(ptr)), PD_MSG_FIELD(size),
-            PD_MSG_FIELD(properties), msg->srcLocation,
+            PD_MSG_FIELD(properties), msg->srcLocation, PD_MSG_FIELD(dbType),
             PD_MSG_FIELD(affinity), PD_MSG_FIELD(allocator), PRESCRIPTION);
         if(PD_MSG_FIELD(returnDetail) == 0) {
             ocrDataBlock_t *db= PD_MSG_FIELD(guid.metaDataPtr);
@@ -837,6 +869,23 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         break;
     }
 
+    case PD_MSG_GUID_ARRAY_CREATE: {
+        START_PROFILE(pd_ce_GuidArrayCreate);
+#define PD_MSG msg
+#define PD_TYPE PD_MSG_GUID_ARRAY_CREATE
+        ASSERT(PD_MSG_FIELD(size) != 0);
+        ASSERT(PD_MSG_FIELD(count) != 0);
+        // Here we need to create a metadata area as well
+        PD_MSG_FIELD(properties) = self->guidProviders[0]->fcts.createGuidArray(
+            self->guidProviders[0], (PD_MSG_FIELD(guid)), PD_MSG_FIELD(size),
+            PD_MSG_FIELD(count), PD_MSG_FIELD(kind));
+        returnCode = ceProcessResponse(self, msg, 0);
+#undef PD_MSG
+#undef PD_TYPE
+        EXIT_PROFILE;
+        break;
+    }
+
     case PD_MSG_GUID_INFO: {
         START_PROFILE(pd_ce_GuidInfo);
 #define PD_MSG msg
@@ -881,12 +930,39 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         START_PROFILE(pd_ce_Take);
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_COMM_TAKE
-        ASSERT(PD_MSG_FIELD(type) == OCR_GUID_EDT);
         DPRINTF(DEBUG_LVL_VVERB, "COMM_TAKE request from 0x%lx\n",
                 msg->srcLocation);
+#ifdef OCR_SCHEDULER_0_9
+        ASSERT(PD_MSG_FIELD(type) == OCR_GUID_EDT);
         PD_MSG_FIELD(returnDetail) = self->schedulers[0]->fcts.takeEdt(
             self->schedulers[0], &(PD_MSG_FIELD(guidCount)),
             PD_MSG_FIELD(guids));
+#else
+        ocrPolicyDomainCe_t * cePd = (ocrPolicyDomainCe_t*)self;
+        if (PD_MSG_FIELD(type) == OCR_GUID_EDT) {
+            ocrParamListHint_1_0_t hintParam;
+            hintParam.base.type = HINT_PARAM_SCHED_EDT;
+            ocrGuid_t edtGuid = NULL_GUID;
+            PD_MSG_FIELD(returnDetail) = self->schedulers[0]->fcts.take(
+                self->schedulers[0],
+                cePd->curInMsgSrc,
+                &edtGuid,
+                OCR_GUID_EDT,
+                (ocrParamListHint_t*)(&hintParam),
+                PD_MSG_FIELD(properties));
+
+            if (edtGuid == NULL_GUID) {
+                PD_MSG_FIELD(guidCount) = 0;
+            } else {
+                PD_MSG_FIELD(guids)->guid = edtGuid;
+                PD_MSG_FIELD(guidCount) = 1;
+                ASSERT(hintParam.component.guid != NULL_GUID);
+                PD_MSG_FIELD(component) = hintParam.component;
+            }
+        } else {
+            ASSERT(0);
+        }
+#endif
         DPRINTF(DEBUG_LVL_VVERB, "COMM_TAKE response: GUID: 0x%lx (@ 0x%lx, base @ 0x%lx)\n",
                 (PD_MSG_FIELD(guids))->guid, &(PD_MSG_FIELD(guids[0].guid)), msg);
         returnCode = ceProcessResponse(self, msg, 0);
@@ -900,15 +976,49 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         START_PROFILE(pd_ce_Give);
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_COMM_GIVE
-        ASSERT(PD_MSG_FIELD(type) == OCR_GUID_EDT);
         DPRINTF(DEBUG_LVL_VVERB, "COMM_GIVE req/resp from 0x%lx with GUID 0x%lx\n",
                 msg->srcLocation, (PD_MSG_FIELD(guids))->guid);
+#ifdef OCR_SCHEDULER_0_9
+        ASSERT(PD_MSG_FIELD(type) == OCR_GUID_EDT);
         PD_MSG_FIELD(returnDetail) = self->schedulers[0]->fcts.giveEdt(
             self->schedulers[0], &(PD_MSG_FIELD(guidCount)),
             PD_MSG_FIELD(guids));
-        returnCode = ceProcessResponse(self, msg, 0);
+#else
+        ocrPolicyDomainCe_t * cePd = (ocrPolicyDomainCe_t*)self;
+        if (PD_MSG_FIELD(type) == OCR_GUID_EDT) {
+            ASSERT(PD_MSG_FIELD(guidCount) == 1);
+            localDeguidify(self, PD_MSG_FIELD(guids));
+            ocrTask_t *edt = (ocrTask_t*)(PD_MSG_FIELD(guids))->metaDataPtr;
+            ocrHintEdt_t *edtUHint = (ocrHintEdt_t*)edt->uHints;
+            ocrHintEdt_t *edtIHint = (ocrHintEdt_t*)edt->iHints;
+
+            ocrParamListHint_1_0_t hintParam;
+            hintParam.base.type = HINT_PARAM_SCHED_EDT;
+            hintParam.priority = edtUHint->priority;
+            hintParam.component.guid = edtIHint->affinity;
+            hintParam.component.metaDataPtr = NULL;
+            localDeguidify(self, &(hintParam.component));
+            hintParam.mapping = edtIHint->mapping;
+            edt->mapping = edtIHint->mapping; //FIXME: hack to get DHS/DMS numbers
+
+/*fprintf(stderr,"[%lu]GIVE: EDT: %s mapping: %ld Affinity: 0x%p Priority: %u\n", (u64)cePd->curInMsgSrc, edt->name,
+(long)hintParam.mapping, hintParam.component.metaDataPtr, hintParam.priority);*/
+
+            PD_MSG_FIELD(returnDetail) = self->schedulers[0]->fcts.give(
+                self->schedulers[0],
+                cePd->curInMsgSrc,
+                (PD_MSG_FIELD(guids))->guid,
+                OCR_GUID_EDT,
+                (ocrParamListHint_t*)(&hintParam),
+                PD_MSG_FIELD(properties));
+
+        } else {
+            ASSERT(0);
+        }
+#endif
 #undef PD_MSG
 #undef PD_TYPE
+        returnCode = ceProcessResponse(self, msg, 0);
         EXIT_PROFILE;
         break;
     }
@@ -932,7 +1042,7 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         ocrFatGuid_t dest = PD_MSG_FIELD(dest);
         if(srcKind == OCR_GUID_DB) {
             // This is equivalent to an immediate satisfy
-            convertDepAddToSatisfy(self, src, dest, PD_MSG_FIELD(slot));
+            convertDepAddToSatisfy(self, src, dest, PD_MSG_FIELD(slot), PD_MSG_FIELD(mapping));
         } else {
             if(srcKind == OCR_GUID_EVENT) {
                 ocrEvent_t *evt = (ocrEvent_t*)(src.metaDataPtr);
@@ -1064,14 +1174,15 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         if(dstKind == OCR_GUID_EVENT) {
             ocrEvent_t *evt = (ocrEvent_t*)(dst.metaDataPtr);
             ASSERT(evt->fctId == self->eventFactories[0]->factoryId);
-            self->eventFactories[0]->fcts[evt->kind].satisfy(
-                evt, PD_MSG_FIELD(payload), PD_MSG_FIELD(slot));
+            PD_MSG_FIELD(returnDetail) = self->eventFactories[0]->fcts[evt->kind].satisfy(
+                evt, PD_MSG_FIELD(payload), PD_MSG_FIELD(slot), PD_MSG_FIELD(mapping));
         } else {
             if(dstKind == OCR_GUID_EDT) {
                 ocrTask_t *edt = (ocrTask_t*)(dst.metaDataPtr);
                 ASSERT(edt->fctId == self->taskFactories[0]->factoryId);
-                self->taskFactories[0]->fcts.satisfy(
-                    edt, PD_MSG_FIELD(payload), PD_MSG_FIELD(slot));
+                localDeguidify(self, &PD_MSG_FIELD(payload));
+                PD_MSG_FIELD(returnDetail) = self->taskFactories[0]->fcts.satisfy(
+                    edt, PD_MSG_FIELD(payload), PD_MSG_FIELD(slot), PD_MSG_FIELD(mapping));
             } else {
                 ASSERT(0); // We can't satisfy anything else
             }
@@ -1130,6 +1241,158 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
     case PD_MSG_SAL_WRITE: {
         DPRINTF(DEBUG_LVL_WARN, "CE PD does not yet implement WRITE (FIXME)\n");
         ASSERT(0);
+    }
+
+    case PD_MSG_HINT_CREATE: {
+        START_PROFILE(pd_ce_HintCreate);
+#define PD_MSG msg
+#define PD_TYPE PD_MSG_HINT_CREATE
+        ocrHintFactory_t * hintFact = (ocrHintFactory_t*)(self->hintFactories[0]);
+        ocrHint_t *hint = hintFact->instantiate(hintFact, PD_MSG_FIELD(type), PD_MSG_FIELD(properties));
+        PD_MSG_FIELD(guid.guid) = hint->guid;
+        PD_MSG_FIELD(guid.metaDataPtr) = hint;
+        returnCode = ceProcessResponse(self, msg, 0);
+#undef PD_MSG
+#undef PD_TYPE
+        EXIT_PROFILE;
+        break;
+    }
+
+    case PD_MSG_HINT_OP: {
+        START_PROFILE(pd_ce_HintOp);
+#define PD_MSG msg
+#define PD_TYPE PD_MSG_HINT_OP
+        localDeguidify(self, &(PD_MSG_FIELD(guid)));
+        ocrHint_t * hint = (ocrHint_t*)(PD_MSG_FIELD(guid.metaDataPtr));
+        ASSERT(hint);
+        ocrHintFactory_t * hintFact = (ocrHintFactory_t*)(self->hintFactories[0]);
+        switch(HINT_PROP_OP(PD_MSG_FIELD(properties))) {
+        case HINT_PROP_SET_PRIORITY:
+            hintFact->fcts.setPriority(hint, (u32)PD_MSG_FIELD(arg1.guid));
+            break;
+        case HINT_PROP_SET_AFFINITY:
+            hintFact->fcts.setAffinity(hint, PD_MSG_FIELD(arg1.guid));
+            break;
+        case HINT_PROP_SET_DEP_WEIGHT:
+            hintFact->fcts.setDepWeight(hint, (u32)PD_MSG_FIELD(arg1.guid), (u32)PD_MSG_FIELD(arg2.guid));
+            break;
+        default:
+            ASSERT(0);
+            break;
+        }
+        returnCode = ceProcessResponse(self, msg, 0);
+#undef PD_MSG
+#undef PD_TYPE
+        EXIT_PROFILE;
+        break;
+    }
+
+    case PD_MSG_HINT_INITIALIZE: {
+        START_PROFILE(pd_ce_HintInitialize);
+#define PD_MSG msg
+#define PD_TYPE PD_MSG_HINT_INITIALIZE
+        ocrHint_t *hint = NULL;
+        ocrHint_t *otherHint = NULL;
+        localDeguidify(self, &(PD_MSG_FIELD(guid)));
+        switch(PD_MSG_FIELD(type)) {
+        case OCR_HINT_EDT: {
+            localDeguidify(self, &(PD_MSG_FIELD(extra)));
+            ocrTask_t* edt = (ocrTask_t*)PD_MSG_FIELD(guid.metaDataPtr);
+            ocrTaskTemplate_t* edtTemp = (ocrTaskTemplate_t*)PD_MSG_FIELD(extra.metaDataPtr);
+            hint = (PD_MSG_FIELD(properties) & HINT_PROP_USER) ? (ocrHint_t*)edt->uHints : (ocrHint_t*)edt->iHints;
+            otherHint = (PD_MSG_FIELD(properties) & HINT_PROP_USER) ? (ocrHint_t*)edtTemp->uHints : (ocrHint_t*)edtTemp->iHints;
+            }
+            break;
+        case OCR_HINT_EDT_TEMPLATE: {
+            ocrTaskTemplate_t* edtTemp = (ocrTaskTemplate_t*)PD_MSG_FIELD(guid.metaDataPtr);
+            hint = (PD_MSG_FIELD(properties) & HINT_PROP_USER) ? (ocrHint_t*)edtTemp->uHints : (ocrHint_t*)edtTemp->iHints;
+            }
+            break;
+        default:
+            ASSERT(0);
+            break;
+        }
+        self->hintFactories[0]->fcts.initialize(hint, PD_MSG_FIELD(type), PD_MSG_FIELD(properties), otherHint);
+        returnCode = ceProcessResponse(self, msg, 0);
+#undef PD_MSG
+#undef PD_TYPE
+        EXIT_PROFILE;
+        break;
+    }
+
+    case PD_MSG_HINT_SET: {
+        START_PROFILE(pd_ce_HintSet);
+#define PD_MSG msg
+#define PD_TYPE PD_MSG_HINT_SET
+        ASSERT(PD_MSG_FIELD(properties) & HINT_PROP_USER);
+        localDeguidify(self, &(PD_MSG_FIELD(hint)));
+        ocrHint_t * hint = (ocrHint_t*)(PD_MSG_FIELD(hint.metaDataPtr));
+        ocrGuidKind guidKind;
+        self->guidProviders[0]->fcts.getVal(self->guidProviders[0], PD_MSG_FIELD(guid.guid), (u64*)(&(PD_MSG_FIELD(guid.metaDataPtr))), &guidKind);
+        if (guidKind == OCR_GUID_EDT_TEMPLATE) {
+            ASSERT(hint->type == OCR_HINT_EDT_TEMPLATE);
+            ocrTaskTemplate_t *tTemplate = (ocrTaskTemplate_t*)(PD_MSG_FIELD(guid.metaDataPtr));
+            self->hintFactories[0]->fcts.setHint((ocrHint_t*)tTemplate->uHints, hint);
+        } else {
+            ASSERT(0);
+            PD_MSG_FIELD(returnDetail) = OCR_ENOTSUP;
+        }
+        returnCode = ceProcessResponse(self, msg, 0);
+#undef PD_MSG
+#undef PD_TYPE
+        EXIT_PROFILE;
+        break;
+    }
+
+    case PD_MSG_HINT_GET: {
+        START_PROFILE(pd_ce_HintGet);
+#define PD_MSG msg
+#define PD_TYPE PD_MSG_HINT_GET
+        ASSERT(PD_MSG_FIELD(properties) & HINT_PROP_USER);
+        ocrGuidKind guidKind;
+        self->guidProviders[0]->fcts.getVal(self->guidProviders[0], PD_MSG_FIELD(guid.guid), (u64*)(&(PD_MSG_FIELD(guid.metaDataPtr))), &guidKind);
+        if (guidKind == OCR_GUID_EDT_TEMPLATE) {
+            ocrTaskTemplate_t *tTemplate = (ocrTaskTemplate_t*)(PD_MSG_FIELD(guid.metaDataPtr));
+            ocrHint_t * hint = self->hintFactories[0]->fcts.getHint((ocrHint_t*)tTemplate->uHints);
+            PD_MSG_FIELD(hint.guid) = hint->guid;
+        } else {
+            ASSERT(0);
+            PD_MSG_FIELD(returnDetail) = OCR_ENOTSUP;
+        }
+        returnCode = ceProcessResponse(self, msg, 0);
+#undef PD_MSG
+#undef PD_TYPE
+        EXIT_PROFILE;
+        break;
+    }
+
+    case PD_MSG_HINT_INTROSPECTION: {
+        START_PROFILE(pd_ce_HintIntrospection);
+#define PD_MSG msg
+#define PD_TYPE PD_MSG_HINT_INTROSPECTION
+        localDeguidify(self, &(PD_MSG_FIELD(guid)));
+        switch(PD_MSG_FIELD(properties)) {
+        case HINT_INTROSPECTION_SATISFY_EDT: {
+            ocrTask_t* edt = (ocrTask_t*)PD_MSG_FIELD(guid.metaDataPtr);
+            ocrHintEdt_t * edtHint = (ocrHintEdt_t*)edt->iHints;
+            u32 slot = PD_MSG_FIELD(extra);
+            if (edtHint->dominantDbSlot == slot) {
+                ASSERT(edtHint->mapping == INVALID_LOCATION);
+                ASSERT(edtHint->affinity == NULL_GUID);
+                edtHint->mapping = PD_MSG_FIELD(location);
+                edtHint->affinity = PD_MSG_FIELD(arg.guid);
+            }
+            }
+            break;
+        default:
+            ASSERT(0);
+            break;
+        }
+        returnCode = ceProcessResponse(self, msg, 0);
+#undef PD_MSG
+#undef PD_TYPE
+        EXIT_PROFILE;
+        break;
     }
 
     default:

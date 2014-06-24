@@ -25,7 +25,9 @@ typedef enum {
     OCR_GUID_COMPTARGET = 9,
     OCR_GUID_SCHEDULER = 10,
     OCR_GUID_WORKPILE = 11,
-    OCR_GUID_COMM = 12
+    OCR_GUID_COMM = 12,
+    OCR_GUID_HINT = 13,
+    OCR_GUID_COMPONENT = 14
 } ocrGuidKind;
 
 #endif /* __OCR_GUID_KIND_H__ */

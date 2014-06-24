@@ -29,6 +29,9 @@
 #include "task/task-all.h"
 #include "worker/worker-all.h"
 #include "workpile/workpile-all.h"
+#include "cost-mapper/cost-mapper-all.h"
+#include "hint/hint-all.h"
+#include "component/component-all.h"
 
 #include "ocr-sysboot.h"
 
@@ -213,6 +216,9 @@ char* populate_type(ocrParamList_t **type_param, type_enum index, dictionary *di
     case comptarget_type:
         ALLOC_PARAM_LIST(*type_param, paramListCompTargetFact_t);
         break;
+    case costmapper_type:
+        ALLOC_PARAM_LIST(*type_param, paramListCostMapperFact_t);
+        break;
     case workpile_type:
         ALLOC_PARAM_LIST(*type_param, paramListWorkpileFact_t);
         break;
@@ -239,6 +245,12 @@ char* populate_type(ocrParamList_t **type_param, type_enum index, dictionary *di
         break;
     case commplatform_type:
         ALLOC_PARAM_LIST(*type_param, paramListCommPlatformFact_t);
+        break;
+    case hintfactory_type:
+        ALLOC_PARAM_LIST(*type_param, paramListHintFact_t);
+        break;
+    case componentfactory_type:
+        ALLOC_PARAM_LIST(*type_param, paramListComponentFact_t);
         break;
     default:
         DPRINTF(DEBUG_LVL_WARN, "Error: %d index unexpected\n", index);
@@ -335,6 +347,18 @@ ocrCompTargetFactory_t *create_factory_comptarget(char *name, ocrParamList_t *pa
     }
 }
 
+ocrCostMapperFactory_t *create_factory_costmapper(char *name, ocrParamList_t *paramlist) {
+    costMapperType_t mytype = costMapperMax_id;
+    TO_ENUM (mytype, name, costMapperType_t, costMapper_types, costMapperMax_id);
+    if (mytype == costMapperMax_id) {
+        DPRINTF(DEBUG_LVL_WARN, "Unrecognized type %s\n", name);
+        return NULL;
+    } else {
+        DPRINTF(DEBUG_LVL_INFO, "Creating a costmapper factory of type %d\n", mytype);
+        return (ocrCostMapperFactory_t *)newCostMapperFactory(mytype, paramlist);
+    }
+}
+
 ocrWorkpileFactory_t *create_factory_workpile(char *name, ocrParamList_t *paramlist) {
     workpileType_t mytype = workpileMax_id;
     TO_ENUM (mytype, name, workpileType_t, workpile_types, workpileMax_id);
@@ -380,6 +404,30 @@ ocrPolicyDomainFactory_t *create_factory_policydomain(char *name, ocrParamList_t
     } else {
         DPRINTF(DEBUG_LVL_INFO, "Creating a worker factory of type %d\n", mytype);
         return (ocrPolicyDomainFactory_t *)newPolicyDomainFactory(mytype, paramlist);
+    }
+}
+
+ocrHintFactory_t *create_factory_hint(char *name, ocrParamList_t *paramlist) {
+    hintType_t mytype = hintMax_id;
+    TO_ENUM (mytype, name, hintType_t, hint_types, hintMax_id);
+    if (mytype == hintMax_id) {
+        DPRINTF(DEBUG_LVL_INFO, "Unrecognized type %s\n", name);
+        return NULL;
+    } else {
+        DPRINTF(DEBUG_LVL_INFO, "Creating a hint factory of type %d\n", mytype);
+        return (ocrHintFactory_t *)newHintFactory(mytype, paramlist);
+    }
+}
+
+ocrComponentFactory_t *create_factory_component(char *name, ocrParamList_t *paramlist) {
+    componentType_t mytype = componentMax_id;
+    TO_ENUM (mytype, name, componentType_t, component_types, componentMax_id);
+    if (mytype == componentMax_id) {
+        DPRINTF(DEBUG_LVL_INFO, "Unrecognized type %s\n", name);
+        return NULL;
+    } else {
+        DPRINTF(DEBUG_LVL_INFO, "Creating a component factory of type %d\n", mytype);
+        return (ocrComponentFactory_t *)newComponentFactory(mytype, paramlist);
     }
 }
 
@@ -471,6 +519,9 @@ void *create_factory (type_enum index, char *factory_name, ocrParamList_t *param
     case comptarget_type:
         new_factory = (void *)create_factory_comptarget(factory_name, paramlist);
         break;
+    case costmapper_type:
+        new_factory = (void *)create_factory_costmapper(factory_name, paramlist);
+        break;
     case workpile_type:
         new_factory = (void *)create_factory_workpile(factory_name, paramlist);
         break;
@@ -482,6 +533,12 @@ void *create_factory (type_enum index, char *factory_name, ocrParamList_t *param
         break;
     case policydomain_type:
         new_factory = (void *)create_factory_policydomain(factory_name, paramlist);
+        break;
+    case hintfactory_type:
+        new_factory = (void *)create_factory_hint(factory_name, paramlist);
+        break;
+    case componentfactory_type:
+        new_factory = (void *)create_factory_component(factory_name, paramlist);
         break;
     case taskfactory_type:
         new_factory = (void *)create_factory_task(factory_name, paramlist);
@@ -684,6 +741,14 @@ s32 populate_inst(ocrParamList_t **inst_param, void **instance, s32 *type_counts
                 DPRINTF(DEBUG_LVL_INFO, "Created comptarget of type %s, index %d\n", inststr, j);
         }
         break;
+    case costmapper_type:
+        for (j = low; j<=high; j++) {
+            ALLOC_PARAM_LIST(inst_param[j], paramListCostMapperInst_t);
+            instance[j] = (void *)((ocrCostMapperFactory_t *)factory)->instantiate(factory, inst_param[j]);
+            if (instance[j])
+                DPRINTF(DEBUG_LVL_INFO, "Created costmapper of type %s, index %d\n", inststr, j);
+        }
+        break;
     case workpile_type:
         for (j = low; j<=high; j++) {
             ALLOC_PARAM_LIST(inst_param[j], paramListWorkpileInst_t);
@@ -765,7 +830,7 @@ s32 populate_inst(ocrParamList_t **inst_param, void **instance, s32 *type_counts
             schedulerType_t mytype = -1;
             TO_ENUM (mytype, inststr, schedulerType_t, scheduler_types, schedulerMax_id);
             switch (mytype) {
-#ifdef ENABLE_SCHEDULER_HC
+#ifdef ENABLE_SCHEDULER_HC_0_9
             case schedulerHc_id: {
                 ALLOC_PARAM_LIST(inst_param[j], paramListSchedulerHcInst_t);
                 snprintf(key, MAX_KEY_SZ, "%s:%s", secname, "workeridfirst");
@@ -809,6 +874,12 @@ s32 populate_inst(ocrParamList_t **inst_param, void **instance, s32 *type_counts
                     ((paramListPolicyDomainHcInst_t *)inst_param[j])->rank = (u32)value;
                 } else {
                     ((paramListPolicyDomainHcInst_t *)inst_param[j])->rank = (u32)-1;
+                }
+                if (key_exists(dict, secname, "neighborcount")) {
+                    value = get_key_value(dict, secname, "neighborcount", j-low);
+                    ((paramListPolicyDomainHcInst_t *)inst_param[j])->neighborCount = (u32)value;
+                } else {
+                    ((paramListPolicyDomainHcInst_t *)inst_param[j])->neighborCount = (u32)0;
                 }
             }
             break;
@@ -860,6 +931,7 @@ void add_dependence (type_enum fromtype, type_enum totype, void *frominstance, o
     case memplatform_type:
     case commplatform_type:
     case compplatform_type:
+    case costmapper_type:
     case workpile_type:
         DPRINTF(DEBUG_LVL_WARN, "Unexpected: this type should have no dependences! (incorrect dependence: %d to %d)\n", fromtype, totype);
         break;
@@ -917,6 +989,14 @@ void add_dependence (type_enum fromtype, type_enum totype, void *frominstance, o
         ocrScheduler_t *f = (ocrScheduler_t *)frominstance;
         DPRINTF(DEBUG_LVL_INFO, "Scheduler %d to %d\n", fromtype, totype);
         switch (totype) {
+        case costmapper_type: {
+            if (f->costmapperCount == 0) {
+                f->costmapperCount = dependence_count;
+                f->costmappers = (ocrCostMapper_t **)runtimeChunkAlloc(dependence_count * sizeof(ocrCostMapper_t *), NULL);
+            }
+            f->costmappers[dependence_index] = (ocrCostMapper_t *)toinstance;
+            break;
+        }
         case workpile_type: {
             if (f->workpileCount == 0) {
                 f->workpileCount = dependence_count;
@@ -973,6 +1053,22 @@ void add_dependence (type_enum fromtype, type_enum totype, void *frominstance, o
                 f->schedulers = (ocrScheduler_t **)runtimeChunkAlloc(dependence_count * sizeof(ocrScheduler_t *), NULL);
             }
             f->schedulers[dependence_index] = (ocrScheduler_t *)toinstance;
+            break;
+        }
+        case hintfactory_type: {
+            if (f->hintFactories == NULL) {
+                f->hintFactoryCount = dependence_count;
+                f->hintFactories = (ocrHintFactory_t **)runtimeChunkAlloc(dependence_count * sizeof(ocrHintFactory_t *), NULL);
+            }
+            f->hintFactories[dependence_index] = (ocrHintFactory_t *)toinstance;
+            break;
+        }
+        case componentfactory_type: {
+            if (f->componentFactories == NULL) {
+                f->componentFactoryCount = dependence_count;
+                f->componentFactories = (ocrComponentFactory_t **)runtimeChunkAlloc(dependence_count * sizeof(ocrComponentFactory_t *), NULL);
+            }
+            f->componentFactories[dependence_index] = (ocrComponentFactory_t *)toinstance;
             break;
         }
         case taskfactory_type: {

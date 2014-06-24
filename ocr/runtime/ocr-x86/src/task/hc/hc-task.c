@@ -17,6 +17,7 @@
 #include "ocr-sysboot.h"
 #include "ocr-task.h"
 #include "ocr-worker.h"
+#include "ocr-hint.h"
 #include "task/hc/hc-task.h"
 #include "utils/ocr-utils.h"
 
@@ -73,6 +74,10 @@ ocrTaskTemplate_t * newTaskTemplateHc(ocrTaskTemplateFactory_t* factory, ocrEdt_
 
     ocrPolicyDomain_t *pd = NULL;
     ocrPolicyMsg_t msg;
+    u32 sizeofHint = 0;
+    paramListTaskTemplate_t * paramTemplate = (paramListTaskTemplate_t *)perInstance;
+    if (paramTemplate)
+        sizeofHint = paramTemplate->sizeofUHint + paramTemplate->sizeofIHint;
 
     getCurrentEnv(&pd, NULL, NULL, &msg);
 #define PD_MSG (&msg)
@@ -80,7 +85,7 @@ ocrTaskTemplate_t * newTaskTemplateHc(ocrTaskTemplateFactory_t* factory, ocrEdt_
     msg.type = PD_MSG_GUID_CREATE | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
     PD_MSG_FIELD(guid.guid) = NULL_GUID;
     PD_MSG_FIELD(guid.metaDataPtr) = NULL;
-    PD_MSG_FIELD(size) = sizeof(ocrTaskTemplateHc_t);
+    PD_MSG_FIELD(size) = sizeof(ocrTaskTemplateHc_t) + sizeofHint;
     PD_MSG_FIELD(kind) = OCR_GUID_EDT_TEMPLATE;
     PD_MSG_FIELD(properties) = 0;
 
@@ -99,6 +104,34 @@ ocrTaskTemplate_t * newTaskTemplateHc(ocrTaskTemplateFactory_t* factory, ocrEdt_
     base->name = fctName;
 #endif
     base->fctId = factory->factoryId;
+    if (sizeofHint > 0) {
+        base->uHints = (u64)((u64)base + sizeof(ocrTaskTemplateHc_t));
+        base->iHints = (u64)((u64)base + sizeof(ocrTaskTemplateHc_t) +  + paramTemplate->sizeofUHint);
+#define PD_MSG (&msg)
+#define PD_TYPE PD_MSG_HINT_INITIALIZE
+        msg.type = PD_MSG_HINT_INITIALIZE | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
+        PD_MSG_FIELD(guid.guid) = base->guid;
+        PD_MSG_FIELD(guid.metaDataPtr) = base;
+        PD_MSG_FIELD(type) = OCR_HINT_EDT_TEMPLATE;
+        PD_MSG_FIELD(properties) = HINT_PROP_USER;
+        PD_MSG_FIELD(extra.guid) = NULL_GUID;
+        PD_MSG_FIELD(extra.metaDataPtr) = NULL;
+        RESULT_ASSERT(pd->fcts.processMessage(pd, &msg, true), ==, 0);
+
+        msg.type = PD_MSG_HINT_INITIALIZE | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
+        PD_MSG_FIELD(guid.guid) = base->guid;
+        PD_MSG_FIELD(guid.metaDataPtr) = base;
+        PD_MSG_FIELD(type) = OCR_HINT_EDT_TEMPLATE;
+        PD_MSG_FIELD(properties) = HINT_PROP_RUNTIME;
+        PD_MSG_FIELD(extra.guid) = NULL_GUID;
+        PD_MSG_FIELD(extra.metaDataPtr) = NULL;
+        RESULT_ASSERT(pd->fcts.processMessage(pd, &msg, true), ==, 0);
+#undef PD_MSG
+#undef PD_TYPE
+    } else {
+        base->uHints = (u64)NULL;
+        base->iHints = (u64)NULL;
+    }
 
 #ifdef OCR_ENABLE_STATISTICS
     {
@@ -124,12 +157,29 @@ ocrTaskTemplate_t * newTaskTemplateHc(ocrTaskTemplateFactory_t* factory, ocrEdt_
     if(gDbWeights) {
       int i;
       for(i = 0; ; i++) {
-	if(gDbWeights[i].fname == NULL) break;
-	if(!ocrStrcmp((u8*)fctName, gDbWeights[i].fname)) {
-	  base->dbWeights = &(gDbWeights[i]);
-	  break;
-	}
+        if(gDbWeights[i].fname == NULL) break;
+        if(!ocrStrcmp((u8*)fctName, gDbWeights[i].fname)) {
+          base->dbWeights = &(gDbWeights[i]);
+          break;
+        }
       }
+    }
+
+    if (base->dbWeights != NULL) {
+        u32 i;
+        for (i = 0; i < OCR_PROFILE_NUM_SLOTS; i++) {
+#define PD_MSG (&msg)
+#define PD_TYPE PD_MSG_HINT_OP
+            msg.type = PD_MSG_HINT_OP | PD_MSG_REQUEST;
+            PD_MSG_FIELD(guid.guid) = NULL_GUID;
+            PD_MSG_FIELD(guid.metaDataPtr) = (void*)base->iHints;
+            PD_MSG_FIELD(properties) = HINT_PROP_SET_DEP_WEIGHT | HINT_PROP_RUNTIME;
+            PD_MSG_FIELD(arg1.guid) = (ocrGuid_t)base->dbWeights->slots[i];
+            PD_MSG_FIELD(arg2.guid) = (ocrGuid_t)base->dbWeights->weights[i];
+            RESULT_ASSERT(pd->fcts.processMessage(pd, &msg, true), ==, 0);
+#undef PD_MSG
+#undef PD_TYPE
+        }
     }
 #endif
 
@@ -292,13 +342,12 @@ static u8 taskSchedule(ocrTask_t *self) {
     getCurrentEnv(&pd, NULL, NULL, &msg);
 
     ocrFatGuid_t toGive = {.guid = self->guid, .metaDataPtr = self};
-
 #define PD_MSG (&msg)
 #define PD_TYPE PD_MSG_COMM_GIVE
     msg.type = PD_MSG_COMM_GIVE | PD_MSG_REQUEST;
     PD_MSG_FIELD(guids) = &toGive;
     PD_MSG_FIELD(guidCount) = 1;
-    PD_MSG_FIELD(properties) = 0;
+    PD_MSG_FIELD(properties) = SCHED_PROP_READY;
     PD_MSG_FIELD(type) = OCR_GUID_EDT;
     RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, false));
 #undef PD_MSG
@@ -346,6 +395,10 @@ ocrTask_t * newTaskHc(ocrTaskFactory_t* factory, ocrFatGuid_t edtTemplate,
     ocrPolicyDomain_t *pd = NULL;
     ocrPolicyMsg_t msg;
     u32 i;
+    u32 sizeofHint = 0;
+    paramListTask_t * paramTask = (paramListTask_t *)perInstance;
+    if (paramTask)
+        sizeofHint = paramTask->sizeofUHint + paramTask->sizeofIHint;
 
     getCurrentEnv(&pd, NULL, NULL, &msg);
 
@@ -381,7 +434,7 @@ ocrTask_t * newTaskHc(ocrTaskFactory_t* factory, ocrFatGuid_t edtTemplate,
     PD_MSG_FIELD(guid.guid) = NULL_GUID;
     PD_MSG_FIELD(guid.metaDataPtr) = NULL;
     // We allocate everything in the meta-data to keep things simple
-    PD_MSG_FIELD(size) = sizeof(ocrTaskHc_t) + paramc*sizeof(u64) + depc*sizeof(regNode_t);
+    PD_MSG_FIELD(size) = sizeof(ocrTaskHc_t) + paramc*sizeof(u64) + depc*sizeof(regNode_t) + sizeofHint;
     PD_MSG_FIELD(kind) = OCR_GUID_EDT;
     PD_MSG_FIELD(properties) = 0;
     RESULT_PROPAGATE2(pd->fcts.processMessage(pd, &msg, true), NULL);
@@ -393,10 +446,11 @@ ocrTask_t * newTaskHc(ocrTaskFactory_t* factory, ocrFatGuid_t edtTemplate,
     base->guid = PD_MSG_FIELD(guid.guid);
     base->templateGuid = edtTemplate.guid;
     ASSERT(edtTemplate.metaDataPtr); // For now we just assume it is passed whole
-    base->funcPtr = ((ocrTaskTemplate_t*)(edtTemplate.metaDataPtr))->executePtr;
+    ocrTaskTemplate_t * pEdtTemplate = (ocrTaskTemplate_t *)edtTemplate.metaDataPtr;
+    base->funcPtr = pEdtTemplate->executePtr;
     base->paramv = (u64*)((u64)base + sizeof(ocrTaskHc_t));
 #ifdef OCR_ENABLE_EDT_NAMING
-    base->name = ((ocrTaskTemplate_t*)(edtTemplate.metaDataPtr))->name;
+    base->name = pEdtTemplate->name;
 #endif
     base->outputEvent = outputEvent.guid;
     base->finishLatch = NULL_GUID;
@@ -411,6 +465,8 @@ ocrTask_t * newTaskHc(ocrTaskFactory_t* factory, ocrFatGuid_t edtTemplate,
     for(i = 0; i < paramc; ++i) {
         base->paramv[i] = paramv[i];
     }
+    base->mapping = INVALID_LOCATION;
+    base->component = NULL_GUID;
 
     edt->signalers = (regNode_t*)((u64)edt + sizeof(ocrTaskHc_t) + paramc*sizeof(u64));
     // Initialize the signalers properly
@@ -434,6 +490,49 @@ ocrTask_t * newTaskHc(ocrTaskFactory_t* factory, ocrFatGuid_t edtTemplate,
     }
 #undef PD_MSG
 #undef PD_TYPE
+
+    //setup hints
+    if (sizeofHint > 0) {
+        base->uHints = (u64)((u64)base + sizeof(ocrTaskHc_t) + paramc*sizeof(u64) + depc*sizeof(regNode_t));
+        base->iHints = (u64)((u64)base + sizeof(ocrTaskHc_t) + paramc*sizeof(u64) + depc*sizeof(regNode_t) + paramTask->sizeofUHint);
+#define PD_MSG (&msg)
+#define PD_TYPE PD_MSG_HINT_INITIALIZE
+        msg.type = PD_MSG_HINT_INITIALIZE | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
+        PD_MSG_FIELD(guid.guid) = base->guid;
+        PD_MSG_FIELD(guid.metaDataPtr) = base;
+        PD_MSG_FIELD(type) = OCR_HINT_EDT;
+        PD_MSG_FIELD(properties) = HINT_PROP_USER;
+        PD_MSG_FIELD(extra.guid) = pEdtTemplate->guid;
+        PD_MSG_FIELD(extra.metaDataPtr) = pEdtTemplate;
+        RESULT_ASSERT(pd->fcts.processMessage(pd, &msg, true), ==, 0);
+
+        msg.type = PD_MSG_HINT_INITIALIZE | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
+        PD_MSG_FIELD(guid.guid) = base->guid;
+        PD_MSG_FIELD(guid.metaDataPtr) = base;
+        PD_MSG_FIELD(type) = OCR_HINT_EDT;
+        PD_MSG_FIELD(properties) = HINT_PROP_RUNTIME;
+        PD_MSG_FIELD(extra.guid) = pEdtTemplate->guid;
+        PD_MSG_FIELD(extra.metaDataPtr) = pEdtTemplate;
+        RESULT_ASSERT(pd->fcts.processMessage(pd, &msg, true), ==, 0);
+#undef PD_MSG
+#undef PD_TYPE
+
+        if (affinity.guid != NULL_GUID) {
+#define PD_MSG (&msg)
+#define PD_TYPE PD_MSG_HINT_OP
+            msg.type = PD_MSG_HINT_OP | PD_MSG_REQUEST;
+            PD_MSG_FIELD(guid.guid) = NULL_GUID;
+            PD_MSG_FIELD(guid.metaDataPtr) = (void*)base->uHints;
+            PD_MSG_FIELD(properties) = HINT_PROP_SET_AFFINITY | HINT_PROP_USER;
+            PD_MSG_FIELD(arg1) = affinity;
+            RESULT_ASSERT(pd->fcts.processMessage(pd, &msg, true), ==, 0);
+#undef PD_MSG
+#undef PD_TYPE
+        }
+    } else {
+        base->uHints = (u64)NULL;
+        base->iHints = (u64)NULL;
+    }
 
 #ifdef OCR_ENABLE_STATISTICS
     // TODO FIXME
@@ -463,7 +562,7 @@ ocrTask_t * newTaskHc(ocrTaskFactory_t* factory, ocrFatGuid_t edtTemplate,
     return base;
 }
 
-u8 satisfyTaskHc(ocrTask_t * base, ocrFatGuid_t data, u32 slot) {
+u8 satisfyTaskHc(ocrTask_t * base, ocrFatGuid_t data, u32 slot, ocrLocation_t mapping) {
     // An EDT has a list of signalers, but only registers
     // incrementally as signals arrive AND on non-persistent
     // events (latch or ONCE)
@@ -493,6 +592,24 @@ u8 satisfyTaskHc(ocrTask_t * base, ocrFatGuid_t data, u32 slot) {
 
     self->signalers[slot].guid = data.guid;
     self->signalers[slot].slot = (u32)-1; // Say that it is satisfied
+
+    if (base->iHints != (u64)NULL && data.guid != NULL_GUID) {
+        ocrDataBlock_t * db = (ocrDataBlock_t*)data.metaDataPtr;
+#define PD_MSG (&msg)
+#define PD_TYPE PD_MSG_HINT_INTROSPECTION
+        msg.type = PD_MSG_HINT_INTROSPECTION | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
+        PD_MSG_FIELD(guid.guid) = base->guid;
+        PD_MSG_FIELD(guid.metaDataPtr) = base;
+        PD_MSG_FIELD(properties) = HINT_INTROSPECTION_SATISFY_EDT;
+        PD_MSG_FIELD(arg.guid) = db->affinity;
+        PD_MSG_FIELD(arg.metaDataPtr) = NULL;
+        PD_MSG_FIELD(location) = mapping;
+        PD_MSG_FIELD(extra) = slot;
+        RESULT_ASSERT(pd->fcts.processMessage(pd, &msg, true), ==, 0);
+#undef PD_MSG
+#undef PD_TYPE
+    }
+
     if(++self->slotSatisfiedCount == base->depc) {
         ++(self->slotSatisfiedCount); // So others don't catch the satisfaction
         hal_unlock32(&(self->lock));
@@ -551,8 +668,9 @@ u8 registerSignalerTaskHc(ocrTask_t * base, ocrFatGuid_t signalerGuid, u32 slot,
             // We need to move the frontier slot over
             hal_lock32(&(self->lock));
             node->guid = signalerGuid.guid;
-            while(++self->frontierSlot < base->depc &&
-                    self->signalers[self->frontierSlot].slot != ++slot) ;
+            while(self->frontierSlot < base->depc &&
+                  self->signalers[self->frontierSlot].slot != self->frontierSlot)
+                  self->frontierSlot++;
 
             // We found a slot that is == to slot (so unsatisfied and not once)
             if(self->frontierSlot < base->depc &&
@@ -689,6 +807,7 @@ u8 taskExecute(ocrTask_t* base) {
     u32 maxAcquiredDb = 0;
 
     ASSERT(derived->unkDbs == NULL); // Should be no dynamically acquired DBs before running
+    ASSERT(base->mapping != INVALID_LOCATION);
 
     if (depc != 0) {
         START_PROFILE(ta_hc_dbAcq);
@@ -876,7 +995,7 @@ ocrTaskFactory_t * newTaskFactoryHc(ocrParamList_t* perInstance, u32 factoryId) 
     base->factoryId = factoryId;
 
     base->fcts.destruct = FUNC_ADDR(u8 (*)(ocrTask_t*), destructTaskHc);
-    base->fcts.satisfy = FUNC_ADDR(u8 (*)(ocrTask_t*, ocrFatGuid_t, u32), satisfyTaskHc);
+    base->fcts.satisfy = FUNC_ADDR(u8 (*)(ocrTask_t*, ocrFatGuid_t, u32, ocrLocation_t), satisfyTaskHc);
     base->fcts.registerSignaler = FUNC_ADDR(u8 (*)(ocrTask_t*, ocrFatGuid_t, u32, bool), registerSignalerTaskHc);
     base->fcts.unregisterSignaler = FUNC_ADDR(u8 (*)(ocrTask_t*, ocrFatGuid_t, u32, bool), unregisterSignalerTaskHc);
     base->fcts.notifyDbAcquire = FUNC_ADDR(u8 (*)(ocrTask_t*, ocrFatGuid_t), notifyDbAcquireTaskHc);

@@ -30,11 +30,7 @@ typedef struct _paramListDataBlockFact_t {
 
 typedef struct _paramListDataBlockInst_t {
     ocrParamList_t base;    /**< Base class */
-    ocrGuid_t allocator;    /**< Allocator that created this data-block */
-    ocrGuid_t allocPD;      /**< Policy-domain of the allocator */
-    u64 size;               /**< data-block size */
-    void* ptr;              /**< Initial location for the data-block */
-    u32 properties;         /**< Properties for the data-block */
+    ocrGuid_t affinity;     /**< Guid of affinity component for this DB */
 } paramListDataBlockInst_t;
 
 
@@ -158,6 +154,7 @@ typedef struct _ocrDataBlock_t {
     void* ptr;              /**< Current location for this data-block */
     u32 properties;         /**< Properties for the data-block */
     u32 fctId;              /**< ID determining which functions to use */
+    ocrGuid_t affinity;     /**< Guid of affinity component for this DB */
 } ocrDataBlock_t;
 
 
@@ -179,6 +176,7 @@ typedef struct _ocrDataBlockFactory_t {
      * @param ptr           Pointer to the memory to use (created through an allocator)
      * @param properties    Properties for the data-block
      * @param instanceArg   Arguments specific for this instance
+     *                      Used primarily for hints
      **/
     ocrDataBlock_t* (*instantiate)(struct _ocrDataBlockFactory_t *factory,
                                    ocrFatGuid_t allocator, ocrFatGuid_t allocPD,

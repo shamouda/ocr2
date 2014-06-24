@@ -12,6 +12,7 @@
 
 #include "ocr-guid.h"
 #include "utils/ocr-utils.h"
+#include "ocr-hint.h"
 #include "ocr-task.h"
 #include "ocr-event.h"
 #include "ocr-comp-target.h"

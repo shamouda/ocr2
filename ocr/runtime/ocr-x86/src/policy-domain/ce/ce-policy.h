@@ -12,6 +12,7 @@
 
 #include "ocr-policy-domain.h"
 #include "utils/ocr-utils.h"
+#include "hint/hint-1-0/hint-1-0.h"
 
 /******************************************************/
 /* OCR-CE POLICY DOMAIN                               */
@@ -24,6 +25,7 @@ typedef struct {
 typedef struct {
     ocrPolicyDomain_t base;
     u64 shutdownCount;
+    ocrLocation_t curInMsgSrc;
 } ocrPolicyDomainCe_t;
 
 typedef struct {

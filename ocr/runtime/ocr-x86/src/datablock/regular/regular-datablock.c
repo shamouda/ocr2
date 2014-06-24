@@ -262,6 +262,7 @@ ocrDataBlock_t* newDataBlockRegular(ocrDataBlockFactory_t *factory, ocrFatGuid_t
     result->base.ptr = ptr;
     result->base.properties = properties;
     result->base.fctId = factory->factoryId;
+    result->base.affinity = (perInstance) ? ((paramListDataBlockInst_t*)perInstance)->affinity : NULL_GUID;
 
     result->lock =0;
     result->attributes.flags = result->base.properties;

@@ -20,6 +20,8 @@
 #include "ocr-scheduler.h"
 #include "ocr-worker.h"
 #include "ocr-workpile.h"
+#include "ocr-cost-mapper.h"
+#include "ocr-component.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -35,6 +37,7 @@ typedef enum {
     commplatform_type,
     compplatform_type,
     comptarget_type,
+    costmapper_type,
     workpile_type,
     worker_type,
     scheduler_type,
@@ -45,6 +48,8 @@ typedef enum {
     tasktemplatefactory_type,
     datablockfactory_type,
     eventfactory_type,
+    hintfactory_type,
+    componentfactory_type,
 } type_enum;
 
 /* Dependence information (from->to) referenced by refstr */

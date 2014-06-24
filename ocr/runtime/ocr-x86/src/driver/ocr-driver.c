@@ -36,6 +36,7 @@ const char *type_str[] = {
     "CommPlatformType",
     "CompPlatformType",
     "CompTargetType",
+    "CostMapperType",
     "WorkPileType",
     "WorkerType",
     "SchedulerType",
@@ -44,6 +45,8 @@ const char *type_str[] = {
     "TaskTemplateType",
     "DataBlockType",
     "EventType",
+    "HintType",
+    "ComponentType",
 };
 
 const char *inst_str[] = {
@@ -55,10 +58,13 @@ const char *inst_str[] = {
     "CommPlatformInst",
     "CompPlatformInst",
     "CompTargetInst",
+    "CostMapperInst",
     "WorkPileInst",
     "WorkerInst",
     "SchedulerInst",
     "PolicyDomainInst",
+    "NULL",
+    "NULL",
     "NULL",
     "NULL",
     "NULL",
@@ -73,6 +79,7 @@ dep_t deps[] = {
     { commapi_type, commplatform_type, "commplatform"},
     { comptarget_type, compplatform_type, "compplatform"},
     { worker_type, comptarget_type, "comptarget"},
+    { scheduler_type, costmapper_type, "costmapper"},
     { scheduler_type, workpile_type, "workpile"},
     { policydomain_type, guid_type, "guid"},
     { policydomain_type, allocator_type, "allocator"},
@@ -84,6 +91,8 @@ dep_t deps[] = {
     { policydomain_type, tasktemplatefactory_type, "tasktemplatefactory"},
     { policydomain_type, datablockfactory_type, "datablockfactory"},
     { policydomain_type, eventfactory_type, "eventfactory"},
+    { policydomain_type, hintfactory_type, "hintfactory"},
+    { policydomain_type, componentfactory_type, "componentfactory"},
 };
 
 extern char* populate_type(ocrParamList_t **type_param, type_enum index, dictionary *dict, char *secname);
@@ -318,12 +327,13 @@ void bringUpRuntime(const char *inifile) {
     // BUILD DEPENDENCES
     DPRINTF(DEBUG_LVL_INFO, "========= Build dependences ==========\n");
 
-    for (i = 0; i <= 11; i++) {
+    for (i = 0; i <= 12; i++) {
         build_deps(dict, deps[i].from, deps[i].to, deps[i].refstr, all_instances, inst_params);
     }
 
     // Special case of policy domain pointing to types rather than instances
-    for (i = 12; i <= 15; i++) {
+    for (i = 13; i <= 18; i++)
+    {
         build_deps_types(deps[i].to, all_instances[policydomain_type],
                          inst_counts[policydomain_type], all_factories, type_params);
     }

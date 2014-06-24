@@ -13,7 +13,17 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-// places include RAM, SP, or NUMA if available
+#include "ocr-types.h"
+
+u8 ocrHintCreate(ocrGuid_t *guid, ocrHintTypes_t hintType);
+
+u8 ocrHintSetPriority(ocrGuid_t guid, u32 priority);
+
+u8 ocrHintSetDependenceWeight(ocrGuid_t guid, u32 depNum, u32 depWeight);
+
+u8 ocrSetHint(ocrGuid_t guid, ocrGuid_t hint);
+
+u8 ocrGetHint(ocrGuid_t guid, ocrGuid_t *hint);
 
 #ifdef __cplusplus
 }

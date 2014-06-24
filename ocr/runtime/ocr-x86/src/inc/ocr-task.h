@@ -35,6 +35,18 @@ typedef struct _paramListTaskTemplateFact_t {
     ocrParamList_t base;
 } paramListTaskTemplateFact_t;
 
+typedef struct _paramListTaskTemplate_t {
+    ocrParamList_t base;
+    u64 sizeofUHint;
+    u64 sizeofIHint;
+} paramListTaskTemplate_t;
+
+typedef struct _paramListTask_t {
+    ocrParamList_t base;
+    u64 sizeofUHint;
+    u64 sizeofIHint;
+} paramListTask_t;
+
 struct _ocrTaskTemplate_t;
 
 /****************************************************/
@@ -74,6 +86,8 @@ typedef struct _ocrTaskTemplate_t {
     struct _dbWeightStruct *dbWeights;
 #endif
     u32 fctId;              /**< Functions to manage this template */
+    u64 uHints;             /**< User provided hints for EDT template (allocated inside template) */
+    u64 iHints;             /**< Introspection provided hints for EDT template (allocated inside template) */
 } ocrTaskTemplate_t;
 
 /****************************************************/
@@ -128,8 +142,9 @@ typedef struct _ocrTaskFcts_t {
      * @param[in] self        Pointer to this task
      * @param[in] db          Optional data passed for this dependence
      * @param[in] slot        Slot satisfied
+     * @param[in] mapping     Location mapping for the EDT
      */
-    u8 (*satisfy)(struct _ocrTask_t* self, ocrFatGuid_t db, u32 slot);
+    u8 (*satisfy)(struct _ocrTask_t* self, ocrFatGuid_t db, u32 slot, ocrLocation_t mapping);
 
     /**
      * @brief Informs the task that the event/db 'src' is linked to its
@@ -241,6 +256,10 @@ typedef struct _ocrTask_t {
     ocrEdtState_t state;    /**< State of the EDT */
     u32 paramc, depc;       /**< Number of parameters and dependences */
     u32 fctId;
+    ocrGuid_t component;    /**< Runtime component of task */
+    ocrLocation_t mapping;  /**< Location where task starts execution */
+    u64 uHints;             /**< User provided hints for EDT (allocated inside task) */
+    u64 iHints;             /**< Introspection provided hints for EDT (allocated inside task) */
 } ocrTask_t;
 
 /****************************************************/

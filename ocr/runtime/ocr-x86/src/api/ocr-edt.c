@@ -77,6 +77,7 @@ u8 ocrEventSatisfySlot(ocrGuid_t eventGuid, ocrGuid_t dataGuid /*= INVALID_GUID*
     PD_MSG_FIELD(payload.guid) = dataGuid;
     PD_MSG_FIELD(payload.metaDataPtr) = NULL;
     PD_MSG_FIELD(slot) = slot;
+    PD_MSG_FIELD(mapping) = curEdt ? curEdt->mapping : INVALID_LOCATION;
     PD_MSG_FIELD(properties) = 0;
     PD_MSG_FIELD(currentEdt.guid) = curEdt ? curEdt->guid : NULL_GUID;
     PD_MSG_FIELD(currentEdt.metaDataPtr) = curEdt;
@@ -245,6 +246,7 @@ u8 ocrAddDependence(ocrGuid_t source, ocrGuid_t destination, u32 slot,
         PD_MSG_FIELD(properties) = mode;
         PD_MSG_FIELD(currentEdt.guid) = curEdt ? curEdt->guid : NULL_GUID;
         PD_MSG_FIELD(currentEdt.metaDataPtr) = curEdt;
+        PD_MSG_FIELD(mapping) = curEdt ? curEdt->mapping : INVALID_LOCATION;
 #undef PD_MSG
 #undef PD_TYPE
     } else {
@@ -258,6 +260,7 @@ u8 ocrAddDependence(ocrGuid_t source, ocrGuid_t destination, u32 slot,
         PD_MSG_FIELD(payload.guid) = NULL_GUID;
         PD_MSG_FIELD(payload.metaDataPtr) = NULL;
         PD_MSG_FIELD(slot) = slot;
+        PD_MSG_FIELD(mapping) = curEdt ? curEdt->mapping : INVALID_LOCATION;
         PD_MSG_FIELD(properties) = 0;
         PD_MSG_FIELD(currentEdt.guid) = curEdt ? curEdt->guid : NULL_GUID;
         PD_MSG_FIELD(currentEdt.metaDataPtr) = curEdt;

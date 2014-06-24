@@ -37,6 +37,13 @@
 // Comp-target
 #define ENABLE_COMP_TARGET_PASSTHROUGH
 
+// Component
+#define ENABLE_COMPONENT_CE
+
+// Cost Mapper
+#define ENABLE_COST_MAPPER_CE
+#define ENABLE_COST_MAPPER_XE
+
 // Datablock
 #define ENABLE_DATABLOCK_REGULAR
 
@@ -49,6 +56,9 @@
 
 // GUID provider
 #define ENABLE_GUID_PTR
+
+// Hints
+#define ENABLE_HINT_1_0
 
 // HAL layer to use
 #define HAL_X86_64
@@ -88,6 +98,25 @@
 #define ENABLE_WORKPILE_XE
 
 #define ENABLE_OCR_LIB
+
+// Version specific configs
+
+#ifdef OCR_SCHEDULER_0_9
+#define ENABLE_SCHEDULER_CE_0_9
+#define ENABLE_SCHEDULER_XE_NULL
+#define ENABLE_COST_MAPPER_CE_NULL
+#define ENABLE_COST_MAPPER_XE_NULL
+#define ENABLE_COMPONENT_CE_NULL
+#else
+
+//default
+#define OCR_HINT_VERSION 100
+#define ENABLE_SCHEDULER_CE_1_0
+#define ENABLE_SCHEDULER_XE_NULL
+#define ENABLE_COST_MAPPER_CE_1_0
+#define ENABLE_COST_MAPPER_XE_NULL
+#define ENABLE_COMPONENT_CE_1_0
+#endif
 
 #endif /* __OCR_CONFIG_H__ */
 

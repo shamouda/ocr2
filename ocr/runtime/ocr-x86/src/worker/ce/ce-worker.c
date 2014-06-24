@@ -16,6 +16,7 @@
 #include "ocr-types.h"
 #include "ocr-worker.h"
 #include "worker/ce/ce-worker.h"
+#include "policy-domain/ce/ce-policy.h"
 
 #ifdef OCR_ENABLE_STATISTICS
 #include "ocr-statistics.h"
@@ -39,6 +40,7 @@ static inline u64 getWorkerId(ocrWorker_t * worker) {
  */
 static void workerLoop(ocrWorker_t * worker) {
     ocrPolicyDomain_t *pd = worker->pd;
+    ocrPolicyDomainCe_t * cePd = (ocrPolicyDomainCe_t*)pd;
 
     DPRINTF(DEBUG_LVL_VERB, "Starting scheduler routine of CE worker %ld\n", getWorkerId(worker));
     while(worker->fcts.isRunning(worker)) {
@@ -46,7 +48,9 @@ static void workerLoop(ocrWorker_t * worker) {
         RESULT_ASSERT(pd->fcts.waitMessage(pd, &handle), ==, 0);
         ASSERT(handle);
         ocrPolicyMsg_t *msg = handle->response;
+        cePd->curInMsgSrc = msg->srcLocation;
         RESULT_ASSERT(pd->fcts.processMessage(pd, msg, true), ==, 0);
+        cePd->curInMsgSrc = pd->myLocation;
         handle->destruct(handle);
     } /* End of while loop */
 }

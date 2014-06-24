@@ -5,7 +5,7 @@
  */
 
 #include "ocr-config.h"
-#ifdef ENABLE_SCHEDULER_HC
+#ifdef ENABLE_SCHEDULER_HC_0_9
 
 #include "debug.h"
 #include "ocr-policy-domain.h"
@@ -297,4 +297,4 @@ ocrSchedulerFactory_t * newOcrSchedulerFactoryHc(ocrParamList_t *perType) {
 }
 
 
-#endif /* ENABLE_SCHEDULER_HC */
+#endif /* ENABLE_SCHEDULER_HC_0_9 */

@@ -56,6 +56,7 @@ static void workerLoop(ocrWorker_t * worker) {
         PD_MSG_FIELD(guidCount) = count;
         PD_MSG_FIELD(properties) = 0;
         PD_MSG_FIELD(type) = OCR_GUID_EDT;
+        PD_MSG_FIELD(extra) = getWorkerId(worker);
         // TODO: In the future, potentially take more than one)
         if(pd->fcts.processMessage(pd, &msg, true) == 0) {
             // We got a response
@@ -63,6 +64,7 @@ static void workerLoop(ocrWorker_t * worker) {
             if(count == 1) {
                 ASSERT(taskGuid.guid != NULL_GUID && taskGuid.metaDataPtr != NULL);
                 worker->curTask = (ocrTask_t*)taskGuid.metaDataPtr;
+                worker->curTask->mapping = (ocrLocation_t)getWorkerId(worker);
                 u8 (*executeFunc)(ocrTask_t *) = (u8 (*)(ocrTask_t*))PD_MSG_FIELD(extra); // Execute is stored in extra
                 executeFunc(worker->curTask);
                 worker->curTask = NULL;

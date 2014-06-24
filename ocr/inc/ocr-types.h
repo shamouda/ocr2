@@ -167,6 +167,14 @@ typedef enum {
 
 #define DB_DEFAULT_MODE (ocrDbAccessMode_t)DB_MODE_ITW
 
+typedef enum {
+    OCR_HINT_EDT=0,          /**< EDT specific hints */
+    OCR_HINT_EDT_TEMPLATE,   /**< EDT template specific hints */
+    OCR_HINT_DB,             /**< DB specific hints */
+    OCR_HINT_EVENT,          /**< Event specific hints */
+    OCR_HINT_NUM_TYPES       /**< Number of Hint Types */
+} ocrHintTypes_t;
+
 #endif /* __OCR_TYPES_H__ */
 
 

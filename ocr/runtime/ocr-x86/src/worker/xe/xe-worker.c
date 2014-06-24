@@ -61,6 +61,15 @@ static void workerLoop(ocrWorker_t * worker) {
                 taskGuid = PD_MSG_FIELD(guids[0]);
                 ASSERT(taskGuid.guid != NULL_GUID && taskGuid.metaDataPtr != NULL);
                 worker->curTask = (ocrTask_t*)taskGuid.metaDataPtr;
+                worker->curTask->component = PD_MSG_FIELD(component).guid;
+                ocrWorkerXe_t * xeWorker = (ocrWorkerXe_t *) worker;
+                //ASSERT(worker->curTask->mapping != INVALID_LOCATION); //TODO: Fix mapping support
+                if (worker->curTask->mapping == (ocrLocation_t)getWorkerId(worker)) {
+                    xeWorker->hit++;
+                } else {
+                    xeWorker->miss++;
+                }
+                worker->curTask->mapping = (ocrLocation_t)getWorkerId(worker);
                 u8 (*executeFunc)(ocrTask_t *) = (u8 (*)(ocrTask_t*))PD_MSG_FIELD(extra); // Execute is stored in extra
                 executeFunc(worker->curTask);
                 worker->curTask = NULL;
@@ -112,6 +121,8 @@ void initializeWorkerXe(ocrWorkerFactory_t * factory, ocrWorker_t* base, ocrPara
     ocrWorkerXe_t* workerXe = (ocrWorkerXe_t*) base;
     workerXe->id = ((paramListWorkerXeInst_t*)perInstance)->workerId;
     workerXe->running = false;
+    workerXe->hit = 0;
+    workerXe->miss = 0;
 }
 
 void xeBeginWorker(ocrWorker_t * base, ocrPolicyDomain_t * policy) {
@@ -210,6 +221,7 @@ void xeFinishWorker(ocrWorker_t * base) {
 void xeStopWorker(ocrWorker_t * base) {
     ocrWorkerXe_t * xeWorker = (ocrWorkerXe_t *) base;
     xeWorker->running = false;
+    //fprintf(stderr, "[%lu]Mapping HIT: %lu MISS: %lu\n", getWorkerId(base), xeWorker->hit, xeWorker->miss);
 
     u64 computeCount = base->computeCount;
     u64 i = 0;

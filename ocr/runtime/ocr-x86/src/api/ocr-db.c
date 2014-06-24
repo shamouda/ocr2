@@ -45,6 +45,11 @@ u8 ocrDbCreate(ocrGuid_t *db, void** addr, u64 len, u16 flags,
     ocrTask_t *task = NULL;
     u8 returnCode = 0;
     getCurrentEnv(&policy, NULL, &task, &msg);
+    ocrGuid_t dbAffinity = affinity;
+    if (affinity == NULL_GUID && task != NULL && (flags & DB_PROP_NO_AFFINITY) == 0) {
+        //fprintf(stderr, "[%s] DB affinity (TASK): 0x%lx\n", task->name, task->component);
+        dbAffinity = task->component;
+    }
 
 #define PD_MSG (&msg)
 #define PD_TYPE PD_MSG_DB_CREATE
@@ -54,7 +59,7 @@ u8 ocrDbCreate(ocrGuid_t *db, void** addr, u64 len, u16 flags,
     PD_MSG_FIELD(edt.guid) = task?task->guid:NULL_GUID; // Can happen when non EDT creates the DB
     PD_MSG_FIELD(edt.metaDataPtr) = task;
     PD_MSG_FIELD(size) = len;
-    PD_MSG_FIELD(affinity.guid) = affinity;
+    PD_MSG_FIELD(affinity.guid) = dbAffinity;
     PD_MSG_FIELD(affinity.metaDataPtr) = NULL;
     PD_MSG_FIELD(properties) = (u32)flags;
     PD_MSG_FIELD(dbType) = USER_DBTYPE;

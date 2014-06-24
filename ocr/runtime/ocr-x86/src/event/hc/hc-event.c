@@ -134,7 +134,7 @@ ocrFatGuid_t getEventHc(ocrEvent_t *base) {
 
 // For once events, we don't have to worry about
 // concurrent registerWaiter calls (this would be a programmer error)
-u8 satisfyEventHcOnce(ocrEvent_t *base, ocrFatGuid_t db, u32 slot) {
+u8 satisfyEventHcOnce(ocrEvent_t *base, ocrFatGuid_t db, u32 slot, ocrLocation_t mapping) {
     ocrEventHc_t *event = (ocrEventHc_t*)base;
     ASSERT(slot == 0); // For non-latch events, only one slot
 
@@ -173,6 +173,7 @@ u8 satisfyEventHcOnce(ocrEvent_t *base, ocrFatGuid_t db, u32 slot) {
         getCurrentEnv(NULL, NULL, NULL, &msg);
         PD_MSG_FIELD(payload) = db; // Do this once as it may get resolved the first time
         PD_MSG_FIELD(properties) = 0;
+        PD_MSG_FIELD(mapping) = mapping;
         for(i = 0; i < event->waitersCount; ++i) {
 #ifdef OCR_ENABLE_STATISTICS
             // We do this *before* calling signalWaiter because otherwise
@@ -207,7 +208,7 @@ u8 satisfyEventHcOnce(ocrEvent_t *base, ocrFatGuid_t db, u32 slot) {
 }
 
 // This is for persistent events such as sticky or idempotent.
-u8 satisfyEventHcPersist(ocrEvent_t *base, ocrFatGuid_t db, u32 slot) {
+u8 satisfyEventHcPersist(ocrEvent_t *base, ocrFatGuid_t db, u32 slot, ocrLocation_t mapping) {
     ocrEventHcPersist_t *event = (ocrEventHcPersist_t*)base;
     ASSERT(slot == 0); // Persistent-events are single slot
     ASSERT(event->base.base.kind == OCR_EVENT_IDEM_T ||
@@ -237,6 +238,8 @@ u8 satisfyEventHcPersist(ocrEvent_t *base, ocrFatGuid_t db, u32 slot) {
     // Try to get all the waiters
     hal_lock32(&(event->waitersLock));
     event->data = db.guid;
+    ASSERT(base->mapping == INVALID_LOCATION);
+    base->mapping = mapping; // Pass dynamic mapping information to waiters
     waitersCount = event->base.waitersCount;
     event->base.waitersCount = (u32)-1; // Indicate that the event is satisfied
     hal_unlock32(&(event->waitersLock));
@@ -261,6 +264,7 @@ u8 satisfyEventHcPersist(ocrEvent_t *base, ocrFatGuid_t db, u32 slot) {
         getCurrentEnv(NULL, NULL, NULL, &msg);
         PD_MSG_FIELD(payload) = db; // Do this once as it may get resolved the first time
         PD_MSG_FIELD(properties) = 0;
+        PD_MSG_FIELD(mapping) = base->mapping;
         for(i = 0; i < waitersCount; ++i) {
 #ifdef OCR_ENABLE_STATISTICS
             // We do this *before* calling signalWaiter because otherwise
@@ -293,7 +297,7 @@ u8 satisfyEventHcPersist(ocrEvent_t *base, ocrFatGuid_t db, u32 slot) {
 }
 
 // This is for latch events
-u8 satisfyEventHcLatch(ocrEvent_t *base, ocrFatGuid_t db, u32 slot) {
+u8 satisfyEventHcLatch(ocrEvent_t *base, ocrFatGuid_t db, u32 slot, ocrLocation_t mapping) {
     ocrEventHcLatch_t *event = (ocrEventHcLatch_t*)base;
     ASSERT(slot == OCR_EVENT_LATCH_DECR_SLOT ||
            slot == OCR_EVENT_LATCH_INCR_SLOT);
@@ -531,6 +535,7 @@ u8 registerWaiterEventHcPersist(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot,
         PD_MSG_FIELD(payload.guid) = event->data;
         PD_MSG_FIELD(payload.metaDataPtr) = NULL;
         PD_MSG_FIELD(slot) = slot;
+        PD_MSG_FIELD(mapping) = base->mapping;
         PD_MSG_FIELD(properties) = 0;
         if((toReturn = pd->fcts.processMessage(pd, &msg, false))) {
             hal_unlock32(&(event->waitersLock));
@@ -796,6 +801,7 @@ ocrEvent_t * newEventHc(ocrEventFactory_t * factory, ocrEventTypes_t eventType,
     // Set-up base structures
     base->guid = PD_MSG_FIELD(guid.guid);
     base->kind = eventType;
+    base->mapping = INVALID_LOCATION;
     base->fctId = factory->factoryId;
 #undef PD_MSG
 #undef PD_TYPE
@@ -898,12 +904,12 @@ ocrEventFactory_t * newEventFactoryHc(ocrParamList_t *perType, u32 factoryId) {
         base->fcts[i].unregisterSignaler = FUNC_ADDR(u8 (*)(ocrEvent_t*, ocrFatGuid_t, u32, bool), unregisterSignalerHc);
     }
     base->fcts[OCR_EVENT_ONCE_T].satisfy =
-        FUNC_ADDR(u8 (*)(ocrEvent_t*, ocrFatGuid_t, u32), satisfyEventHcOnce);
+        FUNC_ADDR(u8 (*)(ocrEvent_t*, ocrFatGuid_t, u32, ocrLocation_t), satisfyEventHcOnce);
     base->fcts[OCR_EVENT_IDEM_T].satisfy =
     base->fcts[OCR_EVENT_STICKY_T].satisfy =
-            FUNC_ADDR(u8 (*)(ocrEvent_t*, ocrFatGuid_t, u32), satisfyEventHcPersist);
+            FUNC_ADDR(u8 (*)(ocrEvent_t*, ocrFatGuid_t, u32, ocrLocation_t), satisfyEventHcPersist);
     base->fcts[OCR_EVENT_LATCH_T].satisfy =
-        FUNC_ADDR(u8 (*)(ocrEvent_t*, ocrFatGuid_t, u32), satisfyEventHcLatch);
+        FUNC_ADDR(u8 (*)(ocrEvent_t*, ocrFatGuid_t, u32, ocrLocation_t), satisfyEventHcLatch);
 
     base->fcts[OCR_EVENT_ONCE_T].registerWaiter =
     base->fcts[OCR_EVENT_LATCH_T].registerWaiter =
