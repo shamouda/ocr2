@@ -22,6 +22,8 @@
 #include "ocr-statistics-callbacks.h"
 #endif
 
+#include "policy-domain/xe/xe-policy.h"
+
 #define DEBUG_TYPE WORKER
 
 /******************************************************/
@@ -161,14 +163,17 @@ void* xeRunWorker(ocrWorker_t * worker) {
 
     if (pd->myLocation == 0) { //Blessed worker
 
-// FIXME: HACK!!! HACK!!! HACK!!!
-// Until Bala resolves how to handle args in FSIM, we will call
-// directly into mainEdt. See fwd decl above.
-#ifndef TEMPORARY_FSIM_HACK_TILL_WE_FIGURE_OCR_START_STOP_HANDSHAKES
         // This is all part of the mainEdt setup
         // and should be executed by the "blessed" worker.
-        void * packedUserArgv = userArgsGet();
+
+        void * packedUserArgv;
+#ifdef TOOL_CHAIN_XE
+        packedUserArgv = ((ocrPolicyDomainXe_t*)pd)->packedArgsLocation;
+extern ocrGuid_t mainEdt( u32, u64 *, u32, ocrEdtDep_t * );
+#else
+        packedUserArgv = userArgsGet();
         ocrEdt_t mainEdt = mainEdtGet();
+#endif
 
         u64 totalLength = ((u64*) packedUserArgv)[0]; // already exclude this first arg
         // strip off the 'totalLength first argument'
@@ -178,8 +183,10 @@ void* xeRunWorker(ocrWorker_t * worker) {
         ocrDbCreate(&dbGuid, &dbPtr, totalLength,
                     DB_PROP_NONE, NULL_GUID, NO_ALLOC);
 
+#ifndef TOOL_CHAIN_XE
         // copy packed args to DB
         hal_memCopy(dbPtr, packedUserArgv, totalLength, 0);
+#endif
 
         // Create the depv
         ocrEdtDep_t depv;
@@ -188,11 +195,6 @@ void* xeRunWorker(ocrWorker_t * worker) {
 
         // Call into mainEdt
         mainEdt(0, NULL, 1, &depv);
-#else
-        // FIXME: HACK!!! HACK!!! HACK!!
-        // Direct call into mainEdt() with NO ARGUMENTS
-        mainEdt((u32)0, (u64*)NULL, (u32)0, (ocrEdtDep_t*)NULL);
-#endif
     }
 
     DPRINTF(DEBUG_LVL_INFO, "Starting scheduler routine of worker %ld\n", getWorkerId(worker));

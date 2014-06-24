@@ -207,14 +207,6 @@ void ocrFinalize() {
     pd->fcts.finish(pd);
     pd->fcts.destruct(pd);
     freeUpRuntime();
-
-    /*
-    ocrPolicyDomain_t* masterPD = getMasterPD();
-    stopAllPD(masterPD);
-    masterPD->destruct(masterPD);
-    */
-    //TODO we need to start by stopping the master PD which
-    //controls stopping down PD located on the same machine.
 // #ifdef OCR_ENABLE_STATISTICS
 //     ocrStatsProcessDestruct(&GfakeProcess);
 //     GocrFilterAggregator->destruct(GocrFilterAggregator);

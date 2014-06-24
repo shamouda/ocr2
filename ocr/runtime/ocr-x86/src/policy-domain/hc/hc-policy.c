@@ -20,6 +20,7 @@
 #include "utils/profiler/profiler.h"
 
 #include "policy-domain/hc/hc-policy.h"
+#include "allocator/allocator-all.h"
 
 //DIST-TODO hack to support edt templates
 #include "task/hc/hc-task.h"
@@ -106,7 +107,7 @@ void hcPolicyDomainStart(ocrPolicyDomain_t * policy) {
         policy->commApis[i]->fcts.start(policy->commApis[i], policy);
     }
 
-    // REC: Moved all workers to start here. 
+    // REC: Moved all workers to start here.
     // Note: it's important to first logically start all workers.
     // Once they are all up, start the runtime.
     // Workers should start the underlying target and platforms
@@ -138,7 +139,12 @@ void hcPolicyDomainFinish(ocrPolicyDomain_t * policy) {
     for(i = 0; i < maxCount; i++) {
         policy->workers[i]->fcts.finish(policy->workers[i]);
     }
-    
+
+    maxCount = policy->commApiCount;
+    for(i = 0; i < maxCount; i++) {
+        policy->commApis[i]->fcts.finish(policy->commApis[i]);
+    }
+
     maxCount = policy->commApiCount;
     for(i = 0; i < maxCount; i++) {
         policy->commApis[i]->fcts.finish(policy->commApis[i]);
@@ -195,6 +201,8 @@ void hcPolicyDomainStop(ocrPolicyDomain_t * policy) {
         policy->workers[i]->fcts.stop(policy->workers[i]);
     }
 
+    // Note: As soon as worker '0' is stopped; its thread is
+    // free to fall-through from 'start' and call 'finish'.
     maxCount = policy->commApiCount;
     for(i = 0; i < maxCount; i++) {
         policy->commApis[i]->fcts.stop(policy->commApis[i]);
@@ -314,57 +322,91 @@ static void localDeguidify(ocrPolicyDomain_t *self, ocrFatGuid_t *guid) {
     RETURN_PROFILE();
 }
 
-// In all these functions, we consider only a single PD. In other words, in HC, we
+// In all these functions, we consider only a single PD. In other words, in CE, we
 // deal with everything locally and never send messages
-static u8 hcAllocateDb(ocrPolicyDomain_t *self, ocrFatGuid_t *guid, void** ptr, u64 size,
-                       u32 properties, ocrFatGuid_t affinity, ocrInDbAllocator_t allocator) {
 
-    // Currently a very simple model of just going through all allocators
-    u64 i;
+// allocateDatablock:  Utility used by hcAllocateDb and hcMemAlloc, just below.
+static void* allocateDatablock (ocrPolicyDomain_t *self,
+                                u64                size,
+                                u64                prescription,
+                                u64               *allocatorIdx) {
     void* result;
-    for(i=0; i < self->allocatorCount; ++i) {
-        result = self->allocators[i]->fcts.allocate(self->allocators[i], size);
-        if(result) break;
-    }
+    u64 hints = 0; // Allocator hint
+    u64 idx;  // Index into the allocators array to select the allocator to try.
+    ASSERT (self->allocatorCount > 0);
+    do {
+        hints = (prescription & 1)?(OCR_ALLOC_HINT_NONE):(OCR_ALLOC_HINT_REDUCE_CONTENTION);
+        prescription >>= 1;
+        idx = prescription & 7;  // Get the index of the allocator to use.
+        prescription >>= 3;
+        if ((idx > self->allocatorCount) || (self->allocators[idx] == NULL)) {
+            continue;  // Skip this allocator if it doesn't exist.
+        }
+        result = self->allocators[idx]->fcts.allocate(self->allocators[idx], size, hints);
 
-    if(i < self->allocatorCount) {
+        if (result) {
+            *allocatorIdx = idx;
+            return result;
+        }
+    } while (prescription != 0);
+    return NULL;
+}
+
+static u8 hcAllocateDb(ocrPolicyDomain_t *self, ocrFatGuid_t *guid, void** ptr, u64 size,
+                       u32 properties, ocrFatGuid_t affinity, ocrInDbAllocator_t allocator,
+                       u64 prescription) {
+    // This function allocates a data block for the requestor, who is either this computing agent or a
+    // different one that sent us a message.  After getting that data block, it "guidifies" the results
+    // which, by the way, ultimately causes hcMemAlloc (just below) to run.
+    //
+    // Currently, the "affinity" and "allocator" arguments are ignored, and I expect that these will
+    // eventually be eliminated here and instead, above this level, processed into the "prescription"
+    // variable, which has been added to this argument list.  The prescription indicates an order in
+    // which to attempt to allocate the block to a pool.
+    u64 idx;
+    void* result = allocateDatablock (self, size, prescription, &idx);
+    if (result) {
         ocrDataBlock_t *block = self->dbFactories[0]->instantiate(
-                                    self->dbFactories[0], self->allocators[i]->fguid, self->fguid,
-                                    size, result, properties, NULL);
+            self->dbFactories[0], self->allocators[idx]->fguid, self->fguid,
+            size, result, properties, NULL);
         *ptr = result;
         (*guid).guid = block->guid;
         (*guid).metaDataPtr = block;
         return 0;
+    } else {
+        DPRINTF(DEBUG_LVL_WARN, "hcAllocateDb returning NULL for size %ld\n", (u64) size);
+        return OCR_ENOMEM;
     }
-    return OCR_ENOMEM;
 }
 
 static u8 hcMemAlloc(ocrPolicyDomain_t *self, ocrFatGuid_t* allocator, u64 size,
-                     ocrMemType_t memType, void** ptr) {
-    u64 i;
+                     ocrMemType_t memType, void** ptr, u64 prescription) {
+    // Like hcAllocateDb, this function also allocates a data block.  But it does NOT guidify
+    // the results.  The main usage of this function is to allocate space for the guid needed
+    // by hcAllocateDb; so if this function also guidified its results, you'd be in an infinite
+    // guidification loop!
+    //
+    // The prescription indicates an order in which to attempt to allocate the block to a pool.
     void* result;
-
-    ASSERT(memType == GUID_MEMTYPE || memType == DB_MEMTYPE);
-    ASSERT (self->allocatorCount > 0);
-    for(i = (memType == GUID_MEMTYPE) ? // If we are allocating storage for a GUID...
-            (self->allocatorCount-1) :  // just allocate it in DRAM (for now).  Otherwise...
-            0;                          // try first allocator (L1) first.
-            i < self->allocatorCount;
-            i++) {                          // Then try L2, L3, DRAM.
-        result = self->allocators[i]->fcts.allocate(self->allocators[i], size);
-        if(result) break;
-    }
-
-    if(i < self->allocatorCount) {
+    u64 idx;
+    ASSERT (memType == GUID_MEMTYPE || memType == DB_MEMTYPE);
+    result = allocateDatablock (self, size, prescription, &idx);
+    if (result) {
         *ptr = result;
-        *allocator = self->allocators[i]->fguid;
+        *allocator = self->allocators[idx]->fguid;
         return 0;
+    } else {
+        DPRINTF(DEBUG_LVL_WARN, "hcMemAlloc returning NULL for size %ld\n", (u64) size);
+        return OCR_ENOMEM;
     }
-    return OCR_ENOMEM;
 }
 
 static u8 hcMemUnAlloc(ocrPolicyDomain_t *self, ocrFatGuid_t* allocator,
                        void* ptr, ocrMemType_t memType) {
+#if 1
+    allocatorFreeFunction(ptr);
+    return 0;
+#else
     u64 i;
     ASSERT (memType == GUID_MEMTYPE || memType == DB_MEMTYPE);
     if (memType == DB_MEMTYPE) {
@@ -384,6 +426,7 @@ static u8 hcMemUnAlloc(ocrPolicyDomain_t *self, ocrFatGuid_t* allocator,
         ASSERT (false);
     }
     return OCR_EINVAL;
+#endif
 }
 
 static u8 hcCreateEdt(ocrPolicyDomain_t *self, ocrFatGuid_t *guid,
@@ -526,11 +569,13 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         // This would impact where we do the PD_MSG_MEM_ALLOC for ex
         // For now we deal with both USER and RT dbs the same way
         ASSERT(PD_MSG_FIELD(dbType) == USER_DBTYPE || PD_MSG_FIELD(dbType) == RUNTIME_DBTYPE);
+#define PRESCRIPTION 0x10LL
         PD_MSG_FIELD(properties) = hcAllocateDb(self, &(PD_MSG_FIELD(guid)),
                                   &(PD_MSG_FIELD(ptr)), PD_MSG_FIELD(size),
                                   PD_MSG_FIELD(properties),
                                   PD_MSG_FIELD(affinity),
-                                  PD_MSG_FIELD(allocator));
+                                  PD_MSG_FIELD(allocator),
+                                  PRESCRIPTION);
         if(PD_MSG_FIELD(properties) == 0) {
             ocrDataBlock_t *db = PD_MSG_FIELD(guid.metaDataPtr);
             ASSERT(db);
@@ -624,7 +669,7 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         PD_MSG_FIELD(allocatingPD.metaDataPtr) = self;
         PD_MSG_FIELD(properties) = hcMemAlloc(
             self, &(PD_MSG_FIELD(allocator)), PD_MSG_FIELD(size),
-            PD_MSG_FIELD(type), &(PD_MSG_FIELD(ptr)));
+            PD_MSG_FIELD(type), &(PD_MSG_FIELD(ptr)), PRESCRIPTION);
         msg->type &= ~PD_MSG_REQUEST;
         msg->type |= PD_MSG_RESPONSE;
 #undef PD_MSG
@@ -945,39 +990,67 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
 
         ocrFatGuid_t src = PD_MSG_FIELD(source);
         ocrFatGuid_t dest = PD_MSG_FIELD(dest);
-        if(srcKind == OCR_GUID_DB) {
+        if ((srcKind == OCR_GUID_DB) || (srcKind == NULL_GUID)) {
             //TODO: debatable why NULL_GUID is caught in user-to-runtime layer and not this one ?
+            //NOTE: Handle 'NULL_GUID' case here to be safe although
+            //we've already caught it in ocrAddDependence for performance
             // This is equivalent to an immediate satisfy
             PD_MSG_FIELD(properties) = convertDepAddToSatisfy(
                 self, src, dest, PD_MSG_FIELD(slot));
         } else {
-            if(srcKind & OCR_GUID_EVENT) {
-                //TODO create a pd-message instead
-                ocrEvent_t *evt = (ocrEvent_t*)(src.metaDataPtr);
-                ASSERT(evt->fctId == self->eventFactories[0]->factoryId);
-                PD_MSG_FIELD(properties) = self->eventFactories[0]->fcts[evt->kind].registerWaiter(
-                    evt, dest, PD_MSG_FIELD(slot), true);
-            } else {
-                //NULL_GUID as source is caught early on in the user-to-runtime API layer
-                //TODO there's no edt has source, it would have to be an edt's output event instead
-                ASSERT(srcKind == OCR_GUID_EDT);
-            }
+            // Only left with events as potential source
+            ASSERT(srcKind & OCR_GUID_EVENT);
+            u8 needSignalerReg = 0;
+            ocrPolicyMsg_t registerMsg;
+            getCurrentEnv(NULL, NULL, NULL, &registerMsg);
+            ocrFatGuid_t sourceGuid = PD_MSG_FIELD(source);
+            ocrFatGuid_t destGuid = PD_MSG_FIELD(dest);
+            u32 slot = PD_MSG_FIELD(slot);
+#undef PD_MSG
+#undef PD_TYPE
+#define PD_MSG (&registerMsg)
+#define PD_TYPE PD_MSG_DEP_REGWAITER
+            // Requires response to determine if we need to register signaler too
+            registerMsg.type = PD_MSG_DEP_REGWAITER | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
+            // Registers destGuid (waiter) onto sourceGuid
+            PD_MSG_FIELD(waiter) = destGuid;
+            PD_MSG_FIELD(dest) = sourceGuid;
+            PD_MSG_FIELD(slot) = slot;
+            PD_MSG_FIELD(properties) = true; // Specify context is add-dependence
+            RESULT_PROPAGATE(self->fcts.processMessage(self, &registerMsg, true));
+            needSignalerReg = PD_MSG_FIELD(properties);
+#undef PD_MSG
+#undef PD_TYPE
+#define PD_MSG msg
+#define PD_TYPE PD_MSG_DEP_ADD
+            PD_MSG_FIELD(properties) = needSignalerReg;
+
+            //PERF: property returned by registerWaiter allows to decide
+            // whether or not a registerSignaler call is needed.
+            //TODO this is not done yet so some calls are pure waste
             if(!PD_MSG_FIELD(properties)) {
-                if(dstKind == OCR_GUID_EDT) {
-                    //TODO create a pd-message instead
-                    ocrTask_t *task = (ocrTask_t*)(dest.metaDataPtr);
-                    ASSERT(task->fctId == self->taskFactories[0]->factoryId);
-                    PD_MSG_FIELD(properties) = self->taskFactories[0]->fcts.registerSignaler(
-                        task, src, PD_MSG_FIELD(slot), true);
-                } else if(dstKind & OCR_GUID_EVENT) {
-                    //TODO create a pd-message instead
-                    ocrEvent_t *evt = (ocrEvent_t*)(dest.metaDataPtr);
-                    ASSERT(evt->fctId == self->eventFactories[0]->factoryId);
-                    PD_MSG_FIELD(properties) = self->eventFactories[0]->fcts[evt->kind].registerSignaler(
-                        evt, src, PD_MSG_FIELD(slot), true);
-                } else {
-                    ASSERT(0); // Cannot have other types of destinations
-                }
+                // Cannot have other types of destinations
+                ASSERT((dstKind == OCR_GUID_EDT) || (dstKind == OCR_GUID_EVENT));
+                ocrPolicyMsg_t registerMsg;
+                getCurrentEnv(NULL, NULL, NULL, &registerMsg);
+                ocrFatGuid_t sourceGuid = PD_MSG_FIELD(source);
+                ocrFatGuid_t destGuid = PD_MSG_FIELD(dest);
+                u32 slot = PD_MSG_FIELD(slot);
+#undef PD_MSG
+#undef PD_TYPE
+#define PD_MSG (&registerMsg)
+#define PD_TYPE PD_MSG_DEP_REGSIGNALER
+                registerMsg.type = PD_MSG_DEP_REGSIGNALER | PD_MSG_REQUEST;
+                // Registers sourceGuid (signaller) onto destGuid
+                PD_MSG_FIELD(signaler) = sourceGuid;
+                PD_MSG_FIELD(dest) = destGuid;
+                PD_MSG_FIELD(slot) = slot;
+                PD_MSG_FIELD(properties) = true; // Specify context is add-dependence
+                RESULT_PROPAGATE(self->fcts.processMessage(self, &registerMsg, true));
+#undef PD_MSG
+#undef PD_TYPE
+#define PD_MSG msg
+#define PD_TYPE PD_MSG_DEP_ADD
             }
         }
 
@@ -999,6 +1072,9 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
 #define PD_TYPE PD_MSG_DEP_REGSIGNALER
         // We first get information about the signaler and destination
         ocrGuidKind signalerKind, dstKind;
+        //NOTE: In distributed the metaDataPtr is set to NULL_GUID since
+        //the guid provider doesn't fetch remote metaDataPtr yet. It's ok
+        //(but fragile) because the HC event/task does not try to use it
         self->guidProviders[0]->fcts.getVal(
             self->guidProviders[0], PD_MSG_FIELD(signaler.guid),
             (u64*)(&(PD_MSG_FIELD(signaler.metaDataPtr))), &signalerKind);
@@ -1008,17 +1084,18 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
 
         ocrFatGuid_t signaler = PD_MSG_FIELD(signaler);
         ocrFatGuid_t dest = PD_MSG_FIELD(dest);
+        bool isAddDep = PD_MSG_FIELD(properties);
 
         if (dstKind & OCR_GUID_EVENT) {
             ocrEvent_t *evt = (ocrEvent_t*)(dest.metaDataPtr);
             ASSERT(evt->fctId == self->eventFactories[0]->factoryId);
             PD_MSG_FIELD(properties) = self->eventFactories[0]->fcts[evt->kind].registerSignaler(
-                evt, signaler, PD_MSG_FIELD(slot), false);
+                evt, signaler, PD_MSG_FIELD(slot), isAddDep);
         } else if (dstKind == OCR_GUID_EDT) {
             ocrTask_t *edt = (ocrTask_t*)(dest.metaDataPtr);
             ASSERT(edt->fctId == self->taskFactories[0]->factoryId);
             PD_MSG_FIELD(properties) = self->taskFactories[0]->fcts.registerSignaler(
-                edt, signaler, PD_MSG_FIELD(slot), false);
+                edt, signaler, PD_MSG_FIELD(slot), isAddDep);
         } else {
             ASSERT(0); // No other things we can register signalers on
         }
@@ -1038,8 +1115,11 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         START_PROFILE(pd_hc_RegWaiter);
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_DEP_REGWAITER
-// We first get information about the signaler and destination
+        // We first get information about the signaler and destination
         ocrGuidKind waiterKind, dstKind;
+        //NOTE: In distributed the metaDataPtr is set to NULL_GUID since
+        //the guid provider doesn't fetch remote metaDataPtr yet. It's ok
+        //(but fragile) because the HC event/task does not try to use it
         self->guidProviders[0]->fcts.getVal(
             self->guidProviders[0], PD_MSG_FIELD(waiter.guid),
             (u64*)(&(PD_MSG_FIELD(waiter.metaDataPtr))), &waiterKind);
@@ -1053,8 +1133,9 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         ASSERT(dstKind & OCR_GUID_EVENT); // Waiters can only wait on events
         ocrEvent_t *evt = (ocrEvent_t*)(dest.metaDataPtr);
         ASSERT(evt->fctId == self->eventFactories[0]->factoryId);
+        bool isAddDep = PD_MSG_FIELD(properties);
         PD_MSG_FIELD(properties) = self->eventFactories[0]->fcts[evt->kind].registerWaiter(
-            evt, waiter, PD_MSG_FIELD(slot), false);
+            evt, waiter, PD_MSG_FIELD(slot), isAddDep);
 #ifdef OCR_ENABLE_STATISTICS
         // TODO: Fixme
         statsDEP_ADD(pd, getCurrentEDT(), NULL, signalerGuid, waiterGuid, NULL, slot);
@@ -1066,6 +1147,7 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         EXIT_PROFILE;
         break;
     }
+
 
     case PD_MSG_DEP_SATISFY: {
         START_PROFILE(pd_hc_Satisfy);
@@ -1254,8 +1336,9 @@ void* hcPdMalloc(ocrPolicyDomain_t *self, u64 size) {
 
     // Just try in the first allocator
     void* toReturn = NULL;
-    toReturn = self->allocators[0]->fcts.allocate(self->allocators[0], size);
-    ASSERT(toReturn != NULL);
+    toReturn = self->allocators[0]->fcts.allocate(self->allocators[0], size, OCR_ALLOC_HINT_NONE);
+    if (toReturn == NULL) DPRINTF(DEBUG_LVL_WARN, "hcPdMalloc returning NULL for size %ld\n", (u64) size);
+
     hcReleasePd((ocrPolicyDomainHc_t*)self);
     RETURN_PROFILE(toReturn);
 }
@@ -1266,8 +1349,7 @@ void hcPdFree(ocrPolicyDomain_t *self, void* addr) {
     if(hcGrabPd((ocrPolicyDomainHc_t*)self))
         RETURN_PROFILE();
 
-    // Just try in the first allocator
-    self->allocators[0]->fcts.free(self->allocators[0], addr);
+    allocatorFreeFunction(addr);
 
     hcReleasePd((ocrPolicyDomainHc_t*)self);
     RETURN_PROFILE();

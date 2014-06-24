@@ -27,6 +27,7 @@
 #ifdef TOOL_CHAIN_XE
 void xePolicyDomainStart(ocrPolicyDomain_t * policy);
 #endif
+extern void ocrShutdown(void);
 
 void xePolicyDomainBegin(ocrPolicyDomain_t * policy) {
     // The PD should have been brought up by now and everything instantiated
@@ -65,6 +66,7 @@ void xePolicyDomainBegin(ocrPolicyDomain_t * policy) {
 
 #ifdef TOOL_CHAIN_XE
     xePolicyDomainStart(policy);
+    hal_exit(0);
 #endif
 
 #ifdef TEMPORARY_FSIM_HACK_TILL_WE_FIGURE_OCR_START_STOP_HANDSHAKES
@@ -300,9 +302,16 @@ static u8 xeProcessCeRequest(ocrPolicyDomain_t *self, ocrPolicyMsg_t **msg) {
             RESULT_ASSERT(self->fcts.waitMessage(self, &handle), ==, 0);
             ASSERT(handle->response);
             // Check if the message was a proper response and came from the right place
-            ASSERT((handle->response->type & PD_MSG_TYPE_ONLY) == type);
             ASSERT(handle->response->srcLocation == self->parentLocation);
             ASSERT(handle->response->destLocation == self->myLocation);
+            if((handle->response->type & PD_MSG_TYPE_ONLY) != type) {
+                // Special case: shutdown in progress, cancel this message
+                // The below causes a hang, but it's in the shutdown path
+                // so is not critically investigated. See trac (#73)
+                // handle->destruct(handle);
+                return OCR_ECANCELED;
+            }
+            ASSERT((handle->response->type & PD_MSG_TYPE_ONLY) == type);
             if(handle->response != *msg) {
                 // We need to copy things back into *msg
                 // TODO: FIXME when issue #68 is fully implemented by checking
@@ -428,13 +437,14 @@ u8 xePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
 #undef PD_TYPE
         break;
     }
-
     case PD_MSG_MGT_SHUTDOWN: {
         START_PROFILE(pd_xe_Shutdown);
         self->fcts.stop(self);
         if(msg->srcLocation == self->myLocation) {
+            DPRINTF(DEBUG_LVL_INFO, "XE %lu initiating shutdown\n", (u64)msg->srcLocation);
             returnCode = xeProcessCeRequest(self, &msg);
         } else {
+            DPRINTF(DEBUG_LVL_INFO, "XE %lu responding to shutdown\n", (u64)msg->srcLocation);
             // Send the message back saying that
             // we did the shutdown
             msg->destLocation = msg->srcLocation;
@@ -448,7 +458,6 @@ u8 xePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         EXIT_PROFILE;
         break;
     }
-
     case PD_MSG_MGT_FINISH: {
         START_PROFILE(pd_xe_Finish);
         self->fcts.finish(self);
@@ -473,11 +482,15 @@ u8 xePdSendMessage(ocrPolicyDomain_t* self, ocrLocation_t target, ocrPolicyMsg_t
     u8 returnCode = self->commApis[0]->fcts.sendMessage(self->commApis[0], target, message, handle, properties);
     if (returnCode == 0) return 0;
     switch (returnCode) {
-    case OCR_EBUSY:
-    case OCR_ECANCELED: {
+    case OCR_ECANCELED:
         // Our outgoing message was cancelled and we probably have an incoming
         // reason why (shutdown most likely)
         // We destruct the handle for the first message in case it was partially used
+        if(*handle)
+            (*handle)->destruct(*handle);
+        if(returnCode==OCR_ECANCELED) ocrShutdown();
+        break;
+    case OCR_EBUSY:
         if(*handle)
             (*handle)->destruct(*handle);
         ocrMsgHandle_t *tempHandle = NULL;
@@ -488,7 +501,6 @@ u8 xePdSendMessage(ocrPolicyDomain_t* self, ocrLocation_t target, ocrPolicyMsg_t
         ASSERT(newMsg->destLocation == self->myLocation);
         RESULT_ASSERT(self->fcts.processMessage(self, newMsg, true), ==, 0);
         tempHandle->destruct(tempHandle);
-    }
         break;
     default:
         ASSERT(0);
@@ -558,6 +570,7 @@ ocrPolicyDomain_t * newPolicyDomainXe(ocrPolicyDomainFactory_t * factory,
 #else
     factory->initialize(factory, base, costFunction, perInstance);
 #endif
+    derived->packedArgsLocation = NULL;
 
     return base;
 }
