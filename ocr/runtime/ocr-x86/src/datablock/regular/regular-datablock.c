@@ -233,7 +233,7 @@ u8 regularUnregisterWaiter(ocrDataBlock_t *self, ocrFatGuid_t waiter, u32 slot,
 
 ocrDataBlock_t* newDataBlockRegular(ocrDataBlockFactory_t *factory, ocrFatGuid_t allocator,
                                     ocrFatGuid_t allocPD, u64 size, void* ptr,
-                                    u32 properties, ocrParamList_t *perInstance) {
+                                    u32 flags, ocrParamList_t *perInstance) {
     ocrPolicyDomain_t *pd = NULL;
     ocrTask_t *task = NULL;
     ocrPolicyMsg_t msg;
@@ -261,11 +261,13 @@ ocrDataBlock_t* newDataBlockRegular(ocrDataBlockFactory_t *factory, ocrFatGuid_t
     result->base.allocatingPD = allocPD.guid;
     result->base.size = size;
     result->base.ptr = ptr;
-    result->base.properties = properties;
+    // Only keep flags that represent the nature of
+    // the DB as opposed to one-time usage creation flags
+    result->base.flags = (flags & DB_PROP_SINGLE_ASSIGNMENT);
     result->base.fctId = factory->factoryId;
 
     result->lock =0;
-    result->attributes.flags = result->base.properties;
+    result->attributes.flags = result->base.flags;
     result->attributes.numUsers = 0;
     result->attributes.internalUsers = 0;
     result->attributes.freeRequested = 0;

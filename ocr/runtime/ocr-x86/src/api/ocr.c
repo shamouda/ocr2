@@ -17,7 +17,7 @@ void ocrShutdown() {
     getCurrentEnv(&pd, NULL, NULL, msgPtr);
 #define PD_MSG msgPtr
 #define PD_TYPE PD_MSG_MGT_SHUTDOWN
-    msgPtr->type = PD_MSG_MGT_SHUTDOWN | PD_MSG_REQUEST;
+    msgPtr->type = PD_MSG_MGT_SHUTDOWN | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
     RESULT_ASSERT(pd->fcts.processMessage(pd, msgPtr, true), ==, 0);
 #undef PD_MSG
 #undef PD_TYPE

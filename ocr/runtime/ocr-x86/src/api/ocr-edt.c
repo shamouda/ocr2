@@ -154,8 +154,9 @@ u8 ocrEdtCreate(ocrGuid_t* edtGuid, ocrGuid_t templateGuid,
     PD_MSG_FIELD(paramv) = paramv;
     PD_MSG_FIELD(paramc) = paramc;
     PD_MSG_FIELD(depc) = depc;
+    PD_MSG_FIELD(depv) = NULL;
     PD_MSG_FIELD(properties) = properties;
-    PD_MSG_FIELD(workType) = EDT_WORKTYPE;
+    PD_MSG_FIELD(workType) = EDT_USER_WORKTYPE;
 
     returnCode = pd->fcts.processMessage(pd, &msg, true);
     if(returnCode) {

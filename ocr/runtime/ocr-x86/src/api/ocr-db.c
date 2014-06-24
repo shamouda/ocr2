@@ -56,7 +56,8 @@ u8 ocrDbCreate(ocrGuid_t *db, void** addr, u64 len, u16 flags,
     PD_MSG_FIELD(size) = len;
     PD_MSG_FIELD(affinity.guid) = affinity;
     PD_MSG_FIELD(affinity.metaDataPtr) = NULL;
-    PD_MSG_FIELD(properties) = (u32)flags;
+    PD_MSG_FIELD(flags) = (u32) flags;
+    PD_MSG_FIELD(properties) = (u32) 0;
     PD_MSG_FIELD(dbType) = USER_DBTYPE;
     PD_MSG_FIELD(allocator) = allocator;
 
@@ -111,11 +112,9 @@ u8 ocrDbDestroy(ocrGuid_t db) {
     PD_MSG_FIELD(guid.metaDataPtr) = NULL;
     PD_MSG_FIELD(edt.guid) = task?task->guid:NULL_GUID;
     PD_MSG_FIELD(edt.metaDataPtr) = task;
-    PD_MSG_FIELD(properties) = 0;
-
-    u8 returnCode =  policy->fcts.processMessage(policy, &msg, false);
 #undef PD_MSG
 #undef PD_TYPE
+    u8 returnCode = policy->fcts.processMessage(policy, &msg, false);
 
     if(task) {
         // Here we inform the task that we destroyed (and therefore released) a DB
@@ -150,11 +149,12 @@ u8 ocrDbRelease(ocrGuid_t db) {
 
 #define PD_MSG (&msg)
 #define PD_TYPE PD_MSG_DB_RELEASE
-    msg.type = PD_MSG_DB_RELEASE | PD_MSG_REQUEST;
+    msg.type = PD_MSG_DB_RELEASE | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
     PD_MSG_FIELD(guid.guid) = db;
     PD_MSG_FIELD(guid.metaDataPtr) = NULL;
     PD_MSG_FIELD(edt.guid) = task?task->guid:NULL_GUID;
     PD_MSG_FIELD(edt.metaDataPtr) = task;
+    PD_MSG_FIELD(flags) = 0;
     PD_MSG_FIELD(properties) = 0;
 
     u8 returnCode = policy->fcts.processMessage(policy, &msg, false);

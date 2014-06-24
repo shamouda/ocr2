@@ -12,10 +12,10 @@
 #include "ocr-sysboot.h"
 #include "ocr-db.h"
 #include "ocr-worker.h"
+#include "ocr-affinity.h"
+#include "ocr-placer.h"
 #include "worker/hc/hc-worker.h"
 #include "worker/hc/hc-comm-worker.h"
-
-#include <stdio.h>
 
 #define DEBUG_TYPE WORKER
 
@@ -23,9 +23,6 @@
 /* OCR-HC COMMUNICATION WORKER                        */
 /* Extends regular HC workers                         */
 /******************************************************/
-
-//DIST-TODO: temporary, this is only to create the template and edt.
-#include "ocr-edt.h"
 
 ocrGuid_t processRequestEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrPolicyMsg_t * requestMsg = (ocrPolicyMsg_t *) paramv[0];
@@ -74,7 +71,7 @@ static u8 takeFromSchedulerAndSend(ocrPolicyDomain_t * pd) {
     PD_MSG_FIELD(extra) = 0; /*unused*/
     PD_MSG_FIELD(guidCount) = 1;
     PD_MSG_FIELD(properties) = 0;
-    PD_MSG_FIELD(type) = OCR_GUID_COMM; /*unused*/
+    PD_MSG_FIELD(type) = OCR_GUID_COMM;
     ret = pd->fcts.processMessage(pd, &msgCommTake, true);
     if (!ret && (PD_MSG_FIELD(guidCount) != 0)) {
         ASSERT(PD_MSG_FIELD(guidCount) == 1); //LIMITATION: single guid returned by comm take
@@ -85,22 +82,22 @@ static u8 takeFromSchedulerAndSend(ocrPolicyDomain_t * pd) {
     #undef PD_TYPE
         if (outgoingHandle != NULL) {
             // This code handles the pd's outgoing messages. They can be requests or responses.
-            DPRINTF(DEBUG_LVL_VVERB,"[%d] hc-comm-worker: outgoing handle comm take successful handle=%p, msg=%p\n", (int) pd->myLocation,
-                outgoingHandle, outgoingHandle->msg);
+            DPRINTF(DEBUG_LVL_VVERB,"[%d] hc-comm-worker: outgoing handle comm take successful handle=%p, msg=%p type=0x%lx\n", (int) pd->myLocation,
+                outgoingHandle, outgoingHandle->msg, outgoingHandle->msg->type);
             //We can never have an outgoing handle with the response ptr set because
             //when we process an incoming request, we lose the handle by calling the
             //pd's process message. Hence, a new handle is created for one-way response.
             ASSERT(outgoingHandle->response == NULL);
-            //DIST-TODO: IMPL: need to know the properties: can recover TWOWAY info by re-inspecting the
+            //DIST-TODO design: IMPL: need to know the properties: can recover TWOWAY info by re-inspecting the
             //message. Also at this stage, message must be PERSIST since there already is a
             //decoupling between caller and callee. This would better be stored in the handle I think
             u32 properties = PERSIST_MSG_PROP | ((outgoingHandle->msg->type & PD_MSG_REQ_RESPONSE) ? (TWOWAY_MSG_PROP) : 0);
-            //DIST-TODO: Not sure where to draw the line between one-way with/out ack implementation
+            //DIST-TODO design: Not sure where to draw the line between one-way with/out ack implementation
             //If the worker was not aware of the no-ack policy, is it ok to always give a handle
             //and the comm-api contract is to at least set the HDL_SEND_OK flag ?
             ocrMsgHandle_t ** sendHandle = (properties & TWOWAY_MSG_PROP) ? &outgoingHandle : NULL;
 
-            //DIST-TODO, who's responsible for deallocating the handle ?
+            //DIST-TODO design: who's responsible for deallocating the handle ?
             //If the message is two-way, the creator of the handle is responsible for deallocation
             //If one-way, the comm-layer disposes of the handle when it is not needed anymore
             //=> Sounds like if an ack is expected, caller is responsible for dealloc, else callee
@@ -123,10 +120,53 @@ static void workerLoopHcComm_RL2(ocrWorker_t * worker) {
     // Poll for completion of all outstanding
     ocrMsgHandle_t * handle = NULL;
     pd->fcts.pollMessage(pd, &handle);
-    // DIST-TODO: this is borderline, because we've transitioned
+    // DIST-TODO stop: this is borderline, because we've transitioned
     // the comm-platform to RL2, we assume that poll blocks until
     // all messages have been processed.
     self->rl_completed[2] = true;
+}
+
+static u8 createProcessRequestEdt(ocrPolicyDomain_t * pd, ocrGuid_t templateGuid, u64 * paramv) {
+
+    ocrGuid_t edtGuid;
+    u32 paramc = 1;
+    u32 depc = 0;
+    u32 properties = 0;
+    ocrWorkType_t workType = EDT_RT_WORKTYPE;
+
+    START_PROFILE(api_EdtCreate);
+    ocrPolicyMsg_t msg;
+    u8 returnCode = 0;
+    getCurrentEnv(NULL, NULL, NULL, &msg);
+
+#define PD_MSG (&msg)
+#define PD_TYPE PD_MSG_WORK_CREATE
+    msg.type = PD_MSG_WORK_CREATE | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
+    PD_MSG_FIELD(guid.guid) = NULL_GUID;
+    PD_MSG_FIELD(guid.metaDataPtr) = NULL;
+    PD_MSG_FIELD(templateGuid.guid) = templateGuid;
+    PD_MSG_FIELD(templateGuid.metaDataPtr) = NULL;
+    PD_MSG_FIELD(affinity.guid) = NULL_GUID;
+    PD_MSG_FIELD(affinity.metaDataPtr) = NULL;
+    PD_MSG_FIELD(outputEvent.guid) = NULL_GUID;
+    PD_MSG_FIELD(outputEvent.metaDataPtr) = NULL;
+    PD_MSG_FIELD(paramv) = paramv;
+    PD_MSG_FIELD(paramc) = paramc;
+    PD_MSG_FIELD(depc) = depc;
+    PD_MSG_FIELD(depv) = NULL;
+    PD_MSG_FIELD(properties) = properties;
+    PD_MSG_FIELD(workType) = workType;
+
+    returnCode = pd->fcts.processMessage(pd, &msg, true);
+    if(returnCode) {
+        edtGuid = PD_MSG_FIELD(guid.guid);
+        DPRINTF(DEBUG_LVL_VVERB,"[%d] hc-comm-worker: Created processRequest EDT with guid %ld\n", (int)pd->myLocation, edtGuid);
+        RETURN_PROFILE(returnCode);
+    }
+
+    RETURN_PROFILE(0);
+#undef PD_MSG
+#undef PD_TYPE
 }
 
 static void workerLoopHcComm_RL3(ocrWorker_t * worker) {
@@ -153,20 +193,17 @@ static void workerLoopHcComm_RL3(ocrWorker_t * worker) {
             if (message->type & PD_MSG_REQUEST) {
                 DPRINTF(DEBUG_LVL_VVERB,"[%d] hc-comm-worker: Received message request, msgId: %ld\n", (int) pd->myLocation, message->msgId);
                 // This is an outstanding request, delegate to PD for processing
-                ocrGuid_t processRequestGuid;
                 u64 msgParamv = (u64) message;
-                ocrEdtCreate(&processRequestGuid, processRequestTemplate, 1, &msgParamv, 0, NULL, 0, NULL_GUID, NULL_GUID);
-                DPRINTF(DEBUG_LVL_VVERB,"[%d] hc-comm-worker: Created processRequest EDT with guid %ld\n", (int)pd->myLocation, processRequestGuid);
+                createProcessRequestEdt(pd, processRequestTemplate, &msgParamv);
                 // We do not need the handle anymore
                 handle->destruct(handle);
-                //DIST-TODO-3: depending on comm-worker implementation, the received
-                //message could then be 'wrapped' in an EDT and pushed to the
-                //deque for load-balancing purpose.
+                //DIST-TODO-3: depending on comm-worker implementation, the received message could
+                //then be 'wrapped' in an EDT and pushed to the deque for load-balancing purpose.
             } else {
                 // Poll a response to a message we had sent.
                 ASSERT(message->type & PD_MSG_RESPONSE);
                 DPRINTF(DEBUG_LVL_VVERB,"[%d] hc-comm-worker: Received message response for msgId: %ld\n", (int) pd->myLocation, message->msgId); // debug
-                //DIST-TODO: If it's a response, how do know if a worker is blocking on the message
+                //DIST-TODO design: If it's a response, how do we know if a worker is blocking on the message
                 //      or if we need to spawn a new task (i.e. two-way but asynchronous handling of response)
                 // => Sounds this should be specified in the handler
 
@@ -191,7 +228,7 @@ static void workerLoopHcComm_RL3(ocrWorker_t * worker) {
                 //the request msg as an input buffer for the response.
             }
         } else {
-            //DIST-TODO-1 No messages ready for processing, ask PD for EDT work.
+            //DIST-TODO No messages ready for processing, ask PD for EDT work.
         }
     } // run-loop
 }
@@ -214,16 +251,25 @@ static void workerLoopHcComm(ocrWorker_t * worker) {
     while(worker->fcts.isRunning(worker));
 }
 
-//DIST-TODO HACK
-#define HACK_RANK_SHIFT 64
+static bool isBlessedWorker(ocrWorker_t * worker, ocrGuid_t * affinityMasterPD) {
+    // Determine if current worker is the master worker of this PD
+    bool blessedWorker = (worker->type == MASTER_WORKERTYPE);
+    if (blessedWorker) {
+        // Determine if current master worker is part of master PD
+        u64 count = 0;
+        // There should be a single master PD
+        ASSERT(!ocrAffinityCount(AFFINITY_PD_MASTER, &count) && (count == 1));
+        ocrAffinityGet(AFFINITY_PD_MASTER, &count, affinityMasterPD);
+        ASSERT(count == 1);
+        blessedWorker &= (worker->pd->myLocation == affinityToLocation(*affinityMasterPD));
+    }
+    return blessedWorker;
+}
 
 void* runWorkerHcComm(ocrWorker_t * worker) {
-    bool blessedWorker = (worker->type == MASTER_WORKERTYPE);
-#ifdef ENABLE_COMM_PLATFORM_MPI
-        //DIST-HACK7 for MPI the blessed worker is master of rank 0
-        blessedWorker &= (worker->pd->myLocation == (ocrLocation_t) (0+HACK_RANK_SHIFT));
-        DPRINTF(DEBUG_LVL_INFO,"[%d] hc-comm-worker: blessed worker at location %d\n", (int)worker->pd->myLocation);
-#endif
+    ocrGuid_t affinityMasterPD;
+    bool blessedWorker = isBlessedWorker(worker, &affinityMasterPD);
+    DPRINTF(DEBUG_LVL_INFO,"[%d] hc-comm-worker: blessed worker at location %d\n", (int)worker->pd->myLocation);
     if (blessedWorker) {
         // This is all part of the mainEdt setup
         // and should be executed by the "blessed" worker.
@@ -236,7 +282,7 @@ void* runWorkerHcComm(ocrWorker_t * worker) {
         ocrGuid_t dbGuid;
         void* dbPtr;
         ocrDbCreate(&dbGuid, &dbPtr, totalLength,
-                    DB_PROP_NONE, NULL_GUID, NO_ALLOC);
+                    DB_PROP_NONE, affinityMasterPD, NO_ALLOC);
         DPRINTF(DEBUG_LVL_INFO,"mainDb guid 0x%lx ptr %p\n", dbGuid, dbPtr);
         // copy packed args to DB
         hal_memCopy(dbPtr, packedUserArgv, totalLength, 0);
@@ -246,7 +292,7 @@ void* runWorkerHcComm(ocrWorker_t * worker) {
         ocrEdtTemplateCreate(&edtTemplateGuid, mainEdt, 0, 1);
         ocrEdtCreate(&edtGuid, edtTemplateGuid, EDT_PARAM_DEF, /* paramv = */ NULL,
                     /* depc = */ EDT_PARAM_DEF, /* depv = */ &dbGuid,
-                    EDT_PROP_NONE, NULL_GUID, NULL);
+                    EDT_PROP_NONE, affinityMasterPD, NULL);
     } else {
         // Set who we are
         ocrPolicyDomain_t *pd = worker->pd;
@@ -291,7 +337,7 @@ void stopWorkerHcComm(ocrWorker_t * selfBase) {
                 // All communications completed.
             break;
             case 1:
-                //DIST-TODO we don't need this RL I think
+                //DIST-TODO stop: we don't need this RL I think
                 DPRINTF(DEBUG_LVL_VVERB,"[%d] hc-comm-worker: begin shutdown RL1\n",(int) selfBase->pd->myLocation);
                 self->rl_completed[1] = true;
                 DPRINTF(DEBUG_LVL_VVERB,"[%d] hc-comm-worker: done shutdown RL1\n",(int) selfBase->pd->myLocation);
@@ -306,7 +352,7 @@ void stopWorkerHcComm(ocrWorker_t * selfBase) {
             ASSERT(false && "hc-comm-worker: Illegal runlevel in shutdown");
         }
     }  else {
-        //DIST-TODO: hc-comm-worker: Implement self shutdown
+        //DIST-TODO stop: Implement self shutdown
         ASSERT(false && "hc-comm-worker: Implement self shutdown");
         // worker stopping itself, just call the appropriate run-level
     }

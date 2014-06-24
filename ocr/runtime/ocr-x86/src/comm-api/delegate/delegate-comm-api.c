@@ -59,6 +59,7 @@ void destructMsgHandlerDelegate(ocrMsgHandle_t * handler) {
  */
 ocrMsgHandle_t * createMsgHandlerDelegate(ocrPolicyDomain_t * pd, ocrPolicyMsg_t * message) {
     ocrMsgHandle_t * handle = (ocrMsgHandle_t *) pd->fcts.pdMalloc(pd, sizeof(delegateMsgHandle_t));
+    ASSERT(handle != NULL);
     handle->msg = message;
     handle->response = NULL;
     handle->status = HDL_NORMAL;
@@ -74,7 +75,7 @@ u8 delegateCommSendMessage(ocrCommApi_t *self, ocrLocation_t target,
                             ocrMsgHandle_t **handle, u32 properties) {
     ocrPolicyDomain_t * pd = self->pd;
     ASSERT((pd->myLocation == message->srcLocation) && (target == message->destLocation));
-    ASSERT(pd->myLocation != target); //DIST-TODO not tested that
+    ASSERT(pd->myLocation != target); //DIST-TODO not tested sending a message to self
 
     if (!(properties & PERSIST_MSG_PROP)) {
         // Need to make a copy of the message now.
@@ -90,7 +91,10 @@ u8 delegateCommSendMessage(ocrCommApi_t *self, ocrLocation_t target,
         properties &= PERSIST_MSG_PROP;
     }
     ocrMsgHandle_t * handlerDelegate = createMsgHandlerDelegate(pd, message);
-    // Give comm handler to policy-domain
+    DPRINTF(DEBUG_LVL_VVERB,"[%d] delegate-comm-api: send message handle=%p, msg=%p type=0x%lx\n", (int) pd->myLocation,
+        handlerDelegate, message, message->type);
+
+    // Give comm handle to policy-domain
     ocrFatGuid_t fatGuid;
     fatGuid.metaDataPtr = handlerDelegate;
     ocrPolicyMsg_t giveMsg;
@@ -141,7 +145,7 @@ u8 delegateCommPollMessage(ocrCommApi_t *self, ocrMsgHandle_t **handle) {
         if (handle != NULL) {
             #ifdef OCR_ASSERT
             // was polling for a specific handle, check if that's what we got
-            //DIST-TODO: comparing polled expected handle and what we get: Is it the handle that's important here or the message id ?
+            //DIST-TODO design: comparing polled expected handle and what we get: Is it the handle that's important here or the message id ?
             if (*handle != NULL)
                 ASSERT(*handle == ((ocrMsgHandle_t*)delHandle));
             #endif
@@ -162,7 +166,7 @@ u8 delegateCommPollMessage(ocrCommApi_t *self, ocrMsgHandle_t **handle) {
  */
 u8 delegateCommWaitMessage(ocrCommApi_t *self, ocrMsgHandle_t **handle) {
     u8 ret;
-    //DIST-TODO is there a use case for waiting a one-way to complete ?
+    //DIST-TODO one-way ack: is there a use case for waiting a one-way to complete ?
     while((ret = self->fcts.pollMessage(self,handle)) == POLL_NO_MESSAGE);
     return ret;
 }

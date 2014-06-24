@@ -278,8 +278,8 @@ function run () {
                 TEST_ARGS=`cat ${TEST_ARGS_FILE}`
         fi
 
-        echo "${BIN_GEN_DIR}/${NAME} ${OCR_FLAGS}"
-        ${RUN_WRAPPER} ${BIN_GEN_DIR}/${NAME} ${OCR_FLAGS} ${TEST_ARGS}
+        echo "ocrrun ${BIN_GEN_DIR}/${NAME} ${OCR_FLAGS}"
+        ocrrun ${RUN_WRAPPER} ${BIN_GEN_DIR}/${NAME} ${OCR_FLAGS} ${TEST_ARGS}
         RES=$?
         cd -;
 

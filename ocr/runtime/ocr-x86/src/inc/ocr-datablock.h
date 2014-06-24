@@ -156,10 +156,17 @@ typedef struct _ocrDataBlock_t {
     ocrGuid_t allocatingPD; /**< Policy domain of the creating allocator */
     u64 size;               /**< Size of the data-block */
     void* ptr;              /**< Current location for this data-block */
-    u32 properties;         /**< Properties for the data-block */
+    u32 flags;              /**< flags for the data-block, lower 16 bits are info
+                                 from user, upper 16 bits is for internal bookeeping */
     u32 fctId;              /**< ID determining which functions to use */
 } ocrDataBlock_t;
 
+// Runtime DB properties and flags (upper 16 bits of a u32)
+// Properties for runtime acquire/release
+#define DB_PROP_RT_ACQUIRE   0x20
+// Flags for runtime acquire/release
+#define DB_FLAG_FETCH        0x30
+#define DB_FLAG_WRITE_BACK   0x40
 
 /****************************************************/
 /* OCR DATABLOCK FACTORY                            */

@@ -295,6 +295,7 @@ typedef struct _ocrPolicyMsg_t {
             void* ptr;                    /**< Out: Address of created DB */
             u64 size;                     /**< In: Size of the created DB */
             ocrFatGuid_t affinity;        /**< In: Affinity group for the DB */
+            u32 flags;                    /**< In: Flags for the creation */
             u32 properties;               /**< In: Properties for creation */
             ocrDataBlockType_t dbType;    /**< In: Type of memory requested */
             ocrInDbAllocator_t allocator; /**< In: In-DB allocator */
@@ -310,13 +311,18 @@ typedef struct _ocrPolicyMsg_t {
             ocrFatGuid_t guid;         /**< In: GUID of the DB to acquire */
             ocrFatGuid_t edt;          /**< In: EDT doing the acquiring */
             void* ptr;                 /**< Out: Pointer to the acquired memory */
-            u32 properties;            /**< In: Properties for acquire. Bit 0: 1 if runtime acquire */
+            u64 size;                  /**< Out: Size of the acquired memory */
+            u32 flags;                 /**< In: Flags for the acquire */
+            u32 properties;            /**< Out: Status of the acquire */
         } PD_MSG_STRUCT_NAME(PD_MSG_DB_ACQUIRE);
 
         struct {
             ocrFatGuid_t guid;         /**< In: GUID of the DB to release */
             ocrFatGuid_t edt;          /**< In: GUID of the EDT doing the release */
-            u32 properties;            /**< In: Properties of the release: Bit 0: 1 if runtime release */
+            void* ptr;                 /**< In: Optionally provide pointer to the released memory */
+            u64 size;                  /**< In: Optionally provide size to the released memory */
+            u32 flags;                 /**< In: Flags for the release */
+            u32 properties;            /**< Out: Status of the release */
         } PD_MSG_STRUCT_NAME(PD_MSG_DB_RELEASE);
 
         struct {
@@ -357,15 +363,9 @@ typedef struct _ocrPolicyMsg_t {
             u32 paramc;                /**< In/out: Number of parameters; on out returns real number
                                         * in case of EDT_PARAM_DEF as input for example */
             u32 depc;                  /**< In/out: Number of dependence slots; same comment as above */
+            ocrFatGuid_t * depv;       /**< In: Dependences for this EDT */
             u32 properties;            /**< In: properties for the creation */
             ocrWorkType_t workType;    /**< In: Type of work to create */
-            //
-            //DIST-TODO this is until we get somekind of guidCopy
-            //
-            ocrGuid_t t_Guid;     /**< In/Out: GUID of the EDT template */
-            ocrEdt_t t_FuncPtr;      /**< In: Function to execute for this EDT */
-            u32 t_paramc;            /**< In: Number of parameters for EDT */
-            u32 t_depc;              /**< In: Number of dependences for EDT */
         } PD_MSG_STRUCT_NAME(PD_MSG_WORK_CREATE);
 
         struct {
@@ -434,8 +434,7 @@ typedef struct _ocrPolicyMsg_t {
         struct {
             ocrFatGuid_t guid; /**< In/Out:
                                 * In: The GUID we request a metadata copy */
-            //DIST-TODO: hardcoded and we probably need a way to chunk the metadata in multiple messages
-            char metaData[1]; /** Contains the copy of the metadata */
+            char metaData[1]; /** Base pointer containing the copy of the metadata. */
         } PD_MSG_STRUCT_NAME(PD_MSG_GUID_METADATA_CLONE);
 
         struct {

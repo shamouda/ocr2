@@ -1,4 +1,5 @@
 ocr.c           - shutdown & argc management
+ocr-affinity.c  - public affinity API
 ocr-db.c        - public DB API
 ocr-edt.c       - public EDT API
 ocr-lib.c       - intialization helper functions

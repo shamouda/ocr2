@@ -80,7 +80,7 @@ typedef struct _ocrWorker_t {
     ocrCompTarget_t **computes; /**< Compute node(s) associated with this worker */
     u64 computeCount;           /**< Number of compute node(s) associated */
 
-    struct _ocrTask_t *curTask; /**< Currently executing task */
+    struct _ocrTask_t * volatile curTask; /**< Currently executing task */
 
     ocrWorkerFcts_t fcts;
 } ocrWorker_t;

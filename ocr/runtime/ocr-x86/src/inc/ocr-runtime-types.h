@@ -142,8 +142,9 @@ typedef enum {
  * stripped out but it is here in case we need it later
  */
 typedef enum {
-    EDT_WORKTYPE    = 0x1,
-    MAX_WORKTYPE    = 0x2
+    EDT_USER_WORKTYPE    = 0x1,
+    EDT_RT_WORKTYPE = 0x2,
+    MAX_WORKTYPE    = 0x3
 } ocrWorkType_t;
 
 typedef enum {
@@ -229,7 +230,7 @@ typedef u64 ocrLocation_t;
  * @brief Indicates that a message was returned and available
  * and that more messages are available
  */
- #define POLL_MORE_MESSAGE 0x2
+#define POLL_MORE_MESSAGE 0x2
 /**
  * @brief AND the return code of pollMessage with this
  * mask to get any real error codes

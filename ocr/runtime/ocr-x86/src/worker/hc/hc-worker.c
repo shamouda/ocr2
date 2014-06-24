@@ -14,6 +14,8 @@
 #include "ocr-sysboot.h"
 #include "ocr-types.h"
 #include "ocr-worker.h"
+#include "ocr-affinity.h"
+#include "ocr-placer.h"
 #include "ocr-db.h"
 #include "worker/hc/hc-worker.h"
 
@@ -149,8 +151,24 @@ void hcStartWorker(ocrWorker_t * base, ocrPolicyDomain_t * policy) {
     // Otherwise, it is highly likely that we are shutting down
 }
 
-void* hcRunWorker(ocrWorker_t * worker) {
+static bool isBlessedWorker(ocrWorker_t * worker, ocrGuid_t * affinityMasterPD) {
+    // Determine if current worker is the master worker of this PD
     bool blessedWorker = (worker->type == MASTER_WORKERTYPE);
+    if (blessedWorker) {
+        // Determine if current master worker is part of master PD
+        u64 count = 0;
+        // There should be a single master PD
+        ASSERT(!ocrAffinityCount(AFFINITY_PD_MASTER, &count) && (count == 1));
+        ocrAffinityGet(AFFINITY_PD_MASTER, &count, affinityMasterPD);
+        ASSERT(count == 1);
+        blessedWorker &= (worker->pd->myLocation == affinityToLocation(*affinityMasterPD));
+    }
+    return blessedWorker;
+}
+
+void* hcRunWorker(ocrWorker_t * worker) {
+    ocrGuid_t affinityMasterPD;
+    bool blessedWorker = isBlessedWorker(worker, &affinityMasterPD);
     if (blessedWorker) {
         // This is all part of the mainEdt setup
         // and should be executed by the "blessed" worker.
@@ -163,7 +181,7 @@ void* hcRunWorker(ocrWorker_t * worker) {
         ocrGuid_t dbGuid;
         void* dbPtr;
         ocrDbCreate(&dbGuid, &dbPtr, totalLength,
-                    DB_PROP_NONE, NULL_GUID, NO_ALLOC);
+                    DB_PROP_NONE, affinityMasterPD, NO_ALLOC);
 
         // copy packed args to DB
         hal_memCopy(dbPtr, packedUserArgv, totalLength, 0);
@@ -173,7 +191,7 @@ void* hcRunWorker(ocrWorker_t * worker) {
         ocrEdtTemplateCreate(&edtTemplateGuid, mainEdt, 0, 1);
         ocrEdtCreate(&edtGuid, edtTemplateGuid, EDT_PARAM_DEF, /* paramv = */ NULL,
                      /* depc = */ EDT_PARAM_DEF, /* depv = */ &dbGuid,
-                     EDT_PROP_NONE, NULL_GUID, NULL);
+                     EDT_PROP_NONE, affinityMasterPD, NULL);
     } else {
         // Set who we are
         ocrPolicyDomain_t *pd = worker->pd;

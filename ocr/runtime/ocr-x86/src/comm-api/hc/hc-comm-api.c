@@ -75,7 +75,7 @@ u8 sendMessageHcCommApi(ocrCommApi_t *self, ocrLocation_t target, ocrPolicyMsg_t
                 // Handle creation requested
                 *handle = createMsgHandler(self, message);
             }
-            //DIST-TODO: is it ok to consider message sent here
+            //Message sent (potentially not yet received at destination)
             (*handle)->status = HDL_SEND_OK;
             // Associate id with handle
             hashtableNonConcPut(commApiHc->handleMap, (void *) id, *handle);
@@ -95,17 +95,17 @@ u8 sendMessageHcCommApi(ocrCommApi_t *self, ocrLocation_t target, ocrPolicyMsg_t
  *
  */
 u8 pollMessageHcCommApi(ocrCommApi_t *self, ocrMsgHandle_t **handle) {
-
-    //DIST-TODO: This implementation does not support one-way with ack
-    //However it's a little hard to detect here, because a handle's message
-    //may not be valid and it's the only place where we can.
+    //DIST-TODO one-way ack: cannot poll to check completion of one-way messages
+    //This implementation does not support one-way with ack
+    //However it's a little hard to detect here. A handle message
+    //pointer may have been de-allocated and it's the only place
+    //where we can have a look.
 
     //IMPL: Alternative would be that the comm-platform always return
     //out/in comms that are done and we can update the status here.
     //That would require to be able to tell the platform to post new recv.
     ocrCommApiHc_t * commApiHc = (ocrCommApiHc_t *) self;
     ocrPolicyMsg_t * msg = NULL;
-    //DIST-TODO: a contract here is probably wrong because it makes assumptions
     //IMPL: by contract commPlatform only poll and return recvs.
     //They can be incoming request or response. (but not outgoing req/resp ack)
     u8 ret = self->commPlatform->fcts.pollMessage(self->commPlatform, &msg, NULL, HC_COMM_NO_PROP, HC_COMM_NO_MASK);

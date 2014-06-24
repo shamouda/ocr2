@@ -70,13 +70,13 @@ void hcCommSchedulerStop(ocrScheduler_t * self) {
  */
 u8 hcCommSchedulerTakeComm(ocrScheduler_t *self, u32* count, ocrFatGuid_t * fatHandlers, u32 properties) {
     ocrSchedulerHcCommDelegate_t * commSched = (ocrSchedulerHcCommDelegate_t *) self;
-    ocrWorker_t *worker = NULL; //DIST-TODO: Casting-down to hc worker is borderline
+    ocrWorker_t *worker = NULL; //DIST-TODO sep-concern: Do we need a way to register worker types somehow ?
     getCurrentEnv(NULL, &worker, NULL, NULL);
     ocrWorkerHc_t * hcWorker = (ocrWorkerHc_t *) worker;
 
     if (hcWorker->hcType == HC_WORKER_COMM) {
         // Steal from other worker's outbox
-        //DIST-TODO use real randomized iterator here
+        //PERF: use real randomized iterator here
         // Try a round of stealing on other worker's outbox
         //NOTE: If we don't care about wasting a steal on self, we wouldn't need
         //      the whole worker ID business
@@ -126,7 +126,7 @@ u8 hcCommSchedulerTakeComm(ocrScheduler_t *self, u32* count, ocrFatGuid_t * fatH
  */
 u8 hcCommSchedulerGiveComm(ocrScheduler_t *self, u32* count, ocrFatGuid_t* fatHandlers, u32 properties) {
     ocrSchedulerHcCommDelegate_t * commSched = (ocrSchedulerHcCommDelegate_t *) self;
-    ocrWorker_t *worker = NULL; //DIST-TODO: Casting-down to hc worker is borderline
+    ocrWorker_t *worker = NULL; //DIST-TODO sep-concern: Do we need a way to register worker types somehow ?
     getCurrentEnv(NULL, &worker, NULL, NULL);
     ocrWorkerHc_t * hcWorker = (ocrWorkerHc_t *) worker;
 

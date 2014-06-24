@@ -14,6 +14,7 @@
 #include "utils/ocr-utils.h"
 #include "utils/hashtable.h"
 #include "policy-domain/hc/hc-policy.h"
+#include "ocr-placer.h"
 
 /******************************************************/
 /* OCR-HC DISTRIBUTED POLICY DOMAIN                   */
@@ -21,9 +22,8 @@
 
 typedef struct {
     ocrPolicyDomainHc_t base;
-    // Map is used to create proxy event for some operations
-    hashtable_t * eventProxyMap;
-    ocrGuid_t remoteSatisfyTemplateGuid;
+    u32 proxyLock; /**< Lock for creating proxies for remote DB */
+    ocrPlacer_t * placer;
     u8 (*baseProcessMessage)(struct _ocrPolicyDomain_t *self, struct _ocrPolicyMsg_t *msg,
                          u8 isBlocking);
     void (*baseStart)(struct _ocrPolicyDomain_t *self);

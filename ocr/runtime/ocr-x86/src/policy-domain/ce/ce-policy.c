@@ -574,7 +574,7 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         ASSERT(db->fctId == self->dbFactories[0]->factoryId);
         //ASSERT(!(msg->type & PD_MSG_REQ_RESPONSE));
         PD_MSG_FIELD(properties) = self->dbFactories[0]->fcts.acquire(
-            db, &(PD_MSG_FIELD(ptr)), PD_MSG_FIELD(edt), PD_MSG_FIELD(properties) & 1);
+            db, &(PD_MSG_FIELD(ptr)), PD_MSG_FIELD(edt), PD_MSG_FIELD(properties) & DB_PROP_RT_ACQUIRE);
         returnCode = ceProcessResponse(self, msg, 0);
 #undef PD_MSG
 #undef PD_TYPE
@@ -661,7 +661,7 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         if(PD_MSG_FIELD(outputEvent.guid) == UNINITIALIZED_GUID) {
             outputEvent = &(PD_MSG_FIELD(outputEvent));
         }
-        ASSERT(PD_MSG_FIELD(workType) == EDT_WORKTYPE);
+        ASSERT((PD_MSG_FIELD(workType) == EDT_USER_WORKTYPE) || (PD_MSG_FIELD(workType) == EDT_RT_WORKTYPE));
         PD_MSG_FIELD(properties) = ceCreateEdt(
             self, &(PD_MSG_FIELD(guid)), PD_MSG_FIELD(templateGuid),
             &PD_MSG_FIELD(paramc), PD_MSG_FIELD(paramv), &PD_MSG_FIELD(depc),
@@ -1018,7 +1018,7 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
 
     case PD_MSG_MGT_SHUTDOWN: {
         START_PROFILE(pd_ce_Shutdown);
-        // REC: Used to be fixed to 1.
+        // REC: Vincent, I removed neighborCount = 1. Plz check
         u32 neighborCount = self->neighborCount;
         ocrPolicyDomainCe_t * cePolicy = (ocrPolicyDomainCe_t *)self;
         if (msg->type & PD_MSG_REQUEST) {

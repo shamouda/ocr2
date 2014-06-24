@@ -169,7 +169,7 @@ void* xeRunWorker(ocrWorker_t * worker) {
         void * packedUserArgv;
 #ifdef TOOL_CHAIN_XE
         packedUserArgv = ((ocrPolicyDomainXe_t*)pd)->packedArgsLocation;
-extern ocrGuid_t mainEdt( u32, u64 *, u32, ocrEdtDep_t * );
+        extern ocrGuid_t mainEdt( u32, u64 *, u32, ocrEdtDep_t * );
 #else
         packedUserArgv = userArgsGet();
         ocrEdt_t mainEdt = mainEdtGet();

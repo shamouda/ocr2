@@ -13,6 +13,9 @@ ifneq (${ARCH}, x86-pthread-mpi)
 $(error ARCH is set to ${ARCH} but expected x86-pthread-mpi)
 endif
 endif
+
+DEFAULT_CONFIG=mach-hc-dist-mpi-clone-4w.cfg
+
 #
 # Tool-chain to be used for the build
 #

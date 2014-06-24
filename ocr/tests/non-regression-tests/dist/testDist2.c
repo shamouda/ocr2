@@ -10,7 +10,7 @@
 #include "ocr.h"
 
 /**
- * DESC: OCR-DIST - create a remote EDT
+ * DESC: OCR-DIST - create a local event and a remote EDT, satisfy, then add-dep.
  */
 
 ocrGuid_t remoteEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
@@ -27,13 +27,18 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrAffinityGet(AFFINITY_PD, &affinityCount, affinities);
     ocrGuid_t edtAffinity = affinities[affinityCount-1]; //TODO this implies we know current PD is '0'
 
-    // create local edt that depends on the remote edt, the db is automatically cloned
     ocrGuid_t remoteEdtTemplateGuid;
-    ocrEdtTemplateCreate(&remoteEdtTemplateGuid, remoteEdt, 0, 0);
-
+    ocrEdtTemplateCreate(&remoteEdtTemplateGuid, remoteEdt, 0, 1);
+    printf("[local] mainEdt: create remote EDT\n");
     ocrGuid_t edtGuid;
-    ocrEdtCreate(&edtGuid, remoteEdtTemplateGuid, 0, NULL, 0, NULL_GUID,
+    ocrEdtCreate(&edtGuid, remoteEdtTemplateGuid, EDT_PARAM_DEF, NULL, EDT_PARAM_DEF, NULL_GUID,
         EDT_PROP_NONE, edtAffinity, NULL);
-
+    ocrGuid_t eventGuid;
+    printf("[local] mainEdt: create local event\n");
+    ocrEventCreate(&eventGuid, OCR_EVENT_STICKY_T, true);
+    printf("[local] mainEdt: satisfy local Event\n");
+    ocrEventSatisfy(eventGuid, NULL_GUID);
+    printf("[local] mainEdt: add-dependence local Event, remote EDT\n");
+    ocrAddDependence(eventGuid, edtGuid, 0, DB_MODE_RO);
     return NULL_GUID;
 }

@@ -187,7 +187,7 @@ static u8 finishLatchCheckin(ocrPolicyDomain_t *pd, ocrPolicyMsg_t *msg,
     PD_MSG_FIELD(source) = sourceEvent;
     PD_MSG_FIELD(dest) = latchEvent;
     PD_MSG_FIELD(slot) = OCR_EVENT_LATCH_DECR_SLOT;
-    PD_MSG_FIELD(properties) = 0; // TODO: do we want a mode for this?
+    PD_MSG_FIELD(properties) = false; // not called from add-dependence
     RESULT_PROPAGATE(pd->fcts.processMessage(pd, msg, false));
 #undef PD_MSG
 #undef PD_TYPE
@@ -206,7 +206,7 @@ static u8 registerOnFrontier(ocrTaskHc_t *self, ocrPolicyDomain_t *pd,
                              ocrPolicyMsg_t *msg, u32 slot) {
 #define PD_MSG (msg)
 #define PD_TYPE PD_MSG_DEP_REGWAITER
-    msg->type = PD_MSG_DEP_REGWAITER | PD_MSG_REQUEST;
+    msg->type = PD_MSG_DEP_REGWAITER | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
     PD_MSG_FIELD(waiter.guid) = self->base.guid;
     PD_MSG_FIELD(waiter.metaDataPtr) = self;
     PD_MSG_FIELD(dest.guid) = self->signalers[slot].guid;
@@ -486,7 +486,6 @@ u8 satisfyTaskHc(ocrTask_t * base, ocrFatGuid_t data, u32 slot) {
     // Could be moved a little later if the ASSERT was not here
     // Should not make a huge difference
     hal_lock32(&(self->lock));
-    ASSERT(slot < base->depc); // Check to make sure non crazy value is passed in
     ASSERT(self->signalers[slot].slot != (u32)-1); // Check to see if not already satisfied
     ASSERT((self->signalers[slot].slot == slot && (self->signalers[slot].slot == self->frontierSlot)) ||
            (self->signalers[slot].slot == (u32)-2) || /* Checks if ONCE/LATCH event satisfaction */
@@ -506,6 +505,8 @@ u8 satisfyTaskHc(ocrTask_t * base, ocrFatGuid_t data, u32 slot) {
         while(++self->frontierSlot < base->depc &&
                 self->signalers[self->frontierSlot].slot != ++slot) ;
         // We found a slot that is == to slot (so unsatisfied and not once)
+        //TODO There's a race here where we find at a free slot, check it is
+        // not initialized and call register frontier.
         if(self->frontierSlot < base->depc &&
                 self->signalers[self->frontierSlot].guid != UNINITIALIZED_GUID) {
             u32 tslot = self->frontierSlot;
@@ -522,6 +523,7 @@ u8 satisfyTaskHc(ocrTask_t * base, ocrFatGuid_t data, u32 slot) {
             hal_unlock32(&(self->lock));
         }
     } else {
+        //DIST-TODO: The slot can not be the frontierSlot only because of once-event I think
         hal_unlock32(&(self->lock));
     }
     return 0;
@@ -544,8 +546,9 @@ u8 registerSignalerTaskHc(ocrTask_t * base, ocrFatGuid_t signalerGuid, u32 slot,
     //DIST-TODO this is the reason why we need to introduce new kinds of guid
     //because we don't have support for cloning metadata around yet
     if(signalerKind & OCR_GUID_EVENT) {
+        //DIST-TODO: slot is already initialized
         node->slot = slot;
-        if((signalerKind == OCR_GUID_EVENT_ONCE) ||
+        if((signalerKind == OCR_GUID_EVENT_ONCE) || //TODO why once OR latch ??
                 (signalerKind == OCR_GUID_EVENT_LATCH)) {
             node->slot = (u32)-2; // To record this slot is for a once event
 
@@ -593,6 +596,9 @@ u8 registerSignalerTaskHc(ocrTask_t * base, ocrFatGuid_t signalerGuid, u32 slot,
             //TODO additionally, think there'a bug here because we need to try and iterate
             //the frontier here because the first slot could be db, followed by other dependences.
             node->slot = (u32)-1; // Already satisfied
+            //TODO bug: we need to try and iterate the frontier here because the
+            //first slot could be db, followed by other dependences.
+            printf("register DB\n");
             hal_lock32(&(self->lock));
             ++(self->slotSatisfiedCount);
             if(base->depc == self->slotSatisfiedCount) {
@@ -676,11 +682,7 @@ u8 taskExecute(ocrTask_t* base) {
     u32 paramc = base->paramc;
     u64 * paramv = base->paramv;
     u32 depc = base->depc;
-
     ocrPolicyDomain_t *pd = NULL;
-    ocrPolicyMsg_t msg;
-    getCurrentEnv(&pd, NULL, NULL, &msg);
-
     ocrEdtDep_t * depv = NULL;
     u64 doNotReleaseSlots = 0; // Used to support an EDT acquiring the same DB
                                // multiple times. For now limit to 64 DBs
@@ -688,9 +690,9 @@ u8 taskExecute(ocrTask_t* base) {
                                // than 64 DBs, others can have as many as they want)
     // If any dependencies, acquire their data-blocks
     u32 maxAcquiredDb = 0;
-
+    ocrPolicyMsg_t msg;
     ASSERT(derived->unkDbs == NULL); // Should be no dynamically acquired DBs before running
-
+    getCurrentEnv(&pd, NULL, NULL, NULL);
     if (depc != 0) {
         START_PROFILE(ta_hc_dbAcq);
         //TODO would be nice to resolve regNode into guids before
@@ -704,16 +706,18 @@ u8 taskExecute(ocrTask_t* base) {
             depv[maxAcquiredDb].guid = derived->signalers[maxAcquiredDb].guid;
             if(depv[maxAcquiredDb].guid != NULL_GUID) {
                 // We send a message that we want to acquire the DB
-#define PD_MSG (&msg)
-#define PD_TYPE PD_MSG_DB_ACQUIRE
+                getCurrentEnv(NULL, NULL, NULL, &msg);
+            #define PD_MSG (&msg)
+            #define PD_TYPE PD_MSG_DB_ACQUIRE
                 msg.type = PD_MSG_DB_ACQUIRE | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
                 PD_MSG_FIELD(guid.guid) = depv[maxAcquiredDb].guid;
                 PD_MSG_FIELD(guid.metaDataPtr) = NULL;
                 PD_MSG_FIELD(edt.guid) = base->guid;
                 PD_MSG_FIELD(edt.metaDataPtr) = base;
-                PD_MSG_FIELD(properties) = 1; // Runtime acquire
+                PD_MSG_FIELD(flags) = 0;
+                PD_MSG_FIELD(properties) = DB_PROP_RT_ACQUIRE; // Runtime acquire
                 // This call may fail if the policy domain goes down
-                // while we are staring to execute
+                // while we are starting to execute
 
                 if(pd->fcts.processMessage(pd, &msg, true)) {
                     // We are not going to launch the EDT
@@ -735,8 +739,8 @@ u8 taskExecute(ocrTask_t* base) {
                     ASSERT(0);
                 }
                 depv[maxAcquiredDb].ptr = PD_MSG_FIELD(ptr);
-#undef PD_MSG
-#undef PD_TYPE
+            #undef PD_MSG
+            #undef PD_TYPE
             } else {
                 depv[maxAcquiredDb].ptr = NULL;
             }
@@ -782,14 +786,18 @@ u8 taskExecute(ocrTask_t* base) {
             if((depv[i].guid != NULL_GUID) &&
                ((i >= 64) || (doNotReleaseSlots == 0) ||
                 ((i < 64) && (((1ULL << i) & doNotReleaseSlots) == 0)))) {
+                getCurrentEnv(NULL, NULL, NULL, &msg);
 #define PD_MSG (&msg)
 #define PD_TYPE PD_MSG_DB_RELEASE
-                msg.type = PD_MSG_DB_RELEASE | PD_MSG_REQUEST;
+                msg.type = PD_MSG_DB_RELEASE | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
                 PD_MSG_FIELD(guid.guid) = depv[i].guid;
+                //DIST-TODO This won't be meaningful in distributed and runtime will
+                //do the right thing and fetch the pointer. Keep it that way for shared-me
                 PD_MSG_FIELD(guid.metaDataPtr) = NULL;
                 PD_MSG_FIELD(edt.guid) = base->guid;
                 PD_MSG_FIELD(edt.metaDataPtr) = base;
-                PD_MSG_FIELD(properties) = 1; // Runtime release
+                PD_MSG_FIELD(flags) = 0;
+                PD_MSG_FIELD(properties) = DB_PROP_RT_ACQUIRE; // Runtime release
                 // Ignore failures at this point
                 pd->fcts.processMessage(pd, &msg, false);
 #undef PD_MSG
@@ -807,9 +815,10 @@ u8 taskExecute(ocrTask_t* base) {
         ocrGuid_t *extraToFree = derived->unkDbs;
         u64 count = derived->countUnkDbs;
         while(count) {
+            getCurrentEnv(NULL, NULL, NULL, &msg);
 #define PD_MSG (&msg)
 #define PD_TYPE PD_MSG_DB_RELEASE
-            msg.type = PD_MSG_DB_RELEASE | PD_MSG_REQUEST;
+            msg.type = PD_MSG_DB_RELEASE | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
             PD_MSG_FIELD(guid.guid) = extraToFree[0];
             PD_MSG_FIELD(guid.metaDataPtr) = NULL;
             PD_MSG_FIELD(edt.guid) = base->guid;
@@ -831,6 +840,7 @@ u8 taskExecute(ocrTask_t* base) {
     // Now deal with the output event
     if(base->outputEvent != NULL_GUID) {
         if(retGuid != NULL_GUID) {
+            getCurrentEnv(NULL, NULL, NULL, &msg);
     #define PD_MSG (&msg)
     #define PD_TYPE PD_MSG_DEP_ADD
             msg.type = PD_MSG_DEP_ADD | PD_MSG_REQUEST;
@@ -845,6 +855,7 @@ u8 taskExecute(ocrTask_t* base) {
     #undef PD_MSG
     #undef PD_TYPE
         } else {
+            getCurrentEnv(NULL, NULL, NULL, &msg);
     #define PD_MSG (&msg)
     #define PD_TYPE PD_MSG_DEP_SATISFY
             msg.type = PD_MSG_DEP_SATISFY | PD_MSG_REQUEST;

@@ -265,6 +265,7 @@ install: ${INSTALL_TARGETS}
 	@$(CP) ${INSTALL_FILES} $(OCRDIR)/install/$(ARCH)/lib
 	@$(CP) -r $(OCRDIR)/inc/* $(OCRDIR)/install/$(ARCH)/include
 	@$(CP) -r $(OCRDIR)/machine-configs/$(ARCH)/* $(OCRDIR)/install/$(ARCH)/config
+	@$(CP) -r $(OCRDIR)/build/$(ARCH)/ocrrun $(OCRDIR)/install/$(ARCH)/bin
 	-@$(LN) -fs ./$(DEFAULT_CONFIG) $(OCRDIR)/install/$(ARCH)/config/default.cfg
 
 .PHONY: uninstall

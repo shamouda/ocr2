@@ -13,6 +13,7 @@
 #include "ocr-sysboot.h"
 
 // Default hashtable's number of buckets
+//PERF: This parameter heavily impacts the GUID provider scalability !
 #define DEFAULT_NB_BUCKETS 10
 
 // Guid is composed of : (LOCID KIND COUNTER)
@@ -35,7 +36,7 @@
 static u64 guidCounter = 0;
 
 void countedMapDestruct(ocrGuidProvider_t* self) {
-    destructHashtable(((ocrGuidProviderCountedMap_t *) self)->guidImplTable);
+    //destructHashtable(((ocrGuidProviderCountedMap_t *) self)->guidImplTable);
     runtimeChunkFree((u64)self, NULL);
 }
 
@@ -72,18 +73,16 @@ static u64 extractLocIdFromGuid(ocrGuid_t guid) {
     return (u64) ((guid & GUID_LOCID_MASK) >> GUID_LOCID_SHIFT_RIGHT);
 }
 
-#define HACK_RANK_SHIFT 64
-
 static ocrLocation_t locIdtoLocation(u64 locId) {
-    //DIST-TODO: We assume there will be a mapping between a location
-    //           and an 'id' stored in the guid.
-    return (ocrLocation_t) (locId + HACK_RANK_SHIFT);
+    //TODO: We assume there will be a mapping between a location
+    //      and an 'id' stored in the guid. For now identity.
+    return (ocrLocation_t) (locId);
 }
 
 static u64 locationToLocId(ocrLocation_t location) {
-    //DIST-TODO: We assume there will be a mapping between a location
-    //           and an 'id' stored in the guid.
-    u64 locId = (u64) ((int)location - HACK_RANK_SHIFT);
+    //TODO: We assume there will be a mapping between a location
+    //      and an 'id' stored in the guid. For now identity.
+    u64 locId = (u64) ((int)location);
     // Make sure we're not overflowing location size
     ASSERT((locId < (1<<GUID_LOCID_SIZE)) && "GUID location ID overflows");
     return locId;
@@ -94,7 +93,6 @@ static u64 locationToLocId(ocrLocation_t location) {
  */
 static u64 generateNextGuid(ocrGuidProvider_t* self, ocrGuidKind kind) {
     u64 locId = (u64) locationToLocId(self->pd->myLocation);
-    // printf("Generating guid with loc %d\n", (int) locId);
     u64 locIdShifted = locId << LOCID_LOCATION;
     u64 kindShifted = kind << KIND_LOCATION;
     u64 guid = (locIdShifted | kindShifted) << GUID_COUNTER_SIZE;
@@ -116,7 +114,6 @@ static u8 countedMapGetGuid(ocrGuidProvider_t* self, ocrGuid_t* guid, u64 val, o
     *guid = (ocrGuid_t) newGuid;
     return 0;
 }
-
 
 /**
  * @brief Allocates a piece of memory that embeds both
