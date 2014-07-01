@@ -57,7 +57,7 @@ extern "C" {
             memset(&edt->dbList[edt->numDbs], 0, (edt->maxDbs-edt->numDbs)*sizeof(dbTable_t));
         }
         edt->dbList[edt->numDbs].db = db;
-        edt->dbList[edt->numDbs].slot = 100;
+        edt->dbList[edt->numDbs].slot = 0xff;
         edt->dbList[edt->numDbs].start = (u64)addr;
         edt->dbList[edt->numDbs].end = (u64)addr+len;
         edt->dbList[edt->numDbs].readcount = (u64)0;
