@@ -22,7 +22,7 @@ typedef struct {
                                       struct _ocrScheduler_t *self, ocrParamList_t *perInstance);
     void (*baseStart)(struct _ocrScheduler_t *self, struct _ocrPolicyDomain_t * PD);
     void (*baseStop)(struct _ocrScheduler_t *self);
-
+    u8 (*baseMonitorProgress)(struct _ocrScheduler_t *self, ocrMonitorProgress_t type, void * monitoree);
 } ocrSchedulerFactoryHcComm_t;
 
 typedef struct {
@@ -31,9 +31,11 @@ typedef struct {
     deque_t ** outboxes;
     u64 inboxesCount;
     deque_t ** inboxes;
+    u32 * inboxesLocks;
     // cached base function pointers
     void (*baseStart)(struct _ocrScheduler_t *self, struct _ocrPolicyDomain_t * PD);
     void (*baseStop)(struct _ocrScheduler_t *self);
+    u8 (*baseMonitorProgress)(struct _ocrScheduler_t *self, ocrMonitorProgress_t type, void * monitoree);
 } ocrSchedulerHcCommDelegate_t;
 
 ocrSchedulerFactory_t * newOcrSchedulerFactoryHcCommDelegate(ocrParamList_t *perType);

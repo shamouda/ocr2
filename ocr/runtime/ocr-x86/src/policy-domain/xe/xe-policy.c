@@ -54,6 +54,7 @@ void xePolicyDomainBegin(ocrPolicyDomain_t * policy) {
     for(i = 0; i < maxCount; i++) {
         policy->commApis[i]->fcts.begin(policy->commApis[i], policy);
     }
+    policy->placer = NULL;
 
     // REC: Moved all workers to start here.
     // Note: it's important to first logically start all workers.

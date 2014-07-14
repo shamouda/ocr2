@@ -375,7 +375,7 @@ u8 satisfyEventHcLatch(ocrEvent_t *base, ocrFatGuid_t db, u32 slot) {
     return destructEventHc(base);
 }
 
-u8 registerSignalerHc(ocrEvent_t *self, ocrFatGuid_t signaler, u32 slot, bool isDepAdd) {
+u8 registerSignalerHc(ocrEvent_t *self, ocrFatGuid_t signaler, u32 slot, ocrDbAccessMode_t mode, bool isDepAdd) {
     return 0; // We do not do anything for signalers
 }
 
@@ -442,6 +442,7 @@ u8 registerWaiterEventHc(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot, bool i
         for(i = event->waitersCount; i < event->waitersMax; ++i) {
             waitersNew[i].guid = NULL_GUID;
             waitersNew[i].slot = 0;
+            waitersNew[i].mode = -1;
         }
         waiters = waitersNew;
     }
@@ -490,6 +491,8 @@ u8 registerWaiterEventHc(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot, bool i
  * The event waiterLock is grabbed, if the event is already satisfied, directly satisfy
  * the waiter. Otherwise add the waiter's guid to the waiters db list. If db is too small
  * reallocate and copy over to a new one.
+ *
+ * Returns non-zero if the registerWaiter requires registerSignaler to be called there-after
  */
 u8 registerWaiterEventHcPersist(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot, bool isDepAdd) {
     ocrEventHcPersist_t *event = (ocrEventHcPersist_t*)base;
@@ -504,7 +507,6 @@ u8 registerWaiterEventHcPersist(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot,
     u8 toReturn = 0;
 
     getCurrentEnv(&pd, NULL, &curTask, &msg);
-    //
 
     // EDTs incrementally register on their dependences as elements
     // get satisfied (Guarantees O(n) traversal of dependence list).
@@ -513,7 +515,11 @@ u8 registerWaiterEventHcPersist(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot,
     RESULT_ASSERT(guidKind(pd, waiter, &waiterKind), ==, 0);
 
     if(isDepAdd && waiterKind == OCR_GUID_EDT) {
-        return 0;
+        // If we're adding a dependence and the waiter is an EDT we
+        // skip this part. The event is registered on the EDT and
+        // the EDT will register on the event only when its dependence
+        // frontier reaches this event.
+        return 0; //Require registerSignaler invocation
     }
     ASSERT(waiterKind == OCR_GUID_EDT || (waiterKind & OCR_GUID_EVENT));
 
@@ -532,11 +538,11 @@ u8 registerWaiterEventHcPersist(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot,
         PD_MSG_FIELD(slot) = slot;
         PD_MSG_FIELD(properties) = 0;
         if((toReturn = pd->fcts.processMessage(pd, &msg, false))) {
-            return toReturn;
+            return toReturn; //TODO error status
         }
 #undef PD_MSG
 #undef PD_TYPE
-        return 0; // All done at this point
+        return 0; //Require registerSignaler invocation
     }
 
     // Here we need to actually update our waiter list. We still hold the lock
@@ -551,7 +557,7 @@ u8 registerWaiterEventHcPersist(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot,
     PD_MSG_FIELD(properties) = DB_PROP_RT_ACQUIRE;
     if((toReturn = pd->fcts.processMessage(pd, &msg, true))) {
         hal_unlock32(&(event->waitersLock));
-        return toReturn;
+        return toReturn; //TODO error status
     }
 
     waiters = (regNode_t*)PD_MSG_FIELD(ptr);
@@ -573,7 +579,7 @@ u8 registerWaiterEventHcPersist(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot,
         PD_MSG_FIELD(allocator) = NO_ALLOC;
         if((toReturn = pd->fcts.processMessage(pd, &msg, true))) {
             hal_unlock32(&(event->waitersLock));
-            return toReturn;
+            return toReturn; //TODO error status
         }
 
         waitersNew = (regNode_t*)PD_MSG_FIELD(ptr);
@@ -584,6 +590,7 @@ u8 registerWaiterEventHcPersist(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot,
         for(i = event->base.waitersCount; i < event->base.waitersMax; ++i) {
             waitersNew[i].guid = NULL_GUID;
             waitersNew[i].slot = 0;
+            waitersNew[i].mode = -1;
         }
         waiters = waitersNew;
     }
@@ -602,7 +609,7 @@ u8 registerWaiterEventHcPersist(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot,
         PD_MSG_FIELD(properties) = 0;
         if((toReturn = pd->fcts.processMessage(pd, &msg, false))) {
             hal_unlock32(&(event->waitersLock));
-            return toReturn;
+            return toReturn; //TODO error status
         }
         event->base.waitersDb = newGuid;
 #undef PD_TYPE
@@ -621,7 +628,7 @@ u8 registerWaiterEventHcPersist(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot,
     RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, false));
 #undef PD_MSG
 #undef PD_TYPE
-    return 0;
+    return 0; //Require registerSignaler invocation
 }
 
 // In this call, we do not contend with satisfy
@@ -858,6 +865,7 @@ ocrEvent_t * newEventHc(ocrEventFactory_t * factory, ocrEventTypes_t eventType,
     for(i = 0; i < INIT_WAITER_COUNT; ++i) {
         temp[i].guid = UNINITIALIZED_GUID;
         temp[i].slot = 0;
+        temp[i].mode = -1;
     }
 
     /* Signalers not used at this point
@@ -910,7 +918,7 @@ ocrEventFactory_t * newEventFactoryHc(ocrParamList_t *perType, u32 factoryId) {
     for(i = 0; i < (u32)OCR_EVENT_T_MAX; ++i) {
         base->fcts[i].destruct = FUNC_ADDR(u8 (*)(ocrEvent_t*), destructEventHc);
         base->fcts[i].get = FUNC_ADDR(ocrFatGuid_t (*)(ocrEvent_t*), getEventHc);
-        base->fcts[i].registerSignaler = FUNC_ADDR(u8 (*)(ocrEvent_t*, ocrFatGuid_t, u32, bool), registerSignalerHc);
+        base->fcts[i].registerSignaler = FUNC_ADDR(u8 (*)(ocrEvent_t*, ocrFatGuid_t, u32, ocrDbAccessMode_t, bool), registerSignalerHc);
         base->fcts[i].unregisterSignaler = FUNC_ADDR(u8 (*)(ocrEvent_t*, ocrFatGuid_t, u32, bool), unregisterSignalerHc);
     }
     // Setup satisfy function pointers

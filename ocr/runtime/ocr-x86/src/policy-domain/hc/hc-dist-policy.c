@@ -107,34 +107,35 @@ static void hcDistReleasePd(ocrPolicyDomainHc_t *rself) {
     RETURN_PROFILE();
 }
 
-u8 resolveEdtTemplate(ocrPolicyDomain_t * self, ocrFatGuid_t * templateFatGuid) {
-    ocrGuid_t templateGuid = templateFatGuid->guid;
+u8 resolveRemoteMetaData(ocrPolicyDomain_t * self, ocrFatGuid_t * fGuid, u64 metaDataSize) {
+    ocrGuid_t remoteGuid = fGuid->guid;
     u64 val;
-    self->guidProviders[0]->fcts.getVal(self->guidProviders[0], templateGuid, &val, NULL);
-    if (((void*)val) == NULL) {
-        DPRINTF(DEBUG_LVL_VVERB,"[%d] resolveEdtTemplate: Query remote EDT template\n", (int) self->myLocation);
+    self->guidProviders[0]->fcts.getVal(self->guidProviders[0], remoteGuid, &val, NULL);
+    if (val == 0) {
+        DPRINTF(DEBUG_LVL_VVERB,"[%d] resolveRemoteMetaData: Query remote GUID metadata\n", (int) self->myLocation);
         // GUID is unknown, request a copy of the metadata
         ocrPolicyMsg_t msgClone;
         getCurrentEnv(NULL, NULL, NULL, &msgClone);
         #define PD_MSG (&msgClone)
         #define PD_TYPE PD_MSG_GUID_METADATA_CLONE
             msgClone.type = PD_MSG_GUID_METADATA_CLONE | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
-            PD_MSG_FIELD(guid.guid) = templateGuid;
+            PD_MSG_FIELD(guid.guid) = remoteGuid;
             PD_MSG_FIELD(guid.metaDataPtr) = NULL;
             u8 returnCode = self->fcts.processMessage(self, &msgClone, true);
             ASSERT(returnCode == 0);
             // On return, Need some more post-processing to make a copy of the metadata
             // and set the fatGuid's metadata ptr to point to the copy
-            ocrTaskTemplate_t * templ = (ocrTaskTemplate_t *) self->fcts.pdMalloc(self, sizeof(ocrTaskTemplateHc_t));
-            hal_memCopy(templ, &PD_MSG_FIELD(metaData), sizeof(ocrTaskTemplateHc_t), false);
-            self->guidProviders[0]->fcts.registerGuid(self->guidProviders[0], templateGuid, (u64) templ);
-            val = (u64) templ;
-            DPRINTF(DEBUG_LVL_VVERB,"[%d] Template GUID registered for %ld\n",(int) self->myLocation, templateGuid);
+            void * metaDataPtr = self->fcts.pdMalloc(self, metaDataSize);
+            hal_memCopy(metaDataPtr, &PD_MSG_FIELD(metaData), metaDataSize, false);
+            //DIST-TODO Potentially multiple concurrent registerGuid on the same template
+            self->guidProviders[0]->fcts.registerGuid(self->guidProviders[0], remoteGuid, (u64) metaDataPtr);
+            val = (u64) metaDataPtr;
+            DPRINTF(DEBUG_LVL_VVERB,"[%d] GUID registered for %ld\n",(int) self->myLocation, remoteGuid);
         #undef PD_MSG
         #undef PD_TYPE
-        DPRINTF(DEBUG_LVL_VVERB,"[%d] resolveEdtTemplate: Retrieved remote EDT template\n", (int) self->myLocation);
+        DPRINTF(DEBUG_LVL_VVERB,"[%d] resolveRemoteMetaData: Retrieved remote EDT template\n", (int) self->myLocation);
     }
-    templateFatGuid->metaDataPtr = (void *) val;
+    fGuid->metaDataPtr = (void *) val;
     return 0;
 }
 
@@ -240,31 +241,32 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
     int wid = ((ocrWorkerHc_t *)worker)->id;
     // end
 
-    // Try to automatically place datablocks and edts by
-    // modyfing the affinity guid field of the message.
+    // Try to automatically place datablocks and edts
     // Only support naive PD-based placement for now.
-    suggestLocationPlacement(self, curLoc, (ocrLocationPlacer_t *)((ocrPolicyDomainHcDist_t*)self)->placer, msg);
+    suggestLocationPlacement(self, curLoc, (ocrLocationPlacer_t *) self->placer, msg);
 
     switch(msg->type & PD_MSG_TYPE_ONLY) {
         case PD_MSG_WORK_CREATE:
         {
     #define PD_MSG msg
     #define PD_TYPE PD_MSG_WORK_CREATE
-        DPRINTF(DEBUG_LVL_VVERB,"[%d][%d] PD_MSG_WORK_CREATE msg: %p\n", (int) self->myLocation, wid, msg);
-        ocrGuid_t affinity = PD_MSG_FIELD(affinity.guid);
-        if (affinity != NULL_GUID) {
-            DPRINTF(DEBUG_LVL_VVERB,"[%d][%d] PD_MSG_WORK_CREATE: remote creation %p\n", (int) self->myLocation, wid, msg);
-            msg->destLocation = affinityToLocation(affinity);
-            //DIST-TODO affinity: we do not propagate affinity so that the receiving side
-            //does not try to make new placement decision.
-            PD_MSG_FIELD(affinity.guid) = NULL_GUID;
+        DPRINTF(DEBUG_LVL_VVERB,"[%d][%d] PD_MSG_WORK_CREATE msg: %p, template 0x%x\n", (int) self->myLocation, wid, msg, PD_MSG_FIELD(templateGuid.guid));
+        // First query the guid provider to determine if we know the edtTemplate.
+        resolveRemoteMetaData(self, &PD_MSG_FIELD(templateGuid), sizeof(ocrTaskTemplateHc_t));
+        // The placer may have altered msg->destLocation
+        if (msg->destLocation != curLoc) {
+            // Check for implementation limitations 
+            ocrTask_t *task = NULL;
+            getCurrentEnv(NULL, NULL, &task, NULL);
+            ASSERT((task->finishLatch == NULL_GUID) && "LIMITATION: distributed finish-EDT not supported");
+
+            DPRINTF(DEBUG_LVL_VVERB,"[%d][%d] PD_MSG_WORK_CREATE: remote creation at %d msg:%p, template 0x%x\n", (int) self->myLocation, wid, msg->destLocation, msg, PD_MSG_FIELD(templateGuid.guid));
             // When it's a remote creation we need to serialize paramv/depv arguments if any
             if ((PD_MSG_FIELD(paramv) != NULL) || (PD_MSG_FIELD(depv) != NULL)) {
                 // Check if we need to involve the EDT template
                 if (((PD_MSG_FIELD(paramv) != NULL) && (PD_MSG_FIELD(paramc) == EDT_PARAM_DEF)) ||
                     ((PD_MSG_FIELD(depv) != NULL) && (PD_MSG_FIELD(depc) == EDT_PARAM_DEF))) {
                     // Make sure we have a copy of it locally and retrieve paramc/depc values
-                    resolveEdtTemplate(self, &PD_MSG_FIELD(templateGuid));
                     getTemplateParamcDepc(self, &PD_MSG_FIELD(templateGuid), &PD_MSG_FIELD(paramc),&PD_MSG_FIELD(depc));
                 }
                 u64 extraParamvPayloadSize = ((PD_MSG_FIELD(paramv) != NULL) ? (sizeof(u64)*PD_MSG_FIELD(paramc)) : 0);
@@ -296,18 +298,15 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
                 //deguidifying the edtTemplate for nothing when EDT_PARAM_DEF is used.
             }
         } else {
-            msg->destLocation = curLoc;
-            DPRINTF(DEBUG_LVL_VVERB,"[%d][%d] PD_MSG_WORK_CREATE: local creation %p\n", (int) self->myLocation, wid, msg);
+            DPRINTF(DEBUG_LVL_VVERB,"[%d][%d] PD_MSG_WORK_CREATE: local creation %p, template 0x%x\n", (int) self->myLocation, wid, msg, PD_MSG_FIELD(templateGuid.guid));
         }
     #undef PD_MSG
     #undef PD_TYPE
+
         if ((msg->srcLocation != curLoc) && (msg->destLocation == curLoc)) {
-            DPRINTF(DEBUG_LVL_VVERB,"[%d] PD_MSG_WORK_CREATE: remote invocation\n", (int) self->myLocation);
             // we're receiving a message
         #define PD_MSG msg
         #define PD_TYPE PD_MSG_WORK_CREATE
-            // First query the guid provider to determine if we know the edtTemplate
-            resolveEdtTemplate(self, &PD_MSG_FIELD(templateGuid));
             // Second, check if we need to unpack paramv/depv
             if ((PD_MSG_FIELD(paramv) != NULL) || (PD_MSG_FIELD(depv) != NULL)) {
                 // Check if we need to read information from the EDT template
@@ -354,14 +353,7 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
         {
     #define PD_MSG msg
     #define PD_TYPE PD_MSG_DB_CREATE
-        ocrGuid_t affinity = PD_MSG_FIELD(affinity.guid);
-        PD_MSG_FIELD(affinity.guid) = NULL_GUID;
-        //DIST-TODO affinity: Blindly cast the affinity guid into a location
-        if (affinity != NULL_GUID) {
-            msg->destLocation = affinityToLocation(affinity);
-        } else {
-            msg->destLocation = curLoc;
-        }
+        // The placer may have altered msg->destLocation
     #undef PD_MSG
     #undef PD_TYPE
         break;
@@ -400,6 +392,15 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
         {
     #define PD_MSG (msg)
     #define PD_TYPE PD_MSG_DB_DESTROY
+        RETRIEVE_LOCATION_FROM_GUID_MSG(self, msg->destLocation)
+    #undef PD_MSG
+    #undef PD_TYPE
+        break;
+        }
+        case PD_MSG_DB_FREE:
+        {
+    #define PD_MSG (msg)
+    #define PD_TYPE PD_MSG_DB_FREE
         RETRIEVE_LOCATION_FROM_GUID_MSG(self, msg->destLocation)
     #undef PD_MSG
     #undef PD_TYPE
@@ -535,42 +536,50 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
         RETRIEVE_LOCATION_FROM_GUID_MSG(self, msg->destLocation)
         // Send/Receive to/from remote or local processing, all fall-through
         if ((msg->srcLocation != curLoc) && (msg->destLocation == curLoc)) {
-            // Need to resolve the DB metadata locally before handing the message over
+            // Incoming acquire: Need to resolve the DB metadata locally before handing the message over
             u64 val;
             self->guidProviders[0]->fcts.getVal(self->guidProviders[0], PD_MSG_FIELD(guid.guid), &val, NULL);
             ASSERT(val != 0);
             PD_MSG_FIELD(guid.metaDataPtr) = (void *) val;
-            DPRINTF(DEBUG_LVL_VVERB,"[%d] PD_MSG_DB_ACQUIRE: received request: DB guid 0x%lx\n", (int) self->myLocation, PD_MSG_FIELD(guid.guid));
+            DPRINTF(DEBUG_LVL_VVERB,"[%d][%d] PD_MSG_DB_ACQUIRE: received request: DB guid 0x%lx flags=0x%lx\n", 
+                (int) self->myLocation, wid, PD_MSG_FIELD(guid.guid), PD_MSG_FIELD(flags));
         }
         if ((msg->srcLocation == curLoc) && (msg->destLocation != curLoc)) {
-            DPRINTF(DEBUG_LVL_VVERB,"[%d] PD_MSG_DB_ACQUIRE: remote request: DB guid 0x%lx\n", (int) self->myLocation, PD_MSG_FIELD(guid.guid));
+            // Outgoing acquire
+            DPRINTF(DEBUG_LVL_VVERB,"[%d][%d] PD_MSG_DB_ACQUIRE: remote request: DB guid 0x%lx msg %p flags=0x%lx\n", 
+                (int) self->myLocation, wid, PD_MSG_FIELD(guid.guid), msg, PD_MSG_FIELD(flags));
             // First check if we know about this foreign DB
             u64 val;
             self->guidProviders[0]->fcts.getVal(self->guidProviders[0], PD_MSG_FIELD(guid.guid), &val, NULL);
             if (val == 0) {
                 // Don't know about this DB yet, request a fetch
                 //There's a race here between first timers DB_ACQUIRE competing to fetch the DB
-                //We only one want to succeed to avoid wasting bandwidth
+                //We would like to have a single worker doing the fetch to avoid wasting bandwidth
+                //However coordinating the two can lead to deadlock in current implementation + blocking helper mode.
+                //So, for now allow concurrent fetch and a single one will be allowed to commit to the registerGuid
                 //DIST-TODO db: Revisit this locking scheme when we have a better idea of what we want to do with DB management
-                ocrPolicyDomainHcDist_t * typedSelf = (ocrPolicyDomainHcDist_t *) self;
-                hal_lock32(&(typedSelf->proxyLock));
-                // double check if someone went ahead of us
-                val = self->guidProviders[0]->fcts.getVal(self->guidProviders[0], PD_MSG_FIELD(guid.guid), &val, NULL);
-                if (val == 0) {
-                    DPRINTF(DEBUG_LVL_VVERB,"[%d] PD_MSG_DB_ACQUIRE: remote request: DB guid 0x%lx requires FETCH\n", (int) self->myLocation, PD_MSG_FIELD(guid.guid));
-                    PD_MSG_FIELD(flags) |= DB_FLAG_FETCH;
-                    // Store a local proxy for the DB
-                    ProxyDb_t * proxyDb = self->fcts.pdMalloc(self, sizeof(ProxyDb_t));
-                    proxyDb->size = 0;
-                    proxyDb->ptr = NULL;
-                    proxyDb->flags = 0;
-                    self->guidProviders[0]->fcts.registerGuid(self->guidProviders[0], PD_MSG_FIELD(guid.guid), (u64) proxyDb);
-                } // else nothing to do, just a regular acquire
-                hal_unlock32(&(typedSelf->proxyLock));
+                DPRINTF(DEBUG_LVL_VVERB,"[%d][%d] PD_MSG_DB_ACQUIRE: remote request: DB guid 0x%lx msg=%p requires FETCH\n", (int) self->myLocation, wid, PD_MSG_FIELD(guid.guid), msg);
+                PD_MSG_FIELD(flags) |= DB_FLAG_RT_FETCH;
+                // ocrPolicyDomainHcDist_t * typedSelf = (ocrPolicyDomainHcDist_t *) self;
+                // hal_lock32(&(typedSelf->proxyLock));
+                // // double check if someone went ahead of us
+                // val = self->guidProviders[0]->fcts.getVal(self->guidProviders[0], PD_MSG_FIELD(guid.guid), &val, NULL);
+                // if (val == 0) {
+                //     DPRINTF(DEBUG_LVL_VVERB,"[%d][%d] PD_MSG_DB_ACQUIRE: remote request: DB guid 0x%lx msg=%p requires FETCH\n", (int) self->myLocation, wid, PD_MSG_FIELD(guid.guid), msg);
+                //     PD_MSG_FIELD(flags) |= DB_FLAG_RT_FETCH;
+                //     // Store a local proxy for the DB
+                //     ProxyDb_t * proxyDb = self->fcts.pdMalloc(self, sizeof(ProxyDb_t));
+                //     proxyDb->size = 0;
+                //     proxyDb->ptr = NULL;
+                //     proxyDb->flags = 0;
+                //     self->guidProviders[0]->fcts.registerGuid(self->guidProviders[0], PD_MSG_FIELD(guid.guid), (u64) proxyDb);
+                // } // else nothing to do, just a regular acquire
+                // hal_unlock32(&(typedSelf->proxyLock));
             }
         }
         if ((msg->srcLocation == curLoc) && (msg->destLocation == curLoc)) {
-            DPRINTF(DEBUG_LVL_VVERB,"[%d] PD_MSG_DB_ACQUIRE: local request: DB guid 0x%lx\n", (int) self->myLocation, PD_MSG_FIELD(guid.guid));
+            DPRINTF(DEBUG_LVL_VVERB,"[%d] PD_MSG_DB_ACQUIRE: local request: DB guid 0x%lx flags 0x%lx\n", 
+                (int) self->myLocation, PD_MSG_FIELD(guid.guid), PD_MSG_FIELD(flags));
         }
         // Let the base policy's processMessage acquire the DB on behalf of the remote EDT
         // and then append the db data to the message.
@@ -584,17 +593,16 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
     #define PD_TYPE PD_MSG_DB_RELEASE
         RETRIEVE_LOCATION_FROM_GUID_MSG(self, msg->destLocation)
         if ((msg->srcLocation != curLoc) && (msg->destLocation == curLoc)) {
-            // Pre-processing an incoming DB_RELEASE
+            // Incoming DB_RELEASE pre-processing
             // Need to resolve the DB metadata locally before handing the message over
             u64 val;
             self->guidProviders[0]->fcts.getVal(self->guidProviders[0], PD_MSG_FIELD(guid.guid), &val, NULL);
             ASSERT(val != 0);
             PD_MSG_FIELD(guid.metaDataPtr) = (void *) val;
-            bool doWriteBack = (PD_MSG_FIELD(flags) & DB_FLAG_WRITE_BACK);
             DPRINTF(DEBUG_LVL_VVERB,"[%d] PD_MSG_DB_RELEASE received request: DB guid 0x%lx ptr, WB=%d\n",
-                    (int) self->myLocation, PD_MSG_FIELD(guid.guid), doWriteBack);
+                    (int) self->myLocation, PD_MSG_FIELD(guid.guid), !!(PD_MSG_FIELD(flags) & DB_FLAG_RT_WRITE_BACK));
             //DIST-TODO db: We may want to double check this writeback (first one) is legal wrt single assignment
-            if (doWriteBack) {
+            if (PD_MSG_FIELD(flags) & DB_FLAG_RT_WRITE_BACK) {
                 // Unmarshall and write back
                 DPRINTF(DEBUG_LVL_VVERB,"[%d] PD_MSG_DB_RELEASE received request: unmarshall DB guid 0x%lx ptr for local WB\n", (int) self->myLocation, PD_MSG_FIELD(guid.guid));
                 //Important to read from the RELEASE size u64 field instead of the msg size (u32)
@@ -607,7 +615,7 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
             } // else fall-through and do the regular release
         }
         if ((msg->srcLocation == curLoc) && (msg->destLocation != curLoc)) {
-            // Pre-processing an outgoing DB_RELEASE
+            // Outgoing DB_RELEASE pre-processing
             u64 val;
             self->guidProviders[0]->fcts.getVal(self->guidProviders[0], PD_MSG_FIELD(guid.guid), &val, NULL);
             if (val == 0) {
@@ -616,7 +624,7 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
                 //This is an issue for the distributed implementation because we've already deallocated the proxy db.
                 //This need to be fixed in base implementation
                 // For now just warn and ignore
-                DPRINTF(DEBUG_LVL_WARN,"[%d] PD_MSG_DB_RELEASE warning double release detected and avoided (hack) for DB guid 0x%lx ptr\n", (int) self->myLocation, PD_MSG_FIELD(guid.guid));
+                DPRINTF(DEBUG_LVL_WARN,"[%d][%d] PD_MSG_DB_RELEASE warning double release detected and avoided (hack) for DB guid 0x%lx ptr\n", (int) self->myLocation, wid, PD_MSG_FIELD(guid.guid));
                 msg->type &= ~PD_MSG_REQUEST;
                 msg->type &= ~PD_MSG_REQ_RESPONSE;
                 msg->type |= PD_MSG_RESPONSE;
@@ -625,16 +633,16 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
             }
             ASSERT(val != 0);
             ProxyDb_t * proxyDb = (ProxyDb_t *) val;
-            //DIST-TODO db: we should read the access mode from somewhere if RO, do nothing
-            bool doWriteBack = (proxyDb->flags & DB_FLAG_WRITE_BACK);
-            if (doWriteBack) {
-                PD_MSG_FIELD(flags) = DB_FLAG_WRITE_BACK;
+            DPRINTF(DEBUG_LVL_VVERB,"[%d][%d] PD_MSG_DB_RELEASE sending request: DB guid 0x%lx ptr flags=0x%x\n", 
+                (int) self->myLocation, wid, PD_MSG_FIELD(guid.guid), proxyDb->flags);
+            if (proxyDb->flags & DB_FLAG_RT_WRITE_BACK) {
+                PD_MSG_FIELD(flags) = DB_FLAG_RT_WRITE_BACK;
                 if (proxyDb->flags & DB_PROP_SINGLE_ASSIGNMENT) {
                     // Clear the writeback flag. For single-assignment DB this prevent multiple illegal write-backs
-                    proxyDb->flags &= ~DB_FLAG_WRITE_BACK;
+                    proxyDb->flags &= ~DB_FLAG_RT_WRITE_BACK;
                 }
                 // Shipping the DB's data back to the home node
-                DPRINTF(DEBUG_LVL_VVERB,"[%d] PD_MSG_DB_RELEASE sending request: marshall DB guid 0x%lx ptr for remote WB\n", (int) self->myLocation, PD_MSG_FIELD(guid.guid));
+                DPRINTF(DEBUG_LVL_VVERB,"[%d][%d] PD_MSG_DB_RELEASE sending request: marshall DB guid 0x%lx ptr for remote WB\n", (int) self->myLocation, wid, PD_MSG_FIELD(guid.guid));
                 u64 dbSize = proxyDb->size;
                 void * dbPtr = proxyDb->ptr;
                 // Prepare response message
@@ -653,7 +661,7 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
             }
         }
         if ((msg->srcLocation == curLoc) && (msg->destLocation == curLoc)) {
-            DPRINTF(DEBUG_LVL_VVERB,"[%d] PD_MSG_DB_RELEASE local processing: DB guid 0x%lx\n", (int) self->myLocation, PD_MSG_FIELD(guid.guid));
+            DPRINTF(DEBUG_LVL_VVERB,"[%d][%d] PD_MSG_DB_RELEASE local processing: DB guid 0x%lx\n", (int) self->myLocation, wid, PD_MSG_FIELD(guid.guid));
         }
     #undef PD_MSG
     #undef PD_TYPE
@@ -679,7 +687,6 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
         }
         // filter out local messages
         case PD_MSG_DEP_ADD:
-        case PD_MSG_DB_FREE:
         case PD_MSG_MEM_OP:
         case PD_MSG_MEM_ALLOC:
         case PD_MSG_MEM_UNALLOC:
@@ -703,6 +710,7 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
         case PD_MSG_MGT_FINISH:
         case PD_MSG_MGT_REGISTER:
         case PD_MSG_MGT_UNREGISTER:
+        case PD_MSG_MGT_MONITOR_PROGRESS:
         {
             msg->destLocation = curLoc;
             // fall-through and let local PD to process
@@ -758,31 +766,46 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
                 // Receiving the reply for a DB_ACQUIRE
             #define PD_MSG (response)
             #define PD_TYPE PD_MSG_DB_ACQUIRE
-                if (PD_MSG_FIELD(flags) & DB_FLAG_FETCH) {
+                if (PD_MSG_FIELD(flags) & DB_FLAG_RT_FETCH) {
                     DPRINTF(DEBUG_LVL_VVERB,"[%d] Received DB_ACQUIRE FETCH reply ptr=%p size=%d flags=0x%x\n",
-                        (int) self->myLocation, PD_MSG_FIELD(size), PD_MSG_FIELD(flags));
-                    // The acquire doubles as a fetch, need to deserialize DB's data from the message
-                    PD_MSG_FIELD(flags) &= ~DB_FLAG_FETCH;
-                    // Set the pointer to the message payload
-                    void * ptr = findMsgPayload(response, NULL);
-                    u64 size = PD_MSG_FIELD(size);
-                    // Copy data ptr from message to new buffer
-                    void * newPtr = self->fcts.pdMalloc(self, size);
-                    hal_memCopy(newPtr, ptr, size, false);
-                    PD_MSG_FIELD(ptr) = newPtr;
-                    // If the acquired DB is not a single assignment we'll need to write it back on release
-                    if (!(PD_MSG_FIELD(flags) & DB_PROP_SINGLE_ASSIGNMENT)) {
-                        PD_MSG_FIELD(flags) |= DB_FLAG_WRITE_BACK;
+                        (int) self->myLocation, response, PD_MSG_FIELD(size), PD_MSG_FIELD(flags));
+                    ocrPolicyDomainHcDist_t * typedSelf = (ocrPolicyDomainHcDist_t *) self;
+                    // double check if someone went ahead of us
+                    hal_lock32(&(typedSelf->proxyLock));
+                    u64 val = self->guidProviders[0]->fcts.getVal(self->guidProviders[0], PD_MSG_FIELD(guid.guid), &val, NULL);
+                    if (val == 0) {
+                        // The acquire doubles as a fetch, need to deserialize DB's data from the message
+                        PD_MSG_FIELD(flags) &= ~DB_FLAG_RT_FETCH;
+                        // Set the pointer to the message payload
+                        void * ptr = findMsgPayload(response, NULL);
+                        u64 size = PD_MSG_FIELD(size);
+                        // Copy data ptr from message to new buffer
+                        void * newPtr = self->fcts.pdMalloc(self, size);
+                        hal_memCopy(newPtr, ptr, size, false);
+                        PD_MSG_FIELD(ptr) = newPtr;
+                        // If the acquired DB is neither single assignment nor read-only
+                        // we'll need to write it back on release
+                        bool doWriteBack = !((PD_MSG_FIELD(flags) & DB_PROP_SINGLE_ASSIGNMENT) || (PD_MSG_FIELD(flags) & DB_MODE_RO));
+                        if (doWriteBack) {
+                            PD_MSG_FIELD(flags) |= DB_FLAG_RT_WRITE_BACK;
+                        }
+                        // Set up the dbProxy
+                        ProxyDb_t * dbProxy = self->fcts.pdMalloc(self, sizeof(ProxyDb_t));
+                        dbProxy->size = PD_MSG_FIELD(size);
+                        dbProxy->flags = PD_MSG_FIELD(flags);
+                        dbProxy->ptr = PD_MSG_FIELD(ptr);
+                        self->guidProviders[0]->fcts.registerGuid(self->guidProviders[0], PD_MSG_FIELD(guid.guid), (u64) dbProxy);
+                        DPRINTF(DEBUG_LVL_VVERB,"[%d][%d] Commit DB_ACQUIRE FETCH db proxy setup guid=0x%lx ptr=%p size=%d flags=0x%x\n",
+                            (int) self->myLocation, wid, PD_MSG_FIELD(guid.guid), dbProxy->ptr, dbProxy->size, dbProxy->flags);
+                    } else {
+                        ProxyDb_t * dbProxy = (ProxyDb_t*) val;
+                        ASSERT(dbProxy->ptr != NULL);
+                        DPRINTF(DEBUG_LVL_VVERB,"[%d] Discard Commit DB_ACQUIRE FETCH reply ptr=%p size=%d flags=0x%x\n", 
+                            (int) self->myLocation, dbProxy->ptr, dbProxy->size, dbProxy->flags);
+                        PD_MSG_FIELD(size) = dbProxy->size;
+                        PD_MSG_FIELD(ptr) = dbProxy->ptr;
                     }
-                    // Set up the dbProxy
-                    u64 val;
-                    self->guidProviders[0]->fcts.getVal(self->guidProviders[0], PD_MSG_FIELD(guid.guid), &val, NULL);
-                    ProxyDb_t * dbProxy = (ProxyDb_t *) val;
-                    dbProxy->size = PD_MSG_FIELD(size);
-                    dbProxy->flags = PD_MSG_FIELD(flags);
-                    dbProxy->ptr = PD_MSG_FIELD(ptr);
-                    DPRINTF(DEBUG_LVL_VVERB,"[%d] Received DB_ACQUIRE FETCH db proxy setup ptr=%p size=%d flags=0x%x\n",
-                        (int) self->myLocation, dbProxy->ptr, dbProxy->size, dbProxy->flags);
+                    hal_unlock32(&(typedSelf->proxyLock));
                 } else {
                     DPRINTF(DEBUG_LVL_VVERB,"[%d] Received DB_ACQUIRE reply\n", (int) self->myLocation);
                     // Acquire without fetch (Runtime detected data was already available locally and usable).
@@ -795,9 +818,12 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
                     ProxyDb_t * dbProxy = (ProxyDb_t*) val;
                     //DIST-TODO db: this is borderline. Since the other worker is populating several fields,
                     //when 'ptr' is written it is not guaranteed the other assignment are visible yet.
-                    while(dbProxy->ptr == NULL); // busy-wait for data to become available
-                    DPRINTF(DEBUG_LVL_VVERB,"[%d] Received DB_ACQUIRE reply ptr=%p size=%d flags=0x%x\n", (int) self->myLocation,
-                        dbProxy->ptr, dbProxy->size, dbProxy->flags);
+                    DPRINTF(DEBUG_LVL_VVERB,"[%d][%d] Waiting for DB_ACQUIRE reply guid=0x%lx ptr=%p size=%d flags=0x%x \n", 
+                        (int) self->myLocation, wid, PD_MSG_FIELD(guid.guid), dbProxy->ptr, dbProxy->size, dbProxy->flags);
+                    ASSERT(dbProxy->ptr != NULL);
+                    // while(dbProxy->ptr == NULL); // busy-wait for data to become available
+                    DPRINTF(DEBUG_LVL_VVERB,"[%d] Received DB_ACQUIRE reply ptr=%p size=%d flags=0x%x\n", 
+                        (int) self->myLocation, dbProxy->ptr, dbProxy->size, dbProxy->flags);
                     PD_MSG_FIELD(size) = dbProxy->size;
                     PD_MSG_FIELD(ptr) = dbProxy->ptr;
                 }
@@ -824,7 +850,7 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
                     proxyDb->size = size;
                     proxyDb->ptr = ptr;
                     // Preset the writeback flag: even single assignment needs to be written back the first time.
-                    proxyDb->flags = PD_MSG_FIELD(flags) | DB_FLAG_WRITE_BACK;
+                    proxyDb->flags = PD_MSG_FIELD(flags) | DB_FLAG_RT_WRITE_BACK;
                     self->guidProviders[0]->fcts.registerGuid(self->guidProviders[0], dbGuid, (u64) proxyDb);
                     PD_MSG_FIELD(ptr) = ptr;
                 #undef PD_MSG
@@ -842,7 +868,9 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
                     self->guidProviders[0]->fcts.getVal(self->guidProviders[0], dbGuid, &val, NULL);
                     ASSERT(val != 0);
                     ProxyDb_t * proxyDb = (ProxyDb_t *) val;
-                    if (proxyDb->flags & DB_FLAG_WRITE_BACK) {
+                    // Current model keeps SA DBs around, otherwise the proxy is nullified 
+                    // so that we're sure we always fetch an updated DB
+                    if (!(proxyDb->flags & DB_PROP_SINGLE_ASSIGNMENT)) {
                         DPRINTF(DEBUG_LVL_VVERB,"[%d] PD_MSG_DB_RELEASE received response: cleanup local proxy for DB guid 0x%lx, ptr=%p size=%d flags=0x%x\n",
                             (int) self->myLocation, PD_MSG_FIELD(guid.guid), proxyDb->ptr, proxyDb->size, proxyDb->flags);
                         self->fcts.pdFree(self, proxyDb->ptr);
@@ -912,11 +940,12 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
             switch(msg->type & PD_MSG_TYPE_ONLY) {
             case PD_MSG_DB_ACQUIRE:
             {
-                DPRINTF(DEBUG_LVL_VVERB,"[%d] PD_MSG_DB_ACQUIRE: post-process response, serialize DB's ptr, dest is [%d]\n", (int) curLoc, (int) msg->destLocation);
             #define PD_MSG (msg)
             #define PD_TYPE PD_MSG_DB_ACQUIRE
+                DPRINTF(DEBUG_LVL_VVERB,"[%d] PD_MSG_DB_ACQUIRE: post-process response, guid=0x%lx serialize DB's ptr, dest is [%d]\n", 
+                    (int) curLoc, PD_MSG_FIELD(guid.guid), (int) msg->destLocation);
                 // The base policy acquired the DB on behalf of the remote EDT
-                if (PD_MSG_FIELD(flags) & DB_FLAG_FETCH) {
+                if (PD_MSG_FIELD(flags) & DB_FLAG_RT_FETCH) {
                     // fetch was requested, serialize the DB data into response
                     u64 dbSize = PD_MSG_FIELD(size);
                     void * dbPtr = PD_MSG_FIELD(ptr);
@@ -991,8 +1020,6 @@ void hcDistPolicyDomainStart(ocrPolicyDomain_t * pd) {
     ocrPolicyDomainHcDist_t * distPd = (ocrPolicyDomainHcDist_t *) pd;
     // initialize parent
     distPd->baseStart(pd);
-    // Create and initialize the placer
-    distPd->placer = createLocationPlacer(pd);
 }
 
 void hcDistPolicyDomainStop(ocrPolicyDomain_t * pd) {

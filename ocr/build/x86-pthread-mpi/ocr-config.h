@@ -68,7 +68,8 @@
 // Scheduler
 #define ENABLE_SCHEDULER_HC
 #define ENABLE_SCHEDULER_HC_COMM_DELEGATE
-
+#define ENABLE_SCHEDULER_BLOCKING_SUPPORT
+ 
 // Sysboot layer to use
 #define ENABLE_SYSBOOT_LINUX
 

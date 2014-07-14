@@ -23,6 +23,7 @@
 #include "ocr-tuning.h"
 #include "ocr-types.h"
 #include "ocr-worker.h"
+#include "ocr-placer.h"
 
 /****************************************************/
 /* PARAMETER LISTS                                  */
@@ -203,6 +204,10 @@ typedef struct _paramListPolicyDomainInst_t {
 
 /**< Opposite of register */
 #define PD_MSG_MGT_UNREGISTER   0x4200
+
+/**< For a worker to request the policy-domain to monitor an operation progress */
+#define PD_MSG_MGT_MONITOR_PROGRESS 0x5200
+
 
 #ifdef OCR_ENABLE_STATISTICS
 // TODO: Add statistics messages
@@ -478,10 +483,11 @@ typedef struct _ocrPolicyMsg_t {
         } PD_MSG_STRUCT_NAME(PD_MSG_DEP_ADD);
 
         struct {
-            ocrFatGuid_t signaler; /**< In: Signaler to register */
-            ocrFatGuid_t dest;     /**< In: Object to register the signaler on */
-            u32 slot;              /**< In: Slot on dest to register the signaler on */
-            u32 properties;        /**< In: Properties */
+            ocrFatGuid_t signaler;  /**< In: Signaler to register */
+            ocrFatGuid_t dest;      /**< In: Object to register the signaler on */
+            u32 slot;               /**< In: Slot on dest to register the signaler on */
+            ocrDbAccessMode_t mode; /**< In: Access mode for the dependence's datablock */
+            u32 properties;         /**< In: Properties */
         } PD_MSG_STRUCT_NAME(PD_MSG_DEP_REGSIGNALER);
 
         struct {
@@ -569,6 +575,11 @@ typedef struct _ocrPolicyMsg_t {
             ocrLocation_t neighbor; /**< In: Neighbor unregistering */
             u32 properties;
         } PD_MSG_STRUCT_NAME(PD_MSG_MGT_UNREGISTER);
+
+        struct {
+            void * monitoree;
+            u32 properties; /**< In: first eight bits is type of monitoree */
+        } PD_MSG_STRUCT_NAME(PD_MSG_MGT_MONITOR_PROGRESS);
     } args;
 } ocrPolicyMsg_t;
 
@@ -797,6 +808,7 @@ typedef struct _ocrPolicyDomain_t {
                                                  * data-blocks */
     ocrEventFactory_t ** eventFactories;        /**< Factories to produce events*/
     ocrGuidProvider_t ** guidProviders;         /**< GUID generators */
+    ocrPlacer_t * placer;                       /**< Affinity and placement (work in progress) */
 
 #ifdef OCR_ENABLE_STATISTICS
     ocrStats_t *statsObject;                    /**< Statistics object */

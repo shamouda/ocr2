@@ -30,7 +30,10 @@ DEFAULT_CONFIG ?= mach-hc-4w.cfg
 CFLAGS += -DOCR_DEBUG
 # Define level
 CFLAGS += -DOCR_DEBUG_LVL=DEBUG_LVL_WARN
-#CFLAGS += -DOCR_DEBUG_LVL=DEBUG_LVL_INFO
+# CFLAGS += -DOCR_DEBUG_LVL=DEBUG_LVL_INFO
+# CFLAGS += -DOCR_DEBUG_LVL=DEBUG_LVL_VERB
+# CFLAGS += -DOCR_DEBUG_LVL=DEBUG_LVL_VVERB
+
 # Define which modules you want for debugging
 # You can optionally define an individual debuging level by
 # defining DEBUG_LVL_XXX like OCR_DEBUG_LEVEL. If not defined,
@@ -54,7 +57,6 @@ CFLAGS += -DOCR_DEBUG_TASK
 CFLAGS += -DOCR_DEBUG_UTIL
 CFLAGS += -DOCR_DEBUG_WORKER
 CFLAGS += -DOCR_DEBUG_WORKPILE
-
 
 #
 # Global CFLAGS to be passed into all architecture builds

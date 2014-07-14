@@ -194,7 +194,8 @@ u8 MPICommSendMessage(ocrCommPlatform_t * self,
     // match the source recv operation that had been posted on the request send.
     int tag = (message->type & PD_MSG_RESPONSE) ? message->msgId : SEND_ANY_ID;
     MPI_Request * status = &(handle->status);
-    DPRINTF(DEBUG_LVL_VERB,"[%d][MPI] posting isend for msgId %ld type %x to rank %d\n", mpiRankToLocation(self->pd->myLocation), message->msgId, message->type, targetRank);
+    DPRINTF(DEBUG_LVL_VERB,"[%d][MPI] posting isend for msgId %ld msg %p type %x to rank %d\n", 
+        mpiRankToLocation(self->pd->myLocation), message->msgId, message, message->type, targetRank);
     int res = MPI_Isend(message, bufferSize, datatype, targetRank, tag, comm, status);
     if (res == MPI_SUCCESS) {
         mpiComm->outgoing->pushFront(mpiComm->outgoing, handle);
@@ -254,12 +255,12 @@ u8 probeIncoming(ocrCommPlatform_t *self, int src, int tag, ocrPolicyMsg_t ** ms
         success = MPI_Get_count(&status, datatype, &count);
         ASSERT(success == MPI_SUCCESS);
         MPI_Comm comm = MPI_COMM_WORLD;
-        DPRINTF(DEBUG_LVL_VERB,"[%d][MPI] iprobe+recv for msgId %ld\n", mpiRankToLocation(self->pd->myLocation), tag);
         // Reuse request's or allocate a new message if incoming size is greater.
         if (count > msgSize) {
             *msg = allocateNewMessage(self, count);
         }
         success = MPI_Recv(*msg, count, datatype, src, tag, comm, MPI_STATUS_IGNORE);
+        DPRINTF(DEBUG_LVL_VERB,"[%d][MPI] iprobe+recv for msgId %ld type=%x\n", mpiRankToLocation(self->pd->myLocation), tag, (*msg)->type);
         ASSERT(success == MPI_SUCCESS);
         return POLL_MORE_MESSAGE;
     }
@@ -283,7 +284,8 @@ u8 MPICommPollMessage_RL3(ocrCommPlatform_t *self, ocrPolicyMsg_t **msg,
         int ret = MPI_Test(&(mpiHandle->status), &completed, MPI_STATUS_IGNORE);
         ASSERT(ret == MPI_SUCCESS);
         if(completed) {
-            DPRINTF(DEBUG_LVL_VERB,"[%d][MPI] successfully sent msgId %ld type %x\n", mpiRankToLocation(self->pd->myLocation), mpiHandle->msg->msgId, mpiHandle->msg->type);
+            DPRINTF(DEBUG_LVL_VERB,"[%d][MPI] successfully sent msgId %ld msg %p type %x\n", 
+                mpiRankToLocation(self->pd->myLocation), mpiHandle->msg->msgId, mpiHandle->msg, mpiHandle->msg->type);
             u32 msgProperties = mpiHandle->properties;
             // By construction, either message are persistent in API's upper levels
             // or they've been made persistent on the send through a copy.

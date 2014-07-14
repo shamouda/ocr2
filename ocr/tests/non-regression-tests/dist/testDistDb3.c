@@ -11,7 +11,7 @@
 #include "ocr.h"
 
 /**
- * DESC: OCR-DIST - EDT operates on remote DB then satisfy EDT at DB's node and check write-back happened
+ * DESC: OCR-DIST - Same as testDistDb2.c but EDTs are pinned to specific affinities.
  */
 
 #define TYPE_ELEM_DB int
@@ -61,7 +61,6 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     assert(affinityCount >= 1);
     ocrGuid_t affinities[affinityCount];
     ocrAffinityGet(AFFINITY_PD, &affinityCount, affinities);
-    ocrGuid_t edtAffinity = affinities[affinityCount-1]; //TODO this implies we know current PD is '0'
 
     // Create a DB
     void * dbPtr;
@@ -90,13 +89,13 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     // Create local EDT depending on event being satisfied
     ocrGuid_t checkerEdtGuid;
     ocrEdtCreate(&checkerEdtGuid, checkerEdtTemplateGuid, 0, NULL, 1, &eventGuid,
-                 EDT_PROP_NONE, NULL_GUID, NULL);
+                 EDT_PROP_NONE, affinities[0], NULL);
 
     // create remote edt that depends the db which is automatically cloned
     u64 rparamv = (u64) eventGuid; // NASTY cast: the event to satisfy later on
     ocrGuid_t addEdtGuid;
     ocrEdtCreate(&addEdtGuid, addEdtTemplateGuid, 1, &rparamv, 1, &dbGuid,
-                 EDT_PROP_NONE, edtAffinity, NULL);
+                 EDT_PROP_NONE, affinities[1], NULL);
 
     return NULL_GUID;
 }

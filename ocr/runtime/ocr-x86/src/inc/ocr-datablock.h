@@ -161,12 +161,17 @@ typedef struct _ocrDataBlock_t {
     u32 fctId;              /**< ID determining which functions to use */
 } ocrDataBlock_t;
 
-// Runtime DB properties and flags (upper 16 bits of a u32)
-// Properties for runtime acquire/release
-#define DB_PROP_RT_ACQUIRE   0x20
-// Flags for runtime acquire/release
-#define DB_FLAG_FETCH        0x30
-#define DB_FLAG_WRITE_BACK   0x40
+// User DB properties
+// Mask to extract the db mode when carried through properties
+#define DB_PROP_MODE_MASK 0x7
+
+// Runtime DB properties (upper 16 bits of a u32)
+//Properties
+#define DB_PROP_RT_ACQUIRE     0x1 // DB acquired by runtime
+
+//Runtime Flags (4 bits)
+#define DB_FLAG_RT_FETCH       0x100
+#define DB_FLAG_RT_WRITE_BACK  0x200
 
 /****************************************************/
 /* OCR DATABLOCK FACTORY                            */

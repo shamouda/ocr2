@@ -25,7 +25,8 @@ typedef enum {
     OCR_GUID_SCHEDULER = 9,
     OCR_GUID_WORKPILE = 10,
     OCR_GUID_COMM = 11,
-    OCR_GUID_EVENT = 16,
+    OCR_GUID_AFFINITY = 12,
+    OCR_GUID_EVENT = 16, // 0x10 bit denotes an event
     OCR_GUID_EVENT_ONCE = 17,
     OCR_GUID_EVENT_IDEM = 18,
     OCR_GUID_EVENT_STICKY = 19,

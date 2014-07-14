@@ -107,6 +107,9 @@ void hcPolicyDomainStart(ocrPolicyDomain_t * policy) {
         policy->commApis[i]->fcts.start(policy->commApis[i], policy);
     }
 
+    // Create and initialize the placer (work in progress)
+    policy->placer = createLocationPlacer(policy);
+
     // REC: Moved all workers to start here.
     // Note: it's important to first logically start all workers.
     // Once they are all up, start the runtime.
@@ -651,7 +654,7 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
 #undef PD_MSG
 #undef PD_TYPE
         msg->type &= ~PD_MSG_REQUEST;
-        msg->type |= PD_MSG_RESPONSE;
+        // msg->type |= PD_MSG_RESPONSE;
         EXIT_PROFILE;
         break;
     }
@@ -870,26 +873,44 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_GUID_METADATA_CLONE
         ocrFatGuid_t fatGuid = PD_MSG_FIELD(guid);
-        ocrGuidKind kind;
+        ocrGuidKind kind = OCR_GUID_NONE;
         guidKind(self, fatGuid, &kind);
         //IMPL: For now only support edt template cloning
-        ASSERT((kind == OCR_GUID_EDT_TEMPLATE) && "Unsupported GUID kind cloning");
-        localDeguidify(self, &(PD_MSG_FIELD(guid)));
-        ocrTaskTemplate_t * templ = (ocrTaskTemplate_t*) (PD_MSG_FIELD(guid.metaDataPtr));
-        //DIST-TODO cloning: make hc template plain copy
-        ocrTaskTemplateHc_t * hcTempl = (ocrTaskTemplateHc_t*) templ;
-        //These won't support flat serialization
-        #ifdef OCR_ENABLE_STATISTICS
-            ASSERT(false && "no statistics support in distributed edt templates");
-        #endif
-        #ifdef OCR_ENABLE_EDT_NAMING
-            ASSERT(false && "no serialization of edt template string");
-        #endif
-        //DIST-TODO cloning: metadata clone to support any size of message
-        ASSERT(sizeof(ocrTaskTemplateHc_t) < (sizeof(ocrPolicyMsg_t)-PD_MSG_SIZE_FULL(PD_MSG_GUID_METADATA_CLONE)));
-        u64 copyPtr = (u64) &(PD_MSG_FIELD(metaData));
-        hal_memCopy(copyPtr, hcTempl, sizeof(ocrTaskTemplateHc_t), false);
-        hcTempl = (ocrTaskTemplateHc_t *) copyPtr;
+        
+        switch(kind) {
+            case OCR_GUID_EDT_TEMPLATE:
+            {
+                localDeguidify(self, &(PD_MSG_FIELD(guid)));
+                ocrTaskTemplate_t * templ = (ocrTaskTemplate_t*) (PD_MSG_FIELD(guid.metaDataPtr));
+                //DIST-TODO cloning: make hc template plain copy
+                ocrTaskTemplateHc_t * hcTempl = (ocrTaskTemplateHc_t*) templ;
+                //These won't support flat serialization
+                #ifdef OCR_ENABLE_STATISTICS
+                    ASSERT(false && "no statistics support in distributed edt templates");
+                #endif
+                #ifdef OCR_ENABLE_EDT_NAMING
+                    ASSERT(false && "no serialization of edt template string");
+                #endif
+                //DIST-TODO cloning: metadata clone to support any size of message
+                ASSERT(sizeof(ocrTaskTemplateHc_t) < (sizeof(ocrPolicyMsg_t)-PD_MSG_SIZE_FULL(PD_MSG_GUID_METADATA_CLONE)));
+                u64 copyPtr = (u64) &(PD_MSG_FIELD(metaData));
+                hal_memCopy(copyPtr, hcTempl, sizeof(ocrTaskTemplateHc_t), false);
+                hcTempl = (ocrTaskTemplateHc_t *) copyPtr;
+            }
+            break;
+            case OCR_GUID_AFFINITY:
+            {
+                localDeguidify(self, &(PD_MSG_FIELD(guid)));
+                void * localPtr = (PD_MSG_FIELD(guid.metaDataPtr));
+                //DIST-TODO cloning: metadata clone to support any size of message
+                ASSERT(sizeof(ocrAffinity_t) < (sizeof(ocrPolicyMsg_t)-PD_MSG_SIZE_FULL(PD_MSG_GUID_METADATA_CLONE)));
+                u64 copyPtr = (u64) &(PD_MSG_FIELD(metaData));
+                hal_memCopy(copyPtr, localPtr, sizeof(ocrAffinity_t), false);
+            }
+            break;
+            default:
+                ASSERT("Unsupported GUID kind cloning");
+        }
 #undef PD_MSG
 #undef PD_TYPE
         msg->type &= ~PD_MSG_REQUEST;
@@ -985,12 +1006,45 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
 
         ocrFatGuid_t src = PD_MSG_FIELD(source);
         ocrFatGuid_t dest = PD_MSG_FIELD(dest);
-        if ((srcKind == OCR_GUID_DB) || (srcKind == NULL_GUID)) {
+        ocrDbAccessMode_t mode = (PD_MSG_FIELD(properties) & DB_PROP_MODE_MASK); //lower 3-bits is mode //TODO not pretty
+
+        if (srcKind == NULL_GUID) {
             //NOTE: Handle 'NULL_GUID' case here to be safe although
             //we've already caught it in ocrAddDependence for performance
             // This is equivalent to an immediate satisfy
             PD_MSG_FIELD(properties) = convertDepAddToSatisfy(
                 self, src, dest, PD_MSG_FIELD(slot));
+        } else if (srcKind == OCR_GUID_DB) {
+            if (dstKind & OCR_GUID_EVENT) {
+                PD_MSG_FIELD(properties) = convertDepAddToSatisfy(
+                    self, src, dest, PD_MSG_FIELD(slot));
+            } else {
+                // NOTE: We could use convertDepAddToSatisfy since adding a DB dependence
+                // is equivalent to satisfy. However, we want to go through the register 
+                // function to make sure the access mode is recorded.
+                ASSERT(dstKind == OCR_GUID_EDT);
+                ocrPolicyMsg_t registerMsg;
+                getCurrentEnv(NULL, NULL, NULL, &registerMsg);
+                ocrFatGuid_t sourceGuid = PD_MSG_FIELD(source);
+                ocrFatGuid_t destGuid = PD_MSG_FIELD(dest);
+                u32 slot = PD_MSG_FIELD(slot);
+            #undef PD_MSG
+            #undef PD_TYPE
+            #define PD_MSG (&registerMsg)
+            #define PD_TYPE PD_MSG_DEP_REGSIGNALER
+                registerMsg.type = PD_MSG_DEP_REGSIGNALER | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
+                // Registers sourceGuid (signaler) onto destGuid
+                PD_MSG_FIELD(signaler) = sourceGuid;
+                PD_MSG_FIELD(dest) = destGuid;
+                PD_MSG_FIELD(slot) = slot;
+                PD_MSG_FIELD(mode) = mode;
+                PD_MSG_FIELD(properties) = true; // Specify context is add-dependence
+                RESULT_PROPAGATE(self->fcts.processMessage(self, &registerMsg, true));
+            #undef PD_MSG
+            #undef PD_TYPE
+            #define PD_MSG msg
+            #define PD_TYPE PD_MSG_DEP_ADD
+            }
         } else {
             // Only left with events as potential source
             ASSERT(srcKind & OCR_GUID_EVENT);
@@ -1019,7 +1073,6 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         #define PD_MSG msg
         #define PD_TYPE PD_MSG_DEP_ADD
             PD_MSG_FIELD(properties) = needSignalerReg;
-
             //PERF: property returned by registerWaiter allows to decide
             // whether or not a registerSignaler call is needed.
             //TODO this is not done yet so some calls are pure waste
@@ -1036,17 +1089,18 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             #define PD_MSG (&registerMsg)
             #define PD_TYPE PD_MSG_DEP_REGSIGNALER
                 registerMsg.type = PD_MSG_DEP_REGSIGNALER | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
-                // Registers sourceGuid (signaller) onto destGuid
+                // Registers sourceGuid (signaler) onto destGuid
                 PD_MSG_FIELD(signaler) = sourceGuid;
                 PD_MSG_FIELD(dest) = destGuid;
                 PD_MSG_FIELD(slot) = slot;
+                PD_MSG_FIELD(mode) = mode;
                 PD_MSG_FIELD(properties) = true; // Specify context is add-dependence
                 RESULT_PROPAGATE(self->fcts.processMessage(self, &registerMsg, true));
             #undef PD_MSG
             #undef PD_TYPE
             #define PD_MSG msg
             #define PD_TYPE PD_MSG_DEP_ADD
-            }
+           }
         }
 
 #ifdef OCR_ENABLE_STATISTICS
@@ -1085,12 +1139,12 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             ocrEvent_t *evt = (ocrEvent_t*)(dest.metaDataPtr);
             ASSERT(evt->fctId == self->eventFactories[0]->factoryId);
             PD_MSG_FIELD(properties) = self->eventFactories[0]->fcts[evt->kind].registerSignaler(
-                evt, signaler, PD_MSG_FIELD(slot), isAddDep);
+                evt, signaler, PD_MSG_FIELD(slot), PD_MSG_FIELD(mode), isAddDep);
         } else if (dstKind == OCR_GUID_EDT) {
             ocrTask_t *edt = (ocrTask_t*)(dest.metaDataPtr);
             ASSERT(edt->fctId == self->taskFactories[0]->factoryId);
             PD_MSG_FIELD(properties) = self->taskFactories[0]->fcts.registerSignaler(
-                edt, signaler, PD_MSG_FIELD(slot), isAddDep);
+                edt, signaler, PD_MSG_FIELD(slot), PD_MSG_FIELD(mode), isAddDep);
         } else {
             ASSERT(0); // No other things we can register signalers on
         }
@@ -1185,6 +1239,17 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         // Never used for now
         ASSERT(0);
         break;
+    }
+
+    case PD_MSG_MGT_MONITOR_PROGRESS: {
+    #define PD_MSG (msg)
+    #define PD_TYPE PD_MSG_MGT_MONITOR_PROGRESS
+      // Delegate to scheduler
+      PD_MSG_FIELD(properties) = self->schedulers[0]->fcts.monitorProgress(self->schedulers[0],
+                                  (ocrMonitorProgress_t) PD_MSG_FIELD(properties) & 0xFF, PD_MSG_FIELD(monitoree));
+    #undef PD_MSG
+    #undef PD_TYPE
+      break;
     }
 
     case PD_MSG_DEP_DYNADD: {

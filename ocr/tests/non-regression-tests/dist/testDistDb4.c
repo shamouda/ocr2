@@ -11,11 +11,11 @@
 #include "ocr.h"
 
 /**
- * DESC: OCR-DIST - EDT operates on remote DB then satisfy EDT at DB's node and check write-back happened
+ * DESC: OCR-DIST - EDT operates on remote (big) DB then satisfy EDT at DB's node and check write-back happened
  */
 
 #define TYPE_ELEM_DB int
-#define NB_ELEM_DB 20
+#define NB_ELEM_DB 262144 //(1MB)
 
 ocrGuid_t addEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrGuid_t dbCloneGuid = (ocrGuid_t) depv[0].guid;

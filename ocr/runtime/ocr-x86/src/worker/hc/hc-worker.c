@@ -40,48 +40,52 @@ static inline u64 getWorkerId(ocrWorker_t * worker) {
     return hcWorker->id;
 }
 
-/**
- * The computation worker routine that asks work to the scheduler
- */
-static void workerLoop(ocrWorker_t * worker) {
-    ocrPolicyDomain_t *pd = worker->pd;
-    while(worker->fcts.isRunning(worker)) {
-        START_PROFILE(wo_hc_workerLoop);
-        ocrPolicyMsg_t msg;
-        getCurrentEnv(NULL, NULL, NULL, &msg);
-        ocrFatGuid_t taskGuid = {.guid = NULL_GUID, .metaDataPtr = NULL};
-        u32 count = 1;
+static void hcWorkShift(ocrWorker_t * worker) {
+    ocrPolicyDomain_t * pd;
+    ocrPolicyMsg_t msg;
+    getCurrentEnv(&pd, NULL, NULL, &msg);
+    ocrFatGuid_t taskGuid = {.guid = NULL_GUID, .metaDataPtr = NULL};
+    u32 count = 1;
 #define PD_MSG (&msg)
 #define PD_TYPE PD_MSG_COMM_TAKE
-        msg.type = PD_MSG_COMM_TAKE | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
-        PD_MSG_FIELD(guids) = &taskGuid;
-        PD_MSG_FIELD(guidCount) = count;
-        PD_MSG_FIELD(properties) = 0;
-        PD_MSG_FIELD(type) = OCR_GUID_EDT;
-        // TODO: In the future, potentially take more than one)
-        if(pd->fcts.processMessage(pd, &msg, true) == 0) {
-            // We got a response
-            count = PD_MSG_FIELD(guidCount);
-            if(count == 1) {
-                ASSERT(taskGuid.guid != NULL_GUID && taskGuid.metaDataPtr != NULL);
-                worker->curTask = (ocrTask_t*)taskGuid.metaDataPtr;
-                u8 (*executeFunc)(ocrTask_t *) = (u8 (*)(ocrTask_t*))PD_MSG_FIELD(extra); // Execute is stored in extra
-                executeFunc(worker->curTask);
-                worker->curTask = NULL;
-                // Destroy the work
+    msg.type = PD_MSG_COMM_TAKE | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
+    PD_MSG_FIELD(guids) = &taskGuid;
+    PD_MSG_FIELD(guidCount) = count;
+    PD_MSG_FIELD(properties) = 0;
+    PD_MSG_FIELD(type) = OCR_GUID_EDT;
+    // TODO: In the future, potentially take more than one)
+    if(pd->fcts.processMessage(pd, &msg, true) == 0) {
+        // We got a response
+        count = PD_MSG_FIELD(guidCount);
+        if(count == 1) {
+            ASSERT(taskGuid.guid != NULL_GUID && taskGuid.metaDataPtr != NULL);
+            worker->curTask = (ocrTask_t*)taskGuid.metaDataPtr;
+            u8 (*executeFunc)(ocrTask_t *) = (u8 (*)(ocrTask_t*))PD_MSG_FIELD(extra); // Execute is stored in extra
+            executeFunc(worker->curTask);
+            worker->curTask = NULL;
+            // Destroy the work
 #undef PD_TYPE
 
 #define PD_MSG (&msg)
 #define PD_TYPE PD_MSG_WORK_DESTROY
-                msg.type = PD_MSG_WORK_DESTROY | PD_MSG_REQUEST;
-                PD_MSG_FIELD(guid) = taskGuid;
-                PD_MSG_FIELD(properties) = 0;
-                // Ignore failures, we may be shutting down
-                pd->fcts.processMessage(pd, &msg, false);
+            msg.type = PD_MSG_WORK_DESTROY | PD_MSG_REQUEST;
+            PD_MSG_FIELD(guid) = taskGuid;
+            PD_MSG_FIELD(properties) = 0;
+            // Ignore failures, we may be shutting down
+            pd->fcts.processMessage(pd, &msg, false);
 #undef PD_MSG
 #undef PD_TYPE
-            }
         }
+    }
+}
+
+/**
+ * The computation worker routine that asks work to the scheduler
+ */
+static void workerLoop(ocrWorker_t * worker) {
+    while(worker->fcts.isRunning(worker)) {
+        START_PROFILE(wo_hc_workerLoop);
+        worker->fcts.workShift(worker);
         EXIT_PROFILE;
     } /* End of while loop */
 }
@@ -298,6 +302,7 @@ ocrWorkerFactory_t * newOcrWorkerFactoryHc(ocrParamList_t * perType) {
     base->workerFcts.begin = FUNC_ADDR(void (*) (ocrWorker_t *, ocrPolicyDomain_t *), hcBeginWorker);
     base->workerFcts.start = FUNC_ADDR(void (*) (ocrWorker_t *, ocrPolicyDomain_t *), hcStartWorker);
     base->workerFcts.run = FUNC_ADDR(void* (*) (ocrWorker_t *), hcRunWorker);
+    base->workerFcts.workShift = FUNC_ADDR(void* (*) (ocrWorker_t *), hcWorkShift);
     base->workerFcts.stop = FUNC_ADDR(void (*) (ocrWorker_t *), hcStopWorker);
     base->workerFcts.finish = FUNC_ADDR(void (*) (ocrWorker_t *), hcFinishWorker);
     base->workerFcts.isRunning = FUNC_ADDR(bool (*) (ocrWorker_t *), hcIsRunningWorker);

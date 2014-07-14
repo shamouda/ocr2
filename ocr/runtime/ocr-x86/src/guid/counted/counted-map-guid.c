@@ -14,7 +14,7 @@
 
 // Default hashtable's number of buckets
 //PERF: This parameter heavily impacts the GUID provider scalability !
-#define DEFAULT_NB_BUCKETS 10
+#define DEFAULT_NB_BUCKETS 40
 
 // Guid is composed of : (LOCID KIND COUNTER)
 #define GUID_BIT_SIZE 64

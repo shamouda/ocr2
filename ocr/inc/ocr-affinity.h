@@ -23,6 +23,7 @@ extern "C" {
 //
 
 typedef enum {
+    AFFINITY_CURRENT,
     AFFINITY_PD,
     AFFINITY_PD_MASTER
 } ocrAffinityKind;
@@ -44,6 +45,15 @@ u8 ocrAffinityCount(ocrAffinityKind kind, u64 * count);
  * @param[out] affinities      Affinity guid array, call-site allocated.
  */
 u8 ocrAffinityGet(ocrAffinityKind kind, u64 * count, ocrGuid_t * affinities);
+
+/**
+ * Returns an affinity the currently executing EDT is affinitized to.
+ * Note that an EDT may have multiple affinities. User should rely on
+ * 'ocrAffinityCount' and 'ocrAffinityGet' to query all affinities.
+ *
+ * @param[out] affinity      One affinity guid, call-site allocated.
+ */
+u8 ocrAffinityGetCurrent(ocrGuid_t * affinity);
 
 #ifdef __cplusplus
 }

@@ -144,13 +144,14 @@ typedef struct _ocrTaskFcts_t {
      * @param[in] self        Pointer to this task
      * @param[in] signaler    GUID of the source (signaler)
      * @param[in] slot        Slot on self that will be satisfied by signaler
+     * @param[in] mode        The access mode for the dependence's data
      * @param[in] isDepAdd    True if the registerSignaler is part of the initial
      *                        adding of the dependence. False if this was a
      *                        standalone signaler register.
      * @return 0 on success and a non-zero value on failure
      */
     u8 (*registerSignaler)(struct _ocrTask_t* self, ocrFatGuid_t src, u32 slot,
-                           bool isDepAdd);
+                           ocrDbAccessMode_t mode, bool isDepAdd);
 
     /**
      * @brief Informs the task that the event/db 'src' is no longer linked

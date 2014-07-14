@@ -53,6 +53,10 @@ typedef struct _ocrWorkerFcts_t {
      */
     void* (*run)(struct _ocrWorker_t *self);
 
+    /** @brief change worker shift
+     */
+    void* (*workShift)(struct _ocrWorker_t *self);
+
     /** @brief Query the worker to finish its work
      */
     void (*finish)(struct _ocrWorker_t *self);

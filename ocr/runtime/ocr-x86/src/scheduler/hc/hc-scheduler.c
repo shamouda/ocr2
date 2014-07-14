@@ -13,6 +13,8 @@
 #include "ocr-sysboot.h"
 #include "ocr-workpile.h"
 #include "scheduler/hc/hc-scheduler.h"
+#include "scheduler/hc/scheduler-blocking-support.h"
+
 // TODO: This relies on data in hc-worker (its ID to do the mapping)
 // This is non-portable (HC scheduler does not work with non
 // HC worker) but works for now
@@ -159,44 +161,6 @@ void hcSchedulerFinish(ocrScheduler_t *self) {
     // Nothing to do locally
 }
 
-// What is this for?
-#if 0
-static u8 hcSchedulerYield (ocrScheduler_t* self, ocrGuid_t workerGuid,
-                            ocrGuid_t yieldingEdtGuid, ocrGuid_t eventToYieldForGuid,
-                            ocrGuid_t * returnGuid,
-                            ocrPolicyCtx_t *context) {
-    // We do not yet take advantage of knowing which EDT we are yielding for.
-    ocrPolicyDomain_t * pd = context->PD;
-    ocrWorker_t * worker = NULL;
-    deguidify(pd, workerGuid, (u64*)&(worker), NULL);
-    // Retrieve currently executing edt's guid
-    ocrEvent_t * eventToYieldFor = NULL;
-    deguidify(pd, eventToYieldForGuid, (u64*)&(eventToYieldFor), NULL);
-
-    ocrPolicyCtx_t * orgCtx = getCurrentWorkerContext();
-    ocrPolicyCtx_t * ctx = orgCtx->clone(orgCtx);
-    ctx->type = PD_MSG_EDT_TAKE;
-
-    ocrGuid_t result = ERROR_GUID;
-    //This only works for single events, not latches
-    ASSERT(isEventSingleGuid(eventToYieldForGuid));
-    while((result = eventToYieldFor->fcts.get(eventToYieldFor, 0)) == ERROR_GUID) {
-        u32 count;
-        ocrGuid_t taskGuid;
-        pd->takeEdt(pd, NULL, &count, &taskGuid, ctx);
-        ASSERT(count <= 1); // >1 not yet supported
-        if (count != 0) {
-            ocrTask_t* task = NULL;
-            deguidify(pd, taskGuid, (u64*)&(task), NULL);
-            worker->fcts.execute(worker, task, taskGuid, yieldingEdtGuid);
-        }
-    }
-    *returnGuid = result;
-    ctx->destruct(ctx);
-    return 0;
-}
-#endif /* if 0 */
-
 u8 hcSchedulerTake (ocrScheduler_t *self, u32 *count, ocrFatGuid_t *edts) {
     // Source must be a worker guid and we rely on indices to map
     // workers to workpiles (one-to-one)
@@ -267,6 +231,16 @@ u8 hcSchedulerGiveComm(ocrScheduler_t *self, u32* count, ocrFatGuid_t* handlers,
     return 0;
 }
 
+u8 hcSchedulerMonitorProgress(ocrScheduler_t *self, ocrMonitorProgress_t type, void * monitoree) {
+#ifdef ENABLE_SCHEDULER_BLOCKING_SUPPORT
+    // Current implementation assumes the worker is blocked.
+    ocrWorker_t * worker;
+    getCurrentEnv(NULL, &worker, NULL, NULL);
+    handleWorkerNotProgressing(worker);
+#endif
+    return 0;
+}
+
 ocrScheduler_t* newSchedulerHc(ocrSchedulerFactory_t * factory, ocrParamList_t *perInstance) {
     ocrScheduler_t* base = (ocrScheduler_t*) runtimeChunkAlloc(sizeof(ocrSchedulerHc_t), NULL);
     factory->initialize(factory, base, perInstance);
@@ -301,6 +275,7 @@ ocrSchedulerFactory_t * newOcrSchedulerFactoryHc(ocrParamList_t *perType) {
     base->schedulerFcts.giveEdt = FUNC_ADDR(u8 (*)(ocrScheduler_t*, u32*, ocrFatGuid_t*), hcSchedulerGive);
     base->schedulerFcts.takeComm = FUNC_ADDR(u8 (*)(ocrScheduler_t*, u32*, ocrFatGuid_t*, u32), hcSchedulerTakeComm);
     base->schedulerFcts.giveComm = FUNC_ADDR(u8 (*)(ocrScheduler_t*, u32*, ocrFatGuid_t*, u32), hcSchedulerGiveComm);
+    base->schedulerFcts.monitorProgress = FUNC_ADDR(u8 (*)(ocrScheduler_t*, ocrMonitorProgress_t, void*), hcSchedulerMonitorProgress);
     return base;
 }
 

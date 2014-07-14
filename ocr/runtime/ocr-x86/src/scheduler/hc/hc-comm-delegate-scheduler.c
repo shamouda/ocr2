@@ -10,6 +10,7 @@
 #include "debug.h"
 #include "ocr-sysboot.h"
 #include "utils/deque.h"
+#include "utils/list.h"
 #include "worker/hc/hc-worker.h"
 #include "scheduler/hc/hc-comm-delegate-scheduler.h"
 #include "comm-api/delegate/delegate-comm-api.h"
@@ -39,8 +40,10 @@
     //Create inbox queues for each worker
     commSched->inboxesCount = boxCount;
     commSched->inboxes = pd->fcts.pdMalloc(pd, sizeof(deque_t *) * boxCount);
+    commSched->inboxesLocks = pd->fcts.pdMalloc(pd, sizeof(u32) * boxCount);
     for(i = 0; i < boxCount; ++i) {
         commSched->inboxes[i] = newWorkStealingDeque(pd, NULL);
+        commSched->inboxesLocks[i] = 0;
     }
 }
 
@@ -73,6 +76,7 @@ u8 hcCommSchedulerTakeComm(ocrScheduler_t *self, u32* count, ocrFatGuid_t * fatH
     ocrWorker_t *worker = NULL; //DIST-TODO sep-concern: Do we need a way to register worker types somehow ?
     getCurrentEnv(NULL, &worker, NULL, NULL);
     ocrWorkerHc_t * hcWorker = (ocrWorkerHc_t *) worker;
+    u64 wid = hcWorker->id;
 
     if (hcWorker->hcType == HC_WORKER_COMM) {
         // Steal from other worker's outbox
@@ -84,9 +88,18 @@ u8 hcCommSchedulerTakeComm(ocrScheduler_t *self, u32* count, ocrFatGuid_t * fatH
         //      or go over all outboxes
         deque_t ** outboxes = commSched->outboxes;
         u64 outboxesCount = commSched->outboxesCount;
-        u64 wid = hcWorker->id;
-        u64 i = (wid+1); // skip over 'self' outbox
         u32 success = 0;
+
+    #ifdef HYBRID_COMM_COMP_WORKER // Experimental see documentation
+        // Try to pop from own outbox first (support HYBRID_COMM_COMP_WORKER mode)
+        ocrMsgHandle_t* handle = outboxes[wid]->popFromTail(outboxes[wid], 1);
+        if (handle != NULL) {
+            fatHandlers[success].metaDataPtr = handle;
+            success++;
+        }
+        #endif
+
+        u64 i = (wid+1); // skip over 'self' outbox
         while ((i < (wid+outboxesCount)) && (success < *count)) {
             deque_t * deque = outboxes[i%outboxesCount];
             ocrMsgHandle_t* handle = deque->popFromHead(deque, 1);
@@ -99,21 +112,69 @@ u8 hcCommSchedulerTakeComm(ocrScheduler_t *self, u32* count, ocrFatGuid_t * fatH
         *count = success;
     } else {
         ASSERT(hcWorker->hcType == HC_WORKER_COMP);
-        // Pop from own inbox
-        u64 wid = hcWorker->id;
         deque_t * inbox = commSched->inboxes[wid];
-        ocrMsgHandle_t* handle = NULL;
-        u32 success = 0;
-        do {
-            // 'steal' from own inbox, comm-worker pushes to it
-            handle = (ocrMsgHandle_t *) inbox->popFromHead(inbox, 0);
-            if (handle == NULL) {
-                break;
+        u32 curIdx = 0;
+        linkedlist_t * candidateList = NULL;
+        while(curIdx < *count) {
+            ocrMsgHandle_t ** target = (ocrMsgHandle_t **) fatHandlers[curIdx].metaDataPtr;
+            bool isSpecificTarget = ((target != NULL) && (*target != NULL));
+            ocrMsgHandle_t * candidate = NULL;
+            if (isSpecificTarget && (candidateList != NULL)) {
+                //Look through previous steals
+                iterator_t * iterator = candidateList->iterator(candidateList);
+                while (iterator->hasNext(iterator)) {
+                    ocrMsgHandle_t * handle = (ocrMsgHandle_t *) iterator->next(iterator);
+                    if (handle == *target) {
+                        candidate = handle;
+                        iterator->removeCurrent(iterator);
+                        curIdx++;
+                        break;
+                    }
+                }
+                iterator->destruct(iterator);
             }
-            fatHandlers[success].metaDataPtr = handle;
-            success++;
-        } while (success < *count);
-        *count = success;
+            if (candidate == NULL) {
+                // 'steal' from own inbox, comm-worker pushes to it
+                candidate = (ocrMsgHandle_t *) inbox->popFromHead(inbox, 0);
+                if (candidate == NULL) {
+                    // No message available
+                    break;
+                } 
+                if (isSpecificTarget) {
+                    if (candidate != *target) {
+                        if (candidateList == NULL) {
+                            ocrPolicyDomain_t * pd;
+                            getCurrentEnv(&pd, NULL, NULL, NULL);
+                            candidateList = newLinkedList(pd);
+                        }
+                        candidateList->pushFront(candidateList, candidate);
+                    } else {
+                        fatHandlers[curIdx].metaDataPtr = candidate;
+                        curIdx++;
+                    }
+                }
+            }
+        }
+        u32 i = curIdx;
+        while (i < *count) {
+            fatHandlers[i].metaDataPtr = NULL;
+            i++;
+        }
+        *count = curIdx;
+        if (candidateList != NULL) {
+            // Put stolen handles for which there's no interest back
+            u32 * inboxLock = &commSched->inboxesLocks[wid];
+            hal_lock32(inboxLock);
+            iterator_t * iterator = candidateList->iterator(candidateList);
+            while (iterator->hasNext(iterator)) {
+                ocrMsgHandle_t * handle = (ocrMsgHandle_t *) iterator->next(iterator);
+                inbox->pushAtTail(inbox, handle, 0);
+                iterator->removeCurrent(iterator);
+            }
+            iterator->destruct(iterator);
+            candidateList->destruct(candidateList);
+            hal_unlock32(inboxLock);
+        }
     }
     return 0;
 }
@@ -131,14 +192,38 @@ u8 hcCommSchedulerGiveComm(ocrScheduler_t *self, u32* count, ocrFatGuid_t* fatHa
     ocrWorkerHc_t * hcWorker = (ocrWorkerHc_t *) worker;
 
     if (hcWorker->hcType == HC_WORKER_COMM) {
-        // Comm-worker giving back to a worker's inbox
         u32 i=0;
         while (i < *count) {
             delegateMsgHandle_t* handle = (delegateMsgHandle_t *) fatHandlers[i].metaDataPtr;
-            DPRINTF(DEBUG_LVL_VVERB,"[%d] hc-comm-delegate-scheduler:: Comm-worker pushes at tail of box %d\n",
-                (int) self->pd->myLocation, handle->boxId);
-            deque_t * inbox = commSched->inboxes[handle->boxId];
-            inbox->pushAtTail(inbox, handle, 0);
+        #ifdef HYBRID_COMM_COMP_WORKER // Experimental see documentation
+            ocrPolicyMsg_t * message = (handle->handle.status == HDL_RESPONSE_OK) ? handle->handle.response : handle->handle.msg;
+            bool outgoingComm = (message->destLocation != self->pd->myLocation);
+            if (outgoingComm) {
+                // (support HYBRID_COMM_COMP_WORKER mode)
+                // The communication worker can process simple messages that 
+                // are known to be short lived and are 'sterile' (i.e. do not generate 
+                // new communication) beside responding to the message.
+                // In that case, the comm-worker should only be able to give outgoing responses to the scheduler
+                ASSERT(message->type & PD_MSG_RESPONSE);
+                // Push to the comm worker outbox
+                DPRINTF(DEBUG_LVL_VVERB,"[%d] hc-comm-delegate-scheduler:: Comm-worker pushes outgoing to own outbox %d\n",
+                    (int) self->pd->myLocation, hcWorker->id);
+                deque_t * outbox = commSched->outboxes[hcWorker->id];
+                outbox->pushAtTail(outbox, handle, 0);
+            } else {
+        #endif
+                // Comm-worker giving back to a worker's inbox
+                DPRINTF(DEBUG_LVL_VVERB,"[%d] hc-comm-delegate-scheduler:: Comm-worker pushes at tail of box %d\n",
+                    (int) self->pd->myLocation, handle->boxId);
+                // The lock is required because the comp-worker can push back handles it took
+                u32 * inboxLock = &commSched->inboxesLocks[handle->boxId];
+                hal_lock32(inboxLock);
+                deque_t * inbox = commSched->inboxes[handle->boxId];
+                inbox->pushAtTail(inbox, (ocrMsgHandle_t *) handle, 0);
+                hal_unlock32(inboxLock);
+        #ifdef HYBRID_COMM_COMP_WORKER
+            }
+        #endif
             i++;
         }
         *count = i;
@@ -163,6 +248,11 @@ u8 hcCommSchedulerGiveComm(ocrScheduler_t *self, u32* count, ocrFatGuid_t* fatHa
     return 0;
 }
 
+u8 hcCommMonitorProgress(ocrScheduler_t *self, ocrMonitorProgress_t type, void * monitoree) {
+    ocrSchedulerHcCommDelegate_t * commSched = (ocrSchedulerHcCommDelegate_t *) self;
+    return commSched->baseMonitorProgress(self, type, monitoree);   
+}
+
 ocrScheduler_t* newSchedulerHcComm(ocrSchedulerFactory_t * factory, ocrParamList_t *perInstance) {
     ocrScheduler_t* base = (ocrScheduler_t*) runtimeChunkAlloc(sizeof(ocrSchedulerHcCommDelegate_t), NULL);
     factory->initialize(factory, base, perInstance);
@@ -180,6 +270,7 @@ void initializeSchedulerHcComm(ocrSchedulerFactory_t * factory, ocrScheduler_t *
     commSched->inboxes = NULL;
     commSched->baseStart = derivedFactory->baseStart;
     commSched->baseStop = derivedFactory->baseStop;
+    commSched->baseMonitorProgress = derivedFactory->baseMonitorProgress;
 }
 
 void destructSchedulerFactoryHcComm(ocrSchedulerFactory_t * factory) {
@@ -197,6 +288,7 @@ ocrSchedulerFactory_t * newOcrSchedulerFactoryHcCommDelegate(ocrParamList_t *per
     derived->baseInitialize = baseFactory->initialize;
     derived->baseStart = baseFcts.start;
     derived->baseStop = baseFcts.stop;
+    derived->baseMonitorProgress = baseFcts.monitorProgress;
 
     ocrSchedulerFactory_t* base = (ocrSchedulerFactory_t*) derived;
     base->instantiate = FUNC_ADDR(ocrScheduler_t* (*)(ocrSchedulerFactory_t*, ocrParamList_t*), newSchedulerHcComm);
@@ -209,7 +301,7 @@ ocrSchedulerFactory_t * newOcrSchedulerFactoryHcCommDelegate(ocrParamList_t *per
     base->schedulerFcts.stop  = FUNC_ADDR(void (*)(ocrScheduler_t*), hcCommSchedulerStop);
     base->schedulerFcts.takeComm = FUNC_ADDR(u8 (*)(ocrScheduler_t*, u32*, ocrFatGuid_t*, u32), hcCommSchedulerTakeComm);
     base->schedulerFcts.giveComm = FUNC_ADDR(u8 (*)(ocrScheduler_t*, u32*, ocrFatGuid_t*, u32), hcCommSchedulerGiveComm);
-
+    base->schedulerFcts.monitorProgress = FUNC_ADDR(u8 (*)(ocrScheduler_t*, ocrMonitorProgress_t, void*), hcCommMonitorProgress);
     baseFactory->destruct(baseFactory);
     return base;
 }

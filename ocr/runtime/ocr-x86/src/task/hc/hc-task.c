@@ -312,7 +312,6 @@ static u8 taskSchedule(ocrTask_t *self) {
 
 u8 destructTaskHc(ocrTask_t* base) {
     DPRINTF(DEBUG_LVL_INFO, "Destroy 0x%lx\n", base->guid);
-
     ocrPolicyDomain_t *pd = NULL;
     ocrPolicyMsg_t msg;
     getCurrentEnv(&pd, NULL, NULL, &msg);
@@ -418,6 +417,7 @@ ocrTask_t * newTaskHc(ocrTaskFactory_t* factory, ocrFatGuid_t edtTemplate,
     for(i = 0; i < depc; ++i) {
         edt->signalers[i].guid = UNINITIALIZED_GUID;
         edt->signalers[i].slot = i;
+        edt->signalers[i].mode = -1;
     }
 
     // Set up HC specific stuff
@@ -532,7 +532,8 @@ u8 satisfyTaskHc(ocrTask_t * base, ocrFatGuid_t data, u32 slot) {
 /**
  * Can be invoked concurrently, however each invocation should be for a different slot
  */
-u8 registerSignalerTaskHc(ocrTask_t * base, ocrFatGuid_t signalerGuid, u32 slot, bool isDepAdd) {
+u8 registerSignalerTaskHc(ocrTask_t * base, ocrFatGuid_t signalerGuid, u32 slot, 
+                            ocrDbAccessMode_t mode, bool isDepAdd) {
     ASSERT(isDepAdd); // This should only be called when adding a dependence
 
     ocrTaskHc_t * self = (ocrTaskHc_t *) base;
@@ -543,6 +544,8 @@ u8 registerSignalerTaskHc(ocrTask_t * base, ocrFatGuid_t signalerGuid, u32 slot,
     getCurrentEnv(&pd, NULL, NULL, &msg);
     ocrGuidKind signalerKind = OCR_GUID_NONE;
     deguidify(pd, &signalerGuid, &signalerKind);
+    node->mode = mode;
+
     //DIST-TODO this is the reason why we need to introduce new kinds of guid
     //because we don't have support for cloning metadata around yet
     if(signalerKind & OCR_GUID_EVENT) {
@@ -591,25 +594,24 @@ u8 registerSignalerTaskHc(ocrTask_t * base, ocrFatGuid_t signalerGuid, u32 slot,
         }
     } else {
         if(signalerKind == OCR_GUID_DB) {
-            ASSERT(false);
-            //TODO Seems this is always handled beforehand by converting add-dep to satisfy
-            //TODO additionally, think there'a bug here because we need to try and iterate
-            //the frontier here because the first slot could be db, followed by other dependences.
-            node->slot = (u32)-1; // Already satisfied
-            //TODO bug: we need to try and iterate the frontier here because the
-            //first slot could be db, followed by other dependences.
-            printf("register DB\n");
-            hal_lock32(&(self->lock));
-            ++(self->slotSatisfiedCount);
-            if(base->depc == self->slotSatisfiedCount) {
-                ++(self->slotSatisfiedCount); // We make it go one over to not schedule twice
-                hal_unlock32(&(self->lock));
-                DPRINTF(DEBUG_LVL_VERB, "Scheduling task 0x%lx due to an add dependence\n",
-                        self->base.guid);
-                RESULT_PROPAGATE(taskSchedule(base));
-            } else {
-                hal_unlock32(&(self->lock));
-            }
+            //Convert to a satisfy now that we've recorded the mode
+            //NOTE: Could improve implementation by figuring out how
+            //to properly iterate the frontier when adding the DB
+            //potentially concurrently with satifies.
+            ocrPolicyMsg_t registerMsg;
+            getCurrentEnv(NULL, NULL, NULL, &registerMsg);
+        #define PD_MSG (&registerMsg)
+        #define PD_TYPE PD_MSG_DEP_SATISFY
+            registerMsg.type = PD_MSG_DEP_SATISFY | PD_MSG_REQUEST;
+            PD_MSG_FIELD(guid.guid) = base->guid;
+            PD_MSG_FIELD(guid.metaDataPtr) = NULL;
+            PD_MSG_FIELD(payload.guid) = signalerGuid.guid;
+            PD_MSG_FIELD(payload.metaDataPtr) = NULL;
+            PD_MSG_FIELD(slot) = slot;
+            PD_MSG_FIELD(properties) = 0;
+            RESULT_PROPAGATE(pd->fcts.processMessage(pd, &registerMsg, true));
+        #undef PD_MSG
+        #undef PD_TYPE
         } else {
             ASSERT(0);
         }
@@ -714,11 +716,10 @@ u8 taskExecute(ocrTask_t* base) {
                 PD_MSG_FIELD(guid.metaDataPtr) = NULL;
                 PD_MSG_FIELD(edt.guid) = base->guid;
                 PD_MSG_FIELD(edt.metaDataPtr) = base;
-                PD_MSG_FIELD(flags) = 0;
+                PD_MSG_FIELD(flags) = derived->signalers[maxAcquiredDb].mode;
                 PD_MSG_FIELD(properties) = DB_PROP_RT_ACQUIRE; // Runtime acquire
                 // This call may fail if the policy domain goes down
                 // while we are starting to execute
-
                 if(pd->fcts.processMessage(pd, &msg, true)) {
                     // We are not going to launch the EDT
                     break;
@@ -889,7 +890,7 @@ ocrTaskFactory_t * newTaskFactoryHc(ocrParamList_t* perInstance, u32 factoryId) 
 
     base->fcts.destruct = FUNC_ADDR(u8 (*)(ocrTask_t*), destructTaskHc);
     base->fcts.satisfy = FUNC_ADDR(u8 (*)(ocrTask_t*, ocrFatGuid_t, u32), satisfyTaskHc);
-    base->fcts.registerSignaler = FUNC_ADDR(u8 (*)(ocrTask_t*, ocrFatGuid_t, u32, bool), registerSignalerTaskHc);
+    base->fcts.registerSignaler = FUNC_ADDR(u8 (*)(ocrTask_t*, ocrFatGuid_t, u32, ocrDbAccessMode_t, bool), registerSignalerTaskHc);
     base->fcts.unregisterSignaler = FUNC_ADDR(u8 (*)(ocrTask_t*, ocrFatGuid_t, u32, bool), unregisterSignalerTaskHc);
     base->fcts.notifyDbAcquire = FUNC_ADDR(u8 (*)(ocrTask_t*, ocrFatGuid_t), notifyDbAcquireTaskHc);
     base->fcts.notifyDbRelease = FUNC_ADDR(u8 (*)(ocrTask_t*, ocrFatGuid_t), notifyDbReleaseTaskHc);

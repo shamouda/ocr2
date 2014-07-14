@@ -17,6 +17,9 @@
 
 #define DEBUG_TYPE COMM_API
 
+// Controls how many times we try to poll for a reply before notifying the scheduler
+#define MAX_ACTIVE_WAIT 100
+
 void delegateCommDestruct (ocrCommApi_t * base) {
     runtimeChunkFree((u64)base, NULL);
 }
@@ -125,9 +128,9 @@ u8 delegateCommSendMessage(ocrCommApi_t *self, ocrLocation_t target,
  */
 u8 delegateCommPollMessage(ocrCommApi_t *self, ocrMsgHandle_t **handle) {
     ocrPolicyDomain_t * pd = self->pd;
-    // Try to take a message from the scheduler
+    // Try to take a message from the scheduler and pass the handle as a hint.
     ocrFatGuid_t fatGuid;
-    fatGuid.metaDataPtr = NULL;
+    fatGuid.metaDataPtr = handle;
     ocrPolicyMsg_t takeMsg;
     getCurrentEnv(NULL, NULL, NULL, &takeMsg);
 #define PD_MSG (&takeMsg)
@@ -165,9 +168,32 @@ u8 delegateCommPollMessage(ocrCommApi_t *self, ocrMsgHandle_t **handle) {
  *  - *handle != NULL
  */
 u8 delegateCommWaitMessage(ocrCommApi_t *self, ocrMsgHandle_t **handle) {
-    u8 ret;
+    u8 ret = POLL_NO_MESSAGE;
     //DIST-TODO one-way ack: is there a use case for waiting a one-way to complete ?
-    while((ret = self->fcts.pollMessage(self,handle)) == POLL_NO_MESSAGE);
+    while(ret == POLL_NO_MESSAGE) {
+        // Try to poll a little
+        u64 i = 0;
+        while ((i < MAX_ACTIVE_WAIT) && (ret == POLL_NO_MESSAGE)) {
+            ret = self->fcts.pollMessage(self,handle);
+            i++;
+        }
+        if (ret == POLL_NO_MESSAGE) {
+            // If nothing shows up, transfer control to the scheduler for monitoring progress
+            ocrPolicyDomain_t * pd;
+            ocrPolicyMsg_t msg;
+            getCurrentEnv(&pd, NULL, NULL, &msg);
+        #define PD_MSG (&msg)
+        #define PD_TYPE PD_MSG_MGT_MONITOR_PROGRESS
+            msg.type = PD_MSG_MGT_MONITOR_PROGRESS | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
+            //TODO not sure if the caller should register a progress function or if the
+            //scheduler should know what to do for each type of monitor progress
+            PD_MSG_FIELD(monitoree) = &handle;
+            PD_MSG_FIELD(properties) = (0 | MONITOR_PROGRESS_COMM);
+            RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, false));
+        #undef PD_MSG
+        #undef PD_TYPE
+        }
+    }
     return ret;
 }
 

@@ -41,13 +41,18 @@ ocrGuid_t mainEdt(u32 paramc, u64 *paramv, u32 depc, ocrEdtDep_t *depv) {
     ocrGuid_t producer_template, consumer_template;
     ocrGuid_t producer_edt, consumer_edt;
     ocrGuid_t producer_done_event;
-    ocrEdtTemplateCreate(&producer_template, producer1, 0, 0);
+    // The ready_event ensures the producer edt doesn't run before we
+    // can add a dependence to its output event
+    ocrGuid_t ready_event;
+    ocrEventCreate(&ready_event, OCR_EVENT_STICKY_T, false);
+    ocrEdtTemplateCreate(&producer_template, producer1, 0, 1);
     ocrEdtTemplateCreate(&consumer_template, consumer , 0, 1);
-    ocrEdtCreate(&producer_edt, producer_template, 0, NULL, 0, NULL,
+    ocrEdtCreate(&producer_edt, producer_template, 0, NULL, 1, &ready_event,
                  EDT_PROP_NONE, NULL_GUID, &producer_done_event);
     ocrEdtCreate(&consumer_edt, consumer_template, 0, NULL, 1, NULL,
                  EDT_PROP_NONE, NULL_GUID, NULL);
-    /* create consumer dependency on producer output */
+    // create consumer dependency on producer output
     ocrAddDependence(producer_done_event,consumer_edt,0,DB_MODE_RO);
+    ocrEventSatisfy(ready_event, NULL_GUID);
     return NULL_GUID;
 }

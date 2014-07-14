@@ -191,10 +191,20 @@ static void workerLoopHcComm_RL3(ocrWorker_t * worker) {
             //To catch misuses, assert src is not self and dst is self
             ASSERT((message->srcLocation != pd->myLocation) && (message->destLocation == pd->myLocation));
             if (message->type & PD_MSG_REQUEST) {
-                DPRINTF(DEBUG_LVL_VVERB,"[%d] hc-comm-worker: Received message request, msgId: %ld\n", (int) pd->myLocation, message->msgId);
+                DPRINTF(DEBUG_LVL_VVERB,"[%d] hc-comm-worker: Received message request, msgId: %ld type:0x%x\n", (int) pd->myLocation, message->msgId, message->type);
                 // This is an outstanding request, delegate to PD for processing
                 u64 msgParamv = (u64) message;
+            #ifdef HYBRID_COMM_COMP_WORKER // Experimental see documentation
+                // Execute selected 'sterile' messages on the spot
+                if ((message->type & PD_MSG_TYPE_ONLY) == PD_MSG_DB_ACQUIRE) {
+                    DPRINTF(DEBUG_LVL_VVERB,"[%d] hc-comm-worker: Execute message request, msgId: %ld\n", (int) pd->myLocation, message->msgId);
+                    processRequestEdt(1, &msgParamv, 0, NULL);
+                } else {
+                    createProcessRequestEdt(pd, processRequestTemplate, &msgParamv);
+                }
+            #else
                 createProcessRequestEdt(pd, processRequestTemplate, &msgParamv);
+            #endif
                 // We do not need the handle anymore
                 handle->destruct(handle);
                 //DIST-TODO-3: depending on comm-worker implementation, the received message could
@@ -409,6 +419,7 @@ ocrWorkerFactory_t * newOcrWorkerFactoryHcComm(ocrParamList_t * perType) {
 
     // Specialize comm functions
     base->workerFcts.run = FUNC_ADDR(void* (*)(ocrWorker_t*), runWorkerHcComm);
+    base->workerFcts.workShift = FUNC_ADDR(void* (*) (ocrWorker_t *), workerLoopHcComm_RL3);
     base->workerFcts.stop = FUNC_ADDR(void (*)(ocrWorker_t*), stopWorkerHcComm);
 
     baseFactory->destruct(baseFactory);

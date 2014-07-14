@@ -212,6 +212,13 @@ typedef enum {
                                 * and should be freed with pdFree) */
 } ocrGuidInfoProp_t;
 
+
+typedef enum { // Coded on 8 bits maximum
+    MONITOR_PROGRESS_COMM  = 0x1, /**< Monitor a communication completion */
+    MONITOR_PROGRESS_EVENT = 0x2, /**< Monitor an event completion */
+    MAX_MONITOR_PROGRESS   = 0x3
+} ocrMonitorProgress_t;
+
 // REC: FIXME
 // This is a placeholder for something that identifies a memory,
 // a compute node and a policy domain.  Whatever else this becomes in the future, it

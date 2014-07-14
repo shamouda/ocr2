@@ -52,8 +52,11 @@ RES=`grep "MPI" ${OCR_CONFIG}`
 if [[ "$RES" != "" ]]; then
     #Default to 2 nodes for now
     #TODO This information should be extracted from the config file
-    NB_NODES=2
-    mpirun -np ${NB_NODES} ${PROGRAM_BIN} -ocr:cfg ${OCR_CONFIG}
+    if [[ "$OCR_NUM_NODES" == "" ]]; then
+        OCR_NUM_NODES=2
+    fi
+    # TODO ifdef
+    mpirun -np ${OCR_NUM_NODES} ${PROGRAM_BIN} -ocr:cfg ${OCR_CONFIG}
     RET_CODE=$?
     exit ${RET_CODE}
 fi

@@ -49,7 +49,8 @@ void cePolicyDomainBegin(ocrPolicyDomain_t * policy) {
     for(i = 0; i < maxCount; i++) {
         policy->commApis[i]->fcts.begin(policy->commApis[i], policy);
     }
-
+    policy->placer = NULL;
+    
     // REC: Moved all workers to start here.
     // Note: it's important to first logically start all workers.
     // Once they are all up, start the runtime.
@@ -886,7 +887,8 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             if(dstKind == OCR_GUID_EDT) {
                 ocrTask_t *task = (ocrTask_t*)(dest.metaDataPtr);
                 ASSERT(task->fctId == self->taskFactories[0]->factoryId);
-                self->taskFactories[0]->fcts.registerSignaler(task, src, PD_MSG_FIELD(slot), true);
+                self->taskFactories[0]->fcts.registerSignaler(task, src, PD_MSG_FIELD(slot), 
+                    PD_MSG_FIELD(properties) & DB_PROP_MODE_MASK, true);
             } else if(dstKind & OCR_GUID_EVENT) {
                 ocrEvent_t *evt = (ocrEvent_t*)(dest.metaDataPtr);
                 ASSERT(evt->fctId == self->eventFactories[0]->factoryId);
@@ -928,12 +930,12 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             ocrEvent_t *evt = (ocrEvent_t*)(dest.metaDataPtr);
             ASSERT(evt->fctId == self->eventFactories[0]->factoryId);
             self->eventFactories[0]->fcts[evt->kind].registerSignaler(
-                evt, signaler, PD_MSG_FIELD(slot), false);
+                evt, signaler, PD_MSG_FIELD(slot), PD_MSG_FIELD(mode), false);
         } else if(dstKind == OCR_GUID_EDT) {
             ocrTask_t *edt = (ocrTask_t*)(dest.metaDataPtr);
             ASSERT(edt->fctId == self->taskFactories[0]->factoryId);
             self->taskFactories[0]->fcts.registerSignaler(
-                edt, signaler, PD_MSG_FIELD(slot), false);
+                edt, signaler, PD_MSG_FIELD(slot), PD_MSG_FIELD(mode), false);
         } else {
             ASSERT(0); // No other things we can register signalers on
         }
