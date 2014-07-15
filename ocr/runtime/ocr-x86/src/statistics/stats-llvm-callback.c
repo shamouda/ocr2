@@ -57,7 +57,7 @@ extern "C" {
             memset(&edt->dbList[edt->numDbs], 0, (edt->maxDbs-edt->numDbs)*sizeof(dbTable_t));
         }
         edt->dbList[edt->numDbs].db = db;
-        edt->dbList[edt->numDbs].slot = 0xff;
+        edt->dbList[edt->numDbs].slot = edt->maxslot--;
         edt->dbList[edt->numDbs].start = (u64)addr;
         edt->dbList[edt->numDbs].end = (u64)addr+len;
         edt->dbList[edt->numDbs].readcount = (u64)0;
@@ -136,6 +136,7 @@ extern "C" {
         addedEDT->maxDbs = MOREDB;
         addedEDT->dbList = (dbTable_t *)realloc(addedEDT->dbList, addedEDT->maxDbs*sizeof(dbTable_t)); // MOREDB to begin with
         addedEDT->numDbs = 0;
+        addedEDT->maxslot = 0xff;
 
         enter_cs();
         task->els[ELS_EDT_INDEX] = numEdts;
@@ -240,6 +241,7 @@ extern "C" {
 
         ptr = edt->dbList;
 
+	ASSERT(slot < edt->maxslot);       // Make sure we don't conflict with created DBs
         for (j = 0; j < edt->numDbs; j++) {
             if(ptr[j].db == db) {
                 ptr[j].slot = slot;

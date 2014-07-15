@@ -28,6 +28,7 @@ typedef struct _edtTable_t {
     dbTable_t *dbList;
     int numDbs;
     int maxDbs;
+    u8 maxslot;
 } edtTable_t;
 
 void ocrStatsAccessInsertDB(ocrTask_t *task, ocrDataBlock_t *db);
