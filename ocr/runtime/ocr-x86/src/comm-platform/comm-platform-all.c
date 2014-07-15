@@ -14,6 +14,7 @@ const char * commplatform_types[] = {
     "CePthread",
     "XePthread",
     "MPI",
+    "GASNet",
     NULL
 };
 
@@ -42,6 +43,10 @@ ocrCommPlatformFactory_t *newCommPlatformFactory(commPlatformType_t type, ocrPar
 #ifdef ENABLE_COMM_PLATFORM_MPI
     case commPlatformMPI_id:
         return newCommPlatformFactoryMPI(typeArg);
+#endif
+#ifdef ENABLE_COMM_PLATFORM_GASNET
+    case commPlatformGasnet_id:
+        return newCommPlatformFactoryGasnet(typeArg);
 #endif
     default:
         ASSERT(0);

@@ -480,6 +480,11 @@ void platformSpecificInit(ocrConfig_t * ocrConfig) {
     extern void platformInitMPIComm(int argc, char ** argv);
     platformInitMPIComm(ocrConfig->userArgc, ocrConfig->userArgv);
 #endif
+
+#ifdef ENABLE_COMM_PLATFORM_GASNET
+    extern void platformInitGasnetComm(int argc, char ** argv);
+    platformInitGasnetComm(ocrConfig->userArgc, ocrConfig->userArgv);
+#endif
 }
 
 int __attribute__ ((weak)) main(int argc, const char* argv[]) {

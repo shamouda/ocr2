@@ -19,6 +19,7 @@ typedef enum _commPlatformType_t {
     commPlatformCePthread_id,
     commPlatformXePthread_id,
     commPlatformMPI_id,
+    commPlatformGasnet_id,
     commPlatformMax_id
 } commPlatformType_t;
 
@@ -30,6 +31,7 @@ extern const char * commplatform_types[];
 #include "comm-platform/ce-pthread/ce-pthread-comm-platform.h"
 #include "comm-platform/xe-pthread/xe-pthread-comm-platform.h"
 #include "comm-platform/mpi/mpi-comm-platform.h"
+#include "comm-platform/gasnet/gasnet-comm-platform.h"
 
 // Add other communication platforms using the same pattern as above
 
