@@ -90,4 +90,12 @@ extern ocrGuidProviderKind	ocrGuidProviderCEKind;
 
 extern ocr_workpile_kind	ocr_workpile_dequeish_heap_kind;
 extern ocr_workpile_kind	ocr_workpile_heap_kind;
+extern ocr_workpile_kind	ocr_workpile_heap_steal_last_kind;
+extern ocr_workpile_kind	ocr_workpile_heap_steal_selfish_kind;
+
+enum md_file_workpile_policy { MD_DEQUE, MD_DEQUEISH_HEAP, MD_PRIORITY_QUEUE };
+enum md_file_steal_victim_policy { MD_RANDOM_VICTIM, MD_CYCLIC_VICTIM , MD_HIER_CYCLIC_VICTIM , MD_HIER_RANDOM_VICTIM, MD_SOCKET_ONLY_VICTIM };
+enum md_file_victim_extract_policy { MD_STEAL_LAST, MD_STEAL_ALTRUISTIC, MD_STEAL_SELFISH };
+enum md_file_push_policy { MD_LOCAL_PUSH, MD_LOCALITY_PUSH, MD_USER_SOCKET_PUSH };
+
 #endif /* __OCR_CONFIG_H__ */

@@ -31,6 +31,7 @@
 
 #include <pthread.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #include "ocr-runtime.h"
 #include "hc.h"
@@ -179,6 +180,8 @@ void * worker_computation_routine(void * arg) {
     ocrGuid_t workerGuid = get_worker_guid(worker);
     ocr_scheduler_t * scheduler = get_worker_scheduler(worker);
     log_worker(INFO, "Starting scheduler routine of worker %d\n", get_worker_id(worker));
+
+    srand(time(NULL));
     while(worker->is_running(worker)) {
         ocrGuid_t taskGuid = scheduler->take(scheduler, workerGuid);
         if (taskGuid != NULL_GUID) {

@@ -58,7 +58,7 @@ static void hc_workpile_push (ocr_workpile_t * base, ocrGuid_t g ) {
     deque_push(derived->deque, (void *)g);
 }
 
-static ocrGuid_t hc_workpile_steal ( ocr_workpile_t * base ) {
+static ocrGuid_t hc_workpile_steal ( ocr_workpile_t * base, int thiefID ) {
     hc_workpile* derived = (hc_workpile*) base;
     return (ocrGuid_t) deque_steal(derived->deque);
 }
@@ -93,7 +93,7 @@ static ocrGuid_t priority_workpile_pop_tail_no_priority ( ocr_workpile_t * base 
     return (ocrGuid_t) locked_heap_tail_pop_no_priority (derived->heap);
 }
 
-static ocrGuid_t priority_workpile_pop_head_no_priority ( ocr_workpile_t * base ) {
+static ocrGuid_t priority_workpile_pop_head_no_priority ( ocr_workpile_t * base, int thiefID  ) {
     priority_workpile* derived = (priority_workpile*) base;
     return (ocrGuid_t) locked_heap_head_pop_no_priority (derived->heap);
 }
@@ -103,12 +103,22 @@ static ocrGuid_t priority_workpile_pop_best_priority ( ocr_workpile_t * base ) {
     return (ocrGuid_t) locked_heap_pop_priority_best (derived->heap);
 }
 
-static ocrGuid_t priority_workpile_pop_worst_priority ( ocr_workpile_t * base ) {
+static ocrGuid_t priority_workpile_pop_worst_priority ( ocr_workpile_t * base, int thiefID  ) {
     priority_workpile* derived = (priority_workpile*) base;
     return (ocrGuid_t) locked_heap_pop_priority_worst (derived->heap);
 }
 
-static void priority_workpile_push_no_priority (ocr_workpile_t * base, ocrGuid_t g ) {
+static ocrGuid_t priority_workpile_pop_last ( ocr_workpile_t * base, int thiefID  ) {
+    priority_workpile* derived = (priority_workpile*) base;
+    return (ocrGuid_t) locked_heap_pop_priority_last (derived->heap);
+}
+
+static ocrGuid_t priority_workpile_steal_selfish ( ocr_workpile_t * base, int thiefID  ) {
+    priority_workpile* derived = (priority_workpile*) base;
+    return (ocrGuid_t) locked_heap_pop_priority_selfish (derived->heap, thiefID);
+}
+
+static void priority_workpile_tail_push_no_priority (ocr_workpile_t * base, ocrGuid_t g ) {
     priority_workpile* derived = (priority_workpile*) base;
     locked_heap_tail_push_no_priority (derived->heap, (void *)g);
 }
@@ -126,7 +136,7 @@ ocr_workpile_t * dequeish_priority_workpile_constructor(void) {
     base->create = priority_workpile_create;
     base->destruct = priority_workpile_destruct;
     base->pop = priority_workpile_pop_tail_no_priority;
-    base->push = priority_workpile_push_no_priority;
+    base->push = priority_workpile_tail_push_no_priority;
     base->steal = priority_workpile_pop_head_no_priority;
     return base;
 }
@@ -141,5 +151,31 @@ ocr_workpile_t * priority_workpile_constructor(void) {
     base->pop = priority_workpile_pop_best_priority;
     base->push = priority_workpile_push_priority;
     base->steal = priority_workpile_pop_worst_priority;
+    return base;
+}
+
+ocr_workpile_t * priority_workpile_steal_last_constructor(void) {
+    priority_workpile* derived = (priority_workpile*) malloc(sizeof(priority_workpile));
+    ocr_workpile_t * base = (ocr_workpile_t *) derived;
+    ocr_module_t * module_base = (ocr_module_t *) base;
+    module_base->map_fct = NULL;
+    base->create = priority_workpile_create;
+    base->destruct = priority_workpile_destruct;
+    base->pop = priority_workpile_pop_best_priority;
+    base->push = priority_workpile_push_priority;
+    base->steal = priority_workpile_pop_last;
+    return base;
+}
+
+ocr_workpile_t * priority_workpile_steal_selfish_constructor(void) {
+    priority_workpile* derived = (priority_workpile*) malloc(sizeof(priority_workpile));
+    ocr_workpile_t * base = (ocr_workpile_t *) derived;
+    ocr_module_t * module_base = (ocr_module_t *) base;
+    module_base->map_fct = NULL;
+    base->create = priority_workpile_create;
+    base->destruct = priority_workpile_destruct;
+    base->pop = priority_workpile_pop_best_priority;
+    base->push = priority_workpile_push_priority;
+    base->steal = priority_workpile_steal_selfish;
     return base;
 }

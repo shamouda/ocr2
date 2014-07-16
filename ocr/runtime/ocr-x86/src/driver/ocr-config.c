@@ -72,3 +72,5 @@ ocrGuidProviderKind	ocrGuidProviderCEKind	= OCR_GUIDPROVIDER_PTR;
 
 ocr_workpile_kind	ocr_workpile_dequeish_heap_kind = OCR_DEQUEISH_PRIORITY_QUEUE;
 ocr_workpile_kind	ocr_workpile_heap_kind = OCR_PRIORITY_QUEUE;
+ocr_workpile_kind	ocr_workpile_heap_steal_last_kind = OCR_PRIORITY_QUEUE_STEAL_LAST_KIND;
+ocr_workpile_kind	ocr_workpile_heap_steal_selfish_kind = OCR_PRIORITY_QUEUE_STEAL_SELFISH_KIND;

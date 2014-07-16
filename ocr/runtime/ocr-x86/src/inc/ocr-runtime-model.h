@@ -32,6 +32,7 @@
 #ifndef OCR_RUNTIME_MODEL_H_
 #define OCR_RUNTIME_MODEL_H_
 
+#include "ocr-config.h"
 #include "ocr-policy.h"
 
 /**
@@ -79,6 +80,10 @@ ocr_model_policy_t * defaultOcrModelPolicyPriorityHeap(size_t nb_policy_domain,
                                            size_t nb_schedulers, size_t nb_workers,
                                            size_t nb_executors, size_t nb_workpiles, int* bind_map);
 
+ocr_model_policy_t * ocrModelPolicyCreator(enum md_file_workpile_policy, enum md_file_steal_victim_policy, enum md_file_victim_extract_policy, enum md_file_push_policy,
+                                           size_t nb_policy_domain,
+                                           size_t nb_schedulers, size_t nb_workers,
+                                           size_t nb_executors, size_t nb_workpiles, int* bind_map);
 
 ocr_model_policy_t * createXeModelPolicies ( size_t nb_CEs, size_t nb_XE_per_CEs );
 ocr_model_policy_t * createCeModelPolicies ( size_t nb_CEs, size_t nb_XE_per_CEs );

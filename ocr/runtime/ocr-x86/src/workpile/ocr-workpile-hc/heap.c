@@ -56,15 +56,20 @@ void heap_init(heap_t * heap, void * init_value) {
     }
 }
 
+static inline void push_capacity_assertion ( heap_t* heap ) {
+    int size = heap->tail - heap->head;
+    if (size == heap->buffer->capacity) { 
+        assert("heap full, increase heap size" && 0);
+    }
+}
+
 void locked_heap_tail_push_no_priority (heap_t* heap, void* entry) {
     int success = 0;
     while (!success) {
         if ( hc_cas(&heap->lock, 0, 1) ) { 
             success = 1;
-            int size = heap->tail - heap->head;
-            if (size == heap->buffer->capacity) { 
-                assert("heap full, increase heap size" && 0);
-            }
+            push_capacity_assertion(heap);
+
             int index = heap->tail % heap->buffer->capacity;
             heap->buffer->data[index] = entry;
 #ifdef __powerpc64__
@@ -80,77 +85,90 @@ void locked_heap_tail_push_no_priority (heap_t* heap, void* entry) {
 #define LOCAL_L3_HIT 50
 #define LOCAL_L2_HIT 10
 
+#define N_SOCKETS 2
+#define N_L3S_PER_SOCKET 1
+#define N_L2S_PER_SOCKET 6
+#define N_L1S_PER_SOCKET 6
+#define N_TOTAL_L3S ( (N_SOCKETS) * (N_L3S_PER_SOCKET))
+#define N_TOTAL_L2S ( (N_SOCKETS) * (N_L2S_PER_SOCKET))
+#define N_TOTAL_L1S ( (N_SOCKETS) * (N_L1S_PER_SOCKET))
+
 #define DAVINCI
 static inline double costToAcquire ( int workerId, u64 placeTracker ) {
     double cost = 0;
 #ifdef DAVINCI
-    static int n_sockets = 2;
-    static int n_L3s_per_socket = 1;
-    static int n_L2s_per_socket = 6;
-    static int n_L1s_per_socket = 6;
-    const int n_total_L1s = n_sockets*n_L1s_per_socket;
-    const int n_total_L2s = n_sockets*n_L2s_per_socket;
-    const int n_total_L3s = n_sockets*n_L3s_per_socket;
-
-    unsigned char socket_id = workerId/n_L1s_per_socket;
-    unsigned char l2_within_socket_id = workerId%n_L2s_per_socket;
+    unsigned char socket_id = workerId/N_L1S_PER_SOCKET;
+    unsigned char l2_within_socket_id = workerId % N_L2S_PER_SOCKET;
     unsigned char l3_within_socket_id = 0;
 
-    if (!( placeTracker & (1ULL << (n_total_L1s + n_total_L2s + n_total_L3s + socket_id)) )) { /*not in my socket*/
+    if (!( placeTracker & (1ULL << (N_TOTAL_L1S + N_TOTAL_L2S + N_TOTAL_L3S + socket_id)) )) { /*not in my socket*/
         cost += MISS;
-    } else if (!( placeTracker & (1ULL << (n_total_L1s + n_total_L2s + socket_id*n_L3s_per_socket + l3_within_socket_id )) )) { /*in socket, not in my L3*/
+    } else if (!( placeTracker & (1ULL << (N_TOTAL_L1S + N_TOTAL_L2S + socket_id*N_L3S_PER_SOCKET + l3_within_socket_id )) )) { /*in socket, not in my L3*/
         cost += MISS;
-    } else if (!( placeTracker & (1ULL << (n_total_L1s + socket_id*n_L2s_per_socket + l2_within_socket_id)) )) { /*in socket, in L3, not in my L2*/
+    } else if (!( placeTracker & (1ULL << (N_TOTAL_L1S + socket_id*N_L2S_PER_SOCKET + l2_within_socket_id)) )) { /*in socket, in L3, not in my L2*/
         cost += LOCAL_L3_HIT;
     } else {
         cost += LOCAL_L2_HIT;
-    }
-#else
-    assert(0);
-    if (!( placeTracker & (1ULL << (16+workerId/8)) )) {
-        /*not in my L3, check if it is in neighbour L3*/
-        if (!( placeTracker & (1ULL << (16+(1-workerId/8))) )) {
-            cost += REMOTE_L3_HIT; 
-        } else cost += MISS;
-    } else {
-        /*in my L3*/
-        if ( placeTracker & (1ULL << workerId) ) {
-            /*in my L2*/
-            cost += LOCAL_L2_HIT;
-        } else {
-            cost += LOCAL_L3_HIT;
-        }
     }
 #endif
     return cost;
 }
 
-static void setCost ( volatile void* entry, int wid ) {
-    double totalCost = 0;
+static double calculateTaskRetrievalCost ( volatile void* entry, int wid ) {
     hc_task_t* derived = (hc_task_t*)entry;
 
     ocrDataBlockPlaced_t *placedDb = NULL;
     ocrGuid_t dbGuid = UNINITIALIZED_GUID;
 
     int i = 0;
-    ocr_event_t* curr = derived->awaitList->array[0];
+    double totalCost = 0;
+
+    ocr_event_t** eventArray = derived->awaitList->array;
+    ocr_event_t* curr = eventArray[0];
+
     while ( NULL != curr ) {
         dbGuid = curr->get(curr);
+
         if(dbGuid != NULL_GUID) {
             globalGuidProvider->getVal(globalGuidProvider, dbGuid, (u64*)&placedDb, NULL);
             u64 placeTracker = placedDb->placeTracker.existInPlaces;
             totalCost += costToAcquire(wid, placeTracker);
         }
 
-        curr = derived->awaitList->array[++i];
+        curr = eventArray[++i];
     };
-    derived->cost = totalCost;
+
+    return totalCost;
+}
+
+static void setLocalCost ( volatile void* entry, int wid ) {
+    hc_task_t* derived = (hc_task_t*)entry;
+    derived->cost = calculateTaskRetrievalCost ( entry, wid );
 }
 
 static double extractCost ( volatile void* entry ) {
     /* TODO implement cost extraction*/
     hc_task_t* derived = (hc_task_t*)entry;
     return derived->cost;
+}
+
+/*sagnak awful awful hardcoding*/
+/*returns cheapest task for the thief to execute by handing out its "heap" index*/
+static int getMostLocal( heap_t* heap, int thiefID ) {
+    int currHeapIndex = 0;
+    int cheapestHeapIndex = 0;
+    int size = heap->tail - heap->head;
+    int minCost = 10000000;
+    while ( currHeapIndex < size ) {
+        volatile void* currTask = heap->buffer->data[(heap->head+currHeapIndex) % heap->buffer->capacity];
+        int currCost = calculateTaskRetrievalCost (currTask, thiefID);
+        if ( minCost > currCost ) {
+            minCost = currCost;
+            cheapestHeapIndex = currHeapIndex;
+        }
+        ++currHeapIndex;
+    }
+    return cheapestHeapIndex;
 }
 
 static inline void swapAtIndices ( heap_t* heap, int firstIndex, int secondIndex ) {
@@ -187,11 +205,8 @@ static void verifyHeap ( heap_t* heap ) {
 
 static void removeFixHeap ( heap_t* heap ) {
     /* set last leaf as root, as the popper already cached the extracted the root task*/
-    heap->buffer->data[ ( heap->head ) % heap->buffer->capacity ] = heap->buffer->data[ ( heap->tail - 1 ) % heap->buffer->capacity ];
-
     /* one less element as root is extracted */
-    --heap->tail;
-
+    heap->buffer->data[ ( heap->head ) % heap->buffer->capacity ] = heap->buffer->data[ ( --heap->tail ) % heap->buffer->capacity ];
 
     int firstElementIndex = heap->head % heap->buffer->capacity;
     int nElements = heap->tail - heap->head;
@@ -248,11 +263,8 @@ static void removeFixHeap ( heap_t* heap ) {
 
 }
 
-static void insertFixHeap ( heap_t* heap ) {
+static void insertFixHeapAtIndex ( heap_t* heap, int heapFixIndex ) {
     int firstElementIndex = heap->head % heap->buffer->capacity;
-
-    /*as if heap was 0 indexed, just undo the offsetting caused by the firstElementIndex*/
-    int heapFixIndex = heap->tail - 1 - heap->head;
 
     while( heapFixIndex > 0 ) {
         int currHeapIndex = (heapFixIndex + firstElementIndex) % heap->buffer->capacity;
@@ -272,20 +284,19 @@ static void insertFixHeap ( heap_t* heap ) {
     }
 }
 
+static void insertFixHeap ( heap_t* heap ) {
+    insertFixHeapAtIndex(heap, heap->tail - heap->head - 1);
+}
+
 void locked_heap_push_priority (heap_t* heap, void* entry) {
     int success = 0;
     while (!success) {
         if ( hc_cas(&heap->lock, 0, 1) ) { 
             success = 1;
-            int size = heap->tail - heap->head;
-            if (size == heap->buffer->capacity) { 
-                assert("heap full, increase heap size" && 0);
-            }
+
+            push_capacity_assertion(heap);
             int index = heap->tail % heap->buffer->capacity;
             heap->buffer->data[index] = entry;
-#ifdef __powerpc64__
-            hc_mfence();
-#endif 
             ++heap->tail;
 
             ocrGuid_t worker_guid = ocr_get_current_worker_guid();
@@ -293,7 +304,7 @@ void locked_heap_push_priority (heap_t* heap, void* entry) {
             globalGuidProvider->getVal(globalGuidProvider, worker_guid, (u64*)&worker, NULL);
             hc_worker_t * hcWorker = (hc_worker_t *) worker;
 
-            setCost(entry, hcWorker->id);
+            setLocalCost (entry, hcWorker->id);
 
             insertFixHeap(heap);
             if(DEBUG)verifyHeap(heap);
@@ -325,7 +336,7 @@ void* locked_heap_pop_priority_best ( heap_t* heap ) {
     return rt;
 }
 
-void* locked_heap_pop_priority_worst ( heap_t* heap ) {
+void* locked_heap_pop_priority_last ( heap_t* heap ) {
     void * rt = NULL;
     int success = 0;
     while (!success) {
@@ -347,22 +358,70 @@ void* locked_heap_pop_priority_worst ( heap_t* heap ) {
     return rt;
 }
 
-void* locked_heap_tail_pop_no_priority ( heap_t* heap ) {
+void* locked_heap_pop_priority_selfish ( heap_t* heap , int thiefID ) {
     void * rt = NULL;
     int success = 0;
     while (!success) {
         if ( hc_cas(&heap->lock, 0, 1) ) {
             success = 1;
 
-            int tail = heap->tail;
-            heap->tail = --tail;
-            rt = (void*) heap->buffer->data[tail % heap->buffer->capacity];
-
             int size = heap->tail - heap->head;
-            if ( size < 0 ) {
+            if ( size <= 0 ) {
                 heap->tail = heap->head;
                 rt = NULL;
-            } 
+            } else { 
+                int thiefsCheapestHeapIndex = getMostLocal(heap, thiefID);
+                /* retract to last element */
+                --heap->tail;
+                /* make the costliest the last one by swapping it with tail */
+                swapAtIndices ( heap, heap->tail % heap->buffer->capacity , (thiefsCheapestHeapIndex + heap->head) % heap->buffer->capacity );
+                /* now the swap may have made the non-worst placed invalid, fix that */
+                insertFixHeapAtIndex(heap, thiefsCheapestHeapIndex);
+                
+                /* pop tail */
+                rt = (void*) heap->buffer->data[heap->tail % heap->buffer->capacity];
+                if(DEBUG)verifyHeap(heap);
+            }
+            heap->lock = 0;
+        }
+    }
+    return rt;
+}
+
+void* locked_heap_pop_priority_worst ( heap_t* heap ) {
+    void * rt = NULL;
+    int success = 0;
+    while (!success) {
+        if ( hc_cas(&heap->lock, 0, 1) ) {
+            success = 1;
+
+            int size = heap->tail - heap->head;
+            if ( size <= 0 ) {
+                heap->tail = heap->head;
+                rt = NULL;
+            } else { 
+                int nLeaves = (1+size)/2;
+                int currIndex, maxIndex = size - nLeaves; /*first leaf index*/;
+                int maxCost = -1;
+                for ( currIndex = maxIndex; currIndex < size; ++currIndex ) {
+                    int currLeafCost = extractCost (heap->buffer->data[ ( currIndex + heap->head ) % heap->buffer->capacity]);
+                    if ( currLeafCost > maxCost ) {
+                        maxCost = currLeafCost;
+                        maxIndex = currIndex;
+                    }
+                }
+
+                /* retract to last element */
+                --heap->tail;
+                /* make the costliest the last one by swapping it with tail */
+                swapAtIndices ( heap, heap->tail % heap->buffer->capacity , (maxIndex + heap->head) % heap->buffer->capacity );
+                /* now the swap may have made the non-worst placed invalid, fix that */
+                insertFixHeapAtIndex(heap, maxIndex);
+                
+                /* pop tail */
+                rt = (void*) heap->buffer->data[heap->tail % heap->buffer->capacity];
+                if(DEBUG)verifyHeap(heap);
+            }
             heap->lock = 0;
         }
     }
@@ -383,6 +442,28 @@ void* locked_heap_head_pop_no_priority ( heap_t* heap ) {
             int size = heap->tail - heap->head;
             if ( size < 0 ) {
                 heap->head = heap->tail;
+                rt = NULL;
+            } 
+            heap->lock = 0;
+        }
+    }
+    return rt;
+}
+
+void* locked_heap_tail_pop_no_priority ( heap_t* heap ) {
+    void * rt = NULL;
+    int success = 0;
+    while (!success) {
+        if ( hc_cas(&heap->lock, 0, 1) ) {
+            success = 1;
+
+            int tail = heap->tail;
+            heap->tail = --tail;
+            rt = (void*) heap->buffer->data[tail % heap->buffer->capacity];
+
+            int size = heap->tail - heap->head;
+            if ( size < 0 ) {
+                heap->tail = heap->head;
                 rt = NULL;
             } 
             heap->lock = 0;

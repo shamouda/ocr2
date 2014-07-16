@@ -49,6 +49,11 @@ static ocrGuid_t ce_message_workpile_pop ( ocr_workpile_t * base ) {
     return (ocrGuid_t) deque_non_competing_pop_head(derived->deque);
 }
 
+static ocrGuid_t ce_message_workpile_steal ( ocr_workpile_t * base, int thiefID ) {
+    ce_message_workpile* derived = (ce_message_workpile*) base;
+    return (ocrGuid_t) deque_non_competing_pop_head(derived->deque);
+}
+
 static void ce_message_workpile_push (ocr_workpile_t * base, ocrGuid_t g ) {
     ce_message_workpile* derived = (ce_message_workpile*) base;
     deque_locked_push(derived->deque, (void *)g);
@@ -63,6 +68,6 @@ ocr_workpile_t * ce_message_workpile_constructor(void) {
     base->destruct = ce_message_workpile_destruct;
     base->pop = ce_message_workpile_pop;
     base->push = ce_message_workpile_push;
-    base->steal = ce_message_workpile_pop;
+    base->steal = ce_message_workpile_steal;
     return base;
 }

@@ -43,6 +43,8 @@ extern ocr_workpile_t * ce_message_workpile_constructor();
 
 extern ocr_workpile_t * dequeish_priority_workpile_constructor();
 extern ocr_workpile_t * priority_workpile_constructor();
+extern ocr_workpile_t * priority_workpile_steal_last_constructor();
+extern ocr_workpile_t * priority_workpile_steal_selfish_constructor();
 
 ocr_workpile_t * newWorkpile(ocr_workpile_kind workpileType) {
     switch(workpileType) {
@@ -52,6 +54,10 @@ ocr_workpile_t * newWorkpile(ocr_workpile_kind workpileType) {
         return dequeish_priority_workpile_constructor();
     case OCR_PRIORITY_QUEUE:
         return priority_workpile_constructor();
+    case OCR_PRIORITY_QUEUE_STEAL_LAST_KIND:
+        return priority_workpile_steal_last_constructor();
+    case OCR_PRIORITY_QUEUE_STEAL_SELFISH_KIND:
+        return priority_workpile_steal_selfish_constructor();
     case OCR_MESSAGE_QUEUE:
         return ce_message_workpile_constructor();
     default:

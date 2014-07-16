@@ -47,7 +47,7 @@ typedef void (*workpile_create_fct) ( struct ocr_workpile_struct* workpile, void
 typedef void (*workpile_destruct_fct)(struct ocr_workpile_struct* base);
 typedef ocrGuid_t (*workpile_pop_fct) ( struct ocr_workpile_struct* base );
 typedef void (*workpile_push_fct) ( struct ocr_workpile_struct* base, ocrGuid_t g );
-typedef ocrGuid_t (*workpile_steal_fct) ( struct ocr_workpile_struct* base );
+typedef ocrGuid_t (*workpile_steal_fct) ( struct ocr_workpile_struct* base, int thiefID );
 
 /*! \brief Abstract class to represent OCR task pool data structures.
  *
@@ -89,7 +89,9 @@ typedef enum ocr_workpile_kind_enum {
     OCR_DEQUE = 1,
     OCR_MESSAGE_QUEUE = 2,
     OCR_DEQUEISH_PRIORITY_QUEUE = 3,
-    OCR_PRIORITY_QUEUE = 4
+    OCR_PRIORITY_QUEUE = 4,
+    OCR_PRIORITY_QUEUE_STEAL_LAST_KIND = 5,
+    OCR_PRIORITY_QUEUE_STEAL_SELFISH_KIND = 6
 } ocr_workpile_kind;
 
 ocr_workpile_t * newWorkpile(ocr_workpile_kind workpileType);

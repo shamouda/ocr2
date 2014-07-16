@@ -106,7 +106,7 @@ ocrGuid_t xe_scheduler_take_most_fsim_faithful (ocr_scheduler_t* base, ocrGuid_t
         // CE worker trying to extract buffered 'executable work' that XE encountered
         // TODO sagnak NOT IDEAL, and the XE may be simultaneously pushing, therefore we 'steal' for synchronization
         wp_to_pop = xe_scheduler_pop_mapping_to_work_shipping(base, w);
-        return wp_to_pop->steal(wp_to_pop);
+        return wp_to_pop->steal(wp_to_pop,/*sagnak, just made this paramater up, irrelevant*/id);
     }
     return NULL_GUID;
 }
@@ -228,7 +228,7 @@ ocrGuid_t ce_scheduler_take (ocr_scheduler_t* base, ocrGuid_t wid ) {
     ocr_workpile_t * wp_to_pop = base->pop_mapping(base, w);
     //ocrGuid_t popped = wp_to_pop->pop(wp_to_pop);
     // TODO fix synchronization errors
-    ocrGuid_t popped = wp_to_pop->steal(wp_to_pop);
+    ocrGuid_t popped = wp_to_pop->steal(wp_to_pop, /*sagnak, just made this paramater up, irrelevant*/ get_worker_id(w));
 
     return popped;
 }

@@ -49,6 +49,25 @@ ocr_scheduler_t * newScheduler(ocr_scheduler_kind schedulerType) {
         return ce_scheduler_constructor();
     case OCR_PLACED_SCHEDULER:
         return hc_placed_scheduler_constructor();
+
+    case OCR_SCHEDULER_RANDOMVICTIM_LOCALPUSH:
+        return hc_randomvictim_localpush_scheduler_constructor();
+    case OCR_SCHEDULER_RANDOMVICTIM_LOCALITYPUSH:
+        return hc_randomvictim_localitypush_scheduler_constructor();
+    case OCR_SCHEDULER_CYCLICVICTIM_LOCALPUSH:
+        return hc_cyclicvictim_localpush_scheduler_constructor();
+    case OCR_SCHEDULER_CYCLICVICTIM_LOCALITYPUSH:
+        return hc_cyclicvictim_localitypush_scheduler_constructor();
+    case OCR_SCHEDULER_HIERCYCLICVICTIM_LOCALPUSH:
+        return hc_hiercyclicvictim_localpush_scheduler_constructor();
+    case OCR_SCHEDULER_HIERCYCLICVICTIM_LOCALITYPUSH:
+        return hc_hiercyclicvictim_localitypush_scheduler_constructor();
+    case OCR_SCHEDULER_HIERRANDOMVICTIM_LOCALPUSH:
+        return hc_hierrandomvictim_localpush_scheduler_constructor();
+    case OCR_SCHEDULER_HIERRANDOMVICTIM_LOCALITYPUSH:
+        return hc_hierrandomvictim_localitypush_scheduler_constructor();
+    case OCR_SCHEDULER_SOCKETONLYVICTIM_USERSOCKETPUSH:
+        return hc_socketonlyvictim_usersocketpush_scheduler_constructor();
     default:
         assert(false && "Unrecognized scheduler kind");
         break;

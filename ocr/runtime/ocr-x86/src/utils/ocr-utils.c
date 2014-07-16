@@ -138,31 +138,39 @@ void ocrPlaceTrackerAllocate ( ocrPlaceTracker_t** toFill ) {
 }
 
 #define DAVINCI
+
+#define N_SOCKETS 2
+#define N_L3S_PER_SOCKET 1
+#define N_L2S_PER_SOCKET 6
+#define N_L1S_PER_SOCKET 6
+#define N_TOTAL_L3S ( (N_SOCKETS) * (N_L3S_PER_SOCKET))
+#define N_TOTAL_L2S ( (N_SOCKETS) * (N_L2S_PER_SOCKET))
+#define N_TOTAL_L1S ( (N_SOCKETS) * (N_L1S_PER_SOCKET))
+
+/* L1s indexed from 0 to N_TOTAL_L1S-1
+ * L2s indexed from N_TOTAL_L1S to N_TOTAL_L1S + N_TOTAL_L2S - 1
+ * L3s indexed from N_TOTAL_L1S + N_TOTAL_L2S to N_TOTAL_L1S + N_TOTAL_L2S + N_TOTAL_L3S - 1
+ * sockets indexed from N_TOTAL_L1S + N_TOTAL_L2S + N_TOTAL_L3S to N_TOTAL_L1S + N_TOTAL_L2S + N_TOTAL_L3S + N_SOCKETS - 1 
+ * */
+
 void ocrPlaceTrackerInsert ( ocrPlaceTracker_t* self, unsigned char currPlace ) {
 #ifdef DAVINCI
-    static int n_sockets = 2;
-    static int n_L3s_per_socket = 1;
-    static int n_L2s_per_socket = 6;
-    static int n_L1s_per_socket = 6;
-    const int n_total_L1s = n_sockets*n_L1s_per_socket;
-    const int n_total_L2s = n_sockets*n_L2s_per_socket;
-    const int n_total_L3s = n_sockets*n_L3s_per_socket;
-    
-    unsigned char socket_id = currPlace/n_L1s_per_socket;
-    unsigned char l2_within_socket_id = currPlace%n_L2s_per_socket;
+
+    unsigned char socket_id = currPlace/N_L1S_PER_SOCKET;
+    unsigned char l2_within_socket_id = currPlace%N_L2S_PER_SOCKET;
     unsigned char l3_within_socket_id = 0;
-    unsigned char core_within_socket_id = currPlace%n_L1s_per_socket;
+    unsigned char core_within_socket_id = currPlace%N_L1S_PER_SOCKET;
     // mark the 'worker'/L1 place
-    self->existInPlaces |= (1ULL << (socket_id*n_L1s_per_socket+core_within_socket_id));
+    self->existInPlaces |= (1ULL << ( socket_id*N_L1S_PER_SOCKET + core_within_socket_id));
     
     // mark the L2 place
-    self->existInPlaces |= (1ULL << ( n_total_L1s + socket_id*n_L2s_per_socket + l2_within_socket_id ));
+    self->existInPlaces |= (1ULL << ( N_TOTAL_L1S + socket_id*N_L2S_PER_SOCKET + l2_within_socket_id ));
     
     // mark the L3 place
-    self->existInPlaces |= (1ULL << ( n_total_L1s + n_total_L2s + socket_id*n_L3s_per_socket + l3_within_socket_id ));
+    self->existInPlaces |= (1ULL << ( N_TOTAL_L1S + N_TOTAL_L2S + socket_id*N_L3S_PER_SOCKET + l3_within_socket_id ));
     
     // mark the socket place
-    self->existInPlaces |= (1ULL << ( n_total_L1s + n_total_L2s + n_total_L3s + socket_id));
+    self->existInPlaces |= (1ULL << ( N_TOTAL_L1S + N_TOTAL_L2S + N_TOTAL_L3S + socket_id));
 #else
 	assert(0);
 #endif

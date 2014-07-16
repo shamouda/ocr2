@@ -41,7 +41,7 @@ typedef struct heap {
         buffer_t * buffer;
 } heap_t;
 
-#define INIT_HEAP_CAPACITY 512
+#define INIT_HEAP_CAPACITY 768
 
 void heap_init(heap_t * heap, void * init_value);
 
@@ -50,6 +50,8 @@ void    locked_heap_push_priority           ( heap_t* heap, void* entry);
 
 void*   locked_heap_pop_priority_best       ( heap_t* heap );
 void*   locked_heap_pop_priority_worst      ( heap_t* heap );
+void*   locked_heap_pop_priority_last       ( heap_t* heap );
+void*   locked_heap_pop_priority_selfish    ( heap_t* heap , int thiefID );
 void*   locked_heap_tail_pop_no_priority    ( heap_t* heap );
 void*   locked_heap_head_pop_no_priority    ( heap_t* heap );
 

@@ -114,6 +114,20 @@ static int * read_bind_file ( char * bind_file ) {
  *
  * Note: removes OCR options from argc / argv
  */
+
+/*
+fprintf(stderr, "chose default (deque, local push, local pop, random steal)\n");
+policy_model = defaultOcrModelPolicy(nb_policy_domain,
+        nb_schedulers_per_policy_domain, nb_workers_per_policy_domain,
+        nb_executors_per_policy_domain, nb_workpiles_per_policy_domain, bind_map);
+fprintf(stderr, "chose (dequeish_heap, local push, local pop, random steal\n");
+policy_model = defaultOcrModelPolicyDequishHeap(nb_policy_domain,
+        nb_schedulers_per_policy_domain, nb_workers_per_policy_domain,
+        nb_executors_per_policy_domain, nb_workpiles_per_policy_domain, bind_map);
+fprintf(stderr, "chose bar_priority_heap\n");
+policy_model = defaultOcrModelPolicyPriorityHeap;
+*/
+
 void ocrInit(int * argc, char ** argv, u32 fnc, ocrEdt_t funcs[]) {
 
     // Intialize the GUID provider
@@ -131,7 +145,75 @@ void ocrInit(int * argc, char ** argv, u32 fnc, ocrEdt_t funcs[]) {
     }
 
     /* sagnak begin */
-    if ( md_file != NULL && !strncmp(md_file,"fsim",5) ) {
+    if ( md_file != NULL && !strncmp(md_file, "bar_", 4)) {
+        size_t nb_policy_domain = 1;
+        size_t nb_workers_per_policy_domain = nbHardThreads;
+        size_t nb_workpiles_per_policy_domain = nbHardThreads;
+        size_t nb_executors_per_policy_domain = nbHardThreads;
+        size_t nb_schedulers_per_policy_domain = 1;
+
+        ocr_model_policy_t * policy_model = NULL;
+        
+        enum md_file_workpile_policy         workpile_policy         = MD_DEQUE;
+        enum md_file_steal_victim_policy     steal_victim_policy     = MD_RANDOM_VICTIM;
+        enum md_file_victim_extract_policy   victim_extract_policy   = MD_STEAL_LAST;
+        enum md_file_push_policy             push_policy             = MD_LOCAL_PUSH;
+
+        char* md_file_tokens = strtok(md_file,"_");
+        md_file_tokens = strtok(NULL,"_"); /*parse the bar_ part*/
+        while ( NULL != md_file_tokens ) {
+            if(!strcmp(md_file_tokens, "dqheap")) {
+                workpile_policy = MD_DEQUEISH_HEAP;
+            } else if (!strcmp(md_file_tokens, "pqheap")) {
+                workpile_policy = MD_PRIORITY_QUEUE;
+            } else if (!strcmp(md_file_tokens, "ndeque")) {
+                workpile_policy = MD_DEQUE;
+            } else if (!strcmp(md_file_tokens, "cycsteal")) {
+                steal_victim_policy = MD_CYCLIC_VICTIM;
+            } else if (!strcmp(md_file_tokens, "rndsteal")) {
+                steal_victim_policy = MD_RANDOM_VICTIM;
+            } else if (!strcmp(md_file_tokens, "hiercyclicsteal")) {
+                steal_victim_policy = MD_HIER_CYCLIC_VICTIM;
+            } else if (!strcmp(md_file_tokens, "hierrandomsteal")) {
+                steal_victim_policy = MD_HIER_RANDOM_VICTIM;
+            } else if (!strcmp(md_file_tokens, "socketonlysteal")) {
+                steal_victim_policy = MD_SOCKET_ONLY_VICTIM;
+            } else if (!strcmp(md_file_tokens, "laststeal")) {
+                victim_extract_policy = MD_STEAL_LAST;
+            } else if (!strcmp(md_file_tokens, "altruisticsteal")) {
+                victim_extract_policy = MD_STEAL_ALTRUISTIC;
+            } else if (!strcmp(md_file_tokens, "selfishsteal")) {
+                victim_extract_policy = MD_STEAL_SELFISH ;
+            } else if (!strcmp(md_file_tokens, "tailpush")) {
+                push_policy = MD_LOCAL_PUSH;
+            } else if (!strcmp(md_file_tokens, "localitypush")) {
+                push_policy = MD_LOCALITY_PUSH ;
+            } else if (!strcmp(md_file_tokens, "usersocketpush")) {
+                push_policy = MD_USER_SOCKET_PUSH ;
+            } else {
+                assert (0 && "md file parse error");
+            }
+            md_file_tokens = strtok(NULL,"_"); 
+        }
+
+        policy_model = ocrModelPolicyCreator( workpile_policy, steal_victim_policy, victim_extract_policy, push_policy,
+                        nb_policy_domain,
+                        nb_schedulers_per_policy_domain, nb_workers_per_policy_domain,
+                        nb_executors_per_policy_domain, nb_workpiles_per_policy_domain,
+                        bind_map);
+
+        //TODO LIMITATION for now support only one policy
+        n_root_policy_nodes = nb_policy_domain;
+        root_policies = instantiateModel(policy_model);
+
+        root_policies[0]->n_successors = 0;
+        root_policies[0]->successors = NULL;
+        root_policies[0]->n_predecessors = 0;
+        root_policies[0]->predecessors = NULL;
+
+        master_worker = root_policies[0]->workers[0];
+        root_policies[0]->start(root_policies[0]);
+    } else if ( md_file != NULL && !strncmp(md_file,"fsim",5) ) {
         // sagnak TODO handle nb_CEs <= 1 case
         size_t nb_CEs = 2;
         size_t nb_XE_per_CEs = 3;
@@ -331,75 +413,6 @@ void ocrInit(int * argc, char ** argv, u32 fnc, ocrEdt_t funcs[]) {
         }
 
         master_worker = thor_mastered_worker_policy_domains[0]->workers[0];
-    } else if ( md_file != NULL && !strncmp(md_file,"bar_flat",8) ) {
-        fprintf(stderr, "chose bar_flat\n");
-        size_t nb_policy_domain = 1;
-        size_t nb_workers_per_policy_domain = nbHardThreads;
-        size_t nb_workpiles_per_policy_domain = nbHardThreads;
-        size_t nb_executors_per_policy_domain = nbHardThreads;
-        size_t nb_schedulers_per_policy_domain = 1;
-
-        ocr_model_policy_t * policy_model = defaultOcrModelPolicy(nb_policy_domain,
-                nb_schedulers_per_policy_domain, nb_workers_per_policy_domain,
-                nb_executors_per_policy_domain, nb_workpiles_per_policy_domain, bind_map);
-
-        //TODO LIMITATION for now support only one policy
-        n_root_policy_nodes = nb_policy_domain;
-        root_policies = instantiateModel(policy_model);
-
-        root_policies[0]->n_successors = 0;
-        root_policies[0]->successors = NULL;
-        root_policies[0]->n_predecessors = 0;
-        root_policies[0]->predecessors = NULL;
-
-        master_worker = root_policies[0]->workers[0];
-        root_policies[0]->start(root_policies[0]);
-    } else if ( md_file != NULL && !strncmp(md_file,"bar_dequeish_heap",17) ) {
-        fprintf(stderr, "chose bar_dequeish_heap\n");
-        size_t nb_policy_domain = 1;
-        size_t nb_workers_per_policy_domain = nbHardThreads;
-        size_t nb_workpiles_per_policy_domain = nbHardThreads;
-        size_t nb_executors_per_policy_domain = nbHardThreads;
-        size_t nb_schedulers_per_policy_domain = 1;
-
-        ocr_model_policy_t * policy_model = defaultOcrModelPolicyDequishHeap(nb_policy_domain,
-                nb_schedulers_per_policy_domain, nb_workers_per_policy_domain,
-                nb_executors_per_policy_domain, nb_workpiles_per_policy_domain, bind_map);
-
-        //TODO LIMITATION for now support only one policy
-        n_root_policy_nodes = nb_policy_domain;
-        root_policies = instantiateModel(policy_model);
-
-        root_policies[0]->n_successors = 0;
-        root_policies[0]->successors = NULL;
-        root_policies[0]->n_predecessors = 0;
-        root_policies[0]->predecessors = NULL;
-
-        master_worker = root_policies[0]->workers[0];
-        root_policies[0]->start(root_policies[0]);
-    } else if ( md_file != NULL && !strncmp(md_file,"bar_priority_heap",17) ) {
-        fprintf(stderr, "chose bar_priority_heap\n");
-        size_t nb_policy_domain = 1;
-        size_t nb_workers_per_policy_domain = nbHardThreads;
-        size_t nb_workpiles_per_policy_domain = nbHardThreads;
-        size_t nb_executors_per_policy_domain = nbHardThreads;
-        size_t nb_schedulers_per_policy_domain = 1;
-
-        ocr_model_policy_t * policy_model = defaultOcrModelPolicyPriorityHeap(nb_policy_domain,
-                nb_schedulers_per_policy_domain, nb_workers_per_policy_domain,
-                nb_executors_per_policy_domain, nb_workpiles_per_policy_domain, bind_map);
-
-        //TODO LIMITATION for now support only one policy
-        n_root_policy_nodes = nb_policy_domain;
-        root_policies = instantiateModel(policy_model);
-
-        root_policies[0]->n_successors = 0;
-        root_policies[0]->successors = NULL;
-        root_policies[0]->n_predecessors = 0;
-        root_policies[0]->predecessors = NULL;
-
-        master_worker = root_policies[0]->workers[0];
-        root_policies[0]->start(root_policies[0]);
     } else {
         if (md_file != NULL) {
             //TODO need a file stat to check
@@ -423,22 +436,24 @@ void ocrInit(int * argc, char ** argv, u32 fnc, ocrEdt_t funcs[]) {
         size_t nb_schedulers_per_policy_domain = 1;
 
         ocr_model_policy_t * policy_model = defaultOcrModelPolicy(nb_policy_domain,
-                                                                  nb_schedulers_per_policy_domain, nb_workers_per_policy_domain,
-                                                                  nb_executors_per_policy_domain, nb_workpiles_per_policy_domain, bind_map);
+                nb_schedulers_per_policy_domain, nb_workers_per_policy_domain,
+                nb_executors_per_policy_domain, nb_workpiles_per_policy_domain, bind_map);
 
         //TODO LIMITATION for now support only one policy
         n_root_policy_nodes = nb_policy_domain;
         root_policies = instantiateModel(policy_model);
 
-	root_policies[0]->n_successors = 0;
-	root_policies[0]->successors = NULL;
-	root_policies[0]->n_predecessors = 0;
-	root_policies[0]->predecessors = NULL;
+        root_policies[0]->n_successors = 0;
+        root_policies[0]->successors = NULL;
+        root_policies[0]->n_predecessors = 0;
+        root_policies[0]->predecessors = NULL;
 
         master_worker = root_policies[0]->workers[0];
         root_policies[0]->start(root_policies[0]);
     }
+
     associate_executor_and_worker(master_worker);
+
     if ( NULL != bind_file ) {
         free(bind_map);
     }

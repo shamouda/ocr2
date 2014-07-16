@@ -205,6 +205,12 @@ void placedCreate(ocrDataBlock_t *self, ocrGuid_t allocatorGuid, u64 size,
 
     ocrDataBlockPlaced_t *derived = (ocrDataBlockPlaced_t*)self;
     ocrPlaceTrackerInit(&(derived->placeTracker));
+
+    ocrGuid_t worker_guid = ocr_get_current_worker_guid();
+    ocr_worker_t * worker = NULL;
+    globalGuidProvider->getVal(globalGuidProvider, worker_guid, (u64*)&worker, NULL);
+    hc_worker_t * hcWorker = (hc_worker_t *) worker;
+    ocrPlaceTrackerInsert(&(derived->placeTracker), hcWorker->id);
 }
 
 void placedDestruct(ocrDataBlock_t *self) {
