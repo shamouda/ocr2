@@ -31,7 +31,7 @@ struct _profileStruct {
 
 struct _dbWeightStruct {
     u8     *fname;
-    u16    slots[2];    // Most dominant slots
+    u32    slots[2];    // Most dominant slots
     u8     weights[2];  // Corresponding weights to most dominant slots, %
     u8     sd[2];       // Corresponding sd to most dominant slots, 0-100
     u8     coverage;    // Coverage of most dominant 2 slots

@@ -16,11 +16,11 @@
 #include "ocr-types.h"
 
 typedef struct _dbTable_t {
-    ocrDataBlock_t *db;
-    u64 start;
-    u64 end;
-    u64 readcount, readsize, writecount, writesize;
-    u8  slot;
+    ocrDataBlock_t *db;		// Ptr to the DB it represents
+    u64 start;			// Start address of DB
+    u64 end;			// End address of DB
+    u64 readcount, readsize, writecount, writesize;	// Stats
+    u32  slot;			// High 3 bytes - created DB, Low byte - slot, 0xffffffff - nonDB accesses
 } dbTable_t;
 
 typedef struct _edtTable_t {
@@ -28,7 +28,7 @@ typedef struct _edtTable_t {
     dbTable_t *dbList;
     int numDbs;
     int maxDbs;
-    u8 maxslot;
+    u32 localslot;		// Keeps track of created DB for fake 'local' slot
 } edtTable_t;
 
 void ocrStatsAccessInsertDB(ocrTask_t *task, ocrDataBlock_t *db);

@@ -57,7 +57,7 @@ extern "C" {
             memset(&edt->dbList[edt->numDbs], 0, (edt->maxDbs-edt->numDbs)*sizeof(dbTable_t));
         }
         edt->dbList[edt->numDbs].db = db;
-        edt->dbList[edt->numDbs].slot = edt->maxslot--;
+        edt->dbList[edt->numDbs].slot = (edt->localslot++)<<8;
         edt->dbList[edt->numDbs].start = (u64)addr;
         edt->dbList[edt->numDbs].end = (u64)addr+len;
         edt->dbList[edt->numDbs].readcount = (u64)0;
@@ -135,8 +135,13 @@ extern "C" {
         addedEDT->task = task;
         addedEDT->maxDbs = MOREDB;
         addedEDT->dbList = (dbTable_t *)realloc(addedEDT->dbList, addedEDT->maxDbs*sizeof(dbTable_t)); // MOREDB to begin with
-        addedEDT->numDbs = 0;
-        addedEDT->maxslot = 0xff;
+        addedEDT->numDbs = 1;
+        addedEDT->localslot = 2; // 0x100 is used for non-DB accesses
+
+        // First entry is a special case for catching accesses outside of DBs
+        memset(&addedEDT->dbList[0], 0, sizeof(dbTable_t));
+        addedEDT->dbList[0].slot = 0x100; // Special value for non-DB accesses
+        addedEDT->dbList[0].db = 0xdeadc0de;
 
         enter_cs();
         task->els[ELS_EDT_INDEX] = numEdts;
@@ -241,7 +246,6 @@ extern "C" {
 
         ptr = edt->dbList;
 
-	ASSERT(slot < edt->maxslot);       // Make sure we don't conflict with created DBs
         for (j = 0; j < edt->numDbs; j++) {
             if(ptr[j].db == db) {
                 ptr[j].slot = slot;
@@ -294,6 +298,10 @@ extern "C" {
                 return ptr[j].db;
             }
         }
+
+        // Stacks, globals accesses will be accounted in DB[0], slot 0xffff
+        if(iswrite) { ptr[0].writecount++; ptr[0].writesize += size; }
+        else { ptr[0].readcount++; ptr[0].readsize += size; }
 
         return NULL; // Returns NULL if address is out of known range (ptr[0] previously used as catch-all but not anymore)
     }
