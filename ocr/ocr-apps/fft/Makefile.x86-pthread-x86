@@ -6,9 +6,9 @@
 ARCH        ?= x86-pthread-x86
 # OCR
 OCR_TARGET   ?= x86-pthread-x86
-OCR_INSTALL_ROOT ?= ../../../install
-OCR_SRC     ?= ../../..
-OCR_BUILD_ROOT   ?= ../../../build/
+OCR_INSTALL_ROOT ?= ../../install
+OCR_SRC     ?= ../..
+OCR_BUILD_ROOT   ?= ../../build/
 
 # Application
 WORKLOAD_SRC          ?= .
@@ -17,9 +17,9 @@ WORKLOAD_INSTALL_ROOT ?= ./install
 
 ## END of variables coming from user/environment
 
-TARGET ?= bounded-parallel-db
+TARGET = fft
 
-SRCS := ${TARGET}.cpp
+SRCS := fft.c verify.c
 
 CFLAGS :=
 LDFLAGS := -lpthread -lm
@@ -35,4 +35,5 @@ debug:	default
 install: all
 
 VALIDGOALS := all debug install
-include ${WORKLOAD_SRC}/../../make-regular.inc
+
+include ${WORKLOAD_SRC}/../make-regular.inc

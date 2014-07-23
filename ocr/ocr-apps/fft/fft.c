@@ -14,16 +14,18 @@
 // each slave handles serialBlockSize elements.
 //
 
-#define _USE_MATH_DEFINES
-
-#include <stack>
-
-#include "options.h"
-#include "verify.h"
-
 #include "ocr.h"
 
+#ifdef RMD
+#include "rmd-math.h"
+#else
+#include "math.h"
+#endif
+
 #define SERIAL_BLOCK_SIZE_DEFAULT (1024*16)
+
+extern void ditfft2(float *X_real, float *X_imag, float *x_in, int N, int step);
+extern ocrGuid_t setUpVerify(ocrGuid_t inDB, ocrGuid_t XrealDB, ocrGuid_t XimagDB, u64 N, ocrGuid_t trigger);
 
 // Performs one entire iteration of FFT.
 // These are meant to be chained serially for timing and testing.
@@ -39,12 +41,12 @@ ocrGuid_t fftIterationEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[])
     }
 
     ocrGuid_t dependencies[1] = { depv[0].guid };
-    u64 edtParamv[9] = { startTempGuid, endTempGuid, endSlaveTempGuid, N,
+    u64 edtParamv[8] = { startTempGuid, endTempGuid, endSlaveTempGuid, N,
                          1 /* step size */, 0 /* offset */, 0 /* x_in_offset */,
-                         verbose, serialBlockSize };
+                         serialBlockSize };
 
     ocrGuid_t edtGuid;
-    ocrEdtCreate(&edtGuid, startTempGuid, EDT_PARAM_DEF, edtParamv, EDT_PARAM_DEF,
+    ocrEdtCreate(&edtGuid, startTempGuid, 8, edtParamv, 1,
                  dependencies, EDT_PROP_FINISH, NULL_GUID, NULL_GUID);
 
     return NULL_GUID;
@@ -61,51 +63,43 @@ ocrGuid_t fftStartEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     u64 step = paramv[4];
     u64 offset = paramv[5];
     u64 x_in_offset = paramv[6];
-    bool verbose = paramv[7];
-    u64 serialBlockSize = paramv[8];
+    u64 serialBlockSize = paramv[7];
     float *x_in = (float*)data;
     float *X_real = (float*)(data+offset + N*step);
     float *X_imag = (float*)(data+offset + 2*N*step);
-    if(verbose) {
-        PRINTF("Step %d offset: %d N*step: %d\n", step, offset, N*step);
-    }
+
+    PRINTF("Step %d offset: %d N*step: %d\n", step, offset, N*step);
 
     if(N <= serialBlockSize) {
         ditfft2(X_real, X_imag, x_in+x_in_offset, N, step);
     } else {
         // DFT even side
-        u64 childParamv[9] = { startGuid, endGuid, endSlaveGuid, N/2, 2 * step,
-                               0 + offset, x_in_offset, verbose, serialBlockSize };
-        u64 childParamv2[9] = { startGuid, endGuid, endSlaveGuid, N/2, 2 * step,
-                                N/2 + offset, x_in_offset + step, verbose, serialBlockSize };
+        u64 childParamv[8] = { startGuid, endGuid, endSlaveGuid, N/2, 2 * step,
+                               0 + offset, x_in_offset, serialBlockSize };
+        u64 childParamv2[8] = { startGuid, endGuid, endSlaveGuid, N/2, 2 * step,
+                                N/2 + offset, x_in_offset + step, serialBlockSize };
 
-        if(verbose) {
             PRINTF("Creating children of size %d\n",N/2);
-        }
         ocrGuid_t edtGuid, edtGuid2, endEdtGuid, finishEventGuid, finishEventGuid2;
 
-        ocrEdtCreate(&edtGuid, startGuid, EDT_PARAM_DEF, childParamv,
+        ocrEdtCreate(&edtGuid, startGuid, 8, childParamv,
                      EDT_PARAM_DEF, NULL_GUID, EDT_PROP_FINISH, NULL_GUID,
                      &finishEventGuid);
-        ocrEdtCreate(&edtGuid2, startGuid, EDT_PARAM_DEF, childParamv2,
+        ocrEdtCreate(&edtGuid2, startGuid, 8, childParamv2,
                      EDT_PARAM_DEF, NULL_GUID, EDT_PROP_FINISH, NULL_GUID,
                      &finishEventGuid2);
-        if(verbose) {
             PRINTF("finishEventGuid after create: %lu\n",finishEventGuid);
-        }
 
         ocrGuid_t endDependencies[3] = { dataGuid, finishEventGuid, finishEventGuid2 };
         // Do calculations after having divided and conquered
-        ocrEdtCreate(&endEdtGuid, endGuid, EDT_PARAM_DEF, paramv, EDT_PARAM_DEF,
+        ocrEdtCreate(&endEdtGuid, endGuid, 8, paramv, 3,
                      endDependencies, EDT_PROP_FINISH, NULL_GUID, NULL);
 
         ocrAddDependence(dataGuid, edtGuid, 0, DB_MODE_ITW);
         ocrAddDependence(dataGuid, edtGuid2, 0, DB_MODE_ITW);
     }
 
-    if(verbose) {
         PRINTF("Task with size %d completed\n",N);
-    }
     return NULL_GUID;
 }
 
@@ -119,23 +113,19 @@ ocrGuid_t fftEndEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     u64 N = paramv[3];
     u64 step = paramv[4];
     u64 offset = paramv[5];
-    bool verbose = paramv[7];
-    u64 serialBlockSize = paramv[8];
+    u64 serialBlockSize = paramv[7];
     float *x_in = (float*)data+offset;
     float *X_real = (float*)(data+offset + N*step);
     float *X_imag = (float*)(data+offset + 2*N*step);
-    if(verbose) {
+
         PRINTF("Reached end phase for step %d\n",step);
-    }
     u64 *slaveParamv;
 
     if(N/2 > serialBlockSize) {
         ocrGuid_t slaveGuids[(N/2)/serialBlockSize];
         u64 slaveParamv[5 * (N/2)/serialBlockSize];
 
-        if(verbose) {
             PRINTF("Creating %d slaves for N=%d\n",(N/2)/serialBlockSize,N);
-        }
 
         for(i=0;i<(N/2)/serialBlockSize;i++) {
             slaveParamv[i*5] = N;
@@ -144,7 +134,7 @@ ocrGuid_t fftEndEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
             slaveParamv[i*5+3] = i*serialBlockSize;
             slaveParamv[i*5+4] = (i+1)*serialBlockSize;
 
-            ocrEdtCreate(slaveGuids+i, endSlaveGuid, EDT_PARAM_DEF,
+            ocrEdtCreate(slaveGuids+i, endSlaveGuid, 5,
                          slaveParamv+i*5, EDT_PARAM_DEF, &dataGuid,
                          EDT_PROP_NONE, NULL_GUID, NULL);
         }
@@ -158,7 +148,7 @@ ocrGuid_t fftEndEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
         slaveParamv[3] = 0;
         slaveParamv[4] = N/2;
 
-        ocrEdtCreate(slaveGuids, endSlaveGuid, EDT_PARAM_DEF, slaveParamv,
+        ocrEdtCreate(slaveGuids, endSlaveGuid, 5, slaveParamv,
                      EDT_PARAM_DEF, &dataGuid, EDT_PROP_NONE, NULL_GUID, NULL);
     }
     return NULL_GUID;
@@ -228,11 +218,30 @@ ocrGuid_t finalPrintEdt(u32 paramc, u64 *paramv, u32 depc, ocrEdtDep_t depv[]) {
             PRINTF("%d [%f + %fi]\n",i,X_real[i],X_imag[i]);
         }
     }
-
+    PRINTF("FFT calling shutdown\n");
     ocrShutdown();
+    return NULL_GUID;
 }
 
-extern "C" ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
+bool parseOptions(int argc, char *argv[], u64 *N, bool *verify, u64 *iterations,
+                  bool *verbose, bool *printResults, u64 *serialBlockSize) {
+  char c;
+  char *buffer = NULL;
+  *verify = false;
+  *verbose = false;
+  *printResults = false;
+  *N = 1;
+  *iterations = 1;
+
+  int power = 10;  // TODO: get this from the argv
+  while(power-- > 0) *N=(*N)*2;
+  *verbose = true;
+  *verify = true;
+  return true;
+}
+
+
+ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     u64 argc = getArgc(depv[0].ptr);
     int i;
     char *argv[argc];
@@ -248,7 +257,6 @@ extern "C" ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv
     u64 serialBlockSize = SERIAL_BLOCK_SIZE_DEFAULT;
     if(!parseOptions(argc, argv, &N, &verify, &iterations, &verbose, &printResults,
                      &serialBlockSize)) {
-        printHelp(argv,true);
         ocrShutdown();
         return NULL_GUID;
     }
@@ -261,8 +269,8 @@ extern "C" ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv
 
     ocrGuid_t iterationTempGuid,startTempGuid,endTempGuid,printTempGuid,endSlaveTempGuid;
     ocrEdtTemplateCreate(&iterationTempGuid, &fftIterationEdt, 6, 2);
-    ocrEdtTemplateCreate(&startTempGuid, &fftStartEdt, 9, 1);
-    ocrEdtTemplateCreate(&endTempGuid, &fftEndEdt, 9, 3);
+    ocrEdtTemplateCreate(&startTempGuid, &fftStartEdt, 8, 1);
+    ocrEdtTemplateCreate(&endTempGuid, &fftEndEdt, 8, 3);
     ocrEdtTemplateCreate(&endSlaveTempGuid, &fftEndSlaveEdt, 5, 1);
     ocrEdtTemplateCreate(&printTempGuid, &finalPrintEdt, 3, 2);
 
@@ -285,43 +293,30 @@ extern "C" ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv
     //x[6] = 1;
 
 
-    std::stack<ocrGuid_t> edtStack;
-    std::stack<ocrGuid_t> eventStack;
     u64 edtParamv[6] = { startTempGuid, endTempGuid, endSlaveTempGuid, N, verbose, serialBlockSize };
 
     ocrGuid_t edtGuid, printEdtGuid, edtEventGuid;
 
-    for(i=1;i<=iterations;i++) {
-        ocrEdtCreate(&edtGuid, iterationTempGuid, EDT_PARAM_DEF, edtParamv,
-                     EDT_PARAM_DEF, NULL_GUID, EDT_PROP_FINISH, NULL_GUID,
-                     &edtEventGuid);
-        edtStack.push(edtGuid);
-        eventStack.push(edtEventGuid);
+    if(iterations!=1) {
+        PRINTF(">1 iterations currently not supported, dialing down to 1 iteration\n");
     }
 
-    edtEventGuid = eventStack.top();
+    ocrEdtCreate(&edtGuid, iterationTempGuid, 6, edtParamv,
+                 EDT_PARAM_DEF, NULL_GUID, EDT_PROP_FINISH, NULL_GUID,
+                 &edtEventGuid);
+
     if(verify) {
         edtEventGuid = setUpVerify(dataGuid, NULL_GUID, NULL_GUID, N, edtEventGuid);
     }
 
     u64 printParamv[3] = { N, verbose, printResults };
     ocrGuid_t finishDependencies[2] = { edtEventGuid, dataGuid };
-    ocrEdtCreate(&printEdtGuid, printTempGuid, EDT_PARAM_DEF, printParamv,
+    ocrEdtCreate(&printEdtGuid, printTempGuid, 3, printParamv,
                  EDT_PARAM_DEF, finishDependencies, EDT_PROP_NONE, NULL_GUID, NULL);
-    eventStack.pop();
 
-    while(!edtStack.empty()) {
-        edtGuid = edtStack.top();
-        if(!eventStack.empty()) {
-            edtEventGuid = eventStack.top();
-        } else {
-            edtEventGuid = NULL_GUID;
-        }
-        ocrAddDependence(dataGuid, edtGuid, 0, DB_MODE_ITW);
-        ocrAddDependence(edtEventGuid, edtGuid, 1, DB_MODE_RO);
-        edtStack.pop();
-        eventStack.pop();
-    }
+    edtEventGuid = NULL_GUID;
+    ocrAddDependence(dataGuid, edtGuid, 0, DB_MODE_ITW);
+    ocrAddDependence(edtEventGuid, edtGuid, 1, DB_MODE_RO);
 
     return NULL_GUID;
 }

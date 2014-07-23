@@ -6,14 +6,45 @@
 
 #include <ocr.h>
 
-#include <cmath>
-#include <limits>
+#ifdef RMD
+#include "rmd-math.h"
+#else
+#include "math.h"
+#include <stdio.h>
+#endif
 
-#include "ditfft2.h"
+bool areSame(float a, float b) {
+    return (fabs(a-b) < 1e-9);
+}
 
+void ditfft2(float *X_real, float *X_imag, float *x_in, int N, int step) {
+    if(N == 1) {
+        X_real[0] = x_in[0];
+        X_imag[0] = 0;
+    } else {
+        // DFT even side
+        ditfft2(X_real, X_imag, x_in, N/2, 2 * step);
+        ditfft2(X_real+N/2, X_imag+N/2, x_in+step, N/2, 2 * step);
+        int k;
+        for(k=0;k<N/2;k++) {
+            float t_real = X_real[k];
+            float t_imag = X_imag[k];
+            double twiddle_real = cos(-2 * M_PI * k / N);
+            double twiddle_imag = sin(-2 * M_PI * k / N);
+            float xr = X_real[k+N/2];
+            float xi = X_imag[k+N/2];
 
-bool areSame(double a, double b) {
-    return std::fabs(a-b) < std::numeric_limits<double>::epsilon();
+            // (a+bi)(c+di) = (ac - bd) + (bc + ad)i
+            X_real[k] = t_real +
+                (twiddle_real*xr - twiddle_imag*xi);
+            X_imag[k] = t_imag +
+                (twiddle_imag*xr + twiddle_real*xi);
+            X_real[k+N/2] = t_real -
+                (twiddle_real*xr - twiddle_imag*xi);
+            X_imag[k+N/2] = t_imag -
+                (twiddle_imag*xr + twiddle_real*xi);
+        }
+    }
 }
 
 // Checks whether the 3 input datablocks (in, X_real and X_imag) match the results
@@ -64,17 +95,20 @@ ocrGuid_t fftVerifyEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     // Verify results
     for(i=0;i<N;i++) {
         if(!areSame(X_real_other[i],X_real[i]) ||
-        !areSame(X_imag_other[i],X_imag[i])) {
+           !areSame(X_imag_other[i],X_imag[i])) {
             intact = false;
             PRINTF("Mismatch at index %d\n",i);
+            PRINTF("Expected: %f, %f\n", X_real[i], X_imag[i]);
+            PRINTF("Computed: %f, %f\n", X_real_other[i], X_imag_other[i]);
             break;
         }
     }
     if(intact) {
         PRINTF("Program produced correct results.\n");
-} else {
+    } else {
         PRINTF("Program output did not match!\n");
     }
+    VERIFY(intact, "Output matched expected results\n");
 
     return NULL_GUID;
 }
@@ -95,13 +129,13 @@ ocrGuid_t setUpVerify(ocrGuid_t inDB, ocrGuid_t XrealDB, ocrGuid_t XimagDB, u64 
     if(XimagDB == NULL_GUID) {
         ocrGuid_t verifyDependencies[4] = { inDB, XrealVDB, XimagVDB, trigger };
 
-        ocrEdtCreate(&vGuid, vTemp, EDT_PARAM_DEF, &N, 4, verifyDependencies,
+        ocrEdtCreate(&vGuid, vTemp, 1, &N, 4, verifyDependencies,
                      EDT_PROP_NONE, NULL_GUID, &vEventGuid);
     } else {
         ocrGuid_t verifyDependencies[6] = { inDB, XrealDB, XimagDB, XrealVDB,
                                             XimagVDB, trigger };
 
-        ocrEdtCreate(&vGuid, vTemp, EDT_PARAM_DEF, &N, 6, verifyDependencies,
+        ocrEdtCreate(&vGuid, vTemp, 1, &N, 6, verifyDependencies,
                      EDT_PROP_NONE, NULL_GUID, &vEventGuid);
     }
 
