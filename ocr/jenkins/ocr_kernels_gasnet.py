@@ -114,38 +114,6 @@ job_ocr_verify_kernel_fib_x86 = {
     'env-vars': { 'WORKLOAD_EXEC': '${JJOB_SHARED_HOME}/ocr/ocr-apps/fib/install/x86-pthread-x86'}
 }
 
-job_ocr_build_kernel_fib_mpi = {
-    'name': 'ocr-build-kernel-fib-mpi',
-    'depends': ('ocr-build-x86-pthread-mpi',),
-    'jobtype': 'ocr-build-kernel',
-    'run-args': 'fib x86-pthread-mpi',
-    'sandbox': ('inherit0',),
-    'env-vars': { 'APPS_LIBS_ROOT': '${JJOB_SHARED_HOME}/apps/libs/x86',
-                  'WORKLOAD_SRC': '${JJOB_INITDIR}/ocr/ocr-apps/fib',
-                  'WORKLOAD_BUILD_ROOT': '${JJOB_PRIVATE_HOME}/ocr/ocr-apps/fib/build',
-                  'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/ocr/ocr-apps/fib/install'}
-}
-
-job_ocr_run_kernel_fib_mpi = {
-    'name': 'ocr-run-kernel-fib-mpi',
-    'depends': ('ocr-build-kernel-fib-mpi',),
-    'jobtype': 'ocr-run-kernel-local',
-    'run-args': 'fib x86-pthread-mpi',
-    'sandbox': ('inherit0',),
-    'env-vars': { 'PATH': '/opt/intel/tools/impi_latest/bin64:${PATH}',
-                  'APPS_LIBS_ROOT': '${JJOB_SHARED_HOME}/apps/libs/x86',
-                  'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/ocr/ocr-apps/fib/install' }
-}
-
-job_ocr_verify_kernel_fib_mpi = {
-    'name': 'ocr-verify-kernel-fib-mpi',
-    'depends': ('ocr-run-kernel-fib-mpi',),
-    'jobtype': 'ocr-verify-kernel-local',
-    'run-args': '-w -c 1',
-    'sandbox': ('inherit0',),
-    'env-vars': { 'WORKLOAD_EXEC': '${JJOB_SHARED_HOME}/ocr/ocr-apps/fib/install/x86-pthread-mpi'}
-}
-
 job_ocr_build_kernel_fib_gasnet = {
     'name': 'ocr-build-kernel-fib-gasnet',
     'depends': ('ocr-build-x86-pthread-gasnet',),
@@ -161,6 +129,7 @@ job_ocr_build_kernel_fib_gasnet = {
                   'PATH': '${GASNET_ROOT}/bin:${MPI_ROOT}/bin64:${PATH}',
                   'GASNET_CONDUIT': 'ibv',
                   'GASNET_TYPE': 'par',
+                  'GASNET_LAUNCHER': 'gasnetrun_ibv',
                   'GASNET_EXTRA_LIBS': '-L/usr/lib64 -lrt -libverbs',
                   'CC': 'mpicc', # gasnet built with mpi
                   }
@@ -176,8 +145,7 @@ job_ocr_run_kernel_fib_gasnet = {
                   'APPS_LIBS_ROOT': '${JJOB_SHARED_HOME}/apps/libs/x86',
                   'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/ocr/ocr-apps/fib/install',
                   'GASNET_ROOT': '/opt/rice/GASNet/1.24.0-impi',
-                  'PATH': '${GASNET_ROOT}/bin:${MPI_ROOT}/bin64:${PATH}',
-                  'GASNET_CONDUIT': 'ibv'}
+                  'PATH': '${GASNET_ROOT}/bin:${MPI_ROOT}/bin64:${PATH}'}
 }
 
 job_ocr_verify_kernel_fib_gasnet = {
@@ -287,38 +255,6 @@ job_ocr_verify_kernel_fft_x86 = {
     'env-vars': { 'WORKLOAD_EXEC': '${JJOB_SHARED_HOME}/ocr/ocr-apps/fft/install/x86-pthread-x86'}
 }
 
-job_ocr_build_kernel_fft_mpi = {
-    'name': 'ocr-build-kernel-fft-mpi',
-    'depends': ('ocr-build-x86-pthread-mpi',),
-    'jobtype': 'ocr-build-kernel',
-    'run-args': 'fft x86-pthread-mpi',
-    'sandbox': ('inherit0',),
-    'env-vars': { 'APPS_LIBS_ROOT': '${JJOB_SHARED_HOME}/apps/libs/x86',
-                  'WORKLOAD_SRC': '${JJOB_INITDIR}/ocr/ocr-apps/fft',
-                  'WORKLOAD_BUILD_ROOT': '${JJOB_PRIVATE_HOME}/ocr/ocr-apps/fft/build',
-                  'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/ocr/ocr-apps/fft/install'}
-}
-
-job_ocr_run_kernel_fft_mpi = {
-    'name': 'ocr-run-kernel-fft-mpi',
-    'depends': ('ocr-build-kernel-fft-mpi',),
-    'jobtype': 'ocr-run-kernel-local',
-    'run-args': 'fft x86-pthread-mpi',
-    'sandbox': ('inherit0',),
-    'env-vars': { 'PATH': '/opt/intel/tools/impi_latest/bin64:${PATH}',
-                  'APPS_LIBS_ROOT': '${JJOB_SHARED_HOME}/apps/libs/x86',
-                  'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/ocr/ocr-apps/fft/install' }
-}
-
-job_ocr_verify_kernel_fft_mpi = {
-    'name': 'ocr-verify-kernel-fft-mpi',
-    'depends': ('ocr-run-kernel-fft-mpi',),
-    'jobtype': 'ocr-verify-kernel-local',
-    'run-args': '-w -c 1',
-    'sandbox': ('inherit0',),
-    'env-vars': { 'WORKLOAD_EXEC': '${JJOB_SHARED_HOME}/ocr/ocr-apps/fft/install/x86-pthread-mpi'}
-}
-
 job_ocr_build_kernel_fft_gasnet = {
     'name': 'ocr-build-kernel-fft-gasnet',
     'depends': ('ocr-build-x86-pthread-gasnet',),
@@ -334,6 +270,7 @@ job_ocr_build_kernel_fft_gasnet = {
                   'PATH': '${GASNET_ROOT}/bin:${MPI_ROOT}/bin64:${PATH}',
                   'GASNET_CONDUIT': 'ibv',
                   'GASNET_TYPE': 'par',
+                  'GASNET_LAUNCHER': 'gasnetrun_ibv',
                   'GASNET_EXTRA_LIBS': '-L/usr/lib64 -lrt -libverbs',
                   'CC': 'mpicc', # gasnet built with mpi
                   }
@@ -349,8 +286,7 @@ job_ocr_run_kernel_fft_gasnet = {
                   'APPS_LIBS_ROOT': '${JJOB_SHARED_HOME}/apps/libs/x86',
                   'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/ocr/ocr-apps/fft/install',
                   'GASNET_ROOT': '/opt/rice/GASNet/1.24.0-impi',
-                  'PATH': '${GASNET_ROOT}/bin:${MPI_ROOT}/bin64:${PATH}',
-                  'GASNET_CONDUIT': 'ibv'}
+                  'PATH': '${GASNET_ROOT}/bin:${MPI_ROOT}/bin64:${PATH}'}
 }
 
 job_ocr_verify_kernel_fft_gasnet = {
@@ -454,30 +390,6 @@ job_ocr_run_kernel_sw_x86 = {
 
 #TODO smith-waterman verification
 
-job_ocr_build_kernel_sw_mpi = {
-    'name': 'ocr-build-kernel-sw-mpi',
-    'depends': ('ocr-build-x86-pthread-mpi',),
-    'jobtype': 'ocr-build-kernel',
-    'run-args': 'smith-waterman x86-pthread-mpi',
-    'sandbox': ('inherit0',),
-    'env-vars': { 'APPS_LIBS_ROOT': '${JJOB_SHARED_HOME}/apps/libs/x86',
-                  'WORKLOAD_SRC': '${JJOB_INITDIR}/ocr/ocr-apps/smith-waterman',
-                  'WORKLOAD_BUILD_ROOT': '${JJOB_PRIVATE_HOME}/ocr/ocr-apps/smith-waterman/build',
-                  'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/ocr/ocr-apps/smith-waterman/install'}
-}
-
-job_ocr_run_kernel_sw_mpi = {
-    'name': 'ocr-run-kernel-sw-mpi',
-    'depends': ('ocr-build-kernel-sw-mpi',),
-    'jobtype': 'ocr-run-kernel-local',
-    'run-args': 'smith-waterman x86-pthread-mpi',
-    'sandbox': ('inherit0',),
-    'env-vars': { 'PATH': '/opt/intel/tools/impi_latest/bin64:${PATH}',
-                  'APPS_LIBS_ROOT': '${JJOB_SHARED_HOME}/apps/libs/x86',
-                  'WORKLOAD_ARGS': '100 100 ${JJOB_SHARED_HOME}/apps/smithwaterman/datasets/string1-medium-large.txt  ${JJOB_SHARED_HOME}/apps/smithwaterman/datasets/string2-medium-large.txt',
-                  'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/ocr/ocr-apps/smith-waterman/install' }
-}
-
 job_ocr_build_kernel_sw_gasnet = {
     'name': 'ocr-build-kernel-sw-gasnet',
     'depends': ('ocr-build-x86-pthread-gasnet',),
@@ -493,6 +405,7 @@ job_ocr_build_kernel_sw_gasnet = {
                   'PATH': '${GASNET_ROOT}/bin:${MPI_ROOT}/bin64:${PATH}',
                   'GASNET_CONDUIT': 'ibv',
                   'GASNET_TYPE': 'par',
+                  'GASNET_LAUNCHER': 'gasnetrun_ibv',
                   'GASNET_EXTRA_LIBS': '-L/usr/lib64 -lrt -libverbs',
                   'CC': 'mpicc', # gasnet built with mpi
                   }
@@ -509,8 +422,7 @@ job_ocr_run_kernel_sw_gasnet = {
                   'WORKLOAD_ARGS': '100 100 ${JJOB_SHARED_HOME}/apps/smithwaterman/datasets/string1-medium-large.txt  ${JJOB_SHARED_HOME}/apps/smithwaterman/datasets/string2-medium-large.txt',
                   'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/ocr/ocr-apps/smith-waterman/install',
                   'GASNET_ROOT': '/opt/rice/GASNet/1.24.0-impi',
-                  'PATH': '${GASNET_ROOT}/bin:${MPI_ROOT}/bin64:${PATH}',
-                  'GASNET_CONDUIT': 'ibv'}
+                  'PATH': '${GASNET_ROOT}/bin:${MPI_ROOT}/bin64:${PATH}'}
 }
 
 job_ocr_build_kernel_sw_tgemul = {
@@ -595,39 +507,6 @@ job_ocr_verify_kernel_cholesky_x86 = {
     'env-vars': { 'WORKLOAD_EXEC': '${JJOB_SHARED_HOME}/ocr/ocr-apps/cholesky/install/x86-pthread-x86' }
 }
 
-job_ocr_build_kernel_cholesky_mpi = {
-    'name': 'ocr-build-kernel-cholesky-mpi',
-    'depends': ('ocr-build-x86-pthread-mpi',),
-    'jobtype': 'ocr-build-kernel',
-    'run-args': 'cholesky x86-pthread-mpi',
-    'sandbox': ('inherit0',),
-    'env-vars': { 'APPS_LIBS_ROOT': '${JJOB_SHARED_HOME}/apps/libs/x86',
-                  'WORKLOAD_SRC': '${JJOB_INITDIR}/ocr/ocr-apps/cholesky',
-                  'WORKLOAD_BUILD_ROOT': '${JJOB_PRIVATE_HOME}/ocr/ocr-apps/cholesky/build',
-                  'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/ocr/ocr-apps/cholesky/install'}
-}
-
-job_ocr_run_kernel_cholesky_mpi = {
-    'name': 'ocr-run-kernel-cholesky-mpi',
-    'depends': ('ocr-build-kernel-cholesky-mpi',),
-    'jobtype': 'ocr-run-kernel-local',
-    'run-args': 'cholesky x86-pthread-mpi',
-    'sandbox': ('inherit0',),
-    'env-vars': { 'PATH': '/opt/intel/tools/impi_latest/bin64:${PATH}',
-                  'APPS_LIBS_ROOT': '${JJOB_SHARED_HOME}/apps/libs/x86',
-                  'WORKLOAD_ARGS': '--ds 1000 --ts 50 --fi ${JJOB_SHARED_HOME}/apps/cholesky/datasets/m_1000.in',
-                  'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/ocr/ocr-apps/cholesky/install' }
-}
-
-job_ocr_verify_kernel_cholesky_mpi = {
-    'name': 'ocr-verify-kernel-cholesky-mpi',
-    'depends': ('ocr-run-kernel-cholesky-mpi',),
-    'jobtype': 'ocr-verify-diff',
-    'run-args': '${WORKLOAD_EXEC}/cholesky.out.txt ${JJOB_SHARED_HOME}/apps/cholesky/datasets/cholesky_out_1000.txt',
-    'sandbox': ('inherit0',),
-    'env-vars': { 'WORKLOAD_EXEC': '${JJOB_SHARED_HOME}/ocr/ocr-apps/cholesky/install/x86-pthread-mpi' }
-}
-
 job_ocr_build_kernel_cholesky_gasnet = {
     'name': 'ocr-build-kernel-cholesky-gasnet',
     'depends': ('ocr-build-x86-pthread-gasnet',),
@@ -643,6 +522,7 @@ job_ocr_build_kernel_cholesky_gasnet = {
                   'PATH': '${GASNET_ROOT}/bin:${MPI_ROOT}/bin64:${PATH}',
                   'GASNET_CONDUIT': 'ibv',
                   'GASNET_TYPE': 'par',
+                  'GASNET_LAUNCHER': 'gasnetrun_ibv',
                   'GASNET_EXTRA_LIBS': '-L/usr/lib64 -lrt -libverbs',
                   'CC': 'mpicc', # gasnet built with mpi
                   }
@@ -659,8 +539,7 @@ job_ocr_run_kernel_cholesky_gasnet = {
                   'WORKLOAD_ARGS': '--ds 1000 --ts 50 --fi ${JJOB_SHARED_HOME}/apps/cholesky/datasets/m_1000.in',
                   'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/ocr/ocr-apps/cholesky/install',
                   'GASNET_ROOT': '/opt/rice/GASNet/1.24.0-impi',
-                  'PATH': '${GASNET_ROOT}/bin:${MPI_ROOT}/bin64:${PATH}',
-                  'GASNET_CONDUIT': 'ibv'}
+                  'PATH': '${GASNET_ROOT}/bin:${MPI_ROOT}/bin64:${PATH}'}
 }
 
 job_ocr_verify_kernel_cholesky_gasnet = {

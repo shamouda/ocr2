@@ -57,6 +57,18 @@ job_ocr_build_x86_pthread_mpi = {
                  'PATH': '${MPI_ROOT}/bin64:'+os.environ['PATH'],}
 }
 
+job_ocr_build_x86_pthread_gasnet = {
+    'name': 'ocr-build-x86-pthread-gasnet',
+    'depends': ('ocr-init-job',),
+    'jobtype': 'ocr-build',
+    'run-args': 'x86-pthread-gasnet',
+    'sandbox': ('inherit0',),
+    'env-vars': {'GASNET_ROOT': '/opt/rice/GASNet/1.24.0-impi',
+                 'PATH': '${GASNET_ROOT}/bin:'+os.environ['PATH'],
+                 'GASNET_CONDUIT': 'ibv',
+                 'GASNET_TYPE': 'par'}
+}
+
 job_ocr_build_x86_pthread_tg = {
     'name': 'ocr-build-x86-pthread-tg',
     'depends': ('ocr-init-job',),

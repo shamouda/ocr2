@@ -31,8 +31,8 @@
 /**
  * @brief Initialize the MPI library.
  */
-void platformInitMPIComm(int argc, char ** argv) {
-    int res = MPI_Init(&argc, &argv);
+void platformInitMPIComm(int * argc, char *** argv) {
+    int res = MPI_Init(argc, argv);
     ASSERT(res == MPI_SUCCESS);
 }
 

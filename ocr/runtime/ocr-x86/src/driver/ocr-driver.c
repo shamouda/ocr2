@@ -23,6 +23,11 @@
 #include <stdio.h>
 #include <string.h>
 
+// For platform-specific finalizer
+#ifdef ENABLE_COMM_PLATFORM_GASNET
+#include <gasnet.h>
+#endif
+
 u8 startMemStat = 0;
 
 #define DEBUG_TYPE INIPARSING
@@ -522,28 +527,44 @@ static void * packUserArguments(int argc, char ** argv) {
  */
 void platformSpecificInit(ocrConfig_t * ocrConfig) {
 #ifdef ENABLE_COMM_PLATFORM_MPI
-    extern void platformInitMPIComm(int argc, char ** argv);
-    platformInitMPIComm(ocrConfig->userArgc, ocrConfig->userArgv);
+    extern void platformInitMPIComm(int * argc, char *** argv);
+    platformInitMPIComm(&ocrConfig->userArgc, &ocrConfig->userArgv);
 #endif
 
 #ifdef ENABLE_COMM_PLATFORM_GASNET
-    extern void platformInitGasnetComm(int argc, char ** argv);
-    platformInitGasnetComm(ocrConfig->userArgc, ocrConfig->userArgv);
+    extern void platformInitGasnetComm(int * argc, char *** argv);
+    platformInitGasnetComm(&ocrConfig->userArgc, &ocrConfig->userArgv);
+#endif
+}
+
+/**
+ * @brief Calls platformn specific finalizer code.
+ *
+ * Allows to call platform specific finalizer code
+ * that may be invoked independently of any OCR
+ * module being still alive.
+ *
+ * Warning ! the call may eventually call 'exit'.
+ */
+void platformSpecificFinalizer(u8 returnCode) {
+#ifdef ENABLE_COMM_PLATFORM_GASNET
+    gasnet_exit(returnCode);
 #endif
 }
 
 int __attribute__ ((weak)) main(int argc, const char* argv[]) {
-    // Parse parameters. The idea is to extract the ones relevant
-    // to the runtime and pass all the other ones down to the mainEdt
     ocrConfig_t ocrConfig;
-    ocrParseArgs(argc, argv, &ocrConfig);
+    ocrConfig.userArgc = argc;
+    ocrConfig.userArgv = (char **) argv;
 
     // Things that must initialize before OCR is started
     platformSpecificInit(&ocrConfig);
 
+    // Parse parameters: Extract the ones relevant to the runtime
+    // and pass all the other ones down to the mainEdt
+    ocrParseArgs(ocrConfig.userArgc, (const char**) ocrConfig.userArgv, &ocrConfig);
     // Register pointer to the mainEdt
     mainEdtSet(mainEdt);
-
     // Pack and save user args for the mainEdt
     void * packedUserArgv = packUserArguments(ocrConfig.userArgc, ocrConfig.userArgv);
     userArgsSet(packedUserArgv);
@@ -556,6 +577,9 @@ int __attribute__ ((weak)) main(int argc, const char* argv[]) {
 
     startMemStat = 1;
     u8 returnCode = ocrFinalize();
+
+    // Warning: Finalizer specific to platforms may call exit
+    platformSpecificFinalizer(returnCode);
 
     return returnCode;
 }
