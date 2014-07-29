@@ -185,11 +185,23 @@ u8 ceCommSendMessage(ocrCommPlatform_t *self, ocrLocation_t target,
 
 #ifndef ENABLE_BUILDER_ONLY
     // - DMA to remote stage
-    rmd_mmio_dma_copyregion_async((u64)message, (u64)&rq[1], bufferSize & 0xFFFFFFFFUL);
+    // We marshall things properly
+    u64 fullMsgSize = 0, marshalledSize = 0;
+    ocrCommPlatformGetMsgSize(message, &fullMsgSize, &marshalledSize);
+    // We can only deal with the case where everything fits in the message
+    if(fullMsgSize > (bufferSize >> 32)) {
+        DPRINTF(DEBUG_LVL_WARN, "Comm platform only handles messages up to size %ld\n",
+                bufferSize >> 32);
+        ASSERT(0);
+    }
+    ocrCommPlatformMarshallMsg(message, (u8*)message, MARSHALL_APPEND);
+    // - DMA to remote stage, with fence
+    DPRINTF(DEBUG_LVL_VVERB, "DMA-ing out message to 0x%lx of size %d\n",
+            (u64)&rq[1], message->size);
+    rmd_mmio_dma_copyregion_async((u64)message, (u64)&rq[1], message->size);
 
     // - Fence DMA
     rmd_fence_fbm();
-
     // - Atomically test & set remote stage to Full. Error if already non-Empty.
     {
         u64 tmp = rmd_mmio_xchg64((u64)rq, (u64)2);
@@ -230,6 +242,16 @@ u8 ceCommPollMessage(ocrCommPlatform_t *self, ocrPolicyMsg_t **msg,
         // We have a message
         // Provide a ptr to the local stage's contents
         *msg = (ocrPolicyMsg_t *)&((cp->lq[i])[1]);
+        // We fixup pointers
+        u64 fullMsgSize = 0, marshalledSize = 0;
+        ocrCommPlatformGetMsgSize(*msg, &fullMsgSize, &marshalledSize);
+        if(fullMsgSize > sizeof(ocrPolicyMsg_t)) {
+            DPRINTF(DEBUG_LVL_WARN, "Comm platform only handles messages up to size %ld\n",
+                    sizeof(ocrPolicyMsg_t));
+            ASSERT(0);
+        }
+        (*msg)->size = fullMsgSize; // Reset it properly
+        ocrCommPlatformUnMarshallMsg((u8*)*msg, NULL, *msg, MARSHALL_APPEND);
 
         // Advance queue for next check
         cp->pollq = (i + 1) % MAX_NUM_XE;
@@ -255,16 +277,33 @@ u8 ceCommWaitMessage(ocrCommPlatform_t *self,  ocrPolicyMsg_t **msg,
     // Local stage is at well-known 0x0
     u64 i;
 
+    DPRINTF(DEBUG_LVL_VVERB, "Going to wait for message (starting at %d)\n",
+            cp->pollq);
     // Loop throught the stages till we receive something
     for(i = cp->pollq; (cp->lq[i])[0] != 2; i = (i+1) % MAX_NUM_XE) {
         // Halt the CPU, instead of burning rubber
         // An alarm would wake us, so no delay will result
+        // TODO: REC: Loop around at least once if we get
+        // an alarm to check all slots.
+        // Note that a timer alarm wakes us up periodically
         __asm__ __volatile__("hlt\n\t");
     }
 
 #if 1
     // We have a message
+    DPRINTF(DEBUG_LVL_VVERB, "Waited for message and got message from %d at 0x%lx\n",
+            i, &((cp->lq[i])[1]));
     *msg = (ocrPolicyMsg_t *)&((cp->lq[i])[1]);
+    // We fixup pointers
+    u64 fullMsgSize = 0, marshalledSize = 0;
+    ocrCommPlatformGetMsgSize(*msg, &fullMsgSize, &marshalledSize);
+    if(fullMsgSize > sizeof(ocrPolicyMsg_t)) {
+        DPRINTF(DEBUG_LVL_WARN, "Comm platform only handles messages up to size %ld\n",
+                sizeof(ocrPolicyMsg_t));
+        ASSERT(0);
+    }
+    (*msg)->size = fullMsgSize; // Reset it properly
+    ocrCommPlatformUnMarshallMsg((u8*)*msg, NULL, *msg, MARSHALL_APPEND);
 #else
     // We have a message
     // NOTE: For now we copy it into the buffer provided by the caller
@@ -287,9 +326,10 @@ u8 ceCommDestructMessage(ocrCommPlatform_t *self, ocrPolicyMsg_t *msg) {
     ASSERT(msg != NULL);
 
     ocrCommPlatformCe_t * cp = (ocrCommPlatformCe_t *)self;
-
     // Remember XE number
     u64 n = cp->pollq;
+
+    DPRINTF(DEBUG_LVL_VVERB, "Destructing message received from %d (un-clock gate)\n", n);
 
     // Sanity check we're "destruct"ing the right thing...
     ASSERT(msg == (ocrPolicyMsg_t *)&((cp->lq[cp->pollq])[1]));

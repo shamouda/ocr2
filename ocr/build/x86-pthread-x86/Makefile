@@ -21,7 +21,7 @@ DEFAULT_CONFIG=mach-hc-4w.cfg
 #
 
 CC      := gcc
-CFLAGS  := 
+CFLAGS  :=
 
 RM      := rm
 RMFLAGS := -rf
@@ -39,7 +39,7 @@ CFLAGS_SHARED := -fpic
 
 # Static libraries specific builds
 # Same as for CFLAGS_SHARED
-CFLAGS_STATIC := 
+CFLAGS_STATIC :=
 AR := ar
 ARFLAGS := cru
 
@@ -48,7 +48,7 @@ RANLIB := ranlib
 # Library supported
 SUPPORTS_SHARED=yes
 SUPPORTS_STATIC=yes
-
+OCRRUNNER=ocrrun
 
 # For Valgrind, uncomment this line
 #CFLAGS += -I/usr/include -DENABLE_VALGRIND #-DELS_USER_SIZE=2
@@ -59,5 +59,7 @@ SUPPORTS_STATIC=yes
 .PHONY: all
 all: static shared
 
-include ../common.mk
+.PHONY: debug
+debug: debug-static debug-shared
 
+include ../common.mk

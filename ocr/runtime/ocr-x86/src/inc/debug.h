@@ -14,7 +14,8 @@
 // TODO: Rework this to make it more platform independent
 #include "ocr-hal.h"
 #include "ocr-sal.h"
-
+#include "ocr-task.h"
+#include "ocr-worker.h"
 
 #ifdef OCR_DEBUG
 /**
@@ -246,6 +247,16 @@
 #define DEBUG_LVL_SYNC OCR_DEBUG_LVL
 #endif
 
+#ifdef OCR_DEBUG_SYSBOOT
+#define OCR_DEBUG_SYSBOOT 1
+#else
+#define OCR_DEBUG_SYSBOOT 0
+#endif
+#define OCR_DEBUG_SYSBOOT_STR "SYSBOOT"
+#ifndef DEBUG_LVL_SYSBOOT
+#define DEBUG_LVL_SYSBOOT OCR_DEBUG_LVL
+#endif
+
 #ifdef OCR_DEBUG_TASK
 #define OCR_DEBUG_TASK 1
 #else
@@ -287,29 +298,21 @@
 #endif
 
 
-// Imply OCR_STATUS
-#define OCR_STATUS
 // Imply ASSERTs
 #define OCR_ASSERT
 
 #define DO_DEBUG_TYPE(type, level) \
-    if(OCR_DEBUG_##type  && level <= DEBUG_LVL_##type) {                               \
-        static const char* __type __attribute__((unused)) = OCR_DEBUG_##type##_STR;    \
-        static const char* __level __attribute__((unused)) = OCR_DEBUG_##level##_STR;
+    if(OCR_DEBUG_##type  && level <= DEBUG_LVL_##type) {
 
-
-// TODO: Re-add the worker thing once I figure out a way to not make it segfault
-#define DEBUG(format, ...)   do { PRINTF("%s(%s) W 0x%lx: " format,                     \
-                                         __type, __level, (u64)0/*pthread_self()*/,     \
-                                         /*(u64)getCurrentWorkerContext()->sourceObj,*/ \
-                                         ## __VA_ARGS__) } while(0)
-
-#define DPRINTF_TYPE(type, level, format, ...) do {                     \
-        if(OCR_DEBUG_##type && level <= DEBUG_LVL_##type) {             \
-            PRINTF(OCR_DEBUG_##type##_STR "(" OCR_DEBUG_##level##_STR ") W 0x%lx: " format, \
-                   (u64)0/*pthread_self()*/,/*(u64)getCurrentWorkerContext()->sourceObj, */ ## __VA_ARGS__); \
-        }                                                               \
-    } while(0);
+#define DPRINTF_TYPE(type, level, format, ...)   do {                   \
+    if(OCR_DEBUG_##type && level <= DEBUG_LVL_##type) {                 \
+        ocrTask_t *_task = NULL; ocrWorker_t *_worker = NULL;           \
+        getCurrentEnv(NULL, &_worker, &_task, NULL);                    \
+        PRINTF(OCR_DEBUG_##type##_STR "(" OCR_DEBUG_##level##_STR       \
+               ") [W:0x%lx EDT:0x%lx] " format,                         \
+               _worker?(u64)_worker->location:0,                        \
+               _task?_task->guid:0, ## __VA_ARGS__);                    \
+    } } while(0)
 
 #else
 #define DO_DEBUG_TYPE(level) if(0) {
@@ -325,15 +328,6 @@
 
 #define END_DEBUG }
 
-#ifdef OCR_STATUS
-#define STATUS(format, ...)                                             \
-    PRINTF("##OCR-STATUS %s:%d " format, __FILE__, __LINE__,##__VA_ARGS__);
-#else
-#define STATUS(format, ...)
-#endif /* OCR_STATUS */
-
-#define STATUS0(format) STATUS("%s" format, "")
-
 #ifdef OCR_ASSERT
 #define ASSERT(a) do { sal_assert((bool)((a) != 0), __FILE__, __LINE__); } while(0);
 #define RESULT_ASSERT(a, op, b) do { sal_assert((a) op (b), __FILE__, __LINE__); } while(0);
@@ -344,4 +338,14 @@
 #define RESULT_TRUE(a) do { a; } while(0);
 #endif /* OCR_ASSERT */
 
+#ifndef VERIFY
+#define VERIFY(cond, format, ...)                                       \
+    do {                                                                \
+        if(!(cond)) {                                                   \
+            PRINTF("FAILURE @ '%s:%d' " format, __FILE__, __LINE__, ## __VA_ARGS__); \
+        } else {                                                        \
+            PRINTF("PASSED @ '%s:%d' " format, __FILE__, __LINE__, ## __VA_ARGS__); \
+        }                                                               \
+    } while(0);
+#endif
 #endif /* __DEBUG_H__ */

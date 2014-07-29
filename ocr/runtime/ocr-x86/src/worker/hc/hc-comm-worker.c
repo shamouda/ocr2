@@ -137,7 +137,8 @@ static u8 createProcessRequestEdt(ocrPolicyDomain_t * pd, ocrGuid_t templateGuid
     START_PROFILE(api_EdtCreate);
     ocrPolicyMsg_t msg;
     u8 returnCode = 0;
-    getCurrentEnv(NULL, NULL, NULL, &msg);
+    ocrTask_t *curEdt = NULL;
+    getCurrentEnv(NULL, NULL, &curEdt, &msg);
 
 #define PD_MSG (&msg)
 #define PD_TYPE PD_MSG_WORK_CREATE
@@ -156,7 +157,9 @@ static u8 createProcessRequestEdt(ocrPolicyDomain_t * pd, ocrGuid_t templateGuid
     PD_MSG_FIELD(depv) = NULL;
     PD_MSG_FIELD(properties) = properties;
     PD_MSG_FIELD(workType) = workType;
-
+    // This is a "fake" EDT so it has no "parent"
+    PD_MSG_FIELD(currentEdt.guid) = NULL_GUID;
+    PD_MSG_FIELD(currentEdt.metaDataPtr) = NULL;
     returnCode = pd->fcts.processMessage(pd, &msg, true);
     if(returnCode) {
         edtGuid = PD_MSG_FIELD(guid.guid);

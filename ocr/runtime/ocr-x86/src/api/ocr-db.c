@@ -56,8 +56,8 @@ u8 ocrDbCreate(ocrGuid_t *db, void** addr, u64 len, u16 flags,
     PD_MSG_FIELD(size) = len;
     PD_MSG_FIELD(affinity.guid) = affinity;
     PD_MSG_FIELD(affinity.metaDataPtr) = NULL;
-    PD_MSG_FIELD(flags) = (u32) flags;
-    PD_MSG_FIELD(properties) = (u32) 0;
+    PD_MSG_FIELD(properties) = (u32) flags;
+    PD_MSG_FIELD(returnDetail) = 0;
     PD_MSG_FIELD(dbType) = USER_DBTYPE;
     PD_MSG_FIELD(allocator) = allocator;
 
@@ -81,6 +81,7 @@ u8 ocrDbCreate(ocrGuid_t *db, void** addr, u64 len, u16 flags,
         // just to be safe
 #define PD_MSG (&msg)
 #define PD_TYPE PD_MSG_DEP_DYNADD
+        getCurrentEnv(NULL, NULL, NULL, &msg);
         msg.type = PD_MSG_DEP_DYNADD | PD_MSG_REQUEST;
         PD_MSG_FIELD(edt.guid) = task->guid;
         PD_MSG_FIELD(edt.metaDataPtr) = task;
@@ -123,6 +124,7 @@ u8 ocrDbDestroy(ocrGuid_t db) {
         // just to be safe
 #define PD_MSG (&msg)
 #define PD_TYPE PD_MSG_DEP_DYNREMOVE
+        getCurrentEnv(NULL, NULL, NULL, &msg);
         msg.type = PD_MSG_DEP_DYNREMOVE | PD_MSG_REQUEST;
         PD_MSG_FIELD(edt.guid) = task->guid;
         PD_MSG_FIELD(edt.metaDataPtr) = task;
@@ -154,8 +156,8 @@ u8 ocrDbRelease(ocrGuid_t db) {
     PD_MSG_FIELD(guid.metaDataPtr) = NULL;
     PD_MSG_FIELD(edt.guid) = task?task->guid:NULL_GUID;
     PD_MSG_FIELD(edt.metaDataPtr) = task;
-    PD_MSG_FIELD(flags) = 0;
     PD_MSG_FIELD(properties) = 0;
+    PD_MSG_FIELD(returnDetail) = 0;
 
     u8 returnCode = policy->fcts.processMessage(policy, &msg, false);
 #undef PD_MSG
@@ -168,6 +170,7 @@ u8 ocrDbRelease(ocrGuid_t db) {
         // just to be safe
 #define PD_MSG (&msg)
 #define PD_TYPE PD_MSG_DEP_DYNREMOVE
+        getCurrentEnv(NULL, NULL, NULL, &msg);
         msg.type = PD_MSG_DEP_DYNREMOVE | PD_MSG_REQUEST;
         PD_MSG_FIELD(edt.guid) = task->guid;
         PD_MSG_FIELD(edt.metaDataPtr) = task;

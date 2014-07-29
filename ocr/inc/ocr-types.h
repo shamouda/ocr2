@@ -160,10 +160,10 @@ typedef ocrGuid_t (*ocrEdt_t)(u32 paramc, u64* paramv,
  *       This potentially limites parallelism
  */
 typedef enum {
-    DB_MODE_RO  = 0x1,   /**< Read-only mode */
-    DB_MODE_ITW = 0x2,   /**< Intent-to-write mode (default mode) */
-    DB_MODE_EW  = 0x4   /**< Exclusive write mode */
-} ocrDbAccessMode_t; // Warning: only 4 bits
+    DB_MODE_RO  = 0x2,   /**< Read-only mode */
+    DB_MODE_ITW = 0x4,   /**< Intent-to-write mode (default mode) */
+    DB_MODE_EW  = 0x8   /**< Exclusive write mode */
+} ocrDbAccessMode_t; // Warning: only 4 bits starting at bit 1 (leave bit 0 as 0
 
 #define DB_DEFAULT_MODE (ocrDbAccessMode_t)DB_MODE_ITW
 

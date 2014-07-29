@@ -1,13 +1,6 @@
-#
-#                 INTEL CONFIDENTIAL
-# Copyright (c) 2010-2011 Intel Corporation. All rights reserved.
-#
-# THIS PROGRAM IS FULLY PROTECTED BY COPYRIGHT LAWS AND IS
-# CONSIDERED A TRADE SECRET BELONGING TO THE INTEL CORPORATION.
-#
-# Author: Ivan B Ganev <ivan.b.ganev@intel.com>
-#
-#
+# This file is subject to the license agreement located in the file LICENSE
+# and cannot be distributed without it. This notice cannot be
+# removed or modified.
 
 MAKE := make
 
@@ -19,6 +12,9 @@ all:
 	@$(MAKE) -f Makefile.$(ARCH) $@
 
 debug:
+	@$(MAKE) -f Makefile.$(ARCH) $@
+
+install:
 	@$(MAKE) -f Makefile.$(ARCH) $@
 
 clean:

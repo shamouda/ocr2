@@ -24,9 +24,9 @@
 
 #define DEBUG_TYPE POLICY
 
-#ifdef TOOL_CHAIN_XE
+
 void xePolicyDomainStart(ocrPolicyDomain_t * policy);
-#endif
+
 extern void ocrShutdown(void);
 
 void xePolicyDomainBegin(ocrPolicyDomain_t * policy) {
@@ -65,7 +65,7 @@ void xePolicyDomainBegin(ocrPolicyDomain_t * policy) {
         policy->workers[i]->fcts.begin(policy->workers[i], policy);
     }
 
-#ifdef TOOL_CHAIN_XE
+#if defined(SAL_FSIM_XE) // If running on FSim XE
     xePolicyDomainStart(policy);
     hal_exit(0);
 #endif
@@ -307,9 +307,7 @@ static u8 xeProcessCeRequest(ocrPolicyDomain_t *self, ocrPolicyMsg_t **msg) {
             ASSERT(handle->response->destLocation == self->myLocation);
             if((handle->response->type & PD_MSG_TYPE_ONLY) != type) {
                 // Special case: shutdown in progress, cancel this message
-                // The below causes a hang, but it's in the shutdown path
-                // so is not critically investigated. See trac (#73)
-                // handle->destruct(handle);
+                // The handle is destroyed by the caller for this case
                 return OCR_ECANCELED;
             }
             ASSERT((handle->response->type & PD_MSG_TYPE_ONLY) == type);
@@ -332,6 +330,8 @@ u8 xePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
     u8 returnCode = 0;
     ASSERT((msg->type & PD_MSG_REQUEST) && (!(msg->type & PD_MSG_RESPONSE)));
 
+    DPRINTF(DEBUG_LVL_VVERB, "Going to process message of type 0x%lx\n",
+            (msg->type & PD_MSG_TYPE_ONLY));
     switch(msg->type & PD_MSG_TYPE_ONLY) {
     // First type of messages: things that we offload completely to the CE
     case PD_MSG_DB_CREATE: case PD_MSG_DB_DESTROY:
@@ -361,7 +361,7 @@ u8 xePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             EXIT_PROFILE;
         }
 
-        DPRINTF(DEBUG_LVL_VERB, "XE Policy offloading message of type 0x%x to CE\n",
+        DPRINTF(DEBUG_LVL_VVERB, "Offloading message of type 0x%x to CE\n",
                 msg->type & PD_MSG_TYPE_ONLY);
         returnCode = xeProcessCeRequest(self, &msg);
 
@@ -370,10 +370,12 @@ u8 xePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_COMM_TAKE
             if (PD_MSG_FIELD(guidCount) > 0) {
-                DPRINTF(DEBUG_LVL_INFO, "[XE%lu] (%lu) Received EDT guid: 0x%lx metadata: 0x%p\n",
-                        (u64)self->myLocation, (u64)msg->srcLocation, (PD_MSG_FIELD(guids))->guid,
-                        (PD_MSG_FIELD(guids))->metaDataPtr);
+                DPRINTF(DEBUG_LVL_VVERB, "Received EDT with GUID 0x%lx (@ 0x%lx)\n",
+                        PD_MSG_FIELD(guids[0].guid), &(PD_MSG_FIELD(guids[0].guid)));
                 localDeguidify(self, (PD_MSG_FIELD(guids)));
+                DPRINTF(DEBUG_LVL_VVERB, "Received EDT (0x%lx; 0x%lx)\n",
+                        (u64)self->myLocation, (PD_MSG_FIELD(guids))->guid,
+                        (PD_MSG_FIELD(guids))->metaDataPtr);
                 // For now, we return the execute function for EDTs
                 PD_MSG_FIELD(extra) = (u64)(self->taskFactories[0]->fcts.execute);
             }
@@ -412,8 +414,10 @@ u8 xePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         ASSERT(curTask &&
                curTask->guid == PD_MSG_FIELD(edt.guid));
 
+        DPRINTF(DEBUG_LVL_VVERB, "DEP_DYNADD req/resp for GUID 0x%lx\n",
+                PD_MSG_FIELD(db.guid));
         ASSERT(curTask->fctId == self->taskFactories[0]->factoryId);
-        PD_MSG_FIELD(properties) = self->taskFactories[0]->fcts.notifyDbAcquire(curTask, PD_MSG_FIELD(db));
+        PD_MSG_FIELD(returnDetail) = self->taskFactories[0]->fcts.notifyDbAcquire(curTask, PD_MSG_FIELD(db));
 #undef PD_MSG
 #undef PD_TYPE
         EXIT_PROFILE;
@@ -431,9 +435,10 @@ u8 xePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         // Also, this should only happen when there is an actual EDT
         ASSERT(curTask &&
             curTask->guid == PD_MSG_FIELD(edt.guid));
-
+        DPRINTF(DEBUG_LVL_VVERB, "DEP_DYNREMOVE req/resp for GUID 0x%lx\n",
+                PD_MSG_FIELD(db.guid));
         ASSERT(curTask->fctId == self->taskFactories[0]->factoryId);
-        PD_MSG_FIELD(properties) = self->taskFactories[0]->fcts.notifyDbRelease(curTask, PD_MSG_FIELD(db));
+        PD_MSG_FIELD(returnDetail) = self->taskFactories[0]->fcts.notifyDbRelease(curTask, PD_MSG_FIELD(db));
 #undef PD_MSG
 #undef PD_TYPE
         break;
@@ -442,10 +447,12 @@ u8 xePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         START_PROFILE(pd_xe_Shutdown);
         self->fcts.stop(self);
         if(msg->srcLocation == self->myLocation) {
-            DPRINTF(DEBUG_LVL_INFO, "XE %lu initiating shutdown\n", (u64)msg->srcLocation);
+            DPRINTF(DEBUG_LVL_VVERB, "MGT_SHUTDOWN initiation from 0x%lx\n",
+                    msg->srcLocation);
             returnCode = xeProcessCeRequest(self, &msg);
         } else {
-            DPRINTF(DEBUG_LVL_INFO, "XE %lu responding to shutdown\n", (u64)msg->srcLocation);
+            DPRINTF(DEBUG_LVL_VVERB, "MGT_SHUTDOWN(slave) from 0x%lx\n",
+                    msg->srcLocation);
             // Send the message back saying that
             // we did the shutdown
             msg->destLocation = msg->srcLocation;
@@ -461,6 +468,7 @@ u8 xePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
     }
     case PD_MSG_MGT_FINISH: {
         START_PROFILE(pd_xe_Finish);
+        DPRINTF(DEBUG_LVL_VVERB, "MGT_FINISH req/resp\n");
         self->fcts.finish(self);
         EXIT_PROFILE;
         break;
@@ -484,12 +492,12 @@ u8 xePdSendMessage(ocrPolicyDomain_t* self, ocrLocation_t target, ocrPolicyMsg_t
     if (returnCode == 0) return 0;
     switch (returnCode) {
     case OCR_ECANCELED:
-        // Our outgoing message was cancelled and we probably have an incoming
-        // reason why (shutdown most likely)
+        // Our outgoing message was cancelled and shutdown is assumed
+        // TODO: later this will be expanded to include failures
         // We destruct the handle for the first message in case it was partially used
         if(*handle)
             (*handle)->destruct(*handle);
-        if(returnCode==OCR_ECANCELED) ocrShutdown();
+        ocrShutdown();
         break;
     case OCR_EBUSY:
         if(*handle)

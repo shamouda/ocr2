@@ -17,8 +17,13 @@ endif
 # Tool-chain to be used for the build
 #
 
+RMD_INSTALL ?= ../../../ss/install
+
+DEFAULT_CONFIG = ce-default.cfg
+
+
 CC      := gcc
-CFLAGS  := -fno-builtin -Wno-unused-local-typedefs -I ../../../ss/common/include
+CFLAGS  := -fno-builtin -fno-stack-protector -Wno-unused-local-typedefs -I $(RMD_INSTALL)/include
 
 RM      := rm
 RMFLAGS := -rf
@@ -36,7 +41,7 @@ CFLAGS_SHARED :=
 
 # Static libraries specific builds
 # Same as for CFLAGS_SHARED
-CFLAGS_STATIC := 
+CFLAGS_STATIC :=
 AR := ar
 ARFLAGS := cru
 
@@ -49,13 +54,7 @@ SUPPORTS_STATIC=yes
 .PHONY: all
 all: static
 
-DEFAULT_CONFIG = fsim_ce.cfg
+.PHONY: debug
+debug: debug-static
 
 include ../common.mk
-
-
-
-
-
-
-

@@ -2,6 +2,10 @@
 #include "ocr-types.h"
 #include "ocr-sal.h"
 
+void _ocrAssert(bool val, const char* file, u32 line) {
+    sal_assert(val, file, line);
+}
+
 //
 // Common part of the SAL for all architectures
 //
@@ -141,7 +145,6 @@ hihex:
         }
 
         (*chars)++;
-
     } while (ud /= radix);
 
     // Currently, we only support xX "%#" formatting
@@ -298,7 +301,7 @@ badfmt:
     return chars;
 }
 
-u32 SNPRINTF(char * buf, u32 size, char * fmt, ...) {
+u32 SNPRINTF(char * buf, u32 size, const char * fmt, ...) {
     u32 tmp;
     __builtin_va_list ap;
 
@@ -324,7 +327,7 @@ u32 SNPRINTF(char * buf, u32 size, char * fmt, ...) {
 
 #define PRINTF_MAX (1024)
 
-u32 PRINTF(char * fmt, ...) {
+u32 PRINTF(const char * fmt, ...) {
     u32 tmp;
     __builtin_va_list ap;
 

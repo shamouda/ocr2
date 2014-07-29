@@ -1,32 +1,39 @@
+# This file is subject to the license agreement located in the file LICENSE
+# and cannot be distributed without it. This notice cannot be
+# removed or modified.
 
-OCR_INSTALL := ../../install/$(ARCH)
+# ARCH
+ARCH        ?= x86-pthread-x86
+# OCR
+OCR_TARGET   ?= x86-pthread-x86
+OCR_INSTALL_ROOT ?= ../../install
+OCR_SRC     ?= ../..
+OCR_BUILD_ROOT   ?= ../../build/
 
-PROG   := printf
+# Application
+WORKLOAD_SRC          ?= .
+WORKLOAD_BUILD_ROOT   ?= ./build
+WORKLOAD_INSTALL_ROOT ?= ./install
 
-CC     := gcc
-CFLAGS := -O0 -g -Werror -I. -I../../inc -c
+## END of variables coming from user/environment
 
-OCR_FLAGS := -L ${OCR_INSTALL}/lib -I ${OCR_INSTALL}/include -locr -lpthread
+TARGET = printf
 
-ifndef OCR_INSTALL
-$(error OCR_INSTALL not set)
-endif
+SRCS := printf.c
 
-ifndef OCR_CONFIG
-OCR_CONFIG := ${OCR_INSTALL}/config/default.cfg
-$(warning OCR_CONFIG not set, defaulting to ${OCR_CONFIG})
-endif
+CFLAGS :=
+LDFLAGS := -lpthread
 
-OCR_RUN_FLAGS := -ocr:cfg ${OCR_CONFIG}
+all:	CFLAGS += -O2
+all:	TARGETS := all
+all:	default
 
-all: compile run
+debug:	CFLAGS += -O0
+debug:	TARGETS := debug
+debug:	default
 
-compile:
-	$(CC) $(CFLAGS) $(PROG).c
-	$(CC) -g -o $(PROG).exe $(PROG).o $(OCR_FLAGS)
+install: all
 
-run:
-	LD_LIBRARY_PATH=$(OCR_INSTALL)/lib ./$(PROG).exe $(OCR_RUN_FLAGS)
+VALIDGOALS :- all debug install
 
-clean:
-	-rm -Rf *.o $(PROG).exe
+include ${WORKLOAD_SRC}/../make-regular.inc

@@ -158,16 +158,16 @@ ocrTaskTemplateFactory_t * newTaskTemplateFactoryHc(ocrParamList_t* perType, u32
 /* OCR HC latch utilities                             */
 /******************************************************/
 
-static ocrFatGuid_t getFinishLatch(ocrTask_t * edt) {
-    ocrFatGuid_t result = {.guid = NULL_GUID, .metaDataPtr = NULL};
-    if (edt != NULL) { //  NULL happens in main when there's no edt yet
-        if(edt->finishLatch)
-            result.guid = edt->finishLatch;
-        else
-            result.guid = edt->parentLatch;
-    }
-    return result;
-}
+//static ocrFatGuid_t getFinishLatch(ocrTask_t * edt) {
+//    ocrFatGuid_t result = {.guid = NULL_GUID, .metaDataPtr = NULL};
+//    if (edt != NULL) { //  NULL happens in main when there's no edt yet
+//        if(edt->finishLatch)
+//            result.guid = edt->finishLatch;
+//        else
+//            result.guid = edt->parentLatch;
+//    }
+//    return result;
+//}
 
 // satisfies the incr slot of a finish latch event
 static u8 finishLatchCheckin(ocrPolicyDomain_t *pd, ocrPolicyMsg_t *msg,
@@ -339,17 +339,20 @@ u8 destructTaskHc(ocrTask_t* base) {
 ocrTask_t * newTaskHc(ocrTaskFactory_t* factory, ocrFatGuid_t edtTemplate,
                       u32 paramc, u64* paramv, u32 depc, u32 properties,
                       ocrFatGuid_t affinity, ocrFatGuid_t * outputEventPtr,
-                      ocrParamList_t *perInstance) {
+                      ocrTask_t *curEdt, ocrParamList_t *perInstance) {
 
     // Get the current environment
     ocrPolicyDomain_t *pd = NULL;
     ocrPolicyMsg_t msg;
-    ocrTask_t *curEdt = NULL;
     u32 i;
 
-    getCurrentEnv(&pd, NULL, &curEdt, &msg);
+    getCurrentEnv(&pd, NULL, NULL, &msg);
 
-    ocrFatGuid_t parentLatch = getFinishLatch(curEdt);
+    // DIST-TODO: For now, we remove the latch completely.
+    // There is an issue where the "parent" EDT is not transmitted
+    // properly (need to implement meta-data cloning)
+    //ocrFatGuid_t parentLatch = getFinishLatch(curEdt);
+    ocrFatGuid_t parentLatch = { .guid = NULL_GUID, .metaDataPtr = NULL };
     ocrFatGuid_t outputEvent = {.guid = NULL_GUID, .metaDataPtr = NULL};
     // We need an output event for the EDT if either:
     //  - the user requested one (outputEventPtr is non NULL)
@@ -716,15 +719,14 @@ u8 taskExecute(ocrTask_t* base) {
                 PD_MSG_FIELD(guid.metaDataPtr) = NULL;
                 PD_MSG_FIELD(edt.guid) = base->guid;
                 PD_MSG_FIELD(edt.metaDataPtr) = base;
-                PD_MSG_FIELD(flags) = derived->signalers[maxAcquiredDb].mode;
-                PD_MSG_FIELD(properties) = DB_PROP_RT_ACQUIRE; // Runtime acquire
+                PD_MSG_FIELD(properties) = derived->signalers[maxAcquiredDb].mode | DB_PROP_RT_ACQUIRE;
                 // This call may fail if the policy domain goes down
                 // while we are starting to execute
                 if(pd->fcts.processMessage(pd, &msg, true)) {
                     // We are not going to launch the EDT
                     break;
                 }
-                switch(PD_MSG_FIELD(properties)) {
+                switch(PD_MSG_FIELD(returnDetail)) {
                 case 0:
                     ASSERT(PD_MSG_FIELD(ptr));
                     break; // Everything went fine
@@ -797,7 +799,6 @@ u8 taskExecute(ocrTask_t* base) {
                 PD_MSG_FIELD(guid.metaDataPtr) = NULL;
                 PD_MSG_FIELD(edt.guid) = base->guid;
                 PD_MSG_FIELD(edt.metaDataPtr) = base;
-                PD_MSG_FIELD(flags) = 0;
                 PD_MSG_FIELD(properties) = DB_PROP_RT_ACQUIRE; // Runtime release
                 // Ignore failures at this point
                 pd->fcts.processMessage(pd, &msg, false);
@@ -884,7 +885,7 @@ void destructTaskFactoryHc(ocrTaskFactory_t* base) {
 ocrTaskFactory_t * newTaskFactoryHc(ocrParamList_t* perInstance, u32 factoryId) {
     ocrTaskFactory_t* base = (ocrTaskFactory_t*)runtimeChunkAlloc(sizeof(ocrTaskFactoryHc_t), NULL);
 
-    base->instantiate = FUNC_ADDR(ocrTask_t* (*) (ocrTaskFactory_t*, ocrFatGuid_t, u32, u64*, u32, u32, ocrFatGuid_t, ocrFatGuid_t*, ocrParamList_t*), newTaskHc);
+    base->instantiate = FUNC_ADDR(ocrTask_t* (*) (ocrTaskFactory_t*, ocrFatGuid_t, u32, u64*, u32, u32, ocrFatGuid_t, ocrFatGuid_t*, ocrTask_t *curEdt, ocrParamList_t*), newTaskHc);
     base->destruct =  FUNC_ADDR(void (*) (ocrTaskFactory_t*), destructTaskFactoryHc);
     base->factoryId = factoryId;
 

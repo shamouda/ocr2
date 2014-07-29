@@ -58,6 +58,7 @@ static void workerLoop(ocrWorker_t * worker) {
             count = PD_MSG_FIELD(guidCount);
             if(count == 1) {
                 // REC: TODO: Do we need a message to execute this
+                taskGuid = PD_MSG_FIELD(guids[0]);
                 ASSERT(taskGuid.guid != NULL_GUID && taskGuid.metaDataPtr != NULL);
                 worker->curTask = (ocrTask_t*)taskGuid.metaDataPtr;
                 u8 (*executeFunc)(ocrTask_t *) = (u8 (*)(ocrTask_t*))PD_MSG_FIELD(extra); // Execute is stored in extra
@@ -66,6 +67,7 @@ static void workerLoop(ocrWorker_t * worker) {
 #undef PD_TYPE
                 // Destroy the work
 #define PD_TYPE PD_MSG_WORK_DESTROY
+                getCurrentEnv(NULL, NULL, NULL, &msg);
                 msg.type = PD_MSG_WORK_DESTROY | PD_MSG_REQUEST;
                 PD_MSG_FIELD(guid) = taskGuid;
                 PD_MSG_FIELD(properties) = 0;
@@ -106,6 +108,7 @@ void initializeWorkerXe(ocrWorkerFactory_t * factory, ocrWorker_t* base, ocrPara
     initializeWorkerOcr(factory, base, perInstance);
     base->type = SLAVE_WORKERTYPE;
 
+
     ocrWorkerXe_t* workerXe = (ocrWorkerXe_t*) base;
     workerXe->id = ((paramListWorkerXeInst_t*)perInstance)->workerId;
     workerXe->running = false;
@@ -132,6 +135,7 @@ void xeStartWorker(ocrWorker_t * base, ocrPolicyDomain_t * policy) {
     // Get a GUID
     guidify(policy, (u64)base, &(base->fguid), OCR_GUID_WORKER);
     base->pd = policy;
+    base->location = policy->myLocation;
 
     ocrWorkerXe_t * xeWorker = (ocrWorkerXe_t *) base;
     xeWorker->running = true;
@@ -167,7 +171,7 @@ void* xeRunWorker(ocrWorker_t * worker) {
         // and should be executed by the "blessed" worker.
 
         void * packedUserArgv;
-#ifdef TOOL_CHAIN_XE
+#if defined(SAL_FSIM_XE)
         packedUserArgv = ((ocrPolicyDomainXe_t*)pd)->packedArgsLocation;
         extern ocrGuid_t mainEdt( u32, u64 *, u32, ocrEdtDep_t * );
 #else
@@ -183,7 +187,7 @@ void* xeRunWorker(ocrWorker_t * worker) {
         ocrDbCreate(&dbGuid, &dbPtr, totalLength,
                     DB_PROP_NONE, NULL_GUID, NO_ALLOC);
 
-#ifndef TOOL_CHAIN_XE
+#if !defined(SAL_FSIM_XE)
         // copy packed args to DB
         hal_memCopy(dbPtr, packedUserArgv, totalLength, 0);
 #endif

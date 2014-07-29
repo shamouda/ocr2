@@ -13,6 +13,7 @@
 #define __OCR_SAL_H__
 
 #include "ocr-config.h"
+#include "ocr-types.h"
 
 struct _ocrPolicyDomain_t;
 struct _ocrWorker_t;
@@ -22,9 +23,10 @@ void getCurrentEnv(struct _ocrPolicyDomain_t** pd, struct _ocrWorker_t** worker,
                    struct _ocrTask_t **task, struct _ocrPolicyMsg_t* msg);
 
 
-u32 SNPRINTF(char * buf, u32 size, char * fmt, ...);
-u32 PRINTF(char * fmt, ...);
+u32 SNPRINTF(char * buf, u32 size, const char * fmt, ...);
+u32 PRINTF(const char * fmt, ...);
 
+void _ocrAssert(bool val, const char* file, u32 line);
 
 #if defined(SAL_FSIM_XE)
 #include "sal/fsim-xe/ocr-sal-fsim-xe.h"
