@@ -59,6 +59,12 @@ u64 ocrNbWorkers();
 ocrGuid_t ocrCurrentWorkerGuid();
 
 /**
+ *  @brief Inform the OCR runtime the currently executing thread is logically blocked
+ *  Note: experimental feature for legacy code, may be deprecated anytime.
+ **/
+u8 ocrInformLegacyCodeBlocking();
+
+/**
  * @}
  */
 #ifdef __cplusplus

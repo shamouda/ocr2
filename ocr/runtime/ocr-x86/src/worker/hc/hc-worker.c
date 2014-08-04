@@ -127,19 +127,19 @@ void hcBeginWorker(ocrWorker_t * base, ocrPolicyDomain_t * policy) {
 void hcStartWorker(ocrWorker_t * base, ocrPolicyDomain_t * policy) {
 
     ocrWorkerHc_t * hcWorker = (ocrWorkerHc_t *) base;
-    if(base->type == MASTER_WORKERTYPE) {
-        if(!hcWorker->secondStart) {
-            hcWorker->secondStart = true;
+
+    if(!hcWorker->secondStart) {
+        // Get a GUID
+        guidify(policy, (u64)base, &(base->fguid), OCR_GUID_WORKER);
+        base->pd = policy;
+        hcWorker->running = true;
+        if(base->type == MASTER_WORKERTYPE) {
+            hcWorker->secondStart = true; // Only relevant for MASTER_WORKERTYPE
             return; // Don't start right away
         }
     }
-
-    // Get a GUID
-    guidify(policy, (u64)base, &(base->fguid), OCR_GUID_WORKER);
-    base->pd = policy;
-
+    
     ASSERT(base->type != MASTER_WORKERTYPE || hcWorker->secondStart);
-    hcWorker->running = true;
 
     // Starts everybody, the first comp-platform has specific
     // code to represent the master thread.
@@ -156,9 +156,11 @@ void hcStartWorker(ocrWorker_t * base, ocrPolicyDomain_t * policy) {
     // Otherwise, it is highly likely that we are shutting down
 }
 
-static bool isBlessedWorker(ocrWorker_t * worker, ocrGuid_t * affinityMasterPD) {
+static bool isMainEdtForker(ocrWorker_t * worker, ocrGuid_t * affinityMasterPD) {
     // Determine if current worker is the master worker of this PD
     bool blessedWorker = (worker->type == MASTER_WORKERTYPE);
+    // When OCR is used in library mode, there's no mainEdt
+    blessedWorker &= (mainEdtGet() != NULL);
     if (blessedWorker) {
         // Determine if current master worker is part of master PD
         u64 count = 0;
@@ -173,13 +175,12 @@ static bool isBlessedWorker(ocrWorker_t * worker, ocrGuid_t * affinityMasterPD) 
 
 void* hcRunWorker(ocrWorker_t * worker) {
     ocrGuid_t affinityMasterPD;
-    bool blessedWorker = isBlessedWorker(worker, &affinityMasterPD);
-    if (blessedWorker) {
+    bool forkMain = isMainEdtForker(worker, &affinityMasterPD);
+    if (forkMain) {
         // This is all part of the mainEdt setup
         // and should be executed by the "blessed" worker.
         void * packedUserArgv = userArgsGet();
         ocrEdt_t mainEdt = mainEdtGet();
-
         u64 totalLength = ((u64*) packedUserArgv)[0]; // already exclude this first arg
         // strip off the 'totalLength first argument'
         packedUserArgv = (void *) (((u64)packedUserArgv) + sizeof(u64)); // skip first totalLength argument
@@ -224,7 +225,7 @@ void hcStopWorker(ocrWorker_t * base) {
     ocrWorkerHc_t * hcWorker = (ocrWorkerHc_t *) base;
     // Makes worker threads to exit their routine.
     hcWorker->running = false;
-
+    ASSERT(base->pd != NULL);
     u64 computeCount = base->computeCount;
     u64 i = 0;
     for(i = 0; i < computeCount; i++) {
@@ -246,6 +247,7 @@ void hcStopWorker(ocrWorker_t * base) {
     msg.type = PD_MSG_GUID_DESTROY | PD_MSG_REQUEST;
     PD_MSG_FIELD(guid) = base->fguid;
     PD_MSG_FIELD(properties) = 0;
+    ASSERT(base->pd != NULL);
     // Ignore failure here, we are most likely shutting down
     base->pd->fcts.processMessage(base->pd, &msg, false);
 #undef PD_MSG

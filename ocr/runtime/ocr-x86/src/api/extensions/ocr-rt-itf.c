@@ -56,3 +56,12 @@ ocrGuid_t ocrCurrentWorkerGuid() {
     getCurrentEnv(NULL, &worker, NULL, NULL);
     return worker->fguid.guid;
 }
+
+// Inform the OCR runtime the currently executing thread is logically blocked
+u8 ocrInformLegacyCodeBlocking() {
+    // The current default implementation is to execute another EDT to try to make progress
+    ocrPolicyDomain_t * pd = NULL;
+    getCurrentEnv(&pd, NULL, NULL, NULL);
+    return pd->schedulers[0]->fcts.monitorProgress(pd->schedulers[0], MAX_MONITOR_PROGRESS, NULL);
+}
+
