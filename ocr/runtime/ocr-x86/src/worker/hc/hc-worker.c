@@ -9,15 +9,16 @@
 
 #include "debug.h"
 #include "ocr-comp-platform.h"
+#include "ocr-db.h"
 #include "ocr-policy-domain.h"
 #include "ocr-runtime-types.h"
 #include "ocr-sysboot.h"
 #include "ocr-types.h"
 #include "ocr-worker.h"
-#include "ocr-affinity.h"
-#include "ocr-placer.h"
-#include "ocr-db.h"
 #include "worker/hc/hc-worker.h"
+
+#include "experimental/ocr-placer.h"
+#include "extensions/ocr-affinity.h"
 
 #ifdef OCR_ENABLE_STATISTICS
 #include "ocr-statistics.h"

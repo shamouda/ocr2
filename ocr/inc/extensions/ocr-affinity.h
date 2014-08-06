@@ -11,6 +11,8 @@
 #ifndef __OCR_AFFINITY_H__
 #define __OCR_AFFINITY_H__
 
+#warning Using ocr-affinity.h may not be supported on all platforms
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -33,6 +35,7 @@ typedef enum {
  *
  * @param[in] kind             The affinity kind to query for
  * @param[out] count           Count of affinity guid of that kind
+ * @return 0 on success or an error code on failure
  */
 u8 ocrAffinityCount(ocrAffinityKind kind, u64 * count);
 
@@ -43,6 +46,7 @@ u8 ocrAffinityCount(ocrAffinityKind kind, u64 * count);
  * @param[in] kind             The affinity kind to query for
  * @param[in,out] count        In: Requested number of element, Out: Actual element returned
  * @param[out] affinities      Affinity guid array, call-site allocated.
+ * @return 0 on success or an error code on failure
  */
 u8 ocrAffinityGet(ocrAffinityKind kind, u64 * count, ocrGuid_t * affinities);
 
@@ -52,6 +56,7 @@ u8 ocrAffinityGet(ocrAffinityKind kind, u64 * count, ocrGuid_t * affinities);
  * 'ocrAffinityCount' and 'ocrAffinityGet' to query all affinities.
  *
  * @param[out] affinity      One affinity guid, call-site allocated.
+ * @return 0 on success or an error code on failure
  */
 u8 ocrAffinityGetCurrent(ocrGuid_t * affinity);
 

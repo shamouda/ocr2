@@ -679,7 +679,8 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_WORK_CREATE
         localDeguidify(self, &(PD_MSG_FIELD(templateGuid)));
-        localDeguidify(self, &(PD_MSG_FIELD(affinity)));
+        // TODO: Ignore affinity for now. It is garbage!
+        //localDeguidify(self, &(PD_MSG_FIELD(affinity)));
         localDeguidify(self, &(PD_MSG_FIELD(currentEdt)));
         ocrFatGuid_t *outputEvent = NULL;
         if(PD_MSG_FIELD(outputEvent.guid) == UNINITIALIZED_GUID) {
@@ -953,7 +954,7 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
                 ocrEvent_t *evt = (ocrEvent_t*)(dest.metaDataPtr);
                 ASSERT(evt->fctId == self->eventFactories[0]->factoryId);
                 self->eventFactories[0]->fcts[evt->kind].registerSignaler(
-                    evt, src, PD_MSG_FIELD(slot), true);
+                    evt, src, PD_MSG_FIELD(slot), PD_MSG_FIELD(properties) & DB_PROP_MODE_MASK, true);
             } else {
                 ASSERT(0); // Cannot have other types of destinations
             }

@@ -13,8 +13,8 @@
 #include "ocr-errors.h"
 #include "ocr-policy-domain.h"
 #include "ocr-sysboot.h"
+#include "experimental/ocr-placer.h"
 #include "utils/hashtable.h"
-#include "ocr-placer.h"
 
 #ifdef OCR_ENABLE_STATISTICS
 #include "ocr-statistics.h"

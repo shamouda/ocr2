@@ -8,14 +8,15 @@
 #ifdef ENABLE_WORKER_HC_COMM
 
 #include "debug.h"
+#include "ocr-db.h"
 #include "ocr-policy-domain.h"
 #include "ocr-sysboot.h"
-#include "ocr-db.h"
 #include "ocr-worker.h"
-#include "ocr-affinity.h"
-#include "ocr-placer.h"
 #include "worker/hc/hc-worker.h"
 #include "worker/hc/hc-comm-worker.h"
+
+#include "experimental/ocr-placer.h"
+#include "extensions/ocr-affinity.h"
 
 #define DEBUG_TYPE WORKER
 

@@ -1,5 +1,5 @@
 /**
- * @brief OCR interface to the memory allocators
+ * @brief Temporary "placer" infrastructure (converting affinities to locations)
  **/
 
 /*

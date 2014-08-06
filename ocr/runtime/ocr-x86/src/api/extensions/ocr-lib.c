@@ -5,7 +5,8 @@
  */
 
 #include "ocr-config.h"
-#ifdef ENABLE_OCR_LIB
+#ifdef ENABLE_EXTENSION_LIB
+
 #include "debug.h"
 #include "machine-description/ocr-machine.h"
 #include "extensions/ocr-lib.h"
@@ -16,6 +17,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <sys/stat.h>
+
+#warning Experimental OCR library support enabled
 
 #define __USE_GNU
 #include <pthread.h>
@@ -247,4 +250,4 @@ ocrGuid_t ocrWait(ocrGuid_t eventToYieldForGuid) {
     return result.guid;
 }
 
-#endif /* ENABLE_OCR_LIB */
+#endif /* ENABLE_EXTENSION_LIB */

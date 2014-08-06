@@ -14,16 +14,15 @@
 #include "ocr-event.h"
 #include "ocr-guid.h"
 #include "ocr-scheduler.h"
-
 #ifdef OCR_ENABLE_STATISTICS
 #include "ocr-statistics.h"
 #endif
-
 #include "ocr-task.h"
-#include "ocr-tuning.h"
 #include "ocr-types.h"
 #include "ocr-worker.h"
-#include "ocr-placer.h"
+
+#include "experimental/ocr-placer.h"
+#include "experimental/ocr-tuning.h"
 
 /****************************************************/
 /* PARAMETER LISTS                                  */

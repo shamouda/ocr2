@@ -4,9 +4,14 @@
  * removed or modified.
  */
 
+#include "ocr-config.h"
+#ifdef ENABLE_EXTENSION_RTITF
+
 #include "debug.h"
 #include "ocr-runtime.h"
 #include "ocr-sal.h"
+
+#warning Experimental OCR RT interface support enabled
 
 /**
    @brief Get @ offset in the currently running edt's local storage
@@ -65,3 +70,4 @@ u8 ocrInformLegacyCodeBlocking() {
     return pd->schedulers[0]->fcts.monitorProgress(pd->schedulers[0], MAX_MONITOR_PROGRESS, NULL);
 }
 
+#endif /* ENABLE_EXTENSION_RTITF */

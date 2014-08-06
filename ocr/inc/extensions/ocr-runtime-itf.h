@@ -7,6 +7,9 @@
 
 #ifndef OCR_RUNTIME_ITF_H_
 #define OCR_RUNTIME_ITF_H_
+
+#warning Using ocr-runtime-itf.h may not be supported on all platforms
+
 #ifdef __cplusplus
 extern "C" {
 #endif
