@@ -8,6 +8,7 @@
 #include <assert.h>
 
 #include "ocr.h"
+#include "extensions/ocr-affinity.h"
 
 /**
  * DESC: OCR-DIST - Create EDTs affinitized to affinities and double check they are

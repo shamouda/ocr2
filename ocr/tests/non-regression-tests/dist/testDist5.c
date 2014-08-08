@@ -8,6 +8,7 @@
 #include <assert.h>
 
 #include "ocr.h"
+#include "extensions/ocr-affinity.h"
 
 /**
  * DESC: OCR-DIST - create two remote EDT depending on db containing events to enable the sink EDT

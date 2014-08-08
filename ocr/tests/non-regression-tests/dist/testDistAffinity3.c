@@ -8,6 +8,7 @@
 #include <assert.h>
 
 #include "ocr.h"
+#include "extensions/ocr-affinity.h"
 
 /**
  * DESC: OCR-DIST - Create finish EDT affinitized to single affinity (remote but not distributed)

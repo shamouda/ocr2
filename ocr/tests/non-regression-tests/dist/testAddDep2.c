@@ -9,6 +9,7 @@
 #include <assert.h>
 
 #include "ocr.h"
+#include "extensions/ocr-affinity.h"
 
 /**
  * DESC: OCR: Add dependence GUID->EDT in Exclusive Write mode

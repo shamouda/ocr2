@@ -8,6 +8,7 @@
  * removed or modified.
  */
 
+
 #ifndef __OCR_CONFIG_H__
 #define __OCR_CONFIG_H__
 
@@ -69,7 +70,7 @@
 #define ENABLE_SCHEDULER_HC
 #define ENABLE_SCHEDULER_HC_COMM_DELEGATE
 #define ENABLE_SCHEDULER_BLOCKING_SUPPORT
- 
+
 // Sysboot layer to use
 #define ENABLE_SYSBOOT_LINUX
 
@@ -87,6 +88,9 @@
 #define ENABLE_WORKPILE_HC
 
 // Build the OCR-lib support
-#define ENABLE_OCR_LIB
+#define ENABLE_EXTENSION_LIB
 
+// Affinity support
+#define ENABLE_EXTENSION_AFFINITY
 #endif /* __OCR_CONFIG_H__ */
+

@@ -7,6 +7,7 @@
 #include <assert.h>
 
 #include "ocr.h"
+#include "extensions/ocr-affinity.h"
 
 /**
  * DESC: OCR-DIST - create an EDT that creates a child EDT in the same affinity group

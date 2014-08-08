@@ -14,7 +14,6 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-#include "ocr-affinity.h"
 #include "ocr-db.h"
 #include "ocr-edt.h"
 #include "ocr-errors.h"

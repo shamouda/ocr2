@@ -9,6 +9,7 @@
 #include <assert.h>
 
 #include "ocr.h"
+#include "extensions/ocr-affinity.h"
 
 /**
  * DESC: OCR-DIST - Same as testDistDb2.c but EDTs are pinned to specific affinities.

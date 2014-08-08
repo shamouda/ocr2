@@ -8,6 +8,7 @@
 #include <assert.h>
 
 #include "ocr.h"
+#include "extensions/ocr-affinity.h"
 
 /**
  * DESC: OCR-DIST - create a local event and a remote EDT, satisfy, then add-dep.

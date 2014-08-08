@@ -8,6 +8,7 @@
 #include <assert.h>
 
 #include "ocr.h"
+#include "extensions/ocr-affinity.h"
 
 /**
  * DESC: OCR-DIST - create two remote EDT with != EDT_PARAM_UNK paramc (+ a lot more for the sink EDT)

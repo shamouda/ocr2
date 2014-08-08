@@ -9,6 +9,7 @@
 #include <assert.h>
 
 #include "ocr.h"
+#include "extensions/ocr-affinity.h"
 
 /**
  * DESC: OCR-DIST - EDT operates on remote DB then satisfy EDT at DB's node and check write-back happened

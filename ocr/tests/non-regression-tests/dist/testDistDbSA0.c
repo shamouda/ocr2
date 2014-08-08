@@ -9,6 +9,7 @@
 #include <assert.h>
 
 #include "ocr.h"
+#include "extensions/ocr-affinity.h"
 
 /**
  * DESC: OCR-DIST - create a local DB SA, have remote EDT depend on and check content
