@@ -4,8 +4,8 @@
  * removed or modified.
  */
 
-#include <stdio.h>
-#include <assert.h>
+
+
 
 #include "ocr.h"
 #include "extensions/ocr-affinity.h"
@@ -15,15 +15,15 @@
  */
 
 ocrGuid_t remoteEdt1(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
-    printf("[remote] RemoteEdt1 will satisfy [0] 0x%lx \n", ((u64 *) depv[0].ptr)[0]);
-    printf("[remote] RemoteEdt1 will satisfy [1] 0x%lx \n", ((u64 *) depv[0].ptr)[1]);
+    PRINTF("[remote] RemoteEdt1 will satisfy [0] 0x%lx \n", ((u64 *) depv[0].ptr)[0]);
+    PRINTF("[remote] RemoteEdt1 will satisfy [1] 0x%lx \n", ((u64 *) depv[0].ptr)[1]);
     ocrEventSatisfy(((ocrGuid_t *) depv[0].ptr)[0], NULL_GUID);
     return NULL_GUID;
 }
 
 ocrGuid_t remoteEdt2(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
-    printf("[remote] RemoteEdt2 will satisfy [0] 0x%lx \n", ((u64 *) depv[0].ptr)[0]);
-    printf("[remote] RemoteEdt2 will satisfy [1] 0x%lx \n", ((u64 *) depv[0].ptr)[1]);
+    PRINTF("[remote] RemoteEdt2 will satisfy [0] 0x%lx \n", ((u64 *) depv[0].ptr)[0]);
+    PRINTF("[remote] RemoteEdt2 will satisfy [1] 0x%lx \n", ((u64 *) depv[0].ptr)[1]);
     ocrEventSatisfy(((ocrGuid_t *) depv[0].ptr)[1], NULL_GUID);
     return NULL_GUID;
 }
@@ -36,7 +36,7 @@ ocrGuid_t shutdownEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
 ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     u64 affinityCount;
     ocrAffinityCount(AFFINITY_PD, &affinityCount);
-    assert(affinityCount >= 1);
+    ASSERT(affinityCount >= 1);
     ocrGuid_t affinities[affinityCount];
     ocrAffinityGet(AFFINITY_PD, &affinityCount, affinities);
     ocrGuid_t edtAffinity = affinities[affinityCount-1]; //TODO this implies we know current PD is '0'
@@ -58,7 +58,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrGuid_t shutdownDepv[2] = {event1Guid, event2Guid};
     ocrEdtCreate(&edtShutdownGuid, shutdownEdtTemplateGuid, 0, NULL, 2, shutdownDepv,
         EDT_PROP_NONE, NULL_GUID, NULL);
-    printf("[local] events guids are [0]=0x%lx [1]=0x%lx\n",(u64)event1Guid, (u64)event2Guid);
+    PRINTF("[local] events guids are [0]=0x%lx [1]=0x%lx\n",(u64)event1Guid, (u64)event2Guid);
     // Setup the test
     ocrGuid_t remoteEdt1TemplateGuid;
     ocrEdtTemplateCreate(&remoteEdt1TemplateGuid, remoteEdt1, 0, 1);

@@ -4,9 +4,9 @@
  * removed or modified.
  */
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <assert.h>
+
+
+
 
 #include "ocr.h"
 
@@ -17,7 +17,7 @@
 #define N 16
 
 ocrGuid_t terminateEDT(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
-    printf("Call Terminate\n");
+    PRINTF("Call Terminate\n");
     ocrShutdown();
     return NULL_GUID;
 }

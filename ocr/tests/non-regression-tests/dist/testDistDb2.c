@@ -5,8 +5,8 @@
  * removed or modified.
  */
 
-#include <stdio.h>
-#include <assert.h>
+
+
 
 #include "ocr.h"
 #include "extensions/ocr-affinity.h"
@@ -20,35 +20,35 @@
 
 ocrGuid_t addEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrGuid_t dbCloneGuid = (ocrGuid_t) depv[0].guid;
-    printf("[remote] addEdt: executing, depends on remote DB guid 0x%lx \n", dbCloneGuid);
+    PRINTF("[remote] addEdt: executing, depends on remote DB guid 0x%lx \n", dbCloneGuid);
     TYPE_ELEM_DB v = 1;
     int i = 0;
     TYPE_ELEM_DB * data = (TYPE_ELEM_DB *) depv[0].ptr;
     while (i < NB_ELEM_DB) {
-        assert (data[i] == v++);
+        ASSERT (data[i] == v++);
         data[i] += 100;
         i++;
     }
-    printf("[remote] addEdt: DB written to, releasing...\n");
+    PRINTF("[remote] addEdt: DB written to, releasing...\n");
     ocrDbRelease(dbCloneGuid); // Forces writeback
-    assert(paramc == 1);
+    ASSERT(paramc == 1);
     ocrGuid_t eventGuid = (ocrGuid_t) paramv[0];
-    printf("[remote] addEdt: Satisfy checkerEdt's event guid 0x%lx\n", eventGuid);
+    PRINTF("[remote] addEdt: Satisfy checkerEdt's event guid 0x%lx\n", eventGuid);
     ocrEventSatisfy(eventGuid, dbCloneGuid);
     return NULL_GUID;
 }
 
 ocrGuid_t checkerEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrGuid_t dbCloneGuid = (ocrGuid_t) depv[0].guid;
-    printf("[local] CheckerEdt: executing, depends on remote DB guid 0x%lx \n", dbCloneGuid);
+    PRINTF("[local] CheckerEdt: executing, depends on remote DB guid 0x%lx \n", dbCloneGuid);
     TYPE_ELEM_DB v = 101;
     int i = 0;
     TYPE_ELEM_DB * data = (TYPE_ELEM_DB *) depv[0].ptr;
     while (i < NB_ELEM_DB) {
-        assert (data[i] == v++);
+        ASSERT (data[i] == v++);
         i++;
     }
-    printf("[local] CheckerEdt: DB values checked, updated correctly\n");
+    PRINTF("[local] CheckerEdt: DB values checked, updated correctly\n");
     //TODO: don't need to do that but we don't support RO mode right now and
     //the write back done after the EDT ends may race with shutdown
     ocrDbRelease(dbCloneGuid);
@@ -59,7 +59,7 @@ ocrGuid_t checkerEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
 ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     u64 affinityCount;
     ocrAffinityCount(AFFINITY_PD, &affinityCount);
-    assert(affinityCount >= 1);
+    ASSERT(affinityCount >= 1);
     ocrGuid_t affinities[affinityCount];
     ocrAffinityGet(AFFINITY_PD, &affinityCount, affinities);
     ocrGuid_t edtAffinity = affinities[affinityCount-1]; //TODO this implies we know current PD is '0'
@@ -77,7 +77,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
         i++;
     }
     ocrDbRelease(dbGuid);
-    printf("[local] mainEdt: DB guid is 0x%lx, dbPtr=%p\n",dbGuid, dbPtr);
+    PRINTF("[local] mainEdt: DB guid is 0x%lx, dbPtr=%p\n",dbGuid, dbPtr);
 
     ocrGuid_t addEdtTemplateGuid;
     ocrEdtTemplateCreate(&addEdtTemplateGuid, addEdt, 1, 1);
@@ -87,7 +87,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     // Create local event
     ocrGuid_t eventGuid;
     ocrEventCreate(&eventGuid, OCR_EVENT_STICKY_T, true);
-    printf("[local] mainEdt: Creating event with guid 0x%lx\n", eventGuid);
+    PRINTF("[local] mainEdt: Creating event with guid 0x%lx\n", eventGuid);
     // Create local EDT depending on event being satisfied
     ocrGuid_t checkerEdtGuid;
     ocrEdtCreate(&checkerEdtGuid, checkerEdtTemplateGuid, 0, NULL, 1, &eventGuid,

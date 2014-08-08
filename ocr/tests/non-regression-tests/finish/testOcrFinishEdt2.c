@@ -4,7 +4,7 @@
  * removed or modified.
  */
 
-#include <assert.h>
+
 
 #include "ocr.h"
 

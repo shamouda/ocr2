@@ -4,8 +4,8 @@
  * removed or modified.
  */
 
-#include <stdio.h>
-#include <assert.h>
+
+
 
 #include "ocr.h"
 #include "extensions/ocr-affinity.h"
@@ -21,19 +21,19 @@
 #define COUNT_EDT 10
 
 ocrGuid_t shutdownEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
-    printf("[remote] shutdownEdt: executing\n");
+    PRINTF("[remote] shutdownEdt: executing\n");
     ocrShutdown();
     return NULL_GUID;
 }
 
 ocrGuid_t remoteEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
-    printf("[remote] RemoteEdt: executing\n");
+    PRINTF("[remote] RemoteEdt: executing\n");
     ocrGuid_t eventGuid = ((ocrGuid_t *) depv[0].ptr)[0];
     // see comment at top of file
     // ocrGuid_t expectedAffinityGuid = ((ocrGuid_t *) depv[0].ptr)[1];
     // ocrGuid_t currentAffinity;
     // ocrAffinityGetCurrent(&currentAffinity);
-    // assert(expectedAffinityGuid == currentAffinity);
+    // ASSERT(expectedAffinityGuid == currentAffinity);
     ocrEventSatisfy(eventGuid, NULL_GUID);
     return NULL_GUID;
 }
@@ -45,7 +45,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrGuid_t * dbAffPtr;
     ocrDbCreate(&dbAffGuid, (void **)&dbAffPtr, sizeof(ocrGuid_t) * affinityCount, DB_PROP_SINGLE_ASSIGNMENT, NULL_GUID, NO_ALLOC);
     ocrAffinityGet(AFFINITY_PD, &affinityCount, dbAffPtr);
-    assert(affinityCount >= 1);
+    ASSERT(affinityCount >= 1);
 
     // create local edt that depends on the remote edt, the db is automatically cloned
     ocrGuid_t remoteEdtTemplateGuid;

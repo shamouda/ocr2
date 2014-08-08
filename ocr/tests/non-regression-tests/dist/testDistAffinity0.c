@@ -4,7 +4,7 @@
  * removed or modified.
  */
 
-#include <assert.h>
+
 
 #include "ocr.h"
 #include "extensions/ocr-affinity.h"
@@ -17,7 +17,7 @@ ocrGuid_t shutdownEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrGuid_t currentAffinity;
     ocrAffinityGetCurrent(&currentAffinity);
     PRINTF("shutdownEdt: executing at %lld\n", (u64) currentAffinity);
-    assert(((u64)currentAffinity) == paramv[0]);
+    ASSERT(((u64)currentAffinity) == paramv[0]);
     ocrShutdown();
     return NULL_GUID;
 }
@@ -39,7 +39,7 @@ ocrGuid_t remoteEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
 ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     u64 affinityCount;
     ocrAffinityCount(AFFINITY_PD, &affinityCount);
-    assert(affinityCount >= 1);
+    ASSERT(affinityCount >= 1);
     ocrGuid_t affinities[affinityCount];
     ocrAffinityGet(AFFINITY_PD, &affinityCount, affinities);
     ocrGuid_t edtAffinity = affinities[affinityCount-1]; //TODO this implies we know current PD is '0'

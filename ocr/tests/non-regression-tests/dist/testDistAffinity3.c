@@ -4,8 +4,8 @@
  * removed or modified.
  */
 
-#include <stdio.h>
-#include <assert.h>
+
+
 
 #include "ocr.h"
 #include "extensions/ocr-affinity.h"
@@ -18,13 +18,13 @@
 #define COUNT_EDT 10
 
 ocrGuid_t shutdownEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
-    printf("shutdownEdt: executing\n");
+    PRINTF("shutdownEdt: executing\n");
     ocrShutdown();
     return NULL_GUID;
 }
 
 ocrGuid_t remoteEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
-    printf("RemoteEdt: executing\n");
+    PRINTF("RemoteEdt: executing\n");
     ocrGuid_t eventGuid = ((ocrGuid_t *) depv[0].ptr)[0];
     ocrEventSatisfy(eventGuid, NULL_GUID);
     return NULL_GUID;
@@ -74,7 +74,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrGuid_t * dbAffPtr;
     ocrDbCreate(&dbAffGuid, (void **)&dbAffPtr, sizeof(ocrGuid_t) * affinityCount, DB_PROP_SINGLE_ASSIGNMENT, NULL_GUID, NO_ALLOC);
     ocrAffinityGet(AFFINITY_PD, &affinityCount, dbAffPtr);
-    assert(affinityCount >= 1);
+    ASSERT(affinityCount >= 1);
     ocrGuid_t affinityGuid = dbAffPtr[affinityCount-1];
     ocrDbRelease(dbAffGuid);
 
@@ -82,7 +82,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrGuid_t finishEdtTemplateGuid;
     ocrEdtTemplateCreate(&finishEdtTemplateGuid, finishEdt, 0, 0);
 
-    printf("mainEdt: spawning remote finish-EDT\n");
+    PRINTF("mainEdt: spawning remote finish-EDT\n");
     ocrGuid_t edtGuid;
     ocrEdtCreate(&edtGuid, finishEdtTemplateGuid, 0, NULL, EDT_PARAM_DEF, 0,
         EDT_PROP_NONE, affinityGuid, NULL);

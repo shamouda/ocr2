@@ -4,8 +4,8 @@
  * removed or modified.
  */
 
-#include <stdio.h>
-#include <assert.h>
+
+
 
 #include "ocr.h"
 
@@ -17,8 +17,8 @@
 
 ocrGuid_t consumer(u32 paramc, u64 *paramv, u32 depc, ocrEdtDep_t *depv) {
     int i, *ptr = (int*)depv[0].ptr;
-    for(i = 0; i < N; i++) assert(N-i == ptr[i]);
-    printf("Everything went OK\n");
+    for(i = 0; i < N; i++) ASSERT(N-i == ptr[i]);
+    PRINTF("Everything went OK\n");
     ocrShutdown();
     return NULL_GUID;
 }

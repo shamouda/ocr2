@@ -1,11 +1,11 @@
-#include <stdio.h>
+
 #include <ocr.h>
 
 //#define N 7
 #define N 6
 
 ocrGuid_t done(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
-    printf("done\n");
+    PRINTF("done\n");
     ocrShutdown();
     return NULL_GUID;
 }

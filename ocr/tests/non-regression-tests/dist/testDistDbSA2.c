@@ -5,8 +5,8 @@
  * removed or modified.
  */
 
-#include <stdio.h>
-#include <assert.h>
+
+
 
 #include "ocr.h"
 #include "extensions/ocr-affinity.h"
@@ -22,30 +22,30 @@
 
 ocrGuid_t checkerEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrGuid_t dbGuid = (ocrGuid_t) depv[0].guid;
-    printf("[remote] checkerEdt: executing, depends on remote DB guid 0x%lx \n", dbGuid);
+    PRINTF("[remote] checkerEdt: executing, depends on remote DB guid 0x%lx \n", dbGuid);
     TYPE_ELEM_DB v = 1;
     int i = 0;
     TYPE_ELEM_DB * data = (TYPE_ELEM_DB *) depv[0].ptr;
     while (i < NB_ELEM_DB) {
-        assert (data[i] == v++);
+        ASSERT (data[i] == v++);
         i++;
     }
-    printf("[remote] checkerEdt: DB/SA copy checked\n");
+    PRINTF("[remote] checkerEdt: DB/SA copy checked\n");
     ocrShutdown();
     return NULL_GUID;
 }
 
 ocrGuid_t saViolationEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrGuid_t dbGuid = (ocrGuid_t) depv[0].guid;
-    printf("[remote] saViolationEdt: executing, depends on remote DB guid 0x%lx \n", dbGuid);
+    PRINTF("[remote] saViolationEdt: executing, depends on remote DB guid 0x%lx \n", dbGuid);
     TYPE_ELEM_DB v = 1;
     int i = 0;
     TYPE_ELEM_DB * data = (TYPE_ELEM_DB *) depv[0].ptr;
     while (i < NB_ELEM_DB) {
-        assert (data[i] == v++);
+        ASSERT (data[i] == v++);
         i++;
     }
-    printf("[remote] saViolationEdt: illegal local writes to DB/SA\n");
+    PRINTF("[remote] saViolationEdt: illegal local writes to DB/SA\n");
 
     // Being a bad boy and trying to modify the DB/SA content.
     // There's nothing the runtime can do to prevent spoiling
@@ -60,7 +60,7 @@ ocrGuid_t saViolationEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) 
 
     u64 affinityCount;
     ocrAffinityCount(AFFINITY_PD, &affinityCount);
-    assert(affinityCount >= 1);
+    ASSERT(affinityCount >= 1);
     ocrGuid_t affinities[affinityCount];
     ocrAffinityGet(AFFINITY_PD, &affinityCount, affinities);
     ocrGuid_t edtAffinity = affinities[0]; //TODO this implies we know current PD is '0'
@@ -68,7 +68,7 @@ ocrGuid_t saViolationEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) 
     ocrGuid_t checkerTemplateGuid;
     ocrEdtTemplateCreate(&checkerTemplateGuid, checkerEdt, 0, 1);
 
-    printf("[remote] saViolationEdt: create checker EDT at DB/SA home node\n");
+    PRINTF("[remote] saViolationEdt: create checker EDT at DB/SA home node\n");
     ocrGuid_t checkerEdtGuid;
     ocrEdtCreate(&checkerEdtGuid, checkerTemplateGuid, 0, NULL, 1, &dbGuid,
                  EDT_PROP_NONE, edtAffinity, NULL);
@@ -78,7 +78,7 @@ ocrGuid_t saViolationEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) 
 ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     u64 affinityCount;
     ocrAffinityCount(AFFINITY_PD, &affinityCount);
-    assert(affinityCount >= 1);
+    ASSERT(affinityCount >= 1);
     ocrGuid_t affinities[affinityCount];
     ocrAffinityGet(AFFINITY_PD, &affinityCount, affinities);
     ocrGuid_t edtAffinity = affinities[affinityCount-1]; //TODO this implies we know current PD is '0'
@@ -96,7 +96,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
         i++;
     }
     ocrDbRelease(dbGuid);
-    printf("[local] mainEdt: local DB guid is 0x%lx, dbPtr=%p\n",dbGuid, dbPtr);
+    PRINTF("[local] mainEdt: local DB guid is 0x%lx, dbPtr=%p\n",dbGuid, dbPtr);
 
     // create local edt that depends on the remote edt, the db is automatically cloned
     ocrGuid_t saViolationTemplateGuid;

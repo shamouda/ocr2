@@ -4,9 +4,9 @@
  * removed or modified.
  */
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <assert.h>
+
+
+
 
 #include "ocr.h"
 
@@ -18,11 +18,11 @@
 #define N 16
 
 ocrGuid_t terminateEDT(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
-    printf("Call Terminate\n");
+    PRINTF("Call Terminate\n");
     int * array = (int*) depv[1].ptr;
     int i = 0;
     while (i < N) {
-        assert(array[i] == 1);
+        ASSERT(array[i] == 1);
         i++;
     }
     ocrShutdown();
