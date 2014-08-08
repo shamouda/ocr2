@@ -13,7 +13,7 @@
 #include "ocr-sysboot.h"
 #include "ocr-worker.h"
 #include "worker/hc/hc-worker.h"
-#include "worker/hc/hc-comm-worker.h"
+#include "worker/hc-comm/hc-comm-worker.h"
 
 #include "experimental/ocr-placer.h"
 #include "extensions/ocr-affinity.h"

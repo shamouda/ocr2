@@ -12,10 +12,6 @@ const char * policyDomain_types [] = {
     "HCDist",
     "XE",
     "CE",
-    "MasterCE",
-    "HCPlaced",
-    "HCLeafPlace",
-    "HCMasterLeafPlace",
     NULL
 };
 

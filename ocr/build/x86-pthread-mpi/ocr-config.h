@@ -24,7 +24,7 @@
 
 // Comm-api
 #define ENABLE_COMM_API_DELEGATE
-#define ENABLE_COMM_API_HC
+#define ENABLE_COMM_API_SIMPLE
 
 // Comm-platform
 #define ENABLE_COMM_PLATFORM_NULL

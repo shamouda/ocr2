@@ -10,7 +10,7 @@
 const char * commapi_types[] = {
     "Delegate",
     "Handleless",
-    "HC",
+    "Simple",
     NULL
 };
 
@@ -24,9 +24,9 @@ ocrCommApiFactory_t *newCommApiFactory(commApiType_t type, ocrParamList_t *typeA
     case commApiHandleless_id:
         return newCommApiFactoryHandleless(typeArg);
 #endif
-#ifdef ENABLE_COMM_API_HC
-    case commApiHc_id:
-        return newCommApiFactoryHc(typeArg);
+#ifdef ENABLE_COMM_API_SIMPLE
+    case commApiSimple_id:
+        return newCommApiFactorySimple(typeArg);
 #endif
     default:
         ASSERT(0);

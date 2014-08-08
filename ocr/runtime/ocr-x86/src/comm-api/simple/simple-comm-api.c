@@ -5,7 +5,7 @@
  */
 
 #include "ocr-config.h"
-#ifdef ENABLE_COMM_API_HC
+#ifdef ENABLE_COMM_API_SIMPLE
 
 #include "debug.h"
 #include "ocr-errors.h"
@@ -14,13 +14,13 @@
 #include "ocr-worker.h"
 #include "ocr-comm-platform.h"
 #include "utils/ocr-utils.h"
-#include "comm-api/hc/hc-comm-api.h"
+#include "comm-api/simple/simple-comm-api.h"
 
 #define DEBUG_TYPE COMM_API
 
-// HC_COMM masks
-#define HC_COMM_NO_PROP 0
-#define HC_COMM_NO_MASK 0
+// SIMPLE_COMM masks
+#define SIMPLE_COMM_NO_PROP 0
+#define SIMPLE_COMM_NO_MASK 0
 
 //PERF: customize map size
 #define HANDLE_MAP_BUCKETS 10
@@ -50,9 +50,9 @@ static ocrPolicyMsg_t * allocateNewMessage(ocrCommApi_t * self, u32 size) {
     return message;
 }
 
-u8 sendMessageHcCommApi(ocrCommApi_t *self, ocrLocation_t target, ocrPolicyMsg_t *message,
+u8 sendMessageSimpleCommApi(ocrCommApi_t *self, ocrLocation_t target, ocrPolicyMsg_t *message,
                         ocrMsgHandle_t **handle, u32 properties) {
-    ocrCommApiHc_t * commApiHc = (ocrCommApiHc_t *) self;
+    ocrCommApiSimple_t * commApiSimple = (ocrCommApiSimple_t *) self;
 
     if (!(properties & PERSIST_MSG_PROP)) {
         ocrPolicyMsg_t * msgCpy = allocateNewMessage(self, message->size);
@@ -65,7 +65,7 @@ u8 sendMessageHcCommApi(ocrCommApi_t *self, ocrLocation_t target, ocrPolicyMsg_t
     u64 id = 0;
 
     u8 ret = self->commPlatform->fcts.sendMessage(self->commPlatform, target, message,
-                                                  bufferSize, &id, properties, HC_COMM_NO_MASK);
+                                                  bufferSize, &id, properties, SIMPLE_COMM_NO_MASK);
 
     if (ret == 0) {
         if (handle == NULL) {
@@ -78,7 +78,7 @@ u8 sendMessageHcCommApi(ocrCommApi_t *self, ocrLocation_t target, ocrPolicyMsg_t
             //Message sent (potentially not yet received at destination)
             (*handle)->status = HDL_SEND_OK;
             // Associate id with handle
-            hashtableNonConcPut(commApiHc->handleMap, (void *) id, *handle);
+            hashtableNonConcPut(commApiSimple->handleMap, (void *) id, *handle);
         }
     } else {
         // Error occurred while sending, set handler status if any
@@ -94,7 +94,7 @@ u8 sendMessageHcCommApi(ocrCommApi_t *self, ocrLocation_t target, ocrPolicyMsg_t
  * Callers should look at the handle's status.
  *
  */
-u8 pollMessageHcCommApi(ocrCommApi_t *self, ocrMsgHandle_t **handle) {
+u8 pollMessageSimpleCommApi(ocrCommApi_t *self, ocrMsgHandle_t **handle) {
     //DIST-TODO one-way ack: cannot poll to check completion of one-way messages
     //This implementation does not support one-way with ack
     //However it's a little hard to detect here. A handle message
@@ -104,11 +104,11 @@ u8 pollMessageHcCommApi(ocrCommApi_t *self, ocrMsgHandle_t **handle) {
     //IMPL: Alternative would be that the comm-platform always return
     //out/in comms that are done and we can update the status here.
     //That would require to be able to tell the platform to post new recv.
-    ocrCommApiHc_t * commApiHc = (ocrCommApiHc_t *) self;
+    ocrCommApiSimple_t * commApiSimple = (ocrCommApiSimple_t *) self;
     ocrPolicyMsg_t * msg = NULL;
     //IMPL: by contract commPlatform only poll and return recvs.
     //They can be incoming request or response. (but not outgoing req/resp ack)
-    u8 ret = self->commPlatform->fcts.pollMessage(self->commPlatform, &msg, NULL, HC_COMM_NO_PROP, HC_COMM_NO_MASK);
+    u8 ret = self->commPlatform->fcts.pollMessage(self->commPlatform, &msg, NULL, SIMPLE_COMM_NO_PROP, SIMPLE_COMM_NO_MASK);
     if (ret == POLL_MORE_MESSAGE) {
         ASSERT((handle != NULL) && (*handle == NULL));
         if (msg->type & PD_MSG_REQUEST) {
@@ -121,7 +121,7 @@ u8 pollMessageHcCommApi(ocrCommApi_t *self, ocrMsgHandle_t **handle) {
             //      must set the handler->response pointer to the response's communication handler.
 
             ASSERT(msg->type & PD_MSG_RESPONSE);
-            bool found = hashtableNonConcRemove(commApiHc->handleMap, (void *) msg->msgId, (void **)handle);
+            bool found = hashtableNonConcRemove(commApiSimple->handleMap, (void *) msg->msgId, (void **)handle);
             ASSERT(found && (*handle != NULL));
             (*handle)->response = msg;
             (*handle)->status = HDL_RESPONSE_OK;
@@ -130,7 +130,7 @@ u8 pollMessageHcCommApi(ocrCommApi_t *self, ocrMsgHandle_t **handle) {
     return ret;
 }
 
-u8 waitMessageHcCommApi(ocrCommApi_t *self, ocrMsgHandle_t **handle) {
+u8 waitMessageSimpleCommApi(ocrCommApi_t *self, ocrMsgHandle_t **handle) {
     u8 ret = 0;
     do {
         ret = self->fcts.pollMessage(self, handle);
@@ -139,78 +139,78 @@ u8 waitMessageHcCommApi(ocrCommApi_t *self, ocrMsgHandle_t **handle) {
     return ret;
 }
 
-void hcCommApiDestruct (ocrCommApi_t * base) {
+void simpleCommApiDestruct (ocrCommApi_t * base) {
     base->commPlatform->fcts.destruct(base->commPlatform);
     runtimeChunkFree((u64)base, NULL);
 }
 
-void hcCommApiBegin(ocrCommApi_t* self, ocrPolicyDomain_t * pd) {
+void simpleCommApiBegin(ocrCommApi_t* self, ocrPolicyDomain_t * pd) {
     self->pd = pd;
     self->commPlatform->fcts.begin(self->commPlatform, pd, self);
 }
 
-void hcCommApiStart(ocrCommApi_t * self, ocrPolicyDomain_t * pd) {
-    ocrCommApiHc_t * commApiHc = (ocrCommApiHc_t *) self;
-    commApiHc->handleMap = newHashtableModulo(pd, HANDLE_MAP_BUCKETS);
+void simpleCommApiStart(ocrCommApi_t * self, ocrPolicyDomain_t * pd) {
+    ocrCommApiSimple_t * commApiSimple = (ocrCommApiSimple_t *) self;
+    commApiSimple->handleMap = newHashtableModulo(pd, HANDLE_MAP_BUCKETS);
     self->commPlatform->fcts.start(self->commPlatform, pd, self);
 }
 
-void hcCommApiStop(ocrCommApi_t * self) {
+void simpleCommApiStop(ocrCommApi_t * self) {
     self->commPlatform->fcts.stop(self->commPlatform);
 }
 
-void hcCommApiFinish(ocrCommApi_t *self) {
+void simpleCommApiFinish(ocrCommApi_t *self) {
     self->commPlatform->fcts.finish(self->commPlatform);
 }
 
-ocrCommApi_t* newCommApiHc(ocrCommApiFactory_t *factory,
+ocrCommApi_t* newCommApiSimple(ocrCommApiFactory_t *factory,
                            ocrParamList_t *perInstance) {
-    ocrCommApiHc_t * commApiHc = (ocrCommApiHc_t*)
-        runtimeChunkAlloc(sizeof(ocrCommApiHc_t), NULL);
-    factory->initialize(factory, (ocrCommApi_t*) commApiHc, perInstance);
-    return (ocrCommApi_t*)commApiHc;
+    ocrCommApiSimple_t * commApiSimple = (ocrCommApiSimple_t*)
+        runtimeChunkAlloc(sizeof(ocrCommApiSimple_t), NULL);
+    factory->initialize(factory, (ocrCommApi_t*) commApiSimple, perInstance);
+    return (ocrCommApi_t*)commApiSimple;
 }
 
 /**
- * @brief Initialize an instance of comm-api hc
+ * @brief Initialize an instance of comm-api simple
  */
-void initializeCommApiHc(ocrCommApiFactory_t * factory, ocrCommApi_t* self, ocrParamList_t * perInstance) {
+void initializeCommApiSimple(ocrCommApiFactory_t * factory, ocrCommApi_t* self, ocrParamList_t * perInstance) {
     initializeCommApiOcr(factory, self, perInstance);
-    ocrCommApiHc_t * commApiHc = (ocrCommApiHc_t*) self;
-    commApiHc->handleMap = NULL;
+    ocrCommApiSimple_t * commApiSimple = (ocrCommApiSimple_t*) self;
+    commApiSimple->handleMap = NULL;
 }
 
 /******************************************************/
-/* OCR COMM API HC                                    */
+/* OCR COMM API Simple                                    */
 /******************************************************/
 
-void destructCommApiFactoryHc(ocrCommApiFactory_t *factory) {
+void destructCommApiFactorySimple(ocrCommApiFactory_t *factory) {
     runtimeChunkFree((u64)factory, NULL);
 }
 
-ocrCommApiFactory_t *newCommApiFactoryHc(ocrParamList_t *perType) {
+ocrCommApiFactory_t *newCommApiFactorySimple(ocrParamList_t *perType) {
     ocrCommApiFactory_t *base = (ocrCommApiFactory_t*)
-        runtimeChunkAlloc(sizeof(ocrCommApiFactoryHc_t), (void *)1);
+        runtimeChunkAlloc(sizeof(ocrCommApiFactorySimple_t), (void *)1);
 
-    base->instantiate = newCommApiHc;
-    base->initialize = initializeCommApiHc;
-    base->destruct = destructCommApiFactoryHc;
+    base->instantiate = newCommApiSimple;
+    base->initialize = initializeCommApiSimple;
+    base->destruct = destructCommApiFactorySimple;
 
-    base->apiFcts.destruct = FUNC_ADDR(void (*)(ocrCommApi_t*), hcCommApiDestruct);
+    base->apiFcts.destruct = FUNC_ADDR(void (*)(ocrCommApi_t*), simpleCommApiDestruct);
     base->apiFcts.begin = FUNC_ADDR(void (*)(ocrCommApi_t*, ocrPolicyDomain_t*),
-                                    hcCommApiBegin);
+                                    simpleCommApiBegin);
     base->apiFcts.start = FUNC_ADDR(void (*)(ocrCommApi_t*, ocrPolicyDomain_t*),
-                                    hcCommApiStart);
-    base->apiFcts.stop = FUNC_ADDR(void (*)(ocrCommApi_t*), hcCommApiStop);
-    base->apiFcts.finish = FUNC_ADDR(void (*)(ocrCommApi_t*), hcCommApiFinish);
+                                    simpleCommApiStart);
+    base->apiFcts.stop = FUNC_ADDR(void (*)(ocrCommApi_t*), simpleCommApiStop);
+    base->apiFcts.finish = FUNC_ADDR(void (*)(ocrCommApi_t*), simpleCommApiFinish);
     base->apiFcts.sendMessage = FUNC_ADDR(u8 (*)(ocrCommApi_t*, ocrLocation_t, ocrPolicyMsg_t *, ocrMsgHandle_t**, u32),
-                                          sendMessageHcCommApi);
+                                          sendMessageSimpleCommApi);
     base->apiFcts.pollMessage = FUNC_ADDR(u8 (*)(ocrCommApi_t*, ocrMsgHandle_t**),
-                                          pollMessageHcCommApi);
+                                          pollMessageSimpleCommApi);
     base->apiFcts.waitMessage = FUNC_ADDR(u8 (*)(ocrCommApi_t*, ocrMsgHandle_t**),
-                                          waitMessageHcCommApi);
+                                          waitMessageSimpleCommApi);
     return base;
 }
 
-#endif /* ENABLE_COMM_API_HC */
+#endif /* ENABLE_COMM_API_SIMPLE */
 

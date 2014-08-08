@@ -25,7 +25,7 @@ extern const char * worker_types[];
 extern const char * ocrWorkerType_types[];
 
 #include "worker/hc/hc-worker.h"
-#include "worker/hc/hc-comm-worker.h"
+#include "worker/hc-comm/hc-comm-worker.h"
 #include "worker/ce/ce-worker.h"
 #include "worker/xe/xe-worker.h"
 

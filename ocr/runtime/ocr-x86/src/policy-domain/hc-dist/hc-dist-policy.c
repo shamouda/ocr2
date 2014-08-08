@@ -20,7 +20,7 @@
 #include "ocr-statistics.h"
 #endif
 
-#include "policy-domain/hc/hc-dist-policy.h"
+#include "policy-domain/hc-dist/hc-dist-policy.h"
 
 //DIST-TODO sep-concern: bad ! This is to use a worker's wid to map to a comm-api
 #include "worker/hc/hc-worker.h"

@@ -12,7 +12,7 @@
 #include "utils/deque.h"
 #include "utils/list.h"
 #include "worker/hc/hc-worker.h"
-#include "scheduler/hc/hc-comm-delegate-scheduler.h"
+#include "scheduler/hc-comm-delegate/hc-comm-delegate-scheduler.h"
 #include "comm-api/delegate/delegate-comm-api.h"
 
 #define DEBUG_TYPE SCHEDULER
@@ -139,7 +139,7 @@ u8 hcCommSchedulerTakeComm(ocrScheduler_t *self, u32* count, ocrFatGuid_t * fatH
                 if (candidate == NULL) {
                     // No message available
                     break;
-                } 
+                }
                 if (isSpecificTarget) {
                     if (candidate != *target) {
                         if (candidateList == NULL) {
@@ -200,8 +200,8 @@ u8 hcCommSchedulerGiveComm(ocrScheduler_t *self, u32* count, ocrFatGuid_t* fatHa
             bool outgoingComm = (message->destLocation != self->pd->myLocation);
             if (outgoingComm) {
                 // (support HYBRID_COMM_COMP_WORKER mode)
-                // The communication worker can process simple messages that 
-                // are known to be short lived and are 'sterile' (i.e. do not generate 
+                // The communication worker can process simple messages that
+                // are known to be short lived and are 'sterile' (i.e. do not generate
                 // new communication) beside responding to the message.
                 // In that case, the comm-worker should only be able to give outgoing responses to the scheduler
                 ASSERT(message->type & PD_MSG_RESPONSE);
@@ -250,7 +250,7 @@ u8 hcCommSchedulerGiveComm(ocrScheduler_t *self, u32* count, ocrFatGuid_t* fatHa
 
 u8 hcCommMonitorProgress(ocrScheduler_t *self, ocrMonitorProgress_t type, void * monitoree) {
     ocrSchedulerHcCommDelegate_t * commSched = (ocrSchedulerHcCommDelegate_t *) self;
-    return commSched->baseMonitorProgress(self, type, monitoree);   
+    return commSched->baseMonitorProgress(self, type, monitoree);
 }
 
 ocrScheduler_t* newSchedulerHcComm(ocrSchedulerFactory_t * factory, ocrParamList_t *perInstance) {
