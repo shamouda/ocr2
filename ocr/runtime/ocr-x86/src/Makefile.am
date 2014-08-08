@@ -3,8 +3,11 @@ SUBDIRS =
 # Includes folder we need when compiling ocr
 OCR_INCLUDES_DIR = -I$(top_srcdir)/inc -I$(top_srcdir)/src/inc -I$(top_srcdir)/src/inc/hc -I$(top_srcdir)/src/inc/fsim
 
+CC=icc
+
 # cflags: important to define that otherwise we inherit default values too
-CFLAGS = -Wall -g -O2 -fno-strict-aliasing
+CFLAGS = -mmic -fPIC -Wall -g -O3 -fno-strict-aliasing
+#CFLAGS = -Wall -g -O3 -fno-strict-aliasing
 
 # additional cflags for ocr modules
 OCR_CFLAGS =
@@ -21,7 +24,7 @@ lib_LTLIBRARIES = libocr.la
 
 # These are populated in sub-folder's Makefile.inc
 noinst_LTLIBRARIES =
-libocr_la_LIBADD =
+libocr_la_LIBADD = #-ltbbmalloc_proxy -ltbbmalloc
 
 include allocator/Makefile.inc
 include datablock/Makefile.inc
@@ -30,7 +33,7 @@ include executor/Makefile.inc
 include guid/Makefile.inc
 include low-workers/Makefile.inc
 include low-memory/Makefile.inc
-include machine/Makefile.inc
+#include machine/Makefile.inc
 include policy/Makefile.inc
 include scheduler/Makefile.inc
 include sync/Makefile.inc

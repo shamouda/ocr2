@@ -16,7 +16,7 @@ AC_COPYRIGHT([todo_copyright_info])
 # configure script revision
 AC_REVISION([$Revision: 0.1 $])
 
-AC_PROG_CC
+AC_PROG_CC([icc])
 AC_PROG_LIBTOOL
 AC_LANG(C)
 

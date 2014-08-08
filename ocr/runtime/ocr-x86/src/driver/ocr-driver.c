@@ -416,13 +416,21 @@ void ocrInit(int * argc, char ** argv, u32 fnc, ocrEdt_t funcs[]) {
     } else {
         if (md_file != NULL) {
             //TODO need a file stat to check
-            setMachineDescriptionFromPDL(md_file);
-            MachineDescription * md = getMachineDescription();
+            // setMachineDescriptionFromPDL(md_file);
+            // sagnak remove XML library dependency
+            // MachineDescription * md = getMachineDescription();
+	    void* md = (void*)0xdeadbeef; 
             if (md == NULL) {
                 // Something went wrong when reading the machine description file
                 ocr_abort();
             } else {
-                nbHardThreads = MachineDescription_getNumHardwareThreads(md);
+                nbHardThreads = ocr_config_default_nb_hardware_threads;
+		char* ocr_num_threads_str = getenv("OCR_NUM_THREADS");
+		if ( NULL != ocr_num_threads_str ) {
+			nbHardThreads = atoi(ocr_num_threads_str);
+			printf("ENV set nThreads to %d\n", nbHardThreads);
+		}
+                // nbHardThreads = MachineDescription_getNumHardwareThreads(md);
                 //	gHackTotalMemSize = MachineDescription_getDramSize(md);
             }
         }

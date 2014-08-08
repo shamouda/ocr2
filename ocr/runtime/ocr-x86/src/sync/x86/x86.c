@@ -53,7 +53,13 @@ void lockX86(ocrLock_t* self) {
 
 void unlockX86(ocrLock_t* self) {
     ocrLockX86_t *rself = (ocrLockX86_t*)self;
+// sagnak, I am claiming this file for Xeon Phi with the cunning use of flags
+// xeon phi is in-order, so below is a trivial compiler fence
+#ifdef __MIC__
+    asm volatile ("":::"memory");
+#else
     asm volatile ("mfence");
+#endif
     ASSERT(rself->val == 1);
     rself->val = 0;
 }

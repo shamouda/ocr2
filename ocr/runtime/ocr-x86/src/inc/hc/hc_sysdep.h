@@ -69,6 +69,7 @@ static __inline__ int hc_cas(volatile int *ptr, int ag, int x) {
 //
 
 #ifdef __x86_64
+#ifndef __MIC__
 
 #define HC_CACHE_LINE 64
 
@@ -93,6 +94,7 @@ static __inline__ int hc_cas(volatile int *ptr, int ag, int x) {
         return tmp == ag;
 }
 
+#endif /* __MIC__ */
 #endif /* __x86_64 */
 
 //
@@ -146,5 +148,22 @@ static __inline__ int hc_cas(volatile int *ptr, int ag, int x) {
 }
 
 #endif /* __powerpc64__ */
+
+#ifdef __MIC__
+
+static __inline__ void hc_mfence(void) {
+        __asm__ __volatile__ ("":::"memory");
+}
+
+/*
+ * if (*ptr == ag) { *ptr = x, return 1 }
+ * else return 0;
+ */
+/*sagnak: may have to write your own with cmpxchg8b, let's see if this works for now*/
+static __inline__ int hc_cas(volatile int *ptr, int ag, int x) {
+        return __sync_bool_compare_and_swap(ptr,ag,x);
+}
+
+#endif /* __xeon_phi__ */
 
 #endif /* HC_SYSDEP_H_ */

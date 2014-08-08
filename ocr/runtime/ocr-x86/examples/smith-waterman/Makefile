@@ -8,7 +8,10 @@ OCR_INPUT=.
 all-test: compile run
 
 compile:
-	gcc $(CFLAGS) $(OCR_FLAGS) -I. $(PROG).c -o $(PROG)$(SUFFIX)
+	$(CC) $(CFLAGS) $(OCR_FLAGS) -I. $(PROG).c -o $(PROG)$(SUFFIX)
+
+compile.mic:
+	icc -mmic -L${OCR_INSTALL}/lib -I${OCR_INSTALL}/include -fPIC -I. $(PROG).c -locr -o $(PROG).mmic$(SUFFIX)
 
 compile_omp:
 	gcc -fopenmp $(CFLAGS) $(OCR_FLAGS) -I. $(OMP_PROG).c -o $(OMP_PROG)$(SUFFIX)

@@ -78,6 +78,7 @@ void regularDestruct(ocrDataBlock_t *self) {
 void* regularAcquire(ocrDataBlock_t *self, ocrGuid_t edt, bool isInternal) {
     ocrDataBlockRegular_t *rself = (ocrDataBlockRegular_t*)self;
 
+#if 0
     // Critical section
     rself->lock->lock(rself->lock);
     if(rself->attributes.freeRequested) {
@@ -102,6 +103,7 @@ void* regularAcquire(ocrDataBlock_t *self, ocrGuid_t edt, bool isInternal) {
 
     rself->lock->unlock(rself->lock);
     // End critical section
+#endif
 
     return rself->ptr;
 }
