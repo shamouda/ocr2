@@ -46,6 +46,16 @@ typedef unsigned long long u64;
 typedef unsigned int u32;
 typedef unsigned char u8;
 typedef struct ocrEdtDep_t { void* ptr; u64 guid; } ocrEdtDep_t;
+
+//sagnak: CAUTION:these are just relevant within tiles
+#ifndef ALTERNATE_INDEXING
+#define TILE_INDEX_2D(tile,x,y) ( tile[y][x] ) 
+#define INDEX_1D(x,y) ( (y) * tileSize + x ) 
+#else
+#define TILE_INDEX_2D(tile,x,y) ( tile[x][y] ) 
+#define INDEX_1D(x,y) ( (x) * tileSize + y ) 
+#endif
+
 struct timeval a,b;
 
 u8 sequential_cholesky_task ( u32 paramc, u64 * params, void* paramv[], u32 depc, ocrEdtDep_t depv[]) {
@@ -60,18 +70,18 @@ u8 sequential_cholesky_task ( u32 paramc, u64 * params, void* paramv[], u32 depc
     double* lBlock = (double*) (depv[1].ptr);
 
     for( kB = 0 ; kB < tileSize ; ++kB ) {
-        if( aBlock[ kB * tileSize + kB ] <= 0 ) {
+        if( aBlock[ INDEX_1D(kB,kB) ] <= 0 ) {
             fprintf(stderr,"Not a symmetric positive definite (SPD) matrix\n"); exit(1);
         } else {
-            lBlock[ kB * tileSize + kB ] = sqrt( aBlock[ kB * tileSize + kB ] );
+            lBlock[ INDEX_1D(kB,kB) ] = sqrt( aBlock[ INDEX_1D(kB,kB)] );
         }
 
         for(jB = kB + 1; jB < tileSize ; ++jB )
-            lBlock[ jB * tileSize + kB ] = aBlock[ jB * tileSize + kB ] / lBlock[ kB * tileSize + kB ];
+            lBlock[ INDEX_1D(jB,kB) ] = aBlock[ INDEX_1D(jB,kB) ] / lBlock[ INDEX_1D(kB,kB) ];
 
         for(jBB= kB + 1; jBB < tileSize ; ++jBB )
             for(iB = jBB ; iB < tileSize ; ++iB )
-                aBlock[ iB * tileSize + jBB ] -= lBlock[ iB * tileSize + kB ] * lBlock[ jBB * tileSize + kB ];
+                aBlock[ INDEX_1D(iB,jBB) ] -= lBlock[ INDEX_1D(iB,kB) ] * lBlock[ INDEX_1D(jBB,kB) ];
     }
 
     *out_lkji_kkkp1_event_guid = (void*)lBlock;
@@ -92,11 +102,11 @@ u8 trisolve_task ( u32 paramc, u64 * params, void* paramv[], u32 depc, ocrEdtDep
 
     for( kB = 0; kB < tileSize ; ++kB ) {
         for( iB = 0; iB < tileSize ; ++iB )
-            loBlock[ iB * tileSize + kB ] = aBlock[ iB * tileSize + kB ] / liBlock[ kB * tileSize + kB ];
+            loBlock[ INDEX_1D(iB,kB) ] = aBlock[ INDEX_1D(iB,kB) ] / liBlock[ INDEX_1D(kB,kB) ];
 
         for( jB = kB + 1 ; jB < tileSize; ++jB )
             for( iB = 0; iB < tileSize; ++iB )
-                aBlock[ iB * tileSize + jB ] -= liBlock[ jB * tileSize + kB ] * loBlock[ iB * tileSize + kB ];
+                aBlock[ INDEX_1D(iB,jB) ] -= liBlock[ INDEX_1D(jB,kB) ] * loBlock[ INDEX_1D(iB,kB) ];
     }
 
     *out_lkji_jkkp1_event_guid = (void*)loBlock;
@@ -117,9 +127,9 @@ u8 update_diagonal_task ( u32 paramc, u64 * params, void* paramv[], u32 depc, oc
     double* l2Block = (double*) (depv[1].ptr);
     for( jB = 0; jB < tileSize ; ++jB ) {
         for( kB = 0; kB < tileSize ; ++kB ) {
-            temp = 0 - l2Block[ jB * tileSize + kB ];
+            temp = 0 - l2Block[ INDEX_1D(jB,kB) ];
             for( iB = jB; iB < tileSize; ++iB )
-                aBlock[ iB * tileSize + jB ] += temp * l2Block[ iB * tileSize + kB ];
+                aBlock[ INDEX_1D(iB,jB) ] += temp * l2Block[ INDEX_1D(iB,kB) ];
         }
     }
 
@@ -142,9 +152,9 @@ u8 update_nondiagonal_task ( u32 paramc, u64 * params, void* paramv[], u32 depc,
     double* l2Block = (double*) (depv[2].ptr);
     for( jB = 0; jB < tileSize ; ++jB ) {
         for( kB = 0; kB < tileSize ; ++kB ) {
-            temp = 0 - l2Block[ jB * tileSize + kB ];
+            temp = 0 - l2Block[ INDEX_1D(jB,kB) ];
             for( iB = 0; iB < tileSize ; ++iB )
-                aBlock[ iB * tileSize + jB ] += temp * l1Block[ iB * tileSize + kB ];
+                aBlock[ INDEX_1D(iB,jB) ] += temp * l1Block[ INDEX_1D(iB,kB) ];
         }
     }
 
@@ -178,11 +188,11 @@ u8 wrap_up_task ( u32 paramc, u64 * params, void* paramv[], u32 depc, ocrEdtDep_
                 temp = (double*) (depv[i*(i+1)/2+j].ptr);
                 if(i != j) {
                     for(j_b = 0; j_b < tileSize; ++j_b) {
-                        fprintf( out, "%lf ", temp[i_b*tileSize+j_b]);
+                        fprintf( out, "%lf ", temp[ INDEX_1D(i_b,j_b) ]);
                     }
                 } else {
                     for(j_b = 0; j_b <= i_b; ++j_b) {
-                        fprintf( out, "%lf ", temp[i_b*tileSize+j_b]);
+                        fprintf( out, "%lf ", temp[ INDEX_1D(i_b,j_b) ]);
                     }
                 }
             }
@@ -309,7 +319,7 @@ inline static void satisfyInitialTiles( int numTiles, int tileSize, double** mat
             // The tiles are indexed by tile indices (which are tag values).
             for( A_i = i*tileSize, T_i = 0 ; T_i < tileSize; ++A_i, ++T_i ) {
                 for( A_j = j*tileSize, T_j = 0 ; T_j < tileSize; ++A_j, ++T_j ) {
-                    temp2D[ T_i ][ T_j ] = matrix[ A_i ][ A_j ];
+                    TILE_INDEX_2D(temp2D, T_i, T_j) = matrix[ A_i ][ A_j ];
                 }
             }
             lkji_event_guids[i][j][0] = temp_db;
@@ -319,8 +329,7 @@ inline static void satisfyInitialTiles( int numTiles, int tileSize, double** mat
 }
 
 inline static double*** allocateSequentialCholeskyBuffers ( int numTiles, int tileSize ) {
-    double*** toBeReturned = NULL;
-    toBeReturned = (double***)malloc(sizeof(double**)*numTiles);
+    double*** toBeReturned = (double***)malloc(sizeof(double**)*numTiles);
     int i = 0;
     for (; i < numTiles; ++i) {
         toBeReturned[i] = (double**)malloc(sizeof(double)*tileSize*tileSize);
@@ -329,8 +338,7 @@ inline static double*** allocateSequentialCholeskyBuffers ( int numTiles, int ti
 }
 
 inline static double**** allocateTrisolveBuffers ( int numTiles, int tileSize ) {
-    double**** toBeReturned = NULL;
-    toBeReturned = (double****)malloc(sizeof(double***)*numTiles);
+    double**** toBeReturned = (double****)malloc(sizeof(double***)*numTiles);
     int k = 0;
     for ( ; k < numTiles; ++k ) {
         int j = k + 1;
