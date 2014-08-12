@@ -67,6 +67,16 @@ typedef struct _ocrWorkerFcts_t {
     bool (*isRunning)(struct _ocrWorker_t *self);
 } ocrWorkerFcts_t;
 
+typedef struct _ocrDataParallelContext_t {
+    ocrGuid_t task;        /* Guid of the data parallel task */
+    ocrGuid_t latch;       /* Latch event that satisfies at the end of the computation */
+    volatile u64 lb, ub;   /* Lower/Upper bounds of the iteration range of the data parallel computation performed by this worker */
+    volatile u32 lock;     /* Lock to coordinate range stealing among multiple workers */
+    volatile bool active;  /* Flag to indicate a running data parallel computation */
+    u64 curIndex;          /* Index of the current iteration being performed by the worker */
+    u64 id;
+} ocrDpCtxt_t;
+
 typedef struct _ocrWorker_t {
     ocrFatGuid_t fguid;
     struct _ocrPolicyDomain_t *pd;
@@ -80,7 +90,7 @@ typedef struct _ocrWorker_t {
     u64 computeCount;           /**< Number of compute node(s) associated */
 
     struct _ocrTask_t *curTask; /**< Currently executing task */
-
+    struct _ocrDataParallelContext_t dpCtxt; /**< Data parallel context */
     ocrWorkerFcts_t fcts;
 } ocrWorker_t;
 

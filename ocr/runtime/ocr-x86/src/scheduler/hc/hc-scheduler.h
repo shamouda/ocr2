@@ -11,6 +11,7 @@
 #ifdef ENABLE_SCHEDULER_HC
 
 #include "ocr-scheduler.h"
+#include "ocr-worker.h"
 #include "ocr-types.h"
 #include "utils/ocr-utils.h"
 

@@ -46,6 +46,20 @@ typedef struct {
 } ocrTaskHc_t;
 
 typedef struct {
+    ocrTaskHc_t base;
+    ocrEdtDep_t * depv;
+    u32 maxAcquiredDb;
+    u64 doNotReleaseSlots;
+    ocrGuid_t sinkTask;      /**< Guid of the data parallel sink EDT */
+    volatile u32 unkLock;    /**< Lock to protect acquire/release of DBs during EDT execution */ 
+} ocrDataParallelTaskHc_t;
+
+typedef struct {
+    ocrTaskHc_t base;
+    ocrGuid_t dpTask;      /**< Guid of the data parallel EDT */
+} ocrDataParallelSinkTaskHc_t;
+
+typedef struct {
     ocrTaskFactory_t baseFactory;
 } ocrTaskFactoryHc_t;
 

@@ -174,6 +174,26 @@ u8 ocrEdtCreate(ocrGuid_t * guid, ocrGuid_t templateGuid,
                 u16 properties, ocrGuid_t affinity, ocrGuid_t *outputEvent);
 
 /**
+ * @brief Creates a Data Parallel EDT instance
+ *
+ * Note: All params are same as ocrEdtCreate, except "range".
+ *
+ * @param range             Iteration range of the data parallel computation
+ *
+ **/
+u8 ocrDataParallelEdtCreate(ocrGuid_t * guid, ocrGuid_t templateGuid,
+                u32 paramc, u64* paramv, u32 depc, ocrGuid_t *depv,
+                u64 range, u16 properties, ocrGuid_t affinity, ocrGuid_t *outputEvent);
+
+/**
+ * @brief Get the current iteration index of the data parallel computation
+ *
+ * @return Iteration index
+ *
+ **/
+u64 ocrDataParallelGetCurrentIteration();
+
+/**
  * @brief Destroy an EDT and release its associated guid
  *
  * This should be called if it becomes known that the EDT

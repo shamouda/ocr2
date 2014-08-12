@@ -27,6 +27,11 @@ struct _ocrTaskTemplate_t;
 /****************************************************/
 /* PARAMETER LISTS                                  */
 /****************************************************/
+typedef struct _paramListTask_t {
+    ocrParamList_t base;
+    u64 dpRange;
+} paramListTask_t;
+
 typedef struct _paramListTaskFact_t {
     ocrParamList_t base;
 } paramListTaskFact_t;
@@ -240,6 +245,7 @@ typedef struct _ocrTask_t {
     ocrGuid_t els[ELS_SIZE];
     ocrEdtState_t state;    /**< State of the EDT */
     u32 paramc, depc;       /**< Number of parameters and dependences */
+    u64 dataParallelRange;  /**< Full iteration range of a data parallel EDT */
     u32 fctId;
 } ocrTask_t;
 

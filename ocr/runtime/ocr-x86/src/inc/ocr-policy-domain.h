@@ -368,6 +368,7 @@ typedef struct _ocrPolicyMsg_t {
             u32 paramc;                /**< In/out: Number of parameters; on out returns real number
                                         * in case of EDT_PARAM_DEF as input for example */
             u32 depc;                  /**< In/out: Number of dependence slots; same comment as above */
+            u64 dataParallelRange;     /**< In: Range of data parallel iterations */
             u32 properties;            /**< In: properties for the creation */
             u32 returnDetail;          /**< Out: Success or error code */
             ocrWorkType_t workType;    /**< In: Type of work to create */

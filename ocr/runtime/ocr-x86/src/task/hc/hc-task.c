@@ -337,10 +337,232 @@ u8 destructTaskHc(ocrTask_t* base) {
     return 0;
 }
 
+ocrTask_t * newDataParallelTaskHc(ocrTaskFactory_t* factory, ocrFatGuid_t edtTemplate,
+                      u32 paramc, u64* paramv, u32 depc, u32 properties,
+                      ocrFatGuid_t affinity, ocrFatGuid_t * outputEventPtr,
+                      ocrTask_t *curEdt, ocrParamList_t *perInstance) {
+
+    // Get the current environment
+    ocrPolicyDomain_t *pd = NULL;
+    ocrPolicyMsg_t msg;
+    u32 i;
+
+    ASSERT(!hasProperty(properties, EDT_PROP_FINISH));
+    getCurrentEnv(&pd, NULL, NULL, &msg);
+
+    //Create a latch event for data parallel EDTs
+    //The data parallel Iteration EDTs will signal this latch
+    //The data parallel Sink EDT will wait on the satisfaction of this latch
+#define PD_MSG (&msg)
+#define PD_TYPE PD_MSG_EVT_CREATE
+        msg.type = PD_MSG_EVT_CREATE | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
+        PD_MSG_FIELD(guid.guid) = NULL_GUID;
+        PD_MSG_FIELD(guid.metaDataPtr) = NULL;
+        PD_MSG_FIELD(type) = OCR_EVENT_LATCH_T;
+        PD_MSG_FIELD(properties) = 0;
+        RESULT_PROPAGATE2(pd->fcts.processMessage(pd, &msg, true), NULL);
+        ocrFatGuid_t dpLatchFGuid = PD_MSG_FIELD(guid);
+#undef PD_MSG
+#undef PD_TYPE
+
+    // Create the data parallel EDT
+#define PD_MSG (&msg)
+#define PD_TYPE PD_MSG_GUID_CREATE
+    msg.type = PD_MSG_GUID_CREATE | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
+    PD_MSG_FIELD(guid.guid) = NULL_GUID;
+    PD_MSG_FIELD(guid.metaDataPtr) = NULL;
+    // We allocate everything in the meta-data to keep things simple
+    PD_MSG_FIELD(size) = sizeof(ocrDataParallelTaskHc_t) + paramc*sizeof(u64) + depc*sizeof(regNode_t);
+    PD_MSG_FIELD(kind) = OCR_GUID_EDT;
+    PD_MSG_FIELD(properties) = 0;
+    RESULT_PROPAGATE2(pd->fcts.processMessage(pd, &msg, true), NULL);
+    ocrDataParallelTaskHc_t *dpEdt = (ocrDataParallelTaskHc_t*)PD_MSG_FIELD(guid.metaDataPtr);
+    ocrTaskHc_t *dpTaskHc = (ocrTaskHc_t*)dpEdt;
+    ocrTask_t *dpTask = (ocrTask_t*)dpEdt;
+    ASSERT(dpEdt);
+    dpTask->guid = PD_MSG_FIELD(guid.guid);
+#undef PD_MSG
+#undef PD_TYPE
+    dpTask->templateGuid = edtTemplate.guid;
+    ASSERT(edtTemplate.metaDataPtr); // For now we just assume it is passed whole
+    dpTask->funcPtr = ((ocrTaskTemplate_t*)(edtTemplate.metaDataPtr))->executePtr;
+    dpTask->paramv = (u64*)((u64)dpTask + sizeof(ocrTaskHc_t));
+#ifdef OCR_ENABLE_EDT_NAMING
+    dpTask->name = ((ocrTaskTemplate_t*)(edtTemplate.metaDataPtr))->name;
+#endif
+    dpTask->outputEvent = dpLatchFGuid.guid;
+    dpTask->finishLatch = NULL_GUID;
+    dpTask->parentLatch = NULL_GUID;
+    for(i = 0; i < ELS_SIZE; ++i) {
+        dpTask->els[i] = NULL_GUID;
+    }
+    dpTask->state = DATA_PARALLEL_CREATED_EDTSTATE;
+    dpTask->paramc = paramc;
+    dpTask->depc = depc;
+    paramListTask_t * pListTask = (paramListTask_t*)perInstance;
+    ASSERT(pListTask->dpRange > 0);
+    dpTask->dataParallelRange = pListTask->dpRange;
+    dpTask->fctId = factory->factoryId;
+    for(i = 0; i < paramc; ++i) {
+        dpTask->paramv[i] = paramv[i];
+    }
+
+    dpTaskHc->signalers = (regNode_t*)((u64)dpTaskHc + sizeof(ocrTaskHc_t) + paramc*sizeof(u64));
+    // Initialize the signalers properly
+    for(i = 0; i < depc; ++i) {
+        dpTaskHc->signalers[i].guid = UNINITIALIZED_GUID;
+        dpTaskHc->signalers[i].slot = i;
+    }
+    if (depc == 0) dpTaskHc->signalers = END_OF_LIST;
+
+    dpTaskHc->frontierSlot = 0;
+    dpTaskHc->slotSatisfiedCount = 0;
+    dpTaskHc->lock = 0;
+    dpTaskHc->unkDbs = NULL;
+    dpTaskHc->countUnkDbs = 0;
+    dpTaskHc->maxUnkDbs = 0;
+
+    dpEdt->depv = NULL;
+    dpEdt->maxAcquiredDb = 0;
+    dpEdt->doNotReleaseSlots = 0;
+    dpEdt->unkLock = 0;
+    
+    //Add the newly created data parallel EDT to the latch event
+#define PD_MSG (&msg)
+#define PD_TYPE PD_MSG_DEP_SATISFY
+    msg.type = PD_MSG_DEP_SATISFY | PD_MSG_REQUEST;
+    PD_MSG_FIELD(guid) = dpLatchFGuid;
+    PD_MSG_FIELD(payload.guid) = NULL_GUID;
+    PD_MSG_FIELD(payload.metaDataPtr) = NULL;
+    PD_MSG_FIELD(slot) = OCR_EVENT_LATCH_INCR_SLOT;
+    PD_MSG_FIELD(properties) = 0;
+    RESULT_PROPAGATE2(pd->fcts.processMessage(pd, &msg, false), NULL);
+#undef PD_TYPE
+#undef PD_MSG
+
+    ocrFatGuid_t parentLatch = getFinishLatch(curEdt);
+    ocrFatGuid_t outputEvent = {.guid = NULL_GUID, .metaDataPtr = NULL};
+    // We need an output event for the EDT if either:
+    //  - the user requested one (outputEventPtr is non NULL)
+    //  - the EDT is within a finish scope (and we need to link to
+    //    that latch event)
+    if (outputEventPtr != NULL || parentLatch.guid != NULL_GUID) {
+#define PD_MSG (&msg)
+#define PD_TYPE PD_MSG_EVT_CREATE
+        msg.type = PD_MSG_EVT_CREATE | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
+        PD_MSG_FIELD(guid.guid) = NULL_GUID;
+        PD_MSG_FIELD(guid.metaDataPtr) = NULL;
+        PD_MSG_FIELD(properties) = 0;
+        PD_MSG_FIELD(type) = OCR_EVENT_ONCE_T; // Output events of EDTs are non sticky
+
+        RESULT_PROPAGATE2(pd->fcts.processMessage(pd, &msg, true), NULL);
+        outputEvent = PD_MSG_FIELD(guid);
+#undef PD_MSG
+#undef PD_TYPE
+    }
+
+    // Create a *sink* EDT for the data parallel EDT 
+    // This sink EDT depends on the satisfaction of 
+    // the data parallel latch created above.
+    // After the sink EDT runs, it satisfies the 
+    // output event of the data parallel computation.
+    // The sink EDT's function is to release all DBs 
+    // acquired by the data parallel EDT.
+#define PD_MSG (&msg)
+#define PD_TYPE PD_MSG_GUID_CREATE
+    msg.type = PD_MSG_GUID_CREATE | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
+    PD_MSG_FIELD(guid.guid) = NULL_GUID;
+    PD_MSG_FIELD(guid.metaDataPtr) = NULL;
+    // We allocate everything in the meta-data to keep things simple
+    PD_MSG_FIELD(size) = sizeof(ocrDataParallelSinkTaskHc_t) + sizeof(regNode_t);
+    PD_MSG_FIELD(kind) = OCR_GUID_EDT;
+    PD_MSG_FIELD(properties) = 0;
+    RESULT_PROPAGATE2(pd->fcts.processMessage(pd, &msg, true), NULL);
+    ocrTaskHc_t *sinkEdt = (ocrTaskHc_t*)PD_MSG_FIELD(guid.metaDataPtr);
+    ocrTask_t *sinkTask = (ocrTask_t*)sinkEdt;
+    ocrDataParallelSinkTaskHc_t *sinkDpEdt = (ocrDataParallelSinkTaskHc_t*)sinkEdt;
+    ASSERT(sinkEdt);
+    sinkTask->guid = PD_MSG_FIELD(guid.guid);
+#undef PD_MSG
+#undef PD_TYPE
+    sinkTask->templateGuid = NULL_GUID;
+    sinkTask->funcPtr = NULL;
+    sinkTask->paramv = NULL;
+#ifdef OCR_ENABLE_EDT_NAMING
+    sinkTask->name = NULL;
+#endif
+    sinkTask->outputEvent = outputEvent.guid;
+    sinkTask->finishLatch = NULL_GUID;
+    sinkTask->parentLatch = parentLatch.guid;
+    for(i = 0; i < ELS_SIZE; ++i) {
+        sinkTask->els[i] = NULL_GUID;
+    }
+    sinkTask->state = DATA_PARALLEL_SINK_EDTSTATE;
+    sinkTask->paramc = 0;
+    sinkTask->depc = 1;
+    sinkTask->fctId = factory->factoryId;
+
+    sinkEdt->signalers = (regNode_t*)((u64)sinkEdt + sizeof(ocrDataParallelSinkTaskHc_t));
+    // Initialize the signalers properly
+    sinkEdt->signalers->guid = UNINITIALIZED_GUID;
+    sinkEdt->signalers->slot = 0;
+    sinkEdt->frontierSlot = 0;
+    sinkEdt->slotSatisfiedCount = 0;
+    sinkEdt->lock = 0;
+    sinkEdt->unkDbs = NULL;
+    sinkEdt->countUnkDbs = 0;
+    sinkEdt->maxUnkDbs = 0;
+
+    sinkDpEdt->dpTask = dpTask->guid;
+    dpEdt->sinkTask = sinkTask->guid;
+
+    //Setup the dependence between the data parallel finish latch and the sink EDT
+#define PD_MSG (&msg)
+#define PD_TYPE PD_MSG_DEP_ADD
+        msg.type = PD_MSG_DEP_ADD | PD_MSG_REQUEST;
+        PD_MSG_FIELD(source) = dpLatchFGuid;
+        PD_MSG_FIELD(dest.guid) = sinkTask->guid;
+        PD_MSG_FIELD(dest.metaDataPtr) = sinkTask;
+        PD_MSG_FIELD(slot) = 0;
+        PD_MSG_FIELD(properties) = DB_DEFAULT_MODE;
+        PD_MSG_FIELD(currentEdt.guid) = curEdt->guid;
+        PD_MSG_FIELD(currentEdt.metaDataPtr) = curEdt;
+        RESULT_PROPAGATE2(pd->fcts.processMessage(pd, &msg, true), NULL);
+#undef PD_MSG
+#undef PD_TYPE
+
+    // If the data parallel computation was created within a finish scope, 
+    // then checkin sink EDT in that scope
+    if(parentLatch.guid != NULL_GUID) {
+        DPRINTF(DEBUG_LVL_INFO, "Checkin 0x%lx on parent flatch 0x%lx\n", sinkTask->guid, parentLatch.guid);
+        RESULT_PROPAGATE2(finishLatchCheckin(pd, &msg, outputEvent, parentLatch), NULL);
+    }
+
+    // Set up outputEventPtr:
+    // This is the output event of the data parallel computation
+    if(outputEventPtr) {
+        outputEventPtr->guid = sinkTask->outputEvent;
+    }
+
+    // ALL SETUP AND CONNECTIONS COMPLETE
+    // Check to see if the data parallel EDT can be run
+    if(dpTask->depc == dpTaskHc->slotSatisfiedCount) {
+        DPRINTF(DEBUG_LVL_VVERB, "Scheduling task 0x%lx due to initial satisfactions\n",
+                dpTask->guid);
+        RESULT_PROPAGATE2(taskSchedule(dpTask), NULL);
+    }
+
+    return dpTask;
+}
+
 ocrTask_t * newTaskHc(ocrTaskFactory_t* factory, ocrFatGuid_t edtTemplate,
                       u32 paramc, u64* paramv, u32 depc, u32 properties,
                       ocrFatGuid_t affinity, ocrFatGuid_t * outputEventPtr,
                       ocrTask_t *curEdt, ocrParamList_t *perInstance) {
+
+    if (hasProperty(properties, EDT_PROP_DATA_PARALLEL)) {
+        return newDataParallelTaskHc(factory, edtTemplate, paramc, paramv, depc, properties, affinity, outputEventPtr, curEdt, perInstance);
+    }
 
     // Get the current environment
     ocrPolicyDomain_t *pd = NULL;
@@ -407,6 +629,7 @@ ocrTask_t * newTaskHc(ocrTaskFactory_t* factory, ocrFatGuid_t edtTemplate,
     base->state = CREATED_EDTSTATE;
     base->paramc = paramc;
     base->depc = depc;
+    base->dataParallelRange = 0;
     base->fctId = factory->factoryId;
     for(i = 0; i < paramc; ++i) {
         base->paramv[i] = paramv[i];
@@ -551,8 +774,9 @@ u8 registerSignalerTaskHc(ocrTask_t * base, ocrFatGuid_t signalerGuid, u32 slot,
             // We need to move the frontier slot over
             hal_lock32(&(self->lock));
             node->guid = signalerGuid.guid;
-            while(++self->frontierSlot < base->depc &&
-                    self->signalers[self->frontierSlot].slot != ++slot) ;
+            while(self->frontierSlot < base->depc &&
+                  self->signalers[self->frontierSlot].slot != self->frontierSlot)
+                  self->frontierSlot++;
 
             // We found a slot that is == to slot (so unsatisfied and not once)
             if(self->frontierSlot < base->depc &&
@@ -618,6 +842,11 @@ u8 unregisterSignalerTaskHc(ocrTask_t * base, ocrFatGuid_t signalerGuid, u32 slo
 }
 
 u8 notifyDbAcquireTaskHc(ocrTask_t *base, ocrFatGuid_t db) {
+    if (base->state == DATA_PARALLEL_ACTIVE_EDTSTATE) {
+        ocrDataParallelTaskHc_t *dpEdt = (ocrDataParallelTaskHc_t*)base;
+        hal_lock32(&(dpEdt->unkLock));
+    }
+
     // This implementation does NOT support EDTs moving while they are executing
     ocrTaskHc_t *derived = (ocrTaskHc_t*)base;
     ocrPolicyDomain_t *pd = NULL;
@@ -641,10 +870,20 @@ u8 notifyDbAcquireTaskHc(ocrTask_t *base, ocrFatGuid_t db) {
     ++derived->countUnkDbs;
     DPRINTF(DEBUG_LVL_VERB, "EDT (GUID: 0x%lx) added DB (GUID: 0x%lx) to its list of dyn. acquired DBs (have %d)\n",
             base->guid, db.guid, derived->countUnkDbs);
+
+    if (base->state == DATA_PARALLEL_ACTIVE_EDTSTATE) {
+        ocrDataParallelTaskHc_t *dpEdt = (ocrDataParallelTaskHc_t*)base;
+        hal_unlock32(&(dpEdt->unkLock));
+    }
     return 0;
 }
 
 u8 notifyDbReleaseTaskHc(ocrTask_t *base, ocrFatGuid_t db) {
+    if (base->state == DATA_PARALLEL_ACTIVE_EDTSTATE) {
+        ocrDataParallelTaskHc_t *dpEdt = (ocrDataParallelTaskHc_t*)base;
+        hal_lock32(&(dpEdt->unkLock));
+    }
+
     ocrTaskHc_t *derived = (ocrTaskHc_t*)base;
     if(derived->unkDbs == NULL)
         return 0; // May be a release we don't care about
@@ -664,10 +903,16 @@ u8 notifyDbReleaseTaskHc(ocrTask_t *base, ocrFatGuid_t db) {
     }
     // We did not find it but it may be that we never acquired it
     // Should not be an error code
+
+    if (base->state == DATA_PARALLEL_ACTIVE_EDTSTATE) {
+        ocrDataParallelTaskHc_t *dpEdt = (ocrDataParallelTaskHc_t*)base;
+        hal_unlock32(&(dpEdt->unkLock));
+    }
+
     return 0;
 }
 
-u8 taskExecute(ocrTask_t* base) {
+u8 regularTaskExecute(ocrTask_t* base) {
     DPRINTF(DEBUG_LVL_INFO, "Execute 0x%lx\n", base->guid);
     ocrTaskHc_t* derived = (ocrTaskHc_t*)base;
     // In this implementation each time a signaler has been satisfied, its guid
@@ -862,6 +1107,263 @@ u8 taskExecute(ocrTask_t* base) {
         }
     }
     return 0;
+}
+
+u8 dataParallelActiveTaskExecute(ocrTask_t* base) {
+    ocrDataParallelTaskHc_t *dpEdt = (ocrDataParallelTaskHc_t *)base;
+    ocrGuid_t retGuid = NULL_GUID;
+    ocrPolicyDomain_t *pd = NULL;
+    ocrWorker_t *worker = NULL;
+    ocrPolicyMsg_t msg;
+    getCurrentEnv(&pd, &worker, NULL, &msg);
+    ocrDpCtxt_t *dpCtxt = &(worker->dpCtxt);
+
+    while(dpCtxt->lb < dpCtxt->ub) {
+        dpCtxt->curIndex = dpCtxt->lb;
+        START_PROFILE(userCode);
+        retGuid = base->funcPtr(base->paramc, base->paramv, base->depc, dpEdt->depv);
+        EXIT_PROFILE;
+        ASSERT(retGuid == NULL_GUID);
+        dpCtxt->lb++;
+    }
+
+    hal_lock32(&(dpCtxt->lock));
+    dpCtxt->active = 0;
+    hal_fence();
+    while(dpCtxt->lb < dpCtxt->ub) {
+        dpCtxt->curIndex = dpCtxt->lb;
+        START_PROFILE(userCode);
+        retGuid = base->funcPtr(base->paramc, base->paramv, base->depc, dpEdt->depv);
+        EXIT_PROFILE;
+        ASSERT(retGuid == NULL_GUID);
+        dpCtxt->lb++;
+    }
+    hal_unlock32(&(dpCtxt->lock));
+
+    // Decrement on the data parallel latch
+    #define PD_MSG (&msg)
+    #define PD_TYPE PD_MSG_DEP_SATISFY
+    msg.type = PD_MSG_DEP_SATISFY | PD_MSG_REQUEST;
+    PD_MSG_FIELD(guid.guid) = dpCtxt->latch;
+    PD_MSG_FIELD(guid.metaDataPtr) = NULL;
+    PD_MSG_FIELD(payload.guid) = NULL_GUID;
+    PD_MSG_FIELD(payload.metaDataPtr) = NULL;
+    PD_MSG_FIELD(slot) = OCR_EVENT_LATCH_DECR_SLOT; 
+    PD_MSG_FIELD(properties) = 0;
+    RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, false));
+    #undef PD_MSG
+    #undef PD_TYPE
+
+    dpCtxt->task = NULL_GUID;
+    dpCtxt->latch = NULL_GUID;
+    dpCtxt->curIndex = (u64)(-1);
+    return 0;
+}
+
+u8 dataParallelSinkTaskExecute(ocrTask_t* sinkBase) {
+    ocrDataParallelSinkTaskHc_t *sinkTask = (ocrDataParallelSinkTaskHc_t*)sinkBase;
+    ocrDataParallelTaskHc_t *dpEdt = NULL;
+    ocrPolicyDomain_t *pd = NULL;
+    ocrPolicyMsg_t msg;
+    getCurrentEnv(&pd, NULL, NULL, &msg);
+    pd->guidProviders[0]->fcts.getVal(pd->guidProviders[0], sinkTask->dpTask, (u64*)(&dpEdt), NULL);
+    ASSERT(dpEdt);
+    ocrTask_t* base = (ocrTask_t*)dpEdt;
+    ocrTaskHc_t* derived = (ocrTaskHc_t*)base;
+
+    ocrEdtDep_t * depv = dpEdt->depv;
+    u32 maxAcquiredDb = dpEdt->maxAcquiredDb;
+    u64 doNotReleaseSlots = dpEdt->doNotReleaseSlots;
+    u32 depc = base->depc;
+
+    // edt user code is done, if any deps, release data-blocks
+    if(depc != 0) {
+        START_PROFILE(ta_hc_dbRel);
+        u32 i;
+        for(i=0; i < maxAcquiredDb; ++i) { // Only release the ones we managed to grab
+            if((depv[i].guid != NULL_GUID) &&
+               ((i >= 64) || (doNotReleaseSlots == 0) ||
+                ((i < 64) && (((1ULL << i) & doNotReleaseSlots) == 0)))) {
+#define PD_MSG (&msg)
+#define PD_TYPE PD_MSG_DB_RELEASE
+                msg.type = PD_MSG_DB_RELEASE | PD_MSG_REQUEST;
+                PD_MSG_FIELD(guid.guid) = depv[i].guid;
+                PD_MSG_FIELD(guid.metaDataPtr) = NULL;
+                PD_MSG_FIELD(edt.guid) = base->guid;
+                PD_MSG_FIELD(edt.metaDataPtr) = base;
+                PD_MSG_FIELD(properties) = 1; // Runtime release
+                // Ignore failures at this point
+                pd->fcts.processMessage(pd, &msg, false);
+#undef PD_MSG
+#undef PD_TYPE
+            }
+        }
+        pd->fcts.pdFree(pd, depv);
+        EXIT_PROFILE;
+    }
+
+    // We now release all other data-blocks that we may potentially
+    // have acquired along the way
+    if(derived->unkDbs != NULL) {
+        // We acquire this DB
+        ocrGuid_t *extraToFree = derived->unkDbs;
+        u64 count = derived->countUnkDbs;
+        while(count) {
+#define PD_MSG (&msg)
+#define PD_TYPE PD_MSG_DB_RELEASE
+            msg.type = PD_MSG_DB_RELEASE | PD_MSG_REQUEST;
+            PD_MSG_FIELD(guid.guid) = extraToFree[0];
+            PD_MSG_FIELD(guid.metaDataPtr) = NULL;
+            PD_MSG_FIELD(edt.guid) = base->guid;
+            PD_MSG_FIELD(edt.metaDataPtr) = base;
+            PD_MSG_FIELD(properties) = 0; // Not a runtime free since it was acquired using DB create
+            if(pd->fcts.processMessage(pd, &msg, false)) {
+                DPRINTF(DEBUG_LVL_WARN, "EDT (GUID: 0x%lx) could not release dynamically acquired DB (GUID: 0x%lx)\n",
+                        base->guid, PD_MSG_FIELD(guid.guid));
+                break;
+            }
+#undef PD_MSG
+#undef PD_TYPE
+            --count;
+            ++extraToFree;
+        }
+        pd->fcts.pdFree(pd, derived->unkDbs);
+    }
+
+    // Now deal with the output event
+    if(sinkBase->outputEvent != NULL_GUID) {
+    #define PD_MSG (&msg)
+    #define PD_TYPE PD_MSG_DEP_SATISFY
+            msg.type = PD_MSG_DEP_SATISFY | PD_MSG_REQUEST;
+            PD_MSG_FIELD(guid.guid) = sinkBase->outputEvent;
+            PD_MSG_FIELD(guid.metaDataPtr) = NULL;
+            PD_MSG_FIELD(payload.guid) = NULL_GUID;
+            PD_MSG_FIELD(payload.metaDataPtr) = NULL;
+            PD_MSG_FIELD(slot) = 0; // Always satisfy on slot 0. This will trickle to
+            // the finish latch if needed
+            PD_MSG_FIELD(properties) = 0;
+            // Ignore failure for now
+            // FIXME: Probably need to be a bit more selective
+            pd->fcts.processMessage(pd, &msg, false);
+    #undef PD_MSG
+    #undef PD_TYPE
+    }
+    return 0;
+}
+
+u8 dataParallelCreatedTaskExecute(ocrTask_t* base) {
+    DPRINTF(DEBUG_LVL_INFO, "Execute 0x%lx\n", base->guid);
+    ocrTaskHc_t* derived = (ocrTaskHc_t*)base;
+    // In this implementation each time a signaler has been satisfied, its guid
+    // has been replaced by the db guid it has been satisfied with.
+    u32 depc = base->depc;
+
+    ocrPolicyDomain_t *pd = NULL;
+    ocrWorker_t *worker = NULL;
+    ocrPolicyMsg_t msg;
+    getCurrentEnv(&pd, &worker, NULL, &msg);
+
+    ocrEdtDep_t * depv = NULL;
+    u64 doNotReleaseSlots = 0; // Used to support an EDT acquiring the same DB
+                               // multiple times. For now limit to 64 DBs
+                               // (ie: an EDT that does this should not have more
+                               // than 64 DBs, others can have as many as they want)
+    // If any dependencies, acquire their data-blocks
+    u32 maxAcquiredDb = 0;
+
+    ASSERT(derived->unkDbs == NULL); // Should be no dynamically acquired DBs before running
+
+    if (depc != 0) {
+        START_PROFILE(ta_hc_dbAcq);
+        //TODO would be nice to resolve regNode into guids before
+        depv = pd->fcts.pdMalloc(pd, sizeof(ocrEdtDep_t)*depc);
+        // Double-check we're not rescheduling an already executed edt
+        ASSERT(derived->signalers != END_OF_LIST);
+        // Make sure the task was actually fully satisfied
+        ASSERT(derived->slotSatisfiedCount == depc+1);
+        while( maxAcquiredDb < depc ) {
+            //TODO would be nice to standardize that on satisfy
+            depv[maxAcquiredDb].guid = derived->signalers[maxAcquiredDb].guid;
+            if(depv[maxAcquiredDb].guid != NULL_GUID) {
+                // We send a message that we want to acquire the DB
+#define PD_MSG (&msg)
+#define PD_TYPE PD_MSG_DB_ACQUIRE
+                msg.type = PD_MSG_DB_ACQUIRE | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
+                PD_MSG_FIELD(guid.guid) = depv[maxAcquiredDb].guid;
+                PD_MSG_FIELD(guid.metaDataPtr) = NULL;
+                PD_MSG_FIELD(edt.guid) = base->guid;
+                PD_MSG_FIELD(edt.metaDataPtr) = base;
+                PD_MSG_FIELD(properties) = 1; // Runtime acquire
+                // This call may fail if the policy domain goes down
+                // while we are staring to execute
+
+                if(pd->fcts.processMessage(pd, &msg, true)) {
+                    // We are not going to launch the EDT
+                    break;
+                }
+                switch(PD_MSG_FIELD(returnDetail)) {
+                case 0:
+                    ASSERT(PD_MSG_FIELD(ptr));
+                    break; // Everything went fine
+                case OCR_EACQ:
+                    // The EDT was already acquired
+                    ASSERT(PD_MSG_FIELD(ptr));
+                    ASSERT(maxAcquiredDb < 64);
+                    DPRINTF(DEBUG_LVL_VERB, "EDT (GUID: 0x%lx) acquiring DB (GUID: 0x%lx) multiple times. Ignoring acquire on slot %d\n",
+                            base->guid, depv[maxAcquiredDb].guid, maxAcquiredDb);
+                    doNotReleaseSlots |= (1ULL << maxAcquiredDb);
+                    break;
+                default:
+                    ASSERT(0);
+                }
+                depv[maxAcquiredDb].ptr = PD_MSG_FIELD(ptr);
+#undef PD_MSG
+#undef PD_TYPE
+            } else {
+                depv[maxAcquiredDb].ptr = NULL;
+            }
+            ++maxAcquiredDb;
+        }
+        derived->signalers = END_OF_LIST;
+        EXIT_PROFILE;
+    }
+
+    //Setup data parallel task
+    ocrDataParallelTaskHc_t * dpEdt = (ocrDataParallelTaskHc_t *)base;
+    dpEdt->depv = depv;
+    dpEdt->maxAcquiredDb = maxAcquiredDb;
+    dpEdt->doNotReleaseSlots = doNotReleaseSlots;
+
+    if(depc == 0 || (maxAcquiredDb == depc)) {
+        base->state = DATA_PARALLEL_ACTIVE_EDTSTATE;
+        //Setup data parallel context
+        ocrDpCtxt_t *dpCtxt = &(worker->dpCtxt);
+        dpCtxt->task = base->guid;
+        dpCtxt->latch = base->outputEvent;
+        dpCtxt->lb = 0;
+        dpCtxt->ub = base->dataParallelRange;
+        dpCtxt->curIndex = (u64)(-1);
+        hal_fence();
+        dpCtxt->active = 1;
+        return dataParallelActiveTaskExecute(base);
+    } else {
+        ocrTask_t *sinkBase = NULL;
+        pd->guidProviders[0]->fcts.getVal(pd->guidProviders[0], dpEdt->sinkTask, (u64*)(&sinkBase), NULL);
+        ASSERT(sinkBase);
+        return dataParallelSinkTaskExecute(sinkBase);
+    }
+}
+
+u8 taskExecute(ocrTask_t* base) {
+    switch(base->state) {
+    case CREATED_EDTSTATE: return regularTaskExecute(base);
+    case DATA_PARALLEL_CREATED_EDTSTATE: return dataParallelCreatedTaskExecute(base);
+    case DATA_PARALLEL_ACTIVE_EDTSTATE: return dataParallelActiveTaskExecute(base);
+    case DATA_PARALLEL_SINK_EDTSTATE: return dataParallelSinkTaskExecute(base);
+    default: 
+        ASSERT(0);
+        break;
+    }
 }
 
 void destructTaskFactoryHc(ocrTaskFactory_t* base) {

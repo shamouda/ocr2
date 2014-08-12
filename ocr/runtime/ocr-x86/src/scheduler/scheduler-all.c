@@ -43,5 +43,6 @@ void initializeSchedulerOcr(ocrSchedulerFactory_t * factory, ocrScheduler_t * se
     self->pd = NULL;
     self->workpiles = NULL;
     self->workpileCount = 0;
+    self->dpCtxt = NULL;
     self->fcts = factory->schedulerFcts;
 }

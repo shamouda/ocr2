@@ -142,9 +142,10 @@ u8 ocrEdtTemplateDestroy(ocrGuid_t guid) {
 #undef PD_TYPE
 }
 
-u8 ocrEdtCreate(ocrGuid_t* edtGuid, ocrGuid_t templateGuid,
+u8 ocrEdtCreateInternal(ocrGuid_t* edtGuid, ocrGuid_t templateGuid,
                 u32 paramc, u64* paramv, u32 depc, ocrGuid_t *depv,
-                u16 properties, ocrGuid_t affinity, ocrGuid_t *outputEvent) {
+                u16 properties, ocrGuid_t affinity, u64 dataParallelRange,
+                ocrGuid_t *outputEvent) {
 
     START_PROFILE(api_EdtCreate);
     ocrPolicyMsg_t msg;
@@ -171,6 +172,7 @@ u8 ocrEdtCreate(ocrGuid_t* edtGuid, ocrGuid_t templateGuid,
     PD_MSG_FIELD(paramv) = paramv;
     PD_MSG_FIELD(paramc) = paramc;
     PD_MSG_FIELD(depc) = depc;
+    PD_MSG_FIELD(dataParallelRange) = dataParallelRange;
     PD_MSG_FIELD(properties) = properties;
     PD_MSG_FIELD(workType) = EDT_WORKTYPE;
     PD_MSG_FIELD(currentEdt.guid) = curEdt ? curEdt->guid : NULL_GUID;
@@ -205,6 +207,25 @@ u8 ocrEdtCreate(ocrGuid_t* edtGuid, ocrGuid_t templateGuid,
     RETURN_PROFILE(0);
 #undef PD_MSG
 #undef PD_TYPE
+}
+
+u8 ocrEdtCreate(ocrGuid_t* edtGuid, ocrGuid_t templateGuid,
+                u32 paramc, u64* paramv, u32 depc, ocrGuid_t *depv,
+                u16 properties, ocrGuid_t affinity, ocrGuid_t *outputEvent) {
+    return ocrEdtCreateInternal(edtGuid, templateGuid, paramc, paramv, depc, depv, properties, affinity, 0, outputEvent);
+}
+
+u8 ocrDataParallelEdtCreate(ocrGuid_t* edtGuid, ocrGuid_t templateGuid,
+                u32 paramc, u64* paramv, u32 depc, ocrGuid_t *depv,
+                u64 dataParallelRange, u16 properties, ocrGuid_t affinity, 
+                ocrGuid_t *outputEvent) {
+    return ocrEdtCreateInternal(edtGuid, templateGuid, paramc, paramv, depc, depv, properties, affinity, dataParallelRange, outputEvent);
+}
+
+u64 ocrDataParallelGetCurrentIteration() {
+    ocrWorker_t * worker = NULL;
+    getCurrentEnv(NULL, &worker, NULL, NULL);
+    return worker->dpCtxt.curIndex;
 }
 
 u8 ocrEdtDestroy(ocrGuid_t edtGuid) {

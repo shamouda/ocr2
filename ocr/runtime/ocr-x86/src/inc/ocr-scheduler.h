@@ -127,6 +127,7 @@ typedef struct _ocrSchedulerFcts_t {
 } ocrSchedulerFcts_t;
 
 struct _ocrWorkpile_t;
+struct _ocrDataParallelContext_t;
 
 /*! \brief Represents OCR schedulers.
  *
@@ -138,6 +139,8 @@ typedef struct _ocrScheduler_t {
 
     struct _ocrWorkpile_t **workpiles;
     u64 workpileCount;
+
+    struct _ocrDataParallelContext_t ** dpCtxt; /* Data parallel context of each worker */
 
     ocrSchedulerFcts_t fcts;
 } ocrScheduler_t;

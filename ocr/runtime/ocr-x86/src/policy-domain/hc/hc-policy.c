@@ -423,7 +423,8 @@ static u8 hcMemUnAlloc(ocrPolicyDomain_t *self, ocrFatGuid_t* allocator,
 static u8 hcCreateEdt(ocrPolicyDomain_t *self, ocrFatGuid_t *guid,
                       ocrFatGuid_t  edtTemplate, u32 *paramc, u64* paramv,
                       u32 *depc, u32 properties, ocrFatGuid_t affinity,
-                      ocrFatGuid_t * outputEvent, ocrTask_t * currentEdt) {
+                      u64 dataParallelRange, ocrFatGuid_t * outputEvent, 
+                      ocrTask_t * currentEdt) {
 
 
     ocrTaskTemplate_t *taskTemplate = (ocrTaskTemplate_t*)edtTemplate.metaDataPtr;
@@ -447,9 +448,13 @@ static u8 hcCreateEdt(ocrPolicyDomain_t *self, ocrFatGuid_t *guid,
         return OCR_EINVAL;
     }
 
+    paramListTask_t pListTask;
+    pListTask.dpRange = dataParallelRange;
+
     ocrTask_t * base = self->taskFactories[0]->instantiate(
                            self->taskFactories[0], edtTemplate, *paramc, paramv,
-                           *depc, properties, affinity, outputEvent, currentEdt, NULL);
+                           *depc, properties, affinity, outputEvent, currentEdt, 
+                           (ocrParamList_t*)(&pListTask));
 
     (*guid).guid = base->guid;
     (*guid).metaDataPtr = base;
@@ -699,8 +704,8 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         PD_MSG_FIELD(returnDetail) = hcCreateEdt(
                 self, &(PD_MSG_FIELD(guid)), PD_MSG_FIELD(templateGuid),
                 &(PD_MSG_FIELD(paramc)), PD_MSG_FIELD(paramv), &(PD_MSG_FIELD(depc)),
-                PD_MSG_FIELD(properties), PD_MSG_FIELD(affinity), outputEvent,
-                (ocrTask_t*)(PD_MSG_FIELD(currentEdt).metaDataPtr));
+                PD_MSG_FIELD(properties), PD_MSG_FIELD(affinity), PD_MSG_FIELD(dataParallelRange), 
+                outputEvent, (ocrTask_t*)(PD_MSG_FIELD(currentEdt).metaDataPtr));
         msg->type &= ~PD_MSG_REQUEST;
         msg->type |= PD_MSG_RESPONSE;
 #undef PD_MSG

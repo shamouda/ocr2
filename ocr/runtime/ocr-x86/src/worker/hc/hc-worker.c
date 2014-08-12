@@ -62,21 +62,24 @@ static void workerLoop(ocrWorker_t * worker) {
             count = PD_MSG_FIELD(guidCount);
             if(count == 1) {
                 ASSERT(taskGuid.guid != NULL_GUID && taskGuid.metaDataPtr != NULL);
+                bool dpFlag = worker->dpCtxt.active;
                 worker->curTask = (ocrTask_t*)taskGuid.metaDataPtr;
                 u8 (*executeFunc)(ocrTask_t *) = (u8 (*)(ocrTask_t*))PD_MSG_FIELD(extra); // Execute is stored in extra
                 executeFunc(worker->curTask);
                 worker->curTask = NULL;
                 // Destroy the work
+                if (!dpFlag) {
 #undef PD_TYPE
 #define PD_MSG (&msg)
 #define PD_TYPE PD_MSG_WORK_DESTROY
-                msg.type = PD_MSG_WORK_DESTROY | PD_MSG_REQUEST;
-                PD_MSG_FIELD(guid) = taskGuid;
-                PD_MSG_FIELD(properties) = 0;
-                // Ignore failures, we may be shutting down
-                pd->fcts.processMessage(pd, &msg, false);
+                    msg.type = PD_MSG_WORK_DESTROY | PD_MSG_REQUEST;
+                    PD_MSG_FIELD(guid) = taskGuid;
+                    PD_MSG_FIELD(properties) = 0;
+                    // Ignore failures, we may be shutting down
+                    pd->fcts.processMessage(pd, &msg, false);
 #undef PD_MSG
 #undef PD_TYPE
+                }
             }
         }
         EXIT_PROFILE;
@@ -257,6 +260,7 @@ void initializeWorkerHc(ocrWorkerFactory_t * factory, ocrWorker_t* self, ocrPara
     workerHc->id = workerId;
     workerHc->running = false;
     workerHc->secondStart = false;
+    self->dpCtxt.id = workerId;
 }
 
 /******************************************************/

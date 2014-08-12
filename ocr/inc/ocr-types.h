@@ -115,6 +115,7 @@ typedef struct {
 
 #define EDT_PROP_NONE   ((u16) 0x0) /**< Property bits indicating a regular EDT */
 #define EDT_PROP_FINISH ((u16) 0x1) /**< Property bits indicating a FINISH EDT */
+#define EDT_PROP_DATA_PARALLEL ((u16) 0x2) /**< Property bits indicating a DATA PARALLEL EDT */
 
 /**
  * @brief Constant indicating that the number of parameters to an EDT template

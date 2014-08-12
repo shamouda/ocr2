@@ -117,6 +117,11 @@ void hcSchedulerStart(ocrScheduler_t * self, ocrPolicyDomain_t * PD) {
         ++i;
     }
     derived->stealIterators = stealIteratorsCache;
+
+    self->dpCtxt = (ocrDpCtxt_t**)PD->fcts.pdMalloc(PD, sizeof(ocrDpCtxt_t*)*PD->workerCount);
+    for(i = 0; i < PD->workerCount; i++) {
+        self->dpCtxt[i] = &(PD->workers[i]->dpCtxt);
+    }
 }
 
 void hcSchedulerStop(ocrScheduler_t * self) {
@@ -202,10 +207,11 @@ u8 hcSchedulerTake (ocrScheduler_t *self, u32 *count, ocrFatGuid_t *edts) {
     // Source must be a worker guid and we rely on indices to map
     // workers to workpiles (one-to-one)
     // TODO: This is a non-portable assumption but will do for now.
+    ocrPolicyDomain_t *pd = NULL;
     ocrWorker_t *worker = NULL;
-    ocrWorkerHc_t *hcWorker = NULL;
-    getCurrentEnv(NULL, &worker, NULL, NULL);
-    hcWorker = (ocrWorkerHc_t*)worker;
+    ocrPolicyMsg_t msg;
+    getCurrentEnv(&pd, &worker, NULL, &msg);
+    ocrWorkerHc_t *hcWorker = (ocrWorkerHc_t*)worker;
 
     if(*count == 0) return 1; // No room to put anything
 
@@ -225,6 +231,53 @@ u8 hcSchedulerTake (ocrScheduler_t *self, u32 *count, ocrFatGuid_t *edts) {
             // TODO sagnak, just to get it to compile, I am trickling down the 'cost' though it most probably is not the same
             // TODO: Add cost again
             popped = next->fcts.pop(next, STEAL_WORKPOPTYPE, NULL);
+        }
+        //check for data parallel computations 
+        if (popped.guid == NULL_GUID) {
+            u32 i;
+            for(i = 1; i < pd->workerCount && (NULL_GUID == popped.guid); i++) {
+                u32 victim = (workerId + i) % pd->workerCount;
+                ocrDpCtxt_t * dpCtxt = self->dpCtxt[victim];
+                if (dpCtxt->active && ((dpCtxt->lb + 1) < dpCtxt->ub)) {
+                    hal_lock32(&(dpCtxt->lock));
+                    if (dpCtxt->active && ((dpCtxt->lb + 1) < dpCtxt->ub)) {
+                        hal_fence();
+                        u64 lb = dpCtxt->lb;
+                        u64 ub = dpCtxt->ub;
+                        if ((lb + 1) < ub) { 
+                            dpCtxt->ub -= (ub - lb) >> 1; //steal half
+                            hal_fence();
+                            if (dpCtxt->lb < dpCtxt->ub) { //steal success
+                                popped.guid = dpCtxt->task;
+                                ocrDpCtxt_t * myDpCtxt = self->dpCtxt[workerId];
+                                ASSERT(myDpCtxt->active == 0);
+                                myDpCtxt->task = dpCtxt->task;
+                                myDpCtxt->latch = dpCtxt->latch;
+                                myDpCtxt->lb = dpCtxt->ub;
+                                myDpCtxt->ub = ub;
+                                myDpCtxt->curIndex = (u64)(-1);
+#define PD_MSG (&msg)
+#define PD_TYPE PD_MSG_DEP_SATISFY
+                                msg.type = PD_MSG_DEP_SATISFY | PD_MSG_REQUEST;
+                                PD_MSG_FIELD(guid.guid) = myDpCtxt->latch;
+                                PD_MSG_FIELD(guid.metaDataPtr) = NULL;
+                                PD_MSG_FIELD(payload.guid) = NULL_GUID;
+                                PD_MSG_FIELD(payload.metaDataPtr) = NULL;
+                                PD_MSG_FIELD(slot) = OCR_EVENT_LATCH_INCR_SLOT;
+                                PD_MSG_FIELD(properties) = 0;
+                                RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, false));
+#undef PD_TYPE
+#undef PD_MSG
+                                hal_fence();
+                                myDpCtxt->active = 1;
+                            } else { //steal exception; rollback
+                                dpCtxt->ub = ub;
+                            }
+                        }
+                    }
+                    hal_unlock32(&(dpCtxt->lock));
+                }
+            }
         }
     }
     // In this implementation we expect the caller to have

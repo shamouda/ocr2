@@ -150,7 +150,10 @@ typedef enum {
     PARTIAL_EDTSTATE    = 0x2, /**< EDT has at least one dependence that is satisfied */
     READY_EDTSTATE      = 0x3, /**< EDT has all dependences satisfied */
     RUNNING_EDTSTATE    = 0x4, /**< EDT is executing */
-    REAPING_EDTSTATE    = 0x5  /**< EDT finished executing and is cleaning up */
+    REAPING_EDTSTATE    = 0x5,  /**< EDT finished executing and is cleaning up */
+    DATA_PARALLEL_CREATED_EDTSTATE = 0x6,
+    DATA_PARALLEL_ACTIVE_EDTSTATE = 0x7,
+    DATA_PARALLEL_SINK_EDTSTATE = 0x8
 } ocrEdtState_t;
 
 /**
