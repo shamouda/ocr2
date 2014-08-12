@@ -1119,12 +1119,17 @@ u8 dataParallelActiveTaskExecute(ocrTask_t* base) {
     ocrDpCtxt_t *dpCtxt = &(worker->dpCtxt);
 
     while(dpCtxt->lb < dpCtxt->ub) {
-        dpCtxt->curIndex = dpCtxt->lb;
-        START_PROFILE(userCode);
-        retGuid = base->funcPtr(base->paramc, base->paramv, base->depc, dpEdt->depv);
-        EXIT_PROFILE;
-        ASSERT(retGuid == NULL_GUID);
-        dpCtxt->lb++;
+        u64 idx = dpCtxt->lb++;
+        hal_fence();
+        if (idx < dpCtxt->ub) {
+            dpCtxt->curIndex = idx;
+            START_PROFILE(userCode);
+            retGuid = base->funcPtr(base->paramc, base->paramv, base->depc, dpEdt->depv);
+            EXIT_PROFILE;
+            ASSERT(retGuid == NULL_GUID);
+        } else {
+            dpCtxt->lb--;
+        }
     }
 
     hal_lock32(&(dpCtxt->lock));
