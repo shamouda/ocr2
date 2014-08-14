@@ -382,11 +382,13 @@ u8 satisfyEventHcLatch(ocrEvent_t *base, ocrFatGuid_t db, u32 slot) {
     return destructEventHc(base);
 }
 
-u8 registerSignalerHc(ocrEvent_t *self, ocrFatGuid_t signaler, u32 slot, ocrDbAccessMode_t mode, bool isDepAdd) {
+u8 registerSignalerHc(ocrEvent_t *self, ocrFatGuid_t signaler, u32 slot,
+                      ocrDbAccessMode_t mode, bool isDepAdd) {
     return 0; // We do not do anything for signalers
 }
 
-u8 unregisterSignalerHc(ocrEvent_t *self, ocrFatGuid_t signaler, u32 slot, bool isDepRem) {
+u8 unregisterSignalerHc(ocrEvent_t *self, ocrFatGuid_t signaler, u32 slot,
+                        bool isDepRem) {
     return 0; // We do not do anything for signalers
 }
 

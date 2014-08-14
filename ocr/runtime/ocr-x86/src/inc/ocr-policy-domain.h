@@ -568,8 +568,8 @@ typedef struct _ocrPolicyMsg_t {
         } PD_MSG_STRUCT_NAME(PD_MSG_DEP_UNREGWAITER);
 
         struct {
-            const char* buffer;  /**< In: Character string to print */
-            u64 length;          /**< In: Length to print */
+            const char* buffer;  /**< In: Character string to print (including NULL terminator) */
+            u64 length;          /**< In: Length to print (including NULL terminator) */
             u32 properties;      /**< In: Properties for the print */
             u32 returnDetail;    /**< Out: Success or error code */
         } PD_MSG_STRUCT_NAME(PD_MSG_SAL_PRINT);

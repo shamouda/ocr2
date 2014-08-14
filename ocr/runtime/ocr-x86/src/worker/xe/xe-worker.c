@@ -153,14 +153,6 @@ void xeStartWorker(ocrWorker_t * base, ocrPolicyDomain_t * policy) {
     }
 }
 
-#ifdef TEMPORARY_FSIM_HACK_TILL_WE_FIGURE_OCR_START_STOP_HANDSHAKES
-// FIXME: HACK!!! HACK!!! HACK!!!
-// Fwd declaration so we can call the fn directly instead of go
-// through a blob function to cook args. Bala needs to resolve this in
-// a better way that allows for args in FSIM.
-ocrGuid_t mainEdt( u32, u64 *, u32, ocrEdtDep_t * );
-#endif
-
 void* xeRunWorker(ocrWorker_t * worker) {
     // Need to pass down a data-structure
     ocrPolicyDomain_t *pd = worker->pd;
@@ -203,6 +195,11 @@ void* xeRunWorker(ocrWorker_t * worker) {
 
     DPRINTF(DEBUG_LVL_INFO, "Starting scheduler routine of worker %ld\n", getWorkerId(worker));
     workerLoop(worker);
+    return NULL;
+}
+
+void* xeWorkShift(ocrWorker_t* worker) {
+    ASSERT(0); // Not supported
     return NULL;
 }
 
@@ -271,6 +268,7 @@ ocrWorkerFactory_t * newOcrWorkerFactoryXe(ocrParamList_t * perType) {
     base->workerFcts.begin = FUNC_ADDR(void (*)(ocrWorker_t*, ocrPolicyDomain_t*), xeBeginWorker);
     base->workerFcts.start = FUNC_ADDR(void (*)(ocrWorker_t*, ocrPolicyDomain_t*), xeStartWorker);
     base->workerFcts.run = FUNC_ADDR(void* (*)(ocrWorker_t*), xeRunWorker);
+    base->workerFcts.workShift = FUNC_ADDR(void* (*)(ocrWorker_t*), xeWorkShift);
     base->workerFcts.stop = FUNC_ADDR(void (*)(ocrWorker_t*), xeStopWorker);
     base->workerFcts.finish = FUNC_ADDR(void (*)(ocrWorker_t*), xeFinishWorker);
     base->workerFcts.isRunning = FUNC_ADDR(bool (*)(ocrWorker_t*), xeIsRunningWorker);

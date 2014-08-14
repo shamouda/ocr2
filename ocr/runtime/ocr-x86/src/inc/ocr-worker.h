@@ -53,7 +53,14 @@ typedef struct _ocrWorkerFcts_t {
      */
     void* (*run)(struct _ocrWorker_t *self);
 
-    /** @brief change worker shift
+    /**
+     * @brief Allows the worker to request another EDT/task
+     * to execute
+     *
+     * This is used by some implementations that support/need
+     * context switching during the execution of an EDT
+     * @warning This API is a WIP and should not be relied on at
+     * the moment (see usage in HC's blocking scheduler)
      */
     void* (*workShift)(struct _ocrWorker_t *self);
 

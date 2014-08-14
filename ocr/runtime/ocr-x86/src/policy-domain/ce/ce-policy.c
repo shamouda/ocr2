@@ -679,8 +679,7 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_WORK_CREATE
         localDeguidify(self, &(PD_MSG_FIELD(templateGuid)));
-        // TODO: Ignore affinity for now. It is garbage!
-        //localDeguidify(self, &(PD_MSG_FIELD(affinity)));
+        localDeguidify(self, &(PD_MSG_FIELD(affinity)));
         localDeguidify(self, &(PD_MSG_FIELD(currentEdt)));
         ocrFatGuid_t *outputEvent = NULL;
         if(PD_MSG_FIELD(outputEvent.guid) == UNINITIALIZED_GUID) {
