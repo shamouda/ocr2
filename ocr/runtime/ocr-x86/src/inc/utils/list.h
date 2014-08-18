@@ -19,6 +19,7 @@
 
 typedef struct _iterator_t {
     struct _ocrPolicyDomain_t * pd;
+    bool (*reset)(struct _iterator_t * it);
     bool (*hasNext)(struct _iterator_t * it);
     void * (*next)(struct _iterator_t * it);
     void (*removeCurrent)(struct _iterator_t * it);

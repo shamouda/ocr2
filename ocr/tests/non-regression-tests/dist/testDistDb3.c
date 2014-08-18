@@ -96,7 +96,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     u64 rparamv = (u64) eventGuid; // NASTY cast: the event to satisfy later on
     ocrGuid_t addEdtGuid;
     ocrEdtCreate(&addEdtGuid, addEdtTemplateGuid, 1, &rparamv, 1, &dbGuid,
-                 EDT_PROP_NONE, affinities[1], NULL);
+                 EDT_PROP_NONE, affinities[affinityCount-1], NULL);
 
     return NULL_GUID;
 }

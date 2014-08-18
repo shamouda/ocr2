@@ -137,6 +137,8 @@ u8 MPICommSendMessage(ocrCommPlatform_t * self,
 
     u64 fullMsgSize = 0, marshalledSize = 0;
     ocrPolicyMsgGetMsgSize(message, &fullMsgSize, &marshalledSize);
+    // TODO the copy here is an issue because the caller that has access to the
+    // handle doesn't know the message pointer has changed
     if (!(properties & PERSIST_MSG_PROP)) {
         ocrPolicyMsg_t * msgCpy = allocateNewMessage(self, fullMsgSize);
         hal_memCopy(msgCpy, message, message->size, false);
@@ -163,15 +165,21 @@ u8 MPICommSendMessage(ocrCommPlatform_t * self,
 
     //DIST-TODO: multi-comm-worker: msgId incr only works if a single comm-worker per rank,
     //do we want OCR to provide PD, system level counters ?
-    //Generate an identifier for this communication
+    // Always generate an identifier for a new communication to give back to upper-layer
     u64 mpiId = mpiComm->msgId++;
 
     // If we're sending a request, set the message's msgId to this communication id
     if (message->type & PD_MSG_REQUEST) {
         message->msgId = mpiId;
+    } else {
+        // For response in ASYNC set the message ID as any.
+        ASSERT(message->type & PD_MSG_RESPONSE);
+        if (properties & ASYNC_MSG_PROP) {
+            message->msgId = SEND_ANY_ID;
+        }
+        // else, for regular responses, just keep the original
+        // message's msgId the calling PD is waiting on.
     }
-    // else, for responses, just keep the original
-    // message's msgId the calling PD is waiting on.
 
     // Prepare MPI call arguments
     MPI_Datatype datatype = MPI_BYTE;
@@ -180,7 +188,7 @@ u8 MPICommSendMessage(ocrCommPlatform_t * self,
     MPI_Comm comm = MPI_COMM_WORLD;
 
     // Setup request's response
-    if (message->type & PD_MSG_REQ_RESPONSE) {
+    if ((message->type & PD_MSG_REQ_RESPONSE) && !(properties & ASYNC_MSG_PROP)) {
         // Reuse request message as receive buffer unless indicated otherwise
         ocrPolicyMsg_t * respMsg = message;
         int respTag = mpiId;
@@ -211,6 +219,10 @@ u8 MPICommSendMessage(ocrCommPlatform_t * self,
     mpiCommHandle_t * handle = createMpiHandle(self, mpiId, properties, message);
     // If this send is for a response, use message's msgId as tag to
     // match the source recv operation that had been posted on the request send.
+    // Note that msgId may be set to zero in the case of asynchronous message
+    // processing as it is the case for DB_ACQUIRE. It allows to treat the
+    // response as a one-way messages that is not tied to any particular request on
+    // the remote end.
     int tag = (message->type & PD_MSG_RESPONSE) ? message->msgId : SEND_ANY_ID;
     MPI_Request * status = &(handle->status);
     DPRINTF(DEBUG_LVL_VERB,"[MPI %d] posting isend for msgId %ld msg %p type %x to rank %d\n",
@@ -236,7 +248,8 @@ u8 MPICommPollMessage_RL2(ocrCommPlatform_t *self, ocrPolicyMsg_t **msg,
     linkedlist_t * outbox = mpiComm->outgoing;
     // RL1 should only be outgoing shutdown message
     while(!outbox->isEmpty(outbox)) {
-        iterator_t * outgoingIt = outbox->iterator(outbox);
+        iterator_t * outgoingIt = mpiComm->outgoingIt;
+        outgoingIt->reset(outgoingIt);
         while (outgoingIt->hasNext(outgoingIt)) {
             mpiCommHandle_t * handle = (mpiCommHandle_t *) outgoingIt->next(outgoingIt);
             int completed = 0;
@@ -251,8 +264,6 @@ u8 MPICommPollMessage_RL2(ocrCommPlatform_t *self, ocrPolicyMsg_t **msg,
                 outgoingIt->removeCurrent(outgoingIt);
             }
         }
-        //DIST-TODO make iterator a singleton for non-safe access and save on mem-alloc
-        outgoingIt->destruct(outgoingIt);
     }
     return POLL_NO_MESSAGE;
 }
@@ -304,7 +315,8 @@ u8 MPICommPollMessage_RL3(ocrCommPlatform_t *self, ocrPolicyMsg_t **msg,
     ASSERT((*msg == NULL) && "MPI comm-layer cannot poll for a specific message");
 
     // Iterate over outgoing communications (mpi sends)
-    iterator_t * outgoingIt = mpiComm->outgoing->iterator(mpiComm->outgoing);
+    iterator_t * outgoingIt = mpiComm->outgoingIt;
+    outgoingIt->reset(outgoingIt);
     while (outgoingIt->hasNext(outgoingIt)) {
         mpiCommHandle_t * mpiHandle = (mpiCommHandle_t *) outgoingIt->next(outgoingIt);
         int completed = 0;
@@ -319,18 +331,17 @@ u8 MPICommPollMessage_RL3(ocrCommPlatform_t *self, ocrPolicyMsg_t **msg,
             ASSERT(msgProperties & PERSIST_MSG_PROP);
             // delete the message if one-way (request or response).
             // Otherwise message is used to store the reply
-            if (!(msgProperties & TWOWAY_MSG_PROP)) {
+            if (!(msgProperties & TWOWAY_MSG_PROP) || (msgProperties & ASYNC_MSG_PROP)) {
                 pd->fcts.pdFree(pd, mpiHandle->msg);
             }
             pd->fcts.pdFree(pd, mpiHandle);
             outgoingIt->removeCurrent(outgoingIt);
         }
     }
-    //DIST-TODO make iterator a singleton for non-safe access and save on mem-alloc
-    outgoingIt->destruct(outgoingIt);
 
     // Iterate over incoming communications (mpi recvs)
-    iterator_t * incomingIt = mpiComm->incoming->iterator(mpiComm->incoming);
+    iterator_t * incomingIt = mpiComm->incomingIt;
+    incomingIt->reset(incomingIt);
 #if STRATEGY_PRE_POST_RECV
     bool debugIts = false;
 #endif
@@ -348,7 +359,6 @@ u8 MPICommPollMessage_RL3(ocrCommPlatform_t *self, ocrPolicyMsg_t **msg,
             *msg = mpiHandle->msg;
             pd->fcts.pdFree(pd, mpiHandle);
             incomingIt->removeCurrent(incomingIt);
-            incomingIt->destruct(incomingIt);
             return res;
         }
     #endif
@@ -376,7 +386,6 @@ u8 MPICommPollMessage_RL3(ocrCommPlatform_t *self, ocrPolicyMsg_t **msg,
 
             pd->fcts.pdFree(pd, mpiHandle);
             incomingIt->removeCurrent(incomingIt);
-            incomingIt->destruct(incomingIt);
             if (needRecvAny) {
                 // Receiving a request indicates a mpi recv any
                 // has completed. Post a new one.
@@ -389,8 +398,6 @@ u8 MPICommPollMessage_RL3(ocrCommPlatform_t *self, ocrPolicyMsg_t **msg,
 #if STRATEGY_PRE_POST_RECV
     ASSERT(debugIts != false); // There should always be an irecv any posted
 #endif
-    incomingIt->destruct(incomingIt);
-
     u8 retValue = POLL_NO_MESSAGE;
 
 #if STRATEGY_PROBE_RECV
@@ -461,6 +468,9 @@ void MPICommStart(ocrCommPlatform_t * self, ocrPolicyDomain_t * pd, ocrCommApi_t
     mpiComm->msgId = 1;
     mpiComm->incoming = newLinkedList(pd);
     mpiComm->outgoing = newLinkedList(pd);
+    mpiComm->incomingIt = mpiComm->incoming->iterator(mpiComm->incoming);
+    mpiComm->outgoingIt = mpiComm->outgoing->iterator(mpiComm->outgoing);
+
     // Default max size is customizable through setMaxExpectedMessageSize()
 #if STRATEGY_PRE_POST_RECV
     //DIST-TODO STRATEGY_PRE_POST_RECV doesn't support arbitrary message size
@@ -570,6 +580,8 @@ void initializeCommPlatformMPI(ocrCommPlatformFactory_t * factory, ocrCommPlatfo
     mpiComm->msgId = 1; // all recv ANY use id '0'
     mpiComm->incoming = NULL;
     mpiComm->outgoing = NULL;
+    mpiComm->incomingIt = NULL;
+    mpiComm->outgoingIt = NULL;
     mpiComm->maxMsgSize = 0;
     int i = 0;
     while (i < (MPI_COMM_RL_MAX+1)) {

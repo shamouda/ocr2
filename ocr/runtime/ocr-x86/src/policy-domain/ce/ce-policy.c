@@ -558,7 +558,8 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             // TODO: Check if properties want DB acquired
             ASSERT(db->fctId == self->dbFactories[0]->factoryId);
             PD_MSG_FIELD(returnDetail) = self->dbFactories[0]->fcts.acquire(
-                db, &(PD_MSG_FIELD(ptr)), PD_MSG_FIELD(edt), false);
+                db, &(PD_MSG_FIELD(ptr)), PD_MSG_FIELD(edt), EDT_SLOT_NONE,
+                DB_MODE_ITW, false, (u32)DB_MODE_ITW);
         } else {
             // Cannot acquire
             PD_MSG_FIELD(ptr) = NULL;
@@ -585,7 +586,9 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         ASSERT(db->fctId == self->dbFactories[0]->factoryId);
         //ASSERT(!(msg->type & PD_MSG_REQ_RESPONSE));
         PD_MSG_FIELD(returnDetail) = self->dbFactories[0]->fcts.acquire(
-            db, &(PD_MSG_FIELD(ptr)), PD_MSG_FIELD(edt), PD_MSG_FIELD(properties) & DB_PROP_RT_ACQUIRE);
+            db, &(PD_MSG_FIELD(ptr)), PD_MSG_FIELD(edt), PD_MSG_FIELD(edtSlot),
+            (ocrDbAccessMode_t)(PD_MSG_FIELD(properties) & (u32)DB_ACCESS_MODE_MASK),
+            PD_MSG_FIELD(properties) & DB_PROP_RT_ACQUIRE, PD_MSG_FIELD(properties));
         DPRINTF(DEBUG_LVL_VVERB, "DB_ACQUIRE response for GUID 0x%lx: PTR: 0x%lx\n",
                 PD_MSG_FIELD(guid.guid), PD_MSG_FIELD(ptr));
         returnCode = ceProcessResponse(self, msg, 0);

@@ -59,6 +59,7 @@ typedef enum {
     PERSIST_MSG_PROP         = 0x2, /**< The input message is guaranteed to be
                                      * valid until *after* a successful poll/wait */
     PENDING_MSG_PROP         = 0x4,  /*message not processed yet*/
+    ASYNC_MSG_PROP           = 0x10,  /* Asynchronous msg processing */
     PRIO1_MSG_PROP           = 0x100, /**< Lowest priority message */
     PRIO2_MSG_PROP           = 0x200, /**< Higher priority message */
     PRIO3_MSG_PROP           = 0x400, /**< Highest priority message */
@@ -150,12 +151,20 @@ typedef enum {
 } ocrWorkType_t;
 
 typedef enum {
-    CREATED_EDTSTATE    = 0x1, /**< EDT created; no dependence satisfied */
-    PARTIAL_EDTSTATE    = 0x2, /**< EDT has at least one dependence that is satisfied */
-    READY_EDTSTATE      = 0x3, /**< EDT has all dependences satisfied */
-    RUNNING_EDTSTATE    = 0x4, /**< EDT is executing */
-    REAPING_EDTSTATE    = 0x5  /**< EDT finished executing and is cleaning up */
+    CREATED_EDTSTATE    = 0x1, /**< EDT created */
+    ALLDEPS_EDTSTATE    = 0x2, /**< EDT has all dependences added */
+    PARTIAL_EDTSTATE    = 0x3, /**< EDT has at least one dependence that is satisfied */
+    ALLSAT_EDTSTATE     = 0x4, /**< EDT has all dependences satisfied */
+    ALLACQ_EDTSTATE     = 0x5, /**< EDT has DB dependences acquired */
+    RUNNING_EDTSTATE    = 0x6, /**< EDT is executing */
+    REAPING_EDTSTATE    = 0x7  /**< EDT finished executing and is cleaning up */
 } ocrEdtState_t;
+
+
+/**
+ * @brief Identifier to represent 'none' of an EDT slots
+ */
+#define EDT_SLOT_NONE ((u32)-1)
 
 /**
  * @brief Type of pop from workpiles.

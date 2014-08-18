@@ -18,6 +18,7 @@
 #include "ocr-task.h"
 #include "utils/ocr-utils.h"
 #include "ocr-worker.h"
+#include "ocr-errors.h"
 
 #ifdef OCR_ENABLE_STATISTICS
 #include "ocr-statistics.h"
@@ -161,10 +162,10 @@ u8 satisfyEventHcOnce(ocrEvent_t *base, ocrFatGuid_t db, u32 slot) {
         PD_MSG_FIELD(guid) = event->waitersDb;
         PD_MSG_FIELD(edt.guid) = curTask ? curTask->guid : NULL_GUID;
         PD_MSG_FIELD(edt.metaDataPtr) = curTask;
-        PD_MSG_FIELD(properties) = DB_PROP_RT_ACQUIRE;
+        PD_MSG_FIELD(properties) = DB_MODE_RO | DB_PROP_RT_ACQUIRE;
         PD_MSG_FIELD(returnDetail) = 0;
-        RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, true));
-
+        u8 res = pd->fcts.processMessage(pd, &msg, true);
+        ASSERT(!res);
         waiters = (regNode_t*)PD_MSG_FIELD(ptr);
         event->waitersDb = PD_MSG_FIELD(guid); //Get updated deguidifcation if needed
         ASSERT(waiters);
@@ -199,7 +200,7 @@ u8 satisfyEventHcOnce(ocrEvent_t *base, ocrFatGuid_t db, u32 slot) {
         PD_MSG_FIELD(edt.metaDataPtr) = curTask;
         PD_MSG_FIELD(properties) = DB_PROP_RT_ACQUIRE;
         PD_MSG_FIELD(returnDetail) = 0;
-        RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, false));
+        RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, true));
 #undef PD_MSG
 #undef PD_TYPE
     }
@@ -212,8 +213,8 @@ u8 satisfyEventHcOnce(ocrEvent_t *base, ocrFatGuid_t db, u32 slot) {
 u8 satisfyEventHcPersist(ocrEvent_t *base, ocrFatGuid_t db, u32 slot) {
     ocrEventHcPersist_t *event = (ocrEventHcPersist_t*)base;
     ASSERT(slot == 0); // Persistent-events are single slot
-    ASSERT(event->base.base.kind == OCR_EVENT_IDEM_T ||
-           event->data == UNINITIALIZED_GUID); // Sticky events can be satisfied once
+    ASSERT((event->base.base.kind == OCR_EVENT_IDEM_T) ||
+           (event->data == UNINITIALIZED_GUID)); // Sticky events can be satisfied once
 
     if(event->data != UNINITIALIZED_GUID) {
         return 1; // TODO: Put some error code here.
@@ -251,10 +252,12 @@ u8 satisfyEventHcPersist(ocrEvent_t *base, ocrFatGuid_t db, u32 slot) {
         PD_MSG_FIELD(guid) = event->base.waitersDb;
         PD_MSG_FIELD(edt.guid) = curTask ? curTask->guid : NULL_GUID;
         PD_MSG_FIELD(edt.metaDataPtr) = curTask;
-        PD_MSG_FIELD(properties) = DB_PROP_RT_ACQUIRE;
+        // !! Warning !! ITW here (and not RO) works in pair with the lock
+        // being unlocked before DB_RELEASE is called in 'registerWaiterEventHcPersist'
+        PD_MSG_FIELD(properties) = DB_MODE_ITW | DB_PROP_RT_ACQUIRE;
         PD_MSG_FIELD(returnDetail) = 0;
-        RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, true));
-
+        u8 res = pd->fcts.processMessage(pd, &msg, true);
+        ASSERT(!res);
         waiters = (regNode_t*)PD_MSG_FIELD(ptr);
         event->base.waitersDb = PD_MSG_FIELD(guid);
         ASSERT(waiters);
@@ -288,7 +291,7 @@ u8 satisfyEventHcPersist(ocrEvent_t *base, ocrFatGuid_t db, u32 slot) {
         PD_MSG_FIELD(edt.metaDataPtr) = curTask;
         PD_MSG_FIELD(properties) = DB_PROP_RT_ACQUIRE;
         PD_MSG_FIELD(returnDetail) = 0;
-        RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, false));
+        RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, true));
 #undef PD_MSG
 #undef PD_TYPE
         //TODO early release of the DB here ?
@@ -337,9 +340,10 @@ u8 satisfyEventHcLatch(ocrEvent_t *base, ocrFatGuid_t db, u32 slot) {
         PD_MSG_FIELD(guid) = event->base.waitersDb;
         PD_MSG_FIELD(edt.guid) = curTask ? curTask->guid : NULL_GUID;
         PD_MSG_FIELD(edt.metaDataPtr) = curTask;
-        PD_MSG_FIELD(properties) = DB_PROP_RT_ACQUIRE;
+        PD_MSG_FIELD(properties) = DB_MODE_RO | DB_PROP_RT_ACQUIRE;
         PD_MSG_FIELD(returnDetail) = 0;
-        RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, true));
+        u8 res = pd->fcts.processMessage(pd, &msg, true);
+        ASSERT(!res);
 
         waiters = (regNode_t*)PD_MSG_FIELD(ptr);
         event->base.waitersDb = PD_MSG_FIELD(guid);
@@ -374,7 +378,7 @@ u8 satisfyEventHcLatch(ocrEvent_t *base, ocrFatGuid_t db, u32 slot) {
         PD_MSG_FIELD(edt.metaDataPtr) = curTask;
         PD_MSG_FIELD(properties) = DB_PROP_RT_ACQUIRE;
         PD_MSG_FIELD(returnDetail) = 0;
-        RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, false));
+        RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, true));
 #undef PD_MSG
 #undef PD_TYPE
     }
@@ -420,10 +424,10 @@ u8 registerWaiterEventHc(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot, bool i
     PD_MSG_FIELD(guid) = event->waitersDb;
     PD_MSG_FIELD(edt.guid) = curTask ? curTask->guid : NULL_GUID;
     PD_MSG_FIELD(edt.metaDataPtr) = curTask;
-    PD_MSG_FIELD(properties) = DB_PROP_RT_ACQUIRE;
+    PD_MSG_FIELD(properties) = DB_MODE_ITW | DB_PROP_RT_ACQUIRE;
     PD_MSG_FIELD(returnDetail) = 0;
-    RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, true));
-
+    u8 res = pd->fcts.processMessage(pd, &msg, true);
+    ASSERT(!res);
     waiters = (regNode_t*)PD_MSG_FIELD(ptr);
     event->waitersDb = PD_MSG_FIELD(guid);
     ASSERT(waiters);
@@ -487,7 +491,7 @@ u8 registerWaiterEventHc(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot, bool i
     PD_MSG_FIELD(edt.metaDataPtr) = curTask;
     PD_MSG_FIELD(properties) = waitersNew?0:DB_PROP_RT_ACQUIRE;
     PD_MSG_FIELD(returnDetail) = 0;
-    RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, false));
+    RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, true));
 #undef PD_MSG
 #undef PD_TYPE
 
@@ -566,9 +570,12 @@ u8 registerWaiterEventHcPersist(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot,
     PD_MSG_FIELD(guid) = event->base.waitersDb;
     PD_MSG_FIELD(edt.guid) = curTask ? curTask->guid : NULL_GUID;
     PD_MSG_FIELD(edt.metaDataPtr) = curTask;
-    PD_MSG_FIELD(properties) = DB_PROP_RT_ACQUIRE;
+    PD_MSG_FIELD(properties) = DB_MODE_ITW | DB_PROP_RT_ACQUIRE;
     PD_MSG_FIELD(returnDetail) = 0;
     if((toReturn = pd->fcts.processMessage(pd, &msg, true))) {
+        // should be the only writer active on the waiter DB since we have the lock
+        ASSERT(false); // debug
+        ASSERT(toReturn != OCR_EBUSY);
         hal_unlock32(&(event->waitersLock));
         return toReturn; //TODO error status
     }
@@ -592,6 +599,7 @@ u8 registerWaiterEventHcPersist(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot,
         PD_MSG_FIELD(dbType) = RUNTIME_DBTYPE;
         PD_MSG_FIELD(allocator) = NO_ALLOC;
         if((toReturn = pd->fcts.processMessage(pd, &msg, true))) {
+            ASSERT(false); // debug
             hal_unlock32(&(event->waitersLock));
             return toReturn; //TODO error status
         }
@@ -614,7 +622,17 @@ u8 registerWaiterEventHcPersist(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot,
     ++event->base.waitersCount;
     // Now release the DB(s)
     if(waitersNew) {
-        // We need to destroy the old DB and release the new one
+        // We need to release and destroy the old DB and release the new one
+#define PD_TYPE PD_MSG_DB_RELEASE
+        getCurrentEnv(NULL, NULL, NULL, &msg);
+        msg.type = PD_MSG_DB_RELEASE | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
+        PD_MSG_FIELD(guid) = event->base.waitersDb;
+        PD_MSG_FIELD(edt.guid) = curTask ? curTask->guid : NULL_GUID;
+        PD_MSG_FIELD(edt.metaDataPtr) = curTask;
+        PD_MSG_FIELD(properties) = DB_PROP_RT_ACQUIRE;
+        PD_MSG_FIELD(returnDetail) = 0;
+        RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, true));
+#undef PD_TYPE
 #define PD_TYPE PD_MSG_DB_FREE
         getCurrentEnv(NULL, NULL, NULL, &msg);
         msg.type = PD_MSG_DB_FREE | PD_MSG_REQUEST;
@@ -623,11 +641,12 @@ u8 registerWaiterEventHcPersist(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot,
         PD_MSG_FIELD(edt.metaDataPtr) = curTask;
         PD_MSG_FIELD(properties) = 0;
         if((toReturn = pd->fcts.processMessage(pd, &msg, false))) {
+            ASSERT(false); // debug
             hal_unlock32(&(event->waitersLock));
             return toReturn; //TODO error status
         }
-        event->base.waitersDb = newGuid;
 #undef PD_TYPE
+        event->base.waitersDb = newGuid;
     }
     // We can release the lock now
     hal_unlock32(&(event->waitersLock));
@@ -639,9 +658,9 @@ u8 registerWaiterEventHcPersist(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot,
     PD_MSG_FIELD(guid) = event->base.waitersDb;
     PD_MSG_FIELD(edt.guid) = curTask ? curTask->guid : NULL_GUID;
     PD_MSG_FIELD(edt.metaDataPtr) = curTask;
-    PD_MSG_FIELD(properties) = waitersNew?0:DB_PROP_RT_ACQUIRE;
+    PD_MSG_FIELD(properties) = DB_PROP_RT_ACQUIRE;
     PD_MSG_FIELD(returnDetail) = 0;
-    RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, false));
+    RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, true));
 #undef PD_MSG
 #undef PD_TYPE
     return 0; //Require registerSignaler invocation
@@ -672,9 +691,10 @@ u8 unregisterWaiterEventHc(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot, bool
     PD_MSG_FIELD(guid) = event->waitersDb;
     PD_MSG_FIELD(edt.guid) = curTask ? curTask->guid : NULL_GUID;
     PD_MSG_FIELD(edt.metaDataPtr) = curTask;
-    PD_MSG_FIELD(properties) = DB_PROP_RT_ACQUIRE;
+    PD_MSG_FIELD(properties) = DB_MODE_ITW | DB_PROP_RT_ACQUIRE;
     PD_MSG_FIELD(returnDetail) = 0;
-    RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, true));
+    u8 res = pd->fcts.processMessage(pd, &msg, true);
+    ASSERT(!res);
 
     waiters = (regNode_t*)PD_MSG_FIELD(ptr);
     event->waitersDb = PD_MSG_FIELD(guid);
@@ -700,7 +720,7 @@ u8 unregisterWaiterEventHc(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot, bool
     PD_MSG_FIELD(edt.metaDataPtr) = curTask;
     PD_MSG_FIELD(properties) = DB_PROP_RT_ACQUIRE;
     PD_MSG_FIELD(returnDetail) = 0;
-    RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, false));
+    RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, true));
 #undef PD_MSG
 #undef PD_TYPE
     return 0;
@@ -738,9 +758,10 @@ u8 unregisterWaiterEventHcPersist(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slo
     PD_MSG_FIELD(guid) = event->base.waitersDb;
     PD_MSG_FIELD(edt.guid) = curTask ? curTask->guid : NULL_GUID;
     PD_MSG_FIELD(edt.metaDataPtr) = curTask;
-    PD_MSG_FIELD(properties) = DB_PROP_RT_ACQUIRE;
+    PD_MSG_FIELD(properties) = DB_MODE_ITW | DB_PROP_RT_ACQUIRE;
     PD_MSG_FIELD(returnDetail) = 0;
     if((toReturn = pd->fcts.processMessage(pd, &msg, true))) {
+        ASSERT(!toReturn);
         hal_unlock32(&(event->waitersLock));
         return toReturn;
     }
@@ -772,7 +793,7 @@ u8 unregisterWaiterEventHcPersist(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slo
     PD_MSG_FIELD(edt.metaDataPtr) = curTask;
     PD_MSG_FIELD(properties) = DB_PROP_RT_ACQUIRE;
     PD_MSG_FIELD(returnDetail) = 0;
-    RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, false));
+    RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, true));
 #undef PD_MSG
 #undef PD_TYPE
     return 0;
@@ -818,6 +839,7 @@ ocrEvent_t * newEventHc(ocrEventFactory_t * factory, ocrEventTypes_t eventType,
             kind = OCR_GUID_EVENT_LATCH;
             break;
         default:
+            kind = OCR_GUID_NONE; // To keep clang happy
             ASSERT(false && "Unknown type of event");
     }
 
@@ -910,7 +932,7 @@ ocrEvent_t * newEventHc(ocrEventFactory_t * factory, ocrEventTypes_t eventType,
     PD_MSG_FIELD(edt.metaDataPtr) = curTask;
     PD_MSG_FIELD(properties) = 0;
     PD_MSG_FIELD(returnDetail) = 0;
-    RESULT_PROPAGATE2(pd->fcts.processMessage(pd, &msg, false), NULL);
+    RESULT_PROPAGATE2(pd->fcts.processMessage(pd, &msg, true), NULL);
 #undef PD_MSG
 #undef PD_TYPE
 

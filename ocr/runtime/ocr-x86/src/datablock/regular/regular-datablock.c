@@ -32,8 +32,8 @@
 // Forward declaraction
 u8 regularDestruct(ocrDataBlock_t *self);
 
-u8 regularAcquire(ocrDataBlock_t *self, void** ptr, ocrFatGuid_t edt,
-                  bool isInternal) {
+u8 regularAcquire(ocrDataBlock_t *self, void** ptr, ocrFatGuid_t edt, u32 edtSlot,
+                  ocrDbAccessMode_t mode, bool isInternal, u32 properties) {
 
     ocrDataBlockRegular_t *rself = (ocrDataBlockRegular_t*)self;
     *ptr = NULL;
@@ -260,9 +260,6 @@ ocrDataBlock_t* newDataBlockRegular(ocrDataBlockFactory_t *factory, ocrFatGuid_t
     result->base.allocatingPD = allocPD.guid;
     result->base.size = size;
     result->base.ptr = ptr;
-    // Only keep flags that represent the nature of
-    // the DB as opposed to one-time usage creation flags
-    result->base.flags = (flags & DB_PROP_SINGLE_ASSIGNMENT);
     result->base.fctId = factory->factoryId;
 
     result->lock =0;
@@ -300,7 +297,7 @@ ocrDataBlockFactory_t *newDataBlockFactoryRegular(ocrParamList_t *perType, u32 f
                                    u64, void*, u32, ocrParamList_t*), newDataBlockRegular);
     base->destruct = FUNC_ADDR(void (*)(ocrDataBlockFactory_t*), destructRegularFactory);
     base->fcts.destruct = FUNC_ADDR(u8 (*)(ocrDataBlock_t*), regularDestruct);
-    base->fcts.acquire = FUNC_ADDR(u8 (*)(ocrDataBlock_t*, void**, ocrFatGuid_t, bool), regularAcquire);
+    base->fcts.acquire = FUNC_ADDR(u8 (*)(ocrDataBlock_t*, void**, ocrFatGuid_t, u32, ocrDbAccessMode_t, bool, u32), regularAcquire);
     base->fcts.release = FUNC_ADDR(u8 (*)(ocrDataBlock_t*, ocrFatGuid_t, bool), regularRelease);
     base->fcts.free = FUNC_ADDR(u8 (*)(ocrDataBlock_t*, ocrFatGuid_t), regularFree);
     base->fcts.registerWaiter = FUNC_ADDR(u8 (*)(ocrDataBlock_t*, ocrFatGuid_t,

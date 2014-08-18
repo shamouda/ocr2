@@ -4,10 +4,6 @@
  * removed or modified.
  */
 
-
-
-
-
 #include "ocr.h"
 
 /**

@@ -72,6 +72,14 @@ typedef struct _linkedlist_t_iterator_t {
     listnode_t * curr;
 } linkedlist_iterator_t;
 
+bool linkedListIteratorReset(iterator_t * iterator) {
+    linkedlist_iterator_t * llit = (linkedlist_iterator_t *) iterator;
+    llit->ante = NULL;
+    llit->prev = NULL;
+    llit->curr = llit->list->head;
+    return false;
+}
+
 bool linkedListIteratorHasNext(iterator_t * iterator) {
     linkedlist_iterator_t * it = (linkedlist_iterator_t *) iterator;
     return (it->curr != NULL);
@@ -116,6 +124,7 @@ iterator_t * newLinkedListIterator(linkedlist_t *self) {
     linkedlist_iterator_t * iterator = (linkedlist_iterator_t *)
         pd->fcts.pdMalloc(pd, sizeof(linkedlist_iterator_t));
     iterator->base.pd = pd;
+    iterator->base.reset = linkedListIteratorReset;
     iterator->base.hasNext = linkedListIteratorHasNext;
     iterator->base.next = linkedListIteratorNext;
     iterator->base.removeCurrent = linkedListIteratorRemove;

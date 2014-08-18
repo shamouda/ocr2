@@ -28,6 +28,8 @@ typedef struct {
     u64 msgId;
     linkedlist_t * incoming;
     linkedlist_t * outgoing;
+    iterator_t * incomingIt;
+    iterator_t * outgoingIt;
     u64 maxMsgSize;
     volatile int rl;
     volatile int rl_completed [MPI_COMM_RL_MAX+1];

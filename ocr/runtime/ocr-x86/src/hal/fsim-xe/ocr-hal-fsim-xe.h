@@ -33,6 +33,7 @@
 #define hal_fence()                                     \
     do { __asm__ __volatile__("fence 0xF\n\t"); } while(0)
 
+
 /**
  * @brief Memory copy from source to destination
  *
@@ -58,6 +59,40 @@
         if (!isBackground) __asm__ __volatile__("fence 0xF\n\t");       \
     } while(0)
 
+
+/**
+ * @brief Memory move from source to destination. As if overlapping portions
+ * were copied to a temporary array
+ *
+ * @param destination[in]    A u64 pointing to where the data is to be copied
+ *                           to
+ * @param source[in]         A u64 pointing to where the data is to be copied
+ *                           from
+ * @param size[in]           A u64 indicating the number of bytes to be copied
+ * @param isBackground[in]   A u8: A zero value indicates that the call will
+ *                           return only once the copy is fully complete and a
+ *                           non-zero value indicates the copy may proceed
+ *                           in the background. A fence will then be
+ *                           required to ensure completion of the copy
+ * source and destination
+ */
+#define hal_memMove(destination, source, size, isBackground) \
+    do {                                                                \
+        u64 _source = (u64)source;                                      \
+        u64 _destination = (u64)destination;                            \
+        if (_source != _destination) {                                  \
+            /* end of dst overlaps with beginning of src */             \
+            if ((_source > _destination) && ((_destination+size) > _source)) { \
+                hal_memCopy(_destination, _source, (_destination+size)-_source, isBackground); \
+                hal_memCopy(_destination+((_destination+size)-_source), (_destination+size), _source-_destination, isBackground); \
+            }                                                           \
+            /* end of src overlaps with beginning of dst */             \
+            if ((_source < _destination) && ((_source+size) > _destination)) { \
+                hal_memCopy(_destination+(_destination-_source), _destination, ((_source+size)-_destination), isBackground); \
+                hal_memCopy(_destination, _source, _destination-_source, isBackground); \
+            }                                                           \
+        }                                                               \
+    } while(0);
 
 /**
  * @brief Atomic swap (64 bit)

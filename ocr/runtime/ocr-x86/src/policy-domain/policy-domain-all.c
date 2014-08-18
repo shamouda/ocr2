@@ -165,10 +165,22 @@ u8 ocrPolicyMsgMarshallMsg(ocrPolicyMsg_t* msg, u8* buffer, ocrMarshallMode_t mo
     switch(outputMsg->type & PD_MSG_TYPE_ONLY) {
     case PD_MSG_WORK_CREATE: {
 #define PD_TYPE PD_MSG_WORK_CREATE
+        // Catch misues for paramc
+        ASSERT(((PD_MSG_FIELD(paramc) != 0) && (PD_MSG_FIELD(paramv) != NULL))
+               || (PD_MSG_FIELD(paramc) == 0) && (PD_MSG_FIELD(paramv) == NULL));
+        // Implementation: So far, we do not pass depv directly as part of this message
+        // If we do, we need to implement marshalling for that as well
+        ASSERT(PD_MSG_FIELD(depv) == NULL);
+
         // First copy things over
         u64 s = sizeof(u64)*PD_MSG_FIELD(paramc);
         if(s) {
-            hal_memCopy(curPtr, PD_MSG_FIELD(paramv), s, false);
+            // There are params and they are already serialized.
+            // Can happen when sending a responde and the request already had
+            // marshalled data
+            if(PD_MSG_FIELD(paramv) != (void*)curPtr) {
+                hal_memCopy(curPtr, PD_MSG_FIELD(paramv), s, false);
+            }
             // Now fixup the pointer
             if(fixupPtrs) {
                 DPRINTF(DEBUG_LVL_VVERB, "Converting paramv (0x%lx) to 0x%lx\n",

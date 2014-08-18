@@ -39,7 +39,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ASSERT(affinityCount >= 1);
     ocrGuid_t affinities[affinityCount];
     ocrAffinityGet(AFFINITY_PD, &affinityCount, affinities);
-    ocrGuid_t edtAffinity = affinities[affinityCount-1]; //TODO this implies we know current PD is '0'
+    ocrGuid_t edtAffinity = affinities[affinityCount-1];
 
     // Setup the sink EDT
     ocrGuid_t event1Guid;

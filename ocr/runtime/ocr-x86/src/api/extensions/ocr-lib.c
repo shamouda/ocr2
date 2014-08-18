@@ -233,7 +233,7 @@ ocrGuid_t ocrWait(ocrGuid_t eventToYieldForGuid) {
     PD_MSG_FIELD(guid.guid) = eventToYieldForGuid;
     PD_MSG_FIELD(guid.metaDataPtr) = NULL;
     PD_MSG_FIELD(properties) = KIND_GUIDPROP | RMETA_GUIDPROP;
-    RESULT_PROPAGATE2(pd->fcts.processMessage(pd, &msg, false), ERROR_GUID);
+    RESULT_PROPAGATE2(pd->fcts.processMessage(pd, &msg, true), ERROR_GUID);
     eventToYieldFor = (ocrEvent_t *)PD_MSG_FIELD(guid.metaDataPtr);
 #undef PD_MSG
 #undef PD_TYPE

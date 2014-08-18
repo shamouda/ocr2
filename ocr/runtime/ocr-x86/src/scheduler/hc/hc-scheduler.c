@@ -216,8 +216,10 @@ u8 hcSchedulerGive (ocrScheduler_t* base, u32* count, ocrFatGuid_t* edts) {
     ocrWorkpile_t * wpToPush = pushMappingOneToOne(base, workerId);
     u32 i = 0;
     for ( ; i < *count; ++i ) {
-        wpToPush->fcts.push(wpToPush, PUSH_WORKPUSHTYPE, edts[i]);
-        edts[i].guid = NULL_GUID;
+        if (((ocrTask_t *)edts[i].metaDataPtr)->state == ALLACQ_EDTSTATE) {
+            wpToPush->fcts.push(wpToPush, PUSH_WORKPUSHTYPE, edts[i]);
+            edts[i].guid = NULL_GUID;
+        }
     }
     *count = 0;
     return 0;

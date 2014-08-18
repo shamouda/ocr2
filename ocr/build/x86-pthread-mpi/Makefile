@@ -14,7 +14,7 @@ $(error ARCH is set to ${ARCH} but expected x86-pthread-mpi)
 endif
 endif
 
-DEFAULT_CONFIG=mach-hc-dist-mpi-clone-4w.cfg
+DEFAULT_CONFIG=mach-hc-dist-mpi-clone-8w-lockable.cfg
 
 #
 # Tool-chain to be used for the build

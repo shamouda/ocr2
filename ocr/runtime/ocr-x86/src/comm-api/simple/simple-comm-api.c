@@ -58,7 +58,7 @@ u8 sendMessageSimpleCommApi(ocrCommApi_t *self, ocrLocation_t target, ocrPolicyM
         ocrPolicyMsg_t * msgCpy = allocateNewMessage(self, message->size);
         hal_memCopy(msgCpy, message, message->size, false);
         message = msgCpy;
-        properties &= PERSIST_MSG_PROP;
+        properties |= PERSIST_MSG_PROP;
     }
 
     // This is weird but otherwise the compiler complains...
@@ -122,10 +122,16 @@ u8 pollMessageSimpleCommApi(ocrCommApi_t *self, ocrMsgHandle_t **handle) {
             // Response for a request
             //NOTE: If the outgoing communication requires a response, the communication layer
             //      must set the handler->response pointer to the response's communication handler.
-
             ASSERT(msg->type & PD_MSG_RESPONSE);
-            bool found = hashtableNonConcRemove(commApiSimple->handleMap, (void *) msg->msgId, (void **)handle);
-            ASSERT(found && (*handle != NULL));
+            if (msg->msgId == 0) {
+                // Contractual with comm-platform when msgId is zero.
+                // It is an asynchronous response callback, not registered in the hashtable.
+                *handle = createMsgHandler(self, msg);
+                (*handle)->properties = ASYNC_MSG_PROP;
+            } else {
+                bool found = hashtableNonConcRemove(commApiSimple->handleMap, (void *) msg->msgId, (void **)handle);
+                ASSERT(found && (*handle != NULL));
+            }
             (*handle)->response = msg;
             (*handle)->status = HDL_RESPONSE_OK;
         }

@@ -23,7 +23,7 @@ RMD_INSTALL ?= ../../../ss/install
 
 PREFIX  := ${RMD_INSTALL}/bin/rmd-linux-elf-
 CC      := $(PREFIX)clang
-CFLAGS  := -frmd-extensions -fno-builtin -I ${RMD_INSTALL}/include
+CFLAGS  := -frmd-extensions -fno-builtin -Wno-typedef-redefinition -I ${RMD_INSTALL}/include
 
 RM      := rm
 RMFLAGS := -rf

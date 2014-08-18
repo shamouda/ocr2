@@ -214,6 +214,20 @@ typedef struct _ocrTaskFcts_t {
      * @return 0 on success and a non-zero code on failure
      */
     u8 (*execute)(struct _ocrTask_t* self);
+
+    /**
+     * @brief Sets the a pointer to a datablock dependence the task has.
+     *
+     * This should be called to set the task's resolved DB dependences pointers
+     * after acquisition.
+     *
+     * @param[in] self        Pointer to this task.
+     * @param[in] dbGuid      The guid of the datablock
+     * @param[in] localDbPtr  Pointer to a task's dependence DB data pointer
+     * @param[in] self        The slot of the dependence.
+     * @return 0 on success and a non-zero code on failure
+     */
+    u8 (*dependenceResolved)(struct _ocrTask_t* self, ocrGuid_t dbGuid, void* localPtr, u32 slot);
 } ocrTaskFcts_t;
 
 #define ELS_RUNTIME_SIZE 0
@@ -238,7 +252,7 @@ typedef struct _ocrTask_t {
     ocrGuid_t outputEvent;  /**< Event to notify when the EDT is done */
     ocrGuid_t finishLatch;  /**< Latch event for this EDT (if this is a finish EDT) */
     ocrGuid_t parentLatch;  /**< Inner-most latch event (not of this EDT) */
-    ocrGuid_t els[ELS_SIZE];
+    ocrGuid_t els[ELS_SIZE];/**< EDT local storage */
     ocrEdtState_t state;    /**< State of the EDT */
     u32 paramc, depc;       /**< Number of parameters and dependences */
     u32 fctId;

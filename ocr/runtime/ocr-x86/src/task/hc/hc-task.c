@@ -202,20 +202,21 @@ static inline bool hasProperty(u32 properties, u32 property) {
     return properties & property;
 }
 
-static u8 registerOnFrontier(ocrTaskHc_t *self, ocrPolicyDomain_t *pd,
-                             ocrPolicyMsg_t *msg, u32 slot) {
-#define PD_MSG (msg)
+static u8 registerOnFrontier(ocrTaskHc_t *self, ocrPolicyDomain_t *pd, u32 slot) {
+    ocrPolicyMsg_t msg;
+    getCurrentEnv(NULL, NULL, NULL, &msg);
+#define PD_MSG (&msg)
 #define PD_TYPE PD_MSG_DEP_REGWAITER
-    msg->type = PD_MSG_DEP_REGWAITER | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
+    msg.type = PD_MSG_DEP_REGWAITER | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
     PD_MSG_FIELD(waiter.guid) = self->base.guid;
     PD_MSG_FIELD(waiter.metaDataPtr) = self;
     PD_MSG_FIELD(dest.guid) = self->signalers[slot].guid;
     PD_MSG_FIELD(dest.metaDataPtr) = NULL;
     PD_MSG_FIELD(slot) = self->signalers[slot].slot;
     PD_MSG_FIELD(properties) = false; // not called from add-dependence
-    RESULT_PROPAGATE(pd->fcts.processMessage(pd, msg, false));
 #undef PD_MSG
 #undef PD_TYPE
+    RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, true));
     return 0;
 }
 /******************************************************/
@@ -235,6 +236,8 @@ static u8 initTaskHcInternal(ocrTaskHc_t *task, ocrPolicyDomain_t * pd,
     task->unkDbs = NULL;
     task->countUnkDbs = 0;
     task->maxUnkDbs = 0;
+    task->resolvedDeps = NULL;
+    task->doNotReleaseSlots = 0;
 
     if(task->base.depc == 0) {
         task->signalers = END_OF_LIST;
@@ -280,19 +283,90 @@ static u8 initTaskHcInternal(ocrTaskHc_t *task, ocrPolicyDomain_t * pd,
 }
 
 /**
- * @brief Schedules a task.
- * Warning: The caller must ensure all dependencies have been satisfied
- * Note: static function only meant to factorize code.
+ * @brief sorted an array of regNode_t according to their GUID
+ * Warning. 'notifyDbReleaseTaskHc' relies on this sort to be stable !
  */
-static u8 taskSchedule(ocrTask_t *self) {
-    DPRINTF(DEBUG_LVL_INFO, "Schedule 0x%lx\n", self->guid);
+ static void sortRegNode(regNode_t * array, u32 length) {
+     if (length >= 2) {
+        int idx;
+        int sorted = 0;
+        do {
+            idx = sorted;
+            regNode_t val = array[sorted+1];
+            while((idx > -1) && (array[idx].guid > val.guid)) {
+                idx--;
+            }
+            if (idx < sorted) {
+                // shift by one to insert the element
+                hal_memMove(&array[idx+2], &array[idx+1], sizeof(regNode_t)*(sorted-idx), false);
+                array[idx+1] = val;
+            }
+            sorted++;
+        } while (sorted < (length-1));
+    }
+}
 
+/**
+ * @brief Advance the DB iteration frontier to the next DB
+ * This implementation iterates on the GUID-sorted signaler vector
+ * Returns false when the end of depv is reached
+ */
+static u8 iterateDbFrontier(ocrTask_t *self) {
+    ocrTaskHc_t * rself = ((ocrTaskHc_t *) self);
+    regNode_t * depv = rself->signalers;
+    u32 i = rself->frontierSlot;
+    for (; i < self->depc; ++i) {
+        // Important to do this before we call processMessage
+        // because of the assert checks done in satisfyTaskHc
+        rself->frontierSlot++;
+        if (depv[i].guid != NULL_GUID) {
+            // Because the frontier is sorted, we can check for duplicates here
+            // and remember them to avoid double release
+            if ((i > 0) && (depv[i-1].guid == depv[i].guid)) {
+                rself->resolvedDeps[depv[i].slot].ptr = rself->resolvedDeps[depv[i-1].slot].ptr;
+                rself->doNotReleaseSlots |= (1ULL << depv[i].slot);
+            } else {
+                // Issue registration request
+                ocrPolicyDomain_t * pd = NULL;
+                ocrPolicyMsg_t msg;
+                getCurrentEnv(&pd, NULL, NULL, &msg);
+            #define PD_MSG (&msg)
+            #define PD_TYPE PD_MSG_DB_ACQUIRE
+                msg.type = PD_MSG_DB_ACQUIRE | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
+                PD_MSG_FIELD(guid.guid) = depv[i].guid; // DB guid
+                PD_MSG_FIELD(guid.metaDataPtr) = NULL;
+                PD_MSG_FIELD(edt.guid) = self->guid; // EDT guid
+                PD_MSG_FIELD(edt.metaDataPtr) = self;
+                PD_MSG_FIELD(edtSlot) = self->depc + 1; // RT slot
+                PD_MSG_FIELD(properties) = depv[i].mode | DB_PROP_RT_ACQUIRE;
+                u8 returnCode = pd->fcts.processMessage(pd, &msg, false);
+                // DB_ACQUIRE is potentially asynchronous, check completion
+                if (returnCode == OCR_EPEND) {
+                    return true;
+                }
+                // else, acquire took place and was successful, continue iterating
+                ASSERT(msg.type & PD_MSG_RESPONSE); // 2x check
+                rself->resolvedDeps[depv[i].slot].ptr = PD_MSG_FIELD(ptr);
+            #undef PD_MSG
+            #undef PD_TYPE
+            }
+        }
+    }
+    return false;
+}
+
+/**
+ * @brief Give the task to the scheduler
+ * Warning: The caller must ensure all dependencies have been satisfied
+ */
+static u8 scheduleTask(ocrTask_t *self) {
+    DPRINTF(DEBUG_LVL_INFO, "Schedule 0x%lx\n", self->guid);
+    self->state = ALLACQ_EDTSTATE;
     ocrPolicyDomain_t *pd = NULL;
     ocrPolicyMsg_t msg;
     getCurrentEnv(&pd, NULL, NULL, &msg);
 
     ocrFatGuid_t toGive = {.guid = self->guid, .metaDataPtr = self};
-
 #define PD_MSG (&msg)
 #define PD_TYPE PD_MSG_COMM_GIVE
     msg.type = PD_MSG_COMM_GIVE | PD_MSG_REQUEST;
@@ -303,6 +377,49 @@ static u8 taskSchedule(ocrTask_t *self) {
     RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, false));
 #undef PD_MSG
 #undef PD_TYPE
+    return 0;
+}
+
+/**
+ * @brief Dependences of the tasks have been satisfied
+ * Warning: The caller must ensure all dependencies have been satisfied
+ * Note: static function only meant to factorize code.
+ */
+static u8 taskAllDepvSatisfied(ocrTask_t *self) {
+    //TODO DBX It feels the responsibility of fetching DB-related things should
+    //be in the scheduler, however it is difficult to interact with the task
+    //inners from there.
+    DPRINTF(DEBUG_LVL_INFO, "All dependences satisfied for task 0x%lx\n", self->guid);
+    // Now check if there's anything to do before scheduling
+    // In this implementation we want to acquire locks for DBs in EW mode
+    ocrTaskHc_t * hcTask = ((ocrTaskHc_t *) self);
+    hcTask->frontierSlot = 0;
+    if (self->depc > 0) {
+        ocrPolicyDomain_t * pd = NULL;
+        getCurrentEnv(&pd, NULL, NULL, NULL);
+        // Initialize the dependence list to be transmitted to the EDT's user code.
+        ocrTaskHc_t * rself = (ocrTaskHc_t *) self;
+        u32 depc = self->depc;
+        ocrEdtDep_t * resolvedDeps = pd->fcts.pdMalloc(pd, sizeof(ocrEdtDep_t)* depc);
+        rself->resolvedDeps = resolvedDeps;
+        regNode_t * signalers = rself->signalers;
+        u32 i = 0;
+        while(i < depc) {
+            rself->signalers[i].slot = i; // reset the slot info
+            resolvedDeps[i].guid = signalers[i].guid; // DB guids by now
+            resolvedDeps[i].ptr = NULL; // resolved by acquire messages
+            i++;
+        }
+        // Sort regnode in guid's ascending order.
+        // This is the order in which we acquire the DBs
+        sortRegNode(signalers, self->depc);
+        // Start the DB acquisition process
+        rself->frontierSlot = 0;
+    }
+
+    if (!iterateDbFrontier(self)) {
+        scheduleTask(self);
+    }
     return 0;
 }
 
@@ -420,7 +537,7 @@ ocrTask_t * newTaskHc(ocrTaskFactory_t* factory, ocrFatGuid_t edtTemplate,
     for(i = 0; i < depc; ++i) {
         edt->signalers[i].guid = UNINITIALIZED_GUID;
         edt->signalers[i].slot = i;
-        edt->signalers[i].mode = -1;
+        edt->signalers[i].mode = DB_DEFAULT_MODE;
     }
 
     // Set up HC specific stuff
@@ -462,9 +579,25 @@ ocrTask_t * newTaskHc(ocrTaskFactory_t* factory, ocrFatGuid_t edtTemplate,
     if(base->depc == edt->slotSatisfiedCount) {
         DPRINTF(DEBUG_LVL_VVERB, "Scheduling task 0x%lx due to initial satisfactions\n",
                 base->guid);
-        RESULT_PROPAGATE2(taskSchedule(base), NULL);
+        RESULT_PROPAGATE2(taskAllDepvSatisfied(base), NULL);
     }
     return base;
+}
+
+u8 dependenceResolvedTaskHc(ocrTask_t * self, ocrGuid_t dbGuid, void * localDbPtr, u32 slot) {
+    ocrTaskHc_t * rself = (ocrTaskHc_t *) self;
+    // EDT already has all its dependences satisfied, now we're getting acquire notifications
+    // should only happen on RT event slot to manage DB acquire
+    ASSERT(slot == (self->depc+1));
+    ASSERT(rself->slotSatisfiedCount == slot);
+    // Implementation acquires DB sequentially, so the DB's GUID
+    // must match the frontier's DB and we do not need to lock this code
+    ASSERT(dbGuid == rself->signalers[rself->frontierSlot-1].guid);
+    rself->resolvedDeps[rself->signalers[rself->frontierSlot-1].slot].ptr = localDbPtr;
+    if (!iterateDbFrontier(self)) {
+        scheduleTask(self);
+    }
+    return 0;
 }
 
 u8 satisfyTaskHc(ocrTask_t * base, ocrFatGuid_t data, u32 slot) {
@@ -476,19 +609,31 @@ u8 satisfyTaskHc(ocrTask_t * base, ocrFatGuid_t data, u32 slot) {
     //  - it can be from the frontier (we registered on it)
     //  - it can be a ONCE event
     //  - it can be a data-block being added (causing an immediate satisfy)
-
+    // Could be moved a little later if the ASSERT was not here
+    // Should not make a huge difference
     ocrTaskHc_t * self = (ocrTaskHc_t *) base;
-    ocrPolicyDomain_t *pd = NULL;
-    ocrPolicyMsg_t msg;
-    getCurrentEnv(&pd, NULL, NULL, &msg);
+    hal_lock32(&(self->lock));
+    ASSERT(self->slotSatisfiedCount < (base->depc+1));
+    // // EDT already has all its dependences satisfied, now we're getting acquire notifications
+    // if(self->slotSatisfiedCount == (base->depc+1)) {
+    //     // should only happen on RT event slot to manage DB acquire
+    //     ASSERT(slot == (base->depc+1));
+    //     // Implementation acquires DB sequentially, so the DB's GUID
+    //     // must match the frontier's DB
+    //     ASSERT(data.guid == self->signalers[self->frontierSlot-1].guid);
+    //     self->resolvedDeps[self->signalers[self->frontierSlot-1].slot].ptr = data.metaDataPtr;
+    //     data.metaDataPtr = NULL; // just to be safe with the hack
+    //     if (!iterateDbFrontier(base)) {
+    //         scheduleTask(base);
+    //     }
+    //     hal_unlock32(&(self->lock));
+    //     return 0;
+    // }
 
     // Replace the signaler's guid by the data guid, this is to avoid
     // further references to the event's guid, which is good in general
     // and crucial for once-event since they are being destroyed on satisfy.
 
-    // Could be moved a little later if the ASSERT was not here
-    // Should not make a huge difference
-    hal_lock32(&(self->lock));
     ASSERT(self->signalers[slot].slot != (u32)-1); // Check to see if not already satisfied
     ASSERT((self->signalers[slot].slot == slot && (self->signalers[slot].slot == self->frontierSlot)) ||
            (self->signalers[slot].slot == (u32)-2) || /* Checks if ONCE/LATCH event satisfaction */
@@ -502,7 +647,7 @@ u8 satisfyTaskHc(ocrTask_t * base, ocrFatGuid_t data, u32 slot) {
         // All dependences have been satisfied, schedule the edt
         DPRINTF(DEBUG_LVL_VERB, "Scheduling task 0x%lx due to last satisfied dependence\n",
                 self->base.guid);
-        RESULT_PROPAGATE(taskSchedule(base));
+        RESULT_PROPAGATE(taskAllDepvSatisfied(base));
     } else if(self->frontierSlot == slot) {
         // We need to go register to the next non-once dependence
         while(++self->frontierSlot < base->depc &&
@@ -514,12 +659,14 @@ u8 satisfyTaskHc(ocrTask_t * base, ocrFatGuid_t data, u32 slot) {
                 self->signalers[self->frontierSlot].guid != UNINITIALIZED_GUID) {
             u32 tslot = self->frontierSlot;
             hal_unlock32(&(self->lock));
+            ocrPolicyDomain_t *pd = NULL;
+            getCurrentEnv(&pd, NULL, NULL, NULL);
             //TODO There seems to be a race here between registerSignalerTaskHc that
             //gets a db signaler on slot 'n', set the guid to db's buid, then get stalled
             //before setting up slot to -1. Then a satisfy on n-1 happens and lead us here
             // because slot[n] is still n. registerOnFrontier would then crash because we
             // cannot register on a db.
-            RESULT_PROPAGATE(registerOnFrontier(self, pd, &msg, tslot));
+            RESULT_PROPAGATE(registerOnFrontier(self, pd, tslot));
         } else {
             // If the slot's guid is UNITIALIZED_GUID it means add-dependence
             // hasn't happened yet for this slot.
@@ -535,7 +682,7 @@ u8 satisfyTaskHc(ocrTask_t * base, ocrFatGuid_t data, u32 slot) {
 /**
  * Can be invoked concurrently, however each invocation should be for a different slot
  */
-u8 registerSignalerTaskHc(ocrTask_t * base, ocrFatGuid_t signalerGuid, u32 slot, 
+u8 registerSignalerTaskHc(ocrTask_t * base, ocrFatGuid_t signalerGuid, u32 slot,
                             ocrDbAccessMode_t mode, bool isDepAdd) {
     ASSERT(isDepAdd); // This should only be called when adding a dependence
 
@@ -543,8 +690,7 @@ u8 registerSignalerTaskHc(ocrTask_t * base, ocrFatGuid_t signalerGuid, u32 slot,
     regNode_t * node = &(self->signalers[slot]);
 
     ocrPolicyDomain_t *pd = NULL;
-    ocrPolicyMsg_t msg;
-    getCurrentEnv(&pd, NULL, NULL, &msg);
+    getCurrentEnv(&pd, NULL, NULL, NULL);
     ocrGuidKind signalerKind = OCR_GUID_NONE;
     deguidify(pd, &signalerGuid, &signalerKind);
     node->mode = mode;
@@ -569,7 +715,7 @@ u8 registerSignalerTaskHc(ocrTask_t * base, ocrFatGuid_t signalerGuid, u32 slot,
                     self->signalers[self->frontierSlot].guid != UNINITIALIZED_GUID) {
                 u32 tslot = self->frontierSlot;
                 hal_unlock32(&(self->lock));
-                RESULT_PROPAGATE(registerOnFrontier(self, pd, &msg, tslot));
+                RESULT_PROPAGATE(registerOnFrontier(self, pd, tslot));
                 // If we are UNITIALIZED_GUID, we will do the REGWAITER
                 // when we add the dependence (just below)
             } else {
@@ -585,10 +731,7 @@ u8 registerSignalerTaskHc(ocrTask_t * base, ocrFatGuid_t signalerGuid, u32 slot,
             if(slot == self->frontierSlot) {
                 hal_unlock32(&(self->lock));
                 // We actually need to register ourself as a waiter here
-                ocrPolicyDomain_t *pd = NULL;
-                ocrPolicyMsg_t msg;
-                getCurrentEnv(&pd, NULL, NULL, &msg);
-                RESULT_PROPAGATE(registerOnFrontier(self, pd, &msg, slot));
+                RESULT_PROPAGATE(registerOnFrontier(self, pd, slot));
             } else {
                 hal_unlock32(&(self->lock));
             }
@@ -636,7 +779,6 @@ u8 notifyDbAcquireTaskHc(ocrTask_t *base, ocrFatGuid_t db) {
     getCurrentEnv(&pd, NULL, NULL, NULL);
     if(derived->maxUnkDbs == 0) {
         derived->unkDbs = (ocrGuid_t*)pd->fcts.pdMalloc(pd, sizeof(ocrGuid_t)*8);
-        ASSERT(derived->unkDbs);
         derived->maxUnkDbs = 8;
     } else {
         if(derived->maxUnkDbs == derived->countUnkDbs) {
@@ -658,24 +800,45 @@ u8 notifyDbAcquireTaskHc(ocrTask_t *base, ocrFatGuid_t db) {
 
 u8 notifyDbReleaseTaskHc(ocrTask_t *base, ocrFatGuid_t db) {
     ocrTaskHc_t *derived = (ocrTaskHc_t*)base;
-    if(derived->unkDbs == NULL)
-        return 0; // May be a release we don't care about
-    u64 maxCount = derived->countUnkDbs;
-    u64 count = 0;
-    DPRINTF(DEBUG_LVL_VERB, "Notifying EDT (GUID: 0x%lx) that it acquired db (GUID: 0x%lx)\n",
-            base->guid, db.guid);
-    while(count < maxCount) {
-        // We bound our search (in case there is an error)
-        if(db.guid == derived->unkDbs[count]) {
-            DPRINTF(DEBUG_LVL_VVERB, "Found a match for count %lu\n", count);
-            derived->unkDbs[count] = derived->unkDbs[maxCount - 1];
-            --(derived->countUnkDbs);
-            return 0;
+    if ((derived->unkDbs != NULL) || (base->depc != 0)) {
+        // Search in the list of DBs created by the EDT
+        u64 maxCount = derived->countUnkDbs;
+        u64 count = 0;
+        DPRINTF(DEBUG_LVL_VERB, "Notifying EDT (GUID: 0x%lx) that it released db (GUID: 0x%lx)\n",
+                base->guid, db.guid);
+        while(count < maxCount) {
+            // We bound our search (in case there is an error)
+            if(db.guid == derived->unkDbs[count]) {
+                DPRINTF(DEBUG_LVL_VVERB, "Dynamic Releasing DB @ 0x%lx (GUID 0x%lx) from EDT 0x%lx, match in unkDbs list for count %lu\n",
+                       db.guid, base->guid, count);
+                // printf("Dynamic Releasing DB (GUID 0x%lx) from EDT 0x%lx, match in unkDbs list for count %lu\n",
+                //        db.guid, base->guid, count);
+                derived->unkDbs[count] = derived->unkDbs[maxCount - 1];
+                --(derived->countUnkDbs);
+                return 0;
+            }
+            ++count;
         }
-        ++count;
+
+        // Search DBs in dependences
+        maxCount = base->depc;
+        count = 0;
+        while(count < maxCount) {
+            // We bound our search (in case there is an error)
+            if(db.guid == derived->resolvedDeps[count].guid) {
+                DPRINTF(DEBUG_LVL_VVERB, "Dynamic Releasing DB (GUID 0x%lx) from EDT 0x%lx, match in dependence list for count %lu\n",
+                       db.guid, base->guid, count);
+                // printf("Dynamic Releasing DB (GUID 0x%lx) from EDT 0x%lx, match in dependence list for count %lu\n",
+                //        db.guid, base->guid, count);
+                derived->doNotReleaseSlots |= (1ULL << count);
+                // we can return on the first instance found since iterateDbFrontier
+                // already marked duplicated DB and the selection sort in sortRegNode is stable.
+                return 0;
+            }
+            ++count;
+        }
     }
-    // We did not find it but it may be that we never acquired it
-    // Should not be an error code
+    // not found means it's an error or it has already been released
     return 0;
 }
 
@@ -688,70 +851,10 @@ u8 taskExecute(ocrTask_t* base) {
     u64 * paramv = base->paramv;
     u32 depc = base->depc;
     ocrPolicyDomain_t *pd = NULL;
-    ocrEdtDep_t * depv = NULL;
-    u64 doNotReleaseSlots = 0; // Used to support an EDT acquiring the same DB
-                               // multiple times. For now limit to 64 DBs
-                               // (ie: an EDT that does this should not have more
-                               // than 64 DBs, others can have as many as they want)
-    // If any dependencies, acquire their data-blocks
-    u32 maxAcquiredDb = 0;
+    ocrEdtDep_t * depv = derived->resolvedDeps;
     ocrPolicyMsg_t msg;
     ASSERT(derived->unkDbs == NULL); // Should be no dynamically acquired DBs before running
     getCurrentEnv(&pd, NULL, NULL, NULL);
-    if (depc != 0) {
-        START_PROFILE(ta_hc_dbAcq);
-        //TODO would be nice to resolve regNode into guids before
-        depv = pd->fcts.pdMalloc(pd, sizeof(ocrEdtDep_t)*depc);
-        // Double-check we're not rescheduling an already executed edt
-        ASSERT(derived->signalers != END_OF_LIST);
-        // Make sure the task was actually fully satisfied
-        ASSERT(derived->slotSatisfiedCount == depc+1);
-        while( maxAcquiredDb < depc ) {
-            //TODO would be nice to standardize that on satisfy
-            depv[maxAcquiredDb].guid = derived->signalers[maxAcquiredDb].guid;
-            if(depv[maxAcquiredDb].guid != NULL_GUID) {
-                // We send a message that we want to acquire the DB
-                getCurrentEnv(NULL, NULL, NULL, &msg);
-            #define PD_MSG (&msg)
-            #define PD_TYPE PD_MSG_DB_ACQUIRE
-                msg.type = PD_MSG_DB_ACQUIRE | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
-                PD_MSG_FIELD(guid.guid) = depv[maxAcquiredDb].guid;
-                PD_MSG_FIELD(guid.metaDataPtr) = NULL;
-                PD_MSG_FIELD(edt.guid) = base->guid;
-                PD_MSG_FIELD(edt.metaDataPtr) = base;
-                PD_MSG_FIELD(properties) = derived->signalers[maxAcquiredDb].mode | DB_PROP_RT_ACQUIRE;
-                // This call may fail if the policy domain goes down
-                // while we are starting to execute
-                if(pd->fcts.processMessage(pd, &msg, true)) {
-                    // We are not going to launch the EDT
-                    break;
-                }
-                switch(PD_MSG_FIELD(returnDetail)) {
-                case 0:
-                    ASSERT(PD_MSG_FIELD(ptr));
-                    break; // Everything went fine
-                case OCR_EACQ:
-                    // The EDT was already acquired
-                    ASSERT(PD_MSG_FIELD(ptr));
-                    ASSERT(maxAcquiredDb < 64);
-                    DPRINTF(DEBUG_LVL_VERB, "EDT (GUID: 0x%lx) acquiring DB (GUID: 0x%lx) multiple times. Ignoring acquire on slot %d\n",
-                            base->guid, depv[maxAcquiredDb].guid, maxAcquiredDb);
-                    doNotReleaseSlots |= (1ULL << maxAcquiredDb);
-                    break;
-                default:
-                    ASSERT(0);
-                }
-                depv[maxAcquiredDb].ptr = PD_MSG_FIELD(ptr);
-            #undef PD_MSG
-            #undef PD_TYPE
-            } else {
-                depv[maxAcquiredDb].ptr = NULL;
-            }
-            ++maxAcquiredDb;
-        }
-        derived->signalers = END_OF_LIST;
-        EXIT_PROFILE;
-    }
 
 #ifdef OCR_ENABLE_STATISTICS
     // TODO: FIXME
@@ -771,9 +874,7 @@ u8 taskExecute(ocrTask_t* base) {
     ocrGuid_t retGuid = NULL_GUID;
     {
         START_PROFILE(userCode);
-        if(depc == 0 || (maxAcquiredDb == depc)) {
-            retGuid = base->funcPtr(paramc, paramv, depc, depv);
-        }
+        retGuid = base->funcPtr(paramc, paramv, depc, depv);
         EXIT_PROFILE;
     }
 #ifdef OCR_ENABLE_STATISTICS
@@ -785,25 +886,23 @@ u8 taskExecute(ocrTask_t* base) {
     if(depc != 0) {
         START_PROFILE(ta_hc_dbRel);
         u32 i;
-        for(i=0; i < maxAcquiredDb; ++i) { // Only release the ones we managed to grab
-            if((depv[i].guid != NULL_GUID) &&
-               ((i >= 64) || (doNotReleaseSlots == 0) ||
-                ((i < 64) && (((1ULL << i) & doNotReleaseSlots) == 0)))) {
+        for(i=0; i < depc; ++i) {
+            if ((depv[i].guid != NULL_GUID) &&
+               ((i >= 64) || (derived->doNotReleaseSlots == 0) ||
+                ((i < 64) && (((1ULL << i) & derived->doNotReleaseSlots) == 0)))) {
                 getCurrentEnv(NULL, NULL, NULL, &msg);
-#define PD_MSG (&msg)
-#define PD_TYPE PD_MSG_DB_RELEASE
+            #define PD_MSG (&msg)
+            #define PD_TYPE PD_MSG_DB_RELEASE
                 msg.type = PD_MSG_DB_RELEASE | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
                 PD_MSG_FIELD(guid.guid) = depv[i].guid;
-                //DIST-TODO This won't be meaningful in distributed and runtime will
-                //do the right thing and fetch the pointer. Keep it that way for shared-me
                 PD_MSG_FIELD(guid.metaDataPtr) = NULL;
                 PD_MSG_FIELD(edt.guid) = base->guid;
                 PD_MSG_FIELD(edt.metaDataPtr) = base;
                 PD_MSG_FIELD(properties) = DB_PROP_RT_ACQUIRE; // Runtime release
                 // Ignore failures at this point
-                pd->fcts.processMessage(pd, &msg, false);
-#undef PD_MSG
-#undef PD_TYPE
+                pd->fcts.processMessage(pd, &msg, true);
+            #undef PD_MSG
+            #undef PD_TYPE
             }
         }
         pd->fcts.pdFree(pd, depv);
@@ -813,7 +912,6 @@ u8 taskExecute(ocrTask_t* base) {
     // We now release all other data-blocks that we may potentially
     // have acquired along the way
     if(derived->unkDbs != NULL) {
-        // We acquire this DB
         ocrGuid_t *extraToFree = derived->unkDbs;
         u64 count = derived->countUnkDbs;
         while(count) {
@@ -826,7 +924,7 @@ u8 taskExecute(ocrTask_t* base) {
             PD_MSG_FIELD(edt.guid) = base->guid;
             PD_MSG_FIELD(edt.metaDataPtr) = base;
             PD_MSG_FIELD(properties) = 0; // Not a runtime free since it was acquired using DB create
-            if(pd->fcts.processMessage(pd, &msg, false)) {
+            if(pd->fcts.processMessage(pd, &msg, true)) {
                 DPRINTF(DEBUG_LVL_WARN, "EDT (GUID: 0x%lx) could not release dynamically acquired DB (GUID: 0x%lx)\n",
                         base->guid, PD_MSG_FIELD(guid.guid));
                 break;
@@ -896,10 +994,9 @@ ocrTaskFactory_t * newTaskFactoryHc(ocrParamList_t* perInstance, u32 factoryId) 
     base->fcts.notifyDbAcquire = FUNC_ADDR(u8 (*)(ocrTask_t*, ocrFatGuid_t), notifyDbAcquireTaskHc);
     base->fcts.notifyDbRelease = FUNC_ADDR(u8 (*)(ocrTask_t*, ocrFatGuid_t), notifyDbReleaseTaskHc);
     base->fcts.execute = FUNC_ADDR(u8 (*)(ocrTask_t*), taskExecute);
-
+    base->fcts.dependenceResolved = FUNC_ADDR(u8 (*)(ocrTask_t*, ocrGuid_t, void*, u32), dependenceResolvedTaskHc);
     return base;
 }
-
 #endif /* ENABLE_TASK_HC */
 
 #endif /* ENABLE_TASK_HC || ENABLE_TASKTEMPLATE_HC */

@@ -44,7 +44,6 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
                 /*location=*/NULL_GUID,
                 NO_ALLOC);
     *k = 42;
-
     // Satisfy once-event
     ocrEventSatisfy(e0, dbGuid);
 

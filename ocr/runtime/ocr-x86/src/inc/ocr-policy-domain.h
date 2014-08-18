@@ -321,6 +321,7 @@ typedef struct _ocrPolicyMsg_t {
         struct {
             ocrFatGuid_t guid;         /**< In: GUID of the DB to acquire */
             ocrFatGuid_t edt;          /**< In: EDT doing the acquiring */
+            u32 edtSlot;               /**< In: EDT's slot if applicable */
             void* ptr;                 /**< Out: Pointer to the acquired memory */
             u64 size;                  /**< Out: Size of the acquired memory */
             u32 properties;            /**< In: Properties for acquire. Bit 0: 1 if runtime acquire */

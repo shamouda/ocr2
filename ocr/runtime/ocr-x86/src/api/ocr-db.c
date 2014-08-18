@@ -169,7 +169,7 @@ u8 ocrDbRelease(ocrGuid_t db) {
     PD_MSG_FIELD(properties) = 0;
     PD_MSG_FIELD(returnDetail) = 0;
 
-    u8 returnCode = policy->fcts.processMessage(policy, &msg, false);
+    u8 returnCode = policy->fcts.processMessage(policy, &msg, true);
 #undef PD_MSG
 #undef PD_TYPE
 

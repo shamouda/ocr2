@@ -60,13 +60,14 @@ void destructMsgHandlerDelegate(ocrMsgHandle_t * handler) {
 /**
  * @brief Create a message handle for this comm-platform
  */
-ocrMsgHandle_t * createMsgHandlerDelegate(ocrPolicyDomain_t * pd, ocrPolicyMsg_t * message) {
+ocrMsgHandle_t * createMsgHandlerDelegate(ocrPolicyDomain_t * pd, ocrPolicyMsg_t * message, u32 properties) {
     ocrMsgHandle_t * handle = (ocrMsgHandle_t *) pd->fcts.pdMalloc(pd, sizeof(delegateMsgHandle_t));
     ASSERT(handle != NULL);
     handle->msg = message;
     handle->response = NULL;
     handle->status = HDL_NORMAL;
     handle->destruct = &destructMsgHandlerDelegate;
+    handle->properties = properties;
     return handle;
 }
 
@@ -91,12 +92,11 @@ u8 delegateCommSendMessage(ocrCommApi_t *self, ocrLocation_t target,
         // The rationale is that one-way calls are always deallocated by the
         // comm-platform and two-way calls are always poll/wait at some point
         // by a caller that must free the message.
-        properties &= PERSIST_MSG_PROP;
+        properties |= PERSIST_MSG_PROP;
     }
-    ocrMsgHandle_t * handlerDelegate = createMsgHandlerDelegate(pd, message);
+    ocrMsgHandle_t * handlerDelegate = createMsgHandlerDelegate(pd, message, properties);
     DPRINTF(DEBUG_LVL_VVERB,"Delegate API: end message handle=%p, msg=%p, type=0x%x\n",
             handlerDelegate, message, message->type);
-
     // Give comm handle to policy-domain
     ocrFatGuid_t fatGuid;
     fatGuid.metaDataPtr = handlerDelegate;
@@ -140,7 +140,7 @@ u8 delegateCommPollMessage(ocrCommApi_t *self, ocrMsgHandle_t **handle) {
     PD_MSG_FIELD(guidCount) = 1;
     PD_MSG_FIELD(properties) = 0;
     PD_MSG_FIELD(type) = OCR_GUID_COMM;
-    RESULT_PROPAGATE(pd->fcts.processMessage(pd, &takeMsg, false));
+    RESULT_PROPAGATE(pd->fcts.processMessage(pd, &takeMsg, true));
 #undef PD_MSG
 #undef PD_TYPE
     delegateMsgHandle_t * delHandle = (delegateMsgHandle_t *) fatGuid.metaDataPtr;
@@ -189,7 +189,7 @@ u8 delegateCommWaitMessage(ocrCommApi_t *self, ocrMsgHandle_t **handle) {
             //scheduler should know what to do for each type of monitor progress
             PD_MSG_FIELD(monitoree) = &handle;
             PD_MSG_FIELD(properties) = (0 | MONITOR_PROGRESS_COMM);
-            RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, false));
+            RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, true));
         #undef PD_MSG
         #undef PD_TYPE
         }
