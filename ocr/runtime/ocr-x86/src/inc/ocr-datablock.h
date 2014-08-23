@@ -131,7 +131,8 @@ typedef struct _ocrDataBlock_t {
 typedef enum _ocrDataBlockKind {
     OCR_DATABLOCK_DEFAULT = 0,
     OCR_DATABLOCK_REGULAR = 1,
-    OCR_DATABLOCK_PLACED  = 2
+    OCR_DATABLOCK_PLACED  = 2,
+    OCR_DATABLOCK_SIMPLEST  = 3
 } ocrDataBlockKind;
 
 extern ocrDataBlockKind ocrDataBlockDefaultKind;

@@ -64,6 +64,14 @@ typedef struct _ocrDataBlockRegular_t {
     ocrGuidTracker_t usersTracker;
 } ocrDataBlockRegular_t;
 
+typedef struct _ocrDataBlockSimplest_t {
+    ocrDataBlock_t base;
+
+    /* Data for the data-block */
+    void* ptr; /**< Current address for this data-block */
+    ocrGuid_t allocatorGuid; /**< Current allocator that this data-block belongs to. */
+    u32 size; /**< Current size for this data-block */
+} ocrDataBlockSimplest_t;
 
 typedef struct ocrDataBlockPlacedStruct_t {
     ocrDataBlockRegular_t base;
@@ -72,5 +80,6 @@ typedef struct ocrDataBlockPlacedStruct_t {
 
 ocrDataBlock_t* newDataBlockRegular();
 ocrDataBlock_t* newDataBlockPlaced();
+ocrDataBlock_t* newDataBlockSimplest();
 
 #endif /* __DATABLOCK_REGULAR_H__ */

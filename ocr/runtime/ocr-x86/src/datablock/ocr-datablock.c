@@ -39,10 +39,15 @@ ocrDataBlock_t* newDataBlock(ocrDataBlockKind type) {
     if(type == OCR_DATABLOCK_DEFAULT) type = ocrDataBlockDefaultKind;
     switch(type) {
     case OCR_DATABLOCK_REGULAR:
+        assert(0); //sagnak does not want this called :)
         return newDataBlockRegular();
         break;
     case OCR_DATABLOCK_PLACED:
+        assert(0); //sagnak does not want this called :)
         return newDataBlockPlaced();
+        break;
+    case OCR_DATABLOCK_SIMPLEST:
+        return newDataBlockSimplest();
         break;
     default:
         ASSERT(0);

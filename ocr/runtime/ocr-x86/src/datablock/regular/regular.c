@@ -78,7 +78,6 @@ void regularDestruct(ocrDataBlock_t *self) {
 void* regularAcquire(ocrDataBlock_t *self, ocrGuid_t edt, bool isInternal) {
     ocrDataBlockRegular_t *rself = (ocrDataBlockRegular_t*)self;
 
-#if 0
     // Critical section
     rself->lock->lock(rself->lock);
     if(rself->attributes.freeRequested) {
@@ -103,7 +102,6 @@ void* regularAcquire(ocrDataBlock_t *self, ocrGuid_t edt, bool isInternal) {
 
     rself->lock->unlock(rself->lock);
     // End critical section
-#endif
 
     return rself->ptr;
 }
@@ -267,6 +265,60 @@ ocrDataBlock_t* newDataBlockPlaced() {
     regular->base.release = &placedRelease;
     regular->base.free = &regularFree;
     regular->lock = newLock(OCR_LOCK_DEFAULT);
+
+    return (ocrDataBlock_t*)result;
+}
+
+void simplestCreate(ocrDataBlock_t *self, ocrGuid_t allocatorGuid, u64 size,
+                   u16 flags, void* configuration) {
+
+    ocrAllocator_t *allocator = NULL;
+    globalGuidProvider->getVal(globalGuidProvider, allocatorGuid, (u64*)&allocator, NULL);
+    ASSERT(allocator);
+    ocrDataBlockSimplest_t *rself = (ocrDataBlockSimplest_t *)self;
+
+    rself->ptr = allocator->allocate(allocator, size);
+    rself->allocatorGuid = allocatorGuid;
+    rself->size = size;
+}
+
+void simplestDestruct(ocrDataBlock_t *self) {
+    ocrDataBlockSimplest_t *derived = (ocrDataBlockSimplest_t *)self;
+    
+    // Tell the allocator to free the data-block
+    ocrAllocator_t *allocator = NULL;
+    globalGuidProvider->getVal(globalGuidProvider, derived->allocatorGuid, (u64*)&allocator, NULL);
+
+    allocator->free(allocator, derived->ptr);
+
+    globalGuidProvider->releaseGuid(globalGuidProvider, self->guid);
+    free(derived);
+}
+
+void* simplestAcquire(ocrDataBlock_t *self, ocrGuid_t edt, bool isInternal) {
+    ocrDataBlockSimplest_t *derived = (ocrDataBlockSimplest_t *)self;
+    return derived->ptr;
+}
+
+u8 simplestRelease(ocrDataBlock_t *self, ocrGuid_t edt, bool isInternal) {
+    return 0;
+}
+
+u8 simplestFree(ocrDataBlock_t *self, ocrGuid_t edt) {
+    ocrDataBlockSimplest_t *derived = (ocrDataBlockSimplest_t *)self;
+    self->destruct(self);
+    return 0;
+}
+ocrDataBlock_t* newDataBlockSimplest () {
+    ocrDataBlockSimplest_t *result = (ocrDataBlockSimplest_t *)malloc(sizeof(ocrDataBlockSimplest_t));
+    result->base.guid = UNINITIALIZED_GUID;
+    globalGuidProvider->getGuid(globalGuidProvider, &(result->base.guid), (u64)result, OCR_GUID_DB);
+
+    result->base.create = &simplestCreate;
+    result->base.destruct = &simplestDestruct;
+    result->base.acquire = &simplestAcquire;
+    result->base.release = &simplestRelease;
+    result->base.free = &simplestFree;
 
     return (ocrDataBlock_t*)result;
 }

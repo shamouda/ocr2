@@ -38,7 +38,7 @@ ocr_policy_kind ocr_policy_default_kind = OCR_POLICY_HC;
 ocr_workpile_kind ocr_workpile_default_kind = OCR_DEQUE;
 ocrAllocatorKind ocrAllocatorDefaultKind = OCR_ALLOCATOR_TLSF;
 ocrLowMemoryKind ocrLowMemoryDefaultKind = OCR_LOWMEMORY_MALLOC;
-ocrDataBlockKind ocrDataBlockDefaultKind = OCR_DATABLOCK_REGULAR;
+ocrDataBlockKind ocrDataBlockDefaultKind = OCR_DATABLOCK_SIMPLEST;
 ocrLockKind ocrLockDefaultKind = OCR_LOCK_X86;
 ocrGuidProviderKind ocrGuidProviderDefaultKind = OCR_GUIDPROVIDER_PTR;
 
