@@ -314,10 +314,20 @@
                _task?_task->guid:0, ## __VA_ARGS__);                    \
     } } while(0)
 
+#define DPRINTF_TYPE_COND_LVL(type, cond, levelT, levelF, format, ...)  \
+    do {                                                                \
+        if(cond) {                                                      \
+            DPRINTF_TYPE(type, levelT, format, ## __VA_ARGS__);         \
+        } else {                                                        \
+            DPRINTF_TYPE(type, levelF, format, ## __VA_ARGS__);         \
+        }                                                               \
+    } while(0)
+
 #else
 #define DO_DEBUG_TYPE(level) if(0) {
 #define DEBUG(format, ...)
 #define DPRINTF_TYPE(type, level, format, ...)
+#define DPRINTF_TYPE_COND_LVL(type, cond, levelT, levelF, format, ...)
 #endif /* OCR_DEBUG */
 
 #define DO_DEBUG_TYPE_INT(type, level) DO_DEBUG_TYPE(type, level)
@@ -325,6 +335,8 @@
 
 #define DPRINTF_TYPE_INT(type, level, format, ...) DPRINTF_TYPE(type, level, format, ## __VA_ARGS__)
 #define DPRINTF(level, format, ...) DPRINTF_TYPE_INT(DEBUG_TYPE, level, format, ## __VA_ARGS__)
+#define DPRINTF_COND_LVL(cond, levelT, levelF, format, ...) \
+    DPRINTF_TYPE_COND_LVL(DEBUG_TYPE, cond, levelT, levelF, format, ## __VA_ARGS__)
 
 #define END_DEBUG }
 

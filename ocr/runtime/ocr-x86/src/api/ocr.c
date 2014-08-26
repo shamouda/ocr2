@@ -10,7 +10,9 @@
 #include "ocr-sal.h"
 #include "ocr-types.h"
 
+#define DEBUG_TYPE API
 void ocrShutdown() {
+    DPRINTF(DEBUG_LVL_INFO, "ENTER ocrShutdown()\n");
     ocrPolicyDomain_t *pd = NULL;
     ocrPolicyMsg_t msg;
     ocrPolicyMsg_t * msgPtr = &msg;
@@ -29,12 +31,17 @@ void ocrShutdown() {
 }
 
 u64 getArgc(void* dbPtr) {
+    DPRINTF(DEBUG_LVL_INFO, "ENTER getArgc(dbPtr=0x%lx)\n", dbPtr);
+    DPRINTF(DEBUG_LVL_INFO, "EXIT getArgc -> %lu\n", ((u64*)dbPtr)[0]);
     return ((u64*)dbPtr)[0];
+
 }
 
 char* getArgv(void* dbPtr, u64 count) {
+    DPRINTF(DEBUG_LVL_INFO, "ENTER getArgv(dbPtr=0x%lx, count=%lu)\n", dbPtr, count);
     u64* dbPtrAsU64 = (u64*)dbPtr;
     ASSERT(count < dbPtrAsU64[0]);
     u64 offset = dbPtrAsU64[1 + count];
+    DPRINTF(DEBUG_LVL_INFO, "EXIT getArgv -> %s\n", ((char*)dbPtr) + offset);
     return ((char*)dbPtr) + offset;
 }

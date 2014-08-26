@@ -33,6 +33,8 @@ u8 ocrDbCreate(ocrGuid_t *db, void** addr, u64 len, u16 flags,
                ocrGuid_t affinity, ocrInDbAllocator_t allocator) {
 
     START_PROFILE(api_DbCreate);
+    DPRINTF(DEBUG_LVL_INFO, "ENTER ocrDbCreate(*guid=0x%lx, len=%lu, flags=%u"
+            ", aff=0x%lx, alloc=%u)\n", *db, len, (u32)flags, affinity, (u32)allocator);
     // TODO: Currently location and allocator are ignored
     // ocrDataBlock_t *createdDb = newDataBlock(OCR_DATABLOCK_DEFAULT);
     // ocrDataBlock_t *createdDb = newDataBlock(OCR_DATABLOCK_PLACED);
@@ -69,6 +71,7 @@ u8 ocrDbCreate(ocrGuid_t *db, void** addr, u64 len, u16 flags,
         *addr = NULL;
     }
     if(*addr == NULL) {
+        DPRINTF(DEBUG_LVL_WARN, "EXIT ocrDbCreate -> %u; GUID: INVAL; ADDR: NULL\n", OCR_ENOMEM);
         RETURN_PROFILE(OCR_ENOMEM);
     }
 #undef PD_MSG
@@ -95,12 +98,14 @@ u8 ocrDbCreate(ocrGuid_t *db, void** addr, u64 len, u16 flags,
         DPRINTF(DEBUG_LVL_WARN, "Acquiring DB (GUID: 0x%lx) from outside an EDT ... auto-release will fail\n",
                 *db);
     }
+    DPRINTF(DEBUG_LVL_INFO, "EXIT ocrDbCreate -> 0; GUID: 0x%lx; ADDR: 0x%lx\n", *db, *addr);
     RETURN_PROFILE(0);
 }
 
 u8 ocrDbDestroy(ocrGuid_t db) {
 
     START_PROFILE(api_DbDestroy);
+    DPRINTF(DEBUG_LVL_INFO, "ENTER ocrDbDestroy(guid=0x%lx)\n", db);
     ocrPolicyMsg_t msg;
     ocrPolicyDomain_t *policy = NULL;
     ocrTask_t *task = NULL;
@@ -138,12 +143,15 @@ u8 ocrDbDestroy(ocrGuid_t db) {
         DPRINTF(DEBUG_LVL_WARN, "Destroying DB (GUID: 0x%lx) from outside an EDT ... auto-release will fail\n",
                 db);
     }
+    DPRINTF_COND_LVL(returnCode, DEBUG_LVL_WARN, DEBUG_LVL_INFO,
+                     "EXIT ocrDbDestroy(guid=0x%lx) -> %u\n", db, returnCode);
     RETURN_PROFILE(returnCode);
 }
 
 u8 ocrDbRelease(ocrGuid_t db) {
 
     START_PROFILE(api_DbRelease);
+    DPRINTF(DEBUG_LVL_INFO, "ENTER ocrDbRelease(guid=0x%lx)\n", db);
     ocrPolicyMsg_t msg;
     ocrPolicyDomain_t *policy = NULL;
     ocrTask_t *task = NULL;
@@ -184,6 +192,8 @@ u8 ocrDbRelease(ocrGuid_t db) {
         DPRINTF(DEBUG_LVL_WARN, "Releasing DB (GUID: 0x%lx) from outside an EDT ... auto-release will fail\n",
                 db);
     }
+    DPRINTF_COND_LVL(returnCode, DEBUG_LVL_WARN, DEBUG_LVL_INFO,
+                     "EXIT ocrDbRelease(guid=0x%lx) -> %u\n", db, returnCode);
     RETURN_PROFILE(returnCode);
 }
 
