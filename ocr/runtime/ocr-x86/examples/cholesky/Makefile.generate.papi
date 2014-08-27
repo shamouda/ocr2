@@ -1,0 +1,238 @@
+PROG=cholesky.generate
+SUFFIX=exec
+
+ifdef INSTRUMENT
+PAPI_CFLAGS=-DPAPI
+PAPI_HOME=$(HOME)/HJsvn/papi/BUILD
+PAPI_LIB_FLAGS=-L$(PAPI_HOME)/lib -lpapi
+PAPI_OBJS=instrument.o
+endif
+
+CFLAGS= -g -O3 -DVERIFY $(PAPI_CFLAGS) #-DHPCTOOLKIT
+
+MICFLAGS= -mmic -fPIC
+OCR_FLAGS=-L${OCR_INSTALL}/lib -I${OCR_INSTALL}/include -locr $(PAPI_LIB_FLAGS) $(PAPI_OBJS)
+OCR_STATIC_FLAGS=-I$(OCR_INSTALL)/include $(OCR_INSTALL)/lib/libocr.a  $(PAPI_LIB_FLAGS) $(PAPI_OBJS)
+HPC_TOOLKIT_FLAGS=-L${HPCTOOLKIT_PATH}/lib/hpctoolkit -I${HPCTOOLKIT_PATH}/include -lhpctoolkit
+
+TBB_LIBS=-ltbbmalloc_proxy -ltbbmalloc 
+MIC_TBB_LIB_PATH=/opt/intel/composer_xe_2013_sp1.0.080/tbb/lib/mic/
+MIC_TBB_LIBS=$(MIC_TBB_LIB_PATH)/libtbbmalloc_proxy.so $(MIC_TBB_LIB_PATH)/libtbbmalloc.so
+
+PTHREAD_LIBS=/lib64/libpthread.so.0 
+MIC_PTHREAD_LIBS=/opt/intel/mic/filesystem/base/lib64/libpthread.so.0 
+
+OCR_INPUT=${OCR_INPUT_HOME}
+
+all: compile.ocr run
+all-test: compile.ocr run verify
+
+MATRIX_SIZE=6000
+TILE_SIZE=80
+
+INPUT_FILE=m_${MATRIX_SIZE}.in
+OUTPUT_FILE=cholesky_out_${MATRIX_SIZE}.txt
+
+PAPI_HOME=$(HOME)/HJsvn/papi/BUILD
+NO_CLUE_WHY_LIBS=-L$(HC_HOME)/lib -L$(PAPI_HOME)/lib -lpthread -lhc -lxml2 -lm -lpapi
+
+instrument.o:
+	$(CC) $(CFLAGS) -c -I$(PAPI_HOME)/include -I. instrument.c 
+
+SEQ_MKL_INCLUDE=-I/${MKLROOT}/include 
+
+SEQ_MKL_STATIC_FLAGS=-Wl,--start-group ${MKLROOT}/lib/intel64/libmkl_intel_lp64.a ${MKLROOT}/lib/intel64/libmkl_core.a ${MKLROOT}/lib/intel64/libmkl_sequential.a -Wl,--end-group -lpthread -lm
+SEQ_MKL_DYNAMIC_FLAGS= -L$(MKLROOT)/lib/intel64 -lmkl_intel_lp64 -lmkl_core -lmkl_sequential -lpthread -lm
+
+MIC_SEQ_MKL_STATIC_FLAGS= -Wl,--start-group $(MKLROOT)/lib/mic/libmkl_intel_lp64.a $(MKLROOT)/lib/mic/libmkl_core.a $(MKLROOT)/lib/mic/libmkl_sequential.a -Wl,--end-group ${MIC_PTHREAD_LIBS} -lm
+MIC_SEQ_MKL_DYNAMIC_FLAGS=-L$(MKLROOT)/lib/mic -lmkl_intel_lp64 -lmkl_core -lmkl_sequential -lpthread -lm
+
+MULTI_MKL_INCLUDE=-openmp -I/${MKLROOT}/include 
+MIC_MULTI_MKL_INCLUDE=-openmp /opt/intel/composer_xe_2013_sp1.0.080/compiler/lib/mic/libiomp5.so  -I/${MKLROOT}/include 
+
+MULTI_MKL_STATIC_FLAGS=-Wl,--start-group $(MKLROOT)/lib/intel64/libmkl_intel_lp64.a $(MKLROOT)/lib/intel64/libmkl_core.a $(MKLROOT)/lib/intel64/libmkl_intel_thread.a -Wl,--end-group ${MIC_PTHREAD_LIBS} -lm
+MULTI_MKL_DYNAMIC_FLAGS=-L$(MKLROOT)/lib/intel64 -lmkl_intel_lp64 -lmkl_core -lmkl_intel_thread -lpthread -lm
+
+MIC_MULTI_MKL_STATIC_FLAGS=-Wl,--start-group $(MKLROOT)/lib/mic/libmkl_intel_lp64.a $(MKLROOT)/lib/mic/libmkl_core.a $(MKLROOT)/lib/mic/libmkl_intel_thread.a -Wl,--end-group ${MIC_PTHREAD_LIBS} -lm
+MIC_MULTI_MKL_DYNAMIC_FLAGS= -L$(MKLROOT)/lib/mic -lmkl_intel_lp64 -lmkl_core -lmkl_intel_thread -lpthread -lm
+
+#compile.<arch>_<model>_<alloc>_<source.suffixes>
+#% can not be empty it seems
+.SUFFIXES:
+
+compile.ocr.tbb.static.seq.mkl%: $(PAPI_OBJS)
+	LD_PRELOAD=libtbbmalloc_proxy.so.2
+	$(CC) $(CFLAGS) ${SEQ_MKL_INCLUDE} $(PROG).ocr$*mkl.c  $(OCR_STATIC_FLAGS) $(PTHREAD_LIBS) $(TBB_LIBS) ${SEQ_MKL_STATIC_FLAGS} -o $(PROG).x86.ocr.tbb.static.seq.mkl$*$(SUFFIX)
+
+compile.ocr.tbb.static.multi.mkl%: $(PAPI_OBJS)
+	LD_PRELOAD=libtbbmalloc_proxy.so.2
+	$(CC) $(CFLAGS) ${MULTI_MKL_INCLUDE} $(PROG).ocr$*mkl.c $(OCR_STATIC_FLAGS) $(PTHREAD_LIBS) $(TBB_LIBS) ${MULTI_MKL_STATIC_FLAGS} -o $(PROG).x86.ocr.tbb.static.multi.mkl$*$(SUFFIX)
+
+compile.ocr.static.seq.mkl%: $(PAPI_OBJS)
+	$(CC) $(CFLAGS) ${SEQ_MKL_INCLUDE} $(PROG).ocr$*mkl.c  $(OCR_STATIC_FLAGS) $(PTHREAD_LIBS) ${SEQ_MKL_STATIC_FLAGS} -o $(PROG).x86.ocr.static.seq.mkl$*$(SUFFIX)
+
+compile.ocr.static.multi.mkl%: $(PAPI_OBJS)
+	$(CC) $(CFLAGS) ${MULTI_MKL_INCLUDE} $(PROG).ocr$*mkl.c $(OCR_STATIC_FLAGS) $(PTHREAD_LIBS) ${MULTI_MKL_STATIC_FLAGS} -o $(PROG).x86.ocr.static.multi.mkl$*$(SUFFIX)
+
+compile.ocr.tbb.seq.mkl%: $(PAPI_OBJS)
+	LD_PRELOAD=libtbbmalloc_proxy.so.2
+	$(CC) $(CFLAGS) ${SEQ_MKL_INCLUDE} $(PROG).ocr$*mkl.c $(OCR_FLAGS) $(TBB_LIBS) ${SEQ_MKL_DYNAMIC_FLAGS} -o $(PROG).x86.ocr.tbb.seq.mkl$*$(SUFFIX)
+
+compile.ocr.tbb.multi.mkl%: $(PAPI_OBJS)
+	LD_PRELOAD=libtbbmalloc_proxy.so.2
+	$(CC) $(CFLAGS) ${MULTI_MKL_INCLUDE} $(PROG).ocr$*mkl.c $(OCR_FLAGS) $(TBB_LIBS) ${MULTI_MKL_DYNAMIC_FLAGS} -o $(PROG).x86.ocr.tbb.multi.mkl$*$(SUFFIX)
+
+compile.ocr.seq.mkl%: $(PAPI_OBJS)
+	$(CC) $(CFLAGS) ${SEQ_MKL_INCLUDE} $(PROG).ocr$*mkl.c $(OCR_FLAGS) ${SEQ_MKL_DYNAMIC_FLAGS} -o $(PROG).x86.ocr.seq.mkl$*$(SUFFIX)
+
+compile.ocr.multi.mkl%: $(PAPI_OBJS)
+	$(CC) $(CFLAGS) ${MULTI_MKL_INCLUDE} $(PROG).ocr$*mkl.c $(OCR_FLAGS) ${MULTI_MKL_DYNAMIC_FLAGS} -o $(PROG).x86.ocr.multi.mkl$*$(SUFFIX)
+
+compile.ocr.tbb.static%: $(PAPI_OBJS)
+	LD_PRELOAD=libtbbmalloc_proxy.so.2
+	$(CC) $(CFLAGS) ${MULTI_MKL_INCLUDE} $(PROG).ocr$*c $(OCR_STATIC_FLAGS) $(PTHREAD_LIBS) $(TBB_LIBS) ${MULTI_MKL_STATIC_FLAGS} -o $(PROG).x86.ocr.tbb.static$*$(SUFFIX)
+
+compile.ocr.static%: $(PAPI_OBJS)
+	$(CC) $(CFLAGS) ${MULTI_MKL_INCLUDE} $(PROG).ocr$*c $(OCR_STATIC_FLAGS) $(PTHREAD_LIBS) ${MULTI_MKL_STATIC_FLAGS} -o $(PROG).x86.ocr.static$*$(SUFFIX)
+
+compile.ocr.tbb%: $(PAPI_OBJS)
+	LD_PRELOAD=libtbbmalloc_proxy.so.2
+	$(CC) $(CFLAGS) ${MULTI_MKL_INCLUDE} $(PROG).ocr$*c $(OCR_FLAGS) $(TBB_LIBS) ${MULTI_MKL_DYNAMIC_FLAGS} -o $(PROG).x86.ocr.tbb$*$(SUFFIX)
+
+compile.ocr%: $(PAPI_OBJS)
+	$(CC) $(CFLAGS) ${MULTI_MKL_INCLUDE} $(PROG).ocr$*c $(OCR_FLAGS) ${MULTI_MKL_DYNAMIC_FLAGS} -o $(PROG).x86.ocr$*$(SUFFIX)
+
+compile.serialized.tbb.static.seq.mkl%: $(PAPI_OBJS)
+	LD_PRELOAD=libtbbmalloc_proxy.so.2
+	$(CC) $(CFLAGS) ${SEQ_MKL_INCLUDE} $(PROG).serialized$*mkl.c ${SEQ_MKL_STATIC_FLAGS} $(TBB_LIBS) -o $(PROG).x86.serialized.tbb.static.seq.mkl$*$(SUFFIX)
+
+compile.serialized.tbb.static.multi.mkl%: $(PAPI_OBJS)
+	LD_PRELOAD=libtbbmalloc_proxy.so.2
+	$(CC) $(CFLAGS) ${MULTI_MKL_INCLUDE} $(PROG).serialized$*mkl.c ${MULTI_MKL_STATIC_FLAGS} $(TBB_LIBS) -o $(PROG).x86.serialized.tbb.static.multi.mkl$*$(SUFFIX)
+
+compile.serialized.static.seq.mkl%: $(PAPI_OBJS)
+	$(CC) $(CFLAGS) ${SEQ_MKL_INCLUDE} $(PROG).serialized$*mkl.c ${SEQ_MKL_STATIC_FLAGS} -o $(PROG).x86.serialized.static.seq.mkl$*$(SUFFIX)
+
+compile.serialized.static.multi.mkl%: $(PAPI_OBJS)
+	$(CC) $(CFLAGS) ${MULTI_MKL_INCLUDE} $(PROG).serialized$*mkl.c ${MULTI_MKL_STATIC_FLAGS} -o $(PROG).x86.serialized.static.multi.mkl$*$(SUFFIX)
+
+compile.serialized.tbb.seq.mkl%: $(PAPI_OBJS)
+	LD_PRELOAD=libtbbmalloc_proxy.so.2
+	$(CC) $(CFLAGS) ${SEQ_MKL_INCLUDE} $(PROG).serialized$*mkl.c ${SEQ_MKL_DYNAMIC_FLAGS} $(TBB_LIBS) -o $(PROG).x86.serialized.tbb.seq.mkl$*$(SUFFIX)
+
+compile.serialized.tbb.multi.mkl%: $(PAPI_OBJS)
+	LD_PRELOAD=libtbbmalloc_proxy.so.2
+	$(CC) $(CFLAGS) ${MULTI_MKL_INCLUDE} $(PROG).serialized$*mkl.c ${MULTI_MKL_DYNAMIC_FLAGS} $(TBB_LIBS) -o $(PROG).x86.serialized.tbb.multi.mkl$*$(SUFFIX)
+
+compile.serialized.seq.mkl%: $(PAPI_OBJS)
+	$(CC) $(CFLAGS) ${SEQ_MKL_INCLUDE} $(PROG).serialized$*mkl.c ${SEQ_MKL_DYNAMIC_FLAGS} -o $(PROG).x86.serialized.seq.mkl$*$(SUFFIX)
+
+compile.serialized.multi.mkl%: $(PAPI_OBJS)
+	$(CC) $(CFLAGS) ${MULTI_MKL_INCLUDE} $(PROG).serialized$*mkl.c ${MULTI_MKL_DYNAMIC_FLAGS} -o $(PROG).x86.serialized.multi.mkl$*$(SUFFIX)
+
+compile.serialized.tbb.static%: $(PAPI_OBJS)
+	LD_PRELOAD=libtbbmalloc_proxy.so.2
+	$(CC) $(CFLAGS) ${MULTI_MKL_INCLUDE} $(PROG).serialized$*c $(TBB_LIBS) ${MULTI_MKL_STATIC_FLAGS} -o $(PROG).x86.serialized.tbb.static$*$(SUFFIX)
+
+compile.serialized.static%: $(PAPI_OBJS)
+	$(CC) $(CFLAGS) ${MULTI_MKL_INCLUDE} $(PROG).serialized$*c ${MULTI_MKL_STATIC_FLAGS} -o $(PROG).x86.serialized.static$*$(SUFFIX)
+
+compile.serialized.tbb%: $(PAPI_OBJS)
+	LD_PRELOAD=libtbbmalloc_proxy.so.2
+	$(CC) $(CFLAGS) ${MULTI_MKL_INCLUDE} $(PROG).serialized$*c $(TBB_LIBS) ${MULTI_MKL_DYNAMIC_FLAGS} -o $(PROG).x86.serialized.tbb$*$(SUFFIX)
+
+compile.serialized%: $(PAPI_OBJS)
+	$(CC) $(CFLAGS) ${MULTI_MKL_INCLUDE} $(PROG).serialized$*c ${MULTI_MKL_DYNAMIC_FLAGS} -o $(PROG).x86.serialized$*$(SUFFIX)
+
+compile.phi.ocr.tbb.static.seq.mkl%: $(PAPI_OBJS)
+	LD_PRELOAD=$(MIC_TBB_LIB_PATH)/libtbbmalloc_proxy.so.2
+	$(CC) $(CFLAGS) $(MICFLAGS) ${SEQ_MKL_INCLUDE} $(PROG).ocr$*mkl.c $(OCR_STATIC_FLAGS) $(MIC_PTHREAD_LIBS) ${MIC_SEQ_MKL_STATIC_FLAGS} $(MIC_TBB_LIBS) -o $(PROG).mic.ocr.tbb.static.seq.mkl$*$(SUFFIX)
+
+compile.phi.ocr.tbb.static.multi.mkl%: $(PAPI_OBJS)
+	LD_PRELOAD=$(MIC_TBB_LIB_PATH)/libtbbmalloc_proxy.so.2
+	$(CC) $(CFLAGS) $(MICFLAGS) ${MIC_MULTI_MKL_INCLUDE} $(PROG).ocr$*mkl.c $(OCR_STATIC_FLAGS) $(MIC_PTHREAD_LIBS)  ${MIC_MULTI_MKL_STATIC_FLAGS} $(MIC_TBB_LIBS) -o $(PROG).mic.ocr.tbb.static.multi.mkl$*$(SUFFIX)
+
+compile.phi.ocr.static.seq.mkl%: $(PAPI_OBJS)
+	$(CC) $(CFLAGS) $(MICFLAGS) ${SEQ_MKL_INCLUDE} $(PROG).ocr$*mkl.c $(OCR_STATIC_FLAGS) $(MIC_PTHREAD_LIBS) ${MIC_SEQ_MKL_STATIC_FLAGS} -o $(PROG).mic.ocr.static.seq.mkl$*$(SUFFIX)
+
+compile.phi.ocr.static.multi.mkl%: $(PAPI_OBJS)
+	$(CC) $(CFLAGS) $(MICFLAGS) ${MIC_MULTI_MKL_INCLUDE} $(PROG).ocr$*mkl.c $(OCR_STATIC_FLAGS) $(MIC_PTHREAD_LIBS)  ${MIC_MULTI_MKL_STATIC_FLAGS} -o $(PROG).mic.ocr.static.multi.mkl$*$(SUFFIX)
+
+compile.phi.ocr.tbb.seq.mkl%: $(PAPI_OBJS)
+	LD_PRELOAD=$(MIC_TBB_LIB_PATH)/libtbbmalloc_proxy.so.2
+	$(CC) $(CFLAGS) $(MICFLAGS) ${SEQ_MKL_INCLUDE} $(PROG).ocr$*mkl.c $(OCR_FLAGS) ${MIC_SEQ_MKL_DYNAMIC_FLAGS} $(MIC_TBB_LIBS) -o $(PROG).mic.ocr.tbb.seq.mkl$*$(SUFFIX)
+
+compile.phi.ocr.tbb.multi.mkl%: $(PAPI_OBJS)
+	LD_PRELOAD=$(MIC_TBB_LIB_PATH)/libtbbmalloc_proxy.so.2
+	$(CC) $(CFLAGS) $(MICFLAGS) ${MIC_MULTI_MKL_INCLUDE} $(PROG).ocr$*mkl.c $(OCR_FLAGS) ${MIC_MULTI_MKL_DYNAMIC_FLAGS} $(MIC_TBB_LIBS) -o $(PROG).mic.ocr.tbb.multi.mkl$*$(SUFFIX)
+
+compile.phi.ocr.seq.mkl%: $(PAPI_OBJS)
+	$(CC) $(CFLAGS) $(MICFLAGS) ${SEQ_MKL_INCLUDE} $(PROG).ocr$*mkl.c $(OCR_FLAGS) ${MIC_SEQ_MKL_DYNAMIC_FLAGS} -o $(PROG).mic.ocr.seq.mkl$*$(SUFFIX)
+
+compile.phi.ocr.multi.mkl%: $(PAPI_OBJS)
+	$(CC) $(CFLAGS) $(MICFLAGS) ${MIC_MULTI_MKL_INCLUDE} $(PROG).ocr$*mkl.c $(OCR_FLAGS) ${MIC_MULTI_MKL_DYNAMIC_FLAGS} -o $(PROG).mic.ocr.multi.mkl$*$(SUFFIX)
+
+compile.phi.ocr.tbb.static%: $(PAPI_OBJS)
+	LD_PRELOAD=$(MIC_TBB_LIB_PATH)/libtbbmalloc_proxy.so.2
+	$(CC) $(CFLAGS) $(MICFLAGS) ${MIC_MULTI_MKL_INCLUDE} $(PROG).ocr$*c $(OCR_STATIC_FLAGS) $(MIC_TBB_LIBS) $(MIC_PTHREAD_LIBS) ${MIC_MULTI_MKL_STATIC_FLAGS} -o $(PROG).mic.ocr.tbb.static$*$(SUFFIX)
+
+compile.phi.ocr.tbb%: $(PAPI_OBJS)
+	LD_PRELOAD=$(MIC_TBB_LIB_PATH)/libtbbmalloc_proxy.so.2
+	$(CC) $(CFLAGS) $(MICFLAGS) ${MIC_MULTI_MKL_INCLUDE} $(PROG).ocr$*c $(OCR_FLAGS) $(MIC_TBB_LIBS) ${MIC_MULTI_MKL_DYNAMIC_FLAGS} -o $(PROG).mic.ocr.tbb$*$(SUFFIX)
+
+compile.phi.ocr.static%: $(PAPI_OBJS)
+	$(CC) $(CFLAGS) $(MICFLAGS) ${MIC_MULTI_MKL_INCLUDE} $(PROG).ocr$*c  $(OCR_STATIC_FLAGS) $(MIC_PTHREAD_LIBS) ${MIC_MULTI_MKL_STATIC_FLAGS} -o $(PROG).mic.ocr.static$*$(SUFFIX)
+
+compile.phi.ocr%: $(PAPI_OBJS)
+	$(CC) $(CFLAGS) $(MICFLAGS) ${MIC_MULTI_MKL_INCLUDE} $(PROG).ocr$*c $(OCR_FLAGS) ${MIC_MULTI_MKL_DYNAMIC_FLAGS} -o $(PROG).mic.ocr$*$(SUFFIX)
+
+compile.phi.serialized.tbb.static.seq.mkl%: $(PAPI_OBJS)
+	LD_PRELOAD=$(MIC_TBB_LIB_PATH)/libtbbmalloc_proxy.so.2
+	$(CC) $(CFLAGS) $(MICFLAGS) ${SEQ_MKL_INCLUDE} $(PROG).serialized$*mkl.c ${MIC_SEQ_MKL_STATIC_FLAGS} $(MIC_TBB_LIBS) -o $(PROG).mic.serialized.tbb.static.seq.mkl$*$(SUFFIX)
+
+compile.phi.serialized.tbb.static.multi.mkl%: $(PAPI_OBJS)
+	LD_PRELOAD=$(MIC_TBB_LIB_PATH)/libtbbmalloc_proxy.so.2
+	$(CC) $(CFLAGS) $(MICFLAGS) ${MIC_MULTI_MKL_INCLUDE} $(PROG).serialized$*mkl.c ${MIC_MULTI_MKL_STATIC_FLAGS} $(MIC_TBB_LIBS) -o $(PROG).mic.serialized.tbb.static.multi.mkl$*$(SUFFIX)
+
+compile.phi.serialized.static.seq.mkl%: $(PAPI_OBJS)
+	$(CC) $(CFLAGS) $(MICFLAGS) ${SEQ_MKL_INCLUDE} $(PROG).serialized$*mkl.c ${MIC_SEQ_MKL_STATIC_FLAGS} -o $(PROG).mic.serialized.static.seq.mkl$*$(SUFFIX)
+
+compile.phi.serialized.static.multi.mkl%: $(PAPI_OBJS)
+	$(CC) $(CFLAGS) $(MICFLAGS) ${MIC_MULTI_MKL_INCLUDE} $(PROG).serialized$*mkl.c ${MIC_MULTI_MKL_STATIC_FLAGS} -o $(PROG).mic.serialized.static.multi.mkl$*$(SUFFIX)
+
+compile.phi.serialized.tbb.seq.mkl%: $(PAPI_OBJS)
+	LD_PRELOAD=$(MIC_TBB_LIB_PATH)/libtbbmalloc_proxy.so.2
+	$(CC) $(CFLAGS) $(MICFLAGS) ${SEQ_MKL_INCLUDE} $(PROG).serialized$*mkl.c ${MIC_SEQ_MKL_DYNAMIC_FLAGS} $(MIC_TBB_LIBS) -o $(PROG).mic.serialized.tbb.seq.mkl$*$(SUFFIX)
+
+compile.phi.serialized.tbb.multi.mkl%: $(PAPI_OBJS)
+	LD_PRELOAD=$(MIC_TBB_LIB_PATH)/libtbbmalloc_proxy.so.2
+	$(CC) $(CFLAGS) $(MICFLAGS) ${MIC_MULTI_MKL_INCLUDE} $(PROG).serialized$*mkl.c ${MIC_MULTI_MKL_DYNAMIC_FLAGS} $(MIC_TBB_LIBS) -o $(PROG).mic.serialized.tbb.multi.mkl$*$(SUFFIX)
+
+compile.phi.serialized.seq.mkl%: $(PAPI_OBJS)
+	$(CC) $(CFLAGS) $(MICFLAGS) ${SEQ_MKL_INCLUDE} $(PROG).serialized$*mkl.c ${MIC_SEQ_MKL_DYNAMIC_FLAGS} -o $(PROG).mic.serialized.seq.mkl$*$(SUFFIX)
+
+compile.phi.serialized.multi.mkl%: $(PAPI_OBJS)
+	$(CC) $(CFLAGS) $(MICFLAGS) ${MIC_MULTI_MKL_INCLUDE} $(PROG).serialized$*mkl.c ${MIC_MULTI_MKL_DYNAMIC_FLAGS} -o $(PROG).mic.serialized.multi.mkl$*$(SUFFIX)
+
+compile.phi.serialized.tbb.static%: $(PAPI_OBJS)
+	LD_PRELOAD=libtbbmalloc_proxy.so.2
+	$(CC) $(CFLAGS) $(MICFLAGS) ${MIC_MULTI_MKL_INCLUDE} $(PROG).serialized$*c $(MIC_TBB_LIBS) $(MIC_PTHREAD_LIBS) ${MIC_MULTI_MKL_STATIC_FLAGS} -o $(PROG).mic.serialized.tbb.static$*$(SUFFIX)
+
+compile.phi.serialized.static%: $(PAPI_OBJS)
+	$(CC) $(CFLAGS) $(MICFLAGS) ${MIC_MULTI_MKL_INCLUDE} $(PROG).serialized$*c ${MIC_MULTI_MKL_STATIC_FLAGS} -o $(PROG).mic.serialized.static$*$(SUFFIX)
+
+compile.phi.serialized.tbb%: $(PAPI_OBJS)
+	LD_PRELOAD=libtbbmalloc_proxy.so.2
+	$(CC) $(CFLAGS) $(MICFLAGS) ${MIC_MULTI_MKL_INCLUDE} $(PROG).serialized$*c $(MIC_TBB_LIBS) $(MIC_PTHREAD_LIBS) ${MIC_MULTI_MKL_DYNAMIC_FLAGS} -o $(PROG).mic.serialized.tbb$*$(SUFFIX)
+
+compile.phi.serialized%: $(PAPI_OBJS)
+	$(CC) $(CFLAGS) $(MICFLAGS) ${MIC_MULTI_MKL_INCLUDE} $(PROG).serialized$*c ${MIC_MULTI_MKL_DYNAMIC_FLAGS} -o $(PROG).mic.serialized$*$(SUFFIX)
+
+run:
+	./$(PROG).$(SUFFIX) ${MATRIX_SIZE} ${TILE_SIZE} ${OCR_INPUT}/${INPUT_FILE}
+
+clean:
+	-rm -Rf *.o $(PROG).$(SUFFIX) cholesky.out
+
+verify:
+	diff -b ${OCR_INPUT}/$(OUTPUT_FILE) cholesky.out

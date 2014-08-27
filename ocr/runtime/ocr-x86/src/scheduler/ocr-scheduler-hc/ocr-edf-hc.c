@@ -68,6 +68,7 @@ ocrGuid_t hc_event_factory_create ( struct ocr_event_factory_struct* factory, oc
 
 struct ocr_event_struct* hc_event_constructor(ocrEventTypes_t eventType, bool takesArg) {
     hc_event_t* derived = (hc_event_t*) malloc(sizeof(hc_event_t));
+    derived->put_cpu_id = -1;
     derived->datum = UNINITIALIZED_GUID;
     derived->register_list = UNINITIALIZED_REGISTER_LIST;
     ocr_event_t* base = (ocr_event_t*)derived;

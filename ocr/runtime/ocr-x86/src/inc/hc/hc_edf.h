@@ -61,6 +61,7 @@ typedef struct hc_event_t {
     ocr_event_t base;
     ocrGuid_t datum;
     volatile register_list_node_t* register_list;
+    int put_cpu_id;
 } hc_event_t;
 
 struct ocr_event_struct* hc_event_constructor(ocrEventTypes_t eventType, bool takesArg);

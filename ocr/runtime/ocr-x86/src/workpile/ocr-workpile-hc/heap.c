@@ -114,6 +114,26 @@ static inline double costToAcquire ( int workerId, u64 placeTracker ) {
     return cost;
 }
 
+static inline double costToAcquireEvent ( int workerId, int put_cpu_id ) {
+    double cost = 0;
+#ifdef DAVINCI
+    unsigned char worker_socket_id = workerId/N_L2S_PER_SOCKET;
+    unsigned char worker_l2_within_socket_id = workerId % N_L2S_PER_SOCKET;
+
+    unsigned char put_socket_id = put_cpu_id/N_L2S_PER_SOCKET;
+    unsigned char put_l2_within_socket_id = put_cpu_id % N_L2S_PER_SOCKET;
+
+    if ( put_socket_id != worker_socket_id ) { /*not in my socket*/
+        cost += MISS;
+    } else if ( put_l2_within_socket_id != worker_l2_within_socket_id ) { /*in socket, in L3, not in my L2*/
+        cost += LOCAL_L3_HIT;
+    } else {
+        cost += LOCAL_L2_HIT;
+    }
+#endif
+    return cost;
+}
+
 static double calculateTaskRetrievalCost ( volatile void* entry, int wid ) {
     hc_task_t* derived = (hc_task_t*)entry;
 
@@ -141,12 +161,28 @@ static double calculateTaskRetrievalCost ( volatile void* entry, int wid ) {
     return totalCost;
 }
 
-static void setLocalCost ( volatile void* entry, int wid ) {
+static double calculateTaskRetrievalCostFromEvents ( volatile void* entry, int wid ) {
     hc_task_t* derived = (hc_task_t*)entry;
-    derived->cost = calculateTaskRetrievalCost ( entry, wid );
+
+    int i = 0;
+    double totalCost = 0;
+
+    ocr_event_t** eventArray = derived->awaitList->array;
+    hc_event_t* curr = NULL;
+
+    int nEvent = 0;
+    for ( curr = (hc_event_t*)eventArray[0]; NULL != curr; curr = (hc_event_t*)eventArray[++nEvent] ) {
+        totalCost += costToAcquireEvent (wid, curr->put_cpu_id);
+    }
+    return totalCost;
 }
 
-static double extractCost ( volatile void* entry ) {
+static void setLocalCost ( volatile void* entry, int wid ) {
+    hc_task_t* derived = (hc_task_t*)entry;
+    derived->cost = calculateTaskRetrievalCostFromEvents ( entry, wid );
+}
+
+static inline double extractCost ( volatile void* entry ) {
     /* TODO implement cost extraction*/
     hc_task_t* derived = (hc_task_t*)entry;
     return derived->cost;

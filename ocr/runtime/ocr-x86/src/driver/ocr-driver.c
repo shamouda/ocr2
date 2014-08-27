@@ -144,6 +144,12 @@ void ocrInit(int * argc, char ** argv, u32 fnc, ocrEdt_t funcs[]) {
         bind_map = read_bind_file(bind_file);
     }
 
+    char* ocr_num_threads_str = getenv("OCR_NUM_THREADS");
+    if ( NULL != ocr_num_threads_str ) {
+        nbHardThreads = atoi(ocr_num_threads_str);
+        fprintf(stderr,"ENV set nThreads to %d\n", nbHardThreads);
+    }
+
     /* sagnak begin */
     if ( md_file != NULL && !strncmp(md_file, "bar_", 4)) {
         size_t nb_policy_domain = 1;
@@ -424,12 +430,6 @@ void ocrInit(int * argc, char ** argv, u32 fnc, ocrEdt_t funcs[]) {
                 // Something went wrong when reading the machine description file
                 ocr_abort();
             } else {
-                nbHardThreads = ocr_config_default_nb_hardware_threads;
-		char* ocr_num_threads_str = getenv("OCR_NUM_THREADS");
-		if ( NULL != ocr_num_threads_str ) {
-			nbHardThreads = atoi(ocr_num_threads_str);
-			printf("ENV set nThreads to %d\n", nbHardThreads);
-		}
                 // nbHardThreads = MachineDescription_getNumHardwareThreads(md);
                 //	gHackTotalMemSize = MachineDescription_getDramSize(md);
             }

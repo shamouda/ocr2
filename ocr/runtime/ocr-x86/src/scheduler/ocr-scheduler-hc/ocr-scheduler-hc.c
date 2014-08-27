@@ -160,9 +160,52 @@ static int calculateMostLocalWorker ( ocrGuid_t taskGuid ) {
 #endif
 }
 
+/* sagnak quite hacky and hardcode-y */
+static int calculateMostEventLocalWorker ( ocrGuid_t taskGuid ) {
+#ifdef DAVINCI
+    hc_task_t* derivedTask = NULL;
+    globalGuidProvider->getVal(globalGuidProvider, taskGuid, (u64*)&derivedTask, NULL);
+
+    ocr_event_t** eventArray = derivedTask->awaitList->array;
+    hc_event_t* curr = NULL;
+
+    char socketPresence[ N_SOCKETS ] = {0,0};
+    int nEvent = 0;
+    for ( curr = (hc_event_t*)eventArray[0]; NULL != curr; curr = (hc_event_t*)eventArray[++nEvent] ) {
+        ++socketPresence [ curr->put_cpu_id % N_L2S_PER_SOCKET ];
+    }
+
+    int mostLocalSocketIndex = socketPresence[1] > socketPresence[0];
+
+    int nEvents = 0;
+
+    char l2Presence[ N_L2S_PER_SOCKET ] = {0,0,0,0,0,0};
+
+    nEvent = 0;
+    for ( curr = (hc_event_t*)eventArray[0]; NULL != curr; curr = (hc_event_t*)eventArray[++nEvent] ) {
+        int put_cpu_id = curr->put_cpu_id;
+        if ( mostLocalSocketIndex == put_cpu_id % N_L2S_PER_SOCKET ) {
+            ++l2Presence [ put_cpu_id - mostLocalSocketIndex * N_L2S_PER_SOCKET ];
+        }
+    }
+
+    int l2index = 0;
+    int maxIndex = 0;
+    for ( ; l2index < N_L2S_PER_SOCKET ; ++l2index ) {
+        if ( l2Presence[maxIndex] < l2Presence[l2index] ) {
+            maxIndex = l2index;
+        }
+    }
+    return mostLocalSocketIndex*N_L2S_PER_SOCKET + maxIndex;
+#else
+    assert(0 && "");
+#endif
+}
+
 static inline ocr_workpile_t * hc_scheduler_push_mapping_most_local (ocr_scheduler_t* base, ocr_worker_t* w, ocrGuid_t taskGuid ) {
     hc_scheduler_t* derived = (hc_scheduler_t*) base;
-    return derived->pools[calculateMostLocalWorker(taskGuid)];
+    //return derived->pools[calculateMostLocalWorker(taskGuid)];
+    return derived->pools[calculateMostEventLocalWorker(taskGuid)];
 }
 
 static ocr_workpile_t * push_mapping_deprecated_assert (ocr_scheduler_t* base, ocr_worker_t* w ) {
