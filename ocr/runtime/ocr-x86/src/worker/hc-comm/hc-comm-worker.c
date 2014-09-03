@@ -36,15 +36,15 @@ ocrGuid_t processRequestEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[
     // a response, the runtime reuses the request's message to post the response.
     // Hence there's a race between this code and the code posting the response.
     bool toBeFreed = !(requestMsg->type & PD_MSG_REQ_RESPONSE);
-    DPRINTF(DEBUG_LVL_VVERB,"[%d] hc-comm-worker: Process incoming EDT request of type %p %x\n", (int)pd->myLocation, requestMsg, requestMsg->type);
+    DPRINTF(DEBUG_LVL_VVERB,"hc-comm-worker: Process incoming EDT request @ %p of type 0x%x\n", requestMsg, requestMsg->type);
     pd->fcts.processMessage(pd, requestMsg, true);
-    DPRINTF(DEBUG_LVL_VVERB,"[%d] hc-comm-worker: [done] Process incoming EDT request %p %x\n", (int)pd->myLocation, requestMsg, requestMsg->type);
+    DPRINTF(DEBUG_LVL_VVERB,"hc-comm-worker: [done] Process incoming EDT @ %p request of type 0x%x\n", requestMsg, requestMsg->type);
     if (toBeFreed) {
         // Makes sure the runtime doesn't try to reuse this message
         // even though it was not supposed to issue a response.
         // If that's the case, this check is racy
         ASSERT(!(requestMsg->type & PD_MSG_RESPONSE));
-        DPRINTF(DEBUG_LVL_VVERB,"[%d] hc-comm-worker: Deleted incoming EDT request %p %x\n", (int)pd->myLocation, requestMsg, requestMsg->type);
+        DPRINTF(DEBUG_LVL_VVERB,"hc-comm-worker: Deleted incoming EDT request @ %p of type 0x%x\n", requestMsg, requestMsg->type);
         // if request was an incoming one-way we can delete the message now.
         pd->fcts.pdFree(pd, requestMsg);
     }
@@ -83,8 +83,8 @@ static u8 takeFromSchedulerAndSend(ocrPolicyDomain_t * pd) {
     #undef PD_TYPE
         if (outgoingHandle != NULL) {
             // This code handles the pd's outgoing messages. They can be requests or responses.
-            DPRINTF(DEBUG_LVL_VVERB,"[%d] hc-comm-worker: outgoing handle comm take successful handle=%p, msg=%p type=0x%lx\n", (int) pd->myLocation,
-                outgoingHandle, outgoingHandle->msg, outgoingHandle->msg->type);
+            DPRINTF(DEBUG_LVL_VVERB,"hc-comm-worker: outgoing handle comm take successful handle=%p, msg=%p type=0x%x\n",
+                    outgoingHandle, outgoingHandle->msg, outgoingHandle->msg->type);
             //We can never have an outgoing handle with the response ptr set because
             //when we process an incoming request, we lose the handle by calling the
             //pd's process message. Hence, a new handle is created for one-way response.
@@ -164,7 +164,7 @@ static u8 createProcessRequestEdt(ocrPolicyDomain_t * pd, ocrGuid_t templateGuid
     returnCode = pd->fcts.processMessage(pd, &msg, true);
     if(returnCode) {
         edtGuid = PD_MSG_FIELD(guid.guid);
-        DPRINTF(DEBUG_LVL_VVERB,"[%d] hc-comm-worker: Created processRequest EDT with guid %ld\n", (int)pd->myLocation, edtGuid);
+        DPRINTF(DEBUG_LVL_VVERB,"hc-comm-worker: Created processRequest EDT GUID 0x%lx\n", edtGuid);
         RETURN_PROFILE(returnCode);
     }
 
@@ -195,13 +195,15 @@ static void workerLoopHcComm_RL3(ocrWorker_t * worker) {
             //To catch misuses, assert src is not self and dst is self
             ASSERT((message->srcLocation != pd->myLocation) && (message->destLocation == pd->myLocation));
             if (message->type & PD_MSG_REQUEST) {
-                DPRINTF(DEBUG_LVL_VVERB,"[%d] hc-comm-worker: Received message request, msgId: %ld type:0x%x\n", (int) pd->myLocation, message->msgId, message->type);
+                DPRINTF(DEBUG_LVL_VVERB,"hc-comm-worker: Received message request, msgId: %ld type:0x%x\n",
+                        message->msgId, message->type);
                 // This is an outstanding request, delegate to PD for processing
                 u64 msgParamv = (u64) message;
             #ifdef HYBRID_COMM_COMP_WORKER // Experimental see documentation
                 // Execute selected 'sterile' messages on the spot
                 if ((message->type & PD_MSG_TYPE_ONLY) == PD_MSG_DB_ACQUIRE) {
-                    DPRINTF(DEBUG_LVL_VVERB,"[%d] hc-comm-worker: Execute message request, msgId: %ld\n", (int) pd->myLocation, message->msgId);
+                    DPRINTF(DEBUG_LVL_VVERB,"hc-comm-worker: Execute message request, msgId: %ld\n",
+                            message->msgId);
                     processRequestEdt(1, &msgParamv, 0, NULL);
                 } else {
                     createProcessRequestEdt(pd, processRequestTemplate, &msgParamv);
@@ -216,7 +218,8 @@ static void workerLoopHcComm_RL3(ocrWorker_t * worker) {
             } else {
                 // Poll a response to a message we had sent.
                 ASSERT(message->type & PD_MSG_RESPONSE);
-                DPRINTF(DEBUG_LVL_VVERB,"[%d] hc-comm-worker: Received message response for msgId: %ld\n", (int) pd->myLocation, message->msgId); // debug
+                DPRINTF(DEBUG_LVL_VVERB,"hc-comm-worker: Received message response for msgId: %ld\n",
+                        message->msgId); // debug
                 //DIST-TODO design: If it's a response, how do we know if a worker is blocking on the message
                 //      or if we need to spawn a new task (i.e. two-way but asynchronous handling of response)
                 // => Sounds this should be specified in the handler
@@ -283,7 +286,8 @@ static bool isBlessedWorker(ocrWorker_t * worker, ocrGuid_t * affinityMasterPD) 
 void* runWorkerHcComm(ocrWorker_t * worker) {
     ocrGuid_t affinityMasterPD;
     bool blessedWorker = isBlessedWorker(worker, &affinityMasterPD);
-    DPRINTF(DEBUG_LVL_INFO,"[%d] hc-comm-worker: blessed worker at location %d\n", (int)worker->pd->myLocation);
+    DPRINTF(DEBUG_LVL_INFO,"hc-comm-worker: blessed worker at location %d\n",
+            (int)worker->pd->myLocation);
     if (blessedWorker) {
         // This is all part of the mainEdt setup
         // and should be executed by the "blessed" worker.
@@ -334,30 +338,30 @@ void stopWorkerHcComm(ocrWorker_t * selfBase) {
     if (currWorker != selfBase) {
         switch(self->rl) {
             case 3:
-                DPRINTF(DEBUG_LVL_VVERB,"[%d] hc-comm-worker: begin shutdown RL3\n", (int) selfBase->pd->myLocation);
+                DPRINTF(DEBUG_LVL_VVERB,"hc-comm-worker: begin shutdown RL3\n");
                 // notify worker of level completion
                 self->rl_completed[3] = true;
                 while(self->rl_completed[3]);
                 self->rl_completed[3] = true; // so ugly
-                DPRINTF(DEBUG_LVL_VVERB,"[%d] hc-comm-worker: done shutdown RL3\n", (int) selfBase->pd->myLocation);
+                DPRINTF(DEBUG_LVL_VVERB,"hc-comm-worker: done shutdown RL3\n");
                 // Guarantees RL3 is fully completed. Avoids race where the RL is flipped
                 // but the comm-worker is in the middle of its RL3 loop.
             break;
             case 2:
-                DPRINTF(DEBUG_LVL_VVERB,"[%d] hc-comm-worker: begin shutdown RL2\n", (int) selfBase->pd->myLocation);
+                DPRINTF(DEBUG_LVL_VVERB,"hc-comm-worker: begin shutdown RL2\n");
                 // Wait for runlevel to complete
                 while(!self->rl_completed[2]);
-                DPRINTF(DEBUG_LVL_VVERB,"[%d] hc-comm-worker: done shutdown RL2\n", (int) selfBase->pd->myLocation);
+                DPRINTF(DEBUG_LVL_VVERB,"hc-comm-worker: done shutdown RL2\n");
                 // All communications completed.
             break;
             case 1:
                 //DIST-TODO stop: we don't need this RL I think
-                DPRINTF(DEBUG_LVL_VVERB,"[%d] hc-comm-worker: begin shutdown RL1\n",(int) selfBase->pd->myLocation);
+                DPRINTF(DEBUG_LVL_VVERB,"hc-comm-worker: begin shutdown RL1\n");
                 self->rl_completed[1] = true;
-                DPRINTF(DEBUG_LVL_VVERB,"[%d] hc-comm-worker: done shutdown RL1\n",(int) selfBase->pd->myLocation);
+                DPRINTF(DEBUG_LVL_VVERB,"hc-comm-worker: done shutdown RL1\n");
             break;
             case 0:
-                DPRINTF(DEBUG_LVL_VVERB,"[%d] hc-comm-worker: begin shutdown RL0\n", (int) selfBase->pd->myLocation);
+                DPRINTF(DEBUG_LVL_VVERB,"hc-comm-worker: begin shutdown RL0\n");
                 // We go on and call the base stop function that
                 // shuts down the comm-api and comm-platform.
                 self->baseStop(selfBase);

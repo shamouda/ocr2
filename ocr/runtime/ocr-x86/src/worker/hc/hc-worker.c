@@ -61,6 +61,7 @@ static void hcWorkShift(ocrWorker_t * worker) {
         if(count == 1) {
             ASSERT(taskGuid.guid != NULL_GUID && taskGuid.metaDataPtr != NULL);
             worker->curTask = (ocrTask_t*)taskGuid.metaDataPtr;
+            DPRINTF(DEBUG_LVL_VERB, "Worker shifting to execute EDT GUID 0x%lx\n", taskGuid.guid);
             u8 (*executeFunc)(ocrTask_t *) = (u8 (*)(ocrTask_t*))PD_MSG_FIELD(extra); // Execute is stored in extra
             executeFunc(worker->curTask);
             worker->curTask = NULL;

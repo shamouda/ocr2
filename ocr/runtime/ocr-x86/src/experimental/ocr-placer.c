@@ -42,7 +42,7 @@ static u8 resolveRemoteMetaData(ocrPolicyDomain_t * self, ocrFatGuid_t * fGuid, 
     u64 val;
     self->guidProviders[0]->fcts.getVal(self->guidProviders[0], remoteGuid, &val, NULL);
     if (val == 0) {
-        DPRINTF(DEBUG_LVL_VVERB,"[%d] resolveRemoteMetaData: Query remote GUID metadata\n", (u32)self->myLocation);
+        DPRINTF(DEBUG_LVL_VVERB,"resolveRemoteMetaData: Query remote GUID metadata\n");
         // GUID is unknown, request a copy of the metadata
         ocrPolicyMsg_t msgClone;
         getCurrentEnv(NULL, NULL, NULL, &msgClone);
@@ -64,10 +64,11 @@ static u8 resolveRemoteMetaData(ocrPolicyDomain_t * self, ocrFatGuid_t * fGuid, 
             //DIST-TODO Potentially multiple concurrent registerGuid on the same template
             self->guidProviders[0]->fcts.registerGuid(self->guidProviders[0], remoteGuid, (u64) metaDataPtr);
             val = (u64) metaDataPtr;
-            DPRINTF(DEBUG_LVL_VVERB,"[%d] GUID registered for %ld\n", (u32)self->myLocation, remoteGuid);
+            DPRINTF(DEBUG_LVL_VVERB,"Data @ 0x%lx registered for GUID 0x%lx for %ld\n",
+                    metaDataPtr, remoteGuid, (u32)self->myLocation);
         #undef PD_MSG
         #undef PD_TYPE
-        DPRINTF(DEBUG_LVL_VVERB,"[%d] resolveRemoteMetaData: Retrieved remote EDT template\n", (u32)self->myLocation);
+        DPRINTF(DEBUG_LVL_VVERB,"resolveRemoteMetaData: Retrieved remote EDT template\n");
     }
     fGuid->metaDataPtr = (void *) val;
     return 0;
@@ -109,7 +110,7 @@ ocrPlacer_t * createLocationPlacer(ocrPolicyDomain_t *pd) {
     placer->pdLocAffinities[placer->current] = fguid.guid;
 
     for(i=0; i < countAff; i++) {
-        DPRINTF(DEBUG_LVL_VVERB,"[%d] affinityGuid[%d]=0x%lx\n", (u32)pd->myLocation, (u32)i, placer->pdLocAffinities[i]);
+        DPRINTF(DEBUG_LVL_VVERB,"affinityGuid[%d]=0x%lx\n", (u32)i, placer->pdLocAffinities[i]);
     }
 
     return (ocrPlacer_t *) placer;
@@ -170,8 +171,8 @@ u8 suggestLocationPlacement(ocrPolicyDomain_t *pd, ocrLocation_t curLoc, ocrLoca
             }
             hal_unlock32(&(placer->lock));
             msg->destLocation = affinityToLocation(pdLocAffinity);
-            DPRINTF(DEBUG_LVL_VVERB,"[%d] Auto-Placement for msg %p, type 0x%x, at location %d\n",
-                (u32)pd->myLocation, msg, msgType, (u32)placementIndex);
+            DPRINTF(DEBUG_LVL_VVERB,"Auto-Placement for msg %p, type 0x%x, at location %d\n",
+                    msg, msgType, (u32)placementIndex);
         }
     }
 
