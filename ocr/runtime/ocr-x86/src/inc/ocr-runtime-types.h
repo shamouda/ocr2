@@ -141,20 +141,32 @@ typedef enum {
  * stripped out but it is here in case we need it later
  */
 typedef enum {
-    EDT_WORKTYPE    = 0x1,
-    MAX_WORKTYPE    = 0x2
+    EDT_WORKTYPE,
+    EDT_WORKTYPE_PARALLEL_FOR,
+    EDT_WORKTYPE_PARALLEL_REDUCE,
+    MAX_WORKTYPE
 } ocrWorkType_t;
 
-typedef enum {
-    CREATED_EDTSTATE    = 0x1, /**< EDT created; no dependence satisfied */
-    PARTIAL_EDTSTATE    = 0x2, /**< EDT has at least one dependence that is satisfied */
-    READY_EDTSTATE      = 0x3, /**< EDT has all dependences satisfied */
-    RUNNING_EDTSTATE    = 0x4, /**< EDT is executing */
-    REAPING_EDTSTATE    = 0x5,  /**< EDT finished executing and is cleaning up */
-    DATA_PARALLEL_CREATED_EDTSTATE = 0x6,
-    DATA_PARALLEL_ACTIVE_EDTSTATE = 0x7,
-    DATA_PARALLEL_SINK_EDTSTATE = 0x8
-} ocrEdtState_t;
+#define EDTSTATE_ONLY           0xFF /**< EDT can have up to 256 states */
+#define EDTSTATE_INVALID        0x00 /**< EDT state is undefined (error condition) */
+#define EDTSTATE_CREATED        0x01 /**< EDT created; no dependence satisfied */
+#define EDTSTATE_PARTIAL        0x02 /**< EDT has at least one dependence that is satisfied */
+#define EDTSTATE_SATISFIED      0x03 /**< EDT has all dependences satisfied */
+#define EDTSTATE_ACQUIRED       0x04 /**< EDT has all input datablocks acquired */
+#define EDTSTATE_READY          0x05 /**< EDT has been scheduled for execution */
+#define EDTSTATE_RUNNING        0x06 /**< EDT is executing */
+#define EDTSTATE_REAPING        0x07 /**< EDT finished executing and is cleaning up */
+#define EDTSTATE_RELEASED       0x08 /**< EDT has released all acquired datablocks */
+#define EDTSTATE_COMPLETE       0x09 /**< EDT has satisfied output event and can be retired */
+#define EDTSTATE_RETIRED        0x0A /**< EDT has been retired */
+#define EDTSTATE_FREED          0x0B /**< EDT has been deallocated */
+
+#define EDTTYPE_ONLY            (~0xFF)
+#define EDTTYPE_RUNTIME         0x100
+#define EDTTYPE_DATA_PARALLEL   0x200
+#define EDTTYPE_REDUCTION       0x400
+#define EDTTYPE_PHASED          0x800
+#define EDTTYPE_SINK            0x1000
 
 /**
  * @brief Type of pop from workpiles.

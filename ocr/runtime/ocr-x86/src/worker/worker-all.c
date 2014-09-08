@@ -49,6 +49,8 @@ void initializeWorkerOcr(ocrWorkerFactory_t * factory, ocrWorker_t * self, ocrPa
     self->curTask = NULL;
     self->fcts = factory->workerFcts;
     self->dpCtxt.task = NULL_GUID;
+    self->dpCtxt.latch = NULL_GUID;
+    self->dpCtxt.reductionDbPtr = NULL;
     self->dpCtxt.lb = 0;
     self->dpCtxt.ub = 0;
     self->dpCtxt.lock = 0;

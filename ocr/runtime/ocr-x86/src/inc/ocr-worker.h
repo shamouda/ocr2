@@ -68,13 +68,14 @@ typedef struct _ocrWorkerFcts_t {
 } ocrWorkerFcts_t;
 
 typedef struct _ocrDataParallelContext_t {
+    u64 id;                /* Id of this context */
     ocrGuid_t task;        /* Guid of the data parallel task */
-    ocrGuid_t latch;       /* Latch event that satisfies at the end of the computation */
+    ocrGuid_t latch;       /* Latch event to satisfy at the end of this context's computation */
+    void *reductionDbPtr;  /* Data block that holds the partial reduction result for this context */
     volatile u64 lb, ub;   /* Lower/Upper bounds of the iteration range of the data parallel computation performed by this worker */
-    volatile u32 lock;     /* Lock to coordinate range stealing among multiple workers */
-    volatile bool active;  /* Flag to indicate a running data parallel computation */
     u64 curIndex;          /* Index of the current iteration being performed by the worker */
-    u64 id;
+    volatile bool active;  /* Flag to indicate a running data parallel computation */
+    volatile u32 lock;     /* Lock to coordinate range stealing among multiple workers */
 } ocrDpCtxt_t;
 
 typedef struct _ocrWorker_t {

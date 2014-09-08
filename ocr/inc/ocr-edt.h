@@ -182,8 +182,9 @@ u8 ocrEdtCreate(ocrGuid_t * guid, ocrGuid_t templateGuid,
  *
  **/
 u8 ocrDataParallelEdtCreate(ocrGuid_t * guid, ocrGuid_t templateGuid,
-                u32 paramc, u64* paramv, u32 depc, ocrGuid_t *depv,
-                u64 range, u16 properties, ocrGuid_t affinity, ocrGuid_t *outputEvent);
+                            u32 paramc, u64* paramv, u32 depc, ocrGuid_t *depv,
+                            u64 dataParallelRange, u16 properties, ocrGuid_t affinity,
+                            ocrGuid_t *outputEvent);
 
 /**
  * @brief Get the current iteration index of the data parallel computation
@@ -192,6 +193,36 @@ u8 ocrDataParallelEdtCreate(ocrGuid_t * guid, ocrGuid_t templateGuid,
  *
  **/
 u64 ocrDataParallelGetCurrentIteration();
+
+/**
+ * @brief Creates a Data Parallel EDT instance for Reduction Operation
+ *
+ * Note: All params are same as ocrDataParallelEdtCreate, except the following.
+ *
+ * @param op             Reduction operation to be performed
+ *                       Can be either one of the builtin ops or a user-defined op
+ * @param type           Type of element involved in each reduction operation
+ * @param typeSize       Size of type of element involved in each reduction operation
+ * @param userFunc       User provided reduction function
+ *                       Should be NULL if using a builtin reduction op
+ * @param initVal        The initialization value
+ *
+ * @return 0 on success and an error code on failure
+ **/
+u8 ocrDataParallelReductionEdtCreate(ocrGuid_t* edtGuid, ocrGuid_t templateGuid,
+                                     u32 paramc, u64* paramv, u32 depc, ocrGuid_t *depv,
+                                     u64 dataParallelRange, ocrReductionOp_t op, ocrReductionType_t type,
+                                     u64 typeSize, ocrUserReductionFn_t userFunc, void* initVal,
+                                     u16 properties, ocrGuid_t affinity, ocrGuid_t *outputEvent);
+
+/**
+ * @brief Reduction call made on element
+ *
+ * @param el             Element involved in a reduction operation
+ *
+ * @return 0 on success and an error code on failure
+ **/
+u8 ocrReduce(void* el);
 
 /**
  * @brief Destroy an EDT and release its associated guid

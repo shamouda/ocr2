@@ -9,6 +9,7 @@
 #include "ocr-edt.h"
 #include "ocr-policy-domain.h"
 #include "ocr-runtime.h"
+#include "task/hc/hc-task.h" //FIXME: Temporary
 
 #include "utils/profiler/profiler.h"
 
@@ -142,11 +143,29 @@ u8 ocrEdtTemplateDestroy(ocrGuid_t guid) {
 #undef PD_TYPE
 }
 
-u8 ocrEdtCreateInternal(ocrGuid_t* edtGuid, ocrGuid_t templateGuid,
-                u32 paramc, u64* paramv, u32 depc, ocrGuid_t *depv,
-                u16 properties, ocrGuid_t affinity, u64 dataParallelRange,
-                ocrGuid_t *outputEvent) {
+static u8 ocrEdtCreateAddDependence(ocrGuid_t edtGuid, u32 depc, ocrGuid_t *depv) {
+    u8 returnCode = 0;
+    // If guids dependences were provided, add them now
+    // TODO: This should probably just send the messages
+    // to the PD
+    if(depv != NULL) {
+        ASSERT(depc != 0);
+        u32 i = 0;
+        while(i < depc) {
+            // FIXME: Not really good. We would need to undo maybe
+            returnCode = ocrAddDependence(depv[i], edtGuid, i, DB_DEFAULT_MODE);
+            ++i;
+            if(returnCode) {
+                RETURN_PROFILE(returnCode);
+            }
+        }
+    }
+    return returnCode;
+}
 
+u8 ocrEdtCreate(ocrGuid_t* edtGuid, ocrGuid_t templateGuid,
+                u32 paramc, u64* paramv, u32 depc, ocrGuid_t *depv,
+                u16 properties, ocrGuid_t affinity, ocrGuid_t *outputEvent) {
     START_PROFILE(api_EdtCreate);
     ocrPolicyMsg_t msg;
     ocrPolicyDomain_t * pd = NULL;
@@ -172,12 +191,10 @@ u8 ocrEdtCreateInternal(ocrGuid_t* edtGuid, ocrGuid_t templateGuid,
     PD_MSG_FIELD(paramv) = paramv;
     PD_MSG_FIELD(paramc) = paramc;
     PD_MSG_FIELD(depc) = depc;
-    PD_MSG_FIELD(dataParallelRange) = dataParallelRange;
     PD_MSG_FIELD(properties) = properties;
-    PD_MSG_FIELD(workType) = EDT_WORKTYPE;
     PD_MSG_FIELD(currentEdt.guid) = curEdt ? curEdt->guid : NULL_GUID;
     PD_MSG_FIELD(currentEdt.metaDataPtr) = curEdt;
-
+    PD_MSG_FIELD(workType) = EDT_WORKTYPE;
     returnCode = pd->fcts.processMessage(pd, &msg, true);
     if(returnCode) {
         RETURN_PROFILE(returnCode);
@@ -189,43 +206,158 @@ u8 ocrEdtCreateInternal(ocrGuid_t* edtGuid, ocrGuid_t templateGuid,
     if(outputEvent)
         *outputEvent = PD_MSG_FIELD(outputEvent.guid);
 
-    // If guids dependences were provided, add them now
-    // TODO: This should probably just send the messages
-    // to the PD
-    if(depv != NULL) {
-        ASSERT(depc != 0);
-        u32 i = 0;
-        while(i < depc) {
-            // FIXME: Not really good. We would need to undo maybe
-            returnCode = ocrAddDependence(depv[i], *edtGuid, i, DB_DEFAULT_MODE);
-            ++i;
-            if(returnCode) {
-                RETURN_PROFILE(returnCode);
-            }
-        }
-    }
-    RETURN_PROFILE(0);
+    returnCode = ocrEdtCreateAddDependence(*edtGuid, depc, depv);
+    RETURN_PROFILE(returnCode);
 #undef PD_MSG
 #undef PD_TYPE
 }
 
-u8 ocrEdtCreate(ocrGuid_t* edtGuid, ocrGuid_t templateGuid,
-                u32 paramc, u64* paramv, u32 depc, ocrGuid_t *depv,
-                u16 properties, ocrGuid_t affinity, ocrGuid_t *outputEvent) {
-    return ocrEdtCreateInternal(edtGuid, templateGuid, paramc, paramv, depc, depv, properties, affinity, 0, outputEvent);
-}
-
 u8 ocrDataParallelEdtCreate(ocrGuid_t* edtGuid, ocrGuid_t templateGuid,
                 u32 paramc, u64* paramv, u32 depc, ocrGuid_t *depv,
-                u64 dataParallelRange, u16 properties, ocrGuid_t affinity, 
+                u64 dataParallelRange, u16 properties, ocrGuid_t affinity,
                 ocrGuid_t *outputEvent) {
-    return ocrEdtCreateInternal(edtGuid, templateGuid, paramc, paramv, depc, depv, properties, affinity, dataParallelRange, outputEvent);
+    START_PROFILE(api_DataParallelEdtCreate);
+    ocrPolicyMsg_t msg;
+    ocrPolicyDomain_t * pd = NULL;
+    u8 returnCode = 0;
+    ocrTask_t * curEdt = NULL;
+    getCurrentEnv(&pd, NULL, &curEdt, &msg);
+
+#define PD_MSG (&msg)
+#define PD_TYPE PD_MSG_WORK_CREATE
+    msg.type = PD_MSG_WORK_CREATE | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
+    PD_MSG_FIELD(guid.guid) = *edtGuid;
+    PD_MSG_FIELD(guid.metaDataPtr) = NULL;
+    PD_MSG_FIELD(templateGuid.guid) = templateGuid;
+    PD_MSG_FIELD(templateGuid.metaDataPtr) = NULL;
+    PD_MSG_FIELD(affinity.guid) = affinity;
+    PD_MSG_FIELD(affinity.metaDataPtr) = NULL;
+    PD_MSG_FIELD(outputEvent.metaDataPtr) = NULL;
+    if(outputEvent) {
+        PD_MSG_FIELD(outputEvent.guid) = UNINITIALIZED_GUID;
+    } else {
+        PD_MSG_FIELD(outputEvent.guid) = NULL_GUID;
+    }
+    PD_MSG_FIELD(paramv) = paramv;
+    PD_MSG_FIELD(paramc) = paramc;
+    PD_MSG_FIELD(depc) = depc;
+    PD_MSG_FIELD(properties) = properties;
+    PD_MSG_FIELD(currentEdt.guid) = curEdt ? curEdt->guid : NULL_GUID;
+    PD_MSG_FIELD(currentEdt.metaDataPtr) = curEdt;
+    PD_MSG_FIELD(dataParallelRange) = dataParallelRange;
+    PD_MSG_FIELD(workType) = EDT_WORKTYPE_PARALLEL_FOR;
+    returnCode = pd->fcts.processMessage(pd, &msg, true);
+    if(returnCode) {
+        RETURN_PROFILE(returnCode);
+    }
+
+    *edtGuid = PD_MSG_FIELD(guid.guid);
+    paramc = PD_MSG_FIELD(paramc);
+    depc = PD_MSG_FIELD(depc);
+    if(outputEvent)
+        *outputEvent = PD_MSG_FIELD(outputEvent.guid);
+
+    returnCode = ocrEdtCreateAddDependence(*edtGuid, depc, depv);
+    RETURN_PROFILE(returnCode);
+#undef PD_MSG
+#undef PD_TYPE
+}
+
+u8 ocrDataParallelReductionEdtCreate(ocrGuid_t* edtGuid, ocrGuid_t templateGuid,
+                u32 paramc, u64* paramv, u32 depc, ocrGuid_t *depv,
+                u64 dataParallelRange, ocrReductionOp_t op, ocrReductionType_t type,
+                u64 size, ocrUserReductionFn_t reductionFunc, void* initVal,
+                u16 properties, ocrGuid_t affinity, ocrGuid_t *outputEvent) {
+    START_PROFILE(api_DataParallelReductionEdtCreate);
+    ocrPolicyMsg_t msg;
+    ocrPolicyDomain_t * pd = NULL;
+    u8 returnCode = 0;
+    ocrTask_t * curEdt = NULL;
+    getCurrentEnv(&pd, NULL, &curEdt, &msg);
+
+#define PD_MSG (&msg)
+#define PD_TYPE PD_MSG_WORK_CREATE
+    msg.type = PD_MSG_WORK_CREATE | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
+    PD_MSG_FIELD(guid.guid) = *edtGuid;
+    PD_MSG_FIELD(guid.metaDataPtr) = NULL;
+    PD_MSG_FIELD(templateGuid.guid) = templateGuid;
+    PD_MSG_FIELD(templateGuid.metaDataPtr) = NULL;
+    PD_MSG_FIELD(affinity.guid) = affinity;
+    PD_MSG_FIELD(affinity.metaDataPtr) = NULL;
+    PD_MSG_FIELD(outputEvent.metaDataPtr) = NULL;
+    if(outputEvent) {
+        PD_MSG_FIELD(outputEvent.guid) = UNINITIALIZED_GUID;
+    } else {
+        PD_MSG_FIELD(outputEvent.guid) = NULL_GUID;
+    }
+    PD_MSG_FIELD(paramv) = paramv;
+    PD_MSG_FIELD(paramc) = paramc;
+    PD_MSG_FIELD(depc) = depc;
+    PD_MSG_FIELD(properties) = properties;
+    PD_MSG_FIELD(currentEdt.guid) = curEdt ? curEdt->guid : NULL_GUID;
+    PD_MSG_FIELD(currentEdt.metaDataPtr) = curEdt;
+    PD_MSG_FIELD(dataParallelRange) = dataParallelRange;
+    PD_MSG_FIELD(redOp) = op;
+    PD_MSG_FIELD(redType) = type;
+    PD_MSG_FIELD(redElSize) = size;
+    PD_MSG_FIELD(redFn) = reductionFunc;
+    PD_MSG_FIELD(initialValue) = initVal;
+    PD_MSG_FIELD(workType) = EDT_WORKTYPE_PARALLEL_REDUCE;
+    returnCode = pd->fcts.processMessage(pd, &msg, true);
+    if(returnCode) {
+        RETURN_PROFILE(returnCode);
+    }
+
+    *edtGuid = PD_MSG_FIELD(guid.guid);
+    paramc = PD_MSG_FIELD(paramc);
+    depc = PD_MSG_FIELD(depc);
+    if(outputEvent)
+        *outputEvent = PD_MSG_FIELD(outputEvent.guid);
+
+    returnCode = ocrEdtCreateAddDependence(*edtGuid, depc, depv);
+    RETURN_PROFILE(returnCode);
+#undef PD_MSG
+#undef PD_TYPE
 }
 
 u64 ocrDataParallelGetCurrentIteration() {
     ocrWorker_t * worker = NULL;
     getCurrentEnv(NULL, &worker, NULL, NULL);
     return worker->dpCtxt.curIndex;
+}
+
+u8 ocrReduceInternal(void * partialResult, void* el, ocrReductionOp_t redOp, ocrReductionType_t redType, ocrUserReductionFn_t redFn) {
+    switch(redOp) {
+    case REDUCTION_OP_SUM: {
+        switch(redType) {
+        case REDUCTION_TYPE_U64: {
+            *((u64*)partialResult) += *((u64*)el);
+            break;
+        }
+        default:
+            ASSERT(0);
+            break;
+        }
+        break;
+    }
+    case REDUCTION_OP_USER: {
+        redFn(partialResult, el);
+        break;
+    }
+    default:
+        ASSERT(0);
+        break;
+    }
+    return 0;
+}
+
+u8 ocrReduce(void* el) {
+    ocrWorker_t * worker = NULL;
+    ocrTask_t * curEdt = NULL;
+    getCurrentEnv(NULL, &worker, &curEdt, NULL);
+    void * partialResult = (void*)(worker->dpCtxt.reductionDbPtr);
+    ocrDataParallelReductionTaskHc_t * dpRedEdt = (ocrDataParallelReductionTaskHc_t*)curEdt; //FIXME: This is temporary. Reduction info will go into base class or dpCtxt.
+    return ocrReduceInternal(partialResult, el, dpRedEdt->redOp, dpRedEdt->redType, dpRedEdt->redFn);
 }
 
 u8 ocrEdtDestroy(ocrGuid_t edtGuid) {

@@ -421,10 +421,10 @@ static u8 hcMemUnAlloc(ocrPolicyDomain_t *self, ocrFatGuid_t* allocator,
 }
 
 static u8 hcCreateEdt(ocrPolicyDomain_t *self, ocrFatGuid_t *guid,
-                      ocrFatGuid_t  edtTemplate, u32 *paramc, u64* paramv,
-                      u32 *depc, u32 properties, ocrFatGuid_t affinity,
-                      u64 dataParallelRange, ocrFatGuid_t * outputEvent, 
-                      ocrTask_t * currentEdt) {
+                      ocrWorkType_t workType, ocrFatGuid_t  edtTemplate,
+                      u32 *paramc, u64* paramv, u32 *depc, u32 properties,
+                      ocrFatGuid_t affinity, ocrFatGuid_t * outputEvent,
+                      ocrTask_t * currentEdt, ocrParamList_t *paramList) {
 
 
     ocrTaskTemplate_t *taskTemplate = (ocrTaskTemplate_t*)edtTemplate.metaDataPtr;
@@ -448,13 +448,9 @@ static u8 hcCreateEdt(ocrPolicyDomain_t *self, ocrFatGuid_t *guid,
         return OCR_EINVAL;
     }
 
-    paramListTask_t pListTask;
-    pListTask.dpRange = dataParallelRange;
-
     ocrTask_t * base = self->taskFactories[0]->instantiate(
-                           self->taskFactories[0], edtTemplate, *paramc, paramv,
-                           *depc, properties, affinity, outputEvent, currentEdt, 
-                           (ocrParamList_t*)(&pListTask));
+                           self->taskFactories[0], workType, edtTemplate, *paramc, paramv,
+                           *depc, properties, affinity, outputEvent, currentEdt, paramList);
 
     (*guid).guid = base->guid;
     (*guid).metaDataPtr = base;
@@ -543,6 +539,17 @@ static void hcReleasePd(ocrPolicyDomainHc_t *rself) {
         newState = hal_cmpswap32(&(rself->state), oldState, newState);
     } while(newState != oldState);
     RETURN_PROFILE();
+}
+
+u64 hcGetTypeSize(ocrReductionType_t redType) {
+    switch(redType) {
+        case REDUCTION_TYPE_U64:
+            return sizeof(u64);
+        default:
+            ASSERT(0);
+            break;
+    }
+    return 0;
 }
 
 u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlocking) {
@@ -700,12 +707,37 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         if(PD_MSG_FIELD(outputEvent.guid) == UNINITIALIZED_GUID) {
             outputEvent = &(PD_MSG_FIELD(outputEvent));
         }
-        ASSERT(PD_MSG_FIELD(workType) == EDT_WORKTYPE);
-        PD_MSG_FIELD(returnDetail) = hcCreateEdt(
-                self, &(PD_MSG_FIELD(guid)), PD_MSG_FIELD(templateGuid),
+
+        //Setup special arguments
+        paramListTask_t pListTask;
+        switch(PD_MSG_FIELD(workType)) {
+        case EDT_WORKTYPE: break;
+        case EDT_WORKTYPE_PARALLEL_FOR:
+            pListTask.dpRange = PD_MSG_FIELD(dataParallelRange);
+            break;
+        case EDT_WORKTYPE_PARALLEL_REDUCE: {
+            pListTask.dpRange = PD_MSG_FIELD(dataParallelRange);
+            pListTask.redOp = PD_MSG_FIELD(redOp);
+            pListTask.redType = PD_MSG_FIELD(redType);
+            pListTask.redElSize = PD_MSG_FIELD(redElSize);
+            if (pListTask.redElSize == 0)
+                pListTask.redElSize = hcGetTypeSize(PD_MSG_FIELD(redType));
+            pListTask.redFn = PD_MSG_FIELD(redFn);
+            pListTask.initialValue = PD_MSG_FIELD(initialValue);
+            pListTask.numReductionDbs = self->workerCount;
+            }
+            break;
+        default:
+            ASSERT(0);
+            break;
+        }
+
+        PD_MSG_FIELD(returnDetail) = hcCreateEdt( self,
+                &(PD_MSG_FIELD(guid)), PD_MSG_FIELD(workType), PD_MSG_FIELD(templateGuid),
                 &(PD_MSG_FIELD(paramc)), PD_MSG_FIELD(paramv), &(PD_MSG_FIELD(depc)),
-                PD_MSG_FIELD(properties), PD_MSG_FIELD(affinity), PD_MSG_FIELD(dataParallelRange), 
-                outputEvent, (ocrTask_t*)(PD_MSG_FIELD(currentEdt).metaDataPtr));
+                PD_MSG_FIELD(properties), PD_MSG_FIELD(affinity), outputEvent,
+                (ocrTask_t*)(PD_MSG_FIELD(currentEdt).metaDataPtr), (ocrParamList_t*)(&pListTask));
+
         msg->type &= ~PD_MSG_REQUEST;
         msg->type |= PD_MSG_RESPONSE;
 #undef PD_MSG
@@ -1127,7 +1159,7 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             ocrEvent_t *evt = (ocrEvent_t*)(dst.metaDataPtr);
             ASSERT(evt->fctId == self->eventFactories[0]->factoryId);
             PD_MSG_FIELD(returnDetail) = self->eventFactories[0]->fcts[evt->kind].satisfy(
-                evt, PD_MSG_FIELD(payload), PD_MSG_FIELD(slot));
+                evt, PD_MSG_FIELD(payload), PD_MSG_FIELD(slot), PD_MSG_FIELD(properties));
         } else {
             if(dstKind == OCR_GUID_EDT) {
                 ocrTask_t *edt = (ocrTask_t*)(dst.metaDataPtr);

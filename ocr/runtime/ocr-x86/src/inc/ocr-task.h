@@ -30,6 +30,12 @@ struct _ocrTaskTemplate_t;
 typedef struct _paramListTask_t {
     ocrParamList_t base;
     u64 dpRange;
+    ocrReductionOp_t redOp;
+    ocrReductionType_t redType;
+    u64 redElSize;
+    ocrUserReductionFn_t redFn;
+    void *initialValue;
+    u64 numReductionDbs;
 } paramListTask_t;
 
 typedef struct _paramListTaskFact_t {
@@ -243,9 +249,9 @@ typedef struct _ocrTask_t {
     ocrGuid_t finishLatch;  /**< Latch event for this EDT (if this is a finish EDT) */
     ocrGuid_t parentLatch;  /**< Inner-most latch event (not of this EDT) */
     ocrGuid_t els[ELS_SIZE];
-    ocrEdtState_t state;    /**< State of the EDT */
-    u32 paramc, depc;       /**< Number of parameters and dependences */
     u64 dataParallelRange;  /**< Full iteration range of a data parallel EDT */
+    u32 paramc, depc;       /**< Number of parameters and dependences */
+    u32 state;              /**< State of the EDT */
     u32 fctId;
 } ocrTask_t;
 
@@ -269,9 +275,9 @@ typedef struct _ocrTaskFactory_t {
      *  the GUIDs used to satisfy the Events enlisted in the dependence list.
      *
      */
-    ocrTask_t* (*instantiate)(struct _ocrTaskFactory_t * factory, ocrFatGuid_t edtTemplate,
-                              u32 paramc, u64* paramv, u32 depc, u32 properties,
-                              ocrFatGuid_t affinity, ocrFatGuid_t *outputEvent,
+    ocrTask_t* (*instantiate)(struct _ocrTaskFactory_t * factory, ocrWorkType_t workType,
+                              ocrFatGuid_t edtTemplate, u32 paramc, u64* paramv, u32 depc,
+                              u32 properties, ocrFatGuid_t affinity, ocrFatGuid_t *outputEvent,
                               ocrTask_t *curEdt, ocrParamList_t *perInstance);
 
     /*! \brief Virtual destructor for the TaskFactory interface

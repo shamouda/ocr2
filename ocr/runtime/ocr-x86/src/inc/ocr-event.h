@@ -37,6 +37,13 @@ typedef struct _paramListEventFact_t {
 /* OCR EVENT                                        */
 /****************************************************/
 
+#define EVENT_PROP_NONE             0x00
+#define EVENT_PROP_ONCE_NONE        0x01
+#define EVENT_PROP_IDEM_NONE        0x02
+#define EVENT_PROP_STICKY_NONE      0x03
+#define EVENT_PROP_LATCH_NONE       0x04
+#define EVENT_PROP_LATCH_REDUCTION  0x14
+
 struct _ocrEvent_t;
 
 /**
@@ -66,7 +73,7 @@ typedef struct _ocrEventFcts_t {
      *
      * @return 0 on success and a non-zero code on failure
      */
-    u8 (*satisfy)(struct _ocrEvent_t* self, ocrFatGuid_t db, u32 slot);
+    u8 (*satisfy)(struct _ocrEvent_t* self, ocrFatGuid_t db, u32 slot, u32 properties);
 
     /**
      * @brief Register a "signaler" on the event

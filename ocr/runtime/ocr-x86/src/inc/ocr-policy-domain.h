@@ -356,23 +356,26 @@ typedef struct _ocrPolicyMsg_t {
         } PD_MSG_STRUCT_NAME(PD_MSG_MEM_UNALLOC);
 
         struct {
-            ocrFatGuid_t guid;         /**< In/Out: GUID of the EDT/Work
-                                        * to create */
-            ocrFatGuid_t templateGuid; /**< In: GUID of the template to use */
-            ocrFatGuid_t affinity;     /**< In: Affinity for this EDT */
-            ocrFatGuid_t outputEvent;  /**< In/Out: If UNINITIALIZED_GUID on input,
-                                       * will contain the output event to wait for for this
-                                       * EDT. If NULL_GUID, no event will be created
-                                       * and returned. */
-            u64 *paramv;               /**< In: Parameters for this EDT */
-            u32 paramc;                /**< In/out: Number of parameters; on out returns real number
-                                        * in case of EDT_PARAM_DEF as input for example */
-            u32 depc;                  /**< In/out: Number of dependence slots; same comment as above */
-            u64 dataParallelRange;     /**< In: Range of data parallel iterations */
-            u32 properties;            /**< In: properties for the creation */
-            u32 returnDetail;          /**< Out: Success or error code */
-            ocrWorkType_t workType;    /**< In: Type of work to create */
-            ocrFatGuid_t currentEdt;   /**< In: EDT that is creating work */
+            ocrFatGuid_t guid;          /**< In/Out: GUID of the EDT/Work to create */
+            ocrFatGuid_t templateGuid;  /**< In: GUID of the template to use */
+            ocrFatGuid_t affinity;      /**< In: Affinity for this EDT */
+            ocrFatGuid_t outputEvent;   /**< In/Out: If UNINITIALIZED_GUID on input,
+                                         **  will contain the output event to wait for for this EDT.
+                                         **  If NULL_GUID, no event will be created and returned. */
+            u64 *paramv;                /**< In: Parameters for this EDT */
+            u32 paramc;                 /**< In/out: Number of parameters; on out returns real number
+                                         **  in case of EDT_PARAM_DEF as input for example */
+            u32 depc;                   /**< In/out: Number of dependence slots; same comment as above */
+            u32 properties;             /**< In: properties for the creation */
+            u32 returnDetail;           /**< Out: Success or error code */
+            u64 dataParallelRange;      /**< In: Range of data parallel iterations */
+            ocrReductionOp_t redOp;     /**< In: Reduction operation */
+            ocrReductionType_t redType; /**< In: Reduction element type */
+            u64 redElSize;              /**< In: Reduction element size */
+            ocrUserReductionFn_t redFn; /**< In: User defined reduction function */
+            void *initialValue;         /**< In: Starting value for reduction result */
+            ocrWorkType_t workType;     /**< In: Type of work to create */
+            ocrFatGuid_t currentEdt;    /**< In: EDT that is creating work */
         } PD_MSG_STRUCT_NAME(PD_MSG_WORK_CREATE);
 
         struct {

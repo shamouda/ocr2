@@ -55,6 +55,15 @@ typedef struct {
 } ocrDataParallelTaskHc_t;
 
 typedef struct {
+    ocrDataParallelTaskHc_t base;
+    ocrReductionOp_t redOp;     /**< Reduction operation */
+    ocrReductionType_t redType; /**< Reduction element type */
+    ocrUserReductionFn_t redFn; /**< User defined reduction function */
+    u64 redElSize;              /**< Reduction element size */
+    void *initialValue;         /**< Starting value for reduction result */
+} ocrDataParallelReductionTaskHc_t;
+
+typedef struct {
     ocrTaskHc_t base;
     ocrGuid_t dpTask;      /**< Guid of the data parallel EDT */
 } ocrDataParallelSinkTaskHc_t;

@@ -44,10 +44,18 @@ typedef struct _ocrEventHcPersist_t {
 typedef struct ocrEventHcLatch_t {
     ocrEventHc_t base;
     volatile s32 counter;
+    volatile u32 redLock;
+    ocrGuid_t redDb;
+    ocrGuid_t *redDbPartial;    /**< Array of DBs that hold the partial results; one per worker */
+    ocrReductionOp_t redOp;     /**< Reduction operation */
+    ocrReductionType_t redType; /**< Reduction element type */
+    ocrUserReductionFn_t redFn; /**< User defined reduction function */
 } ocrEventHcLatch_t;
 
 
 ocrEventFactory_t* newEventFactoryHc(ocrParamList_t *perType, u32 factoryId);
+
+extern u8 ocrReduceInternal(void * partialResult, void* el, ocrReductionOp_t redOp, ocrReductionType_t redType, ocrUserReductionFn_t redFn);
 
 #endif /* ENABLE_EVENT_HC */
 #endif /* __HC_EVENT_H__ */

@@ -115,7 +115,6 @@ typedef struct {
 
 #define EDT_PROP_NONE   ((u16) 0x0) /**< Property bits indicating a regular EDT */
 #define EDT_PROP_FINISH ((u16) 0x1) /**< Property bits indicating a FINISH EDT */
-#define EDT_PROP_DATA_PARALLEL ((u16) 0x2) /**< Property bits indicating a DATA PARALLEL EDT */
 
 /**
  * @brief Constant indicating that the number of parameters to an EDT template
@@ -142,6 +141,36 @@ typedef struct {
  **/
 typedef ocrGuid_t (*ocrEdt_t)(u32 paramc, u64* paramv,
                               u32 depc, ocrEdtDep_t depv[]);
+
+/**
+ * @brief Reduction operation to be performed by a data parallel reduction EDT
+ *
+ * All operations except REDUCTION_OP_USER are builtin ops at runtime level
+ */
+typedef enum {
+    REDUCTION_OP_SUM,
+    REDUCTION_OP_USER,
+} ocrReductionOp_t;
+
+/**
+ * @brief Type of element that participates in a reduction operation
+ * to be performed by a data parallel reduction EDT
+ *
+ * All types except REDUCTION_TYPE_USER are builtin types at runtime level
+ */
+typedef enum {
+    REDUCTION_TYPE_U64,
+    REDUCTION_TYPE_USER,
+} ocrReductionType_t;
+
+/**
+ * @brief Type for a user defined reduction operation
+ *
+ * @param partialResult   Partial result computed in parallel
+ * @param element         Element used in reduction operation
+ **/
+typedef void (*ocrUserReductionFn_t)(void* partialResult, void* element);
+
 /**
  * @brief Data-block access modes
  *

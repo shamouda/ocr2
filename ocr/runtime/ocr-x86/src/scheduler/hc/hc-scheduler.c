@@ -253,6 +253,7 @@ u8 hcSchedulerTake (ocrScheduler_t *self, u32 *count, ocrFatGuid_t *edts) {
                                 ASSERT(myDpCtxt->active == 0);
                                 myDpCtxt->task = dpCtxt->task;
                                 myDpCtxt->latch = dpCtxt->latch;
+                                myDpCtxt->reductionDbPtr = NULL;
                                 myDpCtxt->lb = dpCtxt->ub;
                                 myDpCtxt->ub = ub;
                                 myDpCtxt->curIndex = (u64)(-1);
