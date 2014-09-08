@@ -186,6 +186,8 @@ u8 ocrDataParallelEdtCreate(ocrGuid_t * guid, ocrGuid_t templateGuid,
                             u64 dataParallelRange, u16 properties, ocrGuid_t affinity,
                             ocrGuid_t *outputEvent);
 
+#define ocrParallelFor ocrDataParallelEdtCreate
+
 /**
  * @brief Get the current iteration index of the data parallel computation
  *
@@ -214,6 +216,8 @@ u8 ocrDataParallelReductionEdtCreate(ocrGuid_t* edtGuid, ocrGuid_t templateGuid,
                                      u64 dataParallelRange, ocrReductionOp_t op, ocrReductionType_t type,
                                      u64 typeSize, ocrUserReductionFn_t userFunc, void* initVal,
                                      u16 properties, ocrGuid_t affinity, ocrGuid_t *outputEvent);
+
+#define ocrParallelReduce ocrDataParallelReductionEdtCreate
 
 /**
  * @brief Reduction call made on element
