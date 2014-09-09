@@ -135,12 +135,31 @@ u8 MPICommSendMessage(ocrCommPlatform_t * self,
 
     ocrCommPlatformMPI_t * mpiComm = ((ocrCommPlatformMPI_t *) self);
 
+    u64 fullMsgSize = 0, marshalledSize = 0;
+    ocrPolicyMsgGetMsgSize(message, &fullMsgSize, &marshalledSize);
     if (!(properties & PERSIST_MSG_PROP)) {
-        ocrPolicyMsg_t * msgCpy = allocateNewMessage(self, message->size);
+        ocrPolicyMsg_t * msgCpy = allocateNewMessage(self, fullMsgSize);
         hal_memCopy(msgCpy, message, message->size, false);
         message = msgCpy;
-        properties &= PERSIST_MSG_PROP;
+        properties |= PERSIST_MSG_PROP;
+    } else {
+        // In this case, we are going to use the same message buffer
+        // EXCEPT if the fullMsgSize does not fit and, in this case, we
+        // will create a new message
+        if(fullMsgSize > (bufferSize >> 32)) {
+            ocrPolicyMsg_t *msgCpy = allocateNewMessage(self, fullMsgSize);
+            hal_memCopy(msgCpy, message, message->size, false);
+            // We are done with the original message and it was
+            // persistent so we have to free it
+            self->pd->fcts.pdFree(self->pd, message);
+            message = msgCpy;
+        }
     }
+
+    // Marshall everything we need in the message. We made sure we have enough size
+    ocrPolicyMsgMarshallMsg(message, (u8*)message, MARSHALL_APPEND);
+    // At this point, the message size will be updated properly to the full size of
+    // the message that needs to be sent
 
     //DIST-TODO: multi-comm-worker: msgId incr only works if a single comm-worker per rank,
     //do we want OCR to provide PD, system level counters ?
@@ -194,7 +213,7 @@ u8 MPICommSendMessage(ocrCommPlatform_t * self,
     // match the source recv operation that had been posted on the request send.
     int tag = (message->type & PD_MSG_RESPONSE) ? message->msgId : SEND_ANY_ID;
     MPI_Request * status = &(handle->status);
-    DPRINTF(DEBUG_LVL_VERB,"[%d][MPI] posting isend for msgId %ld msg %p type %x to rank %d\n", 
+    DPRINTF(DEBUG_LVL_VERB,"[%d][MPI] posting isend for msgId %ld msg %p type %x to rank %d\n",
         mpiRankToLocation(self->pd->myLocation), message->msgId, message, message->type, targetRank);
     int res = MPI_Isend(message, bufferSize, datatype, targetRank, tag, comm, status);
     if (res == MPI_SUCCESS) {
@@ -244,6 +263,7 @@ u8 probeIncoming(ocrCommPlatform_t *self, int src, int tag, ocrPolicyMsg_t ** ms
     //rather than having all this book-keeping for receiving and reusing requests space ?
     //Sound we should get a pool of small messages (let say sizeof(ocrPolicyMsg_t) and allocate
     //variable size message on the fly).
+    u64 fullMsgSize = 0, marshalledSize = 0;
     MPI_Status status;
     int available = 0;
     int success = MPI_Iprobe(src, tag, MPI_COMM_WORLD, &available, &status);
@@ -262,6 +282,13 @@ u8 probeIncoming(ocrCommPlatform_t *self, int src, int tag, ocrPolicyMsg_t ** ms
         success = MPI_Recv(*msg, count, datatype, src, tag, comm, MPI_STATUS_IGNORE);
         DPRINTF(DEBUG_LVL_VERB,"[%d][MPI] iprobe+recv for msgId %ld type=%x\n", mpiRankToLocation(self->pd->myLocation), tag, (*msg)->type);
         ASSERT(success == MPI_SUCCESS);
+        // Unmarshall the message. We check to make sure the size is OK
+        // This should be true since MPI seems to make sure to send the whole message
+        ocrPolicyMsgGetMsgSize(*msg, &fullMsgSize, &marshalledSize);
+        ASSERT(fullMsgSize <= count);
+        (*msg)->size = fullMsgSize; // Reset it properly (it will have been set to
+                                    // fullMsgSize - marshalledSize)
+        ocrPolicyMsgUnMarshallMsg((u8*)*msg, NULL, *msg, MARSHALL_APPEND);
         return POLL_MORE_MESSAGE;
     }
     return POLL_NO_MESSAGE;
@@ -284,7 +311,7 @@ u8 MPICommPollMessage_RL3(ocrCommPlatform_t *self, ocrPolicyMsg_t **msg,
         int ret = MPI_Test(&(mpiHandle->status), &completed, MPI_STATUS_IGNORE);
         ASSERT(ret == MPI_SUCCESS);
         if(completed) {
-            DPRINTF(DEBUG_LVL_VERB,"[%d][MPI] successfully sent msgId %ld msg %p type %x\n", 
+            DPRINTF(DEBUG_LVL_VERB,"[%d][MPI] successfully sent msgId %ld msg %p type %x\n",
                 mpiRankToLocation(self->pd->myLocation), mpiHandle->msg->msgId, mpiHandle->msg, mpiHandle->msg->type);
             u32 msgProperties = mpiHandle->properties;
             // By construction, either message are persistent in API's upper levels
@@ -316,6 +343,7 @@ u8 MPICommPollMessage_RL3(ocrCommPlatform_t *self, ocrPolicyMsg_t **msg,
         // if it fits. Otherwise, a new message is allocated. Upper-layers are responsible
         // for deallocating the request/response buffers.
         u8 res = probeIncoming(self, mpiHandle->src, (int) mpiHandle->msgId, &mpiHandle->msg, mpiHandle->msg->size);
+        // The message is properly unmarshalled at this point
         if (res == POLL_MORE_MESSAGE) {
             *msg = mpiHandle->msg;
             pd->fcts.pdFree(pd, mpiHandle);
@@ -338,6 +366,14 @@ u8 MPICommPollMessage_RL3(ocrCommPlatform_t *self, ocrPolicyMsg_t **msg,
             // if response: upper-layer must process and deallocate
             //DIST-TODO there's no convenient way to let upper-layers know if msg can be reused
             *msg = receivedMsg;
+            // We need to unmarshall the message here
+            // Check the size for sanity (I think it should be OK but not sure in this case)
+            ocrPolicyMsgGetMsgSize(*msg, &fullMsgSize, &marshalledSize);
+            ASSERT(fullMsgSize <= count);
+            (*msg)->size = fullMsgSize; // Reset it properly (it will have been set to
+            // fullMsgSize - marshalledSize)
+            ocrPolicyMsgUnMarshallMsg((u8*)*msg, NULL, *msg, MARSHALL_APPEND);
+
             pd->fcts.pdFree(pd, mpiHandle);
             incomingIt->removeCurrent(incomingIt);
             incomingIt->destruct(incomingIt);
@@ -361,6 +397,7 @@ u8 MPICommPollMessage_RL3(ocrCommPlatform_t *self, ocrPolicyMsg_t **msg,
     // Check for outstanding incoming. If any, a message is allocated
     // and returned through 'msg'.
     retValue = probeIncoming(self, MPI_ANY_SOURCE, RECV_ANY_ID, msg, 0);
+    // Message is properly un-marshalled at this point
 #endif
 
     return retValue;

@@ -51,12 +51,16 @@ static u8 resolveRemoteMetaData(ocrPolicyDomain_t * self, ocrFatGuid_t * fGuid, 
             msgClone.type = PD_MSG_GUID_METADATA_CLONE | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
             PD_MSG_FIELD(guid.guid) = remoteGuid;
             PD_MSG_FIELD(guid.metaDataPtr) = NULL;
+            PD_MSG_FIELD(size) = 0ULL;
             u8 returnCode = self->fcts.processMessage(self, &msgClone, true);
             ASSERT(returnCode == 0);
             // On return, Need some more post-processing to make a copy of the metadata
             // and set the fatGuid's metadata ptr to point to the copy
             void * metaDataPtr = self->fcts.pdMalloc(self, metaDataSize);
-            hal_memCopy(metaDataPtr, &PD_MSG_FIELD(metaData), metaDataSize, false);
+            ASSERT(PD_MSG_FIELD(guid.metaDataPtr) != NULL);
+            ASSERT(PD_MSG_FIELD(guid.guid) == remoteGuid);
+            ASSERT(PD_MSG_FIELD(size) == metaDataSize);
+            hal_memCopy(metaDataPtr, PD_MSG_FIELD(guid.metaDataPtr), metaDataSize, false);
             //DIST-TODO Potentially multiple concurrent registerGuid on the same template
             self->guidProviders[0]->fcts.registerGuid(self->guidProviders[0], remoteGuid, (u64) metaDataPtr);
             val = (u64) metaDataPtr;

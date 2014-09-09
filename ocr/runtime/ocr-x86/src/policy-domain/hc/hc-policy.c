@@ -881,35 +881,20 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         
         switch(kind) {
             case OCR_GUID_EDT_TEMPLATE:
-            {
                 localDeguidify(self, &(PD_MSG_FIELD(guid)));
-                ocrTaskTemplate_t * templ = (ocrTaskTemplate_t*) (PD_MSG_FIELD(guid.metaDataPtr));
-                //DIST-TODO cloning: make hc template plain copy
-                ocrTaskTemplateHc_t * hcTempl = (ocrTaskTemplateHc_t*) templ;
                 //These won't support flat serialization
-                #ifdef OCR_ENABLE_STATISTICS
-                    ASSERT(false && "no statistics support in distributed edt templates");
-                #endif
-                #ifdef OCR_ENABLE_EDT_NAMING
-                    ASSERT(false && "no serialization of edt template string");
-                #endif
-                //DIST-TODO cloning: metadata clone to support any size of message
-                ASSERT(sizeof(ocrTaskTemplateHc_t) < (sizeof(ocrPolicyMsg_t)-PD_MSG_SIZE_FULL(PD_MSG_GUID_METADATA_CLONE)));
-                u64 copyPtr = (u64) &(PD_MSG_FIELD(metaData));
-                hal_memCopy(copyPtr, hcTempl, sizeof(ocrTaskTemplateHc_t), false);
-                hcTempl = (ocrTaskTemplateHc_t *) copyPtr;
-            }
-            break;
+#ifdef OCR_ENABLE_STATISTICS
+                ASSERT(false && "no statistics support in distributed edt templates");
+#endif
+#ifdef OCR_ENABLE_EDT_NAMING
+                ASSERT(false && "no serialization of edt template string");
+#endif
+                PD_MSG_FIELD(size) = sizeof(ocrTaskTemplateHc_t);
+                break;
             case OCR_GUID_AFFINITY:
-            {
                 localDeguidify(self, &(PD_MSG_FIELD(guid)));
-                void * localPtr = (PD_MSG_FIELD(guid.metaDataPtr));
-                //DIST-TODO cloning: metadata clone to support any size of message
-                ASSERT(sizeof(ocrAffinity_t) < (sizeof(ocrPolicyMsg_t)-PD_MSG_SIZE_FULL(PD_MSG_GUID_METADATA_CLONE)));
-                u64 copyPtr = (u64) &(PD_MSG_FIELD(metaData));
-                hal_memCopy(copyPtr, localPtr, sizeof(ocrAffinity_t), false);
-            }
-            break;
+                PD_MSG_FIELD(size) = sizeof(ocrAffinity_t);
+                break;
             default:
                 ASSERT("Unsupported GUID kind cloning");
         }

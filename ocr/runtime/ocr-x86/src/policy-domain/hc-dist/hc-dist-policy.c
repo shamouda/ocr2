@@ -121,12 +121,16 @@ u8 resolveRemoteMetaData(ocrPolicyDomain_t * self, ocrFatGuid_t * fGuid, u64 met
             msgClone.type = PD_MSG_GUID_METADATA_CLONE | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
             PD_MSG_FIELD(guid.guid) = remoteGuid;
             PD_MSG_FIELD(guid.metaDataPtr) = NULL;
+            PD_MSG_FIELD(size) = 0ULL;
             u8 returnCode = self->fcts.processMessage(self, &msgClone, true);
             ASSERT(returnCode == 0);
             // On return, Need some more post-processing to make a copy of the metadata
             // and set the fatGuid's metadata ptr to point to the copy
             void * metaDataPtr = self->fcts.pdMalloc(self, metaDataSize);
-            hal_memCopy(metaDataPtr, &PD_MSG_FIELD(metaData), metaDataSize, false);
+            ASSERT(PD_MSG_FIELD(guid.metaDataPtr) != NULL);
+            ASSERT(PD_MSG_FIELD(guid.guid) == remoteGuid);
+            ASSERT(PD_MSG_FIELD(size) == metaDataSize);
+            hal_memCopy(metaDataPtr, PD_MSG_FIELD(guid.metaDataPtr), metaDataSize, false);
             //DIST-TODO Potentially multiple concurrent registerGuid on the same template
             self->guidProviders[0]->fcts.registerGuid(self->guidProviders[0], remoteGuid, (u64) metaDataPtr);
             val = (u64) metaDataPtr;
@@ -144,8 +148,8 @@ void getTemplateParamcDepc(ocrPolicyDomain_t * self, ocrFatGuid_t * fatGuid, u32
     self->guidProviders[0]->fcts.getVal(self->guidProviders[0], fatGuid->guid,
                                         (u64*)&fatGuid->metaDataPtr, NULL);
     ocrTaskTemplate_t * edtTemplate = (ocrTaskTemplate_t *) fatGuid->metaDataPtr;
-    *paramc = edtTemplate->paramc;
-    *depc = edtTemplate->depc;
+    if(*paramc == EDT_PARAM_DEF) *paramc = edtTemplate->paramc;
+    if(*depc == EDT_PARAM_DEF) *depc = edtTemplate->depc;
 }
 
 /*
@@ -253,6 +257,21 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
         DPRINTF(DEBUG_LVL_VVERB,"[%d][%d] PD_MSG_WORK_CREATE msg: %p, template 0x%x\n", (int) self->myLocation, wid, msg, PD_MSG_FIELD(templateGuid.guid));
         // First query the guid provider to determine if we know the edtTemplate.
         resolveRemoteMetaData(self, &PD_MSG_FIELD(templateGuid), sizeof(ocrTaskTemplateHc_t));
+        // Now that we have the template, we can set paramc and depc correctly
+        // This needs to be done because the marshalling of messages relies on paramc and
+        // depc being correctly set (so no negative values)
+        // We do a simple optimization for paramc though: if paramv is NULL, we can assume that
+        // paramc will be 0 (we never get any other way to specify the parameters). We cannot
+        // do this for depc though since parameters can be passed at a later point wo we need
+        // to figure out the number either now or when we remotely create the EDT so might as well
+        // do it here.
+        if(PD_MSG_FIELD(paramv) == NULL) {
+            PD_MSG_FIELD(paramc) = 0;
+        }
+        if(PD_MSG_FIELD(paramc) == EDT_PARAM_DEF || PD_MSG_FIELD(depc) == EDT_PARAM_DEF) {
+            getTemplateParamcDepc(self, &PD_MSG_FIELD(templateGuid), &PD_MSG_FIELD(paramc), &PD_MSG_FIELD(depc));
+        }
+        ASSERT(PD_MSG_FIELD(paramc) != EDT_PARAM_UNK && PD_MSG_FIELD(depc) != EDT_PARAM_UNK);
         // The placer may have altered msg->destLocation
         if (msg->destLocation != curLoc) {
             // Check for implementation limitations
@@ -261,92 +280,12 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
             ASSERT((task->finishLatch == NULL_GUID) && "LIMITATION: distributed finish-EDT not supported");
 
             DPRINTF(DEBUG_LVL_VVERB,"[%d][%d] PD_MSG_WORK_CREATE: remote creation at %d msg:%p, template 0x%x\n", (int) self->myLocation, wid, msg->destLocation, msg, PD_MSG_FIELD(templateGuid.guid));
-            // When it's a remote creation we need to serialize paramv/depv arguments if any
-            if ((PD_MSG_FIELD(paramv) != NULL) || (PD_MSG_FIELD(depv) != NULL)) {
-                // Check if we need to involve the EDT template
-                if (((PD_MSG_FIELD(paramv) != NULL) && (PD_MSG_FIELD(paramc) == EDT_PARAM_DEF)) ||
-                    ((PD_MSG_FIELD(depv) != NULL) && (PD_MSG_FIELD(depc) == EDT_PARAM_DEF))) {
-                    // Make sure we have a copy of it locally and retrieve paramc/depc values
-                    getTemplateParamcDepc(self, &PD_MSG_FIELD(templateGuid), &PD_MSG_FIELD(paramc),&PD_MSG_FIELD(depc));
-                }
-                u64 extraParamvPayloadSize = ((PD_MSG_FIELD(paramv) != NULL) ? (sizeof(u64)*PD_MSG_FIELD(paramc)) : 0);
-                u64 extraDepvPayloadSize = ((PD_MSG_FIELD(depv) != NULL) ? (sizeof(ocrFatGuid_t)*PD_MSG_FIELD(depc)) : 0);
-                u64 extraPayloadSize = extraParamvPayloadSize + extraDepvPayloadSize;
-                u64 msgWorkCreateSize = PD_MSG_SIZE_FULL(PD_MSG_WORK_CREATE);
-                u64 newMsgSize = (msgWorkCreateSize + extraPayloadSize);
-                // See if that fits in the default max message size.
-                if (newMsgSize > sizeof(ocrPolicyMsg_t)) {
-                    // slow path, we need to make a copy of the whole message
-                    // Use the clonedMsg to 'remember' we need to deallocate this on communication completion.
-                    ocrPolicyMsg_t * newMsg = self->fcts.pdMalloc(self, newMsgSize);
-                    hal_memCopy(newMsg, msg, msgWorkCreateSize, false);
-                    msg = newMsg;
-                    msg->size = newMsgSize;
-                }
-                // Copy the extra payload
-                if (extraParamvPayloadSize > 0) {
-                    void * extraPayloadPtr = (((char*)msg) + msgWorkCreateSize);
-                    hal_memCopy(extraPayloadPtr, PD_MSG_FIELD(paramv), extraParamvPayloadSize, false);
-                }
-                if (extraDepvPayloadSize > 0) {
-                    void * extraPayloadPtr = (((char*)msg) + (msgWorkCreateSize + extraParamvPayloadSize));
-                    hal_memCopy(extraPayloadPtr, PD_MSG_FIELD(depv), extraDepvPayloadSize, false);
-                }
-                //PD_MSG_FIELD(paramv) and PD_MSG_FIELD(depv) will point to junk on remote PD, which will
-                //indicate paramv/depv were indeed set on the source location and that deserialization must
-                //be performed. Using this (i.e. paramv/depv being not NULL) rather than paramc/depc avoids
-                //deguidifying the edtTemplate for nothing when EDT_PARAM_DEF is used.
-            }
         } else {
             DPRINTF(DEBUG_LVL_VVERB,"[%d][%d] PD_MSG_WORK_CREATE: local creation %p, template 0x%x\n", (int) self->myLocation, wid, msg, PD_MSG_FIELD(templateGuid.guid));
         }
     #undef PD_MSG
     #undef PD_TYPE
 
-        if ((msg->srcLocation != curLoc) && (msg->destLocation == curLoc)) {
-            // we're receiving a message
-        #define PD_MSG msg
-        #define PD_TYPE PD_MSG_WORK_CREATE
-            // Second, check if we need to unpack paramv/depv
-            if ((PD_MSG_FIELD(paramv) != NULL) || (PD_MSG_FIELD(depv) != NULL)) {
-                // Check if we need to read information from the EDT template
-                if (((PD_MSG_FIELD(paramv) != NULL) && (PD_MSG_FIELD(paramc) == EDT_PARAM_DEF)) ||
-                    ((PD_MSG_FIELD(depv) != NULL) && (PD_MSG_FIELD(depc) == EDT_PARAM_DEF))) {
-                    // Make sure we have a copy of it locally and retrieve paramc/depc values
-                    getTemplateParamcDepc(self, &PD_MSG_FIELD(templateGuid), &PD_MSG_FIELD(paramc), &PD_MSG_FIELD(depc));
-                }
-                u64 msgWorkCreateSize = PD_MSG_SIZE_FULL(PD_MSG_WORK_CREATE);
-                u64 extraParamvPayloadSize = (PD_MSG_FIELD(paramv) != NULL) ? (sizeof(u64)*PD_MSG_FIELD(paramc)) : 0;
-                u64 extraDepvPayloadSize = (PD_MSG_FIELD(depv) != NULL) ? (sizeof(ocrFatGuid_t)*PD_MSG_FIELD(depc)) : 0;
-                if (PD_MSG_FIELD(paramc) > 0) {
-                    DPRINTF(DEBUG_LVL_VVERB,"[%d][%d] PD_MSG_WORK_CREATE: deserialize msg %p paramv, paramc=%d\n",
-                                             (int) self->myLocation, wid, msg, PD_MSG_FIELD(paramc));
-                    u64 extraPayloadSize = sizeof(u64)*PD_MSG_FIELD(paramc);
-                    void * extraPayloadPtr = (void*) (((char*)msg) + msgWorkCreateSize);
-                    u64 * paramvClone = (u64*) self->fcts.pdMalloc(self, extraParamvPayloadSize);
-                    hal_memCopy(paramvClone, extraPayloadPtr, extraPayloadSize, false);
-                    PD_MSG_FIELD(paramv) = paramvClone;
-                }
-                // depc alone is not enough to determine if depv where provided, we need to look
-                // if src location had the message's depv pointing to something (which is junk here) but
-                // still not NULL.
-                if (PD_MSG_FIELD(depv) != NULL) {
-                    DPRINTF(DEBUG_LVL_VVERB,"[%d][%d] PD_MSG_WORK_CREATE: deserialize msg %p depv, depc=%d\n",
-                                             (int) self->myLocation, wid, msg, PD_MSG_FIELD(depc));
-                    ocrGuid_t * extraPayloadPtr = (ocrGuid_t*) (((char*)msg) + (msgWorkCreateSize + extraParamvPayloadSize));
-                    ocrFatGuid_t * depvClone = (ocrFatGuid_t*) self->fcts.pdMalloc(self, extraDepvPayloadSize);
-                    int i =0;
-                    while(i < PD_MSG_FIELD(depc)) {
-                        depvClone[i].guid = extraPayloadPtr[i];
-                        depvClone[i].metaDataPtr = NULL;
-                        i++;
-                    }
-                    PD_MSG_FIELD(depv) = depvClone;
-                }
-            }
-        }
-        #undef PD_MSG
-        #undef PD_TYPE
         break;
         }
         case PD_MSG_DB_CREATE:
@@ -810,7 +749,6 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
                     DPRINTF(DEBUG_LVL_VVERB,"[%d] Received DB_ACQUIRE reply\n", (int) self->myLocation);
                     // Acquire without fetch (Runtime detected data was already available locally and usable).
                     // Hence the message size should be the regular policy message size
-                    ASSERT(msg->size == sizeof(ocrPolicyMsg_t));
                     // Here we're potentially racing with an acquire populating the db proxy
                     u64 val;
                     self->guidProviders[0]->fcts.getVal(self->guidProviders[0], PD_MSG_FIELD(guid.guid), &val, NULL);
@@ -896,7 +834,12 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
 
             if (originalMsg != msg) {
                 // There's been a request message copy (maybe to accomodate larger outgoing message payload)
-                hal_memCopy(originalMsg, handle->response, sizeof(ocrPolicyMsg_t), true);
+                u64 fullMsgSize = 0, marshalledSize = 0;
+                ocrPolicyMsgGetMsgSize(handle->response, &fullMsgSize, &marshalledSize);
+                // For now
+                ASSERT(fullMsgSize <= sizeof(ocrPolicyMsg_t));
+                ocrPolicyMsgMarshallMsg(handle->response, (u8*)originalMsg, MARSHALL_DUPLICATE);
+
                 // Check if the request message has also been used for the response
                 if (msg != handle->response) {
                     self->fcts.pdFree(self, msg);
@@ -905,7 +848,11 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
             } else {
                 if (msg != handle->response) {
                     // Response is in a different message, copy and free
-                    hal_memCopy(originalMsg, handle->response, sizeof(ocrPolicyMsg_t), true);
+                    u64 fullMsgSize = 0, marshalledSize = 0;
+                    ocrPolicyMsgGetMsgSize(handle->response, &fullMsgSize, &marshalledSize);
+                    // For now
+                    ASSERT(fullMsgSize <= sizeof(ocrPolicyMsg_t));
+                    ocrPolicyMsgMarshallMsg(handle->response, (u8*)originalMsg, MARSHALL_DUPLICATE);
                     self->fcts.pdFree(self, handle->response);
                 }
             }
