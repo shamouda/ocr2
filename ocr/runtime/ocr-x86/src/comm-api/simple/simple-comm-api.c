@@ -61,7 +61,10 @@ u8 sendMessageSimpleCommApi(ocrCommApi_t *self, ocrLocation_t target, ocrPolicyM
         properties &= PERSIST_MSG_PROP;
     }
 
+    // This is weird but otherwise the compiler complains...
     u64 bufferSize = message->size;
+    bufferSize <<= 32;
+    bufferSize |= (u32)message->size;
     u64 id = 0;
 
     u8 ret = self->commPlatform->fcts.sendMessage(self->commPlatform, target, message,

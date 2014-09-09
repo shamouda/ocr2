@@ -269,15 +269,18 @@ struct _ocrPolicyDomain_t;
  * in this format (even if synchronous)
  */
 typedef struct _ocrPolicyMsg_t {
-    u32 type;                 /**< Type of the message. Also includes if this
-                               * is a request or a response */
-    u32 size;                 /**< Useful size of this message in bytes */
+    u32 type;                   /**< Type of the message. Also includes if this
+                                 * is a request or a response */
+    u32 size;                   /**< Useful size of this message in bytes. This is the number
+                                 * of bytes in this message buffer that are useful to
+                                 * transmit. This can be reset by ocrPolicyMsgGetMsgSize to
+                                 * just the size of the main content of the message. */
     ocrLocation_t srcLocation;  /**< Source of the message
-                                         * (location making the request) */
+                                 * (location making the request) */
     ocrLocation_t destLocation; /**< Destination of the message
-                                         * (location processing the request) */
-    u64 msgId;                /**< Implementation specific ID identifying
-                              * this message (if required) */
+                                 * (location processing the request) */
+    u64 msgId;                  /**< Implementation specific ID identifying
+                                 * this message (if required) */
 
     /* The following rules apply to all fields in the message:
      *     - All ocrFatGuid_t are in/out parameters in the sense
@@ -461,8 +464,9 @@ typedef struct _ocrPolicyMsg_t {
 
         struct {
             ocrFatGuid_t guid; /**< In/Out:
-                                * In: The GUID we request a metadata copy */
-            char metaData[1]; /** Base pointer containing the copy of the metadata. */
+                                * In: The GUID we request a metadata copy
+                                * Out: The GUID and pointer to the cloned metadata */
+            u64 size;          /**< Out: Size of the metadata that was cloned */
         } PD_MSG_STRUCT_NAME(PD_MSG_GUID_METADATA_CLONE);
 
         struct {
@@ -930,6 +934,130 @@ typedef struct _ocrPolicyDomainFactory_t {
 } ocrPolicyDomainFactory_t;
 
 void initializePolicyDomainOcr(ocrPolicyDomainFactory_t * factory, ocrPolicyDomain_t * self, ocrParamList_t *perInstance);
+
+
+/****************************************************/
+/* UTILITY FUNCTIONS                                */
+/****************************************************/
+
+typedef enum {
+    MARSHALL_FULL_COPY,
+    MARSHALL_DUPLICATE,
+    MARSHALL_APPEND,
+    MARSHALL_ADDL
+} ocrMarshallMode_t;
+
+/**
+ * @brief Gets the effective size of the msg that
+ * needs to be sent
+ *
+ * This size includes the actual payload + whatever
+ * additional space is needed to store variable-size
+ * arguments such as GUIDs, funcName etc.
+ *
+ * @param[in] msg               Message to analyze
+ * @param[out] fullSize         Full size of the message (bytes)
+ * @param[out] marshalledSize   Additional data that needs to be
+ *                              fetched/marshalled (included in fullSize) (bytes)
+ *
+ * This call can be used on both a ocrPolicyMsg_t or a buffer
+ * containing a marshalled ocrPolicyMsg_t. This will set the 'size'
+ * field in the ocrPolicyMsg_t to fullSize - marshalledSize.
+ *
+ * @warning The setting of the size field may not be what you want;
+ * for example, if the buffer contains the message AND the
+ * marshalled content (for example if it was a MARSHALL_APPEND), this
+ * will set the size to something SMALLER than what needs to be transmitted.
+ *
+ * @return 0 on success and a non-zero error code
+ */
+u8 ocrPolicyMsgGetMsgSize(struct _ocrPolicyMsg_t* msg, u64 *fullSize,
+                          u64* marshalledSize);
+
+/**
+ * @brief Marshall everything needed to send the message over to a PD that
+ * does not share the same address space
+ *
+ * This function performs one of three operations depending on the
+ * mode:
+ *   - MARSHALL_FULL_COPY: Fully copy and marshall msg into buffer. In
+ *                         this case buffer and msg do not overlap. The
+ *                         caller also ensures that buffer is at least
+ *                         big enough to contain fullSize bytes as
+ *                         returned by ocrPolicyMsgGetMsgSize. Assumes
+ *                         that msg->size is properly set to (fullSize - marshalledSize)
+ *   - MARSHALL_DUPLICATE: This is exactly like MARSHALL_FULL_COPY except
+ *                         that the pointers are not encoded as offsets from the
+ *                         start of the message. In other words, this mode
+ *                         allows you to duplicate an ocrPolicyMsg_t fully
+ *                         including the first level of pointers. This mode
+ *                         is usually not used with an un-marshall.
+ *   - MARSHALL_APPEND:    In this case (u64)buffer == (u64)msg and
+ *                         marshalled values will be appended to the
+ *                         end of the useful portion of msg. The caller
+ *                         ensures that buffer is at least big enough to
+ *                         contain fullSize bytes as returned by
+ *                         ocrPolicyMsgGetMsgSize
+ *   - MARSHALL_ADDL:      Marshall only neede portions (not already in msg)
+ *                         into buffer. The caller ensures that buffer is
+ *                         at least big enough to contain marshalledSize
+ *                         as returned by ocrPolicyMsgGetMsgSize
+ *
+ * Note that in the case of MARSHALL_APPEND and MARSHALL_ADDL, the
+ * msg itself is modified to encode offsets and positions for the marshalled
+ * values so that it can be unmarshalled by ocrPolicyMsgUnMarshallMsg. In
+ * all cases, size is set to what actually needs to be sent over:
+ *   - For FULL_COPY, DUPLICATE or APPEND to fullSize
+ *   - For ADDL to (fullSize - marshalledSize) since the additional information
+ *     to transmit is in buffer and not in msg
+ *
+ * @param[in/out] msg      Message to marshall from
+ * @param[in/out] buffer   Buffer to marshall to
+ * @param[in] mode         One of MARSHALL_FULL_COPY, MARSHALL_APPEND, MARSHALL_ADDL
+ * @return 0 on success and a non-zero error code
+ */
+u8 ocrPolicyMsgMarshallMsg(struct _ocrPolicyMsg_t* msg, u8* buffer, ocrMarshallMode_t mode);
+
+/**
+ * @brief Performs the opposite operation to ocrPolicyMsgMarshallMsg
+ *
+ * The inputs are the mainBuffer (containing the header of the messsage and
+ * an optional additional buffer (obtained using the MARSHALL_ADDL mode).
+ *
+ * The significance of the modes here are:
+ *   - MARSHALL_FULL_COPY: In this case, none of the buffers (mainBuffer,
+ *                         addlBuffer, msg) overlap. The entire content
+ *                         of the message and any additional structure
+ *                         will be put in msg. The caller ensures that
+ *                         the actual allocated size of msg is at least
+ *                         fullSize bytes (as returned by ocrPolicyMsgGetMsgSize)
+ *   - MARSHALL_APPEND:    In this case, (u64)msg == (u64)mainBuffer. In
+ *                         most cases, this will only fix-up pointers but
+ *                         may copy from addlBuffer into mainBuffer. For
+ *                         example, the mashalling could have been
+ *                         done using MARSHALL_ADDL and unmarshalling is
+ *                         done with MARSHALL_APPEND.
+ *                         The caller ensures that the actual allocated
+ *                         size of msg is at least fullSize bytes (as
+ *                         returned by ocrPolicyMsgGetMsgSize)
+ *   - MARSHALL_ADDL:      Marshall the common part of the message into msg
+ *                         and use pdMalloc for marshalledSize bytes (one
+ *                         or more chunks totalling marshalledSize bytes as
+ *                         returned by ocrPolicyMsgGetMsgSize)
+ *
+ * @param[in] mainBuffer   Buffer containing the common part of the message
+ * @param[in] addlBuffer   Optional addtional buffer (if message was marshalled
+ *                         using MARSHALL_ADDL). NULL otherwise (do not pass in
+ *                         garbage!). It is assumed to have marshalledSize of useful
+ *                         content
+ * @param[out] msg         Message to create from mainBuffer and addlBuffer
+ * @param[in] mode         One of MARSHALL_FULL_COPY, MARSHALL_APPEND, MARSHALL_ADDL
+ *
+ * @return 0 on success and a non-zero error code
+ */
+u8 ocrPolicyMsgUnMarshallMsg(u8* mainBuffer, u8* addlBuffer,
+                             struct _ocrPolicyMsg_t* msg, ocrMarshallMode_t mode);
+
 
 #define __GUID_END_MARKER__
 #include "ocr-guid-end.h"

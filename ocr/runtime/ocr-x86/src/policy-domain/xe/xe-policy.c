@@ -315,7 +315,12 @@ static u8 xeProcessCeRequest(ocrPolicyDomain_t *self, ocrPolicyMsg_t **msg) {
                 // We need to copy things back into *msg
                 // TODO: FIXME when issue #68 is fully implemented by checking
                 // sizes
-                hal_memCopy(*msg, handle->response, sizeof(ocrPolicyMsg_t), false);
+                // We use the marshalling function to "copy" this message
+                u64 fullSize = 0, marshalledSize = 0;
+                ocrPolicyMsgGetMsgSize(handle->response, &fullSize, &marshalledSize);
+                // For now, it must fit in a single message
+                ASSERT(fullSize <= sizeof(ocrPolicyMsg_t));
+                ocrPolicyMsgMarshallMsg(handle->response, (u8*)*msg, MARSHALL_DUPLICATE);
             }
             handle->destruct(handle);
         }
