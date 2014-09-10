@@ -248,10 +248,10 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
 
     DPRINTF(DEBUG_LVL_VERB, "HC-dist processing message @ 0x%lx of type 0x%x\n", msg, msg->type);
     switch(msg->type & PD_MSG_TYPE_ONLY) {
-        case PD_MSG_WORK_CREATE:
-        {
-    #define PD_MSG msg
-    #define PD_TYPE PD_MSG_WORK_CREATE
+    case PD_MSG_WORK_CREATE:
+    {
+#define PD_MSG msg
+#define PD_TYPE PD_MSG_WORK_CREATE
         DPRINTF(DEBUG_LVL_VVERB,"Processing WORK_CREATE for template GUID 0x%lx\n", PD_MSG_FIELD(templateGuid.guid));
         // First query the guid provider to determine if we know the edtTemplate.
         resolveRemoteMetaData(self, &PD_MSG_FIELD(templateGuid), sizeof(ocrTaskTemplateHc_t));
@@ -281,263 +281,263 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
             /*
             // When it's a remote creation we need to serialize paramv/depv arguments if any
             if ((PD_MSG_FIELD(paramv) != NULL) || (PD_MSG_FIELD(depv) != NULL)) {
-                // Check if we need to involve the EDT template
-                if (((PD_MSG_FIELD(paramv) != NULL) && (PD_MSG_FIELD(paramc) == EDT_PARAM_DEF)) ||
-                    ((PD_MSG_FIELD(depv) != NULL) && (PD_MSG_FIELD(depc) == EDT_PARAM_DEF))) {
-                    // Make sure we have a copy of it locally and retrieve paramc/depc values
-                    getTemplateParamcDepc(self, &PD_MSG_FIELD(templateGuid), &PD_MSG_FIELD(paramc),&PD_MSG_FIELD(depc));
-                }
-                u64 extraParamvPayloadSize = ((PD_MSG_FIELD(paramv) != NULL) ? (sizeof(u64)*PD_MSG_FIELD(paramc)) : 0);
-                u64 extraDepvPayloadSize = ((PD_MSG_FIELD(depv) != NULL) ? (sizeof(ocrFatGuid_t)*PD_MSG_FIELD(depc)) : 0);
-                u64 extraPayloadSize = extraParamvPayloadSize + extraDepvPayloadSize;
-                u64 msgWorkCreateSize = PD_MSG_SIZE_FULL(PD_MSG_WORK_CREATE);
-                u64 newMsgSize = (msgWorkCreateSize + extraPayloadSize);
-                // See if that fits in the default max message size.
-                if (newMsgSize > sizeof(ocrPolicyMsg_t)) {
-                    // slow path, we need to make a copy of the whole message
-                    // Use the clonedMsg to 'remember' we need to deallocate this on communication completion.
-                    ocrPolicyMsg_t * newMsg = self->fcts.pdMalloc(self, newMsgSize);
-                    hal_memCopy(newMsg, msg, msgWorkCreateSize, false);
-                    msg = newMsg;
-                    msg->size = newMsgSize;
-                }
-                // Copy the extra payload
-                if (extraParamvPayloadSize > 0) {
-                    void * extraPayloadPtr = (((char*)msg) + msgWorkCreateSize);
-                    hal_memCopy(extraPayloadPtr, PD_MSG_FIELD(paramv), extraParamvPayloadSize, false);
-                }
-                if (extraDepvPayloadSize > 0) {
-                    void * extraPayloadPtr = (((char*)msg) + (msgWorkCreateSize + extraParamvPayloadSize));
-                    hal_memCopy(extraPayloadPtr, PD_MSG_FIELD(depv), extraDepvPayloadSize, false);
-                }
-                //PD_MSG_FIELD(paramv) and PD_MSG_FIELD(depv) will point to junk on remote PD, which will
-                //indicate paramv/depv were indeed set on the source location and that deserialization must
-                //be performed. Using this (i.e. paramv/depv being not NULL) rather than paramc/depc avoids
-                //deguidifying the edtTemplate for nothing when EDT_PARAM_DEF is used.
+            // Check if we need to involve the EDT template
+            if (((PD_MSG_FIELD(paramv) != NULL) && (PD_MSG_FIELD(paramc) == EDT_PARAM_DEF)) ||
+            ((PD_MSG_FIELD(depv) != NULL) && (PD_MSG_FIELD(depc) == EDT_PARAM_DEF))) {
+            // Make sure we have a copy of it locally and retrieve paramc/depc values
+            getTemplateParamcDepc(self, &PD_MSG_FIELD(templateGuid), &PD_MSG_FIELD(paramc),&PD_MSG_FIELD(depc));
+            }
+            u64 extraParamvPayloadSize = ((PD_MSG_FIELD(paramv) != NULL) ? (sizeof(u64)*PD_MSG_FIELD(paramc)) : 0);
+            u64 extraDepvPayloadSize = ((PD_MSG_FIELD(depv) != NULL) ? (sizeof(ocrFatGuid_t)*PD_MSG_FIELD(depc)) : 0);
+            u64 extraPayloadSize = extraParamvPayloadSize + extraDepvPayloadSize;
+            u64 msgWorkCreateSize = PD_MSG_SIZE_FULL(PD_MSG_WORK_CREATE);
+            u64 newMsgSize = (msgWorkCreateSize + extraPayloadSize);
+            // See if that fits in the default max message size.
+            if (newMsgSize > sizeof(ocrPolicyMsg_t)) {
+            // slow path, we need to make a copy of the whole message
+            // Use the clonedMsg to 'remember' we need to deallocate this on communication completion.
+            ocrPolicyMsg_t * newMsg = self->fcts.pdMalloc(self, newMsgSize);
+            hal_memCopy(newMsg, msg, msgWorkCreateSize, false);
+            msg = newMsg;
+            msg->size = newMsgSize;
+            }
+            // Copy the extra payload
+            if (extraParamvPayloadSize > 0) {
+            void * extraPayloadPtr = (((char*)msg) + msgWorkCreateSize);
+            hal_memCopy(extraPayloadPtr, PD_MSG_FIELD(paramv), extraParamvPayloadSize, false);
+            }
+            if (extraDepvPayloadSize > 0) {
+            void * extraPayloadPtr = (((char*)msg) + (msgWorkCreateSize + extraParamvPayloadSize));
+            hal_memCopy(extraPayloadPtr, PD_MSG_FIELD(depv), extraDepvPayloadSize, false);
+            }
+            //PD_MSG_FIELD(paramv) and PD_MSG_FIELD(depv) will point to junk on remote PD, which will
+            //indicate paramv/depv were indeed set on the source location and that deserialization must
+            //be performed. Using this (i.e. paramv/depv being not NULL) rather than paramc/depc avoids
+            //deguidifying the edtTemplate for nothing when EDT_PARAM_DEF is used.
             }
             */
         } else {
             DPRINTF(DEBUG_LVL_VVERB,"WORK_CREATE: local EDT creation for template GUID 0x%lx\n", PD_MSG_FIELD(templateGuid.guid));
         }
-    #undef PD_MSG
-    #undef PD_TYPE
+#undef PD_MSG
+#undef PD_TYPE
 
         if ((msg->srcLocation != curLoc) && (msg->destLocation == curLoc)) {
             // we're receiving a message
             DPRINTF(DEBUG_LVL_VVERB, "WORK_CREATE: received request from %d\n", msg->srcLocation);
         }
         break;
-        }
-        case PD_MSG_DB_CREATE:
-        {
-    #define PD_MSG msg
-    #define PD_TYPE PD_MSG_DB_CREATE
+    }
+    case PD_MSG_DB_CREATE:
+    {
+#define PD_MSG msg
+#define PD_TYPE PD_MSG_DB_CREATE
         // The placer may have altered msg->destLocation
-    #undef PD_MSG
-    #undef PD_TYPE
+#undef PD_MSG
+#undef PD_TYPE
         break;
-        }
+    }
     // Need to determine the destination of the message based
     // on the operation and guids it involves.
-        case PD_MSG_WORK_DESTROY:
-        {
-    #define PD_MSG (msg)
-    #define PD_TYPE PD_MSG_WORK_DESTROY
+    case PD_MSG_WORK_DESTROY:
+    {
+#define PD_MSG (msg)
+#define PD_TYPE PD_MSG_WORK_DESTROY
         RETRIEVE_LOCATION_FROM_GUID_MSG(self, msg->destLocation);
         DPRINTF(DEBUG_LVL_VVERB, "WORK_DESTROY: target is %d\n", (int)msg->destLocation);
-    #undef PD_MSG
-    #undef PD_TYPE
+#undef PD_MSG
+#undef PD_TYPE
         break;
-        }
-        case PD_MSG_DEP_SATISFY:
-        {
-    #define PD_MSG (msg)
-    #define PD_TYPE PD_MSG_DEP_SATISFY
+    }
+    case PD_MSG_DEP_SATISFY:
+    {
+#define PD_MSG (msg)
+#define PD_TYPE PD_MSG_DEP_SATISFY
         RETRIEVE_LOCATION_FROM_GUID_MSG(self, msg->destLocation);
         DPRINTF(DEBUG_LVL_VVERB,"DEP_SATISFY: target is %d\n", (int) msg->destLocation);
-    #undef PD_MSG
-    #undef PD_TYPE
+#undef PD_MSG
+#undef PD_TYPE
         break;
-        }
-        case PD_MSG_EVT_DESTROY:
-        {
-    #define PD_MSG (msg)
-    #define PD_TYPE PD_MSG_EVT_DESTROY
+    }
+    case PD_MSG_EVT_DESTROY:
+    {
+#define PD_MSG (msg)
+#define PD_TYPE PD_MSG_EVT_DESTROY
         RETRIEVE_LOCATION_FROM_GUID_MSG(self, msg->destLocation);
         DPRINTF(DEBUG_LVL_VVERB, "EVT_DESTROY: target is %d\n", (int)msg->destLocation);
-    #undef PD_MSG
-    #undef PD_TYPE
+#undef PD_MSG
+#undef PD_TYPE
         break;
-        }
-        case PD_MSG_DB_DESTROY:
-        {
-    #define PD_MSG (msg)
-    #define PD_TYPE PD_MSG_DB_DESTROY
+    }
+    case PD_MSG_DB_DESTROY:
+    {
+#define PD_MSG (msg)
+#define PD_TYPE PD_MSG_DB_DESTROY
         RETRIEVE_LOCATION_FROM_GUID_MSG(self, msg->destLocation);
         DPRINTF(DEBUG_LVL_VVERB, "DB_DESTROY: target is %d\n", (int)msg->destLocation);
-    #undef PD_MSG
-    #undef PD_TYPE
+#undef PD_MSG
+#undef PD_TYPE
         break;
-        }
-        case PD_MSG_DB_FREE:
-        {
-    #define PD_MSG (msg)
-    #define PD_TYPE PD_MSG_DB_FREE
+    }
+    case PD_MSG_DB_FREE:
+    {
+#define PD_MSG (msg)
+#define PD_TYPE PD_MSG_DB_FREE
         RETRIEVE_LOCATION_FROM_GUID_MSG(self, msg->destLocation);
         DPRINTF(DEBUG_LVL_VVERB, "DB_FREE: target is %d\n", (int)msg->destLocation);
-    #undef PD_MSG
-    #undef PD_TYPE
+#undef PD_MSG
+#undef PD_TYPE
         break;
-        }
-        case PD_MSG_EDTTEMP_DESTROY:
-        {
-    #define PD_MSG (msg)
-    #define PD_TYPE PD_MSG_EDTTEMP_DESTROY
+    }
+    case PD_MSG_EDTTEMP_DESTROY:
+    {
+#define PD_MSG (msg)
+#define PD_TYPE PD_MSG_EDTTEMP_DESTROY
         RETRIEVE_LOCATION_FROM_GUID_MSG(self, msg->destLocation);
         DPRINTF(DEBUG_LVL_VVERB, "EDTTEMP_DESTROY: target is %d\n", (int)msg->destLocation);
-    #undef PD_MSG
-    #undef PD_TYPE
+#undef PD_MSG
+#undef PD_TYPE
         break;
-        }
-        case PD_MSG_GUID_INFO:
-        {
-    #define PD_MSG (msg)
-    #define PD_TYPE PD_MSG_GUID_INFO
+    }
+    case PD_MSG_GUID_INFO:
+    {
+#define PD_MSG (msg)
+#define PD_TYPE PD_MSG_GUID_INFO
         //DIST-TODO cloning: What's the meaning of guid info in distributed ?
         // TODO PD_MSG_FIELD(guid);
         msg->destLocation = curLoc;
-    #undef PD_MSG
-    #undef PD_TYPE
+#undef PD_MSG
+#undef PD_TYPE
         break;
-        }
-        case PD_MSG_GUID_METADATA_CLONE:
-        {
-    #define PD_MSG (msg)
-    #define PD_TYPE PD_MSG_GUID_METADATA_CLONE
+    }
+    case PD_MSG_GUID_METADATA_CLONE:
+    {
+#define PD_MSG (msg)
+#define PD_TYPE PD_MSG_GUID_METADATA_CLONE
         RETRIEVE_LOCATION_FROM_GUID_MSG(self, msg->destLocation);
         DPRINTF(DEBUG_LVL_VVERB, "METADATA_CLONE: target is %d\n", (int)msg->destLocation);
-    #undef PD_MSG
-    #undef PD_TYPE
+#undef PD_MSG
+#undef PD_TYPE
         break;
-        }
-        case PD_MSG_GUID_DESTROY:
-        {
-    #define PD_MSG (msg)
-    #define PD_TYPE PD_MSG_GUID_DESTROY
+    }
+    case PD_MSG_GUID_DESTROY:
+    {
+#define PD_MSG (msg)
+#define PD_TYPE PD_MSG_GUID_DESTROY
         RETRIEVE_LOCATION_FROM_GUID_MSG(self, msg->destLocation);
         DPRINTF(DEBUG_LVL_VVERB, "GUID_DESTROY: target is %d\n", (int)msg->destLocation);
-    #undef PD_MSG
-    #undef PD_TYPE
+#undef PD_MSG
+#undef PD_TYPE
         break;
-        }
-        case PD_MSG_MGT_SHUTDOWN:
-        {
-            ocrWorker_t *worker = NULL;
-            getCurrentEnv(NULL, &worker, NULL, NULL);
-            if ((msg->srcLocation == curLoc) && (msg->destLocation == curLoc)) {
-                ASSERT(msg->destLocation == curLoc);
-                u32 i = 0;
-                //DIST-TODO These should be sent in parallel
-                while(i < self->neighborCount) {
-                    DPRINTF(DEBUG_LVL_VVERB,"MGT_SHUTDOWN: loop shutdown neighbors[%d] is %d\n", i, (int) self->neighbors[i]);
-                    ocrPolicyMsg_t msgShutdown;
-                    getCurrentEnv(NULL, NULL, NULL, &msgShutdown);
-                    msgShutdown.destLocation = self->neighbors[i];
-                    DPRINTF(DEBUG_LVL_VERB,"MGT_SHUTDOWN: send shutdown msg to %d\n", (int) msgShutdown.destLocation);
-                    // Shutdown is a two-way message. It gives the target the opportunity to drain and
-                    // finalize some of its pending communication (think dbRelease called after the EDT
-                    // that triggered shutdown on another node)
-                    #define PD_MSG (&msgShutdown)
-                    #define PD_TYPE PD_MSG_MGT_SHUTDOWN
-                        msgShutdown.type = PD_MSG_MGT_SHUTDOWN | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
-                        u8 returnCode = self->fcts.processMessage(self, &msgShutdown, true);
-                        ASSERT(returnCode == 0);
-                    #undef PD_MSG
-                    #undef PD_TYPE
-                    i++;
-                }
-                //NOTE: We shutdown here otherwise we need to change the state
-                //to spin on from 18 to 34 in hcPolicyDomainStop because the double
-                //acquisition caused by calling the base impl.
-                //Shutdown are one way messages in distributed. Avoids having to
-                //send a response when the comms are shutting down.
-                self->fcts.stop(self);
-                msg->type &= ~PD_MSG_REQUEST;
-                msg->type |= PD_MSG_RESPONSE;
-                hcDistReleasePd((ocrPolicyDomainHc_t*)self);
-                return 0;
-            } else if ((msg->srcLocation != curLoc) && (msg->destLocation == curLoc)) {
-                // Local processing
-                // Same issues as above regarding the pd's state
-                u64 maxCount = self->workerCount;
-                // When a sink EDT depends on a bunch of events. As soon as the events are
-                // satisfied and sent out, the shutdown process may begin.
-                // Here we wait for computation workers to wrap up the EDT they were executing.
-                u64 i;
-                for(i = 0; i < maxCount; i++) {
-                    //DIST-TODO stop: see if that would go in a computation worker stop runlevel
-                    ocrWorkerHc_t * hcWorker = (ocrWorkerHc_t *) self->workers[i];
-                    if ((worker != ((ocrWorker_t *)hcWorker)) && (hcWorker->hcType == HC_WORKER_COMP)) {
-                        DPRINTF(DEBUG_LVL_VVERB,"MGT_SHUTDOWN: wait for comp-worker to wrap-up before shutdown %d\n");
-                        while(self->workers[i]->curTask != NULL);
-                    }
-                }
-                // Notify we're ready to shutdown
-                // Important to send this message here and then call the PD's stop. The implementation
-                // will make sure the outgoing messages are sent before terminating.
-                ocrPolicyMsg_t shutdownReply;
-                shutdownReply = *msg;
-                shutdownReply.destLocation = msg->srcLocation;
-                shutdownReply.srcLocation = curLoc;
-                shutdownReply.type &= ~PD_MSG_REQUEST;
-                shutdownReply.type |= PD_MSG_RESPONSE;
-                self->fcts.sendMessage(self, shutdownReply.destLocation, &shutdownReply, NULL, 0);
-                self->fcts.stop(self);
-                hcDistReleasePd((ocrPolicyDomainHc_t*)self);
-                return 0;
+    }
+    case PD_MSG_MGT_SHUTDOWN:
+    {
+        ocrWorker_t *worker = NULL;
+        getCurrentEnv(NULL, &worker, NULL, NULL);
+        if ((msg->srcLocation == curLoc) && (msg->destLocation == curLoc)) {
+            ASSERT(msg->destLocation == curLoc);
+            u32 i = 0;
+            //DIST-TODO These should be sent in parallel
+            while(i < self->neighborCount) {
+                DPRINTF(DEBUG_LVL_VVERB,"MGT_SHUTDOWN: loop shutdown neighbors[%d] is %d\n", i, (int) self->neighbors[i]);
+                ocrPolicyMsg_t msgShutdown;
+                getCurrentEnv(NULL, NULL, NULL, &msgShutdown);
+                msgShutdown.destLocation = self->neighbors[i];
+                DPRINTF(DEBUG_LVL_VERB,"MGT_SHUTDOWN: send shutdown msg to %d\n", (int) msgShutdown.destLocation);
+                // Shutdown is a two-way message. It gives the target the opportunity to drain and
+                // finalize some of its pending communication (think dbRelease called after the EDT
+                // that triggered shutdown on another node)
+#define PD_MSG (&msgShutdown)
+#define PD_TYPE PD_MSG_MGT_SHUTDOWN
+                msgShutdown.type = PD_MSG_MGT_SHUTDOWN | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
+                u8 returnCode = self->fcts.processMessage(self, &msgShutdown, true);
+                ASSERT(returnCode == 0);
+#undef PD_MSG
+#undef PD_TYPE
+                i++;
             }
-            // Fall-through to send to other PD or local processing.
-         break;
+            //NOTE: We shutdown here otherwise we need to change the state
+            //to spin on from 18 to 34 in hcPolicyDomainStop because the double
+            //acquisition caused by calling the base impl.
+            //Shutdown are one way messages in distributed. Avoids having to
+            //send a response when the comms are shutting down.
+            self->fcts.stop(self);
+            msg->type &= ~PD_MSG_REQUEST;
+            msg->type |= PD_MSG_RESPONSE;
+            hcDistReleasePd((ocrPolicyDomainHc_t*)self);
+            return 0;
+        } else if ((msg->srcLocation != curLoc) && (msg->destLocation == curLoc)) {
+            // Local processing
+            // Same issues as above regarding the pd's state
+            u64 maxCount = self->workerCount;
+            // When a sink EDT depends on a bunch of events. As soon as the events are
+            // satisfied and sent out, the shutdown process may begin.
+            // Here we wait for computation workers to wrap up the EDT they were executing.
+            u64 i;
+            for(i = 0; i < maxCount; i++) {
+                //DIST-TODO stop: see if that would go in a computation worker stop runlevel
+                ocrWorkerHc_t * hcWorker = (ocrWorkerHc_t *) self->workers[i];
+                if ((worker != ((ocrWorker_t *)hcWorker)) && (hcWorker->hcType == HC_WORKER_COMP)) {
+                    DPRINTF(DEBUG_LVL_VVERB,"MGT_SHUTDOWN: wait for comp-worker to wrap-up before shutdown %d\n");
+                    while(self->workers[i]->curTask != NULL);
+                }
+            }
+            // Notify we're ready to shutdown
+            // Important to send this message here and then call the PD's stop. The implementation
+            // will make sure the outgoing messages are sent before terminating.
+            ocrPolicyMsg_t shutdownReply;
+            shutdownReply = *msg;
+            shutdownReply.destLocation = msg->srcLocation;
+            shutdownReply.srcLocation = curLoc;
+            shutdownReply.type &= ~PD_MSG_REQUEST;
+            shutdownReply.type |= PD_MSG_RESPONSE;
+            self->fcts.sendMessage(self, shutdownReply.destLocation, &shutdownReply, NULL, 0);
+            self->fcts.stop(self);
+            hcDistReleasePd((ocrPolicyDomainHc_t*)self);
+            return 0;
         }
-        case PD_MSG_DEP_DYNADD:
-        {
-    #define PD_MSG (msg)
-    #define PD_TYPE PD_MSG_DEP_DYNADD
+        // Fall-through to send to other PD or local processing.
+        break;
+    }
+    case PD_MSG_DEP_DYNADD:
+    {
+#define PD_MSG (msg)
+#define PD_TYPE PD_MSG_DEP_DYNADD
         RETRIEVE_LOCATION_FROM_MSG(self, edt, msg->destLocation);
         DPRINTF(DEBUG_LVL_VVERB, "DEP_DYNADD: target is %d\n", (int)msg->destLocation);
-    #undef PD_MSG
-    #undef PD_TYPE
+#undef PD_MSG
+#undef PD_TYPE
         break;
-        }
-        case PD_MSG_DEP_DYNREMOVE:
-        {
-    #define PD_MSG (msg)
-    #define PD_TYPE PD_MSG_DEP_DYNREMOVE
-            RETRIEVE_LOCATION_FROM_MSG(self, edt, msg->destLocation);
-            DPRINTF(DEBUG_LVL_VVERB, "DEP_DYNREMOVE: target is %d\n", (int)msg->destLocation);
-    #undef PD_MSG
-    #undef PD_TYPE
+    }
+    case PD_MSG_DEP_DYNREMOVE:
+    {
+#define PD_MSG (msg)
+#define PD_TYPE PD_MSG_DEP_DYNREMOVE
+        RETRIEVE_LOCATION_FROM_MSG(self, edt, msg->destLocation);
+        DPRINTF(DEBUG_LVL_VVERB, "DEP_DYNREMOVE: target is %d\n", (int)msg->destLocation);
+#undef PD_MSG
+#undef PD_TYPE
         break;
-        }
-        case PD_MSG_DB_ACQUIRE:
-        {
-    #define PD_MSG (msg)
-    #define PD_TYPE PD_MSG_DB_ACQUIRE
+    }
+    case PD_MSG_DB_ACQUIRE:
+    {
+#define PD_MSG (msg)
+#define PD_TYPE PD_MSG_DB_ACQUIRE
         RETRIEVE_LOCATION_FROM_GUID_MSG(self, msg->destLocation)
-        // Send/Receive to/from remote or local processing, all fall-through
-        if ((msg->srcLocation != curLoc) && (msg->destLocation == curLoc)) {
-            // Incoming acquire: Need to resolve the DB metadata locally before handing the message over
-            u64 val;
-            self->guidProviders[0]->fcts.getVal(self->guidProviders[0], PD_MSG_FIELD(guid.guid), &val, NULL);
-            ASSERT(val != 0);
-            PD_MSG_FIELD(guid.metaDataPtr) = (void *) val;
-            DPRINTF(DEBUG_LVL_VVERB,"DB_ACQUIRE: received request for DB GUID 0x%lx with properties=0x%x\n",
-                PD_MSG_FIELD(guid.guid), PD_MSG_FIELD(properties));
-        }
+            // Send/Receive to/from remote or local processing, all fall-through
+            if ((msg->srcLocation != curLoc) && (msg->destLocation == curLoc)) {
+                // Incoming acquire: Need to resolve the DB metadata locally before handing the message over
+                u64 val;
+                self->guidProviders[0]->fcts.getVal(self->guidProviders[0], PD_MSG_FIELD(guid.guid), &val, NULL);
+                ASSERT(val != 0);
+                PD_MSG_FIELD(guid.metaDataPtr) = (void *) val;
+                DPRINTF(DEBUG_LVL_VVERB,"DB_ACQUIRE: received request for DB GUID 0x%lx with properties=0x%x\n",
+                        PD_MSG_FIELD(guid.guid), PD_MSG_FIELD(properties));
+            }
         if ((msg->srcLocation == curLoc) && (msg->destLocation != curLoc)) {
             // Outgoing acquire
             DPRINTF(DEBUG_LVL_VVERB,"DB_ACQUIRE: remote request for DB GUID 0x%lx with properties=0x%x\n",
-                PD_MSG_FIELD(guid.guid), PD_MSG_FIELD(properties));
+                    PD_MSG_FIELD(guid.guid), PD_MSG_FIELD(properties));
             // First check if we know about this foreign DB
             u64 val;
             self->guidProviders[0]->fcts.getVal(self->guidProviders[0], PD_MSG_FIELD(guid.guid), &val, NULL);
@@ -569,41 +569,41 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
         }
         if ((msg->srcLocation == curLoc) && (msg->destLocation == curLoc)) {
             DPRINTF(DEBUG_LVL_VVERB,"DB_ACQUIRE: local request for DB GUID 0x%lx with properties 0x%x\n",
-                PD_MSG_FIELD(guid.guid), PD_MSG_FIELD(properties));
+                    PD_MSG_FIELD(guid.guid), PD_MSG_FIELD(properties));
         }
         // Let the base policy's processMessage acquire the DB on behalf of the remote EDT
         // and then append the db data to the message.
-    #undef PD_MSG
-    #undef PD_TYPE
+#undef PD_MSG
+#undef PD_TYPE
         break;
-        }
-        case PD_MSG_DB_RELEASE:
-        {
-    #define PD_MSG (msg)
-    #define PD_TYPE PD_MSG_DB_RELEASE
+    }
+    case PD_MSG_DB_RELEASE:
+    {
+#define PD_MSG (msg)
+#define PD_TYPE PD_MSG_DB_RELEASE
         RETRIEVE_LOCATION_FROM_GUID_MSG(self, msg->destLocation)
-        if ((msg->srcLocation != curLoc) && (msg->destLocation == curLoc)) {
-            // Incoming DB_RELEASE pre-processing
-            // Need to resolve the DB metadata locally before handing the message over
-            u64 val;
-            self->guidProviders[0]->fcts.getVal(self->guidProviders[0], PD_MSG_FIELD(guid.guid), &val, NULL);
-            ASSERT(val != 0);
-            PD_MSG_FIELD(guid.metaDataPtr) = (void *) val;
-            DPRINTF(DEBUG_LVL_VVERB,"DB_RELEASE received request for DB GUID 0x%lx WB=%d\n",
-                    PD_MSG_FIELD(guid.guid), !!(PD_MSG_FIELD(properties) & DB_FLAG_RT_WRITE_BACK));
-            //DIST-TODO db: We may want to double check this writeback (first one) is legal wrt single assignment
-            if (PD_MSG_FIELD(properties) & DB_FLAG_RT_WRITE_BACK) {
-                // Unmarshall and write back
-                DPRINTF(DEBUG_LVL_VVERB,"DB_RELEASE unmarshall for DB GUID 0x%lx ptr for local WB\n", PD_MSG_FIELD(guid.guid));
-                //Important to read from the RELEASE size u64 field instead of the msg size (u32)
-                u64 size = PD_MSG_FIELD(size);
-                void * data = findMsgPayload(msg, NULL);
-                // Acquire local DB
-                void * localData = acquireLocalDb(self, PD_MSG_FIELD(guid.guid));
-                hal_memCopy(localData, data, size, false);
-                releaseLocalDb(self, PD_MSG_FIELD(guid.guid), size);
-            } // else fall-through and do the regular release
-        }
+            if ((msg->srcLocation != curLoc) && (msg->destLocation == curLoc)) {
+                // Incoming DB_RELEASE pre-processing
+                // Need to resolve the DB metadata locally before handing the message over
+                u64 val;
+                self->guidProviders[0]->fcts.getVal(self->guidProviders[0], PD_MSG_FIELD(guid.guid), &val, NULL);
+                ASSERT(val != 0);
+                PD_MSG_FIELD(guid.metaDataPtr) = (void *) val;
+                DPRINTF(DEBUG_LVL_VVERB,"DB_RELEASE received request for DB GUID 0x%lx WB=%d\n",
+                        PD_MSG_FIELD(guid.guid), !!(PD_MSG_FIELD(properties) & DB_FLAG_RT_WRITE_BACK));
+                //DIST-TODO db: We may want to double check this writeback (first one) is legal wrt single assignment
+                if (PD_MSG_FIELD(properties) & DB_FLAG_RT_WRITE_BACK) {
+                    // Unmarshall and write back
+                    DPRINTF(DEBUG_LVL_VVERB,"DB_RELEASE unmarshall for DB GUID 0x%lx ptr for local WB\n", PD_MSG_FIELD(guid.guid));
+                    //Important to read from the RELEASE size u64 field instead of the msg size (u32)
+                    u64 size = PD_MSG_FIELD(size);
+                    void * data = findMsgPayload(msg, NULL);
+                    // Acquire local DB
+                    void * localData = acquireLocalDb(self, PD_MSG_FIELD(guid.guid));
+                    hal_memCopy(localData, data, size, false);
+                    releaseLocalDb(self, PD_MSG_FIELD(guid.guid), size);
+                } // else fall-through and do the regular release
+            }
         if ((msg->srcLocation == curLoc) && (msg->destLocation != curLoc)) {
             // Outgoing DB_RELEASE pre-processing
             u64 val;
@@ -653,68 +653,68 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
         if ((msg->srcLocation == curLoc) && (msg->destLocation == curLoc)) {
             DPRINTF(DEBUG_LVL_VVERB,"DB_RELEASE local processing: DB GUID 0x%lx\n", PD_MSG_FIELD(guid.guid));
         }
-    #undef PD_MSG
-    #undef PD_TYPE
+#undef PD_MSG
+#undef PD_TYPE
         break;
-        }
-        case PD_MSG_DEP_REGSIGNALER:
-        {
-    #define PD_MSG (msg)
-    #define PD_TYPE PD_MSG_DEP_REGSIGNALER
-            RETRIEVE_LOCATION_FROM_MSG(self, dest, msg->destLocation);
-            DPRINTF(DEBUG_LVL_VVERB, "DEP_REGSIGNALER: target is %d\n", (int)msg->destLocation);
-    #undef PD_MSG
-    #undef PD_TYPE
+    }
+    case PD_MSG_DEP_REGSIGNALER:
+    {
+#define PD_MSG (msg)
+#define PD_TYPE PD_MSG_DEP_REGSIGNALER
+        RETRIEVE_LOCATION_FROM_MSG(self, dest, msg->destLocation);
+        DPRINTF(DEBUG_LVL_VVERB, "DEP_REGSIGNALER: target is %d\n", (int)msg->destLocation);
+#undef PD_MSG
+#undef PD_TYPE
         break;
-        }
-        case PD_MSG_DEP_REGWAITER:
-        {
-    #define PD_MSG (msg)
-    #define PD_TYPE PD_MSG_DEP_REGWAITER
-            RETRIEVE_LOCATION_FROM_MSG(self, dest, msg->destLocation);
-            DPRINTF(DEBUG_LVL_VVERB, "DEP_REGWAITER: target is %d\n", (int)msg->destLocation);
-    #undef PD_MSG
-    #undef PD_TYPE
+    }
+    case PD_MSG_DEP_REGWAITER:
+    {
+#define PD_MSG (msg)
+#define PD_TYPE PD_MSG_DEP_REGWAITER
+        RETRIEVE_LOCATION_FROM_MSG(self, dest, msg->destLocation);
+        DPRINTF(DEBUG_LVL_VVERB, "DEP_REGWAITER: target is %d\n", (int)msg->destLocation);
+#undef PD_MSG
+#undef PD_TYPE
         break;
-        }
-        // filter out local messages
-        case PD_MSG_DEP_ADD:
-        case PD_MSG_MEM_OP:
-        case PD_MSG_MEM_ALLOC:
-        case PD_MSG_MEM_UNALLOC:
-        case PD_MSG_WORK_EXECUTE:
-        case PD_MSG_EDTTEMP_CREATE:
-        case PD_MSG_EVT_CREATE:
-        case PD_MSG_EVT_GET:
-        case PD_MSG_GUID_CREATE:
-        case PD_MSG_COMM_TAKE:
-        case PD_MSG_COMM_GIVE:
-        case PD_MSG_DEP_UNREGSIGNALER:
+    }
+    // filter out local messages
+    case PD_MSG_DEP_ADD:
+    case PD_MSG_MEM_OP:
+    case PD_MSG_MEM_ALLOC:
+    case PD_MSG_MEM_UNALLOC:
+    case PD_MSG_WORK_EXECUTE:
+    case PD_MSG_EDTTEMP_CREATE:
+    case PD_MSG_EVT_CREATE:
+    case PD_MSG_EVT_GET:
+    case PD_MSG_GUID_CREATE:
+    case PD_MSG_COMM_TAKE:
+    case PD_MSG_COMM_GIVE:
+    case PD_MSG_DEP_UNREGSIGNALER:
         //DIST-TODO not-supported: I don't think PD_MSG_DEP_UNREGSIGNALER is supported yet even in shared-memory
-        case PD_MSG_DEP_UNREGWAITER:
+    case PD_MSG_DEP_UNREGWAITER:
         //DIST-TODO not-supported: I don't think PD_MSG_DEP_UNREGWAITER is support yet even in shared-memory
-        case PD_MSG_SAL_OP:
-        case PD_MSG_SAL_PRINT:
-        case PD_MSG_SAL_READ:
-        case PD_MSG_SAL_WRITE:
-        case PD_MSG_SAL_TERMINATE:
-        case PD_MSG_MGT_OP: //DIST-TODO not-supported: PD_MSG_MGT_OP is probably not always local
-        case PD_MSG_MGT_FINISH:
-        case PD_MSG_MGT_REGISTER:
-        case PD_MSG_MGT_UNREGISTER:
-        case PD_MSG_MGT_MONITOR_PROGRESS:
-        {
-            msg->destLocation = curLoc;
-            // fall-through and let local PD to process
-            break;
-        }
-        default:
-            //DIST-TODO not-supported: not sure what to do with those.
-            // ocrDbReleaseocrDbMalloc, ocrDbMallocOffset, ocrDbFree, ocrDbFreeOffset
+    case PD_MSG_SAL_OP:
+    case PD_MSG_SAL_PRINT:
+    case PD_MSG_SAL_READ:
+    case PD_MSG_SAL_WRITE:
+    case PD_MSG_SAL_TERMINATE:
+    case PD_MSG_MGT_OP: //DIST-TODO not-supported: PD_MSG_MGT_OP is probably not always local
+    case PD_MSG_MGT_FINISH:
+    case PD_MSG_MGT_REGISTER:
+    case PD_MSG_MGT_UNREGISTER:
+    case PD_MSG_MGT_MONITOR_PROGRESS:
+    {
+        msg->destLocation = curLoc;
+        // fall-through and let local PD to process
+        break;
+    }
+    default:
+        //DIST-TODO not-supported: not sure what to do with those.
+        // ocrDbReleaseocrDbMalloc, ocrDbMallocOffset, ocrDbFree, ocrDbFreeOffset
 
-            // This is just a fail-safe to make sure the
-            // PD impl accounts for all type of messages.
-            ASSERT(false && "Unsupported message type");
+        // This is just a fail-safe to make sure the
+        // PD impl accounts for all type of messages.
+        ASSERT(false && "Unsupported message type");
     }
 
     // By now, we must have decided what's the actual destination of the message
@@ -757,14 +757,14 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
             ocrPolicyMsg_t * response = handle->response;
             DPRINTF(DEBUG_LVL_VERB, "Processing response @ 0x%lx to original message @ 0x%lx\n", response, originalMsg);
             switch (response->type & PD_MSG_TYPE_ONLY) {
-                case PD_MSG_DB_ACQUIRE:
-                {
+            case PD_MSG_DB_ACQUIRE:
+            {
                 // Receiving the reply for a DB_ACQUIRE
-            #define PD_MSG (response)
-            #define PD_TYPE PD_MSG_DB_ACQUIRE
+#define PD_MSG (response)
+#define PD_TYPE PD_MSG_DB_ACQUIRE
                 if (PD_MSG_FIELD(properties) & DB_FLAG_RT_FETCH) {
                     DPRINTF(DEBUG_LVL_VVERB,"Received DB_ACQUIRE FETCH reply size=%d properties=0x%x\n",
-                        PD_MSG_FIELD(size), PD_MSG_FIELD(properties));
+                            PD_MSG_FIELD(size), PD_MSG_FIELD(properties));
                     ocrPolicyDomainHcDist_t * typedSelf = (ocrPolicyDomainHcDist_t *) self;
                     // double check if someone went ahead of us
                     hal_lock32(&(typedSelf->proxyLock));
@@ -822,64 +822,64 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
                     PD_MSG_FIELD(size) = dbProxy->size;
                     PD_MSG_FIELD(ptr) = dbProxy->ptr;
                 }
-            #undef PD_MSG
-            #undef PD_TYPE
+#undef PD_MSG
+#undef PD_TYPE
                 break;
-                }
-                case PD_MSG_DB_CREATE:
-                {
-                    // Receiving the reply for a DB_CREATE
-                    // Create a db proxy
-                #define PD_MSG (response)
-                #define PD_TYPE PD_MSG_DB_CREATE
-                    ocrGuid_t dbGuid = PD_MSG_FIELD(guid.guid);
-                    u64 size = PD_MSG_FIELD(size);
-                    // Create the local ptr
-                    void * ptr = self->fcts.pdMalloc(self, size);
-                    // Double check there's no previous registration
-                    u64 val;
-                    self->guidProviders[0]->fcts.getVal(self->guidProviders[0], dbGuid, &val, NULL);
-                    ASSERT(val == 0);
-                    // Register the proxy DB
-                    ProxyDb_t * proxyDb = self->fcts.pdMalloc(self, sizeof(ProxyDb_t));
-                    proxyDb->size = size;
-                    proxyDb->ptr = ptr;
-                    // Preset the writeback flag: even single assignment needs to be written back the first time.
-                    proxyDb->flags = PD_MSG_FIELD(properties) | DB_FLAG_RT_WRITE_BACK;
-                    self->guidProviders[0]->fcts.registerGuid(self->guidProviders[0], dbGuid, (u64) proxyDb);
-                    PD_MSG_FIELD(ptr) = ptr;
-                #undef PD_MSG
-                #undef PD_TYPE
+            }
+            case PD_MSG_DB_CREATE:
+            {
+                // Receiving the reply for a DB_CREATE
+                // Create a db proxy
+#define PD_MSG (response)
+#define PD_TYPE PD_MSG_DB_CREATE
+                ocrGuid_t dbGuid = PD_MSG_FIELD(guid.guid);
+                u64 size = PD_MSG_FIELD(size);
+                // Create the local ptr
+                void * ptr = self->fcts.pdMalloc(self, size);
+                // Double check there's no previous registration
+                u64 val;
+                self->guidProviders[0]->fcts.getVal(self->guidProviders[0], dbGuid, &val, NULL);
+                ASSERT(val == 0);
+                // Register the proxy DB
+                ProxyDb_t * proxyDb = self->fcts.pdMalloc(self, sizeof(ProxyDb_t));
+                proxyDb->size = size;
+                proxyDb->ptr = ptr;
+                // Preset the writeback flag: even single assignment needs to be written back the first time.
+                proxyDb->flags = PD_MSG_FIELD(properties) | DB_FLAG_RT_WRITE_BACK;
+                self->guidProviders[0]->fcts.registerGuid(self->guidProviders[0], dbGuid, (u64) proxyDb);
+                PD_MSG_FIELD(ptr) = ptr;
+#undef PD_MSG
+#undef PD_TYPE
                 break;
+            }
+            case PD_MSG_DB_RELEASE:
+            {
+#define PD_MSG (response)
+#define PD_TYPE PD_MSG_DB_RELEASE
+                DPRINTF(DEBUG_LVL_VVERB,"PD_MSG_DB_RELEASE received response for DB GUID 0x%lx\n",
+                        PD_MSG_FIELD(guid.guid));
+                ocrGuid_t dbGuid = PD_MSG_FIELD(guid.guid);
+                u64 val;
+                self->guidProviders[0]->fcts.getVal(self->guidProviders[0], dbGuid, &val, NULL);
+                ASSERT(val != 0);
+                ProxyDb_t * proxyDb = (ProxyDb_t *) val;
+                // Current model keeps SA DBs around, otherwise the proxy is nullified
+                // so that we're sure we always fetch an updated DB
+                if (!(proxyDb->flags & DB_PROP_SINGLE_ASSIGNMENT)) {
+                    DPRINTF(DEBUG_LVL_VVERB,"[%d] PD_MSG_DB_RELEASE received response: cleanup local proxy for DB GUID 0x%lx, ptr=%p, size=%ld, properties=0x%x\n",
+                            PD_MSG_FIELD(guid.guid), proxyDb->ptr, proxyDb->size, proxyDb->flags);
+                    self->fcts.pdFree(self, proxyDb->ptr);
+                    self->fcts.pdFree(self, proxyDb);
+                    // cleanup guid provider entry to detect racy acquire
+                    self->guidProviders[0]->fcts.registerGuid(self->guidProviders[0], dbGuid, (u64) 0);
                 }
-                case PD_MSG_DB_RELEASE:
-                {
-                #define PD_MSG (response)
-                #define PD_TYPE PD_MSG_DB_RELEASE
-                    DPRINTF(DEBUG_LVL_VVERB,"PD_MSG_DB_RELEASE received response for DB GUID 0x%lx\n",
-                            PD_MSG_FIELD(guid.guid));
-                    ocrGuid_t dbGuid = PD_MSG_FIELD(guid.guid);
-                    u64 val;
-                    self->guidProviders[0]->fcts.getVal(self->guidProviders[0], dbGuid, &val, NULL);
-                    ASSERT(val != 0);
-                    ProxyDb_t * proxyDb = (ProxyDb_t *) val;
-                    // Current model keeps SA DBs around, otherwise the proxy is nullified
-                    // so that we're sure we always fetch an updated DB
-                    if (!(proxyDb->flags & DB_PROP_SINGLE_ASSIGNMENT)) {
-                        DPRINTF(DEBUG_LVL_VVERB,"[%d] PD_MSG_DB_RELEASE received response: cleanup local proxy for DB GUID 0x%lx, ptr=%p, size=%ld, properties=0x%x\n",
-                                PD_MSG_FIELD(guid.guid), proxyDb->ptr, proxyDb->size, proxyDb->flags);
-                        self->fcts.pdFree(self, proxyDb->ptr);
-                        self->fcts.pdFree(self, proxyDb);
-                        // cleanup guid provider entry to detect racy acquire
-                        self->guidProviders[0]->fcts.registerGuid(self->guidProviders[0], dbGuid, (u64) 0);
-                    }
-                #undef PD_MSG
-                #undef PD_TYPE
+#undef PD_MSG
+#undef PD_TYPE
                 break;
-                }
-                default: {
-                    break;
-                }
+            }
+            default: {
+                break;
+            }
             }
 
             //
@@ -916,7 +916,7 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
             handle->destruct(handle);
         } else {
             DPRINTF(DEBUG_LVL_VVERB,"Sending a one-way request msg @ 0x%lx to %d\n",
-                        msg, (int) msg->destLocation);
+                    msg, (int) msg->destLocation);
             // one-way request, several options:
             // - For more asynchrony can make a copy of original msg in 'sendMessage',
             //   'waitMessage' then becomes a no-op.
@@ -945,8 +945,8 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
             switch(msg->type & PD_MSG_TYPE_ONLY) {
             case PD_MSG_DB_ACQUIRE:
             {
-            #define PD_MSG (msg)
-            #define PD_TYPE PD_MSG_DB_ACQUIRE
+#define PD_MSG (msg)
+#define PD_TYPE PD_MSG_DB_ACQUIRE
                 DPRINTF(DEBUG_LVL_VVERB,"DB_ACQUIRE: post-process response, GUID=0x%lx serialize DB's ptr, dest is %d\n",
                         PD_MSG_FIELD(guid.guid), (int) msg->destLocation);
                 // The base policy acquired the DB on behalf of the remote EDT
@@ -970,9 +970,9 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
                     self->fcts.pdFree(self, msg);
                     msg = responseMessage;
                 }
-            #undef PD_MSG
-            #undef PD_TYPE
-            break;
+#undef PD_MSG
+#undef PD_TYPE
+                break;
             }
             default: { }
             }
