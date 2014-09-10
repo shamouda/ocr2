@@ -50,7 +50,7 @@ void cePolicyDomainBegin(ocrPolicyDomain_t * policy) {
         policy->commApis[i]->fcts.begin(policy->commApis[i], policy);
     }
     policy->placer = NULL;
-    
+
     // REC: Moved all workers to start here.
     // Note: it's important to first logically start all workers.
     // Once they are all up, start the runtime.
@@ -470,7 +470,7 @@ static u8 ceCreateEvent(ocrPolicyDomain_t *self, ocrFatGuid_t *guid,
     return 0;
 }
 
-static void convertDepAddToSatisfy(ocrPolicyDomain_t *self, ocrFatGuid_t dbGuid,
+static u8 convertDepAddToSatisfy(ocrPolicyDomain_t *self, ocrFatGuid_t dbGuid,
                                    ocrFatGuid_t destGuid, u32 slot) {
 
     ocrPolicyMsg_t msg;
@@ -482,9 +482,10 @@ static void convertDepAddToSatisfy(ocrPolicyDomain_t *self, ocrFatGuid_t dbGuid,
     PD_MSG_FIELD(payload) = dbGuid;
     PD_MSG_FIELD(slot) = slot;
     PD_MSG_FIELD(properties) = 0;
-    RESULT_ASSERT(self->fcts.processMessage(self, &msg, false), ==, 0);
+    RESULT_PROPAGATE(self->fcts.processMessage(self, &msg, false));
 #undef PD_MSG
 #undef PD_TYPE
+    return 0;
 }
 
 #ifdef OCR_ENABLE_STATISTICS
@@ -527,8 +528,10 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
     case PD_MSG_WORK_EXECUTE: case PD_MSG_DEP_UNREGSIGNALER:
     case PD_MSG_DEP_UNREGWAITER: case PD_MSG_DEP_DYNADD:
     case PD_MSG_DEP_DYNREMOVE:
+    case PD_MSG_GUID_METADATA_CLONE:
     case PD_MSG_SAL_TERMINATE: case PD_MSG_MGT_REGISTER:
     case PD_MSG_MGT_UNREGISTER:
+    case PD_MSG_MGT_MONITOR_PROGRESS:
     {
         DPRINTF(DEBUG_LVL_WARN, "CE PD does not handle call of type 0x%x\n",
                 (u32)(msg->type & PD_MSG_TYPE_ONLY));
@@ -589,6 +592,8 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             db, &(PD_MSG_FIELD(ptr)), PD_MSG_FIELD(edt), PD_MSG_FIELD(edtSlot),
             (ocrDbAccessMode_t)(PD_MSG_FIELD(properties) & (u32)DB_ACCESS_MODE_MASK),
             PD_MSG_FIELD(properties) & DB_PROP_RT_ACQUIRE, PD_MSG_FIELD(properties));
+        PD_MSG_FIELD(size) = db->size;
+        PD_MSG_FIELD(properties) |= db->flags;
         DPRINTF(DEBUG_LVL_VVERB, "DB_ACQUIRE response for GUID 0x%lx: PTR: 0x%lx\n",
                 PD_MSG_FIELD(guid.guid), PD_MSG_FIELD(ptr));
         returnCode = ceProcessResponse(self, msg, 0);
@@ -611,7 +616,7 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         DPRINTF(DEBUG_LVL_VVERB, "DB_RELEASE req/resp from 0x%lx for GUID 0x%lx\n",
                 msg->srcLocation, PD_MSG_FIELD(guid.guid));
         PD_MSG_FIELD(returnDetail) =
-            self->dbFactories[0]->fcts.release(db, PD_MSG_FIELD(edt), PD_MSG_FIELD(properties) & 1);
+            self->dbFactories[0]->fcts.release(db, PD_MSG_FIELD(edt), PD_MSG_FIELD(properties) & DB_PROP_RT_ACQUIRE);
         returnCode = ceProcessResponse(self, msg, 0);
 #undef PD_MSG
 #undef PD_TYPE
@@ -853,6 +858,12 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
                 self->guidProviders[0], PD_MSG_FIELD(guid.guid), &(PD_MSG_FIELD(kind)));
             if(PD_MSG_FIELD(returnDetail) == 0)
                 PD_MSG_FIELD(returnDetail) = KIND_GUIDPROP | WMETA_GUIDPROP | RMETA_GUIDPROP;
+        } else if (PD_MSG_FIELD(properties) & LOCATION_GUIDPROP) {
+            PD_MSG_FIELD(returnDetail) = self->guidProviders[0]->fcts.getLocation(
+                self->guidProviders[0], PD_MSG_FIELD(guid.guid), &(PD_MSG_FIELD(location)));
+            if(PD_MSG_FIELD(returnDetail) == 0) {
+                PD_MSG_FIELD(returnDetail) = LOCATION_GUIDPROP | WMETA_GUIDPROP | RMETA_GUIDPROP;
+            }
         } else {
             PD_MSG_FIELD(returnDetail) = WMETA_GUIDPROP | RMETA_GUIDPROP;
         }
@@ -934,9 +945,45 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
 
         ocrFatGuid_t src = PD_MSG_FIELD(source);
         ocrFatGuid_t dest = PD_MSG_FIELD(dest);
-        if(srcKind == OCR_GUID_DB) {
+        ocrDbAccessMode_t mode = (PD_MSG_FIELD(properties) & DB_PROP_MODE_MASK); //lower 3-bits is mode //TODO not pretty
+        if (srcKind == NULL_GUID) {
+            //NOTE: Handle 'NULL_GUID' case here to be safe although
+            //we've already caught it in ocrAddDependence for performance
             // This is equivalent to an immediate satisfy
-            convertDepAddToSatisfy(self, src, dest, PD_MSG_FIELD(slot));
+            PD_MSG_FIELD(returnDetail) = convertDepAddToSatisfy(
+                self, src, dest, PD_MSG_FIELD(slot));
+        } else if (srcKind == OCR_GUID_DB) {
+            if(dstKind & OCR_GUID_EVENT) {
+                // This is equivalent to an immediate satisfy
+                PD_MSG_FIELD(returnDetail) = convertDepAddToSatisfy(
+                    self, src, dest, PD_MSG_FIELD(slot));
+            } else {
+                // NOTE: We could use convertDepAddToSatisfy since adding a DB dependence
+                // is equivalent to satisfy. However, we want to go through the register
+                // function to make sure the access mode is recorded.
+                ASSERT(dstKind == OCR_GUID_EDT);
+                ocrPolicyMsg_t registerMsg;
+                getCurrentEnv(NULL, NULL, NULL, &registerMsg);
+                ocrFatGuid_t sourceGuid = PD_MSG_FIELD(source);
+                ocrFatGuid_t destGuid = PD_MSG_FIELD(dest);
+                u32 slot = PD_MSG_FIELD(slot);
+#undef PD_MSG
+#undef PD_TYPE
+#define PD_MSG (&registerMsg)
+#define PD_TYPE PD_MSG_DEP_REGSIGNALER
+                registerMsg.type = PD_MSG_DEP_REGSIGNALER | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
+                // Registers sourceGuid (signaler) onto destGuid
+                PD_MSG_FIELD(signaler) = sourceGuid;
+                PD_MSG_FIELD(dest) = destGuid;
+                PD_MSG_FIELD(slot) = slot;
+                PD_MSG_FIELD(mode) = mode;
+                PD_MSG_FIELD(properties) = true; // Specify context is add-dependence
+                RESULT_PROPAGATE(self->fcts.processMessage(self, &registerMsg, true));
+#undef PD_MSG
+#undef PD_TYPE
+#define PD_MSG msg
+#define PD_TYPE PD_MSG_DEP_ADD
+            }
         } else {
             if(srcKind & OCR_GUID_EVENT) {
                 ocrEvent_t *evt = (ocrEvent_t*)(src.metaDataPtr);
@@ -950,7 +997,7 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             if(dstKind == OCR_GUID_EDT) {
                 ocrTask_t *task = (ocrTask_t*)(dest.metaDataPtr);
                 ASSERT(task->fctId == self->taskFactories[0]->factoryId);
-                self->taskFactories[0]->fcts.registerSignaler(task, src, PD_MSG_FIELD(slot), 
+                self->taskFactories[0]->fcts.registerSignaler(task, src, PD_MSG_FIELD(slot),
                     PD_MSG_FIELD(properties) & DB_PROP_MODE_MASK, true);
             } else if(dstKind & OCR_GUID_EVENT) {
                 ocrEvent_t *evt = (ocrEvent_t*)(dest.metaDataPtr);
@@ -1019,7 +1066,7 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         START_PROFILE(pd_ce_DepRegWaiter);
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_DEP_REGWAITER
-// We first get information about the signaler and destination
+        // We first get information about the signaler and destination
         DPRINTF(DEBUG_LVL_VVERB, "DEP_REGWAITER req/resp from 0x%lx for 0x%lx -> 0x%lx\n",
                 msg->srcLocation, PD_MSG_FIELD(dest.guid), PD_MSG_FIELD(waiter.guid));
         ocrGuidKind waiterKind, dstKind;
