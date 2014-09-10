@@ -177,20 +177,19 @@ void* xeRunWorker(ocrWorker_t * worker) {
         ocrGuid_t dbGuid;
         void* dbPtr;
         ocrDbCreate(&dbGuid, &dbPtr, totalLength,
-                    DB_PROP_NONE, NULL_GUID, NO_ALLOC);
+                    DB_PROP_IGNORE_WARN, NULL_GUID, NO_ALLOC);
 
 #if !defined(SAL_FSIM_XE)
         // copy packed args to DB
         hal_memCopy(dbPtr, packedUserArgv, totalLength, 0);
 #endif
 
-        // Create the depv
-        ocrEdtDep_t depv;
-        depv.guid = dbGuid;
-        depv.ptr = dbPtr;
-
-        // Call into mainEdt
-        mainEdt(0, NULL, 1, &depv);
+        // Create mainEDT and then allow it to be scheduled
+        // This gives mainEDT a GUID which is useful for some book-keeping business
+        ocrGuid_t edtTemplateGuid, edtGuid;
+        ocrEdtTemplateCreate(&edtTemplateGuid, mainEdt, 0, 1);
+        ocrEdtCreate(&edtGuid, edtTemplateGuid, EDT_PARAM_DEF, /* paramv=*/ NULL,
+                     EDT_PARAM_DEF, /* depv=*/&dbGuid, EDT_PROP_NONE, NULL_GUID, NULL);
     }
 
     DPRINTF(DEBUG_LVL_INFO, "Starting scheduler routine of worker %ld\n", getWorkerId(worker));

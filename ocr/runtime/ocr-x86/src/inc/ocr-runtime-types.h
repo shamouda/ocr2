@@ -116,6 +116,9 @@ typedef enum {
     MAX_DBTYPE      = 0x3
 } ocrDataBlockType_t;
 
+/** @brief Special property that removes the warning
+ * for the acquire/create */
+#define DB_PROP_IGNORE_WARN (u16)(0x7000)
 /**
  * @brief Type of memory allocated/unallocated
  * by MEM_ALLOC and MEM_UNALLOC

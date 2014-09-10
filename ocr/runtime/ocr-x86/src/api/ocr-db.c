@@ -95,8 +95,10 @@ u8 ocrDbCreate(ocrGuid_t *db, void** addr, u64 len, u16 flags,
 #undef PD_MSG
 #undef PD_TYPE
     } else {
-        DPRINTF(DEBUG_LVL_WARN, "Acquiring DB (GUID: 0x%lx) from outside an EDT ... auto-release will fail\n",
-                *db);
+        if(!(flags & DB_PROP_IGNORE_WARN)) {
+            DPRINTF(DEBUG_LVL_WARN, "Acquiring DB (GUID: 0x%lx) from outside an EDT ... auto-release will fail\n",
+                    *db);
+        }
     }
     DPRINTF(DEBUG_LVL_INFO, "EXIT ocrDbCreate -> 0; GUID: 0x%lx; ADDR: 0x%lx\n", *db, *addr);
     RETURN_PROFILE(0);

@@ -300,7 +300,7 @@ void* runWorkerHcComm(ocrWorker_t * worker) {
         ocrGuid_t dbGuid;
         void* dbPtr;
         ocrDbCreate(&dbGuid, &dbPtr, totalLength,
-                    DB_PROP_NONE, affinityMasterPD, NO_ALLOC);
+                    DB_PROP_IGNORE_WARN, affinityMasterPD, NO_ALLOC);
         DPRINTF(DEBUG_LVL_INFO,"mainDb guid 0x%lx ptr %p\n", dbGuid, dbPtr);
         // copy packed args to DB
         hal_memCopy(dbPtr, packedUserArgv, totalLength, 0);

@@ -189,7 +189,7 @@ void* hcRunWorker(ocrWorker_t * worker) {
         ocrGuid_t dbGuid;
         void* dbPtr;
         ocrDbCreate(&dbGuid, &dbPtr, totalLength,
-                    DB_PROP_NONE, affinityMasterPD, NO_ALLOC);
+                    DB_PROP_IGNORE_WARN, affinityMasterPD, NO_ALLOC);
 
         // copy packed args to DB
         hal_memCopy(dbPtr, packedUserArgv, totalLength, 0);
