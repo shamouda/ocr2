@@ -21,7 +21,7 @@ DEFAULT_CONFIG=mach-hc-dist-mpi-clone-4w.cfg
 #
 
 CC      := mpicc
-CFLAGS  :=
+CFLAGS  := -DINIT_DEQUE_CAPACITY=2048
 
 RM      := rm
 RMFLAGS := -rf
