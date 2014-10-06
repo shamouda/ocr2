@@ -64,56 +64,71 @@ done
 
 # try to lookup for a default ocr install
 if [ -z "${OCR_INSTALL}" ]; then
+# try to lookup for a default TG_INSTALL
+    if [ -z "${TG_INSTALL}" ]; then
+        echo "TG_INSTALL is not set, defaulting to OCR test"
+        TG_INSTALL_TMP=`pwd`/../../ss/install
+        echo "For TG test, set TG_INSTALL environemt variable to ${TG_INSTALL_TMP}"
         echo "OCR_INSTALL is not set, defaulting to ../install/x86-pthread-x86"
         OCR_INSTALL_TMP=`pwd`/../install/x86-pthread-x86
         if [ -x ${OCR_INSTALL_TMP}/lib/libocr.so ]; then
-                export OCR_INSTALL=${OCR_INSTALL_TMP}
+            export OCR_INSTALL=${OCR_INSTALL_TMP}
         fi
+    fi
 fi
 
+# This timeout is to make sure the testing does
+# not get struck in case of any coredumps or hangs
+# while running a particular testcase.
+TG_TIMEOUT=60
 
 #
 # Default compilation option for ocr
 #
 
-export INCLUDES="-I${OCR_INSTALL}/include"
-export CFLAGS=" -Wall -Wno-cpp -g -Werror -DOCR_ENABLE_EDT_NAMING -DOCR_ASSERT"
-if [ -n "${RUNTIME_ITF_EXT}" ]; then
-    CFLAGS="$CFLAGS -DRUNTIME_ITF_EXT=1"
-fi
-if [ -n "${OCR_LIBRARY_ITF}" ]; then
-    CFLAGS="$CFLAGS -DOCR_LIBRARY_ITF=1"
-fi
+BIN_DIR=
+LIB_DIR=
+CFLAGS=
 
-export LDFLAGS="-L${OCR_INSTALL}/lib -locr -lpthread ${OCR_LDFLAGS}"
-export OCR_TESTS_BIN_OUTPUT=
+if [ -z "${TG_INSTALL}" ]; then
+    export INCLUDES="-I${OCR_INSTALL}/include"
+    export CFLAGS=" -Wall -Wno-cpp -g -Werror -DOCR_ENABLE_EDT_NAMING -DOCR_ASSERT"
+    if [ -n "${RUNTIME_ITF_EXT}" ]; then
+        CFLAGS="$CFLAGS -DRUNTIME_ITF_EXT=1"
+    fi
+    if [ -n "${OCR_LIBRARY_ITF}" ]; then
+        CFLAGS="$CFLAGS -DOCR_LIBRARY_ITF=1"
+    fi
 
-if [ -z "${OCR_CONFIG}" ]; then
-export OCR_CONFIG=${OCR_INSTALL}/config/default.cfg
+    export LDFLAGS="-L${OCR_INSTALL}/lib -locr -lpthread ${OCR_LDFLAGS}"
+    export OCR_TESTS_BIN_OUTPUT=
+
+    if [ -z "${OCR_CONFIG}" ]; then
+        export OCR_CONFIG=${OCR_INSTALL}/config/default.cfg
         echo "OCR_CONFIG is not set, defaulting to ${OCR_CONFIG}"
+    fi
+
+    export OCR_FLAGS=" -ocr:cfg ${OCR_CONFIG}"
+
+    #
+    #checking options
+    #
+
+    BIN_DIR=${OCR_INSTALL}/bin
+    LIB_DIR=${OCR_INSTALL}/lib
+
+    if [ -x ${LIB_DIR}/libocr.so -o -e ${LIB_DIR}/libocr.a ]; then
+        echo "OCR library found in ${OCR_INSTALL}/lib"
+    else
+        echo "ERROR OCR library not found in ${OCR_INSTALL}/lib"
+        exit 1
+    fi
+
+    export PATH=${BIN_DIR}:${PATH}
+
+    #update LD_LIBRARY_PATH to find the runtime so
+    export LD_LIBRARY_PATH=${LIB_DIR}:${LD_LIBRARY_PATH}
 fi
-
-export OCR_FLAGS=" -ocr:cfg ${OCR_CONFIG}"
-
-#
-#checking options
-#
-
-BIN_DIR=${OCR_INSTALL}/bin
-LIB_DIR=${OCR_INSTALL}/lib
-
-if [ -x ${LIB_DIR}/libocr.so -o -e ${LIB_DIR}/libocr.a ]; then
-    echo "OCR library found in ${OCR_INSTALL}/lib"
-else
-    echo "ERROR OCR library not found in ${OCR_INSTALL}/lib"
-    exit 1
-fi
-
-export PATH=${BIN_DIR}:${PATH}
-
-#update LD_LIBRARY_PATH to find the runtime so
-export LD_LIBRARY_PATH=${LIB_DIR}:${LD_LIBRARY_PATH}
-
 #
 # Ending extension specific option parsing and checking
 #
@@ -253,14 +268,29 @@ function compile () {
         local FOLDER=$2
 
         cd $FOLDER;
-    NAME=
-    get_name ${FILE}
+        NAME=
+        get_name ${FILE}
 
-    echo "gcc ${OCR_CFLAGS} ${CFLAGS} ${INCLUDES} ${FILE} -o ${BIN_GEN_DIR}/${NAME} ${LDFLAGS}"
-    gcc ${OCR_CFLAGS} ${CFLAGS} ${INCLUDES} ${FILE} -o ${BIN_GEN_DIR}/${NAME} ${LDFLAGS}
-    RES=$?
-
-        rename_binary ${FILE}
+        RES=0
+        if [ ! -z "${TG_INSTALL}" ]; then
+            cp ../../tg-configs/Makefile.tg .
+            cp ../../tg-configs/config.tg config.cfg
+            echo "BUILD_DIR=${BIN_GEN_DIR}/${NAME}/build INSTALL_DIR=${BIN_GEN_DIR}/${NAME}/install SRCS=${FILE} TARGET=${NAME} make -f Makefile.tg clean all install"
+            BUILD_DIR=${BIN_GEN_DIR}/${NAME}/build INSTALL_DIR=${BIN_GEN_DIR}/${NAME}/install SRCS=${FILE} TARGET=${NAME} make -f Makefile.tg clean all install
+            RES=$?
+            echo "Creating config.cfg"
+            echo "[environment]" > ./tmp.cfg
+            echo "TARGET = ${NAME}" >> ./tmp.cfg
+            cat config.cfg >> ./tmp.cfg
+            mv ./tmp.cfg ${BIN_GEN_DIR}/${NAME}/install/tg/config.cfg
+            mkdir -p ${BIN_GEN_DIR}/${NAME}/install/tg/logs
+            rm ./config.cfg ./Makefile.tg
+        else
+            echo "gcc ${OCR_CFLAGS} ${CFLAGS} ${INCLUDES} ${FILE} -o ${BIN_GEN_DIR}/${NAME} ${LDFLAGS}"
+            gcc ${OCR_CFLAGS} ${CFLAGS} ${INCLUDES} ${FILE} -o ${BIN_GEN_DIR}/${NAME} ${LDFLAGS}
+            RES=$?
+            rename_binary ${FILE}
+        fi
 
         cd -;
 
@@ -286,14 +316,31 @@ function run () {
         if [ -f ${TEST_RES_FILE} ]; then
                 TEST_RES=`cat ${TEST_RES_FILE}`
         fi
-        echo "ocrrun ${BIN_GEN_DIR}/${NAME} ${OCR_FLAGS}"
-        ocrrun ${RUN_WRAPPER} ${BIN_GEN_DIR}/${NAME} ${OCR_FLAGS} ${TEST_ARGS}
-        RES=$?
-        if [[ $RES -eq $TEST_RES ]]; then
-                RES=0;
-        elif [[ $TEST_RES -ne 0 ]]; then
-                if [[ $RES -eq 0 ]]; then
-                        RES=${TEST_RES};
+        if [ ! -z "${TG_INSTALL}" ]; then
+                echo "${TG_INSTALL}/bin/fsim -s -c ${TG_INSTALL}/fsim-configs/localhost.cfg -c ${BIN_GEN_DIR}/${NAME}/install/tg/config.cfg"
+                cd  ${BIN_GEN_DIR}/${NAME}/install/tg
+                RES=1
+                ( ${TG_INSTALL}/bin/fsim -s -c ${TG_INSTALL}/fsim-configs/localhost.cfg -c ${BIN_GEN_DIR}/${NAME}/install/tg/config.cfg ${TEST_ARGS} ) & pid=$!
+                ( sleep ${TG_TIMEOUT} && kill -HUP $pid ) 2>/dev/null & watcher=$!
+                if wait $pid 2>/dev/null; then
+                        pkill -HUP -P $watcher
+                        wait $watcher
+                else
+                        echo "Timeout: Test ${NAME} Killed after ${TG_TIMEOUT} seconds"
+                fi
+                if [ `grep "SUCCESS in Simulation" ${OUTPUT} | wc -l` -ne 0 ]; then
+                        RES=0
+                fi
+        else
+                echo "ocrrun ${BIN_GEN_DIR}/${NAME} ${OCR_FLAGS}"
+                ocrrun ${RUN_WRAPPER} ${BIN_GEN_DIR}/${NAME} ${OCR_FLAGS} ${TEST_ARGS}
+                RES=$?
+                if [[ $RES -eq $TEST_RES ]]; then
+                        RES=0;
+                elif [[ $TEST_RES -ne 0 ]]; then
+                        if [[ $RES -eq 0 ]]; then
+                                RES=${TEST_RES};
+                        fi
                 fi
         fi
         cd -;
@@ -551,18 +598,18 @@ function xunit_print_testcase () {
 
         local errors=0;
         local failures=0;
-        
+
         if [[ $status -eq $ERR_STATUS ]]; then
                 errors=1
                 (( error_count = error_count + 1 ))
-                
+
         fi
 
         if [[ $status -eq $FAIL_STATUS ]]; then
                 failures=1
                 (( failure_count = failure_count + 1 ))
         fi
-        
+
         (( test_count = test_count + 1 ))
         total_time=`echo "${total_time} + $3" | bc`
 
@@ -587,7 +634,7 @@ function xunit_print_testcase () {
                 echo "]]>"
                 echo "</failure>"
         fi
-        
+
         if [[ "x${raw_stdout_file}" != "x" ]]; then
                 echo "<system-out><![CDATA["
                 more "$raw_stdout_file"
