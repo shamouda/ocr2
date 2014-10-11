@@ -7,38 +7,25 @@
 #ifndef __SCHEDULER_ALL_H__
 #define __SCHEDULER_ALL_H__
 
+#include "ocr-config.h"
+#include "utils/ocr-utils.h"
+
 #include "ocr-scheduler.h"
-#include "ocr-utils.h"
+#include "scheduler/hc/hc-scheduler.h"
+#include "scheduler/hc-comm-delegate/hc-comm-delegate-scheduler.h"
+#include "scheduler/ce/ce-scheduler.h"
+#include "scheduler/xe/xe-scheduler.h"
 
 typedef enum _schedulerType_t {
     schedulerHc_id,
-    schedulerHcPlaced_id,
-    schedulerFsimXE_id,
-    schedulerFsimCE_id,
+    schedulerHcCommDelegate_id,
+    schedulerXe_id,
+    schedulerCe_id,
     schedulerMax_id
 } schedulerType_t;
 
-const char * scheduler_types[] = {
-    "HC",
-    "HC_Placed",
-    "XE",
-    "CE",
-    NULL
-};
+extern const char * scheduler_types[];
 
-#include "scheduler/hc/hc-scheduler.h"
-
-inline ocrSchedulerFactory_t * newSchedulerFactory(schedulerType_t type, ocrParamList_t *perType) {
-    switch(type) {
-    case schedulerHc_id:
-        return newOcrSchedulerFactoryHc(perType);
-    case schedulerFsimXE_id:
-    case schedulerFsimCE_id:
-    case schedulerHcPlaced_id:
-    default:
-        ASSERT(0);
-    }
-    return NULL;
-}
+ocrSchedulerFactory_t * newSchedulerFactory(schedulerType_t type, ocrParamList_t *perType);
 
 #endif /* __SCHEDULER_ALL_H__ */

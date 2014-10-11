@@ -12,40 +12,27 @@
 #define __DATABLOCK_ALL_H__
 
 #include "debug.h"
+#include "ocr-config.h"
 #include "ocr-datablock.h"
-#include "ocr-utils.h"
+#include "utils/ocr-utils.h"
 
 typedef enum _dataBlockType_t {
     dataBlockRegular_id,
+    dataBlockLockable_id,
     dataBlockPlaced_id,
     dataBlockMax_id
 } dataBlockType_t;
 
-const char * dataBlock_types [] = {
-    "Regular",
-    "Placed",
-    NULL
-};
+extern const char * dataBlock_types[];
 
 // Regular datablock
 #include "datablock/regular/regular-datablock.h"
-
+// Lockable datablock
+#include "datablock/lockable/lockable-datablock.h"
 // Placed datablock (not ported as of now)
 // #include "datablock/placed/placed-datablock.h"
 
 
-ocrDataBlockFactory_t* newDataBlockFactory(dataBlockType_t type, ocrParamList_t *typeArg) {
-    switch(type) {
-    case dataBlockRegular_id:
-        return newDataBlockFactoryRegular(typeArg);
-        break;
-    case dataBlockPlaced_id:
-//        return newDataBlockFactoryPlaced(typeArg);
-//        break;
-    default:
-        ASSERT(0);
-    }
-    return NULL;
-}
+ocrDataBlockFactory_t* newDataBlockFactory(dataBlockType_t type, ocrParamList_t *typeArg);
 
 #endif /* __DATABLOCK_ALL_H__ */

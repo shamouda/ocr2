@@ -11,11 +11,14 @@
 #ifndef __DATABLOCK_REGULAR_H__
 #define __DATABLOCK_REGULAR_H__
 
+#include "ocr-config.h"
+#ifdef ENABLE_DATABLOCK_REGULAR
+
 #include "ocr-allocator.h"
 #include "ocr-datablock.h"
-#include "ocr-sync.h"
 #include "ocr-types.h"
-#include "ocr-utils.h"
+#include "utils/ocr-utils.h"
+
 
 typedef struct {
     ocrDataBlockFactory_t base;
@@ -36,12 +39,13 @@ typedef struct _ocrDataBlockRegular_t {
     ocrDataBlock_t base;
 
     /* Data for the data-block */
-    ocrLock_t* lock; /**< Lock for this data-block */
+    u32 lock; /**< Lock for this data-block */
     ocrDataBlockRegularAttr_t attributes; /**< Attributes for this data-block */
 
     ocrGuidTracker_t usersTracker;
 } ocrDataBlockRegular_t;
 
-extern ocrDataBlockFactory_t* newDataBlockFactoryRegular(ocrParamList_t *perType);
+extern ocrDataBlockFactory_t* newDataBlockFactoryRegular(ocrParamList_t *perType, u32 factoryId);
 
+#endif /* ENABLE_DATABLOCK_REGULAR */
 #endif /* __DATABLOCK_REGULAR_H__ */

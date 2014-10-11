@@ -16,118 +16,163 @@
 #error "Do not include ocr-guid-end.h yourself"
 #endif
 
+#include "debug.h"
 #include "ocr-event.h"
-#include "ocr-policy-domain-getter.h"
 #include "ocr-policy-domain.h"
 
-/*! \brief Resolve the kind of a guid (could be an event, an edt, etc...)
- *  \param[in] pd          Policy domain
- *  \param[in] guid        The gid for which we want the kind
- *  \param[out] kindRes    Parameter-result to contain the kind
+/**
+ *@brief utility function to get the location of a GUID
  */
-static inline u8 guidKind(struct _ocrPolicyDomain_t * pd, ocrGuid_t guid,
+static inline u8 guidLocation(struct _ocrPolicyDomain_t * pd, ocrFatGuid_t guid,
+                              ocrLocation_t* locationRes) {
+
+    u8 returnCode = 0;
+    ocrPolicyMsg_t msg;
+    getCurrentEnv(&pd, NULL, NULL, &msg);
+#define PD_MSG (&msg)
+#define PD_TYPE PD_MSG_GUID_INFO
+
+    msg.type = PD_MSG_GUID_INFO | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
+    PD_MSG_FIELD(guid) = guid;
+    PD_MSG_FIELD(properties) = LOCATION_GUIDPROP;
+    returnCode = pd->fcts.processMessage(pd, &msg, true);
+
+    if(returnCode == 0)
+        *locationRes = PD_MSG_FIELD(location);
+
+    return returnCode;
+#undef PD_MSG
+#undef PD_TYPE
+}
+
+static inline u8 guidKind(struct _ocrPolicyDomain_t * pd, ocrFatGuid_t guid,
                           ocrGuidKind* kindRes) {
-    u64 ptrRes;
-    return pd->getInfoForGuid(pd, guid, &ptrRes, kindRes, NULL);
+
+    u8 returnCode = 0;
+    ocrPolicyMsg_t msg;
+    getCurrentEnv(&pd, NULL, NULL, &msg);
+#define PD_MSG (&msg)
+#define PD_TYPE PD_MSG_GUID_INFO
+
+    msg.type = PD_MSG_GUID_INFO | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
+    PD_MSG_FIELD(guid) = guid;
+    PD_MSG_FIELD(properties) = KIND_GUIDPROP;
+    returnCode = pd->fcts.processMessage(pd, &msg, true);
+
+    if(returnCode == 0)
+        *kindRes = PD_MSG_FIELD(kind);
+
+    return returnCode;
+#undef PD_MSG
+#undef PD_TYPE
 }
 
-/*! \brief Get the kind of a guid
- *  \param[in] pd          Policy domain
- *  \param[in] ptr         The pointer for which we want a guid
- *  \param[out] guidRes    Parameter-result to contain the guid
- *  \param[in] kind        The kind of the guid (whether is an event, an edt, etc...)
- */
-static inline u8 guidify(struct _ocrPolicyDomain_t * pd, u64 ptr, ocrGuid_t * guidRes,
-                         ocrGuidKind kind) {
 
-    return pd->getGuid(pd, guidRes, ptr, kind, NULL);
+static inline u8 guidify(struct _ocrPolicyDomain_t * pd, u64 val,
+                         ocrFatGuid_t * guidRes, ocrGuidKind kind) {
+    u8 returnCode = 0;
+    ocrPolicyMsg_t msg;
+    getCurrentEnv(&pd, NULL, NULL, &msg);
+
+    ASSERT(guidRes->guid == NULL_GUID || guidRes->guid == UNINITIALIZED_GUID);
+
+#define PD_MSG (&msg)
+#define PD_TYPE PD_MSG_GUID_CREATE
+
+    msg.type = PD_MSG_GUID_CREATE | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
+    PD_MSG_FIELD(guid.metaDataPtr) = (void*)val;
+    PD_MSG_FIELD(guid.guid) = NULL_GUID;
+    PD_MSG_FIELD(size) = 0;
+    PD_MSG_FIELD(kind) = kind;
+    returnCode = pd->fcts.processMessage(pd, &msg, true);
+
+    if(returnCode == 0) {
+        *guidRes = PD_MSG_FIELD(guid);
+        ASSERT((u64)(guidRes->metaDataPtr) == val);
+    }
+    return returnCode;
+#undef PD_MSG
+#undef PD_TYPE
 }
 
-/*! \brief Resolve a pointer out of a guid
- *  \param[in] pd          Policy domain
- *  \param[in] guid        The guid we want to resolve
- *  \param[out] ptrRes     Parameter-result to contain the pointer
- *  \param[out] kindRes    Parameter-result to contain the kind
- */
-static inline u8 deguidify(struct _ocrPolicyDomain_t * pd, ocrGuid_t guid, u64* ptrRes,
+static inline u8 deguidify(struct _ocrPolicyDomain_t * pd, ocrFatGuid_t *res,
                            ocrGuidKind* kindRes) {
-    return pd->getInfoForGuid(pd, guid, ptrRes, kindRes, NULL);
+
+    u32 properties = 0;
+    u8 returnCode = 0;
+    if(kindRes)
+        properties |= KIND_GUIDPROP;
+    if(res->metaDataPtr == NULL)
+        properties |= RMETA_GUIDPROP;
+
+    if(properties) {
+        ocrPolicyMsg_t msg;
+        getCurrentEnv(&pd, NULL, NULL, &msg);
+#define PD_MSG (&msg)
+#define PD_TYPE PD_MSG_GUID_INFO
+        msg.type = PD_MSG_GUID_INFO | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
+        PD_MSG_FIELD(guid) = *res;
+        PD_MSG_FIELD(properties) = properties;
+        returnCode = pd->fcts.processMessage(pd, &msg, true);
+
+        if(returnCode) {
+            res->metaDataPtr = NULL;
+            return returnCode;
+        }
+
+        if(!(res->metaDataPtr)) {
+            res->metaDataPtr = PD_MSG_FIELD(guid.metaDataPtr);
+        }
+        if(kindRes) {
+            *kindRes = PD_MSG_FIELD(kind);
+        }
+#undef PD_MSG
+#undef PD_TYPE
+        return returnCode;
+    }
+    return 0;
 }
 
-/*! \brief Check if a guid represents a data-block
- *  \param[in] guid        The guid to check the kind
- */
-static inline bool isDatablockGuid(ocrGuid_t guid) {
-    if (NULL_GUID == guid) {
+static inline bool isDatablockGuid(ocrPolicyDomain_t *pd, ocrFatGuid_t guid) {
+    if (NULL_GUID == guid.guid) {
         return false;
     }
-    ocrGuidKind kind;
-    guidKind(getCurrentPD(),guid, &kind);
-    return kind == OCR_GUID_DB;
-}
 
-/*! \brief Check if a guid represents an event
- *  \param[in] guid        The guid to check the kind
- */
-static inline bool isEventGuid(ocrGuid_t guid) {
-    if (NULL_GUID == guid) {
-        return false;
-    }
-    ocrGuidKind kind;
-    guidKind(getCurrentPD(),guid, &kind);
-    return kind == OCR_GUID_EVENT;
-}
-
-/*! \brief Check if a guid represents an EDT
- *  \param[in] guid        The guid to check the kind
- */
-static inline bool isEdtGuid(ocrGuid_t guid) {
-    if (NULL_GUID == guid) {
-        return false;
-    }
-    ocrGuidKind kind;
-    guidKind(getCurrentPD(),guid, &kind);
-    return kind == OCR_GUID_EDT;
-}
-
-/*! \brief Check if a guid represents a latch-event
- *  \param[in] guid        The guid to check the kind
- */
-static inline bool isEventLatchGuid(ocrGuid_t guid) {
-    if(isEventGuid(guid)) {
-        ocrEvent_t * event = NULL;
-        deguidify(getCurrentPD(), guid, (u64*)&event, NULL);
-        return (event->kind == OCR_EVENT_LATCH_T);
-    }
+    ocrGuidKind kind = OCR_GUID_NONE;
+    if(guidKind(pd, guid, &kind) == 0)
+        return kind == OCR_GUID_DB;
     return false;
 }
 
-/*! \brief Check if a guid represents a single event (once, idempotent or sticky)
- *  \param[in] guid        The guid to check the kind
- */
-static inline bool isEventSingleGuid(ocrGuid_t guid) {
-    if(isEventGuid(guid)) {
-        ocrEvent_t * event = NULL;
-        deguidify(getCurrentPD(), guid, (u64*)&event, NULL);
-        return ((event->kind == OCR_EVENT_ONCE_T)
-                || (event->kind == OCR_EVENT_IDEM_T)
-                || (event->kind == OCR_EVENT_STICKY_T));
+static inline bool isEventGuid(ocrPolicyDomain_t *pd, ocrFatGuid_t guid) {
+    if (NULL_GUID == guid.guid) {
+        return false;
     }
+
+    ocrGuidKind kind = OCR_GUID_NONE;
+    if(guidKind(pd, guid, &kind) == 0)
+        return (kind & OCR_GUID_EVENT);
     return false;
 }
 
-/*! \brief Check if a guid represents an event of a certain kind
- *  \param[in] guid        The guid to check the kind
- *  \param[in] eventKind   The event kind to check for
- *  @return true if the guid's kind matches 'eventKind'
- */
-static inline bool isEventGuidOfKind(ocrGuid_t guid, ocrEventTypes_t eventKind) {
-    if (isEventGuid(guid)) {
-        ocrEvent_t * event = NULL;
-        deguidify(getCurrentPD(), guid, (u64*)&event, NULL);
-        return event->kind == eventKind;
+static inline bool isEdtGuid(ocrPolicyDomain_t *pd, ocrFatGuid_t guid) {
+    if (NULL_GUID == guid.guid) {
+        return false;
     }
+
+    ocrGuidKind kind = OCR_GUID_NONE;
+    if(guidKind(pd, guid, &kind) == 0)
+        return kind == OCR_GUID_EDT;
     return false;
+}
+
+static inline ocrEventTypes_t eventType(ocrPolicyDomain_t *pd, ocrFatGuid_t guid) {
+
+    if(!guid.metaDataPtr) {
+        RESULT_ASSERT(deguidify(pd, &guid, NULL), ==, 0);
+    }
+    // We now have a R/O copy of the event
+    return (((ocrEvent_t*)guid.metaDataPtr)->kind);
 }
 
 #endif /* __OCR_GUID_END_H__ */

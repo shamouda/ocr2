@@ -8,10 +8,12 @@
 #ifndef __OCR_WORKPILE_H_
 #define __OCR_WORKPILE_H_
 
-#include "ocr-mappable.h"
-#include "ocr-tuning.h"
+#include "ocr-runtime-types.h"
+#include "experimental/ocr-tuning.h"
 #include "ocr-types.h"
-#include "ocr-utils.h"
+#include "utils/ocr-utils.h"
+
+struct _ocrPolicyDomain_t;
 
 
 /****************************************************/
@@ -37,24 +39,35 @@ struct _ocrPolicyDomain_t;
 typedef struct _ocrWorkpileFcts_t {
     void (*destruct)(struct _ocrWorkpile_t *self);
 
+    void (*begin)(struct _ocrWorkpile_t *self, struct _ocrPolicyDomain_t *PD);
+
     void (*start)(struct _ocrWorkpile_t *self, struct _ocrPolicyDomain_t *PD);
 
     void (*stop)(struct _ocrWorkpile_t *self);
 
-    /*! \brief Interface to extract a task from this pool
-     *  \return GUID of the task that is extracted from this task pool
-     */
-    ocrGuid_t (*pop) (struct _ocrWorkpile_t *self, ocrCost_t *cost);
+    void (*finish)(struct _ocrWorkpile_t *self);
 
-    /*! \brief Interface to alternative extract a task from this pool
-     *  \return GUID of the task that is extracted from this task pool
+    /** @brief Interface to extract a task from this pool
+     *
+     *  This will get a task from the workpile.
+     *  @param[in] self         Pointer to this workpile
+     *  @param[in] type         Type of pop (regular or steal for eg)
+     *  @param[in] cost         Cost function to use to perform the pop
+     *
+     *  @return GUID of the task extracted from the task pool. After the
+     *  call, that task will no longer exist in the pool
+     *  @todo cost is not used as of now
      */
-    ocrGuid_t (*steal)(struct _ocrWorkpile_t *self, ocrCost_t *cost);
+    ocrFatGuid_t (*pop)(struct _ocrWorkpile_t *self, ocrWorkPopType_t type,
+                        ocrCost_t *cost);
 
-    /*! \brief Interface to enlist a task
-     *  \param[in]  task_guid   GUID of the task that is to be pushed into this task pool.
+    /** @brief Interface to push a task into the pool
+     *  @param[in] self         Pointer to this workpile
+     *  @param[in] type         Type of push
+     *  @param[in] g            GUID of task to push
      */
-    void (*push) (struct _ocrWorkpile_t *self, ocrGuid_t g);
+    void (*push)(struct _ocrWorkpile_t *self, ocrWorkPushType_t type,
+                 ocrFatGuid_t g);
 } ocrWorkpileFcts_t;
 
 /*! \brief Abstract class to represent OCR task pool data structures.
@@ -64,8 +77,9 @@ typedef struct _ocrWorkpileFcts_t {
  */
 //TODO We may be influenced by how STL resolves this issue as in push_back, push_front, pop_back, pop_front
 typedef struct _ocrWorkpile_t {
-    ocrMappable_t module;
-    ocrWorkpileFcts_t *fctPtrs;
+    ocrFatGuid_t fguid;
+    struct _ocrPolicyDomain_t *pd;
+    ocrWorkpileFcts_t fcts;
 } ocrWorkpile_t;
 
 
@@ -74,32 +88,12 @@ typedef struct _ocrWorkpile_t {
 /****************************************************/
 
 typedef struct _ocrWorkpileFactory_t {
-    ocrMappable_t module;
-    ocrWorkpile_t * (*instantiate) (struct _ocrWorkpileFactory_t * factory, ocrParamList_t *perInstance);
-
+    ocrWorkpile_t * (*instantiate)(struct _ocrWorkpileFactory_t * factory, ocrParamList_t *perInstance);
+    void (*initialize) (struct _ocrWorkpileFactory_t * factory, struct _ocrWorkpile_t * worker, ocrParamList_t *perInstance);
     void (*destruct)(struct _ocrWorkpileFactory_t * factory);
     ocrWorkpileFcts_t workpileFcts;
 } ocrWorkpileFactory_t;
 
-
-/****************************************************/
-/* OCR WORKPILE ITERATOR API                        */
-/****************************************************/
-
-typedef struct ocrWorkpileIterator_t {
-    bool (*hasNext) (struct ocrWorkpileIterator_t*);
-    ocrWorkpile_t * (*next) (struct ocrWorkpileIterator_t*);
-    void (*reset) (struct ocrWorkpileIterator_t*);
-    ocrWorkpile_t ** array;
-    u64 id;
-    u64 curr;
-    u64 mod;
-} ocrWorkpileIterator_t;
-
-void workpileIteratorReset (ocrWorkpileIterator_t * base);
-bool workpileIteratorHasNext (ocrWorkpileIterator_t * base);
-ocrWorkpile_t * workpileIteratorNext (ocrWorkpileIterator_t * base);
-ocrWorkpileIterator_t* newWorkpileIterator( u64 id, u64 workpileCount, ocrWorkpile_t ** workpiles );
-void workpileIteratorDestruct(ocrWorkpileIterator_t* base);
+void initializeWorkpileOcr(ocrWorkpileFactory_t * factory, ocrWorkpile_t * self, ocrParamList_t *perInstance);
 
 #endif /* __OCR_WORKPILE_H_ */

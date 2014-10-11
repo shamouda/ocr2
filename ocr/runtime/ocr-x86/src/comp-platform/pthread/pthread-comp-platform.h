@@ -7,42 +7,44 @@
  * and cannot be distributed without it. This notice cannot be
  * removed or modified.
  */
-
-
 #ifndef __COMP_PLATFORM_PTHREAD_H__
 #define __COMP_PLATFORM_PTHREAD_H__
 
+#include "ocr-config.h"
+#ifdef ENABLE_COMP_PLATFORM_PTHREAD
 
 #include "ocr-comp-platform.h"
 #include "ocr-comp-target.h"
+#include "ocr-worker.h"
 #include "ocr-types.h"
-#include "ocr-utils.h"
+#include "utils/ocr-utils.h"
+#ifdef ENABLE_WORKPILE_CE
+#include "utils/deque.h"
+#endif
 
 #include <pthread.h>
 
 
 typedef struct {
     ocrCompPlatformFactory_t base;
-    ocrCompPlatformFcts_t masterPlatformFcts;
     u64 stackSize;
 } ocrCompPlatformFactoryPthread_t;
 
 typedef struct {
     ocrCompPlatform_t base;
     pthread_t osThread;
-    launchArg_t * launchArg;
     u64 stackSize;
-    int binding;
+    s32 binding;
+    bool isMaster;
 } ocrCompPlatformPthread_t;
 
 typedef struct {
     paramListCompPlatformInst_t base;
-    void (*routine)(void*);
-    void* routineArg;
-    bool isMasterThread;
     u64 stackSize;
-    int binding;
+    s32 binding;
 } paramListCompPlatformPthread_t;
 
 extern ocrCompPlatformFactory_t* newCompPlatformFactoryPthread(ocrParamList_t *perType);
+
+#endif /* ENABLE_COMP_PLATFORM_PTHREAD */
 #endif /* __COMP_PLATFORM_PTHREAD_H__ */

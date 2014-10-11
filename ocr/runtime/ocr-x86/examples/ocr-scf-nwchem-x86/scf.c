@@ -96,7 +96,7 @@ ocrGuid_t g_schwarz_max_j_db;
 ocrGuid_t g_cache_db;
 
 //======================================================================================================//
-ocrGuid_t mainEdt(u32 paramc, u64 params[], void* paramv[], u32 depc, ocrEdtDep_t depv[]) 
+ocrGuid_t mainEdt(u32 paramc, u64 params[], void* paramv[], u32 depc, ocrEdtDep_t depv[])
 {
 
 	PRINTF("========================================= 	\n");
@@ -179,7 +179,7 @@ ocrGuid_t mainEdt(u32 paramc, u64 params[], void* paramv[], u32 depc, ocrEdtDep_
 
 	// get the actual time spent initializing
 	tinit = timer();
-	
+
 	//perform twoel using EDTs
 	twoel_ocr();
 
@@ -189,13 +189,13 @@ ocrGuid_t mainEdt(u32 paramc, u64 params[], void* paramv[], u32 depc, ocrEdtDep_
 
 
 //======================================================================================================//
-void mkpre(void) 
+void mkpre(void)
 {
 	int i, j, j_off=0;
 
-	for (j = 0; j < nbfn; j++) 
+	for (j = 0; j < nbfn; j++)
 	{
-		for (i = 0; i < nbfn; i++) 
+		for (i = 0; i < nbfn; i++)
 		{
 			precalc* pre = &g_precalc[j_off + i];
 
@@ -287,7 +287,7 @@ void setvectors(void) {
 	ocrGuid_t fm_db;
 	DBCREATE( &fm_db, &fm_ptr, 2001 * 5 * sizeof(double), FLAGS, affinity, NO_ALLOC);
 	fm = (double*)fm_ptr;
-	
+
 	//outuput events from symm edts
 	//ocrGuid_t symm_finished[mxiter*threads];
 	PTR_T symm_finished_ptr;
@@ -300,42 +300,42 @@ void setvectors(void) {
 	PTR_T reduction_finished_ptr;
 	ocrGuid_t reduction_finished_db;
 	DBCREATE( &reduction_finished_db, &reduction_finished_ptr, mxiter * sizeof(ocrGuid_t), FLAGS, affinity, NO_ALLOC);
-	reduction_finished = (ocrGuid_t*)reduction_finished_ptr;	
+	reduction_finished = (ocrGuid_t*)reduction_finished_ptr;
 
 	//outuput events from complement edts
 	//ocrGuid_t complement_finished[mxiter];
 	PTR_T complement_finished_ptr;
 	ocrGuid_t complement_finished_db;
 	DBCREATE( &complement_finished_db, &complement_finished_ptr, mxiter * sizeof(ocrGuid_t), FLAGS, affinity, NO_ALLOC);
-	complement_finished = (ocrGuid_t*)complement_finished_ptr;	
-	
+	complement_finished = (ocrGuid_t*)complement_finished_ptr;
+
 	//ocrGuid_t *symm_guid;
 	//symm_guid = (ocrGuid_t *) malloc(sizeof(ocrGuid_t)*mxiter*threads);
 	PTR_T symm_guid_ptr;
 	ocrGuid_t symm_guid_db;
 	DBCREATE( &symm_guid_db, &symm_guid_ptr, mxiter * threads * sizeof(ocrGuid_t), FLAGS, affinity, NO_ALLOC);
 	symm_guid = (ocrGuid_t*)symm_guid_ptr;
-	
+
 	//ocrGuid_t *redu_guid;
 	//redu_guid = (ocrGuid_t *) malloc(sizeof(ocrGuid_t)*mxiter);
 	PTR_T redu_guid_ptr;
 	ocrGuid_t redu_guid_db;
 	DBCREATE( &redu_guid_db, &redu_guid_ptr, mxiter * sizeof(ocrGuid_t), FLAGS, affinity, NO_ALLOC);
-	redu_guid = (ocrGuid_t*)redu_guid_ptr;	
+	redu_guid = (ocrGuid_t*)redu_guid_ptr;
 
 	//ocrGuid_t *comp_guid;
 	//comp_guid = (ocrGuid_t *) malloc(sizeof(ocrGuid_t)*mxiter);
 	PTR_T comp_guid_ptr;
 	ocrGuid_t comp_guid_db;
 	DBCREATE( &comp_guid_db, &comp_guid_ptr, mxiter * sizeof(ocrGuid_t), FLAGS, affinity, NO_ALLOC);
-	comp_guid = (ocrGuid_t*)comp_guid_ptr;	
-	
+	comp_guid = (ocrGuid_t*)comp_guid_ptr;
+
 	PTR_T my_twoel_params_ptr;
  	//ocrGuid_t my_twoel_params_db;
 	ocrGuid_t my_twoel_params_affinity=NULL_GUID;
   	DBCREATE( &my_twoel_params_db, &my_twoel_params_ptr, sizeof(twoel_param_t), FLAGS, my_twoel_params_affinity, NO_ALLOC);
 	my_twoel_params = (twoel_param_t*)my_twoel_params_ptr;
-	
+
 }
 
 //======================================================================================================//
@@ -354,7 +354,7 @@ void setarrays(void) {
 	DBCREATE( &g_dens_db, &g_dens_ptr, nbfn * nbfn * sizeof(double), FLAGS, affinity, NO_ALLOC);
 	if(g_dens_ptr==NULL)
 	{
-		PRINTF("\n!!!!!! DBCREATE failed for g_dens, using malloc instead !!!!!!\n\n");	
+		PRINTF("\n!!!!!! DBCREATE failed for g_dens, using malloc instead !!!!!!\n\n");
 		g_dens = (double*)malloc(nbfn * nbfn * sizeof(double));
 	}
 	else
@@ -369,7 +369,7 @@ void setarrays(void) {
 	g_schwarz = (double*)g_schwarz_ptr;
 	if(g_schwarz_ptr==NULL)
 	{
-		PRINTF("\n!!!!!! DBCREATE failed for g_schwarz, using malloc instead !!!!!!\n\n");	
+		PRINTF("\n!!!!!! DBCREATE failed for g_schwarz, using malloc instead !!!!!!\n\n");
 		g_schwarz = (double*)malloc(nbfn * nbfn * sizeof(double));
 	}
 	else
@@ -383,21 +383,21 @@ void setarrays(void) {
 	g_fock = (double*)g_fock_ptr;
 	if(g_fock_ptr==NULL)
 	{
-		PRINTF("\n!!!!!! DBCREATE failed for g_fock, using malloc instead !!!!!!\n\n");	
+		PRINTF("\n!!!!!! DBCREATE failed for g_fock, using malloc instead !!!!!!\n\n");
 		g_fock = (double*)malloc(nbfn * nbfn * sizeof(double));
 	}
 	else
 	{
 		g_fock = (double*)g_fock_ptr;
 	}
-	
+
 	//g_tfock   = (double *) malloc(nbfn * nbfn * sizeof(double));
 	PTR_T g_tfock_ptr;
 	DBCREATE( &g_tfock_db, &g_tfock_ptr, nbfn * nbfn * sizeof(double), FLAGS, affinity, NO_ALLOC);
 	g_tfock = (double*)g_tfock_ptr;
 	if(g_tfock_ptr==NULL)
 	{
-		PRINTF("\n!!!!!! DBCREATE failed for g_tfock, using malloc instead !!!!!!\n\n");	
+		PRINTF("\n!!!!!! DBCREATE failed for g_tfock, using malloc instead !!!!!!\n\n");
 		g_tfock = (double*)malloc(nbfn * nbfn * sizeof(double));
 	}
 	else
@@ -411,7 +411,7 @@ void setarrays(void) {
 	g_work = (double*)g_work_ptr;
 	if(g_work_ptr==NULL)
 	{
-		PRINTF("\n!!!!!! DBCREATE failed for g_work, using malloc instead !!!!!!\n\n");	
+		PRINTF("\n!!!!!! DBCREATE failed for g_work, using malloc instead !!!!!!\n\n");
 		g_work = (double*)malloc(nbfn * nbfn * sizeof(double));
 	}
 	else
@@ -425,7 +425,7 @@ void setarrays(void) {
 	g_ident = (double*)g_ident_ptr;
 	if(g_ident_ptr==NULL)
 	{
-		PRINTF("\n!!!!!! DBCREATE failed for g_ident, using malloc instead !!!!!!\n\n");	
+		PRINTF("\n!!!!!! DBCREATE failed for g_ident, using malloc instead !!!!!!\n\n");
 		g_ident = (double*)malloc(nbfn * nbfn * sizeof(double));
 	}
 	else
@@ -439,7 +439,7 @@ void setarrays(void) {
 	g_orbs = (double*)g_orbs_ptr;
 	if(g_orbs_ptr==NULL)
 	{
-		PRINTF("\n!!!!!! DBCREATE failed for g_orbs, using malloc instead !!!!!!\n\n");	
+		PRINTF("\n!!!!!! DBCREATE failed for g_orbs, using malloc instead !!!!!!\n\n");
 		g_orbs = (double*)malloc(nbfn * nbfn * sizeof(double));
 	}
 	else
@@ -453,7 +453,7 @@ void setarrays(void) {
 	g_schwarz_max_j = (double*)g_schwarz_max_j_ptr;
 	if(g_schwarz_max_j_ptr==NULL)
 	{
-		PRINTF("\n!!!!!! DBCREATE failed for g_schwarz_max_j, using malloc instead !!!!!!\n\n");	
+		PRINTF("\n!!!!!! DBCREATE failed for g_schwarz_max_j, using malloc instead !!!!!!\n\n");
 		g_schwarz_max_j = (double*)malloc(nbfn * sizeof(double));
 	}
 	else
@@ -467,7 +467,7 @@ void setarrays(void) {
 	g_precalc = (precalc*)g_precalc_ptr;
 	if(g_precalc_ptr==NULL)
 	{
-		PRINTF("\n!!!!!! DBCREATE failed for g_precalc, using malloc instead !!!!!!\n\n");	
+		PRINTF("\n!!!!!! DBCREATE failed for g_precalc, using malloc instead !!!!!!\n\n");
 		g_precalc = (precalc*)malloc(nbfn * nbfn * sizeof(precalc));
 	}
 	else
@@ -481,7 +481,7 @@ void setarrays(void) {
 	g_fock_const = (double*)g_fock_const_ptr;
 	if(g_fock_const_ptr==NULL)
 	{
-		PRINTF("\n!!!!!! DBCREATE failed for g_fock_const, using malloc instead !!!!!!\n\n");	
+		PRINTF("\n!!!!!! DBCREATE failed for g_fock_const, using malloc instead !!!!!!\n\n");
 		g_fock_const = (double*)malloc(nbfn * nbfn * sizeof(double));
 	}
 	else
@@ -495,7 +495,7 @@ void setarrays(void) {
 	g_partial_fock = (double*)g_partial_fock_ptr;
 	if(g_partial_fock_ptr==NULL)
 	{
-		PRINTF("\n!!!!!! DBCREATE failed for g_partial_fock, using malloc instead !!!!!!\n\n");	
+		PRINTF("\n!!!!!! DBCREATE failed for g_partial_fock, using malloc instead !!!!!!\n\n");
 		g_partial_fock = (double*)malloc(nbfn * nbfn * sizeof(double));
 	}
 	else
@@ -503,11 +503,11 @@ void setarrays(void) {
 		g_partial_fock = (double*)g_partial_fock_ptr;
 	}
 
-	for (j = 0; j < nbfn; j ++) 
+	for (j = 0; j < nbfn; j ++)
 	{
 		g_schwarz_max_j[j] = 0.0;
 
-		for (i = 0; i < nbfn; i ++) 
+		for (i = 0; i < nbfn; i ++)
 		{
 			g_dens[j_off + i]    		= 0.0;
 			g_schwarz[j_off + i] 		= 0.0;
@@ -526,7 +526,7 @@ void setarrays(void) {
 //======================================================================================================//
 
 //======================================================================================================//
-void ininrm(void)  
+void ininrm(void)
 {
 	int i;
 	long long int bf4 = pow((long long int) nbfn, 4);
@@ -542,10 +542,10 @@ void ininrm(void)
 	printf(" threads ................... %d\n", threads);
 
 	// generate normalisation coefficients for the basis functions and the index array iky;
-	for (i = 0; i < nbfn; i++) 
+	for (i = 0; i < nbfn; i++)
 	{
 		iky[i] = (i + 1) * i / 2;
-	//for (i = 0; i < nbfn; i++) 
+	//for (i = 0; i < nbfn; i++)
 		rnorm[i] = pow((expnt[i] * 2.00 / pi), 0.750);
 	}
 
@@ -571,7 +571,7 @@ void setfm(void)
     et[i]    = exprjh(-tt);
     t[i]     = tt * 2.0;
     //fm[i][4] = 0.0;
-    fm[i*5+4] = 0.0;	
+    fm[i*5+4] = 0.0;
   }
 
   for (i = 199; i > 3; i--) {
@@ -642,7 +642,7 @@ void denges(void) {
     {0.000004,0.000035,0.000166,0.000584,0.001346,0.002471,
      0.001372,-0.009090,-0.008982,0.000124,0.000124,0.000124,
      0.000124,0.000124,0.000062}};
-      
+
 // correct for a factor of two along the diagonal;
   for (i = 0; i < 15; i++) atdens[i][i] = 2.00 * atdens[i][i];
 
@@ -692,7 +692,7 @@ void makeob(void) {
       g_ident[OFFSET(i,j)] = s(i, j);
       g_fock [OFFSET(i,j)] = 0.5;
   } }
-  
+
   Eigen_gen(g_fock, g_ident, g_orbs, eval);
 
   ocrDbRelease(eval_db);
@@ -702,25 +702,25 @@ void makeob(void) {
 //======================================================================================================//
 
 //======================================================================================================//
-double makesz() 
+double makesz()
 {
 	int i, j;
 	double smax = 0.0;
 
-	for (j = 0; j < nbfn; j++) 
+	for (j = 0; j < nbfn; j++)
 	{
 		double jmax = 0.0;
-		for (i = 0; i < nbfn; i++) 
+		for (i = 0; i < nbfn; i++)
 		{
 			// g_fast can be called instead here, but NEVER use a caching variant
 			// of g unless it actually looks up the result based on the arguments
 			double gg = sqrt( g(i, j, i, j) );
-			if (gg > smax) 
+			if (gg > smax)
 				smax = gg;
 
 			g_schwarz[OFFSET(i,j)] = gg;
 
-			if (gg > jmax) 
+			if (gg > jmax)
 				jmax = gg;
 		}
 		g_schwarz_max_j[j] = jmax;
@@ -732,13 +732,13 @@ double makesz()
 
 //======================================================================================================//
 // fill in the one-electron part of the fock matrix and compute the one-electron energy contribution;
-double oneel(double schwmax) 
+double oneel(double schwmax)
 {
 	int i, j, i_off=0;
 	double tol2e_over_schwmax = tol2e / schwmax;
-	for (i = 0; i < nbfn; i++) 
+	for (i = 0; i < nbfn; i++)
 	{
-		for (j = 0; j < nbfn; j++) 
+		for (j = 0; j < nbfn; j++)
 		{
 			g_fock[i_off + j] = (g_schwarz[i_off + j]  > tol2e_over_schwmax) ? h(i, j) : 0.0;
 		}
@@ -775,7 +775,7 @@ double h(int i,int j) {
   double f0val = 0.00, sum = 0.00;
   double facij,expij,repij, xp,yp,zp,rpc2, rab2;
   int iat;
-     
+
   rab2  = (x[i]-x[j])*(x[i]-x[j]) + (y[i]-y[j])*(y[i]-y[j]) + (z[i]-z[j])*(z[i]-z[j]);
   facij = expnt[i]*expnt[j]/(expnt[i]+expnt[j]);
   expij = exprjh(-facij * rab2);

@@ -63,7 +63,7 @@ endif
 
 OCR_RUN_FLAGS=-ocr:cfg ${OCR_CONFIG}
 
-all: compile 
+all: compile
 
 run:
 	./$(PROG)$(SUFFIX) $(OCR_RUN_FLAGS)

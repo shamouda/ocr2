@@ -90,7 +90,7 @@ int my_ga_rrreduc(int nm, int n, double *a, double *b, double *fv2) {
     if (i != j)
        for (k = j; k < i; k ++) x = x - a[OFFSET(k,j)] * b[OFFSET(i,k)];
 
-    if (j > 0) 
+    if (j > 0)
        for (k = 0; k < j; k ++) x = x - a[OFFSET(j,k)] * b[OFFSET(i,k)];
 
     a[OFFSET(i,j)] = x / fv2[i];
@@ -430,7 +430,7 @@ int my_rsg(int nm, int n, double *a, double *b, double *w, double *z, double *fv
 
 int my_rs(int nm, int n, double *a, double *w, double *z, double *fv1, double *fv2) {
 //
-//     this subroutine finds the eigenvalues and eigenvectors 
+//     this subroutine finds the eigenvalues and eigenvectors
 //     for the real symmetric matrix
 //
 //     on input
@@ -495,7 +495,7 @@ void  Eigen_gen(double * g_a, double * g_s, double * g_v, double * evals) {
   if (ierr != 0) {printf("Error code %d\n", ierr); exit(1);}
 
   //free(a); free(s); free(fv1); free(fv2);
-  ocrDbRelease(a_db); ocrDbRelease(s_db); ocrDbRelease(fv1_db); ocrDbRelease(fv2_db);  
+  ocrDbRelease(a_db); ocrDbRelease(s_db); ocrDbRelease(fv1_db); ocrDbRelease(fv2_db);
 }
 
 
@@ -527,7 +527,7 @@ void  Eigen_std(double * g_a, double * g_v, double * evals) {
   int ierr = my_rs(nbfn, nbfn, a, evals, g_v, fv1, fv2);
   if (ierr != 0) {printf("Error code %d\n", ierr); exit(1);}
 
-  ocrDbRelease(a_db); ocrDbRelease(fv1_db); ocrDbRelease(fv2_db); 
+  ocrDbRelease(a_db); ocrDbRelease(fv1_db); ocrDbRelease(fv2_db);
 }
 
 #else

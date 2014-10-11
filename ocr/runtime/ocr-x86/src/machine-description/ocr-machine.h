@@ -31,12 +31,20 @@ typedef enum {
     memplatform_type,
     memtarget_type,
     allocator_type,
+    commapi_type,
+    commplatform_type,
     compplatform_type,
     comptarget_type,
     workpile_type,
     worker_type,
     scheduler_type,
     policydomain_type,
+    // Everything above is used as instances
+    // Everything below is used as types
+    taskfactory_type,
+    tasktemplatefactory_type,
+    datablockfactory_type,
+    eventfactory_type,
 } type_enum;
 
 /* Dependence information (from->to) referenced by refstr */

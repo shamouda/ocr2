@@ -46,8 +46,8 @@ void create_new_iteration();
 
 #define UPDATE(a, b, c, d) fock[OFF(a,b)] += (gg * DENS(c,d)); \
                            fock[OFF(a,c)] -= (0.50 * gg * DENS(b,d));
-                           
-#define UPDATE1(a, b, c, d)    fock[OFF(a,b)] += (gg * DENS(c,d)); 
+
+#define UPDATE1(a, b, c, d)    fock[OFF(a,b)] += (gg * DENS(c,d));
 #define UPDATE2(a, b, c, d)    fock[OFF(a,c)] -= (0.50 * gg * DENS(b,d));
 
 #define UPDATE_COULOMB1(a, b, c, d)  fock[OFF(a,b)] += (gg * DENS(c,d))

@@ -2,9 +2,9 @@ EDT(INFO) W 0: Create 0x1c6ab40 depc 1 outputEvent 0x0
 EDT(INFO) W 0: AddDependence from 0x1c6aa50 to 0x1c6ab40 slot 0
 EDT(INFO) W 0: Schedule 0x1c6ab40
 EDT(INFO) W 0: Execute 0x1c6ab40
-========================================= 	
-SCF-NWCHEM on OCR 				
-========================================= 	
+=========================================
+SCF-NWCHEM on OCR
+=========================================
 EDT(INFO) W 0: Create 0x7f4b50006c90 depc 1 outputEvent 0x0
 EDT(INFO) W 0: AddDependence from 0x7f4b50003b40 to 0x7f4b50006c90 slot 0
 EDT(INFO) W 0: Schedule 0x7f4b50006c90
@@ -167,12 +167,12 @@ final energy =    -29.10655947067
 
 eigenvalues
 
-      init       onel      twoel       diag       dens       print       eigen    
-      ----       ----      -----       ----       ----       ----        ----    
+      init       onel      twoel       diag       dens       print       eigen
+      ----       ----      -----       ----       ----       ----        ----
       0.00       0.00       0.02       0.00       0.00       0.00       0.00
  elapsed time in seconds       0.02
 
-No. of integrals screened or computed (all iters) 
+No. of integrals screened or computed (all iters)
 
 -------------------------------------
   failed #ij test   failed #j test  failed #kl test    #compute           #total       fraction

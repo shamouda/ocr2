@@ -4,9 +4,12 @@
  * removed or modified.
  */
 
-#include "ocr-macros.h"
-#include "ocr-policy-domain-getter.h"
+#include "ocr-config.h"
+#ifdef ENABLE_WORKPILE_HC
+
+#include "debug.h"
 #include "ocr-policy-domain.h"
+#include "ocr-sysboot.h"
 #include "ocr-workpile.h"
 #include "workpile/hc/hc-workpile.h"
 
@@ -15,63 +18,102 @@
 /* OCR-HC WorkPile                                    */
 /******************************************************/
 
-static void hcWorkpileDestruct ( ocrWorkpile_t * base ) {
+void hcWorkpileDestruct ( ocrWorkpile_t * base ) {
     ocrWorkpileHc_t* derived = (ocrWorkpileHc_t*) base;
-    dequeDestroy(derived->deque);
-    free(derived);
+    derived->deque->destruct(base->pd, derived->deque);
+    base->pd->fcts.pdFree(base->pd, derived->deque);
+    runtimeChunkFree((u64)base, NULL);
 }
 
-static void hcWorkpileStart(ocrWorkpile_t *base, ocrPolicyDomain_t *PD) {
+void hcWorkpileBegin(ocrWorkpile_t *base, ocrPolicyDomain_t *PD) {
+    // Nothing to do
 }
 
-static void hcWorkpileStop(ocrWorkpile_t *base) {
+void hcWorkpileStart(ocrWorkpile_t *base, ocrPolicyDomain_t *PD) {
+    guidify(PD, (u64)base, &(base->fguid), OCR_GUID_WORKPILE);
+    ocrWorkpileHc_t* derived = (ocrWorkpileHc_t*)base;
+    base->pd = PD;
+    derived->deque = newWorkStealingDeque(base->pd, (void *) NULL_GUID);
 }
 
-static ocrGuid_t hcWorkpilePop ( ocrWorkpile_t * base, ocrCost_t *cost ) {
+void hcWorkpileStop(ocrWorkpile_t *base) {
+    // Destroy the GUID
+    ocrPolicyMsg_t msg;
+    getCurrentEnv(NULL, NULL, NULL, &msg);
+
+#define PD_MSG (&msg)
+#define PD_TYPE PD_MSG_GUID_DESTROY
+    msg.type = PD_MSG_GUID_DESTROY | PD_MSG_REQUEST;
+    PD_MSG_FIELD(guid) = base->fguid;
+    PD_MSG_FIELD(properties) = 0;
+    // Shutting down so ignore error
+    base->pd->fcts.processMessage(base->pd, &msg, false);
+#undef PD_MSG
+#undef PD_TYPE
+    base->fguid.guid = UNINITIALIZED_GUID;
+}
+
+void hcWorkpileFinish(ocrWorkpile_t *base) {
+    // Nothing to do
+}
+
+ocrFatGuid_t hcWorkpilePop(ocrWorkpile_t * base, ocrWorkPopType_t type,
+                           ocrCost_t *cost) {
+
     ocrWorkpileHc_t* derived = (ocrWorkpileHc_t*) base;
-    return (ocrGuid_t) dequePop(derived->deque);
+    ocrFatGuid_t fguid;
+    switch(type) {
+    case POP_WORKPOPTYPE:
+        fguid.guid = (ocrGuid_t)derived->deque->popFromTail(derived->deque, 0);
+        break;
+    case STEAL_WORKPOPTYPE:
+        fguid.guid = (ocrGuid_t)derived->deque->popFromHead(derived->deque, 1);
+        break;
+    default:
+        ASSERT(0);
+    }
+    fguid.metaDataPtr = NULL_GUID;
+    return fguid;
 }
 
-static void hcWorkpilePush (ocrWorkpile_t * base, ocrGuid_t g ) {
+void hcWorkpilePush(ocrWorkpile_t * base, ocrWorkPushType_t type,
+                    ocrFatGuid_t g ) {
     ocrWorkpileHc_t* derived = (ocrWorkpileHc_t*) base;
-    dequePush(derived->deque, (void *)g);
+    derived->deque->pushAtTail(derived->deque, (void *)(g.guid), 0);
 }
 
-static ocrGuid_t hcWorkpileSteal ( ocrWorkpile_t * base, ocrCost_t *cost ) {
-    ocrWorkpileHc_t* derived = (ocrWorkpileHc_t*) base;
-    return (ocrGuid_t) dequeSteal(derived->deque);
+ocrWorkpile_t * newWorkpileHc(ocrWorkpileFactory_t * factory, ocrParamList_t *perInstance) {
+    ocrWorkpile_t* derived = (ocrWorkpile_t*) runtimeChunkAlloc(sizeof(ocrWorkpileHc_t), PERSISTENT_CHUNK);
+    factory->initialize(factory, derived, perInstance);
+    return derived;
 }
 
-static ocrWorkpile_t * newWorkpileHc(ocrWorkpileFactory_t * factory, ocrParamList_t *perInstance) {
-    ocrWorkpileHc_t* derived = (ocrWorkpileHc_t*) checkedMalloc(derived, sizeof(ocrWorkpileHc_t));
-    ocrWorkpile_t * base = (ocrWorkpile_t *) derived;
-    ocrMappable_t * module_base = (ocrMappable_t *) base;
-    module_base->mapFct = NULL;
-    base->fctPtrs = &(factory->workpileFcts);
-    derived->deque = (deque_t *) checkedMalloc(derived->deque, sizeof(deque_t));
-    dequeInit(derived->deque, (void *) NULL_GUID);
-    return base;
+void initializeWorkpileHc(ocrWorkpileFactory_t * factory, ocrWorkpile_t* self, ocrParamList_t * perInstance) {
+    initializeWorkpileOcr(factory, self, perInstance);
 }
-
 
 /******************************************************/
 /* OCR-HC WorkPile Factory                            */
 /******************************************************/
 
-static void destructWorkpileFactoryHc(ocrWorkpileFactory_t * factory) {
-    free(factory);
+void destructWorkpileFactoryHc(ocrWorkpileFactory_t * factory) {
+    runtimeChunkFree((u64)factory, NULL);
 }
 
 ocrWorkpileFactory_t * newOcrWorkpileFactoryHc(ocrParamList_t *perType) {
-    ocrWorkpileFactoryHc_t* derived = (ocrWorkpileFactoryHc_t*) checkedMalloc(derived, sizeof(ocrWorkpileFactoryHc_t));
-    ocrWorkpileFactory_t* base = (ocrWorkpileFactory_t*) derived;
-    base->instantiate = newWorkpileHc;
-    base->destruct =  destructWorkpileFactoryHc;
-    base->workpileFcts.destruct = hcWorkpileDestruct;
-    base->workpileFcts.start = hcWorkpileStart;
-    base->workpileFcts.stop = hcWorkpileStop;
-    base->workpileFcts.pop = hcWorkpilePop;
-    base->workpileFcts.push = hcWorkpilePush;
-    base->workpileFcts.steal = hcWorkpileSteal;
+    ocrWorkpileFactory_t* base = (ocrWorkpileFactory_t*)runtimeChunkAlloc(sizeof(ocrWorkpileFactoryHc_t), NONPERSISTENT_CHUNK);
+
+    base->instantiate = &newWorkpileHc;
+    base->initialize = &initializeWorkpileHc;
+    base->destruct = &destructWorkpileFactoryHc;
+
+    base->workpileFcts.destruct = FUNC_ADDR(void (*) (ocrWorkpile_t *), hcWorkpileDestruct);
+    base->workpileFcts.begin = FUNC_ADDR(void (*) (ocrWorkpile_t *, ocrPolicyDomain_t *), hcWorkpileBegin);
+    base->workpileFcts.start = FUNC_ADDR(void (*) (ocrWorkpile_t *, ocrPolicyDomain_t *), hcWorkpileStart);
+    base->workpileFcts.stop = FUNC_ADDR(void (*) (ocrWorkpile_t *), hcWorkpileStop);
+    base->workpileFcts.finish = FUNC_ADDR(void (*) (ocrWorkpile_t *), hcWorkpileFinish);
+    base->workpileFcts.pop = FUNC_ADDR(ocrFatGuid_t (*)(ocrWorkpile_t*, ocrWorkPopType_t, ocrCost_t *), hcWorkpilePop);
+    base->workpileFcts.push = FUNC_ADDR(void (*)(ocrWorkpile_t*, ocrWorkPushType_t, ocrFatGuid_t), hcWorkpilePush);
     return base;
 }
+#endif /* ENABLE_WORKPILE_HC */

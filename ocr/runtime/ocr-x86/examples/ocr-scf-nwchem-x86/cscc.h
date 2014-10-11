@@ -46,7 +46,7 @@ extern double tinit, tonel, ttwoel, tdiag, tdens, tprint, i_timer;
 
 extern double tdgemm;
 
-typedef struct 
+typedef struct
 {
   double* fock;
   long long int icut1;
@@ -68,7 +68,7 @@ typedef struct {
 	double * g_dens;
 	double * g_work;
 	double * g_orbs;
-	double * g_fock; 
+	double * g_fock;
 	double * g_tfock;
 	double * t_fock;
 	double * eigv;
@@ -91,28 +91,28 @@ typedef struct {
 
 	double tol2e_over_schwmax;
 	double *energy;
-	double *eone; 
+	double *eone;
 	double *etwo;
 	double *enrep;
 	long long int nbfn;
 	long long int nocc;
 
 
-	double *tinit; 
+	double *tinit;
 	double *tonel;
 	double *ttwoel;
 	double *tdiag;
 	double *tdens;
 	double *tprint;
 	double *tdgemm;
-	double *i_timer;		
+	double *i_timer;
 	int threads;
 
 	long id;
 	ocrGuid_t *finished;
 	int start;
 	int step;
-	
+
 }twoel_param_t;
 extern twoel_param_t * my_twoel_params;
 //======================================================================================================//

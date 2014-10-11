@@ -32,6 +32,9 @@
 #ifndef _INIPARSER_H_
 #define _INIPARSER_H_
 
+#include "ocr-config.h"
+#ifdef ENABLE_EXTERNAL_INIPARSER
+
 /*---------------------------------------------------------------------------
                                 Includes
  ---------------------------------------------------------------------------*/
@@ -39,6 +42,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <assert.h>
 
 /*
  * The following #include is necessary on many Unixes but not Linux.
@@ -205,6 +209,8 @@ char * iniparser_getstring(dictionary * d, const char * key, char * def);
 /*--------------------------------------------------------------------------*/
 int iniparser_getint(dictionary * d, const char * key, int notfound);
 
+long long iniparser_getlonglong(dictionary * d, const char * key, int notfound);
+
 /*-------------------------------------------------------------------------*/
 /**
   @brief    Get the string associated to a key, convert to a double
@@ -326,4 +332,5 @@ dictionary * iniparser_load(const char * ininame);
 /*--------------------------------------------------------------------------*/
 void iniparser_freedict(dictionary * d);
 
+#endif /* ENABLE_EXTERNAL_INIPARSER */
 #endif

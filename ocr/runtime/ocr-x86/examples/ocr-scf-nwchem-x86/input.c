@@ -1,7 +1,7 @@
-#include <math.h>   
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include "cscc.h"  
+#include "cscc.h"
 
 //void input(void) {
 void input(int atoms) {

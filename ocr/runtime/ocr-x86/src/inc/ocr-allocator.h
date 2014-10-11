@@ -12,11 +12,20 @@
 #ifndef __OCR_ALLOCATOR_H__
 #define __OCR_ALLOCATOR_H__
 
-#include "ocr-mappable.h"
 #include "ocr-mem-target.h"
 #include "ocr-types.h"
-#include "ocr-utils.h"
+#include "utils/ocr-utils.h"
 
+#ifdef OCR_ENABLE_STATISTICS
+#include "ocr-statistics.h"
+#endif
+
+typedef enum {
+    OCR_ALLOC_HINT_NONE         = 0x0,
+    OCR_ALLOC_HINT_REDUCE_CONTENTION = 0x1
+} ocrAllocatorHints_t;
+
+struct _ocrPolicyDomain_t;
 
 /****************************************************/
 /* PARAMETER LISTS                                  */
@@ -62,10 +71,13 @@ typedef struct _ocrAllocatorFcts_t {
      */
     void (*destruct)(struct _ocrAllocator_t* self);
 
+    void (*begin)(struct _ocrAllocator_t* self, struct _ocrPolicyDomain_t *PD);
 
     void (*start)(struct _ocrAllocator_t* self, struct _ocrPolicyDomain_t * PD);
 
     void (*stop)(struct _ocrAllocator_t* self);
+
+    void (*finish)(struct _ocrAllocator_t* self);
 
     /**
      * @brief Actual allocation
@@ -74,10 +86,23 @@ typedef struct _ocrAllocatorFcts_t {
      *
      * @param self              Pointer to this allocator
      * @param size              Size to allocate (in bytes)
-     * @return NULL if allocation is unsuccessful or the address
+     * @param hints             Hints for the allocation. These
+     *                          hints help guide allocation inside the allocator.
+     *                          Not all allocators implement all types of hints so
+     *                          allocation should not fail if an unknown hint is
+     *                          passed in. Hints should also not be relied on
+     *                          as directives by the upper-levels. See
+     *                          ocrAllocatorHints_t.
+     * @return NULL if allocation is unsuccessful
      **/
-    void* (*allocate)(struct _ocrAllocator_t *self, u64 size);
+    void* (*allocate)(struct _ocrAllocator_t *self, u64 size, u64 hints);
 
+#if 0
+// The pointer to the "free" function has been removed.  Instead, the
+// appropriate "free" function is derived from information stored in
+// the data block's header at the time it was allocated.  This information
+// allows the Policy Domain to track the block back to the pool it came
+// from, both the type and the instance of that pool.
     /**
      * @brief Frees a previously allocated block
      *
@@ -88,6 +113,7 @@ typedef struct _ocrAllocatorFcts_t {
      * @param address           Address to free
      **/
     void (*free)(struct _ocrAllocator_t *self, void* address);
+#endif
 
     /**
      * @brief Reallocate within the chunk managed by this allocator
@@ -110,20 +136,24 @@ struct _ocrMemTarget_t;
  * @brief Allocator is the interface to the allocator to a zone
  * of memory.
  *
- * This is *not* the low-level memory allocator. This allows memory
- * to be managed in "chunks" (for example one per location) and each can
- * have an independent allocator. Specifically, this enables the
+ * This is *not* the OS/system memory allocator. This allows memory to be
+ * managed in "chunks" (for example one per hierarchical level) and each
+ * can have an independent allocator. Specifically, this enables the
  * modeling of scratchpads and makes NUMA memory explicit
  */
 typedef struct _ocrAllocator_t {
-    ocrMappable_t module;     /**< Base "class" for the allocator */
-    ocrGuid_t guid;           /**< The allocator also has a GUID so that
+    ocrFatGuid_t fguid;       /**< The allocator also has a GUID so that
                                * data-blocks can know what allocated/freed them */
+    struct _ocrPolicyDomain_t *pd; /**< The PD this allocator belongs to */
+    ocrModuleState_t state;   /**< state of the allocator */
+#ifdef OCR_ENABLE_STATISTICS
+    ocrStatsProcess_t *statProcess;
+#endif
 
     struct _ocrMemTarget_t **memories; /**< Allocators are mapped to ocrMemTarget_t (0+) */
-    u64 memoryCount;          /**< Number of memories associated */
+    u64 memoryCount;                   /**< Number of memories associated */
 
-    ocrAllocatorFcts_t *fctPtrs;
+    ocrAllocatorFcts_t fcts;
 } ocrAllocator_t;
 
 
@@ -146,6 +176,8 @@ typedef struct _ocrAllocatorFactory_t {
      */
     struct _ocrAllocator_t * (*instantiate)(struct _ocrAllocatorFactory_t * factory,
                                             ocrParamList_t *instanceArg);
+    void (*initialize) (struct _ocrAllocatorFactory_t * factory, ocrAllocator_t * derived, ocrParamList_t * perInstance);
+
     /**
      * @brief Allocator factory destructor
      *
@@ -155,5 +187,7 @@ typedef struct _ocrAllocatorFactory_t {
 
     ocrAllocatorFcts_t allocFcts;
 } ocrAllocatorFactory_t;
+
+void initializeAllocatorOcr(ocrAllocatorFactory_t *factory, ocrAllocator_t *self, ocrParamList_t *perInstance);
 
 #endif /* __OCR_ALLOCATOR_H__ */

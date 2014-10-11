@@ -9,31 +9,23 @@
 
 #include "debug.h"
 #include "ocr-comp-platform.h"
-#include "ocr-utils.h"
+#include "ocr-config.h"
+#include "utils/ocr-utils.h"
 
 typedef enum _compPlatformType_t {
     compPlatformPthread_id,
+    compPlatformFsim_id,
     compPlatformMax_id,
 } compPlatformType_t;
 
-const char * compplatform_types[] = {
-    "pthread",
-    NULL,
-};
+extern const char * compplatform_types[];
 
 // Pthread compute platform
 #include "comp-platform/pthread/pthread-comp-platform.h"
+#include "comp-platform/fsim/fsim-comp-platform.h"
 
 // Add other compute platforms using the same pattern as above
 
-inline ocrCompPlatformFactory_t *newCompPlatformFactory(compPlatformType_t type, ocrParamList_t *typeArg) {
-    switch(type) {
-    case compPlatformPthread_id:
-        return newCompPlatformFactoryPthread(typeArg);
-    default:
-        ASSERT(0);
-        return NULL;
-    };
-}
+ocrCompPlatformFactory_t *newCompPlatformFactory(compPlatformType_t type, ocrParamList_t *typeArg);
 
 #endif /* __COMP_PLATFORM_ALL_H__ */

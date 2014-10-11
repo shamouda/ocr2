@@ -7,33 +7,21 @@
 #ifndef __WORKPILE_ALL_H__
 #define __WORKPILE_ALL_H__
 
-#include "ocr-utils.h"
+#include "ocr-config.h"
+
+#include "utils/ocr-utils.h"
 #include "ocr-workpile.h"
 
 typedef enum _workpileType_t {
     workpileHc_id,
+    workpileCe_id,
+    workpileXe_id,
     workpileFsimMessage_id,
     workpileMax_id,
 } workpileType_t;
 
-const char * workpile_types[] = {
-    "HC",
-    "FSIM",
-    NULL,
-};
+extern const char * workpile_types[];
 
-#include "workpile/hc/hc-workpile.h"
-
-inline ocrWorkpileFactory_t * newWorkpileFactory(workpileType_t type, ocrParamList_t *perType) {
-    switch(type) {
-    case workpileHc_id:
-        return newOcrWorkpileFactoryHc(perType);
-    case workpileFsimMessage_id:
-    case workpileMax_id:
-    default:
-        ASSERT(0);
-    }
-    return NULL;
-}
+ocrWorkpileFactory_t * newWorkpileFactory(workpileType_t type, ocrParamList_t *perType);
 
 #endif /* __WORKPILE_ALL_H__ */

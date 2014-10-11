@@ -58,7 +58,7 @@ double timer(void)
 //     return the time since the last call to timer.
 
 //     must be initialized by calling once and throwing away the
-//     value 
+//     value
 //     ... use cpu time on multi-user machines
 //     ... use elapsed time on dedicated or single user machines.
 //
@@ -184,8 +184,8 @@ double diagon(int iter) {
   if      (tester > 0.30) shift = 0.30;
   else if (nbfn   > 60  ) shift = 0.10;
   else                    shift = 0.00;
-      
-  if (iter >= 1 && shift != 0.00) 
+
+  if (iter >= 1 && shift != 0.00)
      for (i = nocc; i < nbfn; i++) g_fock[OFFSET(i,i)] += shift;
 
 
@@ -211,7 +211,7 @@ double diagon(int iter) {
 //======================================================================================================//
 
 //======================================================================================================//
-void twoel_i_j_k_l_all_different(double tol2e_over_schwmax, int start, int step, int id) 
+void twoel_i_j_k_l_all_different(double tol2e_over_schwmax, int start, int step, int id)
 {
 	CUT_DECLS;
 	int i, j, k, l;
@@ -228,53 +228,53 @@ void twoel_i_j_k_l_all_different(double tol2e_over_schwmax, int start, int step,
 	{
 	int end = i + CHUNK_SIZE;
 
-#else 
+#else
 
 	//static assignment of work for this thread
 	i = start;
 	int end = i + step;
 	{
 
-#endif   
-   
+#endif
+
 		i_off = (i-1) * nbfn;
 
-		for (; i < nbfn && i < end; i++) 
+		for (; i < nbfn && i < end; i++)
 		{
 			i_off += nbfn;
 			j_off = i_off;
 
 
-		for (j = i + 1; j < nbfn; j++) 
+		for (j = i + 1; j < nbfn; j++)
 		{
 			j_off += nbfn;
 			DENS_DECL_SYMM(j,i);
 			TOL_DECL(i,j);
 
-			if (g_schwarz[OFF(i,j)] < tol2e_over_schwmax) 
+			if (g_schwarz[OFF(i,j)] < tol2e_over_schwmax)
 			{
 				CUT1(8 * (-2*j + i*(3-2*nbfn) + i*i + nbfn*(nbfn - 1))/2);
 				continue;
 			}
 			k_off = i_off - nbfn;
 
-			for (k = i; k < nbfn; k++) 
+			for (k = i; k < nbfn; k++)
 			{
 				k_off += nbfn;
 				DENS_DECL_SYMM(k,i);
 				DENS_DECL_SYMM(k,j);
-				if (g_schwarz_max_j[k] < tol2e_over_g_schwarz_i_j) 
+				if (g_schwarz_max_j[k] < tol2e_over_g_schwarz_i_j)
 				{
 					CUT4(8 * ((k==i) ? nbfn - j - 1: nbfn - k - 1));
 					continue;
 				}
 
 				l_off = ((k == i) ? j_off : k_off);
-				for (l = 1 + ((k == i) ? j : k); l < nbfn; l++) 
+				for (l = 1 + ((k == i) ? j : k); l < nbfn; l++)
 				{
 					l_off += nbfn;
 
-					if (g_schwarz[OFF(k,l)] < tol2e_over_g_schwarz_i_j) 
+					if (g_schwarz[OFF(k,l)] < tol2e_over_g_schwarz_i_j)
 					{
 						CUT2(8);
 						continue;
@@ -291,21 +291,21 @@ void twoel_i_j_k_l_all_different(double tol2e_over_schwmax, int start, int step,
 					//-----------------------------------------------//
 #if defined OCR_ATOMIC
 #ifdef BAD_CACHE_UTILIZATION
-					while (__sync_lock_test_and_set(mymutex+0, 1));   
+					while (__sync_lock_test_and_set(mymutex+0, 1));
 					UPDATE1(i,j,k,l);
 					__sync_lock_release(mymutex+0);
 					while (__sync_lock_test_and_set(mymutex+1, 1));
 					UPDATE1(i,j,l,k);
-					__sync_lock_release(mymutex+1);                          
+					__sync_lock_release(mymutex+1);
 					while (__sync_lock_test_and_set(mymutex+2, 1));
 					UPDATE1(j,i,k,l);
-					__sync_lock_release(mymutex+2);                                                
+					__sync_lock_release(mymutex+2);
 					while (__sync_lock_test_and_set(mymutex+3, 1));
 					UPDATE1(j,i,l,k);
-					__sync_lock_release(mymutex+3);                                                                   
+					__sync_lock_release(mymutex+3);
 					while (__sync_lock_test_and_set(mymutex+4, 1));
 					UPDATE1(k,l,i,j);
-					__sync_lock_release(mymutex+4);                                                                                      
+					__sync_lock_release(mymutex+4);
 					while (__sync_lock_test_and_set(mymutex+5, 1));
 					UPDATE1(k,l,j,i);
 					__sync_lock_release(mymutex+5);
@@ -316,7 +316,7 @@ void twoel_i_j_k_l_all_different(double tol2e_over_schwmax, int start, int step,
 					UPDATE1(l,k,j,i);
 					__sync_lock_release(mymutex+7);
 
-					while (__sync_lock_test_and_set(mymutex+8, 1));   
+					while (__sync_lock_test_and_set(mymutex+8, 1));
 					UPDATE2(i,j,k,l);
 					__sync_lock_release(mymutex+8);
 					while (__sync_lock_test_and_set(mymutex+9, 1));
@@ -337,7 +337,7 @@ void twoel_i_j_k_l_all_different(double tol2e_over_schwmax, int start, int step,
 					while (__sync_lock_test_and_set(mymutex+14, 1));
 					UPDATE2(l,k,i,j);
 					__sync_lock_release(mymutex+14);
-					while (__sync_lock_test_and_set(mymutex+15, 1));   
+					while (__sync_lock_test_and_set(mymutex+15, 1));
 					UPDATE2(l,k,j,i);
 					__sync_lock_release(mymutex+15);
 
@@ -368,22 +368,22 @@ void twoel_i_j_k_l_all_different(double tol2e_over_schwmax, int start, int step,
 
 					while (__sync_lock_test_and_set(mymutex+0, 1));
 					UPDATE_COULOMB2(i,j,k,l);
-					__sync_lock_release(mymutex+0);                       
+					__sync_lock_release(mymutex+0);
 					while (__sync_lock_test_and_set(mymutex+1, 1));
 					UPDATE_COULOMB2(k,l,i,j);
 					__sync_lock_release(mymutex+1);
 					while (__sync_lock_test_and_set(mymutex+2, 1));
 					UPDATE_EXCHANGE(i,j,k,l);
-					__sync_lock_release(mymutex+2);                         
+					__sync_lock_release(mymutex+2);
 					while (__sync_lock_test_and_set(mymutex+3, 1));
 					UPDATE_EXCHANGE(i,j,l,k);
-					__sync_lock_release(mymutex+3);                         
+					__sync_lock_release(mymutex+3);
 					while (__sync_lock_test_and_set(mymutex+4, 1));
 					UPDATE_EXCHANGE(j,i,k,l);
-					__sync_lock_release(mymutex+4);                         
+					__sync_lock_release(mymutex+4);
 					while (__sync_lock_test_and_set(mymutex+5, 1));
 					UPDATE_EXCHANGE(j,i,l,k);
-					__sync_lock_release(mymutex+5);                         
+					__sync_lock_release(mymutex+5);
 
 #endif
 
@@ -391,7 +391,7 @@ void twoel_i_j_k_l_all_different(double tol2e_over_schwmax, int start, int step,
 #elif defined OCR_CRITICAL
 					//enter critical section
 					while (__sync_lock_test_and_set(mymutex, 1));
-       
+
 #ifdef BAD_CACHE_UTILIZATION
 					UPDATE(i,j,k,l);
 					UPDATE(i,j,l,k);
@@ -438,7 +438,7 @@ void twoel_i_j_k_l_all_different(double tol2e_over_schwmax, int start, int step,
 
 
 #else
-       
+
 #ifdef BAD_CACHE_UTILIZATION
 					UPDATE(i,j,k,l);
 					UPDATE(i,j,l,k);
@@ -481,8 +481,8 @@ void twoel_i_j_k_l_all_different(double tol2e_over_schwmax, int start, int step,
 					UPDATE_EXCHANGE(j,i,l,k);
 #endif
 
-         
-#endif//OCR_VERSION         
+
+#endif//OCR_VERSION
 					//-----------------------------------------------//
 				} // l
 			} // k
@@ -523,10 +523,10 @@ void twoel_i_j_k_l_all_different(double tol2e_over_schwmax, int start, int step,
 	*
 	*/
 	k_off = 0;
-	for (k = 0; k < nbfn; k++) 
+	for (k = 0; k < nbfn; k++)
 	{
 		l_off = k_off;
-		for (l = k; l < nbfn; l++) 
+		for (l = k; l < nbfn; l++)
 		{
 			double value = fock[OFF(k,l)] + fock[OFF(l,k)];
 			fock[OFF(k,l)] = value;
@@ -544,7 +544,7 @@ void twoel_i_j_k_l_all_different(double tol2e_over_schwmax, int start, int step,
 
 
 //======================================================================================================//
-void twoel_i_eq_j(double tol2e_over_schwmax, int start, int step, int id) 
+void twoel_i_eq_j(double tol2e_over_schwmax, int start, int step, int id)
 {
 	CUT_DECLS;
 	int i, k, l;
@@ -560,7 +560,7 @@ void twoel_i_eq_j(double tol2e_over_schwmax, int start, int step, int id)
 	{
 	int end = i + N3_CHUNK_SIZE;
 
-#else 
+#else
 
 	//static assignment of work for this thread
 	i = start;
@@ -571,36 +571,36 @@ void twoel_i_eq_j(double tol2e_over_schwmax, int start, int step, int id)
 
 	i_off = (i-1) * nbfn;
 
-	for (; i < nbfn && i < end; i++) 
+	for (; i < nbfn && i < end; i++)
 	{
 		i_off += nbfn;
-	
+
 		DENS_DECL(i,i);
 		TOL_DECL(i,i);
-	
-		if (g_schwarz[OFF(i,i)] < tol2e_over_schwmax) 
+
+		if (g_schwarz[OFF(i,i)] < tol2e_over_schwmax)
 		{
 			CUT1(4 * (1 + i - nbfn) * (i - nbfn) / 2);
 			continue;
 		}
 		k_off = i_off - nbfn;
 
-		for (k = i; k < nbfn; k++) 
+		for (k = i; k < nbfn; k++)
 		{
 			k_off += nbfn;
 			DENS_DECL_SYMM(k,i);
-			if (g_schwarz_max_j[k] < tol2e_over_g_schwarz_i_i) 
+			if (g_schwarz_max_j[k] < tol2e_over_g_schwarz_i_i)
 			{
 				CUT4(4 * (nbfn - k - 1));
 				continue;
 			}
 
 			l_off = k_off;
-			for (l = 1 + k; l < nbfn; l++) 
+			for (l = 1 + k; l < nbfn; l++)
 			{
 				l_off += nbfn;
 
-				if (g_schwarz[OFF(k,l)] < tol2e_over_g_schwarz_i_i) 
+				if (g_schwarz[OFF(k,l)] < tol2e_over_g_schwarz_i_i)
 				{
 	  				CUT2(4);
 					  continue;
@@ -608,7 +608,7 @@ void twoel_i_eq_j(double tol2e_over_schwmax, int start, int step, int id)
 
 				DENS_DECL_SYMM(l,i);
 				DENS_DECL_SYMM(l,k);
-		
+
 				CUT3(4);
 				double gg = G(i, i, k, l);
 
@@ -616,46 +616,46 @@ void twoel_i_eq_j(double tol2e_over_schwmax, int start, int step, int id)
 #if defined OCR_ATOMIC
 
 #ifdef BAD_CACHE_UTILIZATION
-				while (__sync_lock_test_and_set(mymutex+0, 1));   
+				while (__sync_lock_test_and_set(mymutex+0, 1));
 				UPDATE1(i,i,k,l);
 				__sync_lock_release(mymutex+0);
-				while (__sync_lock_test_and_set(mymutex+1, 1));   
+				while (__sync_lock_test_and_set(mymutex+1, 1));
 				UPDATE1(i,i,l,k);
-				__sync_lock_release(mymutex+1);                   
-				while (__sync_lock_test_and_set(mymutex+2, 1));   
+				__sync_lock_release(mymutex+1);
+				while (__sync_lock_test_and_set(mymutex+2, 1));
 				UPDATE1(k,l,i,i);
-				__sync_lock_release(mymutex+2);                   
+				__sync_lock_release(mymutex+2);
 				while (__sync_lock_test_and_set(mymutex+3, 1));
 				UPDATE1(l,k,i,i);
-				__sync_lock_release(mymutex+3);                   
+				__sync_lock_release(mymutex+3);
 
 				while (__sync_lock_test_and_set(mymutex+4, 1));
 				UPDATE2(i,i,k,l);
-				__sync_lock_release(mymutex+4);                   
+				__sync_lock_release(mymutex+4);
 				while (__sync_lock_test_and_set(mymutex+5, 1));
 				UPDATE2(i,i,l,k);
-				__sync_lock_release(mymutex+5);                   
+				__sync_lock_release(mymutex+5);
 				while (__sync_lock_test_and_set(mymutex+6, 1));
 				UPDATE2(k,l,i,i);
-				__sync_lock_release(mymutex+6);                   
+				__sync_lock_release(mymutex+6);
 				while (__sync_lock_test_and_set(mymutex+7, 1));
 				UPDATE2(l,k,i,i);
-				__sync_lock_release(mymutex+7);                   
-	
+				__sync_lock_release(mymutex+7);
+
 #else
 				while (__sync_lock_test_and_set(mymutex+0, 1));
 				UPDATE_COULOMB1(i,i,k,l);
-				__sync_lock_release(mymutex+0);        
+				__sync_lock_release(mymutex+0);
 				while (__sync_lock_test_and_set(mymutex+1, 1));
 				UPDATE_COULOMB1(k,l,i,i);
-				__sync_lock_release(mymutex+1);        
+				__sync_lock_release(mymutex+1);
 
 				while (__sync_lock_test_and_set(mymutex+2, 1));
 				UPDATE_EXCHANGE(i,i,k,l);
-				__sync_lock_release(mymutex+2);        
+				__sync_lock_release(mymutex+2);
 				while (__sync_lock_test_and_set(mymutex+3, 1));
 				UPDATE_EXCHANGE(i,i,l,k);
-				__sync_lock_release(mymutex+3);        
+				__sync_lock_release(mymutex+3);
 #endif
 
 
@@ -694,8 +694,8 @@ void twoel_i_eq_j(double tol2e_over_schwmax, int start, int step, int id)
 				UPDATE_EXCHANGE(i,i,l,k);
 #endif
 
-         
-#endif//OCR_VERSION         
+
+#endif//OCR_VERSION
 				//-----------------------------------------------//
 
 
@@ -714,7 +714,7 @@ void twoel_i_eq_j(double tol2e_over_schwmax, int start, int step, int id)
 
 
 //======================================================================================================//
-void twoel_k_eq_l(double tol2e_over_schwmax, int start, int step, int id) 
+void twoel_k_eq_l(double tol2e_over_schwmax, int start, int step, int id)
 {
 	CUT_DECLS;
 	int i, j, k;
@@ -730,7 +730,7 @@ void twoel_k_eq_l(double tol2e_over_schwmax, int start, int step, int id)
 	{
 	int end = i + N3_CHUNK_SIZE;
 
-#else 
+#else
 
 	//static assignment of work for this thread
 	i =start;
@@ -741,25 +741,25 @@ void twoel_k_eq_l(double tol2e_over_schwmax, int start, int step, int id)
 
 	i_off = (i-1) * nbfn;
 
-	for (; i < nbfn && i < end; i++) 
+	for (; i < nbfn && i < end; i++)
 	{
 		i_off += nbfn;
 		j_off = i_off;
 
-		for (j = i + 1; j < nbfn; j++) 
+		for (j = i + 1; j < nbfn; j++)
 		{
 			j_off += nbfn;
 			DENS_DECL_SYMM(j,i);
 			TOL_DECL(i,j);
 
-			if (g_schwarz[OFF(i,j)] < tol2e_over_schwmax) 
+			if (g_schwarz[OFF(i,j)] < tol2e_over_schwmax)
 			{
 				CUT1(4 * (nbfn - i - 1));
 				continue;
 			}
 			k_off = i_off;
 
-			for (k = i + 1; k < nbfn; k++) 
+			for (k = i + 1; k < nbfn; k++)
 			{
 				k_off += nbfn;
 
@@ -767,7 +767,7 @@ void twoel_k_eq_l(double tol2e_over_schwmax, int start, int step, int id)
 				DENS_DECL_SYMM(k,j);
 				DENS_DECL(k,k);
 
-				if (g_schwarz[OFF(k,k)] < tol2e_over_g_schwarz_i_j) 
+				if (g_schwarz[OFF(k,k)] < tol2e_over_g_schwarz_i_j)
 				{
 					CUT2(4);
 					continue;
@@ -782,37 +782,37 @@ void twoel_k_eq_l(double tol2e_over_schwmax, int start, int step, int id)
 
 				while (__sync_lock_test_and_set(mymutex, 1));
 				UPDATE1(i,j,k,k);
-				__sync_lock_release(mymutex);          
+				__sync_lock_release(mymutex);
 
-				while (__sync_lock_test_and_set(mymutex+1, 1));         
+				while (__sync_lock_test_and_set(mymutex+1, 1));
 				UPDATE1(j,i,k,k);
-				__sync_lock_release(mymutex+1);          
+				__sync_lock_release(mymutex+1);
 
-				while (__sync_lock_test_and_set(mymutex+2, 1)); 
+				while (__sync_lock_test_and_set(mymutex+2, 1));
 				UPDATE1(k,k,i,j);
-				__sync_lock_release(mymutex+2);          
+				__sync_lock_release(mymutex+2);
 
-				while (__sync_lock_test_and_set(mymutex+3, 1));   
+				while (__sync_lock_test_and_set(mymutex+3, 1));
 				UPDATE1(k,k,j,i);
-				__sync_lock_release(mymutex+3);          
+				__sync_lock_release(mymutex+3);
 
-				while (__sync_lock_test_and_set(mymutex+4, 1)); 
+				while (__sync_lock_test_and_set(mymutex+4, 1));
 				UPDATE2(i,j,k,k);
-				__sync_lock_release(mymutex+4);          
+				__sync_lock_release(mymutex+4);
 
-				while (__sync_lock_test_and_set(mymutex+5, 1)); 
+				while (__sync_lock_test_and_set(mymutex+5, 1));
 				UPDATE2(j,i,k,k);
-				__sync_lock_release(mymutex+5);          
+				__sync_lock_release(mymutex+5);
 
-				while (__sync_lock_test_and_set(mymutex+6, 1)); 
+				while (__sync_lock_test_and_set(mymutex+6, 1));
 				UPDATE2(k,k,i,j);
-				__sync_lock_release(mymutex+6);          
+				__sync_lock_release(mymutex+6);
 
-				while (__sync_lock_test_and_set(mymutex+7, 1)); 
+				while (__sync_lock_test_and_set(mymutex+7, 1));
 				UPDATE2(k,k,j,i);
-				__sync_lock_release(mymutex+7);          
+				__sync_lock_release(mymutex+7);
 
-                          
+
 #else
 				while (__sync_lock_test_and_set(mymutex, 1));
 				UPDATE_COULOMB1(i,j,k,k);
@@ -823,10 +823,10 @@ void twoel_k_eq_l(double tol2e_over_schwmax, int start, int step, int id)
 
 				while (__sync_lock_test_and_set(mymutex+2, 1));
 				UPDATE_EXCHANGE(i,j,k,k);
-				__sync_lock_release(mymutex+2);                
-				while (__sync_lock_test_and_set(mymutex+3, 1));                   
+				__sync_lock_release(mymutex+2);
+				while (__sync_lock_test_and_set(mymutex+3, 1));
 				UPDATE_EXCHANGE(j,i,k,k);
-				__sync_lock_release(mymutex+3);                                   
+				__sync_lock_release(mymutex+3);
 #endif
 
 #elif defined OCR_CRITICAL
@@ -864,8 +864,8 @@ void twoel_k_eq_l(double tol2e_over_schwmax, int start, int step, int id)
 				UPDATE_EXCHANGE(j,i,k,k);
 #endif
 
-#endif//OCR_VERSION         
-				//-----------------------------------------------//       
+#endif//OCR_VERSION
+				//-----------------------------------------------//
 
 			} // k
 		} // j
@@ -881,7 +881,7 @@ void twoel_k_eq_l(double tol2e_over_schwmax, int start, int step, int id)
 //======================================================================================================//
 
 //======================================================================================================//
-void twoel_ij_eq_kl(double tol2e_over_schwmax, int start, int step, int id) 
+void twoel_ij_eq_kl(double tol2e_over_schwmax, int start, int step, int id)
 {
 	CUT_DECLS;
 	int i, j;
@@ -890,21 +890,21 @@ void twoel_ij_eq_kl(double tol2e_over_schwmax, int start, int step, int id)
 
 	// 4-way symmetry
 	i_off = -nbfn;
-	for (i = 0; i < nbfn; i++) 
+	for (i = 0; i < nbfn; i++)
 	{
 		i_off += nbfn;
 		j_off = i_off;
 
 		DENS_DECL(i,i);
 
-		for (j = i + 1; j < nbfn; j++) 
+		for (j = i + 1; j < nbfn; j++)
 		{
 			j_off += nbfn;
 			DENS_DECL_SYMM(j,i);
 			DENS_DECL(j,j);
 			TOL_DECL(i,j);
 
-			if (g_schwarz[OFF(i,j)] < tol2e_over_g_schwarz_i_j) 
+			if (g_schwarz[OFF(i,j)] < tol2e_over_g_schwarz_i_j)
 			{
 				CUT1(4);
 				continue;
@@ -926,7 +926,7 @@ void twoel_ij_eq_kl(double tol2e_over_schwmax, int start, int step, int id)
 
 
 //======================================================================================================//
-void twoel_i_eq_j_and_k_eq_l(double tol2e_over_schwmax, int start, int step, int id) 
+void twoel_i_eq_j_and_k_eq_l(double tol2e_over_schwmax, int start, int step, int id)
 {
 	CUT_DECLS;
 	int i, k;
@@ -935,27 +935,27 @@ void twoel_i_eq_j_and_k_eq_l(double tol2e_over_schwmax, int start, int step, int
 
 	// 2-way symmetry
 	i_off = -nbfn;
-	for (i = 0; i < nbfn; i++) 
+	for (i = 0; i < nbfn; i++)
 	{
 		i_off += nbfn;
 
 		DENS_DECL(i,i);
 		TOL_DECL(i,i);
 
-		if (g_schwarz[OFF(i,i)] < tol2e_over_schwmax) 
+		if (g_schwarz[OFF(i,i)] < tol2e_over_schwmax)
 		{
 			CUT1(2 * (nbfn - i - 1));
 			continue;
 		}
 		k_off = i_off;
 
-		for (k = i + 1; k < nbfn; k++) 
+		for (k = i + 1; k < nbfn; k++)
 		{
 			k_off += nbfn;
 			DENS_DECL_SYMM(k,i);
 			DENS_DECL(k,k);
 
-			if (g_schwarz[OFF(k,k)] < tol2e_over_g_schwarz_i_i) 
+			if (g_schwarz[OFF(k,k)] < tol2e_over_g_schwarz_i_i)
 			{
 				CUT2(2);
 				continue;
@@ -975,7 +975,7 @@ void twoel_i_eq_j_and_k_eq_l(double tol2e_over_schwmax, int start, int step, int
 
 
 //======================================================================================================//
-void twoel_i_eq_j_eq_k_eq_l(double tol2e_over_schwmax, int start, int step, int id) 
+void twoel_i_eq_j_eq_k_eq_l(double tol2e_over_schwmax, int start, int step, int id)
 {
 	CUT_DECLS;
 	int i;
@@ -984,14 +984,14 @@ void twoel_i_eq_j_eq_k_eq_l(double tol2e_over_schwmax, int start, int step, int 
 
 	// 1-way symmetry
 	i_off = -nbfn;
-	for (i = 0; i < nbfn; i++) 
+	for (i = 0; i < nbfn; i++)
 	{
 		i_off += nbfn;
 
 		DENS_DECL(i,i);
 		TOL_DECL(i,i);
 
-		if (g_schwarz[OFF(i,i)] < tol2e_over_g_schwarz_i_i) 
+		if (g_schwarz[OFF(i,i)] < tol2e_over_g_schwarz_i_i)
 		{
 			CUT2(1);
 			continue;
@@ -1048,7 +1048,7 @@ ocrGuid_t twoel_symm ( u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[])
 	//======================================================================================================//
 
 	//======================================================================================================//
-	//gather parameters	
+	//gather parameters
 	int id 				= (int)paramv[0];
 	int start 			= (int)paramv[1];
 	int step 			= (int)paramv[2];
@@ -1064,7 +1064,7 @@ ocrGuid_t twoel_symm ( u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[])
 	twoel_i_j_k_l_all_different(tol2e_over_schwmax, start, step, id);
 
 	//satisfy dependency
-	ocrEventSatisfy(finished_event, NULL_GUID);	
+	ocrEventSatisfy(finished_event, NULL_GUID);
 
 	return NULL_GUID;
 }
@@ -1076,9 +1076,9 @@ ocrGuid_t twoel_symm ( u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[])
 //======================================================================================================//
 //twoel_local_reduction:
 //	Reduction of the calculations performed by the twoel_symm instances.
-//	Only executed when the dependencies from twoel_symm have been satisfied 
+//	Only executed when the dependencies from twoel_symm have been satisfied
 //======================================================================================================//
-ocrGuid_t twoel_reduction ( u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) 
+ocrGuid_t twoel_reduction ( u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[])
 {
 	//======================================================================================================//
 	//gather global data
@@ -1116,8 +1116,8 @@ ocrGuid_t twoel_reduction ( u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[
 	z					= my_twoel_params->z;
 	//======================================================================================================//
 
-	//======================================================================================================//	
-	//gather parameters	
+	//======================================================================================================//
+	//gather parameters
 	ocrGuid_t finished_event 	= (ocrGuid_t)paramv[0];
 
 	//PRINTF("twoel_reduction %d\n", iter);
@@ -1136,12 +1136,12 @@ ocrGuid_t twoel_reduction ( u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[
 	size_t t_off = 0;
 
 	t_off = 0;
-	for (t = 0; t < threads + 1; t++) 
+	for (t = 0; t < threads + 1; t++)
 	{
 		i_off=0;
-		for (i = 0; i < nbfn; i++) 
+		for (i = 0; i < nbfn; i++)
 		{
-			for (j = 0; j < nbfn; j++) 
+			for (j = 0; j < nbfn; j++)
 			{
 				g_fock[i_off + j] += t_fock[t_off + i_off + j];
 				t_fock[t_off + i_off + j] = 0.0;
@@ -1151,7 +1151,7 @@ ocrGuid_t twoel_reduction ( u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[
 		t_off += nbfn_squared;
 	}
 
-	for (t = 0; t < threads + 1; t++) 
+	for (t = 0; t < threads + 1; t++)
 	{
 		*icut1 += twoel_context[t].icut1;
 		*icut2 += twoel_context[t].icut2;
@@ -1232,10 +1232,10 @@ ocrGuid_t twoel_complement ( u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv
 	x					= my_twoel_params->x;
 	y					= my_twoel_params->y;
 	z					= my_twoel_params->z;
-	//======================================================================================================//	
+	//======================================================================================================//
 
-	//======================================================================================================//	
-	//gather parameters	
+	//======================================================================================================//
+	//gather parameters
 	long iter 			= (long)paramv[0];
 	ocrGuid_t finished_event 	= (ocrGuid_t)paramv[1];
 
@@ -1277,7 +1277,7 @@ ocrGuid_t twoel_complement ( u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv
 	if (deltad < tol) mybreak = 1;
 	#ifdef BOOKKEEPING
 	// something has gone wrong--print what you know and quit;
-	if (*icut3 == 0) 
+	if (*icut3 == 0)
 	{
 		PRINTF("no two-electron integrals computed!\n");
 		PRINTF("SCF failed to converge in %d iters\n", (int)iter);
@@ -1292,7 +1292,7 @@ ocrGuid_t twoel_complement ( u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv
 	//no more iterations to be performed
 	if(iter == mxiter-1 || mybreak == 1)
 	{
-		if (iter == mxiter-1) 
+		if (iter == mxiter-1)
 		{
 			PRINTF("SCF failed to converge in %d iters\n", (int)iter);
 			iter--;
@@ -1334,11 +1334,11 @@ ocrGuid_t twoel_complement ( u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv
 		PRINTF("  failed #ij test   failed #j test  failed #kl test    #compute           #total       fraction\n");
 		PRINTF("  ---------------  ---------------  ---------------  ---------------  ---------------  --------\n");
 		PRINTF("  %15lld  %15lld  %15lld  %15lld  %15lld  %9.6f\n\n", *icut1, *icut4, *icut2, *icut3, nints, frac);
-		 
+
 		long long int maxint = nbfn;
 		maxint = pow(maxint, 4) * (iter + 1);
 
-		if (nints != maxint) 
+		if (nints != maxint)
 		{
 			PRINTF("Inconsistent number of integrals, should be %lld\n", maxint);
 			PRINTF("Note: largest 32-bit int is 2,147,483,647\n");
@@ -1348,7 +1348,7 @@ ocrGuid_t twoel_complement ( u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv
 		closearrays();
 
 		//shutdown the runtime if this is the last iteration
-		ocrShutdown(); 
+		ocrShutdown();
 	}
 	//======================================================================================================//
 
@@ -1368,7 +1368,7 @@ ocrGuid_t twoel_complement ( u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv
 		g_kl=0;
 
 		//satisfy dependency for the next iteration
-		ocrEventSatisfy(finished_event, NULL_GUID);		
+		ocrEventSatisfy(finished_event, NULL_GUID);
 	}
 	//======================================================================================================//
 
@@ -1434,7 +1434,7 @@ void twoel_ocr(double schwmax)
   	DBCREATE( &t_fock_db, &t_fock_ptr, sizeof(double)*size, FLAGS, t_fock_affinity, NO_ALLOC);
 	if(t_fock_ptr==NULL)
 	{
-		PRINTF("\n!!!!!! DBCREATE failed for t_fock, using malloc instead !!!!!!\n\n");	
+		PRINTF("\n!!!!!! DBCREATE failed for t_fock, using malloc instead !!!!!!\n\n");
 		t_fock = (double*)malloc(sizeof(double)*size);
 	}
 	else
@@ -1454,16 +1454,16 @@ void twoel_ocr(double schwmax)
 
 	if(twoel_context_ptr==NULL)
 	{
-		PRINTF("\n!!!!!! DBCREATE failed for twoel_context, using malloc instead !!!!!!\n\n");	
+		PRINTF("\n!!!!!! DBCREATE failed for twoel_context, using malloc instead !!!!!!\n\n");
 		twoel_context = (twoel_context_t*)malloc((threads + 1) * sizeof(twoel_context_t)*size);
 	}
 	else
 	{
 		twoel_context = (twoel_context_t*)twoel_context_ptr;
-	}	
+	}
 
 
-	for (i = 0; i < (threads + 1); i++) 
+	for (i = 0; i < (threads + 1); i++)
 	{
 		twoel_context[i].fock = t_fock + (i * nbfn * nbfn);
 	}
@@ -1471,7 +1471,7 @@ void twoel_ocr(double schwmax)
 
 
 	//======================================================================================================//
-	//create db for passing arguments to the twoel function. This will be passed to the function as the 
+	//create db for passing arguments to the twoel function. This will be passed to the function as the
 	//db of the dependency on slot 0.
 
 	PTR_T my_twoel_params_ptr;
@@ -1510,11 +1510,11 @@ void twoel_ocr(double schwmax)
 	my_twoel_params->tdens			= &tdens;
 	my_twoel_params->tdgemm			= &tdgemm;
 	my_twoel_params->tdiag			= &tdiag;
-	my_twoel_params->tinit			= &tinit; 
+	my_twoel_params->tinit			= &tinit;
 	my_twoel_params->threads		= threads;
 	my_twoel_params->tonel 			= &tonel;
-	my_twoel_params->tprint			= &tprint;	
-	my_twoel_params->ttwoel			= &ttwoel;	
+	my_twoel_params->tprint			= &tprint;
+	my_twoel_params->ttwoel			= &ttwoel;
 	my_twoel_params->tol2e_over_schwmax 	= tol2e_over_schwmax;
 	my_twoel_params->twoel_context 		= twoel_context;
 	my_twoel_params->t_fock 		= t_fock;
@@ -1559,8 +1559,8 @@ void twoel_ocr(double schwmax)
 
 	//======================================================================================================//
 	//Create EDTs and associate the dependencies
-	for (iter = 0; iter <  mxiter; iter++) 
-	{	
+	for (iter = 0; iter <  mxiter; iter++)
+	{
 		//======================================================================================================//
 		//compute limits of computation for each thread for static scheduling
 		int nbfnDivthreads = nbfn / threads;
@@ -1604,10 +1604,10 @@ void twoel_ocr(double schwmax)
 				symm_params[3]=GUIDTOU64(temp_guid);
 				*(symm_finished+iter*threads+i) = temp_guid;
 
-				ocrEdtCreate(	symm_guid+iter*threads+i, 
-						symm_template, 
-						4, (u64*)(symm_params), 
-						1, NULL, 0, 
+				ocrEdtCreate(	symm_guid+iter*threads+i,
+						symm_template,
+						4, (u64*)(symm_params),
+						1, NULL, 0,
 						symm_affinity, NULL);
 
 
@@ -1616,7 +1616,7 @@ void twoel_ocr(double schwmax)
 			}
 		}
 
-		else 
+		else
 		{
 			for(i=0; i<threads; i++)
 			{
@@ -1642,10 +1642,10 @@ void twoel_ocr(double schwmax)
 				*(symm_finished+iter*threads+i) = temp_guid;
 
 				//create EDT
-				ocrEdtCreate(	symm_guid+iter*threads+i, 
-						symm_template, 
-						4, (u64*)(symm_params), 
-						2, NULL, 0, 
+				ocrEdtCreate(	symm_guid+iter*threads+i,
+						symm_template,
+						4, (u64*)(symm_params),
+						2, NULL, 0,
 						symm_affinity, NULL);
 
 
@@ -1667,10 +1667,10 @@ void twoel_ocr(double schwmax)
 		redu_params=GUIDTOU64(reduction_finished[iter]);
 
 		//create EDT
-		ocrEdtCreate(	redu_guid+iter, 
-				redu_template, 
-				1, (u64*)&redu_params, 
-				threads+1, NULL, 0, 
+		ocrEdtCreate(	redu_guid+iter,
+				redu_template,
+				1, (u64*)&redu_params,
+				threads+1, NULL, 0,
 				redu_affinity, NULL);
 
 		//Since twoel_params_guid has already an associated db, this dependency is satisfied immediately.
@@ -1696,10 +1696,10 @@ void twoel_ocr(double schwmax)
 		comp_params[1]=GUIDTOU64(complement_finished[iter]);
 
 		//create EDT
-		ocrEdtCreate(	comp_guid+iter, 
-				comp_template, 
-				2, (u64*)(comp_params), 
-				2, NULL, 0, 
+		ocrEdtCreate(	comp_guid+iter,
+				comp_template,
+				2, (u64*)(comp_params),
+				2, NULL, 0,
 				comp_affinity, NULL);
 
 		//Since twoel_params_guid has already an associated db, this dependency is satisfied immediately.

@@ -6,9 +6,9 @@
 
 #include "debug.h"
 #include "ocr-comp-platform.h"
-#include "ocr-policy-domain-getter.h"
 #include "ocr-policy-domain.h"
 
+/* REC: TODO: FIGURE THIS OUT. May go all away
 static ocrPolicyDomain_t* bootPD = NULL;
 static ocrPolicyCtx_t* bootCtx = NULL;
 
@@ -42,3 +42,4 @@ void setBootPD(ocrPolicyDomain_t *domain) {
     getCurrentPD = bootGetCurrentPD;
     getMasterPD = bootGetMasterPD;
 }
+*/

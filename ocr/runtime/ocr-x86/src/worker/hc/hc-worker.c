@@ -4,17 +4,30 @@
  * removed or modified.
  */
 
+#include "ocr-config.h"
+#ifdef ENABLE_WORKER_HC
 
 #include "debug.h"
 #include "ocr-comp-platform.h"
-#include "ocr-runtime.h"
+#include "ocr-db.h"
+#include "ocr-policy-domain.h"
+#include "ocr-runtime-types.h"
+#include "ocr-sysboot.h"
 #include "ocr-types.h"
 #include "ocr-worker.h"
 #include "worker/hc/hc-worker.h"
 
-#include <pthread.h>
-#include <stdio.h>
+#include "experimental/ocr-placer.h"
+#include "extensions/ocr-affinity.h"
 
+#ifdef OCR_ENABLE_STATISTICS
+#include "ocr-statistics.h"
+#include "ocr-statistics-callbacks.h"
+#endif
+
+#ifdef OCR_RUNTIME_PROFILER
+#include "utils/profiler/profiler.h"
+#endif
 
 #define DEBUG_TYPE WORKER
 
@@ -22,184 +35,288 @@
 /* OCR-HC WORKER                                      */
 /******************************************************/
 
-static void associate_comp_platform_and_worker(ocrPolicyDomain_t * policy, ocrWorker_t * worker) {
-    // This function must only be used when the contextFactory has its PD set
-    ocrPolicyCtx_t * ctx = policy->contextFactory->instantiate(policy->contextFactory, NULL);
-    ctx->sourcePD = policy->guid;
-    ctx->PD = policy;
-    ctx->sourceObj = worker->guid;
-    ctx->sourceId = ((ocrWorkerHc_t *) worker)->id;
-    setCurrentPD(policy);
-    setCurrentWorkerContext(ctx);
+// Convenient to have an id to index workers in pools
+static inline u64 getWorkerId(ocrWorker_t * worker) {
+    ocrWorkerHc_t * hcWorker = (ocrWorkerHc_t *) worker;
+    return hcWorker->id;
 }
 
-void destructWorkerHc ( ocrWorker_t * base ) {
-    ocrGuidProvider_t * guidProvider = getCurrentPD()->guidProvider;
-    guidProvider->fctPtrs->releaseGuid(guidProvider, base->guid);
-    free(base);
+static void hcWorkShift(ocrWorker_t * worker) {
+    ocrPolicyDomain_t * pd;
+    ocrPolicyMsg_t msg;
+    getCurrentEnv(&pd, NULL, NULL, &msg);
+    ocrFatGuid_t taskGuid = {.guid = NULL_GUID, .metaDataPtr = NULL};
+    u32 count = 1;
+#define PD_MSG (&msg)
+#define PD_TYPE PD_MSG_COMM_TAKE
+    msg.type = PD_MSG_COMM_TAKE | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
+    PD_MSG_FIELD(guids) = &taskGuid;
+    PD_MSG_FIELD(guidCount) = count;
+    PD_MSG_FIELD(properties) = 0;
+    PD_MSG_FIELD(type) = OCR_GUID_EDT;
+    // TODO: In the future, potentially take more than one)
+    if(pd->fcts.processMessage(pd, &msg, true) == 0) {
+        // We got a response
+        count = PD_MSG_FIELD(guidCount);
+        if(count == 1) {
+            ASSERT(taskGuid.guid != NULL_GUID && taskGuid.metaDataPtr != NULL);
+            worker->curTask = (ocrTask_t*)taskGuid.metaDataPtr;
+            DPRINTF(DEBUG_LVL_VERB, "Worker shifting to execute EDT GUID 0x%lx\n", taskGuid.guid);
+            u8 (*executeFunc)(ocrTask_t *) = (u8 (*)(ocrTask_t*))PD_MSG_FIELD(extra); // Execute is stored in extra
+            executeFunc(worker->curTask);
+            // Mark the task. Allows the PD to check the state of workers
+            // and detect quiescence, without weird behavior because curTask
+            // is being deallocated in parallel
+            worker->curTask = (ocrTask_t*)0x1;
+            // Destroy the work
+#undef PD_TYPE
+
+#define PD_MSG (&msg)
+#define PD_TYPE PD_MSG_WORK_DESTROY
+            msg.type = PD_MSG_WORK_DESTROY | PD_MSG_REQUEST;
+            PD_MSG_FIELD(guid) = taskGuid;
+            PD_MSG_FIELD(properties) = 0;
+            // Ignore failures, we may be shutting down
+            pd->fcts.processMessage(pd, &msg, false);
+#undef PD_MSG
+#undef PD_TYPE
+            // Important for this to be the last
+            worker->curTask = NULL;
+        }
+    }
 }
 
 /**
  * The computation worker routine that asks work to the scheduler
  */
-void * worker_computation_routine(void * arg);
-void * master_worker_computation_routine(void * arg);
+static void workerLoop(ocrWorker_t * worker) {
+    while(worker->fcts.isRunning(worker)) {
+        START_PROFILE(wo_hc_workerLoop);
+        worker->fcts.workShift(worker);
+        EXIT_PROFILE;
+    } /* End of while loop */
+}
+
+void destructWorkerHc(ocrWorker_t * base) {
+    u64 i = 0;
+    while(i < base->computeCount) {
+        base->computes[i]->fcts.destruct(base->computes[i]);
+        ++i;
+    }
+    runtimeChunkFree((u64)(base->computes), NULL);
+    runtimeChunkFree((u64)base, NULL);
+}
+
+void hcBeginWorker(ocrWorker_t * base, ocrPolicyDomain_t * policy) {
+
+    // Starts everybody, the first comp-platform has specific
+    // code to represent the master thread.
+    u64 computeCount = base->computeCount;
+    base->location = (ocrLocation_t)base;
+    ASSERT(computeCount == 1);
+    u64 i = 0;
+    for(i = 0; i < computeCount; ++i) {
+        base->computes[i]->fcts.begin(base->computes[i], policy, base->type);
+#ifdef OCR_ENABLE_STATISTICS
+        statsWORKER_START(policy, base->guid, base, base->computes[i]->guid, base->computes[i]);
+#endif
+    }
+
+    if(base->type == MASTER_WORKERTYPE) {
+        // For the master thread, we need to set the PD and worker
+        // The other threads will set this when they start
+        for(i = 0; i < computeCount; ++i) {
+            base->computes[i]->fcts.setCurrentEnv(base->computes[i], policy, base);
+        }
+    }
+}
 
 void hcStartWorker(ocrWorker_t * base, ocrPolicyDomain_t * policy) {
+
     ocrWorkerHc_t * hcWorker = (ocrWorkerHc_t *) base;
-    hcWorker->run = true;
+
+    if(!hcWorker->secondStart) {
+        // Get a GUID
+        guidify(policy, (u64)base, &(base->fguid), OCR_GUID_WORKER);
+        base->pd = policy;
+        hcWorker->running = true;
+        if(base->type == MASTER_WORKERTYPE) {
+            hcWorker->secondStart = true; // Only relevant for MASTER_WORKERTYPE
+            return; // Don't start right away
+        }
+    }
+
+    ASSERT(base->type != MASTER_WORKERTYPE || hcWorker->secondStart);
 
     // Starts everybody, the first comp-platform has specific
     // code to represent the master thread.
     u64 computeCount = base->computeCount;
     // What the compute target will execute
-    launchArg_t * launchArg = malloc(sizeof(launchArg_t));
-    launchArg->routine = (hcWorker->id == 0) ? master_worker_computation_routine : worker_computation_routine;
-    launchArg->arg = base;
-    launchArg->PD = policy;
+    ASSERT(computeCount == 1);
     u64 i = 0;
-    for(i = 0; i < computeCount; i++) {
-        base->computes[i]->fctPtrs->start(base->computes[i], policy, launchArg);
+    for(i = 0; i < computeCount; ++i) {
+        base->computes[i]->fcts.start(base->computes[i], policy, base);
+#ifdef OCR_ENABLE_STATISTICS
+        statsWORKER_START(policy, base->guid, base, base->computes[i]->guid, base->computes[i]);
+#endif
+    }
+    // Otherwise, it is highly likely that we are shutting down
+}
+
+static bool isMainEdtForker(ocrWorker_t * worker, ocrGuid_t * affinityMasterPD) {
+    // Determine if current worker is the master worker of this PD
+    bool blessedWorker = (worker->type == MASTER_WORKERTYPE);
+    // When OCR is used in library mode, there's no mainEdt
+    blessedWorker &= (mainEdtGet() != NULL);
+    if (blessedWorker) {
+        // Determine if current master worker is part of master PD
+        u64 count = 0;
+        // There should be a single master PD
+        ASSERT(!ocrAffinityCount(AFFINITY_PD_MASTER, &count) && (count == 1));
+        ocrAffinityGet(AFFINITY_PD_MASTER, &count, affinityMasterPD);
+        ASSERT(count == 1);
+        blessedWorker &= (worker->pd->myLocation == affinityToLocation(*affinityMasterPD));
+    }
+    return blessedWorker;
+}
+
+void* hcRunWorker(ocrWorker_t * worker) {
+    ocrGuid_t affinityMasterPD;
+    bool forkMain = isMainEdtForker(worker, &affinityMasterPD);
+    if (forkMain) {
+        // This is all part of the mainEdt setup
+        // and should be executed by the "blessed" worker.
+        void * packedUserArgv = userArgsGet();
+        ocrEdt_t mainEdt = mainEdtGet();
+        u64 totalLength = ((u64*) packedUserArgv)[0]; // already exclude this first arg
+        // strip off the 'totalLength first argument'
+        packedUserArgv = (void *) (((u64)packedUserArgv) + sizeof(u64)); // skip first totalLength argument
+        ocrGuid_t dbGuid;
+        void* dbPtr;
+        ocrDbCreate(&dbGuid, &dbPtr, totalLength,
+                    DB_PROP_IGNORE_WARN, affinityMasterPD, NO_ALLOC);
+
+        // copy packed args to DB
+        hal_memCopy(dbPtr, packedUserArgv, totalLength, 0);
+
+        // Prepare the mainEdt for scheduling
+        ocrGuid_t edtTemplateGuid, edtGuid;
+        ocrEdtTemplateCreate(&edtTemplateGuid, mainEdt, 0, 1);
+        ocrEdtCreate(&edtGuid, edtTemplateGuid, EDT_PARAM_DEF, /* paramv = */ NULL,
+                     /* depc = */ EDT_PARAM_DEF, /* depv = */ &dbGuid,
+                     EDT_PROP_NONE, affinityMasterPD, NULL);
+    } else {
+        // Set who we are
+        ocrPolicyDomain_t *pd = worker->pd;
+        u32 i;
+        for(i = 0; i < worker->computeCount; ++i) {
+            worker->computes[i]->fcts.setCurrentEnv(worker->computes[i], pd, worker);
+        }
     }
 
-    if (hcWorker->id == 0) {
-        // Worker zero doesn't start the underlying thread since it is
-        // falling through after that start. However, it stills need
-        // to set its local storage data.
-        associate_comp_platform_and_worker(policy, base);
-    }
+    DPRINTF(DEBUG_LVL_INFO, "Starting scheduler routine of worker %ld\n", getWorkerId(worker));
+    workerLoop(worker);
+    return NULL;
 }
 
 void hcFinishWorker(ocrWorker_t * base) {
-    // Do not recursively stop comp-target, this will be
-    // done when the policy domain stops and allow thread '0'
-    // to join with the other threads
-    ocrWorkerHc_t * hcWorker = (ocrWorkerHc_t *) base;
-    hcWorker->run = false;
-    DPRINTF(DEBUG_LVL_INFO, "Finishing worker routine %d\n", hcWorker->id);
+    DPRINTF(DEBUG_LVL_INFO, "Finishing worker routine %ld\n", getWorkerId(base));
+    ASSERT(base->computeCount == 1);
+    u64 i = 0;
+    for(i = 0; i < base->computeCount; i++) {
+        base->computes[i]->fcts.finish(base->computes[i]);
+    }
 }
 
 void hcStopWorker(ocrWorker_t * base) {
+    ocrWorkerHc_t * hcWorker = (ocrWorkerHc_t *) base;
+    // Makes worker threads to exit their routine.
+    hcWorker->running = false;
+    ASSERT(base->pd != NULL);
     u64 computeCount = base->computeCount;
     u64 i = 0;
-    // This code should be called by the master thread to join others
     for(i = 0; i < computeCount; i++) {
-        base->computes[i]->fctPtrs->stop(base->computes[i]);
+        base->computes[i]->fcts.stop(base->computes[i]);
+#ifdef OCR_ENABLE_STATISTICS
+        statsWORKER_STOP(base->pd, base->fguid.guid, base->fguid.metaDataPtr,
+                         base->computes[i]->fguid.guid,
+                         base->computes[i]->fguid.metaDataPtr);
+#endif
     }
-    DPRINTF(DEBUG_LVL_INFO, "Stopping worker %d\n", ((ocrWorkerHc_t *)base)->id);
+    DPRINTF(DEBUG_LVL_INFO, "Stopping worker %ld\n", getWorkerId(base));
+
+    // Destroy the GUID
+    ocrPolicyMsg_t msg;
+    getCurrentEnv(NULL, NULL, NULL, &msg);
+
+#define PD_MSG (&msg)
+#define PD_TYPE PD_MSG_GUID_DESTROY
+    msg.type = PD_MSG_GUID_DESTROY | PD_MSG_REQUEST;
+    PD_MSG_FIELD(guid) = base->fguid;
+    PD_MSG_FIELD(properties) = 0;
+    ASSERT(base->pd != NULL);
+    // Ignore failure here, we are most likely shutting down
+    base->pd->fcts.processMessage(base->pd, &msg, false);
+#undef PD_MSG
+#undef PD_TYPE
+    base->fguid.guid = UNINITIALIZED_GUID;
 }
 
-bool hc_is_running_worker(ocrWorker_t * base) {
+bool hcIsRunningWorker(ocrWorker_t * base) {
     ocrWorkerHc_t * hcWorker = (ocrWorkerHc_t *) base;
-    return hcWorker->run;
-}
-
-ocrGuid_t hc_getCurrentEDT (ocrWorker_t * base) {
-    ocrWorkerHc_t * hcWorker = (ocrWorkerHc_t *) base;
-    return hcWorker->currentEDTGuid;
-}
-
-void hc_setCurrentEDT (ocrWorker_t * base, ocrGuid_t curr_edt_guid) {
-    ocrWorkerHc_t * hcWorker = (ocrWorkerHc_t *) base;
-    hcWorker->currentEDTGuid = curr_edt_guid;
+    return hcWorker->running;
 }
 
 /**
- * Builds an instance of a HC worker
+ * @brief Builds an instance of a HC worker
  */
-ocrWorker_t* newWorkerHc (ocrWorkerFactory_t * factory, ocrParamList_t * perInstance) {
-    ocrWorkerHc_t * worker = checkedMalloc(worker, sizeof(ocrWorkerHc_t));
-    worker->run = false;
-    worker->id = ((paramListWorkerHcInst_t*)perInstance)->workerId;
-    worker->currentEDTGuid = NULL_GUID;
-    ocrWorker_t * base = (ocrWorker_t *) worker;
-    base->guid = UNINITIALIZED_GUID;
-    guidify(getCurrentPD(), (u64)base, &(base->guid), OCR_GUID_WORKER);
-    base->routine = worker_computation_routine;
-    base->fctPtrs = &(factory->workerFcts);
-    return base;
+ocrWorker_t* newWorkerHc(ocrWorkerFactory_t * factory, ocrParamList_t * perInstance) {
+    ocrWorker_t * worker = (ocrWorker_t*) runtimeChunkAlloc( sizeof(ocrWorkerHc_t), PERSISTENT_CHUNK);
+    factory->initialize(factory, worker, perInstance);
+    return worker;
 }
 
-// Convenient to have an id to index workers in pools
-int get_worker_id(ocrWorker_t * worker) {
-    ocrWorkerHc_t * hcWorker = (ocrWorkerHc_t *) worker;
-    return hcWorker->id;
-}
+/**
+ * @brief Initialize an instance of a HC worker
+ */
+void initializeWorkerHc(ocrWorkerFactory_t * factory, ocrWorker_t* self, ocrParamList_t * perInstance) {
+    initializeWorkerOcr(factory, self, perInstance);
+    self->type = ((paramListWorkerHcInst_t*)perInstance)->workerType;
+    u64 workerId = ((paramListWorkerHcInst_t*)perInstance)->workerId;;
+    ASSERT((workerId && self->type == SLAVE_WORKERTYPE) ||
+           (workerId == 0 && self->type == MASTER_WORKERTYPE));
 
-static void hcExecuteWorker(ocrWorker_t * worker, ocrTask_t* task, ocrGuid_t taskGuid, ocrGuid_t currentTaskGuid) {
-    worker->fctPtrs->setCurrentEDT(worker, taskGuid);
-    task->fctPtrs->execute(task);
-    worker->fctPtrs->setCurrentEDT(worker, currentTaskGuid);
+    ocrWorkerHc_t * workerHc = (ocrWorkerHc_t*) self;
+    workerHc->id = workerId;
+    workerHc->running = false;
+    workerHc->secondStart = false;
+    workerHc->hcType = HC_WORKER_COMP;
 }
-
-void worker_loop(ocrPolicyDomain_t * pd, ocrWorker_t * worker) {
-    // Build and cache a take context
-    ocrPolicyCtx_t * orgCtx = getCurrentWorkerContext();
-    ocrPolicyCtx_t * ctx = orgCtx->clone(orgCtx);
-    ctx->type = PD_MSG_EDT_TAKE;
-    // Entering the worker loop
-    while(worker->fctPtrs->isRunning(worker)) {
-        ocrGuid_t taskGuid;
-        u32 count;
-        pd->takeEdt(pd, NULL, &count, &taskGuid, ctx);
-        // remove this when we can take a bunch and make sure there's
-        // an agreement whether it's the callee or the caller that
-        // allocates the taskGuid array
-        ASSERT(count <= 1);
-        if (count != 0) {
-            ocrTask_t* task = NULL;
-            deguidify(pd, taskGuid, (u64*)&(task), NULL);
-            worker->fctPtrs->execute(worker, task, taskGuid, NULL_GUID);
-            task->fctPtrs->destruct(task);
-        }
-    }
-    ctx->destruct(ctx);
-}
-
-void * worker_computation_routine(void * arg) {
-    // Need to pass down a data-structure
-    launchArg_t * launchArg = (launchArg_t *) arg;
-    ocrPolicyDomain_t * pd = launchArg->PD;
-    ocrWorker_t * worker = (ocrWorker_t *) launchArg->arg;
-    // associate current thread with the worker
-    associate_comp_platform_and_worker(pd, worker);
-    // Setting up this worker context to takeEdts
-    // This assumes workers are not relocatable
-    DPRINTF(DEBUG_LVL_INFO, "Starting scheduler routine of worker %d\n", get_worker_id(worker));
-    worker_loop(pd, worker);
-    return NULL;
-}
-
-void * master_worker_computation_routine(void * arg) {
-    launchArg_t * launchArg = (launchArg_t *) arg;
-    ocrPolicyDomain_t * pd = launchArg->PD;
-    ocrWorker_t * worker = (ocrWorker_t *) launchArg->arg;
-    DPRINTF(DEBUG_LVL_INFO, "Starting scheduler routine of master worker %d\n", get_worker_id(worker));
-    worker_loop(pd, worker);
-    return NULL;
-}
-
 
 /******************************************************/
 /* OCR-HC WORKER FACTORY                              */
 /******************************************************/
 
 void destructWorkerFactoryHc(ocrWorkerFactory_t * factory) {
-    free(factory);
+    runtimeChunkFree((u64)factory, NULL);
 }
 
 ocrWorkerFactory_t * newOcrWorkerFactoryHc(ocrParamList_t * perType) {
-    ocrWorkerFactoryHc_t* derived = (ocrWorkerFactoryHc_t*) checkedMalloc(derived, sizeof(ocrWorkerFactoryHc_t));
-    ocrWorkerFactory_t* base = (ocrWorkerFactory_t*) derived;
-    base->instantiate = newWorkerHc;
-    base->destruct =  destructWorkerFactoryHc;
-    base->workerFcts.destruct = destructWorkerHc;
-    base->workerFcts.start = hcStartWorker;
-    base->workerFcts.execute = hcExecuteWorker;
-    base->workerFcts.finish = hcFinishWorker;
-    base->workerFcts.stop = hcStopWorker;
-    base->workerFcts.isRunning = hc_is_running_worker;
-    base->workerFcts.getCurrentEDT = hc_getCurrentEDT;
-    base->workerFcts.setCurrentEDT = hc_setCurrentEDT;
+    ocrWorkerFactory_t* base = (ocrWorkerFactory_t*)runtimeChunkAlloc(sizeof(ocrWorkerFactoryHc_t), NONPERSISTENT_CHUNK);
+
+    base->instantiate = &newWorkerHc;
+    base->initialize = &initializeWorkerHc;
+    base->destruct = &destructWorkerFactoryHc;
+
+    base->workerFcts.destruct = FUNC_ADDR(void (*) (ocrWorker_t *), destructWorkerHc);
+    base->workerFcts.begin = FUNC_ADDR(void (*) (ocrWorker_t *, ocrPolicyDomain_t *), hcBeginWorker);
+    base->workerFcts.start = FUNC_ADDR(void (*) (ocrWorker_t *, ocrPolicyDomain_t *), hcStartWorker);
+    base->workerFcts.run = FUNC_ADDR(void* (*) (ocrWorker_t *), hcRunWorker);
+    base->workerFcts.workShift = FUNC_ADDR(void* (*) (ocrWorker_t *), hcWorkShift);
+    base->workerFcts.stop = FUNC_ADDR(void (*) (ocrWorker_t *), hcStopWorker);
+    base->workerFcts.finish = FUNC_ADDR(void (*) (ocrWorker_t *), hcFinishWorker);
+    base->workerFcts.isRunning = FUNC_ADDR(bool (*) (ocrWorker_t *), hcIsRunningWorker);
     return base;
 }
+
+#endif /* ENABLE_WORKER_HC */
