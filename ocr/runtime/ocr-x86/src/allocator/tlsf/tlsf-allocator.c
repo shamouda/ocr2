@@ -182,6 +182,10 @@
 #include "tlsf-allocator.h"
 #include "allocator/allocator-all.h"
 
+#if defined(DRAM_KLUDGE)
+#include "ocr-mem-platform.h"
+#endif
+
 #define DEBUG_TYPE ALLOCATOR
 
 //#ifndef ENABLE_BUILDER_ONLY
@@ -596,7 +600,7 @@ static inline blkPayload_t * payloadAddressForBlock(blkHdr_t * pBlk) {    // Ret
 }
 
 static inline blkHdr_t * mapPayloadAddrToBlockAddr(blkPayload_t * payload) {  // Return address of block's header, given address of payload.
-#ifdef HAL_FSIM_CE
+#if defined(HAL_FSIM_CE) && !defined(DRAM_KLUDGE)
     blkPayload_t *ptr = (blkPayload_t *)(((u64)payload) & 0xFFFFFFLL); // FIXME: Is this a sufficient check? trac #222
 #else
     blkPayload_t *ptr = payload;
@@ -1255,6 +1259,33 @@ void tlsfDestruct(ocrAllocator_t *self) {
 void tlsfBegin(ocrAllocator_t *self, ocrPolicyDomain_t * PD ) {
     CHECK_AND_SET_MODULE_STATE(TLSF-ALLOCATOR, self, BEGIN);
     u32 i;
+
+#if defined(DRAM_KLUDGE) && defined(HAL_FSIM_CE)
+
+   // adjust start addresses and sizes depending on neighborcount
+   self->memories[0]->memories[0]->size /= 32;
+   u64 j = ((PD->myLocation >> 8)*8) + (((PD->myLocation >> 4)) & 0xF);
+   PRINTF("Prelim %lx %lx %lx\n", self->memories[0]->memories[0]->startAddr, PD->myLocation, j);
+
+   self->memories[0]->memories[0]->startAddr += self->memories[0]->memories[0]->size * j;
+   self->memories[0]->memories[0]->endAddr = self->memories[0]->memories[0]->startAddr +
+                                             self->memories[0]->memories[0]->size;
+
+   PRINTF("Mem Platform %lx %lx %lx\n", self->memories[0]->memories[0]->startAddr, self->memories[0]->memories[0]->endAddr, self->memories[0]->memories[0]->size);
+
+   self->memories[0]->size = self->memories[0]->memories[0]->size - 0x400;
+   self->memories[0]->startAddr = self->memories[0]->memories[0]->startAddr;
+   self->memories[0]->endAddr = self->memories[0]->startAddr + self->memories[0]->size;
+
+   PRINTF("Mem Target %lx %lx %lx\n", self->memories[0]->startAddr, self->memories[0]->endAddr, self->memories[0]->size);
+
+   ((ocrAllocatorTlsf_t *)self)->poolStorageAddr = self->memories[0]->startAddr;
+   ((ocrAllocatorTlsf_t *)self)->poolSize = self->memories[0]->size - 0x400;
+
+   PRINTF("Allocator %lx %lx\n", ((ocrAllocatorTlsf_t *)self)->poolStorageAddr, ((ocrAllocatorTlsf_t *)self)->poolSize);
+
+#endif
+
     ASSERT(self->memoryCount == 1);
     self->memories[0]->fcts.begin(self->memories[0], PD);
 

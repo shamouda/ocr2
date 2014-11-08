@@ -76,18 +76,49 @@ void cePolicyDomainBegin(ocrPolicyDomain_t * policy) {
     }
 
 #ifdef HAL_FSIM_CE
-    // Neighbor discovery
-    // FIXME: Severely restrictive, only valid within a unit. Extend: trac #231
+    // FIXME: Cleanup the below
+    // In the general case, all other CEs in my unit are my neighbors
+
+    // However, if I'm block 0 CE, my neighbors also include unit 0 block 0 CE
+    // unless I'm unit 0 block 0 CE
+
     u32 ncount = 0;
-    for(i = 0; i < MAX_NUM_BLOCK && ncount < policy->neighborCount; i++) {
-        // Enumerate CEs
-        if(policy->myLocation != MAKE_CORE_ID(0, 0, 0, 0, i, ID_AGENT_CE))
-            // If I'm not the enumerated CE, add as my neighbor
-            policy->neighbors[ncount++] = MAKE_CORE_ID(0, 0, 0, 0, i, ID_AGENT_CE);
+
+    if(policy->neighborCount) {
+        for (i = 0; i < MAX_NUM_BLOCK; i++) {
+            u32 myUnit = (policy->myLocation & 0xF00)>>8;
+            if(policy->myLocation != MAKE_CORE_ID(0, 0, 0, myUnit, i, ID_AGENT_CE))
+                policy->neighbors[ncount++] = MAKE_CORE_ID(0, 0, 0, myUnit, i, ID_AGENT_CE);
+            if(ncount >= policy->neighborCount) break;
+        }
+
+        if((policy->myLocation & 0x0F0) == 0) {
+            for (i = 0; i < MAX_NUM_UNIT; i++) {
+                if(policy->myLocation != MAKE_CORE_ID(0, 0, 0, i, 0, ID_AGENT_CE))
+                    policy->neighbors[ncount++] = MAKE_CORE_ID(0, 0, 0, i, 0, ID_AGENT_CE);
+                if(ncount >= policy->neighborCount) break;
+            }
+        }
     }
+    policy->neighborCount = ncount;
+
 #endif
 
     ocrPolicyDomainCe_t * cePolicy = (ocrPolicyDomainCe_t*)policy;
+
+#ifdef HAL_FSIM_CE
+    cePolicy->shutdownMax = cePolicy->xeCount; // All CE's collect their XE's shutdowns
+    if((policy->myLocation & 0xF0) == 0) {
+        cePolicy->shutdownMax += policy->neighborCount; // Block 0 also collects other blocks in its unit
+        if((policy->myLocation & 0xF00)) {
+            u32 otherblocks = 0;
+            u32 j;
+            for(j = 0; j<policy->neighborCount; j++)
+                if((policy->neighbors[j] & 0xF0) == 0) otherblocks++;
+            cePolicy->shutdownMax -= otherblocks;                    //  Subtract those neighbors which are not block 0, unit 0
+        }
+    }
+#else
     //FIXME: This is a hack to get the shutdown reportees.
     //This should be replaced by a registration protocol for children to parents.
     //Trac bug: #134
@@ -96,6 +127,7 @@ void cePolicyDomainBegin(ocrPolicyDomain_t * policy) {
     } else {
         cePolicy->shutdownMax = cePolicy->xeCount;
     }
+#endif
 }
 
 void cePolicyDomainStart(ocrPolicyDomain_t * policy) {
@@ -356,6 +388,7 @@ static u8 getEngineIndex(ocrPolicyDomain_t *self, ocrLocation_t location) {
         location -         // Absolute location of the agent for which the allocation is being done.
         self->myLocation + // Absolute location of the CE doing the allocation.
         derived->xeCount;  // Offset so that first XE is 0, last is xeCount-1, and CE is xeCount.
+    if(location == self->myLocation) blockRelativeEngineIndex = derived->xeCount; else blockRelativeEngineIndex = location & 0xF;
     ASSERT(blockRelativeEngineIndex >= 0);
     ASSERT(blockRelativeEngineIndex <= derived->xeCount);
     return blockRelativeEngineIndex;
@@ -391,7 +424,7 @@ static void* allocateDatablock (ocrPolicyDomain_t *self,
         result = self->allocators[allocatorIndex]->fcts.allocate(self->allocators[allocatorIndex], size, allocatorHints);
 
         if (result) {
-#ifdef HAL_FSIM_CE
+#if defined(HAL_FSIM_CE) && !defined(DRAM_KLUDGE)
             if((u64)result <= CE_MSR_BASE && (u64)result >= BR_CE_BASE) {
                 result = (void *)DR_CE_BASE(CHIP_FROM_ID(self->myLocation),
                                             UNIT_FROM_ID(self->myLocation),
@@ -412,6 +445,7 @@ static void* allocateDatablock (ocrPolicyDomain_t *self,
             return result;
         }
     } while (prescription != 0);
+
     return NULL;
 }
 
@@ -466,7 +500,7 @@ static u8 ceMemAlloc(ocrPolicyDomain_t *self, ocrFatGuid_t* allocator, u64 size,
 
 static u8 ceMemUnalloc(ocrPolicyDomain_t *self, ocrFatGuid_t* allocator,
                        void* ptr, ocrMemType_t memType) {
-#ifdef HAL_FSIM_CE
+#if defined(HAL_FSIM_CE) && !defined(DRAM_KLUDGE)
     u64 base = DR_CE_BASE(CHIP_FROM_ID(self->myLocation),
                           UNIT_FROM_ID(self->myLocation),
                           BLOCK_FROM_ID(self->myLocation));
@@ -609,7 +643,7 @@ static u8 ceProcessResponse(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u32 pr
         if (msg->type & PD_MSG_REQ_RESPONSE) {
             msg->type &= ~PD_MSG_REQUEST;
             msg->type |=  PD_MSG_RESPONSE;
-#ifdef HAL_FSIM_CE
+#if defined(HAL_FSIM_CE)
             if((msg->destLocation & ID_AGENT_CE) == ID_AGENT_CE) {
                 // This is a CE->CE message
                 ocrPolicyMsg_t toSend;
@@ -618,7 +652,7 @@ static u8 ceProcessResponse(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u32 pr
                 msg->size = fullMsgSize;
                 ocrPolicyMsgMarshallMsg(msg, (u8 *)&toSend, MARSHALL_DUPLICATE);
 
-                while(self->fcts.sendMessage(self, toSend.destLocation, &toSend, NULL, properties)) {
+                while(self->fcts.sendMessage(self, toSend.destLocation, &toSend, NULL, properties) == 1) {
                     ocrPolicyMsg_t myMsg;
                     ocrMsgHandle_t myHandle;
                     myHandle.msg = &myMsg;
@@ -628,7 +662,11 @@ static u8 ceProcessResponse(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u32 pr
                 }
             } else {
                 // This is a CE->XE message
-                RESULT_ASSERT(self->fcts.sendMessage(self, msg->destLocation, msg, NULL, properties), ==, 0);
+                if((msg->type & PD_MSG_TYPE_ONLY) != PD_MSG_MGT_SHUTDOWN) {
+                    RESULT_ASSERT(self->fcts.sendMessage(self, msg->destLocation, msg, NULL, properties), ==, 0);
+                } else  // Temporary workaround till bug #134 is fixed
+                    self->fcts.sendMessage(self, msg->destLocation, msg, NULL, properties);
+
             }
 #else
             RESULT_ASSERT(self->fcts.sendMessage(self, msg->destLocation, msg, NULL, properties), ==, 0);
@@ -1074,15 +1112,19 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             //then we need to start looking for work on other CE's.
             ocrPolicyDomainCe_t * cePolicy = (ocrPolicyDomainCe_t*)self;
             static s32 throttlecount = 1;
+            static u32 i = 0;
             // FIXME: very basic self-throttling mechanism
-            if ((PD_MSG_FIELD(guidCount) == 0) && (cePolicy->shutdownMode == false) && (--throttlecount <= 0)) {
-                throttlecount = 200*(self->neighborCount-1);
+            if ((PD_MSG_FIELD(guidCount) == 0) &&
+                (cePolicy->shutdownMode == false) &&
+                (--throttlecount <= 0)) {
+
+                throttlecount = 20*(self->neighborCount-1);
                 //Try other CE's
-                u32 i;
-                for (i = 0; i < self->neighborCount; i++) {
-                    //Check if I already have an active work request pending on a CE
-                    //If not, then we post one
-                    if ((cePolicy->ceCommTakeActive[i] == 0) && (msg->srcLocation != self->neighbors[i])) {
+                //Check if I already have an active work request pending on a CE
+                //If not, then we post one
+                if (self->neighborCount &&
+                   (cePolicy->ceCommTakeActive[i] == 0) &&
+                   (msg->srcLocation != self->neighbors[i])) {
 #undef PD_MSG
 #define PD_MSG (&ceMsg)
                         ocrPolicyMsg_t ceMsg;
@@ -1099,7 +1141,7 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
 #undef PD_MSG
 #define PD_MSG msg
                     }
-                }
+                if(++i >= self->neighborCount) i = 0;
             }
 
             // Respond to the requester
@@ -1388,12 +1430,15 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
                 ASSERT(msg->srcLocation != self->myLocation);
                 if (self->shutdownCode == 0)
                     self->shutdownCode = PD_MSG_FIELD(errorCode);
+#ifdef HAL_FSIM_CE
+                if(msg->srcLocation != self->parentLocation)
+#endif
                 cePolicy->shutdownCount++;
-                DPRINTF (DEBUG_LVL_VERB, "MSG_SHUTDOWN REQ from Agent 0x%lx; shutdown %u/%u\n",
+                DPRINTF (DEBUG_LVL_INFO, "MSG_SHUTDOWN REQ from Agent 0x%lx; shutdown %u/%u\n",
                     msg->srcLocation, cePolicy->shutdownCount, cePolicy->shutdownMax);
             } else {
                 ASSERT(msg->type & PD_MSG_RESPONSE);
-                DPRINTF (DEBUG_LVL_VERB, "MSG_SHUTDOWN RESP from Agent 0x%lx; shutdown %u/%u\n",
+                DPRINTF (DEBUG_LVL_INFO, "MSG_SHUTDOWN RESP from Agent 0x%lx; shutdown %u/%u\n",
                     msg->srcLocation, cePolicy->shutdownCount, cePolicy->shutdownMax);
             }
 
@@ -1473,7 +1518,7 @@ void* cePdMalloc(ocrPolicyDomain_t *self, u64 size) {
             (allocatorIndex >= self->allocatorCount) ||
             (self->allocators[allocatorIndex] == NULL)) continue;  // Skip this allocator if it doesn't exist.
         result = self->allocators[allocatorIndex]->fcts.allocate(self->allocators[allocatorIndex], size, allocatorHints);
-#ifdef HAL_FSIM_CE
+#if defined(HAL_FSIM_CE) && !defined(DRAM_KLUDGE)
         if (result) {
             if((u64)result <= CE_MSR_BASE && (u64)result >= BR_CE_BASE) {
                 result = (void *)DR_CE_BASE(CHIP_FROM_ID(self->myLocation),
@@ -1499,7 +1544,7 @@ void* cePdMalloc(ocrPolicyDomain_t *self, u64 size) {
 }
 
 void cePdFree(ocrPolicyDomain_t *self, void* addr) {
-#ifdef HAL_FSIM_CE
+#if defined(HAL_FSIM_CE) && !defined(DRAM_KLUDGE)
     u64 base = DR_CE_BASE(CHIP_FROM_ID(self->myLocation),
                           UNIT_FROM_ID(self->myLocation),
                           BLOCK_FROM_ID(self->myLocation));

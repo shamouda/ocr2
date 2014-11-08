@@ -83,6 +83,8 @@ CFLAGS += -DINIT_DEQUE_CAPACITY=2048
 # Debug flags
 ####################################################
 
+CFLAGS += -DDRAM_KLUDGE
+
 # Debugging support
 # Enable debug
 CFLAGS += -DOCR_DEBUG

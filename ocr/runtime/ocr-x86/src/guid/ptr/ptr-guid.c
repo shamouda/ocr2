@@ -85,7 +85,7 @@ u8 ptrCreateGuid(ocrGuidProvider_t* self, ocrFatGuid_t *fguid, u64 size, ocrGuid
     RESULT_PROPAGATE(policy->fcts.processMessage (policy, &msg, true));
 
     ocrGuidImpl_t * guidInst = (ocrGuidImpl_t *)PD_MSG_FIELD(ptr);
-#ifdef HAL_FSIM_CE
+#if defined(HAL_FSIM_CE) && !defined(DRAM_KLUDGE)
     if((u64)PD_MSG_FIELD(ptr) < CE_MSR_BASE) // FIXME: do this check properly, trac #222
         guidInst = (ocrGuidImpl_t *) DR_CE_BASE(CHIP_FROM_ID(policy->myLocation),
                                                 UNIT_FROM_ID(policy->myLocation),

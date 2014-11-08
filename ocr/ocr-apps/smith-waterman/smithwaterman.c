@@ -157,6 +157,7 @@ ocrGuid_t smith_waterman_task ( u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t d
         curr_tile[0][index] = above_tile_bottom_row[index-1];
     }
 
+PRINTF("Starting on tile %d, %d\n", i, j);
     /* Run a smith-waterman on the local tile */
     for ( ii = 1; ii < tile_height+1; ++ii ) {
         for ( jj = 1; jj < tile_width+1; ++jj ) {
@@ -174,6 +175,7 @@ ocrGuid_t smith_waterman_task ( u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t d
             curr_tile[ii][jj] = (bigger_of_left_top > diag_score) ? bigger_of_left_top : diag_score;
         }
     }
+PRINTF("Done with tile %d, %d\n", i, j);
 
     /* Allocate datablock for bottom right of the local tile */
     ocrGuid_t db_guid_i_j_br;
