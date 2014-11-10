@@ -4,7 +4,9 @@ Usage Instruction for EDT Exectution Timeline
 
 This visualization tool records the timeline for thread
 execution. It currently has a time.h dependency, thus
-it is only supported on x86 architecture.
+supported platforms are restricted to:
+    -x86-pthread-x86
+    -x86-pthread-mpi
 
 The following are required pre-execution:
 

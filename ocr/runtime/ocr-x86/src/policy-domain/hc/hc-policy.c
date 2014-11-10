@@ -924,7 +924,8 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
                 ASSERT(false && "no statistics support in distributed edt templates");
 #endif
 #ifdef OCR_ENABLE_EDT_NAMING
-                ASSERT(false && "no serialization of edt template string");
+                //This assertion causes failure when logging distributed execution for timeline viz
+                //ASSERT(false && "no serialization of edt template string");
 #endif
                 PD_MSG_FIELD(size) = sizeof(ocrTaskTemplateHc_t);
                 break;

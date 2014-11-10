@@ -13,19 +13,26 @@ END_TIME_INDEX = 11
 FCT_NAME_INDEX = 7
 WORKER_ID_INDEX = 2
 NUM_TICKS = 15
+PD_ID_INDEX = 1
 
-#========= Write EDT EXECTUION events to xml file ==========
+#========= Write EDT EXECTUION events to html file ==========
 def postProcessData(inString, outFile, offSet, lastLineFlag):
     words = inString.split()
     workerID = words[WORKER_ID_INDEX][WORKER_ID_INDEX:]
     fctName = words[FCT_NAME_INDEX]
     startTime = (int(words[START_TIME_INDEX]) - offSet)/1000 #Ns to Ms
     endTime = (int(words[END_TIME_INDEX]) - offSet)/1000 #Ns to Ms
+    whichNode = words[PD_ID_INDEX][1:]
+    #TODO: Fix incoming time mismatch. Bug happens very infrequently
+    if startTime > endTime:
+        temp = startTime
+        startTime = endTime
+        endTime = temp
 
     if lastLineFlag == True:
-        outFile.write('\t\t[\'Worker: ' + str(workerID) + '\', \'' + str(fctName) + '\', new Date(0,0,0,0,0,0,' + str(startTime) + '), new Date(0,0,0,0,0,0,' + str(endTime) + ') ]]);\n')
+        outFile.write('\t\t[\'Worker: ' + str(workerID) + '\', \'' + str(fctName) + ' on ' + str(whichNode) + '\', new Date(0,0,0,0,0,0,' + str(startTime) + '), new Date(0,0,0,0,0,0,' + str(endTime) + ') ]]);\n')
     else:
-        outFile.write('\t\t[\'Worker: ' + str(workerID) + '\', \'' + str(fctName) + '\', new Date(0,0,0,0,0,0,' + str(startTime) + '), new Date(0,0,0,0,0,0,' + str(endTime) + ') ],\n')
+        outFile.write('\t\t[\'Worker: ' + str(workerID) + '\', \'' + str(fctName) + ' on ' + str(whichNode) + '\', new Date(0,0,0,0,0,0,' + str(startTime) + '), new Date(0,0,0,0,0,0,' + str(endTime) + ') ],\n')
 
 #========== Strip Un-needed events from OCR debug log ========
 def runShellStrip():
@@ -176,6 +183,15 @@ def sortByWorker(sortedLog, uniqWorkers):
 
     return sortedWrkrs
 
+#========= Sets zoom bar height to snap to timeline ==========
+def setZoom(numThreads):
+    zoom = 75 + (numThreads*40)
+    if zoom > 715:
+        #715 in the number of vertical pixels (from top of page to top of zoom bar)
+        #at 16 rows. Inrease this value to show more records.
+        zoom = 715
+    return zoom
+
 #======== cleanup temporary files =========
 def cleanup():
     os.remove('log.txt')
@@ -204,12 +220,7 @@ def main():
         numEDTs = len(sortedLines)
 
         #Used to set zoom bar position
-        zoom = 75 + (numThreads*40)
-
-        if zoom > 715:
-            #715 is height of 16 rows.  Past 16 rows the overflow scroll will take over.
-            #increase this value if you want more rows to be displayed in single frame
-            zoom = 715
+        zoom = setZoom(numThreads)
 
         #Arrange data
         firstLine = sortedLines[0].split()
