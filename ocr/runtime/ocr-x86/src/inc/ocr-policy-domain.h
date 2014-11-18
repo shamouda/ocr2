@@ -195,6 +195,7 @@ typedef struct _paramListPolicyDomainInst_t {
 /**< Finish operation (indicates the PD should
  * destroy itself. The existence of other PDs can
  * no longer be assumed */
+ //TODO-RL this is probably deprecated
 #define PD_MSG_MGT_FINISH       0x2200
 
 /**< Register a policy-domain with another
@@ -208,6 +209,9 @@ typedef struct _paramListPolicyDomainInst_t {
 
 /**< For a worker to request the policy-domain to monitor an operation progress */
 #define PD_MSG_MGT_MONITOR_PROGRESS 0x5200
+
+/**< Runlevel change notification */
+#define PD_MSG_MGT_RL_NOTIFY       0x6200
 
 
 #ifdef OCR_ENABLE_STATISTICS
@@ -621,6 +625,12 @@ typedef struct _ocrPolicyMsg_t {
         } PD_MSG_STRUCT_NAME(PD_MSG_MGT_FINISH);
 
         struct {
+            u32 runlevel;
+            u32 action;
+            u32 properties;
+        } PD_MSG_STRUCT_NAME(PD_MSG_MGT_RL_NOTIFY);
+
+        struct {
             ocrLocation_t neighbor; /**< In: Neighbor registering */
             // TODO: Add things having to do with cost and relationship
             u32 properties;
@@ -704,17 +714,10 @@ typedef struct _ocrPolicyDomainFcts_t {
      *
      * @param self                This policy domain
      */
-    void (*stop)(struct _ocrPolicyDomain_t *self);
+    void (*stop)(struct _ocrPolicyDomain_t *self, ocrRunLevel_t rl, u32 action);
 
-    /**
-     * @brief Finish the execution of the policy domain
-     *
-     * Ask the policy domain to wrap up currently executing
-     * task and shutdown workers. Finish is called after stop
-     *
-     * @param self                This policy domain
-     */
-    void (*finish)(struct _ocrPolicyDomain_t *self);
+    //TODO-RL DOC
+    void (*setRunlevel)(struct _ocrPolicyDomain_t *self, ocrRunLevel_t rl);
 
     /**
      * @brief Requests for the handling of the request msg
@@ -874,6 +877,8 @@ typedef struct _ocrPolicyDomain_t {
                                                  * data-blocks */
     ocrEventFactory_t ** eventFactories;        /**< Factories to produce events*/
     ocrGuidProvider_t ** guidProviders;         /**< GUID generators */
+    volatile ocrRunLevel_t rl; //TODO volatile exposes too much of the underlying implementation
+    u32 seenStopped;
     ocrPlacer_t * placer;                       /**< Affinity and placement (work in progress) */
 
     // TODO: What to do about this?

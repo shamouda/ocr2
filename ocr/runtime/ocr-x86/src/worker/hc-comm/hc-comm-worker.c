@@ -127,22 +127,6 @@ static u8 takeFromSchedulerAndSend(ocrPolicyDomain_t * pd) {
     return POLL_NO_MESSAGE;
 }
 
-static void workerLoopHcComm_RL2(ocrWorker_t * worker) {
-    ocrWorkerHcComm_t * self = (ocrWorkerHcComm_t *) worker;
-    ocrPolicyDomain_t *pd = worker->pd;
-
-    // Take and send all the work
-    while(takeFromSchedulerAndSend(pd) == POLL_MORE_MESSAGE);
-
-    // Poll for completion of all outstanding
-    ocrMsgHandle_t * handle = NULL;
-    pd->fcts.pollMessage(pd, &handle);
-    // DIST-TODO stop: this is borderline, because we've transitioned
-    // the comm-platform to RL2, we assume that poll blocks until
-    // all messages have been processed.
-    self->rl_completed[2] = true;
-}
-
 static u8 createProcessRequestEdt(ocrPolicyDomain_t * pd, ocrGuid_t templateGuid, u64 * paramv) {
 
     ocrGuid_t edtGuid;
@@ -191,15 +175,17 @@ static u8 createProcessRequestEdt(ocrPolicyDomain_t * pd, ocrGuid_t templateGuid
 #undef PD_TYPE
 }
 
-static void workerLoopHcComm_RL3(ocrWorker_t * worker) {
-    ocrWorkerHcComm_t * self = (ocrWorkerHcComm_t *) worker;
+//TODO-RL to make the workShift pointer happy
+static void workerLoopHcComm_DUMMY() {
+    ASSERT(false);
+}
+
+static void workerLoopHcCommInternal(ocrWorker_t * worker, ocrGuid_t processRequestTemplate, bool checkEmptyOutgoing) {
+    ocrWorkerHc_t * bself = (ocrWorkerHc_t *) worker;
     ocrPolicyDomain_t *pd = worker->pd;
 
-    ocrGuid_t processRequestTemplate;
-    ocrEdtTemplateCreate(&processRequestTemplate, &processRequestEdt, 1, 0);
-
-    // This loop exits on the first call to stop.
-    while(!self->rl_completed[3]) {
+    // Runlevel USER 'communication' loop
+    while(bself->workLoopSpin) {
         // First, Ask the scheduler if there are any communication
         // to be scheduled and sent them if any.
         takeFromSchedulerAndSend(pd);
@@ -260,26 +246,117 @@ static void workerLoopHcComm_RL3(ocrWorker_t * worker) {
 
         } else {
             //DIST-TODO No messages ready for processing, ask PD for EDT work.
+            if (checkEmptyOutgoing && (ret & POLL_NO_OUTGOING_MESSAGE)) {
+                break;
+            }
         }
     } // run-loop
 }
 
+static void runlevel_stop(ocrWorker_t * base) {
+    u64 computeCount = base->computeCount;
+    u64 i = 0;
+    for(i = 0; i < computeCount; i++) {
+        base->computes[i]->fcts.stop(base->computes[i], RL_STOP, RL_ACTION_ENTER);
+#ifdef OCR_ENABLE_STATISTICS
+        statsWORKER_STOP(base->pd, base->fguid.guid, base->fguid.metaDataPtr,
+                         base->computes[i]->fguid.guid,
+                         base->computes[i]->fguid.metaDataPtr);
+#endif
+    }
+}
+
+static void hcDistNotifyRunlevelToPd(ocrWorker_t * worker, ocrRunLevel_t newRl, u32 action) {
+    ocrPolicyDomain_t * pd;
+    ocrPolicyMsg_t msg;
+    getCurrentEnv(&pd, NULL, NULL, &msg);
+#define PD_MSG (&msg)
+#define PD_TYPE PD_MSG_MGT_RL_NOTIFY
+    msg.type = PD_MSG_MGT_RL_NOTIFY | PD_MSG_REQUEST;
+    //TODO-RL: for now notify is implicitely meaning the worker reached the runlevel
+    PD_MSG_FIELD(runlevel) = newRl;
+    PD_MSG_FIELD(action) = action;
+    pd->fcts.processMessage(pd, &msg, false);
+#undef PD_MSG
+#undef PD_TYPE
+}
+
+//TODO-RL can factorize in hc-worker if allow function pointer registration for each RL
 static void workerLoopHcComm(ocrWorker_t * worker) {
-    ocrWorkerHcComm_t * self = (ocrWorkerHcComm_t *) worker;
+    ocrGuid_t processRequestTemplate;
+    ocrEdtTemplateCreate(&processRequestTemplate, &processRequestEdt, 1, 0);
 
-    // RL3: take, send / poll, dispatch, execute
-    workerLoopHcComm_RL3(worker);
-    ASSERT(self->rl_completed[3]);
-    self->rl_completed[3] = false;
-    while(self->rl == 3); // transitioned by 'stop'
+    // 'communication' loop: take, send / poll, dispatch, execute
+    workerLoopHcCommInternal(worker, processRequestTemplate, false);
+    // PRINTF("[%d] WORKER[%d] ENTERING RL_ACTION_QUIESCE_COMM\n", (int)worker->pd->myLocation, ((ocrWorkerHc_t*) worker)->id);
+    // Received a RL_ACTION_QUIESCE_COMM that broke the loop
+    ASSERT(worker->rl == RL_RUNNING_USER_WIP);
 
-    // RL2: Empty the scheduler of all communication work,
-    // then keep polling so that the comm-api can drain messages
-    workerLoopHcComm_RL2(worker);
-    while(self->rl == 2); // transitioned by 'stop'
+    // Try to quiesce communication
+    ocrWorkerHc_t * bself = ((ocrWorkerHc_t *) worker);
 
-    // RL1: Wait for PD stop.
-    while(worker->fcts.isRunning(worker));
+    // Empty outgoing messages from the scheduler
+    ocrPolicyDomain_t *pd = worker->pd;
+    while(takeFromSchedulerAndSend(pd) == POLL_MORE_MESSAGE);
+
+    // Loop until pollMessage says there's no more outgoing messages
+    // to be processed by the underlying comm-platform
+    bself->workLoopSpin = true;
+    workerLoopHcCommInternal(worker, processRequestTemplate, true/*check empty queue*/);
+    // Here, no more outgoing messages in comm-platform
+
+    // Done with the quiesce comm action
+    // PRINTF("[%d] WORKER[%d] COMM DONE RL_ACTION_QUIESCE_COMM\n", (int)worker->pd->myLocation, ((ocrWorkerHc_t*) worker)->id);
+    bself->workLoopSpin = true; //TODO-RL do we need a barrier here to prevent compiler reordering ?
+    hcDistNotifyRunlevelToPd(worker, RL_RUNNING_USER, RL_ACTION_QUIESCE_COMM);
+    // Enter the 'keep-working' loop
+    // Here we need to keep serving comms because of incoming messages
+    // the runtime needs to answer. If we busy-wait, we may deadlock.
+    // PRINTF("[%d] WORKER[%d] COMM before loop after comm\n", (int)worker->pd->myLocation, ((ocrWorkerHc_t*) worker)->id);
+    workerLoopHcCommInternal(worker, processRequestTemplate, false);
+    // PRINTF("[%d] WORKER[%d] COMM WORKER stop\n", (int)worker->pd->myLocation, ((ocrWorkerHc_t*) worker)->id);
+    // Received a RL_ACTION_EXIT that broke the loop
+
+    // PRINTF("[%d] WORKER[%d] COMM hcDistNotifyRunlevelToPd RL_ACTION_EXIT\n", (int)worker->pd->myLocation, ((ocrWorkerHc_t*) worker)->id);
+    // bself->workLoopSpin = true; //TODO-RL do we need a barrier here to prevent compiler reordering ?
+    // When the comm-worker quiesce and it already had all its neighbors PD's shutdown msg
+    // we need to make sure there's no outgoing messages pending (i.e. a one-way shutdown) for other PDs
+    // before wrapping up the user runlevel
+    // Empty outgoing messages from the scheduler
+    while(takeFromSchedulerAndSend(pd) == POLL_MORE_MESSAGE);
+
+    // Loop until pollMessage says there's no more outgoing messages
+    // to be processed by the underlying comm-platform
+    bself->workLoopSpin = true;
+    workerLoopHcCommInternal(worker, processRequestTemplate, true/*check empty queue*/);
+
+    hcDistNotifyRunlevelToPd(worker, RL_RUNNING_USER, RL_ACTION_EXIT);
+
+    // Execute the runlevel barrier
+    while(worker->rl == RL_RUNNING_USER_WIP);
+    // PRINTF("[%d] WORKER[%d] COMM AFTER barrier\n", (int)worker->pd->myLocation, ((ocrWorkerHc_t*) worker)->id);
+    //
+    // RUNLEVEL RT
+    //
+    ASSERT(worker->rl == RL_RUNNING_RT);
+
+    worker->rl = RL_RUNNING_RT_WIP;
+    // Nothing to do in the current distributed implementation
+    hcDistNotifyRunlevelToPd(worker, RL_RUNNING_RT, RL_ACTION_EXIT);
+
+    while(worker->rl == RL_RUNNING_RT_WIP);
+    ASSERT(worker->rl == RL_STOP);
+    // At this point the communication layer is stopped
+
+    runlevel_stop(worker);
+
+    worker->rl = RL_STOP_WIP;
+    hcDistNotifyRunlevelToPd(worker, RL_STOP, RL_ACTION_EXIT);
+
+    // PRINTF("[%d] WORKER[%d] COMM exiting thread\n", (int)worker->pd->myLocation, ((ocrWorkerHc_t*) worker)->id);
+    //
+    // This instance of worker becomes inert
+    //
 }
 
 static bool isBlessedWorker(ocrWorker_t * worker, ocrGuid_t * affinityMasterPD) {
@@ -339,54 +416,49 @@ void* runWorkerHcComm(ocrWorker_t * worker) {
     return NULL;
 }
 
-
-void stopWorkerHcComm(ocrWorker_t * selfBase) {
-    ocrWorkerHcComm_t * self = (ocrWorkerHcComm_t *) selfBase;
-    ocrWorker_t * currWorker = NULL;
-    getCurrentEnv(NULL, &currWorker, NULL, NULL);
-
-    if (self->rl_completed[self->rl]) {
-        self->rl--;
-    }
-    // Some other worker wants to stop the communication worker.
-    if (currWorker != selfBase) {
-        switch(self->rl) {
-            case 3:
-                DPRINTF(DEBUG_LVL_VVERB,"hc-comm-worker: begin shutdown RL3\n");
-                // notify worker of level completion
-                self->rl_completed[3] = true;
-                while(self->rl_completed[3]);
-                self->rl_completed[3] = true; // so ugly
-                DPRINTF(DEBUG_LVL_VVERB,"hc-comm-worker: done shutdown RL3\n");
-                // Guarantees RL3 is fully completed. Avoids race where the RL is flipped
-                // but the comm-worker is in the middle of its RL3 loop.
-            break;
-            case 2:
-                DPRINTF(DEBUG_LVL_VVERB,"hc-comm-worker: begin shutdown RL2\n");
-                // Wait for runlevel to complete
-                while(!self->rl_completed[2]);
-                DPRINTF(DEBUG_LVL_VVERB,"hc-comm-worker: done shutdown RL2\n");
-                // All communications completed.
-            break;
-            case 1:
-                //DIST-TODO stop: we don't need this RL I think
-                DPRINTF(DEBUG_LVL_VVERB,"hc-comm-worker: begin shutdown RL1\n");
-                self->rl_completed[1] = true;
-                DPRINTF(DEBUG_LVL_VVERB,"hc-comm-worker: done shutdown RL1\n");
-            break;
-            case 0:
-                DPRINTF(DEBUG_LVL_VVERB,"hc-comm-worker: begin shutdown RL0\n");
-                // We go on and call the base stop function that
-                // shuts down the comm-api and comm-platform.
-                self->baseStop(selfBase);
-            break;
+void hcDistStopWorker(ocrWorker_t * base, ocrRunLevel_t rl, u32 actionRl) {
+    if (actionRl == RL_ACTION_ENTER) {
+        // delegate to base
+        ocrWorkerHcComm_t * derived = (ocrWorkerHcComm_t *) base;
+        derived->baseStop(base, rl, actionRl);
+    } else {
+        switch(rl) {
+            case RL_RUNNING_USER: {
+                ASSERT((base->rl == RL_RUNNING_USER) || (base->rl == RL_RUNNING_USER_WIP));
+                if (actionRl == RL_ACTION_QUIESCE_COMM) {
+                    // Make the worker exit its current work loop
+                    base->rl = RL_RUNNING_USER_WIP;
+                    ocrWorkerHc_t * bself = (ocrWorkerHc_t *) base;
+                    // Break the 'communication' loop
+                    bself->workLoopSpin = false;
+                } else if (actionRl == RL_ACTION_EXIT) {
+                    // Break the 'keep working' loop
+                    ocrWorkerHc_t * bself = (ocrWorkerHc_t *) base;
+                    bself->workLoopSpin = false;
+                    // PRINTF("[%d] stop RL_ACTION_EXIT on COMM\n", (int)base->pd->myLocation);
+                } else {
+                    ASSERT(actionRl != 0);
+                    // nothing to do for other actions, just notify it went through
+                    hcDistNotifyRunlevelToPd(base, RL_RUNNING_USER, actionRl);
+                }
+                break;
+            }
+            case RL_RUNNING_RT: {
+                //TODO-RL check these WIP conditions everywhere
+                ASSERT((base->rl == RL_RUNNING_RT) || (base->rl == RL_RUNNING_RT_WIP));
+                ASSERT(actionRl == RL_ACTION_EXIT);
+                base->rl = RL_RUNNING_RT_WIP;
+                break;
+            }
+            case RL_STOP: {
+                ASSERT(actionRl == RL_ACTION_EXIT);
+                // Nothing to do
+                //TODO-RL do we need this ?
+                break;
+            }
             default:
-            ASSERT(false && "hc-comm-worker: Illegal runlevel in shutdown");
+                ASSERT("No implementation to enter runlevel");
         }
-    }  else {
-        //DIST-TODO stop: Implement self shutdown
-        ASSERT(false && "hc-comm-worker: Implement self shutdown");
-        // worker stopping itself, just call the appropriate run-level
     }
 }
 
@@ -406,14 +478,9 @@ void initializeWorkerHcComm(ocrWorkerFactory_t * factory, ocrWorker_t *self, ocr
     // Override base's default value
     ocrWorkerHc_t * workerHc = (ocrWorkerHc_t *) self;
     workerHc->hcType = HC_WORKER_COMM;
-    // Initialize comm=worker's members
+    // Initialize comm worker's members
     ocrWorkerHcComm_t * workerHcComm = (ocrWorkerHcComm_t *) self;
     workerHcComm->baseStop = derivedFactory->baseStop;
-    int i = 0;
-    while (i < (HC_COMM_WORKER_RL_MAX+1)) {
-        workerHcComm->rl_completed[i++] = false;
-    }
-    workerHcComm->rl = HC_COMM_WORKER_RL_MAX;
 }
 
 /******************************************************/
@@ -441,8 +508,9 @@ ocrWorkerFactory_t * newOcrWorkerFactoryHcComm(ocrParamList_t * perType) {
 
     // Specialize comm functions
     base->workerFcts.run = FUNC_ADDR(void* (*)(ocrWorker_t*), runWorkerHcComm);
-    base->workerFcts.workShift = FUNC_ADDR(void* (*) (ocrWorker_t *), workerLoopHcComm_RL3);
-    base->workerFcts.stop = FUNC_ADDR(void (*)(ocrWorker_t*), stopWorkerHcComm);
+    base->workerFcts.stop = FUNC_ADDR(void (*) (ocrWorker_t *,ocrRunLevel_t,u32), hcDistStopWorker);
+    //TODO-RL: This doesn't really work out for communication-workers
+    base->workerFcts.workShift = FUNC_ADDR(void* (*) (ocrWorker_t *), workerLoopHcComm_DUMMY);
 
     baseFactory->destruct(baseFactory);
     return base;

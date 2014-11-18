@@ -71,8 +71,7 @@ typedef struct _ocrGuidProviderFcts_t {
      */
     void (*start)(struct _ocrGuidProvider_t* self, struct _ocrPolicyDomain_t* pd);
 
-    void (*stop)(struct _ocrGuidProvider_t* self);
-    void (*finish)(struct _ocrGuidProvider_t* self);
+    void (*stop)(struct _ocrGuidProvider_t* self, ocrRunLevel_t newRl, u32 action);
 
     /**
      * @brief Gets a GUID for an object of kind 'kind'

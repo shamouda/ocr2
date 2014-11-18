@@ -240,35 +240,6 @@ u8 MPICommSendMessage(ocrCommPlatform_t * self,
     return res;
 }
 
-u8 MPICommPollMessage_RL2(ocrCommPlatform_t *self, ocrPolicyMsg_t **msg,
-                          u64* bufferSize, u32 properties, u32 *mask) {
-    // NOTE: If one-way were tracked by the comm-api we would need to have
-    // this sort of loop there to notify message status.
-    ocrCommPlatformMPI_t * mpiComm = ((ocrCommPlatformMPI_t *) self);
-    ocrPolicyDomain_t * pd = self->pd;
-    linkedlist_t * outbox = mpiComm->outgoing;
-    // RL1 should only be outgoing shutdown message
-    while(!outbox->isEmpty(outbox)) {
-        iterator_t * outgoingIt = mpiComm->outgoingIt;
-        outgoingIt->reset(outgoingIt);
-        while (outgoingIt->hasNext(outgoingIt)) {
-            mpiCommHandle_t * handle = (mpiCommHandle_t *) outgoingIt->next(outgoingIt);
-            int completed = 0;
-            int ret = MPI_Test(&(handle->status), &completed, MPI_STATUS_IGNORE);
-            ASSERT(ret == MPI_SUCCESS);
-            if(completed) {
-                u32 msgProperties = handle->properties;
-                ASSERT((handle->msg->type & PD_MSG_TYPE_ONLY) == PD_MSG_MGT_SHUTDOWN);
-                ASSERT(msgProperties & PERSIST_MSG_PROP);
-                pd->fcts.pdFree(pd, handle->msg);
-                pd->fcts.pdFree(pd, handle);
-                outgoingIt->removeCurrent(outgoingIt);
-            }
-        }
-    }
-    return POLL_NO_MESSAGE;
-}
-
 #if STRATEGY_PROBE_RECV
 u8 probeIncoming(ocrCommPlatform_t *self, int src, int tag, ocrPolicyMsg_t ** msg, int msgSize) {
     //PERF: Would it be better to always probe and allocate messages for responses on the fly
@@ -307,7 +278,7 @@ u8 probeIncoming(ocrCommPlatform_t *self, int src, int tag, ocrPolicyMsg_t ** ms
 }
 #endif
 
-u8 MPICommPollMessage_RL3(ocrCommPlatform_t *self, ocrPolicyMsg_t **msg,
+u8 MPICommPollMessageInternal(ocrCommPlatform_t *self, ocrPolicyMsg_t **msg,
                           u64* bufferSize, u32 properties, u32 *mask) {
     ocrPolicyDomain_t * pd = self->pd;
     ocrCommPlatformMPI_t * mpiComm = ((ocrCommPlatformMPI_t *) self);
@@ -402,38 +373,39 @@ u8 MPICommPollMessage_RL3(ocrCommPlatform_t *self, ocrPolicyMsg_t **msg,
 #if STRATEGY_PRE_POST_RECV
     ASSERT(debugIts != false); // There should always be an irecv any posted
 #endif
-    u8 retValue = POLL_NO_MESSAGE;
+    u8 retCode = POLL_NO_MESSAGE;
 
 #if STRATEGY_PROBE_RECV
     // Check for outstanding incoming. If any, a message is allocated
     // and returned through 'msg'.
-    retValue = probeIncoming(self, MPI_ANY_SOURCE, RECV_ANY_ID, msg, 0);
+    retCode = probeIncoming(self, MPI_ANY_SOURCE, RECV_ANY_ID, msg, 0);
     // Message is properly un-marshalled at this point
 #endif
-
-    return retValue;
+    if (retCode == POLL_NO_MESSAGE) {
+        retCode |= (mpiComm->outgoing->isEmpty(mpiComm->outgoing)) ? POLL_NO_OUTGOING_MESSAGE : 0;
+        retCode |= (mpiComm->incoming->isEmpty(mpiComm->incoming)) ? POLL_NO_INCOMING_MESSAGE : 0;
+    }
+    return retCode;
 }
 
 u8 MPICommPollMessage(ocrCommPlatform_t *self, ocrPolicyMsg_t **msg,
                       u64* bufferSize, u32 properties, u32 *mask) {
     ocrCommPlatformMPI_t * mpiComm = ((ocrCommPlatformMPI_t *) self);
     switch(mpiComm->rl) {
-        case 3:
-            return MPICommPollMessage_RL3(self, msg, bufferSize, properties, mask);
-        case 2: {
-            // The comm-worker is draining all remaining communication out
-            // of the scheduler, then calls poll to complete those.
-            //DIST-TODO stop: This RL's poll, block until all the work is completed so that
-            //we guarantee the worker there's no outstanding comm
-            u8 res = MPICommPollMessage_RL2(self, msg, bufferSize, properties, mask);
-            ASSERT(res == POLL_NO_MESSAGE);
-            mpiComm->rl_completed[2] = true;
-            return res;
+        case RL_RUNNING_USER:
+        case RL_RUNNING_RT:
+        {
+            return MPICommPollMessageInternal(self, msg, bufferSize, properties, mask);
         }
         default:
-            // nothing to do
-            ASSERT(false && "Illegal RL reached in MPI-comm-platform pollMessage");
+        {
+            // Not supposed to be polled outside above runlevels
+            DPRINTF(DEBUG_LVL_WARN,"[MPI %d] Illegal RL[%d] reached in MPI-comm-platform pollMessage\n",
+                    mpiRankToLocation(self->pd->myLocation), mpiComm->rl);
+            ASSERT(false);
+        }
     }
+    // shouldn't return because of the assert in default
     return POLL_NO_MESSAGE;
 }
 
@@ -507,55 +479,54 @@ void MPICommStart(ocrCommPlatform_t * self, ocrPolicyDomain_t * pd, ocrCommApi_t
  * @brief Stops the communication platform
  * Guarantees all outgoing sends and non-outstanding recv are done
  */
-void MPICommStop(ocrCommPlatform_t * self) {
+void MPICommStop(ocrCommPlatform_t * self, ocrRunLevel_t newRl, u32 action) {
     ocrCommPlatformMPI_t * mpiComm = ((ocrCommPlatformMPI_t *) self);
-    // Some other worker wants to stop the communication worker.
-    //DIST-TODO stop: self stop for mpi-comm-platform i.e. called by comm-worker
-    DPRINTF(DEBUG_LVL_VERB,"[MPI %d] Calling MPI STOP %d\n",  mpiRankToLocation(self->pd->myLocation), mpiComm->rl);
-    switch(mpiComm->rl) {
-        case 3:
-            mpiComm->rl_completed[3] = true;
-            mpiComm->rl = 2;
-            // Transition to RL2:
-            // At this point the comm-worker is in RL2 pulling and sending
-            // all the remaining communication work from the scheduler.
-            // There's no comm-platform code invocation in RL2.
-        break;
-        case 2:
-            ASSERT(mpiComm->rl_completed[2]);
-            mpiComm->rl = 1;
-        break;
-        case 1:
-            //DIST-TODO stop: check if we remove a RL
-            mpiComm->rl_completed[1] = true;
-            mpiComm->rl = 0;
-        break;
-        case 0:
-            // RL0: just cleanup data-structure pdMalloc-ed
-            //NOTE: incoming may have recvs any posted
-            mpiComm->incoming->destruct(mpiComm->incoming);
-            ASSERT(mpiComm->outgoing->isEmpty(mpiComm->outgoing));
-            mpiComm->outgoing->destruct(mpiComm->outgoing);
-        break;
-        default:
-            ASSERT(false && "Illegal RL reached in MPI-comm-platform stop");
+    if (action == RL_ACTION_ENTER) {
+        switch(newRl) {
+            case RL_RUNNING_RT: {
+                ASSERT(mpiComm->rl == RL_RUNNING_USER);
+                mpiComm->rl = RL_RUNNING_RT;
+                break;
+            }
+            case RL_STOP: {
+                ASSERT(mpiComm->rl == RL_RUNNING_RT);
+                mpiComm->rl = RL_STOP;
+                break;
+            }
+            case RL_SHUTDOWN: {
+                ASSERT(mpiComm->rl == RL_STOP);
+                mpiComm->rl = RL_SHUTDOWN;
+                //TODO-RL is this legal wrt pdFree ?
+                // RL0: just cleanup data-structure pdMalloc-ed
+                //NOTE: incoming may have recvs any posted
+                mpiComm->incoming->destruct(mpiComm->incoming);
+                ASSERT(mpiComm->outgoing->isEmpty(mpiComm->outgoing));
+                mpiComm->outgoing->destruct(mpiComm->outgoing);
+                break;
+            }
+            case RL_DEALLOCATE: {
+                ASSERT(mpiComm->rl == RL_SHUTDOWN);
+                mpiComm->rl = RL_DEALLOCATE;
+                //This should be called only once per rank and
+                //by the same thread that did MPI_Init.
+                platformFinalizeMPIComm();
+                runtimeChunkFree((u64)self, NULL);
+                break;
+            }
+            default:
+                ASSERT("Unknown runlevel in stop function");
+        }
+    } else {
+        ASSERT(action == RL_ACTION_EXIT);
+        ASSERT("Unknown runlevel in stop function");
     }
-    DPRINTF(DEBUG_LVL_VERB,"[MPI %d] Exiting Calling MPI STOP %d\n",  mpiRankToLocation(self->pd->myLocation), mpiComm->rl);
 }
-
-void MPICommFinish(ocrCommPlatform_t *self) {
-}
-
 
 //
 // Init and destruct
 //
 
 void MPICommDestruct (ocrCommPlatform_t * base) {
-    //This should be called only once per rank and
-    //by the same thread that did MPI_Init.
-    platformFinalizeMPIComm();
-    runtimeChunkFree((u64)base, NULL);
 }
 
 ocrCommPlatform_t* newCommPlatformMPI(ocrCommPlatformFactory_t *factory,
@@ -587,11 +558,8 @@ void initializeCommPlatformMPI(ocrCommPlatformFactory_t * factory, ocrCommPlatfo
     mpiComm->incomingIt = NULL;
     mpiComm->outgoingIt = NULL;
     mpiComm->maxMsgSize = 0;
-    int i = 0;
-    while (i < (MPI_COMM_RL_MAX+1)) {
-        mpiComm->rl_completed[i++] = false;
-    }
-    mpiComm->rl = MPI_COMM_RL_MAX;
+    //TODO-RL this should be part of comm-api or base module type
+    mpiComm->rl = RL_RUNNING_USER;
 }
 
 ocrCommPlatformFactory_t *newCommPlatformFactoryMPI(ocrParamList_t *perType) {
@@ -606,15 +574,13 @@ ocrCommPlatformFactory_t *newCommPlatformFactoryMPI(ocrParamList_t *perType) {
                                                   ocrCommApi_t*), MPICommBegin);
     base->platformFcts.start = FUNC_ADDR(void (*)(ocrCommPlatform_t*,ocrPolicyDomain_t*,
                                                   ocrCommApi_t*), MPICommStart);
-    base->platformFcts.stop = FUNC_ADDR(void (*)(ocrCommPlatform_t*), MPICommStop);
-    base->platformFcts.finish = FUNC_ADDR(void (*)(ocrCommPlatform_t*), MPICommFinish);
+    base->platformFcts.stop = FUNC_ADDR(void (*)(ocrCommPlatform_t*,ocrRunLevel_t,u32), MPICommStop);
     base->platformFcts.sendMessage = FUNC_ADDR(u8 (*)(ocrCommPlatform_t*,ocrLocation_t,
                                                ocrPolicyMsg_t*,u64,u64*,u32,u32), MPICommSendMessage);
     base->platformFcts.pollMessage = FUNC_ADDR(u8 (*)(ocrCommPlatform_t*,ocrPolicyMsg_t**,u64*,u32,u32*),
                                                MPICommPollMessage);
     base->platformFcts.waitMessage = FUNC_ADDR(u8 (*)(ocrCommPlatform_t*,ocrPolicyMsg_t**,u64*,u32,u32*),
                                                MPICommWaitMessage);
-
     return base;
 }
 

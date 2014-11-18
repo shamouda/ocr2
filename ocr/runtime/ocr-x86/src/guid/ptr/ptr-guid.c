@@ -34,16 +34,14 @@ void ptrDestruct(ocrGuidProvider_t* self) {
 }
 
 void ptrBegin(ocrGuidProvider_t *self, ocrPolicyDomain_t *pd) {
-}
-
-void ptrStart(ocrGuidProvider_t *self, ocrPolicyDomain_t *pd) {
     self->pd = pd;
 }
 
-void ptrStop(ocrGuidProvider_t *self) {
+void ptrStart(ocrGuidProvider_t *self, ocrPolicyDomain_t *pd) {
 }
 
-void ptrFinish(ocrGuidProvider_t *self) {
+void ptrStop(ocrGuidProvider_t *self, ocrRunLevel_t newRl, u32 action) {
+    // Nothing to do
 }
 
 u8 ptrGetGuid(ocrGuidProvider_t* self, ocrGuid_t* guid, u64 val, ocrGuidKind kind) {
@@ -176,8 +174,7 @@ ocrGuidProviderFactory_t *newGuidProviderFactoryPtr(ocrParamList_t *typeArg, u32
     base->providerFcts.destruct = FUNC_ADDR(void (*)(ocrGuidProvider_t*), ptrDestruct);
     base->providerFcts.begin = FUNC_ADDR(void (*)(ocrGuidProvider_t*, ocrPolicyDomain_t*), ptrBegin);
     base->providerFcts.start = FUNC_ADDR(void (*)(ocrGuidProvider_t*, ocrPolicyDomain_t*), ptrStart);
-    base->providerFcts.stop = FUNC_ADDR(void (*)(ocrGuidProvider_t*), ptrStop);
-    base->providerFcts.finish = FUNC_ADDR(void (*)(ocrGuidProvider_t*), ptrFinish);
+    base->providerFcts.stop = FUNC_ADDR(void (*)(ocrGuidProvider_t*,ocrRunLevel_t,u32), ptrStop);
     base->providerFcts.getGuid = FUNC_ADDR(u8 (*)(ocrGuidProvider_t*, ocrGuid_t*, u64, ocrGuidKind), ptrGetGuid);
     base->providerFcts.createGuid = FUNC_ADDR(u8 (*)(ocrGuidProvider_t*, ocrFatGuid_t*, u64, ocrGuidKind), ptrCreateGuid);
     base->providerFcts.getVal = FUNC_ADDR(u8 (*)(ocrGuidProvider_t*, ocrGuid_t, u64*, ocrGuidKind*), ptrGetVal);

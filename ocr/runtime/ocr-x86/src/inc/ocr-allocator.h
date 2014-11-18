@@ -75,9 +75,7 @@ typedef struct _ocrAllocatorFcts_t {
 
     void (*start)(struct _ocrAllocator_t* self, struct _ocrPolicyDomain_t * PD);
 
-    void (*stop)(struct _ocrAllocator_t* self);
-
-    void (*finish)(struct _ocrAllocator_t* self);
+    void (*stop)(struct _ocrAllocator_t* self, ocrRunLevel_t newRl, u32 action);
 
     /**
      * @brief Actual allocation

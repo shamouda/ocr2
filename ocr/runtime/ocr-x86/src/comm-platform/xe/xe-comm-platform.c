@@ -114,21 +114,25 @@ void xeCommStart(ocrCommPlatform_t * commPlatform, ocrPolicyDomain_t * PD, ocrCo
     ASSERT(commPlatform != NULL && PD != NULL && api != NULL);
 }
 
-void xeCommStop(ocrCommPlatform_t * commPlatform) {
-    ASSERT(commPlatform != NULL);
-}
-
-void xeCommFinish(ocrCommPlatform_t *commPlatform) {
-
-    ASSERT(commPlatform != NULL);
-
-    ocrCommPlatformXe_t * cp = (ocrCommPlatformXe_t *)commPlatform;
-
-    // Clear settings
-    cp->pdPtr->myLocation = cp->pdPtr->parentLocation = (ocrLocation_t)0x0;
-    cp->pdPtr = NULL;
-    cp->N = 0;
-    cp->rq = NULL;
+void xeCommStop(ocrCommPlatform_t * commPlatform, ocrRunLevel_t newRl) {
+    switch(newRl) {
+        case RL_STOP: {
+            ASSERT(commPlatform != NULL);
+            break;
+        }
+        case RL_SHUTDOWN: {
+            ASSERT(commPlatform != NULL);
+            ocrCommPlatformXe_t * cp = (ocrCommPlatformXe_t *)commPlatform;
+            // Clear settings
+            cp->pdPtr->myLocation = cp->pdPtr->parentLocation = (ocrLocation_t)0x0;
+            cp->pdPtr = NULL;
+            cp->N = 0;
+            cp->rq = NULL;
+            break;
+        }
+        default:
+            ASSERT("Unknown runlevel in stop function");
+    }
 }
 
 u8 xeCommSetMaxExpectedMessageSize(ocrCommPlatform_t *self, u64 size, u32 mask) {
@@ -317,8 +321,7 @@ ocrCommPlatformFactory_t *newCommPlatformFactoryXe(ocrParamList_t *perType) {
                                          ocrCommApi_t*), xeCommBegin);
     base->platformFcts.start = FUNC_ADDR(void (*)(ocrCommPlatform_t*, ocrPolicyDomain_t*,
                                          ocrCommApi_t*), xeCommStart);
-    base->platformFcts.stop = FUNC_ADDR(void (*)(ocrCommPlatform_t*), xeCommStop);
-    base->platformFcts.finish = FUNC_ADDR(void (*)(ocrCommPlatform_t*), xeCommFinish);
+    base->platformFcts.stop = FUNC_ADDR(void (*)(ocrCommPlatform_t*,ocrRunLevel_t,u32), xeCommStop);
     base->platformFcts.setMaxExpectedMessageSize = FUNC_ADDR(u8 (*)(ocrCommPlatform_t*, u64, u32),
             xeCommSetMaxExpectedMessageSize);
     base->platformFcts.sendMessage = FUNC_ADDR(u8 (*)(ocrCommPlatform_t*, ocrLocation_t,

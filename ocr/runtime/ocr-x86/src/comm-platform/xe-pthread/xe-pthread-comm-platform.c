@@ -43,11 +43,8 @@ void xePthreadCommStart(ocrCommPlatform_t * commPlatform, ocrPolicyDomain_t * PD
     return;
 }
 
-void xePthreadCommStop(ocrCommPlatform_t * commPlatform) {
+void xePthreadCommStop(ocrCommPlatform_t * commPlatform, ocrRunLevel_t newRl, u32 action) {
     // Nothing to do really
-}
-
-void xePthreadCommFinish(ocrCommPlatform_t *commPlatform) {
 }
 
 /*
@@ -148,8 +145,7 @@ ocrCommPlatformFactory_t *newCommPlatformFactoryXePthread(ocrParamList_t *perTyp
                                          xePthreadCommBegin);
     base->platformFcts.start = FUNC_ADDR(void (*)(ocrCommPlatform_t*, ocrPolicyDomain_t*, ocrCommApi_t *),
                                          xePthreadCommStart);
-    base->platformFcts.stop = FUNC_ADDR(void (*)(ocrCommPlatform_t*), xePthreadCommStop);
-    base->platformFcts.finish = FUNC_ADDR(void (*)(ocrCommPlatform_t*), xePthreadCommFinish);
+    base->platformFcts.stop = FUNC_ADDR(void (*)(ocrCommPlatform_t*,ocrRunLevel_t,u32), xePthreadCommStop);
     base->platformFcts.sendMessage = FUNC_ADDR(u8 (*)(ocrCommPlatform_t*, ocrLocation_t, ocrPolicyMsg_t *, u64, u64*, u32, u32),
                                      xePthreadCommSendMessage);
     base->platformFcts.pollMessage = FUNC_ADDR(u8 (*)(ocrCommPlatform_t*, ocrPolicyMsg_t **, u64*, u32, u32*),

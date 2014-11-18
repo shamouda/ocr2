@@ -43,9 +43,7 @@ typedef struct _ocrSchedulerFcts_t {
 
     void (*start)(struct _ocrScheduler_t *self, struct _ocrPolicyDomain_t * PD);
 
-    void (*stop)(struct _ocrScheduler_t *self);
-
-    void (*finish)(struct _ocrScheduler_t *self);
+    void (*stop)(struct _ocrScheduler_t *self, ocrRunLevel_t newRl, u32 action);
 
     // TODO: Check this call
     // u8 (*yield)(struct _ocrScheduler_t *self, ocrGuid_t workerGuid,

@@ -69,9 +69,7 @@ typedef struct _ocrMemPlatformFcts_t {
     /** @brief Stops the mem-platform
      *  @param[in] self       Pointer to this mem-platform
      */
-    void (*stop)(struct _ocrMemPlatform_t* self);
-
-    void (*finish)(struct _ocrMemPlatform_t* self);
+    void (*stop)(struct _ocrMemPlatform_t* self, ocrRunLevel_t, u32 action);
 
     /**
      * @brief Gets the throttle value for this memory

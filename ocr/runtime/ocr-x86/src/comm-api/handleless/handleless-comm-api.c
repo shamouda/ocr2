@@ -38,13 +38,8 @@ void handlelessCommStart(ocrCommApi_t * commApi, ocrPolicyDomain_t * PD) {
     return;
 }
 
-void handlelessCommStop(ocrCommApi_t * commApi) {
-    commApi->commPlatform->fcts.stop(commApi->commPlatform);
-    return;
-}
-
-void handlelessCommFinish(ocrCommApi_t *commApi) {
-    commApi->commPlatform->fcts.finish(commApi->commPlatform);
+void handlelessCommStop(ocrCommApi_t * commApi, ocrRunLevel_t newRl, u32 action) {
+    commApi->commPlatform->fcts.stop(commApi->commPlatform, newRl, action);
     return;
 }
 
@@ -185,8 +180,7 @@ ocrCommApiFactory_t *newCommApiFactoryHandleless(ocrParamList_t *perType) {
                                     handlelessCommBegin);
     base->apiFcts.start = FUNC_ADDR(void (*)(ocrCommApi_t*, ocrPolicyDomain_t*),
                                     handlelessCommStart);
-    base->apiFcts.stop = FUNC_ADDR(void (*)(ocrCommApi_t*), handlelessCommStop);
-    base->apiFcts.finish = FUNC_ADDR(void (*)(ocrCommApi_t*), handlelessCommFinish);
+    base->apiFcts.stop = FUNC_ADDR(void (*)(ocrCommApi_t*,ocrRunLevel_t,u32), handlelessCommStop);
     base->apiFcts.sendMessage = FUNC_ADDR(u8 (*)(ocrCommApi_t*, ocrLocation_t, ocrPolicyMsg_t *, ocrMsgHandle_t**, u32),
                                           handlelessCommSendMessage);
     base->apiFcts.pollMessage = FUNC_ADDR(u8 (*)(ocrCommApi_t*, ocrMsgHandle_t**),

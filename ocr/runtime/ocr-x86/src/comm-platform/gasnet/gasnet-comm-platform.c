@@ -437,39 +437,44 @@ void GasnetCommStart(ocrCommPlatform_t * self, ocrPolicyDomain_t * pd, ocrCommAp
     GASNET_Safe(gasnet_AMPoll());
 }
 
-void GasnetCommStop(ocrCommPlatform_t * self) {
-    ocrCommPlatformGasnet_t * gasnetComm = ((ocrCommPlatformGasnet_t *) self);
+void GasnetCommStop(ocrCommPlatform_t * self, ocrRunLevel_t newRl, u32 action) {
+      switch(newRl) {
+          case RL_STOP: {
+            ocrCommPlatformGasnet_t * gasnetComm = ((ocrCommPlatformGasnet_t *) self);
 
-    debug(__func__);
-    switch(gasnetComm->rl) {
-    case 3:
-        gasnetComm->rl_completed[3] = true;
-        gasnetComm->rl = 2;
-        break;
-    case 2:
-        ASSERT(gasnetComm->rl_completed[2]);
-        gasnetComm->rl = 1;
-        break;
-    case 1:
-        gasnetComm->rl_completed[1] = true;
-        gasnetComm->rl = 0;
-        break;
-    case 0:
-        gasnetComm->incoming->destruct(gasnetComm->incoming);
-        ASSERT(gasnetComm->outgoing->isEmpty(gasnetComm->outgoing));
-        gasnetComm->outgoing->destruct(gasnetComm->outgoing);
-        break;
-    default:
-        ASSERT(false && "Illegal RL reached in Gasnet-comm-platform stop");
+            debug(__func__);
+            switch(gasnetComm->rl) {
+            case 3:
+                gasnetComm->rl_completed[3] = true;
+                gasnetComm->rl = 2;
+                break;
+            case 2:
+                ASSERT(gasnetComm->rl_completed[2]);
+                gasnetComm->rl = 1;
+                break;
+            case 1:
+                gasnetComm->rl_completed[1] = true;
+                gasnetComm->rl = 0;
+                break;
+            case 0:
+                gasnetComm->incoming->destruct(gasnetComm->incoming);
+                ASSERT(gasnetComm->outgoing->isEmpty(gasnetComm->outgoing));
+                gasnetComm->outgoing->destruct(gasnetComm->outgoing);
+                break;
+            default:
+                ASSERT(false && "Illegal RL reached in Gasnet-comm-platform stop");
+            }
+            DPRINTF(DEBUG_LVL_VVERB,"[%d] Exiting Calling Gasnet STOP %d\n",  (int) self->pd->myLocation, gasnetComm->rl);
+            break;
+        }
+        case RL_SHUTDOWN: {
+            // Nothing to do
+            break;
+        }
+        default:
+            ASSERT("Unknown runlevel in stop function");
     }
-    DPRINTF(DEBUG_LVL_VVERB,"[%d] Exiting Calling Gasnet STOP %d\n",  (int) self->pd->myLocation, gasnetComm->rl);
 }
-
-
-void GasnetCommFinish(ocrCommPlatform_t *self) {
-    debug(__func__);
-}
-
 
 void GasnetCommDestruct(ocrCommPlatform_t * base) {
     platformFinalizeGasnetComm();
@@ -525,8 +530,7 @@ ocrCommPlatformFactory_t *newCommPlatformFactoryGasnet(ocrParamList_t *perType) 
                                                   ocrCommApi_t*), GasnetCommBegin);
     base->platformFcts.start = FUNC_ADDR(void (*)(ocrCommPlatform_t*,ocrPolicyDomain_t*,
                                                   ocrCommApi_t*), GasnetCommStart);
-    base->platformFcts.stop = FUNC_ADDR(void (*)(ocrCommPlatform_t*), GasnetCommStop);
-    base->platformFcts.finish = FUNC_ADDR(void (*)(ocrCommPlatform_t*), GasnetCommFinish);
+    base->platformFcts.stop = FUNC_ADDR(void (*)(ocrCommPlatform_t*,ocrRunLevel_t,u32), GasnetCommStop);
     base->platformFcts.sendMessage = FUNC_ADDR(u8 (*)(ocrCommPlatform_t*,ocrLocation_t,
                                                ocrPolicyMsg_t*,u64,u64*,u32,u32), GasnetCommSendMessage);
     base->platformFcts.pollMessage = FUNC_ADDR(u8 (*)(ocrCommPlatform_t*,ocrPolicyMsg_t**,u64*,u32,u32*),

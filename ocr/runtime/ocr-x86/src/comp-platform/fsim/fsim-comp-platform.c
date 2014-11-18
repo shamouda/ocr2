@@ -62,11 +62,8 @@ void fsimCompStart(ocrCompPlatform_t * compPlatform, ocrPolicyDomain_t * PD, ocr
     fsimRoutineExecute(worker);
 }
 
-void fsimCompStop(ocrCompPlatform_t * compPlatform) {
+void fsimCompStop(ocrCompPlatform_t * compPlatform, ocrRunLevel_t newRl, u32 action) {
     // Nothing to do really
-}
-
-void fsimCompFinish(ocrCompPlatform_t *compPlatform) {
 }
 
 u8 fsimCompGetThrottle(ocrCompPlatform_t *self, u64* value) {
@@ -129,8 +126,7 @@ ocrCompPlatformFactory_t *newCompPlatformFactoryFsim(ocrParamList_t *perType) {
     base->platformFcts.destruct = FUNC_ADDR(void (*)(ocrCompPlatform_t*), fsimCompDestruct);
     base->platformFcts.begin = FUNC_ADDR(void (*)(ocrCompPlatform_t*, ocrPolicyDomain_t*, ocrWorkerType_t), fsimCompBegin);
     base->platformFcts.start = FUNC_ADDR(void (*)(ocrCompPlatform_t*, ocrPolicyDomain_t*, ocrWorker_t*), fsimCompStart);
-    base->platformFcts.stop = FUNC_ADDR(void (*)(ocrCompPlatform_t*), fsimCompStop);
-    base->platformFcts.finish = FUNC_ADDR(void (*)(ocrCompPlatform_t*), fsimCompFinish);
+    base->platformFcts.stop = FUNC_ADDR(void (*)(ocrCompPlatform_t*,ocrRunLevel_t,u32), fsimCompStop);
     base->platformFcts.getThrottle = FUNC_ADDR(u8 (*)(ocrCompPlatform_t*, u64*), fsimCompGetThrottle);
     base->platformFcts.setThrottle = FUNC_ADDR(u8 (*)(ocrCompPlatform_t*, u64), fsimCompSetThrottle);
     base->platformFcts.setCurrentEnv = FUNC_ADDR(u8 (*)(ocrCompPlatform_t*, ocrPolicyDomain_t*, ocrWorker_t*), fsimCompSetCurrentEnv);

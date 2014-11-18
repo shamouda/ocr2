@@ -34,12 +34,8 @@ void delegateCommStart(ocrCommApi_t * self, ocrPolicyDomain_t * pd) {
     self->commPlatform->fcts.start(self->commPlatform, pd, self);
 }
 
-void delegateCommStop(ocrCommApi_t * self) {
-    self->commPlatform->fcts.stop(self->commPlatform);
-}
-
-void delegateCommFinish(ocrCommApi_t *self) {
-    self->commPlatform->fcts.finish(self->commPlatform);
+void delegateCommStop(ocrCommApi_t * self, ocrRunLevel_t newRl, u32 action) {
+    self->commPlatform->fcts.stop(self->commPlatform, newRl, action);
 }
 
 static ocrPolicyMsg_t * allocateNewMessage(ocrCommApi_t * self, u32 size) {
@@ -230,8 +226,7 @@ ocrCommApiFactory_t *newCommApiFactoryDelegate(ocrParamList_t *perType) {
     base->apiFcts.destruct = FUNC_ADDR(void (*)(ocrCommApi_t*), delegateCommDestruct);
     base->apiFcts.begin = FUNC_ADDR(void (*)(ocrCommApi_t*, ocrPolicyDomain_t*), delegateCommBegin);
     base->apiFcts.start = FUNC_ADDR(void (*)(ocrCommApi_t*, ocrPolicyDomain_t*), delegateCommStart);
-    base->apiFcts.stop = FUNC_ADDR(void (*)(ocrCommApi_t*), delegateCommStop);
-    base->apiFcts.finish = FUNC_ADDR(void (*)(ocrCommApi_t*), delegateCommFinish);
+    base->apiFcts.stop = FUNC_ADDR(void (*)(ocrCommApi_t*,ocrRunLevel_t,u32), delegateCommStop);
     base->apiFcts.sendMessage = FUNC_ADDR(u8 (*)(ocrCommApi_t*, ocrLocation_t,
                                                       ocrPolicyMsg_t *, ocrMsgHandle_t **, u32), delegateCommSendMessage);
     base->apiFcts.pollMessage = FUNC_ADDR(u8 (*)(ocrCommApi_t*, ocrMsgHandle_t**),

@@ -200,19 +200,21 @@ u8 ocrFinalize() {
     getCurrentEnv(&pd, &worker, NULL, NULL);
     // We start the current worker. After it starts, it will loop
     // until ocrShutdown is called which will cause the entire PD
-    // to stop (including this worker). The currently executing
-    // worker then fallthrough from start to finish.
+    // to stop (including this worker).
     worker->fcts.start(worker, pd);
+    // When the worker exits 'start' the PD runlevel has been
+    // decremented to RL_STOP
+    // Transition from stop to shutdown
+    pd->fcts.setRunlevel(pd, RL_SHUTDOWN);
     u8 returnCode = pd->shutdownCode;
-    // NOTE: finish blocks until stop has completed
-    pd->fcts.finish(pd);
-    pd->fcts.destruct(pd);
+    pd->fcts.setRunlevel(pd, RL_DEALLOCATE);
+    // At this point PD is not a valid pointer anymore
     freeUpRuntime();
 // #ifdef OCR_ENABLE_STATISTICS
 //     ocrStatsProcessDestruct(&GfakeProcess);
 //     GocrFilterAggregator->destruct(GocrFilterAggregator);
 // #endif
-   return returnCode;
+    return returnCode;
 }
 
 #endif /* ENABLE_EXTENSION_LIB */

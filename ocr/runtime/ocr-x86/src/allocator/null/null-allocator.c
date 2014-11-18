@@ -27,11 +27,19 @@ void nullStart(ocrAllocator_t *self, ocrPolicyDomain_t * PD ) {
     self->pd = PD;
 }
 
-void nullStop(ocrAllocator_t *self) {
-    self->fguid.guid = NULL_GUID;
-}
-
-void nullFinish(ocrAllocator_t *self) {
+void nullStop(ocrAllocator_t *self, ocrRunLevel_t newRl, u32 action) {
+    switch(newRl) {
+        case RL_STOP: {
+            self->fguid.guid = NULL_GUID;
+            break;
+        }
+        case RL_SHUTDOWN: {
+            // Nothing to do
+            break;
+        }
+        default:
+            ASSERT("Unknown runlevel in stop function");
+    }
 }
 
 void* nullAllocate(ocrAllocator_t *self, u64 size, u64 hints) {
@@ -75,8 +83,7 @@ ocrAllocatorFactory_t * newAllocatorFactoryNull(ocrParamList_t *perType) {
     base->allocFcts.destruct = FUNC_ADDR(void (*)(ocrAllocator_t*), nullDestruct);
     base->allocFcts.begin = FUNC_ADDR(void (*)(ocrAllocator_t*, ocrPolicyDomain_t*), nullBegin);
     base->allocFcts.start = FUNC_ADDR(void (*)(ocrAllocator_t*, ocrPolicyDomain_t*), nullStart);
-    base->allocFcts.stop = FUNC_ADDR(void (*)(ocrAllocator_t*), nullStop);
-    base->allocFcts.finish = FUNC_ADDR(void (*)(ocrAllocator_t*), nullFinish);
+    base->allocFcts.stop = FUNC_ADDR(void (*)(ocrAllocator_t*,ocrRunLevel_t,u32), nullStop);
     base->allocFcts.allocate = FUNC_ADDR(void* (*)(ocrAllocator_t*, u64, u64), nullAllocate);
     //base->allocFcts.free = FUNC_ADDR(void (*)(ocrAllocator_t*, void*), nullDeallocate);
     base->allocFcts.reallocate = FUNC_ADDR(void* (*)(ocrAllocator_t*, void*, u64), nullReallocate);

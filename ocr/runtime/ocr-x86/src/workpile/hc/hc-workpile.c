@@ -37,25 +37,30 @@ void hcWorkpileStart(ocrWorkpile_t *base, ocrPolicyDomain_t *PD) {
     // derived->deque = newLockedQueue(base->pd, (void *) NULL_GUID);
 }
 
-void hcWorkpileStop(ocrWorkpile_t *base) {
-    // Destroy the GUID
-    ocrPolicyMsg_t msg;
-    getCurrentEnv(NULL, NULL, NULL, &msg);
-
-#define PD_MSG (&msg)
-#define PD_TYPE PD_MSG_GUID_DESTROY
-    msg.type = PD_MSG_GUID_DESTROY | PD_MSG_REQUEST;
-    PD_MSG_FIELD(guid) = base->fguid;
-    PD_MSG_FIELD(properties) = 0;
-    // Shutting down so ignore error
-    base->pd->fcts.processMessage(base->pd, &msg, false);
-#undef PD_MSG
-#undef PD_TYPE
-    base->fguid.guid = UNINITIALIZED_GUID;
-}
-
-void hcWorkpileFinish(ocrWorkpile_t *base) {
-    // Nothing to do
+void hcWorkpileStop(ocrWorkpile_t *base, ocrRunLevel_t newRl, u32 action) {
+    switch(newRl) {
+        case RL_STOP: {
+            break;
+        }
+        case RL_SHUTDOWN: {
+            // Destroy the GUID
+            ocrPolicyMsg_t msg;
+            getCurrentEnv(NULL, NULL, NULL, &msg);
+        #define PD_MSG (&msg)
+        #define PD_TYPE PD_MSG_GUID_DESTROY
+            msg.type = PD_MSG_GUID_DESTROY | PD_MSG_REQUEST;
+            PD_MSG_FIELD(guid) = base->fguid;
+            PD_MSG_FIELD(properties) = 0;
+            // Shutting down so ignore error
+            base->pd->fcts.processMessage(base->pd, &msg, false);
+        #undef PD_MSG
+        #undef PD_TYPE
+            base->fguid.guid = UNINITIALIZED_GUID;
+            break;
+        }
+        default:
+            ASSERT("Unknown runlevel in stop function");
+    }
 }
 
 ocrFatGuid_t hcWorkpilePop(ocrWorkpile_t * base, ocrWorkPopType_t type,
@@ -111,8 +116,7 @@ ocrWorkpileFactory_t * newOcrWorkpileFactoryHc(ocrParamList_t *perType) {
     base->workpileFcts.destruct = FUNC_ADDR(void (*) (ocrWorkpile_t *), hcWorkpileDestruct);
     base->workpileFcts.begin = FUNC_ADDR(void (*) (ocrWorkpile_t *, ocrPolicyDomain_t *), hcWorkpileBegin);
     base->workpileFcts.start = FUNC_ADDR(void (*) (ocrWorkpile_t *, ocrPolicyDomain_t *), hcWorkpileStart);
-    base->workpileFcts.stop = FUNC_ADDR(void (*) (ocrWorkpile_t *), hcWorkpileStop);
-    base->workpileFcts.finish = FUNC_ADDR(void (*) (ocrWorkpile_t *), hcWorkpileFinish);
+    base->workpileFcts.stop = FUNC_ADDR(void (*) (ocrWorkpile_t *,ocrRunLevel_t,u32), hcWorkpileStop);
     base->workpileFcts.pop = FUNC_ADDR(ocrFatGuid_t (*)(ocrWorkpile_t*, ocrWorkPopType_t, ocrCost_t *), hcWorkpilePop);
     base->workpileFcts.push = FUNC_ADDR(void (*)(ocrWorkpile_t*, ocrWorkPushType_t, ocrFatGuid_t), hcWorkpilePush);
     return base;

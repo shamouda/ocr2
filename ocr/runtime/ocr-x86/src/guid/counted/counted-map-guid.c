@@ -14,7 +14,7 @@
 
 // Default hashtable's number of buckets
 //PERF: This parameter heavily impacts the GUID provider scalability !
-#define DEFAULT_NB_BUCKETS 1000
+#define DEFAULT_NB_BUCKETS 10000
 
 // Guid is composed of : (LOCID KIND COUNTER)
 #define GUID_BIT_SIZE 64
@@ -51,11 +51,7 @@ void countedMapStart(ocrGuidProvider_t *self, ocrPolicyDomain_t *pd) {
     derived->guidImplTable = newHashtableBucketLockedModulo(pd, DEFAULT_NB_BUCKETS);
 }
 
-void countedMapStop(ocrGuidProvider_t *self) {
-    // Nothing to do
-}
-
-void countedMapFinish(ocrGuidProvider_t *self) {
+void countedMapStop(ocrGuidProvider_t *self, ocrRunLevel_t newRl, u32 action) {
     // Nothing to do
 }
 
@@ -232,7 +228,6 @@ ocrGuidProviderFactory_t *newGuidProviderFactoryCountedMap(ocrParamList_t *typeA
     base->providerFcts.begin = &countedMapBegin;
     base->providerFcts.start = &countedMapStart;
     base->providerFcts.stop = &countedMapStop;
-    base->providerFcts.finish = &countedMapFinish;
     base->providerFcts.getGuid = &countedMapGetGuid;
     base->providerFcts.createGuid = &countedMapCreateGuid;
     base->providerFcts.getVal = &countedMapGetVal;

@@ -151,22 +151,27 @@ void ceCommStart(ocrCommPlatform_t * commPlatform, ocrPolicyDomain_t * PD, ocrCo
     ASSERT(commPlatform != NULL && PD != NULL && api != NULL);
 }
 
-void ceCommStop(ocrCommPlatform_t * commPlatform) {
-    u32 i;
-    ASSERT(commPlatform != NULL);
-    for(i=0; i< OUTSTANDING_CE_MSGS; i++) {
-        ((ocrPolicyMsg_t *)msgAddresses[i])->type = 0xdead;
-        msgAddresses[i] = 0xdead;
-    }
-    recvBuf.type = 0;
-    sendBuf.type = 0;
-}
+void ceCommStop(ocrCommPlatform_t * commPlatform, ocrRunLevel_t newRl, u32 action) {
+    switch(newRl) {
+        case RL_STOP: {
+          u32 i;
+          ASSERT(commPlatform != NULL);
+          for(i=0; i< OUTSTANDING_CE_MSGS; i++) {
+             ((ocrPolicyMsg_t *)msgAddresses[i])->type = 0xdead;
+             msgAddresses[i] = 0xdead;
+          }
+          recvBuf.type = 0;
+          sendBuf.type = 0;
+        break;
+        }
+        case RL_SHUTDOWN: {
+            u32 i;
+            ASSERT(commPlatform != NULL);
 
-void ceCommFinish(ocrCommPlatform_t *commPlatform) {
-
-    u32 i;
-
-    ASSERT(commPlatform != NULL);
+        //TODO-RL not sure this has been merged correctly
+    for(i=0; i< OUTSTANDING_CE_MSGS; i++) msgAddresses[i] = 0xdead1;
+    recvBuf.type = 0xdead2;
+    sendBuf.type = 0xdead3;
 
     ocrCommPlatformCe_t * cp = (ocrCommPlatformCe_t *)commPlatform;
 
@@ -179,6 +184,11 @@ void ceCommFinish(ocrCommPlatform_t *commPlatform) {
         cp->lq[i] = NULL;
     }
     cp->pollq = 0;
+            break;
+        }
+        default:
+            ASSERT("Unknown runlevel in stop function");
+    }
 }
 
 u8 ceCommSetMaxExpectedMessageSize(ocrCommPlatform_t *self, u64 size, u32 mask) {
@@ -547,8 +557,7 @@ ocrCommPlatformFactory_t *newCommPlatformFactoryCe(ocrParamList_t *perType) {
                                          ceCommBegin);
     base->platformFcts.start = FUNC_ADDR(void (*)(ocrCommPlatform_t*, ocrPolicyDomain_t*, ocrCommApi_t *),
                                          ceCommStart);
-    base->platformFcts.stop = FUNC_ADDR(void (*)(ocrCommPlatform_t*), ceCommStop);
-    base->platformFcts.finish = FUNC_ADDR(void (*)(ocrCommPlatform_t*), ceCommFinish);
+    base->platformFcts.stop = FUNC_ADDR(void (*)(ocrCommPlatform_t*,ocrRunLevel_t,u32), ceCommStop);
     base->platformFcts.setMaxExpectedMessageSize = FUNC_ADDR(u8 (*)(ocrCommPlatform_t*, u64, u32),
             ceCommSetMaxExpectedMessageSize);
     base->platformFcts.sendMessage = FUNC_ADDR(u8 (*)(ocrCommPlatform_t*, ocrLocation_t,

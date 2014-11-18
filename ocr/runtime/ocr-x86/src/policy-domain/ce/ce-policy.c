@@ -216,84 +216,89 @@ void cePolicyDomainStart(ocrPolicyDomain_t * policy) {
     }
 }
 
-void cePolicyDomainFinish(ocrPolicyDomain_t * policy) {
-    // Finish everything in reverse order
-    u64 i = 0;
-    u64 maxCount = 0;
+void cePolicyDomainStop(ocrPolicyDomain_t * policy, ocrRunLevel_t rl, u32 action) {
+    switch(rl) {
+        case RL_STOP: {
+            // Finish everything in reverse order
+            // In CE, we MUST call stop on the master worker first.
+            // The master worker enters its work routine loop and will
+            // be unlocked by ocrShutdown
+            u64 i = 0;
+            u64 maxCount = 0;
 
-    // Note: As soon as worker '0' is stopped; its thread is
-    // free to fall-through and continue shutting down the
-    // policy domain
-    maxCount = policy->workerCount;
-    for(i = 0; i < maxCount; i++) {
-        policy->workers[i]->fcts.finish(policy->workers[i]);
-    }
+            // Note: As soon as worker '0' is stopped; its thread is
+            // free to fall-through and continue shutting down the
+            // policy domain
+            maxCount = policy->workerCount;
+            for(i = 0; i < maxCount; i++) {
+                policy->workers[i]->fcts.stop(policy->workers[i], rl, action);
+            }
+            // WARNING: Do not add code here unless you know what you're doing !!
+            // If we are here, it means an EDT called ocrShutdown which
+            // logically finished workers and can make thread '0' executes this
+            // code before joining the other threads.
 
-    maxCount = policy->commApiCount;
-    for(i = 0; i < maxCount; i++) {
-        policy->commApis[i]->fcts.finish(policy->commApis[i]);
-    }
+            // Thread '0' joins the other (N-1) threads.
 
-    maxCount = policy->schedulerCount;
-    for(i = 0; i < maxCount; ++i) {
-        policy->schedulers[i]->fcts.finish(policy->schedulers[i]);
-    }
+            maxCount = policy->commApiCount;
+            for(i = 0; i < maxCount; i++) {
+                policy->commApis[i]->fcts.stop(policy->commApis[i], rl, action);
+            }
 
-    maxCount = policy->allocatorCount;
-    for(i = 0; i < maxCount; ++i) {
-        policy->allocators[i]->fcts.finish(policy->allocators[i]);
-    }
+            maxCount = policy->schedulerCount;
+            for(i = 0; i < maxCount; ++i) {
+                policy->schedulers[i]->fcts.stop(policy->schedulers[i], rl, action);
+            }
 
-    maxCount = policy->guidProviderCount;
-    for(i = 0; i < maxCount; ++i) {
-        policy->guidProviders[i]->fcts.finish(policy->guidProviders[i]);
-    }
+            maxCount = policy->allocatorCount;
+            for(i = 0; i < maxCount; ++i) {
+                policy->allocators[i]->fcts.stop(policy->allocators[i], rl, action);
+            }
 
-}
+            // We could release our GUID here but not really required
 
-void cePolicyDomainStop(ocrPolicyDomain_t * policy) {
+            maxCount = policy->guidProviderCount;
+            for(i = 0; i < maxCount; ++i) {
+                policy->guidProviders[i]->fcts.stop(policy->guidProviders[i], rl, action);
+            }
+            break;
+        }
+        case RL_SHUTDOWN: {
+            // Finish everything in reverse order
+            u64 i = 0;
+            u64 maxCount = 0;
 
-    // Finish everything in reverse order
-    // In CE, we MUST call stop on the master worker first.
-    // The master worker enters its work routine loop and will
-    // be unlocked by ocrShutdown
-    u64 i = 0;
-    u64 maxCount = 0;
+            // Note: As soon as worker '0' is stopped; its thread is
+            // free to fall-through and continue shutting down the
+            // policy domain
+            maxCount = policy->workerCount;
+            for(i = 0; i < maxCount; i++) {
+                policy->workers[i]->fcts.stop(policy->workers[i], RL_SHUTDOWN, action);
+            }
 
-    // Note: As soon as worker '0' is stopped; its thread is
-    // free to fall-through and continue shutting down the
-    // policy domain
-    maxCount = policy->workerCount;
-    for(i = 0; i < maxCount; i++) {
-        policy->workers[i]->fcts.stop(policy->workers[i]);
-    }
-    // WARNING: Do not add code here unless you know what you're doing !!
-    // If we are here, it means an EDT called ocrShutdown which
-    // logically finished workers and can make thread '0' executes this
-    // code before joining the other threads.
+            maxCount = policy->commApiCount;
+            for(i = 0; i < maxCount; i++) {
+                policy->commApis[i]->fcts.stop(policy->commApis[i], RL_SHUTDOWN, action);
+            }
 
-    // Thread '0' joins the other (N-1) threads.
+            maxCount = policy->schedulerCount;
+            for(i = 0; i < maxCount; ++i) {
+                policy->schedulers[i]->fcts.stop(policy->schedulers[i], RL_SHUTDOWN, action);
+            }
 
-    maxCount = policy->commApiCount;
-    for(i = 0; i < maxCount; i++) {
-        policy->commApis[i]->fcts.stop(policy->commApis[i]);
-    }
+            maxCount = policy->allocatorCount;
+            for(i = 0; i < maxCount; ++i) {
+                policy->allocators[i]->fcts.stop(policy->allocators[i], RL_SHUTDOWN, action);
+            }
 
-    maxCount = policy->schedulerCount;
-    for(i = 0; i < maxCount; ++i) {
-        policy->schedulers[i]->fcts.stop(policy->schedulers[i]);
-    }
-
-    maxCount = policy->allocatorCount;
-    for(i = 0; i < maxCount; ++i) {
-        policy->allocators[i]->fcts.stop(policy->allocators[i]);
-    }
-
-    // We could release our GUID here but not really required
-
-    maxCount = policy->guidProviderCount;
-    for(i = 0; i < maxCount; ++i) {
-        policy->guidProviders[i]->fcts.stop(policy->guidProviders[i]);
+            maxCount = policy->guidProviderCount;
+            for(i = 0; i < maxCount; ++i) {
+                policy->guidProviders[i]->fcts.stop(policy->guidProviders[i], RL_SHUTDOWN, action);
+            }
+            break;
+        }
+        default:
+            ASSERT("Unknown runlevel in stop function");
     }
 }
 
@@ -1641,8 +1646,7 @@ ocrPolicyDomainFactory_t * newPolicyDomainFactoryCe(ocrParamList_t *perType) {
     base->policyDomainFcts.destruct = FUNC_ADDR(void(*)(ocrPolicyDomain_t*), cePolicyDomainDestruct);
     base->policyDomainFcts.begin = FUNC_ADDR(void(*)(ocrPolicyDomain_t*), cePolicyDomainBegin);
     base->policyDomainFcts.start = FUNC_ADDR(void(*)(ocrPolicyDomain_t*), cePolicyDomainStart);
-    base->policyDomainFcts.stop = FUNC_ADDR(void(*)(ocrPolicyDomain_t*), cePolicyDomainStop);
-    base->policyDomainFcts.finish = FUNC_ADDR(void(*)(ocrPolicyDomain_t*), cePolicyDomainFinish);
+    base->policyDomainFcts.stop = FUNC_ADDR(void(*)(ocrPolicyDomain_t*,ocrRunLevel_t,u32), cePolicyDomainStop);
     base->policyDomainFcts.processMessage = FUNC_ADDR(u8(*)(ocrPolicyDomain_t*,ocrPolicyMsg_t*,u8), cePolicyDomainProcessMessage);
 
     base->policyDomainFcts.sendMessage = FUNC_ADDR(u8 (*)(ocrPolicyDomain_t*, ocrLocation_t,

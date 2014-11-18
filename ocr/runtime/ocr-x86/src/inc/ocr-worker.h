@@ -64,13 +64,9 @@ typedef struct _ocrWorkerFcts_t {
      */
     void* (*workShift)(struct _ocrWorker_t *self);
 
-    /** @brief Query the worker to finish its work
-     */
-    void (*finish)(struct _ocrWorker_t *self);
-
     /** @brief Stop Worker
      */
-    void (*stop)(struct _ocrWorker_t *self);
+    void (*stop)(struct _ocrWorker_t *self, ocrRunLevel_t newRl, u32 action);
 
     /** @brief Check if Worker is still running
      *  @return true if the Worker is running, false otherwise
@@ -94,6 +90,7 @@ typedef struct _ocrWorker_t {
     struct _ocrTask_t * volatile curTask; /**< Currently executing task */
 
     ocrWorkerFcts_t fcts;
+    volatile ocrRunLevel_t rl; // TODO volatile exposes to much of the implementation
 } ocrWorker_t;
 
 

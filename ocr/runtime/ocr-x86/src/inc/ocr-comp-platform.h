@@ -74,9 +74,7 @@ typedef struct _ocrCompPlatformFcts_t {
      * @brief Stops this comp-platform
      * @param[in] self          Pointer to this comp-platform
      */
-    void (*stop)(struct _ocrCompPlatform_t *self);
-
-    void (*finish)(struct _ocrCompPlatform_t *self);
+    void (*stop)(struct _ocrCompPlatform_t *self, ocrRunLevel_t newRl, u32 action);
 
     /**
      * @brief Gets the throttle value for this compute node

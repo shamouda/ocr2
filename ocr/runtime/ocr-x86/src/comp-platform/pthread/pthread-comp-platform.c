@@ -109,7 +109,7 @@ static void initializeKey() {
 }
 
 void pthreadDestruct (ocrCompPlatform_t * base) {
-    runtimeChunkFree((u64)base, NULL);
+    // runtimeChunkFree((u64)base, NULL);
 }
 
 void pthreadBegin(ocrCompPlatform_t * compPlatform, ocrPolicyDomain_t * PD, ocrWorkerType_t workerType) {
@@ -147,27 +147,46 @@ void pthreadStart(ocrCompPlatform_t * compPlatform, ocrPolicyDomain_t * PD, ocrW
     }
 }
 
-void pthreadStop(ocrCompPlatform_t * compPlatform) {
-    // To do anything to the TLS (freeing, clean-up, etc.), you need to add
-    // to destroyKey. This will be called when each of the threads
-    // (except the master thread) are joined. For the master thread, you
-    // can clean up in pthreadFinish (it calls destroyKey).
-}
+void pthreadStop(ocrCompPlatform_t * compPlatform, ocrRunLevel_t newRl, u32 action) {
+    switch(newRl) {
+        case RL_STOP: {
+            // A call to 'stop' should be the last call of the 'pthreadRoutineWrapper'
+            // function given at the thread's creation time.
 
-void pthreadFinish(ocrCompPlatform_t *compPlatform) {
-    // This code will be called by the main thread to join everyone else
-    ocrCompPlatformPthread_t *pthreadCompPlatform = (ocrCompPlatformPthread_t*)compPlatform;
-    if(!pthreadCompPlatform->isMaster) {
-        RESULT_ASSERT(pthread_join(pthreadCompPlatform->osThread, NULL), ==, 0);
-    } else {
-        // For some reason the key(s) are not being destroyed for the master thread
-        // We do *not* destroy selfKey however because debug messages depend on it.
-        // This may leak a little (but we are terminating anyways) and it probably
-        // gets destroyed when the program exits
-#ifdef OCR_RUNTIME_PROFILER
-        void* _t = pthread_getspecific(_profilerThreadData);
-        _profilerDataDestroy(_t);
-#endif
+            // Note: All the code accessing this thread's TLS (freeing, clean-up, etc.)
+            // must be added to the 'destroyKey' function. It is to be called when each
+            // of the threads (except the master thread) are joined. The master thread's
+            // clean up can be done in the 'pthreadFinish' function (it calls destroyKey).
+            break;
+        }
+        case RL_SHUTDOWN: {
+            //TODO-RL, it would be nice to move this code in stop, so that we can guarantee everybody
+            // but the master thread is running
+            // This code will be called by the main thread to join everyone else
+            ocrCompPlatformPthread_t *pthreadCompPlatform = (ocrCompPlatformPthread_t*)compPlatform;
+            if(!pthreadCompPlatform->isMaster) {
+                RESULT_ASSERT(pthread_join(pthreadCompPlatform->osThread, NULL), ==, 0);
+            } else {
+                // master thread, do nothing
+            }
+            break;
+        }
+        case RL_DEALLOCATE: {
+            ocrCompPlatformPthread_t *pthreadCompPlatform = (ocrCompPlatformPthread_t*)compPlatform;
+            if(pthreadCompPlatform->isMaster) {
+                // Destroy keys for the master thread
+                void* _t = pthread_getspecific(selfKey);
+                destroyKey(_t);
+            #ifdef OCR_RUNTIME_PROFILER
+                _t = pthread_getspecific(_profilerThreadData);
+                _profilerDataDestroy(_t);
+            #endif
+            }
+            runtimeChunkFree((u64)compPlatform, NULL);
+            break;
+        }
+        default:
+            ASSERT("Unknown runlevel in stop function");
     }
 }
 
@@ -262,8 +281,7 @@ ocrCompPlatformFactory_t *newCompPlatformFactoryPthread(ocrParamList_t *perType)
     base->platformFcts.destruct = FUNC_ADDR(void (*)(ocrCompPlatform_t*), pthreadDestruct);
     base->platformFcts.begin = FUNC_ADDR(void (*)(ocrCompPlatform_t*, ocrPolicyDomain_t*, ocrWorkerType_t), pthreadBegin);
     base->platformFcts.start = FUNC_ADDR(void (*)(ocrCompPlatform_t*, ocrPolicyDomain_t*, ocrWorker_t*), pthreadStart);
-    base->platformFcts.stop = FUNC_ADDR(void (*)(ocrCompPlatform_t*), pthreadStop);
-    base->platformFcts.finish = FUNC_ADDR(void (*)(ocrCompPlatform_t*), pthreadFinish);
+    base->platformFcts.stop = FUNC_ADDR(void (*)(ocrCompPlatform_t*,ocrRunLevel_t,u32), pthreadStop);
     base->platformFcts.getThrottle = FUNC_ADDR(u8 (*)(ocrCompPlatform_t*, u64*), pthreadGetThrottle);
     base->platformFcts.setThrottle = FUNC_ADDR(u8 (*)(ocrCompPlatform_t*, u64), pthreadSetThrottle);
     base->platformFcts.setCurrentEnv = FUNC_ADDR(u8 (*)(ocrCompPlatform_t*, ocrPolicyDomain_t*, ocrWorker_t*), pthreadSetCurrentEnv);

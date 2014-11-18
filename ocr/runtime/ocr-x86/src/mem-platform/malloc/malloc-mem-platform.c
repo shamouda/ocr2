@@ -57,11 +57,8 @@ void mallocStart(ocrMemPlatform_t *self, struct _ocrPolicyDomain_t * PD ) {
     // Nothing much else to do
 }
 
-void mallocStop(ocrMemPlatform_t *self) {
+void mallocStop(ocrMemPlatform_t *self, ocrRunLevel_t newRl, u32 action) {
     // Nothing to do
-}
-
-void mallocFinish(ocrMemPlatform_t *self) {
 }
 
 u8 mallocGetThrottle(ocrMemPlatform_t *self, u64 *value) {
@@ -166,8 +163,7 @@ ocrMemPlatformFactory_t *newMemPlatformFactoryMalloc(ocrParamList_t *perType) {
     base->platformFcts.destruct = FUNC_ADDR(void (*) (ocrMemPlatform_t *), mallocDestruct);
     base->platformFcts.begin = FUNC_ADDR(void (*) (ocrMemPlatform_t *, struct _ocrPolicyDomain_t *), mallocBegin);
     base->platformFcts.start = FUNC_ADDR(void (*) (ocrMemPlatform_t *, struct _ocrPolicyDomain_t *), mallocStart);
-    base->platformFcts.stop = FUNC_ADDR(void (*) (ocrMemPlatform_t *), mallocStop);
-    base->platformFcts.finish = FUNC_ADDR(void (*) (ocrMemPlatform_t *), mallocFinish);
+    base->platformFcts.stop = FUNC_ADDR(void (*) (ocrMemPlatform_t *,ocrRunLevel_t,u32), mallocStop);
     base->platformFcts.getThrottle = FUNC_ADDR(u8 (*) (ocrMemPlatform_t *, u64 *), mallocGetThrottle);
     base->platformFcts.setThrottle = FUNC_ADDR(u8 (*) (ocrMemPlatform_t *, u64), mallocSetThrottle);
     base->platformFcts.getRange = FUNC_ADDR(void (*) (ocrMemPlatform_t *, u64 *, u64 *), mallocGetRange);

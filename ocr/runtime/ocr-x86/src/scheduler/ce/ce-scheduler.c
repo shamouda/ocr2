@@ -123,44 +123,50 @@ void ceSchedulerStart(ocrScheduler_t * self, ocrPolicyDomain_t * PD) {
     derived->stealIterators = stealIteratorsCache;
 }
 
-void ceSchedulerStop(ocrScheduler_t * self) {
-    ocrPolicyDomain_t *pd = NULL;
-    ocrPolicyMsg_t msg;
-    getCurrentEnv(&pd, NULL, NULL, &msg);
+void ceSchedulerStop(ocrScheduler_t * self, ocrRunLevel_t newRl, u32 action) {
+    switch(newRl) {
+        case RL_STOP: {
+            ocrPolicyDomain_t *pd = NULL;
+            ocrPolicyMsg_t msg;
+            getCurrentEnv(&pd, NULL, NULL, &msg);
 
-    // Stop the workpiles
-    u64 i = 0;
-    u64 count = self->workpileCount;
-    for(i = 0; i < count; ++i) {
-        self->workpiles[i]->fcts.stop(self->workpiles[i]);
+            // Stop the workpiles
+            u64 i = 0;
+            u64 count = self->workpileCount;
+            for(i = 0; i < count; ++i) {
+                self->workpiles[i]->fcts.stop(self->workpiles[i]);
+            }
+
+            // We need to destroy the stealIterators now because pdFree does not
+            // exist after stop
+            ocrSchedulerCe_t * derived = (ocrSchedulerCe_t *) self;
+            pd->fcts.pdFree(pd, derived->stealIterators);
+
+            // Destroy the GUID
+
+        #define PD_MSG (&msg)
+        #define PD_TYPE PD_MSG_GUID_DESTROY
+            msg.type = PD_MSG_GUID_DESTROY | PD_MSG_REQUEST;
+            PD_MSG_FIELD(guid) = self->fguid;
+            PD_MSG_FIELD(guid.metaDataPtr) = self;
+            PD_MSG_FIELD(properties) = 0;
+            RESULT_ASSERT(pd->fcts.processMessage(pd, &msg, false), ==, 0);
+        #undef PD_MSG
+        #undef PD_TYPE
+            self->fguid.guid = UNINITIALIZED_GUID;
+            break;
+        }
+        case RL_SHUTDOWN: {
+            u64 i = 0;
+            u64 count = self->workpileCount;
+            for(i = 0; i < count; ++i) {
+                self->workpiles[i]->fcts.finish(self->workpiles[i]);
+            }
+            break;
+        }
+        default:
+            ASSERT("Unknown runlevel in stop function");
     }
-
-    // We need to destroy the stealIterators now because pdFree does not
-    // exist after stop
-    ocrSchedulerCe_t * derived = (ocrSchedulerCe_t *) self;
-    pd->fcts.pdFree(pd, derived->stealIterators);
-
-    // Destroy the GUID
-
-#define PD_MSG (&msg)
-#define PD_TYPE PD_MSG_GUID_DESTROY
-    msg.type = PD_MSG_GUID_DESTROY | PD_MSG_REQUEST;
-    PD_MSG_FIELD(guid) = self->fguid;
-    PD_MSG_FIELD(guid.metaDataPtr) = self;
-    PD_MSG_FIELD(properties) = 0;
-    RESULT_ASSERT(pd->fcts.processMessage(pd, &msg, false), ==, 0);
-#undef PD_MSG
-#undef PD_TYPE
-    self->fguid.guid = UNINITIALIZED_GUID;
-}
-
-void ceSchedulerFinish(ocrScheduler_t *self) {
-    u64 i = 0;
-    u64 count = self->workpileCount;
-    for(i = 0; i < count; ++i) {
-        self->workpiles[i]->fcts.finish(self->workpiles[i]);
-    }
-    // Nothing to do locally
 }
 
 // What is this for?
@@ -300,8 +306,7 @@ ocrSchedulerFactory_t * newOcrSchedulerFactoryCe(ocrParamList_t *perType) {
     base->destruct = &destructSchedulerFactoryCe;
     base->schedulerFcts.begin = FUNC_ADDR(void (*)(ocrScheduler_t*, ocrPolicyDomain_t*), ceSchedulerBegin);
     base->schedulerFcts.start = FUNC_ADDR(void (*)(ocrScheduler_t*, ocrPolicyDomain_t*), ceSchedulerStart);
-    base->schedulerFcts.stop = FUNC_ADDR(void (*)(ocrScheduler_t*), ceSchedulerStop);
-    base->schedulerFcts.finish = FUNC_ADDR(void (*)(ocrScheduler_t*), ceSchedulerFinish);
+    base->schedulerFcts.stop = FUNC_ADDR(void (*)(ocrScheduler_t*,ocrRunLevel_t,u32), ceSchedulerStop);
     base->schedulerFcts.destruct = FUNC_ADDR(void (*)(ocrScheduler_t*), ceSchedulerDestruct);
     base->schedulerFcts.takeEdt = FUNC_ADDR(u8 (*)(ocrScheduler_t*, u32*, ocrFatGuid_t*), ceSchedulerTake);
     base->schedulerFcts.giveEdt = FUNC_ADDR(u8 (*)(ocrScheduler_t*, u32*, ocrFatGuid_t*), ceSchedulerGive);

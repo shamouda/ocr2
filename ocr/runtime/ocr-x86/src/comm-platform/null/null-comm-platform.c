@@ -30,11 +30,8 @@ void nullCommStart(ocrCommPlatform_t * commPlatform, ocrPolicyDomain_t * PD, ocr
     return;
 }
 
-void nullCommStop(ocrCommPlatform_t * commPlatform) {
+void nullCommStop(ocrCommPlatform_t * commPlatform, ocrRunLevel_t newRl, u32 action) {
     // Nothing to do really
-}
-
-void nullCommFinish(ocrCommPlatform_t *commPlatform) {
 }
 
 u8 nullCommSetMaxExpectedMessageSize(ocrCommPlatform_t *self, u64 size, u32 mask) {
@@ -101,8 +98,7 @@ ocrCommPlatformFactory_t *newCommPlatformFactoryNull(ocrParamList_t *perType) {
                                          ocrCommApi_t*), nullCommBegin);
     base->platformFcts.start = FUNC_ADDR(void (*)(ocrCommPlatform_t*, ocrPolicyDomain_t*,
                                          ocrCommApi_t*), nullCommStart);
-    base->platformFcts.stop = FUNC_ADDR(void (*)(ocrCommPlatform_t*), nullCommStop);
-    base->platformFcts.finish = FUNC_ADDR(void (*)(ocrCommPlatform_t*), nullCommFinish);
+    base->platformFcts.stop = FUNC_ADDR(void (*)(ocrCommPlatform_t*,ocrRunLevel_t,u32), nullCommStop);
     base->platformFcts.setMaxExpectedMessageSize = FUNC_ADDR(u8 (*)(ocrCommPlatform_t*, u64, u32),
             nullCommSetMaxExpectedMessageSize);
     base->platformFcts.sendMessage = FUNC_ADDR(u8 (*)(ocrCommPlatform_t*, ocrLocation_t,

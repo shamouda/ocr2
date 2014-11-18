@@ -164,12 +164,8 @@ void simpleCommApiStart(ocrCommApi_t * self, ocrPolicyDomain_t * pd) {
     self->commPlatform->fcts.start(self->commPlatform, pd, self);
 }
 
-void simpleCommApiStop(ocrCommApi_t * self) {
-    self->commPlatform->fcts.stop(self->commPlatform);
-}
-
-void simpleCommApiFinish(ocrCommApi_t *self) {
-    self->commPlatform->fcts.finish(self->commPlatform);
+void simpleCommApiStop(ocrCommApi_t * self, ocrRunLevel_t newRl, u32 action) {
+    self->commPlatform->fcts.stop(self->commPlatform, newRl, action);
 }
 
 ocrCommApi_t* newCommApiSimple(ocrCommApiFactory_t *factory,
@@ -210,8 +206,7 @@ ocrCommApiFactory_t *newCommApiFactorySimple(ocrParamList_t *perType) {
                                     simpleCommApiBegin);
     base->apiFcts.start = FUNC_ADDR(void (*)(ocrCommApi_t*, ocrPolicyDomain_t*),
                                     simpleCommApiStart);
-    base->apiFcts.stop = FUNC_ADDR(void (*)(ocrCommApi_t*), simpleCommApiStop);
-    base->apiFcts.finish = FUNC_ADDR(void (*)(ocrCommApi_t*), simpleCommApiFinish);
+    base->apiFcts.stop = FUNC_ADDR(void (*)(ocrCommApi_t*,ocrRunLevel_t,u32), simpleCommApiStop);
     base->apiFcts.sendMessage = FUNC_ADDR(u8 (*)(ocrCommApi_t*, ocrLocation_t, ocrPolicyMsg_t *, ocrMsgHandle_t**, u32),
                                           sendMessageSimpleCommApi);
     base->apiFcts.pollMessage = FUNC_ADDR(u8 (*)(ocrCommApi_t*, ocrMsgHandle_t**),

@@ -45,21 +45,24 @@
     }
 }
 
-void hcCommSchedulerStop(ocrScheduler_t * self) {
+void hcCommSchedulerStop(ocrScheduler_t * self, ocrRunLevel_t rl, u32 action) {
     ocrSchedulerHcCommDelegate_t * commSched = (ocrSchedulerHcCommDelegate_t *) self;
-    // deallocate all pdMalloc-ed structures
-    ocrPolicyDomain_t * pd = self->pd;
-    u64 i;
-    for(i = 0; i < commSched->outboxesCount; ++i) {
-        pd->fcts.pdFree(pd, commSched->outboxes[i]);
+    if (action == RL_ACTION_ENTER) {
+        if (rl == RL_SHUTDOWN) {
+            // deallocate all pdMalloc-ed structures
+            ocrPolicyDomain_t * pd = self->pd;
+            u64 i;
+            for(i = 0; i < commSched->outboxesCount; ++i) {
+                pd->fcts.pdFree(pd, commSched->outboxes[i]);
+            }
+            for(i = 0; i < commSched->inboxesCount; ++i) {
+                pd->fcts.pdFree(pd, commSched->inboxes[i]);
+            }
+            pd->fcts.pdFree(pd, commSched->outboxes);
+            pd->fcts.pdFree(pd, commSched->inboxes);
+        }
     }
-    for(i = 0; i < commSched->inboxesCount; ++i) {
-        pd->fcts.pdFree(pd, commSched->inboxes[i]);
-    }
-    pd->fcts.pdFree(pd, commSched->outboxes);
-    pd->fcts.pdFree(pd, commSched->inboxes);
-
-    commSched->baseStop(self);
+    commSched->baseStop(self, rl, action);
 }
 
 /**
@@ -295,7 +298,7 @@ ocrSchedulerFactory_t * newOcrSchedulerFactoryHcCommDelegate(ocrParamList_t *per
     base->schedulerFcts = baseFcts;
     // and specialize some
     base->schedulerFcts.start = FUNC_ADDR(void (*)(ocrScheduler_t*, ocrPolicyDomain_t*), hcCommSchedulerStart);
-    base->schedulerFcts.stop  = FUNC_ADDR(void (*)(ocrScheduler_t*), hcCommSchedulerStop);
+    base->schedulerFcts.stop  = FUNC_ADDR(void (*)(ocrScheduler_t*,ocrRunLevel_t,u32), hcCommSchedulerStop);
     base->schedulerFcts.takeComm = FUNC_ADDR(u8 (*)(ocrScheduler_t*, u32*, ocrFatGuid_t*, u32), hcCommSchedulerTakeComm);
     base->schedulerFcts.giveComm = FUNC_ADDR(u8 (*)(ocrScheduler_t*, u32*, ocrFatGuid_t*, u32), hcCommSchedulerGiveComm);
     base->schedulerFcts.monitorProgress = FUNC_ADDR(u8 (*)(ocrScheduler_t*, ocrMonitorProgress_t, void*), hcCommMonitorProgress);

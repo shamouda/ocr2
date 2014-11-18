@@ -14,6 +14,42 @@
 #include "ocr-types.h"
 #include "utils/profiler/profiler.h"
 
+//TODO doc
+typedef u32 ocrRunLevel_t;
+
+// Runlevels
+#define RL_MAX 10
+
+#define RL_NB_CONCRETE (RL_MAX/2)
+
+//TODO define RL_DEFAULT a little better
+#define RL_DEFAULT 0
+
+
+#define RL_NEXT_UP(rl)   (rl+2)
+#define RL_NEXT_DOWN(rl) (rl-2)
+
+// The runtime is up and running, accepting EDT for execution
+#define RL_RUNNING_USER      RL_MAX        //10
+#define RL_RUNNING_USER_WIP (RL_RUNNING_USER-1)
+
+#define RL_RUNNING_RT  (RL_RUNNING_USER_WIP-1) //8
+#define RL_RUNNING_RT_WIP (RL_RUNNING_RT-1)
+
+#define RL_STOP     (RL_RUNNING_RT_WIP-1) //6
+#define RL_STOP_WIP (RL_STOP-1)
+
+#define RL_SHUTDOWN     (RL_STOP_WIP-1) //4
+#define RL_SHUTDOWN_WIP (RL_SHUTDOWN-1)
+
+#define RL_DEALLOCATE     (RL_SHUTDOWN_WIP-1) //2
+#define RL_DEALLOCATE_WIP (RL_DEALLOCATE-1)
+
+#define RL_ACTION_ENTER 1
+#define RL_ACTION_EXIT 2
+#define RL_ACTION_QUIESCE_COMP 3
+#define RL_ACTION_QUIESCE_COMM 4
+
 /**
  * @brief Memory region "tags"
  *
@@ -265,12 +301,14 @@ typedef u64 ocrLocation_t;
  * @brief Returned by the pollMessage function in
  * either the comp-target and comp-platform to indicate
  * that no message was available */
-#define POLL_NO_MESSAGE   0x1
+#define POLL_NO_MESSAGE            0x1 // first bit indicates no message
+#define POLL_NO_OUTGOING_MESSAGE   0x3 // no outgoing in queue
+#define POLL_NO_INCOMING_MESSAGE   0x5 // no incoming in queue
 /**
  * @brief Indicates that a message was returned and available
  * and that more messages are available
  */
-#define POLL_MORE_MESSAGE 0x2
+#define POLL_MORE_MESSAGE 0x4
 /**
  * @brief AND the return code of pollMessage with this
  * mask to get any real error codes

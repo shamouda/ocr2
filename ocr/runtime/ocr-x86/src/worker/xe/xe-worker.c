@@ -214,45 +214,52 @@ void* xeWorkShift(ocrWorker_t* worker) {
     return NULL;
 }
 
-void xeFinishWorker(ocrWorker_t * base) {
-    DPRINTF(DEBUG_LVL_INFO, "Finishing worker routine %ld\n", getWorkerId(base));
-    ASSERT(base->computeCount == 1);
-    u64 i = 0;
-    for(i = 0; i < base->computeCount; i++) {
-        base->computes[i]->fcts.finish(base->computes[i]);
+void xeStopWorker(ocrWorker_t * base, ocrRunLevel_t newRl) {
+    switch(newRl) {
+        case RL_STOP: {
+            ocrWorkerXe_t * xeWorker = (ocrWorkerXe_t *) base;
+            xeWorker->running = false;
+
+            u64 computeCount = base->computeCount;
+            u64 i = 0;
+            // This code should be called by the master thread to join others
+            for(i = 0; i < computeCount; i++) {
+                base->computes[i]->fcts.stop(base->computes[i], newRl);
+        #ifdef OCR_ENABLE_STATISTICS
+                statsWORKER_STOP(base->pd, base->fguid.guid, base->fguid.metaDataPtr,
+                                 base->computes[i]->fguid.guid,
+                                 base->computes[i]->fguid.metaDataPtr);
+        #endif
+            }
+            DPRINTF(DEBUG_LVL_INFO, "Stopping worker %ld\n", getWorkerId(base));
+
+            // Destroy the GUID
+            ocrPolicyMsg_t msg;
+            getCurrentEnv(NULL, NULL, NULL, &msg);
+
+        #define PD_MSG (&msg)
+        #define PD_TYPE PD_MSG_GUID_DESTROY
+            msg.type = PD_MSG_GUID_DESTROY | PD_MSG_REQUEST;
+            PD_MSG_FIELD(guid) = base->fguid;
+            PD_MSG_FIELD(properties) = 0;
+            RESULT_ASSERT(base->pd->fcts.processMessage(base->pd, &msg, false), ==, 0);
+        #undef PD_MSG
+        #undef PD_TYPE
+            base->fguid.guid = UNINITIALIZED_GUID;
+            break;
+        }
+        case RL_SHUTDOWN: {
+            DPRINTF(DEBUG_LVL_INFO, "Finishing worker routine %ld\n", getWorkerId(base));
+            ASSERT(base->computeCount == 1);
+            u64 i = 0;
+            for(i = 0; i < base->computeCount; i++) {
+                base->computes[i]->fcts.stop(base->computes[i], RL_SHUTDOWN);
+            }
+            break;
+        }
+        default:
+            ASSERT("Unknown runlevel in stop function");
     }
-}
-
-void xeStopWorker(ocrWorker_t * base) {
-    ocrWorkerXe_t * xeWorker = (ocrWorkerXe_t *) base;
-    xeWorker->running = false;
-
-    u64 computeCount = base->computeCount;
-    u64 i = 0;
-    // This code should be called by the master thread to join others
-    for(i = 0; i < computeCount; i++) {
-        base->computes[i]->fcts.stop(base->computes[i]);
-#ifdef OCR_ENABLE_STATISTICS
-        statsWORKER_STOP(base->pd, base->fguid.guid, base->fguid.metaDataPtr,
-                         base->computes[i]->fguid.guid,
-                         base->computes[i]->fguid.metaDataPtr);
-#endif
-    }
-    DPRINTF(DEBUG_LVL_INFO, "Stopping worker %ld\n", getWorkerId(base));
-
-    // Destroy the GUID
-    ocrPolicyMsg_t msg;
-    getCurrentEnv(NULL, NULL, NULL, &msg);
-
-#define PD_MSG (&msg)
-#define PD_TYPE PD_MSG_GUID_DESTROY
-    msg.type = PD_MSG_GUID_DESTROY | PD_MSG_REQUEST;
-    PD_MSG_FIELD(guid) = base->fguid;
-    PD_MSG_FIELD(properties) = 0;
-    RESULT_ASSERT(base->pd->fcts.processMessage(base->pd, &msg, false), ==, 0);
-#undef PD_MSG
-#undef PD_TYPE
-    base->fguid.guid = UNINITIALIZED_GUID;
 }
 
 bool xeIsRunningWorker(ocrWorker_t * base) {
@@ -280,8 +287,7 @@ ocrWorkerFactory_t * newOcrWorkerFactoryXe(ocrParamList_t * perType) {
     base->workerFcts.start = FUNC_ADDR(void (*)(ocrWorker_t*, ocrPolicyDomain_t*), xeStartWorker);
     base->workerFcts.run = FUNC_ADDR(void* (*)(ocrWorker_t*), xeRunWorker);
     base->workerFcts.workShift = FUNC_ADDR(void* (*)(ocrWorker_t*), xeWorkShift);
-    base->workerFcts.stop = FUNC_ADDR(void (*)(ocrWorker_t*), xeStopWorker);
-    base->workerFcts.finish = FUNC_ADDR(void (*)(ocrWorker_t*), xeFinishWorker);
+    base->workerFcts.stop = FUNC_ADDR(void (*)(ocrWorker_t*,ocrRunLevel_t,u32), xeStopWorker);
     base->workerFcts.isRunning = FUNC_ADDR(bool (*)(ocrWorker_t*), xeIsRunningWorker);
     return base;
 }

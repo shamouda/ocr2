@@ -55,13 +55,20 @@ void fsimStart(ocrMemPlatform_t *self, struct _ocrPolicyDomain_t * PD ) {
     // Nothing much else to do
 }
 
-void fsimStop(ocrMemPlatform_t *self) {
-    // Nothing to do
-}
-
-void fsimFinish(ocrMemPlatform_t *self) {
-    ocrMemPlatformFsim_t *rself = (ocrMemPlatformFsim_t*)self;
-    destroyRange(&(rself->rangeTracker));
+void fsimStop(ocrMemPlatform_t *self, ocrRunLevel_t newRl, u32 action) {
+    switch(newRl) {
+        case RL_STOP: {
+            // Nothing to do
+            break;
+        }
+        case RL_SHUTDOWN: {
+            ocrMemPlatformFsim_t *rself = (ocrMemPlatformFsim_t*)self;
+            destroyRange(&(rself->rangeTracker));
+            break;
+        }
+        default:
+            ASSERT("Unknown runlevel in stop function");
+    }
 }
 
 u8 fsimGetThrottle(ocrMemPlatform_t *self, u64 *value) {
@@ -181,8 +188,7 @@ ocrMemPlatformFactory_t *newMemPlatformFactoryFsim(ocrParamList_t *perType) {
     base->platformFcts.destruct = FUNC_ADDR(void (*)(ocrMemPlatform_t*), fsimDestruct);
     base->platformFcts.begin = FUNC_ADDR(void (*)(ocrMemPlatform_t*, struct _ocrPolicyDomain_t*), fsimBegin);
     base->platformFcts.start = FUNC_ADDR(void (*)(ocrMemPlatform_t*, struct _ocrPolicyDomain_t*), fsimStart);
-    base->platformFcts.stop = FUNC_ADDR(void (*)(ocrMemPlatform_t*), fsimStop);
-    base->platformFcts.finish = FUNC_ADDR(void (*)(ocrMemPlatform_t*), fsimFinish);
+    base->platformFcts.stop = FUNC_ADDR(void (*)(ocrMemPlatform_t*,ocrRunLevel_t,u32), fsimStop);
     base->platformFcts.getThrottle = FUNC_ADDR(u8 (*)(ocrMemPlatform_t*, u64*), fsimGetThrottle);
     base->platformFcts.setThrottle = FUNC_ADDR(u8 (*)(ocrMemPlatform_t*, u64), fsimSetThrottle);
     base->platformFcts.getRange = FUNC_ADDR(void (*)(ocrMemPlatform_t*, u64*, u64*), fsimGetRange);

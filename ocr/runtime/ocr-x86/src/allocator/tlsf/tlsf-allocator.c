@@ -1417,6 +1417,37 @@ static ocrAllocator_t * getAnchorCE (ocrAllocator_t * self) {
     return anchorCE;
 }
 
+// =======
+// void tlsfDestruct(ocrAllocator_t *self) {
+//         //TODO-RL pretty much all other module depend on this
+//         //being the last thing destroyed.
+//         CHECK_AND_SET_MODULE_STATE(TLSF-ALLOCATOR, self, FINISH);
+//         int i;
+//         ocrAllocatorTlsf_t *rself = (ocrAllocatorTlsf_t*)self;
+//         RESULT_ASSERT(rself->base.memories[0]->fcts.tag(
+//             rself->base.memories[0], rself->poolStorageAddr, rself->poolStorageSize + rself->poolStorageAddr,
+//             USER_FREE_TAG), ==, 0);
+//         u64 poolAddr = rself->poolAddr - (((u64) rself->sliceCount)*((u64) rself->sliceSize));
+//         for (i = 0; i < rself->sliceCount; i++) {
+//     #ifdef ENABLE_VALGRIND
+//             VALGRIND_DESTROY_MEMPOOL(poolAddr);
+//             VALGRIND_MAKE_MEM_DEFINED(poolAddr, rself->sliceSize);
+//     #endif
+//             poolAddr += rself->sliceSize;
+//         }
+
+//     #ifdef ENABLE_VALGRIND
+//         VALGRIND_DESTROY_MEMPOOL(poolAddr);
+//         VALGRIND_MAKE_MEM_DEFINED(poolAddr, rself->poolSize);
+//     #endif
+
+//     if(self->memoryCount) {
+//         self->memories[0]->fcts.destruct(self->memories[0]);
+//         // TODO: Should we do this? It is the clean thing to do but may
+//         // cause mismatch between way it was created and freed
+//         runtimeChunkFree((u64)self->memories, NULL);
+// >>>>>>> Runlevel experimentations (WIP)
+
 void tlsfDestruct(ocrAllocator_t *self) {
     DPRINTF(DEBUG_LVL_INFO, "Entered tlsfDesctruct on allocator 0x%lx\n", (u64) self);
     ASSERT(self->memoryCount == 1);
@@ -1555,96 +1586,105 @@ void tlsfStart(ocrAllocator_t *self, ocrPolicyDomain_t * PD ) {
     DPRINTF(DEBUG_LVL_INFO, "Leaving tlsfStart on allocator 0x%lx\n", (u64) self);
 }
 
-void tlsfStop(ocrAllocator_t *self) {
-    DPRINTF(DEBUG_LVL_INFO, "Entered tlsfStop on allocator 0x%lx\n", (u64) self);
-    ocrPolicyMsg_t msg;
-    getCurrentEnv(&(self->pd), NULL, NULL, &msg);
-    ocrAllocator_t * anchorCE = getAnchorCE(self);
-    ocrAllocatorTlsf_t * rAnchorCE = (ocrAllocatorTlsf_t *) anchorCE;
-    ocrAllocatorTlsf_t * rself = (ocrAllocatorTlsf_t *) self;
-    ASSERT(self->memoryCount == 1);
 
-    CHECK_AND_SET_MODULE_STATE(TLSF-ALLOCATOR, self, STOP);
-    hal_lock32(&(rAnchorCE->lockForInit));
-    { // Bracket the critical section code
-        rAnchorCE->useCount2--;
-    } // End bracketing of the critical section code
-    hal_unlock32(&(rAnchorCE->lockForInit));
-    if (isAnchor(rself, rAnchorCE)) {
-        // On platforms other than FSIM, ALL agents share a common allocator_t struct, and so
-        // think of themselves as the anchor.  Any ONE of them can do the finalization, AFTER
-        // all of them have decremented the useCount to zero.
-        while(rself->useCount2 > 0) continue;
-        hal_lock32(&(rAnchorCE->lockForInit));
-        { // Bracket the critical section code
-            if (rself->useCount2 == 0) {
-#ifdef OCR_ENABLE_STATISTICS
-//TODO:  Should this be done by non-anchor agents too?
-                statsALLOCATOR_STOP(self->pd, self->guid, self, self->memories[0]->guid, self->memories[0]);
-#endif
-                self->memories[0]->fcts.stop(self->memories[0]);
-                rself->useCount2 = -1;  // Assure that other agents don't also perform the finalization steps.
+void tlsfStop(ocrAllocator_t *self, ocrRunLevel_t newRl, u32 action) {
+    // TODO Just put stop and finish in there, need to look into what it actually does
+    switch(newRl) {
+        case RL_STOP: {
+            DPRINTF(DEBUG_LVL_INFO, "Entered tlsfStop on allocator 0x%lx\n", (u64) self);
+            ocrPolicyMsg_t msg;
+            getCurrentEnv(&(self->pd), NULL, NULL, &msg);
+            ocrAllocator_t * anchorCE = getAnchorCE(self);
+            ocrAllocatorTlsf_t * rAnchorCE = (ocrAllocatorTlsf_t *) anchorCE;
+            ocrAllocatorTlsf_t * rself = (ocrAllocatorTlsf_t *) self;
+            ASSERT(self->memoryCount == 1);
+
+            CHECK_AND_SET_MODULE_STATE(TLSF-ALLOCATOR, self, STOP);
+            hal_lock32(&(rAnchorCE->lockForInit));
+            { // Bracket the critical section code
+                rAnchorCE->useCount2--;
+            } // End bracketing of the critical section code
+            hal_unlock32(&(rAnchorCE->lockForInit));
+            if (isAnchor(rself, rAnchorCE)) {
+                // On platforms other than FSIM, ALL agents share a common allocator_t struct, and so
+                // think of themselves as the anchor.  Any ONE of them can do the finalization, AFTER
+                // all of them have decremented the useCount to zero.
+                while(rself->useCount2 > 0) continue;
+                hal_lock32(&(rAnchorCE->lockForInit));
+                { // Bracket the critical section code
+                    if (rself->useCount2 == 0) {
+        #ifdef OCR_ENABLE_STATISTICS
+        //TODO:  Should this be done by non-anchor agents too?
+                        statsALLOCATOR_STOP(self->pd, self->guid, self, self->memories[0]->guid, self->memories[0]);
+        #endif
+                        self->memories[0]->fcts.stop(self->memories[0], newRl, action);
+                        rself->useCount2 = -1;  // Assure that other agents don't also perform the finalization steps.
+                    }
+        #define PD_MSG (&msg)
+        #define PD_TYPE PD_MSG_GUID_DESTROY
+                    msg.type = PD_MSG_GUID_DESTROY | PD_MSG_REQUEST;
+                    PD_MSG_FIELD(guid) = self->fguid;
+                    PD_MSG_FIELD(properties) = 0;
+                    self->pd->fcts.processMessage(self->pd, &msg, false);
+        #undef PD_MSG
+        #undef PD_TYPE
+                    self->fguid.guid = NULL_GUID;
+                } // End bracketing of the critical section code
+                hal_unlock32(&(rAnchorCE->lockForInit));
             }
-#define PD_MSG (&msg)
-#define PD_TYPE PD_MSG_GUID_DESTROY
-            msg.type = PD_MSG_GUID_DESTROY | PD_MSG_REQUEST;
-            PD_MSG_FIELD(guid) = self->fguid;
-            PD_MSG_FIELD(properties) = 0;
-            self->pd->fcts.processMessage(self->pd, &msg, false);
-#undef PD_MSG
-#undef PD_TYPE
-            self->fguid.guid = NULL_GUID;
-        } // End bracketing of the critical section code
-        hal_unlock32(&(rAnchorCE->lockForInit));
-    }
 
-    DPRINTF(DEBUG_LVL_INFO, "Leaving tlsfStop on allocator 0x%lx\n", (u64) self);
-}
+            DPRINTF(DEBUG_LVL_INFO, "Leaving tlsfStop on allocator 0x%lx\n", (u64) self);
+            break;
+        }
+        case RL_SHUTDOWN: {
+            DPRINTF(DEBUG_LVL_INFO, "Entered tlsfFinish on allocator 0x%lx\n", (u64) self);
+            ocrAllocator_t * anchorCE = getAnchorCE(self);
+            ocrAllocatorTlsf_t * rAnchorCE = (ocrAllocatorTlsf_t *) anchorCE;
+            ocrAllocatorTlsf_t * rself = (ocrAllocatorTlsf_t *) self;
+            ASSERT(self->memoryCount == 1);
 
-void tlsfFinish(ocrAllocator_t *self) {
-    DPRINTF(DEBUG_LVL_INFO, "Entered tlsfFinish on allocator 0x%lx\n", (u64) self);
-    ocrAllocator_t * anchorCE = getAnchorCE(self);
-    ocrAllocatorTlsf_t * rAnchorCE = (ocrAllocatorTlsf_t *) anchorCE;
-    ocrAllocatorTlsf_t * rself = (ocrAllocatorTlsf_t *) self;
-    ASSERT(self->memoryCount == 1);
+            CHECK_AND_SET_MODULE_STATE(TLSF-ALLOCATOR, self, FINISH);
+            hal_lock32(&(rAnchorCE->lockForInit));
+            { // Bracket the critical section code
+                rAnchorCE->useCount1--;
+            } // End bracketing of the critical section code
+            hal_unlock32(&(rAnchorCE->lockForInit));
+            if (isAnchor(rself, rAnchorCE)) {
+                // On platforms other than FSIM, ALL agents share a common allocator_t struct, and so
+                // think of themselves as the anchor.  Any ONE of them can do the finalization, AFTER
+                // all of them have decremented the useCount to zero.
+                while(rself->useCount1 > 0) continue;
+                hal_lock32(&(rAnchorCE->lockForInit));
+                { // Bracket the critical section code
+                    if (rself->useCount1 == 0) {
+                        RESULT_ASSERT(rAnchorCE->base.memories[0]->fcts.tag(
+                            rself->base.memories[0],
+                            rself->poolAddr - rself->sliceSize * rself->sliceCount - rself->poolStorageOffset,
+                            rself->poolAddr + rself->poolSize + rself->poolStorageSuffix,
+                            USER_FREE_TAG), ==, 0);
+        #ifdef ENABLE_VALGRIND
+                        u64 poolAddr = rself->poolAddr - (((u64) rself->sliceCount)*((u64) rself->sliceSize));
+                        u32 i;
+                        for (i = 0; i < rself->sliceCount; i++) {
+                            VALGRIND_DESTROY_MEMPOOL(poolAddr);
+                            VALGRIND_MAKE_MEM_DEFINED(poolAddr, rself->sliceSize);
+                            poolAddr += srelf->sliceSize;
+                        }
 
-    CHECK_AND_SET_MODULE_STATE(TLSF-ALLOCATOR, self, FINISH);
-    hal_lock32(&(rAnchorCE->lockForInit));
-    { // Bracket the critical section code
-        rAnchorCE->useCount1--;
-    } // End bracketing of the critical section code
-    hal_unlock32(&(rAnchorCE->lockForInit));
-    if (isAnchor(rself, rAnchorCE)) {
-        // On platforms other than FSIM, ALL agents share a common allocator_t struct, and so
-        // think of themselves as the anchor.  Any ONE of them can do the finalization, AFTER
-        // all of them have decremented the useCount to zero.
-        while(rself->useCount1 > 0) continue;
-        hal_lock32(&(rAnchorCE->lockForInit));
-        { // Bracket the critical section code
-            if (rself->useCount1 == 0) {
-                RESULT_ASSERT(rAnchorCE->base.memories[0]->fcts.tag(
-                    rself->base.memories[0],
-                    rself->poolAddr - rself->sliceSize * rself->sliceCount - rself->poolStorageOffset,
-                    rself->poolAddr + rself->poolSize + rself->poolStorageSuffix,
-                    USER_FREE_TAG), ==, 0);
-#ifdef ENABLE_VALGRIND
-                u64 poolAddr = rself->poolAddr - (((u64) rself->sliceCount)*((u64) rself->sliceSize));
-                u32 i;
-                for (i = 0; i < rself->sliceCount; i++) {
-                    VALGRIND_DESTROY_MEMPOOL(poolAddr);
-                    VALGRIND_MAKE_MEM_DEFINED(poolAddr, rself->sliceSize);
-                    poolAddr += srelf->sliceSize;
-                }
-
-                VALGRIND_DESTROY_MEMPOOL(poolAddr);
-                VALGRIND_MAKE_MEM_DEFINED(poolAddr, rAnchorCE->poolSize);
-#endif
-                self->memories[0]->fcts.finish(self->memories[0]);
+                        VALGRIND_DESTROY_MEMPOOL(poolAddr);
+                        VALGRIND_MAKE_MEM_DEFINED(poolAddr, rAnchorCE->poolSize);
+        #endif
+                        self->memories[0]->fcts.stop(self->memories[0], newRl, action);
+                    }
+                } // End bracketing of the critical section code
+                hal_unlock32(&(rAnchorCE->lockForInit));
             }
-        } // End bracketing of the critical section code
-        hal_unlock32(&(rAnchorCE->lockForInit));
+            DPRINTF(DEBUG_LVL_INFO, "Leaving tlsfFinish on allocator 0x%lx\n", (u64) self);
+            break;
+        }
+        default:
+            ASSERT("Unknown runlevel in stop function");
     }
-    DPRINTF(DEBUG_LVL_INFO, "Leaving tlsfFinish on allocator 0x%lx\n", (u64) self);
 }
 
 void* tlsfAllocate(
@@ -1894,8 +1934,7 @@ ocrAllocatorFactory_t * newAllocatorFactoryTlsf(ocrParamList_t *perType) {
     base->allocFcts.destruct = FUNC_ADDR(void (*)(ocrAllocator_t*), tlsfDestruct);
     base->allocFcts.begin = FUNC_ADDR(void (*)(ocrAllocator_t*, ocrPolicyDomain_t*), tlsfBegin);
     base->allocFcts.start = FUNC_ADDR(void (*)(ocrAllocator_t*, ocrPolicyDomain_t*), tlsfStart);
-    base->allocFcts.stop = FUNC_ADDR(void (*)(ocrAllocator_t*), tlsfStop);
-    base->allocFcts.finish = FUNC_ADDR(void (*)(ocrAllocator_t*), tlsfFinish);
+    base->allocFcts.stop = FUNC_ADDR(void (*)(ocrAllocator_t*,ocrRunLevel_t,u32), tlsfStop);
     base->allocFcts.allocate = FUNC_ADDR(void* (*)(ocrAllocator_t*, u64, u64), tlsfAllocate);
     //base->allocFcts.free = FUNC_ADDR(void (*)(void*), tlsfDeallocate);
     base->allocFcts.reallocate = FUNC_ADDR(void* (*)(ocrAllocator_t*, void*, u64), tlsfReallocate);

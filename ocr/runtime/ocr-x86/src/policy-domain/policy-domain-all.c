@@ -49,6 +49,7 @@ void initializePolicyDomainOcr(ocrPolicyDomainFactory_t * factory, ocrPolicyDoma
     self->schedulers = NULL;
     self->allocators = NULL;
     self->commApis = NULL;
+    self->rl = RL_DEFAULT; //TODO what's the default runlevel ?
     self->shutdownCode = 0;
 }
 

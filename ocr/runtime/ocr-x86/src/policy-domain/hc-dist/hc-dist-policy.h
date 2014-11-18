@@ -22,13 +22,10 @@
 typedef struct {
     ocrPolicyDomainHc_t base;
     u8 (*baseProcessMessage)(struct _ocrPolicyDomain_t *self, struct _ocrPolicyMsg_t *msg,
-                         u8 isBlocking);
-    void (*baseStart)(struct _ocrPolicyDomain_t *self);
-    void (*baseStop)(struct _ocrPolicyDomain_t *self);
-    bool shutdownSent;
+                             u8 isBlocking);
+    // void (*baseStart)(struct _ocrPolicyDomain_t *self);
+    // void (*baseStop)(struct _ocrPolicyDomain_t *self, ocrRunLevel_t, u32);
     u64 shutdownAckCount;
-    volatile u64 piledWorkerCtx;
-    volatile u32 piledWorkerCtxLock;
     u32 lockDbLookup; /**< Lock for querying proxies for remote DB */
 } ocrPolicyDomainHcDist_t;
 
@@ -41,8 +38,8 @@ typedef struct {
          ocrCost_t *costFunction, ocrParamList_t *perInstance);
     u8 (*baseProcessMessage)(struct _ocrPolicyDomain_t *self, struct _ocrPolicyMsg_t *msg,
                          u8 isBlocking);
-    void (*baseStart)(struct _ocrPolicyDomain_t *self);
-    void (*baseStop)(struct _ocrPolicyDomain_t *self);
+    // void (*baseStart)(struct _ocrPolicyDomain_t *self);
+    // void (*baseStop)(struct _ocrPolicyDomain_t *self, ocrRunLevel_t, u32);
 } ocrPolicyDomainFactoryHcDist_t;
 
 ocrPolicyDomainFactory_t *newPolicyDomainFactoryHcDist(ocrParamList_t *perType);
