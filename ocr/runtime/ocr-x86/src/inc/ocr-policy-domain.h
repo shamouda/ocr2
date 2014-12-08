@@ -284,7 +284,15 @@ typedef struct _ocrPolicyMsg_t {
                                  * (location processing the request) */
     u64 msgId;                  /**< Implementation specific ID identifying
                                  * this message (if required) */
-
+#ifdef OCR_ANALYZE_NETWORK
+    //Timestamps for communication overhead analysis
+    u64 marshTime;
+    u64 sendTime;
+    u64 rcvTime;
+    u64 uMarshTime;
+    //Temporary band-aid until message->size reports correct value post unmarshalling
+    u64 realSize;
+#endif
     /* The following rules apply to all fields in the message:
      *     - All ocrFatGuid_t are in/out parameters in the sense
      *       that if they come in with only the GUID information

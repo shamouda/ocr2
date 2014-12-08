@@ -6,7 +6,7 @@
 
 #include "policy-domain/policy-domain-all.h"
 #include "debug.h"
-
+#include "utils/ocr-utils.h"
 #define DEBUG_TYPE POLICY
 
 const char * policyDomain_types [] = {
@@ -85,10 +85,12 @@ u8 ocrPolicyMsgGetMsgSize(ocrPolicyMsg_t *msg, u64 *fullSize,
 
     case PD_MSG_EDTTEMP_CREATE:
 #define PD_TYPE PD_MSG_EDTTEMP_CREATE
+#ifdef OCR_ENABLE_EDT_NAMING
         *marshalledSize = PD_MSG_FIELD(funcNameLen)*sizeof(char);
         if(*marshalledSize) {
             *marshalledSize += 1*sizeof(char); // Null terminating character
         }
+#endif
         break;
 #undef PD_TYPE
 
@@ -203,6 +205,7 @@ u8 ocrPolicyMsgMarshallMsg(ocrPolicyMsg_t* msg, u8* buffer, ocrMarshallMode_t mo
     case PD_MSG_EDTTEMP_CREATE: {
 #define PD_TYPE PD_MSG_EDTTEMP_CREATE
         // First copy things over
+#ifdef OCR_ENABLE_EDT_NAMING
         u64 s = sizeof(char)*(PD_MSG_FIELD(funcNameLen)+1);
         if(s) {
             hal_memCopy(curPtr, PD_MSG_FIELD(funcName), s, false);
@@ -219,6 +222,7 @@ u8 ocrPolicyMsgMarshallMsg(ocrPolicyMsg_t* msg, u8* buffer, ocrMarshallMode_t mo
             // Finally move the curPtr for the next object (none as of now)
             curPtr += s;
         }
+#endif
         break;
 #undef PD_TYPE
     }
@@ -304,6 +308,10 @@ u8 ocrPolicyMsgMarshallMsg(ocrPolicyMsg_t* msg, u8* buffer, ocrMarshallMode_t mo
         outputMsg->size = (u64)(curPtr) - (u64)(startPtr);
     }
 
+#ifdef OCR_ANALYZE_NETWORK
+    outputMsg->marshTime = getTimeNs();
+#endif
+
     DPRINTF(DEBUG_LVL_VVERB, "Size of message set to 0x%lx\n", outputMsg->size);
     return 0;
 }
@@ -312,9 +320,7 @@ u8 ocrPolicyMsgUnMarshallMsg(u8* mainBuffer, u8* addlBuffer,
                              ocrPolicyMsg_t* msg, ocrMarshallMode_t mode) {
     u8* localMainPtr = (u8*)msg;
     u8* localAddlPtr = NULL;
-
     u64 fullSize=0, marshalledSize=0;
-
     switch(mode) {
     case MARSHALL_FULL_COPY:
         // We copy mainBuffer into msg
@@ -329,7 +335,7 @@ u8 ocrPolicyMsgUnMarshallMsg(u8* mainBuffer, u8* addlBuffer,
         // excluding any additional stuff so we can take the localAddlPtr info
         localAddlPtr = (u8*)msg + ((ocrPolicyMsg_t*)msg)->size;
         break;
-
+        //used to ensure that uniqueID does not get incremented twice
     case MARSHALL_APPEND:
         ASSERT((u64)msg == (u64)mainBuffer);
         ocrPolicyMsgGetMsgSize(msg, &fullSize, &marshalledSize);
@@ -401,12 +407,14 @@ u8 ocrPolicyMsgUnMarshallMsg(u8* mainBuffer, u8* addlBuffer,
 
     case PD_MSG_EDTTEMP_CREATE: {
 #define PD_TYPE PD_MSG_EDTTEMP_CREATE
+#ifdef OCR_ENABLE_EDT_NAMING
         if(PD_MSG_FIELD(funcNameLen) > 0) {
             u64 t = (u64)(PD_MSG_FIELD(funcName));
             PD_MSG_FIELD(funcName) = (char*)((t&1?localAddlPtr:localMainPtr) + (t>>1));
             DPRINTF(DEBUG_LVL_VVERB, "Converted field funcName from 0x%lx to 0x%lx\n",
                     t, (u64)PD_MSG_FIELD(funcName));
         }
+#endif
         break;
 #undef PD_TYPE
     }
@@ -456,6 +464,14 @@ u8 ocrPolicyMsgUnMarshallMsg(u8* mainBuffer, u8* addlBuffer,
     if(mode == MARSHALL_APPEND || mode == MARSHALL_FULL_COPY) {
         msg->size = fullSize;
     }
+
+#ifdef OCR_ANALYZE_NETWORK
+    msg->uMarshTime = getTimeNs();
+
+    DPRINTF(DEBUG_LVL_WARN,"Unmarshalled Message src 0x%u dst 0x%u size %u marsh %lu send %lu rcv %lu umarsh %lu type %x\n", msg->srcLocation, msg->destLocation, msg->realSize, msg->marshTime, msg->sendTime, msg->rcvTime, msg->uMarshTime, (msg->type & PD_MSG_TYPE_ONLY));
+#endif
+
+
     DPRINTF(DEBUG_LVL_VVERB, "Done unmarshalling and have size of message %ld\n", msg->size);
     return 0;
 }

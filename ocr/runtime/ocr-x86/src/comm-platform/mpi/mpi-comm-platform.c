@@ -28,6 +28,7 @@
 /**
  * @brief Initialize the MPI library.
  */
+
 void platformInitMPIComm(int argc, char ** argv) {
     int res = MPI_Init(&argc, &argv);
     ASSERT(res == MPI_SUCCESS);
@@ -120,6 +121,11 @@ static void postRecvAny(ocrCommPlatform_t * self) {
     DPRINTF(DEBUG_LVL_VERB,"[MPI %d] posting irecv ANY\n", mpiRankToLocation(self->pd->myLocation));
     int res = MPI_Irecv(buf, count, datatype, src, tag, comm, &(handle->status));
     ASSERT(res == MPI_SUCCESS);
+
+#ifdef OCR_ANALYZE_NETWORK
+    buf->rcvTime = getTimeNs();
+#endif
+
     mpiComm->incoming->pushFront(mpiComm->incoming, handle);
 }
 #endif
@@ -210,6 +216,11 @@ u8 MPICommSendMessage(ocrCommPlatform_t * self,
             ASSERT(false);
             return res;
         }
+
+    #ifdef OCR_ANALYZE_NETWORK
+        respMsg->rcvTime = getTimeNs();
+    #endif
+
         mpiComm->incoming->pushFront(mpiComm->incoming, respHandle);
     #endif
     #if STRATEGY_PROBE_RECV
@@ -226,8 +237,15 @@ u8 MPICommSendMessage(ocrCommPlatform_t * self,
     // the remote end.
     int tag = (message->type & PD_MSG_RESPONSE) ? message->msgId : SEND_ANY_ID;
     MPI_Request * status = &(handle->status);
-    DPRINTF(DEBUG_LVL_VERB,"[MPI %d] posting isend for msgId %ld msg %p type %x to rank %d\n",
-        mpiRankToLocation(self->pd->myLocation), message->msgId, message, message->type, targetRank);
+
+    DPRINTF(DEBUG_LVL_WARN,"[MPI %d] posting isend for msgId %ld msg %p type %x size %x to rank %d\n",
+        mpiRankToLocation(self->pd->myLocation), message->msgId, message, (message->type & PD_MSG_TYPE_ONLY), bufferSize, targetRank);
+
+#ifdef OCR_ANALYZE_NETWORK
+    message->realSize = bufferSize;
+    message->sendTime = getTimeNs();
+#endif
+
     int res = MPI_Isend(message, bufferSize, datatype, targetRank, tag, comm, status);
     if (res == MPI_SUCCESS) {
         mpiComm->outgoing->pushFront(mpiComm->outgoing, handle);
@@ -298,6 +316,11 @@ u8 probeIncoming(ocrCommPlatform_t *self, int src, int tag, ocrPolicyMsg_t ** ms
         // This should be true since MPI seems to make sure to send the whole message
         ocrPolicyMsgGetMsgSize(*msg, &fullMsgSize, &marshalledSize);
         ASSERT(fullMsgSize <= count);
+
+    #ifdef OCR_ANALYZE_NETWORK
+        (*msg)->rcvTime = getTimeNs();
+    #endif
+
         (*msg)->size = fullMsgSize; // Reset it properly (it will have been set to
                                     // fullMsgSize - marshalledSize)
         ocrPolicyMsgUnMarshallMsg((u8*)*msg, NULL, *msg, MARSHALL_APPEND);
@@ -376,6 +399,7 @@ u8 MPICommPollMessage_RL3(ocrCommPlatform_t *self, ocrPolicyMsg_t **msg,
             u32 needRecvAny = (receivedMsg->type & PD_MSG_REQUEST);
             DPRINTF(DEBUG_LVL_VERB,"[MPI %d] Received a message of type %x with msgId %d \n",
                     mpiRankToLocation(self->pd->myLocation), receivedMsg->type, (int) receivedMsg->msgId);
+
             // if request : msg may be reused for the response
             // if response: upper-layer must process and deallocate
             //DIST-TODO there's no convenient way to let upper-layers know if msg can be reused

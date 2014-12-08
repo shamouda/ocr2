@@ -1,0 +1,30 @@
+**********************************************************************
+Usage Instruction for Communication Overhead analysis (distibuted MPI)
+**********************************************************************
+
+This analysis tool is used to gather communcation overhead
+(measured in amount of bytes transfered per message) in an
+app executed using x86-pthread-mpi
+
+The following are required pre-execution:
+
+-In ocr/build/common.mk:
+    -Debug option needs to be set at DEBUG_LVL_WARN
+    *NOTE: DEBUG_LVL_WARN is temporary and will be changed in the future.
+     Using WARN level eliminates other DPRINTFs to speed up execution on
+     large data sets.
+
+Script Instructions:
+
+-Navigate to desired application directory
+
+-Application logging output must be redirected to
+ to the /ocr/scripts/CommOverhead directory
+
+ The command would look like: make -f Makefile.x86-pthread-mpi run > ~/xstack/ocr/scripts/CommOverhead/<log_ouput_file_name>
+
+-Navigate to /ocr/scripts/CommOverhead, and run: python analyzeComm.py <log_ouput_file_name>
+-The output will be called analysis.txt and will contain data transfer info for each message
+ type observed in the execution log.
+
+

@@ -7,7 +7,7 @@
  * and cannot be distributed without it. This notice cannot be
  * removed or modified.
  */
-#ifdef OCR_ENABLE_VISUALIZER
+#if defined(OCR_ENABLE_VISUALIZER) || defined(OCR_ANALYZE_NETWORK)
 #include <time.h>
 #endif
 
@@ -171,11 +171,11 @@ u64 ocrStrlen(const char* str) {
     return res;
 }
 
-#ifdef OCR_ENABLE_VISUALIZER
+#if defined(OCR_ENABLE_VISUALIZER) || defined(OCR_ANALYZE_NETWORK)
 u64 getTimeNs()
 {
     struct timespec ts;
-    clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &ts);
+    clock_gettime(CLOCK_REALTIME, &ts);
     return ts.tv_sec * 1000000000UL + (u64) ts.tv_nsec;
 }
 #endif

@@ -64,7 +64,10 @@ CFLAGS += -DINIT_DEQUE_CAPACITY=2048
 # Enables data collection for execution timeline visualizer
 # (x86 only.  Requires -DOCR_ENABLE_EDT_NAMING and DEBUG_LVL_INFO)
 # CFLAGS += -DOCR_ENABLE_VISUALIZER -DOCR_ENABLE_EDT_NAMING
+# CFLAGS += -DOCR_ENABLE_VISUALIZER
 
+# Enables timing functionality to analyze distributed network overhead.
+# CFLAGS += -DOCR_ANALYZE_NETWORK
 ####################################################
 # Experimental flags
 ####################################################
@@ -87,8 +90,8 @@ CFLAGS += -DINIT_DEQUE_CAPACITY=2048
 # Enable debug
 CFLAGS += -DOCR_DEBUG
 # Define level
- CFLAGS += -DOCR_DEBUG_LVL=DEBUG_LVL_WARN
-#CFLAGS += -DOCR_DEBUG_LVL=DEBUG_LVL_INFO
+CFLAGS += -DOCR_DEBUG_LVL=DEBUG_LVL_WARN
+# CFLAGS += -DOCR_DEBUG_LVL=DEBUG_LVL_INFO
 # CFLAGS += -DOCR_DEBUG_LVL=DEBUG_LVL_VERB
 # CFLAGS += -DOCR_DEBUG_LVL=DEBUG_LVL_VVERB
 
