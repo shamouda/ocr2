@@ -1,0 +1,169 @@
+#include "perfs.h"
+#include "ocr.h"
+
+// DESC: Create a producer event and consumer EDT depending on it
+// TIME: Satisfy the producer event
+// FREQ: Done 'NB_ITERS' times
+// NOTE: The driver EDT is a finish EDT to collect created EDTs
+
+#ifndef CUSTOM_BOUNDS
+#define NB_ITERS 5000
+#define FAN_OUT 1000
+#endif
+
+// Paramc for iteration number and various timer accumulators
+#define DRIVER_PARAMC 4
+#define DRIVER_DEPV 0
+#define DRIVER_PROP EDT_PROP_FINISH
+
+ocrGuid_t consumerEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
+    return NULL_GUID;
+}
+
+ocrGuid_t driverEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
+    u64 iteration = paramv[0];
+#if TIME_SATISFY
+    long accTimerSatisfy = (long) paramv[1];
+#endif
+#if TIME_CONSUMER_CREATE
+    long accTimerConsCreate = (long) paramv[2];
+#endif
+#if TIME_ADD_DEP
+    long accTimerAddDep = (long) paramv[3];
+#endif
+
+    if (iteration == NB_ITERS) {
+#if TIME_SATISFY
+        print_throughput("Satisfy", NB_ITERS, usec_to_sec(accTimerSatisfy));
+#endif
+#if TIME_CONSUMER_CREATE
+        print_throughput("Creation", NB_ITERS, usec_to_sec(accTimerConsCreate));
+#endif
+#if TIME_ADD_DEP
+        print_throughput("AddDependence", NB_ITERS, usec_to_sec(accTimerAddDep));
+#endif
+        ocrShutdown();
+    } else {
+        timestamp_t start;
+        timestamp_t stop;
+        //
+        // Setting up producer
+        //
+
+        ocrGuid_t prodGuid;
+        ocrEventCreate(&prodGuid, PRODUCER_EVENT_TYPE, false);
+
+        //
+        // Setting up consumers
+        //
+        ocrGuid_t consEdtTemplateGuid;
+        ocrEdtTemplateCreate(&consEdtTemplateGuid, consumerEdt, 0, 1);
+
+#if CLEAN_UP_ITERATION
+        ocrGuid_t consGuids[FAN_OUT];
+#if TIME_CONSUMER_CREATE
+        get_time(&start);
+#endif
+        int i = 0;
+        while (i < FAN_OUT) {
+            ocrEdtCreate(&consGuids[i], consEdtTemplateGuid,
+                         0, NULL, 1, NULL, EDT_PROP_NONE, NULL_GUID, NULL);
+            i++;
+        }
+#if TIME_CONSUMER_CREATE
+        get_time(&stop);
+        accTimerConsCreate += elapsed_usec(&start, &stop);
+#endif
+        ocrEdtTemplateDestroy(consEdtTemplateGuid);
+#if TIME_ADD_DEP
+        get_time(&start);
+#endif
+        i = 0;
+        while (i < FAN_OUT) {
+            ocrAddDependence(prodGuid, &consGuids[i], 0, DB_MODE_RO);
+            i++;
+        }
+#if TIME_ADD_DEP
+        get_time(&stop);
+        accTimerAddDep += elapsed_usec(&start, &stop);
+#endif
+
+#else /* No CLEAN_UP_ITERATION */
+        int i = 0;
+        while (i < FAN_OUT) {
+#if TIME_CONSUMER_CREATE
+            get_time(&start);
+#endif
+            ocrGuid_t consGuid;
+            ocrEdtCreate(&consGuid, consEdtTemplateGuid,
+                         0, NULL, 1, NULL, EDT_PROP_NONE, NULL_GUID, NULL);
+#if TIME_CONSUMER_CREATE
+            get_time(&stop);
+            accTimerConsCreate += elapsed_usec(&start, &stop);
+#endif
+#if TIME_ADD_DEP
+            get_time(&start);
+#endif
+            ocrAddDependence(prodGuid, consGuid, 0, DB_MODE_RO);
+#if TIME_ADD_DEP
+            get_time(&stop);
+            accTimerAddDep += elapsed_usec(&start, &stop);
+#endif
+            i++;
+        }
+        ocrEdtTemplateDestroy(consEdtTemplateGuid);
+
+#endif
+
+        //
+        // Satisfying the producer
+        //
+
+#if TIME_SATISFY
+        get_time(&start);
+#endif
+        ocrEventSatisfy(prodGuid, NULL_GUID);
+#if TIME_SATISFY
+        get_time(&stop);
+        accTimerSatisfy += elapsed_usec(&start, &stop);
+#endif
+
+        // spawn next iteration
+        ocrGuid_t driverEdtTemplateGuid;
+        ocrEdtTemplateCreate(&driverEdtTemplateGuid, driverEdt, DRIVER_PARAMC, DRIVER_DEPV);
+        u64 driverParamv[DRIVER_PARAMC];
+        driverParamv[0] = iteration+1;
+#if TIME_SATISFY
+    driverParamv[1] = (u64) accTimerSatisfy;
+#endif
+#if TIME_CONSUMER_CREATE
+    driverParamv[2] = (u64) accTimerConsCreate;
+#endif
+#if TIME_ADD_DEP
+    driverParamv[3] = (u64) accTimerAddDep;
+#endif
+        ocrGuid_t driverEdtGuid;
+        ocrEdtCreate(&driverEdtGuid, driverEdtTemplateGuid,
+                     DRIVER_PARAMC, driverParamv, DRIVER_DEPV, NULL, EDT_PROP_NONE, NULL_GUID, NULL);
+        ocrEdtTemplateDestroy(driverEdtTemplateGuid);
+    }
+}
+
+
+ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
+
+    // spawn first iteration
+    ocrGuid_t driverEdtTemplateGuid;
+    ocrEdtTemplateCreate(&driverEdtTemplateGuid, driverEdt, DRIVER_PARAMC, DRIVER_DEPV);
+    u64 driverParamv[DRIVER_PARAMC];
+    driverParamv[0] = 0; // iteration
+    driverParamv[1] = (u64) 0; // timer satisfy (potentially used)
+    driverParamv[2] = (u64) 0; // timer consumer creation (potentially used)
+    driverParamv[3] = (u64) 0; // timer add-dependence (potentially used)
+    ocrGuid_t driverEdtGuid;
+    ocrEdtCreate(&driverEdtGuid, driverEdtTemplateGuid,
+                 DRIVER_PARAMC, driverParamv, DRIVER_DEPV, NULL, DRIVER_PROP, NULL_GUID, NULL);
+    ocrEdtTemplateDestroy(driverEdtTemplateGuid);
+
+    return NULL_GUID;
+}
