@@ -1,0 +1,163 @@
+#include "perfs.h"
+#include "ocr.h"
+
+// DESC: Create DB_NBS EDTs that each keep creating & destroying DBs, each of size DB_SZ
+// TIME: Duration of create & destroy
+// FREQ: Done 'NB_ITERS' times
+
+#ifndef NB_ITERS
+#define NB_ITERS 50000
+#endif
+
+#ifndef DB_NBS
+#define DB_NBS     32
+#endif
+ 
+#ifndef DB_SZ
+#define DB_SZ    4
+#endif
+
+ocrGuid_t wrapupEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
+    u32 i;
+    u64 * timersPtr = (u64 *) depv[DB_NBS].ptr;
+    u64 t0, t1, t2;
+
+    t0 = 0;
+    t1 = 0;
+    t2 = 0;
+
+
+    for(i = 0; i<DB_NBS*3; i+=3) {
+        t0 += timersPtr[i];
+        t1 += timersPtr[i+1];
+        t2 += timersPtr[i+2];
+    }
+
+
+    PRINTF("Overall: %d %d %d\n", t0/DB_NBS, t1/DB_NBS, t2/DB_NBS);
+
+    ocrShutdown();
+    return NULL_GUID;
+}
+
+ocrGuid_t edtCode(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
+    u64 * timersPtr = (u64 *) depv[0].ptr;
+    u64 index = paramv[0] * 3;
+    u32 i = 0;
+    u64 * syncPtr = (u64 *) depv[1].ptr;
+    timestamp_t t0, t1, t2, t3;
+    ocrGuid_t dbGuid;
+    void *dbPtr = NULL;
+    u8 retval = 0;
+
+    timersPtr[index+0] = 0;
+    timersPtr[index+1] = 0;
+    timersPtr[index+2] = 0;
+    for(i = 0; i<NB_ITERS; i++) {
+
+#if 1
+        dbGuid = NULL_GUID;
+        get_time(&t0);
+        ocrDbCreate(&dbGuid, (void **)&dbPtr, DB_SZ, 0, NULL_GUID, NO_ALLOC);
+ASSERT(dbGuid != NULL_GUID);
+ASSERT(dbPtr != NULL);
+        get_time(&t1);
+        ocrDbRelease(dbGuid);
+        get_time(&t2);
+        ocrDbDestroy(dbGuid);
+        get_time(&t3);
+
+        timersPtr[index+0] += elapsed_usec(&t0, &t1);
+        timersPtr[index+1] += elapsed_usec(&t1, &t2);
+        timersPtr[index+2] += elapsed_usec(&t2, &t3);
+        if((*(u64 *)syncPtr) == 1) break;
+#else
+        get_time(&t0);
+        retval = ocrDbCreate(&dbGuid, (void **)&dbPtr, DB_SZ, 0, NULL_GUID, NO_ALLOC);
+        get_time(&t1);
+        ocrDbRelease(dbGuid);
+        get_time(&t2);
+
+        timersPtr[index+0] += elapsed_usec(&t0, &t1);
+        timersPtr[index+1] += elapsed_usec(&t1, &t2);
+
+        if((*(u64 *)syncPtr) || retval) break;
+#endif
+    }
+
+    *(u64 *)syncPtr = 1;
+
+    // Now average them out
+    timersPtr[index+0] /= i;
+    timersPtr[index+1] /= i;
+    timersPtr[index+2] /= i;
+
+PRINTF("%d: %d iterations; %ld %ld %ld\n", paramv[0], i, timersPtr[index], timersPtr[index+1], timersPtr[index+2]);
+    return NULL_GUID;
+}
+
+// One paramv: [driverIteration]
+// One depv  : [dbTimer]
+ocrGuid_t driverEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
+    u64 driverIteration = paramv[0];
+    ocrGuid_t dbTimerGuid = depv[0].guid;
+    u64 i;
+
+    ocrGuid_t edtCodeTemplateGuid;
+    ocrEdtTemplateCreate(&edtCodeTemplateGuid, edtCode, 1, 2);
+    ocrGuid_t finishTemplateGuid;
+    ocrEdtTemplateCreate(&finishTemplateGuid, wrapupEdt, 0, DB_NBS+1);
+
+    ocrGuid_t edtWrapupGuid;
+    ocrEdtCreate(&edtWrapupGuid, finishTemplateGuid,
+                 0, NULL, 1+DB_NBS, NULL_GUID, EDT_PROP_NONE, NULL_GUID, NULL);
+
+    ocrAddDependence(dbTimerGuid, edtWrapupGuid, DB_NBS, DB_MODE_ITW);
+
+    for(i=0; i<DB_NBS; i++) {
+        ocrGuid_t edtGuid;
+        ocrGuid_t eventGuid;
+        ocrEdtCreate(&edtGuid, edtCodeTemplateGuid,
+                     1, &i, 2, NULL_GUID, EDT_PROP_NONE, NULL_GUID, &eventGuid);
+//        ocrEdtTemplateDestroy(edtCodeTemplateGuid);
+
+        // Add timer dependence
+        ocrAddDependence(dbTimerGuid, edtGuid, 0, DB_MODE_ITW);
+        ocrAddDependence(depv[1].guid, edtGuid, 1, DB_MODE_ITW);
+        ocrAddDependence(eventGuid, edtWrapupGuid, i, DB_MODE_ITW);
+    }
+
+    return NULL_GUID;
+}
+
+
+ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
+
+    u64 * dbTimerPtr;
+    ocrGuid_t dbTimerGuid;
+    u64 *syncPtr;
+    ocrGuid_t syncGuid;
+
+    ocrDbCreate(&dbTimerGuid, (void **)&dbTimerPtr, sizeof(u64)*3*DB_NBS, 0, NULL_GUID, NO_ALLOC);
+    ocrDbRelease(dbTimerGuid);
+
+    ocrDbCreate(&syncGuid, (void **)&syncPtr, sizeof(u64), 0, NULL_GUID, NO_ALLOC);
+    ocrDbRelease(syncGuid);
+
+    *(u64 *)syncPtr = 0;
+
+    ocrGuid_t edtDriverTemplateGuid;
+    ocrEdtTemplateCreate(&edtDriverTemplateGuid, driverEdt, 1, 2);
+
+    u64 paramvDriverEdt[1];
+    paramvDriverEdt[0] = 0;       //driverIteration
+
+    ocrGuid_t driverEdtGuid;
+    ocrEdtCreate(&driverEdtGuid, edtDriverTemplateGuid,
+                 1, paramvDriverEdt, 2, NULL_GUID, EDT_PROP_NONE, NULL_GUID, NULL);
+    ocrAddDependence(dbTimerGuid, driverEdtGuid, 0, DB_MODE_ITW);
+    ocrAddDependence(syncGuid, driverEdtGuid, 1, DB_MODE_ITW);
+    ocrEdtTemplateDestroy(edtDriverTemplateGuid);
+
+    return NULL_GUID;
+}

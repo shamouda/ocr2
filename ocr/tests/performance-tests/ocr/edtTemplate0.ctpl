@@ -1,0 +1,64 @@
+
+#ifndef CUSTOM_BOUNDS
+#define NB_ITERS 5000
+#define NB_INSTANCES 1000
+#endif
+
+ocrGuid_t workEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
+    return NULL_GUID;
+}
+
+ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
+    long accTimer = 0;
+    int it = 0;
+    while (it < NB_ITERS) {
+#if CLEAN_UP_ITERATION
+        ocrGuid_t tempGuids[NB_INSTANCES];
+#endif
+        timestamp_t start;
+        timestamp_t stop;
+#if TIME_CREATION
+        get_time(&start);
+#endif
+        int i = 0;
+        while (i < NB_INSTANCES) {
+#if CLEAN_UP_ITERATION
+            ocrEdtTemplateCreate(&tempGuids[i], workEdt, 1, 1);
+#else
+            ocrGuid_t tempGuid;
+            ocrEdtTemplateCreate(&tempGuid, workEdt, 1, 1);
+#endif
+            i++;
+        }
+#if TIME_CREATION
+        get_time(&stop);
+#endif
+
+#if TIME_DESTRUCTION
+        get_time(&start);
+#endif
+#if CLEAN_UP_ITERATION
+        i = 0;
+        while (i < NB_INSTANCES) {
+            ocrEdtTemplateDestroy(tempGuids[i]);
+            i++;
+        }
+#endif
+#if TIME_DESTRUCTION
+        get_time(&stop);
+#endif
+        accTimer += elapsed_usec(&start, &stop);
+        it++;
+    }
+#if TIME_DESTRUCTION
+    print_throughput("Destruction", NB_ITERS * NB_INSTANCES, usec_to_sec(accTimer));
+#endif
+
+#if TIME_CREATION
+    print_throughput("Creation", NB_ITERS * NB_INSTANCES, usec_to_sec(accTimer));
+#endif
+
+    ocrShutdown();
+
+    return NULL_GUID;
+}

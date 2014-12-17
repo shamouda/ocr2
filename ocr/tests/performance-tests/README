@@ -1,0 +1,162 @@
+
+
+************************
+* OCR Micro-Benchmarks
+************************
+
+** Why Micro-benchmarks ?
+
+Micro-benchmarks can be ran to study the scalability of OCR, compare
+different OCR instantiations using distinct configuration files
+or compare various OCR implementations.
+
+** Expectations
+
+The Micro-Benchmarks and accompanying scripts should be seen as tools
+for OCR runtime developers to understand runtime behaviors and issues
+occuring in specific situations.
+
+As of now, the micro-benchmark suite as a whole is not meant to be a
+comprehensive set of benchmarks representative of OCR performances.
+Some benchmarks are designed as pathological cases and made grossly
+inefficient in one way or another to stress the runtime implementation.
+
+
+*******************
+* Getting Started
+*******************
+
+** Current Limitations
+
+- Only tested for OCR x86-pthread-x86
+
+** Setting up OCR build
+
+Depending on micro-benchmarks, OCR may need to be configured
+to accomodate those large benchmarks.
+
+Relevant 'CFLAGS' to enable in 'ocr/build/common.mk' may include
+
+INIT_DEQUE_CAPACITY
+OCR_MAX_MULTI_SLOT
+
+** Setting up micro-benchmarks
+
+- Check the OCR configuration file the runtime uses
+    - Make sure you understand what the configuration file sets up.
+    - It's usually a good idea to provide the configuration files along
+    with the results as well as mangling file names with relevant
+    configuration details.
+
+- Check the load on the machine
+    - Make sure you have a fully dedicated access to the node you're using.
+
+- Check effect of thread binding
+    - On hyper-threaded (HT) system, binding OCR comp-platform to cores may
+    significantly affect performances. Make sure to reach some understanding
+    of HT behavior on your system before reporting numbers.
+
+
+************************************
+* Compile and Run Micro-benchmarks
+************************************
+
+** Single Micro-benchmark invocation
+
+Makefile.ocr provides an easy way to both compile and run a micro-benchmark
+
+- Compile and run:
+
+    make -f Makefile.ocr PROG=ocr/edtExecuteLatchSync
+
+
+- Compile and run specifying an OCR configuration file:
+
+    make -f Makefile.ocr PROG=ocr/edtExecuteLatchSync OCR_CONFIG=$PWD/../../machine-configs/x86-pthread-x86/mach-hc-1w.cfg
+
+- Parameterized runs:
+
+All tests should declare a number of macros to parameter a default run (nb iterations, data set size etc...)
+Those should be defined only if the compile time constant 'CUSTOM_BOUNDS' is not defined and they are
+the default parameters of the test.
+
+One can customize the default parameters by providing them directly
+as an environment variable:
+
+    CUSTOM_BOUNDS="-DCUSTOM_BOUNDS -DNB_ITERS=500" make -f Makefile.ocr PROG=ocr/benchName
+
+** Perform sweep run for a Micro-benchmark
+
+*** Sweep configuration files
+
+Sweep configuration files allows to specify multiple compile time parameters for micro-benchmarks
+
+The format is to set one configuration per line for a sweep driver to execute.
+
+For a given program, a sweep configuration file can be placed under the 'configSweep/' folder.
+The name must match the program name and have a '.sweep' extension. i.e. A program named
+myProgName, could have a sweep configuration file named configSweep/myProgName.sweep
+
+*** Sweep Driver
+
+The sweep driver relies on the Makefile.ocr facility to compile and run
+micro-benchmarks against a sweep configuration file.
+
+The driver loads a sweep configuration file and invokes Makefile.ocr for
+each line extracted from the file setting up the 'CUSTOM_BOUNDS' environment
+variable to customize the micro-benchmark compilation and run.
+
+- Sweep driver invocation:
+
+    ./scalingOcrDriver.sh edtExecuteLatchSync
+
+If the environment variable 'CUSTOM_BOUNDS' is defined, its value is used to
+parameter the micro-benchmark run (i.e. no sweeping). If the variable is not
+defined, the driver looks for a sweep configuration file under 'configSweep/'
+matching the name of the invoked micro-benchmark. If none is found the driver
+tries to load the 'default.sweep' file (some micro-benchmarks may not work with
+a default parameter file). Alternatively a user can specify a sweep configuration
+file from the driver command line
+
+- Sweep driver invocation with custom sweep file:
+
+    ./scalingOcrDriver.sh edtExecuteLatchSync ./configSweep/myfile.sweep
+
+** Workers Scalability Driver
+
+The worker scalability driver allows to vary the number of workers used by
+OCR for each micro-benchmark invocation. It is essentially doing what the
+sweep driver does but it does it once for each number of workers.
+
+The 'WORKER_SCALING' environment variable can be set to specify a space-separated
+list of the number of workers to use for the scaling experiment.
+
+- Invocation example:
+
+    ./scalingOcrWorkerDriver.sh edtExecuteLatchSync
+
+
+******************************
+* Extracting plots from runs
+******************************
+
+** Generating worker scaling throughput-based plots
+
+For micro-benchmarks that prints throughput and are ran through
+the worker scaling driver, the 'plotWorkerThroughput.sh' script
+can be used to generate a plot.
+
+The plotting script relies on the 'SCRIPT_ROOT' environment variable
+to be defined and point to the 'performance-tests/scripts' folder.
+
+To generate a plot, just provide the log piped to a file from the worker
+scaling run as input to the script.
+
+Example:
+
+    ./scalingOcrWorkerDriver.sh edtExecuteHierFinishSync > edtExecuteHierFinishSync.scaling
+    ./scripts/plotWorkerThroughput.sh edtExecuteHierFinishSync.scaling
+
+The plot shows the number of workers on the x-axis, the throughput
+on the y-axis and one curve for each sweep configuration line used
+to run the test using the benchmark's reported workload.
