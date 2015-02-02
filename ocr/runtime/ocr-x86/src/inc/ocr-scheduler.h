@@ -97,27 +97,35 @@ typedef enum ocr_scheduler_kind_enum {
     , OCR_SCHEDULER_CE = 3
     , OCR_PLACED_SCHEDULER = 4
     , OCR_SCHEDULER_RANDOMVICTIM_LOCALPUSH = 5
-    , OCR_SCHEDULER_RANDOMVICTIM_LOCALITYPUSH = 6
-    , OCR_SCHEDULER_CYCLICVICTIM_LOCALPUSH = 7
-    , OCR_SCHEDULER_CYCLICVICTIM_LOCALITYPUSH = 8
-    , OCR_SCHEDULER_HIERCYCLICVICTIM_LOCALPUSH = 9
-    , OCR_SCHEDULER_HIERCYCLICVICTIM_LOCALITYPUSH = 10
-    , OCR_SCHEDULER_HIERRANDOMVICTIM_LOCALPUSH = 11
-    , OCR_SCHEDULER_HIERRANDOMVICTIM_LOCALITYPUSH = 12
-    , OCR_SCHEDULER_SOCKETONLYVICTIM_USERSOCKETPUSH = 13
+    , OCR_SCHEDULER_RANDOMVICTIM_DATALOCALITYPUSH = 6
+    , OCR_SCHEDULER_RANDOMVICTIM_EVENTLOCALITYPUSH = 7
+    , OCR_SCHEDULER_CYCLICVICTIM_LOCALPUSH = 8
+    , OCR_SCHEDULER_CYCLICVICTIM_DATALOCALITYPUSH = 9
+    , OCR_SCHEDULER_CYCLICVICTIM_EVENTLOCALITYPUSH = 10
+    , OCR_SCHEDULER_HIERCYCLICVICTIM_LOCALPUSH = 11
+    , OCR_SCHEDULER_HIERCYCLICVICTIM_DATALOCALITYPUSH = 12
+    , OCR_SCHEDULER_HIERCYCLICVICTIM_EVENTLOCALITYPUSH = 13
+    , OCR_SCHEDULER_HIERRANDOMVICTIM_LOCALPUSH = 14
+    , OCR_SCHEDULER_HIERRANDOMVICTIM_DATALOCALITYPUSH = 15
+    , OCR_SCHEDULER_HIERRANDOMVICTIM_EVENTLOCALITYPUSH = 16
+    , OCR_SCHEDULER_SOCKETONLYVICTIM_USERSOCKETPUSH = 17
 } ocr_scheduler_kind;
 
 ocr_scheduler_t * newScheduler(ocr_scheduler_kind schedulerType);
 
 ocr_scheduler_t * hc_scheduler_constructor(void);
 ocr_scheduler_t * hc_randomvictim_localpush_scheduler_constructor();
-ocr_scheduler_t * hc_randomvictim_localitypush_scheduler_constructor();
+ocr_scheduler_t * hc_randomvictim_datalocalitypush_scheduler_constructor();
+ocr_scheduler_t * hc_randomvictim_eventlocalitypush_scheduler_constructor();
 ocr_scheduler_t * hc_cyclicvictim_localpush_scheduler_constructor();
-ocr_scheduler_t * hc_cyclicvictim_localitypush_scheduler_constructor();
+ocr_scheduler_t * hc_cyclicvictim_datalocalitypush_scheduler_constructor();
+ocr_scheduler_t * hc_cyclicvictim_eventlocalitypush_scheduler_constructor();
 ocr_scheduler_t * hc_hiercyclicvictim_localpush_scheduler_constructor();
-ocr_scheduler_t * hc_hiercyclicvictim_localitypush_scheduler_constructor();
+ocr_scheduler_t * hc_hiercyclicvictim_datalocalitypush_scheduler_constructor();
+ocr_scheduler_t * hc_hiercyclicvictim_eventlocalitypush_scheduler_constructor();
 ocr_scheduler_t * hc_hierrandomvictim_localpush_scheduler_constructor();
-ocr_scheduler_t * hc_hierrandomvictim_localitypush_scheduler_constructor();
+ocr_scheduler_t * hc_hierrandomvictim_datalocalitypush_scheduler_constructor();
+ocr_scheduler_t * hc_hierrandomvictim_eventlocalitypush_scheduler_constructor();
 ocr_scheduler_t * hc_socketonlyvictim_usersocketpush_scheduler_constructor();
 
 /* we have to end up exposing the configuration declarations too for the runtime model

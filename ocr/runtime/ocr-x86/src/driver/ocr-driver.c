@@ -186,14 +186,18 @@ void ocrInit(int * argc, char ** argv, u32 fnc, ocrEdt_t funcs[]) {
                 steal_victim_policy = MD_SOCKET_ONLY_VICTIM;
             } else if (!strcmp(md_file_tokens, "laststeal")) {
                 victim_extract_policy = MD_STEAL_LAST;
+            } else if (!strcmp(md_file_tokens, "stealhalf")) {
+                victim_extract_policy = MD_STEAL_HALF;
             } else if (!strcmp(md_file_tokens, "altruisticsteal")) {
                 victim_extract_policy = MD_STEAL_ALTRUISTIC;
             } else if (!strcmp(md_file_tokens, "selfishsteal")) {
                 victim_extract_policy = MD_STEAL_SELFISH ;
             } else if (!strcmp(md_file_tokens, "tailpush")) {
                 push_policy = MD_LOCAL_PUSH;
-            } else if (!strcmp(md_file_tokens, "localitypush")) {
-                push_policy = MD_LOCALITY_PUSH ;
+            } else if (!strcmp(md_file_tokens, "datalocalitypush")) {
+                push_policy = MD_DATA_LOCALITY_PUSH ;
+            } else if (!strcmp(md_file_tokens, "eventlocalitypush")) {
+                push_policy = MD_EVENT_LOCALITY_PUSH ;
             } else if (!strcmp(md_file_tokens, "usersocketpush")) {
                 push_policy = MD_USER_SOCKET_PUSH ;
             } else {

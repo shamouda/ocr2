@@ -221,9 +221,14 @@ static void setSchedulersRandomVictimLocalPush ( ocr_model_policy_t * defaultPol
     defaultPolicy->schedulers = newModel( OCR_SCHEDULER_RANDOMVICTIM_LOCALPUSH, nb_schedulers, NULL, scheduler_configurations );
 }
 
-static void setSchedulersRandomVictimLocalityPush ( ocr_model_policy_t * defaultPolicy, size_t nb_policy_domains, size_t nb_schedulers, size_t nb_workers ) {
+static void setSchedulersRandomVictimDataLocalityPush ( ocr_model_policy_t * defaultPolicy, size_t nb_policy_domains, size_t nb_schedulers, size_t nb_workers ) {
     void** scheduler_configurations = setDefaultModelSchedulerConfigurations ( nb_policy_domains, nb_schedulers, nb_workers );
-    defaultPolicy->schedulers = newModel( OCR_SCHEDULER_RANDOMVICTIM_LOCALITYPUSH, nb_schedulers, NULL, scheduler_configurations );
+    defaultPolicy->schedulers = newModel( OCR_SCHEDULER_RANDOMVICTIM_DATALOCALITYPUSH, nb_schedulers, NULL, scheduler_configurations );
+}
+
+static void setSchedulersRandomVictimEventLocalityPush ( ocr_model_policy_t * defaultPolicy, size_t nb_policy_domains, size_t nb_schedulers, size_t nb_workers ) {
+    void** scheduler_configurations = setDefaultModelSchedulerConfigurations ( nb_policy_domains, nb_schedulers, nb_workers );
+    defaultPolicy->schedulers = newModel( OCR_SCHEDULER_RANDOMVICTIM_EVENTLOCALITYPUSH, nb_schedulers, NULL, scheduler_configurations );
 }
 
 static void setSchedulersCyclicVictimLocalPush ( ocr_model_policy_t * defaultPolicy, size_t nb_policy_domains, size_t nb_schedulers, size_t nb_workers ) {
@@ -231,9 +236,14 @@ static void setSchedulersCyclicVictimLocalPush ( ocr_model_policy_t * defaultPol
     defaultPolicy->schedulers = newModel( OCR_SCHEDULER_CYCLICVICTIM_LOCALPUSH, nb_schedulers, NULL, scheduler_configurations );
 }
 
-static void setSchedulersCyclicVictimLocalityPush ( ocr_model_policy_t * defaultPolicy, size_t nb_policy_domains, size_t nb_schedulers, size_t nb_workers ) {
+static void setSchedulersCyclicVictimDataLocalityPush ( ocr_model_policy_t * defaultPolicy, size_t nb_policy_domains, size_t nb_schedulers, size_t nb_workers ) {
     void** scheduler_configurations = setDefaultModelSchedulerConfigurations ( nb_policy_domains, nb_schedulers, nb_workers );
-    defaultPolicy->schedulers = newModel( OCR_SCHEDULER_CYCLICVICTIM_LOCALITYPUSH, nb_schedulers, NULL, scheduler_configurations );
+    defaultPolicy->schedulers = newModel( OCR_SCHEDULER_CYCLICVICTIM_DATALOCALITYPUSH, nb_schedulers, NULL, scheduler_configurations );
+}
+
+static void setSchedulersCyclicVictimEventLocalityPush ( ocr_model_policy_t * defaultPolicy, size_t nb_policy_domains, size_t nb_schedulers, size_t nb_workers ) {
+    void** scheduler_configurations = setDefaultModelSchedulerConfigurations ( nb_policy_domains, nb_schedulers, nb_workers );
+    defaultPolicy->schedulers = newModel( OCR_SCHEDULER_CYCLICVICTIM_EVENTLOCALITYPUSH, nb_schedulers, NULL, scheduler_configurations );
 }
 
 static void setSchedulersHierCyclicVictimLocalPush ( ocr_model_policy_t * defaultPolicy, size_t nb_policy_domains, size_t nb_schedulers, size_t nb_workers ) {
@@ -241,9 +251,14 @@ static void setSchedulersHierCyclicVictimLocalPush ( ocr_model_policy_t * defaul
     defaultPolicy->schedulers = newModel( OCR_SCHEDULER_HIERCYCLICVICTIM_LOCALPUSH, nb_schedulers, NULL, scheduler_configurations );
 }
 
-static void setSchedulersHierCyclicVictimLocalityPush ( ocr_model_policy_t * defaultPolicy, size_t nb_policy_domains, size_t nb_schedulers, size_t nb_workers ) {
+static void setSchedulersHierCyclicVictimDataLocalityPush ( ocr_model_policy_t * defaultPolicy, size_t nb_policy_domains, size_t nb_schedulers, size_t nb_workers ) {
     void** scheduler_configurations = setDefaultModelSchedulerConfigurations ( nb_policy_domains, nb_schedulers, nb_workers );
-    defaultPolicy->schedulers = newModel( OCR_SCHEDULER_HIERCYCLICVICTIM_LOCALITYPUSH, nb_schedulers, NULL, scheduler_configurations );
+    defaultPolicy->schedulers = newModel( OCR_SCHEDULER_HIERCYCLICVICTIM_DATALOCALITYPUSH, nb_schedulers, NULL, scheduler_configurations );
+}
+
+static void setSchedulersHierCyclicVictimEventLocalityPush ( ocr_model_policy_t * defaultPolicy, size_t nb_policy_domains, size_t nb_schedulers, size_t nb_workers ) {
+    void** scheduler_configurations = setDefaultModelSchedulerConfigurations ( nb_policy_domains, nb_schedulers, nb_workers );
+    defaultPolicy->schedulers = newModel( OCR_SCHEDULER_HIERCYCLICVICTIM_EVENTLOCALITYPUSH, nb_schedulers, NULL, scheduler_configurations );
 }
 
 static void setSchedulersHierRandomVictimLocalPush ( ocr_model_policy_t * defaultPolicy, size_t nb_policy_domains, size_t nb_schedulers, size_t nb_workers ) {
@@ -251,9 +266,14 @@ static void setSchedulersHierRandomVictimLocalPush ( ocr_model_policy_t * defaul
     defaultPolicy->schedulers = newModel( OCR_SCHEDULER_HIERRANDOMVICTIM_LOCALPUSH, nb_schedulers, NULL, scheduler_configurations );
 }
 
-static void setSchedulersHierRandomVictimLocalityPush ( ocr_model_policy_t * defaultPolicy, size_t nb_policy_domains, size_t nb_schedulers, size_t nb_workers ) {
+static void setSchedulersHierRandomVictimDataLocalityPush ( ocr_model_policy_t * defaultPolicy, size_t nb_policy_domains, size_t nb_schedulers, size_t nb_workers ) {
     void** scheduler_configurations = setDefaultModelSchedulerConfigurations ( nb_policy_domains, nb_schedulers, nb_workers );
-    defaultPolicy->schedulers = newModel( OCR_SCHEDULER_HIERRANDOMVICTIM_LOCALITYPUSH, nb_schedulers, NULL, scheduler_configurations );
+    defaultPolicy->schedulers = newModel( OCR_SCHEDULER_HIERRANDOMVICTIM_DATALOCALITYPUSH, nb_schedulers, NULL, scheduler_configurations );
+}
+
+static void setSchedulersHierRandomVictimEventLocalityPush ( ocr_model_policy_t * defaultPolicy, size_t nb_policy_domains, size_t nb_schedulers, size_t nb_workers ) {
+    void** scheduler_configurations = setDefaultModelSchedulerConfigurations ( nb_policy_domains, nb_schedulers, nb_workers );
+    defaultPolicy->schedulers = newModel( OCR_SCHEDULER_HIERRANDOMVICTIM_EVENTLOCALITYPUSH, nb_schedulers, NULL, scheduler_configurations );
 }
 
 static void setSchedulersSocketOnlyVictimUserSocketPush ( ocr_model_policy_t * defaultPolicy, size_t nb_policy_domains, size_t nb_schedulers, size_t nb_workers ) {
@@ -282,12 +302,20 @@ static inline void setDefaultModelWorkpilesDequishHeap ( ocr_model_policy_t * de
     defaultPolicy->workpiles  = newModel( ocr_workpile_dequeish_heap_kind, nb_workpiles, NULL, NULL );
 }
 
+static inline void setDefaultModelWorkpilesDequishHeapStealHalf ( ocr_model_policy_t * defaultPolicy, size_t nb_workpiles ) {
+    defaultPolicy->workpiles  = newModel( ocr_workpile_dequeish_heap_steal_half_kind, nb_workpiles, NULL, NULL );
+}
+
 static inline void setDefaultModelWorkpilesPriorityHeap ( ocr_model_policy_t * defaultPolicy, size_t nb_workpiles ) {
     defaultPolicy->workpiles  = newModel( ocr_workpile_heap_kind, nb_workpiles, NULL, NULL );
 }
 
 static inline void setDefaultModelWorkpilesPriorityHeapStealLast ( ocr_model_policy_t * defaultPolicy, size_t nb_workpiles ) {
     defaultPolicy->workpiles  = newModel( ocr_workpile_heap_steal_last_kind, nb_workpiles, NULL, NULL );
+}
+
+static inline void setDefaultModelWorkpilesPriorityHeapStealHalf ( ocr_model_policy_t * defaultPolicy, size_t nb_workpiles ) {
+    defaultPolicy->workpiles  = newModel( ocr_workpile_heap_steal_half_kind, nb_workpiles, NULL, NULL );
 }
 
 static inline void setDefaultModelWorkpilesPriorityHeapStealSelfish ( ocr_model_policy_t * defaultPolicy, size_t nb_workpiles ) {
@@ -378,7 +406,8 @@ ocr_model_policy_t * ocrModelPolicyCreator (
                     break;
                 case MD_STEAL_ALTRUISTIC:
                 case MD_STEAL_SELFISH:
-                    assert( 0 && "altruistic or selfish stealing can not be used with deque");
+                case MD_STEAL_HALF:
+                    assert( 0 && "half, altruistic or selfish stealing can not be used with deque");
                     break;
                 default:
                     assert(0 && "Invalid workpile choice");
@@ -389,6 +418,9 @@ ocr_model_policy_t * ocrModelPolicyCreator (
             switch( victim_extract_policy ) {
                 case MD_STEAL_LAST:
                     setDefaultModelWorkpilesDequishHeap (defaultPolicy, nb_workpiles);
+                    break;
+                case MD_STEAL_HALF:
+                    setDefaultModelWorkpilesDequishHeapStealHalf (defaultPolicy, nb_workpiles);
                     break;
                 case MD_STEAL_ALTRUISTIC:
                 case MD_STEAL_SELFISH:
@@ -401,6 +433,9 @@ ocr_model_policy_t * ocrModelPolicyCreator (
             break;
         case MD_PRIORITY_QUEUE:
             switch( victim_extract_policy ) {
+                case MD_STEAL_HALF:
+                    setDefaultModelWorkpilesPriorityHeapStealHalf (defaultPolicy, nb_workpiles);
+                    break;
                 case MD_STEAL_LAST:
                     setDefaultModelWorkpilesPriorityHeapStealLast (defaultPolicy, nb_workpiles);
                     break;
@@ -423,8 +458,11 @@ ocr_model_policy_t * ocrModelPolicyCreator (
                 case MD_LOCAL_PUSH:
                     setSchedulersRandomVictimLocalPush (defaultPolicy, nb_policy_domains, nb_schedulers, nb_workers);
                     break;
-                case MD_LOCALITY_PUSH:
-                    setSchedulersRandomVictimLocalityPush (defaultPolicy, nb_policy_domains, nb_schedulers, nb_workers);
+                case MD_DATA_LOCALITY_PUSH:
+                    setSchedulersRandomVictimDataLocalityPush (defaultPolicy, nb_policy_domains, nb_schedulers, nb_workers);
+                    break;
+                case MD_EVENT_LOCALITY_PUSH:
+                    setSchedulersRandomVictimEventLocalityPush (defaultPolicy, nb_policy_domains, nb_schedulers, nb_workers);
                     break;
                 default:
                     assert(0 && "Invalid scheduler choice");
@@ -436,8 +474,11 @@ ocr_model_policy_t * ocrModelPolicyCreator (
                 case MD_LOCAL_PUSH:
                     setSchedulersCyclicVictimLocalPush (defaultPolicy, nb_policy_domains, nb_schedulers, nb_workers);
                     break;
-                case MD_LOCALITY_PUSH:
-                    setSchedulersCyclicVictimLocalityPush (defaultPolicy, nb_policy_domains, nb_schedulers, nb_workers);
+                case MD_DATA_LOCALITY_PUSH:
+                    setSchedulersCyclicVictimDataLocalityPush (defaultPolicy, nb_policy_domains, nb_schedulers, nb_workers);
+                    break;
+                case MD_EVENT_LOCALITY_PUSH:
+                    setSchedulersCyclicVictimEventLocalityPush (defaultPolicy, nb_policy_domains, nb_schedulers, nb_workers);
                     break;
                 default:
                     assert(0 && "Invalid scheduler choice");
@@ -449,8 +490,11 @@ ocr_model_policy_t * ocrModelPolicyCreator (
                 case MD_LOCAL_PUSH:
                     setSchedulersHierCyclicVictimLocalPush (defaultPolicy, nb_policy_domains, nb_schedulers, nb_workers);
                     break;
-                case MD_LOCALITY_PUSH:
-                    setSchedulersHierCyclicVictimLocalityPush (defaultPolicy, nb_policy_domains, nb_schedulers, nb_workers);
+                case MD_DATA_LOCALITY_PUSH:
+                    setSchedulersHierCyclicVictimDataLocalityPush (defaultPolicy, nb_policy_domains, nb_schedulers, nb_workers);
+                    break;
+                case MD_EVENT_LOCALITY_PUSH:
+                    setSchedulersHierCyclicVictimEventLocalityPush (defaultPolicy, nb_policy_domains, nb_schedulers, nb_workers);
                     break;
                 default:
                     assert(0 && "Invalid scheduler choice");
@@ -462,8 +506,11 @@ ocr_model_policy_t * ocrModelPolicyCreator (
                 case MD_LOCAL_PUSH:
                     setSchedulersHierRandomVictimLocalPush (defaultPolicy, nb_policy_domains, nb_schedulers, nb_workers);
                     break;
-                case MD_LOCALITY_PUSH:
-                    setSchedulersHierRandomVictimLocalityPush (defaultPolicy, nb_policy_domains, nb_schedulers, nb_workers);
+                case MD_DATA_LOCALITY_PUSH:
+                    setSchedulersHierRandomVictimDataLocalityPush (defaultPolicy, nb_policy_domains, nb_schedulers, nb_workers);
+                    break;
+                case MD_EVENT_LOCALITY_PUSH:
+                    setSchedulersHierRandomVictimEventLocalityPush (defaultPolicy, nb_policy_domains, nb_schedulers, nb_workers);
                     break;
                 default:
                     assert(0 && "Invalid scheduler choice");

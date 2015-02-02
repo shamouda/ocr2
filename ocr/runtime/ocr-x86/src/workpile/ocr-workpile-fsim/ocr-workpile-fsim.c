@@ -49,7 +49,7 @@ static ocrGuid_t ce_message_workpile_pop ( ocr_workpile_t * base ) {
     return (ocrGuid_t) deque_non_competing_pop_head(derived->deque);
 }
 
-static ocrGuid_t ce_message_workpile_steal ( ocr_workpile_t * base, int thiefID ) {
+static ocrGuid_t ce_message_workpile_steal ( ocr_workpile_t * base, int thiefID, struct ocr_scheduler_struct* thief_base ) {
     ce_message_workpile* derived = (ce_message_workpile*) base;
     return (ocrGuid_t) deque_non_competing_pop_head(derived->deque);
 }

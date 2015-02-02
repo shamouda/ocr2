@@ -210,7 +210,7 @@ void placedCreate(ocrDataBlock_t *self, ocrGuid_t allocatorGuid, u64 size,
     ocr_worker_t * worker = NULL;
     globalGuidProvider->getVal(globalGuidProvider, worker_guid, (u64*)&worker, NULL);
     hc_worker_t * hcWorker = (hc_worker_t *) worker;
-    ocrPlaceTrackerInsert(&(derived->placeTracker), hcWorker->id);
+    ocrPlaceTrackerInsert(&(derived->placeTracker), hcWorker->cpu_id);
 }
 
 void placedDestruct(ocrDataBlock_t *self) {
@@ -239,7 +239,7 @@ void* placedAcquire(ocrDataBlock_t *self, ocrGuid_t edt, bool isInternal) {
     globalGuidProvider->getVal(globalGuidProvider, worker_guid, (u64*)&worker, NULL);
     hc_worker_t * hcWorker = (hc_worker_t *) worker;
 
-    ocrPlaceTrackerInsert(&(derived->placeTracker), hcWorker->id);
+    ocrPlaceTrackerInsert(&(derived->placeTracker), hcWorker->cpu_id);
     return regularAcquire(self, edt, isInternal);
 }
 
@@ -276,6 +276,13 @@ void simplestCreate(ocrDataBlock_t *self, ocrGuid_t allocatorGuid, u64 size,
     globalGuidProvider->getVal(globalGuidProvider, allocatorGuid, (u64*)&allocator, NULL);
     ASSERT(allocator);
     ocrDataBlockSimplest_t *rself = (ocrDataBlockSimplest_t *)self;
+    ocrPlaceTrackerInit(&(rself->placeTracker));
+
+    ocrGuid_t worker_guid = ocr_get_current_worker_guid();
+    ocr_worker_t * worker = NULL;
+    globalGuidProvider->getVal(globalGuidProvider, worker_guid, (u64*)&worker, NULL);
+    hc_worker_t * hcWorker = (hc_worker_t *) worker;
+    ocrPlaceTrackerInsert(&(rself->placeTracker), hcWorker->cpu_id);
 
     rself->ptr = allocator->allocate(allocator, size);
     rself->allocatorGuid = allocatorGuid;

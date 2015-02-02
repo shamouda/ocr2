@@ -34,6 +34,7 @@
 
 #include "deque.h"
 
+struct ocr_scheduler_struct;
 typedef struct heap {
         volatile int lock;
         volatile int head;
@@ -54,6 +55,9 @@ void*   locked_heap_pop_priority_last       ( heap_t* heap );
 void*   locked_heap_pop_priority_selfish    ( heap_t* heap , int thiefID );
 void*   locked_heap_tail_pop_no_priority    ( heap_t* heap );
 void*   locked_heap_head_pop_no_priority    ( heap_t* heap );
+
+void*   locked_heap_pop_priority_worst_half   ( heap_t* heap, struct ocr_scheduler_struct* thief_base);
+void*   locked_heap_head_pop_head_half_no_priority ( heap_t* heap, struct ocr_scheduler_struct* thief_base);
 
 #endif /* HEAP_H */
 

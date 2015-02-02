@@ -48,24 +48,33 @@ ocr_scheduler_t * newScheduler(ocr_scheduler_kind schedulerType) {
     case OCR_SCHEDULER_CE:
         return ce_scheduler_constructor();
     case OCR_PLACED_SCHEDULER:
-        return hc_placed_scheduler_constructor();
+        assert ( 0 && "delete support for OCR_PLACED_SCHEDULER" );
+        return NULL;
 
     case OCR_SCHEDULER_RANDOMVICTIM_LOCALPUSH:
         return hc_randomvictim_localpush_scheduler_constructor();
-    case OCR_SCHEDULER_RANDOMVICTIM_LOCALITYPUSH:
-        return hc_randomvictim_localitypush_scheduler_constructor();
+    case OCR_SCHEDULER_RANDOMVICTIM_DATALOCALITYPUSH:
+        return hc_randomvictim_datalocalitypush_scheduler_constructor();
+    case OCR_SCHEDULER_RANDOMVICTIM_EVENTLOCALITYPUSH:
+        return hc_randomvictim_eventlocalitypush_scheduler_constructor();
     case OCR_SCHEDULER_CYCLICVICTIM_LOCALPUSH:
         return hc_cyclicvictim_localpush_scheduler_constructor();
-    case OCR_SCHEDULER_CYCLICVICTIM_LOCALITYPUSH:
-        return hc_cyclicvictim_localitypush_scheduler_constructor();
+    case OCR_SCHEDULER_CYCLICVICTIM_DATALOCALITYPUSH:
+        return hc_cyclicvictim_datalocalitypush_scheduler_constructor();
+    case OCR_SCHEDULER_CYCLICVICTIM_EVENTLOCALITYPUSH:
+        return hc_cyclicvictim_eventlocalitypush_scheduler_constructor();
     case OCR_SCHEDULER_HIERCYCLICVICTIM_LOCALPUSH:
         return hc_hiercyclicvictim_localpush_scheduler_constructor();
-    case OCR_SCHEDULER_HIERCYCLICVICTIM_LOCALITYPUSH:
-        return hc_hiercyclicvictim_localitypush_scheduler_constructor();
+    case OCR_SCHEDULER_HIERCYCLICVICTIM_DATALOCALITYPUSH:
+        return hc_hiercyclicvictim_datalocalitypush_scheduler_constructor();
+    case OCR_SCHEDULER_HIERCYCLICVICTIM_EVENTLOCALITYPUSH:
+        return hc_hiercyclicvictim_eventlocalitypush_scheduler_constructor();
     case OCR_SCHEDULER_HIERRANDOMVICTIM_LOCALPUSH:
         return hc_hierrandomvictim_localpush_scheduler_constructor();
-    case OCR_SCHEDULER_HIERRANDOMVICTIM_LOCALITYPUSH:
-        return hc_hierrandomvictim_localitypush_scheduler_constructor();
+    case OCR_SCHEDULER_HIERRANDOMVICTIM_DATALOCALITYPUSH:
+        return hc_hierrandomvictim_datalocalitypush_scheduler_constructor();
+    case OCR_SCHEDULER_HIERRANDOMVICTIM_EVENTLOCALITYPUSH:
+        return hc_hierrandomvictim_eventlocalitypush_scheduler_constructor();
     case OCR_SCHEDULER_SOCKETONLYVICTIM_USERSOCKETPUSH:
         return hc_socketonlyvictim_usersocketpush_scheduler_constructor();
     default:

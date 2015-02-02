@@ -71,6 +71,7 @@ typedef struct _ocrDataBlockSimplest_t {
     void* ptr; /**< Current address for this data-block */
     ocrGuid_t allocatorGuid; /**< Current allocator that this data-block belongs to. */
     u32 size; /**< Current size for this data-block */
+    ocrPlaceTracker_t placeTracker;
 } ocrDataBlockSimplest_t;
 
 typedef struct ocrDataBlockPlacedStruct_t {

@@ -32,6 +32,7 @@
 #include <stdlib.h>
 #include <assert.h>
 
+#include "assert.h"
 #include "heap.h"
 #include "hc_sysdep.h"
 #include "ocr-types.h"
@@ -81,9 +82,7 @@ void locked_heap_tail_push_no_priority (heap_t* heap, void* entry) {
     }
 }
 
-#define MISS 1000
-#define LOCAL_L3_HIT 50
-#define LOCAL_L2_HIT 10
+#ifdef DAVINCI
 
 #define N_SOCKETS 2
 #define N_L3S_PER_SOCKET 1
@@ -93,12 +92,25 @@ void locked_heap_tail_push_no_priority (heap_t* heap, void* entry) {
 #define N_TOTAL_L2S ( (N_SOCKETS) * (N_L2S_PER_SOCKET))
 #define N_TOTAL_L1S ( (N_SOCKETS) * (N_L1S_PER_SOCKET))
 
-#define DAVINCI
-static inline double costToAcquire ( int workerId, u64 placeTracker ) {
+#define MISS 1000
+#define LOCAL_L3_HIT 50
+#define LOCAL_L2_HIT 10
+
+#endif /* DAVINCI */
+
+#ifdef RICE_PHI
+
+#define MISS 1000
+#define CORE_HIT 50
+#define N_MAX_HYPERTHREADS 4
+
+#endif /* RICE_PHI */
+
+static inline double costToAcquireData ( int worker_cpu_id, u64 placeTracker ) {
     double cost = 0;
 #ifdef DAVINCI
-    unsigned char socket_id = workerId/N_L1S_PER_SOCKET;
-    unsigned char l2_within_socket_id = workerId % N_L2S_PER_SOCKET;
+    unsigned char socket_id = worker_cpu_id/N_L1S_PER_SOCKET;
+    unsigned char l2_within_socket_id = worker_cpu_id % N_L2S_PER_SOCKET;
     unsigned char l3_within_socket_id = 0;
 
     if (!( placeTracker & (1ULL << (N_TOTAL_L1S + N_TOTAL_L2S + N_TOTAL_L3S + socket_id)) )) { /*not in my socket*/
@@ -110,18 +122,27 @@ static inline double costToAcquire ( int workerId, u64 placeTracker ) {
     } else {
         cost += LOCAL_L2_HIT;
     }
-#endif
+#else
+#ifdef RICE_PHI
+    unsigned char core_id = (worker_cpu_id-1)/N_MAX_HYPERTHREADS;
+    if ( placeTracker & (1ULL << core_id) ) {
+        cost += CORE_HIT;
+    } else {
+        cost += MISS;
+    }
+#endif /* RICE_PHI */
+#endif /* DAVINCI */
     return cost;
 }
 
-static inline double costToAcquireEvent ( int workerId, int put_cpu_id ) {
+static inline double costToAcquireEvent ( int worker_cpu_id, int put_worker_cpu_id ) {
     double cost = 0;
 #ifdef DAVINCI
-    unsigned char worker_socket_id = workerId/N_L2S_PER_SOCKET;
-    unsigned char worker_l2_within_socket_id = workerId % N_L2S_PER_SOCKET;
+    unsigned char worker_socket_id = worker_cpu_id/N_L2S_PER_SOCKET;
+    unsigned char worker_l2_within_socket_id = worker_cpu_id % N_L2S_PER_SOCKET;
 
-    unsigned char put_socket_id = put_cpu_id/N_L2S_PER_SOCKET;
-    unsigned char put_l2_within_socket_id = put_cpu_id % N_L2S_PER_SOCKET;
+    unsigned char put_socket_id = put_worker_cpu_id/N_L2S_PER_SOCKET;
+    unsigned char put_l2_within_socket_id = put_worker_cpu_id % N_L2S_PER_SOCKET;
 
     if ( put_socket_id != worker_socket_id ) { /*not in my socket*/
         cost += MISS;
@@ -130,14 +151,24 @@ static inline double costToAcquireEvent ( int workerId, int put_cpu_id ) {
     } else {
         cost += LOCAL_L2_HIT;
     }
-#endif
+#else
+#ifdef RICE_PHI
+    unsigned char core_id = (worker_cpu_id-1)/N_MAX_HYPERTHREADS;
+    unsigned char put_core_id = (put_worker_cpu_id-1)/N_MAX_HYPERTHREADS;
+    if ( core_id == put_core_id ) {
+        cost += CORE_HIT;
+    } else {
+        cost += MISS;
+    }
+#endif /* RICE_PHI */
+#endif /* DAVINCI */
     return cost;
 }
 
-static double calculateTaskRetrievalCost ( volatile void* entry, int wid ) {
+static double calculateTaskRetrievalCostFromData ( volatile void* entry, int worker_cpu_id ) {
     hc_task_t* derived = (hc_task_t*)entry;
 
-    ocrDataBlockPlaced_t *placedDb = NULL;
+    ocrDataBlockSimplest_t *placedDb = NULL;
     ocrGuid_t dbGuid = UNINITIALIZED_GUID;
 
     int i = 0;
@@ -152,7 +183,7 @@ static double calculateTaskRetrievalCost ( volatile void* entry, int wid ) {
         if(dbGuid != NULL_GUID) {
             globalGuidProvider->getVal(globalGuidProvider, dbGuid, (u64*)&placedDb, NULL);
             u64 placeTracker = placedDb->placeTracker.existInPlaces;
-            totalCost += costToAcquire(wid, placeTracker);
+            totalCost += costToAcquireData(worker_cpu_id, placeTracker);
         }
 
         curr = eventArray[++i];
@@ -161,7 +192,7 @@ static double calculateTaskRetrievalCost ( volatile void* entry, int wid ) {
     return totalCost;
 }
 
-static double calculateTaskRetrievalCostFromEvents ( volatile void* entry, int wid ) {
+static double calculateTaskRetrievalCostFromEvents ( volatile void* entry, int worker_cpu_id ) {
     hc_task_t* derived = (hc_task_t*)entry;
 
     int i = 0;
@@ -172,14 +203,14 @@ static double calculateTaskRetrievalCostFromEvents ( volatile void* entry, int w
 
     int nEvent = 0;
     for ( curr = (hc_event_t*)eventArray[0]; NULL != curr; curr = (hc_event_t*)eventArray[++nEvent] ) {
-        totalCost += costToAcquireEvent (wid, curr->put_cpu_id);
+        totalCost += costToAcquireEvent (worker_cpu_id, curr->put_worker_cpu_id);
     }
     return totalCost;
 }
 
-static void setLocalCost ( volatile void* entry, int wid ) {
+static void setLocalCost ( volatile void* entry, int worker_cpu_id ) {
     hc_task_t* derived = (hc_task_t*)entry;
-    derived->cost = calculateTaskRetrievalCostFromEvents ( entry, wid );
+    derived->cost = calculateTaskRetrievalCostFromEvents ( entry, worker_cpu_id );
 }
 
 static inline double extractCost ( volatile void* entry ) {
@@ -190,14 +221,15 @@ static inline double extractCost ( volatile void* entry ) {
 
 /*sagnak awful awful hardcoding*/
 /*returns cheapest task for the thief to execute by handing out its "heap" index*/
-static int getMostLocal( heap_t* heap, int thiefID ) {
+static int getMostLocalToThief ( heap_t* heap, int thief_cpu_id ) {
     int currHeapIndex = 0;
     int cheapestHeapIndex = 0;
     int size = heap->tail - heap->head;
     int minCost = 10000000;
     while ( currHeapIndex < size ) {
         volatile void* currTask = heap->buffer->data[(heap->head+currHeapIndex) % heap->buffer->capacity];
-        int currCost = calculateTaskRetrievalCost (currTask, thiefID);
+      /*int currCost = calculateTaskRetrievalCostFromData (currTask, thief_cpu_id);*/
+        int currCost = calculateTaskRetrievalCostFromEvents (currTask, thief_cpu_id);
         if ( minCost > currCost ) {
             minCost = currCost;
             cheapestHeapIndex = currHeapIndex;
@@ -215,7 +247,7 @@ static inline void swapAtIndices ( heap_t* heap, int firstIndex, int secondIndex
 
 void verifyHeapHelper ( heap_t* heap, int nElements, int firstElementIndex, int checkIndex ) {
     int currHeapIndex = (checkIndex + firstElementIndex) % heap->buffer->capacity;
-    double currCost = ((hc_task_t*)(heap->buffer->data[ currHeapIndex ]))->cost;
+    double currCost = extractCost(heap->buffer->data[ currHeapIndex ]);
 
     if ( checkIndex*2+1 < nElements ) {
         int currLeftHeapIndex = (checkIndex*2+1 + firstElementIndex) % heap->buffer->capacity;
@@ -320,7 +352,7 @@ static void insertFixHeapAtIndex ( heap_t* heap, int heapFixIndex ) {
     }
 }
 
-static void insertFixHeap ( heap_t* heap ) {
+static inline void insertFixHeap ( heap_t* heap ) {
     insertFixHeapAtIndex(heap, heap->tail - heap->head - 1);
 }
 
@@ -338,9 +370,8 @@ void locked_heap_push_priority (heap_t* heap, void* entry) {
             ocrGuid_t worker_guid = ocr_get_current_worker_guid();
             ocr_worker_t * worker = NULL;
             globalGuidProvider->getVal(globalGuidProvider, worker_guid, (u64*)&worker, NULL);
-            hc_worker_t * hcWorker = (hc_worker_t *) worker;
 
-            setLocalCost (entry, hcWorker->id);
+            setLocalCost (entry, get_worker_cpu_id(worker));
 
             insertFixHeap(heap);
             if(DEBUG)verifyHeap(heap);
@@ -394,7 +425,7 @@ void* locked_heap_pop_priority_last ( heap_t* heap ) {
     return rt;
 }
 
-void* locked_heap_pop_priority_selfish ( heap_t* heap , int thiefID ) {
+void* locked_heap_pop_priority_selfish ( heap_t* heap , int thief_cpu_id ) {
     void * rt = NULL;
     int success = 0;
     while (!success) {
@@ -406,7 +437,7 @@ void* locked_heap_pop_priority_selfish ( heap_t* heap , int thiefID ) {
                 heap->tail = heap->head;
                 rt = NULL;
             } else { 
-                int thiefsCheapestHeapIndex = getMostLocal(heap, thiefID);
+                int thiefsCheapestHeapIndex = getMostLocalToThief(heap, thief_cpu_id);
                 /* retract to last element */
                 --heap->tail;
                 /* make the costliest the last one by swapping it with tail */
@@ -464,6 +495,32 @@ void* locked_heap_pop_priority_worst ( heap_t* heap ) {
     return rt;
 }
 
+void* locked_heap_pop_priority_worst_half ( heap_t* heap, ocr_scheduler_t* thief_base) {
+    void * rt = NULL;
+    int success = 0;
+    while (!success) {
+        if ( hc_cas(&heap->lock, 0, 1) ) {
+            success = 1;
+
+            int size = heap->tail - heap->head;
+            if ( size > 0 ) {
+                int tail = heap->tail;
+                int nLeaves = (1+size)/2;
+                int leafIndex = size - nLeaves;
+
+                rt = (void*) heap->buffer->data[ (heap->head + leafIndex) % heap->buffer->capacity];
+                int stolenIndex = 1;
+                for ( ; stolenIndex < nLeaves; ++stolenIndex ) {
+                    thief_base->give(thief_base, ocr_get_current_worker_guid(), (ocrGuid_t)heap->buffer->data[(heap->head + leafIndex + stolenIndex) % heap->buffer->capacity]);
+                }
+                heap->tail -= nLeaves;
+            } 
+            heap->lock = 0;
+        }
+    }
+    return rt;
+}
+
 void* locked_heap_head_pop_no_priority ( heap_t* heap ) {
     void * rt = NULL;
     int success = 0;
@@ -471,14 +528,39 @@ void* locked_heap_head_pop_no_priority ( heap_t* heap ) {
         if ( hc_cas(&heap->lock, 0, 1) ) {
             success = 1;
 
-            int head = heap->head;
-            heap->head= 1 + head;
-            rt = (void*) heap->buffer->data[head % heap->buffer->capacity];
+            int size = heap->tail - heap->head;
+            if ( size > 0 ) {
+                int head = heap->head;
+                ++heap->head;
+                rt = (void*) heap->buffer->data[head % heap->buffer->capacity];
+            } else {
+                rt = NULL;
+            }
+            heap->lock = 0;
+        }
+    }
+    return rt;
+}
+
+
+void* locked_heap_head_pop_head_half_no_priority ( heap_t* heap, ocr_scheduler_t* thief_base ) {
+    void * rt = NULL;
+    int success = 0;
+    while (!success) {
+        if ( hc_cas(&heap->lock, 0, 1) ) {
+            success = 1;
 
             int size = heap->tail - heap->head;
-            if ( size < 0 ) {
-                heap->head = heap->tail;
-                rt = NULL;
+            if ( size > 0 ) {
+                int head = heap->head;
+                int nStolen = (1+size)/2;
+                heap->head = nStolen + head;
+
+                rt = (void*) heap->buffer->data[head % heap->buffer->capacity];
+                int stolenIndex = 1;
+                for ( ; stolenIndex < nStolen; ++stolenIndex ) {
+                    thief_base->give(thief_base, ocr_get_current_worker_guid(), (ocrGuid_t)heap->buffer->data[(stolenIndex + head) % heap->buffer->capacity]);
+                }
             } 
             heap->lock = 0;
         }
@@ -493,15 +575,10 @@ void* locked_heap_tail_pop_no_priority ( heap_t* heap ) {
         if ( hc_cas(&heap->lock, 0, 1) ) {
             success = 1;
 
-            int tail = heap->tail;
-            heap->tail = --tail;
-            rt = (void*) heap->buffer->data[tail % heap->buffer->capacity];
-
             int size = heap->tail - heap->head;
-            if ( size < 0 ) {
-                heap->tail = heap->head;
-                rt = NULL;
-            } 
+            if ( size > 0 ) {
+                rt = (void*) heap->buffer->data[ --heap->tail % heap->buffer->capacity];
+            }
             heap->lock = 0;
         }
     }

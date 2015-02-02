@@ -40,6 +40,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #ifdef HPCTOOLKIT
 #include <hpctoolkit.h>
 #endif
+#ifdef PAPI 
+#include "instrument.h"
+#endif
 
 #define FLAGS 0xdead
 #define PROPERTIES 0xdead
@@ -150,6 +153,10 @@ u8 wrap_up_task ( u32 paramc, u64 * params, void* paramv[], u32 depc, ocrEdtDep_
     printf("The computation took %f seconds\r\n",((b.tv_sec - a.tv_sec)*1000000+(b.tv_usec - a.tv_usec))*1.0/1000000);
 #ifdef HPCTOOLKIT
     hpctoolkit_sampling_stop();
+#endif
+#ifdef PAPI
+    instrument_end();
+    instrument_print();
 #endif
     ocrFinish();
 
@@ -438,6 +445,10 @@ int main( int argc, char* argv[] ) {
 
 #ifdef HPCTOOLKIT
         hpctoolkit_sampling_start();
+#endif
+#ifdef PAPI
+        instrument_init();
+        instrument_start();
 #endif
         gettimeofday(&a,0);
 

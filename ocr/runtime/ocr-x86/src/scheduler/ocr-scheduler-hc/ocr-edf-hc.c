@@ -32,6 +32,7 @@
 #include <stdlib.h>
 #include <assert.h>
 
+#include "hc.h"
 #include "hc_edf.h"
 #include "ocr-datablock.h"
 #include "ocr-utils.h"
@@ -68,7 +69,7 @@ ocrGuid_t hc_event_factory_create ( struct ocr_event_factory_struct* factory, oc
 
 struct ocr_event_struct* hc_event_constructor(ocrEventTypes_t eventType, bool takesArg) {
     hc_event_t* derived = (hc_event_t*) malloc(sizeof(hc_event_t));
-    derived->put_cpu_id = -1;
+    derived->put_worker_cpu_id = -1;
     derived->datum = UNINITIALIZED_GUID;
     derived->register_list = UNINITIALIZED_REGISTER_LIST;
     ocr_event_t* base = (ocr_event_t*)derived;
@@ -131,6 +132,11 @@ void hc_event_signal_waiters( register_list_node_t* task_id_list ) {
 void hc_event_put (struct ocr_event_struct* event, ocrGuid_t db) {
     hc_event_t* derived = (hc_event_t*)event;
     register_list_node_t* task_list = hc_event_compete_for_put(derived, db);
+
+    ocr_worker_t* w = NULL;
+    globalGuidProvider->getVal(globalGuidProvider, ocr_get_current_worker_guid(), (u64*)&w, NULL);
+    derived->put_worker_cpu_id = get_worker_cpu_id(w);
+
     hc_event_signal_waiters(task_list);
 }
 

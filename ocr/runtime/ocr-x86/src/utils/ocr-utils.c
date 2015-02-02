@@ -137,7 +137,7 @@ void ocrPlaceTrackerAllocate ( ocrPlaceTracker_t** toFill ) {
     *toFill = (ocrPlaceTracker_t*) malloc(sizeof(ocrPlaceTracker_t));
 }
 
-#define DAVINCI
+#ifdef DAVINCI
 
 #define N_SOCKETS 2
 #define N_L3S_PER_SOCKET 1
@@ -153,9 +153,16 @@ void ocrPlaceTrackerAllocate ( ocrPlaceTracker_t** toFill ) {
  * sockets indexed from N_TOTAL_L1S + N_TOTAL_L2S + N_TOTAL_L3S to N_TOTAL_L1S + N_TOTAL_L2S + N_TOTAL_L3S + N_SOCKETS - 1 
  * */
 
+#endif /* DAVINCI */
+
+#ifdef RICE_PHI
+
+#define N_HYPERTHREADS 4
+
+#endif /* RICE_PHI */
+
 void ocrPlaceTrackerInsert ( ocrPlaceTracker_t* self, unsigned char currPlace ) {
 #ifdef DAVINCI
-
     unsigned char socket_id = currPlace/N_L1S_PER_SOCKET;
     unsigned char l2_within_socket_id = currPlace%N_L2S_PER_SOCKET;
     unsigned char l3_within_socket_id = 0;
@@ -172,8 +179,13 @@ void ocrPlaceTrackerInsert ( ocrPlaceTracker_t* self, unsigned char currPlace ) 
     // mark the socket place
     self->existInPlaces |= (1ULL << ( N_TOTAL_L1S + N_TOTAL_L2S + N_TOTAL_L3S + socket_id));
 #else
-	assert(0);
-#endif
+#ifdef RICE_PHI
+    unsigned char core_id = (currPlace-1)/N_HYPERTHREADS;
+    self->existInPlaces |= (1ULL << core_id);
+#else
+	assert(0 && "can not insert place tracker information on this architecture");
+#endif /* RICE_PHI */
+#endif /* DAVINCI */
 }
 
 void ocrPlaceTrackerRemove ( ocrPlaceTracker_t* self, unsigned char currPlace ) {
