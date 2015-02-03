@@ -147,7 +147,7 @@ typedef struct ocr_event_factory_struct {
 
 struct ocr_task_factory_struct;
 typedef ocrGuid_t (*task_fact_create_with_event_list_fct) ( struct ocr_task_factory_struct* factory, ocrEdt_t fctPtr, u32 paramc, u64 * params, void** paramv, event_list_t* al);
-typedef ocrGuid_t (*task_fact_create_fct) ( struct ocr_task_factory_struct* factory, ocrEdt_t fctPtr, u32 paramc, u64 * params, void** paramv, size_t l_size);
+typedef ocrGuid_t (*task_fact_create_fct) ( struct ocr_task_factory_struct* factory, ocrEdt_t fctPtr, u32 paramc, u64 * params, void** paramv, size_t l_size, long double nDescendants, long double priority);
 typedef void (*task_fact_destruct_fct)(struct ocr_task_factory_struct* factory);
 
 /*! \brief Abstract factory class to create OCR tasks.

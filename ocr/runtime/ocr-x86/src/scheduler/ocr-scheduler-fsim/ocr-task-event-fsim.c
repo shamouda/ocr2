@@ -66,7 +66,7 @@ void fsim_task_factory_destructor ( struct ocr_task_factory_struct* base ) {
     free(derived);
 }
 
-ocrGuid_t fsim_task_factory_create ( struct ocr_task_factory_struct* factory, ocrEdt_t fctPtr, u32 paramc, u64 * params, void** paramv, size_t dep_l_size) {
+ocrGuid_t fsim_task_factory_create ( struct ocr_task_factory_struct* factory, ocrEdt_t fctPtr, u32 paramc, u64 * params, void** paramv, size_t dep_l_size, long double nDescendants, long double priority) {
     fsim_task_t* edt = fsim_task_construct(fctPtr, paramc, params, paramv, dep_l_size);
     ocr_task_t* base = (ocr_task_t*) edt;
     return base->guid;
@@ -110,7 +110,7 @@ fsim_message_task_t* fsim_message_task_construct (ocrEdt_t funcPtr) {
     return derived;
 }
 
-ocrGuid_t fsim_message_task_factory_create ( struct ocr_task_factory_struct* factory, ocrEdt_t fctPtr, u32 paramc, u64 * params, void** paramv, size_t dep_l_size) {
+ocrGuid_t fsim_message_task_factory_create ( struct ocr_task_factory_struct* factory, ocrEdt_t fctPtr, u32 paramc, u64 * params, void** paramv, size_t dep_l_size, long double nDescendants, long double priority) {
     fsim_message_task_t* edt = fsim_message_task_construct(fctPtr);
     ocr_task_t* base = (ocr_task_t*) edt;
     return base->guid;
@@ -156,7 +156,7 @@ void * xe_worker_computation_routine (void * arg) {
             ocr_task_factory* message_task_factory = policy_domain->taskFactories[1];
 
             // the message to the CE says 'give me work' and notes who is asking for it
-            ocrGuid_t messageTaskGuid = message_task_factory->create(message_task_factory, NULL, 0, NULL, NULL, 0);
+            ocrGuid_t messageTaskGuid = message_task_factory->create(message_task_factory, NULL, 0, NULL, NULL, 0, 0 ,0);
             fsim_message_task_t* derived = NULL;
             globalGuidProvider->getVal(globalGuidProvider, messageTaskGuid, (u64*)&(derived), NULL);
             derived -> type = GIVE_ME_WORK;

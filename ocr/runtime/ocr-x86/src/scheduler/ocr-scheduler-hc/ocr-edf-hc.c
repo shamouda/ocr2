@@ -214,10 +214,12 @@ hc_task_t* hc_task_construct_with_event_list (ocrEdt_t funcPtr, u32 paramc, u64 
     return derived;
 }
 
-hc_task_t* hc_task_construct (ocrEdt_t funcPtr, u32 paramc, u64 * params, void** paramv, size_t dep_list_size) {
+hc_task_t* hc_task_construct (ocrEdt_t funcPtr, u32 paramc, u64 * params, void** paramv, size_t dep_list_size, long double nDescendants, long double priority) {
     hc_task_t* derived = (hc_task_t*)malloc(sizeof(hc_task_t));
     derived->awaitList = hc_await_list_constructor(dep_list_size);
     hc_task_construct_internal(derived, funcPtr, paramc, params, paramv);
+    derived->nDescendants = nDescendants;
+    derived->priority = priority;
     return derived;
 }
 

@@ -96,11 +96,13 @@ typedef struct hc_task_struct_t {
     ocrEdtDep_t * depv;
     ocrEdt_t p_function;
     double cost;
+    long double nDescendants;
+    long double priority;
 } hc_task_t;
 
 void hc_task_construct_internal (hc_task_t* derived, ocrEdt_t funcPtr, u32 paramc, u64 * params, void** paramv);
 hc_task_t* hc_task_construct_with_event_list (ocrEdt_t funcPtr, u32 paramc, u64 * params, void ** paramv, event_list_t* al);
-hc_task_t* hc_task_construct (ocrEdt_t funcPtr, u32 paramc, u64 * params, void ** paramv, size_t l_size);
+hc_task_t* hc_task_construct (ocrEdt_t funcPtr, u32 paramc, u64 * params, void ** paramv, size_t l_size, long double nDescendants, long double priority);
 
 void hc_task_destruct ( ocr_task_t* base );
 bool hc_task_iterate_waiting_frontier ( ocr_task_t* base );

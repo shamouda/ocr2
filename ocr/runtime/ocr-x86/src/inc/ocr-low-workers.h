@@ -101,6 +101,9 @@ typedef struct ocr_worker_struct {
 int get_worker_id (ocr_worker_t * worker);
 /*! \brief Getter for worker id member field
  */
+
+int get_cpu_worker_id (ocr_worker_t * worker);
+
 ocrGuid_t get_worker_guid(ocr_worker_t * worker);
 
 /*! \brief Getter for the scheduler, where this Worker works on

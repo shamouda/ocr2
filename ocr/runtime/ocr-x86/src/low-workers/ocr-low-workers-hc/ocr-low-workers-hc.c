@@ -164,8 +164,8 @@ ocrGuid_t hc_task_factory_create_with_event_list (struct ocr_task_factory_struct
     return base->guid;
 }
 
-ocrGuid_t hc_task_factory_create ( struct ocr_task_factory_struct* factory, ocrEdt_t fctPtr, u32 paramc, u64 * params, void** paramv, size_t dep_l_size) {
-    hc_task_t* edt = hc_task_construct(fctPtr, paramc, params, paramv, dep_l_size);
+ocrGuid_t hc_task_factory_create ( struct ocr_task_factory_struct* factory, ocrEdt_t fctPtr, u32 paramc, u64 * params, void** paramv, size_t dep_l_size, long double nDescendants, long double priority) {
+    hc_task_t* edt = hc_task_construct(fctPtr, paramc, params, paramv, dep_l_size, nDescendants, priority);
     ocr_task_t* base = (ocr_task_t*) edt;
     return base->guid;
 }

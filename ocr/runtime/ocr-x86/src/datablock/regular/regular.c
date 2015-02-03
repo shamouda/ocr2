@@ -312,7 +312,6 @@ u8 simplestRelease(ocrDataBlock_t *self, ocrGuid_t edt, bool isInternal) {
 }
 
 u8 simplestFree(ocrDataBlock_t *self, ocrGuid_t edt) {
-    ocrDataBlockSimplest_t *derived = (ocrDataBlockSimplest_t *)self;
     self->destruct(self);
     return 0;
 }

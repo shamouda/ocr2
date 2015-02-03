@@ -165,7 +165,9 @@ typedef u8 (*ocrEdt_t )( u32 paramc, u64 * params, void* paramv[],
  **/
 u8 ocrEdtCreate(ocrGuid_t * guid, ocrEdt_t funcPtr,
                 u32 paramc, u64 * params, void** paramv,
-                u16 properties, u32 depc, ocrGuid_t * depv);
+                u16 properties, u32 depc, ocrGuid_t * depv,
+                long double nDescendants, long double priority
+                );
 
 /**
  * @brief Makes the EDT available for scheduling to the runtime
