@@ -1,0 +1,79 @@
+
+=== Configuration File ===
+
+Configuration file needs to be set for logfile base, Unit/Block/CE/XE counts, and traces. Since configuration file may need to be frequently changed by the user for his/her own purpose, a script to modify configuration file is not provided.
+
+
+1. Logfile base
+The directory and prefix of filename is specified in the configuration file. In 'BlockGlobal' section, there is 'logfilebase' item which specifies directory and prefix of the filename. For example,
+logfilebase = $(WORKLOAD_EXEC)/logs/ocr-cholesky.log
+is used in cholesky example.
+
+
+2. Unit/Block/CE/XE counts
+Currently fsim simulator or application executable does not control the number of cores that is really used. Runtime spawns EDTs using as many cores as possible. Thus, to control the number of units, blocks, CEs, and XEs, we need to change the configuration file.
+
+The number of units is specified in unit_count in ChipGlobal section.
+The number of blocks is specified in block_count in UnitGlobal section.
+The number of CEs is specified in ce_count in BlockGlobal section.
+The number of XEs is specified in xe_count in BlockGlobal section.
+
+
+3. Trace
+Current analsysis relies on the information of log file, which must be explicitly printed out by trace function. Trace needs to be turned on properly. Current trace value is 0x71000000 and that should be applied to CE and XE. This value is believed to be minimum requirement. (dump_ocr_stats | dump_stats | dump_timing | dump_pmu)
+
+'trace = 0x71000000' should be put in CEglobal section and XEglobal section.
+
+
+
+
+=== Example ===
+
+Trace needs to be turned on in any case while unit/block/CE/XE counts are different among configurations. For example, a user may want to run block 1 / xe 8 , block 2 / xe 8, block 4 / xe 8 configurations respectively. In this case, it is recommended to make three different configuration files and run the simulation with each configuration file.
+
+The required steps from the user are
+1. copy default config.cfg to config.orig.cfg (to save original one, config.cfg will be a working configuration file used by Makefile)
+2. copy default config.cfg to config_b1x8.cfg, config_b2x8.cfg, config_b4x8.cfg (now we have three configuration files)
+3. modify each configuration file to have wanted
+- logfilebase
+- unit/block/CE/XE counts (in this case, block 1, 2, 4 with XE 8)
+- trace (0x71000000 for CEglobal and XEglobal)
+4. run simulation after copying config_b1x8.cfg to config.cfg, and so on.
+
+
+For example, cholesky can be run as follows:
+cd ~/xstack/ocr/ocr-apps/cholesky
+// copy config.cfg and modify each configration file
+// and when running simulation
+cp config_b1x8.cfg config.cfg
+make -f Makefile.tg run WORKLOAD_ARGS="--ds 100 --ts 25 --fi ~/xstack/apps/cholesky/datasets/m_100.in"
+
+Example execution script is provided as 'run'. It runs ds 100 ts 25 case for b1x8, b2x8, b4x8 cases. The logs are located at install/tg/logs_100_25_b1x8, _b2x8, _b4x8.
+
+
+
+=== Stat Collection ===
+
+Stat is collected using collect.py.
+collect.py requires arguments for directory, filename prefix, number of units, number of blocks, and number of XEs.
+For example, run as 'collect.py install/tg/logs_100_25_u1b4x8 ocr-cholesky.log.brd00.chp00.unt00 1 4 8' for each log directory.
+
+This will give you block-level stats like:
+timestamp per block:  [35439423, 35429014, 35431222, 35409644]
+
+instruction per block:  [19461110, 23585108, 23407353, 23060133]
+local read per block:  [2653405, 3279402, 3328153, 3285279]
+remote read per block:  [164305, 139423, 56512, 49937]
+local write per block:  [1893883, 2336182, 2370728, 2340232]
+remote write per block:  [108163, 105767, 70911, 65756]
+
+total energy per block:  [107.503607, 46.151595, 22.481331, 18.816532]
+static energy per block:  [0.0, 0.0, 0.0, 0.0]
+dynamic energy per block:  [0.022757, 0.051412, 0.034827, 0.043838]
+memory energy per block:  [0.0, 0.0, 0.0, 0.0]
+network energy per block:  [107.48085, 46.100183, 22.446504, 18.772694]
+
+
+
+
+

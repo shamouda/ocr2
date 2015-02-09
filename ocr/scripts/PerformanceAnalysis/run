@@ -1,0 +1,23 @@
+#!/usr/bin/bash
+
+file=
+config=( u1b1x8 u1b2x8 u1b4x8 )
+ds=( 100 )
+ts=( 25 )
+
+
+for d in "${ds[@]}"
+do
+    for t in "${ts[@]}"
+    do
+        for c in "${config[@]}"
+        do
+            #echo $i
+            cp config_${c}.cfg config.cfg
+            mkdir install/tg/logs
+            make -f Makefile.tg run WORKLOAD_ARGS="--ds ${d} --ts ${t} --fi ../../../apps/cholesky/datasets/m_${d}.in"
+            mv install/tg/logs install/tg/logs_${d}_${t}_${c}
+        done
+    done
+done
+
