@@ -199,6 +199,7 @@ static void enqueueAcquireMessageInProxy(ocrPolicyDomain_t * pd, ProxyDb_t * pro
  * Warning: The caller must own the proxy DB internal's lock.
  */
 static Queue_t * dequeueCompatibleAcquireMessageInProxy(ocrPolicyDomain_t * pd, Queue_t * candidateQueue, ocrDbAccessMode_t acquireMode) {
+    START_PROFILE(pd_hc_dequeueCompatibleAcquireMessageInProxy);
     if ((candidateQueue != NULL) && ((acquireMode == DB_MODE_RO) || (acquireMode == DB_MODE_ITW))) {
         u32 idx = 0;
         Queue_t * eligibleQueue = NULL;
@@ -224,8 +225,10 @@ static Queue_t * dequeueCompatibleAcquireMessageInProxy(ocrPolicyDomain_t * pd, 
     #undef PD_MSG
     #undef PD_TYPE
         }
+	EXIT_PROFILE;
         return eligibleQueue;
     }
+    EXIT_PROFILE;
     return NULL;
 }
 
@@ -297,6 +300,7 @@ static void hcDistReleasePd(ocrPolicyDomainHc_t *rself) {
 }
 
 u8 resolveRemoteMetaData(ocrPolicyDomain_t * self, ocrFatGuid_t * fGuid, u64 metaDataSize) {
+    START_PROFILE(pd_hc_resolveRemoteMetaData);
     ocrGuid_t remoteGuid = fGuid->guid;
     u64 val;
     self->guidProviders[0]->fcts.getVal(self->guidProviders[0], remoteGuid, &val, NULL);
@@ -332,6 +336,7 @@ u8 resolveRemoteMetaData(ocrPolicyDomain_t * self, ocrFatGuid_t * fGuid, u64 met
 #undef PD_TYPE
     }
     fGuid->metaDataPtr = (void *) val;
+    EXIT_PROFILE;
     return 0;
 }
 
@@ -349,6 +354,7 @@ void getTemplateParamcDepc(ocrPolicyDomain_t * self, ocrFatGuid_t * fatGuid, u32
  * flags : flags of the acquired DB.
  */
 static void * acquireLocalDb(ocrPolicyDomain_t * pd, ocrGuid_t dbGuid, ocrDbAccessMode_t mode) {
+    START_PROFILE(pd_hc_acquireLocalDb);
     ocrTask_t *curTask = NULL;
     PD_MSG_STACK(msg);
     getCurrentEnv(NULL, NULL, &curTask, &msg);
@@ -370,9 +376,15 @@ static void * acquireLocalDb(ocrPolicyDomain_t * pd, ocrGuid_t dbGuid, ocrDbAcce
     // while we are starting to execute
     if(pd->fcts.processMessage(pd, &msg, true)) {
         ASSERT(false); // debug
+   	EXIT_PROFILE;
         return NULL;
     }
+<<<<<<< HEAD
     return PD_MSG_FIELD_O(ptr);
+=======
+    EXIT_PROFILE;
+    return PD_MSG_FIELD(ptr);
+>>>>>>> Start extending profiler coverage
 #undef PD_MSG
 #undef PD_TYPE
 }
@@ -452,7 +464,12 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
     {
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_WORK_CREATE
+<<<<<<< HEAD
         DPRINTF(DEBUG_LVL_VVERB,"Processing WORK_CREATE for template GUID 0x%lx\n", PD_MSG_FIELD_I(templateGuid.guid));
+=======
+	START_PROFILE(pd_hc_pdMsgWorkCreate);
+        DPRINTF(DEBUG_LVL_VVERB,"Processing WORK_CREATE for template GUID 0x%lx\n", PD_MSG_FIELD(templateGuid.guid));
+>>>>>>> Start extending profiler coverage
         // First query the guid provider to determine if we know the edtTemplate.
         resolveRemoteMetaData(self, &PD_MSG_FIELD_I(templateGuid), sizeof(ocrTaskTemplateHc_t));
         // Now that we have the template, we can set paramc and depc correctly
@@ -556,6 +573,7 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
 #undef PD_TYPE
             }
         }
+	EXIT_PROFILE;
         break;
     }
     case PD_MSG_DB_CREATE:
@@ -662,7 +680,8 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
     }
     case PD_MSG_MGT_SHUTDOWN:
     {
-        if ((msg->srcLocation == curLoc) && (msg->destLocation == curLoc)) {
+        START_PROFILE(pd_hc_pdMsgMgtShutdown);
+	if ((msg->srcLocation == curLoc) && (msg->destLocation == curLoc)) {
             ocrPolicyDomainHcDist_t * rself = ((ocrPolicyDomainHcDist_t*)self);
             DPRINTF(DEBUG_LVL_VERB,"MGT_SHUTDOWN: ocrShutdown invoked\n");
         #define PD_MSG (msg)
@@ -694,7 +713,8 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
             PROCESS_MESSAGE_RETURN_NOW(self, 0);
         }
         // Fall-through to send to other PD or local processing.
-        break;
+        EXIT_PROFILE;
+	break;
     }
     case PD_MSG_DEP_DYNADD:
     {
@@ -720,8 +740,14 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
     {
 #define PD_MSG (msg)
 #define PD_TYPE PD_MSG_DB_ACQUIRE
+<<<<<<< HEAD
         if (msg->type & PD_MSG_REQUEST) {
             RETRIEVE_LOCATION_FROM_GUID_MSG(self, msg->destLocation, IO)
+=======
+        START_PROFILE(pd_hc_pdMsgDbAcquire);
+	if (msg->type & PD_MSG_REQUEST) {
+            RETRIEVE_LOCATION_FROM_GUID_MSG(self, msg->destLocation)
+>>>>>>> Start extending profiler coverage
             // Send/Receive to/from remote or local processing, all fall-through
             if ((msg->srcLocation != curLoc) && (msg->destLocation == curLoc)) {
                 // Incoming acquire request
@@ -920,13 +946,19 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
         // and then append the db data to the message.
 #undef PD_MSG
 #undef PD_TYPE
+	EXIT_PROFILE;
         break;
     }
     case PD_MSG_DB_RELEASE:
     {
 #define PD_MSG (msg)
 #define PD_TYPE PD_MSG_DB_RELEASE
+<<<<<<< HEAD
         RETRIEVE_LOCATION_FROM_GUID_MSG(self, msg->destLocation, IO)
+=======
+        START_PROFILE(pd_hc_pdMsgDbRelease);
+	RETRIEVE_LOCATION_FROM_GUID_MSG(self, msg->destLocation)
+>>>>>>> Start extending profiler coverage
         if ((msg->srcLocation == curLoc) && (msg->destLocation != curLoc)) {
             DPRINTF(DEBUG_LVL_VVERB,"DB_RELEASE_WARN outgoing request send for DB GUID 0x%lx\n", PD_MSG_FIELD_IO(guid.guid));
             // Outgoing release request
@@ -1027,7 +1059,8 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
             DPRINTF(DEBUG_LVL_VVERB,"DB_RELEASE_WARN local processing: DB GUID 0x%lx\n", PD_MSG_FIELD_IO(guid.guid));
         }
 #undef PD_MSG
-#undef PD_TYPE
+#undef PD_TYPEi
+	EXIT_PROFILE;
         break;
     }
     case PD_MSG_DEP_REGSIGNALER:
@@ -1051,7 +1084,8 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
         break;
     }
     case PD_MSG_COMM_TAKE: {
-        ocrPolicyDomainHcDist_t* rself = (ocrPolicyDomainHcDist_t*)self;
+        START_PROFILE(pd_hc_pdMsgCommTake);
+	ocrPolicyDomainHcDist_t* rself = (ocrPolicyDomainHcDist_t*)self;
         if (rself->shutdownAckCount > 0) {
             ocrWorker_t * worker;
             getCurrentEnv(NULL, &worker, NULL, NULL);
@@ -1130,6 +1164,7 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
                }
             }
         } // fall-through and do regular take
+	EXIT_PROFILE;
         break;
     }
     case PD_MSG_MGT_MONITOR_PROGRESS:
@@ -1679,6 +1714,7 @@ static void destructPolicyDomainFactoryHcDist(ocrPolicyDomainFactory_t * factory
 }
 
 ocrPolicyDomainFactory_t * newPolicyDomainFactoryHcDist(ocrParamList_t *perType) {
+    START_PROFILE(pd_hc_newPolicyDomainFactoryHcDist);
     ocrPolicyDomainFactory_t * baseFactory = newPolicyDomainFactoryHc(perType);
     ocrPolicyDomainFcts_t baseFcts = baseFactory->policyDomainFcts;
 
@@ -1704,6 +1740,7 @@ ocrPolicyDomainFactory_t * newPolicyDomainFactoryHcDist(ocrParamList_t *perType)
     derivedBase->policyDomainFcts.waitMessage = FUNC_ADDR(u8 (*)(ocrPolicyDomain_t*, ocrMsgHandle_t**), hcDistPdWaitMessage);
 
     baseFactory->destruct(baseFactory);
+    EXIT_PROFILE;
     return derivedBase;
 }
 
