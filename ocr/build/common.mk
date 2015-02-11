@@ -52,7 +52,7 @@ CFLAGS += -DINIT_DEQUE_CAPACITY=2048
 # CFLAGS += -DOCR_MAX_MULTI_SLOT=1
 
 # Enables the collection of runtime profiling (only x86)
-# CFLAGS += -DOCR_RUNTIME_PROFILER
+CFLAGS += -DOCR_RUNTIME_PROFILER -DPROFILE_KHZ=3400000
 
 # Enables naming of EDTs for easier debugging
 # CFLAGS += -DOCR_ENABLE_EDT_NAMING

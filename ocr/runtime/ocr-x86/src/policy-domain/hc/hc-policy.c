@@ -30,7 +30,7 @@
 
 void hcPolicyDomainBegin(ocrPolicyDomain_t * policy) {
     // The PD should have been brought up by now and everything instantiated
-
+    START_PROFILE(pd_hc_hcPolicyDomainBegin);
     u64 i = 0;
     u64 maxCount = 0;
 
@@ -74,10 +74,12 @@ void hcPolicyDomainBegin(ocrPolicyDomain_t * policy) {
     u32 oldState = hal_cmpswap32(&(rself->state), 0, 1);
     ASSERT(oldState == 0); // No EDT should be able
     // to run at this point since mainEDT
-    // is started AFTER this function completes
+    // is started AFTER this function completesi
+    EXIT_PROFILE;
 }
 
 void hcPolicyDomainStart(ocrPolicyDomain_t * policy) {
+    START_PROFILE(pd_hc_hcPolicyDomainStart);
     // The PD should have been brought up by now and everything instantiated
     // This is a bit ugly but I can't find a cleaner solution:
     //   - we need to associate the environment with the
@@ -119,9 +121,11 @@ void hcPolicyDomainStart(ocrPolicyDomain_t * policy) {
     for(i = 0; i < maxCount; i++) {
         policy->workers[i]->fcts.start(policy->workers[i], policy);
     }
+    EXIT_PROFILE;
 }
 
 void hcPolicyDomainFinish(ocrPolicyDomain_t * policy) {
+    START_PROFILE(pd_hc_hcPolicyDomainFinish);
     // Finish everything in reverse order
     u64 i = 0;
     u64 maxCount = 0;
@@ -163,10 +167,11 @@ void hcPolicyDomainFinish(ocrPolicyDomain_t * policy) {
     for(i = 0; i < maxCount; ++i) {
         policy->guidProviders[i]->fcts.finish(policy->guidProviders[i]);
     }
-
+    EXIT_PROFILE;
 }
 
 void hcPolicyDomainStop(ocrPolicyDomain_t * policy) {
+    START_PROFILE(pd_hc_hcPolicyDomainStop);
     u64 i = 0;
     u64 maxCount = 0;
 
@@ -222,9 +227,11 @@ void hcPolicyDomainStop(ocrPolicyDomain_t * policy) {
     // this way for now to make sure the logic is sound
     oldState = hal_cmpswap32(&(rself->state), 18, 26);
     ASSERT(oldState == 18);
+    EXIT_PROFILE;
 }
 
 void hcPolicyDomainDestruct(ocrPolicyDomain_t * policy) {
+    START_PROFILE(pd_hc_hcPolicyDomainDestruct);
     // Destroying instances
     u64 i = 0;
     u64 maxCount = 0;
@@ -301,6 +308,7 @@ void hcPolicyDomainDestruct(ocrPolicyDomain_t * policy) {
     runtimeChunkFree((u64)policy->eventFactories, NULL);
     runtimeChunkFree((u64)policy->guidProviders, NULL);
     runtimeChunkFree((u64)policy, NULL);
+    EXIT_PROFILE;
 }
 
 static void localDeguidify(ocrPolicyDomain_t *self, ocrFatGuid_t *guid) {
@@ -1498,6 +1506,7 @@ static void destructPolicyDomainFactoryHc(ocrPolicyDomainFactory_t * factory) {
 }
 
 ocrPolicyDomainFactory_t * newPolicyDomainFactoryHc(ocrParamList_t *perType) {
+    START_PROFILE(pd_hc_newPolicyDomainFactoryHc);
     ocrPolicyDomainFactory_t* base = (ocrPolicyDomainFactory_t*) runtimeChunkAlloc(sizeof(ocrPolicyDomainFactoryHc_t), NONPERSISTENT_CHUNK);
     // Set factory's methods
 #ifdef OCR_ENABLE_STATISTICS
@@ -1529,7 +1538,7 @@ ocrPolicyDomainFactory_t * newPolicyDomainFactoryHc(ocrParamList_t *perType) {
 #ifdef OCR_ENABLE_STATISTICS
     base->policyDomainFcts.getStats = FUNC_ADDR(ocrStats_t*(*)(ocrPolicyDomain_t*),hcGetStats);
 #endif
-
+    EXIT_PROFILE;
     return base;
 }
 
