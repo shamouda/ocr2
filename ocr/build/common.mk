@@ -367,20 +367,16 @@ INSTALLED_CONFIGS := $(addprefix $(OCR_INSTALL)/config/, $(MACHINE_CONFIGS))
 INSTALLED_INCS    := $(addprefix $(OCR_INSTALL)/include/, $(INC_FILES))
 
 $(OCR_INSTALL)/lib/%: $(BASE_LIBS)% | $(OCR_INSTALL)/lib
-	@$(RM) -f $@
-	@$(CP) $< $@
+	@$(CP) --remove-destination $< $@
 
 $(OCR_INSTALL)/bin/%: $(BASE_EXES)% | $(OCR_INSTALL)/bin
-	@$(RM) -f $@
-	@$(CP) $< $@
+	@$(CP) --remove-destination $< $@
 
 $(OCR_INSTALL)/config/%: $(OCR_SRC)/machine-configs/$(OCR_TYPE)/% | $(OCR_INSTALL)/config
-	@$(RM) -f $@
-	@$(CP) $< $@
+	@$(CP) --remove-destination $< $@
 
 $(OCR_INSTALL)/include/%: $(OCR_SRC)/inc/% | $(OCR_INSTALL)/include $(OCR_INSTALL)/include/extensions
-	@$(RM) -f $@
-	@$(CP) $< $@
+	@$(CP) --remove-destination $< $@
 
 $(OCR_INSTALL)/lib $(OCR_INSTALL)/bin $(OCR_INSTALL)/config $(OCR_INSTALL)/include \
 $(OCR_INSTALL)/include/extensions :

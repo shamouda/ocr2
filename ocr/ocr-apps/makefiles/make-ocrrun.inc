@@ -77,8 +77,7 @@ install: | $(WORKLOAD_INSTALL)
 	"&& export OCR_CONFIG=${OCR_INSTALL}/config/default.cfg (default one) and run "\
 	"the executable $(TARGET) in $(WORKLOAD_INSTALL)"
 	@echo "####"
-	@$(RM) -f $(WORKLOAD_INSTALL)/$(TARGET)
-	@$(CP) $(WORKLOAD_BUILD)/$(TARGET) $(WORKLOAD_INSTALL)/
+	@$(CP) --remove-destination $(WORKLOAD_BUILD)/$(TARGET) $(WORKLOAD_INSTALL)/
 
 ifeq (yes, $(DEBUGMAKE))
 .PHONY: debug_pre_prerun
@@ -140,7 +139,7 @@ $(WORKLOAD_BUILD)/$(TARGET).dbg: $(OBJS) | libocr $(WORKLOAD_BUILD)
 	$(CC) -o $@ $(OBJS) $(LDFLAGS)
 
 $(WORKLOAD_BUILD)/$(TARGET): $(WORKLOAD_BUILD)/$(TARGET).dbg | $(WORKLOAD_BUILD)
-	$(CP) $(WORKLOAD_BUILD)/$(TARGET).dbg $(WORKLOAD_BUILD)/$(TARGET)
+	$(CP) --remove-destination $(WORKLOAD_BUILD)/$(TARGET).dbg $(WORKLOAD_BUILD)/$(TARGET)
 
 # libocr
 # We make this a .PHONY target to force the re-evaluation of this
