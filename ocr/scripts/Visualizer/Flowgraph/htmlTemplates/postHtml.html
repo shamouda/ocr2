@@ -1,0 +1,36 @@
+    nodes.add(edtNodeData);
+    nodes.add(eventNodeData);
+    edges.add(satEdgeData);
+
+    var container = document.getElementById('mynetwork');
+    var data = {
+        nodes: nodes,
+        edges: edges
+    };
+    var options = {
+        edges: {inheritColor: false, style:"arrow", color: {color: 'grey', highlight: 'black'}},
+        physics:
+            {barnesHut: {enabled: true, gravitationalConstant: -2000, nodeDistance: 80, centralGravity: 0.1, springLength: 95, springConstant: 0.04, damping: 0.09}},
+            hierarchicalLayout: {layout: "direction", levelSeparation: 500, nodeSpacing: 115},
+        stabilize: false
+    };
+
+    network = new vis.Network(container, data, options);
+
+    network.on('select', function(params) {
+      document.getElementById('selection').innerHTML = 'Selection: ' + params.nodes;
+    });
+}
+
+
+</script>
+</head>
+
+<body onload="draw();">
+
+
+<br>
+
+</div>
+
+

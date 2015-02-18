@@ -188,8 +188,8 @@ u8 satisfyEventHcOnce(ocrEvent_t *base, ocrFatGuid_t db, u32 slot) {
             statsDEP_SATISFYFromEvt(pd, base->guid, base, waiter->guid,
                                     data.guid, waiter->slot);
 #endif
-            DPRINTF(DEBUG_LVL_INFO, "SatisfyFromEvent %s: 0x%lx with 0x%lx\n", eventTypeToString(base),
-            waiters[i].guid, base->guid);
+
+            DPRINTF(DEBUG_LVL_INFO, "SatisfyFromEvent %s: src: 0x%lx dst: 0x%lx\n", eventTypeToString(base), base->guid, waiters[i].guid);
 
             getCurrentEnv(NULL, NULL, NULL, &msg);
             msg.type = PD_MSG_DEP_SATISFY | PD_MSG_REQUEST;
@@ -284,8 +284,8 @@ u8 satisfyEventHcPersist(ocrEvent_t *base, ocrFatGuid_t db, u32 slot) {
             statsDEP_SATISFYFromEvt(pd, base->guid, base, waiter->guid,
                                     data.guid, waiter->slot);
 #endif
-            DPRINTF(DEBUG_LVL_INFO, "SatisfyFromEvent %s: 0x%lx with 0x%lx\n", eventTypeToString(base),
-            waiters[i].guid, base->guid);
+
+            DPRINTF(DEBUG_LVL_INFO, "SatisfyFromEvent %s: src: 0x%lx dst: 0x%lx\n", eventTypeToString(base), base->guid, waiters[i].guid);
 
             getCurrentEnv(NULL, NULL, NULL, &msg);
             msg.type = PD_MSG_DEP_SATISFY | PD_MSG_REQUEST;
@@ -378,8 +378,9 @@ u8 satisfyEventHcLatch(ocrEvent_t *base, ocrFatGuid_t db, u32 slot) {
             statsDEP_SATISFYFromEvt(pd, base->guid, base, waiter->guid,
                                     data.guid, waiter->slot);
 #endif
-            DPRINTF(DEBUG_LVL_INFO, "SatisfyFromEvent %s: 0x%lx with 0x%lx\n",
-                    eventTypeToString(base), waiters[i].guid, base->guid);
+
+            DPRINTF(DEBUG_LVL_INFO, "SatisfyFromEvent %s: src: 0x%lx dst: 0x%lx\n", eventTypeToString(base), base->guid, waiters[i].guid);
+
             getCurrentEnv(NULL, NULL, NULL, &msg);
             msg.type = PD_MSG_DEP_SATISFY | PD_MSG_REQUEST;
             PD_MSG_FIELD_I(guid.guid) = waiters[i].guid;

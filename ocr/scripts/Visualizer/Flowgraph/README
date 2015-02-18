@@ -1,0 +1,42 @@
+***********************************************************
+Usage Instruction for Application Flowgraph
+***********************************************************
+
+This visualization tool represents an OCR application as a
+directed acyclic graph, showing satisfactions between
+EDTs and events.
+
+-In ocr/build/common.mk:
+    -Debug option needs to be set at DEBUG_LVL_INFO
+    -DOCR_ENABLE_EDT_NAMING must be set.
+    -DOCR_ENABLE_VISUALIZER must be set.
+
+Script Instructions:
+
+-Navigate to desired application directory.
+    -NOTE: The default ocr-config GuidType (PTR) reuses guids, and is not compitable with this tool.
+     GuidType of COUNTED_MAP is needed in the ocr-config file to use this tool.  There is a config-file
+     in this directory that mirrors the default config, with COUNTED_MAP in place of PTR for GuidType.
+     To use this config file, run the following:
+
+        -export OCR_CONFIG=~/xstack/ocr/scripts/Visualizer/Flowgraph/x86_flowGraph.cfg
+
+-Before running an application an environment variable must be set via:
+    -export ENABLE_VISUALIZER=yes
+
+-NOTE: The above env. variable will issue -DOCR_ENABLE_EDT_NAMING and
+  -DOCR_OCR_ENABLE_VISUALIZER to the targeted app only if you are compiling
+  your program with the default Makefile.  If you are using a custom Makefile,
+  you must issue these compiler flags explicitely.
+
+-Application logging output must be redirected to
+ to the /ocr/scripts/Visualizer/Flowgraph directory
+    The command would look like: make -f Makefile.x86-pthread-x86 run > ~/xstack/ocr/scripts/Visualizer/Flowgraph/<log_ouput_file_name>
+
+-Navigate to ~/xstack/ocr/scripts/Visualizer/Flowgraph, and run: python flowgraph.py <log_ouput_file_name>
+-The output will be an HTML file called flowgraph.html
+
+-Copy html file to local machine, and open flowgraph.html in a web browser.
+
+
+

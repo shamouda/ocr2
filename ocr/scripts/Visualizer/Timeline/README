@@ -25,10 +25,10 @@ Script Instructions:
   you must issue these compiler flags explicitely.
 
 -Application logging output must be redirected to
- to the /ocr/scripts/Visualizer directory
-    The command would look like: make -f Makefile.x86-pthread-x86 run > ../../scripts/Visualizer/<log_ouput_file_name>
+ to the /ocr/scripts/Visualizer/Timeline directory
+    The command would look like: make -f Makefile.x86-pthread-x86 run > ../../scripts/Visualizer/Timeline/<log_ouput_file_name>
 
--Navigate to /ocr/scripts/Visualizer, and run: python timeline.py <log_ouput_file_name>
+-Navigate to /ocr/scripts/Visualizer/Timeline, and run: python timeline.py <log_ouput_file_name>
 -The output will be HTML files called timeline[*].html
 
 -Copy html file(s) to local machine, and starting with timeline1.html, open in an internet browser.
