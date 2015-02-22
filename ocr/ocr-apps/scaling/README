@@ -1,5 +1,0 @@
-Running:
-
-./scaling.sh to run through various number of threads
-
-This "app" is just fib used as a workload to test scalability.
