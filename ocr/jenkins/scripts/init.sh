@@ -7,12 +7,14 @@
 mkdir -p ${JJOB_SHARED_HOME}/jenkins
 mkdir -p ${JJOB_SHARED_HOME}/ss/jenkins
 mkdir -p ${JJOB_SHARED_HOME}/ocr/jenkins
+mkdir -p ${JJOB_SHARED_HOME}/ocr/scripts
 mkdir -p ${JJOB_SHARED_HOME}/ocr/ocr-apps
 mkdir -p ${JJOB_SHARED_HOME}/apps
 
 cp -r ${JJOB_PRIVATE_HOME}/jenkins/* ${JJOB_SHARED_HOME}/jenkins/
 cp -r ${JJOB_PRIVATE_HOME}/ss/jenkins/* ${JJOB_SHARED_HOME}/ss/jenkins/
 cp -r ${JJOB_PRIVATE_HOME}/ocr/jenkins/* ${JJOB_SHARED_HOME}/ocr/jenkins/
+cp -r ${JJOB_PRIVATE_HOME}/ocr/scripts/* ${JJOB_SHARED_HOME}/ocr/scripts/
 cp -r ${JJOB_PRIVATE_HOME}/ocr/ocr-apps/* ${JJOB_SHARED_HOME}/ocr/ocr-apps/
 rsync -av -r ${JJOB_PRIVATE_HOME}/apps/ ${JJOB_SHARED_HOME}/apps/ --exclude libs --exclude makefiles
 
