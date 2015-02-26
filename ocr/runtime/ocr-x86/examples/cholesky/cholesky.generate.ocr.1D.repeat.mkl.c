@@ -278,7 +278,7 @@ inline static void update_nondiagonal_task_prescriber ( int k, int j, int i, int
     func_args[3] = tileSize;
     func_args[4] = (ocrGuid_t)lkji_event_guids[j][i][k+1];
 
-    long double nDescendants = dsyrkCountCalculator(numTiles, k, j);
+    long double nDescendants = dgemmCountCalculator(numTiles, k, j, i);
     long double priority = nDescendants;
     ocrEdtCreate(&update_nondiagonal_task_guid, update_nondiagonal_task, 5, NULL, (void**)func_args, PROPERTIES, 3, NULL, nDescendants, priority);
 
@@ -300,7 +300,7 @@ inline static void update_diagonal_task_prescriber ( int k, int j, int i, int ti
     func_args[3] = tileSize;
     func_args[4] = (ocrGuid_t)lkji_event_guids[j][j][k+1];
 
-    long double nDescendants = dgemmCountCalculator(numTiles, k, j, i);
+    long double nDescendants = dsyrkCountCalculator(numTiles, k, j);
     long double priority = nDescendants;
     ocrEdtCreate(&update_diagonal_task_guid, update_diagonal_task, 5, NULL, (void**)func_args, PROPERTIES, 2, NULL, nDescendants, priority);
 
@@ -319,7 +319,7 @@ inline static void wrap_up_task_prescriber ( int numTiles, int tileSize, ocrGuid
     func_args[1]=(intptr_t)tileSize;
     func_args[2]=(intptr_t)input_solution;
 
-    ocrEdtCreate(&wrap_up_task_guid, wrap_up_task, 3, NULL, (void**)func_args, PROPERTIES, (numTiles+1)*numTiles/2, NULL, 0,0);
+    ocrEdtCreate(&wrap_up_task_guid, wrap_up_task, 3, NULL, (void**)func_args, PROPERTIES, (numTiles+1)*numTiles/2, NULL, 0, 0);
 
     int index = 0;
     for ( i = 0; i < numTiles; ++i ) {

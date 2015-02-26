@@ -273,6 +273,44 @@ u8 wrap_up_task ( u32 paramc, u64 * params, void* paramv[], u32 depc, ocrEdtDep_
     free(paramv);
 }
 
+static inline void myCheapPower( long double* p_big, int powerOf2 ) {
+    if ( powerOf2 < 64 ) {
+        *p_big = 1LLU << powerOf2;
+    } else {
+        myCheapPower(p_big, powerOf2-63);
+        *p_big *= 1LLU << 63;
+    }
+}
+
+static inline long double factorCalculator ( int x ) {
+    long double fluff = -9*x*x+3*x+43;
+    long double big;
+    myCheapPower(&big,(2*x+1));
+    long double bigger = fluff + big * 19; 
+
+    return (bigger)/27;
+}
+
+static inline long double dpotrfCountCalculator ( int numTiles, int k ) {
+    return factorCalculator(numTiles-k-1)-(numTiles-k)-2;
+}
+
+static inline long double dtrsmCountCalculator ( int numTiles, int k, int j ) {
+    long double big;
+    myCheapPower(&big,j-k);
+    return factorCalculator(numTiles-j-1)*big-(numTiles-k)-2;
+}
+
+static inline long double dsyrkCountCalculator ( int numTiles, int k, int j ) {
+    return factorCalculator(numTiles-j-1)-(numTiles-j)-2+(j-k);
+}
+
+static inline long double dgemmCountCalculator ( int numTiles, int k, int j, int i ) {
+    long double big;
+    myCheapPower(&big,j-i);
+    return factorCalculator(numTiles-j-1)*big-numTiles+i-2+i-k;
+}
+
 inline static void sequential_cholesky_task_prescriber ( int k, int tileSize, ocrGuid_t*** lkji_event_guids) {
     ocrGuid_t seq_cholesky_task_guid;
 
@@ -281,6 +319,8 @@ inline static void sequential_cholesky_task_prescriber ( int k, int tileSize, oc
     func_args[1] = tileSize;
     func_args[2] = (ocrGuid_t)lkji_event_guids[k][k][k+1];
 
+    long double nDescendants = dpotrfCountCalculator(numTiles, k);
+    long double priority = nDescendants;
     ocrEdtCreate(&seq_cholesky_task_guid, sequential_cholesky_task, 3, NULL, (void**)func_args, PROPERTIES, 1, NULL);
 
     ocrAddDependence(lkji_event_guids[k][k][k], seq_cholesky_task_guid, 0);
@@ -296,6 +336,8 @@ inline static void trisolve_task_prescriber ( int k, int j, int tileSize, ocrGui
     func_args[2] = tileSize;
     func_args[3] = (ocrGuid_t)lkji_event_guids[j][k][k+1];
 
+    long double nDescendants = dtrsmCountCalculator(numTiles, k, j);
+    long double priority = nDescendants;
     ocrEdtCreate(&trisolve_task_guid, trisolve_task, 4, NULL, (void**)func_args, PROPERTIES, 2, NULL);
 
     ocrAddDependence(lkji_event_guids[j][k][k], trisolve_task_guid, 0);
@@ -313,6 +355,8 @@ inline static void update_nondiagonal_task_prescriber ( int k, int j, int i, int
     func_args[3] = tileSize;
     func_args[4] = (ocrGuid_t)lkji_event_guids[j][i][k+1];
 
+    long double nDescendants = dgemmCountCalculator(numTiles, k, j, i);
+    long double priority = nDescendants;
     ocrEdtCreate(&update_nondiagonal_task_guid, update_nondiagonal_task, 5, NULL, (void**)func_args, PROPERTIES, 3, NULL);
 
     ocrAddDependence(lkji_event_guids[j][i][k], update_nondiagonal_task_guid, 0);
@@ -333,6 +377,8 @@ inline static void update_diagonal_task_prescriber ( int k, int j, int i, int ti
     func_args[3] = tileSize;
     func_args[4] = (ocrGuid_t)lkji_event_guids[j][j][k+1];
 
+    long double nDescendants = dsyrkCountCalculator(numTiles, k, j);
+    long double priority = nDescendants;
     ocrEdtCreate(&update_diagonal_task_guid, update_diagonal_task, 5, NULL, (void**)func_args, PROPERTIES, 2, NULL);
 
     ocrAddDependence(lkji_event_guids[j][j][k], update_diagonal_task_guid, 0);
@@ -350,7 +396,7 @@ inline static void wrap_up_task_prescriber ( int numTiles, int tileSize, ocrGuid
     func_args[1]=(intptr_t)tileSize;
     func_args[2]=(intptr_t)input_solution;
 
-    ocrEdtCreate(&wrap_up_task_guid, wrap_up_task, 3, NULL, (void**)func_args, PROPERTIES, (numTiles+1)*numTiles/2, NULL);
+    ocrEdtCreate(&wrap_up_task_guid, wrap_up_task, 3, NULL, (void**)func_args, PROPERTIES, (numTiles+1)*numTiles/2, NULL, 0, 0);
 
     int index = 0;
     for ( i = 0; i < numTiles; ++i ) {
