@@ -50,6 +50,7 @@ typedef struct {
     //TODO this is a convenience to map workers to workpiles
     int id;
     int cpu_id;
+    unsigned long long int nStealAttempts;
     //TODO shall these stay here or go up ?
     bool run;
     // reference to the EDT this worker is currently executing

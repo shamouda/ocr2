@@ -95,7 +95,7 @@ typedef struct hc_task_struct_t {
     size_t nbdeps;
     ocrEdtDep_t * depv;
     ocrEdt_t p_function;
-    double cost;
+    long double cost;
     long double nDescendants;
     long double priority;
 } hc_task_t;

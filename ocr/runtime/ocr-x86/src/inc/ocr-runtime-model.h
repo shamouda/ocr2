@@ -80,7 +80,7 @@ ocr_model_policy_t * defaultOcrModelPolicyPriorityHeap(size_t nb_policy_domain,
                                            size_t nb_schedulers, size_t nb_workers,
                                            size_t nb_executors, size_t nb_workpiles, int* bind_map);
 
-ocr_model_policy_t * ocrModelPolicyCreator(enum md_file_workpile_policy, enum md_file_steal_victim_policy, enum md_file_victim_extract_policy, enum md_file_push_policy,
+ocr_model_policy_t * ocrModelPolicyCreator(enum md_file_workpile_policy, enum md_file_steal_victim_policy, enum md_file_victim_extract_policy, enum md_file_push_policy, enum md_file_priority_policy,
                                            size_t nb_policy_domain,
                                            size_t nb_schedulers, size_t nb_workers,
                                            size_t nb_executors, size_t nb_workpiles, int* bind_map);

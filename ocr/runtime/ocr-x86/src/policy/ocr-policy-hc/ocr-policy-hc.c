@@ -29,6 +29,7 @@
 
 */
 
+#include "stdio.h"
 #include "hc.h"
 #include "ocr-policy.h"
 
@@ -77,9 +78,13 @@ void hc_policy_domain_finish(ocr_policy_domain_t * policy) {
     // Note: As soon as worker '0' is stopped its thread is
     // free to fall-through in ocr_finalize() (see warning there)
     size_t i;
+    unsigned long long int sumStealAttempts = 0;
     for ( i = 0; i < policy->nb_workers; ++i ) {
-        policy->workers[i]->stop(policy->workers[i]);
+        ocr_worker_t* curr = policy->workers[i];
+        curr->stop(policy->workers[i]);
+        sumStealAttempts += ((hc_worker_t*)curr)->nStealAttempts;
     }
+    fprintf(stderr,"Total steal attempts: %llu\n", sumStealAttempts);
 }
 
 void hc_policy_domain_stop(ocr_policy_domain_t * policy) {

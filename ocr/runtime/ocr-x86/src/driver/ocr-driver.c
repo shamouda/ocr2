@@ -164,16 +164,27 @@ void ocrInit(int * argc, char ** argv, u32 fnc, ocrEdt_t funcs[]) {
         enum md_file_steal_victim_policy     steal_victim_policy     = MD_RANDOM_VICTIM;
         enum md_file_victim_extract_policy   victim_extract_policy   = MD_STEAL_LAST;
         enum md_file_push_policy             push_policy             = MD_LOCAL_PUSH;
+        enum md_file_priority_policy         priority_policy         = MD_EVENT_PRIORITY;
 
         char* md_file_tokens = strtok(md_file,"_");
         md_file_tokens = strtok(NULL,"_"); /*parse the bar_ part*/
         while ( NULL != md_file_tokens ) {
+            /* choose  between workpiles dqheap, pqheap, deque */
             if(!strcmp(md_file_tokens, "dqheap")) {
                 workpile_policy = MD_DEQUEISH_HEAP;
             } else if (!strcmp(md_file_tokens, "pqheap")) {
                 workpile_policy = MD_PRIORITY_QUEUE;
+            } else if (!strcmp(md_file_tokens, "sortedpqheap")) {
+                workpile_policy = MD_SORTED_PRIORITY_QUEUE;
             } else if (!strcmp(md_file_tokens, "ndeque")) {
                 workpile_policy = MD_DEQUE;
+            } else if (!strcmp(md_file_tokens, "event")) {
+                priority_policy = MD_EVENT_PRIORITY;
+            } else if (!strcmp(md_file_tokens, "data")) {
+                priority_policy = MD_DATA_PRIORITY;
+            } else if (!strcmp(md_file_tokens, "user")) {
+                priority_policy = MD_USER_PRIORITY;
+            /* choose  between victim selection cyclic, random, hiercyclic, hierrandom */
             } else if (!strcmp(md_file_tokens, "cycsteal")) {
                 steal_victim_policy = MD_CYCLIC_VICTIM;
             } else if (!strcmp(md_file_tokens, "rndsteal")) {
@@ -184,14 +195,18 @@ void ocrInit(int * argc, char ** argv, u32 fnc, ocrEdt_t funcs[]) {
                 steal_victim_policy = MD_HIER_RANDOM_VICTIM;
             } else if (!strcmp(md_file_tokens, "socketonlysteal")) {
                 steal_victim_policy = MD_SOCKET_ONLY_VICTIM;
+            /* choose  between victim extraction last, stealhalf, countingstealhalf, altruistic, selfish */
             } else if (!strcmp(md_file_tokens, "laststeal")) {
                 victim_extract_policy = MD_STEAL_LAST;
             } else if (!strcmp(md_file_tokens, "stealhalf")) {
                 victim_extract_policy = MD_STEAL_HALF;
+            } else if (!strcmp(md_file_tokens, "countingstealhalf")) {
+                victim_extract_policy = MD_COUNTING_STEAL_HALF;
             } else if (!strcmp(md_file_tokens, "altruisticsteal")) {
                 victim_extract_policy = MD_STEAL_ALTRUISTIC;
             } else if (!strcmp(md_file_tokens, "selfishsteal")) {
                 victim_extract_policy = MD_STEAL_SELFISH ;
+            /* choose  between push selection tail, datalocal, eventlocal selfish */
             } else if (!strcmp(md_file_tokens, "tailpush")) {
                 push_policy = MD_LOCAL_PUSH;
             } else if (!strcmp(md_file_tokens, "datalocalitypush")) {
@@ -206,7 +221,7 @@ void ocrInit(int * argc, char ** argv, u32 fnc, ocrEdt_t funcs[]) {
             md_file_tokens = strtok(NULL,"_"); 
         }
 
-        policy_model = ocrModelPolicyCreator( workpile_policy, steal_victim_policy, victim_extract_policy, push_policy,
+        policy_model = ocrModelPolicyCreator( workpile_policy, steal_victim_policy, victim_extract_policy, push_policy, priority_policy,
                         nb_policy_domain,
                         nb_schedulers_per_policy_domain, nb_workers_per_policy_domain,
                         nb_executors_per_policy_domain, nb_workpiles_per_policy_domain,

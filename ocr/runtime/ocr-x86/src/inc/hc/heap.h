@@ -40,24 +40,48 @@ typedef struct heap {
         volatile int head;
         volatile int tail;
         buffer_t * buffer;
+        long double nDescendantsSum;
 } heap_t;
 
 #define INIT_HEAP_CAPACITY 768
 
 void heap_init(heap_t * heap, void * init_value);
 
-void    locked_heap_tail_push_no_priority   ( heap_t* heap, void* entry);
-void    locked_heap_push_priority           ( heap_t* heap, void* entry);
+void    locked_dequeish_heap_tail_push_no_priority   ( heap_t* heap, void* entry);
+
+void    locked_heap_push_event_priority ( heap_t* heap, void* entry);
+void    locked_heap_sorted_push_event_priority ( heap_t* heap, void* entry);
+
+void    locked_heap_push_data_priority  ( heap_t* heap, void* entry);
+void    locked_heap_sorted_push_data_priority  ( heap_t* heap, void* entry);
+
+void    locked_heap_push_user_priority  ( heap_t* heap, void* entry);
+void    locked_heap_sorted_push_user_priority  ( heap_t* heap, void* entry);
 
 void*   locked_heap_pop_priority_best       ( heap_t* heap );
+void*   locked_heap_sorted_pop_priority_best       ( heap_t* heap );
+
 void*   locked_heap_pop_priority_worst      ( heap_t* heap );
+void*   locked_heap_sorted_pop_priority_worst      ( heap_t* heap );
+
 void*   locked_heap_pop_priority_last       ( heap_t* heap );
-void*   locked_heap_pop_priority_selfish    ( heap_t* heap , int thiefID );
-void*   locked_heap_tail_pop_no_priority    ( heap_t* heap );
-void*   locked_heap_head_pop_no_priority    ( heap_t* heap );
+
+void*   locked_heap_pop_event_priority_selfish    ( heap_t* heap , int thiefID );
+void*   locked_heap_pop_data_priority_selfish    ( heap_t* heap , int thiefID );
+void*   locked_heap_sorted_pop_event_priority_selfish    ( heap_t* heap , int thiefID );
+void*   locked_heap_sorted_pop_data_priority_selfish    ( heap_t* heap , int thiefID );
+
+void*   locked_dequeish_heap_tail_pop_no_priority    ( heap_t* heap );
+void*   locked_dequeish_heap_head_pop_no_priority    ( heap_t* heap );
 
 void*   locked_heap_pop_priority_worst_half   ( heap_t* heap, struct ocr_scheduler_struct* thief_base);
-void*   locked_heap_head_pop_head_half_no_priority ( heap_t* heap, struct ocr_scheduler_struct* thief_base);
+void*   locked_heap_sorted_pop_priority_worst_half   ( heap_t* heap, struct ocr_scheduler_struct* thief_base);
+
+void*   locked_heap_pop_priority_worst_counting_half   ( heap_t* heap, struct ocr_scheduler_struct* thief_base);
+void*   locked_heap_sorted_pop_priority_worst_counting_half   ( heap_t* heap, struct ocr_scheduler_struct* thief_base);
+
+void*   locked_dequeish_heap_pop_head_half_no_priority ( heap_t* heap, struct ocr_scheduler_struct* thief_base);
+void*   locked_dequeish_heap_pop_head_counting_half_no_priority ( heap_t* heap, struct ocr_scheduler_struct* thief_base);
 
 #endif /* HEAP_H */
 

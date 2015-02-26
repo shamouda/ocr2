@@ -354,6 +354,7 @@ static ocrGuid_t hc_scheduler_local_pop_then_hier_cyclic_steal (ocr_scheduler_t*
         for ( ; (iteration < N_L1S_PER_SOCKET) && (NULL_GUID == popped); ++iteration ) {
             ocr_workpile_t * victim = derived->pools[ (workerID + iteration) % N_L1S_PER_SOCKET + socketID * N_L1S_PER_SOCKET ];
             popped = victim->steal(victim, worker_cpu_id,base);
+            ++((hc_worker_t*) w)->nStealAttempts;
         }
         if ( NULL_GUID == popped ) {
             const int otherSocketID = 1 - socketID;
@@ -361,6 +362,7 @@ static ocrGuid_t hc_scheduler_local_pop_then_hier_cyclic_steal (ocr_scheduler_t*
             for ( iteration = 0; (iteration < N_L1S_PER_SOCKET ) && (NULL_GUID == popped); ++iteration ) {
                 ocr_workpile_t * victim = derived->pools[ (workerID + iteration) % N_L1S_PER_SOCKET + otherSocketID * N_L1S_PER_SOCKET ];
                 popped = victim->steal(victim, worker_cpu_id,base);
+                ++((hc_worker_t*) w)->nStealAttempts;
             }
 
         }
@@ -398,6 +400,7 @@ static ocrGuid_t hc_scheduler_local_pop_then_hier_random_steal (ocr_scheduler_t*
             if ( worker_cpu_id != currVictimID ) {
                 ocr_workpile_t * victim = derived->pools[currVictimID];
                 popped = victim->steal(victim, worker_cpu_id,base);
+                ++((hc_worker_t*) w)->nStealAttempts;
             }
         }
         if ( NULL_GUID == popped ) {
@@ -407,6 +410,7 @@ static ocrGuid_t hc_scheduler_local_pop_then_hier_random_steal (ocr_scheduler_t*
                 int currVictimID = otherSocketID*N_L1S_PER_SOCKET + (rand() % N_L1S_PER_SOCKET );
                 ocr_workpile_t * victim = derived->pools[currVictimID];
                 popped = victim->steal(victim, worker_cpu_id,base);
+                ++((hc_worker_t*) w)->nStealAttempts;
             }
         }
     }
@@ -442,6 +446,7 @@ static ocrGuid_t hc_scheduler_local_pop_then_socket_random_steal (ocr_scheduler_
             if ( worker_cpu_id != currVictimID ) {
                 ocr_workpile_t * victim = derived->pools[currVictimID];
                 popped = victim->steal(victim, worker_cpu_id,base);
+                ++((hc_worker_t*) w)->nStealAttempts;
             }
         }
     }
@@ -466,6 +471,7 @@ static ocrGuid_t hc_scheduler_local_pop_then_cyclic_steal (ocr_scheduler_t* base
         while ( it->hasNext(it) && (NULL_GUID == popped)) {
             ocr_workpile_t * next = it->next(it);
             popped = next->steal(next, get_worker_cpu_id(w),base);
+            ++((hc_worker_t*) w)->nStealAttempts;
         }
         workpile_iterator_destructor(it);
     }
@@ -486,6 +492,7 @@ static ocrGuid_t hc_scheduler_local_pop_then_random_steal (ocr_scheduler_t* base
     while ( NULL_GUID == popped && ++tries < scope) {
         ocr_workpile_t * victim = hc_scheduler_random_steal_mapping(base,w);
         popped = victim->steal(victim, get_worker_cpu_id(w),base);
+        ++((hc_worker_t*) w)->nStealAttempts;
     }
     return popped;
 }

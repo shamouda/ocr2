@@ -88,19 +88,24 @@ static void priority_workpile_destruct ( ocr_workpile_t * base ) {
     free(derived);
 }
 
-static ocrGuid_t priority_workpile_pop_tail_no_priority ( ocr_workpile_t * base ) {
+static ocrGuid_t dequeish_heap_pop_tail_no_priority ( ocr_workpile_t * base ) {
     priority_workpile* derived = (priority_workpile*) base;
-    return (ocrGuid_t) locked_heap_tail_pop_no_priority (derived->heap);
+    return (ocrGuid_t) locked_dequeish_heap_tail_pop_no_priority (derived->heap);
 }
 
-static ocrGuid_t priority_workpile_pop_head_no_priority ( ocr_workpile_t * base, int thiefID, ocr_scheduler_t* thief_base ) {
+static ocrGuid_t dequeish_heap_pop_head_no_priority ( ocr_workpile_t * base, int thiefID, ocr_scheduler_t* thief_base ) {
     priority_workpile* derived = (priority_workpile*) base;
-    return (ocrGuid_t) locked_heap_head_pop_no_priority (derived->heap);
+    return (ocrGuid_t) locked_dequeish_heap_head_pop_no_priority (derived->heap);
 }
 
-static ocrGuid_t priority_workpile_pop_head_half_no_priority ( ocr_workpile_t * base, int thiefID, ocr_scheduler_t* thief_base ) {
+static ocrGuid_t dequeish_heap_pop_head_half_no_priority ( ocr_workpile_t * base, int thiefID, ocr_scheduler_t* thief_base ) {
     priority_workpile* derived = (priority_workpile*) base;
-    return (ocrGuid_t) locked_heap_head_pop_head_half_no_priority (derived->heap, thief_base);
+    return (ocrGuid_t) locked_dequeish_heap_pop_head_half_no_priority (derived->heap, thief_base);
+}
+
+static ocrGuid_t dequeish_heap_pop_head_counting_half_no_priority ( ocr_workpile_t * base, int thiefID, ocr_scheduler_t* thief_base ) {
+    priority_workpile* derived = (priority_workpile*) base;
+    return (ocrGuid_t) locked_dequeish_heap_pop_head_counting_half_no_priority (derived->heap, thief_base);
 }
 
 static ocrGuid_t priority_workpile_pop_best_priority ( ocr_workpile_t * base ) {
@@ -108,9 +113,19 @@ static ocrGuid_t priority_workpile_pop_best_priority ( ocr_workpile_t * base ) {
     return (ocrGuid_t) locked_heap_pop_priority_best (derived->heap);
 }
 
+static ocrGuid_t priority_workpile_sorted_pop_best_priority ( ocr_workpile_t * base ) {
+    priority_workpile* derived = (priority_workpile*) base;
+    return (ocrGuid_t) locked_heap_sorted_pop_priority_best (derived->heap);
+}
+
 static ocrGuid_t priority_workpile_pop_worst_priority ( ocr_workpile_t * base, int thiefID, ocr_scheduler_t* thief_base ) {
     priority_workpile* derived = (priority_workpile*) base;
     return (ocrGuid_t) locked_heap_pop_priority_worst (derived->heap);
+}
+
+static ocrGuid_t priority_workpile_sorted_pop_worst_priority ( ocr_workpile_t * base, int thiefID, ocr_scheduler_t* thief_base ) {
+    priority_workpile* derived = (priority_workpile*) base;
+    return (ocrGuid_t) locked_heap_sorted_pop_priority_worst (derived->heap);
 }
 
 static ocrGuid_t priority_workpile_pop_worst_half_priority ( ocr_workpile_t * base, int thiefID, ocr_scheduler_t* thief_base ) {
@@ -118,53 +133,121 @@ static ocrGuid_t priority_workpile_pop_worst_half_priority ( ocr_workpile_t * ba
     return (ocrGuid_t) locked_heap_pop_priority_worst_half (derived->heap, thief_base);
 }
 
+static ocrGuid_t priority_workpile_sorted_pop_worst_half_priority ( ocr_workpile_t * base, int thiefID, ocr_scheduler_t* thief_base ) {
+    priority_workpile* derived = (priority_workpile*) base;
+    return (ocrGuid_t) locked_heap_sorted_pop_priority_worst_half (derived->heap, thief_base);
+}
+
+static ocrGuid_t priority_workpile_pop_worst_counting_half_priority ( ocr_workpile_t * base, int thiefID, ocr_scheduler_t* thief_base ) {
+    priority_workpile* derived = (priority_workpile*) base;
+    return (ocrGuid_t) locked_heap_pop_priority_worst_counting_half (derived->heap, thief_base);
+}
+
+static ocrGuid_t priority_workpile_sorted_pop_worst_counting_half_priority ( ocr_workpile_t * base, int thiefID, ocr_scheduler_t* thief_base ) {
+    priority_workpile* derived = (priority_workpile*) base;
+    return (ocrGuid_t) locked_heap_sorted_pop_priority_worst_counting_half (derived->heap, thief_base);
+}
+
 static ocrGuid_t priority_workpile_pop_last ( ocr_workpile_t * base, int thiefID, ocr_scheduler_t* thief_base ) {
     priority_workpile* derived = (priority_workpile*) base;
     return (ocrGuid_t) locked_heap_pop_priority_last (derived->heap);
 }
 
-static ocrGuid_t priority_workpile_steal_selfish ( ocr_workpile_t * base, int thiefID, ocr_scheduler_t* thief_base ) {
+static ocrGuid_t priority_workpile_steal_event_selfish ( ocr_workpile_t * base, int thiefID, ocr_scheduler_t* thief_base ) {
     priority_workpile* derived = (priority_workpile*) base;
-    return (ocrGuid_t) locked_heap_pop_priority_selfish (derived->heap, thiefID);
+    return (ocrGuid_t) locked_heap_pop_event_priority_selfish (derived->heap, thiefID);
 }
 
-static void priority_workpile_tail_push_no_priority (ocr_workpile_t * base, ocrGuid_t g ) {
+static ocrGuid_t priority_workpile_steal_data_selfish ( ocr_workpile_t * base, int thiefID, ocr_scheduler_t* thief_base ) {
     priority_workpile* derived = (priority_workpile*) base;
-    locked_heap_tail_push_no_priority (derived->heap, (void *)g);
+    return (ocrGuid_t) locked_heap_pop_data_priority_selfish (derived->heap, thiefID);
 }
 
-static void priority_workpile_push_priority (ocr_workpile_t * base, ocrGuid_t g ) {
+static ocrGuid_t priority_workpile_sorted_steal_event_selfish ( ocr_workpile_t * base, int thiefID, ocr_scheduler_t* thief_base ) {
     priority_workpile* derived = (priority_workpile*) base;
-    locked_heap_push_priority (derived->heap, (void *)g);
+    return (ocrGuid_t) locked_heap_sorted_pop_event_priority_selfish (derived->heap, thiefID);
 }
 
-ocr_workpile_t * dequeish_priority_workpile_constructor(void) {
+static ocrGuid_t priority_workpile_sorted_steal_data_selfish ( ocr_workpile_t * base, int thiefID, ocr_scheduler_t* thief_base ) {
+    priority_workpile* derived = (priority_workpile*) base;
+    return (ocrGuid_t) locked_heap_sorted_pop_data_priority_selfish (derived->heap, thiefID);
+}
+
+static void dequeish_heap_tail_push_no_priority (ocr_workpile_t * base, ocrGuid_t g ) {
+    priority_workpile* derived = (priority_workpile*) base;
+    locked_dequeish_heap_tail_push_no_priority (derived->heap, (void *)g);
+}
+
+static void priority_workpile_push_event_priority (ocr_workpile_t * base, ocrGuid_t g ) {
+    priority_workpile* derived = (priority_workpile*) base;
+    locked_heap_push_event_priority (derived->heap, (void *)g);
+}
+
+static void priority_workpile_sorted_push_event_priority (ocr_workpile_t * base, ocrGuid_t g ) {
+    priority_workpile* derived = (priority_workpile*) base;
+    locked_heap_sorted_push_event_priority (derived->heap, (void *)g);
+}
+
+static void priority_workpile_push_data_priority (ocr_workpile_t * base, ocrGuid_t g ) {
+    priority_workpile* derived = (priority_workpile*) base;
+    locked_heap_push_data_priority (derived->heap, (void *)g);
+}
+
+static void priority_workpile_sorted_push_data_priority (ocr_workpile_t * base, ocrGuid_t g ) {
+    priority_workpile* derived = (priority_workpile*) base;
+    locked_heap_sorted_push_data_priority (derived->heap, (void *)g);
+}
+
+static void priority_workpile_push_user_priority (ocr_workpile_t * base, ocrGuid_t g ) {
+    priority_workpile* derived = (priority_workpile*) base;
+    locked_heap_push_user_priority (derived->heap, (void *)g);
+}
+
+static void priority_workpile_sorted_push_user_priority (ocr_workpile_t * base, ocrGuid_t g ) {
+    priority_workpile* derived = (priority_workpile*) base;
+    locked_heap_sorted_push_user_priority (derived->heap, (void *)g);
+}
+
+ocr_workpile_t * dequeish_heap_steal_last_workpile_constructor(void) {
     priority_workpile* derived = (priority_workpile*) malloc(sizeof(priority_workpile));
     ocr_workpile_t * base = (ocr_workpile_t *) derived;
     ocr_module_t * module_base = (ocr_module_t *) base;
     module_base->map_fct = NULL;
     base->create = priority_workpile_create;
     base->destruct = priority_workpile_destruct;
-    base->pop = priority_workpile_pop_tail_no_priority;
-    base->push = priority_workpile_tail_push_no_priority;
-    base->steal = priority_workpile_pop_head_no_priority;
+    base->pop = dequeish_heap_pop_tail_no_priority;
+    base->push = dequeish_heap_tail_push_no_priority;
+    base->steal = dequeish_heap_pop_head_no_priority;
     return base;
 }
 
-ocr_workpile_t * dequeish_priority_steal_half_workpile_constructor(void) {
+ocr_workpile_t * dequeish_heap_steal_half_workpile_constructor(void) {
     priority_workpile* derived = (priority_workpile*) malloc(sizeof(priority_workpile));
     ocr_workpile_t * base = (ocr_workpile_t *) derived;
     ocr_module_t * module_base = (ocr_module_t *) base;
     module_base->map_fct = NULL;
     base->create = priority_workpile_create;
     base->destruct = priority_workpile_destruct;
-    base->pop = priority_workpile_pop_tail_no_priority;
-    base->push = priority_workpile_tail_push_no_priority;
-    base->steal = priority_workpile_pop_head_half_no_priority;
+    base->pop = dequeish_heap_pop_tail_no_priority;
+    base->push = dequeish_heap_tail_push_no_priority;
+    base->steal = dequeish_heap_pop_head_half_no_priority;
     return base;
 }
 
-ocr_workpile_t * priority_workpile_constructor(void) {
+ocr_workpile_t * dequeish_heap_counting_steal_half_workpile_constructor(void) {
+    priority_workpile* derived = (priority_workpile*) malloc(sizeof(priority_workpile));
+    ocr_workpile_t * base = (ocr_workpile_t *) derived;
+    ocr_module_t * module_base = (ocr_module_t *) base;
+    module_base->map_fct = NULL;
+    base->create = priority_workpile_create;
+    base->destruct = priority_workpile_destruct;
+    base->pop = dequeish_heap_pop_tail_no_priority;
+    base->push = dequeish_heap_tail_push_no_priority;
+    base->steal = dequeish_heap_pop_head_counting_half_no_priority;
+    return base;
+}
+
+ocr_workpile_t * event_priority_workpile_steal_altruistic_constructor(void) {
     priority_workpile* derived = (priority_workpile*) malloc(sizeof(priority_workpile));
     ocr_workpile_t * base = (ocr_workpile_t *) derived;
     ocr_module_t * module_base = (ocr_module_t *) base;
@@ -172,12 +255,12 @@ ocr_workpile_t * priority_workpile_constructor(void) {
     base->create = priority_workpile_create;
     base->destruct = priority_workpile_destruct;
     base->pop = priority_workpile_pop_best_priority;
-    base->push = priority_workpile_push_priority;
+    base->push = priority_workpile_push_event_priority;
     base->steal = priority_workpile_pop_worst_priority;
     return base;
 }
 
-ocr_workpile_t * priority_workpile_steal_half_constructor(void) {
+ocr_workpile_t * event_priority_workpile_steal_half_constructor(void) {
     priority_workpile* derived = (priority_workpile*) malloc(sizeof(priority_workpile));
     ocr_workpile_t * base = (ocr_workpile_t *) derived;
     ocr_module_t * module_base = (ocr_module_t *) base;
@@ -185,12 +268,12 @@ ocr_workpile_t * priority_workpile_steal_half_constructor(void) {
     base->create = priority_workpile_create;
     base->destruct = priority_workpile_destruct;
     base->pop = priority_workpile_pop_best_priority;
-    base->push = priority_workpile_push_priority;
+    base->push = priority_workpile_push_event_priority;
     base->steal = priority_workpile_pop_worst_half_priority;
     return base;
 }
 
-ocr_workpile_t * priority_workpile_steal_last_constructor(void) {
+ocr_workpile_t * event_priority_workpile_counting_steal_half_constructor(void) {
     priority_workpile* derived = (priority_workpile*) malloc(sizeof(priority_workpile));
     ocr_workpile_t * base = (ocr_workpile_t *) derived;
     ocr_module_t * module_base = (ocr_module_t *) base;
@@ -198,12 +281,25 @@ ocr_workpile_t * priority_workpile_steal_last_constructor(void) {
     base->create = priority_workpile_create;
     base->destruct = priority_workpile_destruct;
     base->pop = priority_workpile_pop_best_priority;
-    base->push = priority_workpile_push_priority;
+    base->push = priority_workpile_push_event_priority;
+    base->steal = priority_workpile_pop_worst_counting_half_priority;
+    return base;
+}
+
+ocr_workpile_t * event_priority_workpile_steal_last_constructor(void) {
+    priority_workpile* derived = (priority_workpile*) malloc(sizeof(priority_workpile));
+    ocr_workpile_t * base = (ocr_workpile_t *) derived;
+    ocr_module_t * module_base = (ocr_module_t *) base;
+    module_base->map_fct = NULL;
+    base->create = priority_workpile_create;
+    base->destruct = priority_workpile_destruct;
+    base->pop = priority_workpile_pop_best_priority;
+    base->push = priority_workpile_push_event_priority;
     base->steal = priority_workpile_pop_last;
     return base;
 }
 
-ocr_workpile_t * priority_workpile_steal_selfish_constructor(void) {
+ocr_workpile_t * event_priority_workpile_steal_selfish_constructor(void) {
     priority_workpile* derived = (priority_workpile*) malloc(sizeof(priority_workpile));
     ocr_workpile_t * base = (ocr_workpile_t *) derived;
     ocr_module_t * module_base = (ocr_module_t *) base;
@@ -211,7 +307,267 @@ ocr_workpile_t * priority_workpile_steal_selfish_constructor(void) {
     base->create = priority_workpile_create;
     base->destruct = priority_workpile_destruct;
     base->pop = priority_workpile_pop_best_priority;
-    base->push = priority_workpile_push_priority;
-    base->steal = priority_workpile_steal_selfish;
+    base->push = priority_workpile_push_event_priority;
+    base->steal = priority_workpile_steal_event_selfish;
+    return base;
+}
+
+ocr_workpile_t * data_priority_workpile_steal_altruistic_constructor(void) {
+    priority_workpile* derived = (priority_workpile*) malloc(sizeof(priority_workpile));
+    ocr_workpile_t * base = (ocr_workpile_t *) derived;
+    ocr_module_t * module_base = (ocr_module_t *) base;
+    module_base->map_fct = NULL;
+    base->create = priority_workpile_create;
+    base->destruct = priority_workpile_destruct;
+    base->pop = priority_workpile_pop_best_priority;
+    base->push = priority_workpile_push_data_priority;
+    base->steal = priority_workpile_pop_worst_priority;
+    return base;
+}
+
+ocr_workpile_t * data_priority_workpile_steal_half_constructor(void) {
+    priority_workpile* derived = (priority_workpile*) malloc(sizeof(priority_workpile));
+    ocr_workpile_t * base = (ocr_workpile_t *) derived;
+    ocr_module_t * module_base = (ocr_module_t *) base;
+    module_base->map_fct = NULL;
+    base->create = priority_workpile_create;
+    base->destruct = priority_workpile_destruct;
+    base->pop = priority_workpile_pop_best_priority;
+    base->push = priority_workpile_push_data_priority;
+    base->steal = priority_workpile_pop_worst_half_priority;
+    return base;
+}
+
+ocr_workpile_t * data_priority_workpile_counting_steal_half_constructor(void) {
+    priority_workpile* derived = (priority_workpile*) malloc(sizeof(priority_workpile));
+    ocr_workpile_t * base = (ocr_workpile_t *) derived;
+    ocr_module_t * module_base = (ocr_module_t *) base;
+    module_base->map_fct = NULL;
+    base->create = priority_workpile_create;
+    base->destruct = priority_workpile_destruct;
+    base->pop = priority_workpile_pop_best_priority;
+    base->push = priority_workpile_push_data_priority;
+    base->steal = priority_workpile_pop_worst_counting_half_priority;
+    return base;
+}
+
+ocr_workpile_t * data_priority_workpile_steal_last_constructor(void) {
+    priority_workpile* derived = (priority_workpile*) malloc(sizeof(priority_workpile));
+    ocr_workpile_t * base = (ocr_workpile_t *) derived;
+    ocr_module_t * module_base = (ocr_module_t *) base;
+    module_base->map_fct = NULL;
+    base->create = priority_workpile_create;
+    base->destruct = priority_workpile_destruct;
+    base->pop = priority_workpile_pop_best_priority;
+    base->push = priority_workpile_push_data_priority;
+    base->steal = priority_workpile_pop_last;
+    return base;
+}
+
+ocr_workpile_t * data_priority_workpile_steal_selfish_constructor(void) {
+    priority_workpile* derived = (priority_workpile*) malloc(sizeof(priority_workpile));
+    ocr_workpile_t * base = (ocr_workpile_t *) derived;
+    ocr_module_t * module_base = (ocr_module_t *) base;
+    module_base->map_fct = NULL;
+    base->create = priority_workpile_create;
+    base->destruct = priority_workpile_destruct;
+    base->pop = priority_workpile_pop_best_priority;
+    base->push = priority_workpile_push_data_priority;
+    base->steal = priority_workpile_steal_data_selfish;
+    return base;
+}
+
+ocr_workpile_t * user_priority_workpile_steal_altruistic_constructor(void) {
+    priority_workpile* derived = (priority_workpile*) malloc(sizeof(priority_workpile));
+    ocr_workpile_t * base = (ocr_workpile_t *) derived;
+    ocr_module_t * module_base = (ocr_module_t *) base;
+    module_base->map_fct = NULL;
+    base->create = priority_workpile_create;
+    base->destruct = priority_workpile_destruct;
+    base->pop = priority_workpile_pop_best_priority;
+    base->push = priority_workpile_push_user_priority;
+    base->steal = priority_workpile_pop_worst_priority;
+    return base;
+}
+
+ocr_workpile_t * user_priority_workpile_steal_half_constructor(void) {
+    priority_workpile* derived = (priority_workpile*) malloc(sizeof(priority_workpile));
+    ocr_workpile_t * base = (ocr_workpile_t *) derived;
+    ocr_module_t * module_base = (ocr_module_t *) base;
+    module_base->map_fct = NULL;
+    base->create = priority_workpile_create;
+    base->destruct = priority_workpile_destruct;
+    base->pop = priority_workpile_pop_best_priority;
+    base->push = priority_workpile_push_user_priority;
+    base->steal = priority_workpile_pop_worst_half_priority;
+    return base;
+}
+
+ocr_workpile_t * user_priority_workpile_counting_steal_half_constructor(void) {
+    priority_workpile* derived = (priority_workpile*) malloc(sizeof(priority_workpile));
+    ocr_workpile_t * base = (ocr_workpile_t *) derived;
+    ocr_module_t * module_base = (ocr_module_t *) base;
+    module_base->map_fct = NULL;
+    base->create = priority_workpile_create;
+    base->destruct = priority_workpile_destruct;
+    base->pop = priority_workpile_pop_best_priority;
+    base->push = priority_workpile_push_user_priority;
+    base->steal = priority_workpile_pop_worst_counting_half_priority;
+    return base;
+}
+
+ocr_workpile_t * user_priority_workpile_steal_last_constructor(void) {
+    priority_workpile* derived = (priority_workpile*) malloc(sizeof(priority_workpile));
+    ocr_workpile_t * base = (ocr_workpile_t *) derived;
+    ocr_module_t * module_base = (ocr_module_t *) base;
+    module_base->map_fct = NULL;
+    base->create = priority_workpile_create;
+    base->destruct = priority_workpile_destruct;
+    base->pop = priority_workpile_pop_best_priority;
+    base->push = priority_workpile_push_user_priority;
+    base->steal = priority_workpile_pop_last;
+    return base;
+}
+
+ocr_workpile_t * event_sorted_priority_workpile_steal_altruistic_constructor(void) {
+    priority_workpile* derived = (priority_workpile*) malloc(sizeof(priority_workpile));
+    ocr_workpile_t * base = (ocr_workpile_t *) derived;
+    ocr_module_t * module_base = (ocr_module_t *) base;
+    module_base->map_fct = NULL;
+    base->create = priority_workpile_create;
+    base->destruct = priority_workpile_destruct;
+    base->pop = priority_workpile_sorted_pop_best_priority;
+    base->push = priority_workpile_sorted_push_event_priority;
+    base->steal = priority_workpile_sorted_pop_worst_priority;
+    return base;
+}
+
+ocr_workpile_t * event_sorted_priority_workpile_steal_half_constructor(void) {
+    priority_workpile* derived = (priority_workpile*) malloc(sizeof(priority_workpile));
+    ocr_workpile_t * base = (ocr_workpile_t *) derived;
+    ocr_module_t * module_base = (ocr_module_t *) base;
+    module_base->map_fct = NULL;
+    base->create = priority_workpile_create;
+    base->destruct = priority_workpile_destruct;
+    base->pop = priority_workpile_sorted_pop_best_priority;
+    base->push = priority_workpile_sorted_push_event_priority;
+    base->steal = priority_workpile_sorted_pop_worst_half_priority;
+    return base;
+}
+
+ocr_workpile_t * event_sorted_priority_workpile_counting_steal_half_constructor(void) {
+    priority_workpile* derived = (priority_workpile*) malloc(sizeof(priority_workpile));
+    ocr_workpile_t * base = (ocr_workpile_t *) derived;
+    ocr_module_t * module_base = (ocr_module_t *) base;
+    module_base->map_fct = NULL;
+    base->create = priority_workpile_create;
+    base->destruct = priority_workpile_destruct;
+    base->pop = priority_workpile_sorted_pop_best_priority;
+    base->push = priority_workpile_sorted_push_event_priority;
+    base->steal = priority_workpile_sorted_pop_worst_counting_half_priority;
+    return base;
+}
+
+ocr_workpile_t * event_sorted_priority_workpile_steal_selfish_constructor(void) {
+    priority_workpile* derived = (priority_workpile*) malloc(sizeof(priority_workpile));
+    ocr_workpile_t * base = (ocr_workpile_t *) derived;
+    ocr_module_t * module_base = (ocr_module_t *) base;
+    module_base->map_fct = NULL;
+    base->create = priority_workpile_create;
+    base->destruct = priority_workpile_destruct;
+    base->pop = priority_workpile_sorted_pop_best_priority;
+    base->push = priority_workpile_sorted_push_event_priority;
+    base->steal = priority_workpile_sorted_steal_event_selfish;
+    return base;
+}
+
+ocr_workpile_t * data_sorted_priority_workpile_steal_altruistic_constructor(void) {
+    priority_workpile* derived = (priority_workpile*) malloc(sizeof(priority_workpile));
+    ocr_workpile_t * base = (ocr_workpile_t *) derived;
+    ocr_module_t * module_base = (ocr_module_t *) base;
+    module_base->map_fct = NULL;
+    base->create = priority_workpile_create;
+    base->destruct = priority_workpile_destruct;
+    base->pop = priority_workpile_sorted_pop_best_priority;
+    base->push = priority_workpile_sorted_push_data_priority;
+    base->steal = priority_workpile_sorted_pop_worst_priority;
+    return base;
+}
+
+ocr_workpile_t * data_sorted_priority_workpile_steal_half_constructor(void) {
+    priority_workpile* derived = (priority_workpile*) malloc(sizeof(priority_workpile));
+    ocr_workpile_t * base = (ocr_workpile_t *) derived;
+    ocr_module_t * module_base = (ocr_module_t *) base;
+    module_base->map_fct = NULL;
+    base->create = priority_workpile_create;
+    base->destruct = priority_workpile_destruct;
+    base->pop = priority_workpile_sorted_pop_best_priority;
+    base->push = priority_workpile_sorted_push_data_priority;
+    base->steal = priority_workpile_sorted_pop_worst_half_priority;
+    return base;
+}
+
+ocr_workpile_t * data_sorted_priority_workpile_counting_steal_half_constructor(void) {
+    priority_workpile* derived = (priority_workpile*) malloc(sizeof(priority_workpile));
+    ocr_workpile_t * base = (ocr_workpile_t *) derived;
+    ocr_module_t * module_base = (ocr_module_t *) base;
+    module_base->map_fct = NULL;
+    base->create = priority_workpile_create;
+    base->destruct = priority_workpile_destruct;
+    base->pop = priority_workpile_sorted_pop_best_priority;
+    base->push = priority_workpile_sorted_push_data_priority;
+    base->steal = priority_workpile_sorted_pop_worst_counting_half_priority;
+    return base;
+}
+
+ocr_workpile_t * data_sorted_priority_workpile_steal_selfish_constructor(void) {
+    priority_workpile* derived = (priority_workpile*) malloc(sizeof(priority_workpile));
+    ocr_workpile_t * base = (ocr_workpile_t *) derived;
+    ocr_module_t * module_base = (ocr_module_t *) base;
+    module_base->map_fct = NULL;
+    base->create = priority_workpile_create;
+    base->destruct = priority_workpile_destruct;
+    base->pop = priority_workpile_sorted_pop_best_priority;
+    base->push = priority_workpile_sorted_push_data_priority;
+    base->steal = priority_workpile_sorted_steal_data_selfish;
+    return base;
+}
+
+ocr_workpile_t * user_sorted_priority_workpile_steal_altruistic_constructor(void) {
+    priority_workpile* derived = (priority_workpile*) malloc(sizeof(priority_workpile));
+    ocr_workpile_t * base = (ocr_workpile_t *) derived;
+    ocr_module_t * module_base = (ocr_module_t *) base;
+    module_base->map_fct = NULL;
+    base->create = priority_workpile_create;
+    base->destruct = priority_workpile_destruct;
+    base->pop = priority_workpile_sorted_pop_best_priority;
+    base->push = priority_workpile_sorted_push_user_priority;
+    base->steal = priority_workpile_sorted_pop_worst_priority;
+    return base;
+}
+
+ocr_workpile_t * user_sorted_priority_workpile_steal_half_constructor(void) {
+    priority_workpile* derived = (priority_workpile*) malloc(sizeof(priority_workpile));
+    ocr_workpile_t * base = (ocr_workpile_t *) derived;
+    ocr_module_t * module_base = (ocr_module_t *) base;
+    module_base->map_fct = NULL;
+    base->create = priority_workpile_create;
+    base->destruct = priority_workpile_destruct;
+    base->pop = priority_workpile_sorted_pop_best_priority;
+    base->push = priority_workpile_sorted_push_user_priority;
+    base->steal = priority_workpile_sorted_pop_worst_half_priority;
+    return base;
+}
+
+ocr_workpile_t * user_sorted_priority_workpile_counting_steal_half_constructor(void) {
+    priority_workpile* derived = (priority_workpile*) malloc(sizeof(priority_workpile));
+    ocr_workpile_t * base = (ocr_workpile_t *) derived;
+    ocr_module_t * module_base = (ocr_module_t *) base;
+    module_base->map_fct = NULL;
+    base->create = priority_workpile_create;
+    base->destruct = priority_workpile_destruct;
+    base->pop = priority_workpile_sorted_pop_best_priority;
+    base->push = priority_workpile_sorted_push_user_priority;
+    base->steal = priority_workpile_sorted_pop_worst_counting_half_priority;
     return base;
 }

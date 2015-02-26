@@ -29,6 +29,8 @@
 
 */
 
+#include <stdio.h>
+#include <float.h>
 #include <stdlib.h>
 #include <assert.h>
 
@@ -40,12 +42,13 @@
 #include "datablock/regular/regular.h"
 #include "hc.h"
 
-#define DEBUG 0
+#define DEBUG 1
 
 void heap_init(heap_t * heap, void * init_value) {
     heap->lock = 0;
     heap->head = 0;
     heap->tail = 0;
+    heap->nDescendantsSum = 0;
     heap->buffer = (buffer_t *) malloc(sizeof(buffer_t));
     heap->buffer->capacity = INIT_HEAP_CAPACITY;
     heap->buffer->data = (volatile void **) malloc(sizeof(void*)*INIT_HEAP_CAPACITY);
@@ -64,7 +67,7 @@ static inline void push_capacity_assertion ( heap_t* heap ) {
     }
 }
 
-void locked_heap_tail_push_no_priority (heap_t* heap, void* entry) {
+void locked_dequeish_heap_tail_push_no_priority (heap_t* heap, void* entry) {
     int success = 0;
     while (!success) {
         if ( hc_cas(&heap->lock, 0, 1) ) { 
@@ -73,6 +76,7 @@ void locked_heap_tail_push_no_priority (heap_t* heap, void* entry) {
 
             int index = heap->tail % heap->buffer->capacity;
             heap->buffer->data[index] = entry;
+            heap->nDescendantsSum += ((hc_task_t*)entry)->nDescendants;
 #ifdef __powerpc64__
             hc_mfence();
 #endif 
@@ -208,12 +212,22 @@ static double calculateTaskRetrievalCostFromEvents ( volatile void* entry, int w
     return totalCost;
 }
 
-static void setLocalCost ( volatile void* entry, int worker_cpu_id ) {
+static void setPriorityAsEventRetrievalCost ( volatile void* entry, int worker_cpu_id ) {
     hc_task_t* derived = (hc_task_t*)entry;
     derived->cost = calculateTaskRetrievalCostFromEvents ( entry, worker_cpu_id );
 }
 
-static inline double extractCost ( volatile void* entry ) {
+static void setPriorityAsDataRetrievalCost ( volatile void* entry, int worker_cpu_id ) {
+    hc_task_t* derived = (hc_task_t*)entry;
+    derived->cost = calculateTaskRetrievalCostFromData ( entry, worker_cpu_id );
+}
+
+static void setPriorityAsUserPriority ( volatile void* entry, int worker_cpu_id ) {
+    hc_task_t* derived = (hc_task_t*)entry;
+    derived->cost = derived->priority;
+}
+
+static inline long double extractPriority ( volatile void* entry ) {
     /* TODO implement cost extraction*/
     hc_task_t* derived = (hc_task_t*)entry;
     return derived->cost;
@@ -221,14 +235,13 @@ static inline double extractCost ( volatile void* entry ) {
 
 /*sagnak awful awful hardcoding*/
 /*returns cheapest task for the thief to execute by handing out its "heap" index*/
-static int getMostLocalToThief ( heap_t* heap, int thief_cpu_id ) {
+static int getMostEventLocalToThief ( heap_t* heap, int thief_cpu_id ) {
     int currHeapIndex = 0;
     int cheapestHeapIndex = 0;
     int size = heap->tail - heap->head;
-    int minCost = 10000000;
+    long double minCost = LDBL_MAX;
     while ( currHeapIndex < size ) {
         volatile void* currTask = heap->buffer->data[(heap->head+currHeapIndex) % heap->buffer->capacity];
-      /*int currCost = calculateTaskRetrievalCostFromData (currTask, thief_cpu_id);*/
         int currCost = calculateTaskRetrievalCostFromEvents (currTask, thief_cpu_id);
         if ( minCost > currCost ) {
             minCost = currCost;
@@ -239,26 +252,46 @@ static int getMostLocalToThief ( heap_t* heap, int thief_cpu_id ) {
     return cheapestHeapIndex;
 }
 
+static int getMostDataLocalToThief ( heap_t* heap, int thief_cpu_id ) {
+    int currHeapIndex = 0;
+    int cheapestHeapIndex = 0;
+    int size = heap->tail - heap->head;
+    long double minCost = LDBL_MAX;
+    while ( currHeapIndex < size ) {
+        volatile void* currTask = heap->buffer->data[(heap->head+currHeapIndex) % heap->buffer->capacity];
+        int currCost = calculateTaskRetrievalCostFromData (currTask, thief_cpu_id);
+        if ( minCost > currCost ) {
+            minCost = currCost;
+            cheapestHeapIndex = currHeapIndex;
+        }
+        ++currHeapIndex;
+    }
+    return cheapestHeapIndex;
+}
+
 static inline void swapAtIndices ( heap_t* heap, int firstIndex, int secondIndex ) {
-    volatile void* swapTemp = heap->buffer->data[firstIndex];
-    heap->buffer->data[firstIndex] = heap->buffer->data[secondIndex];
-    heap->buffer->data[secondIndex] = swapTemp;
+    volatile void** data = heap->buffer->data;
+    volatile void* swapTemp = data[firstIndex];
+    data[firstIndex] = data[secondIndex];
+    data[secondIndex] = swapTemp;
 }
 
 void verifyHeapHelper ( heap_t* heap, int nElements, int firstElementIndex, int checkIndex ) {
-    int currHeapIndex = (checkIndex + firstElementIndex) % heap->buffer->capacity;
-    double currCost = extractCost(heap->buffer->data[ currHeapIndex ]);
+    const int capacity = heap->buffer->capacity;
+
+    int currHeapIndex = (checkIndex + firstElementIndex) % capacity;
+    long double currPriority = extractPriority(heap->buffer->data[ currHeapIndex ]);
 
     if ( checkIndex*2+1 < nElements ) {
-        int currLeftHeapIndex = (checkIndex*2+1 + firstElementIndex) % heap->buffer->capacity;
-        double leftCost = extractCost(heap->buffer->data[currLeftHeapIndex]);
-        assert ( leftCost >= currCost && "broken heap");
+        int currLeftHeapIndex = (checkIndex*2+1 + firstElementIndex) % capacity;
+        long double leftPriority = extractPriority(heap->buffer->data[currLeftHeapIndex]);
+        assert ( leftPriority >= currPriority && "broken heap");
         verifyHeapHelper(heap, nElements, firstElementIndex, checkIndex*2+1);
 
         if ( checkIndex*2+2 < nElements ) {
-            int currRightHeapIndex = (checkIndex*2+2 + firstElementIndex) % heap->buffer->capacity;
-            double rightCost = extractCost(heap->buffer->data[currRightHeapIndex]);
-            assert ( rightCost >= currCost && "broken heap");
+            int currRightHeapIndex = (checkIndex*2+2 + firstElementIndex) % capacity;
+            long double rightPriority = extractPriority(heap->buffer->data[currRightHeapIndex]);
+            assert ( rightPriority >= currPriority && "broken heap");
             verifyHeapHelper(heap, nElements, firstElementIndex, checkIndex*2+2);
         }
     }
@@ -272,32 +305,35 @@ static void verifyHeap ( heap_t* heap ) {
 }
 
 static void removeFixHeap ( heap_t* heap ) {
+    const int capacity = heap->buffer->capacity;
+    volatile void** data = heap->buffer->data;
+
     /* set last leaf as root, as the popper already cached the extracted the root task*/
     /* one less element as root is extracted */
-    heap->buffer->data[ ( heap->head ) % heap->buffer->capacity ] = heap->buffer->data[ ( --heap->tail ) % heap->buffer->capacity ];
+    data[ ( heap->head ) % capacity ] = data[ ( --heap->tail ) % capacity ];
 
-    int firstElementIndex = heap->head % heap->buffer->capacity;
+    int firstElementIndex = heap->head % capacity;
     int nElements = heap->tail - heap->head;
 
     int heapFixIndex = 0;
     while ( heapFixIndex < nElements ) { //TODO 
-        int currHeapIndex = (heapFixIndex + firstElementIndex) % heap->buffer->capacity;
-        double currCost = extractCost(heap->buffer->data[currHeapIndex]);
+        int currHeapIndex = (heapFixIndex + firstElementIndex) % capacity;
+        long double currPriority = extractPriority(data[currHeapIndex]);
 
         int heapLeftChildIndex = heapFixIndex*2+1;
         if ( heapLeftChildIndex < nElements ) {
-            int currLeftHeapIndex = (heapLeftChildIndex + firstElementIndex) % heap->buffer->capacity;
-            double leftCost = extractCost(heap->buffer->data[currLeftHeapIndex]);
+            int currLeftHeapIndex = (heapLeftChildIndex + firstElementIndex) % capacity;
+            long double leftPriority = extractPriority(data[currLeftHeapIndex]);
 
             int heapRightChildIndex = heapFixIndex*2+2;
 
             if ( heapRightChildIndex < nElements ) {
                 /*has left and right children */
-                int currRightHeapIndex = (heapRightChildIndex + firstElementIndex) % heap->buffer->capacity;
-                double rightCost = extractCost(heap->buffer->data[currRightHeapIndex]);
+                int currRightHeapIndex = (heapRightChildIndex + firstElementIndex) % capacity;
+                long double rightPriority = extractPriority(data[currRightHeapIndex]);
 
-                if ( leftCost < rightCost ) {
-                    if ( leftCost < currCost ) {
+                if ( leftPriority < rightPriority ) {
+                    if ( leftPriority < currPriority ) {
                         swapAtIndices(heap, currLeftHeapIndex, currHeapIndex);
                         heapFixIndex = heapLeftChildIndex;
                     } else {
@@ -305,7 +341,7 @@ static void removeFixHeap ( heap_t* heap ) {
                         heapFixIndex = nElements;
                     }
                 } else {
-                    if ( rightCost < currCost ) {
+                    if ( rightPriority < currPriority ) {
                         swapAtIndices(heap, currRightHeapIndex, currHeapIndex);
                         heapFixIndex = heapRightChildIndex;
                     } else {
@@ -315,7 +351,7 @@ static void removeFixHeap ( heap_t* heap ) {
                 }
             } else {
                 /*has only left child */
-                if ( leftCost < currCost ) {
+                if ( leftPriority < currPriority ) {
                     swapAtIndices(heap, currLeftHeapIndex, currHeapIndex);
                     heapFixIndex = heapLeftChildIndex;
                 } else {
@@ -332,16 +368,17 @@ static void removeFixHeap ( heap_t* heap ) {
 }
 
 static void insertFixHeapAtIndex ( heap_t* heap, int heapFixIndex ) {
-    int firstElementIndex = heap->head % heap->buffer->capacity;
+    const int capacity = heap->buffer->capacity;
+    int firstElementIndex = heap->head % capacity;
 
     while( heapFixIndex > 0 ) {
-        int currHeapIndex = (heapFixIndex + firstElementIndex) % heap->buffer->capacity;
-        double currCost = extractCost(heap->buffer->data[ currHeapIndex ]);
+        int currHeapIndex = (heapFixIndex + firstElementIndex) % capacity;
+        long double currPriority = extractPriority(heap->buffer->data[ currHeapIndex ]);
 
-        int parentHeapIndex = ((heapFixIndex-1)/2 + firstElementIndex) % heap->buffer->capacity ;
-        double parentCost = extractCost(heap->buffer->data[parentHeapIndex]);
+        int parentHeapIndex = ((heapFixIndex-1)/2 + firstElementIndex) % capacity ;
+        long double parentPriority = extractPriority(heap->buffer->data[parentHeapIndex]);
 
-        if ( currCost < parentCost ) {
+        if ( currPriority < parentPriority ) {
             swapAtIndices(heap, currHeapIndex, parentHeapIndex);
             /* now fix the new moved level on the tree */
             heapFixIndex = (heapFixIndex-1)/2;
@@ -356,7 +393,78 @@ static inline void insertFixHeap ( heap_t* heap ) {
     insertFixHeapAtIndex(heap, heap->tail - heap->head - 1);
 }
 
-void locked_heap_push_priority (heap_t* heap, void* entry) {
+static int insertSortedBetween ( heap_t* heap, int beginIndex, int endIndex, long double currPriority) {
+    int indexToBeReturned = -1;
+
+    int midRange = beginIndex + (endIndex - beginIndex)/2;
+    long double midPriority = extractPriority(heap->buffer->data[midRange % heap->buffer->capacity]);
+    if ( currPriority < midPriority ) {
+        if ( midRange == beginIndex ) {
+            indexToBeReturned = beginIndex;
+        } else {
+            indexToBeReturned = insertSortedBetween(heap, beginIndex, midRange - 1, currPriority);
+        }
+    } else if ( currPriority > midPriority ) {
+        if ( midRange + 1  <=  endIndex ) {
+            indexToBeReturned = insertSortedBetween(heap, midRange + 1, endIndex, currPriority);
+        } else {
+            indexToBeReturned = midRange+1;
+        }
+    } else {
+        indexToBeReturned = midRange;
+    }
+    return indexToBeReturned;
+}
+
+static void shiftHeapRightAt ( heap_t* heap, int insertIndex ) {
+    const int capacity = heap->buffer->capacity;
+    volatile void** data = heap->buffer->data;
+    int index = heap->tail;
+    for ( ; index > insertIndex; --index ) {
+        data[ (index) % capacity ] = data[ (index-1) % capacity ];
+    }
+    ++heap->tail;
+}
+
+static void shiftHeapLeftAt ( heap_t* heap, int deleteIndex ) {
+    const int capacity = heap->buffer->capacity;
+    volatile void** data = heap->buffer->data;
+    int index = deleteIndex;
+    const int endIndex = heap->tail-1;
+    for ( ; index < endIndex; ++index ) {
+        data[ (index) % capacity ] = data[ (index+1) % capacity ];
+    }
+    --heap->tail;
+}
+
+static inline void insertSorted ( heap_t* heap, void* entry ) {
+    int insertIndex = heap->tail;
+    
+    if ( heap->tail != heap->head ) {
+        long double currPriority = extractPriority(entry);
+        insertIndex = insertSortedBetween (heap, heap->head, heap->tail - 1, currPriority);
+    }
+
+    shiftHeapRightAt (heap, insertIndex);
+    heap->buffer->data[ insertIndex % heap->buffer->capacity ] = entry;
+}
+
+static int verifySortedHeap( heap_t* heap) {
+    const int capacity = heap->buffer->capacity;
+    volatile void** data = heap->buffer->data;
+    int stillValid = 1;
+
+    int currIndex = heap->head;
+    const int endIndex = heap->tail - 1;
+    for ( ; currIndex < endIndex; ++currIndex ) {
+        stillValid = stillValid && (extractPriority(data[currIndex%capacity]) <= extractPriority(data[(currIndex+1)%capacity]));
+        //if (!stillValid) fprintf(stderr, "[%d]-> %Le, [%d]-> %Le", currIndex, extractPriority(data[currIndex%capacity]), currIndex+1, extractPriority(data[(currIndex+1)%capacity]));
+        assert(stillValid && "not sorted");
+    }
+    return stillValid;
+}
+
+void locked_heap_push_event_priority (heap_t* heap, void* entry) {
     int success = 0;
     while (!success) {
         if ( hc_cas(&heap->lock, 0, 1) ) { 
@@ -371,10 +479,132 @@ void locked_heap_push_priority (heap_t* heap, void* entry) {
             ocr_worker_t * worker = NULL;
             globalGuidProvider->getVal(globalGuidProvider, worker_guid, (u64*)&worker, NULL);
 
-            setLocalCost (entry, get_worker_cpu_id(worker));
+            setPriorityAsEventRetrievalCost (entry, get_worker_cpu_id(worker));
 
             insertFixHeap(heap);
+            heap->nDescendantsSum += ((hc_task_t*)entry)->nDescendants;
             if(DEBUG)verifyHeap(heap);
+
+            heap->lock = 0;
+        }
+    }
+}
+
+void locked_heap_sorted_push_event_priority (heap_t* heap, void* entry) {
+    int success = 0;
+    while (!success) {
+        if ( hc_cas(&heap->lock, 0, 1) ) { 
+            success = 1;
+
+            push_capacity_assertion(heap);
+
+            ocrGuid_t worker_guid = ocr_get_current_worker_guid();
+            ocr_worker_t * worker = NULL;
+            globalGuidProvider->getVal(globalGuidProvider, worker_guid, (u64*)&worker, NULL);
+
+            setPriorityAsEventRetrievalCost (entry, get_worker_cpu_id(worker));
+
+            insertSorted(heap, entry);
+            heap->nDescendantsSum += ((hc_task_t*)entry)->nDescendants;
+            if(DEBUG) verifySortedHeap(heap);
+
+            heap->lock = 0;
+        }
+    }
+}
+
+void locked_heap_push_data_priority (heap_t* heap, void* entry) {
+    int success = 0;
+    while (!success) {
+        if ( hc_cas(&heap->lock, 0, 1) ) { 
+            success = 1;
+
+            push_capacity_assertion(heap);
+            int index = heap->tail % heap->buffer->capacity;
+            heap->buffer->data[index] = entry;
+            ++heap->tail;
+
+            ocrGuid_t worker_guid = ocr_get_current_worker_guid();
+            ocr_worker_t * worker = NULL;
+            globalGuidProvider->getVal(globalGuidProvider, worker_guid, (u64*)&worker, NULL);
+
+            setPriorityAsDataRetrievalCost (entry, get_worker_cpu_id(worker));
+
+            insertFixHeap(heap);
+            heap->nDescendantsSum += ((hc_task_t*)entry)->nDescendants;
+            if(DEBUG)verifyHeap(heap);
+
+            heap->lock = 0;
+        }
+    }
+}
+
+void locked_heap_sorted_push_data_priority (heap_t* heap, void* entry) {
+    int success = 0;
+    while (!success) {
+        if ( hc_cas(&heap->lock, 0, 1) ) { 
+            success = 1;
+
+            push_capacity_assertion(heap);
+
+            ocrGuid_t worker_guid = ocr_get_current_worker_guid();
+            ocr_worker_t * worker = NULL;
+            globalGuidProvider->getVal(globalGuidProvider, worker_guid, (u64*)&worker, NULL);
+
+            setPriorityAsDataRetrievalCost (entry, get_worker_cpu_id(worker));
+
+            insertSorted(heap, entry);
+            heap->nDescendantsSum += ((hc_task_t*)entry)->nDescendants;
+            if(DEBUG)verifySortedHeap(heap);
+
+            heap->lock = 0;
+        }
+    }
+}
+
+void locked_heap_push_user_priority (heap_t* heap, void* entry) {
+    int success = 0;
+    while (!success) {
+        if ( hc_cas(&heap->lock, 0, 1) ) { 
+            success = 1;
+
+            push_capacity_assertion(heap);
+            int index = heap->tail % heap->buffer->capacity;
+            heap->buffer->data[index] = entry;
+            ++heap->tail;
+
+            ocrGuid_t worker_guid = ocr_get_current_worker_guid();
+            ocr_worker_t * worker = NULL;
+            globalGuidProvider->getVal(globalGuidProvider, worker_guid, (u64*)&worker, NULL);
+
+            setPriorityAsUserPriority (entry, get_worker_cpu_id(worker));
+
+            insertFixHeap(heap);
+            heap->nDescendantsSum += ((hc_task_t*)entry)->nDescendants;
+            if(DEBUG)verifyHeap(heap);
+
+            heap->lock = 0;
+        }
+    }
+}
+
+void locked_heap_sorted_push_user_priority (heap_t* heap, void* entry) {
+    int success = 0;
+    while (!success) {
+        if ( hc_cas(&heap->lock, 0, 1) ) { 
+            success = 1;
+
+            push_capacity_assertion(heap);
+
+            ocrGuid_t worker_guid = ocr_get_current_worker_guid();
+            ocr_worker_t * worker = NULL;
+            globalGuidProvider->getVal(globalGuidProvider, worker_guid, (u64*)&worker, NULL);
+
+            setPriorityAsUserPriority (entry, get_worker_cpu_id(worker));
+
+            insertSorted(heap,entry);
+            heap->nDescendantsSum += ((hc_task_t*)entry)->nDescendants;
+            if(DEBUG)verifySortedHeap(heap);
 
             heap->lock = 0;
         }
@@ -396,6 +626,27 @@ void* locked_heap_pop_priority_best ( heap_t* heap ) {
                 rt = (void*) heap->buffer->data[ heap->head % heap->buffer->capacity];
                 removeFixHeap(heap);
                 if(DEBUG)verifyHeap(heap);
+            }
+            heap->lock = 0;
+        }
+    }
+    return rt;
+}
+
+void* locked_heap_sorted_pop_priority_best ( heap_t* heap ) {
+    void * rt = NULL;
+    int success = 0;
+    while (!success) {
+        if ( hc_cas(&heap->lock, 0, 1) ) {
+            success = 1;
+
+            int size = heap->tail - heap->head;
+            if ( size <= 0 ) {
+                rt = NULL;
+            } else {
+                rt = (void*) heap->buffer->data[ heap->head % heap->buffer->capacity];
+                ++heap->head;
+                if(DEBUG)verifySortedHeap(heap);
             }
             heap->lock = 0;
         }
@@ -425,7 +676,7 @@ void* locked_heap_pop_priority_last ( heap_t* heap ) {
     return rt;
 }
 
-void* locked_heap_pop_priority_selfish ( heap_t* heap , int thief_cpu_id ) {
+void* locked_heap_pop_event_priority_selfish ( heap_t* heap , int thief_cpu_id ) {
     void * rt = NULL;
     int success = 0;
     while (!success) {
@@ -437,7 +688,7 @@ void* locked_heap_pop_priority_selfish ( heap_t* heap , int thief_cpu_id ) {
                 heap->tail = heap->head;
                 rt = NULL;
             } else { 
-                int thiefsCheapestHeapIndex = getMostLocalToThief(heap, thief_cpu_id);
+                int thiefsCheapestHeapIndex = getMostEventLocalToThief(heap, thief_cpu_id);
                 /* retract to last element */
                 --heap->tail;
                 /* make the costliest the last one by swapping it with tail */
@@ -448,6 +699,84 @@ void* locked_heap_pop_priority_selfish ( heap_t* heap , int thief_cpu_id ) {
                 /* pop tail */
                 rt = (void*) heap->buffer->data[heap->tail % heap->buffer->capacity];
                 if(DEBUG)verifyHeap(heap);
+            }
+            heap->lock = 0;
+        }
+    }
+    return rt;
+}
+
+void* locked_heap_pop_data_priority_selfish ( heap_t* heap , int thief_cpu_id ) {
+    void * rt = NULL;
+    int success = 0;
+    while (!success) {
+        if ( hc_cas(&heap->lock, 0, 1) ) {
+            success = 1;
+
+            int size = heap->tail - heap->head;
+            if ( size <= 0 ) {
+                heap->tail = heap->head;
+                rt = NULL;
+            } else { 
+                int thiefsCheapestHeapIndex = getMostDataLocalToThief(heap, thief_cpu_id);
+                /* retract to last element */
+                --heap->tail;
+                /* make the costliest the last one by swapping it with tail */
+                swapAtIndices ( heap, heap->tail % heap->buffer->capacity , (thiefsCheapestHeapIndex + heap->head) % heap->buffer->capacity );
+                /* now the swap may have made the non-worst placed invalid, fix that */
+                insertFixHeapAtIndex(heap, thiefsCheapestHeapIndex);
+                
+                /* pop tail */
+                rt = (void*) heap->buffer->data[heap->tail % heap->buffer->capacity];
+                if(DEBUG)verifyHeap(heap);
+            }
+            heap->lock = 0;
+        }
+    }
+    return rt;
+}
+
+void* locked_heap_sorted_pop_event_priority_selfish ( heap_t* heap , int thief_cpu_id ) {
+    void * rt = NULL;
+    int success = 0;
+    while (!success) {
+        if ( hc_cas(&heap->lock, 0, 1) ) {
+            success = 1;
+
+            int size = heap->tail - heap->head;
+            if ( size <= 0 ) {
+                rt = NULL;
+            } else { 
+                int thiefsCheapestIndex = getMostEventLocalToThief(heap, thief_cpu_id);
+                rt = (void*) heap->buffer->data[heap->head + thiefsCheapestIndex % heap->buffer->capacity];
+
+                shiftHeapLeftAt(heap, heap->head + thiefsCheapestIndex);
+
+                if(DEBUG)verifySortedHeap(heap);
+            }
+            heap->lock = 0;
+        }
+    }
+    return rt;
+}
+
+void* locked_heap_sorted_pop_data_priority_selfish ( heap_t* heap , int thief_cpu_id ) {
+    void * rt = NULL;
+    int success = 0;
+    while (!success) {
+        if ( hc_cas(&heap->lock, 0, 1) ) {
+            success = 1;
+
+            int size = heap->tail - heap->head;
+            if ( size <= 0 ) {
+                rt = NULL;
+            } else { 
+                int thiefsCheapestIndex = getMostDataLocalToThief(heap, thief_cpu_id);
+                rt = (void*) heap->buffer->data[heap->head + thiefsCheapestIndex % heap->buffer->capacity];
+
+                shiftHeapLeftAt(heap, heap->head+thiefsCheapestIndex);
+
+                if(DEBUG)verifySortedHeap(heap);
             }
             heap->lock = 0;
         }
@@ -469,11 +798,11 @@ void* locked_heap_pop_priority_worst ( heap_t* heap ) {
             } else { 
                 int nLeaves = (1+size)/2;
                 int currIndex, maxIndex = size - nLeaves; /*first leaf index*/;
-                int maxCost = -1;
+                long double maxPriority = -1;
                 for ( currIndex = maxIndex; currIndex < size; ++currIndex ) {
-                    int currLeafCost = extractCost (heap->buffer->data[ ( currIndex + heap->head ) % heap->buffer->capacity]);
-                    if ( currLeafCost > maxCost ) {
-                        maxCost = currLeafCost;
+                    long double currLeafPriority = extractPriority (heap->buffer->data[ ( currIndex + heap->head ) % heap->buffer->capacity]);
+                    if ( currLeafPriority > maxPriority ) {
+                        maxPriority = currLeafPriority;
                         maxIndex = currIndex;
                     }
                 }
@@ -488,6 +817,27 @@ void* locked_heap_pop_priority_worst ( heap_t* heap ) {
                 /* pop tail */
                 rt = (void*) heap->buffer->data[heap->tail % heap->buffer->capacity];
                 if(DEBUG)verifyHeap(heap);
+            }
+            heap->lock = 0;
+        }
+    }
+    return rt;
+}
+
+void* locked_heap_sorted_pop_priority_worst ( heap_t* heap ) {
+    void * rt = NULL;
+    int success = 0;
+    while (!success) {
+        if ( hc_cas(&heap->lock, 0, 1) ) {
+            success = 1;
+
+            int size = heap->tail - heap->head;
+            if ( size <= 0 ) {
+                rt = NULL;
+            } else { 
+                /* pop tail */
+                rt = (void*) heap->buffer->data[ --heap->tail % heap->buffer->capacity];
+                if(DEBUG)verifySortedHeap(heap);
             }
             heap->lock = 0;
         }
@@ -521,7 +871,21 @@ void* locked_heap_pop_priority_worst_half ( heap_t* heap, ocr_scheduler_t* thief
     return rt;
 }
 
-void* locked_heap_head_pop_no_priority ( heap_t* heap ) {
+void* locked_heap_sorted_pop_priority_worst_half ( heap_t* heap, ocr_scheduler_t* thief_base) {
+    return locked_heap_pop_priority_worst_half(heap, thief_base);
+}
+
+void* locked_heap_pop_priority_worst_counting_half ( heap_t* heap, ocr_scheduler_t* thief_base) {
+    assert ( 0 && "locked_heap_pop_priority_worst_counting_half  not yet implemented" );
+    return NULL;
+}
+
+void* locked_heap_sorted_pop_priority_worst_counting_half ( heap_t* heap, ocr_scheduler_t* thief_base) {
+    assert ( 0 && "locked_heap_sorted_pop_priority_worst_counting_half  not yet implemented" );
+    return NULL;
+}
+
+void* locked_dequeish_heap_head_pop_no_priority ( heap_t* heap ) {
     void * rt = NULL;
     int success = 0;
     while (!success) {
@@ -543,7 +907,7 @@ void* locked_heap_head_pop_no_priority ( heap_t* heap ) {
 }
 
 
-void* locked_heap_head_pop_head_half_no_priority ( heap_t* heap, ocr_scheduler_t* thief_base ) {
+void* locked_dequeish_heap_pop_head_half_no_priority ( heap_t* heap, ocr_scheduler_t* thief_base ) {
     void * rt = NULL;
     int success = 0;
     while (!success) {
@@ -568,7 +932,39 @@ void* locked_heap_head_pop_head_half_no_priority ( heap_t* heap, ocr_scheduler_t
     return rt;
 }
 
-void* locked_heap_tail_pop_no_priority ( heap_t* heap ) {
+void* locked_dequeish_heap_pop_head_counting_half_no_priority ( heap_t* heap, ocr_scheduler_t* thief_base ) {
+    void * rt = NULL;
+    int success = 0;
+    while (!success) {
+        if ( hc_cas(&heap->lock, 0, 1) ) {
+            success = 1;
+
+            int size = heap->tail - heap->head;
+            if ( size > 0 ) {
+                rt = (void*) heap->buffer->data[heap->head % heap->buffer->capacity];
+                ++heap->head;
+
+                long double descendantsSumStolen = ((hc_task_t*) rt) -> nDescendants;
+                // fprintf(stderr,"nDescendantsSum: %Le\n", heap->nDescendantsSum);
+                // fprintf(stderr,"stolen: %Le\n", descendantsSumStolen);
+
+                while ( descendantsSumStolen < heap->nDescendantsSum/2 && heap->tail - heap->head > 0 ) {
+                    volatile void* stolen = heap->buffer->data[ heap->head % heap->buffer->capacity];
+                    ++heap->head;
+                    thief_base->give(thief_base, ocr_get_current_worker_guid(), (ocrGuid_t)stolen);
+                    descendantsSumStolen += ((hc_task_t*)stolen) -> nDescendants;
+                    // fprintf(stderr,"stolen: %Le\n", ((hc_task_t*)stolen) -> nDescendants);
+                }
+
+                heap->nDescendantsSum -= descendantsSumStolen;
+            } 
+            heap->lock = 0;
+        }
+    }
+    return rt;
+}
+
+void* locked_dequeish_heap_tail_pop_no_priority ( heap_t* heap ) {
     void * rt = NULL;
     int success = 0;
     while (!success) {

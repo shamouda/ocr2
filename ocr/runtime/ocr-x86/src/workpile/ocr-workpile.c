@@ -41,29 +41,111 @@
 extern ocr_workpile_t * hc_workpile_constructor();
 extern ocr_workpile_t * ce_message_workpile_constructor();
 
-extern ocr_workpile_t * dequeish_priority_workpile_constructor();
-extern ocr_workpile_t * dequeish_priority_steal_half_workpile_constructor();
-extern ocr_workpile_t * priority_workpile_constructor();
-extern ocr_workpile_t * priority_workpile_steal_half_constructor();
-extern ocr_workpile_t * priority_workpile_steal_last_constructor();
-extern ocr_workpile_t * priority_workpile_steal_selfish_constructor();
+extern ocr_workpile_t * dequeish_heap_steal_last_workpile_constructor();
+extern ocr_workpile_t * dequeish_heap_steal_half_workpile_constructor();
+extern ocr_workpile_t * dequeish_heap_counting_steal_half_workpile_constructor();
+
+extern ocr_workpile_t * event_priority_workpile_steal_half_constructor();
+extern ocr_workpile_t * event_priority_workpile_counting_steal_half_constructor();
+extern ocr_workpile_t * event_priority_workpile_steal_last_constructor();
+extern ocr_workpile_t * event_priority_workpile_steal_selfish_constructor();
+extern ocr_workpile_t * event_priority_workpile_steal_altruistic_constructor();
+
+extern ocr_workpile_t * data_priority_workpile_steal_half_constructor();
+extern ocr_workpile_t * data_priority_workpile_counting_steal_half_constructor();
+extern ocr_workpile_t * data_priority_workpile_steal_last_constructor();
+extern ocr_workpile_t * data_priority_workpile_steal_selfish_constructor();
+extern ocr_workpile_t * data_priority_workpile_steal_altruistic_constructor();
+
+extern ocr_workpile_t * user_priority_workpile_steal_half_constructor();
+extern ocr_workpile_t * user_priority_workpile_counting_steal_half_constructor();
+extern ocr_workpile_t * user_priority_workpile_steal_last_constructor();
+extern ocr_workpile_t * user_priority_workpile_steal_altruistic_constructor();
+
+extern ocr_workpile_t * event_sorted_priority_workpile_steal_half_constructor();
+extern ocr_workpile_t * event_sorted_priority_workpile_counting_steal_half_constructor();
+extern ocr_workpile_t * event_sorted_priority_workpile_steal_last_constructor();
+extern ocr_workpile_t * event_sorted_priority_workpile_steal_selfish_constructor();
+extern ocr_workpile_t * event_sorted_priority_workpile_steal_altruistic_constructor();
+
+extern ocr_workpile_t * data_sorted_priority_workpile_steal_half_constructor();
+extern ocr_workpile_t * data_sorted_priority_workpile_counting_steal_half_constructor();
+extern ocr_workpile_t * data_sorted_priority_workpile_steal_last_constructor();
+extern ocr_workpile_t * data_sorted_priority_workpile_steal_selfish_constructor();
+extern ocr_workpile_t * data_sorted_priority_workpile_steal_altruistic_constructor();
+
+extern ocr_workpile_t * user_sorted_priority_workpile_steal_half_constructor();
+extern ocr_workpile_t * user_sorted_priority_workpile_counting_steal_half_constructor();
+extern ocr_workpile_t * user_sorted_priority_workpile_steal_last_constructor();
+extern ocr_workpile_t * user_sorted_priority_workpile_steal_altruistic_constructor();
 
 ocr_workpile_t * newWorkpile(ocr_workpile_kind workpileType) {
     switch(workpileType) {
     case OCR_DEQUE:
         return hc_workpile_constructor();
-    case OCR_DEQUEISH_PRIORITY_QUEUE:
-        return dequeish_priority_workpile_constructor();
-    case OCR_DEQUEISH_PRIORITY_QUEUE_STEAL_HALF_KIND:
-        return dequeish_priority_steal_half_workpile_constructor();
-    case OCR_PRIORITY_QUEUE:
-        return priority_workpile_constructor();
-    case OCR_PRIORITY_QUEUE_STEAL_HALF_KIND:
-        return priority_workpile_steal_half_constructor();
-    case OCR_PRIORITY_QUEUE_STEAL_LAST_KIND:
-        return priority_workpile_steal_last_constructor();
-    case OCR_PRIORITY_QUEUE_STEAL_SELFISH_KIND:
-        return priority_workpile_steal_selfish_constructor();
+    case OCR_DEQUEISH_HEAP_STEAL_LAST_KIND:
+        return dequeish_heap_steal_last_workpile_constructor();
+    case OCR_DEQUEISH_HEAP_STEAL_HALF_KIND:
+        return dequeish_heap_steal_half_workpile_constructor();
+    case OCR_DEQUEISH_HEAP_COUNTING_STEAL_HALF_KIND:
+        return dequeish_heap_counting_steal_half_workpile_constructor();
+
+    case OCR_EVENT_PRIORITY_QUEUE_STEAL_HALF_KIND:
+        return event_priority_workpile_steal_half_constructor();
+    case OCR_EVENT_PRIORITY_QUEUE_COUNTING_STEAL_HALF_KIND:
+        return event_priority_workpile_counting_steal_half_constructor();
+    case OCR_EVENT_PRIORITY_QUEUE_STEAL_LAST_KIND:
+        return event_priority_workpile_steal_last_constructor();
+    case OCR_EVENT_PRIORITY_QUEUE_STEAL_SELFISH_KIND:
+        return event_priority_workpile_steal_selfish_constructor();
+    case OCR_EVENT_PRIORITY_QUEUE_STEAL_ALTRUISTIC_KIND:
+        return event_priority_workpile_steal_altruistic_constructor();
+
+    case OCR_DATA_PRIORITY_QUEUE_STEAL_HALF_KIND:
+        return data_priority_workpile_steal_half_constructor();
+    case OCR_DATA_PRIORITY_QUEUE_COUNTING_STEAL_HALF_KIND:
+        return data_priority_workpile_counting_steal_half_constructor();
+    case OCR_DATA_PRIORITY_QUEUE_STEAL_LAST_KIND:
+        return data_priority_workpile_steal_last_constructor();
+    case OCR_DATA_PRIORITY_QUEUE_STEAL_SELFISH_KIND:
+        return data_priority_workpile_steal_selfish_constructor();
+    case OCR_DATA_PRIORITY_QUEUE_STEAL_ALTRUISTIC_KIND:
+        return data_priority_workpile_steal_altruistic_constructor();
+
+    case OCR_USER_PRIORITY_QUEUE_STEAL_HALF_KIND:
+        return user_priority_workpile_steal_half_constructor();
+    case OCR_USER_PRIORITY_QUEUE_COUNTING_STEAL_HALF_KIND:
+        return user_priority_workpile_counting_steal_half_constructor();
+    case OCR_USER_PRIORITY_QUEUE_STEAL_LAST_KIND:
+        return user_priority_workpile_steal_last_constructor();
+    case OCR_USER_PRIORITY_QUEUE_STEAL_ALTRUISTIC_KIND:
+        return user_priority_workpile_steal_altruistic_constructor();
+
+    case OCR_EVENT_SORTED_PRIORITY_QUEUE_STEAL_HALF_KIND:
+        return event_sorted_priority_workpile_steal_half_constructor();
+    case OCR_EVENT_SORTED_PRIORITY_QUEUE_COUNTING_STEAL_HALF_KIND:
+        return event_sorted_priority_workpile_counting_steal_half_constructor();
+    case OCR_EVENT_SORTED_PRIORITY_QUEUE_STEAL_SELFISH_KIND:
+        return event_sorted_priority_workpile_steal_selfish_constructor();
+    case OCR_EVENT_SORTED_PRIORITY_QUEUE_STEAL_ALTRUISTIC_KIND:
+        return event_sorted_priority_workpile_steal_altruistic_constructor();
+
+    case OCR_DATA_SORTED_PRIORITY_QUEUE_STEAL_HALF_KIND:
+        return data_sorted_priority_workpile_steal_half_constructor();
+    case OCR_DATA_SORTED_PRIORITY_QUEUE_COUNTING_STEAL_HALF_KIND:
+        return data_sorted_priority_workpile_counting_steal_half_constructor();
+    case OCR_DATA_SORTED_PRIORITY_QUEUE_STEAL_SELFISH_KIND:
+        return data_sorted_priority_workpile_steal_selfish_constructor();
+    case OCR_DATA_SORTED_PRIORITY_QUEUE_STEAL_ALTRUISTIC_KIND:
+        return data_sorted_priority_workpile_steal_altruistic_constructor();
+
+    case OCR_USER_SORTED_PRIORITY_QUEUE_STEAL_HALF_KIND:
+        return user_sorted_priority_workpile_steal_half_constructor();
+    case OCR_USER_SORTED_PRIORITY_QUEUE_COUNTING_STEAL_HALF_KIND:
+        return user_sorted_priority_workpile_counting_steal_half_constructor();
+    case OCR_USER_SORTED_PRIORITY_QUEUE_STEAL_ALTRUISTIC_KIND:
+        return user_sorted_priority_workpile_steal_altruistic_constructor();
+
     case OCR_MESSAGE_QUEUE:
         return ce_message_workpile_constructor();
     default:

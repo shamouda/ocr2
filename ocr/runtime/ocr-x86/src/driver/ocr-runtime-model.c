@@ -293,34 +293,129 @@ static void setDefaultModelWorkers ( ocr_model_policy_t * defaultPolicy, size_t 
     defaultPolicy->workers    = newModel( ocr_worker_default_kind, nb_workers, NULL, worker_configurations);
 }
 
-
 static inline void setDefaultModelWorkpiles ( ocr_model_policy_t * defaultPolicy, size_t nb_workpiles ) {
     defaultPolicy->workpiles  = newModel( ocr_workpile_default_kind, nb_workpiles, NULL, NULL );
 }
 
-static inline void setDefaultModelWorkpilesDequishHeap ( ocr_model_policy_t * defaultPolicy, size_t nb_workpiles ) {
-    defaultPolicy->workpiles  = newModel( ocr_workpile_dequeish_heap_kind, nb_workpiles, NULL, NULL );
+/*dequeish heap variaties*/
+static inline void setDefaultModelWorkpilesDequishHeapStealLast ( ocr_model_policy_t * defaultPolicy, size_t nb_workpiles ) {
+    defaultPolicy->workpiles  = newModel( ocr_workpile_dequeish_heap_steal_last_kind, nb_workpiles, NULL, NULL );
 }
 
 static inline void setDefaultModelWorkpilesDequishHeapStealHalf ( ocr_model_policy_t * defaultPolicy, size_t nb_workpiles ) {
     defaultPolicy->workpiles  = newModel( ocr_workpile_dequeish_heap_steal_half_kind, nb_workpiles, NULL, NULL );
 }
 
-static inline void setDefaultModelWorkpilesPriorityHeap ( ocr_model_policy_t * defaultPolicy, size_t nb_workpiles ) {
-    defaultPolicy->workpiles  = newModel( ocr_workpile_heap_kind, nb_workpiles, NULL, NULL );
+static inline void setDefaultModelWorkpilesDequishHeapCountingStealHalf ( ocr_model_policy_t * defaultPolicy, size_t nb_workpiles ) {
+    defaultPolicy->workpiles  = newModel( ocr_workpile_dequeish_heap_counting_steal_half_kind, nb_workpiles, NULL, NULL );
 }
 
-static inline void setDefaultModelWorkpilesPriorityHeapStealLast ( ocr_model_policy_t * defaultPolicy, size_t nb_workpiles ) {
-    defaultPolicy->workpiles  = newModel( ocr_workpile_heap_steal_last_kind, nb_workpiles, NULL, NULL );
+/*event priority queue variaties*/
+static inline void setDefaultModelWorkpilesEventPriorityQueueStealLast ( ocr_model_policy_t * defaultPolicy, size_t nb_workpiles ) {
+    defaultPolicy->workpiles  = newModel( ocr_workpile_event_priority_queue_steal_last_kind, nb_workpiles, NULL, NULL );
 }
 
-static inline void setDefaultModelWorkpilesPriorityHeapStealHalf ( ocr_model_policy_t * defaultPolicy, size_t nb_workpiles ) {
-    defaultPolicy->workpiles  = newModel( ocr_workpile_heap_steal_half_kind, nb_workpiles, NULL, NULL );
+static inline void setDefaultModelWorkpilesEventPriorityQueueStealHalf ( ocr_model_policy_t * defaultPolicy, size_t nb_workpiles ) {
+    defaultPolicy->workpiles  = newModel( ocr_workpile_event_priority_queue_steal_half_kind, nb_workpiles, NULL, NULL );
 }
 
-static inline void setDefaultModelWorkpilesPriorityHeapStealSelfish ( ocr_model_policy_t * defaultPolicy, size_t nb_workpiles ) {
-    defaultPolicy->workpiles  = newModel( ocr_workpile_heap_steal_selfish_kind, nb_workpiles, NULL, NULL );
+static inline void setDefaultModelWorkpilesEventPriorityQueueCountingStealHalf ( ocr_model_policy_t * defaultPolicy, size_t nb_workpiles ) {
+    defaultPolicy->workpiles  = newModel( ocr_workpile_event_priority_queue_counting_steal_half_kind, nb_workpiles, NULL, NULL );
 }
+
+static inline void setDefaultModelWorkpilesEventPriorityQueueStealSelfish ( ocr_model_policy_t * defaultPolicy, size_t nb_workpiles ) {
+    defaultPolicy->workpiles  = newModel( ocr_workpile_event_priority_queue_steal_selfish_kind, nb_workpiles, NULL, NULL );
+}
+
+static inline void setDefaultModelWorkpilesEventPriorityQueueStealAltruistic ( ocr_model_policy_t * defaultPolicy, size_t nb_workpiles ) {
+    defaultPolicy->workpiles  = newModel( ocr_workpile_event_priority_queue_steal_altruistic_kind, nb_workpiles, NULL, NULL );
+}
+
+/*data priority queue variaties*/
+static inline void setDefaultModelWorkpilesDataPriorityQueueStealLast ( ocr_model_policy_t * defaultPolicy, size_t nb_workpiles ) {
+    defaultPolicy->workpiles  = newModel( ocr_workpile_data_priority_queue_steal_last_kind, nb_workpiles, NULL, NULL );
+}
+
+static inline void setDefaultModelWorkpilesDataPriorityQueueStealHalf ( ocr_model_policy_t * defaultPolicy, size_t nb_workpiles ) {
+    defaultPolicy->workpiles  = newModel( ocr_workpile_data_priority_queue_steal_half_kind, nb_workpiles, NULL, NULL );
+}
+
+static inline void setDefaultModelWorkpilesDataPriorityQueueCountingStealHalf ( ocr_model_policy_t * defaultPolicy, size_t nb_workpiles ) {
+    defaultPolicy->workpiles  = newModel( ocr_workpile_data_priority_queue_counting_steal_half_kind, nb_workpiles, NULL, NULL );
+}
+
+static inline void setDefaultModelWorkpilesDataPriorityQueueStealSelfish ( ocr_model_policy_t * defaultPolicy, size_t nb_workpiles ) {
+    defaultPolicy->workpiles  = newModel( ocr_workpile_data_priority_queue_steal_selfish_kind, nb_workpiles, NULL, NULL );
+}
+
+static inline void setDefaultModelWorkpilesDataPriorityQueueStealAltruistic ( ocr_model_policy_t * defaultPolicy, size_t nb_workpiles ) {
+    defaultPolicy->workpiles  = newModel( ocr_workpile_data_priority_queue_steal_altruistic_kind, nb_workpiles, NULL, NULL );
+}
+
+/*user priority queue variaties*/
+static inline void setDefaultModelWorkpilesUserPriorityQueueStealLast ( ocr_model_policy_t * defaultPolicy, size_t nb_workpiles ) {
+    defaultPolicy->workpiles  = newModel( ocr_workpile_user_priority_queue_steal_last_kind, nb_workpiles, NULL, NULL );
+}
+
+static inline void setDefaultModelWorkpilesUserPriorityQueueStealHalf ( ocr_model_policy_t * defaultPolicy, size_t nb_workpiles ) {
+    defaultPolicy->workpiles  = newModel( ocr_workpile_user_priority_queue_steal_half_kind, nb_workpiles, NULL, NULL );
+}
+
+static inline void setDefaultModelWorkpilesUserPriorityQueueCountingStealHalf ( ocr_model_policy_t * defaultPolicy, size_t nb_workpiles ) {
+    defaultPolicy->workpiles  = newModel( ocr_workpile_user_priority_queue_counting_steal_half_kind, nb_workpiles, NULL, NULL );
+}
+
+static inline void setDefaultModelWorkpilesUserPriorityQueueStealAltruistic ( ocr_model_policy_t * defaultPolicy, size_t nb_workpiles ) {
+    defaultPolicy->workpiles  = newModel( ocr_workpile_user_priority_queue_steal_altruistic_kind, nb_workpiles, NULL, NULL );
+}
+
+/*event sorted priority queue variaties*/
+static inline void setDefaultModelWorkpilesEventSortedPriorityQueueStealHalf ( ocr_model_policy_t * defaultPolicy, size_t nb_workpiles ) {
+    defaultPolicy->workpiles  = newModel( ocr_workpile_event_sorted_priority_queue_steal_half_kind, nb_workpiles, NULL, NULL );
+}
+
+static inline void setDefaultModelWorkpilesEventSortedPriorityQueueCountingStealHalf ( ocr_model_policy_t * defaultPolicy, size_t nb_workpiles ) {
+    defaultPolicy->workpiles  = newModel( ocr_workpile_event_sorted_priority_queue_counting_steal_half_kind, nb_workpiles, NULL, NULL );
+}
+
+static inline void setDefaultModelWorkpilesEventSortedPriorityQueueStealSelfish ( ocr_model_policy_t * defaultPolicy, size_t nb_workpiles ) {
+    defaultPolicy->workpiles  = newModel( ocr_workpile_event_sorted_priority_queue_steal_selfish_kind, nb_workpiles, NULL, NULL );
+}
+
+static inline void setDefaultModelWorkpilesEventSortedPriorityQueueStealAltruistic ( ocr_model_policy_t * defaultPolicy, size_t nb_workpiles ) {
+    defaultPolicy->workpiles  = newModel( ocr_workpile_event_sorted_priority_queue_steal_altruistic_kind, nb_workpiles, NULL, NULL );
+}
+
+/*data sorted priority queue variaties*/
+static inline void setDefaultModelWorkpilesDataSortedPriorityQueueStealHalf ( ocr_model_policy_t * defaultPolicy, size_t nb_workpiles ) {
+    defaultPolicy->workpiles  = newModel( ocr_workpile_data_sorted_priority_queue_steal_half_kind, nb_workpiles, NULL, NULL );
+}
+
+static inline void setDefaultModelWorkpilesDataSortedPriorityQueueCountingStealHalf ( ocr_model_policy_t * defaultPolicy, size_t nb_workpiles ) {
+    defaultPolicy->workpiles  = newModel( ocr_workpile_data_sorted_priority_queue_counting_steal_half_kind, nb_workpiles, NULL, NULL );
+}
+
+static inline void setDefaultModelWorkpilesDataSortedPriorityQueueStealSelfish ( ocr_model_policy_t * defaultPolicy, size_t nb_workpiles ) {
+    defaultPolicy->workpiles  = newModel( ocr_workpile_data_sorted_priority_queue_steal_selfish_kind, nb_workpiles, NULL, NULL );
+}
+
+static inline void setDefaultModelWorkpilesDataSortedPriorityQueueStealAltruistic ( ocr_model_policy_t * defaultPolicy, size_t nb_workpiles ) {
+    defaultPolicy->workpiles  = newModel( ocr_workpile_data_sorted_priority_queue_steal_altruistic_kind, nb_workpiles, NULL, NULL );
+}
+
+/*user sorted priority queue variaties*/
+static inline void setDefaultModelWorkpilesUserSortedPriorityQueueStealHalf ( ocr_model_policy_t * defaultPolicy, size_t nb_workpiles ) {
+    defaultPolicy->workpiles  = newModel( ocr_workpile_user_sorted_priority_queue_steal_half_kind, nb_workpiles, NULL, NULL );
+}
+
+static inline void setDefaultModelWorkpilesUserSortedPriorityQueueCountingStealHalf ( ocr_model_policy_t * defaultPolicy, size_t nb_workpiles ) {
+    defaultPolicy->workpiles  = newModel( ocr_workpile_user_sorted_priority_queue_counting_steal_half_kind, nb_workpiles, NULL, NULL );
+}
+
+static inline void setDefaultModelWorkpilesUserSortedPriorityQueueStealAltruistic ( ocr_model_policy_t * defaultPolicy, size_t nb_workpiles ) {
+    defaultPolicy->workpiles  = newModel( ocr_workpile_user_sorted_priority_queue_steal_altruistic_kind, nb_workpiles, NULL, NULL );
+}
+
 
 static inline void setDefaultModelMappings ( ocr_model_policy_t * defaultPolicy ) {
     // Defines how ocr modules are bound together
@@ -366,7 +461,7 @@ ocr_model_policy_t * defaultOcrModelPolicyDequishHeap(size_t nb_policy_domains, 
 
     setDefaultModelSchedulers (defaultPolicy, nb_policy_domains, nb_schedulers, nb_workers);
     setDefaultModelWorkers (defaultPolicy, nb_policy_domains, nb_workers, bind_map);
-    setDefaultModelWorkpilesDequishHeap (defaultPolicy, nb_workpiles);
+    setDefaultModelWorkpilesDequishHeapStealLast (defaultPolicy, nb_workpiles);
 
     defaultPolicy->executors  = newModel( ocr_executor_default_kind, nb_executors, NULL, NULL );
     defaultPolicy->memories   = newModel( OCR_LOWMEMORY_DEFAULT, 1, NULL, NULL );
@@ -380,9 +475,9 @@ ocr_model_policy_t * defaultOcrModelPolicyPriorityHeap(size_t nb_policy_domains,
 
     ocr_model_policy_t * defaultPolicy = defaultModelPolicyConstructor(nb_policy_domains);
 
-    setDefaultModelSchedulers (defaultPolicy, nb_policy_domains, nb_schedulers, nb_workers);
+    setSchedulersRandomVictimEventLocalityPush (defaultPolicy, nb_policy_domains, nb_schedulers, nb_workers);
     setDefaultModelWorkers (defaultPolicy, nb_policy_domains, nb_workers, bind_map);
-    setDefaultModelWorkpilesPriorityHeap (defaultPolicy, nb_workpiles);
+    setDefaultModelWorkpilesEventPriorityQueueStealLast (defaultPolicy, nb_workpiles);
 
     defaultPolicy->executors  = newModel( ocr_executor_default_kind, nb_executors, NULL, NULL );
     defaultPolicy->memories   = newModel( OCR_LOWMEMORY_DEFAULT, 1, NULL, NULL );
@@ -393,7 +488,7 @@ ocr_model_policy_t * defaultOcrModelPolicyPriorityHeap(size_t nb_policy_domains,
 
 ocr_model_policy_t * ocrModelPolicyCreator ( 
               enum md_file_workpile_policy workpile_policy, enum md_file_steal_victim_policy steal_victim_policy,
-              enum md_file_victim_extract_policy victim_extract_policy, enum md_file_push_policy push_policy,
+              enum md_file_victim_extract_policy victim_extract_policy, enum md_file_push_policy push_policy, enum md_file_priority_policy priority_policy,
               size_t nb_policy_domains, size_t nb_schedulers, size_t nb_workers, size_t nb_executors, size_t nb_workpiles, int* bind_map) {
     ocr_model_policy_t * defaultPolicy = defaultModelPolicyConstructor(nb_policy_domains);
 
@@ -407,7 +502,8 @@ ocr_model_policy_t * ocrModelPolicyCreator (
                 case MD_STEAL_ALTRUISTIC:
                 case MD_STEAL_SELFISH:
                 case MD_STEAL_HALF:
-                    assert( 0 && "half, altruistic or selfish stealing can not be used with deque");
+                case MD_COUNTING_STEAL_HALF:
+                    assert( 0 && "half, counting half altruistic or selfish stealing can not be used with deque");
                     break;
                 default:
                     assert(0 && "Invalid workpile choice");
@@ -417,10 +513,13 @@ ocr_model_policy_t * ocrModelPolicyCreator (
         case MD_DEQUEISH_HEAP:
             switch( victim_extract_policy ) {
                 case MD_STEAL_LAST:
-                    setDefaultModelWorkpilesDequishHeap (defaultPolicy, nb_workpiles);
+                    setDefaultModelWorkpilesDequishHeapStealLast (defaultPolicy, nb_workpiles);
                     break;
                 case MD_STEAL_HALF:
                     setDefaultModelWorkpilesDequishHeapStealHalf (defaultPolicy, nb_workpiles);
+                    break;
+                case MD_COUNTING_STEAL_HALF:
+                    setDefaultModelWorkpilesDequishHeapCountingStealHalf (defaultPolicy, nb_workpiles);
                     break;
                 case MD_STEAL_ALTRUISTIC:
                 case MD_STEAL_SELFISH:
@@ -434,16 +533,131 @@ ocr_model_policy_t * ocrModelPolicyCreator (
         case MD_PRIORITY_QUEUE:
             switch( victim_extract_policy ) {
                 case MD_STEAL_HALF:
-                    setDefaultModelWorkpilesPriorityHeapStealHalf (defaultPolicy, nb_workpiles);
+                    switch(priority_policy) {
+                        case MD_EVENT_PRIORITY:
+                            setDefaultModelWorkpilesEventPriorityQueueStealHalf (defaultPolicy, nb_workpiles);
+                            break;
+                        case MD_DATA_PRIORITY:
+                            setDefaultModelWorkpilesDataPriorityQueueStealHalf (defaultPolicy, nb_workpiles);
+                            break;
+                        case MD_USER_PRIORITY:
+                            setDefaultModelWorkpilesUserPriorityQueueStealHalf (defaultPolicy, nb_workpiles);
+                            break;
+                    };
+                    break;
+                case MD_COUNTING_STEAL_HALF:
+                    switch(priority_policy) {
+                        case MD_EVENT_PRIORITY:
+                            setDefaultModelWorkpilesEventPriorityQueueCountingStealHalf (defaultPolicy, nb_workpiles);
+                            break;
+                        case MD_DATA_PRIORITY:
+                            setDefaultModelWorkpilesDataPriorityQueueCountingStealHalf (defaultPolicy, nb_workpiles);
+                            break;
+                        case MD_USER_PRIORITY:
+                            setDefaultModelWorkpilesUserPriorityQueueCountingStealHalf (defaultPolicy, nb_workpiles);
+                            break;
+                    };
+                case MD_STEAL_LAST:
+                    switch(priority_policy) {
+                        case MD_EVENT_PRIORITY:
+                            setDefaultModelWorkpilesEventPriorityQueueStealLast (defaultPolicy, nb_workpiles);
+                            break;
+                        case MD_DATA_PRIORITY:
+                            setDefaultModelWorkpilesDataPriorityQueueStealLast (defaultPolicy, nb_workpiles);
+                            break;
+                        case MD_USER_PRIORITY:
+                            setDefaultModelWorkpilesUserPriorityQueueStealLast (defaultPolicy, nb_workpiles);
+                            break;
+                    };
+                case MD_STEAL_ALTRUISTIC:
+                    switch(priority_policy) {
+                        case MD_EVENT_PRIORITY:
+                            setDefaultModelWorkpilesEventPriorityQueueStealAltruistic (defaultPolicy, nb_workpiles);
+                            break;
+                        case MD_DATA_PRIORITY:
+                            setDefaultModelWorkpilesDataPriorityQueueStealAltruistic (defaultPolicy, nb_workpiles);
+                            break;
+                        case MD_USER_PRIORITY:
+                            setDefaultModelWorkpilesUserPriorityQueueStealAltruistic (defaultPolicy, nb_workpiles);
+                            break;
+                    };
+                case MD_STEAL_SELFISH:
+                    switch(priority_policy) {
+                        case MD_EVENT_PRIORITY:
+                            setDefaultModelWorkpilesEventPriorityQueueStealSelfish (defaultPolicy, nb_workpiles);
+                            break;
+                        case MD_DATA_PRIORITY:
+                            setDefaultModelWorkpilesDataPriorityQueueStealSelfish (defaultPolicy, nb_workpiles);
+                            break;
+                        case MD_USER_PRIORITY:
+                            assert( 0 && "selfish stealing can not be used with user priorities");
+                            break;
+                    };
+                default:
+                    assert(0 && "Invalid workpile choice");
+                    break;
+            };
+            break;
+        case MD_SORTED_PRIORITY_QUEUE:
+            switch( victim_extract_policy ) {
+                case MD_STEAL_HALF:
+                    switch(priority_policy) {
+                        case MD_EVENT_PRIORITY:
+                            setDefaultModelWorkpilesEventSortedPriorityQueueStealHalf (defaultPolicy, nb_workpiles);
+                            break;
+                        case MD_DATA_PRIORITY:
+                            setDefaultModelWorkpilesDataSortedPriorityQueueStealHalf (defaultPolicy, nb_workpiles);
+                            break;
+                        case MD_USER_PRIORITY:
+                            setDefaultModelWorkpilesUserSortedPriorityQueueStealHalf (defaultPolicy, nb_workpiles);
+                            break;
+                    };
+                    break;
+                case MD_COUNTING_STEAL_HALF:
+                    switch(priority_policy) {
+                        case MD_EVENT_PRIORITY:
+                            setDefaultModelWorkpilesEventSortedPriorityQueueCountingStealHalf (defaultPolicy, nb_workpiles);
+                            break;
+                        case MD_DATA_PRIORITY:
+                            setDefaultModelWorkpilesDataSortedPriorityQueueCountingStealHalf (defaultPolicy, nb_workpiles);
+                            break;
+                        case MD_USER_PRIORITY:
+                            setDefaultModelWorkpilesUserSortedPriorityQueueCountingStealHalf (defaultPolicy, nb_workpiles);
+                            break;
+                    };
                     break;
                 case MD_STEAL_LAST:
-                    setDefaultModelWorkpilesPriorityHeapStealLast (defaultPolicy, nb_workpiles);
+                    switch(priority_policy) {
+                        default:
+                            assert( 0 && "steal last is altruistic stealing for sorted workpiles, use that designation");
+                            break;
+                    };
                     break;
                 case MD_STEAL_ALTRUISTIC:
-                    setDefaultModelWorkpilesPriorityHeap (defaultPolicy, nb_workpiles);
+                    switch(priority_policy) {
+                        case MD_EVENT_PRIORITY:
+                            setDefaultModelWorkpilesEventSortedPriorityQueueStealAltruistic (defaultPolicy, nb_workpiles);
+                            break;
+                        case MD_DATA_PRIORITY:
+                            setDefaultModelWorkpilesDataSortedPriorityQueueStealAltruistic (defaultPolicy, nb_workpiles);
+                            break;
+                        case MD_USER_PRIORITY:
+                            setDefaultModelWorkpilesUserSortedPriorityQueueStealAltruistic (defaultPolicy, nb_workpiles);
+                            break;
+                    };
                     break;
                 case MD_STEAL_SELFISH:
-                    setDefaultModelWorkpilesPriorityHeapStealSelfish (defaultPolicy, nb_workpiles);
+                    switch(priority_policy) {
+                        case MD_EVENT_PRIORITY:
+                            setDefaultModelWorkpilesEventSortedPriorityQueueStealSelfish (defaultPolicy, nb_workpiles);
+                            break;
+                        case MD_DATA_PRIORITY:
+                            setDefaultModelWorkpilesDataSortedPriorityQueueStealSelfish (defaultPolicy, nb_workpiles);
+                            break;
+                        case MD_USER_PRIORITY:
+                            assert( 0 && "selfish stealing can not be used with user priorities");
+                            break;
+                    };
                     break;
                 default:
                     assert(0 && "Invalid workpile choice");
