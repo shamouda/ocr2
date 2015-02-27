@@ -293,7 +293,7 @@ inline static void trisolve_task_prescriber ( int k, int j, int tileSize, int nu
     ocrEdtSchedule(trisolve_task_guid);
 }
 
-inline static void update_nondiagonal_task_prescriber ( int k, int j, int i, int tileSize, ocrGuid_t*** lkji_event_guids) { 
+inline static void update_nondiagonal_task_prescriber ( int k, int j, int i, int numTiles, int tileSize, ocrGuid_t*** lkji_event_guids) { 
     ocrGuid_t update_nondiagonal_task_guid;
 
     intptr_t *func_args = (intptr_t *)malloc(5*sizeof(intptr_t));

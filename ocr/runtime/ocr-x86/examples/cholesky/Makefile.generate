@@ -42,7 +42,7 @@ MIC_SEQ_MKL_DYNAMIC_FLAGS=-L$(MKLROOT)/lib/mic -lmkl_intel_lp64 -lmkl_core -lmkl
 MULTI_MKL_INCLUDE=-openmp -I/${MKLROOT}/include 
 MIC_MULTI_MKL_INCLUDE=-openmp /opt/intel/composer_xe_2013_sp1.0.080/compiler/lib/mic/libiomp5.so  -I/${MKLROOT}/include 
 
-MULTI_MKL_STATIC_FLAGS=-Wl,--start-group $(MKLROOT)/lib/intel64/libmkl_intel_lp64.a $(MKLROOT)/lib/intel64/libmkl_core.a $(MKLROOT)/lib/intel64/libmkl_intel_thread.a -Wl,--end-group ${MIC_PTHREAD_LIBS} -lm
+MULTI_MKL_STATIC_FLAGS=-Wl,--start-group $(MKLROOT)/lib/intel64/libmkl_intel_lp64.a $(MKLROOT)/lib/intel64/libmkl_core.a $(MKLROOT)/lib/intel64/libmkl_intel_thread.a -Wl,--end-group ${PTHREAD_LIBS} -lm
 MULTI_MKL_DYNAMIC_FLAGS=-L$(MKLROOT)/lib/intel64 -lmkl_intel_lp64 -lmkl_core -lmkl_intel_thread -lpthread -lm
 
 MIC_MULTI_MKL_STATIC_FLAGS=-Wl,--start-group $(MKLROOT)/lib/mic/libmkl_intel_lp64.a $(MKLROOT)/lib/mic/libmkl_core.a $(MKLROOT)/lib/mic/libmkl_intel_thread.a -Wl,--end-group ${MIC_PTHREAD_LIBS} -lm

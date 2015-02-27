@@ -321,7 +321,7 @@ inline static void sequential_cholesky_task_prescriber ( int k, int tileSize, in
 
     long double nDescendants = dpotrfCountCalculator(numTiles, k);
     long double priority = nDescendants;
-    ocrEdtCreate(&seq_cholesky_task_guid, sequential_cholesky_task, 3, NULL, (void**)func_args, PROPERTIES, 1, NULL);
+    ocrEdtCreate(&seq_cholesky_task_guid, sequential_cholesky_task, 3, NULL, (void**)func_args, PROPERTIES, 1, NULL, nDescendants, priority);
 
     ocrAddDependence(lkji_event_guids[k][k][k], seq_cholesky_task_guid, 0);
     ocrEdtSchedule(seq_cholesky_task_guid);
@@ -338,7 +338,7 @@ inline static void trisolve_task_prescriber ( int k, int j, int tileSize, int nu
 
     long double nDescendants = dtrsmCountCalculator(numTiles, k, j);
     long double priority = nDescendants;
-    ocrEdtCreate(&trisolve_task_guid, trisolve_task, 4, NULL, (void**)func_args, PROPERTIES, 2, NULL);
+    ocrEdtCreate(&trisolve_task_guid, trisolve_task, 4, NULL, (void**)func_args, PROPERTIES, 2, NULL, nDescendants, priority);
 
     ocrAddDependence(lkji_event_guids[j][k][k], trisolve_task_guid, 0);
     ocrAddDependence(lkji_event_guids[k][k][k+1], trisolve_task_guid, 1);
@@ -357,7 +357,7 @@ inline static void update_nondiagonal_task_prescriber ( int k, int j, int i, int
 
     long double nDescendants = dgemmCountCalculator(numTiles, k, j, i);
     long double priority = nDescendants;
-    ocrEdtCreate(&update_nondiagonal_task_guid, update_nondiagonal_task, 5, NULL, (void**)func_args, PROPERTIES, 3, NULL);
+    ocrEdtCreate(&update_nondiagonal_task_guid, update_nondiagonal_task, 5, NULL, (void**)func_args, PROPERTIES, 3, NULL, nDescendants, priority);
 
     ocrAddDependence(lkji_event_guids[j][i][k], update_nondiagonal_task_guid, 0);
     ocrAddDependence(lkji_event_guids[j][k][k+1], update_nondiagonal_task_guid, 1);
@@ -379,7 +379,7 @@ inline static void update_diagonal_task_prescriber ( int k, int j, int i, int ti
 
     long double nDescendants = dsyrkCountCalculator(numTiles, k, j);
     long double priority = nDescendants;
-    ocrEdtCreate(&update_diagonal_task_guid, update_diagonal_task, 5, NULL, (void**)func_args, PROPERTIES, 2, NULL);
+    ocrEdtCreate(&update_diagonal_task_guid, update_diagonal_task, 5, NULL, (void**)func_args, PROPERTIES, 2, NULL, nDescendants, priority);
 
     ocrAddDependence(lkji_event_guids[j][j][k], update_diagonal_task_guid, 0);
     ocrAddDependence(lkji_event_guids[j][k][k+1], update_diagonal_task_guid, 1);

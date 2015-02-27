@@ -43,7 +43,7 @@ typedef struct heap {
         long double nDescendantsSum;
 } heap_t;
 
-#define INIT_HEAP_CAPACITY 768
+#define INIT_HEAP_CAPACITY 1440
 
 void heap_init(heap_t * heap, void * init_value);
 

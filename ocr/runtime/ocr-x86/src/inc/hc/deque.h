@@ -44,7 +44,7 @@ typedef struct deque {
 } deque_t;
 
 //#define INIT_DEQUE_CAPACITY 128
-#define INIT_DEQUE_CAPACITY 768
+#define INIT_DEQUE_CAPACITY 1440
 #define SLOW_EXPAND_THRESHOLD 128
 #define INC_DEQUE_CAPACITY 64
 
