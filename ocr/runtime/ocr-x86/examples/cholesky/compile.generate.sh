@@ -1,9 +1,9 @@
 for ocrbuild in .tbb "" ; do
-    for arch in .x86 .phi; do
+    for arch in .x86 .mic; do
         if [[ ".x86" == "$arch" ]]; then
             compile_arch=""
         else
-            compile_arch=$arch
+            compile_arch=".phi"
         fi
         for model in .ocr .serialized; do
             for allocator in "" .tbb; do
