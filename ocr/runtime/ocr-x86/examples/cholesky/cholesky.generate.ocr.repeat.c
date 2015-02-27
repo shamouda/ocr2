@@ -311,7 +311,7 @@ static inline long double dgemmCountCalculator ( int numTiles, int k, int j, int
     return factorCalculator(numTiles-j-1)*big-numTiles+i-2+i-k;
 }
 
-inline static void sequential_cholesky_task_prescriber ( int k, int tileSize, ocrGuid_t*** lkji_event_guids) {
+inline static void sequential_cholesky_task_prescriber ( int k, int tileSize, int numTiles, ocrGuid_t*** lkji_event_guids) {
     ocrGuid_t seq_cholesky_task_guid;
 
     intptr_t *func_args = (intptr_t *)malloc(3*sizeof(intptr_t));
@@ -327,7 +327,7 @@ inline static void sequential_cholesky_task_prescriber ( int k, int tileSize, oc
     ocrEdtSchedule(seq_cholesky_task_guid);
 }
 
-inline static void trisolve_task_prescriber ( int k, int j, int tileSize, ocrGuid_t*** lkji_event_guids) {
+inline static void trisolve_task_prescriber ( int k, int j, int tileSize, int numTiles, ocrGuid_t*** lkji_event_guids) {
     ocrGuid_t trisolve_task_guid;
 
     intptr_t *func_args = (intptr_t *)malloc(4*sizeof(intptr_t));
@@ -345,7 +345,7 @@ inline static void trisolve_task_prescriber ( int k, int j, int tileSize, ocrGui
     ocrEdtSchedule(trisolve_task_guid);
 }
 
-inline static void update_nondiagonal_task_prescriber ( int k, int j, int i, int tileSize, ocrGuid_t*** lkji_event_guids) { 
+inline static void update_nondiagonal_task_prescriber ( int k, int j, int i, int tileSize, int numTiles, ocrGuid_t*** lkji_event_guids) { 
     ocrGuid_t update_nondiagonal_task_guid;
 
     intptr_t *func_args = (intptr_t *)malloc(5*sizeof(intptr_t));
@@ -367,7 +367,7 @@ inline static void update_nondiagonal_task_prescriber ( int k, int j, int i, int
 }
 
 
-inline static void update_diagonal_task_prescriber ( int k, int j, int i, int tileSize, ocrGuid_t*** lkji_event_guids) { 
+inline static void update_diagonal_task_prescriber ( int k, int j, int i, int tileSize, int numTiles, ocrGuid_t*** lkji_event_guids) { 
     ocrGuid_t update_diagonal_task_guid;
 
     intptr_t *func_args = (intptr_t *)malloc(5*sizeof(intptr_t));
@@ -572,14 +572,14 @@ int main( int argc, char* argv[] ) {
         gettimeofday(&a,0);
 
         for ( k = 0; k < numTiles; ++k ) {
-            sequential_cholesky_task_prescriber ( k, tileSize, lkji_event_guids);
+            sequential_cholesky_task_prescriber ( k, tileSize, numTiles, lkji_event_guids);
 
             for( j = k + 1 ; j < numTiles ; ++j ) {
-                trisolve_task_prescriber ( k, j, tileSize, lkji_event_guids);
+                trisolve_task_prescriber ( k, j, tileSize, numTiles, lkji_event_guids);
 
-                update_diagonal_task_prescriber ( k, j, i, tileSize, lkji_event_guids);
+                update_diagonal_task_prescriber ( k, j, i, tileSize, numTiles, lkji_event_guids);
                 for( i = k + 1 ; i < j ; ++i ) {
-                    update_nondiagonal_task_prescriber ( k, j, i, tileSize, lkji_event_guids);
+                    update_nondiagonal_task_prescriber ( k, j, i, tileSize, numTiles, lkji_event_guids);
                 }
             }
         }
