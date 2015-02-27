@@ -348,7 +348,7 @@ inline static void wrap_up_task_prescriber ( int numTiles, int tileSize, ocrGuid
     func_args[1]=(intptr_t)tileSize;
     func_args[2]=(intptr_t)input_solution;
 
-    ocrEdtCreate(&wrap_up_task_guid, wrap_up_task, 3, NULL, (void**)func_args, PROPERTIES, (numTiles+1)*numTiles/2, NULL);
+    ocrEdtCreate(&wrap_up_task_guid, wrap_up_task, 3, NULL, (void**)func_args, PROPERTIES, (numTiles+1)*numTiles/2, NULL, 0, 0);
 
     int index = 0;
     for ( i = 0; i < numTiles; ++i ) {
