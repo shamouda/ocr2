@@ -974,6 +974,7 @@ void* locked_dequeish_heap_tail_pop_no_priority ( heap_t* heap ) {
             int size = heap->tail - heap->head;
             if ( size > 0 ) {
                 rt = (void*) heap->buffer->data[ --heap->tail % heap->buffer->capacity];
+                heap->nDescendantsSum -= ((hc_task_t*)rt)->nDescendants;
             }
             heap->lock = 0;
         }
