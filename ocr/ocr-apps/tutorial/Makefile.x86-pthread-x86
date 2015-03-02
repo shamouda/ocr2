@@ -11,7 +11,7 @@ OCR_TYPE        ?= x86-pthread-x86
 
 # OCR
 OCR_TARGET   ?= x86-pthread-x86
-OCR_SRC     ?= ../../../ocr
+OCR_ROOT         ?= ../../../ocr
 OCR_INSTALL_ROOT ?= ../../../ocr/install
 OCR_BUILD_ROOT   ?= ../../../ocr/build/
 

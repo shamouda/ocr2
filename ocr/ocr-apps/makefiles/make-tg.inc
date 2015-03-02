@@ -7,8 +7,8 @@
 # subfolders to do make and that screws up the relative
 # paths
 ifeq ($(RUN_JENKINS), run)
-TG_SRC                :=
-OCR_SRC               :=
+TG_ROOT               :=
+OCR_ROOT              :=
 OCR_BUILD_ROOT        :=
 OCR_BUILD_XE          :=
 OCR_BUILD_CE          :=
@@ -17,8 +17,8 @@ WORKLOAD_BUILD        :=
 APPS_LIBS_ROOT        :=
 WORKLOAD_SRC          :=
 else
-TG_SRC                := $(shell cd "${TG_SRC}" && pwd)
-OCR_SRC               := $(shell cd "${OCR_SRC}" && pwd)
+TG_ROOT               := $(shell cd "${TG_ROOT}" && pwd)
+OCR_ROOT              := $(shell cd "${OCR_ROOT}" && pwd)
 OCR_BUILD_ROOT        := $(shell cd "${OCR_BUILD_ROOT}" && pwd)
 OCR_BUILD_XE          := ${OCR_BUILD_ROOT}/${XE_TARGET}
 OCR_BUILD_CE          := ${OCR_BUILD_ROOT}/${CE_TARGET}
@@ -38,7 +38,7 @@ OCR_INSTALL_ROOT := $(shell mkdir -p ${OCR_INSTALL_ROOT} && cd "${OCR_INSTALL_RO
 OCR_INSTALL_XE   := ${OCR_INSTALL_ROOT}/${XE_TARGET}
 OCR_INSTALL_CE   := ${OCR_INSTALL_ROOT}/${CE_TARGET}
 
-FIX_CE_CONFIG    ?= ${OCR_SRC}/scripts/Configs/ce_config_fix.py
+FIX_CE_CONFIG    ?= ${OCR_ROOT}/scripts/Configs/ce_config_fix.py
 OCR_CE_CONFIG    ?= $(OCR_INSTALL_CE)/config/default.cfg
 OCR_XE_CONFIG    ?= $(OCR_INSTALL_XE)/config/default.cfg
 
@@ -188,7 +188,7 @@ $(WORKLOAD_BUILD)/$(TARGET): $(WORKLOAD_BUILD)/$(TARGET).dbg | $(WORKLOAD_BUILD)
 
 # Build the final blob
 # Note the order of the dependence. IMPORTANT!! Do not randomly change
-$(WORKLOAD_BUILD)/$(TARGET).blob: $(OCR_SRC)/scripts/Blob/aggregate_binary_files.sh \
+$(WORKLOAD_BUILD)/$(TARGET).blob: $(OCR_ROOT)/scripts/Blob/aggregate_binary_files.sh \
 $(WORKLOAD_BUILD)/$(TARGET).blob.ce $(WORKLOAD_BUILD)/$(TARGET).blob.xe \
 $(WORKLOAD_BUILD)/$(TARGET).blob.arg | $(WORKLOAD_BUILD)
 	$^ $(WORKLOAD_INPUTS) $@
@@ -234,7 +234,7 @@ else ifeq ($(RUN_JENKINS), build)
 libocrxe: $(OCR_INSTALL_XE)/lib/libocr.a
 $(OCR_INSTALL_XE)/lib/libocr.a: $(OCR_BUILD_XE)/Makefile
 	@echo "#### BUILDING XE libocr.a ####"
-	OCR_TYPE=$(XE_TARGET) OCR_INSTALL=$(OCR_INSTALL_XE) OCR_SRC=$(OCR_SRC) \
+	OCR_TYPE=$(XE_TARGET) OCR_INSTALL=$(OCR_INSTALL_XE) OCR_ROOT=$(OCR_ROOT) \
 	$(MAKE) -C $(OCR_BUILD_XE) $(TARGETS) install
 else
 # This set of rules is the safest (will catch all changes)
@@ -242,7 +242,7 @@ else
 # any modification to OCR's source
 libocrxe: $(OCR_BUILD_XE)/Makefile
 	@echo "#### CHECKING XE libocr.a ####"
-	OCR_TYPE=$(XE_TARGET) OCR_INSTALL=$(OCR_INSTALL_XE) OCR_SRC=$(OCR_SRC) \
+	OCR_TYPE=$(XE_TARGET) OCR_INSTALL=$(OCR_INSTALL_XE) OCR_ROOT=$(OCR_ROOT) \
 	$(MAKE) -C $(OCR_BUILD_XE) $(TARGETS) install
 $(OCR_INSTALL_XE)/lib/libocr.a: | libocrxe
 endif
@@ -263,13 +263,13 @@ builderxe: $(OCR_INSTALL_ROOT)/$(XE_BUILDER)/bin/builder.exe
 $(OCR_INSTALL_ROOT)/$(XE_BUILDER)/bin/builder.exe: $(OCR_BUILD_ROOT)/$(XE_BUILDER)/Makefile
 	@echo "#### BUILDING XE BUILDER ####"
 	OCR_TYPE=$(XE_BUILDER) OCR_INSTALL=$(OCR_INSTALL_ROOT)/$(XE_BUILDER) \
-	OCR_SRC=$(OCR_SRC) $(MAKE) -C $(OCR_BUILD_ROOT)/$(XE_BUILDER) $(TARGETS) install
+	OCR_ROOT=$(OCR_ROOT) $(MAKE) -C $(OCR_BUILD_ROOT)/$(XE_BUILDER) $(TARGETS) install
 else
 
 builderxe: $(OCR_BUILD_ROOT)/$(XE_BUILDER)/Makefile
 	@echo "#### CHECKING XE BUILDER ####"
 	OCR_TYPE=$(XE_BUILDER) OCR_INSTALL=$(OCR_INSTALL_ROOT)/$(XE_BUILDER) \
-	OCR_SRC=$(OCR_SRC) $(MAKE) -C $(OCR_BUILD_ROOT)/$(XE_BUILDER) $(TARGETS) install
+	OCR_ROOT=$(OCR_ROOT) $(MAKE) -C $(OCR_BUILD_ROOT)/$(XE_BUILDER) $(TARGETS) install
 $(OCR_INSTALL_ROOT)/$(XE_BUILDER)/bin/builder.exe: | builderxe
 endif
 
@@ -286,19 +286,19 @@ else ifeq ($(RUN_JENKINS), build)
 
 rmdkrnl.dbg: $(WORKLOAD_BUILD)/build.rmdkrnl/rmdkrnl
 .ONESHELL:
-$(WORKLOAD_BUILD)/build.rmdkrnl/rmdkrnl.dbg: $(TG_SRC)/build/build.rmdkrnl/make-me.make \
+$(WORKLOAD_BUILD)/build.rmdkrnl/rmdkrnl.dbg: $(TG_ROOT)/build/build.rmdkrnl/make-me.make \
 | $(WORKLOAD_BUILD)/build.rmdkrnl
-	@echo "#### BUILDING RMDKRNL FROM $(TG_SRC) ####"
-	OCR_SRC=$(OCR_SRC) OCR_TARGET=$(CE_TARGET) OCR_INSTALL=$(OCR_INSTALL_CE) OCR_BUILD=$(OCR_BUILD_CE) \
-	TG_SRC=$(TG_SRC) TG_INSTALL=$(TG_INSTALL) OCRAPPS_RUN_JENKINS=$(RUN_JENKINS) \
+	@echo "#### BUILDING RMDKRNL FROM $(TG_ROOT) ####"
+	OCR_ROOT=$(OCR_ROOT) OCR_TARGET=$(CE_TARGET) OCR_INSTALL=$(OCR_INSTALL_CE) OCR_BUILD=$(OCR_BUILD_CE) \
+	TG_ROOT=$(TG_ROOT) TG_INSTALL=$(TG_INSTALL) OCRAPPS_RUN_JENKINS=$(RUN_JENKINS) \
 	$(MAKE) -C $(WORKLOAD_BUILD)/build.rmdkrnl -f make-me.make $(TARGETS)
 else
 
 .ONESHELL:
-rmdkrnl.dbg: $(TG_SRC)/build/build.rmdkrnl/make-me.make | $(WORKLOAD_BUILD)/build.rmdkrnl
-	@echo "#### CHECKING RMDKRNL FROM $(TG_SRC) ####"
-	OCR_SRC=$(OCR_SRC) OCR_TARGET=$(CE_TARGET) OCR_INSTALL=$(OCR_INSTALL_CE) OCR_BUILD=$(OCR_BUILD_CE) \
-	TG_SRC=$(TG_SRC) TG_INSTALL=$(TG_INSTALL) OCRAPPS_RUN_JENKINS=$(RUN_JENKINS) \
+rmdkrnl.dbg: $(TG_ROOT)/build/build.rmdkrnl/make-me.make | $(WORKLOAD_BUILD)/build.rmdkrnl
+	@echo "#### CHECKING RMDKRNL FROM $(TG_ROOT) ####"
+	OCR_ROOT=$(OCR_ROOT) OCR_TARGET=$(CE_TARGET) OCR_INSTALL=$(OCR_INSTALL_CE) OCR_BUILD=$(OCR_BUILD_CE) \
+	TG_ROOT=$(TG_ROOT) TG_INSTALL=$(TG_INSTALL) OCRAPPS_RUN_JENKINS=$(RUN_JENKINS) \
 	$(MAKE) -C $(WORKLOAD_BUILD)/build.rmdkrnl -f make-me.make $(TARGETS)
 $(WORKLOAD_BUILD)/build.rmdkrnl/rmdkrnl.dbg: | rmdkrnl.dbg
 endif
@@ -320,13 +320,13 @@ builderce: $(OCR_INSTALL_ROOT)/$(CE_BUILDER)/bin/builder.exe
 $(OCR_INSTALL_ROOT)/$(CE_BUILDER)/bin/builder.exe: $(OCR_BUILD_ROOT)/$(CE_BUILDER)/Makefile
 	@echo "#### BUILDING CE BUILDER ####"
 	OCR_TYPE=$(CE_BUILDER) OCR_INSTALL=$(OCR_INSTALL_ROOT)/$(CE_BUILDER) \
-	OCR_SRC=$(OCR_SRC) $(MAKE) -C $(OCR_BUILD_ROOT)/$(CE_BUILDER) $(TARGETS) install
+	OCR_ROOT=$(OCR_ROOT) $(MAKE) -C $(OCR_BUILD_ROOT)/$(CE_BUILDER) $(TARGETS) install
 else
 
 builderce: $(OCR_BUILD_ROOT)/$(CE_BUILDER)/Makefile
 	@echo "#### CHECKING CE BUILDER ####"
 	OCR_TYPE=$(CE_BUILDER) OCR_INSTALL=$(OCR_INSTALL_ROOT)/$(CE_BUILDER) \
-	OCR_SRC=$(OCR_SRC) $(MAKE) -C $(OCR_BUILD_ROOT)/$(CE_BUILDER) $(TARGETS) install
+	OCR_ROOT=$(OCR_ROOT) $(MAKE) -C $(OCR_BUILD_ROOT)/$(CE_BUILDER) $(TARGETS) install
 $(OCR_INSTALL_ROOT)/$(CE_BUILDER)/bin/builder.exe: | builderce
 endif
 
@@ -341,9 +341,9 @@ uninstall:
 $(WORKLOAD_BUILD):
 	mkdir -p $(WORKLOAD_BUILD)
 
-$(WORKLOAD_BUILD)/build.rmdkrnl: $(TG_SRC)/build/build.rmdkrnl/make-me.make | $(WORKLOAD_BUILD)
+$(WORKLOAD_BUILD)/build.rmdkrnl: $(TG_ROOT)/build/build.rmdkrnl/make-me.make | $(WORKLOAD_BUILD)
 	mkdir -p $(WORKLOAD_BUILD)/build.rmdkrnl
-	@$(CP) --remove-destination $(TG_SRC)/build/build.rmdkrnl/make-me.make $(WORKLOAD_BUILD)/build.rmdkrnl
+	@$(CP) --remove-destination $(TG_ROOT)/build/build.rmdkrnl/make-me.make $(WORKLOAD_BUILD)/build.rmdkrnl
 
 $(WORKLOAD_INSTALL):
 	mkdir -p $(WORKLOAD_INSTALL)

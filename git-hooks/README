@@ -1,0 +1,17 @@
+This directory is meant to have everyone use similar commit hooks.
+
+To use:
+    - The simplest way is to add a symlink:
+        - Supposing you are at the root of your GIT repository
+        - cd .git
+        - mv hooks hooks_old
+        - ln -s ../git-hooks hooks
+    - You can also link to individual hooks or munge them your own way.
+
+
+Current hooks:
+    - pre-commit:
+        - Fixes any trailing whitespace issue. This will reduce the number of fake
+          differences
+    - commit-msg:
+        - Adds the ID line required by Gerrit

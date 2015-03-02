@@ -1,0 +1,8 @@
+This directory contains the original distributions of some external dependences
+used in the test harness.
+
+See each package for its description and license information
+
+Other dependences (need to be installed system wide):
+    - blist
+    - lxml

@@ -1,7 +1,7 @@
 #
 # OCR top level directory
 #
-OCR_SRC ?= ../..
+OCR_ROOT ?= ../..
 OCR_INSTALL_ROOT ?= ../../install
 
 OCR_BUILD := .
@@ -9,7 +9,7 @@ OCR_BUILD := .
 #
 # Make sure we have absolute paths
 #
-OCR_SRC := $(shell cd "${OCR_SRC}" && pwd)
+OCR_ROOT := $(shell cd "${OCR_ROOT}" && pwd)
 OCR_INSTALL_ROOT := $(shell mkdir -p "${OCR_INSTALL_ROOT}" && cd "${OCR_INSTALL_ROOT}" && pwd)
 OCR_BUILD := $(shell cd "${OCR_BUILD}" && pwd)
 
@@ -153,12 +153,12 @@ CFLAGS := -g -Wall $(CFLAGS) $(CFLAGS_USER)
 #
 # Generate a list of all source files and the respective objects
 #
-SRCS   := $(shell find -L $(OCR_SRC)/src -name '*.[csS]' -print)
+SRCS   := $(shell find -L $(OCR_ROOT)/src -name '*.[csS]' -print)
 
 #
 # Generate a source search path
 #
-VPATH  := $(shell find -L $(OCR_SRC)/src -type d -print)
+VPATH  := $(shell find -L $(OCR_ROOT)/src -type d -print)
 
 ifneq (,$(findstring OCR_RUNTIME_PROFILER,$(CFLAGS)))
 SRCSORIG = $(SRCS)
@@ -176,7 +176,7 @@ OBJS_EXEC     := $(addprefix $(OBJDIR)/exec/, $(addsuffix .o, $(basename $(notdi
 
 
 # Update include paths
-CFLAGS := -I . -I $(OCR_SRC)/inc -I $(OCR_SRC)/src -I $(OCR_SRC)/src/inc $(CFLAGS)
+CFLAGS := -I . -I $(OCR_ROOT)/inc -I $(OCR_ROOT)/src -I $(OCR_ROOT)/src/inc $(CFLAGS)
 
 # Static library name (only set if not set in OCR_TYPE specific file)
 ifeq (${SUPPORTS_STATIC}, yes)
@@ -302,7 +302,7 @@ $(OCREXEC): $(OBJS_EXEC)
 
 $(PROFILER_FILE): $(SRCSORIG) | $(OCR_BUILD)/src
 	@echo "Generating profile file..."
-	@$(OCR_SRC)/scripts/Profiler/generateProfilerFile.py $(OCR_SRC)/src $(OCR_BUILD)/src/profilerAutoGen h,c .git profiler
+	@$(OCR_ROOT)/scripts/Profiler/generateProfilerFile.py $(OCR_ROOT)/src $(OCR_BUILD)/src/profilerAutoGen h,c .git profiler
 	@echo "\tDone."
 
 $(OBJDIR)/static/%.o: %.c Makefile ../common.mk $(PROFILER_FILE) | $(OBJDIR)/static
@@ -355,9 +355,9 @@ INSTALL_TARGETS += exec
 INSTALL_EXES += $(OCREXEC)
 endif
 
-MACHINE_CONFIGS   := $(notdir $(wildcard $(OCR_SRC)/machine-configs/$(OCR_TYPE)/*))
-INC_FILES         := $(addprefix extensions/, $(notdir $(wildcard $(OCR_SRC)/inc/extensions/*))) \
-                     $(notdir $(wildcard $(OCR_SRC)/inc/*))
+MACHINE_CONFIGS   := $(notdir $(wildcard $(OCR_ROOT)/machine-configs/$(OCR_TYPE)/*))
+INC_FILES         := $(addprefix extensions/, $(notdir $(wildcard $(OCR_ROOT)/inc/extensions/*))) \
+                     $(notdir $(wildcard $(OCR_ROOT)/inc/*))
 
 INSTALLED_LIBS    := $(addprefix $(OCR_INSTALL)/lib/, $(notdir $(INSTALL_LIBS)))
 BASE_LIBS         := $(firstword $(dir $(INSTALL_LIBS)))
@@ -372,10 +372,10 @@ $(OCR_INSTALL)/lib/%: $(BASE_LIBS)% | $(OCR_INSTALL)/lib
 $(OCR_INSTALL)/bin/%: $(BASE_EXES)% | $(OCR_INSTALL)/bin
 	@$(CP) --remove-destination $< $@
 
-$(OCR_INSTALL)/config/%: $(OCR_SRC)/machine-configs/$(OCR_TYPE)/% | $(OCR_INSTALL)/config
+$(OCR_INSTALL)/config/%: $(OCR_ROOT)/machine-configs/$(OCR_TYPE)/% | $(OCR_INSTALL)/config
 	@$(CP) --remove-destination $< $@
 
-$(OCR_INSTALL)/include/%: $(OCR_SRC)/inc/% | $(OCR_INSTALL)/include $(OCR_INSTALL)/include/extensions
+$(OCR_INSTALL)/include/%: $(OCR_ROOT)/inc/% | $(OCR_INSTALL)/include $(OCR_INSTALL)/include/extensions
 	@$(CP) --remove-destination $< $@
 
 $(OCR_INSTALL)/lib $(OCR_INSTALL)/bin $(OCR_INSTALL)/config $(OCR_INSTALL)/include \
@@ -386,7 +386,7 @@ $(OCR_INSTALL)/include/extensions :
 .ONESHELL:
 install: ${INSTALL_TARGETS} ${INSTALLED_LIBS} ${INSTALLED_EXES} ${INSTALLED_CONFIGS} ${INSTALLED_INCS}
 	@printf "\033[32m Installed '$(INSTALL_LIBS) $(INSTALL_EXES)' into '$(OCR_INSTALL)'\033[0m\n"
-	@if [ -d $(OCR_SRC)/machine-configs/$(OCR_TYPE) ]; then \
+	@if [ -d $(OCR_ROOT)/machine-configs/$(OCR_TYPE) ]; then \
 		$(RM) -f $(OCR_INSTALL)/config/default.cfg; \
 		$(LN) -s ./$(DEFAULT_CONFIG) $(OCR_INSTALL)/config/default.cfg; \
 	fi

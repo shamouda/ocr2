@@ -6,7 +6,7 @@
 # subfolders to do make and that screws up the relative
 # paths
 ifeq ($(RUN_JENKINS), run)
-OCR_SRC               :=
+OCR_ROOT               :=
 OCR_BUILD_ROOT        :=
 OCR_BUILD             :=
 WORKLOAD_BUILD_ROOT   :=
@@ -14,7 +14,7 @@ WORKLOAD_BUILD        :=
 APPS_ROOT             :=
 WORKLOAD_SRC          :=
 else
-OCR_SRC               := $(shell cd "${OCR_SRC}" && pwd)
+OCR_ROOT               := $(shell cd "${OCR_ROOT}" && pwd)
 OCR_BUILD_ROOT        := $(shell cd "${OCR_BUILD_ROOT}" && pwd)
 OCR_BUILD             := ${OCR_BUILD_ROOT}/${OCR_TARGET}
 WORKLOAD_BUILD_ROOT   := $(shell mkdir -p "${WORKLOAD_BUILD_ROOT}" && cd "${WORKLOAD_BUILD_ROOT}" && pwd)
@@ -153,11 +153,11 @@ else ifeq ($(RUN_JENKINS), build)
 libocr: $(OCR_INSTALL)/lib/libocr.so
 $(OCR_INSTALL)/lib/libocr.so: $(OCR_BUILD)/Makefile
 	@echo "Building libocr.so..."
-	OCR_TYPE=$(OCR_TYPE) OCR_INSTALL=$(OCR_INSTALL) OCR_SRC=$(OCR_SRC) $(MAKE) -C $(OCR_BUILD) $(TARGETS) install
+	OCR_TYPE=$(OCR_TYPE) OCR_INSTALL=$(OCR_INSTALL) OCR_ROOT=$(OCR_ROOT) $(MAKE) -C $(OCR_BUILD) $(TARGETS) install
 else
 libocr: $(OCR_BUILD)/Makefile
 	@echo "Checking on libocr.so..."
-	OCR_TYPE=$(OCR_TYPE) OCR_INSTALL=$(OCR_INSTALL) OCR_SRC=$(OCR_SRC) $(MAKE) -C $(OCR_BUILD) $(TARGETS) install
+	OCR_TYPE=$(OCR_TYPE) OCR_INSTALL=$(OCR_INSTALL) OCR_ROOT=$(OCR_ROOT) $(MAKE) -C $(OCR_BUILD) $(TARGETS) install
 endif
 
 # If the visualizer is being used, add necessary CFLAGS to application's makefile

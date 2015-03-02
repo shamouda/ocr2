@@ -14,7 +14,7 @@ OCR_TYPE        ?= x86-pthread-${COMM_LAYER}
 # OCR
 OCR_TARGET   ?= x86-pthread-${COMM_LAYER}
 OCR_INSTALL_ROOT ?= ../../../ocr/install
-OCR_SRC     ?= ../../../ocr
+OCR_ROOT         ?= ../../../ocr
 OCR_BUILD_ROOT   ?= ../../../ocr/build
 
 # APPLICATION

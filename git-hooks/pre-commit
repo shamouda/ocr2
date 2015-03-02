@@ -1,0 +1,87 @@
+#!/bin/sh
+#
+
+# A git hook script to find and fix trailing whitespace
+# in your commits. Bypass it with the --no-verify option
+# to git-commit
+#
+
+if git-rev-parse --verify HEAD >/dev/null 2>&1 ; then
+    against=HEAD
+else
+    # Initial commit: diff against an empty tree object
+    against=4b825dc642cb6eb9a060e54bf8d69288fbee4904
+fi
+
+# If you want to allow non-ascii filenames set this variable to true.
+allownonascii=$(git config hooks.allownonascii)
+
+# Redirect output to stderr.
+exec 1>&2
+
+# Cross platform projects tend to avoid non-ascii filenames; prevent
+# them from being added to the repository. We exploit the fact that the
+# printable range starts at the space character and ends with tilde.
+if [ "$allownonascii" != "true" ] &&
+    # Note that the use of brackets around a tr range is ok here, (it's
+    # even required, for portability to Solaris 10's /usr/bin/tr), since
+    # the square bracket bytes happen to fall in the designated range.
+    test $(git diff --cached --name-only --diff-filter=A -z $against |
+	LC_ALL=C tr -d '[ -~]\0' | wc -c) != 0
+then
+    echo "Error: Attempt to add a non-ascii file name."
+    echo
+    echo "This can cause problems if you want to work"
+    echo "with people on other platforms."
+    echo
+    echo "To be portable it is advisable to rename the file ..."
+    echo
+    echo "If you know what you are doing you can disable this"
+    echo "check using:"
+    echo
+    echo "  git config hooks.allownonascii true"
+    echo
+    exit 1
+fi
+
+# Find files with trailing whitespace
+# The original command (below) only fixes CHANGES that introduce whitespace
+# errors. We are adding a slower version that fixes the file regardless. This
+# will not be needed when all files are fixed but for now is useful
+# Another important fix is that this NEVER touches the working directory but
+# operates ONLY on the index (directly using GIT hashes). This is much safer and
+# allows for partial commits
+
+# FIXME
+#for FILE in `exec git diff-index --check --cached $against -- | sed '/^[+-]/d' | (sed -r 's/:[0-9]+:.*//' 2>&1 || sed -E 's/:[0-9]+:.*//') | uniq` ; do
+
+files_to_check=""
+git diff-index --diff-filter=ACMR --cached $against -- | sed -e 's/:[0-9]\{6\} \([0-9]\{6\}\) [a-f0-9]\{40\} \([a-f0-9]\{40\}\) [ACMR]\t\(.*\)/\1 \2 \3/' | while read mode object path; do
+    # We ned to make sure that we are not modifying a binary file
+    # We therefore test to see if this is a binary file and if
+    # so we ignore it. The trick is to use 'git grep' to match
+    # anything (the '-e .' part) but exclude binary files (the '-I' part)
+    # Very fiendish (thank you Google)
+    git grep -I --name-only -e . -- "$path" > /dev/null
+    if [ $? -eq 0 ]; then
+        # Non binary file
+        case $mode in
+            10*)
+                formatted=`git show $object | sed  -e 's/[[:space:]]*$//' | git hash-object -w --stdin`
+                git update-index --cacheinfo $mode $formatted "$path"
+                files_to_check="${files_to_check} \"$path\""
+                ;;
+        esac
+    fi
+done
+
+# Now go back and see if the only stuff left over is the white-space errors
+# This may be left in an unmerged state and confuse people. We check if the only
+# differences left are whitespace and if so, we dump them
+git diff --numstat --ignore-space-at-eol -- $files_to_check | grep $'^0\t0\t' | cut -d$'\t' -f3- | sed 's/\(.*\)/"\1"/g' | git checkout-index -n -f --stdin
+
+exit
+
+
+
+
