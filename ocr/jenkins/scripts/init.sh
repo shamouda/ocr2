@@ -20,7 +20,7 @@ cp -r ${JJOB_PRIVATE_HOME}/xstack/jenkins/* ${JJOB_SHARED_HOME}/xstack/jenkins/
 cp -r ${JJOB_PRIVATE_HOME}/xstack/ocr/jenkins/* ${JJOB_SHARED_HOME}/xstack/ocr/jenkins/
 cp -r ${JJOB_PRIVATE_HOME}/xstack/ocr/scripts/* ${JJOB_SHARED_HOME}/xstack/ocr/scripts/
 cp -r ${JJOB_PRIVATE_HOME}/xstack/ocr/ocr-apps/* ${JJOB_SHARED_HOME}/xstack/ocr/ocr-apps/
-rsync -av -r ${JJOB_PRIVATE_HOME}/apps/ ${JJOB_SHARED_HOME}/apps/ --exclude libs --exclude makefiles
+rsync -av -r ${JJOB_PRIVATE_HOME}/xstack/apps/ ${JJOB_SHARED_HOME}/xstack/apps/ --exclude libs --exclude makefiles
 
 if [ "x$TG" == "xtg" ]; then
     mkdir -p ${JJOB_SHARED_HOME}/intel/ss/jenkins

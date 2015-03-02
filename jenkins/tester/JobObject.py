@@ -10,6 +10,14 @@ def mycopytree(src, dest):
     names = os.listdir(src)
     errors = []
     myLog = logging.getLogger()
+
+    if os.path.exists(dest):
+        if not os.path.isdir(dest):
+            myLog.error("Destination directory ('%s') exists but is NOT a directory" % (dest))
+            return
+    else:
+        os.makedirs(dest)
+
     for name in names:
         srcname = os.path.join(src, name)
         destname = os.path.join(dest, name)
@@ -22,16 +30,16 @@ def mycopytree(src, dest):
                     shutil.copytree(srcname, destname, symlinks=True)
             else:
                 shutil.copy2(srcname, destname)
-        except shutil.OSError as why:
+        except OSError as why:
             errors.append((srcname, destname, str(why)))
-        except Error as err:
+        except shutil.Error as err:
             errors.extend(err)
     # End of for over names
     try:
         shutil.copystat(src, dest)
     except shutil.WindowsError:
         pass
-    except shutil.OSError as why:
+    except OSError as why:
         errors.append((src, dest, str(why)))
     # Check if any errors
     if len(errors):

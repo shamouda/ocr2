@@ -731,13 +731,28 @@ def main(argv=None):
         # Pick the appropriate alternative
         # Do this first to deal with alternatives that may not yet match the keywords but that will
         # be added back later
+
+        repoMissingJobs = dict() # Jobs that don't have all the repos they need. Keeping track of separately
+                                 # to properly inform the user
+        toRemoveKeys = []
+        for k, v in tempJobs.iteritems():
+            jobType = allJobTypes.get(v['jobtype'])
+            if not hasKeywords(cleanDirectories.keys(), [j.upper() for j in jobType.req_repos + v.get('req-repos', ())], True):
+                myLog.info("Ignoring job '%s' due to lack of repositories" % (v['name']))
+                toRemoveKeys.append(k)
+        for k in toRemoveKeys:
+            repoMissingJobs[k] = tempJobs[k]
+            del tempJobs[k]
+
         toRemoveKeys = []
         if alternateJobs['__count'] > 0:
             for i in range(0, alternateJobs['__count']):
                 maxSet = frozenset()
                 maxName = None
                 for name in alternateJobs[i].get('alternates'):
-                    job = tempJobs[name]
+                    job = tempJobs.get(name, None)
+                    if job is None:
+                        continue
                     jobType = allJobTypes.get(job['jobtype'])
                     myReqSet = frozenset(jobType.req_repos + job.get('req-repos', ()))
                     if myReqSet > maxSet:
@@ -766,18 +781,6 @@ def main(argv=None):
                 toRemoveKeys.append(k)
         for k in toRemoveKeys:
             sideJobs[k] = tempJobs[k]
-            del tempJobs[k]
-
-        repoMissingJobs = dict() # Jobs that don't have all the repos they need. Keeping track of separately
-                                 # to properly inform the user
-        toRemoveKeys = []
-        for k, v in tempJobs.iteritems():
-            jobType = allJobTypes.get(v['jobtype'])
-            if not hasKeywords(cleanDirectories.keys(), [j.upper() for j in jobType.req_repos + v.get('req-repos', ())], True):
-                myLog.info("Ignoring job '%s' due to lack of repositories" % (v['name']))
-                toRemoveKeys.append(k)
-        for k in toRemoveKeys:
-            repoMissingJobs[k] = tempJobs[k]
             del tempJobs[k]
 
         for k, v in tempJobs.iteritems():
