@@ -11,6 +11,7 @@
 
 #include "ocr-comp-platform.h"
 #include "ocr-policy-domain.h"
+#include "policy-domain/ce/ce-policy.h"
 
 #include "ocr-sysboot.h"
 #include "utils/ocr-utils.h"
@@ -84,6 +85,7 @@ ocrPolicyMsg_t sendBuf, recvBuf; // Currently size of 1 msg each.
 u8 ceCommCheckCEMessage(ocrCommPlatform_t *self, ocrPolicyMsg_t **msg);
 u8 ceCommDestructMessage(ocrCommPlatform_t *self, ocrPolicyMsg_t *msg);
 u8 ceCommDestructCEMessage(ocrCommPlatform_t *self, ocrPolicyMsg_t *msg);
+u8 ceCommCheckSeqIdRecv(ocrCommPlatform_t *self, ocrPolicyMsg_t *msg);
 
 void ceCommDestruct (ocrCommPlatform_t * base) {
 
@@ -264,9 +266,10 @@ u8 ceCommSendMessage(ocrCommPlatform_t *self, ocrLocation_t target,
     // If target is not in the same block, use a different function
     // FIXME: do the same for chip/unit/board as well, or better yet, a new macro
     if((self->location & ~ID_AGENT_MASK) != (target & ~ID_AGENT_MASK)) {
+        message->seqId = self->fcts.getSeqIdAtNeighbor(self, target, 0);
         return ceCommSendMessageToCE(self, target, message, id, properties, mask);
     } else {
-
+        message->seqId = 0; //For XE's the neighbor ID of the CE is always 0.
         // TODO: compute all-but-agent & compare between us & target
         // Target XE's stage (note this is in remote XE memory!)
         u64 * rq = cp->rq[((u64)target) & ID_AGENT_MASK];
@@ -307,6 +310,12 @@ u8 ceCommSendMessage(ocrCommPlatform_t *self, ocrLocation_t target,
 
         return 0;
     }
+}
+
+u8 ceCommCheckSeqIdRecv(ocrCommPlatform_t *self, ocrPolicyMsg_t *msg) {
+    u64 mask = msg->srcLocation & self->location;
+    msg->seqId = (mask >> fls64(mask)) & 0xF; // Assumption: that there are always <= 0xF neighbors
+    return 0;
 }
 
 u8 ceCommPollMessage(ocrCommPlatform_t *self, ocrPolicyMsg_t **msg,
@@ -353,6 +362,7 @@ u8 ceCommPollMessage(ocrCommPlatform_t *self, ocrPolicyMsg_t **msg,
             ASSERT(0);
         }
         ocrPolicyMsgUnMarshallMsg((u8*)*msg, NULL, *msg, MARSHALL_APPEND);
+        ceCommCheckSeqIdRecv(self, *msg);
 
         // Advance queue for next check
         cp->pollq = (i + 1) % MAX_NUM_XE;
@@ -389,6 +399,7 @@ u8 ceCommCheckCEMessage(ocrCommPlatform_t *self, ocrPolicyMsg_t **msg) {
         }
         DPRINTF(DEBUG_LVL_VVERB, "Got message %lx from CE of type %x\n", (*msg)->msgId, (*msg)->type);
         ocrPolicyMsgUnMarshallMsg((u8*)*msg, NULL, &recvBuf, MARSHALL_FULL_COPY);
+        ceCommCheckSeqIdRecv(self, *msg);
         ceCommDestructCEMessage(self, *msg);
         *msg = &recvBuf;
         return 0;
@@ -441,6 +452,7 @@ u8 ceCommWaitMessage(ocrCommPlatform_t *self,  ocrPolicyMsg_t **msg,
         ASSERT(0);
     }
     ocrPolicyMsgUnMarshallMsg((u8*)*msg, NULL, *msg, MARSHALL_APPEND);
+    ceCommCheckSeqIdRecv(self, *msg);
 #else
     // We have a message
     // NOTE: For now we copy it into the buffer provided by the caller
@@ -512,6 +524,10 @@ u8 ceCommDestructMessage(ocrCommPlatform_t *self, ocrPolicyMsg_t *msg) {
     return 0;
 }
 
+u64 ceGetSeqIdAtNeighbor(ocrCommPlatform_t *self, ocrLocation_t neighborLoc, u64 neighborId) {
+    return UNINITIALIZED_NEIGHBOR_INDEX;
+}
+
 ocrCommPlatform_t* newCommPlatformCe(ocrCommPlatformFactory_t *factory,
                                      ocrParamList_t *perInstance) {
 
@@ -559,6 +575,8 @@ ocrCommPlatformFactory_t *newCommPlatformFactoryCe(ocrParamList_t *perType) {
                                      ceCommWaitMessage);
     base->platformFcts.destructMessage = FUNC_ADDR(u8 (*)(ocrCommPlatform_t*, ocrPolicyMsg_t*),
                                          ceCommDestructMessage);
+    base->platformFcts.getSeqIdAtNeighbor = FUNC_ADDR(u64 (*)(ocrCommPlatform_t*, ocrLocation_t, u64),
+                                                   ceGetSeqIdAtNeighbor);
 
     return base;
 }

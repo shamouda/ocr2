@@ -223,6 +223,16 @@ typedef struct _ocrCommPlatformFcts_t {
      * @return The status of the message
      */
     ocrMsgStatus_t (*getMessageStatus)(struct _ocrCommPlatform_t *self, u64 id);
+
+    /**
+     * @brief Returns the sequential index of this policy domain
+     *        maintained by the neighbor policy domain.
+     *
+     * @param[in] self          Pointer to this comm-platform
+     * @param[in] neighborLoc   Location of neighbor policy domain
+     * @param[in] neighborId    Sequential ID of neighbor location in this policy domain
+     */
+    u64 (*getSeqIdAtNeighbor)(struct _ocrCommPlatform_t *self, ocrLocation_t neighborLoc, u64 neighborId);
 } ocrCommPlatformFcts_t;
 
 /**

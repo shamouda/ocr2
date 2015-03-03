@@ -36,6 +36,7 @@ void xePthreadCommBegin(ocrCommPlatform_t * commPlatform, ocrPolicyDomain_t * PD
     commPlatformXePthread->channel = &(commPlatformCePthread->channels[commPlatformCePthread->channelIdx++]);
     DPRINTF(DEBUG_LVL_VVERB, "Setting up channel %p on %lu \n", commPlatformXePthread->channel, PD->parentLocation);
     ASSERT(PD->parentLocation == cePD->myLocation);
+    commPlatformXePthread->seqIdAtCe = UNINITIALIZED_NEIGHBOR_INDEX;
     return;
 }
 
@@ -59,6 +60,7 @@ u8 xePthreadCommSendMessage(ocrCommPlatform_t *self, ocrLocation_t target, ocrPo
                             u64 *id, u32 properties, u32 mask) {
     ocrCommPlatformXePthread_t * commPlatformXePthread = (ocrCommPlatformXePthread_t*)self;
     ocrCommChannel_t * channel = commPlatformXePthread->channel;
+    msg->seqId = self->fcts.getSeqIdAtNeighbor(self, target, msg->seqId);
 
     if (!__sync_bool_compare_and_swap ((&(channel->message)), NULL, msg))
         return OCR_EBUSY;
@@ -107,6 +109,12 @@ u8 xePthreadCommWaitMessage(ocrCommPlatform_t *self, ocrPolicyMsg_t **msg,
 u8 xePthreadDestructMessage(ocrCommPlatform_t *self, ocrPolicyMsg_t *msg) {
     // TODO
     return 0;
+}
+
+u64 xePthreadGetSeqIdAtNeighbor(ocrCommPlatform_t *self, ocrLocation_t neighborLoc, u64 neighborId) {
+    ASSERT(neighborLoc == self->pd->parentLocation);
+    ocrCommPlatformXePthread_t *commPlatformXePthread = (ocrCommPlatformXePthread_t*)self;
+    return commPlatformXePthread->seqIdAtCe;
 }
 
 ocrCommPlatform_t* newCommPlatformXePthread(ocrCommPlatformFactory_t *factory,
@@ -158,6 +166,8 @@ ocrCommPlatformFactory_t *newCommPlatformFactoryXePthread(ocrParamList_t *perTyp
                                      xePthreadCommWaitMessage);
     base->platformFcts.destructMessage = FUNC_ADDR(u8 (*)(ocrCommPlatform_t*, ocrPolicyMsg_t *),
                                                    xePthreadDestructMessage);
+    base->platformFcts.getSeqIdAtNeighbor = FUNC_ADDR(u64 (*)(ocrCommPlatform_t*, ocrLocation_t, u64),
+                                                   xePthreadGetSeqIdAtNeighbor);
 
     return base;
 }

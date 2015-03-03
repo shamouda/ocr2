@@ -50,6 +50,35 @@ void cePthreadCommBegin(ocrCommPlatform_t * commPlatform, ocrPolicyDomain_t * PD
     for (i = 0, idx = xeCount; i < PD->neighborCount; i++) {
         commPlatformCePthread->channels[idx++].remoteLocation = PD->neighbors[i];
     }
+
+    // Setup neighbor translation table
+    u64 parentSlotRequired = 1;
+    for(i = 0; i < PD->neighborCount; i++) {
+        if (PD->neighbors[i] == PD->parentLocation) {
+            parentSlotRequired = 0;
+            commPlatformCePthread->parentIdx = i;
+            break;
+        }
+    }
+
+    commPlatformCePthread->countTT = PD->neighborCount + xeCount + parentSlotRequired;
+    commPlatformCePthread->locationTT = (ocrNeighbor_t*)runtimeChunkAlloc(commPlatformCePthread->countTT * sizeof(ocrNeighbor_t), PERSISTENT_CHUNK);
+    for(i = 0; i < PD->neighborCount; i++) {
+        commPlatformCePthread->locationTT[i].loc = PD->neighbors[i];
+        commPlatformCePthread->locationTT[i].seqId = UNINITIALIZED_NEIGHBOR_INDEX;
+    }
+
+    for(i = 0; i < xeCount; i++) {
+        u64 idx = PD->neighborCount + i;
+        commPlatformCePthread->locationTT[idx].loc = PD->myLocation - xeCount + i;
+        commPlatformCePthread->locationTT[idx].seqId = UNINITIALIZED_NEIGHBOR_INDEX;
+    }
+
+    if(parentSlotRequired == 1) {
+        commPlatformCePthread->parentIdx = PD->neighborCount + xeCount;
+        commPlatformCePthread->locationTT[commPlatformCePthread->parentIdx].loc = PD->parentLocation;
+        commPlatformCePthread->locationTT[commPlatformCePthread->parentIdx].seqId = UNINITIALIZED_NEIGHBOR_INDEX;
+    }
     return;
 }
 
@@ -80,12 +109,29 @@ void cePthreadCommStop(ocrCommPlatform_t * commPlatform) {
 void cePthreadCommFinish(ocrCommPlatform_t *commPlatform) {
 }
 
+u8 cePthreadCommCheckSeqIdRecv(ocrCommPlatform_t *self, ocrPolicyMsg_t *msg) {
+    if (msg->seqId == UNINITIALIZED_NEIGHBOR_INDEX) {
+        //This is done until registration completes
+        u64 i;
+        ocrCommPlatformCePthread_t * commPlatformCePthread = (ocrCommPlatformCePthread_t*)self;
+        for (i = 0 ; i < commPlatformCePthread->countTT; i++) {
+            if (commPlatformCePthread->locationTT[i].loc == msg->srcLocation) {
+                msg->seqId = i;
+                break;
+            }
+        }
+        ASSERT(msg->seqId != UNINITIALIZED_NEIGHBOR_INDEX);
+    }
+    return 0;
+}
+
 u8 cePthreadCommSendMessage(ocrCommPlatform_t *self, ocrLocation_t target, ocrPolicyMsg_t *msg,
                             u64 *id, u32 properties, u32 mask) {
     u32 i;
     ocrCommPlatformCePthread_t * commPlatformCePthread = (ocrCommPlatformCePthread_t*)self;
     ocrPolicyDomainCe_t *cePD = (ocrPolicyDomainCe_t*)self->pd;
     ASSERT(target != self->pd->myLocation);
+    msg->seqId = self->fcts.getSeqIdAtNeighbor(self, target, msg->seqId);
 
     //FIXME: This is currently a hack to know if target is a CE or XE.
     //This needs to be replaced by a location query in future.
@@ -213,6 +259,7 @@ u8 cePthreadCommPollMessage(ocrCommPlatform_t *self, ocrPolicyMsg_t **msg,
             hal_fence();
             ++(channel->remoteCounter);
             *msg = message;
+            cePthreadCommCheckSeqIdRecv(self, *msg);
             return 0;
         }
     }
@@ -266,6 +313,7 @@ u8 cePthreadCommPollMessage(ocrCommPlatform_t *self, ocrPolicyMsg_t **msg,
             commPlatformCePthread->startIdx = (idx + 1) % numChannels;
             DPRINTF(DEBUG_LVL_VERB, "Received message @ %p of type 0x%x from %lu\n",
                     (*msg), (*msg)->type, (u64)((*msg)->srcLocation));
+            cePthreadCommCheckSeqIdRecv(self, *msg);
             return 0;
         }
     }
@@ -277,6 +325,14 @@ u8 cePthreadCommWaitMessage(ocrCommPlatform_t *self, ocrPolicyMsg_t **msg,
     while (cePthreadCommPollMessage(self, msg, properties, mask) != 0)
         ;
     return 0;
+}
+
+u64 cePthreadGetSeqIdAtNeighbor(ocrCommPlatform_t *self, ocrLocation_t neighborLoc, u64 neighborId) {
+    ocrCommPlatformCePthread_t *commPlatformCePthread = (ocrCommPlatformCePthread_t*)self;
+    if (neighborLoc == self->pd->parentLocation) {
+        return commPlatformCePthread->locationTT[commPlatformCePthread->parentIdx].seqId;
+    }
+    return commPlatformCePthread->locationTT[neighborId].seqId;
 }
 
 u8 cePthreadDestructMessage(ocrCommPlatform_t *self, ocrPolicyMsg_t *msg) {
@@ -332,6 +388,8 @@ ocrCommPlatformFactory_t *newCommPlatformFactoryCePthread(ocrParamList_t *perTyp
                                      cePthreadCommWaitMessage);
     base->platformFcts.destructMessage = FUNC_ADDR(u8 (*)(ocrCommPlatform_t*, ocrPolicyMsg_t*),
                                                    cePthreadDestructMessage);
+    base->platformFcts.getSeqIdAtNeighbor = FUNC_ADDR(u64 (*)(ocrCommPlatform_t*, ocrLocation_t, u64),
+                                                   cePthreadGetSeqIdAtNeighbor);
 
     return base;
 }
