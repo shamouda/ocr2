@@ -27,6 +27,7 @@ typedef struct {
 typedef struct {
     ocrCommPlatform_t base;
     ocrCommChannel_t * channel; // comm channels between this XE and CE
+    u64 seqIdAtCe;
 } ocrCommPlatformXePthread_t;
 
 typedef struct {

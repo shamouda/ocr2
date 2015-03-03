@@ -1135,6 +1135,7 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
                         getCurrentEnv(NULL, NULL, NULL, &ceMsg);
                         ocrFatGuid_t fguid[CE_TAKE_CHUNK_SIZE] = {{0}};
                         ceMsg.destLocation = self->neighbors[i];
+                        ceMsg.seqId = i;
                         ceMsg.type = PD_MSG_COMM_TAKE | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE | PD_CE_CE_MESSAGE;
                         PD_MSG_FIELD_IO(guids) = &(fguid[0]);
                         PD_MSG_FIELD_IO(guidCount) = CE_TAKE_CHUNK_SIZE;

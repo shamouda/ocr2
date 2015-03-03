@@ -246,7 +246,6 @@ typedef struct _paramListPolicyDomainInst_t {
 /**< Defines if the message is marked a CE-CE message */
 #define PD_CE_CE_MESSAGE        0x10000000
 
-
 #define PD_MSG_ARG_NAME_SUB(ID) _data_##ID
 #define PD_MSG_STRUCT_NAME(ID) PD_MSG_ARG_NAME_SUB(ID)
 
@@ -332,6 +331,9 @@ typedef struct _ocrPolicyMsg_t {
                                  * (location making the request) */
     ocrLocation_t destLocation; /**< Destination of the message
                                  * (location processing the request) */
+#ifdef ENABLE_MSG_SEQID
+    u64 seqId;                  /**< The index of srcLocation at dstLocation */
+#endif
     u32 type;                   /**< Type of the message. Also includes if this
                                  * is a request or a response */
 
@@ -1188,8 +1190,8 @@ typedef struct _ocrPolicyDomain_t {
                               * objective driven scheduling */
     ocrLocation_t myLocation;
     ocrLocation_t parentLocation;
-    ocrLocation_t* neighbors;
-    u32 neighborCount;
+    ocrLocation_t * neighbors;                  /**< Array of neighbor locations */
+    u32 neighborCount;                          /**< Number of neighboring policy domains */
     u8 shutdownCode;
 
     //FIXME: Temporary solution until we get location services. [Bug #135].

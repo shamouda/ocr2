@@ -59,6 +59,7 @@
 
 // Policy domain
 #define ENABLE_POLICY_DOMAIN_CE
+#define ENABLE_MSG_SEQID
 
 // Scheduler
 #define ENABLE_SCHEDULER_CE

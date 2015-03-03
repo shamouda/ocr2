@@ -24,6 +24,18 @@ typedef struct {
     ocrCommPlatformFactory_t base;
 } ocrCommPlatformFactoryCePthread_t;
 
+/**
+ * A comm-platform maintains a local index for every neighbor
+ * it communicates with. This local index is embedded into the
+ * policy message and is extracted by the policy message processing
+ * function. The local index can either be embedded by the sender
+ * or by the comm platform of the receiver is it is not set.
+ */
+typedef struct _ocrNeighbor_t {
+    ocrLocation_t loc;  /**< Global location ID of the neighbor */
+    u64 seqId;          /**< Index of this policy domain at neighbor loc policy domain */
+} ocrNeighbor_t;
+
 typedef struct {
     volatile ocrPolicyMsg_t * message; //typically used for 2-way messages that require response
     ocrPolicyMsg_t messageBuffer;      //typically used for 1-way messages that do not require response
@@ -43,6 +55,9 @@ typedef struct {
     ocrCommChannel_t * channels;          //array of comm channels owned by me
     ocrCommChannel_t ** neighborChannels; //comm channels in other CEs I access as a remote agent
     u32 channelIdx;                       //used to setup the channels
+    ocrNeighbor_t *locationTT;            //Neighbor translation table for translating global location to local index
+    u64 countTT;                          //The number entries in the translation table
+    u64 parentIdx;                        //Index in locationTT for the parent
 } ocrCommPlatformCePthread_t;
 
 typedef struct {
