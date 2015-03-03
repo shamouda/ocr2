@@ -19,11 +19,11 @@ endif
 
 DEFAULT_CONFIG = xe-default.cfg
 
-TG_INSTALL ?= ../../../ss/install
+TG_INSTALL ?= ../../../../intel/ss/install
 
-PREFIX  := ${TG_INSTALL}/bin/rmd-linux-elf-
+PREFIX  := $(TG_INSTALL)/bin/rmd-linux-elf-
 CC      := $(PREFIX)clang
-CFLAGS  := -frmd-extensions -fno-builtin -Wno-typedef-redefinition -I ${TG_INSTALL}/include
+CFLAGS  := -frmd-extensions -fno-builtin -Wno-typedef-redefinition -I $(TG_INSTALL)/include
 
 RM      := rm
 RMFLAGS := -rf
