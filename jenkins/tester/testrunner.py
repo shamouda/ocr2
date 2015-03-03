@@ -769,20 +769,10 @@ def main(argv=None):
                 del tempJobs[k]
         #end if
 
-        # Second step: check the keywords
+        # Second step: check for __alternate
+        # We do this now because if the job is pushed aside and re-added later
+        # we will have issues
         toRemoveKeys = []
-        sideJobs = dict() # Jobs that don't match keyword restrictions. May be re-added due to dependences
-        for k, v in tempJobs.iteritems():
-            jobType = allJobTypes.get(v['jobtype'])
-            if jobType is None:
-                raise Usage("JobObject '%s' uses a job type '%s' which is not defined" % (k, v['jobtype']))
-            if not hasKeywords(jobType.keywords, testKeywords, True):
-                myLog.info("Ignoring job '%s' due to keyword restrictions" % (v['name']))
-                toRemoveKeys.append(k)
-        for k in toRemoveKeys:
-            sideJobs[k] = tempJobs[k]
-            del tempJobs[k]
-
         for k, v in tempJobs.iteritems():
             jobType = allJobTypes.get(v['jobtype'])
             # Check happened before
@@ -795,10 +785,27 @@ def main(argv=None):
                 else:
                     newList.append(item)
             v['depends'] = tuple(newList)
-            if jobType.isLocal:
-                allRemainingJobs[k] = LocalJobObject(v, jobType, len(v['depends']))
+
+        # Third step: check the keywords. Remove all jobs that don't match the keywords.
+        # They may be re-added later as dependences
+        toRemoveKeys = []
+        sideJobs = dict() # Jobs that don't match keyword restrictions. May be re-added due to dependences
+        for k, v in tempJobs.iteritems():
+            jobType = allJobTypes.get(v['jobtype'])
+            if jobType is None:
+                raise Usage("JobObject '%s' uses a job type '%s' which is not defined" % (k, v['jobtype']))
+            if not hasKeywords(jobType.keywords, testKeywords, True):
+                myLog.info("Ignoring job '%s' due to keyword restrictions" % (v['name']))
+                toRemoveKeys.append(k)
             else:
-                allRemainingJobs[k] = TorqueJobObject(v, jobType, len(v['depends']))
+                # This is a job we will use
+                if jobType.isLocal:
+                    allRemainingJobs[k] = LocalJobObject(v, jobType, len(v['depends']))
+                else:
+                    allRemainingJobs[k] = TorqueJobObject(v, jobType, len(v['depends']))
+        for k in toRemoveKeys:
+            sideJobs[k] = tempJobs[k]
+            del tempJobs[k]
 
         # Do another loop to set up the dependences properly
         changedJobs = True
