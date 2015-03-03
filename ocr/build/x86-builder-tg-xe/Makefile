@@ -17,7 +17,7 @@ endif
 # Tool-chain to be used for the build
 #
 
-TG_INSTALL ?= ../../../ss/install
+TG_INSTALL ?= ../../../../intel/ss/install
 
 CC      := gcc
 CFLAGS  := -fno-builtin -fno-stack-protector -I ${TG_INSTALL}/include
