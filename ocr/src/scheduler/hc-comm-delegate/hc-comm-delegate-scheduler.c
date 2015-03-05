@@ -26,40 +26,74 @@
  * IMPL: There is one outbox deque per worker. Communication workers can
  *       steal handlers from other workers outbox.
  */
- void hcCommSchedulerStart(ocrScheduler_t * self, ocrPolicyDomain_t * pd) {
-    ocrSchedulerHcCommDelegate_t * commSched = (ocrSchedulerHcCommDelegate_t *) self;
-    commSched->baseStart(self, pd);
-    //Create outbox queues for each worker
-    u64 boxCount = pd->workerCount;
-    commSched->outboxesCount = boxCount;
-    commSched->outboxes = pd->fcts.pdMalloc(pd, sizeof(deque_t *) * boxCount);
-    u64 i;
-    for(i = 0; i < boxCount; ++i) {
-        commSched->outboxes[i] = newDeque(pd, NULL, WORK_STEALING_DEQUE);
-    }
-    //Create inbox queues for each worker
-    commSched->inboxesCount = boxCount;
-    commSched->inboxes = pd->fcts.pdMalloc(pd, sizeof(deque_t *) * boxCount);
-    for(i = 0; i < boxCount; ++i) {
-        commSched->inboxes[i] = newDeque(pd, NULL, SEMI_CONCURRENT_DEQUE);
-    }
-}
 
-void hcCommSchedulerStop(ocrScheduler_t * self) {
-    ocrSchedulerHcCommDelegate_t * commSched = (ocrSchedulerHcCommDelegate_t *) self;
-    // deallocate all pdMalloc-ed structures
-    ocrPolicyDomain_t * pd = self->pd;
-    u64 i;
-    for(i = 0; i < commSched->outboxesCount; ++i) {
-        pd->fcts.pdFree(pd, commSched->outboxes[i]);
-    }
-    for(i = 0; i < commSched->inboxesCount; ++i) {
-        pd->fcts.pdFree(pd, commSched->inboxes[i]);
-    }
-    pd->fcts.pdFree(pd, commSched->outboxes);
-    pd->fcts.pdFree(pd, commSched->inboxes);
+u8 hcCommSchedulerSwitchRunlevel(ocrScheduler_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
+                                phase_t phase, u32 properties, void (*callback)(ocrPolicyDomain_t*,u64), u64 val) {
+    u8 toReturn = 0;
+    // This is an inert module, we do not handle callbacks (caller needs to wait on us)
+    ASSERT(callback == NULL);
 
-    commSched->baseStop(self);
+    // Verify properties for this call
+    ASSERT((properties & RL_REQUEST) && !(properties & RL_RESPONSE)
+           && !(properties & RL_RELEASE));
+    ASSERT(!(properties & RL_FROM_MSG));
+
+    ocrSchedulerHcCommDelegate_t * commSched = (ocrSchedulerHcCommDelegate_t *) self;
+
+    // Note: because we're extending an implementation some of the
+    // runlevel work is delegated to the base implementation.
+    // Be mindful of how that plays with the derived implementation...
+    switch(runlevel) {
+    case RL_CONFIG_PARSE:
+    case RL_NETWORK_OK:
+    case RL_PD_OK:
+    case RL_MEMORY_OK:
+        // Always delegate to base implementation
+        commSched->baseSwitchRunlevel(self, PD, runlevel, phase, properties, callback, val);
+        break;
+    case RL_GUID_OK:
+        ASSERT(self->pd == PD);
+        if((properties & RL_BRING_UP) && RL_IS_LAST_PHASE_UP(PD, RL_GUID_OK, phase)) {
+            //Note: pd should have been set in base implementation
+            //Create outbox queues for each worker
+            u64 boxCount = PD->workerCount;
+            commSched->outboxesCount = boxCount;
+            commSched->outboxes = PD->fcts.pdMalloc(PD, sizeof(deque_t *) * boxCount);
+            u64 i;
+            for(i = 0; i < boxCount; ++i) {
+                commSched->outboxes[i] = newDeque(PD, NULL, WORK_STEALING_DEQUE);
+            }
+            //Create inbox queues for each worker
+            commSched->inboxesCount = boxCount;
+            commSched->inboxes = PD->fcts.pdMalloc(PD, sizeof(deque_t *) * boxCount);
+            for(i = 0; i < boxCount; ++i) {
+                commSched->inboxes[i] = newDeque(PD, NULL, SEMI_CONCURRENT_DEQUE);
+            }
+        }
+        if ((properties & RL_TEAR_DOWN) && RL_IS_FIRST_PHASE_DOWN(PD, RL_GUID_OK, phase)) {
+            // deallocate all pdMalloc-ed structures
+            u64 i;
+            for(i = 0; i < commSched->outboxesCount; ++i) {
+                PD->fcts.pdFree(PD, commSched->outboxes[i]);
+            }
+            for(i = 0; i < commSched->inboxesCount; ++i) {
+                PD->fcts.pdFree(PD, commSched->inboxes[i]);
+            }
+            PD->fcts.pdFree(PD, commSched->outboxes);
+            PD->fcts.pdFree(PD, commSched->inboxes);
+        }
+        commSched->baseSwitchRunlevel(self, PD, runlevel, phase, properties, callback, val);
+        break;
+    case RL_COMPUTE_OK:
+    case RL_USER_OK:
+        // Always delegate to base implementation
+        commSched->baseSwitchRunlevel(self, PD, runlevel, phase, properties, callback, val);
+        break;
+    default:
+        // Unknown runlevel
+        ASSERT(0);
+    }
+    return toReturn;
 }
 
 /**
@@ -271,8 +305,7 @@ void initializeSchedulerHcComm(ocrSchedulerFactory_t * factory, ocrScheduler_t *
     commSched->outboxes = NULL;
     commSched->inboxesCount = 0;
     commSched->inboxes = NULL;
-    commSched->baseStart = derivedFactory->baseStart;
-    commSched->baseStop = derivedFactory->baseStop;
+    commSched->baseSwitchRunlevel = derivedFactory->baseSwitchRunlevel;
     commSched->baseMonitorProgress = derivedFactory->baseMonitorProgress;
 }
 
@@ -289,8 +322,7 @@ ocrSchedulerFactory_t * newOcrSchedulerFactoryHcCommDelegate(ocrParamList_t *per
 
     // Store function pointers we need from the base implementation
     derived->baseInitialize = baseFactory->initialize;
-    derived->baseStart = baseFcts.start;
-    derived->baseStop = baseFcts.stop;
+    derived->baseSwitchRunlevel = baseFcts.switchRunlevel;
     derived->baseMonitorProgress = baseFcts.monitorProgress;
 
     ocrSchedulerFactory_t* base = (ocrSchedulerFactory_t*) derived;
@@ -300,8 +332,8 @@ ocrSchedulerFactory_t * newOcrSchedulerFactoryHcCommDelegate(ocrParamList_t *per
     // Copy base's function pointers
     base->schedulerFcts = baseFcts;
     // and specialize some
-    base->schedulerFcts.start = FUNC_ADDR(void (*)(ocrScheduler_t*, ocrPolicyDomain_t*), hcCommSchedulerStart);
-    base->schedulerFcts.stop  = FUNC_ADDR(void (*)(ocrScheduler_t*), hcCommSchedulerStop);
+    base->schedulerFcts.switchRunlevel = FUNC_ADDR(u8 (*)(ocrScheduler_t*, ocrPolicyDomain_t*, ocrRunlevel_t,
+                                                  phase_t, u32, void (*)(ocrPolicyDomain_t*,u64), u64), hcCommSchedulerSwitchRunlevel);
     base->schedulerFcts.takeComm = FUNC_ADDR(u8 (*)(ocrScheduler_t*, u32*, ocrFatGuid_t*, u32), hcCommSchedulerTakeComm);
     base->schedulerFcts.giveComm = FUNC_ADDR(u8 (*)(ocrScheduler_t*, u32*, ocrFatGuid_t*, u32), hcCommSchedulerGiveComm);
     base->schedulerFcts.monitorProgress = FUNC_ADDR(u8 (*)(ocrScheduler_t*, ocrMonitorProgress_t, void*), hcCommMonitorProgress);

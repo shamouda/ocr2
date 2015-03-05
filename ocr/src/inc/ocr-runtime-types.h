@@ -16,6 +16,51 @@
 
 #define INVALID_LOCATION (u64)(-1)
 
+/* Run-level support */
+typedef enum _ocrRunlevels_t {
+    RL_CONFIG_PARSE, /**< Configuration has been parsed; RT structures exist */
+    RL_NETWORK_OK,   /**< Intra-PD communication is possible; PDs are known */
+    RL_PD_OK,        /**< PDs are up. One capable module per PD */
+    RL_MEMORY_OK,    /**< On startup, barrier before here. Memory allocators are up
+                        pdMalloc() is functional */
+    RL_GUID_OK,      /**< The global naming is operational; PDs know not to step
+                        on each other's toes */
+    RL_COMPUTE_OK,   /**< All other inert modules are brought up; bring up workers */
+    RL_USER_OK,      /**< One PD starts mainEDT; others are waiting for work */
+    RL_MAX           /**< Not a runlevel. Internal marker */
+} ocrRunlevel_t;
+
+typedef u8 phase_t;
+
+// TODO: Do we need to explicitly expand this
+// to the subcomponents (platform/target for example)
+typedef enum _ocrRLPhaseComponents_t {
+    RL_PHASE_COMMAPI,
+    RL_PHASE_ALLOCATOR,
+    RL_PHASE_GUIDPROVIDER,
+    RL_PHASE_SCHEDULER,
+    RL_PHASE_WORKER,
+    RL_PHASE_MAX
+} ocrRLPhaseComponents_t;
+
+/* Flags for runlevels */
+#define RL_REQUEST     0x1  /**< Only used in policy message: request to change run-level */
+#define RL_RESPONSE    0x2  /**< Only used in policy message: in the case of a RL_BARRIER message, respond that RL transitioned */
+#define RL_RELEASE     0x4  /**< Only used in policy message: in the case of a RL_BARRIER message, release from the barrier */
+#define RL_ASYNC       0x10  /**< Set if the caller can proceed even if the runlevel change is not complete */
+#define RL_BARRIER     0x20  /**< Set if the caller should wait for the callee to return from the runlevel change */
+#define RL_BRING_UP    0x100  /**< Set if this is for OCR bring-up */
+#define RL_TEAR_DOWN   0x200  /**< Set if this is for OCR tear-down */
+#define RL_PD_MASTER   0x1000 /**< Set if the thread is the first capable thread of a PD */
+#define RL_NODE_MASTER 0x3000 /**< Set if the thread is the first on the node (potentially starts multiple PDs);
+                             * implies RL_PD_MASTER */
+#define RL_BLESSED     0x4000 /**< Set if the worker is the blessed worker that should initialize mainEdt */
+#define RL_FROM_MSG    0x8000 /**< Set if the transition came from another PD or was triggered internally
+                                 (as opposed to being called directly using switchRunlevel on the PD).
+                                 This implies that the switchRunlevel PD call should return and not wait
+                                 for the transition*/
+
+
 /**
  * @brief Memory region "tags"
  *
@@ -106,6 +151,7 @@ typedef enum {
     HDL_RESPONSE_OK   = 0x00400  /**< (MANDATORY) Handle has a ready response */
 
 } ocrMsgHandleStatus_t;
+
 /**
  * @brief Types of data-blocks allocated by the runtime
  *
@@ -124,6 +170,7 @@ typedef enum {
 /** @brief Special property that removes the warning
  * for the acquire/create */
 #define DB_PROP_IGNORE_WARN (u16)(0x7000)
+
 /**
  * @brief Type of memory allocated/unallocated
  * by MEM_ALLOC and MEM_UNALLOC
@@ -206,8 +253,8 @@ typedef enum {
  */
 typedef enum {
     SINGLE_WORKERTYPE   = 0x1, /**< Single worker (starts/stops by itself) */
-    MASTER_WORKERTYPE   = 0x2, /**< Master worker (responsible for starting/stopping others */
-    SLAVE_WORKERTYPE    = 0x3, /**< Slave worker (started/stopped by a master worker */
+    MASTER_WORKERTYPE   = 0x2, /**< Master worker (responsible for starting/stopping others) */
+    SLAVE_WORKERTYPE    = 0x3, /**< Slave worker (started/stopped by a master worker) */
     MAX_WORKERTYPE      = 0x4
 } ocrWorkerType_t;
 
@@ -226,27 +273,6 @@ typedef enum {
     CMETA_GUIDPROP      = 0x10, /**< Indicates that the metadata returned is a copy (R/O
                                 * and should be freed with pdFree) */
 } ocrGuidInfoProp_t;
-
-typedef enum {
-    MODULE_STATE_NEW = 0,     /**< Module is freshly created */
-    MODULE_STATE_BEGIN,       /**< Module has completed "begin" phase */
-    MODULE_STATE_START,       /**< Module has completed "start" phase */
-    MODULE_STATE_STOP,        /**< Module has completed "stop" phase */
-    MODULE_STATE_FINISH,      /**< Module has completed "finish" phase */
-    MODULE_NUM_STATES
-} ocrModuleState_t;
-
-#define CHECK_AND_SET_MODULE_STATE(m, p, s) {                       \
-  if (p->state >= MODULE_STATE_##s) {                               \
-    DPRINTF(DEBUG_LVL_INFO, "%s: Trying to set state %u (%s). Current state %u is greater or equal! Exiting.\n", \
-      #m, (unsigned)(MODULE_STATE_##s), #s, (unsigned)(p->state)); \
-    return;                                                         \
-  } else {                                                          \
-    p->state = MODULE_STATE_##s;                                    \
-  }                                                                 \
-}
-
-#define SET_MODULE_STATE(m, p, s) p->state = MODULE_STATE_##s;
 
 typedef enum { // Coded on 8 bits maximum
     MONITOR_PROGRESS_COMM  = 0x1, /**< Monitor a communication completion */
@@ -270,12 +296,14 @@ typedef u64 ocrLocation_t;
  * @brief Returned by the pollMessage function in
  * either the comp-target and comp-platform to indicate
  * that no message was available */
-#define POLL_NO_MESSAGE   0x1
+#define POLL_NO_MESSAGE            0x1 // first bit indicates no message
+#define POLL_NO_OUTGOING_MESSAGE   0x3 // no outgoing in queue
+#define POLL_NO_INCOMING_MESSAGE   0x5 // no incoming in queue
 /**
  * @brief Indicates that a message was returned and available
  * and that more messages are available
  */
-#define POLL_MORE_MESSAGE 0x2
+#define POLL_MORE_MESSAGE 0x4
 /**
  * @brief AND the return code of pollMessage with this
  * mask to get any real error codes

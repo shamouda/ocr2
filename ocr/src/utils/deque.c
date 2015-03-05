@@ -11,7 +11,6 @@
 #include "ocr-policy-domain.h"
 #include "ocr-types.h"
 #include "utils/deque.h"
-#include "worker/hc/hc-worker.h"
 
 #define DEBUG_TYPE UTIL
 

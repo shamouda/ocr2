@@ -26,227 +26,633 @@
 #include "task/hc/hc-task.h"
 #include "event/hc/hc-event.h"
 
+// Currently required to find out if self is the blessed PD
+#include "extensions/ocr-affinity.h"
+
 #define DEBUG_TYPE POLICY
 
 //#define SCHED_1_0 1
 
-void hcPolicyDomainBegin(ocrPolicyDomain_t * policy) {
-    // The PD should have been brought up by now and everything instantiated
-
+static u8 helperSwitchInert(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, phase_t phase, u32 properties) {
     u64 i = 0;
     u64 maxCount = 0;
+    u8 toReturn = 0;
+    maxCount = policy->commApiCount;
+    for(i = 0; i < maxCount; ++i) {
+        toReturn |= policy->commApis[i]->fcts.switchRunlevel(
+            policy->commApis[i], policy, runlevel, phase, properties, NULL, 0);
+    }
 
     maxCount = policy->guidProviderCount;
     for(i = 0; i < maxCount; ++i) {
-        policy->guidProviders[i]->fcts.begin(policy->guidProviders[i], policy);
+        toReturn |= policy->guidProviders[i]->fcts.switchRunlevel(
+            policy->guidProviders[i], policy, runlevel, phase, properties, NULL, 0);
     }
 
     maxCount = policy->allocatorCount;
     for(i = 0; i < maxCount; ++i) {
-        policy->allocators[i]->fcts.begin(policy->allocators[i], policy);
+        toReturn |= policy->allocators[i]->fcts.switchRunlevel(
+            policy->allocators[i], policy, runlevel, phase, properties, NULL, 0);
     }
 
     maxCount = policy->schedulerCount;
     for(i = 0; i < maxCount; ++i) {
-        policy->schedulers[i]->fcts.begin(policy->schedulers[i], policy);
+        toReturn |= policy->schedulers[i]->fcts.switchRunlevel(
+            policy->schedulers[i], policy, runlevel, phase, properties, NULL, 0);
     }
-
-    maxCount = policy->commApiCount;
-    for(i = 0; i < maxCount; i++) {
-        policy->commApis[i]->fcts.begin(policy->commApis[i], policy);
-    }
-
-    // REC: Moved all workers to start here.
-    // Note: it's important to first logically start all workers.
-    // Once they are all up, start the runtime.
-    // Workers should start the underlying target and platforms
-    maxCount = policy->workerCount;
-    for(i = 0; i < maxCount; i++) {
-        policy->workers[i]->fcts.begin(policy->workers[i], policy);
-    }
-
-    // We have now started everyone so we swap the state
-    // The expected behavior is 0 -> 1
-    // This does not have to be a cmpswap but leaving
-    // it that way to verify logic
-    // Note that we swap here because start is allowed to use pdMalloc
-    // for example (ie: the PD should at least be able to respond to queries
-    // after begin is done)
-    ocrPolicyDomainHc_t *rself = (ocrPolicyDomainHc_t*)policy;
-    u32 oldState = hal_cmpswap32(&(rself->state), 0, 1);
-    ASSERT(oldState == 0); // No EDT should be able
-    // to run at this point since mainEDT
-    // is started AFTER this function completes
+    return toReturn;
 }
 
-void hcPolicyDomainStart(ocrPolicyDomain_t * policy) {
-    // The PD should have been brought up by now and everything instantiated
-    // This is a bit ugly but I can't find a cleaner solution:
-    //   - we need to associate the environment with the
-    //   currently running worker/PD so that we can use getCurrentEnv
+// Callback from the capable modules
+// val contains worker id on lower 16 bits and RL on next 16 bits
+void hcWorkerCallback(ocrPolicyDomain_t *self, u64 val) {
+    ocrPolicyDomainHc_t *rself = (ocrPolicyDomainHc_t*)self;
+    DPRINTF(DEBUG_LVL_VERB, "Got check-in from worker %u for RL %lu\n", val & 0xFFFF, (u64)(val >> 16));
 
-    u64 i = 0;
-    u64 maxCount = 0;
-
-    maxCount = policy->guidProviderCount;
-    for(i = 0; i < maxCount; ++i) {
-        policy->guidProviders[i]->fcts.start(policy->guidProviders[i], policy);
-    }
-
-    guidify(policy, (u64)policy, &(policy->fguid), OCR_GUID_POLICY);
-
-    maxCount = policy->allocatorCount;
-    for(i = 0; i < maxCount; ++i) {
-        policy->allocators[i]->fcts.start(policy->allocators[i], policy);
-    }
-
-    maxCount = policy->schedulerCount;
-    for(i = 0; i < maxCount; ++i) {
-        policy->schedulers[i]->fcts.start(policy->schedulers[i], policy);
-    }
-
-    maxCount = policy->commApiCount;
-    for(i = 0; i < maxCount; i++) {
-        policy->commApis[i]->fcts.start(policy->commApis[i], policy);
-    }
-
-    // Create and initialize the placer (work in progress)
-    policy->placer = createLocationPlacer(policy);
-
-    // REC: Moved all workers to start here.
-    // Note: it's important to first logically start all workers.
-    // Once they are all up, start the runtime.
-    // Workers should start the underlying target and platforms
-    maxCount = policy->workerCount;
-    for(i = 0; i < maxCount; i++) {
-        policy->workers[i]->fcts.start(policy->workers[i], policy);
-    }
-}
-
-void hcPolicyDomainFinish(ocrPolicyDomain_t * policy) {
-    // Finish everything in reverse order
-    u64 i = 0;
-    u64 maxCount = 0;
-
-    // Worker 0 enters here
-    ocrPolicyDomainHc_t *rself = (ocrPolicyDomainHc_t*)policy;
-    DPRINTF(DEBUG_LVL_VERB,"Begin PD finish wait loop\n");
-    u32 oldState = 0;
-    // Wait for stop to complete before we start with finish
+    ocrWorker_t * worker;
+    getCurrentEnv(NULL, &worker, NULL, NULL);
+    u32 oldVal, newVal;
     do {
-        oldState = hal_cmpswap32(&(rself->state), 10, 14);
-    } while(oldState != 10);
-
-    DPRINTF(DEBUG_LVL_VERB,"End PD finish wait loop\n");
-    // Note: As soon as worker '0' is stopped; its thread is
-    // free to fall-through and continue shutting down the
-    // policy domain
-    maxCount = policy->workerCount;
-    for(i = 0; i < maxCount; i++) {
-        policy->workers[i]->fcts.finish(policy->workers[i]);
+        oldVal = rself->rlSwitch.checkedIn;
+        newVal = hal_cmpswap32(&(rself->rlSwitch.checkedIn), oldVal, oldVal - 1);
+    } while(oldVal != newVal);
+    if(oldVal == 1) {
+        // This means we managed to set it to 0
+        DPRINTF(DEBUG_LVL_VVERB, "All workers checked in, moving to the next stage: RL %u; phase %d\n",
+                rself->rlSwitch.runlevel, rself->rlSwitch.nextPhase);
+        if(rself->rlSwitch.properties & RL_FROM_MSG) {
+            // We need to re-enter switchRunlevel
+            if((rself->rlSwitch.properties & RL_BRING_UP) &&
+               (rself->rlSwitch.nextPhase == RL_GET_PHASE_COUNT_UP(self, rself->rlSwitch.runlevel))) {
+                // Switch to the next runlevel
+                ++rself->rlSwitch.runlevel;
+                rself->rlSwitch.nextPhase = 0;
+            }
+            if((rself->rlSwitch.properties & RL_TEAR_DOWN) &&
+               (rself->rlSwitch.nextPhase == -1)) {
+                // Switch to the next runlevel (going down)
+                --rself->rlSwitch.runlevel;
+                rself->rlSwitch.nextPhase = RL_GET_PHASE_COUNT_DOWN(self, rself->rlSwitch.runlevel) - 1;
+            }
+            if(rself->rlSwitch.runlevel == RL_COMPUTE_OK && rself->rlSwitch.nextPhase == 0) {
+                // In this case, we do not re-enter the switchRunlevel because the master worker
+                // will drop out of its computation (at some point) and take over
+                DPRINTF(DEBUG_LVL_VVERB, "PD_MASTER thread will pick up for switch to RL_COMPUTE_OK\n");
+            } else {
+                DPRINTF(DEBUG_LVL_VVERB, "Re-entering switchRunlevel with RL %u; phase %u; prop 0x%x\n",
+                        rself->rlSwitch.runlevel, rself->rlSwitch.nextPhase, rself->rlSwitch.properties);
+                RESULT_ASSERT(self->fcts.switchRunlevel(self, rself->rlSwitch.runlevel, rself->rlSwitch.properties), ==, 0);
+            }
+        } else { // else, some thread is already in switchRunlevel and will be unblocked
+            DPRINTF(DEBUG_LVL_VVERB, "PD_MASTER thread will continue\n");
+        }
     }
-
-    maxCount = policy->commApiCount;
-    for(i = 0; i < maxCount; i++) {
-        policy->commApis[i]->fcts.finish(policy->commApis[i]);
-    }
-
-    maxCount = policy->schedulerCount;
-    for(i = 0; i < maxCount; ++i) {
-        policy->schedulers[i]->fcts.finish(policy->schedulers[i]);
-    }
-
-    maxCount = policy->allocatorCount;
-    for(i = 0; i < maxCount; ++i) {
-        policy->allocators[i]->fcts.finish(policy->allocators[i]);
-    }
-
-    maxCount = policy->guidProviderCount;
-    for(i = 0; i < maxCount; ++i) {
-        policy->guidProviders[i]->fcts.finish(policy->guidProviders[i]);
-    }
-
 }
 
-void hcPolicyDomainStop(ocrPolicyDomain_t * policy) {
-    u64 i = 0;
-    u64 maxCount = 0;
+// Function to cause run-level switches in this PD
+u8 hcPdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 properties) {
+    s32 j;
+    phase_t i=0, curPhase, phaseCount;
+    u32 maxCount;
 
-    ocrPolicyDomainHc_t *rself = (ocrPolicyDomainHc_t*)policy;
+    u8 toReturn = 0;
+    u32 origProperties = properties;
+    u32 propertiesPreComputes = properties;
 
-    // We inform people that we want to stop the policy domain
-    // We make sure that no one else is using the PD (in processMessage mostly)
-    DPRINTF(DEBUG_LVL_VERB,"Begin PD stop wait loop\n");
-    u32 oldState = 0, newState = 0;
-    do {
-        oldState = rself->state;
-        newState = (oldState & 0xFFFFFFF0) | 2;
-        newState = hal_cmpswap32(&(rself->state), oldState, newState);
-    } while(oldState != newState);
-    // Now we have set the "I want to shut-down" bit so now we need
-    // to wait for the users to drain
-    // We do something really stupid and just loop for now
-    while(rself->state != 18);
-    DPRINTF(DEBUG_LVL_VERB,"End PD stop wait loop\n");
-    // Here we can start stopping the PD
-    ASSERT(rself->state == 18); // We should have no users and have managed to set
+#define GET_PHASE(counter) curPhase = (properties & RL_BRING_UP)?counter:(phaseCount - counter - 1)
 
-    // Note: As soon as worker '0' is stopped; its thread is
-    // free to fall-through from 'start' and call 'finish'.
-    maxCount = policy->workerCount;
-    for(i = 0; i < maxCount; i++) {
-        policy->workers[i]->fcts.stop(policy->workers[i]);
+    ocrPolicyDomainHc_t* rself = (ocrPolicyDomainHc_t*)policy;
+    // Check properties
+    u32 amNodeMaster = properties & RL_NODE_MASTER;
+    u32 amPDMaster = properties & RL_PD_MASTER;
+    properties &= ~(RL_NODE_MASTER); // Strip out this from the rest; only valuable for the PD and some
+                                     // specific workers
+
+    u32 fromPDMsg = properties & RL_FROM_MSG;
+    properties &= ~RL_FROM_MSG; // Strip this out from the rest; only valuable for the PD
+
+    // This is important before computes (some modules may do something different for the first thread)
+    propertiesPreComputes = properties;
+    if(amPDMaster) propertiesPreComputes |= RL_PD_MASTER;
+
+    if(!(fromPDMsg)) {
+        // RL changes called directly through switchRunlevel should
+        // only transition until PD_OK. After that, transitions should
+        // occur using policy messages
+        ASSERT(amNodeMaster || (runlevel <= RL_PD_OK));
+
+        // If this is direct function call, it should only be a request
+        // if (!((properties & RL_REQUEST) && !(properties & (RL_RESPONSE | RL_RELEASE)))) {
+        //     PRINTF("HERE\n");
+        //     while(1);
+        // }
+        ASSERT((properties & RL_REQUEST) && !(properties & (RL_RESPONSE | RL_RELEASE)))
     }
 
-    maxCount = policy->commApiCount;
-    for(i = 0; i < maxCount; i++) {
-        policy->commApis[i]->fcts.stop(policy->commApis[i]);
+    switch(runlevel) {
+    case RL_CONFIG_PARSE:
+    {
+        // Are we bringing the machine up
+        if(properties & RL_BRING_UP) {
+            for(i = 0; i < RL_MAX; ++i) {
+                for(j = 0; j < RL_PHASE_MAX; ++j) {
+                     // Everything has at least one phase on both up and down
+                    policy->phasesPerRunlevel[i][j] = (1<<4) + 1;
+                }
+            }
+
+            phaseCount = 2;
+        } else {
+            // Tear down
+            phaseCount = policy->phasesPerRunlevel[RL_CONFIG_PARSE][0] >> 4;
+        }
+        // Both cases
+        maxCount = policy->workerCount;
+        for(i = 0; i < phaseCount; ++i) {
+            if(toReturn) break;
+            GET_PHASE(i);
+            toReturn |= helperSwitchInert(policy, runlevel, curPhase, propertiesPreComputes);
+            for(j = 0; j < maxCount; ++j) {
+                toReturn |= policy->workers[j]->fcts.switchRunlevel(
+                    policy->workers[j], policy, runlevel, curPhase, propertiesPreComputes, NULL, 0);
+            }
+        }
+        if(toReturn) {
+            DPRINTF(DEBUG_LVL_WARN, "RL_CONFIG_PARSE(%d) phase %d failed: %d\n", propertiesPreComputes, curPhase, toReturn);
+        }
+
+        if((!toReturn) && (properties & RL_BRING_UP)) {
+            // Coalesce the phasesPerRunLevel by taking the maximum
+            for(i = 0; i < RL_MAX; ++i) {
+                u32 finalCount = policy->phasesPerRunlevel[i][0];
+                for(j = 1; j < RL_PHASE_MAX; ++j) {
+                    // Deal with UP phase count
+                    u32 newCount = 0;
+                    newCount = (policy->phasesPerRunlevel[i][j] & 0xF) > (finalCount & 0xF)?
+                        (policy->phasesPerRunlevel[i][j] & 0xF):(finalCount & 0xF);
+                    // And now the DOWN phase count
+                    newCount |= ((policy->phasesPerRunlevel[i][j] >> 4) > (finalCount >> 4)?
+                        (policy->phasesPerRunlevel[i][j] >> 4):(finalCount >> 4)) << 4;
+                    finalCount = newCount;
+                }
+                policy->phasesPerRunlevel[i][0] = finalCount;
+            }
+        }
+        break;
+    }
+    case RL_NETWORK_OK:
+    {
+        // In this single PD implementation, nothing specific to do (just pass it down)
+        // In general, this is when you setup communication
+        phaseCount = ((policy->phasesPerRunlevel[RL_NETWORK_OK][0]) >> ((properties&RL_TEAR_DOWN)?4:0)) & 0xF;
+        maxCount = policy->workerCount;
+        for(i = 0; i < phaseCount; ++i) {
+            if(toReturn) break;
+            GET_PHASE(i);
+            toReturn |= helperSwitchInert(policy, runlevel, curPhase, propertiesPreComputes);
+            for(j = 0; j < maxCount; ++j) {
+                toReturn |= policy->workers[j]->fcts.switchRunlevel(
+                    policy->workers[j], policy, runlevel, curPhase, propertiesPreComputes, NULL, 0);
+            }
+        }
+        if(toReturn) {
+            DPRINTF(DEBUG_LVL_WARN, "RL_NETWORK_OK(%d) phase %d failed: %d\n", propertiesPreComputes, curPhase, toReturn);
+        }
+        break;
+    }
+    case RL_PD_OK:
+    {
+        // In this single PD implementation for x86, there is nothing specific to do
+        // In general, you need to:
+        //     - if not amNodeMaster, start a worker for this PD
+        //     - that worker (or the master one) needs to then transition all inert modules to PD_OK
+        phaseCount = ((policy->phasesPerRunlevel[RL_PD_OK][0]) >> ((properties&RL_TEAR_DOWN)?4:0)) & 0xF;
+
+        maxCount = policy->workerCount;
+        for(i = 0; i < phaseCount; ++i) {
+            if(toReturn) break;
+            GET_PHASE(i);
+            toReturn |= helperSwitchInert(policy, runlevel, curPhase, propertiesPreComputes);
+            for(j = 0; j < maxCount; ++j) {
+                toReturn |= policy->workers[j]->fcts.switchRunlevel(
+                    policy->workers[j], policy, runlevel, curPhase, propertiesPreComputes, NULL, 0);
+            }
+        }
+
+        if(toReturn) {
+            DPRINTF(DEBUG_LVL_WARN, "RL_PD_OK(%d) phase %d failed: %d\n", propertiesPreComputes, curPhase, toReturn);
+        }
+        break;
+    }
+    case RL_MEMORY_OK:
+    {
+        phaseCount = ((policy->phasesPerRunlevel[RL_MEMORY_OK][0]) >> ((properties&RL_TEAR_DOWN)?4:0)) & 0xF;
+
+        maxCount = policy->workerCount;
+        for(i = 0; i < phaseCount; ++i) {
+            if(toReturn) break;
+            GET_PHASE(i);
+            toReturn |= helperSwitchInert(policy, runlevel, curPhase, propertiesPreComputes);
+            for(j = 0; j < maxCount; ++j) {
+                toReturn |= policy->workers[j]->fcts.switchRunlevel(
+                    policy->workers[j], policy, runlevel, curPhase, propertiesPreComputes, NULL, 0);
+            }
+        }
+        if(toReturn) {
+            DPRINTF(DEBUG_LVL_WARN, "RL_MEMORY_OK(%d) phase %d failed: %d\n", propertiesPreComputes, curPhase, toReturn);
+        }
+        break;
+    }
+    case RL_GUID_OK:
+    {
+        // In the general case (with more than one PD), in this step and on bring-up:
+        //     - send messages to all neighboring PDs to transition to this state
+        //     - do local transition
+        //     - wait for responses from neighboring PDs
+        //     - report back to caller (if RL_FROM_MSG)
+        //     - send release message to neighboring PDs
+        // If this is RL_FROM_MSG, the above steps may occur in multiple steps (ie: you
+        // don't actually "wait" but rather re-enter this function on incomming
+        // messages from neighbors. If not RL_FROM_MSG, you do block.
+
+        if(properties & RL_BRING_UP) {
+            // On BRING_UP, bring up GUID provider
+            // We assert that there are two phases. The first phase is mostly to bring
+            // up the GUID provider and the last phase is to actually get GUIDs for
+            // the various components if needed
+            phaseCount = policy->phasesPerRunlevel[RL_GUID_OK][0] & 0xF;
+            maxCount = policy->workerCount;
+
+            for(i = 0; i < phaseCount; ++i) {
+                if(toReturn) break;
+                toReturn |= helperSwitchInert(policy, runlevel, i, propertiesPreComputes);
+                for(j = 0; j < maxCount; ++j) {
+                    toReturn |= policy->workers[j]->fcts.switchRunlevel(
+                        policy->workers[j], policy, runlevel, i, propertiesPreComputes, NULL, 0);
+                }
+
+            }
+        } else {
+            phaseCount = policy->phasesPerRunlevel[RL_GUID_OK][0] >> 4;
+            maxCount = policy->workerCount;
+            for(i = 0; i < phaseCount; ++i) {
+                if(toReturn) break;
+                toReturn |= helperSwitchInert(policy, runlevel, i, propertiesPreComputes);
+                for(j = 0; j < maxCount; ++j) {
+                    toReturn |= policy->workers[j]->fcts.switchRunlevel(
+                        policy->workers[j], policy, runlevel, i, propertiesPreComputes, NULL, 0);
+                }
+            }
+        }
+
+        if(toReturn) {
+            DPRINTF(DEBUG_LVL_WARN, "RL_GUID_OK(%d) phase %d failed: %d\n", propertiesPreComputes, i-1, toReturn);
+        }
+        break;
     }
 
-    maxCount = policy->schedulerCount;
-    for(i = 0; i < maxCount; ++i) {
-        policy->schedulers[i]->fcts.stop(policy->schedulers[i]);
+    case RL_COMPUTE_OK:
+    {
+        // At this stage, we have a memory to use so we can create the placer
+        // This phase is the first one creating capable modules (workers) apart from myself
+        if(properties & RL_BRING_UP) {
+            phaseCount = policy->phasesPerRunlevel[RL_COMPUTE_OK][0] & 0xF;
+            maxCount = policy->workerCount;
+            for(i = rself->rlSwitch.nextPhase; i < phaseCount; ++i) {
+                if(RL_IS_FIRST_PHASE_UP(policy, RL_COMPUTE_OK, i)) {
+                    guidify(policy, (u64)policy, &(policy->fguid), OCR_GUID_POLICY);
+                    // Create and initialize the placer (work in progress)
+                    policy->placer = createLocationPlacer(policy);
+                }
+                toReturn |= helperSwitchInert(policy, runlevel, i, properties);
+
+                // Setup the resume RL switch structure (in the synchronous case, used as
+                // the counter we wait on)
+                rself->rlSwitch.checkedIn = maxCount;
+                rself->rlSwitch.runlevel = RL_COMPUTE_OK;
+                rself->rlSwitch.nextPhase = i + 1;
+                rself->rlSwitch.properties = origProperties;
+                hal_fence();
+
+                // Worker 0 is considered the capable one by convention
+                // Still need to find out if the current PD is the "blessed" with mainEdt execution
+                ocrGuid_t affinityMasterPD;
+                u64 count = 0;
+                // There should be a single master PD
+                ASSERT(!ocrAffinityCount(AFFINITY_PD_MASTER, &count) && (count == 1));
+                ocrAffinityGet(AFFINITY_PD_MASTER, &count, &affinityMasterPD);
+                u16 blessed = ((policy->myLocation == affinityToLocation(affinityMasterPD)) ? RL_BLESSED : 0);
+                toReturn |= policy->workers[0]->fcts.switchRunlevel(
+                    policy->workers[0], policy, runlevel, i, properties | RL_PD_MASTER | blessed,
+                    &hcWorkerCallback, RL_COMPUTE_OK << 16);
+
+                for(j = 1; j < maxCount; ++j) {
+                    toReturn |= policy->workers[j]->fcts.switchRunlevel(
+                        policy->workers[j], policy, runlevel, i, properties, &hcWorkerCallback, (RL_COMPUTE_OK << 16) | j);
+                }
+                if(!fromPDMsg) {
+                    // Here we need to block because when we return from the function, we need to have
+                    // transitioned
+                    DPRINTF(DEBUG_LVL_VVERB, "switchRunlevel: synchronous switch to RL_COMPUTE_OK phase %d ... will block\n", i);
+                    while(rself->rlSwitch.checkedIn) ;
+                    ASSERT(rself->rlSwitch.checkedIn == 0);
+                } else {
+                    DPRINTF(DEBUG_LVL_VVERB, "switchRunlevel: asynchronous switch to RL_COMPUTE_OK phase %d\n", i);
+                    // We'll continue this from hcWorkerCallback
+                    break; // Break out of the loop
+                }
+            }
+        } else {
+            // Tear down
+            phaseCount = RL_GET_PHASE_COUNT_DOWN(policy, RL_COMPUTE_OK);
+            // On bring down, we need to have at least two phases:
+            //     - one where we actually stop the workers (asynchronously)
+            //     - one where we join the workers (to clean up properly)
+            ASSERT(phaseCount > 1);
+            maxCount = policy->workerCount;
+
+            // We do something special for the last phase in which we only have
+            // one worker (all others should no longer be operating
+            if(RL_IS_LAST_PHASE_DOWN(policy, RL_COMPUTE_OK, rself->rlSwitch.nextPhase)) {
+                ASSERT(!fromPDMsg); // This last phase is done synchronously
+                ASSERT(amPDMaster); // Only master worker should be here
+                toReturn |= helperSwitchInert(policy, runlevel, rself->rlSwitch.nextPhase, properties);
+                toReturn |= policy->workers[0]->fcts.switchRunlevel(
+                    policy->workers[0], policy, runlevel, rself->rlSwitch.nextPhase,
+                    properties | RL_PD_MASTER | RL_BLESSED, NULL, 0);
+                for(j = 1; j < maxCount; ++j) {
+                    toReturn |= policy->workers[j]->fcts.switchRunlevel(
+                        policy->workers[j], policy, runlevel, rself->rlSwitch.nextPhase, properties, NULL, 0);
+                }
+
+                // We need to deguidify ourself here
+                PD_MSG_STACK(msg);
+                getCurrentEnv(NULL, NULL, NULL, &msg);
+#define PD_MSG (&msg)
+#define PD_TYPE PD_MSG_GUID_DESTROY
+                msg.type = PD_MSG_GUID_DESTROY | PD_MSG_REQUEST;
+                PD_MSG_FIELD_I(guid) = policy->fguid;
+                PD_MSG_FIELD_I(properties) = 0;
+                toReturn |= policy->fcts.processMessage(policy, &msg, false);
+                policy->fguid.guid = NULL_GUID;
+#undef PD_MSG
+#undef PD_TYPE
+            } else {
+                for(i = rself->rlSwitch.nextPhase; i > 0; --i) {
+                    toReturn |= helperSwitchInert(policy, runlevel, i, properties);
+
+                    // Setup the resume RL switch structure (in the synchronous case, used as
+                    // the counter we wait on)
+                    rself->rlSwitch.checkedIn = maxCount;
+                    rself->rlSwitch.runlevel = RL_COMPUTE_OK;
+                    rself->rlSwitch.nextPhase = i - 1;
+                    rself->rlSwitch.properties = origProperties;
+                    hal_fence();
+
+                    // Worker 0 is considered the capable one by convention
+                    toReturn |= policy->workers[0]->fcts.switchRunlevel(
+                        policy->workers[0], policy, runlevel, i, properties | RL_PD_MASTER | RL_BLESSED,
+                        &hcWorkerCallback, RL_COMPUTE_OK << 16);
+
+                    for(j = 1; j < maxCount; ++j) {
+                        toReturn |= policy->workers[j]->fcts.switchRunlevel(
+                            policy->workers[j], policy, runlevel, i, properties, &hcWorkerCallback, (RL_COMPUTE_OK << 16) | j);
+                    }
+                    if(!fromPDMsg) {
+                        ASSERT(0); // Always from a PD message since it is from a shutdown message
+                    } else {
+                        DPRINTF(DEBUG_LVL_VVERB, "switchRunlevel: asynchronous switch from RL_COMPUTE_OK phase %d\n", i);
+                        // We'll continue this from hcWorkerCallback
+                        break;
+                    }
+                }
+            }
+        }
+        if(toReturn) {
+            DPRINTF(DEBUG_LVL_WARN, "RL_COMPUTE_OK(%d) phase %d failed: %d\n", properties, i-1, toReturn);
+        }
+        break;
     }
+    case RL_USER_OK:
+    {
+        if(properties & RL_BRING_UP) {
+            phaseCount = RL_GET_PHASE_COUNT_UP(policy, RL_USER_OK);
+            maxCount = policy->workerCount;
+            for(i = 0; i < phaseCount - 1; ++i) {
+                if(toReturn) break;
+                toReturn |= helperSwitchInert(policy, runlevel, i, properties);
+                toReturn |= policy->workers[0]->fcts.switchRunlevel(
+                    policy->workers[0], policy, runlevel, i, properties | RL_PD_MASTER | RL_BLESSED, NULL, 0);
+                for(j = 1; j < maxCount; ++j) {
+                    // We start them in an async manner but don't need any callback (ie: we
+                    // don't care if they have really started) since there is no bring-up barrier)
+                    toReturn |= policy->workers[j]->fcts.switchRunlevel(
+                        policy->workers[j], policy, runlevel, i, properties, NULL, 0);
+                }
+            }
+            if(i == phaseCount - 1) { // Tests if we did not break out earlier with if(toReturn)
+                toReturn |= helperSwitchInert(policy, runlevel, i, properties);
+                for(j = 1; j < maxCount; ++j) {
+                    // We start them in an async manner but don't need any callback (ie: we
+                    // don't care if they have really started) since there is no bring-up barrier)
+                    toReturn |= policy->workers[j]->fcts.switchRunlevel(
+                        policy->workers[j], policy, runlevel, i, properties, NULL, 0);
+                }
+                // Always do the capable worker last in this case (it will actualy start doing something useful)
 
-    maxCount = policy->allocatorCount;
-    for(i = 0; i < maxCount; ++i) {
-        policy->allocators[i]->fcts.stop(policy->allocators[i]);
+                rself->rlSwitch.runlevel = RL_USER_OK;
+                rself->rlSwitch.nextPhase = phaseCount;
+                toReturn |= policy->workers[0]->fcts.switchRunlevel(
+                    policy->workers[0], policy, runlevel, i, properties | RL_PD_MASTER | RL_BLESSED, NULL, 0);
+                // When I drop out of this, I should be in RL_COMPUTE_OK at phase 0
+                // wait for everyone to check in so that I can continue shutting down
+                DPRINTF(DEBUG_LVL_VVERB, "PD_MASTER worker dropped out... waiting for others to complete RL\n");
+
+                while(rself->rlSwitch.checkedIn != 0) ;
+
+                ASSERT(rself->rlSwitch.runlevel == RL_COMPUTE_OK && rself->rlSwitch.nextPhase == 0);
+                DPRINTF(DEBUG_LVL_VVERB, "PD_MASTER worker wrapping up shutdown\n");
+                // We complete the RL_COMPUTE_OK stage which will bring us down to RL_MEMORY_OK which will
+                // get wrapped up by the outside code
+                rself->rlSwitch.properties &= ~RL_FROM_MSG;
+                toReturn |= policy->fcts.switchRunlevel(policy, rself->rlSwitch.runlevel,
+                                                        rself->rlSwitch.properties | RL_PD_MASTER);
+            }
+        } else {
+            // Tear down
+            phaseCount = RL_GET_PHASE_COUNT_DOWN(policy, RL_USER_OK);
+            maxCount = policy->workerCount;
+            for(i = rself->rlSwitch.nextPhase; i >= 0; --i) {
+                toReturn |= helperSwitchInert(policy, runlevel, i, properties);
+
+                // Setup the resume RL switch structure (in the synchronous case, used as
+                // the counter we wait on)
+                rself->rlSwitch.checkedIn = maxCount;
+                rself->rlSwitch.runlevel = RL_USER_OK;
+                rself->rlSwitch.nextPhase = i - 1;
+                rself->rlSwitch.properties = origProperties;
+                hal_fence();
+
+                // Worker 0 is considered the capable one by convention
+                toReturn |= policy->workers[0]->fcts.switchRunlevel(
+                    policy->workers[0], policy, runlevel, i, properties | RL_PD_MASTER | RL_BLESSED,
+                    &hcWorkerCallback, RL_USER_OK << 16);
+
+                for(j = 1; j < maxCount; ++j) {
+                    toReturn |= policy->workers[j]->fcts.switchRunlevel(
+                        policy->workers[j], policy, runlevel, i, properties, &hcWorkerCallback, (RL_USER_OK << 16) | j);
+                }
+                if(!fromPDMsg) {
+                    ASSERT(0); // It should always be from a PD MSG since it is an asynchronous shutdown
+                } else {
+                    DPRINTF(DEBUG_LVL_VVERB, "switchRunlevel: asynchronous switch from RL_USER_OK phase %d\n", i);
+                    // We'll continue this from hcWorkerCallback
+                    break;
+                }
+            }
+        }
+        if(toReturn) {
+            DPRINTF(DEBUG_LVL_WARN, "RL_USER_OK(%d) phase %d failed: %d\n", properties, i-1, toReturn);
+        }
+        break;
     }
-
-    // We could release our GUID here but not really required
-
-    maxCount = policy->guidProviderCount;
-    for(i = 0; i < maxCount; ++i) {
-        policy->guidProviders[i]->fcts.stop(policy->guidProviders[i]);
+    default:
+        // Unknown runlevel
+        ASSERT(0);
     }
-
-    // This does not need to be a cmpswap but keeping it
-    // this way for now to make sure the logic is sound
-    oldState = hal_cmpswap32(&(rself->state), 18, 26);
-    ASSERT(oldState == 18);
+    return toReturn;
 }
+
+
+// void hcPolicyDomainStop(ocrPolicyDomain_t * policy, ocrRunLevel_t expectedRl, ocrRunLevel_t newRl) {
+//     ASSERT(expectedRl > newRl);
+
+//     ASSERT(policy->rl > newRl);
+
+//     // Check if the PD is currently transitioning to the expected runlevel
+//     // or if the caller wants a barrier on the runlevel
+//     if (policy->rl == (expectedRl+1)) {
+//         // If yes, we need to wait for the transition to happen.
+//         // For now supports transitioning from RUNNING to STOPPED
+//         // The runlevel is currently being transitioned
+//         if (expectedRl == RL_STOPPED) {
+//             u64 i = 0;
+//             u64 maxCount = policy->workerCount;
+//             for(i = 0; i < maxCount; i++) {
+//                 //TODO for now busy-wait on the worker's RL but really we should really on some
+//                 //function implementation to check the worker RL
+//                 //while (hal_cmpswap32(&(policy->workers[i]->rl), expectedRl, expectedRl) != expectedRl);
+//                 // ASSERT(oldValue == expectedRl);
+//                 while(policy->workers[i]->rl != expectedRl);
+//                 // while(policy->workers[i]->fcts.stop(policy->workers[i], expectedRl, newRl) == false);
+//             }
+//             policy->seenStopped = 1;
+//             policy->rl = RL_STOPPED;
+//         } else {
+//             ASSERT(false && "Unexpected runlevel state");
+//         }
+//         ASSERT(policy->rl == expectedRl);
+//     }
+
+//     if (policy->rl == expectedRl) {
+//         ASSERT(policy->rl != RL_STOPPED_WIP);
+//         if (newRl == RL_SHUTDOWN) {
+//             ASSERT(policy->seenStopped == 1);
+//         }
+//         // Transition from expectedRL to newRl
+//         bool runlevelReached = runlevelStopAllModules(policy, expectedRl, newRl);
+//         // If all the PD's modules reached the new runlevel, update the PD runlevel to newRl.
+//         // Otherwise, update the PD runlevel to the intermediate WIP runlevel.
+//         if (runlevelReached) {
+//             policy->rl = newRl;
+//         }
+//         //return runlevelReached;
+//     }
+
+//     ASSERT("Unsupported policy-domain runlevel transition requested");
+//     //return false;
+// }
+
+// void hcPolicyDomainStop(ocrPolicyDomain_t * policy) {
+//     u64 i = 0;
+//     u64 maxCount = 0;
+
+//     ocrPolicyDomainHc_t *rself = (ocrPolicyDomainHc_t*)policy;
+
+//     // We inform people that we want to stop the policy domain
+//     // We make sure that no one else is using the PD (in processMessage mostly)
+//     DPRINTF(DEBUG_LVL_VERB,"Begin PD stop wait loop\n");
+//     u32 oldState = 0, newState = 0;
+//     do {
+//         oldState = rself->state;
+//         newState = (oldState & 0xFFFFFFF0) | 2;
+//         newState = hal_cmpswap32(&(rself->state), oldState, newState);
+//     } while(oldState != newState);
+//     // Now we have set the "I want to shut-down" bit so now we need
+//     // to wait for the users to drain
+//     // We do something really stupid and just loop for now
+//     while(rself->state != 18);
+//     DPRINTF(DEBUG_LVL_VERB,"End PD stop wait loop\n");
+//     // Here we can start stopping the PD
+//     ASSERT(rself->state == 18); // We should have no users and have managed to set
+
+//     // Note: As soon as worker '0' is stopped; its thread is
+//     // free to fall-through from 'start' and call 'finish'.
+//     maxCount = policy->workerCount;
+//     for(i = 0; i < maxCount; i++) {
+//         policy->workers[i]->fcts.stop(policy->workers[i]);
+//     }
+
+//     maxCount = policy->commApiCount;
+//     for(i = 0; i < maxCount; i++) {
+//         policy->commApis[i]->fcts.stop(policy->commApis[i]);
+//     }
+
+//     maxCount = policy->schedulerCount;
+//     for(i = 0; i < maxCount; ++i) {
+//         policy->schedulers[i]->fcts.stop(policy->schedulers[i]);
+//     }
+
+//     maxCount = policy->allocatorCount;
+//     for(i = 0; i < maxCount; ++i) {
+//         policy->allocators[i]->fcts.stop(policy->allocators[i]);
+//     }
+
+//     // We could release our GUID here but not really required
+
+//     maxCount = policy->guidProviderCount;
+//     for(i = 0; i < maxCount; ++i) {
+//         policy->guidProviders[i]->fcts.stop(policy->guidProviders[i]);
+//     }
+
+//     // This does not need to be a cmpswap but keeping it
+//     // this way for now to make sure the logic is sound
+//     oldState = hal_cmpswap32(&(rself->state), 18, 26);
+//     ASSERT(oldState == 18);
+// }
 
 void hcPolicyDomainDestruct(ocrPolicyDomain_t * policy) {
     // Destroying instances
     u64 i = 0;
     u64 maxCount = 0;
 
-    ocrPolicyDomainHc_t* rself = (ocrPolicyDomainHc_t*)policy;
-    ASSERT(rself->state == 14);
+    //TODO-RL should transform all these to stop RL_DEALLOCATE
 
     // Note: As soon as worker '0' is stopped; its thread is
     // free to fall-through and continue shutting down the
     // policy domain
 
+    /*
     maxCount = policy->workerCount;
     for(i = 0; i < maxCount; i++) {
-        policy->workers[i]->fcts.destruct(policy->workers[i]);
+        policy->workers[i]->fcts.stop(policy->workers[i], RL_DEALLOCATE, RL_ACTION_ENTER);
     }
 
     maxCount = policy->commApiCount;
     for(i = 0; i < maxCount; i++) {
-        policy->commApis[i]->fcts.destruct(policy->commApis[i]);
+        policy->commApis[i]->fcts.stop(policy->commApis[i], RL_DEALLOCATE, RL_ACTION_ENTER);
     }
+    */
 
     maxCount = policy->schedulerCount;
     for(i = 0; i < maxCount; ++i) {
@@ -530,55 +936,10 @@ static ocrStats_t* hcGetStats(ocrPolicyDomain_t *self) {
 }
 #endif
 
-static u8 hcGrabPd(ocrPolicyDomainHc_t *rself) {
-    START_PROFILE(pd_hc_GrabPd);
-    u32 newState = rself->state;
-    u32 oldState;
-    if((newState & 0xF) == 1) {
-        do {
-            // Try to grab it
-            oldState = newState;
-            newState += 16; // Increment the user count by 1, skips the bottom 4 bits
-            newState = hal_cmpswap32(&(rself->state), oldState, newState);
-            if(newState == oldState) {
-                RETURN_PROFILE(0);
-            } else {
-                if(newState & 0x2) {
-                    // The PD is shutting down
-                    RETURN_PROFILE(OCR_EAGAIN);
-                }
-                // Some other thread incremented the reader count so
-                // we try again
-                ASSERT((newState & 0xF) == 1); // Just to make sure
-            }
-        } while(true);
-    } else {
-        RETURN_PROFILE(OCR_EAGAIN);
-    }
-}
-
-static void hcReleasePd(ocrPolicyDomainHc_t *rself) {
-    START_PROFILE(pd_hc_ReleasePd);
-    u32 oldState = 0;
-    u32 newState = rself->state;
-    do {
-        ASSERT(newState > 16); // We must at least be a user in shmem
-        oldState = newState;
-        newState -= 16;
-        newState = hal_cmpswap32(&(rself->state), oldState, newState);
-    } while(newState != oldState);
-    RETURN_PROFILE();
-}
-
 u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlocking) {
 
     START_PROFILE(pd_hc_ProcessMessage);
     u8 returnCode = 0;
-
-    returnCode = hcGrabPd((ocrPolicyDomainHc_t*)self);
-    if(returnCode) {
-        RETURN_PROFILE(returnCode);
-    }
 
     // This assert checks the call's parameters are correct
     // - Synchronous processMessage calls always deal with a REQUEST.
@@ -1386,19 +1747,6 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         break;
     }
 
-    case PD_MSG_MGT_MONITOR_PROGRESS: {
-    #define PD_MSG (msg)
-    #define PD_TYPE PD_MSG_MGT_MONITOR_PROGRESS
-      // Delegate to scheduler
-      PD_MSG_FIELD_IO(properties) = self->schedulers[0]->fcts.monitorProgress(self->schedulers[0],
-            (ocrMonitorProgress_t) PD_MSG_FIELD_IO(properties) & 0xFF, PD_MSG_FIELD_I(monitoree));
-    #undef PD_MSG
-    #undef PD_TYPE
-        msg->type &= ~PD_MSG_REQUEST;
-        msg->type |= PD_MSG_RESPONSE;
-      break;
-    }
-
     case PD_MSG_DEP_DYNADD: {
         START_PROFILE(pd_hc_DynAdd);
         ocrTask_t *curTask = NULL;
@@ -1466,31 +1814,6 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         ASSERT(0);
         break;
     }
-    case PD_MSG_MGT_SHUTDOWN: {
-        START_PROFILE(pd_hc_Shutdown);
-        msg->type |= PD_MSG_REQ_RESPONSE; // HC needs this.
-#define PD_MSG msg
-#define PD_TYPE PD_MSG_MGT_SHUTDOWN
-        if (self->shutdownCode == 0)
-            self->shutdownCode = PD_MSG_FIELD_I(errorCode);
-        ASSERT(msg->type & PD_MSG_REQ_RESPONSE);
-        self->fcts.stop(self);
-#undef PD_MSG
-#undef PD_TYPE
-        msg->type &= ~PD_MSG_REQUEST;
-        msg->type |= PD_MSG_RESPONSE;
-        EXIT_PROFILE;
-        break;
-    }
-
-    case PD_MSG_MGT_FINISH: {
-        START_PROFILE(pd_hc_Finish);
-        self->fcts.finish(self);
-        msg->type &= ~PD_MSG_REQUEST;
-        msg->type |= PD_MSG_RESPONSE;
-        EXIT_PROFILE;
-        break;
-    }
 
     case PD_MSG_MGT_REGISTER: {
         START_PROFILE(pd_hc_Register);
@@ -1511,6 +1834,45 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
     case PD_MSG_MGT_UNREGISTER: {
         // Only one PD at this time
         ASSERT(0);
+        break;
+    }
+
+    case PD_MSG_MGT_RL_NOTIFY: {
+#define PD_MSG msg
+#define PD_TYPE PD_MSG_MGT_RL_NOTIFY
+        if(PD_MSG_FIELD_I(properties) & RL_FROM_MSG) {
+            // This should not happen here as we only have one PD
+            ASSERT(0);
+        } else {
+            // This is from user code so it should be a request to shutdown
+            ocrPolicyDomainHc_t *rself = (ocrPolicyDomainHc_t*)self;
+            // Set up the switching for the next phase
+            ASSERT(rself->rlSwitch.runlevel == RL_USER_OK && rself->rlSwitch.nextPhase == RL_GET_PHASE_COUNT_UP(self, RL_USER_OK));
+
+            // We want to transition down now
+            rself->rlSwitch.nextPhase = RL_GET_PHASE_COUNT_DOWN(self, RL_USER_OK) - 1;
+            ASSERT(PD_MSG_FIELD_I(properties) & RL_TEAR_DOWN);
+            ASSERT(PD_MSG_FIELD_I(runlevel) & RL_COMPUTE_OK);
+            self->shutdownCode = PD_MSG_FIELD_I(errorCode);
+            RESULT_ASSERT(self->fcts.switchRunlevel(
+                              self, RL_USER_OK, RL_TEAR_DOWN | RL_ASYNC | RL_REQUEST | RL_FROM_MSG), ==, 0);
+        }
+        msg->type &= ~PD_MSG_REQUEST;
+        break;
+#undef PD_MSG
+#undef PD_TYPE
+    }
+
+    case PD_MSG_MGT_MONITOR_PROGRESS: {
+#define PD_MSG (msg)
+#define PD_TYPE PD_MSG_MGT_MONITOR_PROGRESS
+        // Delegate to scheduler
+        PD_MSG_FIELD_IO(properties) = self->schedulers[0]->fcts.monitorProgress(self->schedulers[0],
+                                                                                (ocrMonitorProgress_t) PD_MSG_FIELD_IO(properties) & 0xFF, PD_MSG_FIELD_I(monitoree));
+#undef PD_MSG
+#undef PD_TYPE
+        msg->type &= ~PD_MSG_REQUEST;
+        msg->type |= PD_MSG_RESPONSE;
         break;
     }
 
@@ -1634,9 +1996,6 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         // we need to make sure there is one
     }
 
-    // Now "release" the policy domain
-    hcReleasePd((ocrPolicyDomainHc_t*)self);
-
     RETURN_PROFILE(returnCode);
 }
 
@@ -1658,28 +2017,21 @@ u8 hcPdWaitMessage(ocrPolicyDomain_t *self,  ocrMsgHandle_t **handle) {
 
 void* hcPdMalloc(ocrPolicyDomain_t *self, u64 size) {
     START_PROFILE(pd_hc_PdMalloc);
-    if(hcGrabPd((ocrPolicyDomainHc_t*)self))
-        RETURN_PROFILE(NULL);
-
     // Just try in the first allocator
     void* toReturn = NULL;
     toReturn = self->allocators[0]->fcts.allocate(self->allocators[0], size, 0);
     if(toReturn == NULL)
         DPRINTF(DEBUG_LVL_WARN, "Failed PDMalloc for size %lx\n", size);
     ASSERT(toReturn != NULL);
-    hcReleasePd((ocrPolicyDomainHc_t*)self);
     RETURN_PROFILE(toReturn);
 }
 
 void hcPdFree(ocrPolicyDomain_t *self, void* addr) {
     START_PROFILE(pd_hc_PdFree);
     // May result in leaks but better than the alternative...
-    if(hcGrabPd((ocrPolicyDomainHc_t*)self))
-        RETURN_PROFILE();
 
     allocatorFreeFunction(addr);
 
-    hcReleasePd((ocrPolicyDomainHc_t*)self);
     RETURN_PROFILE();
 }
 
@@ -1715,7 +2067,7 @@ void initializePolicyDomainHc(ocrPolicyDomainFactory_t * factory, ocrPolicyDomai
     ocrPolicyDomainHc_t* derived = (ocrPolicyDomainHc_t*) self;
     //DIST-TODO ((paramListPolicyDomainHcInst_t*)perInstance)->rank;
     derived->rank = ((paramListPolicyDomainHcInst_t*)perInstance)->rank;
-    derived->state = 0;
+    //derived->state = 0;
 }
 
 static void destructPolicyDomainFactoryHc(ocrPolicyDomainFactory_t * factory) {
@@ -1738,10 +2090,7 @@ ocrPolicyDomainFactory_t * newPolicyDomainFactoryHc(ocrParamList_t *perType) {
 
     // Set future PDs' instance  methods
     base->policyDomainFcts.destruct = FUNC_ADDR(void(*)(ocrPolicyDomain_t*), hcPolicyDomainDestruct);
-    base->policyDomainFcts.begin = FUNC_ADDR(void(*)(ocrPolicyDomain_t*), hcPolicyDomainBegin);
-    base->policyDomainFcts.start = FUNC_ADDR(void(*)(ocrPolicyDomain_t*), hcPolicyDomainStart);
-    base->policyDomainFcts.stop = FUNC_ADDR(void(*)(ocrPolicyDomain_t*), hcPolicyDomainStop);
-    base->policyDomainFcts.finish = FUNC_ADDR(void(*)(ocrPolicyDomain_t*), hcPolicyDomainFinish);
+    base->policyDomainFcts.switchRunlevel = FUNC_ADDR(u8 (*)(ocrPolicyDomain_t*, ocrRunlevel_t, u32), hcPdSwitchRunlevel);
     base->policyDomainFcts.processMessage = FUNC_ADDR(u8(*)(ocrPolicyDomain_t*,ocrPolicyMsg_t*,u8), hcPolicyDomainProcessMessage);
 
     base->policyDomainFcts.sendMessage = FUNC_ADDR(u8 (*)(ocrPolicyDomain_t*, ocrLocation_t, ocrPolicyMsg_t *, ocrMsgHandle_t**, u32),

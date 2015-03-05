@@ -20,6 +20,14 @@ struct _ocr_hashtable_entry_struct;
  */
 typedef u32 (*hashFct)(void * key, u32 nbBuckets);
 
+/**
+ * @brief Function to use to deallocate remnant entries
+ *        on hashtable destruction.
+ *
+ * @param entry       the entry to destroy key and value.
+ */
+typedef void (*deallocFct)(void * key, void * value);
+
 typedef struct _hashtable {
     ocrPolicyDomain_t * pd;
     u32 nbBuckets;
@@ -45,10 +53,10 @@ void * hashtableConcBucketLockedTryPut(hashtable_t * hashtable, void * key, void
 bool hashtableConcBucketLockedRemove(hashtable_t * hashtable, void * key, void ** value);
 
 hashtable_t * newHashtable(ocrPolicyDomain_t * pd, u32 nbBuckets, hashFct hashing);
-void destructHashtable(hashtable_t * hashtable);
+void destructHashtable(hashtable_t * hashtable, deallocFct entryDeallocator);
 
 hashtable_t * newHashtableBucketLocked(ocrPolicyDomain_t * pd, u32 nbBuckets, hashFct hashing);
-void destructHashtableBucketLocked(hashtable_t * hashtable);
+void destructHashtableBucketLocked(hashtable_t * hashtable, deallocFct entryDeallocator);
 
 
 //

@@ -22,17 +22,17 @@ typedef struct {
 } ocrPolicyDomainFactoryHc_t;
 
 typedef struct {
+    volatile u64 checkedIn;  // Will initially contain the number of workers we need to
+                             // check in and will decrement to zero
+    ocrRunlevel_t runlevel;
+    s8 nextPhase;
+    u32 properties;
+} pdHcResumeSwitchRL_t;
+
+typedef struct {
     ocrPolicyDomain_t base;
     u32 rank;           // For MPI use
-    volatile u32 state; // State of the policy domain
-    // Bottom 4 bits indicate state:
-    //  - 0000b: Unitialized
-    //  - 0001b: PD usable (up and running)
-    //  - 0010b: Request to enter stop (no more users can use the PD)
-    //  - 0110b: Stop entered. Users have stopped using the PD
-    //  - 1010b: Stop completed successfully, can 'finish' the PD
-    //  - 1110b: Policy domain fully shut down
-    // The upper bits count the number of users ('readers')
+    pdHcResumeSwitchRL_t rlSwitch; // Used for asynchronous RL switch
 } ocrPolicyDomainHc_t;
 
 typedef struct {

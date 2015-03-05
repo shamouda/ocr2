@@ -19,43 +19,78 @@
 /******************************************************/
 
 void hcWorkpileDestruct ( ocrWorkpile_t * base ) {
-    ocrWorkpileHc_t* derived = (ocrWorkpileHc_t*) base;
-    derived->deque->destruct(base->pd, derived->deque);
-    runtimeChunkFree((u64)base, NULL);
+    runtimeChunkFree((u64)base, PERSISTENT_CHUNK);
 }
 
-void hcWorkpileBegin(ocrWorkpile_t *base, ocrPolicyDomain_t *PD) {
-    // Nothing to do
-}
+u8 hcWorkpileSwitchRunlevel(ocrWorkpile_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
+                            phase_t phase, u32 properties, void (*callback)(ocrPolicyDomain_t*, u64), u64 val) {
 
-void hcWorkpileStart(ocrWorkpile_t *base, ocrPolicyDomain_t *PD) {
-    guidify(PD, (u64)base, &(base->fguid), OCR_GUID_WORKPILE);
-    ocrWorkpileHc_t* derived = (ocrWorkpileHc_t*)base;
-    base->pd = PD;
-    derived->deque = newDeque(base->pd, (void *) NULL_GUID, WORK_STEALING_DEQUE);
-    // Can switch to locked implementation for debugging purpose
-    // derived->deque = newDeque(base->pd, (void *) NULL_GUID, LOCKED_DEQUE);
-}
+    u8 toReturn = 0;
 
-void hcWorkpileStop(ocrWorkpile_t *base) {
-    // Destroy the GUID
-    PD_MSG_STACK(msg);
-    getCurrentEnv(NULL, NULL, NULL, &msg);
+    // This is an inert module, we do not handle callbacks (caller needs to wait on us)
+    ASSERT(callback == NULL);
 
+    // Verify properties for this call
+    ASSERT((properties & RL_REQUEST) && !(properties & RL_RESPONSE)
+           && !(properties & RL_RELEASE));
+    ASSERT(!(properties & RL_FROM_MSG));
+
+    switch(runlevel) {
+    case RL_CONFIG_PARSE:
+        // On bring-up: Update PD->phasesPerRunlevel on phase 0
+        // and check compatibility on phase 1
+        break;
+    case RL_NETWORK_OK:
+        break;
+    case RL_PD_OK:
+        if(properties & RL_BRING_UP)
+            self->pd = PD;
+        break;
+    case RL_MEMORY_OK:
+        break;
+    case RL_GUID_OK:
+        if((properties & RL_BRING_UP) && RL_IS_FIRST_PHASE_UP(PD, RL_GUID_OK, phase)) {
+            // Does this need to move up in RL_MEMORY_OK?
+            ocrWorkpileHc_t* derived = (ocrWorkpileHc_t*)self;
+            derived->deque = newDeque(self->pd, (void *) NULL_GUID, WORK_STEALING_DEQUE);
+            // Can switch to locked implementation for debugging purpose
+            // derived->deque = newDeque(self->pd, (void *) NULL_GUID, LOCKED_DEQUE);
+        }
+        if((properties & RL_TEAR_DOWN) && RL_IS_LAST_PHASE_DOWN(PD, RL_GUID_OK, phase)) {
+            ocrWorkpileHc_t* derived = (ocrWorkpileHc_t*) self;
+            derived->deque->destruct(PD, derived->deque);
+        }
+        break;
+    case RL_COMPUTE_OK:
+        if(properties & RL_BRING_UP) {
+            if(RL_IS_FIRST_PHASE_UP(PD, RL_COMPUTE_OK, phase)) {
+                // We get a GUID for ourself
+                guidify(self->pd, (u64)self, &(self->fguid), OCR_GUID_ALLOCATOR);
+            }
+        } else {
+            // Tear-down
+            if(RL_IS_LAST_PHASE_DOWN(PD, RL_COMPUTE_OK, phase)) {
+                PD_MSG_STACK(msg);
+                getCurrentEnv(NULL, NULL, NULL, &msg);
 #define PD_MSG (&msg)
 #define PD_TYPE PD_MSG_GUID_DESTROY
-    msg.type = PD_MSG_GUID_DESTROY | PD_MSG_REQUEST;
-    PD_MSG_FIELD_I(guid) = base->fguid;
-    PD_MSG_FIELD_I(properties) = 0;
-    // Shutting down so ignore error
-    base->pd->fcts.processMessage(base->pd, &msg, false);
+                msg.type = PD_MSG_GUID_DESTROY | PD_MSG_REQUEST;
+                PD_MSG_FIELD_I(guid) = self->fguid;
+                PD_MSG_FIELD_I(properties) = 0;
+                toReturn |= self->pd->fcts.processMessage(self->pd, &msg, false);
+                self->fguid.guid = NULL_GUID;
 #undef PD_MSG
 #undef PD_TYPE
-    base->fguid.guid = UNINITIALIZED_GUID;
-}
-
-void hcWorkpileFinish(ocrWorkpile_t *base) {
-    // Nothing to do
+            }
+        }
+        break;
+    case RL_USER_OK:
+        break;
+    default:
+        // Unknown runlevel
+        ASSERT(0);
+    }
+    return toReturn;
 }
 
 ocrFatGuid_t hcWorkpilePop(ocrWorkpile_t * base, ocrWorkPopType_t type,
@@ -109,10 +144,8 @@ ocrWorkpileFactory_t * newOcrWorkpileFactoryHc(ocrParamList_t *perType) {
     base->destruct = &destructWorkpileFactoryHc;
 
     base->workpileFcts.destruct = FUNC_ADDR(void (*) (ocrWorkpile_t *), hcWorkpileDestruct);
-    base->workpileFcts.begin = FUNC_ADDR(void (*) (ocrWorkpile_t *, ocrPolicyDomain_t *), hcWorkpileBegin);
-    base->workpileFcts.start = FUNC_ADDR(void (*) (ocrWorkpile_t *, ocrPolicyDomain_t *), hcWorkpileStart);
-    base->workpileFcts.stop = FUNC_ADDR(void (*) (ocrWorkpile_t *), hcWorkpileStop);
-    base->workpileFcts.finish = FUNC_ADDR(void (*) (ocrWorkpile_t *), hcWorkpileFinish);
+    base->workpileFcts.switchRunlevel = FUNC_ADDR(u8 (*)(ocrWorkpile_t*, ocrPolicyDomain_t*, ocrRunlevel_t,
+                                                         phase_t, u32, void (*)(ocrPolicyDomain_t*, u64), u64), hcWorkpileSwitchRunlevel);
     base->workpileFcts.pop = FUNC_ADDR(ocrFatGuid_t (*)(ocrWorkpile_t*, ocrWorkPopType_t, ocrCost_t *), hcWorkpilePop);
     base->workpileFcts.push = FUNC_ADDR(void (*)(ocrWorkpile_t*, ocrWorkPushType_t, ocrFatGuid_t), hcWorkpilePush);
     return base;

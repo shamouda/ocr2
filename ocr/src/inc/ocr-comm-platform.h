@@ -57,26 +57,26 @@ typedef struct _ocrCommPlatformFcts_t {
      */
     void (*destruct)(struct _ocrCommPlatform_t *self);
 
-    void (*begin)(struct _ocrCommPlatform_t *self, struct _ocrPolicyDomain_t *PD,
-                  struct _ocrCommApi_t *comm);
-
     /**
-     * @brief Starts a comm-platform (a communication entity).
+     * @brief Switch runlevel
      *
-     * @param[in] self          Pointer to this comm-platform
-     * @param[in] PD            The policy domain bringing up the runtime
-     * @param[in] workerType    Type of the worker runnning on this comp-platform
+     * @param[in] self         Pointer to this object
+     * @param[in] PD           Policy domain this object belongs to
+     * @param[in] runlevel     Runlevel to switch to
+     * @param[in] phase        Phase for this runlevel
+     * @param[in] properties   Properties (see ocr-runtime-types.h)
+     * @param[in] callback     Callback to call when the runlevel switch
+     *                         is complete. NULL if no callback is required
+     * @param[in] val          Value to pass to the callback
+     *
+     * @return 0 if the switch command was successful and a non-zero error
+     * code otherwise. Note that the return value does not indicate that the
+     * runlevel switch occured (the callback will be called when it does) but only
+     * that the call to switch runlevel was well formed and will be processed
+     * at some point
      */
-    void (*start)(struct _ocrCommPlatform_t *self, struct _ocrPolicyDomain_t * PD,
-                  struct _ocrCommApi_t *comm);
-
-    /**
-     * @brief Stops this comp-platform
-     * @param[in] self          Pointer to this comp-platform
-     */
-    void (*stop)(struct _ocrCommPlatform_t *self);
-
-    void (*finish)(struct _ocrCommPlatform_t *self);
+    u8 (*switchRunlevel)(struct _ocrCommPlatform_t* self, struct _ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
+                         phase_t phase, u32 properties, void (*callback)(struct _ocrPolicyDomain_t*, u64), u64 val);
 
     /**
      * @brief Tells the communication platfrom that the biggest

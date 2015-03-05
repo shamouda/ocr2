@@ -25,8 +25,6 @@
 #include <string.h>
 #include <sys/stat.h>
 
-u8 startMemStat = 0;
-
 #define DEBUG_TYPE INIPARSING
 
 /* Configuration parsing options */
@@ -404,7 +402,32 @@ void builderPreamble(dictionary *dict) {
 
 extern bool key_exists(dictionary *dict, char *sec, char *field);
 
-void bringUpRuntime(const char *inifile) {
+/**
+ * @brief Calls platformn specific initialization code.
+ *
+ * Allows to call platform specific initialization code
+ * before OCR is built and started.
+ *
+ * The only concrete use case for this function is to
+ * call MPI_INIT. Implementers should avoid relying on
+ * it as it may be deprecated in near future.
+ */
+void platformSpecificInit(ocrConfig_t * ocrConfig) {
+#ifdef ENABLE_COMM_PLATFORM_MPI
+    extern void platformInitMPIComm(int argc, char ** argv);
+    platformInitMPIComm(ocrConfig->userArgc, ocrConfig->userArgv);
+#endif
+
+#ifdef ENABLE_COMM_PLATFORM_GASNET
+    extern void platformInitGasnetComm(int argc, char ** argv);
+    platformInitGasnetComm(ocrConfig->userArgc, ocrConfig->userArgv);
+#endif
+}
+
+void bringUpRuntime(ocrConfig_t *ocrConfig) {
+    const char *inifile = ocrConfig->iniFile;
+    ASSERT(inifile != NULL);
+
     int i, j, count=0, nsec;
     dictionary *dict = iniparser_load(inifile);
 
@@ -550,10 +573,6 @@ void bringUpRuntime(const char *inifile) {
     ocrPolicyDomain_t *rootPolicy;
     rootPolicy = (ocrPolicyDomain_t *) all_instances[policydomain_type][0];
 
-#ifdef OCR_ENABLE_STATISTICS
-    setCurrentPD(rootPolicy); // Statistics needs to know the current PD so we set it for this main thread
-#endif
-
 #ifdef ENABLE_BUILDER_ONLY
     {
         u64 start_address = (u64)iniparser_getlonglong(dict, START_ADDRESS, 0);
@@ -564,17 +583,74 @@ void bringUpRuntime(const char *inifile) {
     }
 #else
     ocrPolicyDomain_t *otherPolicyDomains = NULL;
-    rootPolicy->fcts.begin(rootPolicy);
-    for (i = 1; i < inst_counts[policydomain_type]; i++) {
+    // Runlevel switch. Everything is initialized at this point and so we switch
+    // to the first runlevel (CONFIG_PARSE). This will, in particular, enable all
+    // modules within a PD to become aware of each other's runaction requirements
+    // Transition all PDs to CONFIG_PARSE
+    for(i = 1; i < inst_counts[policydomain_type]; ++i) {
         otherPolicyDomains = (ocrPolicyDomain_t*)all_instances[policydomain_type][i];
-        otherPolicyDomains->fcts.begin(otherPolicyDomains);
+        RESULT_ASSERT(otherPolicyDomains->fcts.switchRunlevel(otherPolicyDomains, RL_CONFIG_PARSE,
+                                                              RL_REQUEST | RL_ASYNC | RL_BRING_UP),
+                      ==, 0);
     }
+    RESULT_ASSERT(rootPolicy->fcts.switchRunlevel(rootPolicy, RL_CONFIG_PARSE, RL_REQUEST |
+                                                  RL_ASYNC | RL_BRING_UP | RL_NODE_MASTER),
+                  ==, 0);
 
-    rootPolicy->fcts.start(rootPolicy);
-    for (i = 1; i < inst_counts[policydomain_type]; i++) {
+    // We now switch to NETWORK_OK
+    // First do platform specific transitions
+    // TODO: Do we want to keep this here or do we want
+    // to move it in one of the modules?
+    platformSpecificInit(ocrConfig);
+
+    // REC TODO: This part may need to be specialized a bit. Basically,
+    // we need this capable thread to determine which PDs it is responsible
+    // for bringing to PD_OK. On TG, this will only be the one PD (each core brings
+    // its own PD to a start) whereas on TG-emul, it is all PDs. This goes back
+    // to the issue of having the runtime "select" the part of the configuration
+    // that is of interest to it.
+
+    // Transition all PDs to NETWORK_OK
+    // At this stage, everything is inert so all operations are synchronous
+    for(i = 1; i < inst_counts[policydomain_type]; ++i) {
         otherPolicyDomains = (ocrPolicyDomain_t*)all_instances[policydomain_type][i];
-        otherPolicyDomains->fcts.start(otherPolicyDomains);
+        RESULT_ASSERT(otherPolicyDomains->fcts.switchRunlevel(otherPolicyDomains, RL_NETWORK_OK,
+                                                              RL_REQUEST | RL_ASYNC | RL_BRING_UP),
+                      ==, 0);
     }
+    RESULT_ASSERT(rootPolicy->fcts.switchRunlevel(rootPolicy, RL_NETWORK_OK,
+                                                  RL_REQUEST | RL_ASYNC | RL_BRING_UP | RL_NODE_MASTER),
+                  ==, 0);
+
+    // Transition all PDs to PD_OK
+    // This creates a capable module for each PD. The worker/thread executing
+    // this code is the capable thread in the rootPolicy. We then continue executing
+    // with just rootPolicy
+    for(i = 1; i < inst_counts[policydomain_type]; ++i) {
+        otherPolicyDomains = (ocrPolicyDomain_t*)all_instances[policydomain_type][i];
+        RESULT_ASSERT(otherPolicyDomains->fcts.switchRunlevel(otherPolicyDomains, RL_PD_OK,
+                                                              RL_REQUEST | RL_ASYNC | RL_BRING_UP),
+                      ==, 0);
+    }
+    RESULT_ASSERT(rootPolicy->fcts.switchRunlevel(rootPolicy, RL_PD_OK,
+                                                  RL_REQUEST | RL_ASYNC | RL_BRING_UP | RL_NODE_MASTER),
+                  ==, 0);
+
+    // Transition the root PD to MEMORY_OK
+    RESULT_ASSERT(rootPolicy->fcts.switchRunlevel(rootPolicy, RL_MEMORY_OK,
+                                                  RL_REQUEST | RL_ASYNC | RL_BRING_UP | RL_NODE_MASTER),
+                  ==, 0);
+
+    // Transition the root PD to GUID_OK and wait for all PDs to transition
+    RESULT_ASSERT(rootPolicy->fcts.switchRunlevel(rootPolicy, RL_GUID_OK,
+                                                  RL_REQUEST | RL_BARRIER | RL_BRING_UP | RL_NODE_MASTER),
+                  ==, 0);
+
+    // Transition the root PD to COMPUTE_OK
+    RESULT_ASSERT(rootPolicy->fcts.switchRunlevel(rootPolicy, RL_COMPUTE_OK,
+                                                  RL_REQUEST | RL_ASYNC | RL_BRING_UP | RL_NODE_MASTER),
+                  ==, 0);
+
 #endif
     iniparser_freedict(dict);
 
@@ -583,8 +659,40 @@ void bringUpRuntime(const char *inifile) {
 #endif
 }
 
-void freeUpRuntime (void) {
+void freeUpRuntime (bool doTeardown) {
     u32 i, j;
+
+    if(doTeardown) {
+        ocrPolicyDomain_t *pd = NULL;
+        getCurrentEnv(&pd, NULL, NULL, NULL);
+            // When we need to do the tear-down, we need to continue from RL_GUID_OK all the way down to CONFIG_PARSE
+        // TODO: Need to ensure that only NODE_MASTER comes out of here. Other PD_MASTER need to stay in their PDs
+        RESULT_ASSERT(pd->fcts.switchRunlevel(pd, RL_GUID_OK, RL_REQUEST | RL_ASYNC | RL_TEAR_DOWN | RL_NODE_MASTER),
+                      ==, 0);
+        RESULT_ASSERT(pd->fcts.switchRunlevel(pd, RL_MEMORY_OK, RL_REQUEST | RL_ASYNC | RL_TEAR_DOWN | RL_NODE_MASTER),
+                      ==, 0);
+
+        // NOTE: TODO: The switch of other PD's runlevels needs to happen with ocrPdMessages_t
+        RESULT_ASSERT(pd->fcts.switchRunlevel(pd, RL_PD_OK, RL_REQUEST | RL_ASYNC | RL_TEAR_DOWN | RL_NODE_MASTER),
+                      ==, 0);
+        // Here everyone is down except NODE_MASTER
+        ocrPolicyDomain_t *otherPolicyDomains = NULL;
+        for(i = 1; i < inst_counts[policydomain_type]; ++i) {
+            otherPolicyDomains = (ocrPolicyDomain_t*)all_instances[policydomain_type][i];
+            RESULT_ASSERT(otherPolicyDomains->fcts.switchRunlevel(otherPolicyDomains, RL_NETWORK_OK,
+                                                                  RL_REQUEST | RL_ASYNC | RL_TEAR_DOWN), ==, 0);
+        }
+        RESULT_ASSERT(pd->fcts.switchRunlevel(pd, RL_NETWORK_OK, RL_REQUEST | RL_ASYNC | RL_TEAR_DOWN | RL_NODE_MASTER),
+                      ==, 0);
+
+        for(i = 1; i < inst_counts[policydomain_type]; ++i) {
+            otherPolicyDomains = (ocrPolicyDomain_t*)all_instances[policydomain_type][i];
+            RESULT_ASSERT(otherPolicyDomains->fcts.switchRunlevel(otherPolicyDomains, RL_CONFIG_PARSE,
+                                                                  RL_REQUEST | RL_ASYNC | RL_TEAR_DOWN), ==, 0);
+        }
+        RESULT_ASSERT(pd->fcts.switchRunlevel(pd, RL_CONFIG_PARSE, RL_REQUEST | RL_ASYNC | RL_TEAR_DOWN | RL_NODE_MASTER),
+                      ==, 0);
+    }
 
     for (i = 0; i < total_types; i++) {
         for (j = 0; j < type_counts[i]; j++) {
@@ -687,39 +795,13 @@ static void * packUserArguments(int argc, char ** argv) {
     return ptr;
 }
 
-/**
- * @brief Calls platformn specific initialization code.
- *
- * Allows to call platform specific initialization code
- * before OCR is built and started.
- *
- * The only concrete use case for this function is to
- * call MPI_INIT. Implementers should avoid relying on
- * it as it may be deprecated in near future.
- */
-void platformSpecificInit(ocrConfig_t * ocrConfig) {
-#ifdef ENABLE_COMM_PLATFORM_MPI
-    extern void platformInitMPIComm(int argc, char ** argv);
-    platformInitMPIComm(ocrConfig->userArgc, ocrConfig->userArgv);
-#endif
-
-#ifdef ENABLE_COMM_PLATFORM_GASNET
-    extern void platformInitGasnetComm(int argc, char ** argv);
-    platformInitGasnetComm(ocrConfig->userArgc, ocrConfig->userArgv);
-#endif
-}
-
 // This main function is used for x86 platforms
 int __attribute__ ((weak)) main(int argc, const char* argv[]) {
     // Parse parameters. The idea is to extract the ones relevant
     // to the runtime and pass all the other ones down to the mainEdt
     ocrConfig_t ocrConfig;
     ocrPolicyDomain_t *pd = NULL;
-    ocrWorker_t *worker = NULL;
     ocrParseArgs(argc, argv, &ocrConfig);
-
-    // Things that must initialize before OCR is started
-    platformSpecificInit(&ocrConfig);
 
     // Register pointer to the mainEdt
     mainEdtSet(mainEdt);
@@ -729,25 +811,18 @@ int __attribute__ ((weak)) main(int argc, const char* argv[]) {
     userArgsSet(packedUserArgv);
 
     // Set up the runtime
-    const char * iniFile = ocrConfig.iniFile;
-    ASSERT(iniFile != NULL);
-    bringUpRuntime(iniFile);
+    bringUpRuntime(&ocrConfig);
 
-    // Here the runtime is fully functional and
-    // the "blessed" worker will execute the mainEdt
+    // Here, we are in COMPUTE_OK. We just need to transition to USER_OK
+    // which will start mainEdt
+    getCurrentEnv(&pd, NULL, NULL, NULL);
+    RESULT_ASSERT(
+        pd->fcts.switchRunlevel(pd, RL_USER_OK, RL_REQUEST | RL_ASYNC | RL_BRING_UP | RL_NODE_MASTER),
+        ==, 0);
 
-    startMemStat = 1;
-    getCurrentEnv(&pd, &worker, NULL, NULL);
-    // We start the current worker. After it starts, it will loop
-    // until ocrShutdown is called which will cause the entire PD
-    // to stop (including this worker). The currently executing
-    // worker then fallthrough from start to finish.
-    worker->fcts.start(worker, pd);
     u8 returnCode = pd->shutdownCode;
-    // NOTE: finish blocks until stop has completed
-    pd->fcts.finish(pd);
-    pd->fcts.destruct(pd);
-    freeUpRuntime();
+
+    freeUpRuntime(true);
 
     return returnCode;
 }

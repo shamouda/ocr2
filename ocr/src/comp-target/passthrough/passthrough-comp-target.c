@@ -21,61 +21,88 @@
 
 
 void ptDestruct(ocrCompTarget_t *compTarget) {
-    u32 i = 0;
-    while(i < compTarget->platformCount) {
-        compTarget->platforms[i]->fcts.destruct(compTarget->platforms[i]);
-        ++i;
+//     u32 i = 0;
+//     while(i < compTarget->platformCount) {
+//         compTarget->platforms[i]->fcts.destruct(compTarget->platforms[i]);
+//         ++i;
+//     }
+//     runtimeChunkFree((u64)(compTarget->platforms), NULL);
+// #ifdef OCR_ENABLE_STATISTICS
+//     statsCOMPTARGET_STOP(compTarget->pd, compTarget->fguid.guid, compTarget);
+// #endif
+//     runtimeChunkFree((u64)compTarget, NULL);
+}
+
+u8 ptSwitchRunlevel(ocrCompTarget_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
+                    phase_t phase, u32 properties, void (*callback)(ocrPolicyDomain_t*, u64), u64 val) {
+
+    u8 toReturn = 0;
+
+    // The worker is the capable module and we operate as
+    // inert wrt it
+    ASSERT(callback == NULL);
+
+    // Verify properties for this call
+    ASSERT((properties & RL_REQUEST) && !(properties & RL_RESPONSE)
+           && !(properties & RL_RELEASE));
+    ASSERT(!(properties & RL_FROM_MSG));
+
+    // Call the runlevel change on the underlying platform
+    if(runlevel == RL_CONFIG_PARSE && (properties & RL_BRING_UP) && phase == 0) {
+        // Set the worker properly the first time
+        ASSERT(self->platformCount == 1);
+        self->platforms[0]->worker = self->worker;
     }
-    runtimeChunkFree((u64)(compTarget->platforms), NULL);
-#ifdef OCR_ENABLE_STATISTICS
-    statsCOMPTARGET_STOP(compTarget->pd, compTarget->fguid.guid, compTarget);
-#endif
-    runtimeChunkFree((u64)compTarget, NULL);
-}
-
-void ptBegin(ocrCompTarget_t * compTarget, ocrPolicyDomain_t * PD, ocrWorkerType_t workerType) {
-
-    ASSERT(compTarget->platformCount == 1);
-    compTarget->pd = PD;
-    compTarget->platforms[0]->fcts.begin(compTarget->platforms[0], PD, workerType);
-}
-
-void ptStart(ocrCompTarget_t * compTarget, ocrPolicyDomain_t * PD, ocrWorker_t * worker) {
-    // Get a GUID
-    guidify(PD, (u64)compTarget, &(compTarget->fguid), OCR_GUID_COMPTARGET);
-    compTarget->worker = worker;
-
-#ifdef OCR_ENABLE_STATISTICS
-    statsCOMPTARGET_START(PD, compTarget->fguid.guid, compTarget->fguid.metaDataPtr);
-#endif
-
-    ASSERT(compTarget->platformCount == 1);
-    compTarget->platforms[0]->fcts.start(compTarget->platforms[0], PD, worker);
-}
-
-void ptStop(ocrCompTarget_t * compTarget) {
-    ASSERT(compTarget->platformCount == 1);
-    compTarget->platforms[0]->fcts.stop(compTarget->platforms[0]);
-
-    // Destroy the GUID
-    PD_MSG_STACK(msg);
-
-    getCurrentEnv(NULL, NULL, NULL, &msg);
-
+    toReturn |= self->platforms[0]->fcts.switchRunlevel(self->platforms[0], PD, runlevel, phase, properties,
+                                                        NULL, 0);
+    switch(runlevel) {
+    case RL_CONFIG_PARSE:
+        // On bring-up: Update PD->phasesPerRunlevel on phase 0
+        // and check compatibility on phase 1
+        break;
+    case RL_NETWORK_OK:
+        break;
+    case RL_PD_OK:
+        if(properties & RL_BRING_UP)
+            self->pd = PD;
+        break;
+    case RL_MEMORY_OK:
+        break;
+    case RL_GUID_OK:
+        break;
+    case RL_COMPUTE_OK:
+        if(properties & RL_BRING_UP) {
+            if(RL_IS_FIRST_PHASE_UP(PD, RL_COMPUTE_OK, phase)) {
+                // We get a GUID for ourself
+                guidify(self->pd, (u64)self, &(self->fguid), OCR_GUID_COMPTARGET);
+            }
+        } else {
+            // Tear-down
+            if(RL_IS_LAST_PHASE_DOWN(PD, RL_COMPUTE_OK, phase)) {
+                PD_MSG_STACK(msg);
+                getCurrentEnv(NULL, NULL, NULL, &msg);
 #define PD_MSG (&msg)
 #define PD_TYPE PD_MSG_GUID_DESTROY
-    msg.type = PD_MSG_GUID_DESTROY | PD_MSG_REQUEST;
-    PD_MSG_FIELD_I(guid) = compTarget->fguid;
-    PD_MSG_FIELD_I(properties) = 0;
-    compTarget->pd->fcts.processMessage(compTarget->pd, &msg, false); // Don't really care about result
+                msg.type = PD_MSG_GUID_DESTROY | PD_MSG_REQUEST;
+                PD_MSG_FIELD_I(guid) = self->fguid;
+                PD_MSG_FIELD_I(properties) = 0;
+                toReturn |= self->pd->fcts.processMessage(self->pd, &msg, false);
+                self->fguid.guid = NULL_GUID;
 #undef PD_MSG
 #undef PD_TYPE
-    compTarget->fguid.guid = UNINITIALIZED_GUID;
-}
-
-void ptFinish(ocrCompTarget_t *compTarget) {
-    ASSERT(compTarget->platformCount == 1);
-    compTarget->platforms[0]->fcts.finish(compTarget->platforms[0]);
+            }
+        }
+        break;
+// TODO Where should this go?
+#ifdef OCR_ENABLE_STATISTICS
+        statsCOMPTARGET_START(PD, compTarget->fguid.guid, compTarget->fguid.metaDataPtr);
+#endif
+    case RL_USER_OK:
+        break;
+    default:
+        ASSERT(0);
+    }
+    return toReturn;
 }
 
 u8 ptGetThrottle(ocrCompTarget_t *compTarget, u64 *value) {
@@ -116,15 +143,13 @@ static void destructCompTargetFactoryPt(ocrCompTargetFactory_t *factory) {
 
 ocrCompTargetFactory_t *newCompTargetFactoryPt(ocrParamList_t *perType) {
     ocrCompTargetFactory_t *base = (ocrCompTargetFactory_t*)
-                                   runtimeChunkAlloc(sizeof(ocrCompTargetFactoryPt_t), NONPERSISTENT_CHUNK);
+        runtimeChunkAlloc(sizeof(ocrCompTargetFactoryPt_t), NONPERSISTENT_CHUNK);
     base->instantiate = &newCompTargetPt;
     base->initialize = &initializeCompTargetPt;
     base->destruct = &destructCompTargetFactoryPt;
     base->targetFcts.destruct = FUNC_ADDR(void (*)(ocrCompTarget_t*), ptDestruct);
-    base->targetFcts.begin = FUNC_ADDR(void (*)(ocrCompTarget_t*, ocrPolicyDomain_t*, ocrWorkerType_t), ptBegin);
-    base->targetFcts.start = FUNC_ADDR(void (*)(ocrCompTarget_t*, ocrPolicyDomain_t*, ocrWorker_t*), ptStart);
-    base->targetFcts.stop = FUNC_ADDR(void (*)(ocrCompTarget_t*), ptStop);
-    base->targetFcts.finish = FUNC_ADDR(void (*)(ocrCompTarget_t*), ptFinish);
+    base->targetFcts.switchRunlevel = FUNC_ADDR(u8 (*)(ocrCompTarget_t*, ocrPolicyDomain_t*, ocrRunlevel_t,
+                                                       phase_t, u32, void (*)(ocrPolicyDomain_t*, u64), u64), ptSwitchRunlevel);
     base->targetFcts.getThrottle = FUNC_ADDR(u8 (*)(ocrCompTarget_t*, u64*), ptGetThrottle);
     base->targetFcts.setThrottle = FUNC_ADDR(u8 (*)(ocrCompTarget_t*, u64), ptSetThrottle);
     base->targetFcts.setCurrentEnv = FUNC_ADDR(u8 (*)(ocrCompTarget_t*, ocrPolicyDomain_t*, ocrWorker_t*), ptSetCurrentEnv);

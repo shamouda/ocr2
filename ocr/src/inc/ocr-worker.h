@@ -43,11 +43,26 @@ struct _ocrTask_t;
 typedef struct _ocrWorkerFcts_t {
     void (*destruct)(struct _ocrWorker_t *self);
 
-    void (*begin)(struct _ocrWorker_t *self, struct _ocrPolicyDomain_t * PD);
-
-    /** @brief Start Worker
+    /**
+     * @brief Switch runlevel
+     *
+     * @param[in] self         Pointer to this object
+     * @param[in] PD           Policy domain this object belongs to
+     * @param[in] runlevel     Runlevel to switch to
+     * @param[in] phase        Phase for this runlevel
+     * @param[in] properties   Properties (see ocr-runtime-types.h)
+     * @param[in] callback     Callback to call when the runlevel switch
+     *                         is complete. NULL if no callback is required
+     * @param[in] val          Value to pass to the callback
+     *
+     * @return 0 if the switch command was successful and a non-zero error
+     * code otherwise. Note that the return value does not indicate that the
+     * runlevel switch occured (the callback will be called when it does) but only
+     * that the call to switch runlevel was well formed and will be processed
+     * at some point
      */
-    void (*start)(struct _ocrWorker_t *self, struct _ocrPolicyDomain_t * PD);
+    u8 (*switchRunlevel)(struct _ocrWorker_t* self, struct _ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
+                         phase_t phase, u32 properties, void (*callback)(struct _ocrPolicyDomain_t*,u64), u64 val);
 
     /** @brief Run Worker
      */
@@ -64,14 +79,6 @@ typedef struct _ocrWorkerFcts_t {
      */
     void* (*workShift)(struct _ocrWorker_t *self);
 
-    /** @brief Query the worker to finish its work
-     */
-    void (*finish)(struct _ocrWorker_t *self);
-
-    /** @brief Stop Worker
-     */
-    void (*stop)(struct _ocrWorker_t *self);
-
     /** @brief Check if Worker is still running
      *  @return true if the Worker is running, false otherwise
      */
@@ -79,12 +86,27 @@ typedef struct _ocrWorkerFcts_t {
 
 } ocrWorkerFcts_t;
 
+// Relies on runlevel and phases to be encoded on a maximum of 4 bits
+#define GET_STATE(rl, phase) (((rl) << 4) | (phase))
+#define GET_STATE_RL(state) ((state) >> 4)
+#define GET_STATE_PHASE(state) ((state) & 0xF)
+
 typedef struct _ocrWorker_t {
     ocrFatGuid_t fguid;
     struct _ocrPolicyDomain_t *pd;
     ocrLocation_t location;  //!!! TO BE DEPRECATED !!!
     ocrWorkerType_t type;
+    u8 amBlessed; // TODO: Maybe merge in type?
     u64 seqId;
+    // Workers are capable modules so
+    // part of their runlevel processing happens asynchronously
+    // This provides a convenient location to save
+    // what is needed to do this
+    // The state encodes the RL (top 4 bits) and the phase (bottom 4 bits)
+    volatile u8 curState, desiredState;
+    // TODO: Do we need something with RL properties?
+    void (*callback)(struct _ocrPolicyDomain_t*, u64);
+    u64 callbackArg;
 
 #ifdef OCR_ENABLE_STATISTICS
     ocrStatsProcess_t *statProcess;
