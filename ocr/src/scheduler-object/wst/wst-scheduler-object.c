@@ -155,15 +155,21 @@ void wstSchedulerObjectRootStart(ocrSchedulerObjectRoot_t * self) {
     return;
 }
 
-void wstSchedulerObjectRootStop(ocrSchedulerObjectRoot_t * self) {
-    ocrSchedulerObject_t *schedObj = (ocrSchedulerObject_t*)self;
-    ocrSchedulerObjectFactory_t *fact = self->scheduler->pd->schedulerObjectFactories[schedObj->fctId];
-    ASSERT(wstSchedulerObjectCount(fact, schedObj, 0) == 0);
-    return;
-}
+void wstSchedulerObjectRootStop(ocrSchedulerObjectRoot_t * self, ocrRunLevel_t newRl, u32 action) {
+    switch(newRl) {
+        case RL_STOP: {
+            ocrSchedulerObject_t *schedObj = (ocrSchedulerObject_t*)self;
+            ocrSchedulerObjectFactory_t *fact = self->scheduler->pd->schedulerObjectFactories[schedObj->fctId];
+            ASSERT(wstSchedulerObjectCount(fact, schedObj, 0) == 0);
 
-void wstSchedulerObjectRootFinish(ocrSchedulerObjectRoot_t * self) {
-    return;
+            break;
+        }
+        case RL_SHUTDOWN: {
+            break;
+        }
+        default:
+            ASSERT("Unknown runlevel in stop function");
+    }
 }
 
 void wstSchedulerObjectRootDestruct(ocrSchedulerObjectRoot_t *self) {
@@ -210,8 +216,7 @@ static ocrSchedulerObjectFactory_t* newOcrSchedulerObjectRootFactoryWst(ocrParam
     ocrSchedulerObjectRootFactory_t* rootFactory = (ocrSchedulerObjectRootFactory_t*)schedObjFact;
     rootFactory->fcts.begin = FUNC_ADDR(void (*)(ocrSchedulerObjectRoot_t*), wstSchedulerObjectRootBegin);
     rootFactory->fcts.start = FUNC_ADDR(void (*)(ocrSchedulerObjectRoot_t*), wstSchedulerObjectRootStart);
-    rootFactory->fcts.stop = FUNC_ADDR(void (*)(ocrSchedulerObjectRoot_t*), wstSchedulerObjectRootStop);
-    rootFactory->fcts.finish = FUNC_ADDR(void (*)(ocrSchedulerObjectRoot_t*), wstSchedulerObjectRootFinish);
+    rootFactory->fcts.stop = FUNC_ADDR(void (*)(ocrSchedulerObjectRoot_t*,ocrRunLevel_t,u32), wstSchedulerObjectRootStop);
     rootFactory->fcts.destruct = FUNC_ADDR(void (*)(ocrSchedulerObjectRoot_t*), wstSchedulerObjectRootDestruct);
 
     return schedObjFact;

@@ -81,9 +81,8 @@ typedef struct _ocrCompTargetFcts_t {
      * @brief Stops this comp-target
      * @param[in] self          Pointer to this comp-target
      */
-    void (*stop)(struct _ocrCompTarget_t *self);
+    void (*stop)(struct _ocrCompTarget_t *self, ocrRunLevel_t newRl, u32 action);
 
-    void (*finish)(struct _ocrCompTarget_t *self);
     /**
      * @brief Gets the throttle value for this compute node
      *

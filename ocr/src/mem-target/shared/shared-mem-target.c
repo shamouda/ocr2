@@ -41,6 +41,7 @@ void sharedDestruct(ocrMemTarget_t *self) {
 void sharedBegin(ocrMemTarget_t *self, ocrPolicyDomain_t * PD ) {
     // Nothing to do here. In other implementations, this is
     // when you update the range you can use using the sysboot functions
+    self->pd = PD;
     ASSERT(self->memoryCount == 1);
     self->memories[0]->fcts.begin(self->memories[0], PD);
 }
@@ -48,8 +49,7 @@ void sharedBegin(ocrMemTarget_t *self, ocrPolicyDomain_t * PD ) {
 void sharedStart(ocrMemTarget_t *self, ocrPolicyDomain_t * PD ) {
     // Get a GUID
     guidify(PD, (u64)self, &(self->fguid), OCR_GUID_MEMTARGET);
-    self->pd = PD;
-
+    PRINTF("sharedStart PD= %p\n", self->pd);
 #ifdef OCR_ENABLE_STATISTICS
     statsMEMTARGET_START(PD, self->fguid.guid, self->fguid.metaDataPtr);
 #endif
@@ -57,28 +57,42 @@ void sharedStart(ocrMemTarget_t *self, ocrPolicyDomain_t * PD ) {
     self->memories[0]->fcts.start(self->memories[0], PD);
 }
 
-void sharedStop(ocrMemTarget_t *self) {
-    ASSERT(self->memoryCount == 1);
-    self->memories[0]->fcts.stop(self->memories[0]);
+void sharedStop(ocrMemTarget_t *self, ocrRunLevel_t newRl, u32 action) {
+    switch(newRl) {
+        case RL_STOP: {
+            PRINTF("sharedStop RL_STOP PD= %p\n", self->pd);
+            ASSERT(self->memoryCount == 1);
 
-    // Destroy the GUID
-    PD_MSG_STACK(msg);
-    getCurrentEnv(NULL, NULL, NULL, &msg);
+            // Destroy the GUID
+            PD_MSG_STACK(msg);
+            getCurrentEnv(NULL, NULL, NULL, &msg);
 
-#define PD_MSG (&msg)
-#define PD_TYPE PD_MSG_GUID_DESTROY
-    msg.type = PD_MSG_GUID_DESTROY | PD_MSG_REQUEST;
-    PD_MSG_FIELD_I(guid) = self->fguid;
-    PD_MSG_FIELD_I(properties) = 0;
-    self->pd->fcts.processMessage(self->pd, &msg, false); // Probably shutting down
-#undef PD_MSG
-#undef PD_TYPE
-    self->fguid.guid = UNINITIALIZED_GUID;
-}
 
-void sharedFinish(ocrMemTarget_t *self) {
-    ASSERT(self->memoryCount == 1);
-    self->memories[0]->fcts.finish(self->memories[0]);
+            self->memories[0]->fcts.stop(self->memories[0], newRl, action);
+            break;
+        }
+        case RL_SHUTDOWN: {
+            PRINTF("sharedStop RL_SHUTDOWN PD= %p\n", self->pd);
+            PD_MSG_STACK(msg);
+            getCurrentEnv(&(self->pd), NULL, NULL, &msg);
+            // TODO crashes when this guid is destroyed
+        #define PD_MSG (&msg)
+        #define PD_TYPE PD_MSG_GUID_DESTROY
+            msg.type = PD_MSG_GUID_DESTROY | PD_MSG_REQUEST;
+            PD_MSG_FIELD_I(guid) = self->fguid;
+            PD_MSG_FIELD_I(properties) = 0;
+            self->pd->fcts.processMessage(self->pd, &msg, false); // Probably shutting down
+        #undef PD_MSG
+        #undef PD_TYPE
+            self->fguid.guid = UNINITIALIZED_GUID;
+
+            ASSERT(self->memoryCount == 1);
+            self->memories[0]->fcts.stop(self->memories[0], RL_SHUTDOWN, action);
+            break;
+        }
+        default:
+            ASSERT("Unknown runlevel in stop function");
+    }
 }
 
 u8 sharedGetThrottle(ocrMemTarget_t *self, u64* value) {
@@ -146,8 +160,7 @@ ocrMemTargetFactory_t *newMemTargetFactoryShared(ocrParamList_t *perType) {
     base->targetFcts.destruct = FUNC_ADDR(void (*)(ocrMemTarget_t*), sharedDestruct);
     base->targetFcts.begin = FUNC_ADDR(void (*)(ocrMemTarget_t*, ocrPolicyDomain_t*), sharedBegin);
     base->targetFcts.start = FUNC_ADDR(void (*)(ocrMemTarget_t*, ocrPolicyDomain_t*), sharedStart);
-    base->targetFcts.stop = FUNC_ADDR(void (*)(ocrMemTarget_t*), sharedStop);
-    base->targetFcts.finish = FUNC_ADDR(void (*)(ocrMemTarget_t*), sharedFinish);
+    base->targetFcts.stop = FUNC_ADDR(void (*)(ocrMemTarget_t*,ocrRunLevel_t,u32), sharedStop);
     base->targetFcts.getThrottle = FUNC_ADDR(u8 (*)(ocrMemTarget_t*, u64*), sharedGetThrottle);
     base->targetFcts.setThrottle = FUNC_ADDR(u8 (*)(ocrMemTarget_t*, u64), sharedSetThrottle);
     base->targetFcts.getRange = FUNC_ADDR(void (*)(ocrMemTarget_t*, u64*, u64*), sharedGetRange);

@@ -335,9 +335,7 @@ typedef struct _ocrSchedulerObjectRootFcts_t {
 
     void (*start)(struct _ocrSchedulerObjectRoot_t *self);
 
-    void (*stop)(struct _ocrSchedulerObjectRoot_t *self);
-
-    void (*finish)(struct _ocrSchedulerObjectRoot_t *self);
+    void (*stop)(struct _ocrSchedulerObjectRoot_t *self, ocrRunLevel_t newRl, u32 action);
 
     void (*destruct)(struct _ocrSchedulerObjectRoot_t *self);
 

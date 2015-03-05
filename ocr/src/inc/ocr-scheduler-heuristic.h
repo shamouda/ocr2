@@ -164,9 +164,7 @@ typedef struct _ocrSchedulerHeuristicFcts_t {
 
     void (*start)(struct _ocrSchedulerHeuristic_t *self);
 
-    void (*stop)(struct _ocrSchedulerHeuristic_t *self);
-
-    void (*finish)(struct _ocrSchedulerHeuristic_t *self);
+    void (*stop)(struct _ocrSchedulerHeuristic_t *self, ocrRunLevel_t newRl, u32 action);
 
     /**
      * @brief Update this scheduler heuristic proactively

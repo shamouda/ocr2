@@ -71,9 +71,7 @@ typedef struct _ocrCommApiFcts_t {
      * @brief Stops this comm-api
      * @param[in] self          Pointer to this comm-api
      */
-    void (*stop)(struct _ocrCommApi_t *self);
-
-    void (*finish)(struct _ocrCommApi_t *self);
+    void (*stop)(struct _ocrCommApi_t *self, ocrRunLevel_t newRl, u32 action);
 
     /**
      * @brief Send a message to another target

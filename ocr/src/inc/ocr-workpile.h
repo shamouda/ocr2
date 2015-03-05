@@ -43,9 +43,7 @@ typedef struct _ocrWorkpileFcts_t {
 
     void (*start)(struct _ocrWorkpile_t *self, struct _ocrPolicyDomain_t *PD);
 
-    void (*stop)(struct _ocrWorkpile_t *self);
-
-    void (*finish)(struct _ocrWorkpile_t *self);
+    void (*stop)(struct _ocrWorkpile_t *self, ocrRunLevel_t newRl, u32 action);
 
     /** @brief Interface to extract a task from this pool
      *

@@ -202,6 +202,7 @@ typedef struct _paramListPolicyDomainInst_t {
 /**< Finish operation (indicates the PD should
  * destroy itself. The existence of other PDs can
  * no longer be assumed */
+ //TODO-RL this is probably deprecated
 #define PD_MSG_MGT_FINISH       0x00002200
 
 /**< Register a policy-domain with another
@@ -216,6 +217,9 @@ typedef struct _paramListPolicyDomainInst_t {
 /**< For a worker to request the policy-domain to monitor an operation progress */
 #define PD_MSG_MGT_MONITOR_PROGRESS 0x00005200
 
+/**< Runlevel change notification */
+#define PD_MSG_MGT_RL_NOTIFY        0x00006200
+
 /**< AND with this and if result non-null, hint related operation.
  * Generally, these will be calls to set/get user hints
  */
@@ -224,7 +228,6 @@ typedef struct _paramListPolicyDomainInst_t {
 #define PD_MSG_HINT_SET      0x00041400
 /**< Get hint from guid */
 #define PD_MSG_HINT_GET      0x00042400
-
 
 /**< And this to just get the type of the message (note that the number
  * of ocrFatGuid_t is part of the type as for a given type, this won't change)
@@ -911,6 +914,19 @@ typedef struct _ocrPolicyMsg_t {
         struct {
             union {
                 struct {
+                    u32 runlevel; /**< In: Runlevel involved */
+                    u32 action;   /**< In: Action performed */
+                    u32 properties;         /**< In */
+                } in;
+                struct {
+                    u32 returnDetail;       /**< Out: Success or error code */
+                } out;
+            } inOrOut __attribute__ (( aligned(8) ));
+        } PD_MSG_STRUCT_NAME(PD_MSG_MGT_RL_NOTIFY);
+
+        struct {
+            union {
+                struct {
                     ocrLocation_t loc;      /**< In: Location registering */
                     // TODO: Add things having to do with cost and relationship
                     u32 properties;         /**< In */
@@ -1046,17 +1062,10 @@ typedef struct _ocrPolicyDomainFcts_t {
      *
      * @param self                This policy domain
      */
-    void (*stop)(struct _ocrPolicyDomain_t *self);
+    void (*stop)(struct _ocrPolicyDomain_t *self, ocrRunLevel_t rl, u32 action);
 
-    /**
-     * @brief Finish the execution of the policy domain
-     *
-     * Ask the policy domain to wrap up currently executing
-     * task and shutdown workers. Finish is called after stop
-     *
-     * @param self                This policy domain
-     */
-    void (*finish)(struct _ocrPolicyDomain_t *self);
+    //TODO-RL DOC
+    void (*setRunlevel)(struct _ocrPolicyDomain_t *self, ocrRunLevel_t rl);
 
     /**
      * @brief Requests for the handling of the request msg
@@ -1221,6 +1230,8 @@ typedef struct _ocrPolicyDomain_t {
                                                  * known to this policy domain */
     ocrPlacer_t * placer;                       /**< Affinity and placement
                                                  * (work in progress) */
+    volatile ocrRunLevel_t rl; //TODO volatile exposes too much of the underlying implementation
+    u32 seenStopped;
 
     // TODO: What to do about this?
     ocrCost_t *costFunction; /**< Cost function used to determine

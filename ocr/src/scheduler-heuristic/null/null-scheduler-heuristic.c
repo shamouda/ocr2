@@ -35,7 +35,7 @@ void nullSchedulerHeuristicStart(ocrSchedulerHeuristic_t * self) {
     // Nothing to do locally
 }
 
-void nullSchedulerHeuristicStop(ocrSchedulerHeuristic_t * self) {
+void nullSchedulerHeuristicStop(ocrSchedulerHeuristic_t * self, ocrRunLevel_t newRl, u32 action) {
     // Nothing to do locally
 }
 
@@ -91,8 +91,7 @@ ocrSchedulerHeuristicFactory_t * newOcrSchedulerHeuristicFactoryNull(ocrParamLis
     base->destruct = &destructSchedulerHeuristicFactoryNull;
     base->fcts.begin = FUNC_ADDR(void (*)(ocrSchedulerHeuristic_t*), nullSchedulerHeuristicBegin);
     base->fcts.start = FUNC_ADDR(void (*)(ocrSchedulerHeuristic_t*), nullSchedulerHeuristicStart);
-    base->fcts.stop = FUNC_ADDR(void (*)(ocrSchedulerHeuristic_t*), nullSchedulerHeuristicStop);
-    base->fcts.finish = FUNC_ADDR(void (*)(ocrSchedulerHeuristic_t*), nullSchedulerHeuristicFinish);
+    base->fcts.stop = FUNC_ADDR(void (*)(ocrSchedulerHeuristic_t*,ocrRunLevel_t,u32), nullSchedulerHeuristicStop);
     base->fcts.destruct = FUNC_ADDR(void (*)(ocrSchedulerHeuristic_t*), nullSchedulerHeuristicDestruct);
 
     base->fcts.update = FUNC_ADDR(u8 (*)(ocrSchedulerHeuristic_t*, u32), nullSchedulerHeuristicUpdate);

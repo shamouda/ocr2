@@ -55,16 +55,33 @@ u8 sendMessageSimpleCommApi(ocrCommApi_t *self, ocrLocation_t target, ocrPolicyM
                         ocrMsgHandle_t **handle, u32 properties) {
     ocrCommApiSimple_t * commApiSimple = (ocrCommApiSimple_t *) self;
 
+    // Debug and check if we should push this in the in/out patch or runlevel
     if (!(properties & PERSIST_MSG_PROP)) {
+        //NOTE: In a delegation based implementation, all messages issued by comp-workers
+        //are already persistant because of the asynchrony delegation allows. The comm-worker
+        //may occasionally invoke send for its own messages. In that case persist is not set.
         u64 baseSize = 0, marshalledSize = 0;
-        ocrPolicyMsgGetMsgSize(message, &baseSize, &marshalledSize, 0);
-        u64 fullSize = baseSize + marshalledSize;
-        ocrPolicyMsg_t * msgCpy = allocateNewMessage(self, fullSize);
-        ocrPolicyMsgMarshallMsg(message, baseSize, (u8*)msgCpy, MARSHALL_DUPLICATE);
+        // TODO Do we marshall ptr here or do we wait for the comm-platform to decide what to do ?
+        // Currently avoids an extra copy because we know simple-comm fwd to mpi-comm
+        ocrPolicyMsgGetMsgSize(message, &baseSize, &marshalledSize, MARSHALL_DBPTR | MARSHALL_NSADDR);
+        u64 fullMsgSize = baseSize + marshalledSize;
+        ocrPolicyMsg_t * msgCpy = allocateNewMessage(self, fullMsgSize);
+        ocrPolicyMsgMarshallMsg(message, baseSize, (u8*)msgCpy,
+                                MARSHALL_FULL_COPY | MARSHALL_DBPTR | MARSHALL_NSADDR);
         message = msgCpy;
         properties |= PERSIST_MSG_PROP;
-        ASSERT(false && "debug tmp");
     }
+    // This is the old code
+    // if (!(properties & PERSIST_MSG_PROP)) {
+    //     u64 baseSize = 0, marshalledSize = 0;
+    //     ocrPolicyMsgGetMsgSize(message, &baseSize, &marshalledSize, 0);
+    //     u64 fullSize = baseSize + marshalledSize;
+    //     ocrPolicyMsg_t * msgCpy = allocateNewMessage(self, fullSize);
+    //     ocrPolicyMsgMarshallMsg(message, baseSize, (u8*)msgCpy, MARSHALL_DUPLICATE);
+    //     message = msgCpy;
+    //     properties |= PERSIST_MSG_PROP;
+    //     ASSERT(false && "debug tmp");
+    // }
 
     // This is weird but otherwise the compiler complains...
     u64 id = 0;
@@ -165,12 +182,8 @@ void simpleCommApiStart(ocrCommApi_t * self, ocrPolicyDomain_t * pd) {
     self->commPlatform->fcts.start(self->commPlatform, pd, self);
 }
 
-void simpleCommApiStop(ocrCommApi_t * self) {
-    self->commPlatform->fcts.stop(self->commPlatform);
-}
-
-void simpleCommApiFinish(ocrCommApi_t *self) {
-    self->commPlatform->fcts.finish(self->commPlatform);
+void simpleCommApiStop(ocrCommApi_t * self, ocrRunLevel_t newRl, u32 action) {
+    self->commPlatform->fcts.stop(self->commPlatform, newRl, action);
 }
 
 ocrCommApi_t* newCommApiSimple(ocrCommApiFactory_t *factory,
@@ -211,8 +224,7 @@ ocrCommApiFactory_t *newCommApiFactorySimple(ocrParamList_t *perType) {
                                     simpleCommApiBegin);
     base->apiFcts.start = FUNC_ADDR(void (*)(ocrCommApi_t*, ocrPolicyDomain_t*),
                                     simpleCommApiStart);
-    base->apiFcts.stop = FUNC_ADDR(void (*)(ocrCommApi_t*), simpleCommApiStop);
-    base->apiFcts.finish = FUNC_ADDR(void (*)(ocrCommApi_t*), simpleCommApiFinish);
+    base->apiFcts.stop = FUNC_ADDR(void (*)(ocrCommApi_t*,ocrRunLevel_t,u32), simpleCommApiStop);
     base->apiFcts.sendMessage = FUNC_ADDR(u8 (*)(ocrCommApi_t*, ocrLocation_t, ocrPolicyMsg_t *, ocrMsgHandle_t**, u32),
                                           sendMessageSimpleCommApi);
     base->apiFcts.pollMessage = FUNC_ADDR(u8 (*)(ocrCommApi_t*, ocrMsgHandle_t**),

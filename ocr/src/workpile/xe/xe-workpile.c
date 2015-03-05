@@ -29,12 +29,19 @@ void xeWorkpileBegin(ocrWorkpile_t *base, ocrPolicyDomain_t *PD) {
 void xeWorkpileStart(ocrWorkpile_t *base, ocrPolicyDomain_t *PD) {
 }
 
-void xeWorkpileStop(ocrWorkpile_t *base) {
-    base->fguid.guid = UNINITIALIZED_GUID;
-}
-
-void xeWorkpileFinish(ocrWorkpile_t *base) {
-    // Nothing to do
+void xeWorkpileStop(ocrWorkpile_t *base, ocrRunLevel_t newRl, u32 action) {
+    switch(newRl) {
+        case RL_STOP: {
+            base->fguid.guid = UNINITIALIZED_GUID;
+            break;
+        }
+        case RL_SHUTDOWN: {
+            // Nothing to do
+            break;
+        }
+        default:
+            ASSERT("Unknown runlevel in stop function");
+    }
 }
 
 ocrFatGuid_t xeWorkpilePop(ocrWorkpile_t * base, ocrWorkPopType_t type,
@@ -77,8 +84,7 @@ ocrWorkpileFactory_t * newOcrWorkpileFactoryXe(ocrParamList_t *perType) {
     base->workpileFcts.destruct = FUNC_ADDR(void (*)(ocrWorkpile_t*), xeWorkpileDestruct);
     base->workpileFcts.begin = FUNC_ADDR(void (*)(ocrWorkpile_t*, ocrPolicyDomain_t*), xeWorkpileBegin);
     base->workpileFcts.start = FUNC_ADDR(void (*)(ocrWorkpile_t*, ocrPolicyDomain_t*), xeWorkpileStart);
-    base->workpileFcts.stop = FUNC_ADDR(void (*)(ocrWorkpile_t*), xeWorkpileStop);
-    base->workpileFcts.finish = FUNC_ADDR(void (*)(ocrWorkpile_t*), xeWorkpileFinish);
+    base->workpileFcts.stop = FUNC_ADDR(void (*)(ocrWorkpile_t*,ocrRunLevel_t,u32), xeWorkpileStop);
     base->workpileFcts.pop = FUNC_ADDR(ocrFatGuid_t (*)(ocrWorkpile_t*, ocrWorkPopType_t, ocrCost_t*), xeWorkpilePop);
     base->workpileFcts.push = FUNC_ADDR(void (*)(ocrWorkpile_t*, ocrWorkPushType_t, ocrFatGuid_t), xeWorkpilePush);
 

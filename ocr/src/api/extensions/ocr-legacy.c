@@ -43,14 +43,16 @@ u8 ocrLegacyFinalize(ocrGuid_t legacyContext, bool runUntilShutdown) {
         // worker then fallthrough from start to finish.
         worker->fcts.start(worker, pd);
 
-        // NOTE: finish blocks until stop has completed
-        pd->fcts.finish(pd);
-        pd->fcts.destruct(pd);
+        // When the worker exits 'start' the PD runlevel has been
+        // decremented to RL_STOP
+        // Transition from stop to shutdown
+        pd->fcts.setRunlevel(pd, RL_SHUTDOWN);
+        returnCode = pd->shutdownCode;
+        pd->fcts.setRunlevel(pd, RL_DEALLOCATE);
     } else {
         getCurrentEnv(&pd, NULL, NULL, NULL);
         returnCode = pd->shutdownCode;
     }
-    returnCode = pd->shutdownCode;
     freeUpRuntime();
 // #ifdef OCR_ENABLE_STATISTICS
 //     ocrStatsProcessDestruct(&GfakeProcess);

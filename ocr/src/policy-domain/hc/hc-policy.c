@@ -65,6 +65,13 @@ void hcPolicyDomainBegin(ocrPolicyDomain_t * policy) {
         policy->workers[i]->fcts.begin(policy->workers[i], policy);
     }
 
+    //TODO-RL this is rather rl_active
+    ocrPolicyDomainHc_t * rself = (ocrPolicyDomainHc_t *) policy;
+    maxCount = (RL_MAX+1);
+    rself->rl_completed = (u32 *) runtimeChunkAlloc(sizeof(u32) * maxCount, NULL);
+    for(i = 0; i < maxCount; i++) {
+        rself->rl_completed[i] = 0;
+    }
     // We have now started everyone so we swap the state
     // The expected behavior is 0 -> 1
     // This does not have to be a cmpswap but leaving
@@ -72,9 +79,9 @@ void hcPolicyDomainBegin(ocrPolicyDomain_t * policy) {
     // Note that we swap here because start is allowed to use pdMalloc
     // for example (ie: the PD should at least be able to respond to queries
     // after begin is done)
-    ocrPolicyDomainHc_t *rself = (ocrPolicyDomainHc_t*)policy;
-    u32 oldState = hal_cmpswap32(&(rself->state), 0, 1);
-    ASSERT(oldState == 0); // No EDT should be able
+    // ocrPolicyDomainHc_t *rself = (ocrPolicyDomainHc_t*)policy;
+    // u32 oldState = hal_cmpswap32(&(rself->state), 0, 1);
+    // ASSERT(oldState == 0); // No EDT should be able
     // to run at this point since mainEDT
     // is started AFTER this function completes
 }
@@ -121,118 +128,294 @@ void hcPolicyDomainStart(ocrPolicyDomain_t * policy) {
     for(i = 0; i < maxCount; i++) {
         policy->workers[i]->fcts.start(policy->workers[i], policy);
     }
+    // TODO RL do the converse and handle runlevel start cycle
+    ASSERT(policy->rl == RL_DEFAULT);
+    policy->rl = RL_RUNNING_USER;
+    // Setup RL down actions
+    ocrPolicyDomainHc_t * dself = (ocrPolicyDomainHc_t *) policy;
+    dself->rlNbDownActions = (u32*) policy->fcts.pdMalloc(policy, sizeof(u32)* RL_NB_CONCRETE);
+    // zero actions indicates the runlevel is transitioned automatically by the module
+    dself->rlNbDownActions[0] = 0; // DEALLOC
+    dself->rlNbDownActions[1] = 0; // SHUTDOWN
+    dself->rlNbDownActions[2] = 0; // STOP
+    dself->rlNbDownActions[3] = 0; // RT
+    dself->rlNbDownActions[4] = 3; // USER
+    dself->rlDownActions = (u32**) policy->fcts.pdMalloc(policy, sizeof(u32*)* RL_NB_CONCRETE);
+    for(i = 0; i < RL_NB_CONCRETE; i++) {
+        dself->rlDownActions[i] = (u32*) policy->fcts.pdMalloc(policy, sizeof(u32) * dself->rlNbDownActions[i]);
+    }
+    // These are actions to be called by the PD
+    // If there's no action, it means a module is responsible for notifying the PD
+    // it is done with its runlevel.
+    dself->rlDownActions[4][0] = RL_ACTION_EXIT;
+    dself->rlDownActions[4][1] = RL_ACTION_QUIESCE_COMM;
+    dself->rlDownActions[4][2] = RL_ACTION_QUIESCE_COMP;
 }
 
-void hcPolicyDomainFinish(ocrPolicyDomain_t * policy) {
-    // Finish everything in reverse order
+static void hcRunlevelTransitionModules(ocrPolicyDomain_t * policy, ocrRunLevel_t newRl, u32 actionRl) {
+    // Transition all inert modules first
+    // It ensures capable modules operates on inert modules at the same runlevel
+    //TODO-RL: is this still true when we stop ? Capable modules may need to perform
+    //their stop before the inert ones ? Does this means we need to implement enter and exit for all modules ?
     u64 i = 0;
     u64 maxCount = 0;
 
-    // Worker 0 enters here
-    ocrPolicyDomainHc_t *rself = (ocrPolicyDomainHc_t*)policy;
-    DPRINTF(DEBUG_LVL_VERB,"Begin PD finish wait loop\n");
-    u32 oldState = 0;
-    // Wait for stop to complete before we start with finish
-    do {
-        oldState = hal_cmpswap32(&(rself->state), 10, 14);
-    } while(oldState != 10);
-
-    DPRINTF(DEBUG_LVL_VERB,"End PD finish wait loop\n");
-    // Note: As soon as worker '0' is stopped; its thread is
-    // free to fall-through and continue shutting down the
-    // policy domain
-    maxCount = policy->workerCount;
-    for(i = 0; i < maxCount; i++) {
-        policy->workers[i]->fcts.finish(policy->workers[i]);
-    }
-
+    //TODO-RL probably want to rename stop into some runlevel API
     maxCount = policy->commApiCount;
     for(i = 0; i < maxCount; i++) {
-        policy->commApis[i]->fcts.finish(policy->commApis[i]);
+        policy->commApis[i]->fcts.stop(policy->commApis[i], newRl, actionRl);
     }
 
     maxCount = policy->schedulerCount;
     for(i = 0; i < maxCount; ++i) {
-        policy->schedulers[i]->fcts.finish(policy->schedulers[i]);
+        policy->schedulers[i]->fcts.stop(policy->schedulers[i], newRl, actionRl);
     }
 
     maxCount = policy->allocatorCount;
     for(i = 0; i < maxCount; ++i) {
-        policy->allocators[i]->fcts.finish(policy->allocators[i]);
+        policy->allocators[i]->fcts.stop(policy->allocators[i], newRl, actionRl);
     }
 
     maxCount = policy->guidProviderCount;
     for(i = 0; i < maxCount; ++i) {
-        policy->guidProviders[i]->fcts.finish(policy->guidProviders[i]);
+        policy->guidProviders[i]->fcts.stop(policy->guidProviders[i], newRl, actionRl);
     }
 
-}
-
-void hcPolicyDomainStop(ocrPolicyDomain_t * policy) {
-    u64 i = 0;
-    u64 maxCount = 0;
-
-    ocrPolicyDomainHc_t *rself = (ocrPolicyDomainHc_t*)policy;
-
-    // We inform people that we want to stop the policy domain
-    // We make sure that no one else is using the PD (in processMessage mostly)
-    DPRINTF(DEBUG_LVL_VERB,"Begin PD stop wait loop\n");
-    u32 oldState = 0, newState = 0;
-    do {
-        oldState = rself->state;
-        newState = (oldState & 0xFFFFFFF0) | 2;
-        newState = hal_cmpswap32(&(rself->state), oldState, newState);
-    } while(oldState != newState);
-    // Now we have set the "I want to shut-down" bit so now we need
-    // to wait for the users to drain
-    // We do something really stupid and just loop for now
-    while(rself->state != 18);
-    DPRINTF(DEBUG_LVL_VERB,"End PD stop wait loop\n");
-    // Here we can start stopping the PD
-    ASSERT(rself->state == 18); // We should have no users and have managed to set
-
-    // Note: As soon as worker '0' is stopped; its thread is
-    // free to fall-through from 'start' and call 'finish'.
+    // Transition all capable modules
     maxCount = policy->workerCount;
     for(i = 0; i < maxCount; i++) {
-        policy->workers[i]->fcts.stop(policy->workers[i]);
+        policy->workers[i]->fcts.stop(policy->workers[i], newRl, actionRl);
     }
-
-    maxCount = policy->commApiCount;
-    for(i = 0; i < maxCount; i++) {
-        policy->commApis[i]->fcts.stop(policy->commApis[i]);
-    }
-
-    maxCount = policy->schedulerCount;
-    for(i = 0; i < maxCount; ++i) {
-        policy->schedulers[i]->fcts.stop(policy->schedulers[i]);
-    }
-
-    maxCount = policy->allocatorCount;
-    for(i = 0; i < maxCount; ++i) {
-        policy->allocators[i]->fcts.stop(policy->allocators[i]);
-    }
-
-    // We could release our GUID here but not really required
-
-    maxCount = policy->guidProviderCount;
-    for(i = 0; i < maxCount; ++i) {
-        policy->guidProviders[i]->fcts.stop(policy->guidProviders[i]);
-    }
-
-    // This does not need to be a cmpswap but keeping it
-    // this way for now to make sure the logic is sound
-    oldState = hal_cmpswap32(&(rself->state), 18, 26);
-    ASSERT(oldState == 18);
 }
+
+void transitionWorkers(ocrPolicyDomain_t * self) {
+    u32 rlIdxNoWip = (((self->rl % 2) == 0) ? self->rl : (self->rl+1));
+    // action completed, transition to the runlevel's next action
+    // reset the counter
+    ocrPolicyDomainHc_t * bself = (ocrPolicyDomainHc_t *) self;
+    //TODO-RL see if we get rid off WIP levels
+    u32 rlIdx = (rlIdxNoWip/2)-1; // because 0 idx
+    // Check if there are any action left for this runlevel
+    int actionIdx = ((int)bself->rlNbDownActions[rlIdx])-1;
+    if (actionIdx == -1) {
+        // runlevel completed, transition the PD's runlevel
+        ocrRunLevel_t newRl = RL_NEXT_DOWN(rlIdxNoWip);
+        self->rl = newRl;
+        if (newRl > RL_SHUTDOWN) { // Shutdown is transitioned by the master thread
+            // Update the state of all modules
+            hcRunlevelTransitionModules(self, newRl, RL_ACTION_ENTER);
+        }
+    } else {
+        u32 action = bself->rlDownActions[rlIdx][actionIdx];
+        bself->rlNbDownActions[rlIdx]--; // prepare next action's index
+        // DPRINTF(DEBUG_LVL_WARN,"Transitioning workers RL=%d ACTION=%d\n", rlIdxNoWip, action);
+        bself->rl_completed[rlIdxNoWip] = 0;
+        u64 i = 0;
+        u64 maxCount = self->workerCount;
+        for(i = 0; i < maxCount; i++) {
+            // DPRINTF(DEBUG_LVL_WARN,"Calling stop RL=%d ACTION=%d\n", rlIdxNoWip, action);
+            //TODO-RL notifies the worker of the runlevel action
+            self->workers[i]->fcts.stop(self->workers[i], rlIdxNoWip, action);
+        }
+    }
+}
+
+// Only invoked by capable modules to handle RUNNING runlevel
+static void hcRunlevelNotify(ocrPolicyDomainHc_t *rself, ocrRunLevel_t doneRl, u32 action) {
+    //TODO-RL decide if we use the same function or a different to go UP RLs
+    //TODO-RL we need to know where this comes from, at least the kind of module
+    // Concurrent execution
+    //TODO-RL: workers are implictely all the capable modules there is
+    //TODO-RL see about what it means to get a entered notification
+
+    // Received a notifications from capable modules
+    // Whenever we get a notification from all the capable modules
+    // we decide what to do next depending on the action.
+
+    ASSERT(action != RL_ACTION_ENTER);//TODO-RL do not handle that case for now
+    u32 oldValue = hal_xadd32(&rself->rl_completed[doneRl], 1);
+    // DPRINTF(DEBUG_LVL_WARN,"hcRunlevelNotify RL=%d ACTION=%d\n", (int) doneRl, (int) action);
+    if (oldValue == (rself->base.workerCount-1)) {
+        transitionWorkers((ocrPolicyDomain_t *) rself);
+    }
+}
+
+//TODO-RL : so far this is only called for inert runlevels so there's no need
+// to both exit from previous rl and enter the next one
+void hcPolicyDomainSetRunlevel(ocrPolicyDomain_t * policy, ocrRunLevel_t rl) {
+    // In SHUTDOWN and DEALLOCATE, all the modules are inert except for
+    // the master thread running this code.
+
+    switch (rl) {
+        // Called by the master thread to SHUTDOWN the policy-domain
+        case RL_SHUTDOWN: {
+            // Barrier: wait for all capable modules to reach stop which
+            // transition the PD to RL_STOP.
+            while(policy->rl != RL_SHUTDOWN);
+
+            u64 i = 0;
+            u64 maxCount = 0;
+            //NOTE: At this stage, comp-platform may still be wrapping up their execution.
+            //After the  only the master worker remains alive.
+            maxCount = policy->workerCount;
+            for(i = 0; i < maxCount; i++) {
+                policy->workers[i]->fcts.stop(policy->workers[i], RL_SHUTDOWN, RL_ACTION_ENTER);
+            }
+
+            maxCount = policy->commApiCount;
+            for(i = 0; i < maxCount; i++) {
+                policy->commApis[i]->fcts.stop(policy->commApis[i], RL_SHUTDOWN, RL_ACTION_ENTER);
+            }
+
+            maxCount = policy->schedulerCount;
+            for(i = 0; i < maxCount; ++i) {
+                policy->schedulers[i]->fcts.stop(policy->schedulers[i], RL_SHUTDOWN, RL_ACTION_ENTER);
+            }
+
+            maxCount = policy->allocatorCount;
+            for(i = 0; i < maxCount; ++i) {
+                policy->allocators[i]->fcts.stop(policy->allocators[i], RL_SHUTDOWN, RL_ACTION_ENTER);
+            }
+
+            maxCount = policy->guidProviderCount;
+            for(i = 0; i < maxCount; ++i) {
+                policy->guidProviders[i]->fcts.stop(policy->guidProviders[i], RL_SHUTDOWN, RL_ACTION_ENTER);
+            }
+            policy->rl = RL_SHUTDOWN_WIP;
+            break;
+        }
+        // Called by the master thread to DEALLOCATE the policy-domain
+        case RL_DEALLOCATE: {
+            ASSERT(policy->rl == RL_SHUTDOWN_WIP);
+            //TODO-RL transform this in a stop call of the deallocate runlevel
+            policy->fcts.destruct(policy);
+            // WARNING: The policy pointer is NO more calid !
+            break;
+        }
+        default: {
+            ASSERT(false && "Unknown runlevel to stop the policy-domain to");
+        }
+    }
+}
+
+void hcPolicyDomainStop(ocrPolicyDomain_t * policy, ocrRunLevel_t rl, u32 action) {
+//TODO-RL get rid of that ?
+
+}
+
+// void hcPolicyDomainStop(ocrPolicyDomain_t * policy, ocrRunLevel_t expectedRl, ocrRunLevel_t newRl) {
+//     ASSERT(expectedRl > newRl);
+
+//     ASSERT(policy->rl > newRl);
+
+//     // Check if the PD is currently transitioning to the expected runlevel
+//     // or if the caller wants a barrier on the runlevel
+//     if (policy->rl == (expectedRl+1)) {
+//         // If yes, we need to wait for the transition to happen.
+//         // For now supports transitioning from RUNNING to STOPPED
+//         // The runlevel is currently being transitioned
+//         if (expectedRl == RL_STOPPED) {
+//             u64 i = 0;
+//             u64 maxCount = policy->workerCount;
+//             for(i = 0; i < maxCount; i++) {
+//                 //TODO for now busy-wait on the worker's RL but really we should really on some
+//                 //function implementation to check the worker RL
+//                 //while (hal_cmpswap32(&(policy->workers[i]->rl), expectedRl, expectedRl) != expectedRl);
+//                 // ASSERT(oldValue == expectedRl);
+//                 while(policy->workers[i]->rl != expectedRl);
+//                 // while(policy->workers[i]->fcts.stop(policy->workers[i], expectedRl, newRl) == false);
+//             }
+//             policy->seenStopped = 1;
+//             policy->rl = RL_STOPPED;
+//         } else {
+//             ASSERT(false && "Unexpected runlevel state");
+//         }
+//         ASSERT(policy->rl == expectedRl);
+//     }
+
+//     if (policy->rl == expectedRl) {
+//         ASSERT(policy->rl != RL_STOPPED_WIP);
+//         if (newRl == RL_SHUTDOWN) {
+//             ASSERT(policy->seenStopped == 1);
+//         }
+//         // Transition from expectedRL to newRl
+//         bool runlevelReached = runlevelStopAllModules(policy, expectedRl, newRl);
+//         // If all the PD's modules reached the new runlevel, update the PD runlevel to newRl.
+//         // Otherwise, update the PD runlevel to the intermediate WIP runlevel.
+//         if (runlevelReached) {
+//             policy->rl = newRl;
+//         }
+//         //return runlevelReached;
+//     }
+
+//     ASSERT("Unsupported policy-domain runlevel transition requested");
+//     //return false;
+// }
+
+// void hcPolicyDomainStop(ocrPolicyDomain_t * policy) {
+//     u64 i = 0;
+//     u64 maxCount = 0;
+
+//     ocrPolicyDomainHc_t *rself = (ocrPolicyDomainHc_t*)policy;
+
+//     // We inform people that we want to stop the policy domain
+//     // We make sure that no one else is using the PD (in processMessage mostly)
+//     DPRINTF(DEBUG_LVL_VERB,"Begin PD stop wait loop\n");
+//     u32 oldState = 0, newState = 0;
+//     do {
+//         oldState = rself->state;
+//         newState = (oldState & 0xFFFFFFF0) | 2;
+//         newState = hal_cmpswap32(&(rself->state), oldState, newState);
+//     } while(oldState != newState);
+//     // Now we have set the "I want to shut-down" bit so now we need
+//     // to wait for the users to drain
+//     // We do something really stupid and just loop for now
+//     while(rself->state != 18);
+//     DPRINTF(DEBUG_LVL_VERB,"End PD stop wait loop\n");
+//     // Here we can start stopping the PD
+//     ASSERT(rself->state == 18); // We should have no users and have managed to set
+
+//     // Note: As soon as worker '0' is stopped; its thread is
+//     // free to fall-through from 'start' and call 'finish'.
+//     maxCount = policy->workerCount;
+//     for(i = 0; i < maxCount; i++) {
+//         policy->workers[i]->fcts.stop(policy->workers[i]);
+//     }
+
+//     maxCount = policy->commApiCount;
+//     for(i = 0; i < maxCount; i++) {
+//         policy->commApis[i]->fcts.stop(policy->commApis[i]);
+//     }
+
+//     maxCount = policy->schedulerCount;
+//     for(i = 0; i < maxCount; ++i) {
+//         policy->schedulers[i]->fcts.stop(policy->schedulers[i]);
+//     }
+
+//     maxCount = policy->allocatorCount;
+//     for(i = 0; i < maxCount; ++i) {
+//         policy->allocators[i]->fcts.stop(policy->allocators[i]);
+//     }
+
+//     // We could release our GUID here but not really required
+
+//     maxCount = policy->guidProviderCount;
+//     for(i = 0; i < maxCount; ++i) {
+//         policy->guidProviders[i]->fcts.stop(policy->guidProviders[i]);
+//     }
+
+//     // This does not need to be a cmpswap but keeping it
+//     // this way for now to make sure the logic is sound
+//     oldState = hal_cmpswap32(&(rself->state), 18, 26);
+//     ASSERT(oldState == 18);
+// }
 
 void hcPolicyDomainDestruct(ocrPolicyDomain_t * policy) {
     // Destroying instances
     u64 i = 0;
     u64 maxCount = 0;
 
-    ocrPolicyDomainHc_t* rself = (ocrPolicyDomainHc_t*)policy;
-    ASSERT(rself->state == 14);
+    //TODO-RL should transform all these to stop RL_DEALLOCATE
 
     // Note: As soon as worker '0' is stopped; its thread is
     // free to fall-through and continue shutting down the
@@ -240,12 +423,12 @@ void hcPolicyDomainDestruct(ocrPolicyDomain_t * policy) {
 
     maxCount = policy->workerCount;
     for(i = 0; i < maxCount; i++) {
-        policy->workers[i]->fcts.destruct(policy->workers[i]);
+        policy->workers[i]->fcts.stop(policy->workers[i], RL_DEALLOCATE, RL_ACTION_ENTER);
     }
 
     maxCount = policy->commApiCount;
     for(i = 0; i < maxCount; i++) {
-        policy->commApis[i]->fcts.destruct(policy->commApis[i]);
+        policy->commApis[i]->fcts.stop(policy->commApis[i], RL_DEALLOCATE, RL_ACTION_ENTER);
     }
 
     maxCount = policy->schedulerCount;
@@ -530,55 +713,10 @@ static ocrStats_t* hcGetStats(ocrPolicyDomain_t *self) {
 }
 #endif
 
-static u8 hcGrabPd(ocrPolicyDomainHc_t *rself) {
-    START_PROFILE(pd_hc_GrabPd);
-    u32 newState = rself->state;
-    u32 oldState;
-    if((newState & 0xF) == 1) {
-        do {
-            // Try to grab it
-            oldState = newState;
-            newState += 16; // Increment the user count by 1, skips the bottom 4 bits
-            newState = hal_cmpswap32(&(rself->state), oldState, newState);
-            if(newState == oldState) {
-                RETURN_PROFILE(0);
-            } else {
-                if(newState & 0x2) {
-                    // The PD is shutting down
-                    RETURN_PROFILE(OCR_EAGAIN);
-                }
-                // Some other thread incremented the reader count so
-                // we try again
-                ASSERT((newState & 0xF) == 1); // Just to make sure
-            }
-        } while(true);
-    } else {
-        RETURN_PROFILE(OCR_EAGAIN);
-    }
-}
-
-static void hcReleasePd(ocrPolicyDomainHc_t *rself) {
-    START_PROFILE(pd_hc_ReleasePd);
-    u32 oldState = 0;
-    u32 newState = rself->state;
-    do {
-        ASSERT(newState > 16); // We must at least be a user in shmem
-        oldState = newState;
-        newState -= 16;
-        newState = hal_cmpswap32(&(rself->state), oldState, newState);
-    } while(newState != oldState);
-    RETURN_PROFILE();
-}
-
 u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlocking) {
 
     START_PROFILE(pd_hc_ProcessMessage);
     u8 returnCode = 0;
-
-    returnCode = hcGrabPd((ocrPolicyDomainHc_t*)self);
-    if(returnCode) {
-        RETURN_PROFILE(returnCode);
-    }
 
     // This assert checks the call's parameters are correct
     // - Synchronous processMessage calls always deal with a REQUEST.
@@ -1468,24 +1606,53 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
     }
     case PD_MSG_MGT_SHUTDOWN: {
         START_PROFILE(pd_hc_Shutdown);
-        msg->type |= PD_MSG_REQ_RESPONSE; // HC needs this.
+        DPRINTF(DEBUG_LVL_VVERB,"MGT_SHUTDOWN: ocrShutdown has been invoked in user-code\n");
+        // Message originates from invoking ocrShutdown() in the user code.
+        // msg->type |= PD_MSG_REQ_RESPONSE; // HC needs this.
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_MGT_SHUTDOWN
-        if (self->shutdownCode == 0)
+        if (self->shutdownCode == 0) {
             self->shutdownCode = PD_MSG_FIELD_I(errorCode);
-        ASSERT(msg->type & PD_MSG_REQ_RESPONSE);
-        self->fcts.stop(self);
+            //TODO this is cp from the merge, not sure if we need it
+            // ASSERT(msg->type & PD_MSG_REQ_RESPONSE);
+        }
 #undef PD_MSG
 #undef PD_TYPE
+        // ASSERT(msg->type & PD_MSG_REQ_RESPONSE);
+        // The policy-domain is shutting down
+        // Exit the current runlevel
+        // printf("[%d] hc local SHUTDOWN invoked RL=%d\n", (int)self->myLocation, self->rl);
+        // Important to cas to prevent compiler reordering with worker's stop calls
+        u32 oldValue = hal_cmpswap32(&self->rl, RL_RUNNING_USER, RL_RUNNING_USER_WIP);
+        ASSERT(oldValue == RL_RUNNING_USER);
+        // Only notify capable modules
+        // Note that we do not want this code to be waiting for the RL to change but rather
+        // notify capables modules and check back later the status.
+        // An EDT is most likely executing this call, so we want to give a chance to the current
+        // worker to change its runlevel too.
+        transitionWorkers(self);
         msg->type &= ~PD_MSG_REQUEST;
-        msg->type |= PD_MSG_RESPONSE;
+        // msg->type |= PD_MSG_RESPONSE;
         EXIT_PROFILE;
         break;
     }
 
+    case PD_MSG_MGT_RL_NOTIFY: {
+#define PD_MSG msg
+#define PD_TYPE PD_MSG_MGT_RL_NOTIFY
+        // ASSERT(msg->type & PD_MSG_REQ_RESPONSE);
+        hcRunlevelNotify((ocrPolicyDomainHc_t*) self, PD_MSG_FIELD_I(runlevel), PD_MSG_FIELD_I(action));
+        msg->type &= ~PD_MSG_REQUEST;
+        // msg->type |= PD_MSG_RESPONSE;
+        break;
+#undef PD_MSG
+#undef PD_TYPE
+    }
+
+    //TODO-RL: this is deprecated in x86
     case PD_MSG_MGT_FINISH: {
         START_PROFILE(pd_hc_Finish);
-        self->fcts.finish(self);
+        //self->fcts.finish(self);
         msg->type &= ~PD_MSG_REQUEST;
         msg->type |= PD_MSG_RESPONSE;
         EXIT_PROFILE;
@@ -1634,9 +1801,6 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         // we need to make sure there is one
     }
 
-    // Now "release" the policy domain
-    hcReleasePd((ocrPolicyDomainHc_t*)self);
-
     RETURN_PROFILE(returnCode);
 }
 
@@ -1658,28 +1822,21 @@ u8 hcPdWaitMessage(ocrPolicyDomain_t *self,  ocrMsgHandle_t **handle) {
 
 void* hcPdMalloc(ocrPolicyDomain_t *self, u64 size) {
     START_PROFILE(pd_hc_PdMalloc);
-    if(hcGrabPd((ocrPolicyDomainHc_t*)self))
-        RETURN_PROFILE(NULL);
-
     // Just try in the first allocator
     void* toReturn = NULL;
     toReturn = self->allocators[0]->fcts.allocate(self->allocators[0], size, 0);
     if(toReturn == NULL)
         DPRINTF(DEBUG_LVL_WARN, "Failed PDMalloc for size %lx\n", size);
     ASSERT(toReturn != NULL);
-    hcReleasePd((ocrPolicyDomainHc_t*)self);
     RETURN_PROFILE(toReturn);
 }
 
 void hcPdFree(ocrPolicyDomain_t *self, void* addr) {
     START_PROFILE(pd_hc_PdFree);
     // May result in leaks but better than the alternative...
-    if(hcGrabPd((ocrPolicyDomainHc_t*)self))
-        RETURN_PROFILE();
 
     allocatorFreeFunction(addr);
 
-    hcReleasePd((ocrPolicyDomainHc_t*)self);
     RETURN_PROFILE();
 }
 
@@ -1715,7 +1872,7 @@ void initializePolicyDomainHc(ocrPolicyDomainFactory_t * factory, ocrPolicyDomai
     ocrPolicyDomainHc_t* derived = (ocrPolicyDomainHc_t*) self;
     //DIST-TODO ((paramListPolicyDomainHcInst_t*)perInstance)->rank;
     derived->rank = ((paramListPolicyDomainHcInst_t*)perInstance)->rank;
-    derived->state = 0;
+    //derived->state = 0;
 }
 
 static void destructPolicyDomainFactoryHc(ocrPolicyDomainFactory_t * factory) {
@@ -1740,9 +1897,9 @@ ocrPolicyDomainFactory_t * newPolicyDomainFactoryHc(ocrParamList_t *perType) {
     base->policyDomainFcts.destruct = FUNC_ADDR(void(*)(ocrPolicyDomain_t*), hcPolicyDomainDestruct);
     base->policyDomainFcts.begin = FUNC_ADDR(void(*)(ocrPolicyDomain_t*), hcPolicyDomainBegin);
     base->policyDomainFcts.start = FUNC_ADDR(void(*)(ocrPolicyDomain_t*), hcPolicyDomainStart);
-    base->policyDomainFcts.stop = FUNC_ADDR(void(*)(ocrPolicyDomain_t*), hcPolicyDomainStop);
-    base->policyDomainFcts.finish = FUNC_ADDR(void(*)(ocrPolicyDomain_t*), hcPolicyDomainFinish);
+    base->policyDomainFcts.stop = FUNC_ADDR(void(*)(ocrPolicyDomain_t*,ocrRunLevel_t,u32), hcPolicyDomainStop);
     base->policyDomainFcts.processMessage = FUNC_ADDR(u8(*)(ocrPolicyDomain_t*,ocrPolicyMsg_t*,u8), hcPolicyDomainProcessMessage);
+    base->policyDomainFcts.setRunlevel = FUNC_ADDR(void(*)(ocrPolicyDomain_t*,ocrRunLevel_t), hcPolicyDomainSetRunlevel);
 
     base->policyDomainFcts.sendMessage = FUNC_ADDR(u8 (*)(ocrPolicyDomain_t*, ocrLocation_t, ocrPolicyMsg_t *, ocrMsgHandle_t**, u32),
                                          hcPdSendMessage);

@@ -74,9 +74,7 @@ typedef struct _ocrCommPlatformFcts_t {
      * @brief Stops this comp-platform
      * @param[in] self          Pointer to this comp-platform
      */
-    void (*stop)(struct _ocrCommPlatform_t *self);
-
-    void (*finish)(struct _ocrCommPlatform_t *self);
+    void (*stop)(struct _ocrCommPlatform_t *self, ocrRunLevel_t newRl, u32 action);
 
     /**
      * @brief Tells the communication platfrom that the biggest

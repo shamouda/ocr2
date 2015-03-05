@@ -577,27 +577,40 @@ void simpleBegin(ocrAllocator_t *self, ocrPolicyDomain_t * PD ) {
 
     simpleInit( (pool_t *)addrGlobalizeOnTG((void *)rself->poolAddr, PD), rself->poolSize);
 }
+
 void simpleStart(ocrAllocator_t *self, ocrPolicyDomain_t * PD ) {
     //self->pd = PD;    // this didn't work, so I've moved it to simpleBegin
     DPRINTF(DEBUG_LVL_VERB, "simpleStart : skip\n");
 }
-void simpleStop(ocrAllocator_t *self) {
-    DPRINTF(DEBUG_LVL_VERB, "simpleStop : skip\n");
+
+void simpleStop(ocrAllocator_t *self, ocrRunLevel_t newRl, u32 action) {
+    switch(newRl) {
+        case RL_STOP: {
+            DPRINTF(DEBUG_LVL_VERB, "simpleStop : skip\n");
+            self->memories[0]->fcts.stop(self->memories[0], newRl, action);
+            break;
+        }
+        case RL_SHUTDOWN: {
+            DPRINTF(DEBUG_LVL_VERB, "simpleFinish called (This is x86 only?)\n");
+
+            ocrAllocatorSimple_t * rself = (ocrAllocatorSimple_t *) self;
+            ASSERT(self->memoryCount == 1);
+
+            RESULT_ASSERT(self-> /*rAnchorCE->base.*/ memories[0]->fcts.tag(
+            rself->base.memories[0],
+            rself->poolAddr - rself->poolStorageOffset,
+            rself->poolAddr + rself->poolSize + rself->poolStorageSuffix,
+            USER_FREE_TAG), ==, 0);
+
+            self->memories[0]->fcts.stop(self->memories[0], newRl, action);
+            break;
+        }
+        default:
+            ASSERT("Unknown runlevel in stop function");
+    }
+
 }
-void simpleFinish(ocrAllocator_t *self) {
-    DPRINTF(DEBUG_LVL_VERB, "simpleFinish called (This is x86 only?)\n");
 
-    ocrAllocatorSimple_t * rself = (ocrAllocatorSimple_t *) self;
-    ASSERT(self->memoryCount == 1);
-
-    RESULT_ASSERT(self-> /*rAnchorCE->base.*/ memories[0]->fcts.tag(
-        rself->base.memories[0],
-        rself->poolAddr - rself->poolStorageOffset,
-        rself->poolAddr + rself->poolSize + rself->poolStorageSuffix,
-        USER_FREE_TAG), ==, 0);
-
-    self->memories[0]->fcts.finish(self->memories[0]);
-}
 void* simpleAllocate(
     ocrAllocator_t *self,   // Allocator to attempt block allocation
     u64 size,               // Size of desired block, in bytes
@@ -666,8 +679,7 @@ ocrAllocatorFactory_t * newAllocatorFactorySimple(ocrParamList_t *perType) {
     base->allocFcts.destruct = FUNC_ADDR(void (*)(ocrAllocator_t*), simpleDestruct);
     base->allocFcts.begin = FUNC_ADDR(void (*)(ocrAllocator_t*, ocrPolicyDomain_t*), simpleBegin);
     base->allocFcts.start = FUNC_ADDR(void (*)(ocrAllocator_t*, ocrPolicyDomain_t*), simpleStart);
-    base->allocFcts.stop = FUNC_ADDR(void (*)(ocrAllocator_t*), simpleStop);
-    base->allocFcts.finish = FUNC_ADDR(void (*)(ocrAllocator_t*), simpleFinish);
+    base->allocFcts.stop = FUNC_ADDR(void (*)(ocrAllocator_t*,ocrRunLevel_t,u32), simpleStop);
     base->allocFcts.allocate = FUNC_ADDR(void* (*)(ocrAllocator_t*, u64, u64), simpleAllocate);
     //base->allocFcts.free = FUNC_ADDR(void (*)(void*), simpleDeallocate);
     base->allocFcts.reallocate = FUNC_ADDR(void* (*)(ocrAllocator_t*, void*, u64), simpleReallocate);

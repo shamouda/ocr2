@@ -294,34 +294,39 @@ void mallocProxyStart(ocrAllocator_t *self, ocrPolicyDomain_t * PD ) {
 #endif
 }
 
-void mallocProxyStop(ocrAllocator_t *self) {
-    CHECK_AND_SET_MODULE_STATE(MALLOCPROXY-ALLOCATOR, self, STOP);
-    ocrPolicyMsg_t msg;
-    getCurrentEnv(&(self->pd), NULL, NULL, &msg);
-
-#if 0  // The memTarget (pointed to by self->memories[0]) is a dummy, so
-       // maybe we shouldn't expect to do this statistics call.
-#ifdef OCR_ENABLE_STATISTICS
-    statsALLOCATOR_STOP(self->pd, self->guid, self, self->memories[0]->guid,
-                        self->memories[0]);
-#endif
-#endif
-
-#define PD_MSG (&msg)
-#define PD_TYPE PD_MSG_GUID_DESTROY
-    msg.type = PD_MSG_GUID_DESTROY | PD_MSG_REQUEST;
-    PD_MSG_FIELD_I(guid) = self->fguid;
-    PD_MSG_FIELD_I(properties) = 0;
-    self->pd->fcts.processMessage(self->pd, &msg, false);
-#undef PD_MSG
-#undef PD_TYPE
-    self->fguid.guid = NULL_GUID;
-#if 0 // FIXME  -- I don't think we need this code:
-#endif
-}
-
-void mallocProxyFinish(ocrAllocator_t *self) {
-    CHECK_AND_SET_MODULE_STATE(MALLOCPROXY-ALLOCATOR, self, FINISH);
+void mallocProxyStop(ocrAllocator_t *self, ocrRunLevel_t newRl, u32 action) {
+    switch(newRl) {
+        case RL_STOP: {
+            CHECK_AND_SET_MODULE_STATE(MALLOCPROXY-ALLOCATOR, self, STOP);
+            #if 0  // The memTarget (pointed to by self->memories[0]) is a dummy, so
+                   // maybe we shouldn't expect to do this statistics call.
+            #ifdef OCR_ENABLE_STATISTICS
+                statsALLOCATOR_STOP(self->pd, self->guid, self, self->memories[0]->guid,
+                                    self->memories[0]);
+            #endif
+            #endif
+            break;
+        }
+        case RL_SHUTDOWN: {
+            PD_MSG_STACK(msg);
+            getCurrentEnv(&(self->pd), NULL, NULL, &msg);
+        #define PD_MSG (&msg)
+        #define PD_TYPE PD_MSG_GUID_DESTROY
+            msg.type = PD_MSG_GUID_DESTROY | PD_MSG_REQUEST;
+            PD_MSG_FIELD_I(guid) = self->fguid;
+            PD_MSG_FIELD_I(properties) = 0;
+            self->pd->fcts.processMessage(self->pd, &msg, false);
+        #undef PD_MSG
+        #undef PD_TYPE
+            self->fguid.guid = NULL_GUID;
+        #if 0 // FIXME  -- I don't think we need this code:
+        #endif
+            CHECK_AND_SET_MODULE_STATE(MALLOCPROXY-ALLOCATOR, self, FINISH);
+        break;
+        }
+        default:
+            ASSERT("Unknown runlevel in stop function");
+    }
 }
 
 // Method to create the malloc allocator
@@ -356,8 +361,7 @@ ocrAllocatorFactory_t * newAllocatorFactoryMallocProxy(ocrParamList_t *perType) 
     base->allocFcts.destruct = FUNC_ADDR(void (*)(ocrAllocator_t*), mallocProxyDestruct);
     base->allocFcts.begin = FUNC_ADDR(void (*)(ocrAllocator_t*, ocrPolicyDomain_t*), mallocProxyBegin);
     base->allocFcts.start = FUNC_ADDR(void (*)(ocrAllocator_t*, ocrPolicyDomain_t*), mallocProxyStart);
-    base->allocFcts.stop = FUNC_ADDR(void (*)(ocrAllocator_t*), mallocProxyStop);
-    base->allocFcts.finish = FUNC_ADDR(void (*)(ocrAllocator_t*), mallocProxyFinish);
+    base->allocFcts.stop = FUNC_ADDR(void (*)(ocrAllocator_t*,ocrRunLevel_t,u32), mallocProxyStop);
     base->allocFcts.allocate = FUNC_ADDR(void* (*)(ocrAllocator_t*, u64, u64), mallocProxyAllocate);
     //base->allocFcts.free = FUNC_ADDR(void (*)(void*), mallocProxyDeallocate);
     base->allocFcts.reallocate = FUNC_ADDR(void* (*)(ocrAllocator_t*, void*, u64), mallocProxyReallocate);

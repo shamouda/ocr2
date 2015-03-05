@@ -73,9 +73,7 @@ typedef struct _ocrMemTargetFcts_t {
     /** @brief Stops the mem-target
      *  @param[in] self          Pointer to this mem-target
      */
-    void (*stop)(struct _ocrMemTarget_t* self);
-
-    void (*finish)(struct _ocrMemTarget_t* self);
+    void (*stop)(struct _ocrMemTarget_t* self, ocrRunLevel_t newRl, u32 action);
 
     /**
      * @brief Gets the throttle value for this memory

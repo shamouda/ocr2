@@ -63,12 +63,18 @@ void nullSchedulerObjectRootStart(ocrSchedulerObjectRoot_t * self) {
     return;
 }
 
-void nullSchedulerObjectRootStop(ocrSchedulerObjectRoot_t * self) {
-    return;
-}
 
-void nullSchedulerObjectRootFinish(ocrSchedulerObjectRoot_t * self) {
-    return;
+void nullSchedulerObjectRootStop(ocrSchedulerObjectRoot_t * self, ocrRunLevel_t newRl, u32 action) {
+    switch(newRl) {
+        case RL_STOP: {
+            break;
+        }
+        case RL_SHUTDOWN: {
+            break;
+        }
+        default:
+            ASSERT("Unknown runlevel in stop function");
+    }
 }
 
 void nullSchedulerObjectRootDestruct(ocrSchedulerObjectRoot_t *self) {
@@ -119,8 +125,7 @@ ocrSchedulerObjectFactory_t * newOcrSchedulerObjectFactoryNull(ocrParamList_t *p
     ocrSchedulerObjectRootFactory_t* rootFactory = (ocrSchedulerObjectRootFactory_t*)schedObjFact;
     rootFactory->fcts.begin = FUNC_ADDR(void (*)(ocrSchedulerObjectRoot_t*), nullSchedulerObjectRootBegin);
     rootFactory->fcts.start = FUNC_ADDR(void (*)(ocrSchedulerObjectRoot_t*), nullSchedulerObjectRootStart);
-    rootFactory->fcts.stop = FUNC_ADDR(void (*)(ocrSchedulerObjectRoot_t*), nullSchedulerObjectRootStop);
-    rootFactory->fcts.finish = FUNC_ADDR(void (*)(ocrSchedulerObjectRoot_t*), nullSchedulerObjectRootFinish);
+    rootFactory->fcts.stop = FUNC_ADDR(void (*)(ocrSchedulerObjectRoot_t*,ocrRunLevel_t,u32), nullSchedulerObjectRootStop);\
     rootFactory->fcts.destruct = FUNC_ADDR(void (*)(ocrSchedulerObjectRoot_t*), nullSchedulerObjectRootDestruct);
 
     return schedObjFact;

@@ -64,15 +64,22 @@ void hcSchedulerHeuristicStart(ocrSchedulerHeuristic_t * self) {
     }
 }
 
-void hcSchedulerHeuristicStop(ocrSchedulerHeuristic_t * self) {
-    ocrPolicyDomain_t *pd = self->scheduler->pd;
-    ocrSchedulerHeuristicContextHc_t *contextAlloc = (ocrSchedulerHeuristicContextHc_t *)self->contexts[0];
-    pd->fcts.pdFree(pd, contextAlloc);
+void hcSchedulerHeuristicStop(ocrSchedulerHeuristic_t * self, ocrRunLevel_t newRl, u32 action) {
+    switch(newRl) {
+        case RL_STOP: {
+            break;
+        }
+        case RL_SHUTDOWN: {
+            ocrPolicyDomain_t *pd = self->scheduler->pd;
+            ocrSchedulerHeuristicContextHc_t *contextAlloc = (ocrSchedulerHeuristicContextHc_t *)self->contexts[0];
+            pd->fcts.pdFree(pd, contextAlloc);
+            break;
+        }
+        default:
+            ASSERT("Unknown runlevel in stop function");
+    }
 }
 
-void hcSchedulerHeuristicFinish(ocrSchedulerHeuristic_t *self) {
-    // Nothing to do locally
-}
 
 void hcSchedulerHeuristicDestruct(ocrSchedulerHeuristic_t * self) {
     runtimeChunkFree((u64)self, PERSISTENT_CHUNK);
@@ -176,8 +183,7 @@ ocrSchedulerHeuristicFactory_t * newOcrSchedulerHeuristicFactoryHc(ocrParamList_
     base->destruct = &destructSchedulerHeuristicFactoryHc;
     base->fcts.begin = FUNC_ADDR(void (*)(ocrSchedulerHeuristic_t*), hcSchedulerHeuristicBegin);
     base->fcts.start = FUNC_ADDR(void (*)(ocrSchedulerHeuristic_t*), hcSchedulerHeuristicStart);
-    base->fcts.stop = FUNC_ADDR(void (*)(ocrSchedulerHeuristic_t*), hcSchedulerHeuristicStop);
-    base->fcts.finish = FUNC_ADDR(void (*)(ocrSchedulerHeuristic_t*), hcSchedulerHeuristicFinish);
+    base->fcts.stop = FUNC_ADDR(void (*)(ocrSchedulerHeuristic_t*,ocrRunLevel_t,u32), hcSchedulerHeuristicStop);
     base->fcts.destruct = FUNC_ADDR(void (*)(ocrSchedulerHeuristic_t*), hcSchedulerHeuristicDestruct);
 
     base->fcts.update = FUNC_ADDR(u8 (*)(ocrSchedulerHeuristic_t*, u32), hcSchedulerHeuristicUpdate);

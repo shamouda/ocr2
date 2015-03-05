@@ -34,12 +34,11 @@ typedef struct {
     // The HC implementation relies on integer ids to
     // map workers, schedulers and workpiles together
     u64 id;
-    // Flag the worker checks to know if he's running
-    bool running;
     // Master workers need to be started twice (once by the PD and once
     // when they actually start running. This helps keep track of this
     bool secondStart;
     hcWorkerType_t hcType;
+    bool workLoopSpin;
 } ocrWorkerHc_t;
 
 ocrWorkerFactory_t* newOcrWorkerFactoryHc(ocrParamList_t *perType);

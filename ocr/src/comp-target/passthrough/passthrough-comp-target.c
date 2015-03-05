@@ -21,16 +21,16 @@
 
 
 void ptDestruct(ocrCompTarget_t *compTarget) {
-    u32 i = 0;
-    while(i < compTarget->platformCount) {
-        compTarget->platforms[i]->fcts.destruct(compTarget->platforms[i]);
-        ++i;
-    }
-    runtimeChunkFree((u64)(compTarget->platforms), NULL);
-#ifdef OCR_ENABLE_STATISTICS
-    statsCOMPTARGET_STOP(compTarget->pd, compTarget->fguid.guid, compTarget);
-#endif
-    runtimeChunkFree((u64)compTarget, NULL);
+//     u32 i = 0;
+//     while(i < compTarget->platformCount) {
+//         compTarget->platforms[i]->fcts.destruct(compTarget->platforms[i]);
+//         ++i;
+//     }
+//     runtimeChunkFree((u64)(compTarget->platforms), NULL);
+// #ifdef OCR_ENABLE_STATISTICS
+//     statsCOMPTARGET_STOP(compTarget->pd, compTarget->fguid.guid, compTarget);
+// #endif
+//     runtimeChunkFree((u64)compTarget, NULL);
 }
 
 void ptBegin(ocrCompTarget_t * compTarget, ocrPolicyDomain_t * PD, ocrWorkerType_t workerType) {
@@ -53,29 +53,50 @@ void ptStart(ocrCompTarget_t * compTarget, ocrPolicyDomain_t * PD, ocrWorker_t *
     compTarget->platforms[0]->fcts.start(compTarget->platforms[0], PD, worker);
 }
 
-void ptStop(ocrCompTarget_t * compTarget) {
-    ASSERT(compTarget->platformCount == 1);
-    compTarget->platforms[0]->fcts.stop(compTarget->platforms[0]);
+void ptStop(ocrCompTarget_t * compTarget, ocrRunLevel_t newRl, u32 action) {
+    switch(newRl) {
+        case RL_STOP: {
+            ASSERT(compTarget->platformCount == 1);
+            compTarget->platforms[0]->fcts.stop(compTarget->platforms[0], newRl, action);
 
-    // Destroy the GUID
-    PD_MSG_STACK(msg);
+            //TODO shouldn't this done in shutdown or deallocate ?
+            // Destroy the GUID
+            PD_MSG_STACK(msg);
+            getCurrentEnv(NULL, NULL, NULL, &msg);
 
-    getCurrentEnv(NULL, NULL, NULL, &msg);
+        #define PD_MSG (&msg)
+        #define PD_TYPE PD_MSG_GUID_DESTROY
+            msg.type = PD_MSG_GUID_DESTROY | PD_MSG_REQUEST;
+            PD_MSG_FIELD_I(guid) = compTarget->fguid;
+            PD_MSG_FIELD_I(properties) = 0;
+            compTarget->pd->fcts.processMessage(compTarget->pd, &msg, false); // Don't really care about result
+        #undef PD_MSG
+        #undef PD_TYPE
+            compTarget->fguid.guid = UNINITIALIZED_GUID;
+            break;
+        }
+        case RL_SHUTDOWN: {
+            ASSERT(compTarget->platformCount == 1);
+            compTarget->platforms[0]->fcts.stop(compTarget->platforms[0], RL_SHUTDOWN, action);
+            break;
+        }
+        case RL_DEALLOCATE: {
+            u32 i = 0;
+            while(i < compTarget->platformCount) {
+                compTarget->platforms[0]->fcts.stop(compTarget->platforms[0], RL_DEALLOCATE, action);
+                ++i;
+            }
+            runtimeChunkFree((u64)(compTarget->platforms), NULL);
+        #ifdef OCR_ENABLE_STATISTICS
+            statsCOMPTARGET_STOP(compTarget->pd, compTarget->fguid.guid, compTarget);
+        #endif
+            runtimeChunkFree((u64)compTarget, NULL);
+            break;
+        }
 
-#define PD_MSG (&msg)
-#define PD_TYPE PD_MSG_GUID_DESTROY
-    msg.type = PD_MSG_GUID_DESTROY | PD_MSG_REQUEST;
-    PD_MSG_FIELD_I(guid) = compTarget->fguid;
-    PD_MSG_FIELD_I(properties) = 0;
-    compTarget->pd->fcts.processMessage(compTarget->pd, &msg, false); // Don't really care about result
-#undef PD_MSG
-#undef PD_TYPE
-    compTarget->fguid.guid = UNINITIALIZED_GUID;
-}
-
-void ptFinish(ocrCompTarget_t *compTarget) {
-    ASSERT(compTarget->platformCount == 1);
-    compTarget->platforms[0]->fcts.finish(compTarget->platforms[0]);
+        default:
+            ASSERT("Unknown runlevel in stop function");
+    }
 }
 
 u8 ptGetThrottle(ocrCompTarget_t *compTarget, u64 *value) {
@@ -123,8 +144,7 @@ ocrCompTargetFactory_t *newCompTargetFactoryPt(ocrParamList_t *perType) {
     base->targetFcts.destruct = FUNC_ADDR(void (*)(ocrCompTarget_t*), ptDestruct);
     base->targetFcts.begin = FUNC_ADDR(void (*)(ocrCompTarget_t*, ocrPolicyDomain_t*, ocrWorkerType_t), ptBegin);
     base->targetFcts.start = FUNC_ADDR(void (*)(ocrCompTarget_t*, ocrPolicyDomain_t*, ocrWorker_t*), ptStart);
-    base->targetFcts.stop = FUNC_ADDR(void (*)(ocrCompTarget_t*), ptStop);
-    base->targetFcts.finish = FUNC_ADDR(void (*)(ocrCompTarget_t*), ptFinish);
+    base->targetFcts.stop = FUNC_ADDR(void (*)(ocrCompTarget_t*,ocrRunLevel_t,u32), ptStop);
     base->targetFcts.getThrottle = FUNC_ADDR(u8 (*)(ocrCompTarget_t*, u64*), ptGetThrottle);
     base->targetFcts.setThrottle = FUNC_ADDR(u8 (*)(ocrCompTarget_t*, u64), ptSetThrottle);
     base->targetFcts.setCurrentEnv = FUNC_ADDR(u8 (*)(ocrCompTarget_t*, ocrPolicyDomain_t*, ocrWorker_t*), ptSetCurrentEnv);

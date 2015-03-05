@@ -743,10 +743,12 @@ int __attribute__ ((weak)) main(int argc, const char* argv[]) {
     // to stop (including this worker). The currently executing
     // worker then fallthrough from start to finish.
     worker->fcts.start(worker, pd);
+    // When the worker exits 'start' the PD runlevel has been
+    // decremented to RL_STOP
+    // Transition from stop to shutdown
+    pd->fcts.setRunlevel(pd, RL_SHUTDOWN);
     u8 returnCode = pd->shutdownCode;
-    // NOTE: finish blocks until stop has completed
-    pd->fcts.finish(pd);
-    pd->fcts.destruct(pd);
+    pd->fcts.setRunlevel(pd, RL_DEALLOCATE);
     freeUpRuntime();
 
     return returnCode;

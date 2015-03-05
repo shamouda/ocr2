@@ -151,56 +151,64 @@ void hcSchedulerStart(ocrScheduler_t * self, ocrPolicyDomain_t * PD) {
     derived->stealIterators = stealIteratorsCache;
 }
 
-void hcSchedulerStop(ocrScheduler_t * self) {
-    ocrPolicyDomain_t *pd = NULL;
-    PD_MSG_STACK(msg);
-    getCurrentEnv(&pd, NULL, NULL, &msg);
+void hcSchedulerStop(ocrScheduler_t * self, ocrRunLevel_t newRl, u32 action) {
+    switch(newRl) {
+        case RL_STOP: {
+            // Stop the workpiles
+            u64 i = 0;
+            u64 count = self->workpileCount;
+            for(i = 0; i < count; ++i) {
+                self->workpiles[i]->fcts.stop(self->workpiles[i], newRl, action);
+            }
 
-    // Stop the workpiles
-    u64 i = 0;
-    u64 count = self->workpileCount;
-    for(i = 0; i < count; ++i) {
-        self->workpiles[i]->fcts.stop(self->workpiles[i]);
-    }
+            self->rootObj->fcts.stop(self->rootObj, newRl, action);
 
-    self->rootObj->fcts.stop(self->rootObj);
+            u64 schedulerHeuristicCount = self->schedulerHeuristicCount;
+            for(i = 0; i < schedulerHeuristicCount; ++i) {
+                self->schedulerHeuristics[i]->fcts.stop(self->schedulerHeuristics[i], newRl, action);
+            }
+            break;
+        }
+        case RL_SHUTDOWN: {
+            ocrPolicyDomain_t *pd = NULL;
+            PD_MSG_STACK(msg);
+            getCurrentEnv(&pd, NULL, NULL, &msg);
 
-    u64 schedulerHeuristicCount = self->schedulerHeuristicCount;
-    for(i = 0; i < schedulerHeuristicCount; ++i) {
-        self->schedulerHeuristics[i]->fcts.stop(self->schedulerHeuristics[i]);
-    }
+            // We need to destroy the stealIterators now because pdFree does not
+            // exist after stop
+            ocrSchedulerHc_t * derived = (ocrSchedulerHc_t *) self;
+            pd->fcts.pdFree(pd, derived->stealIterators);
 
-    // We need to destroy the stealIterators now because pdFree does not
-    // exist after stop
-    ocrSchedulerHc_t * derived = (ocrSchedulerHc_t *) self;
-    pd->fcts.pdFree(pd, derived->stealIterators);
+            // Destroy the GUID
+        #define PD_MSG (&msg)
+        #define PD_TYPE PD_MSG_GUID_DESTROY
+            msg.type = PD_MSG_GUID_DESTROY | PD_MSG_REQUEST;
+            PD_MSG_FIELD_I(guid) = self->fguid;
+            PD_MSG_FIELD_I(guid.metaDataPtr) = self;
+            PD_MSG_FIELD_I(properties) = 0;
+            // Ignore failure, probably shutting down
+            pd->fcts.processMessage(pd, &msg, false);
+        #undef PD_MSG
+        #undef PD_TYPE
+            self->fguid.guid = UNINITIALIZED_GUID;
+            break;
 
-    // Destroy the GUID
-#define PD_MSG (&msg)
-#define PD_TYPE PD_MSG_GUID_DESTROY
-    msg.type = PD_MSG_GUID_DESTROY | PD_MSG_REQUEST;
-    PD_MSG_FIELD_I(guid) = self->fguid;
-    PD_MSG_FIELD_I(guid.metaDataPtr) = self;
-    PD_MSG_FIELD_I(properties) = 0;
-    // Ignore failure, probably shutting down
-    pd->fcts.processMessage(pd, &msg, false);
-#undef PD_MSG
-#undef PD_TYPE
-    self->fguid.guid = UNINITIALIZED_GUID;
-}
+            u64 i = 0;
+            u64 count = self->workpileCount;
+            for(i = 0; i < count; ++i) {
+                self->workpiles[i]->fcts.stop(self->workpiles[i], newRl, action);
+            }
 
-void hcSchedulerFinish(ocrScheduler_t *self) {
-    u64 i = 0;
-    u64 count = self->workpileCount;
-    for(i = 0; i < count; ++i) {
-        self->workpiles[i]->fcts.finish(self->workpiles[i]);
-    }
+            self->rootObj->fcts.stop(self->rootObj, newRl, action);
 
-    self->rootObj->fcts.finish(self->rootObj);
-
-    u64 schedulerHeuristicCount = self->schedulerHeuristicCount;
-    for(i = 0; i < schedulerHeuristicCount; ++i) {
-        self->schedulerHeuristics[i]->fcts.finish(self->schedulerHeuristics[i]);
+            u64 schedulerHeuristicCount = self->schedulerHeuristicCount;
+            for(i = 0; i < schedulerHeuristicCount; ++i) {
+                self->schedulerHeuristics[i]->fcts.stop(self->schedulerHeuristics[i], newRl, action);
+            }
+            break;
+        }
+        default:
+            ASSERT("Unknown runlevel in stop function");
     }
 }
 
@@ -208,14 +216,15 @@ u8 hcSchedulerTakeEdt (ocrScheduler_t *self, u32 *count, ocrFatGuid_t *edts) {
     // Source must be a worker guid and we rely on indices to map
     // workers to workpiles (one-to-one)
     // TODO: This is a non-portable assumption but will do for now.
+
+    if(*count == 0) return 1; // No room to put anything
+
     ocrWorker_t *worker = NULL;
     ocrWorkerHc_t *hcWorker = NULL;
     getCurrentEnv(NULL, &worker, NULL, NULL);
     hcWorker = (ocrWorkerHc_t*)worker;
     ocrFatGuid_t popped;
     u64 workerId;
-
-    if(*count == 0) return 1; // No room to put anything
 
     ASSERT(edts != NULL); // Array should be allocated at least
 
@@ -372,8 +381,7 @@ ocrSchedulerFactory_t * newOcrSchedulerFactoryHc(ocrParamList_t *perType) {
     base->destruct = &destructSchedulerFactoryHc;
     base->schedulerFcts.begin = FUNC_ADDR(void (*)(ocrScheduler_t*, ocrPolicyDomain_t*), hcSchedulerBegin);
     base->schedulerFcts.start = FUNC_ADDR(void (*)(ocrScheduler_t*, ocrPolicyDomain_t*), hcSchedulerStart);
-    base->schedulerFcts.stop = FUNC_ADDR(void (*)(ocrScheduler_t*), hcSchedulerStop);
-    base->schedulerFcts.finish = FUNC_ADDR(void (*)(ocrScheduler_t*), hcSchedulerFinish);
+    base->schedulerFcts.stop = FUNC_ADDR(void (*)(ocrScheduler_t*,ocrRunLevel_t,u32), hcSchedulerStop);
     base->schedulerFcts.destruct = FUNC_ADDR(void (*)(ocrScheduler_t*), hcSchedulerDestruct);
     base->schedulerFcts.takeEdt = FUNC_ADDR(u8 (*)(ocrScheduler_t*, u32*, ocrFatGuid_t*), hcSchedulerTakeEdt);
     base->schedulerFcts.giveEdt = FUNC_ADDR(u8 (*)(ocrScheduler_t*, u32*, ocrFatGuid_t*), hcSchedulerGiveEdt);
