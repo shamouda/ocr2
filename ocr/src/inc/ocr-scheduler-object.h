@@ -331,13 +331,27 @@ typedef struct _ocrSchedulerObjectFactory_t {
 
 /* Functions for maintaining the top-level schedulerObject collection root */
 typedef struct _ocrSchedulerObjectRootFcts_t {
-    void (*begin)(struct _ocrSchedulerObjectRoot_t *self);
 
-    void (*start)(struct _ocrSchedulerObjectRoot_t *self);
-
-    void (*stop)(struct _ocrSchedulerObjectRoot_t *self);
-
-    void (*finish)(struct _ocrSchedulerObjectRoot_t *self);
+    /**
+     * @brief Switch runlevel
+     *
+     * @param[in] self         Pointer to this object
+     * @param[in] PD           Policy domain this object belongs to
+     * @param[in] runlevel     Runlevel to switch to
+     * @param[in] phase        Phase for this runlevel
+     * @param[in] properties   Properties (see ocr-runtime-types.h)
+     * @param[in] callback     Callback to call when the runlevel switch
+     *                         is complete. NULL if no callback is required
+     * @param[in] val          Value to pass to the callback
+     *
+     * @return 0 if the switch command was successful and a non-zero error
+     * code otherwise. Note that the return value does not indicate that the
+     * runlevel switch occured (the callback will be called when it does) but only
+     * that the call to switch runlevel was well formed and will be processed
+     * at some point
+     */
+    u8 (*switchRunlevel)(struct _ocrSchedulerObjectRoot_t* self, struct _ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
+                         phase_t phase, u32 properties, void (*callback)(struct _ocrPolicyDomain_t*, u64), u64 val);
 
     void (*destruct)(struct _ocrSchedulerObjectRoot_t *self);
 

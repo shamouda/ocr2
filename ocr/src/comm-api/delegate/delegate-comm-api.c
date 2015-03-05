@@ -24,22 +24,54 @@ void delegateCommDestruct (ocrCommApi_t * base) {
     runtimeChunkFree((u64)base, NULL);
 }
 
-void delegateCommBegin(ocrCommApi_t * self, ocrPolicyDomain_t * pd) {
-    //Initialize base
-    self->pd = pd;
-    self->commPlatform->fcts.begin(self->commPlatform, pd, self);
-}
+u8 delegateCommSwitchRunlevel(ocrCommApi_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
+                                phase_t phase, u32 properties, void (*callback)(ocrPolicyDomain_t*,u64), u64 val) {
+    u8 toReturn = 0;
 
-void delegateCommStart(ocrCommApi_t * self, ocrPolicyDomain_t * pd) {
-    self->commPlatform->fcts.start(self->commPlatform, pd, self);
-}
+    // This is an inert module, we do not handle callbacks (caller needs to wait on us)
+    ASSERT(callback == NULL);
 
-void delegateCommStop(ocrCommApi_t * self) {
-    self->commPlatform->fcts.stop(self->commPlatform);
-}
+    // Verify properties for this call
+    ASSERT((properties & RL_REQUEST) && !(properties & RL_RESPONSE)
+           && !(properties & RL_RELEASE));
+    ASSERT(!(properties & RL_FROM_MSG));
 
-void delegateCommFinish(ocrCommApi_t *self) {
-    self->commPlatform->fcts.finish(self->commPlatform);
+    if(properties & RL_BRING_UP) {
+        toReturn |= self->commPlatform->fcts.switchRunlevel(self->commPlatform, PD, runlevel, phase,
+                                                            properties, NULL, 0);
+    }
+
+    switch(runlevel) {
+    case RL_CONFIG_PARSE:
+        // On bring-up: Update PD->phasesPerRunlevel on phase 0
+        // and check compatibility on phase 1
+        break;
+    case RL_NETWORK_OK:
+        // Nothing
+        break;
+    case RL_PD_OK:
+        if(properties & RL_BRING_UP) {
+            // We can now set our PD (before this, we couldn't because
+            // "our" PD might not have been started
+            self->pd = PD;
+        }
+        break;
+    case RL_MEMORY_OK:
+    case RL_GUID_OK:
+    case RL_COMPUTE_OK:
+    case RL_USER_OK:
+        // Nothing to do
+        break;
+    default:
+        // Unknown runlevel
+        ASSERT(0);
+    }
+
+    if(properties & RL_TEAR_DOWN) {
+        toReturn |= self->commPlatform->fcts.switchRunlevel(self->commPlatform, PD, runlevel, phase,
+                                                            properties, NULL, 0);
+    }
+    return toReturn;
 }
 
 static ocrPolicyMsg_t * allocateNewMessage(ocrCommApi_t * self, u32 size) {
@@ -236,10 +268,8 @@ ocrCommApiFactory_t *newCommApiFactoryDelegate(ocrParamList_t *perType) {
     base->initialize = initializeCommApiDelegate;
     base->destruct = destructCommApiFactoryDelegate;
     base->apiFcts.destruct = FUNC_ADDR(void (*)(ocrCommApi_t*), delegateCommDestruct);
-    base->apiFcts.begin = FUNC_ADDR(void (*)(ocrCommApi_t*, ocrPolicyDomain_t*), delegateCommBegin);
-    base->apiFcts.start = FUNC_ADDR(void (*)(ocrCommApi_t*, ocrPolicyDomain_t*), delegateCommStart);
-    base->apiFcts.stop = FUNC_ADDR(void (*)(ocrCommApi_t*), delegateCommStop);
-    base->apiFcts.finish = FUNC_ADDR(void (*)(ocrCommApi_t*), delegateCommFinish);
+    base->apiFcts.switchRunlevel = FUNC_ADDR(u8 (*)(ocrCommApi_t*, ocrPolicyDomain_t*, ocrRunlevel_t,
+                                                    phase_t, u32, void (*)(ocrPolicyDomain_t*,u64), u64), delegateCommSwitchRunlevel);
     base->apiFcts.sendMessage = FUNC_ADDR(u8 (*)(ocrCommApi_t*, ocrLocation_t,
                                                       ocrPolicyMsg_t *, ocrMsgHandle_t **, u32), delegateCommSendMessage);
     base->apiFcts.pollMessage = FUNC_ADDR(u8 (*)(ocrCommApi_t*, ocrMsgHandle_t**),

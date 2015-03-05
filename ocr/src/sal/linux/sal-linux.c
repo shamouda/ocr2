@@ -18,7 +18,7 @@
  * SIGUSR2: Query the contents of queued tasks (will only
  *          succeed if runtime is paused)
  */
-void sig_handler(u32 sigNum){
+void sig_handler(u32 sigNum) {
 
     ocrPolicyDomain_t *pd;
     getCurrentEnv(&pd, NULL, NULL, NULL);
@@ -145,14 +145,14 @@ void salResume(u32 flag){
 void registerSignalHandler(){
 
     struct sigaction action;
-    action.sa_handler = &sig_handler;
+    action.sa_handler = ((void (*)(int))&sig_handler);
     action.sa_flags = SA_RESTART;
     sigfillset(&action.sa_mask);
-    if(sigaction(SIGUSR1, &action, NULL) == SIG_ERR){
-        PRINTF("Couldn't catch SIGUSR1... SIG_ERR Encountered\n");
+    if(sigaction(SIGUSR1, &action, NULL) != 0) {
+        PRINTF("Couldn't catch SIGUSR1...\n");
     }
-     if(sigaction(SIGUSR2, &action, NULL) == SIG_ERR){
-        PRINTF("Couldn't catch SIGUSR2... SIG_ERR Encountered\n");
+     if(sigaction(SIGUSR2, &action, NULL) != 0) {
+        PRINTF("Couldn't catch SIGUSR2...\n");
     }
 }
 

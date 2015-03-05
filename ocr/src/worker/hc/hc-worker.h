@@ -34,11 +34,6 @@ typedef struct {
     // The HC implementation relies on integer ids to
     // map workers, schedulers and workpiles together
     u64 id;
-    // Flag the worker checks to know if he's running
-    bool running;
-    // Master workers need to be started twice (once by the PD and once
-    // when they actually start running. This helps keep track of this
-    bool secondStart;
 
     //Pause/Query/Resume variables for displaying EDTS
     //TODO: Possibly wrap in ifdef
@@ -48,7 +43,6 @@ typedef struct {
 #ifdef OCR_ENABLE_EDT_NAMING
     char * name;
 #endif
-
     hcWorkerType_t hcType;
 } ocrWorkerHc_t;
 

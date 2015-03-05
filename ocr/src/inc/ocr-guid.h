@@ -61,19 +61,26 @@ typedef struct _ocrGuidProviderFcts_t {
      */
     void (*destruct)(struct _ocrGuidProvider_t* self);
 
-    void (*begin)(struct _ocrGuidProvider_t *self, struct _ocrPolicyDomain_t *pd);
-
     /**
-     * @brief "Starts" the GUID provider
+     * @brief Switch runlevel
      *
-     * @param[in] self      Pointer to this GUID provider
-     * @param[in] pd        Policy domain this provider belongs to
+     * @param[in] self         Pointer to this object
+     * @param[in] PD           Policy domain this object belongs to
+     * @param[in] runlevel     Runlevel to switch to
+     * @param[in] phase        Phase for this runlevel
+     * @param[in] properties   Properties (see ocr-runtime-types.h)
+     * @param[in] callback     Callback to call when the runlevel switch
+     *                         is complete. NULL if no callback is required
+     * @param[in] val          Value to pass to the callback
+     *
+     * @return 0 if the switch command was successful and a non-zero error
+     * code otherwise. Note that the return value does not indicate that the
+     * runlevel switch occured (the callback will be called when it does) but only
+     * that the call to switch runlevel was well formed and will be processed
+     * at some point
      */
-    void (*start)(struct _ocrGuidProvider_t* self, struct _ocrPolicyDomain_t* pd);
-
-    void (*stop)(struct _ocrGuidProvider_t* self);
-    void (*finish)(struct _ocrGuidProvider_t* self);
-
+    u8 (*switchRunlevel)(struct _ocrGuidProvider_t* self, struct _ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
+                         phase_t phase, u32 properties, void (*callback)(struct _ocrPolicyDomain_t*, u64), u64 val);
     /**
      * @brief Gets a GUID for an object of kind 'kind'
      * and associates the value val.

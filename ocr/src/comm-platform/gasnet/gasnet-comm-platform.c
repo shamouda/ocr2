@@ -55,7 +55,6 @@ static inline ocrLocation_t GasnetRankToLocation(int rank) {
     return (ocrLocation_t) rank;
 }
 
-
 /*
  * @brief To be called by an active message from remote process
  */
@@ -148,7 +147,6 @@ static void amhandler_register_invoke(void) {
 }
 
 #undef AMHANDLER_ENTRY
-
 
 /*
  * @brief platform initializaton
@@ -353,10 +351,10 @@ static u8 GasnetCommSendMessage(ocrCommPlatform_t * self,
 }
 
 /*
- * @brief Polling message for the third attempt
+ * @brief Gasnet general polling message
  */
-u8 GasnetCommPollMessage_RL3(ocrCommPlatform_t *self, ocrPolicyMsg_t **msg,
-                             u32 properties, u32 *mask) {
+u8 GasnetCommPollMessage(ocrCommPlatform_t *self, ocrPolicyMsg_t **msg,
+                         u32 properties, u32 *mask) {
     ocrCommPlatformGasnet_t *gasnetComm = (ocrCommPlatformGasnet_t*) self;
 
     ASSERT(msg != NULL);
@@ -391,25 +389,6 @@ u8 GasnetCommPollMessage_RL3(ocrCommPlatform_t *self, ocrPolicyMsg_t **msg,
 }
 
 /*
- * @brief Gasnet general polling message
- */
-u8 GasnetCommPollMessage(ocrCommPlatform_t *self, ocrPolicyMsg_t **msg,
-                         u32 properties, u32 *mask) {
-    ocrCommPlatformGasnet_t * gasnetComm = ((ocrCommPlatformGasnet_t *) self);
-    switch(gasnetComm->rl) {
-    case 3:
-        return GasnetCommPollMessage_RL3(self, msg, properties, mask);
-    case 2:
-        gasnetComm->rl_completed[2] = true;
-        return POLL_NO_MESSAGE;
-    default:
-        // nothing to do
-        ASSERT(false && "Illegal RL reached in MPI-comm-platform pollMessage");
-    }
-    return POLL_NO_MESSAGE;
-}
-
-/*
  * @brief Blocking-wait until we receive a message
  */
 u8 GasnetCommWaitMessage(ocrCommPlatform_t *self, ocrPolicyMsg_t **msg,
@@ -422,88 +401,86 @@ u8 GasnetCommWaitMessage(ocrCommPlatform_t *self, ocrPolicyMsg_t **msg,
     return ret;
 }
 
-/*
- * @brief preparation for gasnet communication
- */
-void GasnetCommBegin(ocrCommPlatform_t * self, ocrPolicyDomain_t * pd, ocrCommApi_t *commApi) {
-    self->pd = pd;
-    int rank=gasnet_mynode();
-    pd->myLocation = GasnetRankToLocation(rank);
-    registerMessage( gasnetMessageIncoming );
-}
-
-/*
- * @brief starting gasnet
- */
-void GasnetCommStart(ocrCommPlatform_t * self, ocrPolicyDomain_t * pd, ocrCommApi_t *commApi) {
+u8 GasnetCommSwitchRunlevel(ocrCommPlatform_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
+                                phase_t phase, u32 properties, void (*callback)(ocrPolicyDomain_t*, u64), u64 val) {
     ocrCommPlatformGasnet_t * gasnetComm = ((ocrCommPlatformGasnet_t *) self);
-    gasnetComm->incoming = newLinkedList(pd);
-    gasnetComm->incomingIt = gasnetComm->incoming->iterator(gasnetComm->incoming);
+    u8 toReturn = 0;
+    // Verify properties for this call
+    ASSERT((properties & RL_REQUEST) && !(properties & RL_RESPONSE)
+           && !(properties & RL_RELEASE));
+    ASSERT(!(properties & RL_FROM_MSG));
 
-    addCommPlatform(self);
-
-    // All-to-all neighbor knowledge
-    int nbRanks = gasnet_nodes();
-    pd->neighborCount = nbRanks - 1;
-    pd->neighbors = pd->fcts.pdMalloc(pd, sizeof(ocrLocation_t) * pd->neighborCount);
-    int myRank = (int) locationToGasnetRank(pd->myLocation);
-    int i = 0;
-    while(i < (nbRanks-1)) {
-        pd->neighbors[i] = (((myRank+i+1)%nbRanks));
-        DPRINTF(DEBUG_LVL_VERB,"[%d] neighbors[%d] is %d\n", myRank, i, pd->neighbors[i]);
-        i++;
-    }
-    GASNET_Safe(gasnet_AMPoll());
-}
-
-/*
- * @brief stoping gasnet, with 3 runtime levels
- */
-void GasnetCommStop(ocrCommPlatform_t * self) {
-    ocrCommPlatformGasnet_t * gasnetComm = ((ocrCommPlatformGasnet_t *) self);
-
-    switch(gasnetComm->rl) {
-    case 3:
-        gasnetComm->rl_completed[3] = true;
-        gasnetComm->rl = 2;
+    switch(runlevel) {
+    case RL_CONFIG_PARSE:
+    case RL_NETWORK_OK:
+        // Nothing
         break;
-    case 2:
-        ASSERT(gasnetComm->rl_completed[2]);
-        gasnetComm->rl = 1;
+    case RL_PD_OK:
+        if ((properties & RL_BRING_UP) && RL_IS_FIRST_PHASE_UP(self->pd, RL_PD_OK, phase)) {
+            //Initialize base
+            self->pd = PD;
+            int rank=gasnet_mynode();
+            PD->myLocation = GasnetRankToLocation(rank);
+            registerMessage(gasnetMessageIncoming);
+        }
         break;
-    case 1:
-        gasnetComm->rl_completed[1] = true;
-        gasnetComm->rl = 0;
+    case RL_MEMORY_OK:
+        // Nothing to do
         break;
-    case 0:
-        gasnetComm->incoming->destruct(gasnetComm->incoming);
+    case RL_GUID_OK:
+        ASSERT(self->pd == PD);
+        if((properties & RL_BRING_UP) && RL_IS_LAST_PHASE_UP(self->pd, RL_GUID_OK, phase)) {
+            gasnetComm->incoming = newLinkedList(PD);
+            gasnetComm->incomingIt = gasnetComm->incoming->iterator(gasnetComm->incoming);
+
+            addCommPlatform(self);
+
+            // All-to-all neighbor knowledge
+            int nbRanks = gasnet_nodes();
+            PD->neighborCount = nbRanks - 1;
+            PD->neighbors = PD->fcts.pdMalloc(PD, sizeof(ocrLocation_t) * PD->neighborCount);
+            int myRank = (int) locationToGasnetRank(PD->myLocation);
+            int i = 0;
+            while(i < (nbRanks-1)) {
+                PD->neighbors[i] = (((myRank+i+1)%nbRanks));
+                DPRINTF(DEBUG_LVL_VERB,"[%d] neighbors[%d] is %d\n", myRank, i, PD->neighbors[i]);
+                i++;
+            }
+            // Runlevel barrier across policy-domains
+            gasnet_barrier_notify(0,GASNET_BARRIERFLAG_ANONYMOUS);
+            gasnet_barrier_wait(0,GASNET_BARRIERFLAG_ANONYMOUS);
+
+            GASNET_Safe(gasnet_AMPoll());
+        }
+        if ((properties & RL_TEAR_DOWN) && RL_IS_FIRST_PHASE_DOWN(self->pd, RL_GUID_OK, phase)) {
+            gasnetComm->incomingIt->destruct(gasnetComm->incomingIt);
+            ASSERT(gasnetComm->incoming->isEmpty(gasnetComm->incoming));
+            gasnetComm->incoming->destruct(gasnetComm->incoming);
+        }
+        break;
+    case RL_COMPUTE_OK:
+        break;
+    case RL_USER_OK:
+        // Note: This PD may reach this runlevel after other PDs. It is not
+        // an issue for gasnet since the library is already up and will buffer
+        // the messages. The communication worker wll pick that up whenever
+        // it has started.
+        if((properties & RL_BRING_UP) && RL_IS_LAST_PHASE_UP(self->pd, RL_USER_OK, phase)) {
+            gasnet_barrier_notify(0,GASNET_BARRIERFLAG_ANONYMOUS);
+            gasnet_barrier_wait(0,GASNET_BARRIERFLAG_ANONYMOUS);
+        }
         break;
     default:
-        ASSERT(false && "Illegal RL reached in Gasnet-comm-platform stop");
+        // Unknown runlevel
+        ASSERT(0);
     }
-    DPRINTF(DEBUG_LVL_VVERB,"[%d] Exiting Calling Gasnet STOP %d\n",  (int) self->pd->myLocation, gasnetComm->rl);
+    return toReturn;
 }
 
-/*
- * @brief finish phase
- */
-void GasnetCommFinish(ocrCommPlatform_t *self) {
-}
-
-/*
- * @brief termination phase. End of the comm-platform
- */
 void GasnetCommDestruct(ocrCommPlatform_t * base) {
-
-  /* Spec says client should include a barrier before gasnet_exit() */
-  gasnet_barrier_notify(0,GASNET_BARRIERFLAG_ANONYMOUS);
-  gasnet_barrier_wait(0,GASNET_BARRIERFLAG_ANONYMOUS);
-
-  // free chunk
-  runtimeChunkFree((u64)base, NULL);
-
-  // free resources allocated in am handlers
-  amhandler_free_table();
+    runtimeChunkFree((u64)base, PERSISTENT_CHUNK);
+    // free resources allocated in am-handlers
+    amhandler_free_table();
 }
 
 /*
@@ -511,9 +488,8 @@ void GasnetCommDestruct(ocrCommPlatform_t * base) {
  */
 ocrCommPlatform_t* newCommPlatformGasnet(ocrCommPlatformFactory_t *factory,
                                        ocrParamList_t *perInstance) {
-
     ocrCommPlatformGasnet_t * commPlatformGasnet = (ocrCommPlatformGasnet_t*)
-        runtimeChunkAlloc(sizeof(ocrCommPlatformGasnet_t), NULL);
+    runtimeChunkAlloc(sizeof(ocrCommPlatformGasnet_t), PERSISTENT_CHUNK);
     commPlatformGasnet->base.location = ((paramListCommPlatformInst_t *)perInstance)->location;
     commPlatformGasnet->base.fcts = factory->platformFcts;
     factory->initialize(factory, (ocrCommPlatform_t *) commPlatformGasnet, perInstance);
@@ -526,7 +502,7 @@ ocrCommPlatform_t* newCommPlatformGasnet(ocrCommPlatformFactory_t *factory,
 /******************************************************/
 
 void destructCommPlatformFactoryGasnet(ocrCommPlatformFactory_t *factory) {
-    runtimeChunkFree((u64)factory, NULL);
+    runtimeChunkFree((u64)factory, NONPERSISTENT_CHUNK);
 }
 
 /*
@@ -539,11 +515,6 @@ void initializeCommPlatformGasnet(ocrCommPlatformFactory_t * factory, ocrCommPla
     gasnetComm->msgId = 1;
     gasnetComm->incoming = NULL;
     gasnetComm->incomingIt = NULL;
-    int i = 0;
-    while (i < (GASNET_COMM_RL_MAX+1)) {
-        gasnetComm->rl_completed[i++] = false;
-    }
-    gasnetComm->rl = GASNET_COMM_RL_MAX;
     gasnetComm->queueLock = 0;
 }
 
@@ -553,19 +524,15 @@ void initializeCommPlatformGasnet(ocrCommPlatformFactory_t * factory, ocrCommPla
 ocrCommPlatformFactory_t *newCommPlatformFactoryGasnet(ocrParamList_t *perType) {
 
     ocrCommPlatformFactory_t *base = (ocrCommPlatformFactory_t*)
-        runtimeChunkAlloc(sizeof(ocrCommPlatformFactoryGasnet_t), (void *)1);
+    runtimeChunkAlloc(sizeof(ocrCommPlatformFactoryGasnet_t), NONPERSISTENT_CHUNK);
 
     base->instantiate = &newCommPlatformGasnet;
     base->initialize = &initializeCommPlatformGasnet;
-
     base->destruct = FUNC_ADDR(void (*)(ocrCommPlatformFactory_t*), destructCommPlatformFactoryGasnet);
+
     base->platformFcts.destruct = FUNC_ADDR(void (*)(ocrCommPlatform_t*), GasnetCommDestruct);
-    base->platformFcts.begin = FUNC_ADDR(void (*)(ocrCommPlatform_t*, ocrPolicyDomain_t*,
-                                                  ocrCommApi_t*), GasnetCommBegin);
-    base->platformFcts.start = FUNC_ADDR(void (*)(ocrCommPlatform_t*,ocrPolicyDomain_t*,
-                                                  ocrCommApi_t*), GasnetCommStart);
-    base->platformFcts.stop = FUNC_ADDR(void (*)(ocrCommPlatform_t*), GasnetCommStop);
-    base->platformFcts.finish = FUNC_ADDR(void (*)(ocrCommPlatform_t*), GasnetCommFinish);
+    base->platformFcts.switchRunlevel = FUNC_ADDR(u8 (*)(ocrCommPlatform_t*, ocrPolicyDomain_t*, ocrRunlevel_t,
+                                                  phase_t, u32, void (*)(ocrPolicyDomain_t*,u64), u64), GasnetCommSwitchRunlevel);
     base->platformFcts.sendMessage = FUNC_ADDR(u8 (*)(ocrCommPlatform_t*,ocrLocation_t,
                                                ocrPolicyMsg_t*,u64*,u32,u32), GasnetCommSendMessage);
     base->platformFcts.pollMessage = FUNC_ADDR(u8 (*)(ocrCommPlatform_t*,ocrPolicyMsg_t**,u32,u32*),

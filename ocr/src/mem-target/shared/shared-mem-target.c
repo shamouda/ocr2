@@ -24,6 +24,7 @@
 #endif
 
 
+#define DEBUG_TYPE MEM_TARGET
 /******************************************************/
 /* OCR MEM TARGET SHARED IMPLEMENTATION               */
 /******************************************************/
@@ -38,47 +39,75 @@ void sharedDestruct(ocrMemTarget_t *self) {
     runtimeChunkFree((u64)self, NULL);
 }
 
-void sharedBegin(ocrMemTarget_t *self, ocrPolicyDomain_t * PD ) {
-    // Nothing to do here. In other implementations, this is
-    // when you update the range you can use using the sysboot functions
+u8 sharedSwitchRunlevel(ocrMemTarget_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
+                        phase_t phase, u32 properties, void (*callback)(ocrPolicyDomain_t*, u64), u64 val) {
+
+    u8 toReturn = 0;
+
+    // This is an inert module, we do not handle callbacks (caller needs to wait on us)
+    ASSERT(callback == NULL);
+
+    // Verify properties for this call
+    ASSERT((properties & RL_REQUEST) && !(properties & RL_RESPONSE)
+           && !(properties & RL_RELEASE));
+    ASSERT(!(properties & RL_FROM_MSG));
+
     ASSERT(self->memoryCount == 1);
-    self->memories[0]->fcts.begin(self->memories[0], PD);
-}
-
-void sharedStart(ocrMemTarget_t *self, ocrPolicyDomain_t * PD ) {
-    // Get a GUID
-    guidify(PD, (u64)self, &(self->fguid), OCR_GUID_MEMTARGET);
-    self->pd = PD;
-
+    if(properties & RL_BRING_UP) {
+        toReturn |= self->memories[0]->fcts.switchRunlevel(
+            self->memories[0], PD, runlevel, phase, properties, NULL, 0);
+    }
+    switch(runlevel) {
+    case RL_CONFIG_PARSE:
+        // On bring-up: Update PD->phasesPerRunlevel on phase 0
+        // and check compatibility on phase 1
+        break;
+    case RL_NETWORK_OK:
+        // Nothing
+        break;
+    case RL_PD_OK:
+        if(properties & RL_BRING_UP) {
+            // We can now set our PD (before this, we couldn't because
+            // "our" PD might not have been started
+            self->pd = PD;
+        }
+        break;
+    case RL_MEMORY_OK:
+        break;
+    case RL_GUID_OK:
+        break;
+    case RL_COMPUTE_OK:
+        if((properties & RL_BRING_UP) && RL_IS_FIRST_PHASE_UP(PD, RL_COMPUTE_OK, phase)) {
+            guidify(self->pd, (u64)self, &(self->fguid), OCR_GUID_MEMTARGET);
+            DPRINTF(DEBUG_LVL_VERB, "SharedStart PD=%p\n", self->pd);
 #ifdef OCR_ENABLE_STATISTICS
-    statsMEMTARGET_START(PD, self->fguid.guid, self->fguid.metaDataPtr);
+            statsMEMTARGET_START(PD, self->fguid.guid, self->fguid.metaDataPtr);
 #endif
-    ASSERT(self->memoryCount == 1);
-    self->memories[0]->fcts.start(self->memories[0], PD);
-}
-
-void sharedStop(ocrMemTarget_t *self) {
-    ASSERT(self->memoryCount == 1);
-    self->memories[0]->fcts.stop(self->memories[0]);
-
-    // Destroy the GUID
-    PD_MSG_STACK(msg);
-    getCurrentEnv(NULL, NULL, NULL, &msg);
-
+        } else if((properties & RL_TEAR_DOWN) && RL_IS_LAST_PHASE_DOWN(PD, RL_COMPUTE_OK, phase)) {
+            PD_MSG_STACK(msg);
 #define PD_MSG (&msg)
 #define PD_TYPE PD_MSG_GUID_DESTROY
-    msg.type = PD_MSG_GUID_DESTROY | PD_MSG_REQUEST;
-    PD_MSG_FIELD_I(guid) = self->fguid;
-    PD_MSG_FIELD_I(properties) = 0;
-    self->pd->fcts.processMessage(self->pd, &msg, false); // Probably shutting down
+            msg.type = PD_MSG_GUID_DESTROY | PD_MSG_REQUEST;
+            PD_MSG_FIELD_I(guid) = self->fguid;
+            PD_MSG_FIELD_I(properties) = 0;
+            toReturn |= self->pd->fcts.processMessage(
+                self->pd, &msg, false);
 #undef PD_MSG
 #undef PD_TYPE
-    self->fguid.guid = UNINITIALIZED_GUID;
-}
-
-void sharedFinish(ocrMemTarget_t *self) {
-    ASSERT(self->memoryCount == 1);
-    self->memories[0]->fcts.finish(self->memories[0]);
+            self->fguid.guid = NULL_GUID;
+        }
+        break;
+    case RL_USER_OK:
+        break;
+    default:
+        // Unknown runlevel
+        ASSERT(0);
+    }
+    if(properties & RL_TEAR_DOWN) {
+        toReturn |= self->memories[0]->fcts.switchRunlevel(
+            self->memories[0], PD, runlevel, phase, properties, NULL, 0);
+    }
+    return toReturn;
 }
 
 u8 sharedGetThrottle(ocrMemTarget_t *self, u64* value) {
@@ -139,15 +168,14 @@ static void destructMemTargetFactoryShared(ocrMemTargetFactory_t *factory) {
 
 ocrMemTargetFactory_t *newMemTargetFactoryShared(ocrParamList_t *perType) {
     ocrMemTargetFactory_t *base = (ocrMemTargetFactory_t*)
-                                  runtimeChunkAlloc(sizeof(ocrMemTargetFactoryShared_t), NONPERSISTENT_CHUNK);
+        runtimeChunkAlloc(sizeof(ocrMemTargetFactoryShared_t), NONPERSISTENT_CHUNK);
     base->instantiate = &newMemTargetShared;
     base->initialize = &initializeMemTargetShared;
     base->destruct = &destructMemTargetFactoryShared;
     base->targetFcts.destruct = FUNC_ADDR(void (*)(ocrMemTarget_t*), sharedDestruct);
-    base->targetFcts.begin = FUNC_ADDR(void (*)(ocrMemTarget_t*, ocrPolicyDomain_t*), sharedBegin);
-    base->targetFcts.start = FUNC_ADDR(void (*)(ocrMemTarget_t*, ocrPolicyDomain_t*), sharedStart);
-    base->targetFcts.stop = FUNC_ADDR(void (*)(ocrMemTarget_t*), sharedStop);
-    base->targetFcts.finish = FUNC_ADDR(void (*)(ocrMemTarget_t*), sharedFinish);
+    base->targetFcts.switchRunlevel = FUNC_ADDR(
+        u8 (*)(ocrMemTarget_t*, ocrPolicyDomain_t*, ocrRunlevel_t,
+               phase_t, u32, void (*)(ocrPolicyDomain_t*, u64), u64), sharedSwitchRunlevel);
     base->targetFcts.getThrottle = FUNC_ADDR(u8 (*)(ocrMemTarget_t*, u64*), sharedGetThrottle);
     base->targetFcts.setThrottle = FUNC_ADDR(u8 (*)(ocrMemTarget_t*, u64), sharedSetThrottle);
     base->targetFcts.getRange = FUNC_ADDR(void (*)(ocrMemTarget_t*, u64*, u64*), sharedGetRange);

@@ -27,25 +27,53 @@ void handlelessCommDestruct (ocrCommApi_t * base) {
     runtimeChunkFree((u64)base, NULL);
 }
 
-void handlelessCommBegin(ocrCommApi_t* commApi, ocrPolicyDomain_t * PD) {
-    commApi->pd = PD;
-    commApi->commPlatform->fcts.begin(commApi->commPlatform, PD, commApi);
-    return;
-}
+u8 handlelessCommSwitchRunlevel(ocrCommApi_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
+                                phase_t phase, u32 properties, void (*callback)(ocrPolicyDomain_t*, u64), u64 val) {
 
-void handlelessCommStart(ocrCommApi_t * commApi, ocrPolicyDomain_t * PD) {
-    commApi->commPlatform->fcts.start(commApi->commPlatform, PD, commApi);
-    return;
-}
+    u8 toReturn = 0;
 
-void handlelessCommStop(ocrCommApi_t * commApi) {
-    commApi->commPlatform->fcts.stop(commApi->commPlatform);
-    return;
-}
+    // This is an inert module, we do not handle callbacks (caller needs to wait on us)
+    ASSERT(callback == NULL);
 
-void handlelessCommFinish(ocrCommApi_t *commApi) {
-    commApi->commPlatform->fcts.finish(commApi->commPlatform);
-    return;
+    // Verify properties for this call
+    ASSERT((properties & RL_REQUEST) && !(properties & RL_RESPONSE)
+           && !(properties & RL_RELEASE));
+    ASSERT(!(properties & RL_FROM_MSG));
+
+    if(properties & RL_BRING_UP) {
+        toReturn |= self->commPlatform->fcts.switchRunlevel(self->commPlatform, PD, runlevel, phase,
+                                                            properties, NULL, 0);
+    }
+
+    switch(runlevel) {
+    case RL_CONFIG_PARSE:
+        // On bring-up: Update PD->phasesPerRunlevel on phase 0
+        // and check compatibility on phase 1
+        break;
+    case RL_NETWORK_OK:
+        break;
+    case RL_PD_OK:
+        if(properties & RL_BRING_UP)
+            self->pd = PD;
+        break;
+    case RL_MEMORY_OK:
+        break;
+    case RL_GUID_OK:
+        break;
+    case RL_COMPUTE_OK:
+        break;
+    case RL_USER_OK:
+        break;
+    default:
+        // Unknown runlevel
+        ASSERT(0);
+    }
+
+    if(properties & RL_TEAR_DOWN) {
+        toReturn |= self->commPlatform->fcts.switchRunlevel(self->commPlatform, PD, runlevel, phase,
+                                                            properties, NULL, 0);
+    }
+    return toReturn;
 }
 
 u8 handlelessCommSendMessage(ocrCommApi_t *self, ocrLocation_t target, ocrPolicyMsg_t *message,
@@ -179,12 +207,8 @@ ocrCommApiFactory_t *newCommApiFactoryHandleless(ocrParamList_t *perType) {
     base->initialize = initializeCommApiHandleless;
     base->destruct = destructCommApiFactoryHandleless;
     base->apiFcts.destruct = FUNC_ADDR(void (*)(ocrCommApi_t*), handlelessCommDestruct);
-    base->apiFcts.begin = FUNC_ADDR(void (*)(ocrCommApi_t*, ocrPolicyDomain_t*),
-                                    handlelessCommBegin);
-    base->apiFcts.start = FUNC_ADDR(void (*)(ocrCommApi_t*, ocrPolicyDomain_t*),
-                                    handlelessCommStart);
-    base->apiFcts.stop = FUNC_ADDR(void (*)(ocrCommApi_t*), handlelessCommStop);
-    base->apiFcts.finish = FUNC_ADDR(void (*)(ocrCommApi_t*), handlelessCommFinish);
+    base->apiFcts.switchRunlevel = FUNC_ADDR(u8 (*)(ocrCommApi_t*, ocrPolicyDomain_t*, ocrRunlevel_t,
+                                                    phase_t, u32, void (*)(ocrPolicyDomain_t*, u64), u64), handlelessCommSwitchRunlevel);
     base->apiFcts.sendMessage = FUNC_ADDR(u8 (*)(ocrCommApi_t*, ocrLocation_t, ocrPolicyMsg_t *, ocrMsgHandle_t**, u32),
                                           handlelessCommSendMessage);
     base->apiFcts.pollMessage = FUNC_ADDR(u8 (*)(ocrCommApi_t*, ocrMsgHandle_t**),

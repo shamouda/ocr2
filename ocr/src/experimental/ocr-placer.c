@@ -116,7 +116,7 @@ ocrPlacer_t * createLocationPlacer(ocrPolicyDomain_t *pd) {
 }
 
 void destroyLocationPlacer(ocrPolicyDomain_t *pd) {
-    ocrLocationPlacer_t *placer = pd->placer;
+    ocrLocationPlacer_t *placer = (ocrLocationPlacer_t*)(pd->placer);
     u64 i=0;
     PD_MSG_STACK(msg);
     getCurrentEnv(NULL, NULL, NULL, &msg);

@@ -28,10 +28,7 @@ void xeSchedulerBegin(ocrScheduler_t * self, ocrPolicyDomain_t * PD) {
 void xeSchedulerStart(ocrScheduler_t * self, ocrPolicyDomain_t * PD) {
 }
 
-void xeSchedulerStop(ocrScheduler_t * self) {
-}
-
-void xeSchedulerFinish(ocrScheduler_t *self) {
+void xeSchedulerStop(ocrScheduler_t * self, ocrRunLevel_t newRl, u32 action) {
 }
 
 u8 xeSchedulerTake(ocrScheduler_t *self, u32 *count, ocrFatGuid_t *edts) {
@@ -76,7 +73,6 @@ ocrSchedulerFactory_t * newOcrSchedulerFactoryXe(ocrParamList_t *perType) {
     base->schedulerFcts.begin = FUNC_ADDR(void (*)(ocrScheduler_t*, ocrPolicyDomain_t*), xeSchedulerBegin);
     base->schedulerFcts.start = FUNC_ADDR(void (*)(ocrScheduler_t*, ocrPolicyDomain_t*), xeSchedulerStart);
     base->schedulerFcts.stop = FUNC_ADDR(void (*)(ocrScheduler_t*), xeSchedulerStop);
-    base->schedulerFcts.finish = FUNC_ADDR(void (*)(ocrScheduler_t*), xeSchedulerFinish);
     base->schedulerFcts.destruct = FUNC_ADDR(void (*)(ocrScheduler_t*), xeSchedulerDestruct);
     base->schedulerFcts.takeEdt = FUNC_ADDR(u8 (*)(ocrScheduler_t*, u32*, ocrFatGuid_t*), xeSchedulerTake);
     base->schedulerFcts.giveEdt = FUNC_ADDR(u8 (*)(ocrScheduler_t*, u32*, ocrFatGuid_t*), xeSchedulerGive);

@@ -22,15 +22,11 @@ typedef struct {
     ocrCommPlatformFactory_t base;
 } ocrCommPlatformFactoryGasnet_t;
 
-#define GASNET_COMM_RL_MAX 3
-
 typedef struct {
     ocrCommPlatform_t base;
     u64 msgId;
     linkedlist_t * incoming;
     iterator_t * incomingIt;
-    volatile int rl;
-    volatile int rl_completed [GASNET_COMM_RL_MAX+1];
     u32 queueLock;
 } ocrCommPlatformGasnet_t;
 

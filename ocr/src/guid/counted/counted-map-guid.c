@@ -12,9 +12,11 @@
 #include "ocr-policy-domain.h"
 #include "ocr-sysboot.h"
 
+#define DEBUG_TYPE GUID
+
 // Default hashtable's number of buckets
 //PERF: This parameter heavily impacts the GUID provider scalability !
-#define DEFAULT_NB_BUCKETS 1000
+#define DEFAULT_NB_BUCKETS 10000
 
 // Guid is composed of : (LOCID KIND COUNTER)
 #define GUID_BIT_SIZE 64
@@ -35,28 +37,84 @@
 // GUID 'id' counter, atomically incr when a new GUID is requested
 static u64 guidCounter = 0;
 
+#ifdef COUNTED_MAP_DESTRUCT_CHECK
+// Fwd declaration
+static ocrGuidKind getKindFromGuid(ocrGuid_t guid);
+
+void countedMapHashmapEntryDestructChecker(void * key, void * value) {
+    ocrGuid_t guid = (ocrGuid_t) key;
+    DPRINTF(DEBUG_LVL_WARN, "Remnant GUID 0x%x of kind %d still registered on GUID provider\n", guid, getKindFromGuid(guid));
+}
+#endif
+
+u8 countedMapSwitchRunlevel(ocrGuidProvider_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
+                      phase_t phase, u32 properties, void (*callback)(ocrPolicyDomain_t*, u64), u64 val) {
+
+    u8 toReturn = 0;
+
+    // This is an inert module, we do not handle callbacks (caller needs to wait on us)
+    ASSERT(callback == NULL);
+
+    // Verify properties for this call
+    ASSERT((properties & RL_REQUEST) && !(properties & RL_RESPONSE)
+           && !(properties & RL_RELEASE));
+    ASSERT(!(properties & RL_FROM_MSG));
+
+    switch(runlevel) {
+    case RL_CONFIG_PARSE:
+        // On bring-up: Update PD->phasesPerRunlevel on phase 0
+        // and check compatibility on phase 1
+        break;
+    case RL_NETWORK_OK:
+        // Nothing
+        break;
+    case RL_PD_OK:
+        if ((properties & RL_BRING_UP) && RL_IS_FIRST_PHASE_UP(self->pd, RL_PD_OK, phase)) {
+            self->pd = PD;
+        }
+        break;
+    case RL_MEMORY_OK:
+        // Nothing to do
+        if ((properties & RL_TEAR_DOWN) && RL_IS_FIRST_PHASE_DOWN(PD, RL_GUID_OK, phase)) {
+            // What could the map contain at that point ?
+            // - Non-freed OCR objects from the user program.
+            // - GUIDs internally used by the runtime (module's guids)
+            // Since this is below GUID_OK, nobody should have access to those GUIDs
+            // anymore and we could dispose of them safely.
+            // Note: - Do we want (and can we) destroy user objects ? i.e. need to
+            //       call their specific destructors which may not work in MEM_OK ?
+            //       - If there are any runtime GUID not deallocated then they should
+            //       be considered as leaking memory.
+#ifdef COUNTED_MAP_DESTRUCT_CHECK
+            deallocFct entryDeallocator = countedMapHashmapEntryDestructChecker;
+#else
+            deallocFct entryDeallocator = NULL;
+#endif
+            destructHashtable(((ocrGuidProviderCountedMap_t *) self)->guidImplTable, entryDeallocator);
+        }
+        break;
+    case RL_GUID_OK:
+        ASSERT(self->pd == PD);
+        if((properties & RL_BRING_UP) && RL_IS_LAST_PHASE_UP(PD, RL_GUID_OK, phase)) {
+            //Initialize the map now that we have an assigned policy domain
+            ocrGuidProviderCountedMap_t * derived = (ocrGuidProviderCountedMap_t *) self;
+            derived->guidImplTable = newHashtableBucketLockedModulo(PD, DEFAULT_NB_BUCKETS);
+        }
+        break;
+    case RL_COMPUTE_OK:
+        // We can allocate our map here because the memory is up
+        break;
+    case RL_USER_OK:
+        break;
+    default:
+        // Unknown runlevel
+        ASSERT(0);
+    }
+    return toReturn;
+}
+
 void countedMapDestruct(ocrGuidProvider_t* self) {
-    //destructHashtable(((ocrGuidProviderCountedMap_t *) self)->guidImplTable);
     runtimeChunkFree((u64)self, NULL);
-}
-
-void countedMapBegin(ocrGuidProvider_t *self, ocrPolicyDomain_t *pd) {
-    // Nothing to do
-}
-
-void countedMapStart(ocrGuidProvider_t *self, ocrPolicyDomain_t *pd) {
-    self->pd = pd;
-    //Initialize the map now that we have an assigned policy domain
-    ocrGuidProviderCountedMap_t * derived = (ocrGuidProviderCountedMap_t *) self;
-    derived->guidImplTable = newHashtableBucketLockedModulo(pd, DEFAULT_NB_BUCKETS);
-}
-
-void countedMapStop(ocrGuidProvider_t *self) {
-    // Nothing to do
-}
-
-void countedMapFinish(ocrGuidProvider_t *self) {
-    // Nothing to do
 }
 
 /**
@@ -233,18 +291,17 @@ ocrGuidProviderFactory_t *newGuidProviderFactoryCountedMap(ocrParamList_t *typeA
     base->instantiate = &newGuidProviderCountedMap;
     base->destruct = &destructGuidProviderFactoryCountedMap;
     base->factoryId = factoryId;
+
     base->providerFcts.destruct = &countedMapDestruct;
-    base->providerFcts.begin = &countedMapBegin;
-    base->providerFcts.start = &countedMapStart;
-    base->providerFcts.stop = &countedMapStop;
-    base->providerFcts.finish = &countedMapFinish;
-    base->providerFcts.getGuid = &countedMapGetGuid;
-    base->providerFcts.createGuid = &countedMapCreateGuid;
-    base->providerFcts.getVal = &countedMapGetVal;
-    base->providerFcts.getKind = &countedMapGetKind;
+    base->providerFcts.switchRunlevel = FUNC_ADDR(u8 (*)(ocrGuidProvider_t*, ocrPolicyDomain_t*, ocrRunlevel_t,
+                                                         phase_t, u32, void (*)(ocrPolicyDomain_t*, u64), u64), countedMapSwitchRunlevel);
+    base->providerFcts.getGuid = FUNC_ADDR(u8 (*)(ocrGuidProvider_t*, ocrGuid_t*, u64, ocrGuidKind), countedMapGetGuid);
+    base->providerFcts.createGuid = FUNC_ADDR(u8 (*)(ocrGuidProvider_t*, ocrFatGuid_t*, u64, ocrGuidKind), countedMapCreateGuid);
+    base->providerFcts.getVal = FUNC_ADDR(u8 (*)(ocrGuidProvider_t*, ocrGuid_t, u64*, ocrGuidKind*), countedMapGetVal);
+    base->providerFcts.getKind = FUNC_ADDR(u8 (*)(ocrGuidProvider_t*, ocrGuid_t, ocrGuidKind*), countedMapGetKind);
     base->providerFcts.getLocation = FUNC_ADDR(u8 (*)(ocrGuidProvider_t*, ocrGuid_t, ocrLocation_t*), countedMapGetLocation);
     base->providerFcts.registerGuid = FUNC_ADDR(u8 (*)(ocrGuidProvider_t*, ocrGuid_t, u64), countedMapRegisterGuid);
-    base->providerFcts.releaseGuid = &countedMapReleaseGuid;
+    base->providerFcts.releaseGuid =  FUNC_ADDR(u8 (*)(ocrGuidProvider_t*, ocrFatGuid_t, bool), countedMapReleaseGuid);
     return base;
 }
 

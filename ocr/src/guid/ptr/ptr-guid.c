@@ -33,20 +33,48 @@ void ptrDestruct(ocrGuidProvider_t* self) {
     runtimeChunkFree((u64)self, NULL);
 }
 
-void ptrBegin(ocrGuidProvider_t *self, ocrPolicyDomain_t *pd) {
-}
 
-void ptrStart(ocrGuidProvider_t *self, ocrPolicyDomain_t *pd) {
-    self->pd = pd;
-}
+u8 ptrSwitchRunlevel(ocrGuidProvider_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
+                     phase_t phase, u32 properties, void (*callback)(ocrPolicyDomain_t*, u64), u64 val) {
 
-void ptrStop(ocrGuidProvider_t *self) {
-}
+    u8 toReturn = 0;
 
-void ptrFinish(ocrGuidProvider_t *self) {
+    // This is an inert module, we do not handle callbacks (caller needs to wait on us)
+    ASSERT(callback == NULL);
+
+    // Verify properties for this call
+    ASSERT((properties & RL_REQUEST) && !(properties & RL_RESPONSE)
+           && !(properties & RL_RELEASE));
+    ASSERT(!(properties & RL_FROM_MSG));
+
+    switch(runlevel) {
+    case RL_CONFIG_PARSE:
+        // On bring-up: Update PD->phasesPerRunlevel on phase 0
+        // and check compatibility on phase 1
+        break;
+    case RL_NETWORK_OK:
+        break;
+    case RL_PD_OK:
+        if(properties & RL_BRING_UP)
+            self->pd = PD;
+        break;
+    case RL_MEMORY_OK:
+        break;
+    case RL_GUID_OK:
+        break;
+    case RL_COMPUTE_OK:
+        break;
+    case RL_USER_OK:
+        break;
+    default:
+        // Unknown runlevel
+        ASSERT(0);
+    }
+    return toReturn;
 }
 
 u8 ptrGetGuid(ocrGuidProvider_t* self, ocrGuid_t* guid, u64 val, ocrGuidKind kind) {
+    ocrGuidImpl_t *guidInst = NULL;
     PD_MSG_STACK(msg);
     ocrTask_t *task = NULL;
     ocrPolicyDomain_t *policy = NULL; /* should be self->pd. There is an issue with TG-x86 though... */
@@ -60,10 +88,11 @@ u8 ptrGetGuid(ocrGuidProvider_t* self, ocrGuid_t* guid, u64 val, ocrGuidKind kin
 
     RESULT_PROPAGATE(policy->fcts.processMessage (policy, &msg, true));
 
-    ocrGuidImpl_t * guidInst = (ocrGuidImpl_t *)PD_MSG_FIELD_O(ptr);
+    guidInst = (ocrGuidImpl_t *)PD_MSG_FIELD_O(ptr);
+
     guidInst->guid = (ocrGuid_t)val;
     guidInst->kind = kind;
-    guidInst->location = policy->myLocation;
+    guidInst->location = self->pd->myLocation;
     *guid = (ocrGuid_t) guidInst;
 #undef PD_MSG
 #undef PD_TYPE
@@ -71,6 +100,8 @@ u8 ptrGetGuid(ocrGuidProvider_t* self, ocrGuid_t* guid, u64 val, ocrGuidKind kin
 }
 
 u8 ptrCreateGuid(ocrGuidProvider_t* self, ocrFatGuid_t *fguid, u64 size, ocrGuidKind kind) {
+    // Here we only the creation of GUIDs after the memory is up
+    // We can modify this if needed but it should not be needed
     PD_MSG_STACK(msg);
     ocrTask_t *task = NULL;
     ocrPolicyDomain_t *policy = NULL;
@@ -150,6 +181,7 @@ u8 ptrReleaseGuid(ocrGuidProvider_t *self, ocrFatGuid_t guid, bool releaseVal) {
     RESULT_PROPAGATE(policy->fcts.processMessage (policy, &msg, true));
 #undef PD_MSG
 #undef PD_TYPE
+
     return 0;
 }
 
@@ -179,10 +211,8 @@ ocrGuidProviderFactory_t *newGuidProviderFactoryPtr(ocrParamList_t *typeArg, u32
     base->destruct = &destructGuidProviderFactoryPtr;
     base->factoryId = factoryId;
     base->providerFcts.destruct = FUNC_ADDR(void (*)(ocrGuidProvider_t*), ptrDestruct);
-    base->providerFcts.begin = FUNC_ADDR(void (*)(ocrGuidProvider_t*, ocrPolicyDomain_t*), ptrBegin);
-    base->providerFcts.start = FUNC_ADDR(void (*)(ocrGuidProvider_t*, ocrPolicyDomain_t*), ptrStart);
-    base->providerFcts.stop = FUNC_ADDR(void (*)(ocrGuidProvider_t*), ptrStop);
-    base->providerFcts.finish = FUNC_ADDR(void (*)(ocrGuidProvider_t*), ptrFinish);
+    base->providerFcts.switchRunlevel = FUNC_ADDR(u8 (*)(ocrGuidProvider_t*, ocrPolicyDomain_t*, ocrRunlevel_t,
+                                                         phase_t, u32, void (*)(ocrPolicyDomain_t*, u64), u64), ptrSwitchRunlevel);
     base->providerFcts.getGuid = FUNC_ADDR(u8 (*)(ocrGuidProvider_t*, ocrGuid_t*, u64, ocrGuidKind), ptrGetGuid);
     base->providerFcts.createGuid = FUNC_ADDR(u8 (*)(ocrGuidProvider_t*, ocrFatGuid_t*, u64, ocrGuidKind), ptrCreateGuid);
     base->providerFcts.getVal = FUNC_ADDR(u8 (*)(ocrGuidProvider_t*, ocrGuid_t, u64*, ocrGuidKind*), ptrGetVal);

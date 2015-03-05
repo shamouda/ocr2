@@ -55,16 +55,33 @@ u8 sendMessageSimpleCommApi(ocrCommApi_t *self, ocrLocation_t target, ocrPolicyM
                         ocrMsgHandle_t **handle, u32 properties) {
     ocrCommApiSimple_t * commApiSimple = (ocrCommApiSimple_t *) self;
 
+    // Debug and check if we should push this in the in/out patch or runlevel
     if (!(properties & PERSIST_MSG_PROP)) {
+        //NOTE: In a delegation based implementation, all messages issued by comp-workers
+        //are already persistant because of the asynchrony delegation allows. The comm-worker
+        //may occasionally invoke send for its own messages. In that case persist is not set.
         u64 baseSize = 0, marshalledSize = 0;
-        ocrPolicyMsgGetMsgSize(message, &baseSize, &marshalledSize, 0);
-        u64 fullSize = baseSize + marshalledSize;
-        ocrPolicyMsg_t * msgCpy = allocateNewMessage(self, fullSize);
-        ocrPolicyMsgMarshallMsg(message, baseSize, (u8*)msgCpy, MARSHALL_DUPLICATE);
+        // TODO Do we marshall ptr here or do we wait for the comm-platform to decide what to do ?
+        // Currently avoids an extra copy because we know simple-comm fwd to mpi-comm
+        ocrPolicyMsgGetMsgSize(message, &baseSize, &marshalledSize, MARSHALL_DBPTR | MARSHALL_NSADDR);
+        u64 fullMsgSize = baseSize + marshalledSize;
+        ocrPolicyMsg_t * msgCpy = allocateNewMessage(self, fullMsgSize);
+        ocrPolicyMsgMarshallMsg(message, baseSize, (u8*)msgCpy,
+                                MARSHALL_FULL_COPY | MARSHALL_DBPTR | MARSHALL_NSADDR);
         message = msgCpy;
         properties |= PERSIST_MSG_PROP;
-        ASSERT(false && "debug tmp");
     }
+    // This is the old code
+    // if (!(properties & PERSIST_MSG_PROP)) {
+    //     u64 baseSize = 0, marshalledSize = 0;
+    //     ocrPolicyMsgGetMsgSize(message, &baseSize, &marshalledSize, 0);
+    //     u64 fullSize = baseSize + marshalledSize;
+    //     ocrPolicyMsg_t * msgCpy = allocateNewMessage(self, fullSize);
+    //     ocrPolicyMsgMarshallMsg(message, baseSize, (u8*)msgCpy, MARSHALL_DUPLICATE);
+    //     message = msgCpy;
+    //     properties |= PERSIST_MSG_PROP;
+    //     ASSERT(false && "debug tmp");
+    // }
 
     // This is weird but otherwise the compiler complains...
     u64 id = 0;
@@ -154,23 +171,67 @@ void simpleCommApiDestruct (ocrCommApi_t * base) {
     runtimeChunkFree((u64)base, NULL);
 }
 
-void simpleCommApiBegin(ocrCommApi_t* self, ocrPolicyDomain_t * pd) {
-    self->pd = pd;
-    self->commPlatform->fcts.begin(self->commPlatform, pd, self);
-}
+u8 simpleCommApiSwitchRunlevel(ocrCommApi_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
+                        phase_t phase, u32 properties, void (*callback)(ocrPolicyDomain_t*, u64), u64 val) {
 
-void simpleCommApiStart(ocrCommApi_t * self, ocrPolicyDomain_t * pd) {
-    ocrCommApiSimple_t * commApiSimple = (ocrCommApiSimple_t *) self;
-    commApiSimple->handleMap = newHashtableModulo(pd, HANDLE_MAP_BUCKETS);
-    self->commPlatform->fcts.start(self->commPlatform, pd, self);
-}
+    u8 toReturn = 0;
 
-void simpleCommApiStop(ocrCommApi_t * self) {
-    self->commPlatform->fcts.stop(self->commPlatform);
-}
+    // This is an inert module, we do not handle callbacks (caller needs to wait on us)
+    ASSERT(callback == NULL);
 
-void simpleCommApiFinish(ocrCommApi_t *self) {
-    self->commPlatform->fcts.finish(self->commPlatform);
+    // Verify properties for this call
+    ASSERT((properties & RL_REQUEST) && !(properties & RL_RESPONSE)
+           && !(properties & RL_RELEASE));
+    ASSERT(!(properties & RL_FROM_MSG));
+
+    if(properties & RL_BRING_UP) {
+        toReturn |= self->commPlatform->fcts.switchRunlevel(
+            self->commPlatform, PD, runlevel, phase, properties, NULL, 0);
+    }
+
+    switch(runlevel) {
+    case RL_CONFIG_PARSE:
+        // On bring-up: Update PD->phasesPerRunlevel on phase 0
+        // and check compatibility on phase 1
+        break;
+    case RL_NETWORK_OK:
+        break;
+    case RL_PD_OK:
+        if(properties & RL_BRING_UP) {
+            // We can now set our PD (before this, we couldn't because
+            // "our" PD might not have been started
+            self->pd = PD;
+        }
+        break;
+    case RL_MEMORY_OK:
+        break;
+    case RL_GUID_OK:
+        // We can allocate our map here because the memory is up
+        if((properties & RL_BRING_UP) && RL_IS_FIRST_PHASE_UP(PD, RL_GUID_OK, phase)) {
+            ocrCommApiSimple_t * commApiSimple = (ocrCommApiSimple_t *) self;
+            commApiSimple->handleMap = newHashtableModulo(self->pd, HANDLE_MAP_BUCKETS);
+        }
+        if ((properties & RL_TEAR_DOWN) && RL_IS_LAST_PHASE_DOWN(PD, RL_GUID_OK, phase)) {
+            //TODO would like to make sure this is empty, otherwise it probably
+            //means there are pending communication so we shouldn't be in tear down.
+            ocrCommApiSimple_t * commApiSimple = (ocrCommApiSimple_t *) self;
+            destructHashtable(commApiSimple->handleMap, NULL);
+        }
+        break;
+    case RL_COMPUTE_OK:
+        break;
+    case RL_USER_OK:
+        break;
+    default:
+        // Unknown runlevel
+        ASSERT(0);
+    }
+
+    if(properties & RL_TEAR_DOWN) {
+        toReturn |= self->commPlatform->fcts.switchRunlevel(
+            self->commPlatform, PD, runlevel, phase, properties, NULL, 0);
+    }
+    return toReturn;
 }
 
 ocrCommApi_t* newCommApiSimple(ocrCommApiFactory_t *factory,
@@ -191,7 +252,7 @@ void initializeCommApiSimple(ocrCommApiFactory_t * factory, ocrCommApi_t* self, 
 }
 
 /******************************************************/
-/* OCR COMM API Simple                                    */
+/* OCR COMM API Simple                                */
 /******************************************************/
 
 void destructCommApiFactorySimple(ocrCommApiFactory_t *factory) {
@@ -207,12 +268,8 @@ ocrCommApiFactory_t *newCommApiFactorySimple(ocrParamList_t *perType) {
     base->destruct = destructCommApiFactorySimple;
 
     base->apiFcts.destruct = FUNC_ADDR(void (*)(ocrCommApi_t*), simpleCommApiDestruct);
-    base->apiFcts.begin = FUNC_ADDR(void (*)(ocrCommApi_t*, ocrPolicyDomain_t*),
-                                    simpleCommApiBegin);
-    base->apiFcts.start = FUNC_ADDR(void (*)(ocrCommApi_t*, ocrPolicyDomain_t*),
-                                    simpleCommApiStart);
-    base->apiFcts.stop = FUNC_ADDR(void (*)(ocrCommApi_t*), simpleCommApiStop);
-    base->apiFcts.finish = FUNC_ADDR(void (*)(ocrCommApi_t*), simpleCommApiFinish);
+    base->apiFcts.switchRunlevel = FUNC_ADDR(u8 (*)(ocrCommApi_t*, ocrPolicyDomain_t*, ocrRunlevel_t,
+                                                      phase_t, u32, void (*)(ocrPolicyDomain_t*, u64), u64), simpleCommApiSwitchRunlevel);
     base->apiFcts.sendMessage = FUNC_ADDR(u8 (*)(ocrCommApi_t*, ocrLocation_t, ocrPolicyMsg_t *, ocrMsgHandle_t**, u32),
                                           sendMessageSimpleCommApi);
     base->apiFcts.pollMessage = FUNC_ADDR(u8 (*)(ocrCommApi_t*, ocrMsgHandle_t**),
