@@ -61,79 +61,172 @@ OCR_MAX_MULTI_SLOT
 * Compile and Run Micro-benchmarks
 ************************************
 
-** Single Micro-benchmark invocation
 
-Makefile.ocr provides an easy way to both compile and run a micro-benchmark
+**
+** make-based single micro-benchmark invocation
+**
 
-- Compile and run:
+Makefile provides an easy way to both compile and run a micro-benchmark
 
-    make -f Makefile.ocr PROG=ocr/edtExecuteLatchSync
+- Compile an OCR benchmark named 'myBench':
 
+    make benchmark build/myBench PROG=ocr/myBench.c
+
+- Run an OCR benchmark named 'myBench':
+
+    make run build/myBench
 
 - Compile and run specifying an OCR configuration file:
 
-    make -f Makefile.ocr PROG=ocr/edtExecuteLatchSync OCR_CONFIG=$PWD/../../machine-configs/x86-pthread-x86/mach-hc-1w.cfg
+    make run OCR_CONFIG=/path/to/cfgfile build/myBench
 
-- Parameterized runs:
+Micro-benchmark can be customized through compile time definitions. The default values
+for micro-benchmarks parameters are defined in the 'defaults.mk' file. These definitions
+apply indistinctively to any micro-benchmark. However, since the benchmarks can be very
+different in nature the default value can be overriden.
 
-All tests should declare a number of macros to parameter a default run (nb iterations, data set size etc...)
-Those should be defined only if the compile time constant 'CUSTOM_BOUNDS' is not defined and they are
-the default parameters of the test.
+- Make command default parameter override
 
-One can customize the default parameters by providing them directly
-as an environment variable:
+In this example, the compile time definition 'NB_INSTANCES' originally defined in the
+'defaults.mk' file is set to 100 for the 'myBench' micro-benchmark from the command line.
 
-    CUSTOM_BOUNDS="-DCUSTOM_BOUNDS -DNB_ITERS=500" make -f Makefile.ocr PROG=ocr/benchName
+    NB_INSTANCES=100 make benchmark build/myBench PROG=ocr/myBench.c
 
-** Perform sweep run for a Micro-benchmark
 
-*** Sweep configuration files
+**
+** Driver-based micro-benchmark invocation
+**
 
-Sweep configuration files allows to specify multiple compile time parameters for micro-benchmarks
+The micro-benchmark performance driver under 'scripts/perfDriver.sh' allows to compile and run
+one, several or all micro-benchmarks.
 
-The format is to set one configuration per line for a sweep driver to execute.
+The main interest of the driver is that it can be used to automate various scaling experiments
+and takes care of compiling, running, collecting, aggregating and outputing metrics in a digest
+format.
 
-For a given program, a sweep configuration file can be placed under the 'configSweep/' folder.
-The name must match the program name and have a '.sweep' extension. i.e. A program named
-myProgName, could have a sweep configuration file named configSweep/myProgName.sweep
+The following environment variables can be customized:
 
-*** Sweep Driver
+NB_RUN                  Specifies how many times the benchmark should be ran
+CORE_SCALING            String-list of number of cores to use for scaling experiment ex: "1 2 4 8"
+OCR_CONFIG_BASE         The 'base' configuration file to use when doing core scaling
 
-The sweep driver relies on the Makefile.ocr facility to compile and run
-micro-benchmarks against a sweep configuration file.
+LOGDIR                  Specify the log folder to output to
+RUNLOG_FILENAME_BASE    Base name for run log files (ex: myrunlog)
+REPORT_FILENAME_BASE    Base name for report files  (ex: myreport)
 
-The driver loads a sweep configuration file and invokes Makefile.ocr for
-each line extracted from the file setting up the 'CUSTOM_BOUNDS' environment
-variable to customize the micro-benchmark compilation and run.
+Limitation regarding 'OCR_CONFIG_BASE': Currently the user must make sure the 'OCR_CONFIG_BASE'
+name contains the string '1w' and that for each core scaling value 'c' there is an OCR cfg file
+that is named after 'OCR_CONFIG_BASE' where '1w' is 'cw'.
 
-- Sweep driver invocation:
+- Display help
 
-    ./scalingOcrDriver.sh edtExecuteLatchSync
+    ./perfDriver.sh -help
 
-If the environment variable 'CUSTOM_BOUNDS' is defined, its value is used to
-parameter the micro-benchmark run (i.e. no sweeping). If the variable is not
-defined, the driver looks for a sweep configuration file under 'configSweep/'
-matching the name of the invoked micro-benchmark. If none is found the driver
-tries to load the 'default.sweep' file (some micro-benchmarks may not work with
-a default parameter file). Alternatively a user can specify a sweep configuration
-file from the driver command line
+- Invoke a benchmark with default values:
 
-- Sweep driver invocation with custom sweep file:
+    ./perfDriver.sh myBench
 
-    ./scalingOcrDriver.sh edtExecuteLatchSync ./configSweep/myfile.sweep
+Compile the 'myBench' benchmark with default values from 'defaults.mk'. The driver performs
+a core scaling experiment according to the values from the CORE_SCALING environment variables.
+Each core scaling experiment is ran 'NB_RUN' times. The driver logs all the runs and outputs
+a report containing for each 'core' value the average of the metric, its standard deviation
+and speed-up compared to the first 'core' value.
 
-** Workers Scalability Driver
+** Scaling report example:
 
-The worker scalability driver allows to vary the number of workers used by
-OCR for each micro-benchmark invocation. It is essentially doing what the
-sweep driver does but it does it once for each number of workers.
+    1   1148805.904  9547.354    1.000
+    2   2076150.192  10542.415   1.807
+    4   3761222.550  8262.419    3.274
 
-The 'WORKER_SCALING' environment variable can be set to specify a space-separated
-list of the number of workers to use for the scaling experiment.
+Limitation: Currently the driver only support reporting the 'throughput' metric the
+micro-benchmarks are outtputing.
 
-- Invocation example:
+- Invoke multiple benchmark with default values:
 
-    ./scalingOcrWorkerDriver.sh edtExecuteLatchSync
+    ./perfDriver.sh myBench myOtherBench
+
+Does exactly the same as the previous example but for each benchmark.
+
+
+** Micro-benchmark parameterization
+
+The driver supports three main modes of operation. When invoked without any options the driver
+compiles and run all micro-benchmarks with default values from the 'defaults.mk' file. When used
+with the 'defaultfile' option, each test is ran with its own customized values. Lastly, the sweep
+option allows to perform a multitude of customized runs for a benchmark.
+
+- Sweeping experiments:
+
+-- The 'sweepfile' options
+
+A sweeping experiment varies values of definitions. The definitions are stored
+in a 'sweep' file where each line declares a set of definitions.
+
+Example:
+
+A sweep file defining two definition sets:
+
+    NB_INSTANCES=100
+    NB_INSTANCES=200
+
+The driver is invoked with the 'sweepfile' option as follow:
+
+    ./scripts/perfDriver.sh -sweepfile mydefs.sweep myBench myOtherBench
+
+The '-sweepfile' option causes the driver to load the 'mydefs.sweep' file
+and for each benchmark and each definition line, compile and run the benchmark
+
+
+-- The 'sweep' options
+
+The sweep option let the driver lookup under the 'configSweep/' folder for a '.sweep'
+file named after a micro-benchmark name,
+
+For instance, the 'myBench' benchmark may ahve a sweep file named 'myBench.sweep'.
+
+The driver can then be invoked with the sweep option as follow:
+
+    ./scripts/perfDriver.sh -sweep myBench
+
+The '-sweep' option causes the driver to look try and locate the 'configSweep/myBench.sweep'
+and if found compile and run the benchmark for each definition line.
+
+
+-- The 'defaultfile' options
+
+A "default file" is a text file containing one line per benchmark that specifies a set of
+definition values. Each line begins with the name of the micro-benchmark followed by a s
+equence of definition.
+
+Example:
+
+myBench NB_INSTANCES=100
+myOtherBench NB_INSTANCES=200 NB_ITER=2000
+
+The main advantage of a default file is to allow users to specify different values of a same
+definition but for different tests only. This is useful for instance to "calibrate" the granularity
+of each individual micro-benchmark for a specific machine.
+
+
+** Defines Resolution order
+
+The driver performs a benchmark's defines resolution in the following order:
+
+    sweep => sweepfile => defaultfile => defaults.mk
+
+The order in which options are passed does NOT matter !
+
+Example 1:
+
+    ./scripts/perfDriver.sh -sweepfile mysweep -sweep myBench
+
+The driver first looks up for a sweep file 'configSweep/myBench.sweep'. If it is not found it uses the sweep file from the 'sweepfile' option
+
+Example 2:
+
+    ./scripts/perfDriver.sh -defaultfile foobar.default myBench
+
+The driver looks up for a 'myBench' entry in the default defines file. If none is found defines from 'defaults.mk' are used.
 
 
 ******************************
@@ -142,21 +235,37 @@ list of the number of workers to use for the scaling experiment.
 
 ** Generating worker scaling throughput-based plots
 
-For micro-benchmarks that prints throughput and are ran through
-the worker scaling driver, the 'plotWorkerThroughput.sh' script
-can be used to generate a plot.
+The performance driver outputs scaling reports that can be
+further processed for automated plotting through gnuplot
 
-The plotting script relies on the 'SCRIPT_ROOT' environment variable
-to be defined and point to the 'performance-tests/scripts' folder.
+Three plotting scripts are available under the'scripts/' folder:
 
-To generate a plot, just provide the log piped to a file from the worker
-scaling run as input to the script.
+1- plotCoreScalingSingleRun.sh
+
+    Allows to plot a single scaling report
+
+2- plotCoreScalingMultiRun.sh
+
+    Allows to overlay multiple scaling reports
+
+3- plotCoreScalingTrendRun.sh
+
+    Allows 'trend' plotting from multiple scaling reports
+
+The first two display core scaling on the x-axis and throughput on the y-axis.
+
+The third allows to plot each individual report on a x-axis tick (in the order they were passed on the command line) while the y-axis is the throughput. There is then a single curve per core count. To sum up, let say you do a daily run core scaling for 1,2,4,8 cores and invoke 'plotCoreScalingTrendRun.sh' with all the daily reports properly ordered as command line arguments. The plot shows 4 curvers, where each x-axis tick is a day, and each day has 4 data point representing the throughput for 1,2,4,8 cores.
 
 Example:
 
-    ./scalingOcrWorkerDriver.sh edtExecuteHierFinishSync > edtExecuteHierFinishSync.scaling
-    ./scripts/plotWorkerThroughput.sh edtExecuteHierFinishSync.scaling
+Generate a single report plot:
 
-The plot shows the number of workers on the x-axis, the throughput
-on the y-axis and one curve for each sweep configuration line used
-to run the test using the benchmark's reported workload.
+    ./scripts/plotCoreScalingSingleRun.sh myReport
+
+Generate a multi report plot:
+    ./scripts/plotCoreScalingMultiRun.sh myReport1 myReport2
+
+Generate a daily trend report plot:
+    ./scripts/plotCoreScalingSingleRun.sh myReportMon myReportTue myReportWed
+
+

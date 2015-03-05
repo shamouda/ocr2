@@ -1,5 +1,8 @@
 #!/bin/bash
 
+#
+# Environment check
+#
 if [[ -z "$SCRIPT_ROOT" ]]; then
     echo "SCRIPT_ROOT environment variable is not defined"
     exit 1
@@ -15,6 +18,7 @@ if [[ $# != 1 ]]; then
 fi
 
 LOGFILE=$1
+FILENAME=${LOGFILE##*/}
 
 #
 # Setting up temporary files
@@ -25,34 +29,39 @@ WU_FILE=${TMP_FOLDER}/tmp.wu
 DATA_FILE=${TMP_FOLDER}/tmp.data
 DATA_BUFFER_FILE=${TMP_FOLDER}/tmp.databuffer
 XLABEL_FILE=${TMP_FOLDER}/tmp.xlabel
+IGNORE_TOP_LINES=4
 
 #
 # Extract data for workloads
 #
 
+echo "11"
 ${SCRIPT_ROOT}/extractors/extractWorkloadUniq.sh ${LOGFILE} > ${WU_FILE}
 NB_WORKLOADS=`more ${WU_FILE} | wc -l`
+echo "Workload" > ${WU_FILE}
+echo "wload"
+
 
 #
-# Extract data for x-axis labels (i.e. workers used for each run)
-# TODO need to formalize this a little better in the logs
+# Extract data for x-axis labels (i.e. cores used for each run)
 #
-grep "Run" ${LOGFILE} | sort | cut -d' ' -f 4-4 | uniq | sort -g > ${XLABEL_FILE}
 
-NB_XLABEL=`more ${XLABEL_FILE} | wc -l`
-
+COL_THROUGHPUT_ID=1
+REPORT_FILES=${LOGFILE}
+${SCRIPT_ROOT}/extractors/extractReportColDataPoint.sh ${COL_THROUGHPUT_ID} ${IGNORE_TOP_LINES} ${XLABEL_FILE} "${REPORT_FILES}"
+echo "through"
 #
 # Extract data for throughput
 #
 
-${SCRIPT_ROOT}/extractors/extractThroughput.sh ${LOGFILE} ${NB_XLABEL} > ${DATA_BUFFER_FILE}
-${SCRIPT_ROOT}/utils/transpose.sh ${DATA_BUFFER_FILE} > ${DATA_FILE}
+COL_THROUGHPUT_ID=2
+REPORT_FILES=${LOGFILE}
+${SCRIPT_ROOT}/extractors/extractReportColDataPoint.sh ${COL_THROUGHPUT_ID} ${IGNORE_TOP_LINES} ${DATA_BUFFER_FILE} "${REPORT_FILES}"
 
 #
 # Append x-axis labels and throughput data
 #
 
-cp ${DATA_FILE} ${DATA_BUFFER_FILE}
 paste ${XLABEL_FILE} ${DATA_BUFFER_FILE} > ${DATA_FILE}
 
 #
@@ -65,11 +74,12 @@ OUTPUT_IMG_FORMAT=svg
 FILENAME=${LOGFILE##*/}
 FILENAME_NOEXT=${FILENAME%.scaling}
 TITLE="Workers scaling for ${FILENAME_NOEXT}"
-IMG_NAME="plot_workers_scaling_${FILENAME_NOEXT}".${OUTPUT_IMG_FORMAT}
+IMG_NAME="plotCoreScaling_${FILENAME_NOEXT}".${OUTPUT_IMG_FORMAT}
 XLABEL="Number Of Workers"
 YLABEL="Throughput (op\/s)"
 
-${SCRIPT_ROOT}/plotters/generateMultiCurvePlt.sh ${DATA_FILE} ${WU_FILE} ${XLABEL_FILE} ${IMG_NAME} ${OUTPUT_PLOT_NAME} "${TITLE}" "${XLABEL}" "${YLABEL}"
+DATA_COL_IDX=2
+${SCRIPT_ROOT}/plotters/generateMultiCurvePlt.sh ${DATA_FILE} ${WU_FILE} ${XLABEL_FILE} ${IMG_NAME} ${OUTPUT_PLOT_NAME} "${TITLE}" "${XLABEL}" "${YLABEL}" ${DATA_COL_IDX}
 
 gnuplot ${OUTPUT_PLOT_NAME}
 RES=$?

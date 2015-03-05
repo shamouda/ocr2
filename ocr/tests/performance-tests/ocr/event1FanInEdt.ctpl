@@ -55,19 +55,22 @@ ocrGuid_t driverEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
         // Setting up consumers
         //
         ocrGuid_t consEdtTemplateGuid;
-        ocrEdtTemplateCreate(&consEdtTemplateGuid, consumerEdt, 0, 1);
+        ocrEdtTemplateCreate(&consEdtTemplateGuid, consumerEdt, 0, FAN_OUT);
 
 #if CLEAN_UP_ITERATION
         ocrGuid_t consGuids[FAN_OUT];
+        ocrGuid_t consEdtGuid;
 #if TIME_CONSUMER_CREATE
         get_time(&start);
 #endif
         int i = 0;
         while (i < FAN_OUT) {
-            ocrEdtCreate(&consGuids[i], consEdtTemplateGuid,
-                         0, NULL, 1, NULL, EDT_PROP_NONE, NULL_GUID, NULL);
+            ocrEventCreate(&consGuids[i], PRODUCER_EVENT_TYPE, false);
             i++;
         }
+
+        ocrEdtCreate(&consEdtGuid, consEdtTemplateGuid,
+                     0, NULL, FAN_OUT, NULL, EDT_PROP_NONE, NULL_GUID, NULL);
 #if TIME_CONSUMER_CREATE
         get_time(&stop);
         accTimerConsCreate += elapsed_usec(&start, &stop);
@@ -78,7 +81,8 @@ ocrGuid_t driverEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
 #endif
         i = 0;
         while (i < FAN_OUT) {
-            ocrAddDependence(prodGuid, &consGuids[i], 0, DB_MODE_RO);
+            ocrAddDependence(prodGuid, consGuids[i], 0, DB_MODE_RO);
+            ocrAddDependence(consGuids[i], consEdtGuid, i, DB_MODE_RO);
             i++;
         }
 #if TIME_ADD_DEP
@@ -87,14 +91,16 @@ ocrGuid_t driverEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
 #endif
 
 #else /* No CLEAN_UP_ITERATION */
+        ocrGuid_t consEdtGuid;
+        ocrEdtCreate(&consEdtGuid, consEdtTemplateGuid,
+                     0, NULL, FAN_OUT, NULL, EDT_PROP_NONE, NULL_GUID, NULL);
         int i = 0;
         while (i < FAN_OUT) {
 #if TIME_CONSUMER_CREATE
             get_time(&start);
 #endif
             ocrGuid_t consGuid;
-            ocrEdtCreate(&consGuid, consEdtTemplateGuid,
-                         0, NULL, 1, NULL, EDT_PROP_NONE, NULL_GUID, NULL);
+            ocrEventCreate(&consGuid, PRODUCER_EVENT_TYPE, false);
 #if TIME_CONSUMER_CREATE
             get_time(&stop);
             accTimerConsCreate += elapsed_usec(&start, &stop);
@@ -103,6 +109,7 @@ ocrGuid_t driverEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
             get_time(&start);
 #endif
             ocrAddDependence(prodGuid, consGuid, 0, DB_MODE_RO);
+            ocrAddDependence(consGuid, consEdtGuid, i, DB_MODE_RO);
 #if TIME_ADD_DEP
             get_time(&stop);
             accTimerAddDep += elapsed_usec(&start, &stop);

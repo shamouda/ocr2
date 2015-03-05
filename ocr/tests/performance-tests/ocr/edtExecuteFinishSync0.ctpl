@@ -3,8 +3,10 @@
 //       all tasks through the output-event of a finish EDT.
 // TIME: Completion of all tasks
 // FREQ: Create 'NB_INSTANCES' EDTs once
-// CUSTOM:
-//     - PARAMC_SIZE: the size of paramc for the created EDTs
+//
+// VARIABLES:
+// - NB_INSTANCES
+// - PARAMC_SIZE: the size of paramc for the created EDTs
 
 ocrGuid_t terminateEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     timestamp_t * timers = (timestamp_t *) depv[1].ptr;

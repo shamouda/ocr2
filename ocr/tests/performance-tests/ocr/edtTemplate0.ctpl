@@ -1,8 +1,10 @@
+// DESC: Template to creates NB_INSTANCES edt templates and vary deallocation scheme
+// FREQ: Done 'NB_ITERS' times.
 
-#ifndef CUSTOM_BOUNDS
-#define NB_ITERS 5000
-#define NB_INSTANCES 1000
-#endif
+//
+// VARIABLES:
+// - NB_INSTANCES
+// - NB_ITERS
 
 ocrGuid_t workEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     return NULL_GUID;

@@ -6,16 +6,14 @@
 // TIME: Satisfy the producer event
 // FREQ: Done 'NB_ITERS' times
 // NOTE: The driver EDT is a finish EDT to collect created EDTs
+//
+// VARIABLES
+// - NB_ITERS
+// - FAN_OUT
 
-#ifndef CUSTOM_BOUNDS
+//TODO DEFAULT
+#undef NB_ITERS
 #define NB_ITERS 5000
-#define FAN_OUT 1000
-#endif
-
-// Paramc for accumulated time and iteration number
-#define DRIVER_PARAMC 2
-#define DRIVER_DEPV 0
-#define DRIVER_PROP EDT_PROP_NONE
 
 ocrGuid_t consumerEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     return NULL_GUID;

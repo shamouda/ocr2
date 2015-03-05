@@ -2,14 +2,13 @@
 #include "ocr.h"
 #include "extensions/ocr-affinity.h"
 
-// DESC: One worker creates all the tasks. Sink EDT depends on
-//       all tasks through individual sticky events.
+// DESC: One worker creates all the remote tasks. Sink EDT depends on a latch
+//       event co-located with remote tasks.
 // TIME: Completion of all tasks
 // FREQ: Create 'NB_INSTANCES' EDTs once
-
-#ifndef CUSTOM_BOUNDS
-#define NB_INSTANCES 10000
-#endif
+//
+// VARIABLES:
+// - NB_INSTANCES
 
 ocrGuid_t terminateEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     // timestamp_t * timers = (timestamp_t *) depv[NB_INSTANCES].ptr;

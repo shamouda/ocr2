@@ -5,10 +5,10 @@
 //       all tasks through the output-event of a finish EDT.
 // TIME: Completion of all tasks
 // FREQ: Create 'NB_INSTANCES' EDTs once
+//
+// VARIABLES:
+// - NB_INSTANCES
+// - PARAMC_SIZE: the size of paramc for the created EDTs
 
-#ifndef CUSTOM_BOUNDS
-#define NB_INSTANCES 99999
-#define PARAMC_SIZE 0
-#endif
-
+// TODO DEFAULT VALUE HERE
 #include "edtExecuteFinishSync0.ctpl"
