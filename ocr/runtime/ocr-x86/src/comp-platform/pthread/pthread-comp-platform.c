@@ -243,6 +243,7 @@ void getCurrentEnv(ocrPolicyDomain_t** pd, ocrWorker_t** worker,
             //By default set src and dest location to current location.
             msg->srcLocation = vals->pd->myLocation;
             msg->destLocation = msg->srcLocation;
+            //msg->seqId = vals->worker->seqId;
             msg->usefulSize = 0; // Convention to say that the size is not yet set
         }
     }

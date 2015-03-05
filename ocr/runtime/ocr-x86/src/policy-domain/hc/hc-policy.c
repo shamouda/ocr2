@@ -28,6 +28,8 @@
 
 #define DEBUG_TYPE POLICY
 
+//#define SCHED_1_0 1
+
 void hcPolicyDomainBegin(ocrPolicyDomain_t * policy) {
     // The PD should have been brought up by now and everything instantiated
 
@@ -300,6 +302,7 @@ void hcPolicyDomainDestruct(ocrPolicyDomain_t * policy) {
     runtimeChunkFree((u64)policy->dbFactories, NULL);
     runtimeChunkFree((u64)policy->eventFactories, NULL);
     runtimeChunkFree((u64)policy->guidProviders, NULL);
+    runtimeChunkFree((u64)policy->schedulerObjectFactories, NULL);
     runtimeChunkFree((u64)policy, NULL);
 }
 
@@ -987,6 +990,33 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         START_PROFILE(pd_hc_Take);
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_COMM_TAKE
+#ifdef SCHED_1_0
+        ASSERT(PD_MSG_FIELD_IO(type) == OCR_GUID_EDT);
+        ASSERT(PD_MSG_FIELD_IO(guidCount) == 1);
+        //This is temporary until we get proper seqId support
+        ocrWorker_t *worker;
+        getCurrentEnv(NULL, &worker, NULL, NULL);
+
+        ocrSchedulerObject_t el;
+        el.guid = NULL_GUID;
+        el.kind = OCR_SCHEDULER_OBJECT_EDT;
+        el.fctId = 0;
+
+        ocrSchedulerOpArgs_t opArgs;
+        opArgs.loc = msg->srcLocation;
+        opArgs.contextId = worker->seqId;
+        opArgs.el = &el;
+        opArgs.takeKind = OCR_SCHEDULER_OBJECT_EDT;
+        opArgs.takeCount = PD_MSG_FIELD_IO(guidCount);
+
+        PD_MSG_FIELD_O(returnDetail) = self->schedulers[0]->fcts.op[OCR_SCHEDULER_OP_TAKE].invoke(self->schedulers[0], &opArgs, NULL);
+        PD_MSG_FIELD_IO(guidCount) = el.guid == NULL_GUID ? 0 : 1;
+        if (PD_MSG_FIELD_IO(guidCount) > 0) {
+            PD_MSG_FIELD_IO(guids)[0].guid = el.guid;
+            localDeguidify(self, &(PD_MSG_FIELD_IO(guids)[0]));
+            PD_MSG_FIELD_IO(extra) = (u64)(self->taskFactories[0]->fcts.execute);
+        }
+#else
         if (PD_MSG_FIELD_IO(type) == OCR_GUID_EDT) {
             PD_MSG_FIELD_O(returnDetail) = self->schedulers[0]->fcts.takeEdt(
                 self->schedulers[0], &(PD_MSG_FIELD_IO(guidCount)),
@@ -1005,6 +1035,7 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
                 self->schedulers[0], &(PD_MSG_FIELD_IO(guidCount)),
                 PD_MSG_FIELD_IO(guids), PD_MSG_FIELD_I(properties));
         }
+#endif
 #undef PD_MSG
 #undef PD_TYPE
         msg->type &= ~PD_MSG_REQUEST;
@@ -1017,6 +1048,27 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         START_PROFILE(pd_hc_Give);
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_COMM_GIVE
+#ifdef SCHED_1_0
+        ASSERT(PD_MSG_FIELD_I(type) == OCR_GUID_EDT);
+        ASSERT(PD_MSG_FIELD_IO(guidCount) == 1);
+        //This is temporary until we get proper seqId support
+        ocrWorker_t *worker;
+        getCurrentEnv(NULL, &worker, NULL, NULL);
+
+        ocrSchedulerObject_t el;
+        el.guid = PD_MSG_FIELD_IO(guids)[0].guid;
+        el.kind = OCR_SCHEDULER_OBJECT_EDT;
+        el.fctId = 0;
+
+        ocrSchedulerOpArgs_t opArgs;
+        opArgs.loc = msg->srcLocation;
+        opArgs.contextId = worker->seqId;
+        opArgs.el = &el;
+        opArgs.takeKind = 0;
+        opArgs.takeCount = 0;
+
+        PD_MSG_FIELD_O(returnDetail) = self->schedulers[0]->fcts.op[OCR_SCHEDULER_OP_GIVE].invoke(self->schedulers[0], &opArgs, NULL);
+#else
         if (PD_MSG_FIELD_I(type) == OCR_GUID_EDT) {
             PD_MSG_FIELD_O(returnDetail) = self->schedulers[0]->fcts.giveEdt(
                 self->schedulers[0], &(PD_MSG_FIELD_IO(guidCount)),
@@ -1027,6 +1079,7 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
                 self->schedulers[0], &(PD_MSG_FIELD_IO(guidCount)),
                 PD_MSG_FIELD_IO(guids), PD_MSG_FIELD_I(properties));
         }
+#endif
 #undef PD_MSG
 #undef PD_TYPE
         msg->type &= ~PD_MSG_REQUEST;
@@ -1393,8 +1446,18 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
     }
 
     case PD_MSG_MGT_REGISTER: {
-        // Only one PD at this time
-        ASSERT(0);
+        START_PROFILE(pd_hc_Register);
+#define PD_MSG msg
+#define PD_TYPE PD_MSG_MGT_REGISTER
+        u64 contextId = ((u64)PD_MSG_FIELD_I(loc));
+        PD_MSG_FIELD_O(returnDetail) = self->schedulers[0]->fcts.registerContext(
+                self->schedulers[0], contextId, msg->srcLocation);
+        PD_MSG_FIELD_O(seqId) = contextId;
+#undef PD_MSG
+#undef PD_TYPE
+        msg->type &= ~PD_MSG_REQUEST;
+        msg->type |= PD_MSG_RESPONSE;
+        EXIT_PROFILE;
         break;
     }
 

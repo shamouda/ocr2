@@ -294,4 +294,5 @@ typedef struct _ocrTaskFactory_t {
     u32 factoryId;
     ocrTaskFcts_t fcts;
 } ocrTaskFactory_t;
+
 #endif /* __OCR_TASK_H__ */

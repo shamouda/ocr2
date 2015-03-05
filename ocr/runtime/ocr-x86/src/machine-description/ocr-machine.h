@@ -38,6 +38,8 @@ typedef enum {
     workpile_type,
     worker_type,
     scheduler_type,
+    schedulerObject_type,
+    schedulerHeuristic_type,
     policydomain_type,
     // Everything above is used as instances
     // Everything below is used as types

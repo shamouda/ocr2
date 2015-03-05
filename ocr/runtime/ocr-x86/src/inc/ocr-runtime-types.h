@@ -14,6 +14,8 @@
 #include "ocr-types.h"
 #include "utils/profiler/profiler.h"
 
+#define INVALID_LOCATION (u64)(-1)
+
 /**
  * @brief Memory region "tags"
  *

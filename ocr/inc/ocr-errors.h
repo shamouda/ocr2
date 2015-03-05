@@ -40,6 +40,7 @@
 #define OCR_EDOM            33      /**< Math argument out of domain of func */
 #define OCR_ERANGE          34      /**< Math result not representable */
 #define OCR_ENOSYS          38      /**< Function not implemented */
+#define OCR_ENOTEMPTY       39      /**< Directory not empty */
 #define OCR_ENOTSUP         95      /**< Function is not supported */
 
 // OCR specific errors

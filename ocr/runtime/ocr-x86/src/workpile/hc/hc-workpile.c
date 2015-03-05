@@ -32,9 +32,9 @@ void hcWorkpileStart(ocrWorkpile_t *base, ocrPolicyDomain_t *PD) {
     guidify(PD, (u64)base, &(base->fguid), OCR_GUID_WORKPILE);
     ocrWorkpileHc_t* derived = (ocrWorkpileHc_t*)base;
     base->pd = PD;
-    derived->deque = newWorkStealingDeque(base->pd, (void *) NULL_GUID);
+    derived->deque = newDeque(base->pd, (void *) NULL_GUID, WORK_STEALING_DEQUE);
     // Can switch to locked implementation for debugging purpose
-    // derived->deque = newLockedQueue(base->pd, (void *) NULL_GUID);
+    // derived->deque = newDeque(base->pd, (void *) NULL_GUID, LOCKED_DEQUE);
 }
 
 void hcWorkpileStop(ocrWorkpile_t *base) {

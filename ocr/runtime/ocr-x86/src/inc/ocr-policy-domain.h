@@ -901,11 +901,12 @@ typedef struct _ocrPolicyMsg_t {
         struct {
             union {
                 struct {
-                    ocrLocation_t neighbor; /**< In: Neighbor registering */
+                    ocrLocation_t loc;      /**< In: Location registering */
                     // TODO: Add things having to do with cost and relationship
                     u32 properties;         /**< In */
                 } in;
                 struct {
+                    u32 seqId;              /**< Out: Seq Id at dest policy domain */
                     u32 returnDetail;       /**< Out: Success or error code */
                 } out;
             } inOrOut __attribute__ (( aligned(8) ));
@@ -1166,6 +1167,7 @@ typedef struct _ocrPolicyDomain_t {
     u64 taskTemplateFactoryCount;               /**< Number of task-template factories */
     u64 dbFactoryCount;                         /**< Number of data-block factories */
     u64 eventFactoryCount;                      /**< Number of event factories */
+    u64 schedulerObjectFactoryCount;                  /**< Number of schedulerObject factories */
 
     ocrScheduler_t  ** schedulers;              /**< All the schedulers */
     ocrAllocator_t  ** allocators;              /**< All the allocators */
@@ -1181,7 +1183,10 @@ typedef struct _ocrPolicyDomain_t {
                                                  * data-blocks */
     ocrEventFactory_t ** eventFactories;        /**< Factories to produce events*/
     ocrGuidProvider_t ** guidProviders;         /**< GUID generators */
-    ocrPlacer_t * placer;                       /**< Affinity and placement (work in progress) */
+    ocrSchedulerObjectFactory_t **schedulerObjectFactories; /**< All the schedulerObject factories
+                                                 * known to this policy domain */
+    ocrPlacer_t * placer;                       /**< Affinity and placement
+                                                 * (work in progress) */
 
     // TODO: What to do about this?
     ocrCost_t *costFunction; /**< Cost function used to determine

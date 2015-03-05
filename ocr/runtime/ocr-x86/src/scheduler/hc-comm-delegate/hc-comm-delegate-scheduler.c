@@ -35,13 +35,13 @@
     commSched->outboxes = pd->fcts.pdMalloc(pd, sizeof(deque_t *) * boxCount);
     u64 i;
     for(i = 0; i < boxCount; ++i) {
-        commSched->outboxes[i] = newWorkStealingDeque(pd, NULL);
+        commSched->outboxes[i] = newDeque(pd, NULL, WORK_STEALING_DEQUE);
     }
     //Create inbox queues for each worker
     commSched->inboxesCount = boxCount;
     commSched->inboxes = pd->fcts.pdMalloc(pd, sizeof(deque_t *) * boxCount);
     for(i = 0; i < boxCount; ++i) {
-        commSched->inboxes[i] = newSemiConcurrentQueue(pd, NULL);
+        commSched->inboxes[i] = newDeque(pd, NULL, SEMI_CONCURRENT_DEQUE);
     }
 }
 

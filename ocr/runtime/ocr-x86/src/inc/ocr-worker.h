@@ -82,8 +82,10 @@ typedef struct _ocrWorkerFcts_t {
 typedef struct _ocrWorker_t {
     ocrFatGuid_t fguid;
     struct _ocrPolicyDomain_t *pd;
-    ocrLocation_t location;
+    ocrLocation_t location;  //!!! TO BE DEPRECATED !!!
     ocrWorkerType_t type;
+    u64 seqId;
+
 #ifdef OCR_ENABLE_STATISTICS
     ocrStatsProcess_t *statProcess;
 #endif

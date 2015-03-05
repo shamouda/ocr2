@@ -281,7 +281,7 @@ void * lockedDequePopHead(deque_t * self, u8 doTry) {
  * @brief Deque constructor. For a given type, create an instance and
  * initialize its base type.
  */
-static deque_t * newDeque(ocrPolicyDomain_t *pd, void * initValue, ocrDequeType_t type) {
+deque_t * newDeque(ocrPolicyDomain_t *pd, void * initValue, ocrDequeType_t type) {
     deque_t* deq = NULL;
     switch(type) {
     case WORK_STEALING_DEQUE:

@@ -93,6 +93,7 @@ static void hcWorkShift(ocrWorker_t * worker) {
  * The computation worker routine that asks work to the scheduler
  */
 static void workerLoop(ocrWorker_t * worker) {
+    //Start the worker loop
     while(worker->fcts.isRunning(worker)) {
         START_PROFILE(wo_hc_workerLoop);
         worker->fcts.workShift(worker);
@@ -184,6 +185,21 @@ static bool isMainEdtForker(ocrWorker_t * worker, ocrGuid_t * affinityMasterPD) 
 }
 
 void* hcRunWorker(ocrWorker_t * worker) {
+    //Register this worker and get a context id
+    ocrPolicyDomain_t *pd = worker->pd;
+    PD_MSG_STACK(msg);
+    msg.srcLocation = pd->myLocation;
+    msg.destLocation = pd->myLocation;
+#define PD_MSG (&msg)
+#define PD_TYPE PD_MSG_MGT_REGISTER
+    msg.type = PD_MSG_MGT_REGISTER | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
+    PD_MSG_FIELD_I(loc) = (ocrLocation_t)getWorkerId(worker);
+    PD_MSG_FIELD_I(properties) = 0;
+    pd->fcts.processMessage(pd, &msg, true);
+    worker->seqId = PD_MSG_FIELD_O(seqId);
+#undef PD_MSG
+#undef PD_TYPE
+
     ocrGuid_t affinityMasterPD;
     bool forkMain = isMainEdtForker(worker, &affinityMasterPD);
     if (forkMain) {

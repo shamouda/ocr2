@@ -32,7 +32,7 @@ void ceWorkpileStart(ocrWorkpile_t *base, ocrPolicyDomain_t *PD) {
     guidify(PD, (u64)base, &(base->fguid), OCR_GUID_WORKPILE);
     ocrWorkpileCe_t* derived = (ocrWorkpileCe_t*)base;
     base->pd = PD;
-    derived->deque = newNonConcurrentQueue(base->pd, (void *) NULL_GUID);
+    derived->deque = newDeque(base->pd, (void *) NULL_GUID, NON_CONCURRENT_DEQUE);
 }
 
 void ceWorkpileStop(ocrWorkpile_t *base) {

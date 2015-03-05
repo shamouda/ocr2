@@ -97,9 +97,6 @@ typedef struct _ocrDequeDualLocked_t {
 /* DEQUE API                                        */
 /****************************************************/
 
-deque_t* newWorkStealingDeque(ocrPolicyDomain_t *pd, void * initValue);
-deque_t* newNonConcurrentQueue(ocrPolicyDomain_t *pd, void * initValue);
-deque_t* newSemiConcurrentQueue(ocrPolicyDomain_t *pd, void * initValue);
-deque_t* newLockedQueue(ocrPolicyDomain_t *pd, void * initValue);
+deque_t * newDeque(ocrPolicyDomain_t *pd, void * initValue, ocrDequeType_t type);
 
 #endif /* DEQUE_H_ */

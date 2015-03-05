@@ -29,6 +29,9 @@
 #include "task/task-all.h"
 #include "worker/worker-all.h"
 #include "workpile/workpile-all.h"
+#include "scheduler-heuristic/scheduler-heuristic-all.h"
+#include "scheduler-object/scheduler-object-all.h"
+#include "ocr-scheduler-object.h"
 
 #include "ocr-sysboot.h"
 
@@ -266,6 +269,21 @@ char* populate_type(ocrParamList_t **type_param, type_enum index, dictionary *di
     case commplatform_type:
         ALLOC_PARAM_LIST(*type_param, paramListCommPlatformFact_t);
         break;
+    case schedulerObject_type: {
+            ALLOC_PARAM_LIST(*type_param, paramListSchedulerObjectFact_t);
+            ((paramListSchedulerObjectFact_t*)(*type_param))->kind = OCR_SCHEDULER_OBJECT_AGGREGATE;
+            if (key_exists(dict, secname, "kind")) {
+                char *valuestr = NULL;
+                snprintf(key, MAX_KEY_SZ, "%s:%s", secname, "kind");
+                INI_GET_STR (key, valuestr, "");
+                ASSERT(strcmp(valuestr, "root") == 0);
+                ((paramListSchedulerObjectFact_t*)(*type_param))->kind = OCR_SCHEDULER_OBJECT_ROOT;
+            }
+        }
+        break;
+    case schedulerHeuristic_type:
+        ALLOC_PARAM_LIST(*type_param, paramListSchedulerHeuristicFact_t);
+        break;
     default:
         DPRINTF(DEBUG_LVL_WARN, "Error: %d index unexpected\n", index);
         break;
@@ -370,6 +388,30 @@ ocrWorkpileFactory_t *create_factory_workpile(char *name, ocrParamList_t *paraml
     } else {
         DPRINTF(DEBUG_LVL_INFO, "Creating a workpile factory of type %d\n", mytype);
         return (ocrWorkpileFactory_t *)newWorkpileFactory(mytype, paramlist);
+    }
+}
+
+ocrSchedulerObjectFactory_t *create_factory_schedulerObject(char *name, ocrParamList_t *paramlist) {
+    schedulerObjectType_t mytype = schedulerObjectMax_id;
+    TO_ENUM (mytype, name, schedulerObjectType_t, schedulerObject_types, schedulerObjectMax_id);
+    if (mytype == schedulerObjectMax_id) {
+        DPRINTF(DEBUG_LVL_WARN, "Unrecognized type %s. Check name and ocr-config header\n", name);
+        return NULL;
+    } else {
+        DPRINTF(DEBUG_LVL_INFO, "Creating a schedulerObject factory of type %d\n", mytype);
+        return (ocrSchedulerObjectFactory_t *)newSchedulerObjectFactory(mytype, paramlist);
+    }
+}
+
+ocrSchedulerHeuristicFactory_t *create_factory_schedulerHeuristic(char *name, ocrParamList_t *paramlist) {
+    schedulerHeuristicType_t mytype = schedulerHeuristicMax_id;
+    TO_ENUM (mytype, name, schedulerHeuristicType_t, schedulerHeuristic_types, schedulerHeuristicMax_id);
+    if (mytype == schedulerHeuristicMax_id) {
+        DPRINTF(DEBUG_LVL_WARN, "Unrecognized type %s. Check name and ocr-config header\n", name);
+        return NULL;
+    } else {
+        DPRINTF(DEBUG_LVL_INFO, "Creating a schedulerHeuristic factory of type %d\n", mytype);
+        return (ocrSchedulerHeuristicFactory_t *)newSchedulerHeuristicFactory(mytype, paramlist);
     }
 }
 
@@ -499,6 +541,12 @@ void *create_factory (type_enum index, char *factory_name, ocrParamList_t *param
         break;
     case workpile_type:
         new_factory = (void *)create_factory_workpile(factory_name, paramlist);
+        break;
+    case schedulerObject_type:
+        new_factory = (void *)create_factory_schedulerObject(factory_name, paramlist);
+        break;
+    case schedulerHeuristic_type:
+        new_factory = (void *)create_factory_schedulerHeuristic(factory_name, paramlist);
         break;
     case worker_type:
         new_factory = (void *)create_factory_worker(factory_name, paramlist);
@@ -730,6 +778,28 @@ s32 populate_inst(ocrParamList_t **inst_param, void **instance, s32 *type_counts
                 DPRINTF(DEBUG_LVL_INFO, "Created workpile of type %s, index %d\n", inststr, j);
         }
         break;
+    case schedulerObject_type:
+        for (j = low; j<=high; j++) {
+            schedulerObjectType_t mytype = -1;
+            TO_ENUM (mytype, inststr, schedulerObjectType_t, schedulerObject_types, schedulerObjectMax_id);
+            switch (mytype) {
+            default:
+                break;
+            }
+            ALLOC_PARAM_LIST(inst_param[j], paramListSchedulerObject_t);
+            instance[j] = (void *)((ocrSchedulerObjectFactory_t *)factory)->instantiate(factory, inst_param[j]);
+            if (instance[j])
+                DPRINTF(DEBUG_LVL_INFO, "Created schedulerObject of type %s, index %d\n", inststr, j);
+        }
+        break;
+    case schedulerHeuristic_type:
+        for (j = low; j<=high; j++) {
+            ALLOC_PARAM_LIST(inst_param[j], paramListSchedulerHeuristic_t);
+            instance[j] = (void *)((ocrSchedulerHeuristicFactory_t *)factory)->instantiate(factory, inst_param[j]);
+            if (instance[j])
+                DPRINTF(DEBUG_LVL_INFO, "Created schedulerHeuristic of type %s, index %d\n", inststr, j);
+        }
+        break;
     case worker_type:
         for (j = low; j<=high; j++) {
 
@@ -824,7 +894,7 @@ s32 populate_inst(ocrParamList_t **inst_param, void **instance, s32 *type_counts
                 ALLOC_PARAM_LIST(inst_param[j], paramListSchedulerInst_t);
                 break;
             }
-
+            ASSERT(inst_param[j]);
             instance[j] = (void *)((ocrSchedulerFactory_t *)factory)->instantiate(factory, inst_param[j]);
             if (instance[j])
                 DPRINTF(DEBUG_LVL_INFO, "Created scheduler of type %s, index %d\n", inststr, j);
@@ -900,7 +970,7 @@ s32 populate_inst(ocrParamList_t **inst_param, void **instance, s32 *type_counts
     return 0;
 }
 
-void add_dependence (type_enum fromtype, type_enum totype,
+void add_dependence (type_enum fromtype, type_enum totype, char *refstr,
                      void *frominstance, ocrParamList_t *fromparam,
                      void *toinstance, ocrParamList_t *toparam,
                      s32 dependence_index, s32 dependence_count) {
@@ -910,6 +980,8 @@ void add_dependence (type_enum fromtype, type_enum totype,
     case commplatform_type:
     case compplatform_type:
     case workpile_type:
+    case schedulerObject_type:
+    case schedulerHeuristic_type:
         DPRINTF(DEBUG_LVL_WARN, "Unexpected: this type should have no dependences! (incorrect dependence: %d to %d)\n", fromtype, totype);
         break;
 
@@ -973,6 +1045,22 @@ void add_dependence (type_enum fromtype, type_enum totype,
             }
             f->workpiles[dependence_index] = (ocrWorkpile_t *)toinstance;
             break;
+        }
+        case schedulerObject_type: {
+            if (toinstance != NULL) {
+                ASSERT(f->rootObj == NULL); //scheduler can have only one schedulerObject root
+                f->rootObj = (ocrSchedulerObjectRoot_t *)toinstance;
+            }
+            break;
+        }
+        case schedulerHeuristic_type: {
+            if (f->schedulerHeuristicCount == 0) {
+                f->schedulerHeuristicCount = dependence_count;
+                f->schedulerHeuristics = (ocrSchedulerHeuristic_t **)runtimeChunkAlloc(dependence_count * sizeof(ocrSchedulerHeuristic_t *), NULL);
+            }
+            ocrSchedulerHeuristic_t* t = (ocrSchedulerHeuristic_t *)toinstance;
+            f->schedulerHeuristics[dependence_index] = t;
+            t->scheduler = f;
         }
         default:
             break;
@@ -1056,6 +1144,15 @@ void add_dependence (type_enum fromtype, type_enum totype,
             f->eventFactories[dependence_index] = (ocrEventFactory_t *)toinstance;
             break;
         }
+        case schedulerObject_type: {
+            ASSERT(strcasecmp(refstr, "schedulerObjectfactory") == 0);
+            if (f->schedulerObjectFactories == NULL) {
+                f->schedulerObjectFactoryCount = dependence_count;
+                f->schedulerObjectFactories = (ocrSchedulerObjectFactory_t **)runtimeChunkAlloc(dependence_count * sizeof(ocrSchedulerObjectFactory_t *), NULL);
+            }
+            f->schedulerObjectFactories[dependence_index] = (ocrSchedulerObjectFactory_t *)toinstance;
+            break;
+        }
         case policydomain_type: {
             ocrPolicyDomain_t* t = (ocrPolicyDomain_t*)toinstance;
             f->parentLocation = (u64) t->myLocation;
@@ -1091,11 +1188,11 @@ s32 build_deps (dictionary *dict, s32 A, s32 B, char *refstr, void ***all_instan
                 // Using a rough heuristic for now: if |from| == |to| then 1:1, else all:all TODO: What else makes sense here?
                 if (depcount == high-low+1) {
                     k = values_array[j-low];
-                    add_dependence(A, B, all_instances[A][j], inst_params[A][j], all_instances[B][k], inst_params[B][k], 0, 1);
+                    add_dependence(A, B, refstr, all_instances[A][j], inst_params[A][j], all_instances[B][k], inst_params[B][k], 0, 1);
                 } else {
                     for (l = 0; l < depcount; l++) {
                         k = values_array[l];
-                        add_dependence(A, B, all_instances[A][j], inst_params[A][j], all_instances[B][k], inst_params[B][k], l, depcount);
+                        add_dependence(A, B, refstr, all_instances[A][j], inst_params[A][j], all_instances[B][k], inst_params[B][k], l, depcount);
                     }
                 }
             }
@@ -1104,11 +1201,13 @@ s32 build_deps (dictionary *dict, s32 A, s32 B, char *refstr, void ***all_instan
     return 0;
 }
 
-s32 build_deps_types (s32 B, void **pdinst, int pdcount, void ***all_factories, ocrParamList_t ***type_params) {
-    s32 i;
+s32 build_deps_types (s32 A, s32 B, char *refstr, void **pdinst, int pdcount, int type_count, void ***all_factories, ocrParamList_t ***type_params) {
+    s32 i, j;
 
     for (i = 0; i < pdcount; i++) {
-        add_dependence(policydomain_type, B, pdinst[i], NULL, all_factories[B][0], NULL, 0, 1);
+        for (j = 0; j < type_count; j++) {
+            add_dependence(A, B, refstr, pdinst[i], NULL, all_factories[B][j], NULL, j, type_count);
+        }
     }
 
     // FIXME: The above is highly simplified, needs review/change

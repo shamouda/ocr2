@@ -261,6 +261,12 @@ typedef enum {
     OCR_EVENT_LATCH_INCR_SLOT = 1  /**< The increment slot of a LATCH event */
 } ocrLatchEventSlot_t;
 
+typedef enum {
+    //currently placeholder for hint types
+    OCR_HINT_NUM_TYPES       /**< Number of Hint Types */
+} ocrHintTypes_t;
+
+
 /**
  * @}
  * @}

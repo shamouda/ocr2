@@ -39,6 +39,8 @@ const char *type_str[] = {
     "WorkPileType",
     "WorkerType",
     "SchedulerType",
+    "SchedulerObjectType",
+    "SchedulerHeuristicType",
     "PolicyDomainType",
     "TaskType",
     "TaskTemplateType",
@@ -58,6 +60,8 @@ const char *inst_str[] = {
     "WorkPileInst",
     "WorkerInst",
     "SchedulerInst",
+    "SchedulerObjectInst",
+    "SchedulerHeuristicInst",
     "PolicyDomainInst",
     "NULL",
     "NULL",
@@ -74,6 +78,8 @@ dep_t deps[] = {
     { comptarget_type, compplatform_type, "compplatform"},
     { worker_type, comptarget_type, "comptarget"},
     { scheduler_type, workpile_type, "workpile"},
+    { scheduler_type, schedulerObject_type, "schedulerObject"},
+    { scheduler_type, schedulerHeuristic_type, "schedulerHeuristic"},
     { policydomain_type, guid_type, "guid"},
     { policydomain_type, allocator_type, "allocator"},
     { policydomain_type, worker_type, "worker"},
@@ -84,12 +90,13 @@ dep_t deps[] = {
     { policydomain_type, tasktemplatefactory_type, "tasktemplatefactory"},
     { policydomain_type, datablockfactory_type, "datablockfactory"},
     { policydomain_type, eventfactory_type, "eventfactory"},
+    { policydomain_type, schedulerObject_type, "schedulerObjectfactory"},
 };
 
 extern char* populate_type(ocrParamList_t **type_param, type_enum index, dictionary *dict, char *secname);
 int populate_inst(ocrParamList_t **inst_param, void **instance, int *type_counts, char ***factory_names, void ***all_factories, void ***all_instances, type_enum index, dictionary *dict, char *secname);
 extern int build_deps (dictionary *dict, int A, int B, char *refstr, void ***all_instances, ocrParamList_t ***inst_params);
-extern int build_deps_types (int B, void **pdinst, int pdcount, void ***all_factories, ocrParamList_t ***type_params);
+extern int build_deps_types (int A, int B, char *refstr, void **pdinst, int pdcount, int type_counts, void ***all_factories, ocrParamList_t ***type_params);
 extern void *create_factory (type_enum index, char *factory_name, ocrParamList_t *paramlist);
 extern int read_range(dictionary *dict, char *sec, char *field, int *low, int *high);
 extern void free_instance(void *instance, type_enum inst_type);
@@ -255,16 +262,18 @@ void bringUpRuntime(const char *inifile) {
 
     nsec = iniparser_getnsec(dict);
     for (i = 0; i < nsec; i++) {
+        char * secname = iniparser_getsecname(dict, i);
         for (j = 0; j < total_types; j++) {
-            if (strncasecmp(type_str[j], iniparser_getsecname(dict, i), strlen(type_str[j]))==0) {
+            if (strncasecmp(type_str[j], secname, strlen(type_str[j]))==0) {
                 type_counts[j]++;
             }
         }
     }
 
     for (i = 0; i < nsec; i++) {
+        char * secname = iniparser_getsecname(dict, i);
         for (j = 0; j < total_types; j++) {
-            if (strncasecmp(type_str[j], iniparser_getsecname(dict, i), strlen(type_str[j]))==0) {
+            if (strncasecmp(type_str[j], secname, strlen(type_str[j]))==0) {
                 if(type_counts[j] && type_params[j]==NULL) {
                     type_params[j] = (ocrParamList_t **)runtimeChunkAlloc(type_counts[j] * sizeof(ocrParamList_t *), NONPERSISTENT_CHUNK);
                     factory_names[j] = (char **)runtimeChunkAlloc(type_counts[j] * sizeof(char *), NONPERSISTENT_CHUNK);
@@ -276,7 +285,7 @@ void bringUpRuntime(const char *inifile) {
                     }
                     count = 0;
                 }
-                factory_names[j][count] = populate_type(&type_params[j][count], j, dict, iniparser_getsecname(dict, i));
+                factory_names[j][count] = populate_type(&type_params[j][count], j, dict, secname);
                 all_factories[j][count] = create_factory(j, factory_names[j][count], type_params[j][count]);
                 if (all_factories[j][count] == NULL) {
                     runtimeChunkFree((u64)factory_names[j][count], NULL);
@@ -291,25 +300,27 @@ void bringUpRuntime(const char *inifile) {
     DPRINTF(DEBUG_LVL_INFO, "========= Create instances ==========\n");
 
     for (i = 0; i < nsec; i++) {
+        char * secname = iniparser_getsecname(dict, i);
         for (j = 0; j < total_types; j++) {
-            if (strncasecmp(inst_str[j], iniparser_getsecname(dict, i), strlen(inst_str[j]))==0) {
+            if (strncasecmp(inst_str[j], secname, strlen(inst_str[j]))==0) {
                 int low, high, count;
-                count = read_range(dict, iniparser_getsecname(dict, i), "id", &low, &high);
+                count = read_range(dict, secname, "id", &low, &high);
                 inst_counts[j]+=count;
             }
         }
     }
 
     for (i = 0; i < nsec; i++) {
+        char * secname = iniparser_getsecname(dict, i);
         for (j = total_types-1; j >= 0; j--) {
-            if (strncasecmp(inst_str[j], iniparser_getsecname(dict, i), strlen(inst_str[j]))==0) {
+            if (strncasecmp(inst_str[j], secname, strlen(inst_str[j]))==0) {
                 if(inst_counts[j] && inst_params[j] == NULL) {
                     DPRINTF(DEBUG_LVL_INFO, "Create %d instances of %s\n", inst_counts[j], inst_str[j]);
                     inst_params[j] = (ocrParamList_t **)runtimeChunkAlloc(inst_counts[j] * sizeof(ocrParamList_t *), NONPERSISTENT_CHUNK);
                     all_instances[j] = (void **)runtimeChunkAlloc(inst_counts[j] * sizeof(void *), NONPERSISTENT_CHUNK);
                     count = 0;
                 }
-                populate_inst(inst_params[j], all_instances[j], type_counts, factory_names, all_factories, all_instances, j, dict, iniparser_getsecname(dict, i));
+                populate_inst(inst_params[j], all_instances[j], type_counts, factory_names, all_factories, all_instances, j, dict, secname);
             }
         }
     }
@@ -325,26 +336,26 @@ void bringUpRuntime(const char *inifile) {
     // BUILD DEPENDENCES
     DPRINTF(DEBUG_LVL_INFO, "========= Build dependences ==========\n");
 
-    for (i = 0; i <= 11; i++) {
+    for (i = 0; i <= 13; i++) {
         build_deps(dict, deps[i].from, deps[i].to, deps[i].refstr, all_instances, inst_params);
     }
 
     // Special case of policy domain pointing to types rather than instances
-    for (i = 12; i <= 15; i++) {
-        build_deps_types(deps[i].to, all_instances[policydomain_type],
-                         inst_counts[policydomain_type], all_factories, type_params);
+    for (i = 14; i <= 18; i++) {
+        build_deps_types(deps[i].from, deps[i].to, deps[i].refstr, all_instances[deps[i].from],
+                         inst_counts[deps[i].from], type_counts[deps[i].to], all_factories, type_params);
     }
 
     // SETUP NEIGHBORS
     for (i = 0; i < nsec; i++) {
         char *secname = iniparser_getsecname(dict, i);
-        if (strncasecmp("PolicyDomainInst", iniparser_getsecname(dict, i), strlen("PolicyDomainInst"))==0) {
+        if (strncasecmp("PolicyDomainInst", secname, strlen("PolicyDomainInst"))==0) {
           if (key_exists(dict, secname, "neighbors")) {
             int neighbors_low, neighbors_high, neighbors_count;
-            neighbors_count = read_range(dict, iniparser_getsecname(dict, i), "neighbors", &neighbors_low, &neighbors_high);
+            neighbors_count = read_range(dict, secname, "neighbors", &neighbors_low, &neighbors_high);
             if (neighbors_count > 0) {
                 int low, high, count;
-                count = read_range(dict, iniparser_getsecname(dict, i), "id", &low, &high);
+                count = read_range(dict, secname, "id", &low, &high);
                 ASSERT(count == 1 && low == high);
                 ocrPolicyDomain_t *pd = (ocrPolicyDomain_t*)all_instances[policydomain_type][low];
                 ASSERT(neighbors_count == pd->neighborCount);

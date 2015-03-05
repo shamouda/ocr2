@@ -38,6 +38,12 @@
 // Comp-target
 #define ENABLE_COMP_TARGET_PASSTHROUGH
 
+// Scheduler Objects
+#define ENABLE_SCHEDULER_OBJECT_NULL
+
+// Scheduler Heuristic
+#define ENABLE_SCHEDULER_HEURISTIC_NULL
+
 // Datablock
 #define ENABLE_DATABLOCK_REGULAR
 #define ENABLE_DATABLOCK_LOCKABLE
