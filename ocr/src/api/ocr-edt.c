@@ -177,15 +177,15 @@ u8 ocrEdtTemplateDestroy(ocrGuid_t guid) {
 #undef PD_TYPE
 }
 
-u8 ocrEdtCreate(ocrGuid_t* edtGuid, ocrGuid_t templateGuid,
+u8 ocrEdtCreate(ocrGuid_t* edtGuidPtr, ocrGuid_t templateGuid,
                 u32 paramc, u64* paramv, u32 depc, ocrGuid_t *depv,
                 u16 properties, ocrGuid_t affinity, ocrGuid_t *outputEvent) {
-
+    ocrGuid_t edtGuid = (edtGuidPtr != NULL) ? *edtGuidPtr : NULL_GUID;
     START_PROFILE(api_EdtCreate);
     DPRINTF(DEBUG_LVL_INFO,
             "ENTER ocrEdtCreate(*guid=0x%lx, template=0x%lx, paramc=%d, paramv=0x%lx"
             ", depc=%d, depv=0x%lx, prop=%u, aff=0x%lx, outEvt=0x%lx)\n",
-            *edtGuid, templateGuid, (s32)paramc, paramv, (s32)depc, depv,
+            edtGuid, templateGuid, (s32)paramc, paramv, (s32)depc, depv,
             (u32)properties, affinity, outputEvent);
     PD_MSG_STACK(msg);
     ocrPolicyDomain_t * pd = NULL;
@@ -198,8 +198,25 @@ u8 ocrEdtCreate(ocrGuid_t* edtGuid, ocrGuid_t templateGuid,
     }
 #define PD_MSG (&msg)
 #define PD_TYPE PD_MSG_WORK_CREATE
-    msg.type = PD_MSG_WORK_CREATE | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
-    PD_MSG_FIELD_IO(guid.guid) = *edtGuid;
+    msg.type = PD_MSG_WORK_CREATE | PD_MSG_REQUEST;
+    PD_MSG_FIELD_IO(guid.guid) = edtGuid;
+    if (edtGuidPtr != NULL) {
+        msg.type |= PD_MSG_REQ_RESPONSE;
+    } else {
+        if ((depc != 0) && (depv == NULL)) {
+            // Error since we do not return a GUID, dependences can never be added
+            ASSERT(false && "Error: NULL-GUID EDT depv not provided");
+            return OCR_EPERM;
+        } else if (depc == EDT_PARAM_DEF) {
+            // Because we'd like to avoid deguidifying the template here
+            // make the creation synchronous if EDT_PARAM_DEF is set.
+            DPRINTF(DEBUG_LVL_WARN,"NULL-GUID EDT creation made synchronous: depc is set to EDT_PARAM_DEF\n");
+            msg.type |= PD_MSG_REQ_RESPONSE;
+        } else if (outputEvent != NULL) {
+            DPRINTF(DEBUG_LVL_WARN,"NULL-GUID EDT creation made synchronous: EDT has an output-event\n");
+            msg.type |= PD_MSG_REQ_RESPONSE;
+        }
+    }
 
     ocrFatGuid_t * depvFatGuids = NULL;
     // EDT_DEPV_DELAYED allows to use the older implementation
@@ -215,8 +232,7 @@ u8 ocrEdtCreate(ocrGuid_t* edtGuid, ocrGuid_t templateGuid,
         depvArray[i].metaDataPtr = NULL;
     }
 #endif
-
-    PD_MSG_FIELD_IO(guid.guid) = *edtGuid;
+    PD_MSG_FIELD_IO(guid.guid) = NULL_GUID; // to be set by callee
     PD_MSG_FIELD_IO(guid.metaDataPtr) = NULL;
     if(outputEvent) {
         PD_MSG_FIELD_IO(outputEvent.guid) = UNINITIALIZED_GUID;
@@ -245,9 +261,16 @@ u8 ocrEdtCreate(ocrGuid_t* edtGuid, ocrGuid_t templateGuid,
         RETURN_PROFILE(returnCode);
     }
 
-    *edtGuid = PD_MSG_FIELD_IO(guid.guid);
+    // Read the GUID anyway as the EDT may have been assigned one
+    // even if the user didn't need it to be returned.
+    edtGuid = PD_MSG_FIELD_IO(guid.guid);
+    if (edtGuidPtr != NULL) {
+        *edtGuidPtr = edtGuid;
+    }
+    // These should have been resolved
     paramc = PD_MSG_FIELD_IO(paramc);
     depc = PD_MSG_FIELD_IO(depc);
+
     if(outputEvent)
         *outputEvent = PD_MSG_FIELD_IO(outputEvent.guid);
 
@@ -260,12 +283,13 @@ u8 ocrEdtCreate(ocrGuid_t* edtGuid, ocrGuid_t templateGuid,
     if (depv != NULL) {
 #endif
         // Please check that # of dependences agrees with depv vector
+        ASSERT(edtGuid != NULL_GUID);
         ASSERT(depc != 0);
         u32 i = 0;
         while(i < depc) {
             if(depv[i] != UNINITIALIZED_GUID) {
                 // We only add dependences that are not UNINITIALIZED_GUID
-                returnCode = ocrAddDependence(depv[i], *edtGuid, i, DB_DEFAULT_MODE);
+                returnCode = ocrAddDependence(depv[i], edtGuid, i, DB_DEFAULT_MODE);
             } else {
                 returnCode = 0;
             }
@@ -277,9 +301,9 @@ u8 ocrEdtCreate(ocrGuid_t* edtGuid, ocrGuid_t templateGuid,
     }
 
     if(outputEvent) {
-        DPRINTF(DEBUG_LVL_INFO, "EXIT ocrEdtCreate -> 0; GUID: 0x%lx; outEvt: 0x%lx\n", *edtGuid, *outputEvent);
+        DPRINTF(DEBUG_LVL_INFO, "EXIT ocrEdtCreate -> 0; GUID: 0x%lx; outEvt: 0x%lx\n", edtGuid, *outputEvent);
     } else {
-        DPRINTF(DEBUG_LVL_INFO, "EXIT ocrEdtCreate -> 0; GUID: 0x%lx\n", *edtGuid);
+        DPRINTF(DEBUG_LVL_INFO, "EXIT ocrEdtCreate -> 0; GUID: 0x%lx\n", edtGuid);
     }
     RETURN_PROFILE(0);
 #undef PD_MSG

@@ -120,14 +120,28 @@ u8 delegateCommSendMessage(ocrCommApi_t *self, ocrLocation_t target,
     ASSERT((pd->myLocation == message->srcLocation) && (target == message->destLocation));
     ASSERT(pd->myLocation != target); //DIST-TODO not tested sending a message to self
 
+    // If the message is not persistent and the marshall mode is set, we do the specified
+    // copy. Otherwise it is just the mode the buffer has been copied in the first place.
+
+    // Modified this to experiment with asynchronous remote edt creation
     if (!(properties & PERSIST_MSG_PROP)) {
-        // Need to make a copy of the message. Recall send is returning as soon as
-        // the handle is handed over to the scheduler.
+        // Need to make a copy of the message. Recall that send is returning
+        // as soon as the handle is handed over to the scheduler.
+        ocrMarshallMode_t marshallMode = (ocrMarshallMode_t) GET_PROP_U8_MARSHALL(properties);
+
+        if (marshallMode == 0) {
+            marshallMode = MARSHALL_DUPLICATE; // impl choice
+        }
+
+        // NOTE: here we could support _APPEND or _ADDL although we would still
+        //       have to create a new message anyway because of PERSIST_MSG_PROP
+        ASSERT((marshallMode & MARSHALL_DUPLICATE) || (marshallMode & MARSHALL_FULL_COPY));
+
         u64 baseSize = 0, marshalledSize = 0;
-        ocrPolicyMsgGetMsgSize(message, &baseSize, &marshalledSize, 0);
+        ocrPolicyMsgGetMsgSize(message, &baseSize, &marshalledSize, marshallMode);
         u64 fullSize = baseSize + marshalledSize;
         ocrPolicyMsg_t * msgCpy = allocateNewMessage(self, fullSize);
-        ocrPolicyMsgMarshallMsg(message, baseSize, (u8*)msgCpy, MARSHALL_DUPLICATE);
+        ocrPolicyMsgMarshallMsg(message, baseSize, (u8*)msgCpy, marshallMode);
         message = msgCpy;
         // Indicates to entities down the line the message is now persistent
         // The rationale is that one-way calls are always deallocated by the

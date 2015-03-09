@@ -427,6 +427,26 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
         if (msg->destLocation == curLoc) {
             DPRINTF(DEBUG_LVL_VVERB,"WORK_CREATE: local EDT creation for template GUID 0x%lx\n", PD_MSG_FIELD_I(templateGuid.guid));
         } else {
+            // For asynchronous EDTs we check the content of depv.
+            // If it contains non-persistent events the creation
+            // must be synchronous and we change the message flags here.
+            if (!(msg->type & PD_MSG_REQ_RESPONSE)) {
+                ocrFatGuid_t * depv = PD_MSG_FIELD_I(depv);
+                u32 depc = ((depv != NULL) ? PD_MSG_FIELD_IO(depc) : 0);
+                u32 i;
+                for(i=0; i<depc; i++) {
+                    ASSERT(depv[i].guid != UNINITIALIZED_GUID);
+                    ocrGuidKind kind;
+                    u8 ret = self->guidProviders[0]->fcts.getKind(self->guidProviders[0], depv[i].guid, &kind);
+                    ASSERT(!ret);
+                    if ((kind == OCR_GUID_EVENT_ONCE) || (kind == OCR_GUID_EVENT_LATCH)) {
+                        msg->type |= PD_MSG_REQ_RESPONSE;
+                        DPRINTF(DEBUG_LVL_WARN,"NULL-GUID EDT creation made synchronous: depv[%d] is (ONCE|LATCH)\n", i);
+                        break;
+                    }
+                }
+            }
+
             // Outgoing EDT create message
             DPRINTF(DEBUG_LVL_VVERB,"WORK_CREATE: remote EDT creation at %lu for template GUID 0x%lx\n", (u64)msg->destLocation, PD_MSG_FIELD_I(templateGuid.guid));
 #undef PD_MSG
@@ -1345,6 +1365,18 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
                 }
                 default: { }
                 }
+            } else {
+                ASSERT(msg->type & PD_MSG_REQUEST);
+#define PD_MSG msg
+#define PD_TYPE PD_MSG_WORK_CREATE
+                if (((msg->type & PD_MSG_TYPE_ONLY) == PD_MSG_WORK_CREATE) && !(msg->type & PD_MSG_REQ_RESPONSE)) {
+                    ASSERT(PD_MSG_FIELD_IO(guid.guid) == NULL_GUID);
+                    // Do a full marshalling to make sure we capture paramv/depv
+                    ocrMarshallMode_t marshallMode = MARSHALL_FULL_COPY;
+                    sendProp |= (((u32)marshallMode) << COMM_PROP_BEHAVIOR_OFFSET);
+                }
+#undef PD_MSG
+#undef PD_TYPE
             }
 
             // one-way request, several options:

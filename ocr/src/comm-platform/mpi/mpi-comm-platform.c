@@ -196,14 +196,28 @@ u8 MPICommSendMessage(ocrCommPlatform_t * self,
             ASSERT(false && "not used in current implementation (hence not tested)");
         }
     } else {
-        // Marshall the message. We made sure we had enough space.
-        ocrPolicyMsgMarshallMsg(messageBuffer, baseSize, (u8*)messageBuffer,
-                                MARSHALL_APPEND | MARSHALL_DBPTR | MARSHALL_NSADDR);
+        ocrMarshallMode_t marshallMode = (ocrMarshallMode_t) GET_PROP_U8_MARSHALL(properties);
+        if (marshallMode == 0) {
+            // Marshall the message. We made sure we had enough space.
+            ocrPolicyMsgMarshallMsg(messageBuffer, baseSize, (u8*)messageBuffer,
+                                    MARSHALL_APPEND | MARSHALL_DBPTR | MARSHALL_NSADDR);
+        } else {
+            ASSERT(marshallMode == MARSHALL_FULL_COPY);
+            //TODO These are only relevant in certain contexts
+            // They are needed in a comm-platform such as mpi or gasnet
+            // but it feels off that the calling context already set those
+            // because it shouldn't know beforehand if the communication is
+            // crossing address space
+            // | MARSHALL_DBPTR :  only for acquire/release message
+            // | MARSHALL_NSADDR : only used when unmarshalling so far
+            ASSERT ((((messageBuffer->type & PD_MSG_TYPE_ONLY) == PD_MSG_DB_ACQUIRE) ||
+                    ((messageBuffer->type & PD_MSG_TYPE_ONLY) == PD_MSG_DB_RELEASE))
+                    ? (marshallMode & (MARSHALL_DBPTR | MARSHALL_NSADDR)) : 1);
+        }
     }
 
     // Warning: From now on, exclusively use 'messageBuffer' instead of 'message'
     ASSERT(fullMsgSize == messageBuffer->usefulSize);
-
     // Prepare MPI call arguments
     MPI_Datatype datatype = MPI_BYTE;
     int targetRank = locationToMpiRank(target);

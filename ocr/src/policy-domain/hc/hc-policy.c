@@ -1241,8 +1241,12 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             }
         }
 #endif
-        msg->type &= ~PD_MSG_REQUEST;
-        msg->type |= PD_MSG_RESPONSE;
+        // For asynchronous edt creation
+        if (msg->type & PD_MSG_REQ_RESPONSE) {
+            msg->type &= ~PD_MSG_REQUEST;
+            msg->type |= PD_MSG_RESPONSE;
+        }
+
 #undef PD_MSG
 #undef PD_TYPE
         EXIT_PROFILE;

@@ -76,9 +76,9 @@ u64 ocrPolicyMsgGetMsgBaseSize(ocrPolicyMsg_t *msg, bool isIn) {
 #define PER_TYPE(type)                                  \
     case type:                                          \
         if(isIn) {                                      \
-            baseSize = _PD_MSG_SIZE_IN(type);                          \
+            baseSize = _PD_MSG_SIZE_IN(type);           \
         } else {                                        \
-            baseSize = _PD_MSG_SIZE_OUT(type);         \
+            baseSize = _PD_MSG_SIZE_OUT(type);          \
         }                                               \
         break;
 #include "ocr-policy-msg-list.h"
@@ -306,7 +306,7 @@ u8 ocrPolicyMsgMarshallMsg(ocrPolicyMsg_t* msg, u64 baseSize, u8* buffer, u32 mo
                             (u64)PD_MSG_FIELD_I(paramv), curPtr);
                     PD_MSG_FIELD_I(paramv) = (void*)curPtr;
                 }
-                // Finally move the curPtr for the next object (none as of now)
+                // Finally move the curPtr for the next object
                 curPtr += s;
             } else {
                 PD_MSG_FIELD_I(paramv) = NULL;
@@ -327,7 +327,6 @@ u8 ocrPolicyMsgMarshallMsg(ocrPolicyMsg_t* msg, u64 baseSize, u8* buffer, u32 mo
                             (u64)PD_MSG_FIELD_I(depv), curPtr);
                     PD_MSG_FIELD_I(depv) = (void*)curPtr;
                 }
-                // Finally move the curPtr for the next object (none as of now)
                 curPtr += s;
             } else {
                 PD_MSG_FIELD_I(depv) = NULL;
