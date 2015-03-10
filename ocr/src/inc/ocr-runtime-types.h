@@ -114,6 +114,17 @@ typedef enum {
     PRIO3_MSG_PROP           = 0x400, /**< Highest priority message */
 } ocrMsgBehaviorProp_t;
 
+// Defines communication behavior properties to be used as the
+// upper 16 bits of the u32 property flag of send/recv/poll API calls.
+#define COMM_PROP_BEHAVIOR_SIZE 16
+#define COMM_PROP_BEHAVIOR_OFFSET   16
+// Marshalling mode (ocrMarshallMode_t) is the first 8 bits of the behavior prop
+#define COMM_BEHAVIOR_MARSHALL_MASK 0x00FF0000
+#define COMM_PROP_MARSHALL_OFFSET   COMM_PROP_BEHAVIOR_OFFSET
+
+// Extracts marshalling information from a u32 communication property
+#define GET_PROP_U8_MARSHALL(commProperty) ((u8) ((commProperty & COMM_BEHAVIOR_MARSHALL_MASK) >> COMM_PROP_MARSHALL_OFFSET))
+
 /**
  * @brief Status of messages at the comm-platform level
  *

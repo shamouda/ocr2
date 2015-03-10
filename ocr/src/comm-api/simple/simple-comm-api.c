@@ -70,18 +70,8 @@ u8 sendMessageSimpleCommApi(ocrCommApi_t *self, ocrLocation_t target, ocrPolicyM
                                 MARSHALL_FULL_COPY | MARSHALL_DBPTR | MARSHALL_NSADDR);
         message = msgCpy;
         properties |= PERSIST_MSG_PROP;
+
     }
-    // This is the old code
-    // if (!(properties & PERSIST_MSG_PROP)) {
-    //     u64 baseSize = 0, marshalledSize = 0;
-    //     ocrPolicyMsgGetMsgSize(message, &baseSize, &marshalledSize, 0);
-    //     u64 fullSize = baseSize + marshalledSize;
-    //     ocrPolicyMsg_t * msgCpy = allocateNewMessage(self, fullSize);
-    //     ocrPolicyMsgMarshallMsg(message, baseSize, (u8*)msgCpy, MARSHALL_DUPLICATE);
-    //     message = msgCpy;
-    //     properties |= PERSIST_MSG_PROP;
-    //     ASSERT(false && "debug tmp");
-    // }
 
     // This is weird but otherwise the compiler complains...
     u64 id = 0;

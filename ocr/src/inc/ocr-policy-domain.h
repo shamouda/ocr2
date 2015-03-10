@@ -1351,6 +1351,8 @@ void initializePolicyDomainOcr(ocrPolicyDomainFactory_t * factory, ocrPolicyDoma
 /* UTILITY FUNCTIONS                                */
 /****************************************************/
 
+// The u32 property flag of send/recv/poll API calls
+// relies on ocrMarshallMode_t to be 8 bits wide.
 typedef enum {
     MARSHALL_FULL_COPY = 0x1,
     MARSHALL_DUPLICATE = 0x2,
