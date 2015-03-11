@@ -31,7 +31,7 @@ MKDIR   := mkdir
 LN      := ln
 
 # Shared libraries specific builds
-LDFLAGS := -shared -fpic -lpthread
+LDFLAGS := -g -shared -fpic -lpthread -Wl,-soname,libocr.so.1
 
 # CFLAGS_SHARED will be concatenated with any
 # common CFLAGS options
