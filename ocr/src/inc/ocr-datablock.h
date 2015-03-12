@@ -105,9 +105,10 @@ typedef struct _ocrDataBlockFcts_t {
      * @param self          Pointer to this data-block
      * @param edt           EDT seeking to free the data-block
      *                      Must be fully resolved
+     * @param isInternal    Mode of the release (see release()) if required
      * @return 0 on success and an error code on failure (see ocr-db.h)
      */
-    u8 (*free)(struct _ocrDataBlock_t *self, ocrFatGuid_t edt);
+    u8 (*free)(struct _ocrDataBlock_t *self, ocrFatGuid_t edt, bool isInternal);
 
     /**
      * @brief Register a "waiter" (aka a dependence) on the data-block

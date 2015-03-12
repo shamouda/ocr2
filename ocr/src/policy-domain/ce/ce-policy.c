@@ -687,7 +687,7 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             ASSERT(db->fctId == self->dbFactories[0]->factoryId);
             PD_MSG_FIELD_O(returnDetail) = self->dbFactories[0]->fcts.acquire(
                 db, &(PD_MSG_FIELD_O(ptr)), edtFatGuid, EDT_SLOT_NONE,
-                DB_MODE_ITW, false, (u32)DB_MODE_ITW);
+                DB_MODE_ITW, PD_MSG_FIELD_IO(properties) & DB_PROP_RT_ACQUIRE, (u32)DB_MODE_ITW);
         } else {
             // Cannot acquire
             PD_MSG_FIELD_O(ptr) = NULL;
@@ -779,7 +779,7 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         ASSERT(db->fctId == self->dbFactories[0]->factoryId);
         ASSERT(!(msg->type & PD_MSG_REQ_RESPONSE));
         PD_MSG_FIELD_O(returnDetail) =
-            self->dbFactories[0]->fcts.free(db, PD_MSG_FIELD_I(edt));
+            self->dbFactories[0]->fcts.free(db, PD_MSG_FIELD_I(edt), PD_MSG_FIELD_I(properties) & DB_PROP_RT_ACQUIRE);
         returnCode = ceProcessResponse(self, msg, 0);
 #undef PD_MSG
 #undef PD_TYPE

@@ -478,7 +478,7 @@ u8 lockableDestruct(ocrDataBlock_t *self) {
     return 0;
 }
 
-u8 lockableFree(ocrDataBlock_t *self, ocrFatGuid_t edt) {
+u8 lockableFree(ocrDataBlock_t *self, ocrFatGuid_t edt, bool isInternal) {
     ocrDataBlockLockable_t *rself = (ocrDataBlockLockable_t*)self;
     DPRINTF(DEBUG_LVL_VERB, "Requesting a free for DB @ 0x%lx (GUID: 0x%lx)\n",
             (u64)self->ptr, rself->base.guid);
@@ -586,7 +586,7 @@ ocrDataBlockFactory_t *newDataBlockFactoryLockable(ocrParamList_t *perType, u32 
     base->fcts.destruct = FUNC_ADDR(u8 (*)(ocrDataBlock_t*), lockableDestruct);
     base->fcts.acquire = FUNC_ADDR(u8 (*)(ocrDataBlock_t*, void**, ocrFatGuid_t, u32, ocrDbAccessMode_t, bool, u32), lockableAcquire);
     base->fcts.release = FUNC_ADDR(u8 (*)(ocrDataBlock_t*, ocrFatGuid_t, bool), lockableRelease);
-    base->fcts.free = FUNC_ADDR(u8 (*)(ocrDataBlock_t*, ocrFatGuid_t), lockableFree);
+    base->fcts.free = FUNC_ADDR(u8 (*)(ocrDataBlock_t*, ocrFatGuid_t, bool), lockableFree);
     base->fcts.registerWaiter = FUNC_ADDR(u8 (*)(ocrDataBlock_t*, ocrFatGuid_t,
                                                  u32, bool), lockableRegisterWaiter);
     base->fcts.unregisterWaiter = FUNC_ADDR(u8 (*)(ocrDataBlock_t*, ocrFatGuid_t,

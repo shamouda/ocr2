@@ -183,7 +183,7 @@ u8 regularDestruct(ocrDataBlock_t *self) {
     return 0;
 }
 
-u8 regularFree(ocrDataBlock_t *self, ocrFatGuid_t edt) {
+u8 regularFree(ocrDataBlock_t *self, ocrFatGuid_t edt, bool isInternal) {
     ocrDataBlockRegular_t *rself = (ocrDataBlockRegular_t*)self;
 
     u32 id = ocrGuidTrackerFind(&(rself->usersTracker), edt.guid);
@@ -201,7 +201,7 @@ u8 regularFree(ocrDataBlock_t *self, ocrFatGuid_t edt) {
 
 
     if(id < 64) {
-        regularRelease(self, edt, false);
+        regularRelease(self, edt, isInternal);
     } else {
         // We can call free without having acquired the block
         // Now check if we can actually free the block
@@ -303,7 +303,7 @@ ocrDataBlockFactory_t *newDataBlockFactoryRegular(ocrParamList_t *perType, u32 f
     base->fcts.destruct = FUNC_ADDR(u8 (*)(ocrDataBlock_t*), regularDestruct);
     base->fcts.acquire = FUNC_ADDR(u8 (*)(ocrDataBlock_t*, void**, ocrFatGuid_t, u32, ocrDbAccessMode_t, bool, u32), regularAcquire);
     base->fcts.release = FUNC_ADDR(u8 (*)(ocrDataBlock_t*, ocrFatGuid_t, bool), regularRelease);
-    base->fcts.free = FUNC_ADDR(u8 (*)(ocrDataBlock_t*, ocrFatGuid_t), regularFree);
+    base->fcts.free = FUNC_ADDR(u8 (*)(ocrDataBlock_t*, ocrFatGuid_t, bool), regularFree);
     base->fcts.registerWaiter = FUNC_ADDR(u8 (*)(ocrDataBlock_t*, ocrFatGuid_t,
                                                  u32, bool), regularRegisterWaiter);
     base->fcts.unregisterWaiter = FUNC_ADDR(u8 (*)(ocrDataBlock_t*, ocrFatGuid_t,

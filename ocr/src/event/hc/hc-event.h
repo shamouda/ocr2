@@ -29,6 +29,7 @@ typedef struct ocrEventHc_t {
     u32 waitersMax; /**< Maximum number of waiters in waitersDb */
     u32 signalersCount; /**< Number of signalers in signalersDb */
     u32 signalersMax; /**< Maximum number of signalers in signalersDb */
+    volatile u32 waitersLock;
 } ocrEventHc_t;
 
 // STICKY or IDEM events need a lock
@@ -37,7 +38,6 @@ typedef struct ocrEventHc_t {
 typedef struct _ocrEventHcPersist_t {
     ocrEventHc_t base;
     ocrGuid_t data;
-    volatile u32 waitersLock;
 } ocrEventHcPersist_t;
 
 
