@@ -1,0 +1,13 @@
+Written and Committed by David S Scott
+
+stencil1D.c implements a 1D dissapative stencil on a set of points
+the initial data is 1s at each end and zero on the interior
+there are three input parameters that are set in #define s
+N is the number of worker EDTs
+M is the number of points controlled by each EDT
+I is the number of iterations
+
+The can be changed and rerun.
+
+There is a j.sh bash script that compiles and runs the code in all four modes
+Or you can just run one of the four lines at the bottom
