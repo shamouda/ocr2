@@ -46,6 +46,8 @@ void hc_scheduler_create(ocr_scheduler_t * base, void * per_type_configuration, 
     derived->worker_id_begin = mapper->worker_id_begin;
     derived->worker_id_end = mapper->worker_id_end;
     derived->n_workers_per_scheduler = 1 + derived->worker_id_end - derived->worker_id_begin;
+
+    free(per_instance_configuration);
 }
 
 void hc_scheduler_destruct(ocr_scheduler_t * scheduler) {
@@ -73,18 +75,15 @@ static inline ocr_workpile_t * hc_scheduler_push_mapping_one_to_one (ocr_schedul
 #define N_SOCKETS 2
 #define N_L3S_PER_SOCKET 1
 #define N_L2S_PER_SOCKET 6
-#define N_L1S_PER_SOCKET 6
 #define N_TOTAL_L3S ( (N_SOCKETS) * (N_L3S_PER_SOCKET))
 #define N_TOTAL_L2S ( (N_SOCKETS) * (N_L2S_PER_SOCKET))
-#define N_TOTAL_L1S ( (N_SOCKETS) * (N_L1S_PER_SOCKET))
 
-/* L1s indexed from 0 to N_TOTAL_L1S-1
- * L2s indexed from N_TOTAL_L1S to N_TOTAL_L1S + N_TOTAL_L2S - 1
- * L3s indexed from N_TOTAL_L1S + N_TOTAL_L2S to N_TOTAL_L1S + N_TOTAL_L2S + N_TOTAL_L3S - 1
- * sockets indexed from N_TOTAL_L1S + N_TOTAL_L2S + N_TOTAL_L3S to N_TOTAL_L1S + N_TOTAL_L2S + N_TOTAL_L3S + N_SOCKETS - 1 
+/* L2s indexed from 0 to N_TOTAL_L2S-1
+ * L3s indexed from N_TOTAL_L2S to N_TOTAL_L2S + N_TOTAL_L3S - 1
+ * sockets indexed from N_TOTAL_L2S + N_TOTAL_L3S to N_TOTAL_L2S + N_TOTAL_L3S + N_SOCKETS - 1 
  * */
 
-#define SOCKET_INDEX_OFFSET ((N_TOTAL_L1S)+(N_TOTAL_L2S)+(N_TOTAL_L3S))
+#define SOCKET_INDEX_OFFSET ((N_TOTAL_L2S)+(N_TOTAL_L3S))
 
 #endif /* DAVINCI */
 
@@ -131,7 +130,7 @@ static int davinciMostDataLocalWorker ( ocrGuid_t taskGuid ) {
     curr = eventArray[0];
 
     char l2Presence[ N_L2S_PER_SOCKET ] = {0,0,0,0,0,0};
-    int l2IndexOffset = N_TOTAL_L1S + mostLocalSocketIndex * N_L2S_PER_SOCKET;
+    int l2IndexOffset = mostLocalSocketIndex * N_L2S_PER_SOCKET;
 
     while ( NULL != curr ) {
         dbGuid = curr->get(curr);
@@ -348,19 +347,19 @@ static ocrGuid_t hc_scheduler_local_pop_then_hier_cyclic_steal (ocr_scheduler_t*
 
         const int worker_cpu_id = get_worker_cpu_id(w);
         const int workerID = get_worker_id(w);
-        const int socketID = worker_cpu_id / N_L1S_PER_SOCKET;
+        const int socketID = worker_cpu_id / N_L2S_PER_SOCKET;
         int iteration = 1;
 
-        for ( ; (iteration < N_L1S_PER_SOCKET) && (NULL_GUID == popped); ++iteration ) {
-            ocr_workpile_t * victim = derived->pools[ (workerID + iteration) % N_L1S_PER_SOCKET + socketID * N_L1S_PER_SOCKET ];
+        for ( ; (iteration < N_L2S_PER_SOCKET) && (NULL_GUID == popped); ++iteration ) {
+            ocr_workpile_t * victim = derived->pools[ (workerID + iteration) % N_L2S_PER_SOCKET + socketID * N_L2S_PER_SOCKET ];
             popped = victim->steal(victim, worker_cpu_id,base);
             ++((hc_worker_t*) w)->nStealAttempts;
         }
         if ( NULL_GUID == popped ) {
             const int otherSocketID = 1 - socketID;
 
-            for ( iteration = 0; (iteration < N_L1S_PER_SOCKET ) && (NULL_GUID == popped); ++iteration ) {
-                ocr_workpile_t * victim = derived->pools[ (workerID + iteration) % N_L1S_PER_SOCKET + otherSocketID * N_L1S_PER_SOCKET ];
+            for ( iteration = 0; (iteration < N_L2S_PER_SOCKET ) && (NULL_GUID == popped); ++iteration ) {
+                ocr_workpile_t * victim = derived->pools[ (workerID + iteration) % N_L2S_PER_SOCKET + otherSocketID * N_L2S_PER_SOCKET ];
                 popped = victim->steal(victim, worker_cpu_id,base);
                 ++((hc_worker_t*) w)->nStealAttempts;
             }
@@ -390,13 +389,13 @@ static ocrGuid_t hc_scheduler_local_pop_then_hier_random_steal (ocr_scheduler_t*
         hc_scheduler_t* derived = (hc_scheduler_t*) base;
 
         const int worker_cpu_id = get_worker_cpu_id(w);
-        const int socketID = worker_cpu_id / N_L1S_PER_SOCKET;
+        const int socketID = worker_cpu_id / N_L2S_PER_SOCKET;
 
-        const int nTrials = N_TURNS * N_L1S_PER_SOCKET;
+        const int nTrials = N_TURNS * N_L2S_PER_SOCKET;
         int trial = 0;
 
         for ( ; ( trial < nTrials ) && (NULL_GUID == popped); ++trial ) {
-            int currVictimID = socketID*N_L1S_PER_SOCKET + (rand() % N_L1S_PER_SOCKET );
+            int currVictimID = socketID*N_L2S_PER_SOCKET + (rand() % N_L2S_PER_SOCKET );
             if ( worker_cpu_id != currVictimID ) {
                 ocr_workpile_t * victim = derived->pools[currVictimID];
                 popped = victim->steal(victim, worker_cpu_id,base);
@@ -407,7 +406,7 @@ static ocrGuid_t hc_scheduler_local_pop_then_hier_random_steal (ocr_scheduler_t*
             const int otherSocketID = 1 - socketID;
             int trial = 0;
             for ( ; ( trial < nTrials ) && (NULL_GUID == popped) ; ++trial ) {
-                int currVictimID = otherSocketID*N_L1S_PER_SOCKET + (rand() % N_L1S_PER_SOCKET );
+                int currVictimID = otherSocketID*N_L2S_PER_SOCKET + (rand() % N_L2S_PER_SOCKET );
                 ocr_workpile_t * victim = derived->pools[currVictimID];
                 popped = victim->steal(victim, worker_cpu_id,base);
                 ++((hc_worker_t*) w)->nStealAttempts;
@@ -436,13 +435,13 @@ static ocrGuid_t hc_scheduler_local_pop_then_socket_random_steal (ocr_scheduler_
         hc_scheduler_t* derived = (hc_scheduler_t*) base;
 
         const int worker_cpu_id = get_worker_cpu_id(w);
-        const int socketID = worker_cpu_id / N_L1S_PER_SOCKET;
+        const int socketID = worker_cpu_id / N_L2S_PER_SOCKET;
 
-        const int nTrials = N_TURNS * N_L1S_PER_SOCKET;
+        const int nTrials = N_TURNS * N_L2S_PER_SOCKET;
         int trial = 0;
 
         for ( ; ( trial < nTrials ) && (NULL_GUID == popped); ++trial ) {
-            int currVictimID = socketID*N_L1S_PER_SOCKET + (rand() % N_L1S_PER_SOCKET );
+            int currVictimID = socketID*N_L2S_PER_SOCKET + (rand() % N_L2S_PER_SOCKET );
             if ( worker_cpu_id != currVictimID ) {
                 ocr_workpile_t * victim = derived->pools[currVictimID];
                 popped = victim->steal(victim, worker_cpu_id,base);
@@ -533,9 +532,9 @@ static void hc_scheduler_usersocket_push (ocr_scheduler_t* base, ocrGuid_t worke
     hc_scheduler_t* derived = (hc_scheduler_t*) base;
     int scope = derived->n_workers_per_scheduler;
     int my_id = get_worker_id(w) % scope;
-    int idWithinSocket = my_id % N_L1S_PER_SOCKET;
+    int idWithinSocket = my_id % N_L2S_PER_SOCKET;
     
-    ocr_workpile_t * wp_to_push = derived->pools[ idWithinSocket + socketID * N_L1S_PER_SOCKET ];
+    ocr_workpile_t * wp_to_push = derived->pools[ idWithinSocket + socketID * N_L2S_PER_SOCKET ];
     wp_to_push->push(wp_to_push,tid);
 #else
 #ifdef RICE_PHI

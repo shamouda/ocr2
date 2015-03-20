@@ -142,15 +142,12 @@ void ocrPlaceTrackerAllocate ( ocrPlaceTracker_t** toFill ) {
 #define N_SOCKETS 2
 #define N_L3S_PER_SOCKET 1
 #define N_L2S_PER_SOCKET 6
-#define N_L1S_PER_SOCKET 6
 #define N_TOTAL_L3S ( (N_SOCKETS) * (N_L3S_PER_SOCKET))
 #define N_TOTAL_L2S ( (N_SOCKETS) * (N_L2S_PER_SOCKET))
-#define N_TOTAL_L1S ( (N_SOCKETS) * (N_L1S_PER_SOCKET))
 
-/* L1s indexed from 0 to N_TOTAL_L1S-1
- * L2s indexed from N_TOTAL_L1S to N_TOTAL_L1S + N_TOTAL_L2S - 1
- * L3s indexed from N_TOTAL_L1S + N_TOTAL_L2S to N_TOTAL_L1S + N_TOTAL_L2S + N_TOTAL_L3S - 1
- * sockets indexed from N_TOTAL_L1S + N_TOTAL_L2S + N_TOTAL_L3S to N_TOTAL_L1S + N_TOTAL_L2S + N_TOTAL_L3S + N_SOCKETS - 1 
+/* L2s indexed from 0 to N_TOTAL_L2S-1
+ * L3s indexed from N_TOTAL_L2S to N_TOTAL_L2S + N_TOTAL_L3S - 1
+ * sockets indexed from N_TOTAL_L2S + N_TOTAL_L3S to N_TOTAL_L2S + N_TOTAL_L3S + N_SOCKETS - 1 
  * */
 
 #endif /* DAVINCI */
@@ -163,21 +160,18 @@ void ocrPlaceTrackerAllocate ( ocrPlaceTracker_t** toFill ) {
 
 void ocrPlaceTrackerInsert ( ocrPlaceTracker_t* self, unsigned char currPlace ) {
 #ifdef DAVINCI
-    unsigned char socket_id = currPlace/N_L1S_PER_SOCKET;
+    unsigned char socket_id = currPlace/N_L2S_PER_SOCKET;
     unsigned char l2_within_socket_id = currPlace%N_L2S_PER_SOCKET;
     unsigned char l3_within_socket_id = 0;
-    unsigned char core_within_socket_id = currPlace%N_L1S_PER_SOCKET;
-    // mark the 'worker'/L1 place
-    self->existInPlaces |= (1ULL << ( socket_id*N_L1S_PER_SOCKET + core_within_socket_id));
     
     // mark the L2 place
-    self->existInPlaces |= (1ULL << ( N_TOTAL_L1S + socket_id*N_L2S_PER_SOCKET + l2_within_socket_id ));
+    self->existInPlaces |= (1ULL << ( socket_id*N_L2S_PER_SOCKET + l2_within_socket_id ));
     
     // mark the L3 place
-    self->existInPlaces |= (1ULL << ( N_TOTAL_L1S + N_TOTAL_L2S + socket_id*N_L3S_PER_SOCKET + l3_within_socket_id ));
+    self->existInPlaces |= (1ULL << ( N_TOTAL_L2S + socket_id*N_L3S_PER_SOCKET + l3_within_socket_id ));
     
     // mark the socket place
-    self->existInPlaces |= (1ULL << ( N_TOTAL_L1S + N_TOTAL_L2S + N_TOTAL_L3S + socket_id));
+    self->existInPlaces |= (1ULL << ( N_TOTAL_L2S + N_TOTAL_L3S + socket_id));
 #else
 #ifdef RICE_PHI
     unsigned char core_id = (currPlace-1)/N_HYPERTHREADS;

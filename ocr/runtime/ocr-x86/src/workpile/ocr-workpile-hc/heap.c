@@ -91,10 +91,8 @@ void locked_dequeish_heap_tail_push_no_priority (heap_t* heap, void* entry) {
 #define N_SOCKETS 2
 #define N_L3S_PER_SOCKET 1
 #define N_L2S_PER_SOCKET 6
-#define N_L1S_PER_SOCKET 6
 #define N_TOTAL_L3S ( (N_SOCKETS) * (N_L3S_PER_SOCKET))
 #define N_TOTAL_L2S ( (N_SOCKETS) * (N_L2S_PER_SOCKET))
-#define N_TOTAL_L1S ( (N_SOCKETS) * (N_L1S_PER_SOCKET))
 
 #define MISS 1000
 #define LOCAL_L3_HIT 50
@@ -113,15 +111,15 @@ void locked_dequeish_heap_tail_push_no_priority (heap_t* heap, void* entry) {
 static inline double costToAcquireData ( int worker_cpu_id, u64 placeTracker ) {
     double cost = 0;
 #ifdef DAVINCI
-    unsigned char socket_id = worker_cpu_id/N_L1S_PER_SOCKET;
+    unsigned char socket_id = worker_cpu_id/N_L2S_PER_SOCKET;
     unsigned char l2_within_socket_id = worker_cpu_id % N_L2S_PER_SOCKET;
     unsigned char l3_within_socket_id = 0;
 
-    if (!( placeTracker & (1ULL << (N_TOTAL_L1S + N_TOTAL_L2S + N_TOTAL_L3S + socket_id)) )) { /*not in my socket*/
+    if (!( placeTracker & (1ULL << (N_TOTAL_L2S + N_TOTAL_L3S + socket_id)) )) { /*not in my socket*/
         cost += MISS;
-    } else if (!( placeTracker & (1ULL << (N_TOTAL_L1S + N_TOTAL_L2S + socket_id*N_L3S_PER_SOCKET + l3_within_socket_id )) )) { /*in socket, not in my L3*/
+    } else if (!( placeTracker & (1ULL << (N_TOTAL_L2S + socket_id*N_L3S_PER_SOCKET + l3_within_socket_id )) )) { /*in socket, not in my L3*/
         cost += MISS;
-    } else if (!( placeTracker & (1ULL << (N_TOTAL_L1S + socket_id*N_L2S_PER_SOCKET + l2_within_socket_id)) )) { /*in socket, in L3, not in my L2*/
+    } else if (!( placeTracker & (1ULL << (socket_id*N_L2S_PER_SOCKET + l2_within_socket_id)) )) { /*in socket, in L3, not in my L2*/
         cost += LOCAL_L3_HIT;
     } else {
         cost += LOCAL_L2_HIT;
