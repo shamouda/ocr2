@@ -304,7 +304,7 @@ inline static double** readMatrix( int matrixSize, FILE* in ) {
 
 inline static void createMatrix( double** matrix, double **input_solution, int matrixSize ) {
     gettimeofday(&c,0);
-    *input_solution = (double*) malloc (sizeof(double)*matrixSize*matrixSize);
+    *input_solution = (double*) malloc (sizeof(double)*(matrixSize*matrixSize+matrixSize));
     *matrix = (double*) malloc (sizeof(double)*matrixSize*matrixSize);
 
     double *L = *input_solution;

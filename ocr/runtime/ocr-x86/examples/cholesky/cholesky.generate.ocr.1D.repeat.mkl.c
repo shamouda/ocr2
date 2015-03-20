@@ -167,7 +167,7 @@ u8 wrap_up_task ( u32 paramc, u64 * params, void* paramv[], u32 depc, ocrEdtDep_
 
     int matrixSize = numTiles * tileSize;
 #ifdef VERIFY
-    long double max_diff = -100.0;
+    long double max_diff = -100.0L;
 
     for ( i = 0; i < numTiles; ++i ) {
         for( i_b = 0; i_b < tileSize; ++i_b) {
@@ -176,13 +176,13 @@ u8 wrap_up_task ( u32 paramc, u64 * params, void* paramv[], u32 depc, ocrEdtDep_
                 if(i != j) {
                     for(j_b = 0; j_b < tileSize; ++j_b) {
                         long double diff = (long double) temp[ INDEX_1D(i_b,j_b) ] - (long double)input_solution[ (i*tileSize+i_b)*matrixSize + (j*tileSize) + j_b]; 
-                        if ( diff < 0.0 ) diff = 0 - diff;
+                        if ( diff < 0.0L ) diff = 0.0L - diff;
                         if ( diff > max_diff ) max_diff = diff;
                     }
                 } else {
                     for(j_b = 0; j_b <= i_b; ++j_b) {
                         long double diff = (long double)temp[ INDEX_1D(i_b,j_b) ] - (long double)input_solution[ (i*tileSize+i_b)*matrixSize + (j*tileSize) + j_b]; 
-                        if ( diff < 0.0 ) diff = 0 - diff;
+                        if ( diff < 0.0L ) diff = 0.0L - diff;
                         if ( diff > max_diff ) max_diff = diff;
                     }
                 }
@@ -234,9 +234,7 @@ static inline long double dgemmCountCalculator ( int numTiles, int k, int j, int
     return factorCalculator(numTiles-j-1)*big-numTiles+i-2+i-k;
 }
 
-inline static void sequential_cholesky_task_prescriber ( int k, int tileSize, int numTiles, ocrGuid_t*** lkji_event_guids) {
-    ocrGuid_t seq_cholesky_task_guid;
-
+inline static void sequential_cholesky_task_prescriber ( int k, int tileSize, int numTiles, ocrGuid_t*** lkji_event_guids, ocrGuid_t* dpotrf_guids) {
     intptr_t *func_args = (intptr_t *)malloc(3*sizeof(intptr_t));
     func_args[0] = k;
     func_args[1] = tileSize;
@@ -244,15 +242,13 @@ inline static void sequential_cholesky_task_prescriber ( int k, int tileSize, in
 
     long double nDescendants = dpotrfCountCalculator(numTiles, k);
     long double priority = nDescendants;
-    ocrEdtCreate(&seq_cholesky_task_guid, sequential_cholesky_task, 3, NULL, (void**)func_args, PROPERTIES, 1, NULL, nDescendants, priority);
+    ocrEdtCreate(&(dpotrf_guids[k]), sequential_cholesky_task, 3, NULL, (void**)func_args, PROPERTIES, 1, NULL, nDescendants, priority);
 
-    ocrAddDependence(lkji_event_guids[k][k][k], seq_cholesky_task_guid, 0);
-    ocrEdtSchedule(seq_cholesky_task_guid);
+    ocrAddDependence(lkji_event_guids[k][k][k], dpotrf_guids[k], 0);
+    ocrEdtSchedule(dpotrf_guids[k]);
 }
 
-inline static void trisolve_task_prescriber ( int k, int j, int tileSize, int numTiles, ocrGuid_t*** lkji_event_guids) {
-    ocrGuid_t trisolve_task_guid;
-
+inline static void trisolve_task_prescriber ( int k, int j, int tileSize, int numTiles, ocrGuid_t*** lkji_event_guids, ocrGuid_t** dtrsm_guids) {
     intptr_t *func_args = (intptr_t *)malloc(4*sizeof(intptr_t));
     func_args[0] = k;
     func_args[1] = j;
@@ -261,16 +257,14 @@ inline static void trisolve_task_prescriber ( int k, int j, int tileSize, int nu
 
     long double nDescendants = dtrsmCountCalculator(numTiles, k, j);
     long double priority = nDescendants;
-    ocrEdtCreate(&trisolve_task_guid, trisolve_task, 4, NULL, (void**)func_args, PROPERTIES, 2, NULL, nDescendants, priority);
+    ocrEdtCreate(&(dtrsm_guids[k][j-k-1]), trisolve_task, 4, NULL, (void**)func_args, PROPERTIES, 2, NULL, nDescendants, priority);
 
-    ocrAddDependence(lkji_event_guids[j][k][k], trisolve_task_guid, 0);
-    ocrAddDependence(lkji_event_guids[k][k][k+1], trisolve_task_guid, 1);
-    ocrEdtSchedule(trisolve_task_guid);
+    ocrAddDependence(lkji_event_guids[j][k][k], dtrsm_guids[k][j-k-1], 0);
+    ocrAddDependence(lkji_event_guids[k][k][k+1], dtrsm_guids[k][j-k-1], 1);
+    ocrEdtSchedule(dtrsm_guids[k][j-k-1]);
 }
 
-inline static void update_nondiagonal_task_prescriber ( int k, int j, int i, int tileSize, int numTiles, ocrGuid_t*** lkji_event_guids) { 
-    ocrGuid_t update_nondiagonal_task_guid;
-
+inline static void update_nondiagonal_task_prescriber ( int k, int j, int i, int tileSize, int numTiles, ocrGuid_t*** lkji_event_guids, ocrGuid_t*** dgemm_guids) { 
     intptr_t *func_args = (intptr_t *)malloc(5*sizeof(intptr_t));
     func_args[0] = k;
     func_args[1] = j;
@@ -280,19 +274,17 @@ inline static void update_nondiagonal_task_prescriber ( int k, int j, int i, int
 
     long double nDescendants = dgemmCountCalculator(numTiles, k, j, i);
     long double priority = nDescendants;
-    ocrEdtCreate(&update_nondiagonal_task_guid, update_nondiagonal_task, 5, NULL, (void**)func_args, PROPERTIES, 3, NULL, nDescendants, priority);
+    ocrEdtCreate(&(dgemm_guids[k][j-k-1][i-k-1]), update_nondiagonal_task, 5, NULL, (void**)func_args, PROPERTIES, 3, NULL, nDescendants, priority);
 
-    ocrAddDependence(lkji_event_guids[j][i][k], update_nondiagonal_task_guid, 0);
-    ocrAddDependence(lkji_event_guids[j][k][k+1], update_nondiagonal_task_guid, 1);
-    ocrAddDependence(lkji_event_guids[i][k][k+1], update_nondiagonal_task_guid, 2);
+    ocrAddDependence(lkji_event_guids[j][i][k], dgemm_guids[k][j-k-1][i-k-1], 0);
+    ocrAddDependence(lkji_event_guids[j][k][k+1], dgemm_guids[k][j-k-1][i-k-1], 1);
+    ocrAddDependence(lkji_event_guids[i][k][k+1], dgemm_guids[k][j-k-1][i-k-1], 2);
 
-    ocrEdtSchedule(update_nondiagonal_task_guid);
+    ocrEdtSchedule(dgemm_guids[k][j-k-1][i-k-1]);
 }
 
 
-inline static void update_diagonal_task_prescriber ( int k, int j, int i, int tileSize, int numTiles, ocrGuid_t*** lkji_event_guids) { 
-    ocrGuid_t update_diagonal_task_guid;
-
+inline static void update_diagonal_task_prescriber ( int k, int j, int i, int tileSize, int numTiles, ocrGuid_t*** lkji_event_guids, ocrGuid_t** dsyrk_guids) { 
     intptr_t *func_args = (intptr_t *)malloc(5*sizeof(intptr_t));
     func_args[0] = k;
     func_args[1] = j;
@@ -302,35 +294,34 @@ inline static void update_diagonal_task_prescriber ( int k, int j, int i, int ti
 
     long double nDescendants = dsyrkCountCalculator(numTiles, k, j);
     long double priority = nDescendants;
-    ocrEdtCreate(&update_diagonal_task_guid, update_diagonal_task, 5, NULL, (void**)func_args, PROPERTIES, 2, NULL, nDescendants, priority);
+    ocrEdtCreate(&(dsyrk_guids[k][j-k-1]), update_diagonal_task, 5, NULL, (void**)func_args, PROPERTIES, 2, NULL, nDescendants, priority);
 
-    ocrAddDependence(lkji_event_guids[j][j][k], update_diagonal_task_guid, 0);
-    ocrAddDependence(lkji_event_guids[j][k][k+1], update_diagonal_task_guid, 1);
+    ocrAddDependence(lkji_event_guids[j][j][k], dsyrk_guids[k][j-k-1], 0);
+    ocrAddDependence(lkji_event_guids[j][k][k+1], dsyrk_guids[k][j-k-1], 1);
 
-    ocrEdtSchedule(update_diagonal_task_guid);
+    ocrEdtSchedule(dsyrk_guids[k][j-k-1]);
 }
 
-inline static void wrap_up_task_prescriber ( int numTiles, int tileSize, ocrGuid_t*** lkji_event_guids, double* input_solution ) {
+inline static void wrap_up_task_prescriber ( int numTiles, int tileSize, ocrGuid_t*** lkji_event_guids, double* input_solution, ocrGuid_t* task_guid) {
     int i,j,k;
-    ocrGuid_t wrap_up_task_guid;
 
     intptr_t *func_args = (intptr_t *)malloc(3*sizeof(intptr_t));
     func_args[0]=(intptr_t)numTiles;
     func_args[1]=(intptr_t)tileSize;
     func_args[2]=(intptr_t)input_solution;
 
-    ocrEdtCreate(&wrap_up_task_guid, wrap_up_task, 3, NULL, (void**)func_args, PROPERTIES, (numTiles+1)*numTiles/2, NULL, 0, 0);
+    ocrEdtCreate(task_guid, wrap_up_task, 3, NULL, (void**)func_args, PROPERTIES, (numTiles+1)*numTiles/2, NULL, 0, 0);
 
     int index = 0;
     for ( i = 0; i < numTiles; ++i ) {
         k = 1;
         for ( j = 0; j <= i; ++j ) {
-            ocrAddDependence(lkji_event_guids[i][j][k], wrap_up_task_guid, index++);
+            ocrAddDependence(lkji_event_guids[i][j][k], *task_guid, index++);
             ++k;
         }
     }
 
-    ocrEdtSchedule(wrap_up_task_guid);
+    ocrEdtSchedule(*task_guid);
 }
 
 inline static ocrGuid_t*** allocateCreateEvents ( int numTiles ) {
@@ -351,9 +342,11 @@ inline static ocrGuid_t*** allocateCreateEvents ( int numTiles ) {
 }
 
 inline static void freeEvents ( ocrGuid_t*** lkji_event_guids, int numTiles ) {
-    int i,j;
+    int i,j,k;
     for( i = 0 ; i < numTiles ; ++i ) {
         for( j = 0 ; j <= i ; ++j ) {
+            for( k = 0 ; k <= numTiles ; ++k )
+                ocrEventDestroy(lkji_event_guids[i][j][k]);
             free(lkji_event_guids[i][j]);
         }
         free(lkji_event_guids[i]);
@@ -416,7 +409,108 @@ inline static freeMatrix ( double* A, double *L ) {
     free(L);
 }
 
-inline static void satisfyInitialTiles( int numTiles, int tileSize, double* matrix, ocrGuid_t*** lkji_event_guids) {
+inline static ocrGuid_t** allocateDataBlockGuids ( int numTiles ) {
+    int i,j,k;
+    ocrGuid_t** db_guids;
+
+    db_guids = (ocrGuid_t **) malloc(sizeof(ocrGuid_t *)*numTiles);
+    for( i = 0 ; i < numTiles ; ++i ) {
+        db_guids[i] = (ocrGuid_t *) malloc(sizeof(ocrGuid_t)*(i+1));
+    }
+
+    return db_guids;
+}
+
+inline static ocrGuid_t* allocateDpotrfGuids ( int numTiles ) {
+    return (ocrGuid_t *) malloc(sizeof(ocrGuid_t)*numTiles);
+}
+
+inline static ocrGuid_t** allocateDtrsmGuids ( int numTiles ) {
+    int k;
+    ocrGuid_t** dtrsm_guids = (ocrGuid_t**)malloc(numTiles*sizeof(ocrGuid_t*));
+    for( k = 0 ; k < numTiles ; ++k ) {
+        dtrsm_guids[k] = (ocrGuid_t*)malloc((numTiles-1-k)*sizeof(ocrGuid_t));
+    }
+    return dtrsm_guids;
+}
+
+inline static ocrGuid_t** allocateDsyrkGuids ( int numTiles ) {
+    int k;
+    ocrGuid_t** dsyrk_guids = (ocrGuid_t**)malloc(numTiles*sizeof(ocrGuid_t*));
+    for( k = 0 ; k < numTiles ; ++k ) {
+        dsyrk_guids[k] = (ocrGuid_t*)malloc((numTiles-1-k)*sizeof(ocrGuid_t));
+    }
+    return dsyrk_guids;
+}
+
+inline static ocrGuid_t*** allocateDgemmGuids ( int numTiles ) {
+    int k,j;
+    ocrGuid_t*** dgemm_guids = (ocrGuid_t***)malloc(numTiles*sizeof(ocrGuid_t**));
+    for( k = 0 ; k < numTiles ; ++k ) {
+        dgemm_guids[k] = (ocrGuid_t**)malloc((numTiles-1-k)*sizeof(ocrGuid_t*));
+        for( j = k+1 ; j < numTiles ; ++j ) {
+            dgemm_guids[k][j-k-1]=(ocrGuid_t*)malloc((j-k-1)*sizeof(ocrGuid_t));
+        }
+    }
+    return dgemm_guids;
+}
+
+inline static void freeDpotrfGuids ( ocrGuid_t* dpotrf_guids, int numTiles ) {
+    int k;
+    for( k = 0 ; k < numTiles; ++k ) {
+        ocrEdtDestroy(dpotrf_guids[k]);
+    }
+    free(dpotrf_guids);
+}
+
+inline static void freeDtrsmGuids ( ocrGuid_t** dtrsm_guids, int numTiles ) {
+    int k,j;
+    for( k = 0 ; k < numTiles; ++k ) {
+        for( j = k+1 ; j < numTiles; ++j ) {
+            ocrEdtDestroy(dtrsm_guids[k][j-k-1]);
+        }
+        free(dtrsm_guids[k]);
+    }
+    free(dtrsm_guids);
+}
+
+inline static void freeDsyrkGuids ( ocrGuid_t** dsyrk_guids, int numTiles ) {
+    int k,j;
+    for( k = 0 ; k < numTiles ; ++k ) {
+        for( j = k+1 ; j < numTiles ; ++j ) {
+            ocrEdtDestroy(dsyrk_guids[k][j-k-1]);
+        }
+        free(dsyrk_guids[k]);
+    }
+    free(dsyrk_guids);
+}
+
+inline static void freeDgemmGuids ( ocrGuid_t*** dgemm_guids, int numTiles ) {
+    int k,j,i;
+    for( k = 0 ; k < numTiles ; ++k ) {
+        for( j = k+1 ; j < numTiles ; ++j ) {
+            for( i = k+1 ; i < j; ++i ) {
+                ocrEdtDestroy(dgemm_guids[k][j-k-1][i-k-1]);
+            }
+            free(dgemm_guids[k][j-k-1]);
+        }
+        free(dgemm_guids[k]);
+    }
+    free(dgemm_guids);
+}
+
+inline static void freeDataBlocks ( ocrGuid_t** db_guids, int numTiles ) {
+    int i,j,k;
+    for( i = 0 ; i < numTiles ; ++i ) {
+        for( j = 0 ; j <= i ; ++j ) {
+            ocrDbDestroy(db_guids[i][j]);
+        }
+        free(db_guids[i]);
+    }
+    free(db_guids);
+}
+
+inline static void satisfyInitialTiles( int numTiles, int tileSize, double* matrix, ocrGuid_t*** lkji_event_guids, ocrGuid_t** db_guids) {
     int i,j,index;
     int A_i, A_j, T_i, T_j;
     int matrixSize = numTiles * tileSize;
@@ -424,11 +518,12 @@ inline static void satisfyInitialTiles( int numTiles, int tileSize, double* matr
     for( i = 0 ; i < numTiles ; ++i ) {
         for( j = 0 ; j <= i ; ++j ) {
             void* temp_db;
-            ocrGuid_t db_guid;
-            ocrDbCreate( &db_guid, &temp_db, sizeof(double)*tileSize*tileSize, FLAGS, NULL, NO_ALLOC );
+            ocrDbCreate( &(db_guids[i][j]), &temp_db, sizeof(double)*tileSize*tileSize, FLAGS, NULL, NO_ALLOC );
 
             double* temp = (double*) temp_db;
             double** temp2D = (double**) malloc(sizeof(double*)*tileSize);
+            assert(temp);
+            assert(temp2D);
 
             for( index = 0; index < tileSize; ++index )
                 temp2D [index] = &(temp[index*tileSize]);
@@ -440,7 +535,7 @@ inline static void satisfyInitialTiles( int numTiles, int tileSize, double* matr
                     TILE_INDEX_2D(temp2D, T_i, T_j) = matrix[ A_i * matrixSize + A_j ];
                 }
             }
-            ocrEventSatisfy(lkji_event_guids[i][j][0], db_guid);
+            ocrEventSatisfy(lkji_event_guids[i][j][0], db_guids[i][j]);
             free(temp2D);
         }
     }
@@ -486,8 +581,14 @@ int main( int argc, char* argv[] ) {
         OCR_INIT(&changing_argc, changing_argv, sequential_cholesky_task, trisolve_task, update_nondiagonal_task, update_diagonal_task, wrap_up_task);
 
         ocrGuid_t*** lkji_event_guids = allocateCreateEvents(numTiles);
+        ocrGuid_t**  db_guids = allocateDataBlockGuids (numTiles);
+        ocrGuid_t*   dpotrf_guids = allocateDpotrfGuids (numTiles);
+        ocrGuid_t**  dtrsm_guids = allocateDtrsmGuids (numTiles);
+        ocrGuid_t**  dsyrk_guids = allocateDsyrkGuids (numTiles);
+        ocrGuid_t*** dgemm_guids = allocateDgemmGuids (numTiles);
+        ocrGuid_t    wrap_up_task_guid;
 
-        satisfyInitialTiles( numTiles, tileSize, matrix, lkji_event_guids);
+        satisfyInitialTiles( numTiles, tileSize, matrix, lkji_event_guids, db_guids);
 
 #ifdef HPCTOOLKIT
         hpctoolkit_sampling_start();
@@ -499,26 +600,34 @@ int main( int argc, char* argv[] ) {
         gettimeofday(&a,0);
 
         for ( k = 0; k < numTiles; ++k ) {
-            sequential_cholesky_task_prescriber ( k, tileSize, numTiles, lkji_event_guids);
+            sequential_cholesky_task_prescriber ( k, tileSize, numTiles, lkji_event_guids, dpotrf_guids);
 
             for( j = k + 1 ; j < numTiles ; ++j ) {
-                trisolve_task_prescriber ( k, j, tileSize, numTiles, lkji_event_guids);
+                trisolve_task_prescriber ( k, j, tileSize, numTiles, lkji_event_guids, dtrsm_guids);
 
-                update_diagonal_task_prescriber ( k, j, i, tileSize, numTiles, lkji_event_guids);
+                update_diagonal_task_prescriber ( k, j, i, tileSize, numTiles, lkji_event_guids, dsyrk_guids);
                 for( i = k + 1 ; i < j ; ++i ) {
-                    update_nondiagonal_task_prescriber ( k, j, i, tileSize, numTiles, lkji_event_guids);
+                    update_nondiagonal_task_prescriber ( k, j, i, tileSize, numTiles, lkji_event_guids, dgemm_guids);
                 }
             }
         }
 
-        wrap_up_task_prescriber ( numTiles, tileSize, lkji_event_guids, input_solution );
+        wrap_up_task_prescriber ( numTiles, tileSize, lkji_event_guids, input_solution, &wrap_up_task_guid);
 
         ocrCleanup();
         freeEvents(lkji_event_guids, numTiles);
+        freeDataBlocks(db_guids, numTiles);
+        freeDpotrfGuids(dpotrf_guids,numTiles);
+        freeDtrsmGuids(dtrsm_guids, numTiles);
+        freeDsyrkGuids(dsyrk_guids, numTiles);
+        freeDgemmGuids(dgemm_guids, numTiles);
+        ocrEdtDestroy(wrap_up_task_guid);
         for ( argc_it = 0; argc_it < changing_argc; ++argc_it ) {
             free(changing_argv[argc_it]);
         }
         free(changing_argv);
+        mkl_free_buffers();
+        unravel();
     }
     freeMatrix(matrix, input_solution);
     return 0;
