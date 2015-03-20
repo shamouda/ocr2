@@ -109,6 +109,49 @@ void hc_policy_domain_destruct(ocr_policy_domain_t * policy) {
     eventFactories[0]->destruct(eventFactories[0]);
     free(eventFactories);
 
+    size_t i = 0;
+    ocr_scheduler_t** schedulers = policy->schedulers;
+    size_t nb_schedulers = policy->nb_schedulers;
+    for ( i = 0; i < nb_schedulers; ++i) {
+        schedulers[i]->destruct(schedulers[i]);
+    }
+
+    ocr_worker_t   ** workers = policy->workers;
+    size_t nb_workers = policy->nb_workers;
+    for ( i = 0; i < nb_workers; ++i) {
+        workers[i]->destruct(workers[i]);
+    }
+
+    ocr_executor_t ** executors = policy->executors ;
+    size_t nb_executors = policy->nb_executors;
+    for ( i = 0; i < nb_executors; ++i) {
+        executors[i]->destruct(executors[i]);
+    }
+
+    ocr_workpile_t ** workpiles = policy->workpiles;
+    size_t nb_workpiles = policy->nb_workpiles;
+    for ( i = 0; i < nb_workpiles; ++i) {
+        workpiles[i]->destruct(workpiles[i]);
+    }
+
+    ocrAllocator_t ** allocators = policy->allocators;
+    for ( i = 0; i < 1; ++i) {
+        allocators[i]->destruct(allocators[i]);
+    }
+
+    ocrLowMemory_t ** memories = policy->memories;
+    for ( i = 0; i < 1; ++i) {
+        memories[i]->destruct(memories[i]);
+    }
+
+   free(policy->schedulers);
+   free(policy->workers);
+   free(policy->executors);
+   free(policy->workpiles);
+   free(policy->allocators);
+   free(policy->memories);
+
+   free(policy);
 }
 
 ocrGuid_t hc_policy_getAllocator(ocr_policy_domain_t * policy, ocrLocation_t* location) {

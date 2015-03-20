@@ -55,6 +55,7 @@ void hc_worker_create ( ocr_worker_t * base, void * per_type_configuration, void
     hc_worker->id = ((worker_configuration*)per_instance_configuration)->worker_id;
     hc_worker->cpu_id = ((worker_configuration*)per_instance_configuration)->cpu_id;
     hc_worker->nStealAttempts = 0ULL;
+    free(per_instance_configuration);
 }
 
 void hc_worker_destruct ( ocr_worker_t * base ) {

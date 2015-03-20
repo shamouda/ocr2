@@ -110,22 +110,25 @@ register_list_node_t* hc_event_compete_for_put ( hc_event_t* derived, ocrGuid_t 
 
 void hc_event_signal_waiters( register_list_node_t* task_id_list ) {
     register_list_node_t* curr = task_id_list;
+    register_list_node_t* toDelete;
+
+    ocrGuid_t wid = ocr_get_current_worker_guid();
+    ocr_worker_t* w = NULL;
+    globalGuidProvider->getVal(globalGuidProvider, wid, (u64*)&w, NULL);
+    ocr_scheduler_t * scheduler = get_worker_scheduler(w);
 
     while ( UNINITIALIZED_REGISTER_LIST != curr ) {
-        ocrGuid_t wid = ocr_get_current_worker_guid();
         ocrGuid_t curr_task_guid = curr->task_guid;
 
         ocr_task_t* curr_task = NULL;
         globalGuidProvider->getVal(globalGuidProvider, curr_task_guid, (u64*)&curr_task, NULL);
 
         if ( curr_task->iterate_waiting_frontier(curr_task) ) {
-            ocr_worker_t* w = NULL;
-            globalGuidProvider->getVal(globalGuidProvider, wid, (u64*)&w, NULL);
-
-            ocr_scheduler_t * scheduler = get_worker_scheduler(w);
             scheduler->give(scheduler, wid, curr_task_guid);
         }
+        toDelete = curr;
         curr = curr->next;
+        free(toDelete);
     }
 }
 
@@ -158,7 +161,9 @@ bool hc_event_register_if_not_ready(struct ocr_event_struct* event, ocrGuid_t po
                 registerListOfEDF = derived -> register_list;
             }
         }
-
+	if ( !success ) {
+            free(new_node);
+	}
     }
     return success;
 }
@@ -187,6 +192,7 @@ hc_await_list_t* hc_await_list_constructor_with_event_list ( event_list_t* el) {
 }
 
 void hc_await_list_destructor( hc_await_list_t* derived ) {
+    free(derived->array);
     free(derived);
 }
 
@@ -291,6 +297,7 @@ void hc_task_execute ( ocr_task_t* base ) {
             RESULT_ASSERT(db->release(db, base->guid, true), ==, 0);
         }
     }
+    free(derived->depv);
 }
 
 void hc_task_add_dependence ( ocr_task_t* base, ocr_event_t* dep, size_t index ) {

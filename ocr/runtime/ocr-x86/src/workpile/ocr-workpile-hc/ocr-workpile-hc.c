@@ -44,6 +44,8 @@ static void hc_workpile_create ( ocr_workpile_t * base, void * configuration) {
 
 static void hc_workpile_destruct ( ocr_workpile_t * base ) {
     hc_workpile* derived = (hc_workpile*) base;
+    free(derived->deque->buffer->data);
+    free(derived->deque->buffer);
     free(derived->deque);
     free(derived);
 }
@@ -84,6 +86,8 @@ static void priority_workpile_create ( ocr_workpile_t * base, void * configurati
 
 static void priority_workpile_destruct ( ocr_workpile_t * base ) {
     priority_workpile* derived = (priority_workpile*) base;
+    free(derived->heap->buffer->data);
+    free(derived->heap->buffer);
     free(derived->heap);
     free(derived);
 }

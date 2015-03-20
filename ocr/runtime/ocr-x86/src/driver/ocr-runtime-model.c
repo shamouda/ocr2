@@ -1157,6 +1157,10 @@ static  void create_configure_all_schedulers ( ocr_scheduler_t ** all_schedulers
                 all_schedulers[idx]->create(all_schedulers[idx], curr_model.per_type_configuration,
                                             (curr_model.per_instance_configuration) ? curr_model.per_instance_configuration[idx]: NULL );
             }
+	    if ( NULL != curr_model.per_instance_configuration)
+                free(curr_model.per_instance_configuration);
+	    if ( NULL != curr_model.per_type_configuration)
+                free(curr_model.per_type_configuration);
         }
     }
 }
@@ -1190,6 +1194,10 @@ static  void create_configure_all_workers ( ocr_worker_t** all_workers, int n_po
                 all_workers[idx]->create(all_workers[idx], curr_model.per_type_configuration,
                                          (curr_model.per_instance_configuration) ? curr_model.per_instance_configuration[idx]: NULL );
             }
+	    if ( NULL != curr_model.per_instance_configuration)
+                free(curr_model.per_instance_configuration);
+	    if ( NULL != curr_model.per_type_configuration)
+                free(curr_model.per_type_configuration);
         }
     }
 }

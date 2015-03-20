@@ -102,6 +102,7 @@ static int * read_bind_file ( char * bind_file ) {
     }
     int *bind_map = (int *)malloc(sizeof(int) * n);
     memcpy(bind_map, temp_map, sizeof(int) * n);
+    fclose(fp);
     return bind_map;
 }
 
@@ -134,7 +135,7 @@ void ocrInit(int * argc, char ** argv, u32 fnc, ocrEdt_t funcs[]) {
     globalGuidProvider = newGuidProvider(OCR_GUIDPROVIDER_DEFAULT);
 
     u32 nbHardThreads = ocr_config_default_nb_hardware_threads;
-    gHackTotalMemSize = 512*1024*1024; /* 64 MB default */
+    gHackTotalMemSize = 1024*1024*1024; /* 64 MB default */
     char * md_file = parseOcrOptions_MachineDescription(argc, argv);
 
     char * bind_file = parseOcrOptions_Binding (argc, argv);
@@ -230,6 +231,7 @@ void ocrInit(int * argc, char ** argv, u32 fnc, ocrEdt_t funcs[]) {
         //TODO LIMITATION for now support only one policy
         n_root_policy_nodes = nb_policy_domain;
         root_policies = instantiateModel(policy_model);
+        destructOcrModelPolicy(policy_model);
 
         root_policies[0]->n_successors = 0;
         root_policies[0]->successors = NULL;
@@ -520,17 +522,9 @@ static void recursive_policy_destruct_helper ( ocr_policy_domain_t* curr ) {
     }
 }
 
-static inline void unravel () {
+void unravel () {
     // current root policy index
     int index = 0;
-
-    for ( index = 0; index < n_root_policy_nodes; ++index ) {
-        recursive_policy_finish_helper(root_policies[index]);
-    }
-
-    for ( index = 0; index < n_root_policy_nodes; ++index ) {
-        recursive_policy_stop_helper(root_policies[index]);
-    }
 
     for ( index = 0; index < n_root_policy_nodes; ++index ) {
         recursive_policy_destruct_helper(root_policies[index]);
@@ -543,5 +537,13 @@ static inline void unravel () {
 void ocrCleanup() {
     master_worker->routine(master_worker);
 
-    unravel();
+    int index = 0;
+
+    for ( index = 0; index < n_root_policy_nodes; ++index ) {
+        recursive_policy_finish_helper(root_policies[index]);
+    }
+
+    for ( index = 0; index < n_root_policy_nodes; ++index ) {
+        recursive_policy_stop_helper(root_policies[index]);
+    }
 }

@@ -82,4 +82,6 @@ void ocrFinish();
  */
 void ocrCleanup();
 
+void unravel();
+
 #endif /* __OCR_H__ */
