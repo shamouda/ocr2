@@ -38,8 +38,8 @@ u8 regularAcquire(ocrDataBlock_t *self, void** ptr, ocrFatGuid_t edt, u32 edtSlo
     ocrDataBlockRegular_t *rself = (ocrDataBlockRegular_t*)self;
     *ptr = NULL;
 
-    DPRINTF(DEBUG_LVL_VERB, "Acquiring DB @ 0x%lx (GUID: 0x%lx) from EDT (GUID: 0x%lx) (runtime acquire: %d)\n",
-            (u64)self->ptr, rself->base.guid, edt.guid, (u32)isInternal);
+    DPRINTF(DEBUG_LVL_VERB, "Acquiring DB @ 0x%lx (GUID: 0x%lx) from EDT (GUID: 0x%lx) (runtime acquire: %d) size: %lu\n",
+            (u64)self->ptr, rself->base.guid, edt.guid, (u32)isInternal, self->size);
 
     // Critical section
     hal_lock32(&(rself->lock));

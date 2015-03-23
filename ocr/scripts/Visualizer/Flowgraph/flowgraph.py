@@ -1,9 +1,15 @@
 import sys
-sys.path.append('/opt/pygraph-1.8.2/python-graph-core-1.8.2')
 
+try:
+    sys.path.append('/opt/pygraph-1.8.2/python-graph-core-1.8.2')
+except:
+    e = sys.exc_info()[0]
+    print("pygraph package not found in python path.  Check /opt and make sure python-graph-core is there.\n\n"
+
+)
 import pygraph
 from pygraph.classes.digraph import digraph
-from pygraph.algorithms.critical import transitive_edges, critical_path
+from pygraph.algorithms.critical import transitive_edges, critical_path, find_cycle
 import os
 import subprocess
 import collections
@@ -46,6 +52,23 @@ def writeEventCreations(events, outFile, eventMap, levels):
         else:
             outFile.write('\t\t{id:' + '\'' + str(evtGuid) + '\'' + ', label: \'Event\', title: \'Event type: \' + \'' + str(evtType) + '\' + \'<br>\' + \'GUID: \' + \'' + str(evtGuid) + '\', value: 20, color: \'Tomato\', level: ' + str(curLevel) + ', allowedToMoveX: true, allowedToMoveY: true},\n')
 
+#============= Fill Datablack node html dataset ================
+def writeDbCreations(allDbs, outFile, dbLvls):
+    outFile.write('\tdatablockNodeData = [\n')
+    prevObserved = []
+
+    for i in range(len(allDbs)):
+        curDb = allDbs[i]
+        curLvl = getCurrentLevelHelper(curDb, dbLvls)
+        if curLvl == None:
+            print "DB not being assigned a level.  Debug this."
+            curLvl = 0
+        if i == len(allDbs) - 1:
+            outFile.write('\t\t{id:' + '\'' + str(curDb) + '\'' + ', label: \'DataBlock\', title: \'GUID: \' + \'' + str(curDb) + '\', value: 20, shape: \'square\', color: \'Green\', level: ' +str(curLvl) + ', allowedToMoveX: true, allowedToMoveY: true}\n')
+            outFile.write('\t];\n\n')
+        else:
+            outFile.write('\t\t{id:' + '\'' + str(curDb) + '\'' + ', label: \'DataBlock\', title: \'GUID: \' + \'' + str(curDb) + '\', value: 20, shape: \'square\', color: \'Green\', level: ' +str(curLvl) + ', allowedToMoveX: true, allowedToMoveY: true},\n')
+
 #================ Fill edge html dataset =======================
 def writeSatEdges(sats, outFile, critPath):
     lastEdge = sats[-1]
@@ -58,12 +81,12 @@ def writeSatEdges(sats, outFile, critPath):
         inCritPath = any([src, dst] == critPath[i:i+2] for i in xrange(len(critPath)-1))
 
         if inCritPath == True and line is lastEdge:
-            outFile.write('\t\t{from: ' + '\'' + str(src) + '\'' + ', to: ' + '\'' + str(dst) + '\', value: 4' + '}\n')
+            outFile.write('\t\t{from: ' + '\'' + str(src) + '\'' + ', to: ' + '\'' + str(dst) + '\', value: 2, color: \'Lime\'' + '}\n')
             outFile.write('\t];\n\n')
             continue
 
         elif inCritPath == True and line is not lastEdge:
-            outFile.write('\t\t{from: ' + '\'' + str(src) + '\'' + ', to: ' + '\'' + str(dst) + '\', value: 4' + '},\n')
+            outFile.write('\t\t{from: ' + '\'' + str(src) + '\'' + ', to: ' + '\'' + str(dst) + '\', value: 2, color: \'Lime\'' + '},\n')
             continue
 
         elif line is lastEdge:
@@ -73,6 +96,19 @@ def writeSatEdges(sats, outFile, critPath):
 
         else:
             outFile.write('\t\t{from: ' + '\'' + str(src) + '\'' + ', to: ' + '\'' + str(dst) + '\', value: 1' + '},\n')
+
+#============ Write datablock satisfaction edges ==============
+def writeDbSatEdges(dbSats, outFile):
+    outFile.write('\tdbSatEdgeData = [\n')
+    for i in range(len(dbSats)):
+        src = dbSats[i][1]
+        dst = dbSats[i][0]
+        if i == len(dbSats)-1:
+            outFile.write('\t\t{from: ' + '\'' + str(src) + '\'' + ', to: ' + '\'' + str(dst) + '\', value: 1, length: 1' + '}\n')
+            outFile.write('\t];\n\n')
+        else:
+            outFile.write('\t\t{from: ' + '\'' + str(src) + '\'' + ', to: ' + '\'' + str(dst) + '\', value: 1, length: 1' + '},\n')
+
 
 #========== Read in html templates and write to outputHtml ===========
 def writePreHtml(outFile, pre):
@@ -103,6 +139,37 @@ def getCommonEdts(edts):
     for line in edts:
         edtGuids.append(line.split()[5])
     return edtGuids
+
+
+def getApiDbGuids(Dbs):
+    dbGuids = []
+    for line in Dbs:
+        dbGuids.append(line.split()[6][5:-1])
+    return dbGuids
+
+def getCommonDbGuids(Dbs):
+    dbGuids = []
+    for line in Dbs:
+        dbGuids.append(line.split()[8])
+    return dbGuids
+
+def getApiDbPairs(Dbs):
+    satPairs = []
+    for line in Dbs:
+        curLine = line.split()
+        curObj = curLine[5][24:-1]
+        curDb = curLine[6][5:-1]
+        satPairs.append((curObj, curDb))
+    return satPairs
+
+def getCommonDbPairs(Dbs):
+    satPairs = []
+    for line in Dbs:
+        curLine = line.split()
+        curObj = curLine[6]
+        curDb = curLine[8]
+        satPairs.append((curObj, curDb))
+    return satPairs
 
 def getApiEvts(evts):
     evtGuids = []
@@ -153,8 +220,8 @@ def getTimeMap(names):
     for line in names:
         curLine = line.split()
         edt = curLine[5]
-        startTime = int(curLine[9])
-        endTime = int(curLine[11])
+        startTime = float(curLine[9])
+        endTime = float(curLine[11])
         time = endTime - startTime
         timeMap.append([edt, time])
     return timeMap
@@ -163,12 +230,12 @@ def getTimeMap(names):
 def getRunTimes(names):
     runTimeMap = []
     sortedNames = sortAscendingStartTime(names)
-    offSet = int(sortedNames[0].split()[9])
+    offSet = float(sortedNames[0].split()[9])
     for i in sortedNames:
         curLine = i.split()
         #Structure: each record has EDT name(0) guid(1) startTime(2) and endTime(3)
-        curStart = (int(curLine[9]) - offSet)
-        curEnd = (int(curLine[11]) - offSet)
+        curStart = (float(curLine[9]) - offSet)
+        curEnd = (float(curLine[11])- offSet)
         runTimeMap.append([curLine[7], curLine[5], curStart, curEnd])
     return runTimeMap
 
@@ -285,6 +352,16 @@ def moveEdtFront(guid, pairs):
             return 1
 
     return 0
+
+#========= Define hierarchy levels for DBs ============
+def defDbLevels(dbPairs, objLvls):
+    dbLvls = []
+    for i in range(len(dbPairs)):
+        curObjLvl = getCurrentLevelHelper(dbPairs[i][0], objLvls)
+        curDb = dbPairs[i][1]
+        dbLvls.append([curDb, curObjLvl+1])
+    return dbLvls
+
 
 #========= Define node leveling heirarchy for visualization =========
 def defineHierarchy(edgePairs, runtimeMap, allEdts, allEvts, critPath):
@@ -424,6 +501,37 @@ def cleanupArrows(edgePairs, levels, allEdts, allEvts, mainGuid):
 
     return levels
 
+#========== Assign all disconnected nodes value of 0 (top of graph) ============
+def zeroDisconnectedNodes(levels):
+    for i in range(len(levels)):
+        if levels[i][1] == None:
+            levels[i][1] = 0
+    return levels
+
+#======== Offset all defined levels to include datablocks between levels ==========
+def offsetLevels(levels):
+    for i in range(len(levels)):
+        dblLvl = (int(levels[i][1]))*2
+        levels[i][1] = dblLvl
+
+    return levels
+
+#========== Get's level of first connected node in execution flow ===========
+def getFirstConnectedNode(allSats, levels):
+    allLevels = []
+    srcs = []
+    for i in range(len(allSats)):
+        srcs.append(allSats[i][0])
+    for i in range(len(levels)):
+        allLevels.append(levels[i][1])
+    totalLvls = max(allLevels)
+    for i in range(totalLvls):
+        for j in range(len(levels)):
+            if levels[j][1] == i and levels[j][0] in srcs:
+                return i
+
+    return 0
+
 #========= Returns node type of given Guid ========
 def getNodeType(guid, edts, evts):
     for i in evts:
@@ -433,16 +541,33 @@ def getNodeType(guid, edts, evts):
         if i == guid:
             return 'Edt'
 
+#========= Compute execution time =============
+def getTotalExeTime(edts):
+    startTime = float(edts[0].split()[9])
+    endTime = float(edts[-1].split()[11])
+    return endTime - startTime
+
 #======= Compute critical path ==============
-def pygraphCrit(edgePairs, nameMap, timeMap, allEdts, allEvts):
+def pygraphCrit(edgePairs, nameMap, timeMap, allEdts, allEvts, mainGuid):
     G = digraph()
-    allNodes = set(allEdts+allEvts)
+    srcs = []
+    dsts = []
+    for i in range(len(edgePairs)):
+        srcs.append(edgePairs[i][0])
+        dsts.append(edgePairs[i][1])
+
+    allNodes = set(srcs+dsts)
     for i in allNodes:
-        G.add_node(str(i))
+        if i == mainGuid:
+            continue
+        else:
+            G.add_node(str(i))
     for i in range(len(edgePairs)):
         curTime = 0
         curSrc = str(edgePairs[i][0])
         curDst = str(edgePairs[i][1])
+        if curSrc == mainGuid or curDst == mainGuid:
+            continue
         if getNodeType(curSrc, allEdts, allEvts) == 'Event':
             curTime = 1
         else:
@@ -455,6 +580,7 @@ def pygraphCrit(edgePairs, nameMap, timeMap, allEdts, allEvts):
         print find_cycle(G)
         os.remove(HTML_FILE_NAME)
         sys.exit(0)
+
     return critical_path(G)
 
 #======== Execution time of EDTs on critical path ========
@@ -470,7 +596,7 @@ def getCritPathExeTime(path, edtMap):
             idx = edtGuids.index(path[i])
             curExe = edtMap[idx][3] - edtMap[idx][2]
         else:
-            curExe = 1
+            curExe = 0
 
         critTime += curExe
 
@@ -483,6 +609,8 @@ def runShellStrip(dbgLog):
     os.system("egrep -w \'API\\(INFO\\)\' " + str(dbgLog) + " | grep \'EXIT ocrEventCreate\' > apiEvts.txt")
     os.system("egrep -w \'EVT\\(INFO\\)\' " + str(dbgLog) + " | grep Create > evts.txt")
     os.system("egrep -w \'API\\(INFO\\)\' " + str(dbgLog) + " | grep \'EXIT ocrEdtCreate\' > apiEdts.txt")
+    os.system("egrep -w \'API\\(INFO\\)\' " + str(dbgLog) + " | grep \'ocrEventSatisfySlot\' | grep ENTER > apiDbs.txt")
+    os.system("egrep -w \'EVT\\(INFO\\)\' " + str(dbgLog) + " | grep \'Satisfy ' | grep with > Dbs.txt")
     os.system("egrep -w \'EDT\\(INFO\\)\' " + str(dbgLog) + " | grep Create > edts.txt")
     os.system("grep \'SatisfyFromEvent\' " + str(dbgLog) + " > fromSats.txt")
     os.system("grep FctName " + str(dbgLog) + " > names.txt")
@@ -497,6 +625,8 @@ def cleanup():
     os.remove('edts.txt')
     os.remove('names.txt')
     os.remove('fromSats.txt')
+    os.remove('apiDbs.txt')
+    os.remove('Dbs.txt')
 
 #========= MAIN ==========
 def main():
@@ -507,7 +637,6 @@ def main():
         sys.exit(0)
     dbgLog = sys.argv[1]
     runShellStrip(dbgLog)
-
 
     #Open html templates, and create new html file for writing.
     outFile = open(HTML_FILE_NAME, 'w')
@@ -533,6 +662,10 @@ def main():
     edts = edtsFP.readlines()
     namesFP = open('names.txt', 'r')
     names = namesFP.readlines()
+    apiDbsFP = open('apiDbs.txt', 'r')
+    apiDbs = apiDbsFP.readlines()
+    DbsFP = open('Dbs.txt', 'r')
+    Dbs = DbsFP.readlines()
 
     #Close file pointers and cleanup temp files
     apiSatsFP.close()
@@ -543,6 +676,8 @@ def main():
     apiEdtsFP.close()
     edtsFP.close()
     namesFP.close()
+    apiDbsFP.close()
+    DbsFP.close()
     cleanup()
 
     if len(names) == 0:
@@ -553,35 +688,57 @@ def main():
     #Fetch GUIDs of EDTs and Events, and src->dst pairs from satisfaction log records
     apiSats2 = getApiSats(apiSats)
     sats2 = getCommonSats(sats)
+
     fromSats2 = getFromSats(fromSats)
+
     apiEvts2 = getApiEvts(apiEvts)
     evts2 = getCommonEvts(evts)
+
     apiEdts2 = getApiEdts(apiEdts)
     edts2 = getCommonEdts(edts)
+
+    apiDbs2 = getApiDbGuids(apiDbs)
+    dbs2 = getCommonDbGuids(Dbs)
+
+    apiDbSats = getApiDbPairs(apiDbs)
+    dbSats = getCommonDbPairs(Dbs)
+
+    #Create utility data structures
     nameMap = getNameMap(names)
     evtTypeMap = getEvtTypeMap(evts, apiEvts)
     timeMap = getTimeMap(names)
     runTimesMap = getRunTimes(names)
     mainGuid = getMainEdtGuid(nameMap)
-    totalExeTime = runTimesMap[-1][3]
+    totalExeTime = getTotalExeTime(names)
 
     #Remove duplicates
+    allDbGuids = list(collections.OrderedDict.fromkeys(apiDbs2 + dbs2))
+    allDbSats = list(collections.OrderedDict.fromkeys(apiDbSats+dbSats))
     allSats = list(collections.OrderedDict.fromkeys(apiSats2 + sats2 + fromSats2))
     allEdts = list(collections.OrderedDict.fromkeys(apiEdts2 + edts2))
     allEvts = list(collections.OrderedDict.fromkeys(apiEvts2 + evts2))
 
     #Compute critical path and level hierarchy for viz
-    critPath = pygraphCrit(allSats, nameMap, timeMap, allEdts, allEvts)
+    critPath = pygraphCrit(allSats, nameMap, timeMap, allEdts, allEvts, mainGuid)
     critPathLen = len(critPath)
     critTime =  getCritPathExeTime(critPath, runTimesMap)
     lvls = defineHierarchy(allSats, runTimesMap, allEdts, allEvts, critPath)
     modLvls = cleanupArrows(allSats, lvls, allEdts, allEvts, mainGuid)
-
+    modLvls = zeroDisconnectedNodes(modLvls)
+    modLvls = offsetLevels(modLvls)
+    dbLvls  = defDbLevels(allDbSats, modLvls)
+    firstPathNode = critPath[0]
+    for i in range(len(modLvls)):
+        if modLvls[i][0] == firstPathNode:
+            modLvls[i][1] = getFirstConnectedNode(allSats, modLvls)
+            break
 
     #Write postprocessed data to html file
     writePreHtml(outFile, pre)
     writeEdtCreations(allEdts, outFile, nameMap, modLvls)
     writeEventCreations(allEvts, outFile, evtTypeMap, modLvls)
+    writeDbCreations(allDbGuids, outFile, dbLvls)
+    writeDbSatEdges(allDbSats, outFile)
     writeSatEdges(allSats, outFile, critPath)
     writePostHtml(outFile, post, totalExeTime, critTime, critPathLen)
 
