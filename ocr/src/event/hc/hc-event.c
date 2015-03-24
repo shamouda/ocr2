@@ -83,14 +83,13 @@ u8 destructEventHc(ocrEvent_t *base) {
 
     // Destroy both of the datablocks linked
     // with this event
-
 #define PD_MSG (&msg)
 #define PD_TYPE PD_MSG_DB_FREE
     msg.type = PD_MSG_DB_FREE | PD_MSG_REQUEST;
     PD_MSG_FIELD_I(guid) = event->waitersDb;
     PD_MSG_FIELD_I(edt.guid) = curTask ? curTask->guid : NULL_GUID;
     PD_MSG_FIELD_I(edt.metaDataPtr) = curTask;
-    PD_MSG_FIELD_I(properties) = 0;
+    PD_MSG_FIELD_I(properties) = DB_PROP_RT_ACQUIRE;
     RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, false));
 
     /* Signalers not used
@@ -245,6 +244,7 @@ u8 satisfyEventHcPersist(ocrEvent_t *base, ocrFatGuid_t db, u32 slot) {
     getCurrentEnv(&pd, NULL, &curTask, &msg);
 
     // Try to get all the waiters
+
     hal_lock32(&(event->base.waitersLock));
     event->data = db.guid;
     waitersCount = event->base.waitersCount;
@@ -626,7 +626,7 @@ u8 registerWaiterEventHcPersist(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot,
         PD_MSG_FIELD_IO(size) = sizeof(regNode_t)*event->base.waitersMax*2;
         PD_MSG_FIELD_I(affinity.guid) = NULL_GUID;
         PD_MSG_FIELD_I(affinity.metaDataPtr) = NULL;
-        PD_MSG_FIELD_IO(properties) = 0;
+        PD_MSG_FIELD_IO(properties) = DB_PROP_RT_ACQUIRE;
         PD_MSG_FIELD_I(dbType) = RUNTIME_DBTYPE;
         PD_MSG_FIELD_I(allocator) = NO_ALLOC;
         if((toReturn = pd->fcts.processMessage(pd, &msg, true))) {
@@ -654,20 +654,13 @@ u8 registerWaiterEventHcPersist(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot,
     // Now release the DB(s)
     if(waitersNew) {
         // We need to release and destroy the old DB and release the new one
-#define PD_TYPE PD_MSG_DB_RELEASE
-        getCurrentEnv(NULL, NULL, NULL, &msg);
-        msg.type = PD_MSG_DB_RELEASE | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
-        PD_MSG_FIELD_IO(guid) = event->base.waitersDb;
-        PD_MSG_FIELD_I(edt) = currentEdt;
-        PD_MSG_FIELD_I(properties) = DB_PROP_RT_ACQUIRE;
-        RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, true));
 #undef PD_TYPE
 #define PD_TYPE PD_MSG_DB_FREE
         getCurrentEnv(NULL, NULL, NULL, &msg);
         msg.type = PD_MSG_DB_FREE | PD_MSG_REQUEST;
         PD_MSG_FIELD_I(guid) = event->base.waitersDb;
         PD_MSG_FIELD_I(edt) = currentEdt;
-        PD_MSG_FIELD_I(properties) = 0;
+        PD_MSG_FIELD_I(properties) = DB_PROP_RT_ACQUIRE;
         if((toReturn = pd->fcts.processMessage(pd, &msg, false))) {
             ASSERT(false); // debug
             hal_unlock32(&(event->base.waitersLock));
@@ -919,7 +912,7 @@ ocrEvent_t * newEventHc(ocrEventFactory_t * factory, ocrEventTypes_t eventType,
     PD_MSG_FIELD_IO(size) = sizeof(regNode_t)*INIT_WAITER_COUNT;
     PD_MSG_FIELD_I(affinity.guid) = NULL_GUID;
     PD_MSG_FIELD_I(affinity.metaDataPtr) = NULL_GUID;
-    PD_MSG_FIELD_IO(properties) = 0;
+    PD_MSG_FIELD_IO(properties) = DB_PROP_RT_ACQUIRE;
     PD_MSG_FIELD_I(dbType) = RUNTIME_DBTYPE;
     PD_MSG_FIELD_I(allocator) = NO_ALLOC;
     RESULT_PROPAGATE2(pd->fcts.processMessage(pd, &msg, true), NULL);
@@ -952,7 +945,7 @@ ocrEvent_t * newEventHc(ocrEventFactory_t * factory, ocrEventTypes_t eventType,
     msg.type = PD_MSG_DB_RELEASE | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
     PD_MSG_FIELD_IO(guid) = event->waitersDb;
     PD_MSG_FIELD_I(edt) = curEdt;
-    PD_MSG_FIELD_I(properties) = 0;
+    PD_MSG_FIELD_I(properties) = DB_PROP_RT_ACQUIRE;
     RESULT_PROPAGATE2(pd->fcts.processMessage(pd, &msg, true), NULL);
 #undef PD_MSG
 #undef PD_TYPE

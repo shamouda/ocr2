@@ -340,7 +340,7 @@ static u8 iterateDbFrontier(ocrTask_t *self) {
                 PD_MSG_FIELD_IO(edt.guid) = self->guid; // EDT guid
                 PD_MSG_FIELD_IO(edt.metaDataPtr) = self;
                 PD_MSG_FIELD_IO(edtSlot) = self->depc + 1; // RT slot
-                PD_MSG_FIELD_IO(properties) = depv[i].mode | DB_PROP_RT_ACQUIRE;
+                PD_MSG_FIELD_IO(properties) = depv[i].mode;
                 u8 returnCode = pd->fcts.processMessage(pd, &msg, false);
                 // DB_ACQUIRE is potentially asynchronous, check completion.
                 // In shmem and dist HC PD, ACQUIRE is two-way, processed asynchronously
@@ -961,7 +961,7 @@ u8 taskExecute(ocrTask_t* base) {
                 PD_MSG_FIELD_I(edt.metaDataPtr) = base;
                 PD_MSG_FIELD_I(ptr) = NULL;
                 PD_MSG_FIELD_I(size) = 0; // TODO check that's set properly for release by hc-dist-policy.c
-                PD_MSG_FIELD_I(properties) = DB_PROP_RT_ACQUIRE; // Runtime release
+                PD_MSG_FIELD_I(properties) = 0;
                 // Ignore failures at this point
                 pd->fcts.processMessage(pd, &msg, true);
 #undef PD_MSG
