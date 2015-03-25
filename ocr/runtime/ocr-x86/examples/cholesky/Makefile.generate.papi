@@ -15,12 +15,14 @@ OCR_FLAGS=-L${OCR_INSTALL}/lib -I${OCR_INSTALL}/include -locr $(PAPI_LIB_FLAGS) 
 OCR_STATIC_FLAGS=-I$(OCR_INSTALL)/include $(OCR_INSTALL)/lib/libocr.a  $(PAPI_LIB_FLAGS) $(PAPI_OBJS)
 HPC_TOOLKIT_FLAGS=-L${HPCTOOLKIT_PATH}/lib/hpctoolkit -I${HPCTOOLKIT_PATH}/include -lhpctoolkit
 
+COMPOSER_PATH=/opt/apps/intel/psxe_2015_u2/composer_xe_2015.2.164
 TBB_LIBS=-ltbbmalloc_proxy -ltbbmalloc 
-MIC_TBB_LIB_PATH=/opt/intel/composer_xe_2013_sp1.0.080/tbb/lib/mic/
+MIC_TBB_LIB_PATH=$(COMPOSER_PATH)/tbb/lib/mic
 MIC_TBB_LIBS=$(MIC_TBB_LIB_PATH)/libtbbmalloc_proxy.so $(MIC_TBB_LIB_PATH)/libtbbmalloc.so
 
 PTHREAD_LIBS=/lib64/libpthread.so.0 
-MIC_PTHREAD_LIBS=/opt/intel/mic/filesystem/base/lib64/libpthread.so.0 
+MIC_LIB=$(HOME)/mic.libs
+MIC_PTHREAD_LIBS=$(MIC_LIB)/libpthread.so.0 
 
 OCR_INPUT=${OCR_INPUT_HOME}
 
@@ -48,9 +50,9 @@ MIC_SEQ_MKL_STATIC_FLAGS= -Wl,--start-group $(MKLROOT)/lib/mic/libmkl_intel_lp64
 MIC_SEQ_MKL_DYNAMIC_FLAGS=-L$(MKLROOT)/lib/mic -lmkl_intel_lp64 -lmkl_core -lmkl_sequential -lpthread -lm
 
 MULTI_MKL_INCLUDE=-openmp -I/${MKLROOT}/include 
-MIC_MULTI_MKL_INCLUDE=-openmp /opt/intel/composer_xe_2013_sp1.0.080/compiler/lib/mic/libiomp5.so  -I/${MKLROOT}/include 
+MIC_MULTI_MKL_INCLUDE=-openmp $(COMPOSER_PATH)/lib/mic/libiomp5.so  -I/${MKLROOT}/include 
 
-MULTI_MKL_STATIC_FLAGS=-Wl,--start-group $(MKLROOT)/lib/intel64/libmkl_intel_lp64.a $(MKLROOT)/lib/intel64/libmkl_core.a $(MKLROOT)/lib/intel64/libmkl_intel_thread.a -Wl,--end-group ${MIC_PTHREAD_LIBS} -lm
+MULTI_MKL_STATIC_FLAGS=-Wl,--start-group $(MKLROOT)/lib/intel64/libmkl_intel_lp64.a $(MKLROOT)/lib/intel64/libmkl_core.a $(MKLROOT)/lib/intel64/libmkl_intel_thread.a -Wl,--end-group ${PTHREAD_LIBS} -lm
 MULTI_MKL_DYNAMIC_FLAGS=-L$(MKLROOT)/lib/intel64 -lmkl_intel_lp64 -lmkl_core -lmkl_intel_thread -lpthread -lm
 
 MIC_MULTI_MKL_STATIC_FLAGS=-Wl,--start-group $(MKLROOT)/lib/mic/libmkl_intel_lp64.a $(MKLROOT)/lib/mic/libmkl_core.a $(MKLROOT)/lib/mic/libmkl_intel_thread.a -Wl,--end-group ${MIC_PTHREAD_LIBS} -lm
