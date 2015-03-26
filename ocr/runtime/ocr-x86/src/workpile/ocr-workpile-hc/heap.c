@@ -83,30 +83,42 @@ void locked_dequeish_heap_tail_push_no_priority (heap_t* heap, void* entry) {
 }
 
 #ifdef DAVINCI
-
 #define N_SOCKETS 2
 #define N_L3S_PER_SOCKET 1
 #define N_L2S_PER_SOCKET 6
+#endif /* DAVINCI */
+
+#ifdef GUADALUPE
+#define N_SOCKETS 2
+#define N_L3S_PER_SOCKET 1
+#define N_L2S_PER_SOCKET 18
+#endif /* GUADALUPE */
+
+#if defined(DAVINCI) || defined(GUADALUPE)
 #define N_TOTAL_L3S ( (N_SOCKETS) * (N_L3S_PER_SOCKET))
 #define N_TOTAL_L2S ( (N_SOCKETS) * (N_L2S_PER_SOCKET))
+
+/* L2s indexed from 0 to N_TOTAL_L2S-1
+ * L3s indexed from N_TOTAL_L2S to N_TOTAL_L2S + N_TOTAL_L3S - 1
+ * sockets indexed from N_TOTAL_L2S + N_TOTAL_L3S to N_TOTAL_L2S + N_TOTAL_L3S + N_SOCKETS - 1 
+ * */
 
 #define MISS 1000
 #define LOCAL_L3_HIT 50
 #define LOCAL_L2_HIT 10
 
-#endif /* DAVINCI */
+#define SOCKET_INDEX_OFFSET ((N_TOTAL_L2S)+(N_TOTAL_L3S))
+#endif /*defined(DAVINCI) || defined(GUADALUPE) */
 
-#ifdef RICE_PHI
-
+#if defined(RICE_PHI) || defined(INTEL_PHI)
 #define MISS 1000
 #define CORE_HIT 50
 #define N_MAX_HYPERTHREADS 4
-
-#endif /* RICE_PHI */
+#endif /* defined(RICE_PHI) || defined(INTEL_PHI) */
 
 static inline double costToAcquireData ( int worker_cpu_id, u64 placeTracker ) {
     double cost = 0;
-#ifdef DAVINCI
+#if defined(DAVINCI) || defined(GUADALUPE)
     unsigned char socket_id = worker_cpu_id/N_L2S_PER_SOCKET;
     unsigned char l2_within_socket_id = worker_cpu_id % N_L2S_PER_SOCKET;
     unsigned char l3_within_socket_id = 0;
@@ -121,7 +133,7 @@ static inline double costToAcquireData ( int worker_cpu_id, u64 placeTracker ) {
         cost += LOCAL_L2_HIT;
     }
 #else
-#ifdef RICE_PHI
+#if defined(RICE_PHI) || defined(INTEL_PHI)
     unsigned char core_id = (worker_cpu_id-1)/N_MAX_HYPERTHREADS;
     if ( placeTracker & (1ULL << core_id) ) {
         cost += CORE_HIT;
@@ -135,7 +147,7 @@ static inline double costToAcquireData ( int worker_cpu_id, u64 placeTracker ) {
 
 static inline double costToAcquireEvent ( int worker_cpu_id, int put_worker_cpu_id ) {
     double cost = 0;
-#ifdef DAVINCI
+#if defined(DAVINCI) || defined(GUADALUPE)
     unsigned char worker_socket_id = worker_cpu_id/N_L2S_PER_SOCKET;
     unsigned char worker_l2_within_socket_id = worker_cpu_id % N_L2S_PER_SOCKET;
 
@@ -150,7 +162,7 @@ static inline double costToAcquireEvent ( int worker_cpu_id, int put_worker_cpu_
         cost += LOCAL_L2_HIT;
     }
 #else
-#ifdef RICE_PHI
+#if defined(RICE_PHI) || defined(INTEL_PHI)
     unsigned char core_id = (worker_cpu_id-1)/N_MAX_HYPERTHREADS;
     unsigned char put_core_id = (put_worker_cpu_id-1)/N_MAX_HYPERTHREADS;
     if ( core_id == put_core_id ) {

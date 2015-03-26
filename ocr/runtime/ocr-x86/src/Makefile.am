@@ -7,7 +7,9 @@ CC=icc
 
 # cflags: important to define that otherwise we inherit default values too
 #CFLAGS = -mmic -fPIC -Wall -g -O3 -fno-strict-aliasing -DRICE_PHI
+#CFLAGS = -mmic -fPIC -Wall -g -O3 -fno-strict-aliasing -DINTEL_PHI
 #CFLAGS = -Wall -g -O3 -fno-strict-aliasing -DDAVINCI
+#CFLAGS = -Wall -g -O3 -fno-strict-aliasing -DGUADALUPE
 
 # additional cflags for ocr modules
 OCR_CFLAGS =

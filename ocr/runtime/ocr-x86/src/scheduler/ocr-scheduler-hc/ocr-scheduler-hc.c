@@ -75,6 +75,15 @@ static inline ocr_workpile_t * hc_scheduler_push_mapping_one_to_one (ocr_schedul
 #define N_SOCKETS 2
 #define N_L3S_PER_SOCKET 1
 #define N_L2S_PER_SOCKET 6
+#endif /* DAVINCI */
+
+#ifdef GUADALUPE
+#define N_SOCKETS 2
+#define N_L3S_PER_SOCKET 1
+#define N_L2S_PER_SOCKET 18
+#endif /* GUADALUPE */
+
+#if defined(DAVINCI) || defined(GUADALUPE)
 #define N_TOTAL_L3S ( (N_SOCKETS) * (N_L3S_PER_SOCKET))
 #define N_TOTAL_L2S ( (N_SOCKETS) * (N_L2S_PER_SOCKET))
 
@@ -84,16 +93,21 @@ static inline ocr_workpile_t * hc_scheduler_push_mapping_one_to_one (ocr_schedul
  * */
 
 #define SOCKET_INDEX_OFFSET ((N_TOTAL_L2S)+(N_TOTAL_L3S))
+#endif /*defined(DAVINCI) || defined(GUADALUPE) */
 
-#endif /* DAVINCI */
+#if defined(RICE_PHI) || defined(INTEL_PHI)
+#define N_MAX_HYPERTHREADS 4
+#endif /*defined(RICE_PHI) || defined(INTEL_PHI)*/
 
 #ifdef RICE_PHI
-#define N_MAX_HYPERTHREADS 4
-#define N_PHI_CORES 55
-#endif /*RICE_PHI*/
+#define N_PHI_CORES 56
+#endif /* RICE_PHI */
 
+#ifdef INTEL_PHI
+#define N_PHI_CORES 60
+#endif /* INTEL_PHI */
 
-#ifdef DAVINCI
+#if defined(DAVINCI) || defined(GUADALUPE)
 /* sagnak quite hacky and hardcode-y */
 static int davinciMostDataLocalWorker ( ocrGuid_t taskGuid ) {
     hc_task_t* derivedTask = NULL;
@@ -129,7 +143,13 @@ static int davinciMostDataLocalWorker ( ocrGuid_t taskGuid ) {
     nEvents = 0;
     curr = eventArray[0];
 
-    char l2Presence[ N_L2S_PER_SOCKET ] = {0,0,0,0,0,0};
+    char l2Presence[ N_L2S_PER_SOCKET ]
+#ifdef DAVINCI
+        = {0,0,0,0,0,0};
+#endif /* DAVINCI */
+#ifdef GUADALUPE 
+        = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+#endif /* GUADALUPE */
     int l2IndexOffset = mostLocalSocketIndex * N_L2S_PER_SOCKET;
 
     while ( NULL != curr ) {
@@ -175,7 +195,13 @@ static int davinciMostEventLocalWorker ( ocrGuid_t taskGuid ) {
     int mostLocalSocketIndex = socketPresence[1] > socketPresence[0];
     int mostLocalSocketIndexOffset = mostLocalSocketIndex * N_L2S_PER_SOCKET;
 
-    char l2Presence[ N_L2S_PER_SOCKET ] = {0,0,0,0,0,0};
+    char l2Presence[ N_L2S_PER_SOCKET ]
+#ifdef DAVINCI
+        = {0,0,0,0,0,0};
+#endif /* DAVINCI */
+#ifdef GUADALUPE 
+        = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+#endif /* GUADALUPE */
 
     nEvent = 0;
     for ( curr = (hc_event_t*)eventArray[0]; NULL != curr; curr = (hc_event_t*)eventArray[++nEvent] ) {
@@ -194,9 +220,9 @@ static int davinciMostEventLocalWorker ( ocrGuid_t taskGuid ) {
     }
     return mostLocalSocketIndexOffset + maxIndex;
 }
-#endif /* DAVINCI */
+#endif /*defined(DAVINCI) || defined(GUADALUPE) */
 
-#ifdef RICE_PHI
+#if defined(RICE_PHI) || defined(INTEL_PHI)
 /* sagnak quite hacky and hardcode-y */
 static int ricePhiMostDataLocalWorker ( ocrGuid_t taskGuid ) {
     hc_task_t* derivedTask = NULL;
@@ -268,32 +294,32 @@ static int ricePhiMostEventLocalWorker ( ocrGuid_t taskGuid ) {
     }
     return maxIndex * N_MAX_HYPERTHREADS;
 }
-#endif /* RICE_PHI */
+#endif /* defined(RICE_PHI) || defined(INTEL_PHI) */
 
 static inline int calculateMostDataLocalWorker ( ocrGuid_t taskGuid ) {
-#ifdef DAVINCI
+#if defined(DAVINCI) || defined(GUADALUPE)
     return davinciMostDataLocalWorker (taskGuid); 
 #else
-#ifdef RICE_PHI
+#if defined(RICE_PHI) || defined(INTEL_PHI) 
     return ricePhiMostDataLocalWorker (taskGuid);
 #else
     assert(0 && "Can not calculate most local worker for architecture");
     return -1;
-#endif /* RICE_PHI */
-#endif /* DAVINCI */
+#endif /* defined(RICE_PHI) || defined(INTEL_PHI) */
+#endif /* defined(DAVINCI) || defined(GUADALUPE) */
 }
 
 /* sagnak quite hacky and hardcode-y */
 static int calculateMostEventLocalWorker ( ocrGuid_t taskGuid ) {
-#ifdef DAVINCI
+#if defined(DAVINCI) || defined(GUADALUPE)
     return davinciMostEventLocalWorker ( taskGuid );
 #else
-#ifdef RICE_PHI
+#if defined(RICE_PHI) || defined(INTEL_PHI) 
     return ricePhiMostEventLocalWorker ( taskGuid );
 #else
     assert(0 && "Can not calculate most event worker for architecture");
     return -1;
-#endif /* RICE_PHI */
+#endif /* defined(RICE_PHI) || defined(INTEL_PHI) */
 #endif /* DAVINCI */
 }
 
@@ -336,7 +362,7 @@ static workpile_iterator_t* steal_mapping_deprecated_assert (ocr_scheduler_t* ba
 
 /*TODO sagnak hardcoded BAD */
 static ocrGuid_t hc_scheduler_local_pop_then_hier_cyclic_steal (ocr_scheduler_t* base, ocrGuid_t workerGuid ) {
-#ifdef DAVINCI
+#if defined(DAVINCI) || defined(GUADALUPE)
     ocr_worker_t* w = NULL;
     globalGuidProvider->getVal(globalGuidProvider, workerGuid, (u64*)&w, NULL);
 
@@ -368,17 +394,17 @@ static ocrGuid_t hc_scheduler_local_pop_then_hier_cyclic_steal (ocr_scheduler_t*
     }
     return popped;
 #else
-#ifdef RICE_PHI
+#if defined(RICE_PHI) || defined(INTEL_PHI)
     assert(0 && "Xeon Phi and hierarchical scheduling seems meh");
 #else
     assert(0 && "can not calculate hierarchical cyclical stealing for architecture");
-#endif /* RICE_PHI */
-#endif /* DAVINCI */
+#endif /* defined(RICE_PHI) || defined(INTEL_PHI) */
+#endif /* defined(DAVINCI) || defined(GUADALUPE) */
 }
 
 /*TODO sagnak hardcoded BAD */
 static ocrGuid_t hc_scheduler_local_pop_then_hier_random_steal (ocr_scheduler_t* base, ocrGuid_t workerGuid) {
-#ifdef DAVINCI
+#if defined(DAVINCI) || defined(GUADALUPE)
 #define N_TURNS 2
     ocr_worker_t* w = NULL;
     globalGuidProvider->getVal(globalGuidProvider, workerGuid, (u64*)&w, NULL);
@@ -415,16 +441,16 @@ static ocrGuid_t hc_scheduler_local_pop_then_hier_random_steal (ocr_scheduler_t*
     }
     return popped;
 #else
-#ifdef RICE_PHI
+#if defined(RICE_PHI) || defined(INTEL_PHI)
     assert(0 && "Xeon Phi and hierarchical scheduling seems meh");
 #else
     assert(0 && "can not calculate hierarchical random stealing for architecture");
-#endif /* RICE_PHI */
-#endif /* DAVINCI */
+#endif /* defined(RICE_PHI) || defined(INTEL_PHI)*/
+#endif /* defined(DAVINCI) || defined(GUADALUPE) */
 }
 
 static ocrGuid_t hc_scheduler_local_pop_then_socket_random_steal (ocr_scheduler_t* base, ocrGuid_t workerGuid ) {
-#ifdef DAVINCI
+#if defined(DAVINCI) || defined(GUADALUPE)
 #define N_TURNS 2
     ocr_worker_t* w = NULL;
     globalGuidProvider->getVal(globalGuidProvider, workerGuid, (u64*)&w, NULL);
@@ -451,12 +477,12 @@ static ocrGuid_t hc_scheduler_local_pop_then_socket_random_steal (ocr_scheduler_
     }
     return popped;
 #else
-#ifdef RICE_PHI
+#if defined(RICE_PHI) || defined(INTEL_PHI)
     assert(0 && "Xeon Phi and hierarchical scheduling seems meh");
 #else
     assert(0 && "can not calculate socket stealing for architecture");
-#endif /* RICE_PHI */
-#endif /* DAVINCI */
+#endif /* defined(RICE_PHI) || defined(INTEL_PHI) */
+#endif /* defined(DAVINCI) || defined(GUADALUPE) */
 }
 
 static ocrGuid_t hc_scheduler_local_pop_then_cyclic_steal (ocr_scheduler_t* base, ocrGuid_t workerGuid) {
@@ -521,7 +547,7 @@ static void hc_scheduler_event_locality_push (ocr_scheduler_t* base, ocrGuid_t w
 }
 
 static void hc_scheduler_usersocket_push (ocr_scheduler_t* base, ocrGuid_t workerGuid, ocrGuid_t tid ) {
-#ifdef DAVINCI
+#if defined(DAVINCI) || defined(GUADALUPE)
     ocr_worker_t* w = NULL;
     globalGuidProvider->getVal(globalGuidProvider, workerGuid, (u64*)&w, NULL);
 
@@ -537,12 +563,12 @@ static void hc_scheduler_usersocket_push (ocr_scheduler_t* base, ocrGuid_t worke
     ocr_workpile_t * wp_to_push = derived->pools[ idWithinSocket + socketID * N_L2S_PER_SOCKET ];
     wp_to_push->push(wp_to_push,tid);
 #else
-#ifdef RICE_PHI
+#if defined(RICE_PHI) || defined(INTEL_PHI)
     assert(0 && "Xeon Phi and hierarchical scheduling seems meh");
 #else
     assert(0 && "can not calculate user socket pushing for architecture");
-#endif /* RICE_PHI */
-#endif /* DAVINCI */
+#endif /* defined(RICE_PHI) || defined(INTEL_PHI) */
+#endif /* defined(DAVINCI) || defined(GUADALUPE) */
 }
 
 /**!

@@ -138,10 +138,18 @@ void ocrPlaceTrackerAllocate ( ocrPlaceTracker_t** toFill ) {
 }
 
 #ifdef DAVINCI
-
 #define N_SOCKETS 2
 #define N_L3S_PER_SOCKET 1
 #define N_L2S_PER_SOCKET 6
+#endif /* DAVINCI */
+
+#ifdef GUADALUPE
+#define N_SOCKETS 2
+#define N_L3S_PER_SOCKET 1
+#define N_L2S_PER_SOCKET 18
+#endif /* GUADALUPE */
+
+#if defined(DAVINCI) || defined(GUADALUPE)
 #define N_TOTAL_L3S ( (N_SOCKETS) * (N_L3S_PER_SOCKET))
 #define N_TOTAL_L2S ( (N_SOCKETS) * (N_L2S_PER_SOCKET))
 
@@ -150,16 +158,23 @@ void ocrPlaceTrackerAllocate ( ocrPlaceTracker_t** toFill ) {
  * sockets indexed from N_TOTAL_L2S + N_TOTAL_L3S to N_TOTAL_L2S + N_TOTAL_L3S + N_SOCKETS - 1 
  * */
 
-#endif /* DAVINCI */
+#define SOCKET_INDEX_OFFSET ((N_TOTAL_L2S)+(N_TOTAL_L3S))
+#endif /*defined(DAVINCI) || defined(GUADALUPE) */
+
+#if defined(RICE_PHI) || defined(INTEL_PHI)
+#define N_MAX_HYPERTHREADS 4
+#endif /*defined(RICE_PHI) || defined(INTEL_PHI)*/
 
 #ifdef RICE_PHI
-
-#define N_HYPERTHREADS 4
-
+#define N_PHI_CORES 56
 #endif /* RICE_PHI */
 
+#ifdef INTEL_PHI
+#define N_PHI_CORES 60
+#endif /* INTEL_PHI */
+
 void ocrPlaceTrackerInsert ( ocrPlaceTracker_t* self, unsigned char currPlace ) {
-#ifdef DAVINCI
+#if defined(DAVINCI) || defined(GUADALUPE)
     unsigned char socket_id = currPlace/N_L2S_PER_SOCKET;
     unsigned char l2_within_socket_id = currPlace%N_L2S_PER_SOCKET;
     unsigned char l3_within_socket_id = 0;
@@ -173,13 +188,13 @@ void ocrPlaceTrackerInsert ( ocrPlaceTracker_t* self, unsigned char currPlace ) 
     // mark the socket place
     self->existInPlaces |= (1ULL << ( N_TOTAL_L2S + N_TOTAL_L3S + socket_id));
 #else
-#ifdef RICE_PHI
+#if defined(RICE_PHI) || defined(INTEL_PHI)
     unsigned char core_id = (currPlace-1)/N_HYPERTHREADS;
     self->existInPlaces |= (1ULL << core_id);
 #else
 	assert(0 && "can not insert place tracker information on this architecture");
-#endif /* RICE_PHI */
-#endif /* DAVINCI */
+#endif /* defined(RICE_PHI) || defined(INTEL_PHI) */
+#endif /* defined(DAVINCI) || defined(GUADALUPE) */
 }
 
 void ocrPlaceTrackerRemove ( ocrPlaceTracker_t* self, unsigned char currPlace ) {
