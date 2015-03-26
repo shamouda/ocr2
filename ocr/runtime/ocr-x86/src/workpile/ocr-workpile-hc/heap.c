@@ -688,10 +688,10 @@ void* locked_heap_sorted_pop_priority_selfish_helper ( heap_t* heap , int thief_
                 int thiefsCheapestIndex = -1;
                 switch (p) {
                     case EVENT_PRIORITY:
-                        thiefsCheapestHeapIndex = getMostEventLocalToThief(heap, thief_cpu_id);
+                        thiefsCheapestIndex = getMostEventLocalToThief(heap, thief_cpu_id);
                         break;
                     case DATA_PRIORITY:
-                        thiefsCheapestHeapIndex = getMostDataLocalToThief(heap, thief_cpu_id);
+                        thiefsCheapestIndex = getMostDataLocalToThief(heap, thief_cpu_id);
                         break;
                     default: assert(0 && "no such priority for selfish popping"); break;
                 };
@@ -711,11 +711,11 @@ void* locked_heap_sorted_pop_priority_selfish_helper ( heap_t* heap , int thief_
 }
 
 void* locked_heap_sorted_pop_event_priority_selfish ( heap_t* heap , int thief_cpu_id ) {
-    return locked_heap_sorted_pop_priority_selfish_helper(heap, entry, EVENT_PRIORITY);
+    return locked_heap_sorted_pop_priority_selfish_helper(heap, thief_cpu_id, EVENT_PRIORITY);
 }
 
 void* locked_heap_sorted_pop_data_priority_selfish ( heap_t* heap , int thief_cpu_id ) {
-    return locked_heap_sorted_pop_priority_selfish_helper(heap, entry, DATA_PRIORITY);
+    return locked_heap_sorted_pop_priority_selfish_helper(heap, thief_cpu_id, DATA_PRIORITY);
 }
 
 void* locked_heap_pop_priority_worst ( heap_t* heap ) {
