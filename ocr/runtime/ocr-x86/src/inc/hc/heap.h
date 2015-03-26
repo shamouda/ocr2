@@ -41,6 +41,7 @@ typedef struct heap {
         volatile int tail;
         buffer_t * buffer;
         long double nDescendantsSum;
+        long double nPrioritySum;
 } heap_t;
 
 #define INIT_HEAP_CAPACITY 1440

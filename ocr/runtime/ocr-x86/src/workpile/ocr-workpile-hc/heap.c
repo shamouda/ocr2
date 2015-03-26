@@ -49,6 +49,7 @@ void heap_init(heap_t * heap, void * init_value) {
     heap->head = 0;
     heap->tail = 0;
     heap->nDescendantsSum = 0;
+    heap->nPrioritySum = 0;
     heap->buffer = (buffer_t *) malloc(sizeof(buffer_t));
     heap->buffer->capacity = INIT_HEAP_CAPACITY;
     heap->buffer->data = (volatile void **) malloc(sizeof(void*)*INIT_HEAP_CAPACITY);
@@ -74,13 +75,8 @@ void locked_dequeish_heap_tail_push_no_priority (heap_t* heap, void* entry) {
             success = 1;
             push_capacity_assertion(heap);
 
-            int index = heap->tail % heap->buffer->capacity;
-            heap->buffer->data[index] = entry;
+            heap->buffer->data[ heap->tail++ % heap->buffer->capacity] = entry;
             heap->nDescendantsSum += ((hc_task_t*)entry)->nDescendants;
-#ifdef __powerpc64__
-            hc_mfence();
-#endif 
-            ++heap->tail;
             heap->lock = 0;
         }
     }
@@ -230,6 +226,8 @@ static inline long double extractPriority ( volatile void* entry ) {
     hc_task_t* derived = (hc_task_t*)entry;
     return derived->cost;
 }
+
+enum priority_t {EVENT_PRIORITY, DATA_PRIORITY, USER_PRIORITY};
 
 /*sagnak awful awful hardcoding*/
 /*returns cheapest task for the thief to execute by handing out its "heap" index*/
@@ -462,25 +460,35 @@ static int verifySortedHeap( heap_t* heap) {
     return stillValid;
 }
 
-void locked_heap_push_event_priority (heap_t* heap, void* entry) {
+void locked_heap_push_priority_helper (heap_t* heap, void* entry, enum priority_t p) {
     int success = 0;
     while (!success) {
         if ( hc_cas(&heap->lock, 0, 1) ) { 
             success = 1;
 
             push_capacity_assertion(heap);
-            int index = heap->tail % heap->buffer->capacity;
-            heap->buffer->data[index] = entry;
-            ++heap->tail;
+            heap->buffer->data[heap->tail++ % heap->buffer->capacity] = entry;
 
             ocrGuid_t worker_guid = ocr_get_current_worker_guid();
             ocr_worker_t * worker = NULL;
             globalGuidProvider->getVal(globalGuidProvider, worker_guid, (u64*)&worker, NULL);
 
-            setPriorityAsEventRetrievalCost (entry, get_worker_cpu_id(worker));
+            switch(p) {
+                case EVENT_PRIORITY:
+                    setPriorityAsEventRetrievalCost (entry, get_worker_cpu_id(worker));
+                    break;
+                case DATA_PRIORITY:
+                    setPriorityAsDataRetrievalCost (entry, get_worker_cpu_id(worker));
+                    break;
+                case USER_PRIORITY:
+                    setPriorityAsUserPriority (entry, get_worker_cpu_id(worker));
+                    break;
+                default: assert(0 && "no such priority type for pushing"); break;
+            };
 
             insertFixHeap(heap);
             heap->nDescendantsSum += ((hc_task_t*)entry)->nDescendants;
+            heap->nPrioritySum += extractPriority(entry);
             if(DEBUG)verifyHeap(heap);
 
             heap->lock = 0;
@@ -488,7 +496,19 @@ void locked_heap_push_event_priority (heap_t* heap, void* entry) {
     }
 }
 
-void locked_heap_sorted_push_event_priority (heap_t* heap, void* entry) {
+void locked_heap_push_event_priority (heap_t* heap, void* entry) {
+    locked_heap_push_priority_helper(heap, entry, EVENT_PRIORITY);
+}
+
+void locked_heap_push_data_priority (heap_t* heap, void* entry) {
+    locked_heap_push_priority_helper(heap, entry, DATA_PRIORITY);
+}
+
+void locked_heap_push_user_priority (heap_t* heap, void* entry) {
+    locked_heap_push_priority_helper(heap, entry, USER_PRIORITY);
+}
+
+void locked_heap_sorted_push_priority_helper (heap_t* heap, void* entry, enum priority_t p) {
     int success = 0;
     while (!success) {
         if ( hc_cas(&heap->lock, 0, 1) ) { 
@@ -500,10 +520,22 @@ void locked_heap_sorted_push_event_priority (heap_t* heap, void* entry) {
             ocr_worker_t * worker = NULL;
             globalGuidProvider->getVal(globalGuidProvider, worker_guid, (u64*)&worker, NULL);
 
-            setPriorityAsEventRetrievalCost (entry, get_worker_cpu_id(worker));
+            switch(p) {
+                case EVENT_PRIORITY:
+                    setPriorityAsEventRetrievalCost (entry, get_worker_cpu_id(worker));
+                    break;
+                case DATA_PRIORITY:
+                    setPriorityAsDataRetrievalCost (entry, get_worker_cpu_id(worker));
+                    break;
+                case USER_PRIORITY:
+                    setPriorityAsUserPriority (entry, get_worker_cpu_id(worker));
+                    break;
+                default: assert(0 && "no such priority type for sorted pushing"); break;
+            };
 
             insertSorted(heap, entry);
             heap->nDescendantsSum += ((hc_task_t*)entry)->nDescendants;
+            heap->nPrioritySum += extractPriority(entry);
             if(DEBUG) verifySortedHeap(heap);
 
             heap->lock = 0;
@@ -511,102 +543,16 @@ void locked_heap_sorted_push_event_priority (heap_t* heap, void* entry) {
     }
 }
 
-void locked_heap_push_data_priority (heap_t* heap, void* entry) {
-    int success = 0;
-    while (!success) {
-        if ( hc_cas(&heap->lock, 0, 1) ) { 
-            success = 1;
-
-            push_capacity_assertion(heap);
-            int index = heap->tail % heap->buffer->capacity;
-            heap->buffer->data[index] = entry;
-            ++heap->tail;
-
-            ocrGuid_t worker_guid = ocr_get_current_worker_guid();
-            ocr_worker_t * worker = NULL;
-            globalGuidProvider->getVal(globalGuidProvider, worker_guid, (u64*)&worker, NULL);
-
-            setPriorityAsDataRetrievalCost (entry, get_worker_cpu_id(worker));
-
-            insertFixHeap(heap);
-            heap->nDescendantsSum += ((hc_task_t*)entry)->nDescendants;
-            if(DEBUG)verifyHeap(heap);
-
-            heap->lock = 0;
-        }
-    }
+void locked_heap_sorted_push_event_priority (heap_t* heap, void* entry) {
+    locked_heap_sorted_push_priority_helper(heap, entry, EVENT_PRIORITY);
 }
 
 void locked_heap_sorted_push_data_priority (heap_t* heap, void* entry) {
-    int success = 0;
-    while (!success) {
-        if ( hc_cas(&heap->lock, 0, 1) ) { 
-            success = 1;
-
-            push_capacity_assertion(heap);
-
-            ocrGuid_t worker_guid = ocr_get_current_worker_guid();
-            ocr_worker_t * worker = NULL;
-            globalGuidProvider->getVal(globalGuidProvider, worker_guid, (u64*)&worker, NULL);
-
-            setPriorityAsDataRetrievalCost (entry, get_worker_cpu_id(worker));
-
-            insertSorted(heap, entry);
-            heap->nDescendantsSum += ((hc_task_t*)entry)->nDescendants;
-            if(DEBUG)verifySortedHeap(heap);
-
-            heap->lock = 0;
-        }
-    }
-}
-
-void locked_heap_push_user_priority (heap_t* heap, void* entry) {
-    int success = 0;
-    while (!success) {
-        if ( hc_cas(&heap->lock, 0, 1) ) { 
-            success = 1;
-
-            push_capacity_assertion(heap);
-            int index = heap->tail % heap->buffer->capacity;
-            heap->buffer->data[index] = entry;
-            ++heap->tail;
-
-            ocrGuid_t worker_guid = ocr_get_current_worker_guid();
-            ocr_worker_t * worker = NULL;
-            globalGuidProvider->getVal(globalGuidProvider, worker_guid, (u64*)&worker, NULL);
-
-            setPriorityAsUserPriority (entry, get_worker_cpu_id(worker));
-
-            insertFixHeap(heap);
-            heap->nDescendantsSum += ((hc_task_t*)entry)->nDescendants;
-            if(DEBUG)verifyHeap(heap);
-
-            heap->lock = 0;
-        }
-    }
+    locked_heap_sorted_push_priority_helper(heap, entry, DATA_PRIORITY);
 }
 
 void locked_heap_sorted_push_user_priority (heap_t* heap, void* entry) {
-    int success = 0;
-    while (!success) {
-        if ( hc_cas(&heap->lock, 0, 1) ) { 
-            success = 1;
-
-            push_capacity_assertion(heap);
-
-            ocrGuid_t worker_guid = ocr_get_current_worker_guid();
-            ocr_worker_t * worker = NULL;
-            globalGuidProvider->getVal(globalGuidProvider, worker_guid, (u64*)&worker, NULL);
-
-            setPriorityAsUserPriority (entry, get_worker_cpu_id(worker));
-
-            insertSorted(heap,entry);
-            heap->nDescendantsSum += ((hc_task_t*)entry)->nDescendants;
-            if(DEBUG)verifySortedHeap(heap);
-
-            heap->lock = 0;
-        }
-    }
+    locked_heap_sorted_push_priority_helper(heap, entry, USER_PRIORITY);
 }
 
 void* locked_heap_pop_priority_best ( heap_t* heap ) {
@@ -617,12 +563,11 @@ void* locked_heap_pop_priority_best ( heap_t* heap ) {
             success = 1;
 
             int size = heap->tail - heap->head;
-            if ( size <= 0 ) {
-                heap->tail = heap->head;
-                rt = NULL;
-            } else {
+            if ( size > 0 ) {
                 rt = (void*) heap->buffer->data[ heap->head % heap->buffer->capacity];
                 removeFixHeap(heap);
+                heap->nDescendantsSum -= ((hc_task_t*)rt)->nDescendants;
+                heap->nPrioritySum -= extractPriority(rt);
                 if(DEBUG)verifyHeap(heap);
             }
             heap->lock = 0;
@@ -639,11 +584,11 @@ void* locked_heap_sorted_pop_priority_best ( heap_t* heap ) {
             success = 1;
 
             int size = heap->tail - heap->head;
-            if ( size <= 0 ) {
-                rt = NULL;
-            } else {
+            if ( size > 0 ) {
                 rt = (void*) heap->buffer->data[ heap->head % heap->buffer->capacity];
                 ++heap->head;
+                heap->nDescendantsSum -= ((hc_task_t*)rt)->nDescendants;
+                heap->nPrioritySum -= extractPriority(rt);
                 if(DEBUG)verifySortedHeap(heap);
             }
             heap->lock = 0;
@@ -660,12 +605,49 @@ void* locked_heap_pop_priority_last ( heap_t* heap ) {
             success = 1;
 
             int size = heap->tail - heap->head;
-            if ( size <= 0 ) {
-                heap->tail = heap->head;
-                rt = NULL;
-            } else { 
+            if ( size > 0 ) {
                 --heap->tail;
                 rt = (void*) heap->buffer->data[heap->tail % heap->buffer->capacity];
+                heap->nDescendantsSum -= ((hc_task_t*)rt)->nDescendants;
+                heap->nPrioritySum -= extractPriority(rt);
+                if(DEBUG)verifyHeap(heap);
+            }
+            heap->lock = 0;
+        }
+    }
+    return rt;
+}
+
+void* locked_heap_pop_priority_selfish_helper ( heap_t* heap , int thief_cpu_id, enum priority_t p ) {
+    void * rt = NULL;
+    int success = 0;
+    while (!success) {
+        if ( hc_cas(&heap->lock, 0, 1) ) {
+            success = 1;
+
+            int size = heap->tail - heap->head;
+            if ( size > 0 ) {
+                int thiefsCheapestHeapIndex = -1;
+                switch (p) {
+                    case EVENT_PRIORITY:
+                        thiefsCheapestHeapIndex = getMostEventLocalToThief(heap, thief_cpu_id);
+                        break;
+                    case DATA_PRIORITY:
+                        thiefsCheapestHeapIndex = getMostDataLocalToThief(heap, thief_cpu_id);
+                        break;
+                    default: assert(0 && "no such priority for selfish popping"); break;
+                };
+                /* retract to last element */
+                --heap->tail;
+                /* make the costliest the last one by swapping it with tail */
+                swapAtIndices ( heap, heap->tail % heap->buffer->capacity , (thiefsCheapestHeapIndex + heap->head) % heap->buffer->capacity );
+                /* now the swap may have made the non-worst placed invalid, fix that */
+                insertFixHeapAtIndex(heap, thiefsCheapestHeapIndex);
+                
+                /* pop tail */
+                rt = (void*) heap->buffer->data[heap->tail % heap->buffer->capacity];
+                heap->nDescendantsSum -= ((hc_task_t*)rt)->nDescendants;
+                heap->nPrioritySum -= extractPriority(rt);
                 if(DEBUG)verifyHeap(heap);
             }
             heap->lock = 0;
@@ -675,66 +657,14 @@ void* locked_heap_pop_priority_last ( heap_t* heap ) {
 }
 
 void* locked_heap_pop_event_priority_selfish ( heap_t* heap , int thief_cpu_id ) {
-    void * rt = NULL;
-    int success = 0;
-    while (!success) {
-        if ( hc_cas(&heap->lock, 0, 1) ) {
-            success = 1;
-
-            int size = heap->tail - heap->head;
-            if ( size <= 0 ) {
-                heap->tail = heap->head;
-                rt = NULL;
-            } else { 
-                int thiefsCheapestHeapIndex = getMostEventLocalToThief(heap, thief_cpu_id);
-                /* retract to last element */
-                --heap->tail;
-                /* make the costliest the last one by swapping it with tail */
-                swapAtIndices ( heap, heap->tail % heap->buffer->capacity , (thiefsCheapestHeapIndex + heap->head) % heap->buffer->capacity );
-                /* now the swap may have made the non-worst placed invalid, fix that */
-                insertFixHeapAtIndex(heap, thiefsCheapestHeapIndex);
-                
-                /* pop tail */
-                rt = (void*) heap->buffer->data[heap->tail % heap->buffer->capacity];
-                if(DEBUG)verifyHeap(heap);
-            }
-            heap->lock = 0;
-        }
-    }
-    return rt;
+    return locked_heap_pop_priority_selfish_helper(heap, thief_cpu_id, EVENT_PRIORITY);
 }
 
 void* locked_heap_pop_data_priority_selfish ( heap_t* heap , int thief_cpu_id ) {
-    void * rt = NULL;
-    int success = 0;
-    while (!success) {
-        if ( hc_cas(&heap->lock, 0, 1) ) {
-            success = 1;
-
-            int size = heap->tail - heap->head;
-            if ( size <= 0 ) {
-                heap->tail = heap->head;
-                rt = NULL;
-            } else { 
-                int thiefsCheapestHeapIndex = getMostDataLocalToThief(heap, thief_cpu_id);
-                /* retract to last element */
-                --heap->tail;
-                /* make the costliest the last one by swapping it with tail */
-                swapAtIndices ( heap, heap->tail % heap->buffer->capacity , (thiefsCheapestHeapIndex + heap->head) % heap->buffer->capacity );
-                /* now the swap may have made the non-worst placed invalid, fix that */
-                insertFixHeapAtIndex(heap, thiefsCheapestHeapIndex);
-                
-                /* pop tail */
-                rt = (void*) heap->buffer->data[heap->tail % heap->buffer->capacity];
-                if(DEBUG)verifyHeap(heap);
-            }
-            heap->lock = 0;
-        }
-    }
-    return rt;
+    return locked_heap_pop_priority_selfish_helper(heap, thief_cpu_id, DATA_PRIORITY);
 }
 
-void* locked_heap_sorted_pop_event_priority_selfish ( heap_t* heap , int thief_cpu_id ) {
+void* locked_heap_sorted_pop_priority_selfish_helper ( heap_t* heap , int thief_cpu_id, enum priority_t p ) {
     void * rt = NULL;
     int success = 0;
     while (!success) {
@@ -742,11 +672,21 @@ void* locked_heap_sorted_pop_event_priority_selfish ( heap_t* heap , int thief_c
             success = 1;
 
             int size = heap->tail - heap->head;
-            if ( size <= 0 ) {
-                rt = NULL;
-            } else { 
-                int thiefsCheapestIndex = getMostEventLocalToThief(heap, thief_cpu_id);
+            if ( size > 0 ) {
+                int thiefsCheapestIndex = -1;
+                switch (p) {
+                    case EVENT_PRIORITY:
+                        thiefsCheapestHeapIndex = getMostEventLocalToThief(heap, thief_cpu_id);
+                        break;
+                    case DATA_PRIORITY:
+                        thiefsCheapestHeapIndex = getMostDataLocalToThief(heap, thief_cpu_id);
+                        break;
+                    default: assert(0 && "no such priority for selfish popping"); break;
+                };
                 rt = (void*) heap->buffer->data[heap->head + thiefsCheapestIndex % heap->buffer->capacity];
+
+                heap->nDescendantsSum -= ((hc_task_t*)rt)->nDescendants;
+                heap->nPrioritySum -= extractPriority(rt);
 
                 shiftHeapLeftAt(heap, heap->head + thiefsCheapestIndex);
 
@@ -758,28 +698,12 @@ void* locked_heap_sorted_pop_event_priority_selfish ( heap_t* heap , int thief_c
     return rt;
 }
 
+void* locked_heap_sorted_pop_event_priority_selfish ( heap_t* heap , int thief_cpu_id ) {
+    return locked_heap_sorted_pop_priority_selfish_helper(heap, entry, EVENT_PRIORITY);
+}
+
 void* locked_heap_sorted_pop_data_priority_selfish ( heap_t* heap , int thief_cpu_id ) {
-    void * rt = NULL;
-    int success = 0;
-    while (!success) {
-        if ( hc_cas(&heap->lock, 0, 1) ) {
-            success = 1;
-
-            int size = heap->tail - heap->head;
-            if ( size <= 0 ) {
-                rt = NULL;
-            } else { 
-                int thiefsCheapestIndex = getMostDataLocalToThief(heap, thief_cpu_id);
-                rt = (void*) heap->buffer->data[heap->head + thiefsCheapestIndex % heap->buffer->capacity];
-
-                shiftHeapLeftAt(heap, heap->head+thiefsCheapestIndex);
-
-                if(DEBUG)verifySortedHeap(heap);
-            }
-            heap->lock = 0;
-        }
-    }
-    return rt;
+    return locked_heap_sorted_pop_priority_selfish_helper(heap, entry, DATA_PRIORITY);
 }
 
 void* locked_heap_pop_priority_worst ( heap_t* heap ) {
@@ -790,10 +714,7 @@ void* locked_heap_pop_priority_worst ( heap_t* heap ) {
             success = 1;
 
             int size = heap->tail - heap->head;
-            if ( size <= 0 ) {
-                heap->tail = heap->head;
-                rt = NULL;
-            } else { 
+            if ( size > 0 ) {
                 int nLeaves = (1+size)/2;
                 int currIndex, maxIndex = size - nLeaves; /*first leaf index*/;
                 long double maxPriority = -1;
@@ -814,6 +735,8 @@ void* locked_heap_pop_priority_worst ( heap_t* heap ) {
                 
                 /* pop tail */
                 rt = (void*) heap->buffer->data[heap->tail % heap->buffer->capacity];
+                heap->nDescendantsSum -= ((hc_task_t*)rt)->nDescendants;
+                heap->nPrioritySum -= extractPriority(rt);
                 if(DEBUG)verifyHeap(heap);
             }
             heap->lock = 0;
@@ -830,11 +753,10 @@ void* locked_heap_sorted_pop_priority_worst ( heap_t* heap ) {
             success = 1;
 
             int size = heap->tail - heap->head;
-            if ( size <= 0 ) {
-                rt = NULL;
-            } else { 
-                /* pop tail */
+            if ( size > 0 ) {
                 rt = (void*) heap->buffer->data[ --heap->tail % heap->buffer->capacity];
+                heap->nDescendantsSum -= ((hc_task_t*)rt)->nDescendants;
+                heap->nPrioritySum -= extractPriority(rt);
                 if(DEBUG)verifySortedHeap(heap);
             }
             heap->lock = 0;
@@ -857,9 +779,15 @@ void* locked_heap_pop_priority_worst_half ( heap_t* heap, ocr_scheduler_t* thief
                 int leafIndex = size - nLeaves;
 
                 rt = (void*) heap->buffer->data[ (heap->head + leafIndex) % heap->buffer->capacity];
+                heap->nDescendantsSum -= ((hc_task_t*)rt)->nDescendants;
+                heap->nPrioritySum -= extractPriority(rt);
                 int stolenIndex = 1;
+                ocrGuid_t worker_guid = ocr_get_current_worker_guid();
                 for ( ; stolenIndex < nLeaves; ++stolenIndex ) {
-                    thief_base->give(thief_base, ocr_get_current_worker_guid(), (ocrGuid_t)heap->buffer->data[(heap->head + leafIndex + stolenIndex) % heap->buffer->capacity]);
+                    volatile void* stolen = heap->buffer->data[(heap->head + leafIndex + stolenIndex) % heap->buffer->capacity];
+                    thief_base->give(thief_base, worker_guid, (ocrGuid_t)stolen);
+                    heap->nDescendantsSum -= ((hc_task_t*)stolen)->nDescendants;
+                    heap->nPrioritySum -= extractPriority(stolen);
                 }
                 heap->tail -= nLeaves;
             } 
@@ -873,15 +801,44 @@ void* locked_heap_sorted_pop_priority_worst_half ( heap_t* heap, ocr_scheduler_t
     return locked_heap_pop_priority_worst_half(heap, thief_base);
 }
 
+void* locked_heap_pop_priority_worst_counting_half_helper ( heap_t* heap, ocr_scheduler_t* thief_base) {
+    void * rt = NULL;
+    int success = 0;
+    while (!success) {
+        if ( hc_cas(&heap->lock, 0, 1) ) {
+            success = 1;
+
+            int size = heap->tail - heap->head;
+            if ( size > 0 ) {
+                rt = (void*) heap->buffer->data[ --heap->tail % heap->buffer->capacity];
+
+                long double prioritySumStolen = extractPriority(rt);
+                heap->nDescendantsSum -= ((hc_task_t*)rt)->nDescendants;
+
+                ocrGuid_t worker_guid = ocr_get_current_worker_guid();
+                while ( prioritySumStolen < heap->nPrioritySum/2 && heap->tail - heap->head > 0 ) {
+                    volatile void* stolen = heap->buffer->data[ --heap->tail % heap->buffer->capacity];
+                    thief_base->give(thief_base, worker_guid, (ocrGuid_t)stolen);
+                    prioritySumStolen += extractPriority(stolen);
+                    heap->nDescendantsSum -= ((hc_task_t*)stolen)->nDescendants;
+                }
+
+                heap->nPrioritySum -= prioritySumStolen;
+            } 
+            heap->lock = 0;
+        }
+    }
+    return rt;
+}
+
 void* locked_heap_pop_priority_worst_counting_half ( heap_t* heap, ocr_scheduler_t* thief_base) {
-    assert ( 0 && "locked_heap_pop_priority_worst_counting_half  not yet implemented" );
-    return NULL;
+    return locked_heap_pop_priority_worst_counting_half_helper(heap, thief_base);
 }
 
 void* locked_heap_sorted_pop_priority_worst_counting_half ( heap_t* heap, ocr_scheduler_t* thief_base) {
-    assert ( 0 && "locked_heap_sorted_pop_priority_worst_counting_half  not yet implemented" );
-    return NULL;
+    return locked_heap_pop_priority_worst_counting_half_helper(heap, thief_base);
 }
+
 
 void* locked_dequeish_heap_head_pop_no_priority ( heap_t* heap ) {
     void * rt = NULL;
@@ -892,11 +849,8 @@ void* locked_dequeish_heap_head_pop_no_priority ( heap_t* heap ) {
 
             int size = heap->tail - heap->head;
             if ( size > 0 ) {
-                int head = heap->head;
-                ++heap->head;
-                rt = (void*) heap->buffer->data[head % heap->buffer->capacity];
-            } else {
-                rt = NULL;
+                rt = (void*) heap->buffer->data[ heap->head++ % heap->buffer->capacity];
+                heap->nDescendantsSum -= ((hc_task_t*)rt)->nDescendants;
             }
             heap->lock = 0;
         }
@@ -919,9 +873,13 @@ void* locked_dequeish_heap_pop_head_half_no_priority ( heap_t* heap, ocr_schedul
                 heap->head = nStolen + head;
 
                 rt = (void*) heap->buffer->data[head % heap->buffer->capacity];
+                heap->nDescendantsSum -= ((hc_task_t*)rt)->nDescendants;
                 int stolenIndex = 1;
+                ocrGuid_t worker_guid = ocr_get_current_worker_guid();
                 for ( ; stolenIndex < nStolen; ++stolenIndex ) {
-                    thief_base->give(thief_base, ocr_get_current_worker_guid(), (ocrGuid_t)heap->buffer->data[(stolenIndex + head) % heap->buffer->capacity]);
+                    volatile void* stolen = heap->buffer->data[(stolenIndex + head) % heap->buffer->capacity];
+                    thief_base->give(thief_base, worker_guid, (ocrGuid_t)stolen);
+                    heap->nDescendantsSum -= ((hc_task_t*)stolen)->nDescendants;
                 }
             } 
             heap->lock = 0;
@@ -943,15 +901,13 @@ void* locked_dequeish_heap_pop_head_counting_half_no_priority ( heap_t* heap, oc
                 ++heap->head;
 
                 long double descendantsSumStolen = ((hc_task_t*) rt) -> nDescendants;
-                // fprintf(stderr,"nDescendantsSum: %Le\n", heap->nDescendantsSum);
-                // fprintf(stderr,"stolen: %Le\n", descendantsSumStolen);
 
+                ocrGuid_t worker_guid = ocr_get_current_worker_guid();
                 while ( descendantsSumStolen < heap->nDescendantsSum/2 && heap->tail - heap->head > 0 ) {
                     volatile void* stolen = heap->buffer->data[ heap->head % heap->buffer->capacity];
                     ++heap->head;
-                    thief_base->give(thief_base, ocr_get_current_worker_guid(), (ocrGuid_t)stolen);
+                    thief_base->give(thief_base, worker_guid, (ocrGuid_t)stolen);
                     descendantsSumStolen += ((hc_task_t*)stolen) -> nDescendants;
-                    // fprintf(stderr,"stolen: %Le\n", ((hc_task_t*)stolen) -> nDescendants);
                 }
 
                 heap->nDescendantsSum -= descendantsSumStolen;
