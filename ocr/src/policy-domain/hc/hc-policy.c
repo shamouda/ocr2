@@ -1514,6 +1514,104 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         break;
     }
 
+    case PD_MSG_HINT_SET: {
+        START_PROFILE(pd_hc_HintSet);
+#define PD_MSG msg
+#define PD_TYPE PD_MSG_HINT_SET
+        localDeguidify(self, &(PD_MSG_FIELD_I(guid)));
+        ocrFatGuid_t fatGuid = PD_MSG_FIELD_I(guid);
+        ocrGuidKind kind = OCR_GUID_NONE;
+        guidKind(self, fatGuid, &kind);
+        switch(PD_MSG_FIELD_I(hint.type)) {
+        case OCR_HINT_EDT_T:
+            {
+                if (kind == OCR_GUID_EDT_TEMPLATE) {
+                    ocrTaskTemplate_t* taskTemplate = (ocrTaskTemplate_t*)(PD_MSG_FIELD_I(guid.metaDataPtr));
+                    PD_MSG_FIELD_O(returnDetail) = self->taskTemplateFactories[0]->fcts.setHint(taskTemplate, &(PD_MSG_FIELD_I(hint)));
+                } else {
+                    ASSERT(kind == OCR_GUID_EDT);
+                    ocrTask_t *task = (ocrTask_t*)(PD_MSG_FIELD_I(guid.metaDataPtr));
+                    PD_MSG_FIELD_O(returnDetail) = self->taskFactories[0]->fcts.setHint(task, &(PD_MSG_FIELD_I(hint)));
+                }
+            }
+            break;
+        case OCR_HINT_DB_T:
+            {
+                ASSERT(kind == OCR_GUID_DB);
+                ocrDataBlock_t *db = (ocrDataBlock_t*)(PD_MSG_FIELD_I(guid.metaDataPtr));
+                PD_MSG_FIELD_O(returnDetail) = self->dbFactories[0]->fcts.setHint(db, &(PD_MSG_FIELD_I(hint)));
+            }
+            break;
+        case OCR_HINT_EVT_T:
+            {
+                ASSERT(kind & OCR_GUID_EVENT);
+                ocrEvent_t *evt = (ocrEvent_t*)(PD_MSG_FIELD_I(guid.metaDataPtr));
+                PD_MSG_FIELD_O(returnDetail) = self->eventFactories[0]->fcts[evt->kind].setHint(evt, &(PD_MSG_FIELD_I(hint)));
+            }
+            break;
+        case OCR_HINT_GROUP_T:
+        default:
+            ASSERT(0);
+            PD_MSG_FIELD_O(returnDetail) = OCR_ENOTSUP;
+            break;
+        }
+        msg->type &= ~PD_MSG_REQUEST;
+        msg->type |= PD_MSG_RESPONSE;
+#undef PD_MSG
+#undef PD_TYPE
+        EXIT_PROFILE;
+        break;
+    }
+
+    case PD_MSG_HINT_GET: {
+        START_PROFILE(pd_hc_HintGet);
+#define PD_MSG msg
+#define PD_TYPE PD_MSG_HINT_GET
+        localDeguidify(self, &(PD_MSG_FIELD_I(guid)));
+        ocrFatGuid_t fatGuid = PD_MSG_FIELD_I(guid);
+        ocrGuidKind kind = OCR_GUID_NONE;
+        guidKind(self, fatGuid, &kind);
+        switch(PD_MSG_FIELD_IO(hint.type)) {
+        case OCR_HINT_EDT_T:
+            {
+                if (kind == OCR_GUID_EDT_TEMPLATE) {
+                    ocrTaskTemplate_t* taskTemplate = (ocrTaskTemplate_t*)(PD_MSG_FIELD_I(guid.metaDataPtr));
+                    PD_MSG_FIELD_O(returnDetail) = self->taskTemplateFactories[0]->fcts.getHint(taskTemplate, &(PD_MSG_FIELD_IO(hint)));
+                } else {
+                    ASSERT(kind == OCR_GUID_EDT);
+                    ocrTask_t *task = (ocrTask_t*)(PD_MSG_FIELD_I(guid.metaDataPtr));
+                    PD_MSG_FIELD_O(returnDetail) = self->taskFactories[0]->fcts.getHint(task, &(PD_MSG_FIELD_IO(hint)));
+                }
+            }
+            break;
+        case OCR_HINT_DB_T:
+            {
+                ASSERT(kind == OCR_GUID_DB);
+                ocrDataBlock_t *db = (ocrDataBlock_t*)(PD_MSG_FIELD_I(guid.metaDataPtr));
+                PD_MSG_FIELD_O(returnDetail) = self->dbFactories[0]->fcts.getHint(db, &(PD_MSG_FIELD_IO(hint)));
+            }
+            break;
+        case OCR_HINT_EVT_T:
+            {
+                ASSERT(kind & OCR_GUID_EVENT);
+                ocrEvent_t *evt = (ocrEvent_t*)(PD_MSG_FIELD_I(guid.metaDataPtr));
+                PD_MSG_FIELD_O(returnDetail) = self->eventFactories[0]->fcts[evt->kind].getHint(evt, &(PD_MSG_FIELD_IO(hint)));
+            }
+            break;
+        case OCR_HINT_GROUP_T:
+        default:
+            ASSERT(0);
+            PD_MSG_FIELD_O(returnDetail) = OCR_ENOTSUP;
+            break;
+        }
+        msg->type &= ~PD_MSG_REQUEST;
+        msg->type |= PD_MSG_RESPONSE;
+#undef PD_MSG
+#undef PD_TYPE
+        EXIT_PROFILE;
+        break;
+    }
+
     default:
         // Not handled
         ASSERT(0);

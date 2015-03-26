@@ -11,7 +11,7 @@
 #define OCR_RUNTIME_HINT_H_
 
 #include "ocr-types.h"
-//#include "ocr-hints.h"
+#include "ocr-hint.h"
 #include "ocr-runtime-types.h"
 #include "utils/ocr-utils.h"
 
@@ -25,13 +25,23 @@ typedef struct _paramListHintFact_t {
 } paramListHintFact_t;
 
 /****************************************************/
+/* OCR USER HINTS UTILS                             */
+/****************************************************/
+
+extern u64 ocrHintPropIndexStart[];
+extern u64 ocrHintPropIndexEnd[];
+
+#define OCR_HINT_INDX(property, type)       (property - ocrHintPropIndexStart[type] - 1)
+#define OCR_HINT_BIT_MASK(hint, property)   (0x1 << OCR_HINT_INDX(property, hint->type))
+#define OCR_HINT_FIELD(hint, property)      ((u64*)(&(hint->args)))[OCR_HINT_INDX(property, hint->type)]
+
+/****************************************************/
 /* OCR RUNTIME HINTS                                */
 /****************************************************/
 
 #define RUNTIME_HINT_PROP_NULL  0 /* Initialization value */
 
 typedef struct _ocrRuntimeHint_t {
-    ocrHintTypes_t type;
     u32 properties;
 } ocrRuntimeHint_t;
 

@@ -137,6 +137,14 @@ ocrTaskTemplate_t * newTaskTemplateHc(ocrTaskTemplateFactory_t* factory, ocrEdt_
     return base;
 }
 
+u8 setHintTaskTemplateHc(ocrTaskTemplate_t* self, ocrHint_t *hint) {
+    return 0;
+}
+
+u8 getHintTaskTemplateHc(ocrTaskTemplate_t* self, ocrHint_t *hint) {
+    return 0;
+}
+
 void destructTaskTemplateFactoryHc(ocrTaskTemplateFactory_t* base) {
     runtimeChunkFree((u64)base, NULL);
 }
@@ -148,6 +156,8 @@ ocrTaskTemplateFactory_t * newTaskTemplateFactoryHc(ocrParamList_t* perType, u32
     base->destruct =  FUNC_ADDR(void (*)(ocrTaskTemplateFactory_t*), destructTaskTemplateFactoryHc);
     base->factoryId = factoryId;
     base->fcts.destruct = FUNC_ADDR(u8 (*)(ocrTaskTemplate_t*), destructTaskTemplateHc);
+    base->fcts.setHint = FUNC_ADDR(u8 (*)(ocrTaskTemplate_t*, ocrHint_t*), setHintTaskTemplateHc);
+    base->fcts.getHint = FUNC_ADDR(u8 (*)(ocrTaskTemplate_t*, ocrHint_t*), getHintTaskTemplateHc);
     return base;
 }
 
@@ -1045,6 +1055,14 @@ u8 taskExecute(ocrTask_t* base) {
     return 0;
 }
 
+u8 setHintTaskHc(ocrTask_t* self, ocrHint_t *hint) {
+    return 0;
+}
+
+u8 getHintTaskHc(ocrTask_t* self, ocrHint_t *hint) {
+    return 0;
+}
+
 void destructTaskFactoryHc(ocrTaskFactory_t* base) {
     runtimeChunkFree((u64)base, NULL);
 }
@@ -1064,6 +1082,8 @@ ocrTaskFactory_t * newTaskFactoryHc(ocrParamList_t* perInstance, u32 factoryId) 
     base->fcts.notifyDbRelease = FUNC_ADDR(u8 (*)(ocrTask_t*, ocrFatGuid_t), notifyDbReleaseTaskHc);
     base->fcts.execute = FUNC_ADDR(u8 (*)(ocrTask_t*), taskExecute);
     base->fcts.dependenceResolved = FUNC_ADDR(u8 (*)(ocrTask_t*, ocrGuid_t, void*, u32), dependenceResolvedTaskHc);
+    base->fcts.setHint = FUNC_ADDR(u8 (*)(ocrTask_t*, ocrHint_t*), setHintTaskHc);
+    base->fcts.getHint = FUNC_ADDR(u8 (*)(ocrTask_t*, ocrHint_t*), getHintTaskHc);
     return base;
 }
 #endif /* ENABLE_TASK_HC */

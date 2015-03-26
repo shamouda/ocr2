@@ -824,6 +824,14 @@ u8 unregisterWaiterEventHcPersist(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slo
     return 0;
 }
 
+u8 setHintEventHc(ocrEvent_t* self, ocrHint_t *hint) {
+    return 0;
+}
+
+u8 getHintEventHc(ocrEvent_t* self, ocrHint_t *hint) {
+    return 0;
+}
+
 /******************************************************/
 /* OCR-HC Events Factory                              */
 /******************************************************/
@@ -985,6 +993,8 @@ ocrEventFactory_t * newEventFactoryHc(ocrParamList_t *perType, u32 factoryId) {
         base->fcts[i].get = FUNC_ADDR(ocrFatGuid_t (*)(ocrEvent_t*), getEventHc);
         base->fcts[i].registerSignaler = FUNC_ADDR(u8 (*)(ocrEvent_t*, ocrFatGuid_t, u32, ocrDbAccessMode_t, bool), registerSignalerHc);
         base->fcts[i].unregisterSignaler = FUNC_ADDR(u8 (*)(ocrEvent_t*, ocrFatGuid_t, u32, bool), unregisterSignalerHc);
+        base->fcts[i].setHint = FUNC_ADDR(u8 (*)(ocrEvent_t*, ocrHint_t*), setHintEventHc);
+        base->fcts[i].getHint = FUNC_ADDR(u8 (*)(ocrEvent_t*, ocrHint_t*), getHintEventHc);
     }
     // Setup satisfy function pointers
     base->fcts[OCR_EVENT_ONCE_T].satisfy =

@@ -12,6 +12,7 @@
 #include "ocr-runtime-types.h"
 #include "ocr-types.h"
 #include "utils/ocr-utils.h"
+#include "ocr-hint.h"
 
 #ifdef OCR_ENABLE_STATISTICS
 #include "ocr-statistics.h"
@@ -50,6 +51,30 @@ typedef struct ocrTaskTemplateFcts_t {
     /** @brief Virtual destructor for the task template interface
      */
     u8 (*destruct)(struct _ocrTaskTemplate_t* self);
+
+    /**
+     * @brief Set user hints for the EDT template
+     *
+     * The EDT template implementation chooses which hint properties will be set.
+     * Other properties in the user hint will be ignored.
+     *
+     * @param[in] self        Pointer to this task template
+     * @param[in] hint        Pointer to the user hint object
+     * @return 0 on success and a non-zero code on failure
+     */
+    u8 (*setHint)(struct _ocrTaskTemplate_t* self, ocrHint_t *hint);
+
+    /**
+     * @brief Get user hints from the EDT template
+     *
+     * The EDT template implementation chooses which hint properties will be gotten.
+     * Other properties in the user hint will be ignored.
+     *
+     * @param[in] self        Pointer to this task template
+     * @param[in/out] hint    Pointer to the user hint object
+     * @return 0 on success and a non-zero code on failure
+     */
+    u8 (*getHint)(struct _ocrTaskTemplate_t* self, ocrHint_t *hint);
 } ocrTaskTemplateFcts_t;
 
 /** @brief Abstract class to represent OCR task templates.
@@ -228,6 +253,30 @@ typedef struct _ocrTaskFcts_t {
      * @return 0 on success and a non-zero code on failure
      */
     u8 (*dependenceResolved)(struct _ocrTask_t* self, ocrGuid_t dbGuid, void* localPtr, u32 slot);
+
+    /**
+     * @brief Set user hints for the EDT
+     *
+     * The task implementation chooses which hint properties will be set.
+     * Other properties in the user hint will be ignored.
+     *
+     * @param[in] self        Pointer to this task
+     * @param[in] hint        Pointer to the user hint object
+     * @return 0 on success and a non-zero code on failure
+     */
+    u8 (*setHint)(struct _ocrTask_t* self, ocrHint_t *hint);
+
+    /**
+     * @brief Get user hints from the EDT
+     *
+     * The task implementation chooses which hint properties will be gotten.
+     * Other properties in the user hint will be ignored.
+     *
+     * @param[in] self        Pointer to this task
+     * @param[in/out] hint    Pointer to the user hint object
+     * @return 0 on success and a non-zero code on failure
+     */
+    u8 (*getHint)(struct _ocrTask_t* self, ocrHint_t *hint);
 } ocrTaskFcts_t;
 
 #define ELS_RUNTIME_SIZE 0

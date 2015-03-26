@@ -567,6 +567,14 @@ ocrDataBlock_t* newDataBlockLockable(ocrDataBlockFactory_t *factory, ocrFatGuid_
     return (ocrDataBlock_t*)result;
 }
 
+u8 lockableSetHint(ocrDataBlock_t* self, ocrHint_t *hint) {
+    return 0;
+}
+
+u8 lockableGetHint(ocrDataBlock_t* self, ocrHint_t *hint) {
+    return 0;
+}
+
 /******************************************************/
 /* OCR DATABLOCK LOCKABLE FACTORY                      */
 /******************************************************/
@@ -591,6 +599,8 @@ ocrDataBlockFactory_t *newDataBlockFactoryLockable(ocrParamList_t *perType, u32 
                                                  u32, bool), lockableRegisterWaiter);
     base->fcts.unregisterWaiter = FUNC_ADDR(u8 (*)(ocrDataBlock_t*, ocrFatGuid_t,
                                                    u32, bool), lockableUnregisterWaiter);
+    base->fcts.setHint = FUNC_ADDR(u8 (*)(ocrDataBlock_t*, ocrHint_t*), lockableSetHint);
+    base->fcts.getHint = FUNC_ADDR(u8 (*)(ocrDataBlock_t*, ocrHint_t*), lockableGetHint);
     base->factoryId = factoryId;
 
     return base;

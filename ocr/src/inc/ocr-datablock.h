@@ -14,6 +14,7 @@
 #include "ocr-allocator.h"
 #include "ocr-types.h"
 #include "utils/ocr-utils.h"
+#include "ocr-hint.h"
 
 #ifdef OCR_ENABLE_STATISTICS
 #include "ocr-statistics.h"
@@ -141,6 +142,30 @@ typedef struct _ocrDataBlockFcts_t {
      */
     u8 (*unregisterWaiter)(struct _ocrDataBlock_t *self, ocrFatGuid_t waiter, u32 slot,
                            bool isDepRem);
+
+    /**
+     * @brief Set user hints for the data-block
+     *
+     * The data-block implementation chooses which hint properties will be set.
+     * Other properties in the user hint will be ignored.
+     *
+     * @param[in] self        Pointer to this data-block
+     * @param[in] hint        Pointer to the user hint object
+     * @return 0 on success and a non-zero code on failure
+     */
+    u8 (*setHint)(struct _ocrDataBlock_t* self, ocrHint_t *hint);
+
+    /**
+     * @brief Get user hints from the data-block
+     *
+     * The data-block implementation chooses which hint properties will be gotten.
+     * Other properties in the user hint will be ignored.
+     *
+     * @param[in] self        Pointer to this data-block
+     * @param[in/out] hint    Pointer to the user hint object
+     * @return 0 on success and a non-zero code on failure
+     */
+    u8 (*getHint)(struct _ocrDataBlock_t* self, ocrHint_t *hint);
 } ocrDataBlockFcts_t;
 
 /**

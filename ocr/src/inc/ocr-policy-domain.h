@@ -20,6 +20,7 @@
 #include "ocr-task.h"
 #include "ocr-types.h"
 #include "ocr-worker.h"
+#include "ocr-hint.h"
 
 #include "experimental/ocr-placer.h"
 #include "experimental/ocr-tuning.h"
@@ -214,6 +215,15 @@ typedef struct _paramListPolicyDomainInst_t {
 
 /**< For a worker to request the policy-domain to monitor an operation progress */
 #define PD_MSG_MGT_MONITOR_PROGRESS 0x00005200
+
+/**< AND with this and if result non-null, hint related operation.
+ * Generally, these will be calls to set/get user hints
+ */
+#define PD_MSG_HINT_OP          0x400
+/**< Set hint on guid */
+#define PD_MSG_HINT_SET      0x00041400
+/**< Get hint from guid */
+#define PD_MSG_HINT_GET      0x00042400
 
 
 /**< And this to just get the type of the message (note that the number
@@ -935,6 +945,30 @@ typedef struct _ocrPolicyMsg_t {
                 } out;
             } inOrOut __attribute__ (( aligned(8) ));
         } PD_MSG_STRUCT_NAME(PD_MSG_MGT_MONITOR_PROGRESS);
+
+        struct {
+            union {
+                struct {
+                    ocrFatGuid_t guid;      /**< In: Target guid to set hints on */
+                    ocrHint_t hint;         /**< In: Hint to set */
+                } in;
+                struct {
+                    u32 returnDetail;       /**< Out: Success or error code */
+                } out;
+            } inOrOut __attribute__ (( aligned(8) ));
+        } PD_MSG_STRUCT_NAME(PD_MSG_HINT_SET);
+
+        struct {
+            ocrHint_t hint;                 /**< InOut: Hints retrieved from guid */
+            union {
+                struct {
+                    ocrFatGuid_t guid;      /**< In: Guid from which hints are retrieved */
+                } in;
+                struct {
+                    u32 returnDetail;       /**< Out: Success or error code */
+                } out;
+            } inOrOut __attribute__ (( aligned(8) ));
+        } PD_MSG_STRUCT_NAME(PD_MSG_HINT_GET);
     } args;
     char _padding[64]; // REC: HACK to be able to fit everything in messages!!
 } ocrPolicyMsg_t;

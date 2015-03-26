@@ -16,6 +16,7 @@
 #include "ocr-runtime-types.h"
 #include "ocr-types.h"
 #include "utils/ocr-utils.h"
+#include "ocr-hint.h"
 
 #ifdef OCR_ENABLE_STATISTICS
 #include "ocr-statistics.h"
@@ -137,6 +138,30 @@ typedef struct _ocrEventFcts_t {
      */
     u8 (*unregisterWaiter)(struct _ocrEvent_t *self, ocrFatGuid_t waiter, u32 slot,
                            bool isDepRem);
+
+    /**
+     * @brief Set user hints for the Event
+     *
+     * The event implementation chooses which hint properties will be set.
+     * Other properties in the user hint will be ignored.
+     *
+     * @param[in] self        Pointer to this event
+     * @param[in] hint        Pointer to the user hint object
+     * @return 0 on success and a non-zero code on failure
+     */
+    u8 (*setHint)(struct _ocrEvent_t* self, ocrHint_t *hint);
+
+    /**
+     * @brief Get user hints from the Event
+     *
+     * The event implementation chooses which hint properties will be gotten.
+     * Other properties in the user hint will be ignored.
+     *
+     * @param[in] self        Pointer to this event
+     * @param[in/out] hint    Pointer to the user hint object
+     * @return 0 on success and a non-zero code on failure
+     */
+    u8 (*getHint)(struct _ocrEvent_t* self, ocrHint_t *hint);
 } ocrEventFcts_t;
 
 /**

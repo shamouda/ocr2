@@ -264,11 +264,71 @@ typedef enum {
     OCR_EVENT_LATCH_INCR_SLOT = 1  /**< The increment slot of a LATCH event */
 } ocrLatchEventSlot_t;
 
-typedef enum {
-    //currently placeholder for hint types
-    OCR_HINT_NUM_TYPES       /**< Number of Hint Types */
-} ocrHintTypes_t;
+/**
+ * @}
+ *
+ * @defgroup OCR Hint types, properties and structure
+ *
+ * @{
+ */
 
+/**
+ * ocrHintType_t: is the type of the hint object.
+ * It typically denotes the kind of target guid.
+ */
+typedef enum {
+    OCR_HINT_UNDEF_T,     // Undefined hint type
+    OCR_HINT_EDT_T,       // Hints for Event Driven Tasks. Can be set to both EDT and EDT template guids.
+    OCR_HINT_DB_T,        // Hints for DataBlock guids
+    OCR_HINT_EVT_T,       // Hints for Event guids
+    OCR_HINT_GROUP_T,     // Hints for Group guids
+} ocrHintType_t;
+
+/**
+ * ocrHintProp_t: denotes the property kinds that can be set on the hint object.
+ * If new hint a property is to be added, then it needs to go into this enum.
+ *
+ * Note: New hints should be added within the respective type's
+ *       START and END fields in the following enum.
+ */
+typedef enum {
+    //EDT Hint Properties                   (OCR_HINT_EDT_T)
+    OCR_HINT_EDT_PROP_START,                /* This is NOT a hint. Its use is reserved for the runtime */
+    OCR_HINT_EDT_PRIORITY,                  /* [u64] : Global priority number of EDT. Higher value is greater priority. */
+    OCR_HINT_EDT_SLOT_MAX_ACCESS,           /* [u64] : EDT slot number that contains the DB which is accessed most by the EDT. */
+    OCR_HINT_EDT_PROP_END,                  /* This is NOT a hint. Its use is reserved for the runtime */
+
+    //DB Hint Properties                    (OCR_HINT_DB_T)
+    OCR_HINT_DB_PROP_START,                 /* This is NOT a hint. Its use is reserved for the runtime */
+    OCR_HINT_DB_PROP_END,                   /* This is NOT a hint. Its use is reserved for the runtime */
+
+    //EVT Hint Properties                   (OCR_HINT_EVT_T)
+    OCR_HINT_EVT_PROP_START,                /* This is NOT a hint. Its use is reserved for the runtime */
+    OCR_HINT_EVT_PROP_END,                  /* This is NOT a hint. Its use is reserved for the runtime */
+
+    //GROUP Hint Properties                 (OCR_HINT_GROUP_T)
+    OCR_HINT_GROUP_PROP_START,              /* This is NOT a hint. Its use is reserved for the runtime */
+    OCR_HINT_GROUP_PROP_END,                /* This is NOT a hint. Its use is reserved for the runtime */
+
+} ocrHintProp_t;
+
+/**
+ * @brief OCR Hint structure
+ *
+ * Note: This struct requires no modification while adding
+ *       new hint properties or removing old ones.
+ *
+ */
+typedef struct {
+    ocrHintType_t type; /* The type of hint variable; depends on target kind */
+    u64 propMask;       /* The bit mask that reflects all the set properties */
+    union {
+        u64 propEDT[OCR_HINT_EDT_PROP_END - OCR_HINT_EDT_PROP_START - 1];
+        u64 propDB[OCR_HINT_DB_PROP_END - OCR_HINT_DB_PROP_START - 1];
+        u64 propEVT[OCR_HINT_EVT_PROP_END - OCR_HINT_EVT_PROP_START - 1];
+        u64 propGROUP[OCR_HINT_GROUP_PROP_END - OCR_HINT_GROUP_PROP_START - 1];
+    } args;
+} ocrHint_t;
 
 /**
  * @}

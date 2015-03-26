@@ -284,6 +284,15 @@ ocrDataBlock_t* newDataBlockRegular(ocrDataBlockFactory_t *factory, ocrFatGuid_t
 
     return (ocrDataBlock_t*)result;
 }
+
+u8 regularSetHint(ocrDataBlock_t* self, ocrHint_t *hint) {
+    return 0;
+}
+
+u8 regularGetHint(ocrDataBlock_t* self, ocrHint_t *hint) {
+    return 0;
+}
+
 /******************************************************/
 /* OCR DATABLOCK REGULAR FACTORY                      */
 /******************************************************/
@@ -308,6 +317,8 @@ ocrDataBlockFactory_t *newDataBlockFactoryRegular(ocrParamList_t *perType, u32 f
                                                  u32, bool), regularRegisterWaiter);
     base->fcts.unregisterWaiter = FUNC_ADDR(u8 (*)(ocrDataBlock_t*, ocrFatGuid_t,
                                                    u32, bool), regularUnregisterWaiter);
+    base->fcts.setHint = FUNC_ADDR(u8 (*)(ocrDataBlock_t*, ocrHint_t*), regularSetHint);
+    base->fcts.getHint = FUNC_ADDR(u8 (*)(ocrDataBlock_t*, ocrHint_t*), regularGetHint);
     base->factoryId = factoryId;
 
     return base;
