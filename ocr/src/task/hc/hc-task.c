@@ -327,7 +327,7 @@ static u8 iterateDbFrontier(ocrTask_t *self) {
                 ASSERT(depv[i].slot / 64 < OCR_MAX_MULTI_SLOT);
                 rself->doNotReleaseSlots[depv[i].slot / 64] |= (1ULL << (depv[i].slot % 64));
             } else {
-                // Issue registration request
+                // Issue acquire request
                 ocrPolicyDomain_t * pd = NULL;
                 PD_MSG_STACK(msg);
                 getCurrentEnv(&pd, NULL, NULL, &msg);
@@ -649,7 +649,11 @@ u8 satisfyTaskHc(ocrTask_t * base, ocrFatGuid_t data, u32 slot) {
     ASSERT(self->slotSatisfiedCount < base->depc);
 
     self->slotSatisfiedCount++;
-    self->signalers[slot].guid = data.guid;
+    // If a valid DB is expected, assign the GUID
+    if(self->signalers[slot].mode == DB_MODE_NULL)
+        self->signalers[slot].guid = NULL_GUID;
+    else
+        self->signalers[slot].guid = data.guid;
 
     if(self->slotSatisfiedCount == base->depc) {
         DPRINTF(DEBUG_LVL_VERB, "Scheduling task 0x%lx, satisfied dependences %d/%d\n",

@@ -91,7 +91,9 @@ typedef enum {
  * @brief Data block access modes
  *
  * These are the modes with which an EDT can access a data block. OCR currently
- * supports four modes:
+ * supports five modes:
+ * - None: This is useful to convert a data-dependence into a control-dependence,
+ *   when an EDT doesn't expect a datablock but it may be passed along the event.
  * - Read Only (RO): The EDT is stating that it will only read from the data block.
  *   In this mode, the runtime guarantees that the data block seen by the EDT
  *   is not modified by other concurrent EDTs (in other words, the data block
@@ -112,6 +114,7 @@ typedef enum {
  *   This can limit parallelism.
  */
 typedef enum {
+    DB_MODE_NULL = 0x0,   /**< No mode specified; useful for pure control dependences */
     DB_MODE_RO   = 0x2,   /**< Read-only mode */
     DB_MODE_ITW  = 0x4,   /**< Intent-to-write mode (default mode) */
     DB_MODE_EW   = 0x8,   /**< Exclusive write mode */
