@@ -19,6 +19,7 @@
 
 // Allocator
 #define ENABLE_ALLOCATOR_TLSF
+#define ENABLE_ALLOCATOR_SIMPLE
 
 // CommApi
 #define ENABLE_COMM_API_HANDLELESS

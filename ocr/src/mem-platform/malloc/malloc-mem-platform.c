@@ -33,7 +33,7 @@
 
 void mallocDestruct(ocrMemPlatform_t *self) {
     ocrMemPlatformMalloc_t *rself = (ocrMemPlatformMalloc_t*)self;
-    destroyRange(&(rself->rangeTracker));
+    destroyRange(rself->pRangeTracker);
     free((void*)self->startAddr);
     runtimeChunkFree((u64)self, NULL);
 }
@@ -48,7 +48,7 @@ void mallocBegin(ocrMemPlatform_t *self, struct _ocrPolicyDomain_t * PD ) {
     self->endAddr = self->startAddr + self->size;
 
     ocrMemPlatformMalloc_t *rself = (ocrMemPlatformMalloc_t*)self;
-    initializeRange(&(rself->rangeTracker), 16, self->startAddr,
+    rself->pRangeTracker = initializeRange(16, self->startAddr,
                     self->endAddr, USER_FREE_TAG);
 }
 
@@ -91,13 +91,13 @@ u8 mallocChunkAndTag(ocrMemPlatform_t *self, u64 *startAddr, u64 size,
     u8 result;
     LOCK(&(rself->lock));
     do {
-        result = getRegionWithTag(&(rself->rangeTracker), oldTag, &startRange,
+        result = getRegionWithTag(rself->pRangeTracker, oldTag, &startRange,
                                   &endRange, &iterate);
         if(endRange - startRange >= size) {
             // This is a fit, we do not look for "best" fit for now
             *startAddr = startRange;
-            RESULT_ASSERT(splitRange(&(rself->rangeTracker),
-                                     startRange, size, newTag), ==, 0);
+            RESULT_ASSERT(splitRange(rself->pRangeTracker,
+                                     startRange, size, newTag, 0), ==, 0);
             break;
         }
     } while(result == 0);
@@ -115,8 +115,8 @@ u8 mallocTag(ocrMemPlatform_t *self, u64 startAddr, u64 endAddr,
     ocrMemPlatformMalloc_t *rself = (ocrMemPlatformMalloc_t *)self;
 
     LOCK(&(rself->lock));
-    RESULT_ASSERT(splitRange(&(rself->rangeTracker), startAddr,
-                             endAddr - startAddr, newTag), ==, 0);
+    RESULT_ASSERT(splitRange(rself->pRangeTracker, startAddr,
+                             endAddr - startAddr, newTag, 0), ==, 0);
     UNLOCK(&(rself->lock));
     return 0;
 }
@@ -125,7 +125,7 @@ u8 mallocQueryTag(ocrMemPlatform_t *self, u64 *start, u64* end,
                   ocrMemoryTag_t *resultTag, u64 addr) {
     ocrMemPlatformMalloc_t *rself = (ocrMemPlatformMalloc_t *)self;
 
-    RESULT_ASSERT(getTag(&(rself->rangeTracker), addr, start, end, resultTag),
+    RESULT_ASSERT(getTag(rself->pRangeTracker, addr, start, end, resultTag),
                   ==, 0);
     return 0;
 }

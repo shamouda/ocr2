@@ -32,7 +32,7 @@
 /******************************************************/
 
 void fsimDestruct(ocrMemPlatform_t *self) {
-    destroyRange(&(((ocrMemPlatformFsim_t*)self)->rangeTracker));
+    destroyRange(((ocrMemPlatformFsim_t*)self)->pRangeTracker);
     runtimeChunkFree((u64)self, NULL);
 }
 
@@ -46,7 +46,7 @@ void fsimBegin(ocrMemPlatform_t *self, struct _ocrPolicyDomain_t * PD ) {
 
     DPRINTF(DEBUG_LVL_VERB, "Initializing memory range %lx to %lx\n", self->startAddr, self->endAddr);
     ocrMemPlatformFsim_t *rself = (ocrMemPlatformFsim_t*)self;
-    initializeRange(&(rself->rangeTracker), 16, self->startAddr,
+    rself->pRangeTracker = initializeRange(16, self->startAddr,
                     self->endAddr, USER_FREE_TAG);
 }
 
@@ -61,7 +61,7 @@ void fsimStop(ocrMemPlatform_t *self) {
 
 void fsimFinish(ocrMemPlatform_t *self) {
     ocrMemPlatformFsim_t *rself = (ocrMemPlatformFsim_t*)self;
-    destroyRange(&(rself->rangeTracker));
+    destroyRange(rself->pRangeTracker);
 }
 
 u8 fsimGetThrottle(ocrMemPlatform_t *self, u64 *value) {
@@ -92,27 +92,60 @@ u8 fsimChunkAndTag(ocrMemPlatform_t *self, u64 *startAddr, u64 size,
     u64 iterate = 0;
     u64 startRange, endRange;
     u8 result;
-    LOCK(&(rself->lock));
+    LOCK(&(rself->pRangeTracker->lockChunkAndTag));
+    /* I had to change this function's behavior a bit.. (it's a bit hacky, so please let me know
+     * if you have suggestions how to properly do it)
+     *
+     * scenario: multiple CE calls fsimChunkAndTag() , and first one allocates a big chunk.
+     *
+     * original semantic : the rest tries to allocate another chunk, but fails, so fsim crashes.
+     * or, it allocates different private chunk so each CE has its own private portion for BSM or CSM
+     *
+     * current semantic :  the other CEs arrive but they shouldn't allocate a new chunk, but they
+     * should get the return value of that already-allocated chunk. So, fsimChunkAndTag() first check
+     * if there's existing one and return it if true. Note that this is atomic behavior. It queries
+     * if any other CE already allocated that chunk, and get that chunk if so. Otherwise, it does
+     * allocation for all CEs that shares this memory.
+     *
+     * It's hacky at the moment, so we should define better (atomic) semantics for fsimChunkAndTag() or
+     * other chunkAndTag() functions. Need a bit of redoing.
+     */
+
+    // first check if there's existing one. (query part)
     do {
-        result = getRegionWithTag(&(rself->rangeTracker), oldTag, &startRange,
+        result = getRegionWithTag(rself->pRangeTracker, newTag, &startRange,
+                                  &endRange, &iterate);
+        if(endRange - startRange >= size) {
+            *startAddr = startRange;
+            DPRINTF(DEBUG_LVL_VERB, "ChunkAndTag returning (existing) start of 0x%llx for size %lld (0x%llx) Tag %d\n",
+                    *startAddr, size, size, newTag);
+            // exit.
+            UNLOCK(&(rself->pRangeTracker->lockChunkAndTag));
+            return result;
+        }
+    } while(result == 0);
+
+    // now do chunkAndTag (allocation part)
+    iterate = 0;
+    do {
+        result = getRegionWithTag(rself->pRangeTracker, oldTag, &startRange,
                                   &endRange, &iterate);
         if(endRange - startRange >= size) {
             // This is a fit, we do not look for "best" fit for now
             *startAddr = startRange;
-            DPRINTF(DEBUG_LVL_VERB, "ChunkAndTag returning start of 0x%llx for size %lld and newTag %d\n",
-                    *startAddr, size, newTag);
-            RESULT_ASSERT(splitRange(&(rself->rangeTracker),
-                                     startRange, size, newTag), ==, 0);
+            DPRINTF(DEBUG_LVL_VERB, "ChunkAndTag returning start of 0x%llx for size %lld (0x%llx) and newTag %d\n",
+                    *startAddr, size, size, newTag);
+            RESULT_ASSERT(splitRange(rself->pRangeTracker,
+                                     startRange, size, newTag, 0), ==, 0);
             break;
         } else {
             if(result == 0) {
-                DPRINTF(DEBUG_LVL_VVERB, "ChunkAndTag, found [0x%llx; 0x%llx[ but too small for size %lld\n",
-                        startRange, endRange, size);
+                DPRINTF(DEBUG_LVL_VVERB, "ChunkAndTag, found [0x%llx; 0x%llx[ but too small for size %lld (0xllx)\n",
+                        startRange, endRange, size, size);
             }
         }
     } while(result == 0);
-
-    UNLOCK(&(rself->lock));
+    UNLOCK(&(rself->pRangeTracker->lockChunkAndTag));
     return result;
 }
 
@@ -125,8 +158,8 @@ u8 fsimTag(ocrMemPlatform_t *self, u64 startAddr, u64 endAddr,
     ocrMemPlatformFsim_t *rself = (ocrMemPlatformFsim_t *)self;
 
     LOCK(&(rself->lock));
-    RESULT_ASSERT(splitRange(&(rself->rangeTracker), startAddr,
-                             endAddr - startAddr, newTag), ==, 0);
+    RESULT_ASSERT(splitRange(rself->pRangeTracker, startAddr,
+                             endAddr - startAddr, newTag, 0), ==, 0);
     UNLOCK(&(rself->lock));
     return 0;
 }
@@ -135,7 +168,7 @@ u8 fsimQueryTag(ocrMemPlatform_t *self, u64 *start, u64* end,
                 ocrMemoryTag_t *resultTag, u64 addr) {
     ocrMemPlatformFsim_t *rself = (ocrMemPlatformFsim_t *)self;
 
-    RESULT_ASSERT(getTag(&(rself->rangeTracker), addr, start, end, resultTag),
+    RESULT_ASSERT(getTag(rself->pRangeTracker, addr, start, end, resultTag),
                   ==, 0);
     return 0;
 }

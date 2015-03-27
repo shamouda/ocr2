@@ -50,7 +50,7 @@ typedef struct _tagNode_t {
 
 typedef struct _tagHead_t {
     u32 headIdx; /**< Index of the first element of tag-list in the tag array (0 == invalid) */
-    // TODO: See if useful to introduce finer-grain locking
+    // TODO: See if useful to introduce finer-grain locking. Bug #499
     //volatile u32 lock; /**< Local lock on the tag-list */
 } tagHead_t;
 
@@ -68,22 +68,22 @@ typedef struct _rangeTracker_t {
 
     // TODO: For the lock, would be better to move to a reader-writer lock
     volatile u32 lock; /**< Lock protecting range */
+    volatile u32 lockChunkAndTag;    // TODO move this to ocrMemPlatformFsim_t. Bug #497
 } rangeTracker_t;
 
 
 /**
  * @brief Initialize the range tracker.
  *
- * This does not do any allocation for the range tracker (it must be pre-allocated
- * at the address passed in as dest
+ * The range tracker will be allocated at 'minRange'
  *
- * @param[in] dest          Pointer to this rangeTracker_t
  * @param[in] maxSplits     Maximum number of splits that will occur
  * @param[in] minRange      Smallest value for the range (inclusive)
  * @param[in] maxRange      Largest value for the range (exclusive)
  * @param[in] initTag       Initial tag for the entire range
+ * @return the pointer to the rangeTracker_t, which is effectively minRange.
  */
-void initializeRange(rangeTracker_t *dest, u32 maxSplits, u64 minRange,
+rangeTracker_t *initializeRange(u32 maxSplits, u64 minRange,
                      u64 maxRange, ocrMemoryTag_t initTag);
 
 /**
@@ -104,9 +104,10 @@ void destroyRange(rangeTracker_t *self);
  * @param[in] startAddr     Start-address for the new tag
  * @param[in] size          Size of the chunk of the range to tag with the new tag
  * @param[in] tag           New tag
+ * @param[in] skipLock      non-zero to skip locking (i.e. does not acquire lock if 1)
  * @return 0 on success
  */
-u8 splitRange(rangeTracker_t *range, u64 startAddr, u64 size, ocrMemoryTag_t tag);
+u8 splitRange(rangeTracker_t *range, u64 startAddr, u64 size, ocrMemoryTag_t tag, u32 skipLock);
 
 /**
  * @brief Gets the tag at address addr

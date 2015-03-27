@@ -26,7 +26,7 @@ typedef struct {
 
 typedef struct {
     ocrMemPlatform_t base;
-    rangeTracker_t rangeTracker;
+    rangeTracker_t *pRangeTracker;
     u32 lock;
 } ocrMemPlatformMalloc_t;
 

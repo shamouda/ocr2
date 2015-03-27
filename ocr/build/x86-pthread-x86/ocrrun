@@ -40,8 +40,17 @@ if [ "${OCR_CONFIG}" = "" ]; then
     OCR_CONFIG=${PWD}/default.cfg
 fi
 
+if [[ "${OCRRUN_VALGRIND_OPTS}" != "" ]]; then
+    OCRRUN_VALGRIND="yes";
+fi
+
+if [[ "${OCRRUN_VALGRIND}" == "yes" ]]; then
+    PROGRAM_BIN="valgrind ${OCRRUN_VALGRIND_OPTS} ${PROGRAM_BIN}"
+fi
+
 # Default is regular X86-backend
 ${PROGRAM_BIN} -ocr:cfg ${OCR_CONFIG}
+
 RET_CODE=$?
 exit ${RET_CODE}
 

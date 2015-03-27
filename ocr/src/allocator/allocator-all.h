@@ -18,7 +18,11 @@
 #include "utils/ocr-utils.h"
 
 typedef enum _allocatorType_t {
+#ifdef ENABLE_ALLOCATOR_SIMPLE
+    allocatorSimple_id,
+#endif
     allocatorTlsf_id,
+
 #ifdef ENABLE_ALLOCATOR_MALLOCPROXY
     allocatorMallocProxy_id,
 #endif
@@ -42,6 +46,7 @@ typedef enum _allocatorType_t {
 extern const char * allocator_types[];
 
 #include "allocator/tlsf/tlsf-allocator.h"    // TLSF allocator
+#include "allocator/simple/simple-allocator.h"
 #ifdef ENABLE_ALLOCATOR_MALLOCPROXY
 // System malloc allocator with our own wrapper, for platforms other than FSIM, for fall-back testing
 #include "allocator/mallocproxy/mallocproxy-allocator.h"

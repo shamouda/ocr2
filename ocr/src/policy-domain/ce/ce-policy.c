@@ -401,6 +401,7 @@ static u8 getEngineIndex(ocrPolicyDomain_t *self, ocrLocation_t location) {
     return blockRelativeEngineIndex;
 }
 
+
 // In all these functions, we consider only a single PD. In other words, in CE, we
 // deal with everything locally and never send messages
 
@@ -429,23 +430,7 @@ static void* allocateDatablock (ocrPolicyDomain_t *self,
             (allocatorIndex >= self->allocatorCount) ||
             (self->allocators[allocatorIndex] == NULL)) continue;  // Skip this allocator if it doesn't exist.
         result = self->allocators[allocatorIndex]->fcts.allocate(self->allocators[allocatorIndex], size, allocatorHints);
-
         if (result) {
-#if defined(HAL_FSIM_CE)
-            if((u64)result <= CE_MSR_BASE && (u64)result >= BR_CE_BASE) {
-                result = (void *)DR_CE_BASE(CHIP_FROM_ID(self->myLocation),
-                                            UNIT_FROM_ID(self->myLocation),
-                                            BLOCK_FROM_ID(self->myLocation))
-                                            + (u64)(result - BR_CE_BASE);
-                u64 check = MAKE_CORE_ID(0,
-                                         0,
-                                         ((((u64)result >> MAP_CHIP_SHIFT) & ((1ULL<<MAP_CHIP_LEN) - 1)) - 1),
-                                         ((((u64)result >> MAP_UNIT_SHIFT) & ((1ULL<<MAP_UNIT_LEN) - 1)) - 2),
-                                         ((((u64)result >> MAP_BLOCK_SHIFT) & ((1ULL<<MAP_BLOCK_LEN) - 1)) - 2),
-                                         ID_AGENT_CE);
-                ASSERT(check==self->myLocation);
-            }
-#endif
             DPRINTF (DEBUG_LVL_VVERB, "Success allocationg %5ld-byte block to allocator %ld (level %ld) for engine %ld (%2ld) -- 0x%lx\n",
             (u64) size, (u64) allocatorIndex, (u64) levelIndex, (u64) engineIndex, (u64) self->myLocation, (u64) (((u64*) result)[-1]));
             *allocatorIndexReturn = allocatorIndex;
@@ -470,6 +455,7 @@ static u8 ceAllocateDb(ocrPolicyDomain_t *self, ocrFatGuid_t *guid, void** ptr, 
     // which to attempt to allocate the block to a pool.
     u64 idx;
     void* result = allocateDatablock (self, size, engineIndex, prescription, &idx);
+
     if (result) {
         ocrDataBlock_t *block = self->dbFactories[0]->instantiate(
             self->dbFactories[0], self->allocators[idx]->fguid, self->fguid,
@@ -495,6 +481,7 @@ static u8 ceMemAlloc(ocrPolicyDomain_t *self, ocrFatGuid_t* allocator, u64 size,
     u64 idx;
     ASSERT (memType == GUID_MEMTYPE || memType == DB_MEMTYPE);
     result = allocateDatablock (self, size, engineIndex, prescription, &idx);
+
     if (result) {
         *ptr = result;
         *allocator = self->allocators[idx]->fguid;
@@ -1527,25 +1514,9 @@ void* cePdMalloc(ocrPolicyDomain_t *self, u64 size) {
             (allocatorIndex >= self->allocatorCount) ||
             (self->allocators[allocatorIndex] == NULL)) continue;  // Skip this allocator if it doesn't exist.
         result = self->allocators[allocatorIndex]->fcts.allocate(self->allocators[allocatorIndex], size, allocatorHints);
-#if defined(HAL_FSIM_CE)
         if (result) {
-            if((u64)result <= CE_MSR_BASE && (u64)result >= BR_CE_BASE) {
-                result = (void *)DR_CE_BASE(CHIP_FROM_ID(self->myLocation),
-                                            UNIT_FROM_ID(self->myLocation),
-                                            BLOCK_FROM_ID(self->myLocation)) +
-                                            (u64)(result - BR_CE_BASE);
-                u64 check = MAKE_CORE_ID(0,
-                                         0,
-                                         ((((u64)result >> MAP_CHIP_SHIFT) & ((1ULL<<MAP_CHIP_LEN) - 1)) - 1),
-                                         ((((u64)result >> MAP_UNIT_SHIFT) & ((1ULL<<MAP_UNIT_LEN) - 1)) - 2),
-                                         ((((u64)result >> MAP_BLOCK_SHIFT) & ((1ULL<<MAP_BLOCK_LEN) - 1)) - 2),
-                                         ID_AGENT_CE);
-                ASSERT(check==self->myLocation);
-            }
             return result;
         }
-#endif
-        if (result) return result;
     } while (prescription != 0);
 
     DPRINTF(DEBUG_LVL_WARN, "cePdMalloc returning NULL for size %ld\n", (u64) size);

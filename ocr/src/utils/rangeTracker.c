@@ -556,22 +556,35 @@ static void avlDestroy(u64 startChunk, avlBinaryNode_t *root) {
 }
 
 // Range functions
-void initializeRange(rangeTracker_t *dest, u32 maxSplits,
+rangeTracker_t *initializeRange(u32 maxSplits,
                      u64 minRange, u64 maxRange, ocrMemoryTag_t initTag) {
     ASSERT(minRange < maxRange);
     ASSERT(initTag < MAX_TAG);
     ASSERT(maxSplits > 0);
     u32 i;
 
+    rangeTracker_t *dest = (rangeTracker_t *)minRange;
+
+#ifdef ENABLE_VALGRIND
+//    TODO this generates 'undefined reference' on x86
+//    VALGRIND_MAKE_MEM_DEFINED(&(dest->lock), sizeof(dest->lock));
+#endif
+    LOCK(&(dest->lock));           // assume pool->lock is already 0 at startup
+    if (dest->startBKHeap) {       // already init'ed?
+        DPRINTF(DEBUG_LVL_INFO, "Initializing a range @ 0x%lx from 0x%lx to 0x%lx -- SKIP\n",
+            (u64)dest, minRange, maxRange);
+        goto init_range_skip;
+    }
+
     dest->minimum = minRange;
-    dest->startBKHeap = minRange + sizeof(tagNode_t)*maxSplits; // Start of our book-keeping heap
+    dest->startBKHeap = minRange + sizeof(rangeTracker_t) + sizeof(tagNode_t)*maxSplits; // Start of our book-keeping heap
     dest->maximum = maxRange;
     dest->maxSplits = maxSplits;
     dest->nextTag = 1; // We will use tags[0]
 
     // We use the beginning as our tags table and then we use a stupid
     // allocator for the tree nodes
-    dest->tags = (tagNode_t *)dest->minimum;
+    dest->tags = (tagNode_t *)(minRange + sizeof(rangeTracker_t));
     INIT_MALLOC(dest->startBKHeap, sizeof(u64) +
                 dest->maxSplits*sizeof(avlBinaryNode_t)); // We allocate at most the number of maxsplits
 
@@ -583,10 +596,11 @@ void initializeRange(rangeTracker_t *dest, u32 maxSplits,
 
     for(i = 0; i < MAX_TAG; ++i) {
         dest->heads[i].headIdx = 0;
+
+        //    This is Romain's (disabled) fine-grained locking code for the future.
+        //    See rangeTracker.h tagHead_t struct
         //    INIT_LOCK(&(dest->heads[i].lock));
     }
-
-    INIT_LOCK(&(dest->lock));
 
     // Set up one point with initTag
 
@@ -601,17 +615,31 @@ void initializeRange(rangeTracker_t *dest, u32 maxSplits,
     dest->heads[initTag].headIdx = 1; // Offset by 1
 
     // Now say that the first part is reserved for OS stuff (basically our book-keeping space)
-    splitRange(dest, dest->minimum, sizeof(u64) + dest->maxSplits*2*sizeof(avlBinaryNode_t),
-               RESERVED_TAG);
+    //
+    // Brief layout of this reserved parts
+    // (1) rangeTracker_t at the starting addres 'minRange'
+    // (2) array of tagNode_t,        count=maxSplits
+    // (3) bitVector for BKHeap (startBKHeap)
+    // (4) array of avlBinaryNode_t , count=maxSplits
+    // Thus, the size below.
+    splitRange(dest, dest->minimum, sizeof(rangeTracker_t) + sizeof(u64) + dest->maxSplits*(sizeof(tagNode_t) + sizeof(avlBinaryNode_t)),
+               RESERVED_TAG, 1);  // this is only call which skipLock == 1
+
+init_range_skip:
+    UNLOCK(&(dest->lock));
+    return dest;
 }
 
 void destroyRange(rangeTracker_t *self) {
 
     DPRINTF(DEBUG_LVL_INFO, "Destroying range @ 0x%lx", (u64)self);
+    LOCK(&self->lock);
     avlDestroy(self->startBKHeap, self->rangeSplits);
+    UNLOCK(&self->lock);
 }
 
-u8 splitRange(rangeTracker_t *range, u64 startAddr, u64 size, ocrMemoryTag_t tag) {
+// 'skipLock' is used by initializeRange() function
+u8 splitRange(rangeTracker_t *range, u64 startAddr, u64 size, ocrMemoryTag_t tag, u32 skipLock) {
 
     // TODO: Convert some asserts to return error codes
     /*
@@ -638,7 +666,8 @@ u8 splitRange(rangeTracker_t *range, u64 startAddr, u64 size, ocrMemoryTag_t tag
     avlBinaryNode_t *v;
     u64 lookupKey = startAddr + size + 1;
     u32 oldLastTag = MAX_TAG + 1;
-    LOCK(&(range->lock)); // Enter critical section to search the tree
+    if (!skipLock)
+        LOCK(&(range->lock)); // Enter critical section to search the tree
 
     DPRINTF(DEBUG_LVL_VERB, "Splitting range 0x%lx: adding %d for [0x%lx; 0x%lx[\n",
             (u64)range, (u32)tag, startAddr, startAddr + size);
@@ -663,7 +692,8 @@ u8 splitRange(rangeTracker_t *range, u64 startAddr, u64 size, ocrMemoryTag_t tag
     linkTag(range, startAddr, tag);
     linkTag(range, startAddr + size + 1, oldLastTag);
 
-    UNLOCK(&(range->lock));
+    if (!skipLock)
+        UNLOCK(&(range->lock));
     return 0;
 }
 

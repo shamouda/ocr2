@@ -23,8 +23,8 @@ typedef struct {
 
 typedef struct {
     ocrMemPlatform_t base;
-    rangeTracker_t rangeTracker;
-    u32 lock;
+    rangeTracker_t *pRangeTracker;
+    u32 lock;   // this does not work on fsim, so I'll use pRangeTracker->lockChunkAndTag instead. See Bug #497
 } ocrMemPlatformFsim_t;
 
 typedef struct {

@@ -1633,7 +1633,7 @@ void tlsfFinish(ocrAllocator_t *self) {
                 for (i = 0; i < rself->sliceCount; i++) {
                     VALGRIND_DESTROY_MEMPOOL(poolAddr);
                     VALGRIND_MAKE_MEM_DEFINED(poolAddr, rself->sliceSize);
-                    poolAddr += srelf->sliceSize;
+                    poolAddr += rself->sliceSize;
                 }
 
                 VALGRIND_DESTROY_MEMPOOL(poolAddr);
