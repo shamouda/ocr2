@@ -31,28 +31,43 @@ The profiler provides the following macros:
 # Analyzing the profile
 ##
 
-Run the script 'analyzeProfile.py'. This script takes two parameters:
+Run the script 'analyzeProfile.py'. This script takes the following parameters:
     - the name of the basename of the output files (set as 'profiler_' by default)
-    - the number of threads to look at. One file is produced per thread and the
+    - the nodes to look at. This is optional but allows you to form groups of threads
+      for aggregation analysis.
+    - the threads to look at. One file is produced per thread and the
       analyzer will analyze each thread separately and also generate a summary
-      over all threads. You can specify '*' to look for all files in the current
-      directory starting with the basename
+      over all threads in a node (if nodes are specified) and over all threads.
+      You can specify '*' to look for all files in the current directory starting
+      with the basename and the node name.
+    - optional flags that specify:
+        - if you want to print the time spent in a function that recursively calls itself
+          (see at the end of this document for details on how we handle recursion). Use '-r'.
+        - if you want the aggregate statistics (per node and overall) to also compute
+          the average and standard deviation across threads. Use '-s'.
 Run the script with the '-h' option for more information.
 
-The analyzer will output its analysis for each thread as well as for all
-threads combined. Each analysis is very similar to the output produced by
+The analyzer will output its analysis for each thread, for each node and for all
+nodes combined. The output is very similar to the output produced by
 gprof.
+
+The description of the output for threads is the same whether or not '-s' is specified.
+The output for nodes and globally changes if '-s' is specified.
 
 It will first output a flat profile of all the blocks of code
 profiled. For each block of code it will output (in this order):
     - the percentage of total measured time spent in this block of code (not
       including its children). The flat profile is ordered by this
       percentage.
-    - the total time spent in this block of code and children
+    - the total time spent in this block of code and children EXCLUDING time spent
+      calling itself. See how recursion is handled at the end of this document
+    - optionally if the '-r' option is specified, in brackets, the time spent
+      in calls to itself
     - the total time spent in this block of code (not including its children).
       This is the time used to compute the percentage in the first column.
     - The number of calls to this block of code
-    - The average time spent per call (including children)
+    - The average time spent per call (including children AND calls to itself). This
+      might be fixed in the future to exclude calls to itself
     - The standard deviation on this average
     - The name of the block of code (set by 'START_PROFILER').
     - An index in [] used in the call-graph profile
@@ -60,7 +75,7 @@ profiled. For each block of code it will output (in this order):
 It will also output a call-graph profile which gives more detail about
 how each block of code is called. This profile is ordered by the
 percentage of total measured time spent in the block of code (INCLUDING
-its children).
+its children but EXCLUDING time spent calling itself).
 
 To clarify the notations, we will use the following example output:
                       62.128203        0.001531      32870326/54696727      shared_Crefwiththread [1]
@@ -78,7 +93,8 @@ For the lines describing the parents:
     - the first column is the amount of time spent in '[3]' (excluding
         its children) that comes from '[3]' being called by this parent
     - the second column is the amount of time spent in the children
-        of '[3]' that comes from '[3]' being called by this parent
+        of '[3]' INCLUDING time '[3]' spends calling itself
+        that comes from '[3]' being called by this parent
     - the third column is the number of times '[3]' was called from
         this parent
     - the fourth column is the name of the parent and its index
@@ -86,15 +102,14 @@ For the lines describing the parents:
 For the line describing the entry:
     - the first column is its index
     - the second column is the percentage of total measured time spent in
-        this entry (including its children). This percentage may be bigger
-        than 100% if the function calls itself because the full total measured
-        time only sums the "self" times (and here, the time of a function
-        that calls itself is counted more than once in the total measured
-        time of the entry).
+        this entry (including its children but EXCLUDING the time '[3]' spends
+        calling itself).
     - the third column is the total time spent inside this entry (excluding
         its children)
     - the fourth column is the total time spent inside its
-        children
+        children EXCLUDING the time '[3]' spends calling itself
+    - optionally if the '-r' option is specified, in brackets, the time
+      spent indirectly in '[3]'s children calling '[3]'.
     - the fifth column is the total number of calls
     - the sixth colum is the entry's name and index
 
@@ -103,10 +118,33 @@ For the lines describing the children:
         it is called from '[3]'
     - the second column is the total time spent in this child's children
         when it is called from '[3]'
+    - optionally if the '-r' option is specified, in brackets, the time
+        this child spent calling '[3]'
     - the third column is the number of times this child is called
         from '[3]'
     - the fourth colum is the name of the child and its index
 
+##
+# Aggregate output
+##
+
+If you specify the '-s' option, each line in the output for nodes and the global output
+will be doubled where the second line will indicate the average value and standard deviation of
+the value right above it on the first line.
+
+For example:
+/ 3.72                  8.739922                              [0.289304]                              0.566882                                4410                      0.002047          0.001914      pd_hc_ProcessMessage R [7]
+\               (1.092490, 0.320933)                  [(0.036163, 0.054024)]                  (0.070860, 0.035297)                (551.250000, 137.142945)
+
+shows a sample output for a recursive function in the flat-profile. The second column
+shows that the application spent 8.739922 ms in pd_hc_ProcessMessage and its children
+(excluding self calls) across all threads. The second line indicates that, on
+average, each thread spent 1.092490 ms and that the standard deviation across all
+threads was 0.320933. The same logic goes for all other numbers that have a corresponding
+pair (avg, std-dev) on the second line.
+
+Note that this can make the output very large and hard to read but is useful in
+evaluating load-balancing.
 
 ##
 # Note on recursive functions
@@ -115,12 +153,32 @@ For the lines describing the children:
 To solve the issue of resursive functions, all profiling instances of the same
 scope (ie: if START_PROFILE(foobar) is called after a START_PROFILE(foobar) without
 any intervening EXIT/RETURN_PROFILE) are collapsed into one. This has the effect
-of lengthening the effective time of the profiled function but produces more accurate
-results.
+of lengthening the effective time of the profiled function
 
 For chains such as:
-A->B->A
+A->B->A->C->A where the time spent inside each function is, respectively:
+t1 -> tB -> t2 -> tC -> t3
 
-The execution time of the last A will be counted multiple times (it will be counted
-as part of A's execution time when the last A finishes and also as part of
-the first A's execution time).
+The time reported for A will be:
+    - in the flat profile:
+        - second column (Cum time): t1 + tB + t2 + tC + t3
+        - If '-r' is specified, the third column: t2 + t3
+        - third (or fourth if '-r') column (Self time): t1 + t2 + t3
+	- average time per call INCLUDES the time A spent calling itself.
+          Specifically, if the chain is executed only once, the average
+          will be computed as the average of t3, t2 + tC + t3 and t1 + tB + t2 + tC + t3
+        - the standard deviation will also include the time A spent calling
+          itself
+    - the the call-graph profile
+        - for the parent lines:
+            - for B, the times listed will be t2 and t2 + tC + t3
+            - for C, the times listed will be t3 and t3
+        - for the entry line:
+            - the third column will be t1 + t2 + t3
+            - the fourth column will be t1 + tB + t2 + tC + t3
+            - If '-r' is specified, the fifth column will be: t2 + t3
+        - for the children lines:
+            - for B, the times listed will be tB and tC. If '-r' is
+              specified, the time t2 + t3 will be listed in brackets
+            - for C, the times listed will be tC and 0. If '-r' is
+              specified, the time t3 will be listed in brackets

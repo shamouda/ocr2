@@ -46,8 +46,30 @@ RANLIB := ranlib
 SUPPORTS_SHARED=no
 SUPPORTS_STATIC=yes
 
-# For Valgrind, uncomment this line
-#CFLAGS += -I/usr/include -DENABLE_VALGRIND
+# Valgrind compatibility for internal allocators
+# x86 only
+# Requires valgrind-devel package
+# CFLAGS += -I/usr/include -DENABLE_VALGRIND
+
+# Runtime overhead profiler
+# x86 only
+#
+# Enable profiler
+# CFLAGS += -DOCR_RUNTIME_PROFILER -DPROFILE_KHZ=3400000
+#
+# (optional) Maximum number of scope
+# nesting for runtime profiler
+# CFLAGS += -DMAX_PROFILER_LEVEL=512
+
+# Enables the collection of EDT R/W statistics
+# x86 only
+# Requires OCR_ENABLE_EDT_NAMING
+# CFLAGS += -DOCR_ENABLE_EDT_PROFILING
+
+# Enables data collection for execution timeline visualizer
+# x86 only
+# Requires -DOCR_ENABLE_EDT_NAMING and DEBUG_LVL_INFO
+# CFLAGS += -DOCR_ENABLE_VISUALIZER -DOCR_ENABLE_EDT_NAMING
 
 ifndef GASNET_ROOT
 	$(error GASNET_ROOT not specified)

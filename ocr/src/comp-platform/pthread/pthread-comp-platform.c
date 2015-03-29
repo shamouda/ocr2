@@ -72,8 +72,8 @@ static void * pthreadRoutineWrapper(void * arg) {
 
 #ifdef OCR_RUNTIME_PROFILER
     _profilerData *d = (_profilerData*)malloc(sizeof(_profilerData));
-    char buffer[30];
-    snprintf(buffer, 30, "profiler_%lx", (u64)arg);
+    char buffer[50];
+    snprintf(buffer, 50, "profiler_%lx-%lx", data->pd->myLocation, (u64)arg);
     d->output = fopen(buffer, "w");
     ASSERT(d->output);
     RESULT_ASSERT(pthread_setspecific(_profilerThreadData, d), ==, 0);
@@ -91,20 +91,18 @@ static void destroyKey(void* arg) {
  */
 static void initializeKey() {
     RESULT_ASSERT(pthread_key_create(&selfKey, &destroyKey), ==, 0);
+#ifdef OCR_RUNTIME_PROFILER
+    RESULT_ASSERT(pthread_key_create(&_profilerThreadData, &_profilerDataDestroy), ==, 0);
+#endif
+
+    ocrPolicyDomain_t *pd = NULL;
+    getCurrentEnv(&pd, NULL, NULL, NULL);
     // We are going to set our own key (we are the master thread)
     perThreadStorage_t *data = (perThreadStorage_t*)malloc(sizeof(perThreadStorage_t));
     data->pd = NULL;
     data->worker = NULL;
     RESULT_ASSERT(pthread_setspecific(selfKey, data), ==, 0);
-#ifdef OCR_RUNTIME_PROFILER
-    RESULT_ASSERT(pthread_key_create(&_profilerThreadData, &_profilerDataDestroy), ==, 0);
-    _profilerData *d = (_profilerData*)malloc(sizeof(_profilerData));
-    char buffer[30];
-    snprintf(buffer, 30, "profiler_%lx", 0UL);
-    d->output = fopen(buffer, "w");
-    ASSERT(d->output);
-    RESULT_ASSERT(pthread_setspecific(_profilerThreadData, d), ==, 0);
-#endif
+
     keyInit = true;
 }
 
@@ -125,6 +123,16 @@ void pthreadBegin(ocrCompPlatform_t * compPlatform, ocrPolicyDomain_t * PD, ocrW
             DPRINTF(DEBUG_LVL_INFO, "Binding comp-platform to cpu_id %d\n", cpuBind);
             bindThread(cpuBind);
         }
+#ifdef OCR_RUNTIME_PROFILER
+        {
+            _profilerData *d = (_profilerData*)malloc(sizeof(_profilerData));
+            char buffer[50];
+            snprintf(buffer, 50, "profiler_%lx-%lx", PD->myLocation, 0UL);
+            d->output = fopen(buffer, "w");
+            ASSERT(d->output);
+            RESULT_ASSERT(pthread_setspecific(_profilerThreadData, d), ==, 0);
+        }
+#endif
         // The master starts executing when we call "stop" on it
     }
 }

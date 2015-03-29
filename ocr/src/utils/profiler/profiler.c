@@ -44,15 +44,17 @@ extern pthread_key_t _profilerThreadData;
 
 /* _profiler functions */
 void _profilerInit(_profiler *self, profilerEvent_t event, u64 prevTicks) {
-    self->accumulatorTicks = self->startTicks = self->endTicks = 0UL;
+    self->accumulatorTicks = self->accumulatedChildrenTicks = self->startTicks = self->endTicks =
+        self->recurseAccumulate = self->currentRecurseAccumulate = 0UL;
     self->countResume = 0;
     self->onStackCount = 1;
     self->myEvent = event;
-    self->active = self->isPaused = 0;
+    self->previousLastLevel = 0;
+    *(u8*)(&(self->flags)) = 0;
 
     self->myData = (_profilerData*)pthread_getspecific(_profilerThreadData);
     if(self->myData) {
-        self->active = true;
+        self->flags.active = true;
         if(self->myData->level >= 1) {
             ASSERT(prevTicks != 0);
             if(self->myData->stack[self->myData->level-1]->myEvent == event) {
@@ -60,20 +62,34 @@ void _profilerInit(_profiler *self, profilerEvent_t event, u64 prevTicks) {
                 self->endTicks = prevTicks; // We cheat to keep track of this overhead
                                             // startTicks will be udpated when we return from here
                                             // and we will be able to remove startTicks - endTicks
-                                            // from our "parent"
+                                            // from our "parent" (another instance of us in this case)
+                                            // to remove the overhead of the init
             } else {
+                // "Fake" pause; we are "pausing" to remove this overhead from the parent's total
                 _profilerPause(self->myData->stack[self->myData->level-1], prevTicks); // It's a "fake" pause in the sense that we still want this time in the parent's total
+
+                // We push ourself on the stack
+                self->myData->stack[self->myData->level] = self;
+                // We check if we are in a recursive chain
+                self->previousLastLevel = self->myData->stackPosition[event];
+                self->flags.isRecurse = (self->previousLastLevel &&
+                                         self->myData->stack[self->previousLastLevel-1]->flags.active);
+
                 ++(self->myData->level);
                 ASSERT(self->myData->level < MAX_PROFILER_LEVEL);
-                // We push ourself on the stack
-                self->myData->stack[self->myData->level-1] = self;
+                self->myData->stackPosition[event] = self->myData->level; // +1 taken care of above
                 // _gettime will be called after we returned to remove the return overhead
+
             }
         } else {
+
+            self->flags.isRecurse = false;
+            // We push ourself on the stack
+            self->myData->stack[self->myData->level] = self;
+
             ++(self->myData->level);
             ASSERT(self->myData->level < MAX_PROFILER_LEVEL);
-            // We push ourself on the stack
-            self->myData->stack[self->myData->level-1] = self;
+            self->myData->stackPosition[event] = self->myData->level; // +1 taken care of above
             // _gettime will be called after we returned to remove the return overhead
         }
     }
@@ -81,36 +97,34 @@ void _profilerInit(_profiler *self, profilerEvent_t event, u64 prevTicks) {
 
 _profiler* _profilerDestroy(_profiler *self, u64 end) {
     u8 removedFromStack = 0;
-    if(self->active && !self->isPaused) {
+    if(self->flags.active && !self->flags.isPaused) {
         ASSERT(self->myData->stack[self->myData->level-1]->onStackCount >= 1);
         if(--(self->myData->stack[self->myData->level-1]->onStackCount) == 0) {
             --(self->myData->level);
             self->myData->stack[self->myData->level] = NULL;
-            removedFromStack = 1;
 
             self->endTicks = end;
-            ASSERT(self->endTicks > self->startTicks);
+            // self->endTicks > self->startTicks
             self->accumulatorTicks += self->endTicks - self->startTicks;
-            self->isPaused = true;
+            self->accumulatorTicks += self->accumulatedChildrenTicks;
+            self->flags.isPaused = true;
+            removedFromStack = 1;
         } else {
-            ASSERT(self->startTicks > self->endTicks); // Our cheat to measure the overhead of profilerInit
+            // Our cheat to measure overhead of profilerInit
+            // self->startTicks > self->endTicks
             // We pause the "parent" to remove the overhead of this call
+            // The parent is us here (another instance of us)
             _profilerPause(self->myData->stack[self->myData->level-1], end);
             // We compute the time to "fix-up" by
-            ASSERT(self->accumulatorTicks == 0);
-            ASSERT(self->onStackCount == 1); // This is 1 because it should not have changed at all
-            self->isPaused = true;
-            self->accumulatorTicks = self->startTicks - self->endTicks;
+            self->flags.isPaused = true;
         }
     }
 
-    if(!self->active) {
+    if(!self->flags.active) {
         return NULL;
     }
 
-    ASSERT(self->active && self->isPaused);
-
-
+    // Here self->flags.active && self->flags.isPaused
     if(self->accumulatorTicks < (1+self->countResume)*self->myData->overheadTimer) {
         self->accumulatorTicks = 0;
     } else {
@@ -122,17 +136,38 @@ _profiler* _profilerDestroy(_profiler *self, u64 end) {
 
     if(removedFromStack) {
         // First the self counter
-        _profilerSelfEntryAddTime(&(self->myData->selfEvents[self->myEvent]), accumulatorMs, accumulatorNs);
+        if(0 && self->recurseAccumulate) {
+            // Remove the time from our self-entry. We only do this for our own entry because
+            // this is the only place that the time is counted twice (once for the execution of the child of the same
+            // type and once inside the execution time of the parent).
+            ASSERT(self->accumulatorTicks > self->recurseAccumulate);
+            u64 t = self->accumulatorTicks - self->recurseAccumulate;
+            u64 tt = t/PROFILE_KHZ;
+
+            _profilerSelfEntryAddTime(&(self->myData->selfEvents[self->myEvent]), tt,
+                                      (u32)(1000000.0*((double)t/PROFILE_KHZ - tt)));
+        } else {
+            _profilerSelfEntryAddTime(&(self->myData->selfEvents[self->myEvent]), accumulatorMs, accumulatorNs);
+        }
 
         // We also update the child counter
         if(self->myData->level >= 1) {
             // We have a parent so we update there
             _profiler *parentEventPtr = self->myData->stack[self->myData->level-1];
             u32 parentEvent = parentEventPtr->myEvent;
-            ASSERT(parentEvent != self->myEvent);
+            //ASSERT(parentEvent != self->myEvent);
             _profilerChildEntryAddTime(
                 &(self->myData->childrenEvents[parentEvent][self->myEvent<parentEvent?self->myEvent:(self->myEvent-1)]),
                 accumulatorMs, accumulatorNs);
+
+            if(parentEventPtr->currentRecurseAccumulate != 0.0) {
+                u64 t = parentEventPtr->currentRecurseAccumulate;
+                u64 tt = t/PROFILE_KHZ;
+                _profilerChildEntryAddRecurseTime(
+                    &(self->myData->childrenEvents[parentEvent][self->myEvent<parentEvent?self->myEvent:(self->myEvent-1)]),
+                    tt, (u32)(1000000.0*((double)t/PROFILE_KHZ - tt)));
+                _profilerSwapRecurse(parentEventPtr);
+            }
 
             // We also add the time directly to the parent as the parent has been paused to avoid counting
             // the overhead of creating the child profiling object
@@ -145,18 +180,32 @@ _profiler* _profilerDestroy(_profiler *self, u64 end) {
                 // was due to a child of parent (us in this case)
                 _profiler *grandParentEventPtr = self->myData->stack[self->myData->level-2];
                 u32 grandParentEvent = grandParentEventPtr->myEvent;
-                ASSERT(grandParentEvent != parentEvent);
+                //ASSERT(grandParentEvent != parentEvent);
                 _profilerChildEntryAddChildTime(
                     &(self->myData->childrenEvents[grandParentEvent][parentEvent<grandParentEvent?parentEvent:(parentEvent-1)]),
                     accumulatorMs, accumulatorNs);
             }
+            // Deal with recursion. We are going to remove our time from the entry of our
+            // ancestor that is the same event
+            if(self->flags.isRecurse) {
+                // We need to remove the time from our ancestor that is of the same type
+
+                _profilerRecurseAccumulate(self->myData->stack[self->previousLastLevel-1],
+                                           self->accumulatorTicks);
+            }
+            // Set the stack information properly for recursion
+            self->myData->stackPosition[self->myEvent] = self->previousLastLevel;
             return parentEventPtr;
+        } else {
+            // Still set the recurse info properly (resets it)
+            self->myData->stackPosition[self->myEvent] = self->previousLastLevel;
         }
     } else {
         // Not removed from stack which means that this is a collapsed call
-        ASSERT(self->myEvent == self->myData->stack[self->myData->level-1]->myEvent);
-        _profilerFixup(self->myData->stack[self->myData->level-1], self->accumulatorTicks);
+        //ASSERT(self->myEvent == self->myData->stack[self->myData->level-1]->myEvent);
+        _profilerSubTime(self->myData->stack[self->myData->level-1], self->accumulatorTicks);
         return self->myData->stack[self->myData->level-1]; // We resume our "parent" from the pause earlier in this function
+                                                           // In this case, it's just us (another iteration)
     }
     return NULL;
 }
@@ -188,7 +237,9 @@ void _profilerDataInit(_profilerData *self) {
     _gettime(end);
     ASSERT(end > start);
     self->overheadTimer = (end - start)/1000;
-    fprintf(stderr, "Got RDTSCP overhead of %lu ticks\n", self->overheadTimer);
+    //fprintf(stderr, "Got RDTSCP overhead of %lu ticks\n", self->overheadTimer);
+
+    memset(&(self->stackPosition[0]), 0, sizeof(u32)*MAX_EVENTS);
 }
 
 void _profilerDataDestroy(void* _self) {
@@ -208,17 +259,19 @@ void _profilerDataDestroy(void* _self) {
             if(j == i) {
                 _profilerSelfEntry *entry = &(self->selfEvents[i]);
                 if(entry->count == 0) continue; // Skip entries with no content
-                fprintf(self->output, "ENTRY %u:%u = count(%lu), sum(%lu.%06u), sumSq(%lu.%06u)\n",
+                fprintf(self->output, "ENTRY %u:%u = count(%lu), sum(%lu.%06u), sumSq(%lu.%012lu)\n",
                         i, j, entry->count, entry->sumMs, entry->sumNs, entry->sumSqMs, entry->sumSqNs);
             } else {
                 // Child entry
                 _profilerChildEntry *entry = &(self->childrenEvents[i][j<i?j:(j-1)]);
                 if(entry->count == 0) continue;
                 fprintf(self->output,
-                        "ENTRY %u:%u = count(%lu), sum(%lu.%06u), sumSq(%lu.%06u), sumChild(%lu.%06u), sumSqChild(%lu.%06u)\n",
+                        "ENTRY %u:%u = count(%lu), sum(%lu.%06u), sumSq(%lu.%012lu), sumChild(%lu.%06u), sumSqChild(%lu.%012lu), sumRecurse(%lu.%06u), sumSqRecurse(%lu.%012lu)\n",
                         i, j, entry->count, entry->sumMs, entry->sumNs, entry->sumSqMs,
                         entry->sumSqNs, entry->sumInChildrenMs, entry->sumInChildrenNs,
-                        entry->sumSqInChildrenMs, entry->sumSqInChildrenNs);
+                        entry->sumSqInChildrenMs, entry->sumSqInChildrenNs,
+                        entry->sumRecurseMs, entry->sumRecurseNs, entry->sumSqRecurseMs,
+                        entry->sumSqRecurseNs);
             }
         }
     }

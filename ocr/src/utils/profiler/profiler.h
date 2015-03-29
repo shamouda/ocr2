@@ -70,25 +70,41 @@
 
 typedef struct __profilerChildEntry {
     u64 count;
-    u64 sumMs, sumSqMs, sumInChildrenMs, sumSqInChildrenMs;
-    u32 sumNs, sumSqNs, sumInChildrenNs, sumSqInChildrenNs;
+    u64 sumMs, sumSqMs, sumInChildrenMs, sumSqInChildrenMs,
+        sumRecurseMs, sumSqRecurseMs;
+    u64 sumSqNs, sumSqInChildrenNs, sumSqRecurseNs; // 64 bits because needs to contain 1e12
+    u32 sumNs, sumInChildrenNs, sumRecurseNs;
 } _profilerChildEntry;
 
 typedef struct __profilerSelfEntry {
     u64 count;
-    u64 sumMs, sumSqMs;
-    u32 sumNs, sumSqNs;
+    u64 sumMs, sumSqMs, sumSqNs;
+    u32 sumNs;
 } _profilerSelfEntry;
 
 struct __profilerData;
 
+typedef struct __profilerFlags {
+    u8 active    :1;
+    u8 isPaused  :1;
+    u8 isRecurse :1;
+    u8 _pad      :5;
+} _profilerFlags;
+
 typedef struct __profiler {
-    u64 accumulatorTicks, startTicks, endTicks;
+    u64 startTicks, endTicks;
+    u64 recurseAccumulate; // Accumulates ticks to be substracted from parents for recursion
+    u64 currentRecurseAccumulate; // Counts for each child (will accumulate in recurseAccumulate when child is destroyed
+    s64 accumulatorTicks; // Hopefully no overflow
+    u64 accumulatedChildrenTicks; // Ticks from children
     struct __profilerData *myData;
     u32 countResume;
     u32 onStackCount;
     profilerEvent_t myEvent;
-    u8 active, isPaused;
+    u32 previousLastLevel; // Contains the level that was in stackPosition before
+                           // we started. If isRecurse is true, this is also the
+                           // level from which we should remove our time from
+    _profilerFlags flags;
 } _profiler;
 
 typedef struct __profilerData {
@@ -99,14 +115,16 @@ typedef struct __profilerData {
 
     _profilerSelfEntry selfEvents[MAX_EVENTS];
     _profilerChildEntry childrenEvents[MAX_EVENTS][MAX_EVENTS-1]; // We already have the self entry
+    u32 stackPosition[MAX_EVENTS]; // Contains either 0 or the level at which the most recent
+                                   // entry for the event is made (+1: level 0 is encoded as 1)
 } _profilerData;
 
 /* _profilerChildEntry functions */
 static inline void _profilerChildEntryReset(_profilerChildEntry *self) {
-    self->count = self->sumMs = self->sumSqMs = self->sumInChildrenMs
-        = self->sumSqInChildrenMs = 0UL;
-    self->sumNs = self->sumSqNs = self->sumInChildrenNs
-        = self->sumSqInChildrenNs = 0;
+    self->count = self->sumMs = self->sumSqMs = self->sumInChildrenMs =
+        self->sumSqInChildrenMs = self->sumRecurseMs = self->sumSqRecurseMs =
+        self->sumSqNs = self->sumSqInChildrenNs = self->sumSqRecurseNs = 0UL;
+    self->sumNs = self->sumInChildrenNs = self->sumRecurseNs = 0;
 }
 
 static inline void _profilerChildEntryAddTime(_profilerChildEntry *self,
@@ -119,9 +137,9 @@ static inline void _profilerChildEntryAddTime(_profilerChildEntry *self,
     }
     self->sumMs += timeMs;
 
-    self->sumSqNs += (u32)((double)timeNs/(double)1e6*(double)timeNs);
-    while(self->sumSqNs >= 1000000) {
-        self->sumSqNs -= 1000000;
+    self->sumSqNs += timeNs*timeNs;
+    while(self->sumSqNs >= 1000000000000UL) {
+        self->sumSqNs -= 1000000000000UL;
         ++self->sumSqMs;
     }
     self->sumSqMs += timeMs*timeMs;
@@ -137,18 +155,36 @@ static inline void _profilerChildEntryAddChildTime(_profilerChildEntry *self,
 
     self->sumInChildrenMs += timeMs;
 
-    self->sumSqInChildrenNs += (u32)((double)timeNs/(double)1e6*(double)timeNs);
-    while(self->sumSqInChildrenNs >= 1000000) {
-        self->sumSqInChildrenNs -= 1000000;
+    self->sumSqInChildrenNs += timeNs*timeNs;
+    while(self->sumSqInChildrenNs >= 1000000000000UL) {
+        self->sumSqInChildrenNs -= 1000000000000UL;
         ++self->sumSqInChildrenMs;
     }
     self->sumSqInChildrenMs += timeMs*timeMs;
 }
 
+static inline void _profilerChildEntryAddRecurseTime(_profilerChildEntry *self,
+                                                     u32 timeMs, u32 timeNs) {
+    self->sumRecurseNs += timeNs;
+    if(self->sumRecurseNs >= 1000000) {
+        self->sumRecurseNs -= 1000000;
+        ++self->sumRecurseMs;
+    }
+
+    self->sumRecurseMs += timeMs;
+
+    self->sumSqRecurseNs += timeNs*timeNs;
+    while(self->sumSqRecurseNs >= 1000000000000UL) {
+        self->sumSqRecurseNs -= 1000000000000UL;
+        ++self->sumSqRecurseMs;
+    }
+    self->sumSqRecurseMs += timeMs*timeMs;
+}
+
 /* _profilerSelfEntry functions */
 static inline void _profilerSelfEntryReset(_profilerSelfEntry *self) {
-    self->count = self->sumMs = self->sumSqMs = 0;
-    self->sumNs = self->sumSqNs = 0;
+    self->count = self->sumMs = self->sumSqMs = self->sumSqNs = 0UL;
+    self->sumNs = 0;
 }
 
 static inline void _profilerSelfEntryAddTime(_profilerSelfEntry *self,
@@ -162,59 +198,81 @@ static inline void _profilerSelfEntryAddTime(_profilerSelfEntry *self,
     }
     self->sumMs += timeMs;
 
-    self->sumSqNs += (u32)((double)timeNs/(double)1e6*(double)timeNs);
-    while(self->sumSqNs >= 1000000) {
-        self->sumSqNs -= 1000000;
+    self->sumSqNs += timeNs*timeNs;
+    while(self->sumSqNs >= 1000000000000UL) {
+        self->sumSqNs -= 1000000000000UL;
         ++self->sumSqMs;
     }
     self->sumSqMs += timeMs*timeMs;
 }
 
 /* _profiler inline functions */
+
+/* If realEndTicks is not zero, it means that we are not really "pausing" but rather
+   stopping to count to eliminate overhead
+*/
 static inline void _profilerPause(_profiler *self, u64 realEndTicks) __attribute__((always_inline));
 static inline void _profilerPause(_profiler *self, u64 realEndTicks) {
     // Code looks weird to try to get _gettime as early as possible
     if(realEndTicks == 0) {
         _gettime(self->endTicks);
-        if(self->active && !self->isPaused) {
+        if(self->flags.active && !self->flags.isPaused) {
+            // Remove ourself from the stack
             --(self->myData->level);
             self->myData->stack[self->myData->level] = NULL;
+            self->myData->stackPosition[self->myEvent] = self->previousLastLevel;
+
             // Here: self->endTicks > self->startTicks
             self->accumulatorTicks += self->endTicks - self->startTicks;
-            self->isPaused = 1;
+            self->flags.isPaused = 1;
         }
     } else {
         self->endTicks = realEndTicks;
-        if(self->active && !self->isPaused) {
+        if(self->flags.active && !self->flags.isPaused) {
             // Here: self->endTicks > self->startTicks
             self->accumulatorTicks += self->endTicks - self->startTicks;
-            self->isPaused = 1;
+            self->flags.isPaused = 1;
         }
     }
 }
 
+/* If "isFakePause", this corresponds to the symmetric call of _profilerPause with realEndTicks != 0 */
 static inline void _profilerResume(_profiler *self, u8 isFakePause) __attribute__((always_inline));
 static inline void _profilerResume(_profiler *self, u8 isFakePause) {
-    if(self->active && self->isPaused) {
+    if(self->flags.active && self->flags.isPaused) {
         if(!isFakePause) {
+            self->myData->stack[self->myData->level] = self; // Put ourself back on the stack
+            self->previousLastLevel = self->myData->stackPosition[self->myEvent];
+            self->flags.isRecurse = (self->previousLastLevel &&
+                                     self->myData->stack[self->previousLastLevel-1]->flags.active);
             ++(self->myData->level);
-            self->myData->stack[self->myData->level-1] = self; // Put ourself back on the stack
+            self->myData->stackPosition[self->myEvent] = self->myData->level; // +1 taken care of above
         }
-        self->isPaused = 0;
+        self->flags.isPaused = 0;
         ++self->countResume;
         _gettime(self->startTicks);
     }
 }
 
-static inline void _profilerFixup(_profiler *self, u64 ticks) __attribute__((always_inline));
-static inline void _profilerFixup(_profiler *self, u64 ticks) {
-    // Here: self->accumulatorTicks > ticks
+static inline void _profilerSubTime(_profiler *self, u64 ticks) __attribute__((always_inline));
+static inline void _profilerSubTime(_profiler *self, u64 ticks) {
     self->accumulatorTicks -= ticks;
+}
+
+static inline void _profilerRecurseAccumulate(_profiler *self, u64 ticks) __attribute__((always_inline));
+static inline void _profilerRecurseAccumulate(_profiler *self, u64 ticks) {
+    self->currentRecurseAccumulate += ticks;
+}
+
+static inline void _profilerSwapRecurse(_profiler *self) __attribute__((always_inline));
+static inline void _profilerSwapRecurse(_profiler *self) {
+    self->recurseAccumulate += self->currentRecurseAccumulate;
+    self->currentRecurseAccumulate = 0.0;
 }
 
 static inline void _profilerAddTime(_profiler *self, u64 ticks) __attribute__((always_inline));
 static inline void _profilerAddTime(_profiler *self, u64 ticks) {
-    self->accumulatorTicks += ticks;
+    self->accumulatedChildrenTicks += ticks;
 }
 
 /* Non-inline profiler functions */
@@ -232,23 +290,22 @@ void _profilerDataDestroy(void * self);
     u64 _tempTicks;                                                     \
     _gettime(_tempTicks)                                                \
     /*_sync_synchronize();*/                                            \
-    _profiler *_flightweight = (_profiler*)malloc(sizeof(_profiler));   \
-    _profilerInit(_flightweight, (profilerEvent_t)eventId, _tempTicks); \
-    _gettime(_flightweight->startTicks);
+    _profiler _flightweight;                                            \
+    _profilerInit(&_flightweight, (profilerEvent_t)eventId, _tempTicks); \
+    _gettime(_flightweight.startTicks);
 
 
 #define PAUSE_PROFILE                           \
-    do { _profilerPause(_flightweight); } while(0);
+    do { _profilerPause(&_flightweight, 0); } while(0);
 
 #define RESUME_PROFILE                          \
-    do { _profilerResume(_flightweight, 0); } while(0);
+    do { _profilerResume(&_flightweight, 0); } while(0);
 
 #define RETURN_PROFILE(val)                                             \
     do {                                                                \
         _gettime(_tempTicks);                                           \
         /*_sync_synchronize(); */                                       \
-        _profiler *_tres = _profilerDestroy(_flightweight, _tempTicks); \
-        free(_flightweight);                                            \
+        _profiler *_tres = _profilerDestroy(&_flightweight, _tempTicks); \
         if(_tres) _profilerResume(_tres, 1);                            \
         return val;                                                     \
     } while(0);
@@ -257,8 +314,7 @@ void _profilerDataDestroy(void * self);
     do {                                                                \
         _gettime(_tempTicks);                                           \
         /*_sync_synchronize();*/                                        \
-        _profiler *_tres = _profilerDestroy(_flightweight, _tempTicks); \
-        free(_flightweight);                                            \
+        _profiler *_tres = _profilerDestroy(&_flightweight, _tempTicks); \
         if(_tres) _profilerResume(_tres, 1);                            \
     } while(0);
 
