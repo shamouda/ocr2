@@ -269,13 +269,22 @@ u8 satisfyEventHcPersist(ocrEvent_t *base, ocrFatGuid_t db, u32 slot) {
         // TODO: bug #273
         event->base.waitersDb = PD_MSG_FIELD_IO(guid);
         ASSERT(waiters); // Check for corruption
+        // Before we satisfy, we "cache" some of the information we need
+        // to complete this function because an EDT that we satisfy may
+        // fire and destroy us
+        const char* eventTypeStr __attribute__((unused));
+        eventTypeStr = eventTypeToString(base);
+        ocrGuid_t baseGuid __attribute__((unused));
+        baseGuid = base->guid;
+        ocrFatGuid_t dbToRelease = event->base.waitersDb;
 #undef PD_TYPE
         // Call satisfy on all the waiters
 #define PD_TYPE PD_MSG_DEP_SATISFY
         PD_MSG_FIELD_I(payload) = db; // Do this once as it may get resolved the first time
         PD_MSG_FIELD_I(properties) = 0;
         PD_MSG_FIELD_I(satisfierGuid.guid) = base->guid;
-        PD_MSG_FIELD_I(satisfierGuid.metaDataPtr) = base;
+        // Passing NULL since base may become invalid
+        PD_MSG_FIELD_I(satisfierGuid.metaDataPtr) = NULL;
         for(i = 0; i < waitersCount; ++i) {
 #ifdef OCR_ENABLE_STATISTICS
             // We do this *before* calling signalWaiter because otherwise
@@ -285,7 +294,7 @@ u8 satisfyEventHcPersist(ocrEvent_t *base, ocrFatGuid_t db, u32 slot) {
                                     data.guid, waiter->slot);
 #endif
 
-            DPRINTF(DEBUG_LVL_INFO, "SatisfyFromEvent %s: src: 0x%lx dst: 0x%lx\n", eventTypeToString(base), base->guid, waiters[i].guid);
+            DPRINTF(DEBUG_LVL_INFO, "SatisfyFromEvent %s: src: 0x%lx dst: 0x%lx\n", eventTypeStr, baseGuid, waiters[i].guid);
 
             getCurrentEnv(NULL, NULL, NULL, &msg);
             msg.type = PD_MSG_DEP_SATISFY | PD_MSG_REQUEST;
@@ -299,7 +308,7 @@ u8 satisfyEventHcPersist(ocrEvent_t *base, ocrFatGuid_t db, u32 slot) {
 #define PD_TYPE PD_MSG_DB_RELEASE
         getCurrentEnv(NULL, NULL, NULL, &msg);
         msg.type = PD_MSG_DB_RELEASE | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
-        PD_MSG_FIELD_IO(guid) = event->base.waitersDb;
+        PD_MSG_FIELD_IO(guid) = dbToRelease;
         PD_MSG_FIELD_I(edt.guid) = curTask ? curTask->guid : NULL_GUID;
         PD_MSG_FIELD_I(edt.metaDataPtr) = curTask;
         PD_MSG_FIELD_I(properties) = DB_PROP_RT_ACQUIRE;
