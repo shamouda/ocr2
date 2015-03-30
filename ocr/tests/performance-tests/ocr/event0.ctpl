@@ -4,10 +4,8 @@
 // DESC: One worker creates all the events.
 // TIME: Creation of all events
 
-#ifndef CUSTOM_BOUNDS
 #define NB_ITERS 5000
 #define NB_INSTANCES 1000
-#endif
 
 ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     long accTimer = 0;

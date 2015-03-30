@@ -5,17 +5,19 @@
 // TIME: Satisfying an event that has 'FAN_OUT' dependences
 // FREQ: Done 'NB_ITERS' times.
 
+#undef NB_ITERS
 #define NB_ITERS 10
 
-#define PRODUCER_EVENT_TYPE_IS_LATCH 1
-#define PRODUCER_EVENT_TYPE  OCR_EVENT_LATCH_T
-#define CONSUMER_EVENT_TYPE  OCR_EVENT_LATCH_T
+#define PRODUCER_EVENT_TYPE  OCR_EVENT_ONCE_T
+#define CONSUMER_EVENT_TYPE  OCR_EVENT_ONCE_T
 
-#define CLEAN_UP_ITERATION   1
+// Warning: this test relies on once event hence destruction is done automatically
+#define CLEAN_UP_ITERATION   0
 
 #define TIME_SATISFY 1
 #define TIME_ADD_DEP 0
 #define TIME_CONSUMER_CREATE 0
+// Warning: this test relies on once event hence destruction is done automatically
 #define TIME_CONSUMER_DESTRUCT 0
 
-#include "event2FanOutEvent.ctpl"
+#include "event2FanInEvent.ctpl"

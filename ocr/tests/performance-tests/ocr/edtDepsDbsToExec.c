@@ -5,12 +5,7 @@
 // TIME: Duration of add-dependence + execution of the EDT
 // FREQ: Done 'NB_ITERS' times
 
-#ifndef CUSTOM_BOUNDS
 #define NB_ITERS 500000
-#define DB_NBS     50
-#define DB_TYPE    u64
-#define DB_NB_ELT  10
-#endif
 
 //fwd declaration
 ocrGuid_t driverEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]);

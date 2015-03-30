@@ -1,7 +1,7 @@
 #include "perfs.h"
 #include "ocr.h"
 
-// DESC: Create a producer event and consumer EDT depending on it
+// DESC: Create a consumer event and consumer EDT depending on it
 // TIME: Satisfy the producer event
 // FREQ: Done 'NB_ITERS' times
 // NOTE: The driver EDT is a finish EDT to collect created EDTs
@@ -10,7 +10,7 @@
 #define DRIVER_PARAMC 4
 #define DRIVER_PROP EDT_PROP_FINISH
 
-ocrGuid_t consumerEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
+ocrGuid_t producerEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     return NULL_GUID;
 }
 
@@ -48,19 +48,19 @@ ocrGuid_t driverEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
         ocrEventCreate(&prodGuid, PRODUCER_EVENT_TYPE, false);
 
         //
-        // Setting up consumers
+        // Setting up producers
         //
         ocrGuid_t consEdtTemplateGuid;
         ocrEdtTemplateCreate(&consEdtTemplateGuid, consumerEdt, 0, 1);
 
 #if CLEAN_UP_ITERATION
-        ocrGuid_t consGuids[FAN_OUT];
+        ocrGuid_t prodGuids[FAN_IN];
 #if TIME_CONSUMER_CREATE
         get_time(&start);
 #endif
         int i = 0;
         while (i < FAN_OUT) {
-            ocrEdtCreate(&consGuids[i], consEdtTemplateGuid,
+            ocrEdtCreate(&prodGuids[i], prodEdtTemplateGuid,
                          0, NULL, 1, NULL, EDT_PROP_NONE, NULL_GUID, NULL);
             i++;
         }

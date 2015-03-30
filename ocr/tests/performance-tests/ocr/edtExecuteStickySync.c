@@ -6,10 +6,6 @@
 // TIME: Completion of all tasks
 // FREQ: Create 'NB_INSTANCES' EDTs once
 
-#ifndef CUSTOM_BOUNDS
-#define NB_INSTANCES 99999
-#endif
-
 ocrGuid_t terminateEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     timestamp_t * timers = (timestamp_t *) depv[NB_INSTANCES].ptr;
     get_time(&timers[1]);

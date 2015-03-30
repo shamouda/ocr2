@@ -18,4 +18,4 @@
 #define TIME_CONSUMER_CREATE 0
 #define TIME_CONSUMER_DESTRUCT 0
 
-#include "event2FanOutEvent.ctpl"
+#include "event2FanInEvent.ctpl"

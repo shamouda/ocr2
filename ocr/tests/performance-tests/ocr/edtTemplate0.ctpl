@@ -1,8 +1,8 @@
 
-#ifndef CUSTOM_BOUNDS
+#undef NB_ITERS
 #define NB_ITERS 5000
+#undef NB_INSTANCES
 #define NB_INSTANCES 1000
-#endif
 
 ocrGuid_t workEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     return NULL_GUID;

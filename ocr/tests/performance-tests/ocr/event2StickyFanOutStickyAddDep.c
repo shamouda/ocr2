@@ -5,11 +5,7 @@
 // TIME: Setting up the dependence between producer and consumer
 // FREQ: 'FAN_OUT' dependences done NB_ITERS' times.
 
-#ifndef CUSTOM_BOUNDS
-#define CUSTOM_BOUNDS
 #define NB_ITERS 10
-#define FAN_OUT 1000
-#endif
 
 #define PRODUCER_EVENT_TYPE  OCR_EVENT_STICKY_T
 #define CONSUMER_EVENT_TYPE  OCR_EVENT_STICKY_T
