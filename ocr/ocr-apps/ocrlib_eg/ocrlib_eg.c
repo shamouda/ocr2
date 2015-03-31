@@ -1,13 +1,17 @@
 #include "ocr.h"
-#include "extensions/ocr-lib.h"
+#include "extensions/ocr-legacy.h"
 
 #include <stdio.h>
 #include <stdlib.h>
+
+// This is a worker EDT
 
 ocrGuid_t workerEdt ( u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     PRINTF("Worker here, this would do a portion of the parallel workload\n");
     return NULL_GUID;
 }
+
+// This is the "key" EDT that is responsible for spawning all the workers
 
 ocrGuid_t keyEdt ( u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrGuid_t templateGuid;
@@ -18,60 +22,61 @@ ocrGuid_t keyEdt ( u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     return evtGuid;
 }
 
+// Demonstrates 2 "blocks of OCR" run back to back from within the same legacy context
+
+void ocrBlock(ocrConfig_t cfg)
+{
+
+    ocrGuid_t legacyCtx;
+    ocrGuid_t  edt, template, output_event;
+    ocrGuid_t wait_event;
+
+    ocrGuid_t ctrlDep;
+    ocrGuid_t outputGuid;
+    void *result;
+    u64 size;
+
+    ocrLegacyInit(&legacyCtx, &cfg);
+    ocrEdtTemplateCreate(&template, keyEdt, 0, 1);
+
+    ctrlDep = NULL_GUID;
+    ocrLegacySpawnOCR(&output_event, template, 0, NULL, 1, &ctrlDep, legacyCtx);
+
+    ocrLegacyBlockProgress(output_event, &outputGuid, &result, &size);
+    ocrEventDestroy(output_event);
+
+
+    printf("Let's try again...\n");
+
+
+    ctrlDep = NULL_GUID;
+    ocrLegacySpawnOCR(&output_event, template, 0, NULL, 1, &ctrlDep, legacyCtx);
+
+    ocrLegacyBlockProgress(output_event, &outputGuid, &result, &size);
+    ocrEventDestroy(output_event);
+
+    ocrEdtTemplateDestroy(template);
+    ocrLegacyFinalize(&legacyCtx, false);
+}
+
 int main(int argc, char *argv[])
 {
 
     ocrConfig_t cfg;
-    ocrGuid_t legacyCtx;
-
 
     cfg.userArgc = argc;
     cfg.userArgv = argv;
     cfg.iniFile = getenv("OCR_CONFIG");
 
-    ocrGuid_t  edt, template, output_event;
-    ocrGuid_t wait_event;
-
     printf("Legacy code...\n");
 
-    // Begin OCR portions
-    ocrInitLegacy(&legacyCtx, &cfg);
-    ocrEventCreate(&wait_event, OCR_EVENT_STICKY_T, 0);
+    ocrBlock(cfg);
 
-    ocrEdtTemplateCreate(&template, keyEdt, 0, 0);
+    printf("Let's try again with a fresh legacy block\n");
 
-    ocrSpawnOCR(&output_event, template, 0, NULL, 0, NULL_GUID, legacyCtx);
-    ocrAddDependence(output_event, wait_event, 0, DB_MODE_ITW);
-    ocrEdtTemplateDestroy(template);
+    ocrBlock(cfg);
 
-    ocrLegacyBlockProgress(wait_event, NULL, NULL, NULL);
-    ocrEventDestroy(wait_event);
-
-    ocrFinalizeLegacy(&legacyCtx);
-    // Done with OCR
-
-    printf("Legacy code...\n");
-    printf("Trying again...\n");
-
-    // Begin OCR portions
-    ocrInitLegacy(&legacyCtx, &cfg);
-    ocrEventCreate(&wait_event, OCR_EVENT_STICKY_T, 0);
-
-    ocrEdtTemplateCreate(&template, keyEdt, 0, 0);
-
-    ocrSpawnOCR(&output_event, template, 0, NULL, 0, NULL_GUID, legacyCtx);
-    ocrAddDependence(output_event, wait_event, 0, DB_MODE_ITW);
-    ocrEdtTemplateDestroy(template);
-
-    ocrLegacyBlockProgress(wait_event, NULL, NULL, NULL);
-    ocrEventDestroy(wait_event);
-
-    ocrFinalizeLegacy(&legacyCtx);
-    // Done with OCR
-
-    printf("Legacy code...\n");
-
-    ocrShutdown();
+    printf("Back to legacy code, done.\n");
 
     return 0;
 }

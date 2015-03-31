@@ -9,13 +9,13 @@
 
 #include "ocr.h"
 
-// Only tested when OCR library interface is available
-#ifdef OCR_LIBRARY_ITF
+// Only tested when OCR legacy interface is available
+#ifdef OCR_LEGACY_ITF
 
-#include "extensions/ocr-lib.h"
+#include "extensions/ocr-legacy.h"
 
 /**
- * DESC: OCR-library, init, edt does shutdown, finalize
+ * DESC: OCR-legacy, init, edt does shutdown, finalize
  */
 
 ocrGuid_t rootEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
@@ -26,14 +26,15 @@ ocrGuid_t rootEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
 
 int main(int argc, const char * argv[]) {
     ocrConfig_t ocrConfig;
+    ocrGuid_t legacyCtx;
     ocrParseArgs(argc, argv, &ocrConfig);
-    ocrInit(&ocrConfig);
+    ocrLegacyInit(&legacyCtx, &ocrConfig);
     ocrGuid_t rootEdtGuid;
     ocrGuid_t rootEdtTemplateGuid;
     ocrEdtTemplateCreate(&rootEdtTemplateGuid, rootEdt, 0 /*paramc*/, 0 /*depc*/);
     ocrEdtCreate(&rootEdtGuid, rootEdtTemplateGuid, EDT_PARAM_DEF, /*paramv=*/NULL, EDT_PARAM_DEF, /*depv=*/NULL,
                  /*properties=*/0, NULL_GUID, /*outEvent=*/NULL);
-    ocrFinalize();
+    ocrLegacyFinalize(legacyCtx, true);
     return 0;
 }
 

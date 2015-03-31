@@ -9,23 +9,189 @@
 #ifdef SAL_LINUX
 
 #include "debug.h"
-#include "machine-description/ocr-machine.h"
+
 #include "ocr-config.h"
 #include "ocr-db.h"
 #include "ocr-edt.h"
-#include "extensions/ocr-lib.h"
 #include "ocr-runtime.h"
 #include "ocr-types.h"
 #include "ocr-sysboot.h"
+#include "extensions/ocr-legacy.h"
+#include "machine-description/ocr-machine.h"
 #include "utils/ocr-utils.h"
 
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/stat.h>
 
 u8 startMemStat = 0;
 
 #define DEBUG_TYPE INIPARSING
+
+/* Configuration parsing options */
+#ifndef ENABLE_EXTENSION_LEGACY
+// Defined in ocr-legacy.h but only included in ENABLE_EXTENSION_LEGACY
+typedef struct _ocrConfig_t {
+    int userArgc;          /**< Application argc (after having stripped the OCR arguments) */
+    char ** userArgv;      /**< Application argv (after having stripped the OCR arguments) */
+    const char * iniFile;  /**< INI configuration file for the runtime */
+} ocrConfig_t;
+#endif
+enum {
+    OPT_NONE, OPT_CONFIG, OPT_VERSION, OPT_HELP
+};
+
+// Helper methods
+static struct options {
+    char *flag;
+    char *env_flag;
+    s32 option;
+    char *help;
+} ocrOptionDesc[] = {
+    {
+        "cfg", "OCR_CONFIG", OPT_CONFIG, "-ocr:cfg <file> : the OCR runtime configuration file to use."
+    },
+    {
+        "version", "", OPT_VERSION, "-ocr:version : print OCR version"
+    },
+    {
+        "help", "", OPT_HELP, "-ocr:help : print this message"
+    },
+    {
+        NULL, NULL, 0, NULL
+    }
+};
+
+static void printHelp(void) {
+    struct options *p;
+
+    fprintf(stderr, "Usage: program [<OCR options>] [<program options>]\n");
+    fprintf(stderr, "OCR options:\n");
+
+    for (p = ocrOptionDesc; p->flag; ++p)
+        if (p->help)
+            fprintf(stderr, "    %s, env: %s\n", p->help, p->env_flag);
+
+    fprintf(stderr, "\n");
+    fprintf(stderr, "https://github.com/01org/ocr\n");
+}
+
+static void printVersion(void) {
+    fprintf(stderr, "Open Community Runtime (OCR) %s%s\n", "0.9", "");
+}
+
+static void setIniFile(ocrConfig_t * ocrConfig, const char * value) {
+    struct stat st;
+    if (stat(value, &st) != 0) {
+        fprintf(stderr, "ERROR: cannot find runtime configuration file: %s\n", value);
+        exit(1);
+    }
+    ocrConfig->iniFile = value;
+}
+
+static inline void checkNextArgExists(s32 i, s32 argc, char * option) {
+    if (i == argc) {
+        fprintf(stderr, "ERROR: No argument for OCR option %s\n", option);
+        exit(1);
+    }
+}
+
+static void checkOcrOption(ocrConfig_t * ocrConfig) {
+    if (ocrConfig->iniFile == NULL) {
+        fprintf(stderr, "ERROR: no runtime configuration file provided\n");
+        exit(1);
+    }
+}
+
+static void readFromEnv(ocrConfig_t * ocrConfig) {
+    // Go over OCR options description and check
+    // if some of the env variables are set.
+    struct options  *p;
+    for (p = ocrOptionDesc; p->flag; ++p) {
+        char * opt = getenv(p->env_flag);
+        // If variable defined and has value
+        if ((opt != NULL) && (strcmp(opt, "") != 0)) {
+            switch (p->option) {
+            case OPT_CONFIG:
+                setIniFile(ocrConfig, opt);
+                break;
+            }
+        }
+    }
+}
+
+static s32 readFromArgs(s32 argc, const char* argv[], ocrConfig_t * ocrConfig) {
+    // Override any env variable with command line option
+    s32 cur = 1;
+    s32 userArgs = argc;
+    char * ocrOptPrefix = "-ocr:";
+    s32 ocrOptPrefixLg = strlen(ocrOptPrefix);
+    while(cur < argc) {
+        const char * arg = argv[cur];
+        if (strncmp(ocrOptPrefix, arg, ocrOptPrefixLg) == 0) {
+            // This is an OCR option
+            const char * ocrArg = arg+ocrOptPrefixLg;
+            if (strcmp("cfg", ocrArg) == 0) {
+                checkNextArgExists(cur, argc, "cfg");
+                setIniFile(ocrConfig, argv[cur+1]);
+                argv[cur] = NULL;
+                argv[cur+1] = NULL;
+                cur++; // skip param
+                userArgs-=2;
+            } else if (strcmp("version", ocrArg) == 0) {
+                printVersion();
+                exit(0);
+                break;
+            } else if (strcmp("help", ocrArg) == 0) {
+                printHelp();
+                exit(0);
+                break;
+            }
+        }
+        cur++;
+    }
+    return userArgs;
+}
+
+static void ocrConfigInit(ocrConfig_t * ocrConfig) {
+    ocrConfig->userArgc = 0;
+    ocrConfig->userArgv = NULL;
+    ocrConfig->iniFile = NULL;
+}
+
+void ocrParseArgs(s32 argc, const char* argv[], ocrConfig_t * ocrConfig) {
+
+    // Zero-ed the ocrConfig
+    ocrConfigInit(ocrConfig);
+
+    // First retrieve options from environment variables
+    readFromEnv(ocrConfig);
+
+    // Override any env variable with command line args
+    s32 userArgs = readFromArgs(argc, argv, ocrConfig);
+
+    // Check for mandatory options
+    checkOcrOption(ocrConfig);
+
+    // Pack argument list
+    s32 cur = 0;
+    s32 head = 0;
+    while(cur < argc) {
+        if(argv[cur] != NULL) {
+            if (cur == head) {
+                head++;
+            } else {
+                argv[head] = argv[cur];
+                argv[cur] = NULL;
+                head++;
+            }
+        }
+        cur++;
+    }
+    ocrConfig->userArgc = userArgs;
+    ocrConfig->userArgv = (char **) argv;
+}
 
 const char *type_str[] = {
     "GuidType",
@@ -543,10 +709,13 @@ void platformSpecificInit(ocrConfig_t * ocrConfig) {
 #endif
 }
 
+// This main function is used for x86 platforms
 int __attribute__ ((weak)) main(int argc, const char* argv[]) {
     // Parse parameters. The idea is to extract the ones relevant
     // to the runtime and pass all the other ones down to the mainEdt
     ocrConfig_t ocrConfig;
+    ocrPolicyDomain_t *pd = NULL;
+    ocrWorker_t *worker = NULL;
     ocrParseArgs(argc, argv, &ocrConfig);
 
     // Things that must initialize before OCR is started
@@ -560,13 +729,25 @@ int __attribute__ ((weak)) main(int argc, const char* argv[]) {
     userArgsSet(packedUserArgv);
 
     // Set up the runtime
-    ocrInit(&ocrConfig);
+    const char * iniFile = ocrConfig.iniFile;
+    ASSERT(iniFile != NULL);
+    bringUpRuntime(iniFile);
 
     // Here the runtime is fully functional and
     // the "blessed" worker will execute the mainEdt
 
     startMemStat = 1;
-    u8 returnCode = ocrFinalize();
+    getCurrentEnv(&pd, &worker, NULL, NULL);
+    // We start the current worker. After it starts, it will loop
+    // until ocrShutdown is called which will cause the entire PD
+    // to stop (including this worker). The currently executing
+    // worker then fallthrough from start to finish.
+    worker->fcts.start(worker, pd);
+    u8 returnCode = pd->shutdownCode;
+    // NOTE: finish blocks until stop has completed
+    pd->fcts.finish(pd);
+    pd->fcts.destruct(pd);
+    freeUpRuntime();
 
     return returnCode;
 }

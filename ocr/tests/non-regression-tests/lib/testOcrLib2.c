@@ -6,16 +6,16 @@
 
 #include "ocr.h"
 
-// Only tested when OCR library interface is available
-#ifdef OCR_LIBRARY_ITF
+// Only tested when OCR legacy interface is available
+#ifdef OCR_LEGACY_ITF
 
 
 
 
-#include "extensions/ocr-lib.h"
+#include "extensions/ocr-legacy.h"
 
 /**
- * DESC: OCR-library, init, edt-finish, finalize
+ * DESC: OCR-legacy, init, edt-finish, finalize
  * Builds a finish-edt that spawns a number of sub-edt to fill-in an array.
  * Then checks if all the elements of the array have been properly set.
  */
@@ -72,8 +72,9 @@ ocrGuid_t rootEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
 
 int main(int argc, const char * argv[]) {
     ocrConfig_t ocrConfig;
+    ocrGuid_t legacyCtx;
     ocrParseArgs(argc, argv, &ocrConfig);
-    ocrInit(&ocrConfig);
+    ocrLegacyInit(&legacyCtx, &ocrConfig);
 
     ocrGuid_t terminateEdtGuid;
     ocrGuid_t terminateEdtTemplateGuid;
@@ -92,7 +93,7 @@ int main(int argc, const char * argv[]) {
     // spawned by rootEdt will be done, and shutdownEdt is called.
     ocrAddDependence(outputEventGuid, terminateEdtGuid, 0, DB_MODE_RO);
 
-    ocrFinalize();
+    ocrLegacyFinalize(legacyCtx, true);
     return 0;
 }
 

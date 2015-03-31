@@ -7,7 +7,7 @@
 #include "ocr.h"
 
 // Only tested when OCR library interface is available
-#ifdef OCR_LIBRARY_ITF
+#ifdef OCR_LEGACY_ITF
 
 
 
@@ -72,8 +72,9 @@ ocrGuid_t rootEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
 
 int main(int argc, const char * argv[]) {
     ocrConfig_t ocrConfig;
+    ocrGuid_T legacyCtx;
     ocrParseArgs(argc, argv, &ocrConfig);
-    ocrInit(&ocrConfig);
+    ocrLegacyInit(&legacyCtx, &ocrConfig);
 
     ocrGuid_t terminateEdtGuid;
     ocrGuid_t terminateEdtTemplateGuid;
@@ -92,7 +93,7 @@ int main(int argc, const char * argv[]) {
     // Wait for the output-event to be satisfied before proceeding
     ocrWait(outputEventGuid);
 
-    ocrFinalize();
+    ocrLegacyFinalize(legacyCtx, true);
     return 0;
 }
 

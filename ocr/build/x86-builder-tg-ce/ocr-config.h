@@ -90,11 +90,8 @@
 // Workpile
 #define ENABLE_WORKPILE_CE
 
-// Build the OCR-lib support
-#define ENABLE_EXTENSION_LIB
-
 // Build the OCR-legacy support
-//#define ENABLE_EXTENSION_LEGACY
+#define ENABLE_EXTENSION_LEGACY
 #endif /* __OCR_CONFIG_H__ */
 
 

@@ -60,7 +60,7 @@ SRCS := ocrlib_eg.c
 # Additional CFLAGS. By default, it includes
 # all OCR required includes and apps/libs/<target>/include
 # TG_ARCH is also defined for Fsim
-CFLAGS := -w
+CFLAGS := -w -DENABLE_EXTENSION_LEGACY
 # Additional LDFLAGS. By default, it includes
 # the required OCR library path and apps/libs/<target/lib
 # Note that none of the specific libraries specified in

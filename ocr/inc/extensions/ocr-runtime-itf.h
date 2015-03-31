@@ -12,7 +12,7 @@
 #ifndef OCR_RUNTIME_ITF_H_
 #define OCR_RUNTIME_ITF_H_
 
-#warning Using ocr-runtime-itf.h may not be supported on all platforms
+#ifdef ENABLE_EXTENSION_RTITF
 
 #ifdef __cplusplus
 extern "C" {
@@ -107,4 +107,5 @@ u8 ocrInformLegacyCodeBlocking();
 }
 #endif
 
+#endif /* ENABLE_EXTENSION_RTITF */
 #endif /* OCR_RUNTIME_ITF_H_ */

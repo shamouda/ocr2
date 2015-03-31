@@ -11,7 +11,7 @@
 #include "ocr-runtime.h"
 #include "ocr-sal.h"
 
-#warning Experimental OCR RT interface support enabled
+#pragma message "RT-ITF extension is experimental and may not be supported on all platforms"
 
 /**
    @brief Get @ offset in the currently running edt's local storage

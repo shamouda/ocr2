@@ -4,11 +4,15 @@
  * removed or modified.
  */
 
+#include "ocr-config.h"
+#ifdef ENABLE_EXTENSION_AFFINITY
+
 #include "extensions/ocr-affinity.h"
 #include "ocr-policy-domain.h"
 #include "experimental/ocr-placer.h"
 #include "ocr-errors.h"
 
+#pragma message "AFFINITY extension is experimental and may not be supported on all platforms"
 
 //Part of policy-domain debug messages
 #define DEBUG_TYPE POLICY
@@ -111,3 +115,5 @@ u8 ocrAffinityGetCurrent(ocrGuid_t * affinity) {
     u64 count = 1;
     return ocrAffinityGet(AFFINITY_CURRENT, &count, affinity);
 }
+
+#endif /* ENABLE_EXTENSION_AFFINITY */

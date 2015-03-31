@@ -10,9 +10,9 @@
 #include "ocr.h"
 
 // Only tested when OCR library interface is available
-#ifdef OCR_LIBRARY_ITF
+#ifdef OCR_LEGACY_ITF
 
-#include "extensions/ocr-lib.h"
+#include "extensions/ocr-legacy.h"
 
 /**
  * DESC: Simplest OCR-library, init, shutdown, finalize
@@ -20,11 +20,12 @@
 
 int main(int argc, const char * argv[]) {
     ocrConfig_t ocrConfig;
+    ocrGuid_t legacyCtx;
     ocrParseArgs(argc, argv, &ocrConfig);
-    ocrInit(&ocrConfig);
+    ocrLegacyInit(&legacyCtx, &ocrConfig);
     PRINTF("Running\n");
     ocrShutdown();
-    ocrFinalize();
+    ocrLegacyFinalize(legacyCtx, true);
     return 0;
 }
 

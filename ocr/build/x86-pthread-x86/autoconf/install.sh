@@ -65,8 +65,8 @@ fi
 
 cd ${COMPTREE}
 
-# Uncomment to distribute ocr-lib.h header
-#OCR_CONF_OPTS="${OCR_CONF_OPTS} --enable-ocrlib --enable-els=0"
+# Uncomment to distribute ocr-legacy.h header
+#OCR_CONF_OPTS="${OCR_CONF_OPTS} --enable-ocrlegacy --enable-els=0"
 OCR_CONF_OPTS="${OCR_CONF_OPTS}"
 
 ../configure ${INSTALL_ROOT} ${OCR_CONF_OPTS}

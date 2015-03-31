@@ -110,18 +110,18 @@ AS_IF([test "x$with_rtapi" != xno],
 # Check if we need to distribute runtime headers
 AM_CONDITIONAL([INCLUDE_RUNTIME_ITF_HEADERS], [test x$with_els != xno -o x$with_rtapi != xno])
 
-AC_ARG_ENABLE(ocrlib,
-    AS_HELP_STRING([--enable-ocrlib],
-    [enable OCR library headers]),
-    [with_ocrlib=$enableval],
-    [with_ocrlib=no;])
+AC_ARG_ENABLE(ocrlegacy,
+    AS_HELP_STRING([--enable-ocrlegacy],
+    [enable OCR legacy headers]),
+    [with_ocrlegacy=$enableval],
+    [with_ocrlegacy=no;])
 
-AS_IF([test "x$with_ocrlib" != xno],
-      [ AC_MSG_NOTICE([OCR-lib header requested]) ],
-      [ AC_MSG_NOTICE([OCR-lib header not requested]) ])
+AS_IF([test "x$with_ocrlegacy" != xno],
+      [ AC_MSG_NOTICE([OCR-legacy header requested]) ],
+      [ AC_MSG_NOTICE([OCR-legacy header not requested]) ])
 
 # Check if we need to distribute OCR library headers
-AM_CONDITIONAL([INCLUDE_OCR_LIBRARY_ITF_HEADERS], [test x$with_ocrlib != xno])
+AM_CONDITIONAL([INCLUDE_OCR_LEGACY_ITF_HEADERS], [test x$with_ocrlegacy != xno])
 
 
 #

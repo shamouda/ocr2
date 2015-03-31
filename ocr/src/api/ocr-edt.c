@@ -234,7 +234,12 @@ u8 ocrEdtCreate(ocrGuid_t* edtGuid, ocrGuid_t templateGuid,
         u32 i = 0;
         while(i < depc) {
             // FIXME: Not really good. We would need to undo maybe
-            returnCode = ocrAddDependence(depv[i], *edtGuid, i, DB_DEFAULT_MODE);
+            if(depv[i] != UNINITIALIZED_GUID) {
+                // We only add dependences that are not UNINITIALIZED_GUID
+                returnCode = ocrAddDependence(depv[i], *edtGuid, i, DB_DEFAULT_MODE);
+            } else {
+                returnCode = 0;
+            }
             ++i;
             if(returnCode) {
                 RETURN_PROFILE(returnCode);

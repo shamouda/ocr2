@@ -10,8 +10,8 @@
 
 #include "ocr.h"
 
-// Only tested when ocr-lib interface is available
-#ifdef OCR_LIBRARY_ITF
+// Only tested when ocr-legacy interface is available
+#ifdef OCR_LEGACY_ITF
 
 #include "extensions/ocr-runtime-itf.h"
 
