@@ -93,7 +93,7 @@ u8 mallocChunkAndTag(ocrMemPlatform_t *self, u64 *startAddr, u64 size,
     do {
         result = getRegionWithTag(rself->pRangeTracker, oldTag, &startRange,
                                   &endRange, &iterate);
-        if(endRange - startRange >= size) {
+        if(result == 0 && endRange - startRange >= size) {
             // This is a fit, we do not look for "best" fit for now
             *startAddr = startRange;
             RESULT_ASSERT(splitRange(rself->pRangeTracker,

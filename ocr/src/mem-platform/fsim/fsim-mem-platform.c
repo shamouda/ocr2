@@ -111,11 +111,23 @@ u8 fsimChunkAndTag(ocrMemPlatform_t *self, u64 *startAddr, u64 size,
      * other chunkAndTag() functions. Need a bit of redoing.
      */
 
+     /* 'If' statement below checks if the call was successful (result == 0 &&) and also check
+      * if the size is big enough (endRange - startRange >= size) , if both are met, it exits because
+      * it found a good one. If not, it keeps calling getRegionWithTag(), if it fails eventually, it
+      * exits while loop.
+      *
+      * Three cases.
+      * (1) It returns when result == 0 AND size is big enough.
+      * (2) Even if result == 0, if the size is small, it does another iteration by while loop
+      *     i.e. call again getRegionWithTag()
+      * (3) If result != 0 , it exits the while loop.
+      */
+
     // first check if there's existing one. (query part)
     do {
         result = getRegionWithTag(rself->pRangeTracker, newTag, &startRange,
                                   &endRange, &iterate);
-        if(endRange - startRange >= size) {
+        if(result == 0 && endRange - startRange >= size) {
             *startAddr = startRange;
             DPRINTF(DEBUG_LVL_VERB, "ChunkAndTag returning (existing) start of 0x%llx for size %lld (0x%llx) Tag %d\n",
                     *startAddr, size, size, newTag);
@@ -130,7 +142,7 @@ u8 fsimChunkAndTag(ocrMemPlatform_t *self, u64 *startAddr, u64 size,
     do {
         result = getRegionWithTag(rself->pRangeTracker, oldTag, &startRange,
                                   &endRange, &iterate);
-        if(endRange - startRange >= size) {
+        if(result == 0 && endRange - startRange >= size) {
             // This is a fit, we do not look for "best" fit for now
             *startAddr = startRange;
             DPRINTF(DEBUG_LVL_VERB, "ChunkAndTag returning start of 0x%llx for size %lld (0x%llx) and newTag %d\n",
