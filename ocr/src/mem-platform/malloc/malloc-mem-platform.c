@@ -33,7 +33,8 @@
 
 void mallocDestruct(ocrMemPlatform_t *self) {
     ocrMemPlatformMalloc_t *rself = (ocrMemPlatformMalloc_t*)self;
-    destroyRange(rself->pRangeTracker);
+    if (rself->pRangeTracker)    // in case of mallocproxy, pRangeTracker==0
+        destroyRange(rself->pRangeTracker);
     free((void*)self->startAddr);
     runtimeChunkFree((u64)self, NULL);
 }
