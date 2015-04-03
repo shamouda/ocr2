@@ -59,6 +59,7 @@ static void hcWorkShift(ocrWorker_t * worker) {
         // We got a response
         count = PD_MSG_FIELD_IO(guidCount);
         if(count == 1) {
+            // Stolen task sanity checks
             ASSERT(taskGuid.guid != NULL_GUID && taskGuid.metaDataPtr != NULL);
             worker->curTask = (ocrTask_t*)taskGuid.metaDataPtr;
             DPRINTF(DEBUG_LVL_VERB, "Worker shifting to execute EDT GUID 0x%lx\n", taskGuid.guid);

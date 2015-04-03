@@ -45,7 +45,7 @@ void mallocBegin(ocrMemPlatform_t *self, struct _ocrPolicyDomain_t * PD ) {
     // This is where we need to update the memory
     // using the sysboot functions
     self->startAddr = (u64)malloc(self->size);
-    ASSERT(self->startAddr);
+    ASSERT(self->startAddr); // Check that the mem-platform size in config file is reasonable
     self->endAddr = self->startAddr + self->size;
 
     ocrMemPlatformMalloc_t *rself = (ocrMemPlatformMalloc_t*)self;

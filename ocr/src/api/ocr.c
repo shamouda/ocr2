@@ -50,7 +50,7 @@ u64 getArgc(void* dbPtr) {
 char* getArgv(void* dbPtr, u64 count) {
     DPRINTF(DEBUG_LVL_INFO, "ENTER getArgv(dbPtr=0x%lx, count=%lu)\n", dbPtr, count);
     u64* dbPtrAsU64 = (u64*)dbPtr;
-    ASSERT(count < dbPtrAsU64[0]);
+    ASSERT(count < dbPtrAsU64[0]); // We can't ask for more args than total
     u64 offset = dbPtrAsU64[1 + count];
     DPRINTF(DEBUG_LVL_INFO, "EXIT getArgv -> %s\n", ((char*)dbPtr) + offset);
     return ((char*)dbPtr) + offset;

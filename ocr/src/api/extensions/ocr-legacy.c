@@ -38,6 +38,7 @@ ocrGuid_t ocrWait(ocrGuid_t eventToYieldForGuid) {
 #undef PD_MSG
 #undef PD_TYPE
 
+    // We can't wait on once/latch events since they could get freed asynchronously
     ASSERT(eventToYieldFor->kind == OCR_EVENT_STICKY_T ||
            eventToYieldFor->kind == OCR_EVENT_IDEM_T);
 

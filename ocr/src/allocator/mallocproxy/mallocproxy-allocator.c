@@ -276,6 +276,7 @@ void mallocProxyStart(ocrAllocator_t *self, ocrPolicyDomain_t * PD ) {
     guidify(PD, (u64)self, &(self->fguid), OCR_GUID_ALLOCATOR);
     self->pd = PD;
 
+    // Each allocator only manages one contiguous chunk of memory
     ASSERT(self->memoryCount == 1);
 
 #if 0 // mallocProxy has no underlying memTarget or memPlatform.  The

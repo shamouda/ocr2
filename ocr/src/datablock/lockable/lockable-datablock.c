@@ -52,6 +52,7 @@ static ocrLocation_t fatGuidToLocation(ocrPolicyDomain_t * pd, ocrFatGuid_t fatG
     } else {
         ocrLocation_t edtLoc = -1;
         u8 res = guidLocation(pd, fatGuid, &edtLoc);
+        // Check that the GUID is valid
         ASSERT(!res);
         return edtLoc;
     }
@@ -67,6 +68,7 @@ static ocrLocation_t guidToLocation(ocrPolicyDomain_t * pd, ocrGuid_t edtGuid) {
         fatGuid.metaDataPtr = NULL;
         ocrLocation_t edtLoc = -1;
         u8 res = guidLocation(pd, fatGuid, &edtLoc);
+        // Check that the GUID is valid
         ASSERT(!res);
         return edtLoc;
     }

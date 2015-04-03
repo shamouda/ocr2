@@ -80,6 +80,7 @@ u8 delegateCommSendMessage(ocrCommApi_t *self, ocrLocation_t target,
                             ocrPolicyMsg_t *message,
                             ocrMsgHandle_t **handle, u32 properties) {
     ocrPolicyDomain_t * pd = self->pd;
+    // Message source/destination is corrupted
     ASSERT((pd->myLocation == message->srcLocation) && (target == message->destLocation));
     ASSERT(pd->myLocation != target); //DIST-TODO not tested sending a message to self
 

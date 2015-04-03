@@ -137,6 +137,7 @@ u8 regularRelease(ocrDataBlock_t *self, ocrFatGuid_t edt,
 u8 regularDestruct(ocrDataBlock_t *self) {
     // We don't use a lock here. Maybe we should
     ocrDataBlockRegular_t *rself = (ocrDataBlockRegular_t*)self;
+    // Check that no other EDT has acquired this datablock
     ASSERT(rself->attributes.numUsers == 0);
     ASSERT(rself->attributes.internalUsers == 0);
     ASSERT(rself->attributes.freeRequested == 1);

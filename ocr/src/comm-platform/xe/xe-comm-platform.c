@@ -168,6 +168,9 @@ u8 xeCommSendMessage(ocrCommPlatform_t *self, ocrLocation_t target,
         ASSERT(0);
     }
     ocrPolicyMsgMarshallMsg(message, baseSize, (u8*)message, MARSHALL_APPEND);
+    if(message->usefulSize > MSG_QUEUE_SIZE - sizeof(u64))
+        DPRINTF(DEBUG_LVL_WARN, "Message of type %x has size (%lx) too large (limit %lx)\n",
+                                message->type, message->usefulSize, MSG_QUEUE_SIZE-sizeof(u64));
     ASSERT(message->usefulSize <= MSG_QUEUE_SIZE - sizeof(u64))
     // - DMA to remote stage, with fence
     DPRINTF(DEBUG_LVL_VVERB, "DMA-ing out message to 0x%lx of size %d\n",
@@ -203,6 +206,9 @@ u8 xeCommPollMessage(ocrCommPlatform_t *self, ocrPolicyMsg_t **msg,
 #if 1
     // Provide a ptr to the local stage's contents
     *msg = (ocrPolicyMsg_t *)&lq[1];
+    if((*msg)->bufferSize > MSG_QUEUE_SIZE - sizeof(u64))
+        DPRINTF(DEBUG_LVL_WARN, "Message of type %x has buffer size (%lx) too large (limit %lx)\n",
+                                (*msg)->type, (*msg)->bufferSize, MSG_QUEUE_SIZE-sizeof(u64));
     ASSERT((*msg)->bufferSize <= MSG_QUEUE_SIZE - sizeof(u64));
     // We fixup pointers
     u64 baseSize = 0, marshalledSize = 0;
@@ -245,6 +251,9 @@ u8 xeCommWaitMessage(ocrCommPlatform_t *self,  ocrPolicyMsg_t **msg,
     // We fixup pointers
     u64 baseSize = 0, marshalledSize = 0;
     ocrPolicyMsgGetMsgSize(*msg, &baseSize, &marshalledSize, 0);
+    if((*msg)->bufferSize > MSG_QUEUE_SIZE - sizeof(u64))
+        DPRINTF(DEBUG_LVL_WARN, "Message of type %x has buffer size (%lx) too large (limit %lx)\n",
+                                (*msg)->type, (*msg)->bufferSize, MSG_QUEUE_SIZE-sizeof(u64));
     ASSERT((*msg)->bufferSize <= MSG_QUEUE_SIZE - sizeof(u64));
     if(baseSize + marshalledSize > (*msg)->bufferSize) {
         DPRINTF(DEBUG_LVL_WARN, "Comm platform only handles messages up to size %ld\n",

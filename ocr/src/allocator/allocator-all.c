@@ -47,7 +47,7 @@ ocrAllocatorFactory_t *newAllocatorFactory(allocatorType_t type, ocrParamList_t 
 #endif
     case allocatorMax_id:
     default:
-        ASSERT(0);
+        ASSERT(0); // Invalid allocator factory in configuration file
         return NULL;
     };
 }
@@ -93,7 +93,7 @@ void allocatorFreeFunction(void* blockPayloadAddr) {
 #endif
     case allocatorMax_id:
     default:
-        ASSERT(0);
+        ASSERT(0); // Invalid allocator in configuration file
         return;
     };
 }

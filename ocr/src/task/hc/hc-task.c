@@ -324,6 +324,7 @@ static u8 iterateDbFrontier(ocrTask_t *self) {
             // and remember them to avoid double release
             if ((i > 0) && (depv[i-1].guid == depv[i].guid)) {
                 rself->resolvedDeps[depv[i].slot].ptr = rself->resolvedDeps[depv[i-1].slot].ptr;
+                // If the below asserts, rebuild OCR with a higher OCR_MAX_MULTI_SLOT (in build/common.mk)
                 ASSERT(depv[i].slot / 64 < OCR_MAX_MULTI_SLOT);
                 rself->doNotReleaseSlots[depv[i].slot / 64] |= (1ULL << (depv[i].slot % 64));
             } else {
@@ -875,6 +876,7 @@ u8 notifyDbReleaseTaskHc(ocrTask_t *base, ocrFatGuid_t db) {
                 DPRINTF(DEBUG_LVL_VVERB, "Dynamic Releasing DB (GUID 0x%lx) from EDT 0x%lx, "
                         "match in dependence list for count %lu\n",
                         db.guid, base->guid, count);
+                // If the below asserts, rebuild OCR with a higher OCR_MAX_MULTI_SLOT (in build/common.mk)
                 ASSERT(count / 64 < OCR_MAX_MULTI_SLOT);
                 derived->doNotReleaseSlots[count / 64] |= (1ULL << (count % 64));
                 // we can return on the first instance found since iterateDbFrontier

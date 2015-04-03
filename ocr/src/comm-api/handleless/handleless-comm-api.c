@@ -51,6 +51,7 @@ void handlelessCommFinish(ocrCommApi_t *commApi) {
 u8 handlelessCommSendMessage(ocrCommApi_t *self, ocrLocation_t target, ocrPolicyMsg_t *message,
                              ocrMsgHandle_t **handle, u32 properties) {
     u64 id;
+    // Asserts in this function are sanity checks; any violation points to memory corruption
     if (message->type & PD_MSG_REQUEST) {
         ASSERT(!(message->type & PD_MSG_RESPONSE));
         if(handle) {
@@ -103,6 +104,7 @@ u8 handlelessCommPollMessage(ocrCommApi_t *self, ocrMsgHandle_t **handle) {
 u8 handlelessCommWaitMessage(ocrCommApi_t *self, ocrMsgHandle_t **handle) {
     ASSERT(handle);
     ocrCommApiHandleless_t * commApiHandleless = (ocrCommApiHandleless_t*)self;
+    // Asserts in this function are sanity checks; any violation points to memory corruption
     if (!(*handle)) {
         *handle = &(commApiHandleless->handle);
         ASSERT((*handle)->status == 0);

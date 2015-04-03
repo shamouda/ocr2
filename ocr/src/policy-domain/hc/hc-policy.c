@@ -436,9 +436,21 @@ static u8 hcCreateEdt(ocrPolicyDomain_t *self, ocrFatGuid_t *guid,
     DPRINTF(DEBUG_LVL_VVERB, "Creating EDT with template GUID 0x%lx (0x%lx) (paramc=%d; depc=%d)"
             " and have paramc=%d; depc=%d\n", edtTemplate.guid, edtTemplate.metaDataPtr,
             taskTemplate->paramc, taskTemplate->depc, *paramc, *depc);
+    // Check that
+    // 1. EDT doesn't have "default" as parameter count if the template
+    //    was created with "unknown" as parameter count
+    // 2. EDT has "default" as parameter count only if the template was created
+    //    with a valid parameter count
+    // 3. If neither of the above, the EDT & template both agree on the parameter count
     ASSERT(((taskTemplate->paramc == EDT_PARAM_UNK) && *paramc != EDT_PARAM_DEF) ||
            (taskTemplate->paramc != EDT_PARAM_UNK && (*paramc == EDT_PARAM_DEF ||
                    taskTemplate->paramc == *paramc)));
+    // Check that
+    // 1. EDT doesn't have "default" as dependence count if the template
+    //    was created with "unknown" as dependence count
+    // 2. EDT has "default" as dependence count only if the template was created
+    //    with a valid dependence count
+    // 3. If neither of the above, the EDT & template both agree on the dependence count
     ASSERT(((taskTemplate->depc == EDT_PARAM_UNK) && *depc != EDT_PARAM_DEF) ||
            (taskTemplate->depc != EDT_PARAM_UNK && (*depc == EDT_PARAM_DEF ||
                    taskTemplate->depc == *depc)));
@@ -451,6 +463,7 @@ static u8 hcCreateEdt(ocrPolicyDomain_t *self, ocrFatGuid_t *guid,
     }
     // If paramc are expected, double check paramv is not NULL
     if((*paramc > 0) && (paramv == NULL)) {
+        DPRINTF(DEBUG_LVL_WARN, "Expected %d parameters but got none\n", *paramc);
         ASSERT(0);
         return OCR_EINVAL;
     }
@@ -459,6 +472,9 @@ static u8 hcCreateEdt(ocrPolicyDomain_t *self, ocrFatGuid_t *guid,
                            self->taskFactories[0], guid, edtTemplate, *paramc, paramv,
                            *depc, properties, affinity, outputEvent, currentEdt,
                            parentLatch, NULL);
+    if(res)
+        DPRINTF(DEBUG_LVL_WARN, "Unable to create EDT, got code %x\n", res);
+
     ASSERT(!res);
     return 0;
 }
@@ -597,6 +613,8 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
                                   PRESCRIPTION);
         if(PD_MSG_FIELD_O(returnDetail) == 0) {
             ocrDataBlock_t *db = PD_MSG_FIELD_IO(guid.metaDataPtr);
+            if(db==NULL)
+                DPRINTF(DEBUG_LVL_WARN, "DB Create failed for size %lx\n", PD_MSG_FIELD_IO(size));
             ASSERT(db);
             // TODO: Check if properties want DB acquired
             ASSERT(db->fctId == self->dbFactories[0]->factoryId);
@@ -649,6 +667,8 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
                 returnCode = OCR_EPEND;
             } else {
                 // Something went wrong in dbAcquire
+                if(PD_MSG_FIELD_O(returnDetail)!=0)
+                    DPRINTF(DEBUG_LVL_WARN, "DB Acquire failed for guid %lx\n", PD_MSG_FIELD_IO(guid));
                 ASSERT(PD_MSG_FIELD_O(returnDetail) == 0);
                 msg->type &= ~PD_MSG_REQUEST;
                 msg->type |= PD_MSG_RESPONSE;
@@ -706,6 +726,8 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         ASSERT(!(msg->type & PD_MSG_REQ_RESPONSE));
         PD_MSG_FIELD_O(returnDetail) = self->dbFactories[0]->fcts.free(
             db, PD_MSG_FIELD_I(edt));
+        if(PD_MSG_FIELD_O(returnDetail)!=0)
+            DPRINTF(DEBUG_LVL_WARN, "DB Free failed for guid %lx\n", PD_MSG_FIELD_I(guid));
 #undef PD_MSG
 #undef PD_TYPE
         msg->type &= ~PD_MSG_REQUEST;
@@ -755,6 +777,8 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_WORK_CREATE
         localDeguidify(self, &(PD_MSG_FIELD_I(templateGuid)));
+        if(PD_MSG_FIELD_I(templateGuid.metaDataPtr) == NULL)
+            DPRINTF(DEBUG_LVL_WARN, "Invalid template GUID %lx\n", PD_MSG_FIELD_I(templateGuid));
         ASSERT(PD_MSG_FIELD_I(templateGuid.metaDataPtr) != NULL);
         localDeguidify(self, &(PD_MSG_FIELD_I(affinity)));
         localDeguidify(self, &(PD_MSG_FIELD_I(currentEdt)));
@@ -763,6 +787,9 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         if(PD_MSG_FIELD_IO(outputEvent.guid) == UNINITIALIZED_GUID) {
             outputEvent = &(PD_MSG_FIELD_IO(outputEvent));
         }
+
+        if((PD_MSG_FIELD_I(workType) != EDT_USER_WORKTYPE) && (PD_MSG_FIELD_I(workType) != EDT_RT_WORKTYPE))
+            DPRINTF(DEBUG_LVL_WARN, "Invalid worktype %x\n", PD_MSG_FIELD_I(workType));
         ASSERT((PD_MSG_FIELD_I(workType) == EDT_USER_WORKTYPE) || (PD_MSG_FIELD_I(workType) == EDT_RT_WORKTYPE));
         PD_MSG_FIELD_O(returnDetail) = hcCreateEdt(
                 self, &(PD_MSG_FIELD_IO(guid)), PD_MSG_FIELD_I(templateGuid),
@@ -788,6 +815,8 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
 #define PD_TYPE PD_MSG_WORK_DESTROY
         localDeguidify(self, &(PD_MSG_FIELD_I(guid)));
         ocrTask_t *task = (ocrTask_t*)PD_MSG_FIELD_I(guid.metaDataPtr);
+        if(task == NULL)
+            DPRINTF(DEBUG_LVL_WARN, "Invalid task, guid %lx\n", PD_MSG_FIELD_I(guid));
         ASSERT(task);
         ASSERT(task->fctId == self->taskFactories[0]->factoryId);
         PD_MSG_FIELD_O(returnDetail) = self->taskFactories[0]->fcts.destruct(task);
@@ -1126,6 +1155,9 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
                 // NOTE: We could use convertDepAddToSatisfy since adding a DB dependence
                 // is equivalent to satisfy. However, we want to go through the register
                 // function to make sure the access mode is recorded.
+                if(dstKind != OCR_GUID_EDT)
+                    DPRINTF(DEBUG_LVL_WARN, "Attempting to add a DB dependence to dest of kind %x "
+                                            "that's neither EDT nor Event\n", dstKind);
                 ASSERT(dstKind == OCR_GUID_EDT);
                 PD_MSG_STACK(registerMsg);
                 getCurrentEnv(NULL, NULL, NULL, &registerMsg);
@@ -1148,6 +1180,9 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             }
         } else {
             // Only left with events as potential source
+            if((srcKind & OCR_GUID_EVENT) == 0)
+                DPRINTF(DEBUG_LVL_WARN, "Attempting to add a dependence with a GUID of type %x, "
+                                        "expected Event\n", srcKind);
             ASSERT(srcKind & OCR_GUID_EVENT);
             //OK if srcKind is at current location
             u8 needSignalerReg = 0;
@@ -1176,6 +1211,9 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             //TODO this is not done yet so some calls are pure waste
             if(!PD_MSG_FIELD_IO(properties)) {
                 // Cannot have other types of destinations
+                if((dstKind != OCR_GUID_EDT) && ((dstKind & OCR_GUID_EVENT) == 0))
+                    DPRINTF(DEBUG_LVL_WARN, "Attempting to add a dependence to a GUID of type %x, "
+                                            "expected EDT or Event\n", dstKind);
                 ASSERT((dstKind == OCR_GUID_EDT) || (dstKind & OCR_GUID_EVENT));
                 PD_MSG_STACK(registerMsg);
                 getCurrentEnv(NULL, NULL, NULL, &registerMsg);
@@ -1241,6 +1279,7 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             PD_MSG_FIELD_O(returnDetail) = self->taskFactories[0]->fcts.registerSignaler(
                 edt, signaler, PD_MSG_FIELD_I(slot), PD_MSG_FIELD_I(mode), isAddDep);
         } else {
+            DPRINTF(DEBUG_LVL_WARN, "Attempt to register signaler on %x which is not of type EDT or Event\n", dstKind);
             ASSERT(0); // No other things we can register signalers on
         }
 #ifdef OCR_ENABLE_STATISTICS
@@ -1273,6 +1312,8 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             PD_MSG_FIELD_O(returnDetail) = self->eventFactories[0]->fcts[evt->kind].registerWaiter(
                 evt, waiter, PD_MSG_FIELD_I(slot), isAddDep);
         } else {
+            if((dstKind & OCR_GUID_DB) == 0)
+                DPRINTF(DEBUG_LVL_WARN, "Attempting to add a dependence to a GUID of type %x, expected DB\n", dstKind);
             ASSERT(dstKind & OCR_GUID_DB);
             // When an EDT want to register to a DB, for instance to get EW access.
             ocrDataBlock_t *db = (ocrDataBlock_t*)(dest.metaDataPtr);
@@ -1317,6 +1358,7 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
                 PD_MSG_FIELD_O(returnDetail) = self->taskFactories[0]->fcts.satisfy(
                     edt, PD_MSG_FIELD_I(payload), PD_MSG_FIELD_I(slot));
             } else {
+                DPRINTF(DEBUG_LVL_WARN, "Attempting to satisfy a GUID of type %x, expected EDT\n", dstKind);
                 ASSERT(0); // We can't satisfy anything else
             }
         }
@@ -1365,6 +1407,8 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         // Check to make sure that the EDT is only doing this to
         // itself
         // Also, this should only happen when there is an actual EDT
+        if((curTask==NULL) || (curTask->guid != PD_MSG_FIELD_I(edt.guid)))
+            DPRINTF(DEBUG_LVL_WARN, "Attempting to notify a missing/different EDT, GUID=%lx\n", PD_MSG_FIELD_I(edt.guid));
         ASSERT(curTask &&
                curTask->guid == PD_MSG_FIELD_I(edt.guid));
 
@@ -1387,6 +1431,8 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         // Check to make sure that the EDT is only doing this to
         // itself
         // Also, this should only happen when there is an actual EDT
+        if((curTask==NULL) || (curTask->guid != PD_MSG_FIELD_I(edt.guid)))
+            DPRINTF(DEBUG_LVL_WARN, "Attempting to notify a missing/different EDT, GUID=%lx\n", PD_MSG_FIELD_I(edt.guid));
         ASSERT(curTask &&
                curTask->guid == PD_MSG_FIELD_I(edt.guid));
 
@@ -1519,6 +1565,8 @@ void* hcPdMalloc(ocrPolicyDomain_t *self, u64 size) {
     // Just try in the first allocator
     void* toReturn = NULL;
     toReturn = self->allocators[0]->fcts.allocate(self->allocators[0], size, 0);
+    if(toReturn == NULL)
+        DPRINTF(DEBUG_LVL_WARN, "Failed PDMalloc for size %lx\n", size);
     ASSERT(toReturn != NULL);
     hcReleasePd((ocrPolicyDomainHc_t*)self);
     RETURN_PROFILE(toReturn);

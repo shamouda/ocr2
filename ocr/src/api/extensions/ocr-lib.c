@@ -155,6 +155,7 @@ extern void stopAllPD(ocrPolicyDomain_t *pd);
  */
 void ocrInit(ocrConfig_t * ocrConfig) {
     const char * iniFile = ocrConfig->iniFile;
+    // Configuration file is missing, please check OCR_CONFIG env var or -ocr:cfg option
     ASSERT(iniFile != NULL);
     bringUpRuntime(iniFile);
 }

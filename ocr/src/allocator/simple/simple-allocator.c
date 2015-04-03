@@ -173,7 +173,6 @@ void *addrGlobalizeOnTG(void *result, ocrPolicyDomain_t *self)
         //DPRINTF(DEBUG_LVL_INFO, "BSM conv: %p -> %p\n", result, newresult );
         result = newresult;
     }
-    // Brian's original code for L1 SPAD address conversion to canonical form.
     if((u64)result <= CE_MSR_BASE && (u64)result >= BR_CE_BASE) {
         result = (void *)DR_CE_BASE(CHIP_FROM_ID(self->myLocation),
                                     UNIT_FROM_ID(self->myLocation),
@@ -185,7 +184,7 @@ void *addrGlobalizeOnTG(void *result, ocrPolicyDomain_t *self)
                                  ((((u64)result >> MAP_UNIT_SHIFT) & ((1ULL<<MAP_UNIT_LEN) - 1)) - 2),
                                  ((((u64)result >> MAP_BLOCK_SHIFT) & ((1ULL<<MAP_BLOCK_LEN) - 1)) - 2),
                                  ID_AGENT_CE);
-//DPRINTF(DEBUG_LVL_WARN, "check:%p , self:%p, myloc:0x%lx\n", check, self, self->myLocation);
+        //DPRINTF(DEBUG_LVL_WARN, "check:%p , self:%p, myloc:0x%lx\n", check, self, self->myLocation);
         ASSERT(check==self->myLocation);
     }
 #endif

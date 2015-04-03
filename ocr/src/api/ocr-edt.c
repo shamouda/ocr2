@@ -111,6 +111,7 @@ u8 ocrEdtTemplateCreate_internal(ocrGuid_t *guid, ocrEdt_t funcPtr, u32 paramc, 
     DPRINTF(DEBUG_LVL_INFO, "ENTER ocrEdtTemplateCreate(*guid=0x%lx, funcPtr=0x%lx, paramc=%d, depc=%d, name=%s)\n",
             *guid, funcPtr, (s32)paramc, (s32)depc, funcName?funcName:"");
 #ifdef OCR_ENABLE_EDT_NAMING
+    // Please check that OCR_ENABLE_EDT_NAMING is defined in the app's makefile
     ASSERT(funcName);
 #endif
     PD_MSG_STACK(msg);
@@ -228,6 +229,7 @@ u8 ocrEdtCreate(ocrGuid_t* edtGuid, ocrGuid_t templateGuid,
     // TODO: This should probably just send the messages
     // to the PD
     if(depv != NULL) {
+        // Please check that # of dependences agrees with depv vector
         ASSERT(depc != 0);
         u32 i = 0;
         while(i < depc) {

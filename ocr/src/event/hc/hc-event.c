@@ -166,11 +166,11 @@ u8 satisfyEventHcOnce(ocrEvent_t *base, ocrFatGuid_t db, u32 slot) {
         PD_MSG_FIELD_IO(properties) = DB_MODE_RO | DB_PROP_RT_ACQUIRE;
         //Should be a local DB
         u8 res = pd->fcts.processMessage(pd, &msg, true);
-        ASSERT(!res);
+        ASSERT(!res); // Possible corruption of waitersDb
         waiters = (regNode_t*)PD_MSG_FIELD_O(ptr);
         // Todo: Related to bug #273. We should not get an updated deguidification...
         event->waitersDb = PD_MSG_FIELD_IO(guid); //Get updated deguidifcation if needed
-        ASSERT(waiters);
+        ASSERT(waiters); // Indicates a corruption
 #undef PD_TYPE
 
         // Second, call satisfy on all the waiters
@@ -264,11 +264,11 @@ u8 satisfyEventHcPersist(ocrEvent_t *base, ocrFatGuid_t db, u32 slot) {
         PD_MSG_FIELD_IO(properties) = DB_MODE_ITW | DB_PROP_RT_ACQUIRE;
         //Should be a local DB
         u8 res = pd->fcts.processMessage(pd, &msg, true);
-        ASSERT(!res);
+        ASSERT(!res); // Possible corruption of waitersDb
         waiters = (regNode_t*)PD_MSG_FIELD_O(ptr);
         // TODO: bug #273
         event->base.waitersDb = PD_MSG_FIELD_IO(guid);
-        ASSERT(waiters);
+        ASSERT(waiters); // Check for corruption
 #undef PD_TYPE
         // Call satisfy on all the waiters
 #define PD_TYPE PD_MSG_DEP_SATISFY
@@ -356,12 +356,12 @@ u8 satisfyEventHcLatch(ocrEvent_t *base, ocrFatGuid_t db, u32 slot) {
         PD_MSG_FIELD_IO(properties) = DB_MODE_RO | DB_PROP_RT_ACQUIRE;
         //Should be a local DB
         u8 res = pd->fcts.processMessage(pd, &msg, true);
-        ASSERT(!res);
+        ASSERT(!res); // Possible corruption of waitersDb
 
         waiters = (regNode_t*)PD_MSG_FIELD_O(ptr);
         // TODO: See bug #273
         event->base.waitersDb = PD_MSG_FIELD_IO(guid);
-        ASSERT(waiters);
+        ASSERT(waiters); // Check for corruption
 #undef PD_TYPE
         // Call satisfy on all the waiters
 #define PD_TYPE PD_MSG_DEP_SATISFY
@@ -445,11 +445,11 @@ u8 registerWaiterEventHc(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot, bool i
     PD_MSG_FIELD_IO(properties) = DB_MODE_ITW | DB_PROP_RT_ACQUIRE;
     //Should be a local DB
     u8 res = pd->fcts.processMessage(pd, &msg, true);
-    ASSERT(!res);
+    ASSERT(!res); // Possible corruption of waitersDb
     waiters = (regNode_t*)PD_MSG_FIELD_O(ptr);
     // TODO: See bug #273
     event->waitersDb = PD_MSG_FIELD_IO(guid);
-    ASSERT(waiters);
+    ASSERT(waiters); // Check for corruption
 #undef PD_TYPE
     if((event->waitersCount + 1) == event->waitersMax) {
         // We need to create a new DB
@@ -715,7 +715,7 @@ u8 unregisterWaiterEventHc(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot, bool
     PD_MSG_FIELD_IO(properties) = DB_MODE_ITW | DB_PROP_RT_ACQUIRE;
     //Should be a local DB
     u8 res = pd->fcts.processMessage(pd, &msg, true);
-    ASSERT(!res);
+    ASSERT(!res); // Possible corruption of waitersDb
 
     waiters = (regNode_t*)PD_MSG_FIELD_O(ptr);
     // TODO: Bug #273
@@ -782,7 +782,7 @@ u8 unregisterWaiterEventHcPersist(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slo
     PD_MSG_FIELD_IO(properties) = DB_MODE_ITW | DB_PROP_RT_ACQUIRE;
     //Should be a local DB
     if((toReturn = pd->fcts.processMessage(pd, &msg, true))) {
-        ASSERT(!toReturn);
+        ASSERT(!toReturn); // Possible corruption of waitersDb
         hal_unlock32(&(event->waitersLock));
         return toReturn;
     }
