@@ -398,7 +398,8 @@ def importFromFile(name, tempJobs, jobTypetoName, alternateJobs):
                     replaceList.append(item)
             for item in replaceList:
                 depList.remove(item)
-                depList = depList + jobTypetoName[item.split()[1]]
+                if  item.split()[1] in jobTypetoName :
+                    depList = depList + jobTypetoName[item.split()[1]]
             depTup = tuple(depList)
             v['depends'] = depTup
 
