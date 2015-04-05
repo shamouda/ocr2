@@ -136,6 +136,7 @@ void ocrInit(int * argc, char ** argv, u32 fnc, ocrEdt_t funcs[]) {
 
     u32 nbHardThreads = ocr_config_default_nb_hardware_threads;
     gHackTotalMemSize = 1024*1024*1024; /* 64 MB default */
+    gHackTotalMemSize *= 2;
     char * md_file = parseOcrOptions_MachineDescription(argc, argv);
 
     char * bind_file = parseOcrOptions_Binding (argc, argv);

@@ -124,7 +124,7 @@ typedef u32 tlsf_size_t;
  * For 256MB memory: 26 (if ELEMENT_SIZE_LOG2 == 2)
  * For 512MB memory: 27 (if ELEMENT_SIZE_LOG2 == 2)
  */
-#define FL_MAX_LOG2 27
+#define FL_MAX_LOG2 29
 
 
 /* Size specific functions:

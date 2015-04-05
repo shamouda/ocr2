@@ -156,7 +156,7 @@ u8 wrap_up_task ( u32 paramc, u64 * params, void* paramv[], u32 depc, ocrEdtDep_
     int i, j, i_b, j_b;
     double* temp;
     gettimeofday(&b,0);
-    printf("The computation took %f seconds\r\n",((b.tv_sec - a.tv_sec)*1000000+(b.tv_usec - a.tv_usec))*1.0/1000000);
+    fprintf(stderr,"The computation took %f seconds\r\n",((b.tv_sec - a.tv_sec)*1000000+(b.tv_usec - a.tv_usec))*1.0/1000000);
 #ifdef HPCTOOLKIT
     hpctoolkit_sampling_stop();
 #endif
@@ -191,7 +191,7 @@ u8 wrap_up_task ( u32 paramc, u64 * params, void* paramv[], u32 depc, ocrEdtDep_
         }
     }
 
-    printf("epsilon: %Lf\n", max_diff);
+    fprintf(stderr,"epsilon: %Lf\n", max_diff);
 #endif
 
     free(paramv);
@@ -342,7 +342,7 @@ inline static void createMatrix( double** matrix, double **input_solution, int m
     static const double beta = 0.0;
     dgemm ("T", "N", &matrixSize, &matrixSize, &matrixSize, &alpha, L, &matrixSize, L, &matrixSize, &beta, A, &matrixSize);
     gettimeofday(&d,0);
-    printf("creation took %f seconds\r\n",((d.tv_sec - c.tv_sec)*1000000+(d.tv_usec - c.tv_usec))*1.0/1000000);
+    fprintf(stderr,"creation took %f seconds\r\n",((d.tv_sec - c.tv_sec)*1000000+(d.tv_usec - c.tv_usec))*1.0/1000000);
     char* n_threads_str = getenv("MY_MKL_NUM_THREADS");
     int n_threads = 1;
     if ( NULL != n_threads_str ) n_threads = atoi(n_threads_str);

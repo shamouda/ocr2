@@ -150,7 +150,7 @@ u8 wrap_up_task ( u32 paramc, u64 * params, void* paramv[], u32 depc, ocrEdtDep_
     int i, j, i_b, j_b;
     double* temp;
     gettimeofday(&b,0);
-    printf("The computation took %f seconds\r\n",((b.tv_sec - a.tv_sec)*1000000+(b.tv_usec - a.tv_usec))*1.0/1000000);
+    fprintf(stderr,"The computation took %f seconds\r\n",((b.tv_sec - a.tv_sec)*1000000+(b.tv_usec - a.tv_usec))*1.0/1000000);
 #ifdef HPCTOOLKIT
     hpctoolkit_sampling_stop();
 #endif
@@ -190,7 +190,7 @@ u8 wrap_up_task ( u32 paramc, u64 * params, void* paramv[], u32 depc, ocrEdtDep_
         }
     }
 
-    printf("epsilon: %Lf\n", max_diff);
+    fprintf(stderr,"epsilon: %Lf\n", max_diff);
 #endif
 
     free(paramv);
@@ -396,7 +396,7 @@ inline static void createMatrix( double** matrix, double **input_solution, int m
     static const double beta = 0.0;
     dgemm ("T", "N", &matrixSize, &matrixSize, &matrixSize, &alpha, L, &matrixSize, L, &matrixSize, &beta, A, &matrixSize);
     gettimeofday(&d,0);
-    printf("creation took %f seconds\r\n",((d.tv_sec - c.tv_sec)*1000000+(d.tv_usec - c.tv_usec))*1.0/1000000);
+    fprintf(stderr,"creation took %f seconds\r\n",((d.tv_sec - c.tv_sec)*1000000+(d.tv_usec - c.tv_usec))*1.0/1000000);
     char* n_threads_str = getenv("MY_MKL_NUM_THREADS");
     int n_threads = 1;
     if ( NULL != n_threads_str ) n_threads = atoi(n_threads_str);
@@ -541,37 +541,41 @@ inline static void satisfyInitialTiles( int numTiles, int tileSize, double* matr
     }
 }
 
-#define N_POLICIES 24
+#define N_POLICIES 7
 #define N_POLICY_STRLEN 100
 #define N_TILESIZES 6
 #define N_TILESIZE_STRLEN 6
 
 static const char* tileSizes[N_TILESIZES] = {"64","96","128","192","256","384"};
 static const char* policies[N_POLICIES] = {
-    "bar_tailpush_ndeque_rndsteal_laststeal",
-    "bar_tailpush_ndeque_hierrandomsteal_laststeal",
-    "bar_tailpush_ndeque_cycsteal_laststeal",
-    "bar_tailpush_ndeque_hiercyclicsteal_laststeal",
-    "bar_tailpush_dqheap_rndsteal_laststeal",
-    "bar_tailpush_dqheap_hierrandomsteal_laststeal",
-    "bar_tailpush_dqheap_cycsteal_laststeal",
-    "bar_tailpush_dqheap_hiercyclicsteal_laststeal",
-    "bar_tailpush_dqheap_rndsteal_stealhalf",
-    "bar_tailpush_dqheap_hierrandomsteal_stealhalf",
-    "bar_tailpush_dqheap_cycsteal_stealhalf",
-    "bar_tailpush_dqheap_hiercyclicsteal_stealhalf",
-    "bar_tailpush_dqheap_rndsteal_countingstealhalf",
-    "bar_tailpush_dqheap_hierrandomsteal_countingstealhalf",
-    "bar_tailpush_dqheap_cycsteal_countingstealhalf",
-    "bar_tailpush_dqheap_hiercyclicsteal_countingstealhalf",
-    "bar_tailpush_sortedpqheap_user_rndsteal_stealhalf",
-    "bar_tailpush_sortedpqheap_user_hierrandomsteal_stealhalf",
-    "bar_tailpush_sortedpqheap_user_cycsteal_stealhalf",
-    "bar_tailpush_sortedpqheap_user_hiercyclicsteal_stealhalf",
-    "bar_tailpush_sortedpqheap_user_rndsteal_altruisticsteal",
-    "bar_tailpush_sortedpqheap_user_hierrandomsteal_altruisticsteal",
-    "bar_tailpush_sortedpqheap_user_cycsteal_altruisticsteal",
-    "bar_tailpush_sortedpqheap_user_hiercyclicsteal_altruisticsteal"
+    "bar_tailpush_ndeque_rndsteal_laststeal"
+//    ,"bar_tailpush_ndeque_hierrandomsteal_laststeal"
+//    ,"bar_tailpush_ndeque_cycsteal_laststeal"
+//    ,"bar_tailpush_ndeque_hiercyclicsteal_laststeal"
+    ,"bar_tailpush_dqheap_rndsteal_laststeal"
+//    ,"bar_tailpush_dqheap_hierrandomsteal_laststeal"
+//    ,"bar_tailpush_dqheap_cycsteal_laststeal"
+//    ,"bar_tailpush_dqheap_hiercyclicsteal_laststeal"
+    ,"bar_tailpush_dqheap_rndsteal_stealhalf"
+//    ,"bar_tailpush_dqheap_hierrandomsteal_stealhalf"
+//    ,"bar_tailpush_dqheap_cycsteal_stealhalf"
+//    ,"bar_tailpush_dqheap_hiercyclicsteal_stealhalf"
+    ,"bar_tailpush_dqheap_rndsteal_countingstealhalf"
+//    ,"bar_tailpush_dqheap_hierrandomsteal_countingstealhalf"
+//    ,"bar_tailpush_dqheap_cycsteal_countingstealhalf"
+//    ,"bar_tailpush_dqheap_hiercyclicsteal_countingstealhalf"
+    ,"bar_tailpush_sortedpqheap_user_rndsteal_altruisticsteal"
+//    ,"bar_tailpush_sortedpqheap_user_hierrandomsteal_altruisticsteal"
+//    ,"bar_tailpush_sortedpqheap_user_cycsteal_altruisticsteal"
+//    ,"bar_tailpush_sortedpqheap_user_hiercyclicsteal_altruisticsteal"
+    ,"bar_tailpush_sortedpqheap_user_rndsteal_stealhalf"
+//    ,"bar_tailpush_sortedpqheap_user_hierrandomsteal_stealhalf"
+//    ,"bar_tailpush_sortedpqheap_user_cycsteal_stealhalf"
+//    ,"bar_tailpush_sortedpqheap_user_hiercyclicsteal_stealhalf"
+    ,"bar_tailpush_sortedpqheap_user_rndsteal_countingstealhalf"
+//    ,"bar_tailpush_sortedpqheap_user_hierrandomsteal_countingstealhalf"
+//    ,"bar_tailpush_sortedpqheap_user_cycsteal_countingstealhalf"
+//    ,"bar_tailpush_sortedpqheap_user_hiercyclicsteal_countingstealhalf"
 };
 int main( int argc, char* argv[] ) {
     int i, j, k;

@@ -11,7 +11,7 @@
 #define FLAGS 0xdead
 #define PROPERTIES 0xdead
 
-enum Nucleotide {GAP=0, ADENINE, CYTOSINE, GUANINE, THYMINE};
+enum Nucleotide {N_GAP=0, ADENINE, CYTOSINE, GUANINE, THYMINE};
 
 static char alignment_score_matrix[5][5] = {
     {GAP,   GAP,            GAP,            GAP,            GAP},
@@ -77,8 +77,8 @@ u8 smith_waterman_task ( u32 paramc, u64 * params, void* paramv[], u32 depc, ocr
 
             /* Get score from northwest, north and west */
             int diag_score = curr_tile[ii-1][jj-1] + alignment_score_matrix[char_from_2][char_from_1];
-            int left_score = curr_tile[ii  ][jj-1] + alignment_score_matrix[char_from_1][GAP];
-            int  top_score = curr_tile[ii-1][jj  ] + alignment_score_matrix[GAP][char_from_2];
+            int left_score = curr_tile[ii  ][jj-1] + alignment_score_matrix[char_from_1][N_GAP];
+            int  top_score = curr_tile[ii-1][jj  ] + alignment_score_matrix[N_GAP][char_from_2];
 
             int bigger_of_left_top = (left_score > top_score) ? left_score : top_score;
 
@@ -205,6 +205,21 @@ void generate_strings ( int size1, int size2, char* string1, char* string2 ) {
     string2[size2] = 0;
 }
 
+void populateAnnotations( long double** granularityAnnotations, int n_tiles_height, int n_tiles_width) {
+    int i,j;
+    for ( j = n_tiles_width; j > 0 ; --j) {
+        granularityAnnotations[n_tiles_height-1][j-1] = n_tiles_width-j; 
+    }
+    for ( i = n_tiles_height; i > 0 ; --i) {
+        granularityAnnotations[i-1][n_tiles_width-1] = n_tiles_height-i; 
+    }
+    for ( i = n_tiles_height-2; i >= 0 ; --i) {
+        for ( j = n_tiles_width-2; j >= 0 ; --j) {
+            granularityAnnotations[i][j] = granularityAnnotations[i+1][j]+granularityAnnotations[i][j+1]+granularityAnnotations[i+1][j+1]+3;
+        }
+    }
+}
+
 int main ( int argc, char* argv[] ) {
 
     OCR_INIT(&argc, argv, smith_waterman_task );
@@ -224,20 +239,27 @@ int main ( int argc, char* argv[] ) {
     int n_tiles_height = strlen2/tile_height;
 
     if ( n_tiles_width * tile_width != strlen1 ) {
-        fprintf(stderr, " strlen1:%d is not divisible by tileWidth:%d\n", strlen1, tile_width);
+        fprintf(stderr, " strlen1:%d is not divisible by tileWidth:%d\n", strlen1, n_tiles_width);
     }
 
-    if ( n_tiles_height * n_tiles_height != strlen2 ) {
+    if ( n_tiles_height * tile_height != strlen2 ) {
         fprintf(stderr, " strlen2:%d is not divisible by tileHeight:%d\n", strlen2, n_tiles_height);
     }
 
-    fprintf(stdout, "Imported %d x %d tiles.\n", n_tiles_width, n_tiles_height);
+    // fprintf(stdout, "Imported %d x %d tiles.\n", n_tiles_width, n_tiles_height);
 
     char* string_1 = (char*) malloc(sizeof(char)*(1+strlen1));
     char* string_2 = (char*) malloc(sizeof(char)*(1+strlen2));
     generate_strings(strlen1, strlen2, string_1, string_2);
 
-    fprintf(stdout, "Allocating tile matrix\n");
+    // fprintf(stdout, "Allocating tile matrix\n");
+
+    long double** granularityAnnotations = (long double**)malloc(sizeof(long double*)*n_tiles_height);
+    for ( i = 0; i < n_tiles_height; ++i ) {
+        granularityAnnotations[i] = (long double*)malloc(sizeof(long double)*n_tiles_width);
+    }
+
+    populateAnnotations(granularityAnnotations, n_tiles_height, n_tiles_width);
 
     /* Allocate a 2D matrix of 'Tile's where every Tile has 3 events that represents the readiness
      * of the bottom row, right column and bottom right element of that tile */
@@ -252,7 +274,7 @@ int main ( int argc, char* argv[] ) {
         }
     }
 
-    fprintf(stdout, "Allocated tile matrix\n");
+    // fprintf(stdout, "Allocated tile matrix\n");
 
     initialize_border_values(tile_matrix, n_tiles_width, n_tiles_height, tile_width, tile_height);
 
@@ -278,7 +300,7 @@ int main ( int argc, char* argv[] ) {
             /* Create an event-driven tasks of smith_waterman tasks */
             ocrGuid_t task_guid;
 
-            ocrEdtCreate(&task_guid, smith_waterman_task, 9, NULL, (void **) paramv, PROPERTIES, 3, NULL);
+            ocrEdtCreate(&task_guid, smith_waterman_task, 9, NULL, (void **) paramv, PROPERTIES, 3, NULL, granularityAnnotations[i-1][j-1],granularityAnnotations[i-1][j-1]);
 
             /* add dependency to the EDT from the west tile's right column ready event */
             ocrAddDependence(tile_matrix[i][j-1].right_column_event_guid, task_guid, 0);

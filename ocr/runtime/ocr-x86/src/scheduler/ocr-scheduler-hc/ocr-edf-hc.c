@@ -294,7 +294,7 @@ void hc_task_execute ( ocr_task_t* base ) {
     for(i=0; i<derived->nbdeps; ++i) {
         if(derived->depv[i].guid != NULL_GUID) {
             globalGuidProvider->getVal(globalGuidProvider, derived->depv[i].guid, (u64*)&db, NULL);
-            RESULT_ASSERT(db->release(db, base->guid, true), ==, 0);
+            //RESULT_ASSERT(db->release(db, base->guid, true), ==, 0);
         }
     }
     free(derived->depv);
