@@ -32,16 +32,8 @@ DEFAULT_CONFIG ?= mach-hc-4w.cfg
 # Number of elements in EDT local storage
 # CFLAGS += -DELS_USER_SIZE=0
 
-# Valgrind compatibility for internal allocators
-# (x86 only, requires valgrind-devel & inclusion of
-# /usr/include in search path)
-# CFLAGS += -DENABLE_VALGRIND
-
 # Static size for deques used to contain EDTs
 CFLAGS += -DINIT_DEQUE_CAPACITY=2048
-
-# Maximum number of function nesting for runtime profiler
-# CFLAGS += -DMAX_PROFILER_LEVEL=512
 
 # Maximum number of characters handled by a single PRINTF
 # CFLAGS += -DPRINTF_MAX=1024
@@ -51,18 +43,39 @@ CFLAGS += -DINIT_DEQUE_CAPACITY=2048
 # multiple slots
 # CFLAGS += -DOCR_MAX_MULTI_SLOT=1
 
-# Enables the collection of runtime profiling (only x86)
-# CFLAGS += -DOCR_RUNTIME_PROFILER
-
 # Enables naming of EDTs for easier debugging
 # CFLAGS += -DOCR_ENABLE_EDT_NAMING
 
+####################################################
+# Platform specific user configurable settings
+#
+# Set these in <platform>/Makefile
+# They are added here for reference
+###################################################
+
+# Valgrind compatibility for internal allocators
+# x86 only
+# Requires valgrind-devel package
+# CFLAGS += -I/usr/include -DENABLE_VALGRIND
+
+# Runtime overhead profiler
+# x86 only
+#
+# Enable profiler
+# CFLAGS += -DOCR_RUNTIME_PROFILER -DPROFILE_KHZ=3400000
+#
+# (optional) Maximum number of scope
+# nesting for runtime profiler
+# CFLAGS += -DMAX_PROFILER_LEVEL=512
+
 # Enables the collection of EDT R/W statistics
-# (only on x86, requires OCR_ENABLE_EDT_NAMING)
+# x86 only
+# Requires OCR_ENABLE_EDT_NAMING
 # CFLAGS += -DOCR_ENABLE_EDT_PROFILING
 
 # Enables data collection for execution timeline visualizer
-# (x86 only.  Requires -DOCR_ENABLE_EDT_NAMING and DEBUG_LVL_INFO)
+# x86 only
+# Requires -DOCR_ENABLE_EDT_NAMING and DEBUG_LVL_INFO
 # CFLAGS += -DOCR_ENABLE_VISUALIZER -DOCR_ENABLE_EDT_NAMING
 
 ####################################################

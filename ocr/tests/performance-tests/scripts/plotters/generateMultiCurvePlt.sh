@@ -1,7 +1,5 @@
 #!/bin/bash
 
-# takes
-
 DATA_FILE=$1
 CURVETITLE_FILE=$2
 XLABELS_FILE=$3
@@ -10,6 +8,7 @@ OUTPUT_PLOT_NAME=$5
 TITLE=$6
 XLABEL=$7
 YLABEL=$8
+COL_IDX=$9
 
 #
 # Extract target image format from name
@@ -25,10 +24,8 @@ TMPL=${SCRIPT_ROOT}/plotters/multicurves_template.plt
 
 CURVES_DEFS=""
 NB_CURVES=`more ${CURVETITLE_FILE} |wc -l`
-let COL_IDX=2
 while read -r line
 do
-    # INPUT="\'$DATA_FILE\' using 1:${COL_IDX} title \"$line\" with lines"
     INPUT="\'$DATA_FILE\' using ${COL_IDX}:xticlabels(1) title \"$line\" with lines"
     if [[ -z "${CURVES_DEFS}" ]]; then
         CURVES_DEFS="$INPUT"

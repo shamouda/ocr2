@@ -21,6 +21,7 @@
 
 // Allocator
 #define ENABLE_ALLOCATOR_TLSF
+#define ENABLE_ALLOCATOR_SIMPLE
 #define ENABLE_ALLOCATOR_MALLOCPROXY
 
 // Comm-api
@@ -35,6 +36,13 @@
 
 // Comp-target
 #define ENABLE_COMP_TARGET_PASSTHROUGH
+
+// Scheduler Objects
+#define ENABLE_SCHEDULER_OBJECT_WST
+#define ENABLE_SCHEDULER_OBJECT_DEQ
+
+// Scheduler Heuristic
+#define ENABLE_SCHEDULER_HEURISTIC_HC
 
 // Datablock
 #define ENABLE_DATABLOCK_REGULAR
@@ -83,9 +91,6 @@
 
 // Workpile
 #define ENABLE_WORKPILE_HC
-
-// Build the OCR-lib support
-#define ENABLE_EXTENSION_LIB
 
 // Legacy support
 #define ENABLE_EXTENSION_LEGACY

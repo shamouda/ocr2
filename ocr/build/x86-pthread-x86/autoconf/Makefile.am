@@ -18,9 +18,9 @@ if INCLUDE_RUNTIME_ITF_HEADERS
 library_include_HEADERS += $(rootdir)/inc/extensions/ocr-runtime-itf.h
 endif
 
-# Distribute OCR library interface headers - set by configure
-if INCLUDE_OCR_LIBRARY_ITF_HEADERS
-library_include_HEADERS += $(rootdir)/inc/extensions/ocr-lib.h
+# Distribute OCR legacy interface headers - set by configure
+if INCLUDE_OCR_LEGACY_ITF_HEADERS
+library_include_HEADERS += $(rootdir)/inc/extensions/ocr-legacy.h
 endif
 
 configdir = $(prefix)/config

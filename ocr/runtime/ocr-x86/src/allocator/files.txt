@@ -1,2 +1,0 @@
-null - a placeholder allocator with no functionality
-tlsf - TLSF (Two Level Segregate Fit) allocator

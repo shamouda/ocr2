@@ -41,6 +41,12 @@
 // Comp-target
 #define ENABLE_COMP_TARGET_PASSTHROUGH
 
+// Scheduler Objects
+#define ENABLE_SCHEDULER_OBJECT_NULL
+
+// Scheduler Heuristic
+#define ENABLE_SCHEDULER_HEURISTIC_NULL
+
 // Datablock
 #define ENABLE_DATABLOCK_REGULAR
 #define ENABLE_DATABLOCK_LOCKABLE
@@ -64,6 +70,7 @@
 
 // Policy domain
 #define ENABLE_POLICY_DOMAIN_XE
+#define ENABLE_MSG_SEQID
 
 // Scheduler
 #define ENABLE_SCHEDULER_XE

@@ -1,0 +1,3 @@
+ocr-affinity.c  - public affinity API
+ocr-legacy.c    - Support for calling OCR from legacy programming models
+ocr-rt-itf.c    - public API for runtime implementations on top of OCR

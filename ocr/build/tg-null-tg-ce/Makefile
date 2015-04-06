@@ -17,7 +17,7 @@ endif
 # Tool-chain to be used for the build
 #
 
-TG_INSTALL ?= ../../../ss/install
+TG_INSTALL ?= ../../../../intel/ss/install
 
 #DEFAULT_CONFIG = ce-default.cfg      #Switch to this configuration file to go back to a single 256K memory allocator.
 DEFAULT_CONFIG = ce-multialloc-default.cfg

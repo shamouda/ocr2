@@ -21,6 +21,7 @@
 
 // Allocator
 #define ENABLE_ALLOCATOR_TLSF
+#define ENABLE_ALLOCATOR_SIMPLE
 #define ENABLE_ALLOCATOR_MALLOCPROXY
 #define ENABLE_ALLOCATOR_NULL
 
@@ -37,6 +38,12 @@
 
 // Comp-target
 #define ENABLE_COMP_TARGET_PASSTHROUGH
+
+// Scheduler Objects
+#define ENABLE_SCHEDULER_OBJECT_NULL
+
+// Scheduler Heuristic
+#define ENABLE_SCHEDULER_HEURISTIC_NULL
 
 // Datablock
 #define ENABLE_DATABLOCK_REGULAR
@@ -64,6 +71,7 @@
 // Policy domain
 #define ENABLE_POLICY_DOMAIN_CE
 #define ENABLE_POLICY_DOMAIN_XE
+#define ENABLE_MSG_SEQID
 
 // Scheduler
 #define ENABLE_SCHEDULER_CE
@@ -91,7 +99,6 @@
 
 // Extensions
 #define ENABLE_EXTENSION_AFFINITY
-#define ENABLE_EXTENSION_LIB
 #define ENABLE_EXTENSION_LEGACY
 
 #endif /* __OCR_CONFIG_H__ */

@@ -4,17 +4,15 @@
 // DESC: Create DB_NBS EDTs that each keep creating & destroying DBs, each of size DB_SZ
 // TIME: Duration of create & destroy
 // FREQ: Done 'NB_ITERS' times
+//
+// VARIABLES:
+// - NB_ITERS
+// - DB_NBS
+// - DB_SZ
 
-#ifndef NB_ITERS
-#define NB_ITERS 50000
-#endif
-
-#ifndef DB_NBS
-#define DB_NBS     32
-#endif
- 
-#ifndef DB_SZ
-#define DB_SZ    4
+// Time the destroys by default
+#ifndef TIME_DESTROY
+#define TIME_DESTROY 1
 #endif
 
 ocrGuid_t wrapupEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
@@ -26,15 +24,13 @@ ocrGuid_t wrapupEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     t1 = 0;
     t2 = 0;
 
-
     for(i = 0; i<DB_NBS*3; i+=3) {
         t0 += timersPtr[i];
         t1 += timersPtr[i+1];
         t2 += timersPtr[i+2];
     }
 
-
-    PRINTF("Overall: %d %d %d\n", t0/DB_NBS, t1/DB_NBS, t2/DB_NBS);
+    PRINTF("Overall: DB Create %d\t DB Release %d\t DB Destroy %d\n", t0/DB_NBS, t1/DB_NBS, t2/DB_NBS);
 
     ocrShutdown();
     return NULL_GUID;
@@ -53,46 +49,48 @@ ocrGuid_t edtCode(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     timersPtr[index+0] = 0;
     timersPtr[index+1] = 0;
     timersPtr[index+2] = 0;
+
     for(i = 0; i<NB_ITERS; i++) {
 
-#if 1
         dbGuid = NULL_GUID;
         get_time(&t0);
         ocrDbCreate(&dbGuid, (void **)&dbPtr, DB_SZ, 0, NULL_GUID, NO_ALLOC);
-ASSERT(dbGuid != NULL_GUID);
-ASSERT(dbPtr != NULL);
+        // Check that the DB creates succeeded
+        ASSERT(dbGuid != NULL_GUID);
+        ASSERT(dbPtr != NULL);
+
         get_time(&t1);
         ocrDbRelease(dbGuid);
         get_time(&t2);
+#if  TIME_DESTROY
         ocrDbDestroy(dbGuid);
         get_time(&t3);
-
-        timersPtr[index+0] += elapsed_usec(&t0, &t1);
-        timersPtr[index+1] += elapsed_usec(&t1, &t2);
-        timersPtr[index+2] += elapsed_usec(&t2, &t3);
-        if((*(u64 *)syncPtr) == 1) break;
-#else
-        get_time(&t0);
-        retval = ocrDbCreate(&dbGuid, (void **)&dbPtr, DB_SZ, 0, NULL_GUID, NO_ALLOC);
-        get_time(&t1);
-        ocrDbRelease(dbGuid);
-        get_time(&t2);
-
-        timersPtr[index+0] += elapsed_usec(&t0, &t1);
-        timersPtr[index+1] += elapsed_usec(&t1, &t2);
-
-        if((*(u64 *)syncPtr) || retval) break;
 #endif
+
+        timersPtr[index+0] += elapsed_usec(&t0, &t1);
+        timersPtr[index+1] += elapsed_usec(&t1, &t2);
+#if TIME_DESTROY
+        timersPtr[index+2] += elapsed_usec(&t2, &t3);
+#endif
+
+        // If errors or some other thread's done, bail
+        if(((*(u64 *)syncPtr) == 1) || retval)
+            break;
     }
 
     *(u64 *)syncPtr = 1;
 
-    // Now average them out
-    timersPtr[index+0] /= i;
-    timersPtr[index+1] /= i;
-    timersPtr[index+2] /= i;
+    if(i==0)
+        PRINTF("Invalid run! Please check that the number of EDTs generated match number of workers\n");
+    else {
+        // Now average them out
+        timersPtr[index+0] /= i;
+        timersPtr[index+1] /= i;
+        timersPtr[index+2] /= i;
 
-PRINTF("%d: %d iterations; %ld %ld %ld\n", paramv[0], i, timersPtr[index], timersPtr[index+1], timersPtr[index+2]);
+        PRINTF("Thread %d: %d iterations; Times: %ld %ld %ld\n", paramv[0], i, timersPtr[index], timersPtr[index+1], timersPtr[index+2]);
+    }
+
     return NULL_GUID;
 }
 
@@ -119,13 +117,14 @@ ocrGuid_t driverEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
         ocrGuid_t eventGuid;
         ocrEdtCreate(&edtGuid, edtCodeTemplateGuid,
                      1, &i, 2, NULL_GUID, EDT_PROP_NONE, NULL_GUID, &eventGuid);
-//        ocrEdtTemplateDestroy(edtCodeTemplateGuid);
 
         // Add timer dependence
         ocrAddDependence(dbTimerGuid, edtGuid, 0, DB_MODE_ITW);
         ocrAddDependence(depv[1].guid, edtGuid, 1, DB_MODE_ITW);
         ocrAddDependence(eventGuid, edtWrapupGuid, i, DB_MODE_ITW);
     }
+    ocrEdtTemplateDestroy(edtCodeTemplateGuid);
+    ocrEdtTemplateDestroy(finishTemplateGuid);
 
     return NULL_GUID;
 }

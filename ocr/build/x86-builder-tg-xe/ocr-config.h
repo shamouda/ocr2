@@ -36,6 +36,12 @@
 // Comp-target
 #define ENABLE_COMP_TARGET_PASSTHROUGH
 
+// Scheduler Objects
+#define ENABLE_SCHEDULER_OBJECT_NULL
+
+// Scheduler Heuristic
+#define ENABLE_SCHEDULER_HEURISTIC_NULL
+
 // Datablock
 #define ENABLE_DATABLOCK_REGULAR
 #define ENABLE_DATABLOCK_LOCKABLE
@@ -61,6 +67,7 @@
 
 // Policy domain
 #define ENABLE_POLICY_DOMAIN_XE
+#define ENABLE_MSG_SEQID
 
 // Scheduler
 #define ENABLE_SCHEDULER_XE
@@ -83,8 +90,6 @@
 // Workpile
 #define ENABLE_WORKPILE_XE
 
-// Build the OCR-lib support
-#define ENABLE_EXTENSION_LIB
 // Build OCR legacy support
-//#define ENABLE_EXTENSION_LEGACY
+#define ENABLE_EXTENSION_LEGACY
 #endif /* __OCR_CONFIG_H__ */

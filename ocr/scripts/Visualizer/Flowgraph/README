@@ -15,11 +15,13 @@ Script Instructions:
 
 -Navigate to desired application directory.
     -NOTE: The default ocr-config GuidType (PTR) reuses guids, and is not compitable with this tool.
-     GuidType of COUNTED_MAP is needed in the ocr-config file to use this tool.  There is a config-file
-     in this directory that mirrors the default config, with COUNTED_MAP in place of PTR for GuidType.
-     To use this config file, run the following:
+     GuidType of COUNTED_MAP is needed in the ocr-config file to use this tool.  Run the following
+     command to use the proper GuidType.
 
-        -export OCR_CONFIG=~/xstack/ocr/scripts/Visualizer/Flowgraph/x86_flowGraph.cfg
+        -export OCR_CONFIG=~/xstack/ocr/machine-configs/x86-pthread-x86/mach-hc-4w-countedMap.cfg
+
+     If you wish to customize a config file using COUNTED_MAP, consider using the config-generator tool
+     located in /ocr/scripts/Configs/.
 
 -Before running an application an environment variable must be set via:
     -export ENABLE_VISUALIZER=yes

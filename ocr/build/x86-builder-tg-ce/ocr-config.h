@@ -21,7 +21,7 @@
 
 // Allocator
 #define ENABLE_ALLOCATOR_TLSF
-
+#define ENABLE_ALLOCATOR_SIMPLE
 
 // CommApi
 #define ENABLE_COMM_API_HANDLELESS
@@ -34,6 +34,12 @@
 
 // Comp-target
 #define ENABLE_COMP_TARGET_PASSTHROUGH
+
+// Scheduler Objects
+#define ENABLE_SCHEDULER_OBJECT_NULL
+
+// Scheduler Heuristic
+#define ENABLE_SCHEDULER_HEURISTIC_NULL
 
 // Datablock
 #define ENABLE_DATABLOCK_REGULAR
@@ -64,6 +70,7 @@
 
 // Policy domain
 #define ENABLE_POLICY_DOMAIN_CE
+#define ENABLE_MSG_SEQID
 
 // Scheduler
 #define ENABLE_SCHEDULER_CE
@@ -83,11 +90,8 @@
 // Workpile
 #define ENABLE_WORKPILE_CE
 
-// Build the OCR-lib support
-#define ENABLE_EXTENSION_LIB
-
 // Build the OCR-legacy support
-//#define ENABLE_EXTENSION_LEGACY
+#define ENABLE_EXTENSION_LEGACY
 #endif /* __OCR_CONFIG_H__ */
 
 

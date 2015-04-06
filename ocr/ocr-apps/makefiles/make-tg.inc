@@ -47,7 +47,7 @@ WORKLOAD_INSTALL      := ${WORKLOAD_INSTALL_ROOT}/${OCR_TYPE}
 
 REQ_LIBS         ?=
 
-PREFIX           := ${TG_INSTALL}/bin/rmd-linux-elf
+PREFIX           := $(TG_INSTALL)/bin/rmd-linux-elf
 
 AS	= $(PREFIX)-as
 ASFLAGS	=

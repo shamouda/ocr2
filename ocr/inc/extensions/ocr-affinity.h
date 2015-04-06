@@ -10,8 +10,7 @@
 
 #ifndef __OCR_AFFINITY_H__
 #define __OCR_AFFINITY_H__
-
-#warning Using ocr-affinity.h may not be supported on all platforms
+#ifdef ENABLE_EXTENSION_AFFINITY
 
 #ifdef __cplusplus
 extern "C" {
@@ -112,5 +111,7 @@ u8 ocrAffinityQuery(ocrGuid_t guid, u64 * count, ocrGuid_t * affinities);
  * @}
  * @}
  */
+#endif /* ENABLE_EXTENSION_AFFINITY */
+
 #endif /* __OCR_AFFINITY_H__ */
 

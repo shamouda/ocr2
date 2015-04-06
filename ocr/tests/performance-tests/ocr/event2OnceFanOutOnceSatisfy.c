@@ -4,12 +4,14 @@
 // DESC: Create a producer event and 'FAN_OUT' consumer event depending on it.
 // TIME: Satisfying an event that has 'FAN_OUT' dependences
 // FREQ: Done 'NB_ITERS' times.
+//
+// VARIABLES
+// - NB_ITERS
+// - FAN_OUT
 
-#ifndef CUSTOM_BOUNDS
-#define CUSTOM_BOUNDS
+//TODO DEFAULT
+#undef NB_ITERS
 #define NB_ITERS 10
-#define FAN_OUT 1000
-#endif
 
 #define PRODUCER_EVENT_TYPE  OCR_EVENT_ONCE_T
 #define CONSUMER_EVENT_TYPE  OCR_EVENT_ONCE_T

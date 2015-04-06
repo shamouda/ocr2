@@ -1,0 +1,4 @@
+null        - a placeholder allocator with no functionality
+simple      - a simple best-fit allocator
+mallocproxy - mallocProxy (Not available on FSIM)
+tlsf        - TLSF (Two Level Segregate Fit) allocator

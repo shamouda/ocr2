@@ -206,7 +206,9 @@ u8 ocrEdtTemplateDestroy(ocrGuid_t guid);
  *                              #DB_DEFAULT_MODE. Use ocrAddDependence() to add unknown
  *                              dependences or dependences with another mode.
  *                              This pointer should either be NULL or point to an array
- *                              of size 'depc'.
+ *                              of size 'depc'. If only some dependences are known, you can
+ *                              specify the known ones in the array and use UNINITIALIZED_GUID
+ *                              for the unknown ones
  * @param[in] properties        Used to indicate if this is a finish EDT
  *                              (see #EDT_PROP_FINISH). Use #EDT_PROP_NONE as
  *                              a default value.

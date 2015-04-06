@@ -31,15 +31,16 @@ def postProcessData(inString, outFile, offSet, lastLineFlag, counter, color):
     words = inString.split()
     workerID = words[WORKER_ID_INDEX][WORKER_ID_INDEX:]
     fctName = words[FCT_NAME_INDEX]
-    startTime = (int(words[START_TIME_INDEX]) - offSet)/1000 #Ns to Ms
-    endTime = (int(words[END_TIME_INDEX]) - offSet)/1000 #Ns to Ms
+    startTime = (int(words[START_TIME_INDEX]) - offSet)/float(1000000) #Ns to Ms
+    endTime = (int(words[END_TIME_INDEX]) - offSet)/float(1000000) #Ns to Ms
+    totalTime = "{0:.2f}".format(endTime - startTime)
     whichNode = words[PD_ID_INDEX][1:]
 
     if lastLineFlag == True:
-        outFile.write('\t\t{id: ' + str(counter) + ', group: ' + '\'' + str(workerID) + '\'' + ', content: \'' + str(fctName) + '\', start: new Date(' + str(startTime) + '), end: new Date(' +  str(endTime) + '), style: "background-color: ' + str(color) + ';"}\n')
+        outFile.write('\t\t{id: ' + str(counter) + ', group: ' + '\'' + str(workerID) + '\'' + ', title: \'EDT Name: ' + str(fctName) + '\\nExecution Time: ' + str(totalTime) + 'Ms\', content: \'' + str(fctName) + '\', start: new Date(' + str(startTime) + '), end: new Date(' +  str(endTime) + '), style: "background-color: ' + str(color) + ';"}\n')
         outFile.write('\t]);\n\n')
     else:
-        outFile.write('\t\t{id: ' + str(counter) + ', group: ' + '\'' + str(workerID) + '\'' + ', content: \'' + str(fctName) + '\', start: new Date(' + str(startTime) + '), end: new Date(' +  str(endTime) + '), style: "background-color: ' + str(color) + ';"},\n')
+        outFile.write('\t\t{id: ' + str(counter) + ', group: ' + '\'' + str(workerID) + '\'' + ', title: \'EDT Name: ' + str(fctName) + '\\nExecution Time: ' + str(totalTime) + 'Ms\', content: \'' + str(fctName) + '\', start: new Date(' + str(startTime) + '), end: new Date(' +  str(endTime) + '), style: "background-color: ' + str(color) + ';"},\n')
 
 #========== Strip Un-needed events from OCR debug log ========
 def runShellStrip(dbgLog):
@@ -93,8 +94,8 @@ def appendWorkerIdHTML(outFile, uniqueWorkers):
 
 #========== Write Common closing HTML tags to output file ========
 def appendPostHTML(outFile, flag, pageNum, start, end, timeOffset, numThreads):
-    modStart = math.ceil((int(start) - timeOffset) / float(1000))
-    modEnd = math.ceil((int(end) - timeOffset) / float(1000))
+    modStart = math.ceil((int(start) - timeOffset) / float(1000000))
+    modEnd = math.ceil((int(end) - timeOffset) / float(1000000))
 
     outFile.write('\tvar container = document.getElementById(\'visualization\');\n')
     outFile.write('\tvar options = {\n')
@@ -160,7 +161,7 @@ def getExecutionTime(logFile):
     firstLine = logFile[0].split()
     lastLine = logFile[-1].split()
     offset = int(firstLine[START_TIME_INDEX])
-    totalTime = (int(lastLine[END_TIME_INDEX]) - offset) / 1000 #Ns to Ms
+    totalTime = (int(lastLine[END_TIME_INDEX]) - offset) / 1000000 #Ns to Ms
     return totalTime
 
 #======== Gathers unique EDT names to be mapped to color ======
@@ -329,7 +330,7 @@ def preCheckEdtLength(toHtml, exeTime, numThreads, numEDTs, totalTime, uniqWorke
 
     for i in range(len(toHtml)):
         pageName = HTML_FILE_NAME + str(i+1) + ".html"
-        outFile = open(pageName, 'a')
+        outFile = open(pageName, 'w')
         appendPreHTML(outFile, exeTime, numThreads, numEDTs, totalTime)
         appendWorkerIdHTML(outFile, uniqWorkers)
 

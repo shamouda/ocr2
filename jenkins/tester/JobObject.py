@@ -253,8 +253,8 @@ class JobObject(object):
         if self._recomputeStatus:
             self._updateStatus()
         assert(self._recomputeStatus == False)
-        if self._jobStatus & 0x40:
-            # We already have run the job and everything we
+        if self._jobStatus & 0x40 or self._jobStatus == JobObject.BLOCKED_JOB:
+            # We already have run the job or are blocked
             # don't add the waiter
             return False
         self._waiters[waiterJob.name] = (waiterJob, slot)

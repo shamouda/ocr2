@@ -50,11 +50,30 @@ SUPPORTS_SHARED=yes
 SUPPORTS_STATIC=yes
 OCRRUNNER=ocrrun
 
-# For Valgrind, uncomment this line
-#CFLAGS += -I/usr/include -DENABLE_VALGRIND #-DELS_USER_SIZE=2
+# Valgrind compatibility for internal allocators
+# x86 only
+# Requires valgrind-devel package
+# CFLAGS += -I/usr/include -DENABLE_VALGRIND
 
-# For runtime-overhead profiling
-#CFLAGS += -DOCR_RUNTIME_PROFILER -DPROFILE_KHZ=3400000
+# Runtime overhead profiler
+# x86 only
+#
+# Enable profiler
+# CFLAGS += -DOCR_RUNTIME_PROFILER -DPROFILE_KHZ=3400000
+#
+# (optional) Maximum number of scope
+# nesting for runtime profiler
+# CFLAGS += -DMAX_PROFILER_LEVEL=512
+
+# Enables the collection of EDT R/W statistics
+# x86 only
+# Requires OCR_ENABLE_EDT_NAMING
+# CFLAGS += -DOCR_ENABLE_EDT_PROFILING
+
+# Enables data collection for execution timeline visualizer
+# x86 only
+# Requires -DOCR_ENABLE_EDT_NAMING and DEBUG_LVL_INFO
+# CFLAGS += -DOCR_ENABLE_VISUALIZER -DOCR_ENABLE_EDT_NAMING
 
 .PHONY: all
 all: static shared

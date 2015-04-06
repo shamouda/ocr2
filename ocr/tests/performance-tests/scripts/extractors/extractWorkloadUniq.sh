@@ -8,6 +8,6 @@
 FILE=$1
 
 # Assumes there are a number of consecutive workload values
-DATA=`grep Workload $FILE | cut -d' ' -f 6-6| uniq `
+DATA=`grep Workload $FILE | cut -d' ' -f 6-6 | uniq `
 
 echo $DATA | tr ' ' '\n'

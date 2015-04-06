@@ -6,12 +6,11 @@
 //       Nodes at depth 'TREE_DEPTH-1' create 'LEAF_FANOUT' leaf tasks.
 // TIME: Execution of all tasks
 // FREQ: Tree is created once
-
-#ifndef CUSTOM_BOUNDS
-#define TREE_DEPTH  8
-#define NODE_FANOUT 2
-#define LEAF_FANOUT 100
-#endif
+//
+// VARIABLES:
+// - TREE_DEPTH
+// - NODE_FANOUT
+// - LEAF_FANOUT
 
 ocrGuid_t terminateEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     timestamp_t * timers = (timestamp_t *) depv[1].ptr;

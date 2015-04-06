@@ -848,7 +848,14 @@ def main(argv=None):
 
                         if signalingJob is not None:
                             slot = waitingJob.addDependence(signalingJob)
-                            signalingJob.addWaiter(waitingJob, slot)
+                            if signalingJob.addWaiter(waitingJob, slot) == False:
+                                # This means that the job already "completed". This happens
+                                # if the signaler was removed (missing dep or whatever)
+                                myLog.debug("Job %s's dependence %d is being satisfied due to completed producer (%s)"
+                                            % (waitingJob, slot, signalingJob))
+                                waitingJob.satisfyDependence(signalingJob, slot)
+                                # In most cases, this will block the job. We don't deal with it here
+                                # as it will get removed in the mainloop.
                         # End of signalingJob is None
                     # End of dep in v['depends']
                 # end of len(v['depends'])
