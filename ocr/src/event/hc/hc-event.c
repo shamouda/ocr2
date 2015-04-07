@@ -928,7 +928,7 @@ ocrEvent_t * newEventHc(ocrEventFactory_t * factory, ocrEventTypes_t eventType,
     PD_MSG_FIELD_I(edt) = curEdt;
     PD_MSG_FIELD_IO(size) = sizeof(regNode_t)*INIT_WAITER_COUNT;
     PD_MSG_FIELD_I(affinity.guid) = NULL_GUID;
-    PD_MSG_FIELD_I(affinity.metaDataPtr) = NULL_GUID;
+    PD_MSG_FIELD_I(affinity.metaDataPtr) = NULL;
     PD_MSG_FIELD_IO(properties) = DB_PROP_RT_ACQUIRE;
     PD_MSG_FIELD_I(dbType) = RUNTIME_DBTYPE;
     PD_MSG_FIELD_I(allocator) = NO_ALLOC;

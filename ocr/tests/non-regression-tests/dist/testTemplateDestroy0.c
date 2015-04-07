@@ -33,7 +33,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrEdtTemplateCreate(&edtTemplateGuid, remoteEdt, 0, 0);
 
     ocrGuid_t edtGuid;
-    ocrEdtCreate(&edtGuid, edtTemplateGuid, 0, NULL, 0, NULL_GUID,
+    ocrEdtCreate(&edtGuid, edtTemplateGuid, 0, NULL, 0, NULL,
         EDT_PROP_NONE, edtAffinity, NULL);
     ocrEdtTemplateDestroy(edtTemplateGuid);
 

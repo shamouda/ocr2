@@ -31,7 +31,7 @@ ocrGuid_t remoteEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrEdtTemplateCreate(&shutdownEdtTemplateGuid, shutdownEdt, 1, 0);
     ocrGuid_t edtGuid;
     u64 nparamv = (u64) currentAffinity;
-    ocrEdtCreate(&edtGuid, shutdownEdtTemplateGuid, EDT_PARAM_DEF, &nparamv, EDT_PARAM_DEF, NULL_GUID,
+    ocrEdtCreate(&edtGuid, shutdownEdtTemplateGuid, EDT_PARAM_DEF, &nparamv, EDT_PARAM_DEF, NULL,
         EDT_PROP_NONE, currentAffinity, NULL);
     return NULL_GUID;
 }
@@ -49,7 +49,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
 
     PRINTF("mainEdt: create remote EDT\n");
     ocrGuid_t edtGuid;
-    ocrEdtCreate(&edtGuid, remoteEdtTemplateGuid, EDT_PARAM_DEF, NULL, EDT_PARAM_DEF, NULL_GUID,
+    ocrEdtCreate(&edtGuid, remoteEdtTemplateGuid, EDT_PARAM_DEF, NULL, EDT_PARAM_DEF, NULL,
         EDT_PROP_NONE, edtAffinity, NULL);
 
     return NULL_GUID;

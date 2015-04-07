@@ -73,7 +73,7 @@ ocrFatGuid_t hcWorkpilePop(ocrWorkpile_t * base, ocrWorkPopType_t type,
     default:
         ASSERT(0);
     }
-    fguid.metaDataPtr = NULL_GUID;
+    fguid.metaDataPtr = NULL;
     return fguid;
 }
 

@@ -32,7 +32,7 @@ ocrGuid_t computeEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     while (i < N) {
         ocrGuid_t updaterEdtGuid;
         u64 nparamv = i;
-        ocrEdtCreate(&updaterEdtGuid, updaterEdtTemplateGuid, EDT_PARAM_DEF, &nparamv, EDT_PARAM_DEF, NULL, 0, NULL_GUID, NULL_GUID);
+        ocrEdtCreate(&updaterEdtGuid, updaterEdtTemplateGuid, EDT_PARAM_DEF, &nparamv, EDT_PARAM_DEF, NULL, 0, NULL_GUID, NULL);
         i++;
     }
     return NULL_GUID;
