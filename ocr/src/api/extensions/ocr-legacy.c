@@ -93,7 +93,7 @@ u8 ocrLegacySpawnOCR(ocrGuid_t* handle, ocrGuid_t finishEdtTemplate, u64 paramc,
 }
 
 ocrGuid_t ocrWait(ocrGuid_t outputEvent) {
-    DPRINTF(DEBUG_LVL_WARN, "ocrWait is deprecated -- use ocrLegacyBlockProgress instead\n");
+    //DPRINTF(DEBUG_LVL_WARN, "ocrWait is deprecated -- use ocrLegacyBlockProgress instead\n");
     ocrGuid_t outputGuid;
     if(ocrLegacyBlockProgress(outputEvent, &outputGuid, NULL, NULL) == 0) {
         return outputGuid;

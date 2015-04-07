@@ -24,7 +24,7 @@ static double** readMatrix(int matrixSize, FILE* in) {
     return A;
 }
 
-int main(int argc, const char *argv[]) {
+int main(int argc, char **argv) {
 
     FILE *in, *out;
     int matrixSize = -1, tileSize = -1, numTiles = -1;
