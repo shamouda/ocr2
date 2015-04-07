@@ -213,6 +213,13 @@ OCREXEC ?= builder.exe
 OCREXEC := $(OCR_BUILD)/$(OCREXEC)
 endif
 
+#
+# Platform specific options
+#
+ifeq ($(shell $(RANLIB) -V 2>/dev/null | head -1 | cut -f 1 -d ' '), Apple)
+RANLIB := $(RANLIB) -no_warning_for_no_symbols
+ARFLAGS := cruS
+endif
 
 #
 # Build targets
@@ -380,16 +387,20 @@ INSTALLED_CONFIGS := $(addprefix $(OCR_INSTALL)/config/, $(MACHINE_CONFIGS))
 INSTALLED_INCS    := $(addprefix $(OCR_INSTALL)/include/, $(INC_FILES))
 
 $(OCR_INSTALL)/lib/%: $(BASE_LIBS)% | $(OCR_INSTALL)/lib
-	@$(CP) --remove-destination $< $@
+	@$(RM) -f $@
+	@$(CP) $< $@
 
 $(OCR_INSTALL)/bin/%: $(BASE_EXES)% | $(OCR_INSTALL)/bin
-	@$(CP) --remove-destination $< $@
+	@$(RM) -f $@
+	@$(CP) $< $@
 
 $(OCR_INSTALL)/config/%: $(OCR_ROOT)/machine-configs/$(OCR_TYPE)/% | $(OCR_INSTALL)/config
-	@$(CP) --remove-destination $< $@
+	@$(RM) -f $@
+	@$(CP) $< $@
 
 $(OCR_INSTALL)/include/%: $(OCR_ROOT)/inc/% | $(OCR_INSTALL)/include $(OCR_INSTALL)/include/extensions
-	@$(CP) --remove-destination $< $@
+	@$(RM) -f $@
+	@$(CP) $< $@
 
 $(OCR_INSTALL)/lib $(OCR_INSTALL)/bin $(OCR_INSTALL)/config $(OCR_INSTALL)/include \
 $(OCR_INSTALL)/include/extensions :
@@ -405,11 +416,9 @@ install: ${INSTALL_TARGETS} ${INSTALLED_LIBS} ${INSTALLED_EXES} ${INSTALLED_CONF
 	fi
 
 .PHONY: uninstall
-.ONESHELL:
 uninstall:
 	-$(RM) $(RMFLAGS) $(OCR_INSTALL)/*
 
 .PHONY:clean
 clean:
 	-$(RM) $(RMFLAGS) $(OBJDIR)/* $(OCRSHARED) $(OCRSTATIC) $(OCREXEC) src/*
-

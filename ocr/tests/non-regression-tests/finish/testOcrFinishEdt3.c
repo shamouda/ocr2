@@ -52,7 +52,7 @@ ocrGuid_t computeEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
         u64 nparamv = i;
         // Pass the guid we got fron depv to the updaterEdt through depv
         ocrGuid_t updaterEdtGuid;
-        ocrEdtCreate(&updaterEdtGuid, updaterEdtTemplateGuid, EDT_PARAM_DEF, &nparamv, EDT_PARAM_DEF, &(depv[0].guid), 0, NULL_GUID, NULL_GUID);
+        ocrEdtCreate(&updaterEdtGuid, updaterEdtTemplateGuid, EDT_PARAM_DEF, &nparamv, EDT_PARAM_DEF, &(depv[0].guid), 0, NULL_GUID, NULL);
         i++;
     }
     return depv[0].guid;

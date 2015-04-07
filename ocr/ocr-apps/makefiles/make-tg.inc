@@ -106,10 +106,12 @@ endif
 	@echo "To run, use 'OCR_TYPE=${OCR_TYPE} make run <args>' or run manually:"
 	@echo "(from $(WORKLOAD_INSTALL)): ${RUN_CMD} -s ${MACHINE_CONFIG} -c ${WORKLOAD_INSTALL}/config.cfg"
 	@echo "####"
-	@$(CP) --remove-destination $(WORKLOAD_BUILD)/$(TARGET) $(WORKLOAD_INSTALL)/
-	@$(CP) --remove-destination $(WORKLOAD_BUILD)/$(TARGET).blob $(WORKLOAD_INSTALL)/
-	@$(CP) --remove-destination $(WORKLOAD_SRC)/config.cfg $(WORKLOAD_INSTALL)/
-	@$(CP) --remove-destination $(WORKLOAD_BUILD)/build.rmdkrnl/rmdkrnl $(WORKLOAD_INSTALL)/
+	@$(RM) -f $(WORKLOAD_INSTALL)/$(TARGET) $(WORKLOAD_INSTALL)/$(TARGET).blob
+	@$(RM) -f $(WORKLOAD_INSTALL)/config.cfg $(WORKLOAD_INSTALL)/rmdkrnl
+	@$(CP) $(WORKLOAD_BUILD)/$(TARGET) $(WORKLOAD_INSTALL)/
+	@$(CP) $(WORKLOAD_BUILD)/$(TARGET).blob $(WORKLOAD_INSTALL)/
+	@$(CP) $(WORKLOAD_SRC)/config.cfg $(WORKLOAD_INSTALL)/
+	@$(CP) $(WORKLOAD_BUILD)/build.rmdkrnl/rmdkrnl $(WORKLOAD_INSTALL)/
 
 ifeq (yes, $(DEBUGMAKE))
 .PHONY: debug_pre_prerun
@@ -140,9 +142,10 @@ endif
 	@$(MKDIR) -p $(WORKLOAD_EXEC)/logs
 	@$(RM) -rf $(WORKLOAD_EXEC)/logs/*
 	@$(RM) -f $(WORKLOAD_EXEC)/console.out
-	cd $(WORKLOAD_EXEC)
-	WORKLOAD_EXEC=$(WORKLOAD_EXEC) WORKLOAD_INSTALL=$(WORKLOAD_INSTALL) $(RUN_CMD) -s $(MACHINE_CONFIG) -c $(WORKLOAD_INSTALL)/config.cfg
-	@$(GREP) -H "CONSOLE: XE[0-7]" logs/*brd*.chp*.unt*.blk*.CE.00 | $(SED) 's/.*\.blk\([0-9]\+\)\.CE\.00:CONSOLE:/BLK\1/' > console.out
+	WORKLOAD_EXEC=$(WORKLOAD_EXEC) WORKLOAD_INSTALL=$(WORKLOAD_INSTALL) \
+	bash -ec 'cd $(WORKLOAD_EXEC) && $(RUN_CMD) -s $(MACHINE_CONFIG) -c $(WORKLOAD_INSTALL)/config.cfg && \
+	$(GREP) -H "CONSOLE: XE[0-7]" $(WORKLOAD_EXEC)/logs/*brd*.chp*.unt*.blk*.CE.00 \
+	| $(SED) "s/.*\.blk\([0-9]\+\)\.CE\.00:CONSOLE:/BLK\1/" > $(WORKLOAD_EXEC)/console.out'
 
 postrun: run_internal
 postrun: WORKLOAD_OUTS := `find -L $(WORKLOAD_EXEC)/logs/* -name '*.app_output' -print`
@@ -183,8 +186,9 @@ $(WORKLOAD_BUILD)/$(TARGET).dbg: $(OBJS) $(OCR_INSTALL_XE)/lib/libocr.a | libocr
 	$(LD) -o $@ $(OBJS) $(LDFLAGS) --whole-archive $(OCR_INSTALL_XE)/lib/libocr.a
 
 $(WORKLOAD_BUILD)/$(TARGET): $(WORKLOAD_BUILD)/$(TARGET).dbg | $(WORKLOAD_BUILD)
-	$(CP) --remove-destination $(WORKLOAD_BUILD)/$(TARGET).dbg $(WORKLOAD_BUILD)/$(TARGET)
-	$(STRIP) $(WORKLOAD_BUILD)/$(TARGET)
+	@$(RM) -f $(WORKLOAD_BUILD)/$(TARGET)
+	@$(CP) $(WORKLOAD_BUILD)/$(TARGET).dbg $(WORKLOAD_BUILD)/$(TARGET)
+	@$(STRIP) $(WORKLOAD_BUILD)/$(TARGET)
 
 # Build the final blob
 # Note the order of the dependence. IMPORTANT!! Do not randomly change
@@ -300,6 +304,7 @@ rmdkrnl.dbg: $(TG_ROOT)/build/build.rmdkrnl/make-me.make | $(WORKLOAD_BUILD)/bui
 	OCR_ROOT=$(OCR_ROOT) OCR_TARGET=$(CE_TARGET) OCR_INSTALL=$(OCR_INSTALL_CE) OCR_BUILD=$(OCR_BUILD_CE) \
 	TG_ROOT=$(TG_ROOT) TG_INSTALL=$(TG_INSTALL) OCRAPPS_RUN_JENKINS=$(RUN_JENKINS) \
 	$(MAKE) -C $(WORKLOAD_BUILD)/build.rmdkrnl -f make-me.make $(TARGETS)
+
 $(WORKLOAD_BUILD)/build.rmdkrnl/rmdkrnl.dbg: | rmdkrnl.dbg
 endif
 
@@ -343,7 +348,8 @@ $(WORKLOAD_BUILD):
 
 $(WORKLOAD_BUILD)/build.rmdkrnl: $(TG_ROOT)/build/build.rmdkrnl/make-me.make | $(WORKLOAD_BUILD)
 	mkdir -p $(WORKLOAD_BUILD)/build.rmdkrnl
-	@$(CP) --remove-destination $(TG_ROOT)/build/build.rmdkrnl/make-me.make $(WORKLOAD_BUILD)/build.rmdkrnl
+	@$(RM) -f $(WORKLOAD_BUILD)/build.rmdkrnl/make-me.make
+	@$(CP) $(TG_ROOT)/build/build.rmdkrnl/make-me.make $(WORKLOAD_BUILD)/build.rmdkrnl
 
 $(WORKLOAD_INSTALL):
 	mkdir -p $(WORKLOAD_INSTALL)

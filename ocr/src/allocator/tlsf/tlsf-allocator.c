@@ -425,11 +425,13 @@ static inline u32 GET_flCount (poolHdr_t * pPool) {
     return temp;
 }
 
+/* Unused
 static inline u32 GET_lock (poolHdr_t * pPool) {
     u32 temp;
     GET32(temp,((u64)(&(pPool->lock))));
     return temp;
 }
+*/
 
 static inline u32 GET_offsetToGlebe (poolHdr_t * pPool) {
     u32 temp;
@@ -683,7 +685,6 @@ myStaticAssert(sizeof(char) == 1);
 /* Some contants */
 static const u64 GoffsetFromBlkHdrToPayload = (sizeof(blkHdr_t));
 static const u64 GminBlockSizeIncludingHdr  = sizeof(blkHdr_t) + sizeof(u64);
-static const u64 GminPayloadSize = sizeof(blkHdr_t);
 
 static u32 myffs(u64 val) {
     return FLS(val & (~val + 1LL));

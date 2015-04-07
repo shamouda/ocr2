@@ -18,7 +18,7 @@ extern "C" {
 #endif
 
 /**
- *  @defgroup User hints management for OCR
+ *  @defgroup user_hints User hints management for OCR
  *  @brief Describes the user hints management APIs for OCR.
  *
  *  These APIs will enable OCR application developers to provide runtime hints
@@ -45,7 +45,7 @@ extern "C" {
  * u8 err = ocrHintInit( &hintVar, OCR_HINT_EDT_T );
  * ...
  *
- * @param[in/out] hint      Hint object to initialize
+ * @param[in,out] hint      Hint object to initialize
  * @param[in] hintType      The type of hint object
  *                          (denoting the target guid)
  *
