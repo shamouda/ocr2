@@ -227,8 +227,18 @@ static void simpleInit(pool_t *pool, u64 size)
     ASSERT((size & ALIGNMENT_MASK) == 0);
     size = size - sizeof(pool_t);
 
-    // assume pool->lock is already 0 at startup
+    // assume pool->lock and pool->inited is already 0 at startup
+#ifdef ENABLE_VALGRIND
+    VALGRIND_MAKE_MEM_DEFINED(&(pool->lock), sizeof(pool->lock));
     hal_lock32(&(pool->lock));
+    VALGRIND_MAKE_MEM_NOACCESS(&(pool->lock), sizeof(pool->lock));
+#else
+    hal_lock32(&(pool->lock));
+#endif
+
+#ifdef ENABLE_VALGRIND
+    VALGRIND_MAKE_MEM_DEFINED(&(pool->inited), sizeof(pool->inited));
+#endif
     if (!(pool->inited)) {
         simpleTest((u64)pool, size+sizeof(pool_t));
         HEAD(q) = MARK | size;
@@ -247,7 +257,17 @@ static void simpleInit(pool_t *pool, u64 size)
     } else {
         DPRINTF(DEBUG_LVL_INFO, "init skip for pool %p\n", pool);
     }
+#ifdef ENABLE_VALGRIND
+    VALGRIND_MAKE_MEM_NOACCESS(&(pool->inited), sizeof(pool->inited));
+#endif
+
+#ifdef ENABLE_VALGRIND
+    VALGRIND_MAKE_MEM_DEFINED(&(pool->lock), sizeof(pool->lock));
     hal_unlock32(&(pool->lock));
+    VALGRIND_MAKE_MEM_NOACCESS(&(pool->lock), sizeof(pool->lock));
+#else
+    hal_unlock32(&(pool->lock));
+#endif
 }
 
 static void simplePrint(pool_t *pool)

@@ -554,7 +554,9 @@ static void avlDestroy(u64 startChunk, avlBinaryNode_t *root) {
         FREE(startChunk, root);
     }
 }
-
+#ifdef ENABLE_VALGRIND
+#include <valgrind/memcheck.h>
+#endif
 // Range functions
 rangeTracker_t *initializeRange(u32 maxSplits,
                      u64 minRange, u64 maxRange, ocrMemoryTag_t initTag) {
@@ -566,11 +568,11 @@ rangeTracker_t *initializeRange(u32 maxSplits,
     rangeTracker_t *dest = (rangeTracker_t *)minRange;
 
 #ifdef ENABLE_VALGRIND
-//    TODO this generates 'undefined reference' on x86
-//    VALGRIND_MAKE_MEM_DEFINED(&(dest->lock), sizeof(dest->lock));
+    VALGRIND_MAKE_MEM_DEFINED(&(dest->lock), sizeof(dest->lock));
+    VALGRIND_MAKE_MEM_DEFINED(&(dest->startBKHeap), sizeof(dest->startBKHeap));
 #endif
     LOCK(&(dest->lock));           // assume pool->lock is already 0 at startup
-    if (dest->startBKHeap) {       // already init'ed?
+    if (dest->startBKHeap) {       // already init'ed? use startBKHeap as a initialization flag
         DPRINTF(DEBUG_LVL_INFO, "Initializing a range @ 0x%lx from 0x%lx to 0x%lx -- SKIP\n",
             (u64)dest, minRange, maxRange);
         goto init_range_skip;
