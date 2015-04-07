@@ -42,3 +42,4 @@ Arguments:
                 5: Write algorithm timing data to ocr_cholesky_stats.csv and write solution to binary file
                    Note: If ocr_cholesky_stats.csv does not exist it will be created,
                          otherwise new stat data will append to new row within the file
+

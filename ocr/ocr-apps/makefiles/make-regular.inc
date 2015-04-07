@@ -72,7 +72,8 @@ install: | $(WORKLOAD_INSTALL)
 	"&& export OCR_CONFIG=${OCR_INSTALL}/config/default.cfg (default one) and run "\
 	"the executable $(TARGET) in $(WORKLOAD_INSTALL)"
 	@echo "####"
-	@$(CP) --remove-destination $(WORKLOAD_BUILD)/$(TARGET) $(WORKLOAD_INSTALL)/
+	@$(RM) -f $(WORKLOAD_INSTALL)/$(TARGET)
+	@$(CP) $(WORKLOAD_BUILD)/$(TARGET) $(WORKLOAD_INSTALL)/
 
 ifeq (yes, $(DEBUGMAKE))
 .PHONY: debug_pre_prerun
@@ -101,8 +102,8 @@ endif
 ifeq ($(HOSTNAME), bar1)
 	$(error Please refrain from running jobs on bar1!)
 endif
-	cd $(WORKLOAD_EXEC)
-	LD_LIBRARY_PATH=$(OCR_INSTALL)/lib:$(APPS_LIBS_ROOT) OCR_CONFIG=$(OCR_CONFIG) bash -c '$(RUN_TOOL) ./$(TARGET) $(WORKLOAD_ARGS) $(WORKLOAD_INPUTS)'
+	LD_LIBRARY_PATH=$(OCR_INSTALL)/lib:$(APPS_LIBS_ROOT) OCR_CONFIG=$(OCR_CONFIG) \
+	bash -c 'cd $(WORKLOAD_EXEC) && $(RUN_TOOL) ./$(TARGET) $(WORKLOAD_ARGS) $(WORKLOAD_INPUTS)'
 
 postrun: run_internal
 
@@ -135,7 +136,8 @@ $(WORKLOAD_BUILD)/$(TARGET).dbg: $(OBJS) | libocr $(WORKLOAD_BUILD)
 	$(CC) -o $@ $(OBJS) $(LDFLAGS)
 
 $(WORKLOAD_BUILD)/$(TARGET): $(WORKLOAD_BUILD)/$(TARGET).dbg | $(WORKLOAD_BUILD)
-	$(CP) --remove-destination $(WORKLOAD_BUILD)/$(TARGET).dbg $(WORKLOAD_BUILD)/$(TARGET)
+	@$(RM) -f $(WORKLOAD_BUILD)/$(TARGET)
+	@$(CP) $(WORKLOAD_BUILD)/$(TARGET).dbg $(WORKLOAD_BUILD)/$(TARGET)
 
 # libocr
 # Make this a .PHONY target so that we check if any of the

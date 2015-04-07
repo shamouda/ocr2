@@ -121,9 +121,11 @@ static inline void SET_distToMallocedBlock (blkHdr_t * pBlk, u8 value) {
 // Get/Set that this is the malloc proxy.  Needed by deallocate function, to know which type of allocator
 // is associated with a block being freed.  As such, ALL allocators must agree on how and where to get
 // this value.
+/*
 static inline u8 GET_allocatorType (blkHdr_t * pBlk) {
     return pBlk->allocatorType;
 }
+*/
 
 static inline void SET_allocatorType (blkHdr_t * pBlk, u8 value) {
     pBlk->allocatorType = value;

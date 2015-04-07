@@ -12,11 +12,11 @@
 #ifndef TG_ARCH
 #include <getopt.h>
 #include <string.h>
-#include <time.h>
+#include <sys/time.h>
 static double** readMatrix( u32 matrixSize, FILE* in );
 
 #else
-int compare_string(char *, char *);
+int compare_string(const char *, const char *);
 #endif
 
 
@@ -538,7 +538,7 @@ ocrGuid_t mainEdt(u32 paramc, u64 *paramv, u32 depc, ocrEdtDep_t depv[]) {
                     {0, 0, 0, 0}
                 };
 
-            u32 option_index = 0;
+            s32 option_index = 0;
 
             c = getopt_long(argc, nparamv, "a:b:c:d:e", long_options, &option_index);
 
@@ -767,7 +767,7 @@ static double** readMatrix( u32 matrixSize, FILE* in ) {
     return A;
 }
 #else
-int compare_string(char *first, char *second)
+int compare_string(const char *first, const char *second)
 {
     while(*first==*second)
    {
