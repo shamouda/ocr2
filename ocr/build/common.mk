@@ -216,10 +216,13 @@ endif
 #
 # Platform specific options
 #
-ifeq ($(shell $(RANLIB) -V 2>/dev/null | head -1 | cut -f 1 -d ' '), Apple)
-RANLIB := $(RANLIB) -no_warning_for_no_symbols
-ARFLAGS := cruS
-endif
+# Removed for now as this does not work with all
+# versions of Apple's ranlib
+# This is to remove the warnings when building the library
+#ifeq ($(shell $(RANLIB) -V 2>/dev/null | head -1 | cut -f 1 -d ' '), Apple)
+#RANLIB := $(RANLIB) -no_warning_for_no_symbols
+#ARFLAGS := cruS
+#endif
 
 #
 # Build targets
