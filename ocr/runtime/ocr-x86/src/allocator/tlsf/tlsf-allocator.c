@@ -924,8 +924,10 @@ static void removeFreeBlock(poolHdr_t * pPool, blkHdr_t * pFreeBlk) {
     VALGRIND_NOACCESS(pFreeBlkFrwdLink);
 }
 
+
 // Assumes freeBlock OK for valgrind
 void addFreeBlock(poolHdr_t * pPool, blkHdr_t * pFreeBlock) {
+    START_PROFILE(allocator_tisf_addFreeBlock);
     u32 flIndex, slIndex;
     u64 tempSz;
 
@@ -967,15 +969,18 @@ void addFreeBlock(poolHdr_t * pPool, blkHdr_t * pFreeBlock) {
             SET_flAvailOrNot(pPool, tempSz);
         }
     }
-
+	
     VALGRIND_NOACCESS(pCurrentHead);
+    RETURN_PROFILE();
 }
+
 
 /* Split origBlock so that origBlock is allocSize long and
  * returns a pointer to the remaining block which is free
  */
 // Assumes origBlock OK for valgrind
 static blkHdr_t * splitBlock(poolHdr_t * pPool, blkHdr_t * pOrigBlock, u64 allocSize) {
+    START_PROFILE(allocator_tlsf_splitBlock);
     blkHdr_t * pRemainingBlock;
     u64 origBlockSize;
     origBlockSize = GET_payloadSize(pOrigBlock);
@@ -995,8 +1000,9 @@ static blkHdr_t * splitBlock(poolHdr_t * pPool, blkHdr_t * pOrigBlock, u64 alloc
     SET_payloadSize(pOrigBlock, allocSize);
 
     VALGRIND_NOACCESS(pRemainingBlock);
-    return pRemainingBlock;
+    RETURN_PROFILE(pRemainingBlock);
 }
+
 
 /* Absorbs nextBlock into freeBlock making one much larger freeBlock. nextBlock
  * must be physically next to freeBlock
@@ -1041,6 +1047,8 @@ static blkHdr_t * mergePrevNbr(poolHdr_t * pPool, blkHdr_t * pBlockToBeFreed) {
 }
 #endif
 
+
+
 /* Merges a block with the block contiguously next if that one is free as well. The input
  * block must be free to start with
  */
@@ -1056,6 +1064,8 @@ static blkHdr_t * mergeNextNbr(poolHdr_t * pPool, blkHdr_t * pFreeBlock) {
     return pFreeBlock;
 }
 
+
+
 static u32 tlsfInit(poolHdr_t * pPool, u64 size) {
     /* The memory will be layed out as follows:
      *  - at location: the poolHdr_t structure is used
@@ -1066,7 +1076,7 @@ static u32 tlsfInit(poolHdr_t * pPool, u64 size) {
 
 // Figure out how much additional space needs to be annexed onto the end of the poolHdr_t struct
 // for the first-level bucket bit-masks and second-level block lists.
-
+    START_PROFILE(allocator_tlsfInit);
     size &= ~(ALIGNMENT-1);
     u64 poolHeaderSize = sizeof(poolHdr_t);  // This size will increase as we add first-level buckets.
     u64 sizeRemainingAfterPoolHeader =
@@ -1107,7 +1117,7 @@ static u32 tlsfInit(poolHdr_t * pPool, u64 size) {
         DPRINTF(DEBUG_LVL_WARN, "Not enough space provided to make a meaningful TLSF pool at pPool=0x%lx.", (u64)pPool);
         DPRINTF(DEBUG_LVL_WARN, "Provision of %ld bytes nets a glebe (net pool size, after pool overhead) of %ld bytes\n",
             (u64) size, (u64)sizeRemainingAfterPoolHeader);
-        return -1; // Can't allocate pool
+        RETURN_PROFILE(-1); // Can't allocate pool
     }
     DPRINTF(DEBUG_LVL_INFO,"Allocating a TLSF pool at 0x%lx of %ld bytes (glebe size, i.e. net size after pool overhead)\n",
         (u64)pPool, (u64)sizeRemainingAfterPoolHeader);
@@ -1162,8 +1172,10 @@ static u32 tlsfInit(poolHdr_t * pPool, u64 size) {
 
     VALGRIND_NOACCESS(pSentinelBlk);
 
-    return 0;
+    RETURN_PROFILE(0);
 }
+
+
 
 //static u32 tlsfResize(u64 pgStart, u64 newsize) {
 //    return -1;
@@ -1173,6 +1185,7 @@ static u32 tlsfInit(poolHdr_t * pPool, u64 size) {
 void tlsf_walk_heap(poolHdr_t * pPool/*, tlsf_walkerAction action, void* extra*/);
 static blkPayload_t * tlsfMalloc(poolHdr_t * pPool, u64 size)
 {
+    START_PROFILE(allocator_tlsfMalloc);
     blkPayload_t * pResult = 0ULL;
     u64 payloadSize, returnedSize;
     u32 flIndex, slIndex;
@@ -1183,7 +1196,7 @@ static blkPayload_t * tlsfMalloc(poolHdr_t * pPool, u64 size)
     if(size > 0 && payloadSize == 0) {
         DPRINTF(DEBUG_LVL_INFO, "tlsfMalloc returning NULL for request size too large (%ld bytes) on pool at 0x%lx\n",
                size, (u64) pPool);
-        return _NULL;
+        RETURN_PROFILE(_NULL);
     }
 
     pAvailableBlock = findFreeBlockForRealSize(pPool, payloadSize, &flIndex, &slIndex);
@@ -1200,7 +1213,7 @@ static blkPayload_t * tlsfMalloc(poolHdr_t * pPool, u64 size)
         // warning.  The other possibility is that the caller might try allocating the block in a different pool.
         //DPRINTF(DEBUG_LVL_WARN, "tlsfMalloc @ 0x%lx returning NULL for size %ld\n",
         //        (u64) pPool, size);
-        return _NULL;
+        RETURN_PROFILE(_NULL);
     }
     VALGRIND_DEFINED1(pAvailableBlock);
     removeFreeBlock(pPool, pAvailableBlock);
@@ -1234,10 +1247,13 @@ static blkPayload_t * tlsfMalloc(poolHdr_t * pPool, u64 size)
         *((u64 *) (((u64) pResult) + i)) = ENABLE_ALLOCATOR_INIT_NEW_DB_PAYLOAD;
     }
 #endif
-    return pResult;
+    RETURN_PROFILE(pResult);
 }
 
+
+
 static void tlsfFree(poolHdr_t * pPool, blkPayload_t * pPayload) {
+    START_PROFILE(allocator_tlsfFree);
     blkHdr_t * pBlk = mapPayloadAddrToBlockAddr (pPayload);
     u64 payloadSize = GET_payloadSize(pBlk);
     ASSERT ((payloadSize & (ALIGNMENT-1)) == 0);
@@ -1287,9 +1303,13 @@ static void tlsfFree(poolHdr_t * pPool, blkPayload_t * pPayload) {
 #endif // leakage conditional
     DPRINTF(DEBUG_LVL_INFO, "tlsfFree done on pool @ 0x%lx: free 0x%lx to 0x%lx, payloadSize=%ld/0x%lx\n",
             (u64) pPool, (u64) pBlk, ((u64) pPayload)+payloadSize, (u64) payloadSize, (u64) payloadSize);
+    RETURN_PROFILE();
 }
 
+
+
 static blkPayload_t * tlsfRealloc(poolHdr_t * pPool, blkPayload_t * pOldBlkPayload, u64 size) {
+    START_PROFILE(allocator_tlsfRealloc);
 #if defined(ENABLE_ALLOCATOR_CHECKSUM) | \
     defined(ENABLE_ALLOCATOR_INIT_NEW_DB_PAYLOAD) | \
     defined(ENABLE_ALLOCATOR_TRASH_FREED_DB_PAYLOAD) | \
@@ -1309,10 +1329,10 @@ static blkPayload_t * tlsfRealloc(poolHdr_t * pPool, blkPayload_t * pOldBlkPaylo
 
     if(pOldBlkPayload != _NULL && size == 0) {
         tlsfFree(pPool, pOldBlkPayload);
-        return _NULL;
+        RETURN_PROFILE(_NULL);
     }
     if(pOldBlkPayload == _NULL) {
-        return tlsfMalloc(pPool, size);
+        RETURN_PROFILE(tlsfMalloc(pPool, size));
     }
 
     blkPayload_t * pResultPayload;
@@ -1364,8 +1384,10 @@ static blkPayload_t * tlsfRealloc(poolHdr_t * pPool, blkPayload_t * pOldBlkPaylo
 
     VALGRIND_NOACCESS(pOldBlk);
     VALGRIND_NOACCESS1(pNextNbrBlk);
-    return pResultPayload;
+    RETURN_PROFILE(pResultPayload);
 }
+
+
 
 static ocrAllocator_t * getAnchorCE (ocrAllocator_t * self) {
 // TODO:  given the address of this agent's ocrAllocator_t, this function returns the address of the
@@ -1417,6 +1439,8 @@ static ocrAllocator_t * getAnchorCE (ocrAllocator_t * self) {
     return anchorCE;
 }
 
+
+
 void tlsfDestruct(ocrAllocator_t *self) {
     DPRINTF(DEBUG_LVL_INFO, "Entered tlsfDesctruct on allocator 0x%lx\n", (u64) self);
     ASSERT(self->memoryCount == 1);
@@ -1428,6 +1452,8 @@ void tlsfDestruct(ocrAllocator_t *self) {
     runtimeChunkFree((u64)self, NULL);
     DPRINTF(DEBUG_LVL_INFO, "Leaving tlsfDesctruct on allocator 0x%lx\n", (u64) self);
 }
+
+
 
 static bool isAnchor (ocrAllocatorTlsf_t * rself, ocrAllocatorTlsf_t * rAnchorCE) {
     bool result;
@@ -1441,6 +1467,7 @@ static bool isAnchor (ocrAllocatorTlsf_t * rself, ocrAllocatorTlsf_t * rAnchorCE
 
 
 void tlsfBegin(ocrAllocator_t *self, ocrPolicyDomain_t * PD ) {
+    START_PROFILE(allocator_tlsfBegin);
     ocrAllocator_t * anchorCE = getAnchorCE(self);
     DPRINTF(DEBUG_LVL_INFO, "Entered tlsfBegin on allocator 0x%lx, anchorCE allocator is 0x%lx\n", (u64) self, (u64) anchorCE);
     u32 i;
@@ -1518,9 +1545,11 @@ void tlsfBegin(ocrAllocator_t *self, ocrPolicyDomain_t * PD ) {
         hal_unlock32(&(rAnchorCE->lockForInit));
     }
     DPRINTF(DEBUG_LVL_INFO, "Leaving tlsfBegin on allocator 0x%lx\n", (u64) self);
+    RETURN_PROFILE();
 }
 
 void tlsfStart(ocrAllocator_t *self, ocrPolicyDomain_t * PD ) {
+    START_PROFILE(allocator_tlsfStart);
     DPRINTF(DEBUG_LVL_INFO, "Entered tlsfStart on allocator 0x%lx\n", (u64) self);
     ASSERT(self->memoryCount == 1);
     ocrAllocator_t * anchorCE = getAnchorCE(self);
@@ -1553,9 +1582,11 @@ void tlsfStart(ocrAllocator_t *self, ocrPolicyDomain_t * PD ) {
     }
     self->pd = PD;
     DPRINTF(DEBUG_LVL_INFO, "Leaving tlsfStart on allocator 0x%lx\n", (u64) self);
+    RETURN_PROFILE();
 }
 
 void tlsfStop(ocrAllocator_t *self) {
+    START_PROFILE(allocator_tlsfStop);
     DPRINTF(DEBUG_LVL_INFO, "Entered tlsfStop on allocator 0x%lx\n", (u64) self);
     PD_MSG_STACK(msg);
     getCurrentEnv(&(self->pd), NULL, NULL, &msg);
@@ -1599,9 +1630,13 @@ void tlsfStop(ocrAllocator_t *self) {
     }
 
     DPRINTF(DEBUG_LVL_INFO, "Leaving tlsfStop on allocator 0x%lx\n", (u64) self);
+    RETURN_PROFILE();
 }
 
+
+
 void tlsfFinish(ocrAllocator_t *self) {
+    START_PROFILE(allocator_tlsfFinish);
     DPRINTF(DEBUG_LVL_INFO, "Entered tlsfFinish on allocator 0x%lx\n", (u64) self);
     ocrAllocator_t * anchorCE = getAnchorCE(self);
     ocrAllocatorTlsf_t * rAnchorCE = (ocrAllocatorTlsf_t *) anchorCE;
@@ -1645,12 +1680,16 @@ void tlsfFinish(ocrAllocator_t *self) {
         hal_unlock32(&(rAnchorCE->lockForInit));
     }
     DPRINTF(DEBUG_LVL_INFO, "Leaving tlsfFinish on allocator 0x%lx\n", (u64) self);
+    RETURN_PROFILE();
 }
+
+
 
 void* tlsfAllocate(
     ocrAllocator_t *self,   // Allocator to attempt block allocation
     u64 size,               // Size of desired block, in bytes
     u64 hints) {            // Allocator-dependent hints; TLSF supports reduced contention
+    //START_PROFILE(allocator_tlsf_tlsfAllocate);
     ocrAllocatorTlsf_t *rself = (ocrAllocatorTlsf_t*)self;
 
     bool useRemnant = !(hints & OCR_ALLOC_HINT_REDUCE_CONTENTION);
@@ -1716,8 +1755,10 @@ void* tlsfAllocate(
     if (toReturn) VALGRIND_MEMPOOL_ALLOC((u64) pPool, toReturn, size);
     VALGRIND_MAKE_MEM_NOACCESS((u64) pPool, sizeOfPoolHdr);
 #endif
-    return toReturn;
+    //RETURN_PROFILE(toReturn);
 }
+
+
 
 void tlsfDeallocate(void* address) {
     blkHdr_t * pBlock = mapPayloadAddrToBlockAddr(address);
@@ -1749,14 +1790,16 @@ void tlsfDeallocate(void* address) {
 #endif
 }
 
+
+
 void* tlsfReallocate(
     ocrAllocator_t *self,   // Allocator to attempt block allocation
     void * pCurrBlkPayload, // Address of existing block.  (NOT necessarily allocated to this Allocator instance, nor even in an allocator of this type.)
     u64 size,               // Size of desired block, in bytes
     u64 hints) {            // Allocator-dependent hints; TLSF supports reduced contention
-
+    START_PROFILE(allocator_tlsf_tlsfReallocate);
     if (pCurrBlkPayload == _NULL) {  // Handle corner case, where a non-existent "existing" block means this is just a plain ole malloc.
-        return tlsfAllocate (self, size, hints);
+        RETURN_PROFILE(tlsfAllocate (self, size, hints));
     }
     ASSERT (size != 0);     // Caller has to handle the oddball corner case where size is zero, meaning what we really want to do is a "free".
 
@@ -1835,7 +1878,7 @@ void* tlsfReallocate(
 #endif
         allocatorFreeFunction(pCurrBlkPayload);  // Free up the old block.  (Note that this might call an entirely different allocator instance, and even a different allocator type.)
     }
-    return pNewBlockPayload;
+    RETURN_PROFILE(pNewBlockPayload);
 }
 
 //#endif /* ENABLE_BUILDER_ONLY */

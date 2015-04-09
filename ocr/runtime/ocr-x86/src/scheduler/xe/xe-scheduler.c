@@ -66,6 +66,7 @@ void destructSchedulerFactoryXe(ocrSchedulerFactory_t * factory) {
 }
 
 ocrSchedulerFactory_t * newOcrSchedulerFactoryXe(ocrParamList_t *perType) {
+    PROFILE(sched_xe_newOcrSchedulerFactory)
     ocrSchedulerFactory_t* base = (ocrSchedulerFactory_t*) runtimeChunkAlloc(
                                       sizeof(ocrSchedulerFactoryXe_t), NULL);
 
@@ -82,6 +83,7 @@ ocrSchedulerFactory_t * newOcrSchedulerFactoryXe(ocrParamList_t *perType) {
     base->schedulerFcts.giveEdt = FUNC_ADDR(u8 (*)(ocrScheduler_t*, u32*, ocrFatGuid_t*), xeSchedulerGive);
     base->schedulerFcts.takeComm = FUNC_ADDR(u8 (*)(ocrScheduler_t*, u32*, ocrFatGuid_t*, u32), xeSchedulerTakeComm);
     base->schedulerFcts.giveComm = FUNC_ADDR(u8 (*)(ocrScheduler_t*, u32*, ocrFatGuid_t*, u32), xeSchedulerGiveComm);
+    EXIT_PROFILE;
     return base;
 }
 

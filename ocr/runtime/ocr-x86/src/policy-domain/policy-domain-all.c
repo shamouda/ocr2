@@ -202,7 +202,7 @@ u8 ocrPolicyMsgGetMsgSize(ocrPolicyMsg_t *msg, u64 *baseSize,
 }
 
 u8 ocrPolicyMsgMarshallMsg(ocrPolicyMsg_t* msg, u64 baseSize, u8* buffer, u32 mode) {
-
+    START_PROFILE(pd_ocrPolicyMsgMarshallMsg);
     u8* startPtr = NULL;
     u8* curPtr = NULL;
     ocrPolicyMsg_t* outputMsg = NULL;
@@ -498,11 +498,12 @@ u8 ocrPolicyMsgMarshallMsg(ocrPolicyMsg_t* msg, u64 baseSize, u8* buffer, u32 mo
     }
 
     DPRINTF(DEBUG_LVL_VVERB, "Useful size of message set to %u\n", outputMsg->usefulSize);
-    return 0;
+    RETURN_PROFILE(0);
 }
 
 u8 ocrPolicyMsgUnMarshallMsg(u8* mainBuffer, u8* addlBuffer,
                              ocrPolicyMsg_t* msg, u32 mode) {
+    START_PROFILE(pd_ocrPolicyMsgUnMarshallMsg);
     u8* localMainPtr = (u8*)msg;
     u8* localAddlPtr = NULL;
 
@@ -804,6 +805,6 @@ u8 ocrPolicyMsgUnMarshallMsg(u8* mainBuffer, u8* addlBuffer,
         msg->usefulSize = baseSize;
     }
     DPRINTF(DEBUG_LVL_VVERB, "Done unmarshalling and have size of message %ld\n", msg->usefulSize);
-    return 0;
+    RETURN_PROFILE(0);
 }
 

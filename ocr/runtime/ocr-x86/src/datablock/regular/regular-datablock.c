@@ -234,6 +234,7 @@ u8 regularUnregisterWaiter(ocrDataBlock_t *self, ocrFatGuid_t waiter, u32 slot,
 ocrDataBlock_t* newDataBlockRegular(ocrDataBlockFactory_t *factory, ocrFatGuid_t allocator,
                                     ocrFatGuid_t allocPD, u64 size, void* ptr,
                                     u32 flags, ocrParamList_t *perInstance) {
+    START_PROFILE(datablock_newDataBlockRegular);
     ocrPolicyDomain_t *pd = NULL;
     ocrTask_t *task = NULL;
     PD_MSG_STACK(msg);
@@ -281,7 +282,7 @@ ocrDataBlock_t* newDataBlockRegular(ocrDataBlockFactory_t *factory, ocrFatGuid_t
     DPRINTF(DEBUG_LVL_VERB, "Creating a datablock of size %lu @ 0x%lx (GUID: 0x%lx)\n",
             size, (u64)result->base.ptr, result->base.guid);
 
-    return (ocrDataBlock_t*)result;
+    RETURN_PROFILE((ocrDataBlock_t*)result);
 }
 /******************************************************/
 /* OCR DATABLOCK REGULAR FACTORY                      */

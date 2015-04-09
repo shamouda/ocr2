@@ -120,6 +120,7 @@ static bool lockButSelf(ocrDataBlockLockable_t *rself) {
 //Warning: This call must be protected with the self->lock in the calling context
 static u8 lockableAcquireInternal(ocrDataBlock_t *self, void** ptr, ocrFatGuid_t edt, u32 edtSlot,
                   ocrDbAccessMode_t mode, bool isInternal, u32 properties) {
+    START_PROFILE(datablock_lockableAcquireInternal);
     ocrDataBlockLockable_t * rself = (ocrDataBlockLockable_t*) self;
 
     if(rself->attributes.freeRequested && (rself->attributes.numUsers == 0)) {
@@ -127,13 +128,13 @@ static u8 lockableAcquireInternal(ocrDataBlock_t *self, void** ptr, ocrFatGuid_t
         // There's a race between the datablock being freed and having no
         // users with someone else trying to acquire the DB
         ASSERT(false && "OCR_EACCES");
-        return OCR_EACCES;
+        RETURN_PROFILE(OCR_EACCES);
     }
 
     //TODO DBX this is temporary until we get a real OB mode implemented
     if(properties & DB_PROP_RT_OBLIVIOUS) {
         *ptr = self->ptr;
-        return 0;
+        RETURN_PROFILE(0);
     }
 
     if (mode == DB_MODE_RO) {
@@ -148,7 +149,7 @@ static u8 lockableAcquireInternal(ocrDataBlock_t *self, void** ptr, ocrFatGuid_t
             waiterEntry->next = rself->roWaiterList;
             rself->roWaiterList = waiterEntry;
             *ptr = NULL; // not contractual, but should ease debug if misread
-            return OCR_EBUSY;
+            RETURN_PROFILE(OCR_EBUSY);
         }
     }
 
@@ -165,7 +166,7 @@ static u8 lockableAcquireInternal(ocrDataBlock_t *self, void** ptr, ocrFatGuid_t
             waiterEntry->next = rself->ewWaiterList;
             rself->ewWaiterList = waiterEntry;
             *ptr = NULL; // not contractual, but should ease debug if misread
-            return OCR_EBUSY;
+            RETURN_PROFILE(OCR_EBUSY);
         } else {
             rself->attributes.modeLock = DB_LOCKED_EW;
         }
@@ -193,7 +194,7 @@ static u8 lockableAcquireInternal(ocrDataBlock_t *self, void** ptr, ocrFatGuid_t
             waiterEntry->next = rself->itwWaiterList;
             rself->itwWaiterList = waiterEntry;
             *ptr = NULL; // not contractual, but should ease debug if misread
-            return OCR_EBUSY;
+            RETURN_PROFILE(OCR_EBUSY);
         } else {
             // Ruled out all enque scenario, we can acquire.
             // Just check if we need to grab lock too
@@ -218,7 +219,7 @@ static u8 lockableAcquireInternal(ocrDataBlock_t *self, void** ptr, ocrFatGuid_t
     }
 #endif /* OCR_ENABLE_STATISTICS */
     *ptr = self->ptr;
-    return 0;
+    RETURN_PROFILE(0);
 }
 
 
@@ -266,6 +267,7 @@ u8 lockableAcquire(ocrDataBlock_t *self, void** ptr, ocrFatGuid_t edt, u32 edtSl
 }
 
 u8 lockableRelease(ocrDataBlock_t *self, ocrFatGuid_t edt, bool isInternal) {
+    START_PROFILE(datablock_lockableRelease);
     ocrDataBlockLockable_t *rself = (ocrDataBlockLockable_t*)self;
     dbWaiter_t * waiter = NULL;
     DPRINTF(DEBUG_LVL_VERB, "Releasing DB @ 0x%lx (GUID 0x%lx) from EDT 0x%lx (runtime release: %d)\n",
@@ -354,7 +356,7 @@ u8 lockableRelease(ocrDataBlock_t *self, ocrFatGuid_t edt, bool isInternal) {
             #endif /* OCR_ENABLE_STATISTICS */
             rself->worker = NULL;
             hal_unlock32(&(rself->lock));
-            return 0;
+            RETURN_PROFILE(0);
         } else if (rself->attributes.modeLock == DB_LOCKED_EW) {
             // EW: by design there should be a waiter otherwise we would have exit the modeLock
             ASSERT(waiter != NULL);
@@ -374,7 +376,7 @@ u8 lockableRelease(ocrDataBlock_t *self, ocrFatGuid_t edt, bool isInternal) {
             hal_unlock32(&(rself->lock));
             pd->fcts.pdFree(pd, waiter);
             ASSERT(!pd->fcts.processMessage(pd, &msg, true));
-            return 0;
+            RETURN_PROFILE(0);
         } else { // RO
             //NOTE: if waiter is NULL it means there was nobody queued up for any mode
             if (waiter != NULL) {
@@ -400,7 +402,7 @@ u8 lockableRelease(ocrDataBlock_t *self, ocrFatGuid_t edt, bool isInternal) {
                 #endif /* OCR_ENABLE_STATISTICS */
                 rself->worker = NULL;
                 hal_unlock32(&(rself->lock));
-                return 0;
+                RETURN_PROFILE(0);
             }
         }
     }
@@ -419,11 +421,11 @@ u8 lockableRelease(ocrDataBlock_t *self, ocrFatGuid_t edt, bool isInternal) {
         rself->attributes.freeRequested == 1) {
         rself->worker = NULL;
         hal_unlock32(&(rself->lock));
-        return lockableDestruct(self);
+        RETURN_PROFILE(lockableDestruct(self));
     }
     rself->worker = NULL;
     hal_unlock32(&(rself->lock));
-    return 0;
+    RETURN_PROFILE(0);
 }
 
 u8 lockableDestruct(ocrDataBlock_t *self) {
@@ -574,6 +576,7 @@ void destructLockableFactory(ocrDataBlockFactory_t *factory) {
 }
 
 ocrDataBlockFactory_t *newDataBlockFactoryLockable(ocrParamList_t *perType, u32 factoryId) {
+    START_PROFILE(datablock_newDataBlockFactoryLockable);
     ocrDataBlockFactory_t *base = (ocrDataBlockFactory_t*)
                                   runtimeChunkAlloc(sizeof(ocrDataBlockFactoryLockable_t), NULL);
 
@@ -591,6 +594,6 @@ ocrDataBlockFactory_t *newDataBlockFactoryLockable(ocrParamList_t *perType, u32 
                                                    u32, bool), lockableUnregisterWaiter);
     base->factoryId = factoryId;
 
-    return base;
+    RETURN_PROFILE(base);
 }
 #endif /* ENABLE_DATABLOCK_LOCKABLE */

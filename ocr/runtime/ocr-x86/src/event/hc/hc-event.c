@@ -67,7 +67,7 @@ static char * eventTypeToString(ocrEvent_t * base) {
 //
 
 u8 destructEventHc(ocrEvent_t *base) {
-
+    START_PROFILE(event_destructEventHc);
     ocrEventHc_t *event = (ocrEventHc_t*)base;
 
     ocrPolicyDomain_t *pd = NULL;
@@ -112,7 +112,7 @@ u8 destructEventHc(ocrEvent_t *base) {
     RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, false));
 #undef PD_MSG
 #undef PD_TYPE
-    return 0;
+    RETURN_PROFILE(0);
 }
 
 ocrFatGuid_t getEventHc(ocrEvent_t *base) {
@@ -136,6 +136,7 @@ ocrFatGuid_t getEventHc(ocrEvent_t *base) {
 // For once events, we don't have to worry about
 // concurrent registerWaiter calls (this would be a programmer error)
 u8 satisfyEventHcOnce(ocrEvent_t *base, ocrFatGuid_t db, u32 slot) {
+    START_PROFILE(event_satisfyEventHcOnce);
     ocrEventHc_t *event = (ocrEventHc_t*)base;
     ASSERT(slot == 0); // For non-latch events, only one slot
 
@@ -213,18 +214,19 @@ u8 satisfyEventHcOnce(ocrEvent_t *base, ocrFatGuid_t db, u32 slot) {
     }
     // Since this a ONCE event, we need to destroy it as well
     // This is safe to do so at this point as all the messages have been sent
-    return destructEventHc(base);
+    RETURN_PROFILE(destructEventHc(base));
 }
 
 // This is for persistent events such as sticky or idempotent.
 u8 satisfyEventHcPersist(ocrEvent_t *base, ocrFatGuid_t db, u32 slot) {
+    START_PROFILE(event_satisfyEventHcPersist);
     ocrEventHcPersist_t *event = (ocrEventHcPersist_t*)base;
     ASSERT(slot == 0); // Persistent-events are single slot
     ASSERT((event->base.base.kind == OCR_EVENT_IDEM_T) ||
            (event->data == UNINITIALIZED_GUID)); // Sticky events can be satisfied once
 
     if(event->data != UNINITIALIZED_GUID) {
-        return 1; // TODO: Put some error code here.
+        RETURN_PROFILE(1); // TODO: Put some error code here.
     } else {
         DPRINTF(DEBUG_LVL_INFO, "Satisfy %s: 0x%lx with 0x%lx\n", eventTypeToString(base),
                 base->guid, db.guid);
@@ -309,11 +311,12 @@ u8 satisfyEventHcPersist(ocrEvent_t *base, ocrFatGuid_t db, u32 slot) {
         //TODO early release of the DB here ?
     }
     // The event sticks around until the user destroys it
-    return 0;
+    RETURN_PROFILE(0);
 }
 
 // This is for latch events
 u8 satisfyEventHcLatch(ocrEvent_t *base, ocrFatGuid_t db, u32 slot) {
+    START_PROFILE(event_satisfyEventHcLatch);
     ocrEventHcLatch_t *event = (ocrEventHcLatch_t*)base;
     ASSERT(slot == OCR_EVENT_LATCH_DECR_SLOT ||
            slot == OCR_EVENT_LATCH_INCR_SLOT);
@@ -339,7 +342,7 @@ u8 satisfyEventHcLatch(ocrEvent_t *base, ocrFatGuid_t db, u32 slot) {
     statsDEP_SATISFYToEvt(pd, currentEdt.guid, NULL, base->guid, base, data, slot);
 #endif
     if(count + incr != 0) {
-        return 0;
+        RETURN_PROFILE(0);
     }
     // Here the event is satisfied
     DPRINTF(DEBUG_LVL_INFO, "Satisfy %s: 0x%lx reached zero\n", eventTypeToString(base), base->guid);
@@ -401,7 +404,7 @@ u8 satisfyEventHcLatch(ocrEvent_t *base, ocrFatGuid_t db, u32 slot) {
 #undef PD_TYPE
     }
     // The latch is satisfied so we destroy it
-    return destructEventHc(base);
+    RETURN_PROFILE(destructEventHc(base));
 }
 
 u8 registerSignalerHc(ocrEvent_t *self, ocrFatGuid_t signaler, u32 slot,
@@ -420,6 +423,7 @@ u8 unregisterSignalerHc(ocrEvent_t *self, ocrFatGuid_t signaler, u32 slot,
  * By construction, users must ensure a ONCE event is registered before satisfy is called.
  */
 u8 registerWaiterEventHc(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot, bool isDepAdd) {
+    START_PROFILE(event_registerWaiterEventHc);
     // Here we always add the waiter to our list so we ignore isDepAdd
     ocrEventHc_t *event = (ocrEventHc_t*)base;
 
@@ -513,7 +517,7 @@ u8 registerWaiterEventHc(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot, bool i
 #undef PD_MSG
 #undef PD_TYPE
 
-    return 0;
+    RETURN_PROFILE(0);
 }
 
 
@@ -529,6 +533,7 @@ u8 registerWaiterEventHc(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot, bool i
  * Returns non-zero if the registerWaiter requires registerSignaler to be called there-after
  */
 u8 registerWaiterEventHcPersist(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot, bool isDepAdd) {
+    START_PROFILE(event_registerWaiterEventHcPersist);
     ocrEventHcPersist_t *event = (ocrEventHcPersist_t*)base;
 
     ocrPolicyDomain_t *pd = NULL;
@@ -555,7 +560,7 @@ u8 registerWaiterEventHcPersist(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot,
         // skip this part. The event is registered on the EDT and
         // the EDT will register on the event only when its dependence
         // frontier reaches this event.
-        return 0; //Require registerSignaler invocation
+        RETURN_PROFILE(0); //Require registerSignaler invocation
     }
     ASSERT(waiterKind == OCR_GUID_EDT || (waiterKind & OCR_GUID_EVENT));
 
@@ -577,11 +582,11 @@ u8 registerWaiterEventHcPersist(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot,
         PD_MSG_FIELD_I(slot) = slot;
         PD_MSG_FIELD_I(properties) = 0;
         if((toReturn = pd->fcts.processMessage(pd, &msg, false))) {
-            return toReturn; //TODO error status
+            RETURN_PROFILE(toReturn); //TODO error status
         }
 #undef PD_MSG
 #undef PD_TYPE
-        return 0; //Require registerSignaler invocation
+        RETURN_PROFILE(0); //Require registerSignaler invocation
     }
 
     // Here we need to actually update our waiter list. We still hold the lock
@@ -599,7 +604,7 @@ u8 registerWaiterEventHcPersist(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot,
         ASSERT(false); // debug
         ASSERT(toReturn != OCR_EBUSY);
         hal_unlock32(&(event->waitersLock));
-        return toReturn; //TODO error status
+        RETURN_PROFILE(toReturn); //TODO error status
     }
 
     waiters = (regNode_t*)PD_MSG_FIELD_O(ptr);
@@ -624,7 +629,7 @@ u8 registerWaiterEventHcPersist(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot,
         if((toReturn = pd->fcts.processMessage(pd, &msg, true))) {
             ASSERT(false); // debug
             hal_unlock32(&(event->waitersLock));
-            return toReturn; //TODO error status
+            RETURN_PROFILE(toReturn); //TODO error status
         }
 
         waitersNew = (regNode_t*)PD_MSG_FIELD_O(ptr);
@@ -665,7 +670,7 @@ u8 registerWaiterEventHcPersist(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot,
         if((toReturn = pd->fcts.processMessage(pd, &msg, false))) {
             ASSERT(false); // debug
             hal_unlock32(&(event->waitersLock));
-            return toReturn; //TODO error status
+            RETURN_PROFILE(toReturn); //TODO error status
         }
 #undef PD_TYPE
         event->base.waitersDb = newGuid;
@@ -684,11 +689,12 @@ u8 registerWaiterEventHcPersist(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot,
     RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, true));
 #undef PD_MSG
 #undef PD_TYPE
-    return 0; //Require registerSignaler invocation
+    RETURN_PROFILE(0); //Require registerSignaler invocation
 }
 
 // In this call, we do not contend with satisfy
 u8 unregisterWaiterEventHc(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot, bool isDepRem) {
+    START_PROFILE(event_unregisterWaiterEventHc);
     // Always search for the waiter because we don't know if it registered or not so
     // ignore isDepRem
     ocrEventHc_t *event = (ocrEventHc_t*)base;
@@ -744,12 +750,13 @@ u8 unregisterWaiterEventHc(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot, bool
     RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, true));
 #undef PD_MSG
 #undef PD_TYPE
-    return 0;
+    RETURN_PROFILE(0);
 }
 
 
 // In this call, we can have concurrent satisfy
 u8 unregisterWaiterEventHcPersist(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot) {
+    START_PROFILE(event_unregisterWaiterEventHcPersist);
     ocrEventHcPersist_t *event = (ocrEventHcPersist_t*)base;
 
 
@@ -768,7 +775,7 @@ u8 unregisterWaiterEventHcPersist(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slo
     if(event->data != UNINITIALIZED_GUID) {
         // We don't really care at this point so we don't do anything
         hal_unlock32(&(event->waitersLock));
-        return 0;
+        RETURN_PROFILE(0);
     }
 
     // Here we need to actually update our waiter list. We still hold the lock
@@ -784,7 +791,7 @@ u8 unregisterWaiterEventHcPersist(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slo
     if((toReturn = pd->fcts.processMessage(pd, &msg, true))) {
         ASSERT(!toReturn);
         hal_unlock32(&(event->waitersLock));
-        return toReturn;
+        RETURN_PROFILE(toReturn);
     }
     // TODO: Guid reading (bug #273)
     waiters = (regNode_t*)PD_MSG_FIELD_O(ptr);
@@ -816,7 +823,7 @@ u8 unregisterWaiterEventHcPersist(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slo
     RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, true));
 #undef PD_MSG
 #undef PD_TYPE
-    return 0;
+    RETURN_PROFILE(0);
 }
 
 /******************************************************/
@@ -826,7 +833,7 @@ u8 unregisterWaiterEventHcPersist(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slo
 // takesArg indicates whether or not this event carries any data
 ocrEvent_t * newEventHc(ocrEventFactory_t * factory, ocrEventTypes_t eventType,
                         bool takesArg, ocrParamList_t *perInstance) {
-
+    START_PROFILE(event_newEventHc);
     // Get the current environment
     ocrPolicyDomain_t *pd = NULL;
     PD_MSG_STACK(msg);
@@ -959,14 +966,15 @@ ocrEvent_t * newEventHc(ocrEventFactory_t * factory, ocrEventTypes_t eventType,
 #ifdef OCR_ENABLE_STATISTICS
     statsEVT_CREATE(getCurrentPD(), getCurrentEDT(), NULL, base->guid, base);
 #endif
-    return base;
+    RETURN_PROFILE(base);
 }
 
 void destructEventFactoryHc(ocrEventFactory_t * base) {
     runtimeChunkFree((u64)base, NULL);
 }
-
+ 
 ocrEventFactory_t * newEventFactoryHc(ocrParamList_t *perType, u32 factoryId) {
+    START_PROFILE(event_newEventFactoryHc); 
     ocrEventFactory_t* base = (ocrEventFactory_t*) runtimeChunkAlloc(
                                   sizeof(ocrEventFactoryHc_t), NULL);
 
@@ -1008,6 +1016,6 @@ ocrEventFactory_t * newEventFactoryHc(ocrParamList_t *perType, u32 factoryId) {
 
     base->factoryId = factoryId;
 
-    return base;
+    RETURN_PROFILE(base);
 }
 #endif /* ENABLE_EVENT_HC */
