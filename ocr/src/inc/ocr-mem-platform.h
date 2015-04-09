@@ -16,6 +16,9 @@
 #include "ocr-types.h"
 #include "utils/ocr-utils.h"
 
+// 64KB to zero before initialization
+#define MEM_PLATFORM_ZEROED_AREA_SIZE    (64*1024)
+
 struct _ocrPolicyDomain_t;
 
 /****************************************************/

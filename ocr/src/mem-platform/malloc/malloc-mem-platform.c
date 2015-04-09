@@ -21,6 +21,7 @@
 #include "mem-platform/malloc/malloc-mem-platform.h"
 
 #include <stdlib.h>
+#include <string.h>
 
 // Poor man's basic lock
 #define INIT_LOCK(addr) do {*addr = 0;} while(0);
@@ -47,6 +48,12 @@ void mallocBegin(ocrMemPlatform_t *self, struct _ocrPolicyDomain_t * PD ) {
     self->startAddr = (u64)malloc(self->size);
     ASSERT(self->startAddr); // Check that the mem-platform size in config file is reasonable
     self->endAddr = self->startAddr + self->size;
+
+    // rangeTracker will be located at self->startAddr, and it should be zero'ed
+    // since initializeRange() assumes zero-ed 'lock' and 'inited' variables
+    ASSERT(self->size >= MEM_PLATFORM_ZEROED_AREA_SIZE);    // make sure no buffer overrun
+    // zero beginning part to cover rangeTracker and pad, and allocator metadata part i.e. pool header (pool_t)
+    memset((void *)self->startAddr , 0, MEM_PLATFORM_ZEROED_AREA_SIZE);
 
     ocrMemPlatformMalloc_t *rself = (ocrMemPlatformMalloc_t*)self;
     rself->pRangeTracker = initializeRange(16, self->startAddr,
