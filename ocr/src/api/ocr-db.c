@@ -53,15 +53,14 @@ u8 ocrDbCreate(ocrGuid_t *db, void** addr, u64 len, u16 flags,
     msg.type = PD_MSG_DB_CREATE | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
     PD_MSG_FIELD_IO(guid.guid) = *db;
     PD_MSG_FIELD_IO(guid.metaDataPtr) = NULL;
+    PD_MSG_FIELD_IO(properties) = (u32) flags;
+    PD_MSG_FIELD_IO(size) = len;
     PD_MSG_FIELD_I(edt.guid) = task?task->guid:NULL_GUID; // Can happen when non EDT creates the DB
     PD_MSG_FIELD_I(edt.metaDataPtr) = task;
-    PD_MSG_FIELD_IO(size) = len;
     PD_MSG_FIELD_I(affinity.guid) = affinity;
     PD_MSG_FIELD_I(affinity.metaDataPtr) = NULL;
-    PD_MSG_FIELD_IO(properties) = (u32) flags;
     PD_MSG_FIELD_I(dbType) = USER_DBTYPE;
     PD_MSG_FIELD_I(allocator) = allocator;
-
     returnCode = policy->fcts.processMessage(policy, &msg, true);
     if(returnCode == 0) {
         *db = PD_MSG_FIELD_IO(guid.guid);
@@ -119,6 +118,7 @@ u8 ocrDbDestroy(ocrGuid_t db) {
     PD_MSG_FIELD_I(guid.metaDataPtr) = NULL;
     PD_MSG_FIELD_I(edt.guid) = task?task->guid:NULL_GUID;
     PD_MSG_FIELD_I(edt.metaDataPtr) = task;
+    PD_MSG_FIELD_I(properties) = 0;
 #undef PD_MSG
 #undef PD_TYPE
     u8 returnCode = policy->fcts.processMessage(policy, &msg, false);

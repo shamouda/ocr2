@@ -152,11 +152,11 @@ u8 regularDestruct(ocrDataBlock_t *self) {
 #define PD_MSG (&msg)
 #define PD_TYPE PD_MSG_MEM_UNALLOC
     msg.type = PD_MSG_MEM_UNALLOC | PD_MSG_REQUEST;
-    PD_MSG_FIELD_I(ptr) = self->ptr;
     PD_MSG_FIELD_I(allocatingPD.guid) = self->allocatingPD;
     PD_MSG_FIELD_I(allocatingPD.metaDataPtr) = NULL;
     PD_MSG_FIELD_I(allocator.guid) = self->allocator;
     PD_MSG_FIELD_I(allocator.metaDataPtr) = NULL;
+    PD_MSG_FIELD_I(ptr) = self->ptr;
     PD_MSG_FIELD_I(type) = DB_MEMTYPE;
     PD_MSG_FIELD_I(properties) = 0;
     RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, false));

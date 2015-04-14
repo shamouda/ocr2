@@ -563,13 +563,14 @@ static u8 convertDepAddToSatisfy(ocrPolicyDomain_t *self, ocrFatGuid_t dbGuid,
     PD_MSG_STACK(msg);
     ocrTask_t *curTask = NULL;
     getCurrentEnv(NULL, NULL, &curTask, &msg);
+    ocrFatGuid_t curEdt = {.guid = curTask?curTask->guid:NULL_GUID, .metaDataPtr = curTask };
 #define PD_MSG (&msg)
 #define PD_TYPE PD_MSG_DEP_SATISFY
     msg.type = PD_MSG_DEP_SATISFY | PD_MSG_REQUEST;
-    PD_MSG_FIELD_I(satisfierGuid.guid) = curTask?curTask->guid:NULL_GUID;
-    PD_MSG_FIELD_I(satisfierGuid.metaDataPtr) = curTask;
+    PD_MSG_FIELD_I(satisfierGuid) = curEdt;
     PD_MSG_FIELD_I(guid) = destGuid;
     PD_MSG_FIELD_I(payload) = dbGuid;
+    PD_MSG_FIELD_I(currentEdt) = curEdt;
     PD_MSG_FIELD_I(slot) = slot;
     PD_MSG_FIELD_I(properties) = 0;
     RESULT_PROPAGATE(self->fcts.processMessage(self, &msg, false));
@@ -1549,6 +1550,7 @@ void cePdFree(ocrPolicyDomain_t *self, void* addr) {
         PD_MSG_FIELD_I(ptr) = ((void *) addr);
         // TODO: Hun? What is this? 0 shouldn't be a valid type...
         PD_MSG_FIELD_I(type) = 0;
+        PD_MSG_FIELD_I(properties) = 0;
         while(self->fcts.sendMessage(self, msg.destLocation, &msg, NULL, 0)) {
            PD_MSG_STACK(msg);
            ocrMsgHandle_t myHandle;

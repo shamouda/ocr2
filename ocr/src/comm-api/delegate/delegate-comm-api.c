@@ -113,8 +113,8 @@ u8 delegateCommSendMessage(ocrCommApi_t *self, ocrLocation_t target,
     giveMsg.type = PD_MSG_COMM_GIVE | PD_MSG_REQUEST;
     PD_MSG_FIELD_IO(guids) = &fatGuid;
     PD_MSG_FIELD_IO(guidCount) = 1;
-    PD_MSG_FIELD_I(properties) = 0;
     PD_MSG_FIELD_I(type) = OCR_GUID_COMM;
+    PD_MSG_FIELD_I(properties) = 0;
     RESULT_PROPAGATE(pd->fcts.processMessage(pd, &giveMsg, false));
 #undef PD_MSG
 #undef PD_TYPE
@@ -143,9 +143,11 @@ u8 delegateCommPollMessage(ocrCommApi_t *self, ocrMsgHandle_t **handle) {
 #define PD_TYPE PD_MSG_COMM_TAKE
     takeMsg.type = PD_MSG_COMM_TAKE | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
     PD_MSG_FIELD_IO(guids) = &fatGuid;
+    PD_MSG_FIELD_IO(extra) = 0ULL; // Initialize
+    PD_MSG_FIELD_IO(type) = OCR_GUID_COMM;
     PD_MSG_FIELD_IO(guidCount) = 1;
     PD_MSG_FIELD_I(properties) = 0;
-    PD_MSG_FIELD_IO(type) = OCR_GUID_COMM;
+
     RESULT_PROPAGATE(pd->fcts.processMessage(pd, &takeMsg, true));
 #undef PD_MSG
 #undef PD_TYPE
@@ -193,8 +195,8 @@ u8 delegateCommWaitMessage(ocrCommApi_t *self, ocrMsgHandle_t **handle) {
             msg.type = PD_MSG_MGT_MONITOR_PROGRESS | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
             //TODO not sure if the caller should register a progress function or if the
             //scheduler should know what to do for each type of monitor progress
-            PD_MSG_FIELD_I(monitoree) = &handle;
             PD_MSG_FIELD_IO(properties) = (0 | MONITOR_PROGRESS_COMM);
+            PD_MSG_FIELD_I(monitoree) = &handle;
             RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, true));
         #undef PD_MSG
         #undef PD_TYPE

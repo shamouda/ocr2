@@ -120,6 +120,11 @@ static bool lockButSelf(ocrDataBlockLockable_t *rself) {
 }
 
 //Warning: This call must be protected with the self->lock in the calling context
+//
+//If the datablock is not available for immediate acquisition, the implementation
+//asserts on edtSlot not being equal to EDT_SLOT_NONE. The current runtime implementation
+//only supports asynchronous acquisition of datablocks from EDT's dependences (i.e. the call
+//site of acquire is written in a way that supports an asynchronous callback).
 static u8 lockableAcquireInternal(ocrDataBlock_t *self, void** ptr, ocrFatGuid_t edt, u32 edtSlot,
                   ocrDbAccessMode_t mode, bool isInternal, u32 properties) {
     ocrDataBlockLockable_t * rself = (ocrDataBlockLockable_t*) self;
@@ -140,6 +145,7 @@ static u8 lockableAcquireInternal(ocrDataBlock_t *self, void** ptr, ocrFatGuid_t
 
     if (mode == DB_MODE_RO) {
         if (rself->attributes.modeLock) {
+            ASSERT(edtSlot != EDT_SLOT_NONE);
             ocrPolicyDomain_t * pd = NULL;
             getCurrentEnv(&pd, NULL, NULL, NULL);
             dbWaiter_t * waiterEntry = (dbWaiter_t *) pd->fcts.pdMalloc(pd, sizeof(dbWaiter_t));
@@ -156,6 +162,7 @@ static u8 lockableAcquireInternal(ocrDataBlock_t *self, void** ptr, ocrFatGuid_t
 
     if (mode == DB_MODE_EW) {
         if ((rself->attributes.modeLock) || (rself->attributes.numUsers != 0)) {
+            ASSERT(edtSlot != EDT_SLOT_NONE);
             // The DB is already in use
             ocrPolicyDomain_t * pd = NULL;
             getCurrentEnv(&pd, NULL, NULL, NULL);
@@ -184,6 +191,7 @@ static u8 lockableAcquireInternal(ocrDataBlock_t *self, void** ptr, ocrFatGuid_t
             enque = (rself->attributes.numUsers != 0) || (rself->attributes.modeLock == DB_LOCKED_EW);
         }
         if (enque) {
+            ASSERT(edtSlot != EDT_SLOT_NONE);
             // The DB is already in use, enque
             ocrPolicyDomain_t * pd = NULL;
             getCurrentEnv(&pd, NULL, NULL, NULL);
@@ -238,10 +246,11 @@ static void processAcquireCallback(ocrDataBlock_t *self, dbWaiter_t * waiter, oc
     PD_MSG_FIELD_IO(edt.guid) = waiter->guid;
     PD_MSG_FIELD_IO(edt.metaDataPtr) = NULL;
     PD_MSG_FIELD_IO(edtSlot) = waiter->slot;
-    PD_MSG_FIELD_O(size) = self->size;
     // In this implementation properties encodes the MODE + isInternal +
     // any additional flags set by the PD (such as the FETCH flag)
     PD_MSG_FIELD_IO(properties) = properties;
+    // A response msg is being built, must set all the OUT fields
+    PD_MSG_FIELD_O(size) = self->size;
     PD_MSG_FIELD_O(returnDetail) = 0;
     //NOTE: we still have the lock, calling the internal version
     u8 res = lockableAcquireInternal(self, &PD_MSG_FIELD_O(ptr), PD_MSG_FIELD_IO(edt),
@@ -448,11 +457,11 @@ u8 lockableDestruct(ocrDataBlock_t *self) {
 #define PD_MSG (&msg)
 #define PD_TYPE PD_MSG_MEM_UNALLOC
     msg.type = PD_MSG_MEM_UNALLOC | PD_MSG_REQUEST;
-    PD_MSG_FIELD_I(ptr) = self->ptr;
     PD_MSG_FIELD_I(allocatingPD.guid) = self->allocatingPD;
     PD_MSG_FIELD_I(allocatingPD.metaDataPtr) = NULL;
     PD_MSG_FIELD_I(allocator.guid) = self->allocator;
     PD_MSG_FIELD_I(allocator.metaDataPtr) = NULL;
+    PD_MSG_FIELD_I(ptr) = self->ptr;
     PD_MSG_FIELD_I(type) = DB_MEMTYPE;
     PD_MSG_FIELD_I(properties) = 0;
     RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, false));
