@@ -277,7 +277,7 @@ u8 ceSchedulerGiveComm(ocrScheduler_t *self, u32* count, ocrFatGuid_t* handlers,
 
 ocrScheduler_t* newSchedulerCe(ocrSchedulerFactory_t * factory, ocrParamList_t *perInstance) {
     ocrScheduler_t* base = (ocrScheduler_t*) runtimeChunkAlloc(
-                               sizeof(ocrSchedulerCe_t), NULL);
+                               sizeof(ocrSchedulerCe_t), PERSISTENT_CHUNK);
     factory->initialize(factory, base, perInstance);
     return base;
 }
@@ -292,7 +292,7 @@ void destructSchedulerFactoryCe(ocrSchedulerFactory_t * factory) {
 
 ocrSchedulerFactory_t * newOcrSchedulerFactoryCe(ocrParamList_t *perType) {
     ocrSchedulerFactoryCe_t* derived = (ocrSchedulerFactoryCe_t*) runtimeChunkAlloc(
-                                           sizeof(ocrSchedulerFactoryCe_t), NULL);
+                                           sizeof(ocrSchedulerFactoryCe_t), NONPERSISTENT_CHUNK);
 
     ocrSchedulerFactory_t* base = (ocrSchedulerFactory_t*) derived;
     base->instantiate = &newSchedulerCe;
