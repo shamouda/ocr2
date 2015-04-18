@@ -60,3 +60,21 @@ job_ocr_regression_x86_pthread_mpi_lockableDB = {
                  'PATH': '${MPI_ROOT}/bin64:'+os.environ['PATH'],
                  'LD_LIBRARY_PATH': '${MPI_ROOT}/lib64',}
 }
+
+#TODO: not sure how to not hardcode GASNET_ROOT here
+job_ocr_regression_x86_pthread_gasnet_lockableDB = {
+    'name': 'ocr-regression-x86-pthread-gasnet-lockableDB',
+    'depends': ('ocr-build-x86-pthread-gasnet',),
+    'jobtype': 'ocr-regression',
+    'run-args': 'x86-pthread-gasnet jenkins-hc-dist-gasnet-clone-8w-lockableDB.cfg lockableDB',
+    'sandbox': ('inherit0',),
+    'env-vars': {'MPI_ROOT': '/opt/intel/tools/impi/5.0.1.035',
+                 'GASNET_ROOT': '/opt/rice/GASNet/1.24.0-impi',
+                 'PATH': '${GASNET_ROOT}/bin:${MPI_ROOT}/bin64:'+os.environ['PATH'],
+                 'GASNET_CONDUIT': 'ibv',
+                 'GASNET_TYPE': 'par',
+                 'GASNET_EXTRA_LIBS': '-L/usr/lib64 -lrt -libverbs',
+                 'TEST_CC': 'mpicc', # gasnet built with mpi
+                 # picked up by non-regression test script
+                 'OCR_LDFLAGS': '-L${GASNET_ROOT}/lib -lgasnet-${GASNET_CONDUIT}-${GASNET_TYPE} ${GASNET_EXTRA_LIBS}',}
+}

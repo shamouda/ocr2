@@ -415,7 +415,7 @@ install: ${INSTALL_TARGETS} ${INSTALLED_LIBS} ${INSTALLED_EXES} ${INSTALLED_CONF
 	@printf "\033[32m Installed '$(INSTALL_LIBS) $(INSTALL_EXES)' into '$(OCR_INSTALL)'\033[0m\n"
 	@if [ -d $(OCR_ROOT)/machine-configs/$(OCR_TYPE) ]; then \
 		$(RM) -f $(OCR_INSTALL)/config/default.cfg; \
-		$(LN) -s ./$(DEFAULT_CONFIG) $(OCR_INSTALL)/config/default.cfg; \
+		$(LN) -sf ./$(DEFAULT_CONFIG) $(OCR_INSTALL)/config/default.cfg; \
 	fi
 
 .PHONY: uninstall

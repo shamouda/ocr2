@@ -17,408 +17,430 @@
 
 #include "amhandler.h"
 #include "gasnet-comm-platform.h"
+#include "gasnet-policy-domain.h"
+#include "gasnet-am.h"
+#include "gasnet-share-segment.h"
+
 #include <gasnet.h>
 
 #define DEBUG_TYPE COMM_PLATFORM
 #define MINHEAPOFFSET (128*4096)
 
-// ---------------------------------
-// OCR data structure
-// ---------------------------------
-typedef struct {
-    u64 msgId; // The Gasnet comm layer message id for this communication
-    u32 properties;
-    ocrPolicyMsg_t * msg;
-} gasnetCommHandle_t;
+#define IS_MSG_TYPE(msg, msg_type) ((msg->type & PD_MSG_TYPE_ONLY) ==  msg_type)
 
-// ---------------------------------
-// global variables
-// ---------------------------------
-// hack: store this communication platform pointer for incoming message
-static ocrCommPlatform_t *platform;
+// For upper-level platforms
+#define SEND_ANY_ID 0
 
-// hack: storing the address of other nodes' segment
-// instead of storing O(p), we should store O(log p) like CAF 2.0
-static gasnet_seginfo_t *seginfo;
-
-// ---------------------------------
-// translate from OCR location to GASNet rank
-// ---------------------------------
-static inline int locationToGasnetRank(ocrLocation_t location) {
-    return ((int) location);
-}
-
-static inline ocrLocation_t GasnetRankToLocation(int rank) {
-  return (ocrLocation_t) rank;
-}
-
-// ---------------------------------
-// debugging purposes
-// ---------------------------------
-static inline void debug(const char *msg) {
-    DPRINTF(DEBUG_LVL_VVERB,"[%d]  %s \n", GasnetRankToLocation(gasnet_mynode()), msg);
-    fflush(stdout);
-}
-
-// ---------------------------------
-// Message allocation
-// ---------------------------------
+/*
+ * @brief Message allocation
+ */
 static ocrPolicyMsg_t * allocateNewMessage(ocrCommPlatform_t * self, u32 size) {
     ocrPolicyDomain_t * pd = self->pd;
     ocrPolicyMsg_t * message = pd->fcts.pdMalloc(pd, size);
-    ASSERT(message != NULL);
+    initializePolicyMessage(message, size);
     return message;
 }
 
-// ---------------------------------
-// create GASNet communication handle
-// ---------------------------------
-static gasnetCommHandle_t * createGasnetHandle(ocrCommPlatform_t * self, u64 id, u32 properties, ocrPolicyMsg_t * msg) {
-    ocrPolicyDomain_t * pd = self->pd;
-    gasnetCommHandle_t * handle = pd->fcts.pdMalloc(pd, sizeof(gasnetCommHandle_t));
-    ASSERT(handle != NULL);
-    handle->msgId = id;
-    handle->properties = properties;
-    handle->msg = msg;
-    return handle;
+/*
+ * @brief Translate from OCR rank to GASNet rank
+ */
+static inline int locationToGasnetRank(ocrLocation_t target) {
+    return ((int) target);
 }
 
-/***
- * to be called by an active message from remote process
- **/
-static void gasnetMessageIncoming(ocrCommPlatform_t * self, ocrPolicyMsg_t *msg, uint64_t size) {
-    ocrCommPlatformGasnet_t * gasnetComm = (ocrCommPlatformGasnet_t *) self;
-    ocrPolicyMsg_t * buf = allocateNewMessage(self, size);
-
-    gasnetCommHandle_t * handle = createGasnetHandle(self, 0, PERSIST_MSG_PROP, buf);
-
-    debug(__func__);
-
-    memcpy(buf, msg, size);
-    DPRINTF(DEBUG_LVL_VERB,"[%d][GASNET] Received a message of type %x with msgId %d \n",
-            (int) self->pd->myLocation, msg->type, (int) msg->msgId);
-    //VC8 put a pthread lock here: I'm not sure this can be invoked concurrently or not
-#ifdef CONCURRENT_GASNET
-    hal_lock32(&gasnetComm->queueLock);
-#endif
-    gasnetComm->incoming->pushFront(gasnetComm->incoming, handle);
-#ifdef CONCURRENT_GASNET
-    hal_unlock32(&gasnetComm->queueLock);
-#endif
+/*
+ * @brief Translate from GASNet rank to OCR rank
+ */
+static inline ocrLocation_t GasnetRankToLocation(int rank) {
+    return (ocrLocation_t) rank;
 }
 
+
+/*
+ * @brief To be called by an active message from remote process
+ */
+static void gasnetMessageIncoming(ocrCommPlatformGasnet_t *platform , ocrPolicyMsg_t *msg, uint64_t size,
+       gasnet_handlerarg_t seg_addr_hi, gasnet_handlerarg_t seg_addr_lo,
+       gasnet_handlerarg_t seg_size)
+{
+    ocrCommPlatform_t * self = (ocrCommPlatform_t*) platform;
+
+    // -------------------------------------------------------------
+    // copy the message from share segment into local segment
+    // this can be slow and require more memory, but it's simpler
+    // than using the share segment within OCR
+    // -------------------------------------------------------------
+    ocrPolicyMsg_t * msgCopy = allocateNewMessage(self, size);
+    hal_memCopy(msgCopy, msg, size, false);
+    msgCopy->bufferSize = size;
+
+    // once we finished copying the message into a local buffer,
+    // other nodes are free to write this share segment
+
+    DPRINTF(DEBUG_LVL_VERB,"[GASNET] Received a message type %lx with msgId %lu size: %lu\n",
+                           msg->type, msg->msgId, size);
+    hal_lock32(&platform->queueLock);
+    platform->incoming->pushFront(platform->incoming, msgCopy);
+    hal_unlock32(&platform->queueLock);
+
+    // Warning ! Do NOT touch msgCopy from now on
+
+    // the message is to acquire a datablock. If we do receive a datablock (a response)
+    // then we need to free the reserved share segment block
+    if (IS_MSG_TYPE(msg, PD_MSG_DB_ACQUIRE)) {
+        if (IS_MSG_TYPE(msg, PD_MSG_RESPONSE)) {
+            // free this segment block for other usages
+            gasnetReleaseSegmentBlock((void*)msg);
+        }
+    }
+    void *addr = (void*) getBits64(seg_addr_hi, seg_addr_lo);
+
+    // if the remote process provides an address to its share segment, we need to
+    // store it in case we need to write a long message directly to the segment
+    if (addr != NULL) {
+        ocrPolicyDomain_t * pd = self->pd;
+        gasnetCommBlock_t *block = (gasnetCommBlock_t*) pd->fcts.pdMalloc(pd, sizeof(gasnetCommBlock_t));
+        block->addr = addr;
+        block->size = seg_size;
+        int src = locationToGasnetRank( msg->srcLocation );
+        gasnetSegmentBlockPush(pd, src, block);
+        DPRINTF(DEBUG_LVL_VVERB, "[GASNET] pushing %p ( %p | %p) \n", src, addr, seg_addr_hi, seg_addr_lo);
+    }
+}
 
 // ---------------------------------
 // Active messages definition
 // ---------------------------------
-/**
- * function to be invoked for medium-size message
- **/
-static void gasnetAMMessageMedium(gasnet_token_t token, void *buf, size_t nbytes, gasnet_handlerarg_t arg)
-{
-  gasnet_node_t src;
-  GASNET_Safe( gasnet_AMGetMsgSource(token, &src) );
-  DPRINTF(DEBUG_LVL_VVERB, "[%d] %s: platform=%p from %d, size: %d\n",
-          GasnetRankToLocation(gasnet_mynode()), __func__, platform, src, nbytes);
-
-  gasnetMessageIncoming(platform, (ocrPolicyMsg_t *)buf, nbytes);
-}
 
 /**
- * Function to be invoked for long-size message
- * A long message communication is not as efficient as the medium one.
- * we need to avoid as much as possible using a long message.
- * The future version of Gasnet should support asynchrony AM Long.
- **/
-static void gasnetAMMessageLong(gasnet_token_t token, void *buf, size_t nbytes, gasnet_handlerarg_t arg)
-{
+ * @brief function to be invoked for medium-size message
+ */
+static void gasnetAMMessageMedium(gasnet_token_t token, void *buf, size_t nbytes,
+                                  gasnet_handlerarg_t id, gasnet_handlerarg_t seg_addr_hi,
+                                  gasnet_handlerarg_t seg_addr_lo, gasnet_handlerarg_t seg_size) {
   gasnet_node_t src;
   GASNET_Safe( gasnet_AMGetMsgSource(token, &src) );
-  DPRINTF(DEBUG_LVL_VVERB, "[%d] %s: platform=%p from %d, size: %d\n",
-          GasnetRankToLocation(gasnet_mynode()), __func__, platform, src, nbytes);
 
-  gasnetMessageIncoming(platform, (ocrPolicyMsg_t *)buf, nbytes);
+  ocrCommPlatformGasnet_t *platform = getCommPlatform();
+
+  DPRINTF(DEBUG_LVL_VVERB,"[GASNET] %s: pd=%p from %d, size: %d\n",
+                          __func__, platform->base.pd, src, nbytes);
+
+  gasnetMessageIncoming(platform, (ocrPolicyMsg_t *)buf, nbytes, seg_addr_hi,
+                        seg_addr_lo, seg_size);
 }
+
 
 // ---------------------------------
 // declaring the function shippings
 // ---------------------------------
+
 AMHANDLER_REGISTER(gasnetAMMessageMedium);
-AMHANDLER_REGISTER(gasnetAMMessageLong);
 
 // ---------------------------------
 // amhandler_register_invoke: function to invoke function shippings
 // ---------------------------------
 #define AMHANDLER_ENTRY(handler)  AMH_REGISTER_FCN(handler)();
-static void
-amhandler_register_invoke(void)
-{
-AMHANDLER_ENTRY(gasnetAMMessageMedium);
-AMHANDLER_ENTRY(gasnetAMMessageLong);
+
+static void amhandler_register_invoke(void) {
+    AMHANDLER_ENTRY(gasnetAMMessageMedium);
+    registerGasnetHandler();
 }
+
 #undef AMHANDLER_ENTRY
 
 
-// ---------------------------------
-// platform initializaton
-// ---------------------------------
-void platformInitGasnetComm(int argc, char ** argv) {
+/*
+ * @brief platform initializaton
+ */
+void platformInitGasnetComm(int * argc, char *** argv) {
 
-  gasnet_handlerentry_t * table;
-  int count = 0;
-  uintptr_t maxLocalSegSize;
+    gasnet_handlerentry_t * table;
+    int count = 0;
+    uintptr_t maxLocalSegSize;
 
-  // initialize GASNet
-  GASNET_Safe( gasnet_init(&argc, &argv) ) ;
+    // initialize GASNet
+    GASNET_Safe( gasnet_init(argc, argv) ) ;
 
-  // initialize AM functions
-  amhandler_register_invoke();
-  table = amhandler_table();
-  count = amhandler_count();
+    // initialize AM functions
+    amhandler_register_invoke();
+    table = amhandler_table();
+    count = amhandler_count();
 
-  maxLocalSegSize = gasnet_getMaxLocalSegmentSize();
-  int segSize = GASNET_PAGESIZE * 64;
-  segSize = (maxLocalSegSize<segSize ? maxLocalSegSize : segSize);
-  int minheap = MINHEAPOFFSET;
+    maxLocalSegSize = gasnet_getMaxLocalSegmentSize();
+    int segSize = GASNET_PAGESIZE * 64;
+    segSize = (maxLocalSegSize<segSize ? maxLocalSegSize : segSize);
+    int minheap = MINHEAPOFFSET;
 
-  GASNET_Safe( gasnet_attach(table, count, segSize, minheap));
+    GASNET_Safe( gasnet_attach(table, count, segSize, minheap));
 
-  gasnet_node_t nodes = gasnet_nodes();
-
-  // get the address of other nodes
-  seginfo = (gasnet_seginfo_t*) malloc(nodes * sizeof(gasnet_seginfo_t));
-  GASNET_Safe( gasnet_getSegmentInfo(seginfo, nodes) );
-
-  debug(__func__);
+    gasnetBlockInit();
 }
 
-// ---------------------------------
-// platform finalization
-// ---------------------------------
-void platformFinalizeGasnetComm() {
-  debug(__func__);
-
-  /* Spec says client should include a barrier before gasnet_exit() */
-  gasnet_barrier_notify(0,GASNET_BARRIERFLAG_ANONYMOUS);
-  gasnet_barrier_wait(0,GASNET_BARRIERFLAG_ANONYMOUS);
-
-  free(seginfo);
-
-  gasnet_exit(0);
+/*
+ * @brief send a medium message to a remote node.
+ *
+ *  If a message is a take type, we should suffix it with a share segment block and its
+ *  maximum size. This segment block will be used to communicate via long message
+ *  by the remote node
+ */
+static void sendMediumMessage(ocrCommPlatform_t * self, int targetRank, u64 gasnetId,
+      ocrPolicyMsg_t * message, u64 bufferSize,
+      gasnet_handlerarg_t addr_hi, gasnet_handlerarg_t addr_lo,
+      u32 segment_size) {
+    // if the request is "asking a data", we need also to provide our shared segment
+    // so that the owner of the data can send directly to the shared buffer
+    if (IS_MSG_TYPE(message, PD_MSG_DB_ACQUIRE)) {
+        if (IS_MSG_TYPE(message, PD_MSG_RESPONSE)) {
+            // it's a response from PD_MSG_DB_ACQUIRE, but we don't need share segment
+            // since the the data we requested is not big, let's free the block.
+            gasnetCommBlock_t *block = gasnetSegmentBlockGet(self->pd, targetRank);
+            // sometimes we don't get the gasnet share segment due to insufficient memory
+            // or because the message can be small. In this case we don't need to free
+            if (block != NULL) {
+                self->pd->fcts.pdFree(self->pd, block);
+            }
+        }
+    }
+    // According to spec, GASNet will copy the message into its buffer
+    GASNET_Safe( gasnet_AMRequestMedium4(targetRank, AMHANDLER(gasnetAMMessageMedium),
+                                         message, bufferSize, gasnetId,
+                                         addr_hi, addr_lo, segment_size) );
 }
 
 //-------------------------------------------------------------------------------------------
-// Active message for receiving messages
+// Comm life-cycle functions
 //-------------------------------------------------------------------------------------------
-// short messages
 
-u8 GasnetCommSendMessage(ocrCommPlatform_t * self,
-                      ocrLocation_t target, ocrPolicyMsg_t * message,
-                      u64 bufferSize, u64 *id, u32 properties, u32 mask) {
+/*
+ * @brief Sending a message through gasnet am handler
+ *
+ * This function will send a message to a target node using an appropriate handler.
+ * If the size of the message is small or medium, we use am medium handler. Otherwise we
+ * use long message or huge message for long and huge size respectively.
+ */
+static u8 GasnetCommSendMessage(ocrCommPlatform_t * self,
+                                ocrLocation_t target, ocrPolicyMsg_t * message,
+                                u64 *id, u32 properties, u32 mask) {
 
+    u64 bufferSize = message->bufferSize;
     ocrCommPlatformGasnet_t * gasnetComm = ((ocrCommPlatformGasnet_t *) self);
+
+    u64 baseSize = 0, marshalledSize = 0;
+    ocrPolicyMsgGetMsgSize(message, &baseSize, &marshalledSize, MARSHALL_DBPTR | MARSHALL_NSADDR);
+    u64 fullMsgSize = baseSize + marshalledSize;
+
+    //DIST-TODO: multi-comm-worker: msgId incr only works if a single comm-worker per rank,
+    //do we want OCR to provide PD, system level counters ?
+    // Always generate an identifier for a new communication to give back to upper-layer
     u64 gasnetId = gasnetComm->msgId++;
 
+    // If we're sending a request, set the message's msgId to this communication id
     if (message->type & PD_MSG_REQUEST) {
-      message->msgId = gasnetId;
+        message->msgId = gasnetId;
+    } else {
+        // For response in ASYNC set the message ID as any.
+        ASSERT(message->type & PD_MSG_RESPONSE);
+        if (properties & ASYNC_MSG_PROP) {
+            message->msgId = SEND_ANY_ID;
+        }
+        // else, for regular responses, just keep the original
+        // message's msgId the calling PD is waiting on.
     }
+
+    ocrPolicyMsg_t * messageBuffer = message;
+
+    // Check if we need to allocate a new message buffer:
+    //  - Does the serialized message fit in the current message ?
+    //  - Is the message persistent (then need a copy anyway) ?
+    if (fullMsgSize > bufferSize) {
+        // Allocate message and marshall a copy
+        messageBuffer = allocateNewMessage(self, fullMsgSize);
+        ocrPolicyMsgMarshallMsg(message, baseSize, (u8*)messageBuffer,
+            MARSHALL_FULL_COPY | MARSHALL_DBPTR | MARSHALL_NSADDR);
+    } else {
+        // Marshall the message. We made sure we had enough space.
+        ocrPolicyMsgMarshallMsg(messageBuffer, baseSize, (u8*)messageBuffer,
+                                MARSHALL_APPEND | MARSHALL_DBPTR | MARSHALL_NSADDR);
+    }
+
+    // Warning: From now on, exclusively use 'messageBuffer' instead of 'message'
+    ASSERT(fullMsgSize == messageBuffer->usefulSize);
+
+    // Prepare GASNET call arguments
     int targetRank = locationToGasnetRank(target);
     ASSERT(targetRank > -1);
-    DPRINTF(DEBUG_LVL_VVERB, "[%d] GasnetCommSendMessage self=%p, to %d (%d) %d bytes\n",
-            (int) self->pd->myLocation, self, target, targetRank, bufferSize);
+    DPRINTF(DEBUG_LVL_VVERB,"GasnetCommSendMessage self=%p, to %d (%d) %ld bytes\n",
+                            self, target, targetRank, fullMsgSize);
+
+    void * segment_addr = NULL;
+    u32 segment_size = 0;
+
+    if (IS_MSG_TYPE(messageBuffer, PD_MSG_DB_ACQUIRE))
+    {
+      // for PD_MSG_RESPONSE:
+      //   we need to reserve a share segment so that the remote node can write it there
+      //   for releasing the data (PD_MSG_RELEASE_DB)
+      // for msg request:
+      //   this message is to request a datablock, we need to prepare a share
+      //   segment in case the data we request is big
+      //
+      // get any available segment memory, needed for both response and request
+      gasnetCommBlockSender_t *block = gasnetReserveSegmentBlock();
+      if (block != NULL) {
+          segment_addr = block->block.addr;
+          segment_size = block->block.size;
+      }
+      DPRINTF(DEBUG_LVL_VVERB,"[%d] msg type: %x   s: %p\n", gasnet_mynode(),
+                              message->type, segment_addr);
+    }
+    gasnet_handlerarg_t addr_hi = (gasnet_handlerarg_t) BITS64_HIGH(segment_addr);
+    gasnet_handlerarg_t addr_lo = (gasnet_handlerarg_t) BITS64_LOW(segment_addr);
 
     // ------------------------------------------------------------
     // if the length of the message is less than the maximum of medium gasnet,
     // we'll use gasnet_AMRequestMedium1.
     // if the length is bigger then medium size and less than long size,
-    // we'll use gasnet_AMRequestLong1 (which use address in segment)
+    //  we'll use gasnet_AMRequestLong1 (which use address in segment)
     // Otherwise, we send an error message.
     // ------------------------------------------------------------
+    const int max_medium_size = gasnet_AMMaxMedium();
 
-    if (gasnet_AMMaxMedium() > bufferSize) {
-      // short and medium message
-      //VC8 when this call terminates, does message is still potentially used by the gasnet runtime or not ?
-      GASNET_Safe( gasnet_AMRequestMedium1(targetRank, AMHANDLER(gasnetAMMessageMedium), message, bufferSize,
-                                           gasnetId) );
-
-    } else if (gasnet_AMMaxLongRequest() > bufferSize) {
-      // in case of long message, use AM's long request
-      void *address = seginfo[targetRank].addr;
-      GASNET_Safe( gasnet_AMRequestLong1(targetRank, AMHANDLER(gasnetAMMessageLong), message, bufferSize,
-                                         address, gasnetId) );
-
+    if (max_medium_size > fullMsgSize) {
+        sendMediumMessage( self, targetRank, gasnetId, messageBuffer, fullMsgSize,
+        addr_hi, addr_lo, segment_size);
     } else {
-      // at the moment we couldn't afford to have a huge message due to Gasnet limitation.
-      // we'll deal with this by chunking the message.
-      DPRINTF(DEBUG_LVL_VVERB, "[%d] %s ERROR too long message (%d bytes)\n", (int) self->pd->myLocation, __func__, bufferSize);
-      ASSERT(false);
-      // TODO: the buffer size if too big to send. We need to split it.
-      return 1;
+        // sending large messages require access to the remote share segment
+        // (only when am long enabled)
+        gasnetCommBlock_t *blockRemote = gasnetSegmentBlockGet(self->pd, targetRank);
+        if (gasnet_AMMaxLongRequest() > fullMsgSize) {
+            gasnetSendLongMessage(targetRank, messageBuffer, fullMsgSize, gasnetId, blockRemote,
+                                  addr_hi, addr_lo, segment_size);
+        } else {
+        // at the moment we couldn't afford to have a huge message due to Gasnet limitation.
+        // we need to deal with this by chunking the message.
+        gasnetSendHugeMessage( targetRank, messageBuffer, fullMsgSize, gasnetId, blockRemote,
+                              addr_hi, addr_lo, segment_size );
+        }
+        // sometimes we don't get the gasnet share segment due to insufficient memory
+        // or because the message can be small. In this case we don't need to free
+        if (blockRemote != NULL) {
+            self->pd->fcts.pdFree(self->pd, blockRemote);
+        }
     }
 
-    DPRINTF(DEBUG_LVL_VERB,"[%d][GASNET] AM for msgId %ld type %x to rank %d\n", (int) self->pd->myLocation, message->msgId, message->type, targetRank);
-    *id = gasnetId;
+    // Whatever happened up there, the copy can always be deleted
+    if (message != messageBuffer) {
+        self->pd->fcts.pdFree(self->pd, messageBuffer);
+    }
 
+    // Regarding the original message
+    // An outgoing request for a two-way should be on the user stack
+    // An outgoing request for a one-way should have been copied (hence to be deleted)
+    // An outgoing response for a two-way should be on the heap
+    //    => What about if the response was larger than the request who deallocates ?
+    if (!(message->type & PD_MSG_REQ_RESPONSE)) {
+        // A one-way (req or resp) should have been made persistent in upper-layers
+        ASSERT(properties & PERSIST_MSG_PROP);
+        // Hence, free the original since we've just made a copy
+        self->pd->fcts.pdFree(self->pd, message);
+    }
+
+    DPRINTF(DEBUG_LVL_VERB,"[GASNET] AM for msgId %ld type %x to rank %d\n",
+                           message->msgId, message->type, targetRank);
+    *id = gasnetId;
     return 0;
 }
 
-
-//-------------------------------------------------------------------------------------------
-// Comm life-cycle functions
-//-------------------------------------------------------------------------------------------
-//
-
-
-//-------------------------------------------------------------------------------------------
-// polling message for the third attempt
-//-------------------------------------------------------------------------------------------
+/*
+ * @brief Polling message for the third attempt
+ */
 u8 GasnetCommPollMessage_RL3(ocrCommPlatform_t *self, ocrPolicyMsg_t **msg,
-                      u64* bufferSize, u32 properties, u32 *mask) {
+                             u32 properties, u32 *mask) {
+    ocrCommPlatformGasnet_t *gasnetComm = (ocrCommPlatformGasnet_t*) self;
 
-  ASSERT(msg != NULL);
-  ASSERT(*msg == NULL && "GASNet cannot poll for a specific message");
+    ASSERT(msg != NULL);
+    ASSERT(*msg == NULL && "GASNet cannot poll for a specific message");
 
-  ocrCommPlatformGasnet_t *gasnetComm = (ocrCommPlatformGasnet_t*) self;
-  ocrPolicyDomain_t *pd  = self->pd;
+    // remove all incoming tasks in the check the queue
+    GASNET_Safe(gasnet_AMPoll());
 
-  // ---------------------------------------
-  // remove all outgoing tasks in the queue
-  // ---------------------------------------
-  // VC8 I don't understand why we need that in gasnet
-  // iterator_t *iterator = gasnetComm->outgoing->iterator(gasnetComm->outgoing);
-  // while(iterator->hasNext(iterator)) {
-  //   // check the queue
-  //   //VC8 From what I read on the net, this thing allows to call the handler of an AM. Is that right ?
-  //   GASNET_Safe(gasnet_AMPoll());
+    hal_lock32(&gasnetComm->queueLock);
+    iterator_t * incomingIt = gasnetComm->incomingIt;
+    incomingIt->reset(incomingIt);
 
-  //   //VC8 I don't understand how this AMPoll is related to this particular instance of gasnetCommHandle_t in the outgoing list.
-  //   gasnetCommHandle_t *handle = (gasnetCommHandle_t*) iterator->next(iterator);
-  //   u32 msgProperties = handle->properties;
-  //   ASSERT(msgProperties & PERSIST_MSG_PROP);
-  //   if (!(msgProperties & TWOWAY_MSG_PROP)) {
-  //     pd->fcts.pdFree(pd, handle->msg);
-  //   }
-  //   pd->fcts.pdFree(pd, handle);
-  //   iterator->removeCurrent(iterator);
-  // }
-  // iterator->destruct(iterator);
+    if (incomingIt->hasNext(incomingIt)) {
+        *msg = (ocrPolicyMsg_t *) incomingIt->next(incomingIt);
+        incomingIt->removeCurrent(incomingIt);
+        hal_unlock32(&gasnetComm->queueLock);
 
-  // ---------------------------------------
-  // remove all incoming tasks in the queue
-  // ---------------------------------------
-  // check the queue
-  GASNET_Safe(gasnet_AMPoll());
+        u64 baseSize = 0, marshalledSize = 0;
+        ocrPolicyMsgGetMsgSize(*msg, &baseSize, &marshalledSize, MARSHALL_DBPTR | MARSHALL_NSADDR);
 
-#ifdef CONCURRENT_GASNET
-  hal_lock32(&gasnetComm->queueLock);
-#endif
-  iterator_t * iterator = gasnetComm->incoming->iterator(gasnetComm->incoming);
-  while(iterator->hasNext(iterator)) {
-    // The handle the AM handle has created
-    //VC8: it sounds that in gasnet we don't need to create a handle on incoming, we could just
-    //store the message in the queue and give it out to the caller
-    gasnetCommHandle_t *handle = (gasnetCommHandle_t*) iterator->next(iterator);
-    ocrPolicyMsg_t * receivedMsg = handle->msg;
+        ocrPolicyMsgUnMarshallMsg((u8*)*msg, NULL, *msg,
+                                  MARSHALL_APPEND | MARSHALL_NSADDR | MARSHALL_DBPTR);
 
-    //VC8: don't understand why you would need that in gasnet, the AM handler is always listening right ?
-    // if (receivedMsg->type & PD_MSG_REQUEST) {
-    //   // Receiving a request indicates a mpi recv any
-    //   // has completed. Post a new one.
-    //   DPRINTF(DEBUG_LVL_VVERB, "[%d] WARNING: a request message still in wait self=%p\n", gasnet_mynode(), self);
-    //   ocrPolicyMsg_t *msg = allocateNewMessage(self, gasnetComm->maxMsgSize);
-    //   gasnetCommHandle_t *handle = createGasnetHandle(self, 0, PERSIST_MSG_PROP, msg);
-    //   gasnetComm->incoming->pushFront(gasnetComm->incoming, handle);
-    // }
-    *msg = receivedMsg;
-    pd->fcts.pdFree(pd, handle);
-    iterator->removeCurrent(iterator);
-    iterator->destruct(iterator);
-#ifdef CONCURRENT_GASNET
-    hal_unlock32(&gasnetComm->queueLock);
-#endif
-    return POLL_MORE_MESSAGE;
-  }
-  iterator->destruct(iterator);
-#ifdef CONCURRENT_GASNET
-  hal_unlock32(&gasnetComm->queueLock);
-#endif
-  return POLL_NO_MESSAGE;
-}
-
-
-
-//-------------------------------------------------------------------------------------------
-// polling message for the second attempt
-//-------------------------------------------------------------------------------------------
-u8 GasnetCommPollMessage_RL2(ocrCommPlatform_t *self, ocrPolicyMsg_t **msg,
-                      u64* bufferSize, u32 properties, u32 *mask) {
-
-  ocrCommPlatformGasnet_t *gasnetComm = (ocrCommPlatformGasnet_t*) self;
-  ocrPolicyDomain_t *pd  = self->pd;
-  linkedlist_t * outbox = gasnetComm->outgoing;
-
-  while(!outbox->isEmpty(outbox)) {
-    iterator_t *iterator = outbox->iterator(outbox);
-
-    while(iterator->hasNext(iterator)) {
-      // check the queue
-      GASNET_Safe(gasnet_AMPoll());
-
-      gasnetCommHandle_t *handle = (gasnetCommHandle_t*) iterator->next(iterator);
-      pd->fcts.pdFree(pd, handle->msg);
-      pd->fcts.pdFree(pd, handle);
-      iterator->removeCurrent(iterator);
+        return POLL_MORE_MESSAGE;
     }
-    iterator->destruct(iterator);
-  }
-  return POLL_NO_MESSAGE;
+
+    pdLookingForWork(gasnetComm);
+
+    hal_unlock32(&gasnetComm->queueLock);
+
+    return POLL_NO_MESSAGE;
 }
 
-
+/*
+ * @brief Gasnet general polling message
+ */
 u8 GasnetCommPollMessage(ocrCommPlatform_t *self, ocrPolicyMsg_t **msg,
-                      u64* bufferSize, u32 properties, u32 *mask) {
+                         u32 properties, u32 *mask) {
     ocrCommPlatformGasnet_t * gasnetComm = ((ocrCommPlatformGasnet_t *) self);
-    // debug(__func__);
     switch(gasnetComm->rl) {
     case 3:
-        return GasnetCommPollMessage_RL3(self, msg, bufferSize, properties, mask);
+        return GasnetCommPollMessage_RL3(self, msg, properties, mask);
     case 2:
-    default:
-        GasnetCommPollMessage_RL2(self, msg, bufferSize, properties, mask);
         gasnetComm->rl_completed[2] = true;
+        return POLL_NO_MESSAGE;
+    default:
+        // nothing to do
+        ASSERT(false && "Illegal RL reached in MPI-comm-platform pollMessage");
     }
     return POLL_NO_MESSAGE;
-
 }
 
+/*
+ * @brief Blocking-wait until we receive a message
+ */
 u8 GasnetCommWaitMessage(ocrCommPlatform_t *self, ocrPolicyMsg_t **msg,
-                      u64* bufferSize, u32 properties, u32 *mask) {
+                         u32 properties, u32 *mask) {
     u8 ret = 0;
-    debug(__func__);
     do {
-        ret = self->fcts.pollMessage(self, msg, bufferSize, properties, mask);
+        ret = self->fcts.pollMessage(self, msg, properties, mask);
     } while(ret != POLL_MORE_MESSAGE);
 
     return ret;
 }
 
+/*
+ * @brief preparation for gasnet communication
+ */
 void GasnetCommBegin(ocrCommPlatform_t * self, ocrPolicyDomain_t * pd, ocrCommApi_t *commApi) {
-    debug(__func__);
-
     self->pd = pd;
     int rank=gasnet_mynode();
     pd->myLocation = GasnetRankToLocation(rank);
-    platform = self;
+    registerMessage( gasnetMessageIncoming );
 }
 
+/*
+ * @brief starting gasnet
+ */
 void GasnetCommStart(ocrCommPlatform_t * self, ocrPolicyDomain_t * pd, ocrCommApi_t *commApi) {
     ocrCommPlatformGasnet_t * gasnetComm = ((ocrCommPlatformGasnet_t *) self);
-    debug(__func__);
-    gasnetComm->msgId = 1;
     gasnetComm->incoming = newLinkedList(pd);
-    gasnetComm->outgoing = newLinkedList(pd);
+    gasnetComm->incomingIt = gasnetComm->incoming->iterator(gasnetComm->incoming);
 
-    gasnetComm->maxMsgSize = sizeof(ocrPolicyMsg_t);
+    addCommPlatform(self);
 
     // All-to-all neighbor knowledge
     int nbRanks = gasnet_nodes();
@@ -427,20 +449,19 @@ void GasnetCommStart(ocrCommPlatform_t * self, ocrPolicyDomain_t * pd, ocrCommAp
     int myRank = (int) locationToGasnetRank(pd->myLocation);
     int i = 0;
     while(i < (nbRanks-1)) {
-        pd->neighbors[i] = GasnetRankToLocation((myRank+i+1)%nbRanks);
-        DPRINTF(DEBUG_LVL_VERB,"[%d] neighbors[%d] is %d\n", pd->myLocation , i, pd->neighbors[i]);
+        pd->neighbors[i] = (((myRank+i+1)%nbRanks));
+        DPRINTF(DEBUG_LVL_VERB,"[%d] neighbors[%d] is %d\n", myRank, i, pd->neighbors[i]);
         i++;
     }
-#ifdef CONCURRENT_GASNET
-    gasnetComm->queueLock = 0;
-#endif
     GASNET_Safe(gasnet_AMPoll());
 }
 
+/*
+ * @brief stoping gasnet, with 3 runtime levels
+ */
 void GasnetCommStop(ocrCommPlatform_t * self) {
     ocrCommPlatformGasnet_t * gasnetComm = ((ocrCommPlatformGasnet_t *) self);
 
-    debug(__func__);
     switch(gasnetComm->rl) {
     case 3:
         gasnetComm->rl_completed[3] = true;
@@ -456,8 +477,6 @@ void GasnetCommStop(ocrCommPlatform_t * self) {
         break;
     case 0:
         gasnetComm->incoming->destruct(gasnetComm->incoming);
-        ASSERT(gasnetComm->outgoing->isEmpty(gasnetComm->outgoing));
-        gasnetComm->outgoing->destruct(gasnetComm->outgoing);
         break;
     default:
         ASSERT(false && "Illegal RL reached in Gasnet-comm-platform stop");
@@ -465,24 +484,36 @@ void GasnetCommStop(ocrCommPlatform_t * self) {
     DPRINTF(DEBUG_LVL_VVERB,"[%d] Exiting Calling Gasnet STOP %d\n",  (int) self->pd->myLocation, gasnetComm->rl);
 }
 
-
+/*
+ * @brief finish phase
+ */
 void GasnetCommFinish(ocrCommPlatform_t *self) {
-    debug(__func__);
 }
 
-
+/*
+ * @brief termination phase. End of the comm-platform
+ */
 void GasnetCommDestruct(ocrCommPlatform_t * base) {
-    platformFinalizeGasnetComm();
-    runtimeChunkFree((u64)base, NULL);
+
+  /* Spec says client should include a barrier before gasnet_exit() */
+  gasnet_barrier_notify(0,GASNET_BARRIERFLAG_ANONYMOUS);
+  gasnet_barrier_wait(0,GASNET_BARRIERFLAG_ANONYMOUS);
+
+  // free chunk
+  runtimeChunkFree((u64)base, NULL);
+
+  // free resources allocated in am handlers
+  amhandler_free_table();
 }
 
-
+/*
+ * @brief create a new comm-platform for gasnet
+ */
 ocrCommPlatform_t* newCommPlatformGasnet(ocrCommPlatformFactory_t *factory,
                                        ocrParamList_t *perInstance) {
 
     ocrCommPlatformGasnet_t * commPlatformGasnet = (ocrCommPlatformGasnet_t*)
         runtimeChunkAlloc(sizeof(ocrCommPlatformGasnet_t), NULL);
-
     commPlatformGasnet->base.location = ((paramListCommPlatformInst_t *)perInstance)->location;
     commPlatformGasnet->base.fcts = factory->platformFcts;
     factory->initialize(factory, (ocrCommPlatform_t *) commPlatformGasnet, perInstance);
@@ -490,32 +521,40 @@ ocrCommPlatform_t* newCommPlatformGasnet(ocrCommPlatformFactory_t *factory,
 }
 
 
-
 /******************************************************/
 /*  GASNET COMM-PLATFORM FACTORY                      */
 /******************************************************/
 
- void destructCommPlatformFactoryGasnet(ocrCommPlatformFactory_t *factory) {
+void destructCommPlatformFactoryGasnet(ocrCommPlatformFactory_t *factory) {
     runtimeChunkFree((u64)factory, NULL);
 }
 
-void initializeCommPlatformGasnet(ocrCommPlatformFactory_t * factory, ocrCommPlatform_t * base, ocrParamList_t * perInstance) {
+/*
+ * @brief Callback to initialize the platform
+ */
+void initializeCommPlatformGasnet(ocrCommPlatformFactory_t * factory, ocrCommPlatform_t * base,
+          ocrParamList_t * perInstance) {
     initializeCommPlatformOcr(factory, base, perInstance);
     ocrCommPlatformGasnet_t * gasnetComm = (ocrCommPlatformGasnet_t*) base;
     gasnetComm->msgId = 1;
     gasnetComm->incoming = NULL;
-    gasnetComm->outgoing = NULL;
-    gasnetComm->maxMsgSize = 0;
+    gasnetComm->incomingIt = NULL;
     int i = 0;
     while (i < (GASNET_COMM_RL_MAX+1)) {
         gasnetComm->rl_completed[i++] = false;
     }
     gasnetComm->rl = GASNET_COMM_RL_MAX;
+    gasnetComm->queueLock = 0;
 }
 
+/*
+ * @brief Function to define communication callbacks
+ */
 ocrCommPlatformFactory_t *newCommPlatformFactoryGasnet(ocrParamList_t *perType) {
+
     ocrCommPlatformFactory_t *base = (ocrCommPlatformFactory_t*)
         runtimeChunkAlloc(sizeof(ocrCommPlatformFactoryGasnet_t), (void *)1);
+
     base->instantiate = &newCommPlatformGasnet;
     base->initialize = &initializeCommPlatformGasnet;
 
@@ -528,14 +567,13 @@ ocrCommPlatformFactory_t *newCommPlatformFactoryGasnet(ocrParamList_t *perType) 
     base->platformFcts.stop = FUNC_ADDR(void (*)(ocrCommPlatform_t*), GasnetCommStop);
     base->platformFcts.finish = FUNC_ADDR(void (*)(ocrCommPlatform_t*), GasnetCommFinish);
     base->platformFcts.sendMessage = FUNC_ADDR(u8 (*)(ocrCommPlatform_t*,ocrLocation_t,
-                                               ocrPolicyMsg_t*,u64,u64*,u32,u32), GasnetCommSendMessage);
-    base->platformFcts.pollMessage = FUNC_ADDR(u8 (*)(ocrCommPlatform_t*,ocrPolicyMsg_t**,u64*,u32,u32*),
+                                               ocrPolicyMsg_t*,u64*,u32,u32), GasnetCommSendMessage);
+    base->platformFcts.pollMessage = FUNC_ADDR(u8 (*)(ocrCommPlatform_t*,ocrPolicyMsg_t**,u32,u32*),
                                                GasnetCommPollMessage);
-    base->platformFcts.waitMessage = FUNC_ADDR(u8 (*)(ocrCommPlatform_t*,ocrPolicyMsg_t**,u64*,u32,u32*),
+    base->platformFcts.waitMessage = FUNC_ADDR(u8 (*)(ocrCommPlatform_t*,ocrPolicyMsg_t**,u32,u32*),
                                                GasnetCommWaitMessage);
 
     return base;
 }
-
 
 #endif //ENABLE_COMM_PLATFORM_GASNET
