@@ -16,6 +16,12 @@
 #include "ocr-types.h"
 #include "utils/ocr-utils.h"
 
+#ifdef __MACH__
+#include <mach/mach_time.h>
+static double conversion_factor;
+static int getTimeNs_initialized = 0;
+#endif
+
 /******************************************************/
 /*  ABORT / EXIT OCR                                  */
 /******************************************************/
@@ -172,6 +178,22 @@ u64 ocrStrlen(const char* str) {
 }
 
 #ifdef OCR_ENABLE_VISUALIZER
+
+#ifdef __MACH__
+u64 getTimeNs()
+{
+    double timeStamp;
+    if (!getTimeNs_initialized)
+    {
+        mach_timebase_info_data_t timebase;
+        mach_timebase_info(&timebase);
+        conversion_factor = (double)timebase.numer / (double)timebase.denom;
+        getTimeNs_initialized=1;
+    }
+    timeStamp = mach_absolute_time() * conversion_factor;
+    return (u64) timeStamp;
+}
+#else
 u64 getTimeNs()
 {
     struct timespec ts;
@@ -180,6 +202,7 @@ u64 getTimeNs()
 }
 #endif
 
+#endif
 
 /* This is not currently used. What to do with it?
 void ocrPlaceTrackerAllocate ( ocrPlaceTracker_t** toFill ) {

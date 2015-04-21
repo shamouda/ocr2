@@ -364,7 +364,7 @@ static void * acquireLocalDb(ocrPolicyDomain_t * pd, ocrGuid_t dbGuid, ocrDbAcce
     PD_MSG_FIELD_IO(guid.metaDataPtr) = NULL;
     PD_MSG_FIELD_IO(edt.guid) = curTask->guid;
     PD_MSG_FIELD_IO(edt.metaDataPtr) = curTask;
-    //TODO-225 missing edtSlot init
+    PD_MSG_FIELD_IO(edtSlot) = EDT_SLOT_NONE;
     PD_MSG_FIELD_IO(properties) = properties; // Runtime acquire
     // This call may fail if the policy domain goes down
     // while we are starting to execute
@@ -501,6 +501,8 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
                     // before we return. Otherwise there's a race between this registration
                     // and the current EDT finishing.
                     msg2.type = PD_MSG_DEP_SATISFY | PD_MSG_REQUEST;
+                    PD_MSG_FIELD_I(satisfierGuid.guid) = NULL_GUID; // TODO: Vincent, what to set these as?
+                    PD_MSG_FIELD_I(satisfierGuid.metaDataPtr) = NULL;
                     PD_MSG_FIELD_I(guid) = parentLatch;
                     PD_MSG_FIELD_I(payload.guid) = NULL_GUID;
                     PD_MSG_FIELD_I(payload.metaDataPtr) = NULL;
@@ -532,19 +534,19 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
                 PD_MSG_FIELD_IO(guid.guid) = NULL_GUID;
                 PD_MSG_FIELD_IO(guid.metaDataPtr) = NULL;
                 PD_MSG_FIELD_I(currentEdt) = currentEdt;
-                PD_MSG_FIELD_I(type) = OCR_EVENT_LATCH_T;
                 PD_MSG_FIELD_I(properties) = 0;
+                PD_MSG_FIELD_I(type) = OCR_EVENT_LATCH_T;
                 RESULT_PROPAGATE(self->fcts.processMessage(self, &msg2, true));
 
                 ocrFatGuid_t latchFGuid = PD_MSG_FIELD_IO(guid);
 #undef PD_TYPE
 #define PD_TYPE PD_MSG_DEP_ADD
                 msg2.type = PD_MSG_DEP_ADD | PD_MSG_REQUEST;
+                PD_MSG_FIELD_IO(properties) = DB_MODE_RO; // not called from add-dependence
                 PD_MSG_FIELD_I(source) = latchFGuid;
                 PD_MSG_FIELD_I(dest) = parentLatch;
                 PD_MSG_FIELD_I(currentEdt) = currentEdt;
                 PD_MSG_FIELD_I(slot) = OCR_EVENT_LATCH_DECR_SLOT;
-                PD_MSG_FIELD_IO(properties) = DB_MODE_RO; // not called from add-dependence
                 RESULT_PROPAGATE(self->fcts.processMessage(self, &msg2, true));
 #undef PD_MSG
 #undef PD_TYPE
@@ -1085,6 +1087,7 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
                         PD_MSG_FIELD_I(currentEdt.guid) = NULL_GUID;
                         PD_MSG_FIELD_I(currentEdt.metaDataPtr) = NULL;
                         PD_MSG_FIELD_I(errorCode) = self->shutdownCode;
+                        PD_MSG_FIELD_I(properties) = 0;
                         DPRINTF(DEBUG_LVL_VERB,"MGT_SHUTDOWN: send shutdown msg to %d\n", (int) msgShutdown.destLocation);
                         // Shutdown is a two-way message. It gives the target the opportunity to drain and
                         // finalize some of its pending communication (think dbRelease called after the EDT

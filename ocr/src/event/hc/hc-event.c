@@ -162,6 +162,7 @@ u8 satisfyEventHcOnce(ocrEvent_t *base, ocrFatGuid_t db, u32 slot) {
         msg.type = PD_MSG_DB_ACQUIRE | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
         PD_MSG_FIELD_IO(guid) = event->waitersDb;
         PD_MSG_FIELD_IO(edt) = currentEdt;
+        PD_MSG_FIELD_IO(edtSlot) = EDT_SLOT_NONE;
         PD_MSG_FIELD_IO(properties) = DB_MODE_RO | DB_PROP_RT_ACQUIRE;
         //Should be a local DB
         u8 res = pd->fcts.processMessage(pd, &msg, true);
@@ -174,10 +175,6 @@ u8 satisfyEventHcOnce(ocrEvent_t *base, ocrFatGuid_t db, u32 slot) {
 
         // Second, call satisfy on all the waiters
 #define PD_TYPE PD_MSG_DEP_SATISFY
-        // Fill the common part to all the satisfy messages
-        PD_MSG_FIELD_I(payload) = db; // Do this once as it may get resolved the first time
-        PD_MSG_FIELD_I(currentEdt) = currentEdt;
-        PD_MSG_FIELD_I(properties) = 0;
 
         for(i = 0; i < event->waitersCount; ++i) {
 #ifdef OCR_ENABLE_STATISTICS
@@ -192,9 +189,15 @@ u8 satisfyEventHcOnce(ocrEvent_t *base, ocrFatGuid_t db, u32 slot) {
 
             getCurrentEnv(NULL, NULL, NULL, &msg);
             msg.type = PD_MSG_DEP_SATISFY | PD_MSG_REQUEST;
+            // Need to refill because out may overwrite some of the in fields
+            PD_MSG_FIELD_I(satisfierGuid.guid) = base->guid;
+            PD_MSG_FIELD_I(satisfierGuid.metaDataPtr) = base;
             PD_MSG_FIELD_I(guid.guid) = waiters[i].guid;
             PD_MSG_FIELD_I(guid.metaDataPtr) = NULL;
+            PD_MSG_FIELD_I(payload) = db;
+            PD_MSG_FIELD_I(currentEdt) = currentEdt;
             PD_MSG_FIELD_I(slot) = waiters[i].slot;
+            PD_MSG_FIELD_I(properties) = 0;
             RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, false));
         }
 
@@ -205,6 +208,8 @@ u8 satisfyEventHcOnce(ocrEvent_t *base, ocrFatGuid_t db, u32 slot) {
         msg.type = PD_MSG_DB_RELEASE | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
         PD_MSG_FIELD_IO(guid) = event->waitersDb;
         PD_MSG_FIELD_I(edt) = currentEdt;
+        PD_MSG_FIELD_I(ptr) = NULL;
+        PD_MSG_FIELD_I(size) = 0;
         PD_MSG_FIELD_I(properties) = DB_PROP_RT_ACQUIRE;
         RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, true));
 #undef PD_MSG
@@ -259,6 +264,7 @@ u8 satisfyEventHcPersist(ocrEvent_t *base, ocrFatGuid_t db, u32 slot) {
         PD_MSG_FIELD_IO(guid) = event->base.waitersDb;
         PD_MSG_FIELD_IO(edt.guid) = curTask ? curTask->guid : NULL_GUID;
         PD_MSG_FIELD_IO(edt.metaDataPtr) = curTask;
+        PD_MSG_FIELD_IO(edtSlot) = EDT_SLOT_NONE;
         // !! Warning !! ITW here (and not RO) works in pair with the lock
         // being unlocked before DB_RELEASE is called in 'registerWaiterEventHcPersist'
         PD_MSG_FIELD_IO(properties) = DB_MODE_ITW | DB_PROP_RT_ACQUIRE;
@@ -280,11 +286,6 @@ u8 satisfyEventHcPersist(ocrEvent_t *base, ocrFatGuid_t db, u32 slot) {
 #undef PD_TYPE
         // Call satisfy on all the waiters
 #define PD_TYPE PD_MSG_DEP_SATISFY
-        PD_MSG_FIELD_I(payload) = db; // Do this once as it may get resolved the first time
-        PD_MSG_FIELD_I(properties) = 0;
-        PD_MSG_FIELD_I(satisfierGuid.guid) = base->guid;
-        // Passing NULL since base may become invalid
-        PD_MSG_FIELD_I(satisfierGuid.metaDataPtr) = NULL;
         for(i = 0; i < waitersCount; ++i) {
 #ifdef OCR_ENABLE_STATISTICS
             // We do this *before* calling signalWaiter because otherwise
@@ -298,9 +299,14 @@ u8 satisfyEventHcPersist(ocrEvent_t *base, ocrFatGuid_t db, u32 slot) {
 
             getCurrentEnv(NULL, NULL, NULL, &msg);
             msg.type = PD_MSG_DEP_SATISFY | PD_MSG_REQUEST;
+            PD_MSG_FIELD_I(satisfierGuid.guid) = base->guid;
+            // Passing NULL since base may become invalid
+            PD_MSG_FIELD_I(satisfierGuid.metaDataPtr) = NULL;
             PD_MSG_FIELD_I(guid.guid) = waiters[i].guid;
             PD_MSG_FIELD_I(guid.metaDataPtr) = NULL;
+            PD_MSG_FIELD_I(payload) = db;
             PD_MSG_FIELD_I(slot) = waiters[i].slot;
+            PD_MSG_FIELD_I(properties) = 0;
             RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, false));
         }
         // Release the DB
@@ -311,6 +317,8 @@ u8 satisfyEventHcPersist(ocrEvent_t *base, ocrFatGuid_t db, u32 slot) {
         PD_MSG_FIELD_IO(guid) = dbToRelease;
         PD_MSG_FIELD_I(edt.guid) = curTask ? curTask->guid : NULL_GUID;
         PD_MSG_FIELD_I(edt.metaDataPtr) = curTask;
+        PD_MSG_FIELD_I(ptr) = NULL;
+        PD_MSG_FIELD_I(size) = 0;
         PD_MSG_FIELD_I(properties) = DB_PROP_RT_ACQUIRE;
         RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, true));
 #undef PD_MSG
@@ -362,6 +370,7 @@ u8 satisfyEventHcLatch(ocrEvent_t *base, ocrFatGuid_t db, u32 slot) {
         msg.type = PD_MSG_DB_ACQUIRE | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
         PD_MSG_FIELD_IO(guid) = event->base.waitersDb;
         PD_MSG_FIELD_IO(edt) = currentEdt;
+        PD_MSG_FIELD_IO(edtSlot) = EDT_SLOT_NONE;
         PD_MSG_FIELD_IO(properties) = DB_MODE_RO | DB_PROP_RT_ACQUIRE;
         //Should be a local DB
         u8 res = pd->fcts.processMessage(pd, &msg, true);
@@ -374,11 +383,6 @@ u8 satisfyEventHcLatch(ocrEvent_t *base, ocrFatGuid_t db, u32 slot) {
 #undef PD_TYPE
         // Call satisfy on all the waiters
 #define PD_TYPE PD_MSG_DEP_SATISFY
-        PD_MSG_FIELD_I(payload) = db; // Do this once as it may get resolved the first time
-        PD_MSG_FIELD_I(currentEdt) = currentEdt;
-        PD_MSG_FIELD_I(properties) = 0;
-        PD_MSG_FIELD_I(satisfierGuid.guid) = base->guid;
-        PD_MSG_FIELD_I(satisfierGuid.metaDataPtr) = base;
         for(i = 0; i < event->base.waitersCount; ++i) {
 #ifdef OCR_ENABLE_STATISTICS
             // We do this *before* calling signalWaiter because otherwise
@@ -392,9 +396,14 @@ u8 satisfyEventHcLatch(ocrEvent_t *base, ocrFatGuid_t db, u32 slot) {
 
             getCurrentEnv(NULL, NULL, NULL, &msg);
             msg.type = PD_MSG_DEP_SATISFY | PD_MSG_REQUEST;
+            PD_MSG_FIELD_I(satisfierGuid.guid) = base->guid;
+            PD_MSG_FIELD_I(satisfierGuid.metaDataPtr) = base;
             PD_MSG_FIELD_I(guid.guid) = waiters[i].guid;
             PD_MSG_FIELD_I(guid.metaDataPtr) = NULL;
+            PD_MSG_FIELD_I(payload) = db;
+            PD_MSG_FIELD_I(currentEdt) = currentEdt;
             PD_MSG_FIELD_I(slot) = waiters[i].slot;
+            PD_MSG_FIELD_I(properties) = 0;
             RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, false));
         }
         // Release the DB
@@ -404,6 +413,8 @@ u8 satisfyEventHcLatch(ocrEvent_t *base, ocrFatGuid_t db, u32 slot) {
         msg.type = PD_MSG_DB_RELEASE | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
         PD_MSG_FIELD_IO(guid) = event->base.waitersDb;
         PD_MSG_FIELD_I(edt) = currentEdt;
+        PD_MSG_FIELD_I(ptr) = NULL;
+        PD_MSG_FIELD_I(size) = 0;
         PD_MSG_FIELD_I(properties) = DB_PROP_RT_ACQUIRE;
         RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, true));
 #undef PD_MSG
@@ -453,6 +464,7 @@ u8 registerWaiterEventHc(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot, bool i
     msg.type = PD_MSG_DB_ACQUIRE | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
     PD_MSG_FIELD_IO(guid) = event->waitersDb;
     PD_MSG_FIELD_IO(edt) = curEdt;
+    PD_MSG_FIELD_IO(edtSlot) = EDT_SLOT_NONE;
     PD_MSG_FIELD_IO(properties) = DB_MODE_ITW | DB_PROP_RT_ACQUIRE;
     //Should be a local DB
     u8 res = pd->fcts.processMessage(pd, &msg, true);
@@ -469,11 +481,11 @@ u8 registerWaiterEventHc(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot, bool i
         msg.type = PD_MSG_DB_CREATE | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
         PD_MSG_FIELD_IO(guid.guid) = NULL_GUID;
         PD_MSG_FIELD_IO(guid.metaDataPtr) = NULL;
-        PD_MSG_FIELD_I(edt) = curEdt;
+        PD_MSG_FIELD_IO(properties) = DB_PROP_RT_ACQUIRE;
         PD_MSG_FIELD_IO(size) = sizeof(regNode_t)*event->waitersMax*2;
+        PD_MSG_FIELD_I(edt) = curEdt;
         PD_MSG_FIELD_I(affinity.guid) = NULL_GUID;
         PD_MSG_FIELD_I(affinity.metaDataPtr) = NULL;
-        PD_MSG_FIELD_IO(properties) = DB_PROP_RT_ACQUIRE;
         PD_MSG_FIELD_I(dbType) = RUNTIME_DBTYPE;
         PD_MSG_FIELD_I(allocator) = NO_ALLOC;
         RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, true));
@@ -526,6 +538,8 @@ u8 registerWaiterEventHc(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot, bool i
         msg.type = PD_MSG_DB_RELEASE | PD_MSG_REQUEST;
         PD_MSG_FIELD_IO(guid) = dbToRelease;
         PD_MSG_FIELD_I(edt) = curEdt;
+        PD_MSG_FIELD_I(ptr) = NULL;
+        PD_MSG_FIELD_I(size) = 0;
         PD_MSG_FIELD_I(properties) = DB_PROP_RT_ACQUIRE;
         RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, false));
 #undef PD_TYPE
@@ -586,12 +600,12 @@ u8 registerWaiterEventHcPersist(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot,
 #define PD_MSG (&msg)
 #define PD_TYPE PD_MSG_DEP_SATISFY
         msg.type = PD_MSG_DEP_SATISFY | PD_MSG_REQUEST;
+        PD_MSG_FIELD_I(satisfierGuid.guid) = base->guid;
+        PD_MSG_FIELD_I(satisfierGuid.metaDataPtr) = base;
         PD_MSG_FIELD_I(guid) = waiter;
         PD_MSG_FIELD_I(payload.guid) = event->data;
         PD_MSG_FIELD_I(payload.metaDataPtr) = NULL;
         PD_MSG_FIELD_I(currentEdt) = currentEdt;
-        PD_MSG_FIELD_I(satisfierGuid.guid) = base->guid;
-        PD_MSG_FIELD_I(satisfierGuid.metaDataPtr) = base;
         PD_MSG_FIELD_I(slot) = slot;
         PD_MSG_FIELD_I(properties) = 0;
         if((toReturn = pd->fcts.processMessage(pd, &msg, false))) {
@@ -610,6 +624,7 @@ u8 registerWaiterEventHcPersist(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot,
     msg.type = PD_MSG_DB_ACQUIRE | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
     PD_MSG_FIELD_IO(guid) = event->base.waitersDb;
     PD_MSG_FIELD_IO(edt) = currentEdt;
+    PD_MSG_FIELD_IO(edtSlot) = EDT_SLOT_NONE;
     PD_MSG_FIELD_IO(properties) = DB_MODE_ITW | DB_PROP_RT_ACQUIRE;
     //Should be a local DB
     if((toReturn = pd->fcts.processMessage(pd, &msg, true))) {
@@ -631,11 +646,11 @@ u8 registerWaiterEventHcPersist(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot,
         getCurrentEnv(NULL, NULL, NULL, &msg);
         msg.type = PD_MSG_DB_CREATE | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
         PD_MSG_FIELD_IO(guid) = event->base.waitersDb;
-        PD_MSG_FIELD_I(edt) = currentEdt;
+        PD_MSG_FIELD_IO(properties) = DB_PROP_RT_ACQUIRE;
         PD_MSG_FIELD_IO(size) = sizeof(regNode_t)*event->base.waitersMax*2;
+        PD_MSG_FIELD_I(edt) = currentEdt;
         PD_MSG_FIELD_I(affinity.guid) = NULL_GUID;
         PD_MSG_FIELD_I(affinity.metaDataPtr) = NULL;
-        PD_MSG_FIELD_IO(properties) = DB_PROP_RT_ACQUIRE;
         PD_MSG_FIELD_I(dbType) = RUNTIME_DBTYPE;
         PD_MSG_FIELD_I(allocator) = NO_ALLOC;
         if((toReturn = pd->fcts.processMessage(pd, &msg, true))) {
@@ -687,6 +702,8 @@ u8 registerWaiterEventHcPersist(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot,
     msg.type = PD_MSG_DB_RELEASE | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
     PD_MSG_FIELD_IO(guid) = event->base.waitersDb;
     PD_MSG_FIELD_I(edt) = currentEdt;
+    PD_MSG_FIELD_I(ptr) = NULL;
+    PD_MSG_FIELD_I(size) = 0;
     PD_MSG_FIELD_I(properties) = DB_PROP_RT_ACQUIRE;
     RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, true));
 #undef PD_MSG
@@ -719,6 +736,7 @@ u8 unregisterWaiterEventHc(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot, bool
     msg.type = PD_MSG_DB_ACQUIRE | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
     PD_MSG_FIELD_IO(guid) = event->waitersDb;
     PD_MSG_FIELD_IO(edt) = curEdt;
+    PD_MSG_FIELD_IO(edtSlot) = EDT_SLOT_NONE;
     PD_MSG_FIELD_IO(properties) = DB_MODE_ITW | DB_PROP_RT_ACQUIRE;
     //Should be a local DB
     u8 res = pd->fcts.processMessage(pd, &msg, true);
@@ -746,6 +764,8 @@ u8 unregisterWaiterEventHc(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot, bool
     msg.type = PD_MSG_DB_RELEASE | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
     PD_MSG_FIELD_IO(guid) = event->waitersDb;
     PD_MSG_FIELD_I(edt) = curEdt;
+    PD_MSG_FIELD_I(ptr) = NULL;
+    PD_MSG_FIELD_I(size) = 0;
     PD_MSG_FIELD_I(properties) = DB_PROP_RT_ACQUIRE;
     RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, true));
 #undef PD_MSG
@@ -785,6 +805,7 @@ u8 unregisterWaiterEventHcPersist(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slo
     msg.type = PD_MSG_DB_ACQUIRE | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
     PD_MSG_FIELD_IO(guid) = event->base.waitersDb;
     PD_MSG_FIELD_IO(edt) = curEdt;
+    PD_MSG_FIELD_IO(edtSlot) = EDT_SLOT_NONE;
     PD_MSG_FIELD_IO(properties) = DB_MODE_ITW | DB_PROP_RT_ACQUIRE;
     //Should be a local DB
     if((toReturn = pd->fcts.processMessage(pd, &msg, true))) {
@@ -817,6 +838,8 @@ u8 unregisterWaiterEventHcPersist(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slo
     msg.type = PD_MSG_DB_RELEASE | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
     PD_MSG_FIELD_IO(guid) = event->base.waitersDb;
     PD_MSG_FIELD_I(edt) = curEdt;
+    PD_MSG_FIELD_I(ptr) = NULL;
+    PD_MSG_FIELD_I(size) = 0;
     PD_MSG_FIELD_I(properties) = DB_PROP_RT_ACQUIRE;
     RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, true));
 #undef PD_MSG
@@ -925,11 +948,11 @@ ocrEvent_t * newEventHc(ocrEventFactory_t * factory, ocrEventTypes_t eventType,
     getCurrentEnv(NULL, NULL, NULL, &msg);
     msg.type = PD_MSG_DB_CREATE | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
     PD_MSG_FIELD_IO(guid) = event->waitersDb;
-    PD_MSG_FIELD_I(edt) = curEdt;
     PD_MSG_FIELD_IO(size) = sizeof(regNode_t)*INIT_WAITER_COUNT;
+    PD_MSG_FIELD_IO(properties) = DB_PROP_RT_ACQUIRE;
+    PD_MSG_FIELD_I(edt) = curEdt;
     PD_MSG_FIELD_I(affinity.guid) = NULL_GUID;
     PD_MSG_FIELD_I(affinity.metaDataPtr) = NULL;
-    PD_MSG_FIELD_IO(properties) = DB_PROP_RT_ACQUIRE;
     PD_MSG_FIELD_I(dbType) = RUNTIME_DBTYPE;
     PD_MSG_FIELD_I(allocator) = NO_ALLOC;
     RESULT_PROPAGATE2(pd->fcts.processMessage(pd, &msg, true), NULL);
@@ -962,6 +985,8 @@ ocrEvent_t * newEventHc(ocrEventFactory_t * factory, ocrEventTypes_t eventType,
     msg.type = PD_MSG_DB_RELEASE | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
     PD_MSG_FIELD_IO(guid) = event->waitersDb;
     PD_MSG_FIELD_I(edt) = curEdt;
+    PD_MSG_FIELD_I(ptr) = NULL;
+    PD_MSG_FIELD_I(size) = 0;
     PD_MSG_FIELD_I(properties) = DB_PROP_RT_ACQUIRE;
     RESULT_PROPAGATE2(pd->fcts.processMessage(pd, &msg, true), NULL);
 #undef PD_MSG

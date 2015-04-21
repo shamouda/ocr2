@@ -68,7 +68,9 @@ typedef struct _ocrDataBlockFcts_t {
      * @param[out] ptr          Returns the pointer to use to access the data
      * @param[in] edt           EDT seeking registration
      *                          Must be fully resolved
-     * @param[in] edtSlot       EDT slot the DB is acquired for (can be EDT_NO_SLOT)
+     * @param[in] edtSlot       EDT slot the DB is acquired for. Can be EDT_NO_SLOT
+     *                          when not applicable. For example when acquiring
+     *                          a datablock for runtime usage)
      * @param[in] isInternal    True if this is an acquire implicitly
      *                          done by the runtime at EDT launch
      * @param[in] properties    Any additional properties for the acquire call

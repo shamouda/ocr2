@@ -22,9 +22,10 @@ static void ocrShutdownInternal(u8 errorCode) {
 #define PD_MSG msgPtr
 #define PD_TYPE PD_MSG_MGT_SHUTDOWN
     msgPtr->type = PD_MSG_MGT_SHUTDOWN | PD_MSG_REQUEST;
-    PD_MSG_FIELD_I(errorCode) = errorCode;
     PD_MSG_FIELD_I(currentEdt.guid) = curEdt ? curEdt->guid : NULL_GUID;
     PD_MSG_FIELD_I(currentEdt.metaDataPtr) = curEdt;
+    PD_MSG_FIELD_I(properties) = 0;
+    PD_MSG_FIELD_I(errorCode) = errorCode;
     RESULT_ASSERT(pd->fcts.processMessage(pd, msgPtr, true), ==, 0);
 #undef PD_MSG
 #undef PD_TYPE
