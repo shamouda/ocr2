@@ -120,10 +120,12 @@
 // Conversion between user-provided address and block header
 #define HEAD_TO_USER(X)         ((X)+3)
 #define USER_TO_HEAD(X)         (((u64 *)(X))-3)
-// Minimum allocatable size == ALLOC_OVERHEAD + (2*u64 for prev/next for free list)
-#define MINIMUM_SIZE            (6*sizeof(u64))
 // At the moment, we have alloc overhead of 4 u64 to user payload (HEAD,INFO1,INFO2,and TAIL)
 #define ALLOC_OVERHEAD          (4*sizeof(u64))
+// Minimum allocatable size from user's perspective is 2*u64 for prev/next for free list
+// Thus, the minimum block size is MINIMUM_SIZE_USER + ALLOC_OVERHEAD
+#define MINIMUM_SIZE_USER       (2*sizeof(u64))
+#define MINIMUM_SIZE            (MINIMUM_SIZE_USER + ALLOC_OVERHEAD)
 
 // VALGRIND SUPPORT
 //
@@ -424,8 +426,8 @@ static void *simpleMalloc(pool_t *pool,u64 size, struct _ocrPolicyDomain_t *pd)
     if (p == NULL)
         goto exit_fail;
 
-    if (size < MINIMUM_SIZE)  // should be bigger than minimum size
-        size = MINIMUM_SIZE;
+    if (size < MINIMUM_SIZE_USER)  // should be bigger than minimum size
+        size = MINIMUM_SIZE_USER;
     size = (size + ALIGNMENT_MASK)&(~ALIGNMENT_MASK);   // ceiling
     do {
         VALGRIND_CHUNK_OPEN(p);
