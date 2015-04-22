@@ -57,6 +57,7 @@
 #include "utils/ocr-utils.h"
 #include "simple-allocator.h"
 #include "allocator/allocator-all.h"
+#include "ocr-mem-platform.h"
 #ifdef HAL_FSIM_CE
 #include "rmd-map.h"
 #endif
@@ -227,8 +228,18 @@ static void simpleInit(pool_t *pool, u64 size)
     ASSERT((size & ALIGNMENT_MASK) == 0);
     size = size - sizeof(pool_t);
 
-    // assume pool->lock is already 0 at startup
+    // pool->lock and pool->inited is already 0 at startup (on x86, it's done at mallocBegin())
+#ifdef ENABLE_VALGRIND
+    VALGRIND_MAKE_MEM_DEFINED(&(pool->lock), sizeof(pool->lock));
     hal_lock32(&(pool->lock));
+    VALGRIND_MAKE_MEM_NOACCESS(&(pool->lock), sizeof(pool->lock));
+#else
+    hal_lock32(&(pool->lock));
+#endif
+
+#ifdef ENABLE_VALGRIND
+    VALGRIND_MAKE_MEM_DEFINED(&(pool->inited), sizeof(pool->inited));
+#endif
     if (!(pool->inited)) {
         simpleTest((u64)pool, size+sizeof(pool_t));
         HEAD(q) = MARK | size;
@@ -247,7 +258,17 @@ static void simpleInit(pool_t *pool, u64 size)
     } else {
         DPRINTF(DEBUG_LVL_INFO, "init skip for pool %p\n", pool);
     }
+#ifdef ENABLE_VALGRIND
+    VALGRIND_MAKE_MEM_NOACCESS(&(pool->inited), sizeof(pool->inited));
+#endif
+
+#ifdef ENABLE_VALGRIND
+    VALGRIND_MAKE_MEM_DEFINED(&(pool->lock), sizeof(pool->lock));
     hal_unlock32(&(pool->lock));
+    VALGRIND_MAKE_MEM_NOACCESS(&(pool->lock), sizeof(pool->lock));
+#else
+    hal_unlock32(&(pool->lock));
+#endif
 }
 
 static void simplePrint(pool_t *pool)
@@ -554,6 +575,10 @@ void simpleBegin(ocrAllocator_t *self, ocrPolicyDomain_t * PD ) {
         "SIMPLE Allocator @ 0x%llx/0x%llx got pool at address 0x%llx of size 0x%llx(%lld), offset from storage addr by %lld\n",
         (u64) rself, (u64) self,
         (u64) (rself->poolAddr), (u64) (rself->poolSize), (u64)(rself->poolSize), (u64) (rself->poolStorageOffset));
+
+    ASSERT(self->memories[0]->memories[0]->startAddr /* startAddr of the memory that memplatform allocated. (for x86, at mallocBegin()) */
+              + MEM_PLATFORM_ZEROED_AREA_SIZE >= /* Add the size of zero-ed area (for x86, at mallocBegin()), then this should be greater than */
+             rself->poolAddr + sizeof(pool_t) /* the end of pool_t, so this ensures zero'ed rangeTracker,pad,pool_t */ );
 
     simpleInit( (pool_t *)addrGlobalizeOnTG((void *)rself->poolAddr, PD), rself->poolSize);
 }

@@ -198,6 +198,7 @@ u8 countedMapReleaseGuid(ocrGuidProvider_t *self, ocrFatGuid_t fatGuid, bool rel
         PD_MSG_FIELD_I(allocator.metaDataPtr) = NULL;
         PD_MSG_FIELD_I(ptr) = fatGuid.metaDataPtr;
         PD_MSG_FIELD_I(type) = GUID_MEMTYPE;
+        PD_MSG_FIELD_I(properties) = 0;
         RESULT_PROPAGATE(policy->fcts.processMessage (policy, &msg, true));
 #undef PD_MSG
 #undef PD_TYPE

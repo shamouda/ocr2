@@ -55,8 +55,8 @@ u8 ptrGetGuid(ocrGuidProvider_t* self, ocrGuid_t* guid, u64 val, ocrGuidKind kin
 #define PD_TYPE PD_MSG_MEM_ALLOC
     msg.type = PD_MSG_MEM_ALLOC | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
     PD_MSG_FIELD_I(size) = sizeof(ocrGuidImpl_t);
-    PD_MSG_FIELD_I(properties) = 0; // TODO:  What flags should be defined?  Where are symbolic constants for them defined?
     PD_MSG_FIELD_I(type) = GUID_MEMTYPE;
+    PD_MSG_FIELD_I(properties) = 0; // TODO:  What flags should be defined?  Where are symbolic constants for them defined?
 
     RESULT_PROPAGATE(policy->fcts.processMessage (policy, &msg, true));
 
@@ -146,6 +146,7 @@ u8 ptrReleaseGuid(ocrGuidProvider_t *self, ocrFatGuid_t guid, bool releaseVal) {
     PD_MSG_FIELD_I(allocator.metaDataPtr) = NULL;
     PD_MSG_FIELD_I(ptr) = ((void *) guid.guid);
     PD_MSG_FIELD_I(type) = GUID_MEMTYPE;
+    PD_MSG_FIELD_I(properties) = 0;
     RESULT_PROPAGATE(policy->fcts.processMessage (policy, &msg, true));
 #undef PD_MSG
 #undef PD_TYPE

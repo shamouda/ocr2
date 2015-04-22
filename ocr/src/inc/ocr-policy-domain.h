@@ -402,7 +402,7 @@ typedef struct _ocrPolicyMsg_t {
             // This is reported in bug #273
             ocrFatGuid_t guid;         /**< In: GUID of the DB to acquire */
             ocrFatGuid_t edt;          /**< In: EDT doing the acquire */
-            u32 edtSlot;               /**< In: EDT's slot if applicable */
+            u32 edtSlot;               /**< In: EDT's slot if applicable else EDT_SLOT_NONE */
             u32 properties;            /**< In: Properties for acquire. Bit 0: 1 if runtime acquire */
             union {
                 struct {

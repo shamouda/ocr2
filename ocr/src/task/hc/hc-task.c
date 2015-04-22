@@ -187,10 +187,12 @@ static u8 finishLatchCheckin(ocrPolicyDomain_t *pd, ocrPolicyMsg_t *msg,
 #undef PD_TYPE
 #define PD_TYPE PD_MSG_DEP_ADD
     msg->type = PD_MSG_DEP_ADD | PD_MSG_REQUEST;
+    PD_MSG_FIELD_IO(properties) = DB_MODE_RO; // not called from add-dependence
     PD_MSG_FIELD_I(source) = sourceEvent;
     PD_MSG_FIELD_I(dest) = latchEvent;
     PD_MSG_FIELD_I(slot) = OCR_EVENT_LATCH_DECR_SLOT;
-    PD_MSG_FIELD_IO(properties) = DB_MODE_RO; // not called from add-dependence
+    PD_MSG_FIELD_I(currentEdt.guid) = NULL_GUID;
+    PD_MSG_FIELD_I(currentEdt.metaDataPtr) = NULL;
     RESULT_PROPAGATE(pd->fcts.processMessage(pd, msg, false));
 #undef PD_MSG
 #undef PD_TYPE
@@ -255,6 +257,8 @@ static u8 initTaskHcInternal(ocrTaskHc_t *task, ocrPolicyDomain_t * pd,
         msg.type = PD_MSG_EVT_CREATE | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
         PD_MSG_FIELD_IO(guid.guid) = NULL_GUID;
         PD_MSG_FIELD_IO(guid.metaDataPtr) = NULL;
+        PD_MSG_FIELD_I(currentEdt.guid) = curTask!=NULL?curTask->guid:NULL_GUID;
+        PD_MSG_FIELD_I(currentEdt.metaDataPtr) = NULL;
         PD_MSG_FIELD_I(type) = OCR_EVENT_LATCH_T;
         PD_MSG_FIELD_I(properties) = 0;
         RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, true));
@@ -490,8 +494,9 @@ u8 newTaskHc(ocrTaskFactory_t* factory, ocrFatGuid_t * edtGuid, ocrFatGuid_t edt
 
     // Get the current environment
     ocrPolicyDomain_t *pd = NULL;
+    ocrTask_t *curTask = NULL;
     u32 i;
-    getCurrentEnv(&pd, NULL, NULL, NULL);
+    getCurrentEnv(&pd, NULL, &curTask, NULL);
 
     ocrFatGuid_t outputEvent = {.guid = NULL_GUID, .metaDataPtr = NULL};
     // We need an output event for the EDT if either:
@@ -509,6 +514,8 @@ u8 newTaskHc(ocrTaskFactory_t* factory, ocrFatGuid_t * edtGuid, ocrFatGuid_t edt
         msg.type = PD_MSG_EVT_CREATE | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
         PD_MSG_FIELD_IO(guid.guid) = NULL_GUID;
         PD_MSG_FIELD_IO(guid.metaDataPtr) = NULL;
+        PD_MSG_FIELD_I(currentEdt.guid) = curTask!=NULL?curTask->guid:NULL_GUID;
+        PD_MSG_FIELD_I(currentEdt.metaDataPtr) = curTask;
         PD_MSG_FIELD_I(properties) = 0;
         PD_MSG_FIELD_I(type) = OCR_EVENT_ONCE_T; // Output events of EDTs are non sticky
 
@@ -807,6 +814,7 @@ u8 registerSignalerTaskHc(ocrTask_t * base, ocrFatGuid_t signalerGuid, u32 slot,
     #define PD_MSG (&registerMsg)
     #define PD_TYPE PD_MSG_DEP_SATISFY
         registerMsg.type = PD_MSG_DEP_SATISFY | PD_MSG_REQUEST;
+        PD_MSG_FIELD_I(satisfierGuid) = currentEdt;
         PD_MSG_FIELD_I(guid.guid) = base->guid;
         PD_MSG_FIELD_I(guid.metaDataPtr) = NULL;
         PD_MSG_FIELD_I(payload.guid) = signalerGuid.guid;
@@ -1021,6 +1029,8 @@ u8 taskExecute(ocrTask_t* base) {
             msg.type = PD_MSG_DEP_ADD | PD_MSG_REQUEST;
             PD_MSG_FIELD_I(source.guid) = retGuid;
             PD_MSG_FIELD_I(dest.guid) = base->outputEvent;
+            PD_MSG_FIELD_I(currentEdt.guid) = base->guid;
+            PD_MSG_FIELD_I(currentEdt.metaDataPtr) = base;
             PD_MSG_FIELD_I(slot) = 0; // Always satisfy on slot 0. This will trickle to
             // the finish latch if needed
             PD_MSG_FIELD_IO(properties) = DB_MODE_RO;

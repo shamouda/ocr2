@@ -33,6 +33,10 @@ typedef int64_t  s64; /**< 64-bit signed integer */
 typedef int32_t  s32; /**< 32-bit signed integer */
 typedef int8_t   s8;  /**< 8-bit signed integer */
 
+#ifdef __MACH__
+#include <stdbool.h>
+#else
+
 /* boolean support in C */
 #ifndef __cplusplus
 #define true 1
@@ -46,6 +50,8 @@ typedef u8 bool;
 #define TRUE true
 #define FALSE false
 #endif /* __cplusplus */
+
+#endif
 
 /**
  * @brief Type describing the unique identifier of most

@@ -77,9 +77,9 @@ static u8 takeFromSchedulerAndSend(ocrPolicyDomain_t * pd) {
     msgCommTake.type = PD_MSG_COMM_TAKE | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
     PD_MSG_FIELD_IO(guids) = &handlerGuid;
     PD_MSG_FIELD_IO(extra) = 0; /*unused*/
+    PD_MSG_FIELD_IO(type) = OCR_GUID_COMM;
     PD_MSG_FIELD_IO(guidCount) = 1;
     PD_MSG_FIELD_I(properties) = 0;
-    PD_MSG_FIELD_IO(type) = OCR_GUID_COMM;
     ret = pd->fcts.processMessage(pd, &msgCommTake, true);
     if (!ret && (PD_MSG_FIELD_IO(guidCount) != 0)) {
         ASSERT(PD_MSG_FIELD_IO(guidCount) == 1); //LIMITATION: single guid returned by comm take
@@ -162,23 +162,23 @@ static u8 createProcessRequestEdt(ocrPolicyDomain_t * pd, ocrGuid_t templateGuid
     msg.type = PD_MSG_WORK_CREATE | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
     PD_MSG_FIELD_IO(guid.guid) = NULL_GUID;
     PD_MSG_FIELD_IO(guid.metaDataPtr) = NULL;
+    PD_MSG_FIELD_IO(outputEvent.guid) = NULL_GUID;
+    PD_MSG_FIELD_IO(outputEvent.metaDataPtr) = NULL;
+    PD_MSG_FIELD_IO(paramc) = paramc;
+    PD_MSG_FIELD_IO(depc) = depc;
     PD_MSG_FIELD_I(templateGuid.guid) = templateGuid;
     PD_MSG_FIELD_I(templateGuid.metaDataPtr) = NULL;
     PD_MSG_FIELD_I(affinity.guid) = NULL_GUID;
     PD_MSG_FIELD_I(affinity.metaDataPtr) = NULL;
-    PD_MSG_FIELD_IO(outputEvent.guid) = NULL_GUID;
-    PD_MSG_FIELD_IO(outputEvent.metaDataPtr) = NULL;
-    PD_MSG_FIELD_I(paramv) = paramv;
-    PD_MSG_FIELD_IO(paramc) = paramc;
-    PD_MSG_FIELD_IO(depc) = depc;
-    PD_MSG_FIELD_I(depv) = NULL;
-    PD_MSG_FIELD_I(properties) = properties;
-    PD_MSG_FIELD_I(workType) = workType;
     // This is a "fake" EDT so it has no "parent"
     PD_MSG_FIELD_I(currentEdt.guid) = NULL_GUID;
     PD_MSG_FIELD_I(currentEdt.metaDataPtr) = NULL;
     PD_MSG_FIELD_I(parentLatch.guid) = NULL_GUID;
     PD_MSG_FIELD_I(parentLatch.metaDataPtr) = NULL;
+    PD_MSG_FIELD_I(paramv) = paramv;
+    PD_MSG_FIELD_I(depv) = NULL;
+    PD_MSG_FIELD_I(workType) = workType;
+    PD_MSG_FIELD_I(properties) = properties;
     returnCode = pd->fcts.processMessage(pd, &msg, true);
     if(returnCode) {
         edtGuid = PD_MSG_FIELD_IO(guid.guid);

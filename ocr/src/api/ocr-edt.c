@@ -30,10 +30,10 @@ u8 ocrEventCreate(ocrGuid_t *guid, ocrEventTypes_t eventType, bool takesArg) {
     msg.type = PD_MSG_EVT_CREATE | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
     PD_MSG_FIELD_IO(guid.guid) = *guid;
     PD_MSG_FIELD_IO(guid.metaDataPtr) = NULL;
-    PD_MSG_FIELD_I(properties) = takesArg;
-    PD_MSG_FIELD_I(type) = eventType;
     PD_MSG_FIELD_I(currentEdt.guid) = curEdt ? curEdt->guid : NULL_GUID;
     PD_MSG_FIELD_I(currentEdt.metaDataPtr) = curEdt;
+    PD_MSG_FIELD_I(properties) = takesArg;
+    PD_MSG_FIELD_I(type) = eventType;
     returnCode = pd->fcts.processMessage(pd, &msg, true);
     if(returnCode == 0)
         *guid = PD_MSG_FIELD_IO(guid.guid);
@@ -59,9 +59,9 @@ u8 ocrEventDestroy(ocrGuid_t eventGuid) {
 
     PD_MSG_FIELD_I(guid.guid) = eventGuid;
     PD_MSG_FIELD_I(guid.metaDataPtr) = NULL;
-    PD_MSG_FIELD_I(properties) = 0;
     PD_MSG_FIELD_I(currentEdt.guid) = curEdt ? curEdt->guid : NULL_GUID;
     PD_MSG_FIELD_I(currentEdt.metaDataPtr) = curEdt;
+    PD_MSG_FIELD_I(properties) = 0;
 
     u8 toReturn = pd->fcts.processMessage(pd, &msg, false);
     DPRINTF_COND_LVL(toReturn, DEBUG_LVL_WARN, DEBUG_LVL_INFO,
@@ -90,10 +90,10 @@ u8 ocrEventSatisfySlot(ocrGuid_t eventGuid, ocrGuid_t dataGuid /*= INVALID_GUID*
     PD_MSG_FIELD_I(guid.metaDataPtr) = NULL;
     PD_MSG_FIELD_I(payload.guid) = dataGuid;
     PD_MSG_FIELD_I(payload.metaDataPtr) = NULL;
-    PD_MSG_FIELD_I(slot) = slot;
-    PD_MSG_FIELD_I(properties) = 0;
     PD_MSG_FIELD_I(currentEdt.guid) = curEdt ? curEdt->guid : NULL_GUID;
     PD_MSG_FIELD_I(currentEdt.metaDataPtr) = curEdt;
+    PD_MSG_FIELD_I(slot) = slot;
+    PD_MSG_FIELD_I(properties) = 0;
     u8 toReturn = pd->fcts.processMessage(pd, &msg, false);
     DPRINTF_COND_LVL(toReturn, DEBUG_LVL_WARN, DEBUG_LVL_INFO,
                      "EXIT ocrEventSatisfySlot(evt=0x%lx) -> %u\n", eventGuid, toReturn);
@@ -124,15 +124,16 @@ u8 ocrEdtTemplateCreate_internal(ocrGuid_t *guid, ocrEdt_t funcPtr, u32 paramc, 
     msg.type = PD_MSG_EDTTEMP_CREATE | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
     PD_MSG_FIELD_IO(guid.guid) = *guid;
     PD_MSG_FIELD_IO(guid.metaDataPtr) = NULL;
+    PD_MSG_FIELD_I(currentEdt.guid) = curEdt ? curEdt->guid : NULL_GUID;
+    PD_MSG_FIELD_I(currentEdt.metaDataPtr) = curEdt;
     PD_MSG_FIELD_I(funcPtr) = funcPtr;
     PD_MSG_FIELD_I(paramc) = paramc;
     PD_MSG_FIELD_I(depc) = depc;
+    PD_MSG_FIELD_I(properties) = 0;
 #ifdef OCR_ENABLE_EDT_NAMING
     PD_MSG_FIELD_I(funcName) = funcName;
     PD_MSG_FIELD_I(funcNameLen) = ocrStrlen(funcName);
 #endif
-    PD_MSG_FIELD_I(currentEdt.guid) = curEdt ? curEdt->guid : NULL_GUID;
-    PD_MSG_FIELD_I(currentEdt.metaDataPtr) = curEdt;
 
     returnCode = pd->fcts.processMessage(pd, &msg, true);
     if(returnCode == 0)
@@ -160,6 +161,7 @@ u8 ocrEdtTemplateDestroy(ocrGuid_t guid) {
     PD_MSG_FIELD_I(guid.metaDataPtr) = NULL;
     PD_MSG_FIELD_I(currentEdt.guid) = curEdt ? curEdt->guid : NULL_GUID;
     PD_MSG_FIELD_I(currentEdt.metaDataPtr) = curEdt;
+    PD_MSG_FIELD_I(properties) = 0;
     u8 toReturn = pd->fcts.processMessage(pd, &msg, false);
     DPRINTF_COND_LVL(toReturn, DEBUG_LVL_WARN, DEBUG_LVL_INFO,
                      "EXIT ocrEdtTemplateDestroy(guid=0x%lx) -> %u\n", guid, toReturn);
@@ -192,26 +194,26 @@ u8 ocrEdtCreate(ocrGuid_t* edtGuid, ocrGuid_t templateGuid,
     msg.type = PD_MSG_WORK_CREATE | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
     PD_MSG_FIELD_IO(guid.guid) = *edtGuid;
     PD_MSG_FIELD_IO(guid.metaDataPtr) = NULL;
-    PD_MSG_FIELD_I(templateGuid.guid) = templateGuid;
-    PD_MSG_FIELD_I(templateGuid.metaDataPtr) = NULL;
-    PD_MSG_FIELD_I(affinity.guid) = affinity;
-    PD_MSG_FIELD_I(affinity.metaDataPtr) = NULL;
-    PD_MSG_FIELD_IO(outputEvent.metaDataPtr) = NULL;
     if(outputEvent) {
         PD_MSG_FIELD_IO(outputEvent.guid) = UNINITIALIZED_GUID;
     } else {
         PD_MSG_FIELD_IO(outputEvent.guid) = NULL_GUID;
     }
-    PD_MSG_FIELD_I(paramv) = paramv;
+    PD_MSG_FIELD_IO(outputEvent.metaDataPtr) = NULL;
     PD_MSG_FIELD_IO(paramc) = paramc;
     PD_MSG_FIELD_IO(depc) = depc;
-    PD_MSG_FIELD_I(depv) = NULL;
-    PD_MSG_FIELD_I(properties) = properties;
-    PD_MSG_FIELD_I(workType) = EDT_USER_WORKTYPE;
-    PD_MSG_FIELD_I(currentEdt.guid) = curEdt ? curEdt->guid : NULL_GUID;
-    PD_MSG_FIELD_I(currentEdt.metaDataPtr) = curEdt;
+    PD_MSG_FIELD_I(templateGuid.guid) = templateGuid;
+    PD_MSG_FIELD_I(templateGuid.metaDataPtr) = NULL;
+    PD_MSG_FIELD_I(affinity.guid) = affinity;
+    PD_MSG_FIELD_I(affinity.metaDataPtr) = NULL;
     PD_MSG_FIELD_I(parentLatch.guid) = curEdt ? ((curEdt->finishLatch != NULL_GUID) ? curEdt->finishLatch : curEdt->parentLatch) : NULL_GUID;
     PD_MSG_FIELD_I(parentLatch.metaDataPtr) = NULL;
+    PD_MSG_FIELD_I(currentEdt.guid) = curEdt ? curEdt->guid : NULL_GUID;
+    PD_MSG_FIELD_I(currentEdt.metaDataPtr) = curEdt;
+    PD_MSG_FIELD_I(paramv) = paramv;
+    PD_MSG_FIELD_I(depv) = NULL;
+    PD_MSG_FIELD_I(workType) = EDT_USER_WORKTYPE;
+    PD_MSG_FIELD_I(properties) = properties;
 
     returnCode = pd->fcts.processMessage(pd, &msg, true);
     if(returnCode) {
@@ -270,6 +272,7 @@ u8 ocrEdtDestroy(ocrGuid_t edtGuid) {
     PD_MSG_FIELD_I(guid.metaDataPtr) = NULL;
     PD_MSG_FIELD_I(currentEdt.guid) = curEdt ? curEdt->guid : NULL_GUID;
     PD_MSG_FIELD_I(currentEdt.metaDataPtr) = curEdt;
+    PD_MSG_FIELD_I(properties) = 0;
     u8 toReturn = pd->fcts.processMessage(pd, &msg, false);
     DPRINTF_COND_LVL(toReturn, DEBUG_LVL_WARN, DEBUG_LVL_INFO,
                      "EXIT ocrEdtDestroy(guid=0x%lx) -> %u\n", edtGuid, toReturn);
@@ -313,10 +316,10 @@ u8 ocrAddDependence(ocrGuid_t source, ocrGuid_t destination, u32 slot,
         PD_MSG_FIELD_I(guid.metaDataPtr) = NULL;
         PD_MSG_FIELD_I(payload.guid) = NULL_GUID;
         PD_MSG_FIELD_I(payload.metaDataPtr) = NULL;
-        PD_MSG_FIELD_I(slot) = slot;
-        PD_MSG_FIELD_I(properties) = 0;
         PD_MSG_FIELD_I(currentEdt.guid) = curEdt ? curEdt->guid : NULL_GUID;
         PD_MSG_FIELD_I(currentEdt.metaDataPtr) = curEdt;
+        PD_MSG_FIELD_I(slot) = slot;
+        PD_MSG_FIELD_I(properties) = 0;
 #undef PD_MSG
 #undef PD_TYPE
     }

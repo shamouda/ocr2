@@ -166,7 +166,7 @@ typedef enum {
 
 
 /**
- * @brief Identifier to represent 'none' of an EDT slots
+ * @brief Identifier to represent 'none' of an EDT slots.
  */
 #define EDT_SLOT_NONE ((u32)-1)
 
