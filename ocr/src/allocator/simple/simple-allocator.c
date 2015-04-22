@@ -111,13 +111,18 @@
 #define GET_BIT0(X)             ((                   1) & (X))
 #define GET_BIT1(X)             ((                   2) & (X))
 
+// Additional INFOs
 #define INFO1(X)                ((X)[1])
 #define INFO2(X)                ((X)[2])
+// in case of free block, prev/next is used to get linked into free list
 #define NEXT(X)                 ((X)[3])
 #define PREV(X)                 ((X)[4])
+// Conversion between user-provided address and block header
 #define HEAD_TO_USER(X)         ((X)+3)
 #define USER_TO_HEAD(X)         (((u64 *)(X))-3)
-#define MIN_SIZE_FREE           (6*sizeof(u64))
+// Minimum allocatable size == ALLOC_OVERHEAD + (2*u64 for prev/next for free list)
+#define MINIMUM_SIZE            (6*sizeof(u64))
+// At the moment, we have alloc overhead of 4 u64 to user payload (HEAD,INFO1,INFO2,and TAIL)
 #define ALLOC_OVERHEAD          (4*sizeof(u64))
 
 // VALGRIND SUPPORT
@@ -271,9 +276,10 @@ static void simpleInit(pool_t *pool, u64 size)
 #endif
 }
 
+#if 0 // debugging code. disabled to prevent warning messages
 static void simplePrint(pool_t *pool)
 {
-/*
+    // debugging code
     u64 *p = pool->freelist;
     u64 *next;
     u64 size = 0, count = 0;
@@ -294,8 +300,39 @@ static void simplePrint(pool_t *pool)
         p = next;
     } while(1);
     DPRINTF(DEBUG_LVL_VERB, "[free list] count %ld  size %ld (%lx)\n", count, size, size);
-*/
 }
+
+static void simpleWalk(pool_t *pool)
+{
+    // debugging code.
+    u64 *p = pool->pool_start;
+    u64 size;
+    u64 count = 0;
+
+    do {
+        if (  GET_MARK(HEAD(p)) != MARK ) {
+            DPRINTF(DEBUG_LVL_WARN, "[walk] mark not found %p\n", p);
+            break;
+        }
+        size = GET_SIZE(HEAD(p));
+        ASSERT((size & ALIGNMENT_MASK) == 0);
+        if (TAIL(p, size) != size) {
+            DPRINTF(DEBUG_LVL_WARN, "[walk] two sizes doesn't match. p=%p  size=%ld , tail=%ld\n", p, size, TAIL(p,size));
+            break;
+        }
+
+        count++;
+        p = &PEER_RIGHT(p, size);
+        if (p == pool->pool_end)
+            break;
+        if (p > pool->pool_end) {
+            DPRINTF(DEBUG_LVL_WARN, "[walk] p %p > end %p\n", p, pool->pool_end);
+            break;
+        }
+    } while(1);
+    DPRINTF(DEBUG_LVL_VERB, "[walk] count %ld\n", count);
+}
+#endif
 
 static void simpleInsertFree(pool_t *pool,u64 *p, u64 size)
 {
@@ -332,7 +369,8 @@ static void simpleSplitFree(pool_t *pool,u64 *p, u64 size)
     u64 remain = GET_SIZE(HEAD(p)) - size;
     ASSERT( remain < GET_SIZE(HEAD(p)) );
     ASSERT((size & ALIGNMENT_MASK) == 0);
-    if (remain >= MIN_SIZE_FREE) {
+    // make sure the remaining block is bigger than minimum size
+    if (remain >= MINIMUM_SIZE) {
         HEAD(p) = MARK | size | 0x1;    // in-use mark
         TAIL(p, size) = size;
         VALGRIND_CHUNK_CLOSE(p);
@@ -382,10 +420,12 @@ static void *simpleMalloc(pool_t *pool,u64 size, struct _ocrPolicyDomain_t *pd)
     u64 size_orig = size;
 #endif
     DPRINTF(DEBUG_LVL_VERB, "before malloc size %ld:\n", size);
-    simplePrint(pool);
+    //simplePrint(pool);
     if (p == NULL)
         goto exit_fail;
 
+    if (size < MINIMUM_SIZE)  // should be bigger than minimum size
+        size = MINIMUM_SIZE;
     size = (size + ALIGNMENT_MASK)&(~ALIGNMENT_MASK);   // ceiling
     do {
         VALGRIND_CHUNK_OPEN(p);
@@ -457,27 +497,28 @@ void simpleFree(void *p)
     }
     u64 size = GET_SIZE(HEAD(q));
     if (TAIL(q, size) != size) {
-        DPRINTF(DEBUG_LVL_INFO, "SimpleAlloc : two sizes doesn't match. p=%p\n", p);   // TODO: make it WARN
+        DPRINTF(DEBUG_LVL_WARN, "SimpleAlloc : two sizes doesn't match. p=%p\n", p);
         goto free_exit;
     }
 
     DPRINTF(DEBUG_LVL_VERB, "before free : pool = %p, addr=%p\n", pool, INFO2(q));
-    simplePrint(pool);
+    //simplePrint(pool);
 
     u64 *peer_right = &PEER_RIGHT(q, size);
     if ((u64)peer_right > end) {
-        DPRINTF(DEBUG_LVL_INFO, "SimpleAlloc : PEER_RIGHT address %p is above the heap area\n", peer_right);
+        DPRINTF(DEBUG_LVL_WARN, "SimpleAlloc : PEER_RIGHT address %p is above the heap area\n", peer_right);
         goto free_exit;
     }
     if ((u64)&HEAD(q) < start) {
-        DPRINTF(DEBUG_LVL_INFO, "SimpleAlloc : address %p is below the heap area\n", &HEAD(q));
+        DPRINTF(DEBUG_LVL_WARN, "SimpleAlloc : address %p is below the heap area\n", &HEAD(q));
         goto free_exit;
     }
     VALGRIND_CHUNK_CLOSE(q);
+
     if ((u64)peer_right != end) {
         VALGRIND_CHUNK_OPEN(peer_right);
         if (  GET_MARK(HEAD(peer_right)) != MARK ) {
-            DPRINTF(DEBUG_LVL_INFO, "SimpleAlloc : right neighbor's mark not found %p\n", p);
+            DPRINTF(DEBUG_LVL_WARN, "SimpleAlloc : right neighbor's mark not found %p\n", p);
         } else {
             if (!(GET_BIT0(HEAD(peer_right)))) {     // right block is free?
                 size += GET_SIZE(HEAD(peer_right));
@@ -497,19 +538,15 @@ void simpleFree(void *p)
         // just omit chunk_close_left()
         VALGRIND_CHUNK_OPEN(peer_left);
         if (  GET_MARK(HEAD(peer_left)) != MARK ) {
-            DPRINTF(DEBUG_LVL_INFO, "SimpleAlloc : left neighbor's mark not found %p\n", p);
+            DPRINTF(DEBUG_LVL_WARN, "SimpleAlloc : left neighbor's mark not found %p\n", p);
         } else {
             if (!(GET_BIT0(HEAD(peer_left)))) {      // left block is free?
                 size += GET_SIZE(HEAD(peer_left));
-                HEAD(peer_left) = MARK | size;
-                VALGRIND_CHUNK_CLOSE(peer_left);        // this closes old tail
-                ASSERT((size & ALIGNMENT_MASK) == 0);
-                VALGRIND_CHUNK_OPEN(peer_left);         // this opens new tail due to the changed size
-                TAIL(peer_left, size) = size;
                 VALGRIND_CHUNK_CLOSE(peer_left);
-                VALGRIND_CHUNK_OPEN(q);
+                simpleDeleteFree(pool, peer_left);
+                VALGRIND_CHUNK_OPEN(peer_left);
                 HEAD(q) = 0;    // erase header (and mark)
-                goto free_exit;
+                q = peer_left;
             }
         }
         VALGRIND_CHUNK_CLOSE(peer_left);
