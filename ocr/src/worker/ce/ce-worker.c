@@ -17,6 +17,10 @@
 #include "ocr-worker.h"
 #include "worker/ce/ce-worker.h"
 
+#ifdef HAL_FSIM_CE
+#include "rmd-map.h"
+#endif
+
 #ifdef OCR_ENABLE_STATISTICS
 #include "ocr-statistics.h"
 #include "ocr-statistics-callbacks.h"
@@ -194,6 +198,17 @@ bool ceIsRunningWorker(ocrWorker_t * base) {
     return ceWorker->running;
 }
 
+void cePrintLocation(ocrWorker_t *base, char* location) {
+    // TODO This should be made more platform agnostic. When we have a better
+    // notion of location
+#ifdef HAL_FSIM_CE
+    SNPRINTF(location, 32, "CE %d Block %d Unit %d", AGENT_FROM_ID(base->location),
+             BLOCK_FROM_ID(base->location), UNIT_FROM_ID(base->location));
+#else
+    SNPRINTF(location, 32, "CE");
+#endif
+}
+
 /******************************************************/
 /* OCR-CE WORKER FACTORY                              */
 /******************************************************/
@@ -217,6 +232,7 @@ ocrWorkerFactory_t * newOcrWorkerFactoryCe(ocrParamList_t * perType) {
     base->workerFcts.stop = FUNC_ADDR(void (*)(ocrWorker_t*), ceStopWorker);
     base->workerFcts.finish = FUNC_ADDR(void (*)(ocrWorker_t*), ceFinishWorker);
     base->workerFcts.isRunning = FUNC_ADDR(bool (*)(ocrWorker_t*), ceIsRunningWorker);
+    base->workerFcts.printLocation = FUNC_ADDR(void (*)(ocrWorker_t*, char* location), cePrintLocation);
     return base;
 }
 

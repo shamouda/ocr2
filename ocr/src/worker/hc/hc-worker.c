@@ -287,6 +287,10 @@ bool hcIsRunningWorker(ocrWorker_t * base) {
     return hcWorker->running;
 }
 
+void hcPrintLocation(ocrWorker_t *base, char* location) {
+    SNPRINTF(location, 32, "Worker 0x%lx", base->location);
+}
+
 /**
  * @brief Builds an instance of a HC worker
  */
@@ -336,6 +340,7 @@ ocrWorkerFactory_t * newOcrWorkerFactoryHc(ocrParamList_t * perType) {
     base->workerFcts.stop = FUNC_ADDR(void (*) (ocrWorker_t *), hcStopWorker);
     base->workerFcts.finish = FUNC_ADDR(void (*) (ocrWorker_t *), hcFinishWorker);
     base->workerFcts.isRunning = FUNC_ADDR(bool (*) (ocrWorker_t *), hcIsRunningWorker);
+    base->workerFcts.printLocation = FUNC_ADDR(void (*)(ocrWorker_t*, char*), hcPrintLocation);
     return base;
 }
 

@@ -22,6 +22,12 @@
 #include "ocr-edt-profiling.h"
 #endif
 
+#ifdef OCR_ENABLE_EDT_NAMING
+#ifndef OCR_EDT_NAME_SIZE
+#define OCR_EDT_NAME_SIZE 32
+#endif
+#endif
+
 struct _ocrTask_t;
 struct _ocrTaskTemplate_t;
 
@@ -92,7 +98,7 @@ typedef struct _ocrTaskTemplate_t {
     // going to be a problem...
     ocrEdt_t executePtr;    /**< Function pointer to execute */
 #ifdef OCR_ENABLE_EDT_NAMING
-    const char* name;       /**< Name of the EDT */
+    const char name[OCR_EDT_NAME_SIZE];       /**< Name of the EDT */
 #endif
 #ifdef OCR_ENABLE_EDT_PROFILING
     struct _profileStruct *profileData;
@@ -299,7 +305,7 @@ typedef struct _ocrTask_t {
     ocrEdt_t funcPtr;       /**< Function to execute */
     u64* paramv;            /**< Pointer to the paramaters; should be inside task metadata */
 #ifdef OCR_ENABLE_EDT_NAMING
-    const char* name;       /**< Name of the EDT (for debugging purposes */
+    const char name[OCR_EDT_NAME_SIZE];       /**< Name of the EDT (for debugging purposes */
 #endif
     ocrGuid_t outputEvent;  /**< Event to notify when the EDT is done */
     ocrGuid_t finishLatch;  /**< Latch event for this EDT (if this is a finish EDT) */

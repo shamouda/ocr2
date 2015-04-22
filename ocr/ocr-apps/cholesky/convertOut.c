@@ -21,7 +21,7 @@ static double** readMatrix(int matrixSize, FILE* in) {
     return A;
 }
 
-int compare_string(char *first, char *second)
+int compare_string(const char *first, const char *second)
 {
    while(*first==*second)
    {

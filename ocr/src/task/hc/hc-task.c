@@ -97,7 +97,7 @@ ocrTaskTemplate_t * newTaskTemplateHc(ocrTaskTemplateFactory_t* factory, ocrEdt_
     base->depc = depc;
     base->executePtr = executePtr;
 #ifdef OCR_ENABLE_EDT_NAMING
-    base->name = fctName;
+    hal_memCopy(&(base->name[0]), fctName, ocrStrlen(fctName) + 1, false);
 #endif
     base->fctId = factory->factoryId;
 
@@ -550,7 +550,8 @@ u8 newTaskHc(ocrTaskFactory_t* factory, ocrFatGuid_t * edtGuid, ocrFatGuid_t edt
     base->funcPtr = ((ocrTaskTemplate_t*)(edtTemplate.metaDataPtr))->executePtr;
     base->paramv = (paramc > 0) ? ((u64*)((u64)base + sizeof(ocrTaskHc_t))) : NULL;
 #ifdef OCR_ENABLE_EDT_NAMING
-    base->name = ((ocrTaskTemplate_t*)(edtTemplate.metaDataPtr))->name;
+    hal_memCopy(&(base->name[0]), &(((ocrTaskTemplate_t*)(edtTemplate.metaDataPtr))->name[0]),
+                ocrStrlen(&(((ocrTaskTemplate_t*)(edtTemplate.metaDataPtr))->name[0])) + 1, false);
 #endif
     base->outputEvent = outputEvent.guid;
     base->finishLatch = NULL_GUID;
@@ -917,10 +918,11 @@ u8 taskExecute(ocrTask_t* base) {
     u64 * paramv = base->paramv;
     u32 depc = base->depc;
     ocrPolicyDomain_t *pd = NULL;
+    ocrWorker_t *curWorker = NULL;
     ocrEdtDep_t * depv = derived->resolvedDeps;
     PD_MSG_STACK(msg);
     ASSERT(derived->unkDbs == NULL); // Should be no dynamically acquired DBs before running
-    getCurrentEnv(&pd, NULL, NULL, NULL);
+    getCurrentEnv(&pd, &curWorker, NULL, NULL);
 
 #ifdef OCR_ENABLE_STATISTICS
     // TODO: FIXME
@@ -943,10 +945,25 @@ u8 taskExecute(ocrTask_t* base) {
 #ifdef OCR_ENABLE_VISUALIZER
         u64 startTime = getTimeNs();
 #endif
-
+        char location[32];
+        curWorker->fcts.printLocation(curWorker, &(location[0]));
+#ifdef OCR_ENABLE_EDT_NAMING
+        TPRINTF("EDT Start: %s 0x%llx in %s\n",
+                base->name, base->guid, location);
+#else
+        TPRINTF("EDT Start: 0x%llx 0x%llx in %s\n",
+                base->funcPtr, base->guid, location);
+#endif
         START_PROFILE(userCode);
         retGuid = base->funcPtr(paramc, paramv, depc, depv);
         EXIT_PROFILE;
+#ifdef OCR_ENABLE_EDT_NAMING
+        TPRINTF("EDT End: %s 0x%llx in %s\n",
+                base->name, base->guid, location);
+#else
+        TPRINTF("EDT End: 0x%llx 0x%llx in %s\n",
+                base->funcPtr, base->guid, location);
+#endif
 
 #ifdef OCR_ENABLE_VISUALIZER
         u64 endTime = getTimeNs();
