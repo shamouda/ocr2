@@ -1565,7 +1565,6 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         break;
     }
 
-
     case PD_MSG_DEP_ADD: {
         START_PROFILE(pd_hc_AddDep);
 #define PD_MSG msg
@@ -1593,7 +1592,7 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         ocrDbAccessMode_t mode = (PD_MSG_FIELD_IO(properties) & DB_PROP_MODE_MASK); //lower bits is the mode //TODO not pretty
         u32 slot = PD_MSG_FIELD_I(slot);
 
-        if (srcKind == NULL_GUID) {
+        if (srcKind == OCR_GUID_NONE) {
             //NOTE: Handle 'NULL_GUID' case here to be safe although
             //we've already caught it in ocrAddDependence for performance
             // This is equivalent to an immediate satisfy
@@ -1631,46 +1630,50 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             #define PD_TYPE PD_MSG_DEP_ADD
             }
         } else {
-            // Only left with events as potential source
-            if((srcKind & OCR_GUID_EVENT) == 0)
-                DPRINTF(DEBUG_LVL_WARN, "Attempting to add a dependence with a GUID of type %x, "
+            if(!(srcKind & OCR_GUID_EVENT)) {
+                DPRINTF(DEBUG_LVL_WARN, "Attempting to add a dependence with a GUID of type 0x%x, "
                                         "expected Event\n", srcKind);
+            }
             ASSERT(srcKind & OCR_GUID_EVENT);
-            //OK if srcKind is at current location
-            u8 needSignalerReg = 0;
-            PD_MSG_STACK(registerMsg);
-            getCurrentEnv(NULL, NULL, NULL, &registerMsg);
-        #undef PD_MSG
-        #undef PD_TYPE
-        #define PD_MSG (&registerMsg)
-        #define PD_TYPE PD_MSG_DEP_REGWAITER
-            // Requires response to determine if we need to register signaler too
-            registerMsg.type = PD_MSG_DEP_REGWAITER | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
-            // Registers destGuid (waiter) onto sourceGuid
-            PD_MSG_FIELD_I(waiter) = dest;
-            PD_MSG_FIELD_I(dest) = src;
-            PD_MSG_FIELD_I(slot) = slot;
-            PD_MSG_FIELD_I(properties) = true; // Specify context is add-dependence
-            RESULT_PROPAGATE(self->fcts.processMessage(self, &registerMsg, true));
-            needSignalerReg = PD_MSG_FIELD_O(returnDetail);
-        #undef PD_MSG
-        #undef PD_TYPE
-        #define PD_MSG msg
-        #define PD_TYPE PD_MSG_DEP_ADD
-            PD_MSG_FIELD_IO(properties) = needSignalerReg;
-            //PERF: property returned by registerWaiter allows to decide
-            // whether or not a registerSignaler call is needed.
-            //TODO this is not done yet so some calls are pure waste
-            if(!PD_MSG_FIELD_IO(properties)) {
-                // Cannot have other types of destinations
-                if((dstKind != OCR_GUID_EDT) && ((dstKind & OCR_GUID_EVENT) == 0))
-                    DPRINTF(DEBUG_LVL_WARN, "Attempting to add a dependence to a GUID of type %x, "
-                                            "expected EDT or Event\n", dstKind);
-                ASSERT((dstKind == OCR_GUID_EDT) || (dstKind & OCR_GUID_EVENT));
+            bool srcIsNonPersistent = ((srcKind == OCR_GUID_EVENT_ONCE) ||
+                                        (srcKind == OCR_GUID_EVENT_LATCH));
+            // 'Push' registration when source is non-persistent and/or destination is another event.
+            // NOTE: This code could be made more generic if we could query the src/dst metadata
+            //       to determine the correct mode to use.
+            bool isPushMode = (srcIsNonPersistent || (dstKind & OCR_GUID_EVENT));
+            bool needSignalerReg = 0;
+            if (isPushMode) {
+                //OK if srcKind is at current location
                 PD_MSG_STACK(registerMsg);
                 getCurrentEnv(NULL, NULL, NULL, &registerMsg);
             #undef PD_MSG
             #undef PD_TYPE
+            #define PD_MSG (&registerMsg)
+            #define PD_TYPE PD_MSG_DEP_REGWAITER
+                // Registration with non-persistent events is two-way
+                // to enforce message ordering constraints.
+                registerMsg.type = PD_MSG_DEP_REGWAITER | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
+                // Registers destGuid (waiter) onto sourceGuid
+                PD_MSG_FIELD_I(waiter) = dest;
+                PD_MSG_FIELD_I(dest) = src;
+                PD_MSG_FIELD_I(slot) = slot;
+                PD_MSG_FIELD_I(properties) = true; // Specify context is add-dependence
+                RESULT_PROPAGATE(self->fcts.processMessage(self, &registerMsg, true));
+                // We should be looking at the returnDetail to determine if we need to call
+                // the signaler too. However, the current implementation requires to do the
+                // signaler registration anyway to be able to record the mode.
+                needSignalerReg = 1;
+            #undef PD_MSG
+            #undef PD_TYPE
+            }
+            if(!isPushMode || needSignalerReg) {
+                ASSERT_BLOCK_BEGIN(((dstKind == OCR_GUID_EDT) || (dstKind & OCR_GUID_EVENT)))
+                DPRINTF(DEBUG_LVL_WARN, "Attempting to add a dependence to a GUID of type 0x%x, "
+                                        "but expected EDT or Event\n", dstKind);
+                ASSERT_BLOCK_END
+                PD_MSG_STACK(registerMsg);
+                getCurrentEnv(NULL, NULL, NULL, &registerMsg);
+                // 'Pull' registration left with persistent event as source and EDT as destination
             #define PD_MSG (&registerMsg)
             #define PD_TYPE PD_MSG_DEP_REGSIGNALER
                 registerMsg.type = PD_MSG_DEP_REGSIGNALER | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
@@ -1683,11 +1686,8 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
                 RESULT_PROPAGATE(self->fcts.processMessage(self, &registerMsg, true));
             #undef PD_MSG
             #undef PD_TYPE
-            #define PD_MSG msg
-            #define PD_TYPE PD_MSG_DEP_ADD
-           }
+            }
         }
-
 #ifdef OCR_ENABLE_STATISTICS
         // TODO: Fixme
         statsDEP_ADD(pd, getCurrentEDT(), NULL, signalerGuid, waiterGuid, NULL, slot);
