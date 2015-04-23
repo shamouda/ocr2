@@ -18,28 +18,67 @@ void nullDestruct(ocrAllocator_t *self) {
     runtimeChunkFree((u64)self, NULL);
 }
 
-void nullBegin(ocrAllocator_t *self, ocrPolicyDomain_t * PD ) {
-}
+u8 nullSwitchRunlevel(ocrAllocator_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
+                      u32 phase, u32 properties, void (*callback)(u64), u64 val) {
 
-void nullStart(ocrAllocator_t *self, ocrPolicyDomain_t * PD ) {
-    // Get a GUID
-    guidify(PD, (u64)self, &(self->fguid), OCR_GUID_ALLOCATOR);
-    self->pd = PD;
-}
+    // This is an inert module, we do not handle callbacks (caller needs to wait on us)
+    ASSERT(callback == NULL);
 
-void nullStop(ocrAllocator_t *self, ocrRunLevel_t newRl, u32 action) {
-    switch(newRl) {
-        case RL_STOP: {
-            self->fguid.guid = NULL_GUID;
-            break;
+    // Verify properties for this call
+    ASSERT((properties & RL_REQUEST) && !(properties & RL_RESPONSE)
+           && !(properties & RL_RELEASE));
+    ASSERT(!(properties & RL_FROM_MSG));
+
+    switch(runlevel) {
+    case RL_CONFIG_PARSE:
+        // On bring-up: Update PD->phasesPerRunlevel on phase 0
+        // and check compatibility on phase 1
+        break;
+    case RL_NETWORK_OK:
+        // Nothing
+        break;
+    case RL_PD_OK:
+        if(properties & RL_BRING_UP) {
+            // We can now set our PD (before this, we couldn't because
+            // "our" PD might not have been started
+            self->pd = PD;
         }
-        case RL_SHUTDOWN: {
-            // Nothing to do
-            break;
+        break;
+    case RL_GUID_OK:
+        if(properties & RL_BRING_UP) {
+            if(phase == (self->pd->phasesPerRunlevel[RL_GUID_OK][0] & 0xFFFF) - 1) {
+                // We get a GUID for ourself
+                guidify(self->pd, (u64)self, &(self->fguid), OCR_GUID_ALLOCATOR);
+            }
+        } else {
+            // Tear-down
+            if(phase == 0) {
+                PD_MSG_STACK(msg);
+                getCurrentEnv(NULL, NULL, NULL, &msg);
+#define PD_MSG (&msg)
+#define PD_TYPE PD_MSG_GUID_DESTROY
+                msg.type = PD_MSG_GUID_DESTROY | PD_MSG_REQUEST;
+                PD_MSG_FIELD_I(guid) = self->fguid;
+                PD_MSG_FIELD_I(properties) = 0;
+                self->pd->fcts.processMessage(self->pd, &msg, false);
+                self->fguid->guid = NULL_GUID;
+#undef PD_MSG
+#undef PD_TYPE
+            }
         }
-        default:
-            ASSERT("Unknown runlevel in stop function");
+        break;
+    case RL_MEMORY_OK:
+        // Nothing to do (yes, we are an allocator but no setup is required)
+        break;
+    case RL_COMPUTE_OK:
+        break;
+    case RL_USER_OK:
+        break;
+    default:
+        // Unknown runlevel
+        ASSERT(0);
     }
+    return 0;
 }
 
 void* nullAllocate(ocrAllocator_t *self, u64 size, u64 hints) {
@@ -81,9 +120,8 @@ ocrAllocatorFactory_t * newAllocatorFactoryNull(ocrParamList_t *perType) {
     base->initialize = &initializeAllocatorNull;
     base->destruct =  &destructAllocatorFactoryNull;
     base->allocFcts.destruct = FUNC_ADDR(void (*)(ocrAllocator_t*), nullDestruct);
-    base->allocFcts.begin = FUNC_ADDR(void (*)(ocrAllocator_t*, ocrPolicyDomain_t*), nullBegin);
-    base->allocFcts.start = FUNC_ADDR(void (*)(ocrAllocator_t*, ocrPolicyDomain_t*), nullStart);
-    base->allocFcts.stop = FUNC_ADDR(void (*)(ocrAllocator_t*,ocrRunLevel_t,u32), nullStop);
+    base->allocFcts.switchRunlevel = FUNC_ADDR(u8 (*)(ocrAllocator_t*, ocrPolicyDomain_t*, ocrRunlevel_t,
+                                                      u32, u32, void (*)(u64), u64), nullSwitchRunlevel);
     base->allocFcts.allocate = FUNC_ADDR(void* (*)(ocrAllocator_t*, u64, u64), nullAllocate);
     //base->allocFcts.free = FUNC_ADDR(void (*)(ocrAllocator_t*, void*), nullDeallocate);
     base->allocFcts.reallocate = FUNC_ADDR(void* (*)(ocrAllocator_t*, void*, u64), nullReallocate);

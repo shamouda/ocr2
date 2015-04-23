@@ -171,19 +171,56 @@ void simpleCommApiDestruct (ocrCommApi_t * base) {
     runtimeChunkFree((u64)base, NULL);
 }
 
-void simpleCommApiBegin(ocrCommApi_t* self, ocrPolicyDomain_t * pd) {
-    self->pd = pd;
-    self->commPlatform->fcts.begin(self->commPlatform, pd, self);
-}
+u8 simpleSwitchRunlevel(ocrCommApi_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
+                        u32 phase, u32 properties, void (*callback)(u64), u64 val) {
 
-void simpleCommApiStart(ocrCommApi_t * self, ocrPolicyDomain_t * pd) {
-    ocrCommApiSimple_t * commApiSimple = (ocrCommApiSimple_t *) self;
-    commApiSimple->handleMap = newHashtableModulo(pd, HANDLE_MAP_BUCKETS);
-    self->commPlatform->fcts.start(self->commPlatform, pd, self);
-}
+    u8 toReturn = 0;
 
-void simpleCommApiStop(ocrCommApi_t * self, ocrRunLevel_t newRl, u32 action) {
-    self->commPlatform->fcts.stop(self->commPlatform, newRl, action);
+    // This is an inert module, we do not handle callbacks (caller needs to wait on us)
+    ASSERT(callback == NULL);
+
+    // Verify properties for this call
+    ASSERT((properties & RL_REQUEST) && !(properties & RL_RESPONSE)
+           && !(properties & RL_RELEASE));
+    ASSERT(!(properties & RL_FROM_MSG));
+
+    toReturn |= self->commPlatform->fcts.switchRunlevel(
+        self->commPlatform, PD, runlevel, phase, properties, NULL, 0);
+    switch(runlevel) {
+    case RL_CONFIG_PARSE:
+        // On bring-up: Update PD->phasesPerRunlevel on phase 0
+        // and check compatibility on phase 1
+        break;
+    case RL_NETWORK_OK:
+        // Nothing
+        break;
+    case RL_PD_OK:
+        if(properties & RL_BRING_UP) {
+            // We can now set our PD (before this, we couldn't because
+            // "our" PD might not have been started
+            self->pd = PD;
+        }
+        break;
+    case RL_GUID_OK:
+        // Nothing to do
+        break;
+    case RL_MEMORY_OK:
+        // Nothing to do
+        break;
+    case RL_COMPUTE_OK:
+        // We can allocate our map here because the memory is up
+        if((properties & RL_BRING_UP) && phase == 0) {
+            ocrCommApiSimple_t * commApiSimple = (ocrCommApiSimple_t *) self;
+            commApiSimple->handleMap = newHashtableModulo(pd, HANDLE_MAP_BUCKETS);
+        }
+        break;
+    case RL_USER_OK:
+        break;
+    default:
+        // Unknown runlevel
+        ASSERT(0);
+    }
+    return toReturn;
 }
 
 ocrCommApi_t* newCommApiSimple(ocrCommApiFactory_t *factory,
@@ -220,11 +257,8 @@ ocrCommApiFactory_t *newCommApiFactorySimple(ocrParamList_t *perType) {
     base->destruct = destructCommApiFactorySimple;
 
     base->apiFcts.destruct = FUNC_ADDR(void (*)(ocrCommApi_t*), simpleCommApiDestruct);
-    base->apiFcts.begin = FUNC_ADDR(void (*)(ocrCommApi_t*, ocrPolicyDomain_t*),
-                                    simpleCommApiBegin);
-    base->apiFcts.start = FUNC_ADDR(void (*)(ocrCommApi_t*, ocrPolicyDomain_t*),
-                                    simpleCommApiStart);
-    base->apiFcts.stop = FUNC_ADDR(void (*)(ocrCommApi_t*,ocrRunLevel_t,u32), simpleCommApiStop);
+    base->apiFcts.switchRunlevel = FUNC_ADDR(u8 (*)(ocrCommApi_t*, ocrPolicyDomain_t*, ocrRunlevel_t,
+                                                      u32, u32, void (*)(u64), u64), simpleSwitchRunlevel);
     base->apiFcts.sendMessage = FUNC_ADDR(u8 (*)(ocrCommApi_t*, ocrLocation_t, ocrPolicyMsg_t *, ocrMsgHandle_t**, u32),
                                           sendMessageSimpleCommApi);
     base->apiFcts.pollMessage = FUNC_ADDR(u8 (*)(ocrCommApi_t*, ocrMsgHandle_t**),

@@ -541,74 +541,116 @@ void simpleDestruct(ocrAllocator_t *self) {
     DPRINTF(DEBUG_LVL_WARN, "simpleDestruct free %p\n", (u64)self->memories );
     */
     runtimeChunkFree((u64)self, NULL);
-    DPRINTF(DEBUG_LVL_INFO, "Leaving simpleDesctruct on allocator 0x%lx (free)\n", (u64) self);
+    DPRINTF(DEBUG_LVL_INFO, "Leaving simpleDestruct on allocator 0x%lx (free)\n", (u64) self);
 }
 
-void simpleBegin(ocrAllocator_t *self, ocrPolicyDomain_t * PD ) {
-    DPRINTF(DEBUG_LVL_INFO, "Entered simpleBegin on allocator 0x%lx\n", (u64) self);
-    self->pd = PD;	// I needed this here in simpleBegin, maybe because simpleMalloc() is called before simpleStart() ?
+u8 simpleSwitchRunlevel(ocrAllocator_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
+                        u32 phase, u32 properties, void (*callback)(u64), u64 val) {
+
+    u8 toReturn = 0;
+    // This is an inert module, we do not handle callbacks (caller needs to wait on us)
+    ASSERT(callback == NULL);
+
+    // Verify properties for this call
+    ASSERT((properties & RL_REQUEST) && !(properties & RL_RESPONSE)
+           && !(properties & RL_RELEASE));
+    ASSERT(!(properties & RL_FROM_MSG));
+
     ASSERT(self->memoryCount == 1);
-    ocrAllocatorSimple_t * rself = (ocrAllocatorSimple_t *) self;
-
-    self->memories[0]->fcts.begin(self->memories[0], PD);
-    u64 poolAddr = 0;
-    DPRINTF(DEBUG_LVL_INFO, "simpleBegin : poolsize 0x%llx, level %d\n",  rself->poolSize, self->memories[0]->level);
-    RESULT_ASSERT(self->memories[0]->fcts.chunkAndTag(
-        self->memories[0], &poolAddr, rself->poolSize,
-        USER_FREE_TAG, USER_USED_TAG), ==, 0);
-    rself->poolAddr = poolAddr;
-    DPRINTF(DEBUG_LVL_INFO, "simpleBegin : %p\n", poolAddr);
-
-    // Adjust alignment if required
-    u64 fiddlyBits = ((u64) rself->poolAddr) & (ALIGNMENT - 1LL);
-    if (fiddlyBits == 0) {
-        rself->poolStorageOffset = 0;
-    } else {
-        rself->poolStorageOffset = ALIGNMENT - fiddlyBits;
-        rself->poolAddr += rself->poolStorageOffset;
-        rself->poolSize -= rself->poolStorageOffset;
-    }
-    rself->poolStorageSuffix = rself->poolSize & (ALIGNMENT-1LL);
-    rself->poolSize &= ~(ALIGNMENT-1LL);
-    DPRINTF(DEBUG_LVL_VERB,
-        "SIMPLE Allocator @ 0x%llx/0x%llx got pool at address 0x%llx of size 0x%llx(%lld), offset from storage addr by %lld\n",
-        (u64) rself, (u64) self,
-        (u64) (rself->poolAddr), (u64) (rself->poolSize), (u64)(rself->poolSize), (u64) (rself->poolStorageOffset));
-
-    simpleInit( (pool_t *)addrGlobalizeOnTG((void *)rself->poolAddr, PD), rself->poolSize);
-}
-
-void simpleStart(ocrAllocator_t *self, ocrPolicyDomain_t * PD ) {
-    //self->pd = PD;    // this didn't work, so I've moved it to simpleBegin
-    DPRINTF(DEBUG_LVL_VERB, "simpleStart : skip\n");
-}
-
-void simpleStop(ocrAllocator_t *self, ocrRunLevel_t newRl, u32 action) {
-    switch(newRl) {
-        case RL_STOP: {
-            DPRINTF(DEBUG_LVL_VERB, "simpleStop : skip\n");
-            self->memories[0]->fcts.stop(self->memories[0], newRl, action);
-            break;
+    // Call the runlevel change on the underlying memory
+    toReturn |= self->memories[0]->fcts.switchRunlevel(self->memories[0], PD, runlevel, properties,
+                                                       NULL, 0);
+    switch(runlevel) {
+    case RL_CONFIG_PARSE:
+    {
+        // On bring-up: Update PD->phasesPerRunlevel on phase 0
+        // and check compatibility on phase 1
+        // We indicate that we need two phase on tear-down of RL_MEMORY_OK
+        if(properties & RL_BRING_UP && phase == 0) {
+            u32 t = PD->phasesPerRunlevel[RL_MEMORY_OK][RL_PHASE_ALLOCATOR];
+            if(t >> 16 < 2) t = 2 << 16 + t & 0xFFFF;
+            PD->phasesPerRunlevel[RL_MEMORY_OK][RL_PHASE_ALLOCATOR] = t;
         }
-        case RL_SHUTDOWN: {
-            DPRINTF(DEBUG_LVL_VERB, "simpleFinish called (This is x86 only?)\n");
+        break;
+    }
+    case RL_NETWORK_OK:
+        // Nothing
+        break;
+    case RL_PD_OK:
+        if(properties & RL_BRING_UP) {
+            // We can now set our PD (before this, we couldn't because
+            // "our" PD might not have been started
+            self->pd = PD;
+        }
+        break;
+    case RL_GUID_OK:
+        if(properties & RL_BRING_UP) {
+            if(phase == (self->pd->phasesPerRunlevel[RL_GUID_OK][0] & 0xFFFF) - 1) {
+                // We get a GUID for ourself
+                guidify(self->pd, (u64)self, &(self->fguid), OCR_GUID_ALLOCATOR);
+            }
+        } else {
+            // Tear-down
+            if(phase == 0) {
+                PD_MSG_STACK(msg);
+                getCurrentEnv(NULL, NULL, NULL, &msg);
+#define PD_MSG (&msg)
+#define PD_TYPE PD_MSG_GUID_DESTROY
+                msg.type = PD_MSG_GUID_DESTROY | PD_MSG_REQUEST;
+                PD_MSG_FIELD_I(guid) = self->fguid;
+                PD_MSG_FIELD_I(properties) = 0;
+                toReturn |= self->pd->fcts.processMessage(self->pd, &msg, false);
+                self->fguid->guid = NULL_GUID;
+            }
+        }
+        break;
+    case RL_MEMORY_OK:
+        if(phase == 0 && (properties & RL_BRING_UP)) {
+            ocrAllocatorSimple_t *rself = (ocrAllocatorSimple_t*)self;
+            u64 poolAddr = 0;
+            DPRINTF(DEBUG_LVL_INFO, "simple bring up: poolsize 0x%llx, level %d\n",
+                    rself->poolSize, self->memories[0]->level);
+            RESULT_ASSERT(self->memories[0]->fcts.chunkAndTag(
+                              self->memories[0], &poolAddr, rself->poolSize,
+                              USER_FREE_TAG, USER_USED_TAG), ==, 0);
+            rself->poolAddr = poolAddr;
+            DPRINTF(DEBUG_LVL_INFO, "simple bring up : %p\n", poolAddr);
 
+            // Adjust alignment if required
+            u64 fiddlyBits = ((u64) rself->poolAddr) & (ALIGNMENT - 1LL);
+            if (fiddlyBits == 0) {
+                rself->poolStorageOffset = 0;
+            } else {
+                rself->poolStorageOffset = ALIGNMENT - fiddlyBits;
+                rself->poolAddr += rself->poolStorageOffset;
+                rself->poolSize -= rself->poolStorageOffset;
+            }
+            rself->poolStorageSuffix = rself->poolSize & (ALIGNMENT-1LL);
+            rself->poolSize &= ~(ALIGNMENT-1LL);
+            DPRINTF(DEBUG_LVL_VERB,
+                    "SIMPLE Allocator @ 0x%llx got pool at address 0x%llx of size 0x%llx(%lld), offset from storage addr by %lld\n",
+                    (u64) rself, (u64) (rself->poolAddr), (u64) (rself->poolSize),
+                    (u64)(rself->poolSize), (u64) (rself->poolStorageOffset));
+
+            simpleInit( (pool_t *)addrGlobalizeOnTG((void *)rself->poolAddr, PD), rself->poolSize);
+        } else if(phase == 0 && (properties & RL_TEAR_DOWN)) {
             ocrAllocatorSimple_t * rself = (ocrAllocatorSimple_t *) self;
-            ASSERT(self->memoryCount == 1);
-
-            RESULT_ASSERT(self-> /*rAnchorCE->base.*/ memories[0]->fcts.tag(
-            rself->base.memories[0],
-            rself->poolAddr - rself->poolStorageOffset,
-            rself->poolAddr + rself->poolSize + rself->poolStorageSuffix,
-            USER_FREE_TAG), ==, 0);
-
-            self->memories[0]->fcts.stop(self->memories[0], newRl, action);
-            break;
+            RESULT_ASSERT(self->memories[0]->fcts.tag(
+                              rself->base.memories[0],
+                              rself->poolAddr - rself->poolStorageOffset,
+                              rself->poolAddr + rself->poolSize + rself->poolStorageSuffix,
+                              USER_FREE_TAG), ==, 0);
         }
-        default:
-            ASSERT("Unknown runlevel in stop function");
+        break;
+    case RL_COMPUTE_OK:
+        break;
+    case RL_USER_OK:
+        break;
+    default:
+        // Unknown runlevel
+        ASSERT(0);
     }
-
+    return toReturn;
 }
 
 void* simpleAllocate(
@@ -677,9 +719,8 @@ ocrAllocatorFactory_t * newAllocatorFactorySimple(ocrParamList_t *perType) {
     base->initialize = &initializeAllocatorSimple;
     base->destruct = &destructAllocatorFactorySimple;
     base->allocFcts.destruct = FUNC_ADDR(void (*)(ocrAllocator_t*), simpleDestruct);
-    base->allocFcts.begin = FUNC_ADDR(void (*)(ocrAllocator_t*, ocrPolicyDomain_t*), simpleBegin);
-    base->allocFcts.start = FUNC_ADDR(void (*)(ocrAllocator_t*, ocrPolicyDomain_t*), simpleStart);
-    base->allocFcts.stop = FUNC_ADDR(void (*)(ocrAllocator_t*,ocrRunLevel_t,u32), simpleStop);
+    base->allocFcts.switchRunlevel = FUNC_ADDR(u8 (*)(ocrAllocator_t*, ocrPolicyDomain_t*, ocrRunlevel_t,
+                                                      u32, u32, void (*)(u64), u64), simpleSwitchRunlevel);
     base->allocFcts.allocate = FUNC_ADDR(void* (*)(ocrAllocator_t*, u64, u64), simpleAllocate);
     //base->allocFcts.free = FUNC_ADDR(void (*)(void*), simpleDeallocate);
     base->allocFcts.reallocate = FUNC_ADDR(void* (*)(ocrAllocator_t*, void*, u64), simpleReallocate);

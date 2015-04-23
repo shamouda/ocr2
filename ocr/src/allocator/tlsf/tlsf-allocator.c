@@ -1521,6 +1521,8 @@ static void tlsfInitPool(ocrAllocatorTlsf_t *rself) {
 u8 tlsfSwitchRunlevel(ocrAllocator_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
                         u32 phase, u32 properties, void (*callback)(u64), u64 val) {
 
+    u8 toReturn = 0;
+
     // This is an inert module, we do not handle callbacks (caller needs to wait on us)
     ASSERT(callback == NULL);
 
@@ -1565,7 +1567,8 @@ u8 tlsfSwitchRunlevel(ocrAllocator_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t
     // sit tight.
     if(rself->initAttributed == (u64)rself) {
         // We switch the memory to the proper runlevel
-        self->memories[0]->fcts.switchRunlevel(self->memories[0], PD, runlevel, phase, properties, NULL, 0);
+        toReturn |= self->memories[0]->fcts.switchRunlevel(
+            self->memories[0], PD, runlevel, phase, properties, NULL, 0);
     }
 
     // Now take care of our startup
@@ -1600,7 +1603,7 @@ u8 tlsfSwitchRunlevel(ocrAllocator_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t
                 msg.type = PD_MSG_GUID_DESTROY | PD_MSG_REQUEST;
                 PD_MSG_FIELD_I(guid) = self->fguid;
                 PD_MSG_FIELD_I(properties) = 0;
-                self->pd->fcts.processMessage(self->pd, &msg, false);
+                toRetrun |= self->pd->fcts.processMessage(self->pd, &msg, false);
                 self->fguid->guid = NULL_GUID;
 #undef PD_MSG
 #undef PD_TYPE
@@ -1612,7 +1615,8 @@ u8 tlsfSwitchRunlevel(ocrAllocator_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t
             if(rself->initAttributed == (u64)rself && phase == 0) {
                 // We start the underlying memory
                 tlsfInitPool(rself);
-            } else if(rself->initAttributed != (u64)rself && phase == self->pd->phasesPerRunlevel[RL_MEMORY_OK][0] - 1) {
+            } else if(rself->initAttributed != (u64)rself
+                      && phase == self->pd->phasesPerRunlevel[RL_MEMORY_OK][0] - 1) {
                 // At this point, we know that the initialization has happened (see above) so we can get
                 // the right information
                 ocrAllocatorTlsf_t *rAnchorCE = (ocrAllocatorTlsf_t*)(getAnchorCE(self));
@@ -1654,7 +1658,7 @@ u8 tlsfSwitchRunlevel(ocrAllocator_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t
         // Unknown runlevel
         ASSERT(0);
     }
-    return 0;
+    return toReturn;
 }
 void* tlsfAllocate(
     ocrAllocator_t *self,   // Allocator to attempt block allocation
