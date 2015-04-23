@@ -16,41 +16,42 @@
 
 #define INVALID_LOCATION (u64)(-1)
 
-//TODO doc
-typedef u32 ocrRunLevel_t;
+/* Run-level support */
+typedef enum _ocrRunlevels_t {
+    RL_CONFIG_PARSE, /**< Configuration has been parsed; RT structures exist */
+    RL_NETWORK_OK,   /**< Intra-PD communication is possible; PDs are known */
+    RL_PD_OK,        /**< PDs are up. One capable module per PD */
+    RL_GUID_OK,      /**< The global naming is operational; PDs know not to step
+                        on each other's toes */
+    RL_MEMORY_OK,    /**< On startup, barrier before here. Memory allocators are up
+                        pdMalloc() is functional */
+    RL_COMPUTE_OK,   /**< All other inert modules are brought up; bring up workers */
+    RL_USER_OK,      /**< One PD starts mainEDT; others are waiting for work */
+    RL_MAX           /**< Not a runlevel. Internal marker */
+} ocrRunLevel_t;
 
-// Runlevels
-#define RL_MAX 10
+// TODO: Do we need to explicitly expand this
+// to the subcomponents (platform/target for example)
+typedef enum _ocrRLPhaseComponents_t {
+    RL_PHASE_COMMAPI,
+    RL_PHASE_GUIDPROVIDER,
+    RL_PHASE_ALLOCATOR,
+    RL_PHASE_SCHEDULER,
+    RL_PHASE_WORKER,
+    RL_PHASE_MAX
+} ocrRLPhaseComponents_t;
 
-#define RL_NB_CONCRETE (RL_MAX/2)
-
-//TODO define RL_DEFAULT a little better
-#define RL_DEFAULT 0
-
-
-#define RL_NEXT_UP(rl)   (rl+2)
-#define RL_NEXT_DOWN(rl) (rl-2)
-
-// The runtime is up and running, accepting EDT for execution
-#define RL_RUNNING_USER      RL_MAX        //10
-#define RL_RUNNING_USER_WIP (RL_RUNNING_USER-1)
-
-#define RL_RUNNING_RT  (RL_RUNNING_USER_WIP-1) //8
-#define RL_RUNNING_RT_WIP (RL_RUNNING_RT-1)
-
-#define RL_STOP     (RL_RUNNING_RT_WIP-1) //6
-#define RL_STOP_WIP (RL_STOP-1)
-
-#define RL_SHUTDOWN     (RL_STOP_WIP-1) //4
-#define RL_SHUTDOWN_WIP (RL_SHUTDOWN-1)
-
-#define RL_DEALLOCATE     (RL_SHUTDOWN_WIP-1) //2
-#define RL_DEALLOCATE_WIP (RL_DEALLOCATE-1)
-
-#define RL_ACTION_ENTER 1
-#define RL_ACTION_EXIT 2
-#define RL_ACTION_QUIESCE_COMP 3
-#define RL_ACTION_QUIESCE_COMM 4
+/* Flags for runlevels */
+#define RL_REQUEST     0x0  /**< Only used in policy message: request to change run-level */
+#define RL_RESPONSE    0x1  /**< Only used in policy message: in the case of a RL_BARRIER message, respond that RL transitioned */
+#define RL_RELEASE     0x2  /**< Only used in policy message: in the case of a RL_BARRIER message, release from the barrier */
+#define RL_ASYNC       0x0  /**< Set if the caller can proceed even if the runlevel change is not complete */
+#define RL_BARRIER     0x4  /**< Set if the caller should wait for the callee to return from the runlevel change */
+#define RL_BRING_UP    0x0  /**< Set if this is for OCR bring-up */
+#define RL_TEAR_DOWN   0x8  /**< Set if this is for OCR tear-down */
+#define RL_AM_MASTER   0x10 /**< Set if the thread doing the calling is the first capable one for the PD */
+#define RL_FROM_MSG    0x20 /**< Set if the transition came from another PD or was triggered internally
+                                 (as opposed to being called directly using switchRunlevel on the PD) */
 
 /**
  * @brief Memory region "tags"
@@ -142,6 +143,7 @@ typedef enum {
     HDL_RESPONSE_OK   = 0x00400  /**< (MANDATORY) Handle has a ready response */
 
 } ocrMsgHandleStatus_t;
+
 /**
  * @brief Types of data-blocks allocated by the runtime
  *
@@ -160,6 +162,7 @@ typedef enum {
 /** @brief Special property that removes the warning
  * for the acquire/create */
 #define DB_PROP_IGNORE_WARN (u16)(0x7000)
+
 /**
  * @brief Type of memory allocated/unallocated
  * by MEM_ALLOC and MEM_UNALLOC
@@ -242,8 +245,8 @@ typedef enum {
  */
 typedef enum {
     SINGLE_WORKERTYPE   = 0x1, /**< Single worker (starts/stops by itself) */
-    MASTER_WORKERTYPE   = 0x2, /**< Master worker (responsible for starting/stopping others */
-    SLAVE_WORKERTYPE    = 0x3, /**< Slave worker (started/stopped by a master worker */
+    MASTER_WORKERTYPE   = 0x2, /**< Master worker (responsible for starting/stopping others) */
+    SLAVE_WORKERTYPE    = 0x3, /**< Slave worker (started/stopped by a master worker) */
     MAX_WORKERTYPE      = 0x4
 } ocrWorkerType_t;
 

@@ -160,11 +160,26 @@ typedef struct _ocrSchedulerHeuristicOpFcts_t {
 typedef struct _ocrSchedulerHeuristicFcts_t {
     void (*destruct)(struct _ocrSchedulerHeuristic_t *self);
 
-    void (*begin)(struct _ocrSchedulerHeuristic_t *self);
-
-    void (*start)(struct _ocrSchedulerHeuristic_t *self);
-
-    void (*stop)(struct _ocrSchedulerHeuristic_t *self, ocrRunLevel_t newRl, u32 action);
+    /**
+     * @brief Switch runlevel
+     *
+     * @param[in] self         Pointer to this object
+     * @param[in] PD           Policy domain this object belongs to
+     * @param[in] runlevel     Runlevel to switch to
+     * @param[in] phase        Phase for this runlevel
+     * @param[in] properties   Properties (see ocr-runtime-types.h)
+     * @param[in] callback     Callback to call when the runlevel switch
+     *                         is complete. NULL if no callback is required
+     * @param[in] val          Value to pass to the callback
+     *
+     * @return 0 if the switch command was successful and a non-zero error
+     * code otherwise. Note that the return value does not indicate that the
+     * runlevel switch occured (the callback will be called when it does) but only
+     * that the call to switch runlevel was well formed and will be processed
+     * at some point
+     */
+    u8 (*switchRunlevel)(struct _ocrSchedulerHeuristic_t* self, struct _ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
+                         u32 phase, u32 properties, void (*callback)(u64), u64 val);
 
     /**
      * @brief Update this scheduler heuristic proactively

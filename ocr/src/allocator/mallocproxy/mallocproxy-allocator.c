@@ -268,65 +268,79 @@ void mallocProxyDestruct(ocrAllocator_t *self) {
     runtimeChunkFree((u64)self, NULL);
 }
 
-void mallocProxyBegin(ocrAllocator_t *self, ocrPolicyDomain_t * PD ) {
-    CHECK_AND_SET_MODULE_STATE(MALLOCPROXY-ALLOCATOR, self, BEGIN);
-}
+u8 mallocSwitchRunlevel(ocrAllocator_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
+                        u32 phase, u32 properties, void (*callback)(u64), u64 val) {
 
-void mallocProxyStart(ocrAllocator_t *self, ocrPolicyDomain_t * PD ) {
-    CHECK_AND_SET_MODULE_STATE(MALLOCPROXY-ALLOCATOR, self, START);
-    // Get a GUID
-    guidify(PD, (u64)self, &(self->fguid), OCR_GUID_ALLOCATOR);
-    self->pd = PD;
+    // Note on MallocProxy:
+    // MallocProxy has no underlying memTarget or memPlatform. The
+    // one that is there is just a dummy because the machine-description
+    // processing expects to stitch an allocator to a memTarget, and a
+    // memTarget to a memPlatform, but we don't use them. If we decide
+    // to eliminate the dummies, it saves memory on a platform where it
+    // isn't really needed, and it perhaps makes the indices of remaining
+    // allocators of other types (e.g. TLSF) to mismatch the indices of
+    // memTargets and memPlatforms. Seems not worthwhile. But if we do
+    // it, we need to propagage the runlevel change to our mem-target
+    // prior to switching ourself
 
-    // Each allocator only manages one contiguous chunk of memory
-    ASSERT(self->memoryCount == 1);
+    // This is an inert module, we do not handle callbacks (caller needs to wait on us)
+    ASSERT(callback == NULL);
 
-#if 0 // mallocProxy has no underlying memTarget or memPlatform.  The
-      // one that is there is just a dummy because the machine-description
-      // processing expects to stitch an allocator to a memTarget, and a
-      // memTarget to a memPlatform, but we don't use them.  (If we decide
-      // to eliminate the dummies, it saves memory on a platform where it
-      // isn't really needed, and it perhaps makes the indices of remaining
-      // allocators of other types (e.g. TLSF) to mismatch the indices of
-      // memTargets and memPlatforms.  Seems not worthwhile.  But if we do
-      // it, the above assert needs to change to ... == 0.
-    self->memories[0]->fcts.start(self->memories[0], PD);
-#endif
-}
+    // Verify properties for this call
+    ASSERT((properties & RL_REQUEST) && !(properties & RL_RESPONSE)
+           && !(properties & RL_RELEASE));
+    ASSERT(!(properties & RL_FROM_MSG));
 
-void mallocProxyStop(ocrAllocator_t *self, ocrRunLevel_t newRl, u32 action) {
-    switch(newRl) {
-        case RL_STOP: {
-            CHECK_AND_SET_MODULE_STATE(MALLOCPROXY-ALLOCATOR, self, STOP);
-            #if 0  // The memTarget (pointed to by self->memories[0]) is a dummy, so
-                   // maybe we shouldn't expect to do this statistics call.
-            #ifdef OCR_ENABLE_STATISTICS
-                statsALLOCATOR_STOP(self->pd, self->guid, self, self->memories[0]->guid,
-                                    self->memories[0]);
-            #endif
-            #endif
-            break;
-        }
-        case RL_SHUTDOWN: {
-            PD_MSG_STACK(msg);
-            getCurrentEnv(&(self->pd), NULL, NULL, &msg);
-        #define PD_MSG (&msg)
-        #define PD_TYPE PD_MSG_GUID_DESTROY
-            msg.type = PD_MSG_GUID_DESTROY | PD_MSG_REQUEST;
-            PD_MSG_FIELD_I(guid) = self->fguid;
-            PD_MSG_FIELD_I(properties) = 0;
-            self->pd->fcts.processMessage(self->pd, &msg, false);
-        #undef PD_MSG
-        #undef PD_TYPE
-            self->fguid.guid = NULL_GUID;
-        #if 0 // FIXME  -- I don't think we need this code:
-        #endif
-            CHECK_AND_SET_MODULE_STATE(MALLOCPROXY-ALLOCATOR, self, FINISH);
+    switch(runlevel) {
+    case RL_CONFIG_PARSE:
+        // On bring-up: Update PD->phasesPerRunlevel on phase 0
+        // and check compatibility on phase 1
         break;
+    case RL_NETWORK_OK:
+        // Nothing
+        break;
+    case RL_PD_OK:
+        if(properties & RL_BRING_UP) {
+            // We can now set our PD (before this, we couldn't because
+            // "our" PD might not have been started
+            self->pd = PD;
         }
-        default:
-            ASSERT("Unknown runlevel in stop function");
+        break;
+    case RL_GUID_OK:
+        if(properties & RL_BRING_UP) {
+            if(phase == (self->pd->phasesPerRunlevel[RL_GUID_OK][0] & 0xFFFF) - 1) {
+                // We get a GUID for ourself
+                guidify(self->pd, (u64)self, &(self->fguid), OCR_GUID_ALLOCATOR);
+            }
+        } else {
+            // Tear-down
+            if(phase == 0) {
+                PD_MSG_STACK(msg);
+                getCurrentEnv(NULL, NULL, NULL, &msg);
+#define PD_MSG (&msg)
+#define PD_TYPE PD_MSG_GUID_DESTROY
+                msg.type = PD_MSG_GUID_DESTROY | PD_MSG_REQUEST;
+                PD_MSG_FIELD_I(guid) = self->fguid;
+                PD_MSG_FIELD_I(properties) = 0;
+                self->pd->fcts.processMessage(self->pd, &msg, false);
+                self->fguid->guid = NULL_GUID;
+#undef PD_MSG
+#undef PD_TYPE
+            }
+        }
+        break;
+    case RL_MEMORY_OK:
+        // Nothing to do (yes, we are an allocator but no setup is required)
+        break;
+    case RL_COMPUTE_OK:
+        break;
+    case RL_USER_OK:
+        break;
+    default:
+        // Unknown runlevel
+        ASSERT(0);
     }
+    return 0;
 }
 
 // Method to create the malloc allocator
@@ -359,9 +373,8 @@ ocrAllocatorFactory_t * newAllocatorFactoryMallocProxy(ocrParamList_t *perType) 
     base->initialize = &initializeAllocatorMallocProxy;
     base->destruct = &destructAllocatorFactoryMallocProxy;
     base->allocFcts.destruct = FUNC_ADDR(void (*)(ocrAllocator_t*), mallocProxyDestruct);
-    base->allocFcts.begin = FUNC_ADDR(void (*)(ocrAllocator_t*, ocrPolicyDomain_t*), mallocProxyBegin);
-    base->allocFcts.start = FUNC_ADDR(void (*)(ocrAllocator_t*, ocrPolicyDomain_t*), mallocProxyStart);
-    base->allocFcts.stop = FUNC_ADDR(void (*)(ocrAllocator_t*,ocrRunLevel_t,u32), mallocProxyStop);
+    base->allocFcts.switchRunlevel = FUNC_ADDR(u8 (*)(ocrAllocator_t*, ocrPolicyDomain_t*, ocrRunlevel_t,
+                                                      u32, u32, void (*)(u64), u64), mallocProxySwitchRunlevel);
     base->allocFcts.allocate = FUNC_ADDR(void* (*)(ocrAllocator_t*, u64, u64), mallocProxyAllocate);
     //base->allocFcts.free = FUNC_ADDR(void (*)(void*), mallocProxyDeallocate);
     base->allocFcts.reallocate = FUNC_ADDR(void* (*)(ocrAllocator_t*, void*, u64), mallocProxyReallocate);

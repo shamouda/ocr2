@@ -57,24 +57,26 @@ typedef struct _ocrCompPlatformFcts_t {
      */
     void (*destruct)(struct _ocrCompPlatform_t *self);
 
-    void (*begin)(struct _ocrCompPlatform_t *self, struct _ocrPolicyDomain_t *PD,
-                  ocrWorkerType_t workerType);
-
     /**
-     * @brief Starts a comp-platform (a thread of execution).
+     * @brief Switch runlevel
      *
-     * @param[in] self          Pointer to this comp-platform
-     * @param[in] pd            Policy domain on this comp-platform
-     * @param[in] worker        Worker runnning on this comp-platform
+     * @param[in] self         Pointer to this object
+     * @param[in] PD           Policy domain this object belongs to
+     * @param[in] runlevel     Runlevel to switch to
+     * @param[in] phase        Phase for this runlevel
+     * @param[in] properties   Properties (see ocr-runtime-types.h)
+     * @param[in] callback     Callback to call when the runlevel switch
+     *                         is complete. NULL if no callback is required
+     * @param[in] val          Value to pass to the callback
+     *
+     * @return 0 if the switch command was successful and a non-zero error
+     * code otherwise. Note that the return value does not indicate that the
+     * runlevel switch occured (the callback will be called when it does) but only
+     * that the call to switch runlevel was well formed and will be processed
+     * at some point
      */
-    void (*start)(struct _ocrCompPlatform_t *self, struct _ocrPolicyDomain_t *PD,
-                  struct _ocrWorker_t * worker);
-
-    /**
-     * @brief Stops this comp-platform
-     * @param[in] self          Pointer to this comp-platform
-     */
-    void (*stop)(struct _ocrCompPlatform_t *self, ocrRunLevel_t newRl, u32 action);
+    u8 (*switchRunlevel)(struct _ocrCompPlatform_t* self, struct _ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
+                           u32 phase, u32 properties, void (*callback)(u64), u64 val);
 
     /**
      * @brief Gets the throttle value for this compute node
