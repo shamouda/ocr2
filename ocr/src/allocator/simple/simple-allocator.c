@@ -115,6 +115,8 @@
 #define INFO1(X)                ((X)[1])
 #define INFO2(X)                ((X)[2])
 // in case of free block, prev/next is used to get linked into free list
+// PREV/NEXT exists only on free blocks.. i.e. not on allocated blocks,
+// because only free blocks go into free list.
 #define NEXT(X)                 ((X)[3])
 #define PREV(X)                 ((X)[4])
 // Conversion between user-provided address and block header
@@ -426,6 +428,8 @@ static void *simpleMalloc(pool_t *pool,u64 size, struct _ocrPolicyDomain_t *pd)
     if (p == NULL)
         goto exit_fail;
 
+    // This guarantees that the block will be able to embed NEXT/PREV
+    // in case that it's freed in the future.
     if (size < MINIMUM_SIZE_USER)  // should be bigger than minimum size
         size = MINIMUM_SIZE_USER;
     size = (size + ALIGNMENT_MASK)&(~ALIGNMENT_MASK);   // ceiling
@@ -440,9 +444,9 @@ static void *simpleMalloc(pool_t *pool,u64 size, struct _ocrPolicyDomain_t *pd)
             VALGRIND_CHUNK_OPEN(p);
             INFO1(p) = (u64)addrGlobalizeOnTG((void *)pool, pd);   // old : INFO1(p) = (u64)pool;
             INFO2(p) = (u64)addrGlobalizeOnTG((void *)ret, pd);    // old : INFO2(p) = (u64)ret;
-            if ((*(u8 *)(&INFO2(p)) & POOL_HEADER_TYPE_MASK) != allocatorSimple_id) {
-                DPRINTF(DEBUG_LVL_WARN, "SimpleAlloc : id != allocatorSimple_id \n");
-            }
+            ASSERT_BLOCK_BEGIN((*(u8 *)(&INFO2(p)) & POOL_HEADER_TYPE_MASK) == allocatorSimple_id)
+            DPRINTF(DEBUG_LVL_WARN, "SimpleAlloc : id != allocatorSimple_id \n");
+            ASSERT_BLOCK_END
             VALGRIND_CHUNK_CLOSE(p);
             VALGRIND_POOL_OPEN(pool);
             hal_unlock32(&(pool->lock));
@@ -474,14 +478,13 @@ void simpleFree(void *p)
     u64 *q = USER_TO_HEAD(p);
     VALGRIND_CHUNK_OPEN(q);
     pool_t *pool = (pool_t *)INFO1(q);
-    if (  GET_MARK(HEAD(q)) != MARK ) {
-        DPRINTF(DEBUG_LVL_WARN, "SimpleAlloc : free: cannot find mark. Probably wrong address is passed to free()? %p\n", p);
+    ASSERT_BLOCK_BEGIN (  GET_MARK(HEAD(q)) == MARK )
+    DPRINTF(DEBUG_LVL_WARN, "SimpleAlloc : free: cannot find mark. Probably wrong address is passed to free()? %p\n", p);
+    ASSERT_BLOCK_END
     VALGRIND_CHUNK_CLOSE(q);
 #ifdef ENABLE_VALGRIND
     VALGRIND_MEMPOOL_FREE(pool, p);
 #endif
-        return;
-    }
     VALGRIND_POOL_OPEN(pool);
     u64 start = (u64)pool->pool_start;
     u64 end   = (u64)pool->pool_end;
@@ -489,46 +492,45 @@ void simpleFree(void *p)
     VALGRIND_POOL_CLOSE(pool);
     q = USER_TO_HEAD(INFO2(q)); // For TG. no effects on x86
 
-    if (  GET_MARK(HEAD(q)) != MARK ) {
-        DPRINTF(DEBUG_LVL_WARN, "SimpleAlloc : free: mark not found %p\n", p);
-        goto free_exit;
-    }
-    if (!(GET_BIT0(HEAD(q)))) {
-        DPRINTF(DEBUG_LVL_WARN, "SimpleAlloc : free not-allocated block? double free? p=%p\n", p);
-        goto free_exit;
-    }
-    u64 size = GET_SIZE(HEAD(q));
-    if (TAIL(q, size) != size) {
-        DPRINTF(DEBUG_LVL_WARN, "SimpleAlloc : two sizes doesn't match. p=%p\n", p);
-        goto free_exit;
-    }
+    ASSERT_BLOCK_BEGIN ( GET_MARK(HEAD(q)) == MARK )
+    DPRINTF(DEBUG_LVL_WARN, "SimpleAlloc : free: mark not found %p\n", p);
+    ASSERT_BLOCK_END
 
-    DPRINTF(DEBUG_LVL_VERB, "before free : pool = %p, addr=%p\n", pool, INFO2(q));
+    ASSERT_BLOCK_BEGIN ( GET_BIT0(HEAD(q)) )
+    DPRINTF(DEBUG_LVL_WARN, "SimpleAlloc : free not-allocated block? double free? p=%p\n", p);
+    ASSERT_BLOCK_END
+
+    u64 size = GET_SIZE(HEAD(q));
+    ASSERT_BLOCK_BEGIN(TAIL(q, size) == size)
+    DPRINTF(DEBUG_LVL_WARN, "SimpleAlloc : two sizes doesn't match. p=%p\n", p);
+    ASSERT_BLOCK_END
+
+    //DPRINTF(DEBUG_LVL_VERB, "before free : pool = %p, addr=%p\n", pool, INFO2(q));
     //simplePrint(pool);
 
     u64 *peer_right = &PEER_RIGHT(q, size);
-    if ((u64)peer_right > end) {
-        DPRINTF(DEBUG_LVL_WARN, "SimpleAlloc : PEER_RIGHT address %p is above the heap area\n", peer_right);
-        goto free_exit;
-    }
-    if ((u64)&HEAD(q) < start) {
-        DPRINTF(DEBUG_LVL_WARN, "SimpleAlloc : address %p is below the heap area\n", &HEAD(q));
-        goto free_exit;
-    }
+    ASSERT_BLOCK_BEGIN (!((u64)peer_right > end))
+    DPRINTF(DEBUG_LVL_WARN, "SimpleAlloc : PEER_RIGHT address %p is above the heap area\n", peer_right);
+    ASSERT_BLOCK_END
+
+    ASSERT_BLOCK_BEGIN (!((u64)&HEAD(q) < start))
+    DPRINTF(DEBUG_LVL_WARN, "SimpleAlloc : address %p is below the heap area\n", &HEAD(q));
+    ASSERT_BLOCK_END
     VALGRIND_CHUNK_CLOSE(q);
 
     if ((u64)peer_right != end) {
         VALGRIND_CHUNK_OPEN(peer_right);
-        if (  GET_MARK(HEAD(peer_right)) != MARK ) {
-            DPRINTF(DEBUG_LVL_WARN, "SimpleAlloc : right neighbor's mark not found %p\n", p);
-        } else {
-            if (!(GET_BIT0(HEAD(peer_right)))) {     // right block is free?
-                size += GET_SIZE(HEAD(peer_right));
-                VALGRIND_CHUNK_CLOSE(peer_right);
-                simpleDeleteFree(pool, peer_right);
-                VALGRIND_CHUNK_OPEN(peer_right);
-                HEAD(peer_right) = 0;    // erase header (and mark)
-            }
+
+        ASSERT_BLOCK_BEGIN (  GET_MARK(HEAD(peer_right)) == MARK )
+        DPRINTF(DEBUG_LVL_WARN, "SimpleAlloc : right neighbor's mark not found %p\n", p);
+        ASSERT_BLOCK_END
+
+        if (!(GET_BIT0(HEAD(peer_right)))) {     // right block is free?
+            size += GET_SIZE(HEAD(peer_right));
+            VALGRIND_CHUNK_CLOSE(peer_right);
+            simpleDeleteFree(pool, peer_right);
+            VALGRIND_CHUNK_OPEN(peer_right);
+            HEAD(peer_right) = 0;    // erase header (and mark)
         }
         VALGRIND_CHUNK_CLOSE(peer_right);
     }
@@ -539,26 +541,24 @@ void simpleFree(void *p)
         VALGRIND_CHUNK_CLOSE(q);
         // just omit chunk_close_left()
         VALGRIND_CHUNK_OPEN(peer_left);
-        if (  GET_MARK(HEAD(peer_left)) != MARK ) {
-            DPRINTF(DEBUG_LVL_WARN, "SimpleAlloc : left neighbor's mark not found %p\n", p);
-        } else {
-            if (!(GET_BIT0(HEAD(peer_left)))) {      // left block is free?
-                size += GET_SIZE(HEAD(peer_left));
-                VALGRIND_CHUNK_CLOSE(peer_left);
-                simpleDeleteFree(pool, peer_left);
-                VALGRIND_CHUNK_OPEN(peer_left);
-                HEAD(q) = 0;    // erase header (and mark)
-                q = peer_left;
-            }
+
+        ASSERT_BLOCK_BEGIN ( GET_MARK(HEAD(peer_left)) == MARK )
+        DPRINTF(DEBUG_LVL_WARN, "SimpleAlloc : left neighbor's mark not found %p\n", p);
+        ASSERT_BLOCK_END
+
+        if (!(GET_BIT0(HEAD(peer_left)))) {      // left block is free?
+            size += GET_SIZE(HEAD(peer_left));
+            VALGRIND_CHUNK_CLOSE(peer_left);
+            simpleDeleteFree(pool, peer_left);
+            VALGRIND_CHUNK_OPEN(peer_left);
+            HEAD(q) = 0;    // erase header (and mark)
+            q = peer_left;
         }
         VALGRIND_CHUNK_CLOSE(peer_left);
     } else {
         VALGRIND_CHUNK_CLOSE(q);
     }
     simpleInsertFree(pool, &HEAD(q), size);
-    VALGRIND_CHUNK_OPEN(q);
-free_exit:
-    VALGRIND_CHUNK_CLOSE(q);
     VALGRIND_POOL_OPEN(pool);
     hal_unlock32(&(pool->lock));
     VALGRIND_POOL_CLOSE(pool);
