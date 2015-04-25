@@ -184,6 +184,44 @@ void destructWorkerHc(ocrWorker_t * base) {
     // runtimeChunkFree((u64)base, NULL);
 }
 
+u8 hcWorkerSwitchRunlevel(ocrWorker_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
+                          u32 phase, u32 properties, void (*callback)(u64), u64 val) {
+
+    u8 toReturn = 0;
+
+    // This is an inert module, we do not handle callbacks (caller needs to wait on us)
+    ASSERT(callback == NULL);
+
+    // Verify properties for this call
+    ASSERT((properties & RL_REQUEST) && !(properties & RL_RESPONSE)
+           && !(properties & RL_RELEASE));
+    ASSERT(!(properties & RL_FROM_MSG));
+
+    switch(runlevel) {
+    case RL_CONFIG_PARSE:
+        // On bring-up: Update PD->phasesPerRunlevel on phase 0
+        // and check compatibility on phase 1
+        break;
+    case RL_NETWORK_OK:
+        break;
+    case RL_PD_OK:
+        break;
+    case RL_GUID_OK:
+        break;
+    case RL_MEMORY_OK:
+        break;
+    case RL_COMPUTE_OK:
+        break;
+    case RL_USER_OK:
+        break;
+    default:
+        // Unknown runlevel
+        ASSERT(0);
+    }
+    return toReturn;
+}
+
+#if 0
 void hcBeginWorker(ocrWorker_t * base, ocrPolicyDomain_t * policy) {
     // Starts everybody, the first comp-platform has specific
     // code to represent the master thread.
@@ -240,75 +278,6 @@ void hcStartWorker(ocrWorker_t * base, ocrPolicyDomain_t * policy) {
 #endif
     }
     // Otherwise, it is highly likely that we are shutting down
-}
-
-static bool isMainEdtForker(ocrWorker_t * worker, ocrGuid_t * affinityMasterPD) {
-    // Determine if current worker is the master worker of this PD
-    bool blessedWorker = (worker->type == MASTER_WORKERTYPE);
-    // When OCR is used in library mode, there's no mainEdt
-    blessedWorker &= (mainEdtGet() != NULL);
-    if (blessedWorker) {
-        // Determine if current master worker is part of master PD
-        u64 count = 0;
-        // There should be a single master PD
-        ASSERT(!ocrAffinityCount(AFFINITY_PD_MASTER, &count) && (count == 1));
-        ocrAffinityGet(AFFINITY_PD_MASTER, &count, affinityMasterPD);
-        ASSERT(count == 1);
-        blessedWorker &= (worker->pd->myLocation == affinityToLocation(*affinityMasterPD));
-    }
-    return blessedWorker;
-}
-
-void* hcRunWorker(ocrWorker_t * worker) {
-    //Register this worker and get a context id
-    ocrPolicyDomain_t *pd = worker->pd;
-    PD_MSG_STACK(msg);
-    msg.srcLocation = pd->myLocation;
-    msg.destLocation = pd->myLocation;
-#define PD_MSG (&msg)
-#define PD_TYPE PD_MSG_MGT_REGISTER
-    msg.type = PD_MSG_MGT_REGISTER | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
-    PD_MSG_FIELD_I(loc) = (ocrLocation_t)getWorkerId(worker);
-    PD_MSG_FIELD_I(properties) = 0;
-    pd->fcts.processMessage(pd, &msg, true);
-    worker->seqId = PD_MSG_FIELD_O(seqId);
-#undef PD_MSG
-#undef PD_TYPE
-
-    ocrGuid_t affinityMasterPD;
-    bool forkMain = isMainEdtForker(worker, &affinityMasterPD);
-    if (forkMain) {
-        // This is all part of the mainEdt setup
-        // and should be executed by the "blessed" worker.
-        void * packedUserArgv = userArgsGet();
-        ocrEdt_t mainEdt = mainEdtGet();
-        u64 totalLength = ((u64*) packedUserArgv)[0]; // already exclude this first arg
-        // strip off the 'totalLength first argument'
-        packedUserArgv = (void *) (((u64)packedUserArgv) + sizeof(u64)); // skip first totalLength argument
-        ocrGuid_t dbGuid;
-        void* dbPtr;
-        ocrDbCreate(&dbGuid, &dbPtr, totalLength,
-                    DB_PROP_IGNORE_WARN, affinityMasterPD, NO_ALLOC);
-        // copy packed args to DB
-        hal_memCopy(dbPtr, packedUserArgv, totalLength, 0);
-        // Prepare the mainEdt for scheduling
-        ocrGuid_t edtTemplateGuid = NULL_GUID, edtGuid = NULL_GUID;
-        ocrEdtTemplateCreate(&edtTemplateGuid, mainEdt, 0, 1);
-        ocrEdtCreate(&edtGuid, edtTemplateGuid, EDT_PARAM_DEF, /* paramv = */ NULL,
-                     /* depc = */ EDT_PARAM_DEF, /* depv = */ &dbGuid,
-                     EDT_PROP_NONE, affinityMasterPD, NULL);
-    } else {
-        // Set who we are
-        ocrPolicyDomain_t *pd = worker->pd;
-        u32 i;
-        for(i = 0; i < worker->computeCount; ++i) {
-            worker->computes[i]->fcts.setCurrentEnv(worker->computes[i], pd, worker);
-        }
-    }
-
-    DPRINTF(DEBUG_LVL_INFO, "Starting scheduler routine of worker %ld\n", getWorkerId(worker));
-    workerLoop(worker);
-    return NULL;
 }
 
 void hcStopWorker(ocrWorker_t * base, ocrRunLevel_t rl, u32 actionRl) {
@@ -412,6 +381,77 @@ void hcStopWorker(ocrWorker_t * base, ocrRunLevel_t rl, u32 actionRl) {
     }
 }
 
+#endif
+
+static bool isMainEdtForker(ocrWorker_t * worker, ocrGuid_t * affinityMasterPD) {
+    // Determine if current worker is the master worker of this PD
+    bool blessedWorker = (worker->type == MASTER_WORKERTYPE);
+    // When OCR is used in library mode, there's no mainEdt
+    blessedWorker &= (mainEdtGet() != NULL);
+    if (blessedWorker) {
+        // Determine if current master worker is part of master PD
+        u64 count = 0;
+        // There should be a single master PD
+        ASSERT(!ocrAffinityCount(AFFINITY_PD_MASTER, &count) && (count == 1));
+        ocrAffinityGet(AFFINITY_PD_MASTER, &count, affinityMasterPD);
+        ASSERT(count == 1);
+        blessedWorker &= (worker->pd->myLocation == affinityToLocation(*affinityMasterPD));
+    }
+    return blessedWorker;
+}
+
+void* hcRunWorker(ocrWorker_t * worker) {
+    //Register this worker and get a context id
+    ocrPolicyDomain_t *pd = worker->pd;
+    PD_MSG_STACK(msg);
+    msg.srcLocation = pd->myLocation;
+    msg.destLocation = pd->myLocation;
+#define PD_MSG (&msg)
+#define PD_TYPE PD_MSG_MGT_REGISTER
+    msg.type = PD_MSG_MGT_REGISTER | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
+    PD_MSG_FIELD_I(loc) = (ocrLocation_t)getWorkerId(worker);
+    PD_MSG_FIELD_I(properties) = 0;
+    pd->fcts.processMessage(pd, &msg, true);
+    worker->seqId = PD_MSG_FIELD_O(seqId);
+#undef PD_MSG
+#undef PD_TYPE
+
+    ocrGuid_t affinityMasterPD;
+    bool forkMain = isMainEdtForker(worker, &affinityMasterPD);
+    if (forkMain) {
+        // This is all part of the mainEdt setup
+        // and should be executed by the "blessed" worker.
+        void * packedUserArgv = userArgsGet();
+        ocrEdt_t mainEdt = mainEdtGet();
+        u64 totalLength = ((u64*) packedUserArgv)[0]; // already exclude this first arg
+        // strip off the 'totalLength first argument'
+        packedUserArgv = (void *) (((u64)packedUserArgv) + sizeof(u64)); // skip first totalLength argument
+        ocrGuid_t dbGuid;
+        void* dbPtr;
+        ocrDbCreate(&dbGuid, &dbPtr, totalLength,
+                    DB_PROP_IGNORE_WARN, affinityMasterPD, NO_ALLOC);
+        // copy packed args to DB
+        hal_memCopy(dbPtr, packedUserArgv, totalLength, 0);
+        // Prepare the mainEdt for scheduling
+        ocrGuid_t edtTemplateGuid = NULL_GUID, edtGuid = NULL_GUID;
+        ocrEdtTemplateCreate(&edtTemplateGuid, mainEdt, 0, 1);
+        ocrEdtCreate(&edtGuid, edtTemplateGuid, EDT_PARAM_DEF, /* paramv = */ NULL,
+                     /* depc = */ EDT_PARAM_DEF, /* depv = */ &dbGuid,
+                     EDT_PROP_NONE, affinityMasterPD, NULL);
+    } else {
+        // Set who we are
+        ocrPolicyDomain_t *pd = worker->pd;
+        u32 i;
+        for(i = 0; i < worker->computeCount; ++i) {
+            worker->computes[i]->fcts.setCurrentEnv(worker->computes[i], pd, worker);
+        }
+    }
+
+    DPRINTF(DEBUG_LVL_INFO, "Starting scheduler routine of worker %ld\n", getWorkerId(worker));
+    workerLoop(worker);
+    return NULL;
+}
+
 bool hcIsRunningWorker(ocrWorker_t * base) {
     ocrWorkerHc_t * hcWorker = (ocrWorkerHc_t *) base;
     //TODO-RL: define exactly what running means ?
@@ -460,11 +500,10 @@ ocrWorkerFactory_t * newOcrWorkerFactoryHc(ocrParamList_t * perType) {
     base->destruct = &destructWorkerFactoryHc;
 
     base->workerFcts.destruct = FUNC_ADDR(void (*) (ocrWorker_t *), destructWorkerHc);
-    base->workerFcts.begin = FUNC_ADDR(void (*) (ocrWorker_t *, ocrPolicyDomain_t *), hcBeginWorker);
-    base->workerFcts.start = FUNC_ADDR(void (*) (ocrWorker_t *, ocrPolicyDomain_t *), hcStartWorker);
+    base->workerFcts.switchRunlevel = FUNC_ADDR(u8 (*)(ocrWorker_t*, ocrPolicyDomain_t*, ocrRunlevel_t,
+                                                       u32, u32, void (*)(u64), u64), hcWorkerSwitchRunlevel);
     base->workerFcts.run = FUNC_ADDR(void* (*) (ocrWorker_t *), hcRunWorker);
     base->workerFcts.workShift = FUNC_ADDR(void* (*) (ocrWorker_t *), hcWorkShift);
-    base->workerFcts.stop = FUNC_ADDR(void (*) (ocrWorker_t *,ocrRunLevel_t,u32), hcStopWorker);
     base->workerFcts.isRunning = FUNC_ADDR(bool (*) (ocrWorker_t *), hcIsRunningWorker);
     return base;
 }

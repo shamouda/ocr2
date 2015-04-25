@@ -33,6 +33,47 @@ void ptDestruct(ocrCompTarget_t *compTarget) {
 //     runtimeChunkFree((u64)compTarget, NULL);
 }
 
+u8 ptSwitchRunlevel(ocrCompTarget_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
+                    u32 phase, u32 properties, void (*callback)(u64), u64 val) {
+
+    u8 toReturn = 0;
+
+    // This is an inert module, we do not handle callbacks (caller needs to wait on us)
+    ASSERT(callback == NULL);
+
+    // Verify properties for this call
+    ASSERT((properties & RL_REQUEST) && !(properties & RL_RESPONSE)
+           && !(properties & RL_RELEASE));
+    ASSERT(!(properties & RL_FROM_MSG));
+
+    switch(runlevel) {
+    case RL_CONFIG_PARSE:
+        // On bring-up: Update PD->phasesPerRunlevel on phase 0
+        // and check compatibility on phase 1
+        break;
+    case RL_NETWORK_OK:
+        // Nothing
+        break;
+    case RL_PD_OK:
+        break;
+    case RL_GUID_OK:
+        // Nothing to do
+        break;
+    case RL_MEMORY_OK:
+        // Nothing to do
+        break;
+    case RL_COMPUTE_OK:
+        // We can allocate our map here because the memory is up
+        break;
+    case RL_USER_OK:
+        break;
+    default:
+        // Unknown runlevel
+        ASSERT(0);
+    }
+    return toReturn;
+}
+#if 0
 void ptBegin(ocrCompTarget_t * compTarget, ocrPolicyDomain_t * PD, ocrWorkerType_t workerType) {
 
     ASSERT(compTarget->platformCount == 1);
@@ -98,6 +139,7 @@ void ptStop(ocrCompTarget_t * compTarget, ocrRunLevel_t newRl, u32 action) {
             ASSERT("Unknown runlevel in stop function");
     }
 }
+#endif
 
 u8 ptGetThrottle(ocrCompTarget_t *compTarget, u64 *value) {
     ASSERT(compTarget->platformCount == 1);
@@ -137,14 +179,13 @@ static void destructCompTargetFactoryPt(ocrCompTargetFactory_t *factory) {
 
 ocrCompTargetFactory_t *newCompTargetFactoryPt(ocrParamList_t *perType) {
     ocrCompTargetFactory_t *base = (ocrCompTargetFactory_t*)
-                                   runtimeChunkAlloc(sizeof(ocrCompTargetFactoryPt_t), NONPERSISTENT_CHUNK);
+        runtimeChunkAlloc(sizeof(ocrCompTargetFactoryPt_t), NONPERSISTENT_CHUNK);
     base->instantiate = &newCompTargetPt;
     base->initialize = &initializeCompTargetPt;
     base->destruct = &destructCompTargetFactoryPt;
     base->targetFcts.destruct = FUNC_ADDR(void (*)(ocrCompTarget_t*), ptDestruct);
-    base->targetFcts.begin = FUNC_ADDR(void (*)(ocrCompTarget_t*, ocrPolicyDomain_t*, ocrWorkerType_t), ptBegin);
-    base->targetFcts.start = FUNC_ADDR(void (*)(ocrCompTarget_t*, ocrPolicyDomain_t*, ocrWorker_t*), ptStart);
-    base->targetFcts.stop = FUNC_ADDR(void (*)(ocrCompTarget_t*,ocrRunLevel_t,u32), ptStop);
+    base->targetFcts.switchRunlevel = FUNC_ADDR(u8 (*)(ocrCompTarget_t*, ocrPolicyDomain_t*, ocrRunlevel_t,
+                                                       u32, u32, void (*)(u64), u64), ptSwitchRunlevel);
     base->targetFcts.getThrottle = FUNC_ADDR(u8 (*)(ocrCompTarget_t*, u64*), ptGetThrottle);
     base->targetFcts.setThrottle = FUNC_ADDR(u8 (*)(ocrCompTarget_t*, u64), ptSetThrottle);
     base->targetFcts.setCurrentEnv = FUNC_ADDR(u8 (*)(ocrCompTarget_t*, ocrPolicyDomain_t*, ocrWorker_t*), ptSetCurrentEnv);

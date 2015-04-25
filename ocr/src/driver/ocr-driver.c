@@ -404,7 +404,7 @@ extern bool key_exists(dictionary *dict, char *sec, char *field);
 
 void bringUpRuntime(ocrConfig_t *ocrConfig) {
     const char *inifile = ocrConfig->iniFile;
-    ASSERT(iniFile != NULL);
+    ASSERT(inifile != NULL);
 
     int i, j, count=0, nsec;
     dictionary *dict = iniparser_load(inifile);

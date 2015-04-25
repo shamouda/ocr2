@@ -31,16 +31,39 @@ void nullSchedulerHeuristicBegin(ocrSchedulerHeuristic_t * self) {
     ASSERT(self->scheduler != NULL);
 }
 
-void nullSchedulerHeuristicStart(ocrSchedulerHeuristic_t * self) {
-    // Nothing to do locally
-}
+u8 nullSchedulerHeuristicSwitchRunlevel(ocrSchedulerHeuristc_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
+                                        u32 phase, u32 properties, void (*callback)(u64), u64 val) {
 
-void nullSchedulerHeuristicStop(ocrSchedulerHeuristic_t * self, ocrRunLevel_t newRl, u32 action) {
-    // Nothing to do locally
-}
+    u8 toReturn = 0;
 
-void nullSchedulerHeuristicFinish(ocrSchedulerHeuristic_t *self) {
-    // Nothing to do locally
+    // This is an inert module, we do not handle callbacks (caller needs to wait on us)
+    ASSERT(callback == NULL);
+
+    // Verify properties for this call
+    ASSERT((properties & RL_REQUEST) && !(properties & RL_RESPONSE)
+           && !(properties & RL_RELEASE));
+    ASSERT(!(properties & RL_FROM_MSG));
+
+    switch(runlevel) {
+    case RL_CONFIG_PARSE:
+        break;
+    case RL_NETWORK_OK:
+        break;
+    case RL_PD_OK:
+        break;
+    case RL_GUID_OK:
+        break;
+    case RL_MEMORY_OK:
+        break;
+    case RL_COMPUTE_OK:
+        break;
+    case RL_USER_OK:
+        break;
+    default:
+        // Unknown runlevel
+        ASSERT(0);
+    }
+    return toReturn;
 }
 
 void nullSchedulerHeuristicDestruct(ocrSchedulerHeuristic_t * self) {
@@ -89,9 +112,8 @@ ocrSchedulerHeuristicFactory_t * newOcrSchedulerHeuristicFactoryNull(ocrParamLis
                                       sizeof(ocrSchedulerHeuristicFactoryNull_t), NONPERSISTENT_CHUNK);
     base->instantiate = &newSchedulerHeuristicNull;
     base->destruct = &destructSchedulerHeuristicFactoryNull;
-    base->fcts.begin = FUNC_ADDR(void (*)(ocrSchedulerHeuristic_t*), nullSchedulerHeuristicBegin);
-    base->fcts.start = FUNC_ADDR(void (*)(ocrSchedulerHeuristic_t*), nullSchedulerHeuristicStart);
-    base->fcts.stop = FUNC_ADDR(void (*)(ocrSchedulerHeuristic_t*,ocrRunLevel_t,u32), nullSchedulerHeuristicStop);
+    base->fcts.switchRunlevel = FUNC_ADDR(u8 (*)(ocrSchedulerHeuristic_t*, ocrPolicyDomain_t*, ocrRunlevel_t,
+                                                 u32, u32, void (*)(u64), u64), simpleSwitchRunlevel);
     base->fcts.destruct = FUNC_ADDR(void (*)(ocrSchedulerHeuristic_t*), nullSchedulerHeuristicDestruct);
 
     base->fcts.update = FUNC_ADDR(u8 (*)(ocrSchedulerHeuristic_t*, u32), nullSchedulerHeuristicUpdate);

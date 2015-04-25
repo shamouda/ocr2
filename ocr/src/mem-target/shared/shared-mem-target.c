@@ -24,6 +24,7 @@
 #endif
 
 
+#define DEBUG_TYPE MEM_TARGET
 /******************************************************/
 /* OCR MEM TARGET SHARED IMPLEMENTATION               */
 /******************************************************/

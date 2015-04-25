@@ -93,6 +93,48 @@ void hcSchedulerDestruct(ocrScheduler_t * self) {
     runtimeChunkFree((u64)self, NULL);
 }
 
+u8 hcSchedulerSwitchRunlevel(ocrScheduler_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
+                             u32 phase, u32 properties, void (*callback)(u64), u64 val) {
+
+    u8 toReturn = 0;
+
+    // This is an inert module, we do not handle callbacks (caller needs to wait on us)
+    ASSERT(callback == NULL);
+
+    // Verify properties for this call
+    ASSERT((properties & RL_REQUEST) && !(properties & RL_RESPONSE)
+           && !(properties & RL_RELEASE));
+    ASSERT(!(properties & RL_FROM_MSG));
+
+    switch(runlevel) {
+    case RL_CONFIG_PARSE:
+        // On bring-up: Update PD->phasesPerRunlevel on phase 0
+        // and check compatibility on phase 1
+        break;
+    case RL_NETWORK_OK:
+        // Nothing
+        break;
+    case RL_PD_OK:
+        break;
+    case RL_GUID_OK:
+        // Nothing to do
+        break;
+    case RL_MEMORY_OK:
+        // Nothing to do
+        break;
+    case RL_COMPUTE_OK:
+        // We can allocate our map here because the memory is up
+        break;
+    case RL_USER_OK:
+        break;
+    default:
+        // Unknown runlevel
+        ASSERT(0);
+    }
+    return toReturn;
+}
+
+#if 0
 void hcSchedulerBegin(ocrScheduler_t * self, ocrPolicyDomain_t * PD) {
     u64 workpileCount = self->workpileCount;
     u64 i;
@@ -211,6 +253,7 @@ void hcSchedulerStop(ocrScheduler_t * self, ocrRunLevel_t newRl, u32 action) {
             ASSERT("Unknown runlevel in stop function");
     }
 }
+#endif
 
 u8 hcSchedulerTakeEdt (ocrScheduler_t *self, u32 *count, ocrFatGuid_t *edts) {
     // Source must be a worker guid and we rely on indices to map
@@ -379,9 +422,8 @@ ocrSchedulerFactory_t * newOcrSchedulerFactoryHc(ocrParamList_t *perType) {
     base->instantiate = &newSchedulerHc;
     base->initialize  = &initializeSchedulerHc;
     base->destruct = &destructSchedulerFactoryHc;
-    base->schedulerFcts.begin = FUNC_ADDR(void (*)(ocrScheduler_t*, ocrPolicyDomain_t*), hcSchedulerBegin);
-    base->schedulerFcts.start = FUNC_ADDR(void (*)(ocrScheduler_t*, ocrPolicyDomain_t*), hcSchedulerStart);
-    base->schedulerFcts.stop = FUNC_ADDR(void (*)(ocrScheduler_t*,ocrRunLevel_t,u32), hcSchedulerStop);
+    base->schedulerFcts.switchRunlevel = FUNC_ADDR(u8 (*)(ocrScheduler_t*, ocrPolicyDomain_t*, ocrRunlevel_t,
+                                                          u32, u32, void (*)(u64), u64), hcSchedulerSwitchRunlevel);
     base->schedulerFcts.destruct = FUNC_ADDR(void (*)(ocrScheduler_t*), hcSchedulerDestruct);
     base->schedulerFcts.takeEdt = FUNC_ADDR(u8 (*)(ocrScheduler_t*, u32*, ocrFatGuid_t*), hcSchedulerTakeEdt);
     base->schedulerFcts.giveEdt = FUNC_ADDR(u8 (*)(ocrScheduler_t*, u32*, ocrFatGuid_t*), hcSchedulerGiveEdt);

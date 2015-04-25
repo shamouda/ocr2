@@ -24,10 +24,44 @@ void hcWorkpileDestruct ( ocrWorkpile_t * base ) {
     runtimeChunkFree((u64)base, NULL);
 }
 
-void hcWorkpileBegin(ocrWorkpile_t *base, ocrPolicyDomain_t *PD) {
-    // Nothing to do
+u8 hcWorkpileSwitchRunlevel(ocrWorkpile_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
+                            u32 phase, u32 properties, void (*callback)(u64), u64 val) {
+
+    u8 toReturn = 0;
+
+    // This is an inert module, we do not handle callbacks (caller needs to wait on us)
+    ASSERT(callback == NULL);
+
+    // Verify properties for this call
+    ASSERT((properties & RL_REQUEST) && !(properties & RL_RESPONSE)
+           && !(properties & RL_RELEASE));
+    ASSERT(!(properties & RL_FROM_MSG));
+
+    switch(runlevel) {
+    case RL_CONFIG_PARSE:
+        // On bring-up: Update PD->phasesPerRunlevel on phase 0
+        // and check compatibility on phase 1
+        break;
+    case RL_NETWORK_OK:
+        break;
+    case RL_PD_OK:
+        break;
+    case RL_GUID_OK:
+        break;
+    case RL_MEMORY_OK:
+        break;
+    case RL_COMPUTE_OK:
+        break;
+    case RL_USER_OK:
+        break;
+    default:
+        // Unknown runlevel
+        ASSERT(0);
+    }
+    return toReturn;
 }
 
+#if 0
 void hcWorkpileStart(ocrWorkpile_t *base, ocrPolicyDomain_t *PD) {
     guidify(PD, (u64)base, &(base->fguid), OCR_GUID_WORKPILE);
     ocrWorkpileHc_t* derived = (ocrWorkpileHc_t*)base;
@@ -62,6 +96,7 @@ void hcWorkpileStop(ocrWorkpile_t *base, ocrRunLevel_t newRl, u32 action) {
             ASSERT("Unknown runlevel in stop function");
     }
 }
+#endif
 
 ocrFatGuid_t hcWorkpilePop(ocrWorkpile_t * base, ocrWorkPopType_t type,
                            ocrCost_t *cost) {
@@ -114,9 +149,8 @@ ocrWorkpileFactory_t * newOcrWorkpileFactoryHc(ocrParamList_t *perType) {
     base->destruct = &destructWorkpileFactoryHc;
 
     base->workpileFcts.destruct = FUNC_ADDR(void (*) (ocrWorkpile_t *), hcWorkpileDestruct);
-    base->workpileFcts.begin = FUNC_ADDR(void (*) (ocrWorkpile_t *, ocrPolicyDomain_t *), hcWorkpileBegin);
-    base->workpileFcts.start = FUNC_ADDR(void (*) (ocrWorkpile_t *, ocrPolicyDomain_t *), hcWorkpileStart);
-    base->workpileFcts.stop = FUNC_ADDR(void (*) (ocrWorkpile_t *,ocrRunLevel_t,u32), hcWorkpileStop);
+    base->workpileFcts.switchRunlevel = FUNC_ADDR(u8 (*)(ocrWorkpile_t*, ocrPolicyDomain_t*, ocrRunlevel_t,
+                                                         u32, u32, void (*)(u64), u64), hcWorkpileSwitchRunlevel);
     base->workpileFcts.pop = FUNC_ADDR(ocrFatGuid_t (*)(ocrWorkpile_t*, ocrWorkPopType_t, ocrCost_t *), hcWorkpilePop);
     base->workpileFcts.push = FUNC_ADDR(void (*)(ocrWorkpile_t*, ocrWorkPushType_t, ocrFatGuid_t), hcWorkpilePush);
     return base;

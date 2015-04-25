@@ -75,7 +75,7 @@ typedef struct _ocrCommPlatformFcts_t {
      * that the call to switch runlevel was well formed and will be processed
      * at some point
      */
-    u8 (*switchRunlevel)(struct _ocrCommPLatform_t* self, struct _ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
+    u8 (*switchRunlevel)(struct _ocrCommPlatform_t* self, struct _ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
                          u32 phase, u32 properties, void (*callback)(u64), u64 val);
 
     /**

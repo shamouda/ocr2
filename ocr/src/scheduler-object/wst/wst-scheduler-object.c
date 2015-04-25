@@ -122,6 +122,43 @@ ocrSchedulerObject_t* newSchedulerObjectRootWst(ocrSchedulerObjectFactory_t *fac
     return schedObj;
 }
 
+u8 wstSchedulerObjectSwitchRunlevel(ocrSchedulerObjectRoot_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
+                                    u32 phase, u32 properties, void (*callback)(u64), u64 val) {
+
+    u8 toReturn = 0;
+
+    // This is an inert module, we do not handle callbacks (caller needs to wait on us)
+    ASSERT(callback == NULL);
+
+    // Verify properties for this call
+    ASSERT((properties & RL_REQUEST) && !(properties & RL_RESPONSE)
+           && !(properties & RL_RELEASE));
+    ASSERT(!(properties & RL_FROM_MSG));
+
+    switch(runlevel) {
+    case RL_CONFIG_PARSE:
+        // On bring-up: Update PD->phasesPerRunlevel on phase 0
+        // and check compatibility on phase 1
+        break;
+    case RL_NETWORK_OK:
+        break;
+    case RL_PD_OK:
+        break;
+    case RL_GUID_OK:
+        break;
+    case RL_MEMORY_OK:
+        break;
+    case RL_COMPUTE_OK:
+        break;
+    case RL_USER_OK:
+        break;
+    default:
+        ASSERT(0);
+    }
+    return toReturn;
+}
+
+#if 0
 void wstSchedulerObjectRootBegin(ocrSchedulerObjectRoot_t * self) {
     u32 i;
     ASSERT(self->scheduler);
@@ -171,6 +208,7 @@ void wstSchedulerObjectRootStop(ocrSchedulerObjectRoot_t * self, ocrRunLevel_t n
             ASSERT("Unknown runlevel in stop function");
     }
 }
+#endif
 
 void wstSchedulerObjectRootDestruct(ocrSchedulerObjectRoot_t *self) {
     u32 i;
@@ -214,9 +252,8 @@ static ocrSchedulerObjectFactory_t* newOcrSchedulerObjectRootFactoryWst(ocrParam
     schedObjFact->fcts.getSchedulerObjectForLocation = FUNC_ADDR(ocrSchedulerObject_t* (*)(ocrSchedulerObjectFactory_t*, ocrSchedulerObject_t*, ocrLocation_t, ocrSchedulerObjectMappingKind, u32), wstGetSchedulerObjectForLocation);
 
     ocrSchedulerObjectRootFactory_t* rootFactory = (ocrSchedulerObjectRootFactory_t*)schedObjFact;
-    rootFactory->fcts.begin = FUNC_ADDR(void (*)(ocrSchedulerObjectRoot_t*), wstSchedulerObjectRootBegin);
-    rootFactory->fcts.start = FUNC_ADDR(void (*)(ocrSchedulerObjectRoot_t*), wstSchedulerObjectRootStart);
-    rootFactory->fcts.stop = FUNC_ADDR(void (*)(ocrSchedulerObjectRoot_t*,ocrRunLevel_t,u32), wstSchedulerObjectRootStop);
+    rootFactory->fcts.switchRunlevel = FUNC_ADDR(u8 (*)(ocrSchedulerObjectRoot_t*, ocrPolicyDomain_t*, ocrRunlevel_t,
+                                                        u32, u32, void (*)(u64), u64), wstSchedulerObjectSwitchRunlevel);
     rootFactory->fcts.destruct = FUNC_ADDR(void (*)(ocrSchedulerObjectRoot_t*), wstSchedulerObjectRootDestruct);
 
     return schedObjFact;

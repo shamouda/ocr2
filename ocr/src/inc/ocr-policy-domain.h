@@ -205,10 +205,13 @@ typedef struct _paramListPolicyDomainInst_t {
 #define PD_MSG_MGT_UNREGISTER   0x00002200
 
 /**< For a worker to request the policy-domain to monitor an operation progress */
-#define PD_MSG_MGT_MONITOR_PROGRESS 0x00002200
+#define PD_MSG_MGT_MONITOR_PROGRESS 0x00003200
 
 /**< Runlevel change notification */
 #define PD_MSG_MGT_RL_NOTIFY        0x00004200
+
+/**< Trigger a shutdown (TO BE REMOVED) */
+#define PD_MSG_MG_SHUTDOWN          0x00005200
 
 /**< AND with this and if result non-null, hint related operation.
  * Generally, these will be calls to set/get user hints
@@ -904,7 +907,7 @@ typedef struct _ocrPolicyMsg_t {
         struct {
             union {
                 struct {
-                    ocrRunLevel_t runlevel; /**< In: Runlevel involved */
+                    ocrRunlevel_t runlevel; /**< In: Runlevel involved */
                     u32 properties;         /**< Properties: OR of the following flags
                                                One of:
                                                  - RL_REQUEST
@@ -1236,7 +1239,7 @@ typedef struct _ocrPolicyDomain_t {
      * phase but part of it needs to be kept around for the shutdown
      * part. Is there a better way
      */
-    u32 phasesPerRunLevel[RL_MAX][RL_PHASE_MAX];
+    u32 phasesPerRunlevel[RL_MAX][RL_PHASE_MAX];
 
     // TODO: What to do about this?
     ocrCost_t *costFunction; /**< Cost function used to determine

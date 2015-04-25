@@ -28,7 +28,7 @@ typedef enum _ocrRunlevels_t {
     RL_COMPUTE_OK,   /**< All other inert modules are brought up; bring up workers */
     RL_USER_OK,      /**< One PD starts mainEDT; others are waiting for work */
     RL_MAX           /**< Not a runlevel. Internal marker */
-} ocrRunLevel_t;
+} ocrRunlevel_t;
 
 // TODO: Do we need to explicitly expand this
 // to the subcomponents (platform/target for example)

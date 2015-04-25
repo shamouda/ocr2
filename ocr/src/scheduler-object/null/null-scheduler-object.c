@@ -54,27 +54,39 @@ u8 nullSetLocationForSchedulerObject(ocrSchedulerObjectFactory_t *fact, ocrSched
 /* NULL SCHEDULER_OBJECT ROOT FUNCTIONS                      */
 /******************************************************/
 
-void nullSchedulerObjectRootBegin(ocrSchedulerObjectRoot_t * self) {
-    ASSERT(self->scheduler);
-    return;
-}
+u8 nullSchedulerObjectRootSwitchRunlevel(ocrSchedulerObjectRoot_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
+                                         u32 phase, u32 properties, void (*callback)(u64), u64 val) {
 
-void nullSchedulerObjectRootStart(ocrSchedulerObjectRoot_t * self) {
-    return;
-}
+    u8 toReturn = 0;
 
+    // This is an inert module, we do not handle callbacks (caller needs to wait on us)
+    ASSERT(callback == NULL);
 
-void nullSchedulerObjectRootStop(ocrSchedulerObjectRoot_t * self, ocrRunLevel_t newRl, u32 action) {
-    switch(newRl) {
-        case RL_STOP: {
-            break;
-        }
-        case RL_SHUTDOWN: {
-            break;
-        }
-        default:
-            ASSERT("Unknown runlevel in stop function");
+    // Verify properties for this call
+    ASSERT((properties & RL_REQUEST) && !(properties & RL_RESPONSE)
+           && !(properties & RL_RELEASE));
+    ASSERT(!(properties & RL_FROM_MSG));
+
+    switch(runlevel) {
+    case RL_CONFIG_PARSE:
+        break;
+    case RL_NETWORK_OK:
+        break;
+    case RL_PD_OK:
+        break;
+    case RL_GUID_OK:
+        break;
+    case RL_MEMORY_OK:
+        break;
+    case RL_COMPUTE_OK:
+        break;
+    case RL_USER_OK:
+        break;
+    default:
+        // Unknown runlevel
+        ASSERT(0);
     }
+    return toReturn;
 }
 
 void nullSchedulerObjectRootDestruct(ocrSchedulerObjectRoot_t *self) {
@@ -123,6 +135,8 @@ ocrSchedulerObjectFactory_t * newOcrSchedulerObjectFactoryNull(ocrParamList_t *p
     schedObjFact->fcts.getSchedulerObjectForLocation = FUNC_ADDR(ocrSchedulerObject_t* (*)(ocrSchedulerObjectFactory_t*, ocrSchedulerObject_t*, ocrLocation_t, ocrSchedulerObjectMappingKind, u32), nullGetSchedulerObjectForLocation);
 
     ocrSchedulerObjectRootFactory_t* rootFactory = (ocrSchedulerObjectRootFactory_t*)schedObjFact;
+    rootFactory->fcts.switchRunlevel = FUNC_ADDR(u8 (*)(ocrSchedulerObjectRoot_t*, ocrPolicyDomain_t*, ocrRunlevel_t,
+                                                        u32, u32, void (*)(u64), u64), simpleSwitchRunlevel);
     rootFactory->fcts.begin = FUNC_ADDR(void (*)(ocrSchedulerObjectRoot_t*), nullSchedulerObjectRootBegin);
     rootFactory->fcts.start = FUNC_ADDR(void (*)(ocrSchedulerObjectRoot_t*), nullSchedulerObjectRootStart);
     rootFactory->fcts.stop = FUNC_ADDR(void (*)(ocrSchedulerObjectRoot_t*,ocrRunLevel_t,u32), nullSchedulerObjectRootStop);\

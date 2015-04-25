@@ -33,15 +33,44 @@ void ptrDestruct(ocrGuidProvider_t* self) {
     runtimeChunkFree((u64)self, NULL);
 }
 
-void ptrBegin(ocrGuidProvider_t *self, ocrPolicyDomain_t *pd) {
-    self->pd = pd;
-}
 
-void ptrStart(ocrGuidProvider_t *self, ocrPolicyDomain_t *pd) {
-}
+u8 ptrSwitchRunlevel(ocrGuidProvider_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
+                     u32 phase, u32 properties, void (*callback)(u64), u64 val) {
 
-void ptrStop(ocrGuidProvider_t *self, ocrRunLevel_t newRl, u32 action) {
-    // Nothing to do
+    u8 toReturn = 0;
+
+    // This is an inert module, we do not handle callbacks (caller needs to wait on us)
+    ASSERT(callback == NULL);
+
+    // Verify properties for this call
+    ASSERT((properties & RL_REQUEST) && !(properties & RL_RESPONSE)
+           && !(properties & RL_RELEASE));
+    ASSERT(!(properties & RL_FROM_MSG));
+
+    switch(runlevel) {
+    case RL_CONFIG_PARSE:
+        // On bring-up: Update PD->phasesPerRunlevel on phase 0
+        // and check compatibility on phase 1
+        break;
+    case RL_NETWORK_OK:
+        break;
+    case RL_PD_OK:
+        if(properties & RL_BRING_UP)
+            self->pd = PD;
+        break;
+    case RL_GUID_OK:
+        break;
+    case RL_MEMORY_OK:
+        break;
+    case RL_COMPUTE_OK:
+        break;
+    case RL_USER_OK:
+        break;
+    default:
+        // Unknown runlevel
+        ASSERT(0);
+    }
+    return toReturn;
 }
 
 u8 ptrGetGuid(ocrGuidProvider_t* self, ocrGuid_t* guid, u64 val, ocrGuidKind kind) {
@@ -176,9 +205,8 @@ ocrGuidProviderFactory_t *newGuidProviderFactoryPtr(ocrParamList_t *typeArg, u32
     base->destruct = &destructGuidProviderFactoryPtr;
     base->factoryId = factoryId;
     base->providerFcts.destruct = FUNC_ADDR(void (*)(ocrGuidProvider_t*), ptrDestruct);
-    base->providerFcts.begin = FUNC_ADDR(void (*)(ocrGuidProvider_t*, ocrPolicyDomain_t*), ptrBegin);
-    base->providerFcts.start = FUNC_ADDR(void (*)(ocrGuidProvider_t*, ocrPolicyDomain_t*), ptrStart);
-    base->providerFcts.stop = FUNC_ADDR(void (*)(ocrGuidProvider_t*,ocrRunLevel_t,u32), ptrStop);
+    base->providerFcts.switchRunlevel = FUNC_ADDR(u8 (*)(ocrGuidProvider_t*, ocrPolicyDomain_t*, ocrRunlevel_t,
+                                                         u32, u32, void (*)(u64), u64), ptrSwitchRunlevel);
     base->providerFcts.getGuid = FUNC_ADDR(u8 (*)(ocrGuidProvider_t*, ocrGuid_t*, u64, ocrGuidKind), ptrGetGuid);
     base->providerFcts.createGuid = FUNC_ADDR(u8 (*)(ocrGuidProvider_t*, ocrFatGuid_t*, u64, ocrGuidKind), ptrCreateGuid);
     base->providerFcts.getVal = FUNC_ADDR(u8 (*)(ocrGuidProvider_t*, ocrGuid_t, u64*, ocrGuidKind*), ptrGetVal);

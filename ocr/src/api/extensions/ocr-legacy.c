@@ -41,6 +41,9 @@ u8 ocrLegacyFinalize(ocrGuid_t legacyContext, bool runUntilShutdown) {
         // until ocrShutdown is called which will cause the entire PD
         // to stop (including this worker). The currently executing
         // worker then fallthrough from start to finish.
+        ASSERT(0);
+        /*
+          RUNLEVEL-TODO
         worker->fcts.start(worker, pd);
 
         // When the worker exits 'start' the PD runlevel has been
@@ -49,6 +52,7 @@ u8 ocrLegacyFinalize(ocrGuid_t legacyContext, bool runUntilShutdown) {
         pd->fcts.setRunlevel(pd, RL_SHUTDOWN);
         returnCode = pd->shutdownCode;
         pd->fcts.setRunlevel(pd, RL_DEALLOCATE);
+        */
     } else {
         getCurrentEnv(&pd, NULL, NULL, NULL);
         returnCode = pd->shutdownCode;

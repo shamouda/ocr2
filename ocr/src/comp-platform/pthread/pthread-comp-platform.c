@@ -110,6 +110,49 @@ void pthreadDestruct (ocrCompPlatform_t * base) {
     // runtimeChunkFree((u64)base, NULL);
 }
 
+
+u8 pthreadSwitchRunlevel(ocrCompPlatform_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
+                         u32 phase, u32 properties, void (*callback)(u64), u64 val) {
+
+    u8 toReturn = 0;
+
+    // This is an inert module, we do not handle callbacks (caller needs to wait on us)
+    ASSERT(callback == NULL);
+
+    // Verify properties for this call
+    ASSERT((properties & RL_REQUEST) && !(properties & RL_RESPONSE)
+           && !(properties & RL_RELEASE));
+    ASSERT(!(properties & RL_FROM_MSG));
+
+    switch(runlevel) {
+    case RL_CONFIG_PARSE:
+        // On bring-up: Update PD->phasesPerRunlevel on phase 0
+        // and check compatibility on phase 1
+        break;
+    case RL_NETWORK_OK:
+        // Nothing
+        break;
+    case RL_PD_OK:
+        break;
+    case RL_GUID_OK:
+        // Nothing to do
+        break;
+    case RL_MEMORY_OK:
+        // Nothing to do
+        break;
+    case RL_COMPUTE_OK:
+        // We can allocate our map here because the memory is up
+        break;
+    case RL_USER_OK:
+        break;
+    default:
+        // Unknown runlevel
+        ASSERT(0);
+    }
+    return toReturn;
+}
+
+#if 0
 void pthreadBegin(ocrCompPlatform_t * compPlatform, ocrPolicyDomain_t * PD, ocrWorkerType_t workerType) {
 
     ocrCompPlatformPthread_t * pthreadCompPlatform = (ocrCompPlatformPthread_t *) compPlatform;
@@ -197,6 +240,7 @@ void pthreadStop(ocrCompPlatform_t * compPlatform, ocrRunLevel_t newRl, u32 acti
             ASSERT("Unknown runlevel in stop function");
     }
 }
+#endif
 
 u8 pthreadGetThrottle(ocrCompPlatform_t *self, u64* value) {
     return 1;
@@ -287,9 +331,8 @@ ocrCompPlatformFactory_t *newCompPlatformFactoryPthread(ocrParamList_t *perType)
     base->initialize = &initializeCompPlatformPthread;
     base->destruct = &destructCompPlatformFactoryPthread;
     base->platformFcts.destruct = FUNC_ADDR(void (*)(ocrCompPlatform_t*), pthreadDestruct);
-    base->platformFcts.begin = FUNC_ADDR(void (*)(ocrCompPlatform_t*, ocrPolicyDomain_t*, ocrWorkerType_t), pthreadBegin);
-    base->platformFcts.start = FUNC_ADDR(void (*)(ocrCompPlatform_t*, ocrPolicyDomain_t*, ocrWorker_t*), pthreadStart);
-    base->platformFcts.stop = FUNC_ADDR(void (*)(ocrCompPlatform_t*,ocrRunLevel_t,u32), pthreadStop);
+    base->platformFcts.switchRunlevel = FUNC_ADDR(u8 (*)(ocrCompPlatform_t*, ocrPolicyDomain_t*, ocrRunlevel_t,
+                                                         u32, u32, void (*)(u64), u64), pthreadSwitchRunlevel);
     base->platformFcts.getThrottle = FUNC_ADDR(u8 (*)(ocrCompPlatform_t*, u64*), pthreadGetThrottle);
     base->platformFcts.setThrottle = FUNC_ADDR(u8 (*)(ocrCompPlatform_t*, u64), pthreadSetThrottle);
     base->platformFcts.setCurrentEnv = FUNC_ADDR(u8 (*)(ocrCompPlatform_t*, ocrPolicyDomain_t*, ocrWorker_t*), pthreadSetCurrentEnv);

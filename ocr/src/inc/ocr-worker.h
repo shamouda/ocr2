@@ -103,7 +103,6 @@ typedef struct _ocrWorker_t {
     struct _ocrTask_t * volatile curTask; /**< Currently executing task */
 
     ocrWorkerFcts_t fcts;
-    volatile ocrRunLevel_t rl; // TODO volatile exposes to much of the implementation
 } ocrWorker_t;
 
 

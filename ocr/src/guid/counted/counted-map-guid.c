@@ -35,11 +35,52 @@
 // GUID 'id' counter, atomically incr when a new GUID is requested
 static u64 guidCounter = 0;
 
+u8 countedMapSwitchRunlevel(ocrGuidProvider_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
+                      u32 phase, u32 properties, void (*callback)(u64), u64 val) {
+
+    u8 toReturn = 0;
+
+    // This is an inert module, we do not handle callbacks (caller needs to wait on us)
+    ASSERT(callback == NULL);
+
+    // Verify properties for this call
+    ASSERT((properties & RL_REQUEST) && !(properties & RL_RESPONSE)
+           && !(properties & RL_RELEASE));
+    ASSERT(!(properties & RL_FROM_MSG));
+
+    switch(runlevel) {
+    case RL_CONFIG_PARSE:
+        // On bring-up: Update PD->phasesPerRunlevel on phase 0
+        // and check compatibility on phase 1
+        break;
+    case RL_NETWORK_OK:
+        // Nothing
+        break;
+    case RL_PD_OK:
+        break;
+    case RL_GUID_OK:
+        // Nothing to do
+        break;
+    case RL_MEMORY_OK:
+        // Nothing to do
+        break;
+    case RL_COMPUTE_OK:
+        // We can allocate our map here because the memory is up
+        break;
+    case RL_USER_OK:
+        break;
+    default:
+        // Unknown runlevel
+        ASSERT(0);
+    }
+    return toReturn;
+}
 void countedMapDestruct(ocrGuidProvider_t* self) {
     //destructHashtable(((ocrGuidProviderCountedMap_t *) self)->guidImplTable);
     runtimeChunkFree((u64)self, NULL);
 }
 
+#if 0
 void countedMapBegin(ocrGuidProvider_t *self, ocrPolicyDomain_t *pd) {
     // Nothing to do
 }
@@ -48,12 +89,15 @@ void countedMapStart(ocrGuidProvider_t *self, ocrPolicyDomain_t *pd) {
     self->pd = pd;
     //Initialize the map now that we have an assigned policy domain
     ocrGuidProviderCountedMap_t * derived = (ocrGuidProviderCountedMap_t *) self;
+    // REC: This will be a problem. We need to do this in the GUID_OK phase but that
+    // means that we need to use runtimeChunkAlloc.
     derived->guidImplTable = newHashtableBucketLockedModulo(pd, DEFAULT_NB_BUCKETS);
 }
 
 void countedMapStop(ocrGuidProvider_t *self, ocrRunLevel_t newRl, u32 action) {
     // Nothing to do
 }
+#endif
 
 /**
  * @brief Utility function to extract a kind from a GUID.
@@ -229,9 +273,9 @@ ocrGuidProviderFactory_t *newGuidProviderFactoryCountedMap(ocrParamList_t *typeA
     base->destruct = &destructGuidProviderFactoryCountedMap;
     base->factoryId = factoryId;
     base->providerFcts.destruct = &countedMapDestruct;
-    base->providerFcts.begin = &countedMapBegin;
-    base->providerFcts.start = &countedMapStart;
-    base->providerFcts.stop = &countedMapStop;
+    base->providerFcts.switchRunlevel = FUNC_ADDR(u8 (*)(ocrGuidProvider_t*, ocrPolicyDomain_t*, ocrRunlevel_t,
+                                                         u32, u32, void (*)(u64), u64), countedMapSwitchRunlevel);
+    // TODO: Why are these not wrapped with FUNC_ADDR?
     base->providerFcts.getGuid = &countedMapGetGuid;
     base->providerFcts.createGuid = &countedMapCreateGuid;
     base->providerFcts.getVal = &countedMapGetVal;
