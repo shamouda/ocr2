@@ -1474,6 +1474,7 @@ static bool isAnchor (ocrAllocatorTlsf_t * rself, ocrAllocatorTlsf_t * rAnchorCE
 
 static void tlsfInitPool(ocrAllocatorTlsf_t *rself) {
     u64 poolAddr;
+    u32 i;
     RESULT_ASSERT(rself->base.memories[0]->fcts.chunkAndTag(
                       rself->base.memories[0], &poolAddr, rself->poolSize,
                       USER_FREE_TAG, USER_USED_TAG), ==, 0);
@@ -1501,7 +1502,7 @@ static void tlsfInitPool(ocrAllocatorTlsf_t *rself) {
 
     for (i = 0; i < rself->sliceCount; i++) {
         DPRINTF(DEBUG_LVL_VVERB, "TLSF Allocator at 0x%llx initializing slice %d"
-                " at address 0x%llx of size %lld", self, i, rself->poolAddr, rself->sliceSize);
+                " at address 0x%llx of size %lld", rself, i, rself->poolAddr, rself->sliceSize);
         RESULT_ASSERT(tlsfInit(((poolHdr_t *) (rself->poolAddr)), rself->sliceSize), ==, 0);
 #ifdef ENABLE_VALGRIND
         VALGRIND_CREATE_MEMPOOL(((poolHdr_t *) (rself->poolAddr)), 0, false);
@@ -1556,10 +1557,10 @@ u8 tlsfSwitchRunlevel(ocrAllocator_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t
             rself->initAttributed = 0ULL; // We are definitely not in charge
         }
         // We indicate that the RL_MEMORY_OK phase requires at least 2 phases
-        u32 t = PD->phasesPerRunlevel[RL_MEMORY_OK][RL_PHASE_ALLOCATOR];
-        if(t & 0xFFFF < 2) t = t & 0xFFFF0000 + 2;
-        if(t >> 16 < 2) t = 2 << 16 + t & 0xFFFF;
-        PD->phasesPerRunlevel[RL_MEMORY_OK][RL_PHASE_ALLOCATOR] = t;
+        RL_ENSURE_PHASE_UP(PD, RL_MEMORY_OK, RL_PHASE_ALLOCATOR, 2);
+        RL_ENSURE_PHASE_DOWN(PD, RL_MEMORY_OK, RL_PHASE_ALLOCATOR, 2);
+        RL_ENSURE_PHASE_UP(PD, RL_GUID_OK, RL_PHASE_ALLOCATOR, 2);
+        RL_ENSURE_PHASE_DOWN(PD, RL_GUID_OK, RL_PHASE_ALLOCATOR, 2);
     }
 
     // At this point, we can just check initAttributed. If it is
@@ -1589,7 +1590,7 @@ u8 tlsfSwitchRunlevel(ocrAllocator_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t
     case RL_GUID_OK:
         if(properties & RL_BRING_UP) {
             if(rself->initAttributed == (u64)rself &&
-               phase == (self->pd->phasesPerRunlevel[RL_GUID_OK][0] & 0xFFFF) - 1) {
+               phase == RL_GET_PHASE_COUNT_UP(self->pd, RL_GUID_OK) - 1) {
                 // We get a GUID for ourself
                 guidify(self->pd, (u64)self, &(self->fguid), OCR_GUID_ALLOCATOR);
             }
@@ -1603,8 +1604,8 @@ u8 tlsfSwitchRunlevel(ocrAllocator_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t
                 msg.type = PD_MSG_GUID_DESTROY | PD_MSG_REQUEST;
                 PD_MSG_FIELD_I(guid) = self->fguid;
                 PD_MSG_FIELD_I(properties) = 0;
-                toRetrun |= self->pd->fcts.processMessage(self->pd, &msg, false);
-                self->fguid->guid = NULL_GUID;
+                toReturn |= self->pd->fcts.processMessage(self->pd, &msg, false);
+                self->fguid.guid = NULL_GUID;
 #undef PD_MSG
 #undef PD_TYPE
             }
@@ -1616,7 +1617,7 @@ u8 tlsfSwitchRunlevel(ocrAllocator_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t
                 // We start the underlying memory
                 tlsfInitPool(rself);
             } else if(rself->initAttributed != (u64)rself
-                      && phase == self->pd->phasesPerRunlevel[RL_MEMORY_OK][0] - 1) {
+                      && phase == RL_GET_PHASE_COUNT_UP(self->pd, RL_MEMORY_OK) - 1) {
                 // At this point, we know that the initialization has happened (see above) so we can get
                 // the right information
                 ocrAllocatorTlsf_t *rAnchorCE = (ocrAllocatorTlsf_t*)(getAnchorCE(self));
@@ -1626,7 +1627,7 @@ u8 tlsfSwitchRunlevel(ocrAllocator_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t
             }
         } else {
             // tear-down
-            if(rself->initAttributed == (u64)rself && phase == 0) {
+            if(rself->initAttributed == (u64)rself && phase == RL_GET_PHASE_COUNT_DOWN(self->pd, RL_MEMORY_OK)) {
 #ifdef OCR_ENABLE_STATISTICS
                 //TODO:  Should this be done by non-anchor agents too?
                 statsALLOCATOR_STOP(self->pd, self->guid, self, self->memories[0]->guid, self->memories[0]);
@@ -1877,8 +1878,6 @@ void initializeAllocatorTlsf(ocrAllocatorFactory_t * factory, ocrAllocator_t * s
         derived->sliceCount        = (u16) perInstanceReal->sliceCount;
     }
     derived->sliceSize         = perInstanceReal->sliceSize;
-    derived->useCount1         = 0;
-    derived->useCount2         = 0;
     derived->poolAddr          = 0ULL;
     derived->poolSize          = perInstanceReal->base.size;
     derived->poolStorageOffset = 0;

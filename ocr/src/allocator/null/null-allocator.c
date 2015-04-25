@@ -21,6 +21,7 @@ void nullDestruct(ocrAllocator_t *self) {
 u8 nullSwitchRunlevel(ocrAllocator_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
                       u32 phase, u32 properties, void (*callback)(u64), u64 val) {
 
+    u8 toReturn = 0;
     // This is an inert module, we do not handle callbacks (caller needs to wait on us)
     ASSERT(callback == NULL);
 
@@ -33,6 +34,10 @@ u8 nullSwitchRunlevel(ocrAllocator_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t
     case RL_CONFIG_PARSE:
         // On bring-up: Update PD->phasesPerRunlevel on phase 0
         // and check compatibility on phase 1
+        if((properties & RL_BRING_UP) && phase == 0) {
+            RL_ENSURE_PHASE_UP(PD, RL_GUID_OK, RL_PHASE_ALLOCATOR, 2);
+            RL_ENSURE_PHASE_DOWN(PD, RL_GUID_OK, RL_PHASE_ALLOCATOR, 2);
+        }
         break;
     case RL_NETWORK_OK:
         // Nothing
@@ -46,7 +51,7 @@ u8 nullSwitchRunlevel(ocrAllocator_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t
         break;
     case RL_GUID_OK:
         if(properties & RL_BRING_UP) {
-            if(phase == (self->pd->phasesPerRunlevel[RL_GUID_OK][0] & 0xFFFF) - 1) {
+            if(phase == RL_GET_PHASE_COUNT_UP(self->pd, RL_GUID_OK) - 1) {
                 // We get a GUID for ourself
                 guidify(self->pd, (u64)self, &(self->fguid), OCR_GUID_ALLOCATOR);
             }
@@ -60,7 +65,7 @@ u8 nullSwitchRunlevel(ocrAllocator_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t
                 msg.type = PD_MSG_GUID_DESTROY | PD_MSG_REQUEST;
                 PD_MSG_FIELD_I(guid) = self->fguid;
                 PD_MSG_FIELD_I(properties) = 0;
-                self->pd->fcts.processMessage(self->pd, &msg, false);
+                toReturn |= self->pd->fcts.processMessage(self->pd, &msg, false);
                 self->fguid->guid = NULL_GUID;
 #undef PD_MSG
 #undef PD_TYPE
@@ -78,7 +83,7 @@ u8 nullSwitchRunlevel(ocrAllocator_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t
         // Unknown runlevel
         ASSERT(0);
     }
-    return 0;
+    return toReturn;
 }
 
 void* nullAllocate(ocrAllocator_t *self, u64 size, u64 hints) {

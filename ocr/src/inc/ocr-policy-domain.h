@@ -40,6 +40,25 @@ typedef struct _paramListPolicyDomainInst_t {
 
 
 /******************************************************/
+/* RL macros                                          */
+/******************************************************/
+#define RL_ENSURE_PHASE_UP(pd, dim1, dim2, val) do {                    \
+        u32 _t = (pd)->phasesPerRunlevel[dim1][dim2];                   \
+        if((_t & 0xFFFF) < (val)) _t = (_t & 0xFFFF0000) + (val);       \
+        (pd)->phasesPerRunlevel[dim1][dim2] = _t;                       \
+    } while(0)
+
+#define RL_ENSURE_PHASE_DOWN(pd, dim1, dim2, val) do {                  \
+        u32 _t = (pd)->phasesPerRunlevel[dim1][dim2];                   \
+        if((_t >> 16) < (val)) _t = ((val) << 16) + (_t & 0xFFFF);      \
+        (pd)->phasesPerRunlevel[dim1][dim2] = _t;                       \
+    } while(0)
+
+#define RL_GET_PHASE_COUNT_UP(pd, dim1) ((pd)->phasesPerRunlevel[dim1][0] & 0xFFFF)
+
+#define RL_GET_PHASE_COUNT_DOWN(pd, dim1) ((pd)->phasesPerRunlevel[dim1][0] >> 16)
+
+/******************************************************/
 /* OCR POLICY DOMAIN INTERFACE                        */
 /******************************************************/
 

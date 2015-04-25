@@ -558,18 +558,16 @@ u8 simpleSwitchRunlevel(ocrAllocator_t *self, ocrPolicyDomain_t *PD, ocrRunlevel
 
     ASSERT(self->memoryCount == 1);
     // Call the runlevel change on the underlying memory
-    toReturn |= self->memories[0]->fcts.switchRunlevel(self->memories[0], PD, runlevel, properties,
+    toReturn |= self->memories[0]->fcts.switchRunlevel(self->memories[0], PD, runlevel, phase, properties,
                                                        NULL, 0);
     switch(runlevel) {
     case RL_CONFIG_PARSE:
     {
         // On bring-up: Update PD->phasesPerRunlevel on phase 0
         // and check compatibility on phase 1
-        // We indicate that we need two phase on tear-down of RL_MEMORY_OK
         if(properties & RL_BRING_UP && phase == 0) {
-            u32 t = PD->phasesPerRunlevel[RL_MEMORY_OK][RL_PHASE_ALLOCATOR];
-            if(t >> 16 < 2) t = 2 << 16 + t & 0xFFFF;
-            PD->phasesPerRunlevel[RL_MEMORY_OK][RL_PHASE_ALLOCATOR] = t;
+            RL_ENSURE_PHASE_UP(PD, RL_GUID_OK, RL_PHASE_ALLOCATOR, 2);
+            RL_ENSURE_PHASE_DOWN(PD, RL_GUID_OK, RL_PHASE_ALLOCATOR, 2);
         }
         break;
     }
@@ -585,7 +583,7 @@ u8 simpleSwitchRunlevel(ocrAllocator_t *self, ocrPolicyDomain_t *PD, ocrRunlevel
         break;
     case RL_GUID_OK:
         if(properties & RL_BRING_UP) {
-            if(phase == (self->pd->phasesPerRunlevel[RL_GUID_OK][0] & 0xFFFF) - 1) {
+            if(phase == RL_GET_PHASE_COUNT_UP(self->pd, RL_GUID_OK) - 1) {
                 // We get a GUID for ourself
                 guidify(self->pd, (u64)self, &(self->fguid), OCR_GUID_ALLOCATOR);
             }
@@ -633,7 +631,7 @@ u8 simpleSwitchRunlevel(ocrAllocator_t *self, ocrPolicyDomain_t *PD, ocrRunlevel
                     (u64)(rself->poolSize), (u64) (rself->poolStorageOffset));
 
             simpleInit( (pool_t *)addrGlobalizeOnTG((void *)rself->poolAddr, PD), rself->poolSize);
-        } else if(phase == 0 && (properties & RL_TEAR_DOWN)) {
+        } else if(phase == RL_GET_PHASE_COUNT_DOWN(self->pd, RL_MEMORY_OK) - 1 && (properties & RL_TEAR_DOWN)) {
             ocrAllocatorSimple_t * rself = (ocrAllocatorSimple_t *) self;
             RESULT_ASSERT(self->memories[0]->fcts.tag(
                               rself->base.memories[0],
