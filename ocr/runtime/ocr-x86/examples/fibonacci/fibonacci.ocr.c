@@ -84,6 +84,21 @@ static inline int nNodes ( int depth ) {
     return 2*efficientSerialFib(depth+2) - 1;
 }
 
+static inline int computeNDescendants( int depth, int largestN ){
+#ifdef ACCURATE_OPTIMISTIC
+    return 3*efficientSerialFib(depth+2)-3 + largestN-depth;
+#endif
+#ifdef ACCURATE_PESSIMISTIC
+    return 3*efficientSerialFib(depth+2)-3;
+#endif
+#ifdef LEAF 
+    return efficientSerialFib(depth+2);
+#endif
+#ifdef DEFAULT
+    return 0;
+#endif
+}
+
 u8 fibonacci_join_task ( u32 paramc, u64 * params, void* paramv[], u32 depc, ocrEdtDep_t depv[]) {
     u64_t *func_args = (u64_t*)paramv;
     int n = (int) func_args[0];
@@ -103,24 +118,25 @@ u8 fibonacci_join_task ( u32 paramc, u64 * params, void* paramv[], u32 depc, ocr
     free(paramv);
 }
 
-inline static void join_task_prescriber ( int n, int cutoff, ocrGuid_t* out_db_guids, ocrGuid_t* out_event_guids ) { 
-    u64_t *func_args = (u64_t *)malloc(4*sizeof(u64_t));
+inline static void join_task_prescriber ( int largestN, int n, int cutoff, ocrGuid_t* out_db_guids, ocrGuid_t* out_event_guids ) { 
+    u64_t *func_args = (u64_t *)malloc(5*sizeof(u64_t));
     func_args[0] = n;
     func_args[1] = cutoff;
     func_args[2] = (u64_t)out_db_guids;
     func_args[3] = (u64_t)out_event_guids;
+    func_args[4] = largestN;
 
-    long double nDescendants = 0; // TODO sagnak
-    long double priority = 0; // TODO sagnak
+    long double nDescendants = computeNDescendants(n-cutoff,largestN);
+    long double priority = nDescendants;
     ocrGuid_t task_guid;
-    ocrEdtCreate(&task_guid, fibonacci_join_task, 4, NULL, (void**)func_args, PROPERTIES, 2, NULL, nDescendants, priority);
+    ocrEdtCreate(&task_guid, fibonacci_join_task, 5, NULL, (void**)func_args, PROPERTIES, 2, NULL, nDescendants, priority);
 
     ocrAddDependence(out_event_guids[1], task_guid, 0);
     ocrAddDependence(out_event_guids[nNodes(n-cutoff-1)+1], task_guid, 1);
     ocrEdtSchedule(task_guid);
 }
 
-void fork_task_prescriber ( int, int, ocrGuid_t*, ocrGuid_t*);
+void fork_task_prescriber ( int, int, int, ocrGuid_t*, ocrGuid_t*);
 
 u8 fibonacci_fork_task ( u32 paramc, u64 * params, void* paramv[], u32 depc, ocrEdtDep_t depv[]) {
     u64_t *func_args = (u64_t*)paramv;
@@ -128,11 +144,12 @@ u8 fibonacci_fork_task ( u32 paramc, u64 * params, void* paramv[], u32 depc, ocr
     int cutoff = (int) func_args[1];
     ocrGuid_t* out_db_guids = (ocrGuid_t*) func_args[2];
     ocrGuid_t* out_event_guids = (ocrGuid_t*) func_args[3];
+    int largestN  = (int) func_args[4];
 
     if ( n > cutoff ) {
-        fork_task_prescriber(n-1, cutoff, (ocrGuid_t*)(&(out_db_guids[1])), (ocrGuid_t*)(&(out_event_guids[1])));
-        fork_task_prescriber(n-2, cutoff, (ocrGuid_t*)(&(out_db_guids[nNodes(n-cutoff-1)+1])), (ocrGuid_t*)(&(out_event_guids[nNodes(n-cutoff-1)+1])));
-        join_task_prescriber( n , cutoff, (ocrGuid_t*) out_db_guids, (ocrGuid_t*) out_event_guids);
+        fork_task_prescriber(largestN, n-1, cutoff, (ocrGuid_t*)(&(out_db_guids[1])), (ocrGuid_t*)(&(out_event_guids[1])));
+        fork_task_prescriber(largestN, n-2, cutoff, (ocrGuid_t*)(&(out_db_guids[nNodes(n-cutoff-1)+1])), (ocrGuid_t*)(&(out_event_guids[nNodes(n-cutoff-1)+1])));
+        join_task_prescriber(largestN, n , cutoff, (ocrGuid_t*) out_db_guids, (ocrGuid_t*) out_event_guids);
     } else {
         void* temp_db;
         ocrDbCreate( &(out_db_guids[0]), &temp_db, sizeof(u64_t), FLAGS, NULL, NO_ALLOC );
@@ -142,17 +159,18 @@ u8 fibonacci_fork_task ( u32 paramc, u64 * params, void* paramv[], u32 depc, ocr
     free(paramv);
 }
 
-void fork_task_prescriber ( int n, int cutoff, ocrGuid_t* out_db_guids, ocrGuid_t* out_event_guids ) { 
-    u64_t *func_args = (u64_t *)malloc(4*sizeof(u64_t));
+void fork_task_prescriber ( int largestN, int n, int cutoff, ocrGuid_t* out_db_guids, ocrGuid_t* out_event_guids ) { 
+    u64_t *func_args = (u64_t *)malloc(5*sizeof(u64_t));
     func_args[0] = n;
     func_args[1] = cutoff;
     func_args[2] = (u64_t) out_db_guids;
     func_args[3] = (u64_t) out_event_guids;
+    func_args[4] = (u64_t) largestN;
 
-    long double nDescendants = 0; // TODO sagnak;
-    long double priority = 0; // TODO sagnak;
+    long double nDescendants = computeNDescendants(n-cutoff, largestN);
+    long double priority = nDescendants;
     ocrGuid_t task_guid;
-    ocrEdtCreate(&task_guid, fibonacci_fork_task, 4, NULL, (void**)func_args, PROPERTIES, 0, NULL, nDescendants, priority);
+    ocrEdtCreate(&task_guid, fibonacci_fork_task, 5, NULL, (void**)func_args, PROPERTIES, 0, NULL, nDescendants, priority);
 
     ocrEdtSchedule(task_guid);
 }
@@ -220,8 +238,8 @@ void wrap_up_task_prescriber ( int n, int cutoff, ocrGuid_t* out_db_guids, ocrGu
     func_args[2] = (u64_t) out_db_guids;
     func_args[3] = (u64_t) out_event_guids;
 
-    long double nDescendants = 0; // TODO sagnak;
-    long double priority = 0; // TODO sagnak;
+    long double nDescendants = 0;
+    long double priority = 0; 
     ocrGuid_t task_guid;
     ocrEdtCreate(&task_guid, wrap_up_task, 4, NULL, (void**)func_args, PROPERTIES, 1, NULL, nDescendants, priority);
 
@@ -266,8 +284,8 @@ inline static void freeDataBlocks ( ocrGuid_t* db_guids, int n, int cutoff) {
 }
 
 void assertParameters ( int argc ) {
-    if ( argc !=  7 ) {
-        fprintf(stderr, "Usage: ./fibonacci -md <> -bind <> N cutoff (found %d args)\n", argc);
+    if ( argc !=  8 ) {
+        fprintf(stderr, "Usage: ./fibonacci -md <> -bind <> N cutoff repeat (found %d args)\n", argc);
         assert(0 && "failed runtime parameters list");
         exit(0);
     }
@@ -290,12 +308,16 @@ int main( int argc, char* argv[] ) {
     assertParameters(argc);
     int n = -1;
     int cutoff = -1;
+    int repeat = -1;
 
     n = atoi(argv[5]);
     cutoff = atoi(argv[6]);
+    repeat = atoi(argv[7]);
 
     assertParameterValues(n,cutoff);
 
+    int iteration = 0;
+    for ( iteration = 0; iteration < repeat; ++iteration) {
     int changing_argc = argc;
     char** changing_argv = (char**) malloc(sizeof(char*)*argc);
     int argc_it = 0;
@@ -318,12 +340,13 @@ int main( int argc, char* argv[] ) {
 #endif
     gettimeofday(&a,0);
 
-    fork_task_prescriber ( n, cutoff, db_guids, event_guids );
+    fork_task_prescriber ( n, n, cutoff, db_guids, event_guids );
     wrap_up_task_prescriber ( n, cutoff, db_guids, event_guids );
 
     ocrCleanup();
     freeEvents(event_guids, n, cutoff);
     freeDataBlocks(db_guids, n, cutoff);
     unravel();
+    }
     return 0;
 }

@@ -1,7 +1,11 @@
 PROG=fibonacci
 SUFFIX=exec
 
-CFLAGS= -g -O3 #-DVERIFY #-DHPCTOOLKIT
+ifdef POLICY
+POLICY_CFLAGS=-D${POLICY}
+endif  
+
+CFLAGS= -g -O3 ${POLICY_CFLAGS} #-DVERIFY #-DHPCTOOLKIT
 MICFLAGS= -mmic -fPIC
 OCR_FLAGS=-L${OCR_INSTALL}/lib -I${OCR_INSTALL}/include -locr
 OCR_STATIC_FLAGS=-I$(OCR_INSTALL)/include $(OCR_INSTALL)/lib/libocr.a
@@ -23,7 +27,7 @@ PAPI_HOME=$(HOME)/HJsvn/papi/BUILD
 NO_CLUE_WHY_LIBS=-L$(HC_HOME)/lib -L$(PAPI_HOME)/lib -lpthread -lhc -lxml2 -lm -lpapi
 
 instrument.o:
-	gcc -O3 -c -I$(PAPI_HOME)/include -I. instrument.c 
+	$(CC) -O3 -c -I$(PAPI_HOME)/include -I. instrument.c 
 
 #compile.<arch>_<model>_<alloc>_<source.suffixes>
 #% can not be empty it seems

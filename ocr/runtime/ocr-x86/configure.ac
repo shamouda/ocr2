@@ -24,7 +24,7 @@ AC_LANG(C)
 AC_SUBST([ac_aux_dir])
 AC_SUBST([abs_top_srcdir])
 
-PKG_CHECK_MODULES(XML, libxml-2.0 >= 2.4)
+# PKG_CHECK_MODULES(XML, libxml-2.0 >= 2.4)
 
 #
 # Communication support is activated only if one of the following layer is available
