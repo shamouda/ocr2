@@ -85,103 +85,43 @@ static void hcWorkShift(ocrWorker_t * worker) {
     }
 }
 
-static void hcNotifyRunlevelToPd(ocrWorker_t * worker, ocrRunLevel_t newRl, u32 action) {
-    ocrPolicyDomain_t * pd;
-    PD_MSG_STACK(msg);
-    getCurrentEnv(&pd, NULL, NULL, &msg);
-#define PD_MSG (&msg)
-#define PD_TYPE PD_MSG_MGT_RL_NOTIFY
-    msg.type = PD_MSG_MGT_RL_NOTIFY | PD_MSG_REQUEST;
-    //TODO-RL: for now notify is implicitely meaning the worker reached the runlevel
-    PD_MSG_FIELD_I(runlevel) = newRl;
-    PD_MSG_FIELD_I(action) = action;
-    pd->fcts.processMessage(pd, &msg, false);
-#undef PD_MSG
-#undef PD_TYPE
-}
-
-static void runlevel_stop(ocrWorker_t * base) {
-    //
-    // ENTERING THE STOP RUNLEVEL
-    //
-    u64 computeCount = base->computeCount;
-    u64 i = 0;
-    for(i = 0; i < computeCount; i++) {
-        base->computes[i]->fcts.stop(base->computes[i], RL_STOP, RL_ACTION_ENTER);
-#ifdef OCR_ENABLE_STATISTICS
-        statsWORKER_STOP(base->pd, base->fguid.guid, base->fguid.metaDataPtr,
-                         base->computes[i]->fguid.guid,
-                         base->computes[i]->fguid.metaDataPtr);
-#endif
-    }
-    DPRINTF(DEBUG_LVL_INFO, "Stopping worker %ld\n", getWorkerId(base));
-}
-
 static void workerLoop(ocrWorker_t * worker) {
-    // Runlevel USER 'computation' loop
     ocrWorkerHc_t * self = ((ocrWorkerHc_t *) worker);
+    u8 continueLoop = true;
+    // At this stage, we are in the USER_OK runlevel
+    ASSERT(worker->curRL == RL_USER_OK);
+    do {
+        while(worker->curRL == worker->desiredRL) {
+            START_PROFILE(wo_hc_workerLoop);
+            worker->fcts.workShift(worker);
+            EXIT_PROFILE;
+        }
+        // Here we are shifting to another RL
+        switch(worker->desiredRL) {
+        case RL_COMPUTE_OK:
+            DPRINTF(DEBUG_LVL_VERB, "Noticed transition to RL_COMPUTE_OK\n");
+            ASSERT(worker->callback != NULL);
+            worker->callback(worker->callbackArg);
+            worker->curRL= RL_COMPUTE_OK;
+            break;
+        case RL_MEMORY_OK:
+            DPRINTF(DEBUG_LVL_VERB, "Noticed transition to RL_MEMORY_OK\n");
+            ASSERT(worker->callback == (void (*)(u64))-1);
+            // There is no need to do anything else except quit
+            worker->curRL = RL_MEMORY_OK;
+            continueLoop = false;
+        default:
+            // Only these two RL should occur
+            ASSERT(0);
+        }
+        // We have a callback to indicate that we
+        // have processed the runlevel
+    } while(continueLoop);
 
-    while(self->workLoopSpin) {
-        START_PROFILE(wo_hc_workerLoop);
-        worker->fcts.workShift(worker);
-        EXIT_PROFILE;
-    }
-    // Received a RL_ACTION_QUIESCE_COMP that broke the loop
-    ASSERT(worker->rl == RL_RUNNING_USER_WIP);
-
-    // Notify the policy-domain we have quiesced
-    // PRINTF("[%d] WORKER[%d] RL_ACTION_QUIESCE_COMP\n", (int)worker->pd->myLocation, ((ocrWorkerHc_t*) worker)->id);
-    self->workLoopSpin = true;
-    hcNotifyRunlevelToPd(worker, RL_RUNNING_USER, RL_ACTION_QUIESCE_COMP);
-
-    // While the worker transitions it keep accepting work.
-    // NOTE: the rationale for doing this is that other workers are
-    // potentially wrapping up their user EDTs and that might create
-    // runtime EDTs depending on the implementation. Hence, keep
-    // working until the PD says so.
-
-    // Runlevel USER_WIP 'keep working' loop
-    while(self->workLoopSpin) {
-        START_PROFILE(wo_hc_workerLoop);
-        worker->fcts.workShift(worker);
-        EXIT_PROFILE;
-    }
-    // Received a RL_ACTION_EXIT that broke the loop
-
-    // Example of a runlevel 'barrier': The PD is responsible to
-    // transition the runlevel of all workers whenever it sees fit.
-    // This barrier ensures that all other workers have exited their
-    // RL_RUNNING_USER before proceeding to the next runlevel.
-    hcNotifyRunlevelToPd(worker, RL_RUNNING_USER, RL_ACTION_EXIT);
-    while(worker->rl == RL_RUNNING_USER_WIP);
-    ASSERT(worker->rl == RL_RUNNING_RT);
-
-    // Nothing to do in RT mode for workers
-    worker->rl = RL_RUNNING_RT_WIP;
-    hcNotifyRunlevelToPd(worker, RL_RUNNING_RT, RL_ACTION_EXIT);
-
-    while(worker->rl == RL_RUNNING_RT_WIP);
-    // Enter the stop runlevel
-    ASSERT(worker->rl == RL_STOP);
-    runlevel_stop(worker);
-
-    worker->rl = RL_STOP_WIP;
-    hcNotifyRunlevelToPd(worker, RL_STOP, RL_ACTION_EXIT);
-
-    //
-    // This instance of worker becomes inert
-    //
+    DPRINTF(DEBUG_LVL_VERB, "Finished worker loop ... waiting to be reapped\n");
 }
 
 void destructWorkerHc(ocrWorker_t * base) {
-    // u64 i = 0;
-    // while(i < base->computeCount) {
-    //     //base->computes[i]->fcts.destruct(base->computes[i]);
-    //     base->computes[i]->fcts.stop(base->computes[i], RL_DEALLOCATE, RL_ACTION_ENTER);
-    //     ++i;
-    // }
-    // runtimeChunkFree((u64)(base->computes), NULL);
-    // runtimeChunkFree((u64)base, NULL);
 }
 
 u8 hcWorkerSwitchRunlevel(ocrWorker_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
@@ -189,13 +129,23 @@ u8 hcWorkerSwitchRunlevel(ocrWorker_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_
 
     u8 toReturn = 0;
 
-    // This is an inert module, we do not handle callbacks (caller needs to wait on us)
-    ASSERT(callback == NULL);
-
-    // Verify properties for this call
+    // Verify properties
     ASSERT((properties & RL_REQUEST) && !(properties & RL_RESPONSE)
            && !(properties & RL_RELEASE));
     ASSERT(!(properties & RL_FROM_MSG));
+
+    // Call the runlevel change on the underlying platform
+    if(runlevel == RL_CONFIG_PARSE && (properties & RL_BRING_UP) && phase == 0) {
+        // Set the worker properly the first time
+        ASSERT(self->computeCount == 1);
+        self->computes[0]->worker = self;
+    }
+    // Even if we have a callback, we make things synchronous for the computes
+    if(runlevel != RL_COMPUTE_OK) {
+        // For compute OK, we need to do things BEFORE calling this
+        toReturn |= self->computes[0]->fcts.switchRunlevel(self->computes[0], PD, runlevel, phase, properties,
+                                                           NULL, 0);
+    }
 
     switch(runlevel) {
     case RL_CONFIG_PARSE:
@@ -205,14 +155,85 @@ u8 hcWorkerSwitchRunlevel(ocrWorker_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_
     case RL_NETWORK_OK:
         break;
     case RL_PD_OK:
+        if(properties & RL_BRING_UP)
+            self->pd = PD;
         break;
     case RL_GUID_OK:
+        if(properties & RL_BRING_UP) {
+            if(phase == RL_GET_PHASE_COUNT_UP(self->pd, RL_GUID_OK) - 1) {
+                // We get a GUID for ourself
+                guidify(self->pd, (u64)self, &(self->fguid), OCR_GUID_WORKER);
+            }
+        } else {
+            // Tear-down
+            if(phase == 0) {
+                PD_MSG_STACK(msg);
+                getCurrentEnv(NULL, NULL, NULL, &msg);
+#define PD_MSG (&msg)
+#define PD_TYPE PD_MSG_GUID_DESTROY
+                msg.type = PD_MSG_GUID_DESTROY | PD_MSG_REQUEST;
+                PD_MSG_FIELD_I(guid) = self->fguid;
+                PD_MSG_FIELD_I(properties) = 0;
+                toReturn |= self->pd->fcts.processMessage(self->pd, &msg, false);
+                self->fguid.guid = NULL_GUID;
+#undef PD_MSG
+#undef PD_TYPE
+            }
+        }
         break;
     case RL_MEMORY_OK:
         break;
+
     case RL_COMPUTE_OK:
+        if((properties & RL_BRING_UP) && phase == 0) {
+            // On bring up, if we are not already capable, we need a way
+            // to inform the PD that we are up after we transition
+            ASSERT((properties & RL_ALREADY_CAPABLE) || (callback != NULL));
+            self->curRL = RL_MEMORY_OK;
+            self->desiredRL = RL_COMPUTE_OK;
+            if(!(properties & RL_ALREADY_CAPABLE)) {
+                self->callback = callback;
+                self->callbackArg = val;
+                hal_fence();
+            } else {
+                // We don't have to do anything else to change
+                self->curRL = RL_COMPUTE_OK;
+            }
+            toReturn |= self->computes[0]->fcts.switchRunlevel(self->computes[0], PD, runlevel, phase, properties,
+                                                               NULL, 0);
+        }
+        if((properties & RL_TEAR_DOWN) && phase == 0) {
+            ASSERT(self->curRL == RL_COMPUTE_OK);
+            // We don't actually need a callback for this (the barrier is implicit in
+            // the first comp-platform's RL_MEMORY phase due to the join
+            self->callback = ((void)()(u64))(-1); // Set to a special value to check
+            self->callbackArg = 0ULL;
+            hal_fence();
+            self->desiredRL = RL_MEMORY_OK;
+        }
         break;
     case RL_USER_OK:
+        if((properties & RL_BRING_UP) && phase == 0) {
+            ASSERT(self->curRL == RL_COMPUTE_OK);
+            // No callback required on the bring-up
+            self->callback = NULL;
+            self->callbackArg = 0ULL;
+            hal_fence();
+            self->desiredRL = RL_USER_OK;
+        }
+        if((properties & RL_TEAR_DOWN) && phase == 0) {
+            // We need to break out of the compute loop
+            // We need to have a callback for all workers here
+            ASSERT(callback != NULL);
+            // We make sure that we actually fully booted before shutting down
+            while(self->curRL != RL_USER_OK) ;
+
+            ASSERT(self->curRL == RL_USER_OK);
+            self->callback = callback;
+            self->callbackArg = val;
+            hal_fence();
+            self->desiredRL = RL_COMPUTE_OK;
+        }
         break;
     default:
         // Unknown runlevel
@@ -220,168 +241,6 @@ u8 hcWorkerSwitchRunlevel(ocrWorker_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_
     }
     return toReturn;
 }
-
-#if 0
-void hcBeginWorker(ocrWorker_t * base, ocrPolicyDomain_t * policy) {
-    // Starts everybody, the first comp-platform has specific
-    // code to represent the master thread.
-    u64 computeCount = base->computeCount;
-    base->location = (ocrLocation_t)base;
-    ASSERT(computeCount == 1);
-    u64 i = 0;
-    for(i = 0; i < computeCount; ++i) {
-        base->computes[i]->fcts.begin(base->computes[i], policy, base->type);
-#ifdef OCR_ENABLE_STATISTICS
-        statsWORKER_START(policy, base->guid, base, base->computes[i]->guid, base->computes[i]);
-#endif
-    }
-
-    if(base->type == MASTER_WORKERTYPE) {
-        // For the master thread, we need to set the PD and worker
-        // The other threads will set this when they start
-        for(i = 0; i < computeCount; ++i) {
-            base->computes[i]->fcts.setCurrentEnv(base->computes[i], policy, base);
-        }
-    }
-}
-
-void hcStartWorker(ocrWorker_t * base, ocrPolicyDomain_t * policy) {
-
-    ocrWorkerHc_t * hcWorker = (ocrWorkerHc_t *) base;
-
-    if(!hcWorker->secondStart) {
-        // Get a GUID
-        guidify(policy, (u64)base, &(base->fguid), OCR_GUID_WORKER);
-        base->pd = policy;
-        if(base->type == MASTER_WORKERTYPE) {
-            hcWorker->secondStart = true; // Only relevant for MASTER_WORKERTYPE
-            return; // Don't start right away
-        }
-    }
-
-    ASSERT(base->type != MASTER_WORKERTYPE || hcWorker->secondStart);
-    // u32 oldValue = hal_cmpswap32(&base->rl, RL_DEFAULT, RL_RUNNING);
-    // ASSERT(oldValue == RL_DEFAULT);
-    ASSERT(base->rl == RL_DEFAULT);
-    base->rl = RL_RUNNING_USER;
-
-    // Starts everybody, the first comp-platform has specific
-    // code to represent the master thread.
-    u64 computeCount = base->computeCount;
-    // What the compute target will execute
-    ASSERT(computeCount == 1);
-    u64 i = 0;
-    for(i = 0; i < computeCount; ++i) {
-        base->computes[i]->fcts.start(base->computes[i], policy, base);
-#ifdef OCR_ENABLE_STATISTICS
-        statsWORKER_START(policy, base->guid, base, base->computes[i]->guid, base->computes[i]);
-#endif
-    }
-    // Otherwise, it is highly likely that we are shutting down
-}
-
-void hcStopWorker(ocrWorker_t * base, ocrRunLevel_t rl, u32 actionRl) {
-    if (actionRl == RL_ACTION_ENTER) {
-        switch(rl) {
-            case RL_RUNNING_RT: {
-                ASSERT(base->rl == RL_RUNNING_USER_WIP);
-                base->rl = RL_RUNNING_RT;
-                break;
-            }
-            case RL_STOP: {
-                ASSERT(base->rl == RL_RUNNING_RT_WIP);
-                base->rl = RL_STOP;
-                break;
-            }
-            case RL_SHUTDOWN: {
-                ASSERT(base->rl == RL_STOP_WIP);
-                base->rl = RL_SHUTDOWN;
-                DPRINTF(DEBUG_LVL_INFO, "Finishing worker routine %ld\n", getWorkerId(base));
-                ASSERT(base->computeCount == 1);
-                u64 i = 0;
-                for(i = 0; i < base->computeCount; i++) {
-                    base->computes[i]->fcts.stop(base->computes[i], RL_SHUTDOWN, actionRl);
-            #ifdef OCR_ENABLE_STATISTICS
-                    statsWORKER_STOP(base->pd, base->fguid.guid, base->fguid.metaDataPtr,
-                                     base->computes[i]->fguid.guid,
-                                     base->computes[i]->fguid.metaDataPtr);
-            #endif
-                }
-
-                DPRINTF(DEBUG_LVL_INFO, "Stopping worker %ld\n", getWorkerId(base));
-
-                // Destroy the GUID
-                PD_MSG_STACK(msg);
-                getCurrentEnv(NULL, NULL, NULL, &msg);
-                //TODO do this in another runlevel, for now we're just shutting down
-                #define PD_MSG (&msg)
-                #define PD_TYPE PD_MSG_GUID_DESTROY
-                    msg.type = PD_MSG_GUID_DESTROY | PD_MSG_REQUEST;
-                    PD_MSG_FIELD_I(guid) = base->fguid;
-                    PD_MSG_FIELD_I(properties) = 0;
-                    // Ignore failure here, we are most likely shutting down
-                    base->pd->fcts.processMessage(base->pd, &msg, false);
-                #undef PD_MSG
-                #undef PD_TYPE
-                    base->fguid.guid = UNINITIALIZED_GUID;
-
-                base->rl = RL_SHUTDOWN_WIP;
-                hcNotifyRunlevelToPd(base, RL_SHUTDOWN, RL_ACTION_EXIT);
-                break;
-            }
-            case RL_DEALLOCATE: {
-                u64 i = 0;
-                while(i < base->computeCount) {
-                    base->computes[i]->fcts.stop(base->computes[i], RL_DEALLOCATE, RL_ACTION_ENTER);
-                    ++i;
-                }
-                runtimeChunkFree((u64)(base->computes), NULL);
-                runtimeChunkFree((u64)base, NULL);
-                break;
-            }
-            default:
-                ASSERT("No implementation to enter runlevel");
-        }
-    } else {
-        switch(rl) {
-            case RL_RUNNING_USER: {
-                ASSERT((base->rl == RL_RUNNING_USER) || (base->rl == RL_RUNNING_USER_WIP));
-                if (actionRl == RL_ACTION_QUIESCE_COMP) {
-                    // Make the worker exit its current work loop
-                    base->rl = RL_RUNNING_USER_WIP;
-                    ocrWorkerHc_t * self = (ocrWorkerHc_t *) base;
-                    // Break the 'computation' loop
-                    self->workLoopSpin = false;
-                } else if (actionRl == RL_ACTION_EXIT) {
-                    // Break the 'keep working' loop
-                    ocrWorkerHc_t * self = (ocrWorkerHc_t *) base;
-                    self->workLoopSpin = false;
-                } else {
-                    // nothing to do for other actions, just notify it went through
-                    hcNotifyRunlevelToPd(base, RL_RUNNING_USER, actionRl);
-                }
-                break;
-            }
-            case RL_RUNNING_RT: {
-                ASSERT((base->rl == RL_RUNNING_RT) || (base->rl == RL_RUNNING_RT_WIP));
-                ASSERT(actionRl == RL_ACTION_EXIT);
-                ocrWorkerHc_t * self = (ocrWorkerHc_t *) base;
-                self->workLoopSpin = false;
-                break;
-            }
-            case RL_STOP: {
-                ASSERT(actionRl == RL_ACTION_EXIT);
-                // Nothing to do
-                //TODO-RL do we need this ?
-                break;
-            }
-            default:
-                ASSERT("No implementation to enter runlevel");
-        }
-    }
-}
-
-#endif
 
 static bool isMainEdtForker(ocrWorker_t * worker, ocrGuid_t * affinityMasterPD) {
     // Determine if current worker is the master worker of this PD
@@ -401,6 +260,8 @@ static bool isMainEdtForker(ocrWorker_t * worker, ocrGuid_t * affinityMasterPD) 
 }
 
 void* hcRunWorker(ocrWorker_t * worker) {
+    // TODO: This probably needs to go away and be set directly
+    // by the PD during one of the RLs
     //Register this worker and get a context id
     ocrPolicyDomain_t *pd = worker->pd;
     PD_MSG_STACK(msg);
@@ -416,6 +277,24 @@ void* hcRunWorker(ocrWorker_t * worker) {
 #undef PD_MSG
 #undef PD_TYPE
 
+    // At this point, we should have a callback to inform the PD
+    // that we have successfully achieved the RL_COMPUTE_OK RL
+    ASSERT(worker->callback != NULL);
+    worker->callback(worker->callbackArg);
+
+    // We wait until we transition to the next RL
+    // Set the current environment
+    worker->computes[0]->fcts.setCurrentEnv(worker->computes[0], worker->pd, worker);
+    worker->curRL = RL_COMPUTE_OK;
+
+    while(worker->curRL == worker->desiredRL) ;
+
+    // At this point, we should be going to RL_USER_OK
+    ASSERT(worker->desiredRL == RL_USER_OK);
+
+    // TODO: This needs to move elsewhere and be made more generic
+    // Just like we have RL_AM_MASTER, we may want something like
+    // RL_AM_GRAND_MASTER
     ocrGuid_t affinityMasterPD;
     bool forkMain = isMainEdtForker(worker, &affinityMasterPD);
     if (forkMain) {
@@ -438,25 +317,19 @@ void* hcRunWorker(ocrWorker_t * worker) {
         ocrEdtCreate(&edtGuid, edtTemplateGuid, EDT_PARAM_DEF, /* paramv = */ NULL,
                      /* depc = */ EDT_PARAM_DEF, /* depv = */ &dbGuid,
                      EDT_PROP_NONE, affinityMasterPD, NULL);
-    } else {
-        // Set who we are
-        ocrPolicyDomain_t *pd = worker->pd;
-        u32 i;
-        for(i = 0; i < worker->computeCount; ++i) {
-            worker->computes[i]->fcts.setCurrentEnv(worker->computes[i], pd, worker);
-        }
     }
+    // Start the worker loop
+    self->curRL = RL_USER_OK;
+    workerLoop(self);
+    // Worker loop will transition back down to RL_MEMORY_OK
 
-    DPRINTF(DEBUG_LVL_INFO, "Starting scheduler routine of worker %ld\n", getWorkerId(worker));
-    workerLoop(worker);
+    ASSERT((self->curRL == self->desiredRL) && (self->curRL == RL_MEMORY_OK));
     return NULL;
 }
 
 bool hcIsRunningWorker(ocrWorker_t * base) {
-    ocrWorkerHc_t * hcWorker = (ocrWorkerHc_t *) base;
-    //TODO-RL: define exactly what running means ?
-    //Currently serving edts ? or worker rl being RL_USER/RL_RT ?
-    return hcWorker->workLoopSpin;
+    // TODO: This states that we are in USER mode. Do we want to include RL_COMPUTE_OK?
+    return (base->curRL == RL_USER_OK);
 }
 
 /**
@@ -479,9 +352,7 @@ void initializeWorkerHc(ocrWorkerFactory_t * factory, ocrWorker_t* self, ocrPara
            (workerId == 0 && self->type == MASTER_WORKERTYPE));
     ocrWorkerHc_t * workerHc = (ocrWorkerHc_t*) self;
     workerHc->id = workerId;
-    workerHc->secondStart = false;
     workerHc->hcType = HC_WORKER_COMP;
-    workerHc->workLoopSpin = true;
 }
 
 /******************************************************/

@@ -598,7 +598,7 @@ u8 simpleSwitchRunlevel(ocrAllocator_t *self, ocrPolicyDomain_t *PD, ocrRunlevel
                 PD_MSG_FIELD_I(guid) = self->fguid;
                 PD_MSG_FIELD_I(properties) = 0;
                 toReturn |= self->pd->fcts.processMessage(self->pd, &msg, false);
-                self->fguid->guid = NULL_GUID;
+                self->fguid.guid = NULL_GUID;
             }
         }
         break;

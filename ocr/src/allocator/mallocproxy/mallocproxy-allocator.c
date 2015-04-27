@@ -268,8 +268,8 @@ void mallocProxyDestruct(ocrAllocator_t *self) {
     runtimeChunkFree((u64)self, NULL);
 }
 
-u8 mallocSwitchRunlevel(ocrAllocator_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
-                        u32 phase, u32 properties, void (*callback)(u64), u64 val) {
+u8 mallocProxySwitchRunlevel(ocrAllocator_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
+                             u32 phase, u32 properties, void (*callback)(u64), u64 val) {
 
     u8 toReturn = 0;
 
@@ -329,7 +329,7 @@ u8 mallocSwitchRunlevel(ocrAllocator_t *self, ocrPolicyDomain_t *PD, ocrRunlevel
                 PD_MSG_FIELD_I(guid) = self->fguid;
                 PD_MSG_FIELD_I(properties) = 0;
                 toReturn |= self->pd->fcts.processMessage(self->pd, &msg, false);
-                self->fguid->guid = NULL_GUID;
+                self->fguid.guid = NULL_GUID;
 #undef PD_MSG
 #undef PD_TYPE
             }

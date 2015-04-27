@@ -53,5 +53,8 @@ void initializeWorkerOcr(ocrWorkerFactory_t * factory, ocrWorker_t * self, ocrPa
     self->location = 0;
     self->curTask = NULL;
     self->fcts = factory->workerFcts;
-    self->rl = RL_DEFAULT;  //TODO default RL
+    self->curRL = self->desiredRL = RL_CONFIG_PARSE;
+    self->callback = NULL;
+    self->callbackArg = 0ULL;
 }
+

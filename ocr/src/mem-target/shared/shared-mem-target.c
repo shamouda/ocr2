@@ -54,7 +54,7 @@ u8 sharedSwitchRunlevel(ocrMemTarget_t *self, ocrPolicyDomain_t *PD, ocrRunlevel
 
     ASSERT(self->memoryCount == 1);
     toReturn |= self->memories[0]->fcts.switchRunlevel(
-        self->commPlatform, PD, runlevel, phase, properties, NULL, 0);
+        self->memories[0], PD, runlevel, phase, properties, NULL, 0);
     switch(runlevel) {
     case RL_CONFIG_PARSE:
         // On bring-up: Update PD->phasesPerRunlevel on phase 0

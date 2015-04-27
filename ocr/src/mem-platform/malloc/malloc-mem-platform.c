@@ -87,7 +87,7 @@ u8 mallocSwitchRunlevel(ocrMemPlatform_t *self, ocrPolicyDomain_t *PD, ocrRunlev
                   (properties & RL_TEAR_DOWN)) {
 
             // Here we can free the memory we allocated
-            free(self->startAddr);
+            free((void*)(self->startAddr));
         }
         break;
     case RL_COMPUTE_OK:

@@ -116,7 +116,8 @@ u8 pthreadSwitchRunlevel(ocrCompPlatform_t *self, ocrPolicyDomain_t *PD, ocrRunl
 
     u8 toReturn = 0;
 
-    // This is an inert module, we do not handle callbacks (caller needs to wait on us)
+    // The worker is the capable module and we operate as
+    // inert wrt it
     ASSERT(callback == NULL);
 
     // Verify properties for this call
@@ -124,122 +125,88 @@ u8 pthreadSwitchRunlevel(ocrCompPlatform_t *self, ocrPolicyDomain_t *PD, ocrRunl
            && !(properties & RL_RELEASE));
     ASSERT(!(properties & RL_FROM_MSG));
 
+    ocrCompPlatformPthread_t *pthreadCompPlatform = (ocrCompPlatformPthread_t*)self;
     switch(runlevel) {
     case RL_CONFIG_PARSE:
         // On bring-up: Update PD->phasesPerRunlevel on phase 0
         // and check compatibility on phase 1
+        if((properties & RL_BRING_UP) && phase == 0) {
+            ASSERT(self->worker != NULL);
+        }
         break;
     case RL_NETWORK_OK:
-        // Nothing
         break;
     case RL_PD_OK:
+        if(properties & RL_BRING_UP)
+            self->pd = PD;
         break;
     case RL_GUID_OK:
-        // Nothing to do
         break;
     case RL_MEMORY_OK:
-        // Nothing to do
+        if((properties & RL_TEAR_DOWN) && phase == 0) {
+            // We are just after the barrier in the tear-down
+            // phase which means we need to join the thread
+            // This is executed by the last capable thread
+            if(!(properties & RL_ALREADY_CAPABLE)) {
+                // We do not join with ourself
+                toReturn |= pthread_join(pthreadCompPlatform->osThread, NULL);
+            }
         break;
     case RL_COMPUTE_OK:
-        // We can allocate our map here because the memory is up
+        if((properties & RL_BRING_UP) && phase == 0) {
+            if(properties & RL_ALREADY_CAPABLE) {
+                // We do not need to create another thread
+                // Only do the binding
+                s32 cpuBind = pthreadCompPlatform->binding;
+                if(cpuBind != -1) {
+                    DPRINTF(DEBUG_LVL_INFO, "Binding comp-platform to cpu_id %d\n", cpuBind);
+                    bindThread(cpuBind);
+                }
+#ifdef OCR_RUNTIME_PROFILER
+                {
+                    _profilerData *d = (_profilerData*)malloc(sizeof(_profilerData));
+                    char buffer[50];
+                    snprintf(buffer, 50, "profiler_%lx-%lx", PD->myLocation, 0UL);
+                    d->output = fopen(buffer, "w");
+                    ASSERT(d->output);
+                    RESULT_ASSERT(pthread_setspecific(_profilerThreadData, d), ==, 0);
+                }
+#endif
+            } else {
+                // We need to create another capable module
+                ocrCompPlatformPthread_t * pthreadCompPlatform = (ocrCompPlatformPthread_t *)self;
+                pthread_attr_t attr;
+                toReturn |= pthread_attr_init(&attr);
+                //Note this call may fail if the system doesn't like the stack size asked for.
+                if(!toReturn)
+                    toReturn |= pthread_attr_setstacksize(&attr, pthreadCompPlatform->stackSize);
+                if(!toReturn) {
+                    toReturn |= pthread_create(&(pthreadCompPlatform->osThread),
+                                               &attr, &pthreadRoutineWrapper,
+                                               pthreadCompPlatform);
+                }
+            }
+        }
         break;
     case RL_USER_OK:
         break;
     default:
-        // Unknown runlevel
         ASSERT(0);
     }
     return toReturn;
 }
 
 #if 0
-void pthreadBegin(ocrCompPlatform_t * compPlatform, ocrPolicyDomain_t * PD, ocrWorkerType_t workerType) {
-
-    ocrCompPlatformPthread_t * pthreadCompPlatform = (ocrCompPlatformPthread_t *) compPlatform;
-    compPlatform->pd = PD;
-    pthreadCompPlatform->isMaster = (workerType == MASTER_WORKERTYPE);
-
+    // Not sure if I need to do this anymore for master thread
     if(pthreadCompPlatform->isMaster) {
-        // Only do the binding
-        s32 cpuBind = pthreadCompPlatform->binding;
-        if(cpuBind != -1) {
-            DPRINTF(DEBUG_LVL_INFO, "Binding comp-platform to cpu_id %d\n", cpuBind);
-            bindThread(cpuBind);
-        }
+        // Destroy keys for the master thread
+        void* _t = pthread_getspecific(selfKey);
+        destroyKey(_t);
 #ifdef OCR_RUNTIME_PROFILER
-        {
-            _profilerData *d = (_profilerData*)malloc(sizeof(_profilerData));
-            char buffer[50];
-            snprintf(buffer, 50, "profiler_%lx-%lx", PD->myLocation, 0UL);
-            d->output = fopen(buffer, "w");
-            ASSERT(d->output);
-            RESULT_ASSERT(pthread_setspecific(_profilerThreadData, d), ==, 0);
-        }
+        _t = pthread_getspecific(_profilerThreadData);
+        _profilerDataDestroy(_t);
 #endif
-        // The master starts executing when we call "stop" on it
     }
-}
-
-void pthreadStart(ocrCompPlatform_t * compPlatform, ocrPolicyDomain_t * PD, ocrWorker_t * worker) {
-    ocrCompPlatformPthread_t * pthreadCompPlatform = (ocrCompPlatformPthread_t *) compPlatform;
-    compPlatform->worker = worker;
-
-    if(!pthreadCompPlatform->isMaster) {
-        pthread_attr_t attr;
-        RESULT_ASSERT(pthread_attr_init(&attr), ==, 0);
-        //Note this call may fail if the system doesn't like the stack size asked for.
-        RESULT_ASSERT(pthread_attr_setstacksize(&attr, pthreadCompPlatform->stackSize), ==, 0);
-        RESULT_ASSERT(pthread_create(&(pthreadCompPlatform->osThread),
-                                     &attr, &pthreadRoutineWrapper,
-                                     pthreadCompPlatform), ==, 0);
-    } else {
-        // The upper level worker will only start us once
-        pthreadRoutineExecute(worker);
-    }
-}
-
-void pthreadStop(ocrCompPlatform_t * compPlatform, ocrRunLevel_t newRl, u32 action) {
-    switch(newRl) {
-        case RL_STOP: {
-            // A call to 'stop' should be the last call of the 'pthreadRoutineWrapper'
-            // function given at the thread's creation time.
-
-            // Note: All the code accessing this thread's TLS (freeing, clean-up, etc.)
-            // must be added to the 'destroyKey' function. It is to be called when each
-            // of the threads (except the master thread) are joined. The master thread's
-            // clean up can be done in the 'pthreadFinish' function (it calls destroyKey).
-            break;
-        }
-        case RL_SHUTDOWN: {
-            //TODO-RL, it would be nice to move this code in stop, so that we can guarantee everybody
-            // but the master thread is running
-            // This code will be called by the main thread to join everyone else
-            ocrCompPlatformPthread_t *pthreadCompPlatform = (ocrCompPlatformPthread_t*)compPlatform;
-            if(!pthreadCompPlatform->isMaster) {
-                RESULT_ASSERT(pthread_join(pthreadCompPlatform->osThread, NULL), ==, 0);
-            } else {
-                // master thread, do nothing
-            }
-            break;
-        }
-        case RL_DEALLOCATE: {
-            ocrCompPlatformPthread_t *pthreadCompPlatform = (ocrCompPlatformPthread_t*)compPlatform;
-            if(pthreadCompPlatform->isMaster) {
-                // Destroy keys for the master thread
-                void* _t = pthread_getspecific(selfKey);
-                destroyKey(_t);
-            #ifdef OCR_RUNTIME_PROFILER
-                _t = pthread_getspecific(_profilerThreadData);
-                _profilerDataDestroy(_t);
-            #endif
-            }
-            runtimeChunkFree((u64)compPlatform, NULL);
-            break;
-        }
-        default:
-            ASSERT("Unknown runlevel in stop function");
-    }
-}
 #endif
 
 u8 pthreadGetThrottle(ocrCompPlatform_t *self, u64* value) {
@@ -254,12 +221,9 @@ u8 pthreadSetCurrentEnv(ocrCompPlatform_t *self, ocrPolicyDomain_t *pd,
                         ocrWorker_t *worker) {
 
     ASSERT(pd->fguid.guid == self->pd->fguid.guid);
-    ocrCompPlatformPthread_t *pthreadCompPlatform = (ocrCompPlatformPthread_t*)self;
-    if(pthreadCompPlatform->isMaster) {
-        perThreadStorage_t *vals = pthread_getspecific(selfKey);
-        vals->pd = pd;
-        vals->worker = worker;
-    }
+    perThreadStorage_t *vals = pthread_getspecific(selfKey);
+    vals->pd = pd;
+    vals->worker = worker;
     return 0;
 }
 
@@ -285,7 +249,6 @@ void initializeCompPlatformPthread(ocrCompPlatformFactory_t * factory, ocrCompPl
     compPlatformPthread->base.fcts = factory->platformFcts;
     compPlatformPthread->binding = (params != NULL) ? params->binding : -1;
     compPlatformPthread->stackSize = ((params != NULL) && (params->stackSize > 0)) ? params->stackSize : 8388608;
-    compPlatformPthread->isMaster = false;
 }
 
 /******************************************************/

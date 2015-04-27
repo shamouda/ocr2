@@ -344,7 +344,10 @@ u8 hcPdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
     u8 amMasterWorker = properties & RL_AM_MASTER;
     properties &= ~RL_AM_MASTER; // Strip out this from the rest; only valuable for the PD
 
-    if(!(properties & RL_FROM_MSG)) {
+    u8 fromPDMsg = properties & RL_FROM_MSG;
+    properties &= ~=RL_FROM_MSG; // Strip this out from the rest; only valuable for the PD
+
+    if(!(fromPDMsg)) {
         // RL changes called directly through switchRunlevel should
         // only transition until PD_OK. After that, transitions should
         // occur using policy messages
@@ -352,8 +355,6 @@ u8 hcPdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
 
         // If this is direct function call, it should only be a request
         ASSERT((properties & RL_REQUEST) && !(properties & (RL_RESPONSE | RL_REQUEST)))
-    } else {
-        properties &= ~RL_FROM_MSG;
     }
 
     switch(runlevel) {
@@ -569,7 +570,6 @@ u8 hcPdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
         if(toReturn) {
             DPRINTF(DEBUG_LVL_WARN, "RL_USER_OK(%d) phase %d failed: %d\n", properties, i-1, toReturn);
         }
-        break;
         break;
     }
     default:

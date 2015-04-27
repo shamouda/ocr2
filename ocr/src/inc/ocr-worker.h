@@ -93,6 +93,16 @@ typedef struct _ocrWorker_t {
     ocrWorkerType_t type;
     u64 seqId;
 
+    // Workers are capable modules so
+    // part of their runlevel processing happens asynchronously
+    // This provides a convenient location to save
+    // what is needed to do this
+    volatile ocrRunlevel_t curRL, desiredRL;
+    // TODO: Do we need something with phases?
+    // TODO: Do we need something with RL properties?
+    void (*callback)(u64);
+    u64 callbackArg;
+
 #ifdef OCR_ENABLE_STATISTICS
     ocrStatsProcess_t *statProcess;
 #endif

@@ -38,7 +38,8 @@ u8 ptSwitchRunlevel(ocrCompTarget_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t 
 
     u8 toReturn = 0;
 
-    // This is an inert module, we do not handle callbacks (caller needs to wait on us)
+    // The worker is the capable module and we operate as
+    // inert wrt it
     ASSERT(callback == NULL);
 
     // Verify properties for this call
@@ -46,100 +47,62 @@ u8 ptSwitchRunlevel(ocrCompTarget_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t 
            && !(properties & RL_RELEASE));
     ASSERT(!(properties & RL_FROM_MSG));
 
+    // Call the runlevel change on the underlying platform
+    if(runlevel == RL_CONFIG_PARSE && (properties & RL_BRING_UP) && phase == 0) {
+        // Set the worker properly the first time
+        ASSERT(self->platformCount == 1);
+        self->platforms[0]->worker = self->worker;
+    }
+    toReturn |= self->platforms[0]->fcts.switchRunlevel(self->platforms[0], PD, runlevel, phase, properties,
+                                                        NULL, 0);
     switch(runlevel) {
     case RL_CONFIG_PARSE:
         // On bring-up: Update PD->phasesPerRunlevel on phase 0
         // and check compatibility on phase 1
         break;
     case RL_NETWORK_OK:
-        // Nothing
         break;
     case RL_PD_OK:
+        if(properties & RL_BRING_UP)
+            self->pd = PD;
         break;
     case RL_GUID_OK:
-        // Nothing to do
+        if(properties & RL_BRING_UP) {
+            if(phase == RL_GET_PHASE_COUNT_UP(self->pd, RL_GUID_OK) - 1) {
+                // We get a GUID for ourself
+                guidify(self->pd, (u64)self, &(self->fguid), OCR_GUID_COMPTARGET);
+            }
+        } else {
+            // Tear-down
+            if(phase == 0) {
+                PD_MSG_STACK(msg);
+                getCurrentEnv(NULL, NULL, NULL, &msg);
+#define PD_MSG (&msg)
+#define PD_TYPE PD_MSG_GUID_DESTROY
+                msg.type = PD_MSG_GUID_DESTROY | PD_MSG_REQUEST;
+                PD_MSG_FIELD_I(guid) = self->fguid;
+                PD_MSG_FIELD_I(properties) = 0;
+                toReturn |= self->pd->fcts.processMessage(self->pd, &msg, false);
+                self->fguid.guid = NULL_GUID;
+#undef PD_MSG
+#undef PD_TYPE
+            }
+        }
         break;
     case RL_MEMORY_OK:
-        // Nothing to do
         break;
     case RL_COMPUTE_OK:
-        // We can allocate our map here because the memory is up
+#ifdef OCR_ENABLE_STATISTICS
+        statsCOMPTARGET_START(PD, compTarget->fguid.guid, compTarget->fguid.metaDataPtr);
+#endif
         break;
     case RL_USER_OK:
         break;
     default:
-        // Unknown runlevel
         ASSERT(0);
     }
     return toReturn;
 }
-#if 0
-void ptBegin(ocrCompTarget_t * compTarget, ocrPolicyDomain_t * PD, ocrWorkerType_t workerType) {
-
-    ASSERT(compTarget->platformCount == 1);
-    compTarget->pd = PD;
-    compTarget->platforms[0]->fcts.begin(compTarget->platforms[0], PD, workerType);
-}
-
-void ptStart(ocrCompTarget_t * compTarget, ocrPolicyDomain_t * PD, ocrWorker_t * worker) {
-    // Get a GUID
-    guidify(PD, (u64)compTarget, &(compTarget->fguid), OCR_GUID_COMPTARGET);
-    compTarget->worker = worker;
-
-#ifdef OCR_ENABLE_STATISTICS
-    statsCOMPTARGET_START(PD, compTarget->fguid.guid, compTarget->fguid.metaDataPtr);
-#endif
-
-    ASSERT(compTarget->platformCount == 1);
-    compTarget->platforms[0]->fcts.start(compTarget->platforms[0], PD, worker);
-}
-
-void ptStop(ocrCompTarget_t * compTarget, ocrRunLevel_t newRl, u32 action) {
-    switch(newRl) {
-        case RL_STOP: {
-            ASSERT(compTarget->platformCount == 1);
-            compTarget->platforms[0]->fcts.stop(compTarget->platforms[0], newRl, action);
-
-            //TODO shouldn't this done in shutdown or deallocate ?
-            // Destroy the GUID
-            PD_MSG_STACK(msg);
-            getCurrentEnv(NULL, NULL, NULL, &msg);
-
-        #define PD_MSG (&msg)
-        #define PD_TYPE PD_MSG_GUID_DESTROY
-            msg.type = PD_MSG_GUID_DESTROY | PD_MSG_REQUEST;
-            PD_MSG_FIELD_I(guid) = compTarget->fguid;
-            PD_MSG_FIELD_I(properties) = 0;
-            compTarget->pd->fcts.processMessage(compTarget->pd, &msg, false); // Don't really care about result
-        #undef PD_MSG
-        #undef PD_TYPE
-            compTarget->fguid.guid = UNINITIALIZED_GUID;
-            break;
-        }
-        case RL_SHUTDOWN: {
-            ASSERT(compTarget->platformCount == 1);
-            compTarget->platforms[0]->fcts.stop(compTarget->platforms[0], RL_SHUTDOWN, action);
-            break;
-        }
-        case RL_DEALLOCATE: {
-            u32 i = 0;
-            while(i < compTarget->platformCount) {
-                compTarget->platforms[0]->fcts.stop(compTarget->platforms[0], RL_DEALLOCATE, action);
-                ++i;
-            }
-            runtimeChunkFree((u64)(compTarget->platforms), NULL);
-        #ifdef OCR_ENABLE_STATISTICS
-            statsCOMPTARGET_STOP(compTarget->pd, compTarget->fguid.guid, compTarget);
-        #endif
-            runtimeChunkFree((u64)compTarget, NULL);
-            break;
-        }
-
-        default:
-            ASSERT("Unknown runlevel in stop function");
-    }
-}
-#endif
 
 u8 ptGetThrottle(ocrCompTarget_t *compTarget, u64 *value) {
     ASSERT(compTarget->platformCount == 1);
