@@ -36,13 +36,9 @@ typedef union {
 } ocrDataBlockRegularAttr_t;
 
 typedef struct _ocrDataBlockRegular_t {
-    ocrDataBlock_t base;
-
-    /* Data for the data-block */
+    ocrDataBlock_t base; /* Data for the data-block */
     u32 lock; /**< Lock for this data-block */
     ocrDataBlockRegularAttr_t attributes; /**< Attributes for this data-block */
-
-    ocrGuidTracker_t usersTracker;
 } ocrDataBlockRegular_t;
 
 extern ocrDataBlockFactory_t* newDataBlockFactoryRegular(ocrParamList_t *perType, u32 factoryId);

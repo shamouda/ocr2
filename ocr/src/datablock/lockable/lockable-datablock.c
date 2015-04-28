@@ -562,7 +562,6 @@ ocrDataBlock_t* newDataBlockLockable(ocrDataBlockFactory_t *factory, ocrFatGuid_
     result->itwWaiterList = NULL;
     result->itwLocation = -1;
     result->worker = NULL;
-    ocrGuidTrackerInit(&(result->usersTracker));
 
 #ifdef OCR_ENABLE_STATISTICS
     statsDB_CREATE(pd, task->guid, task, allocator.guid,

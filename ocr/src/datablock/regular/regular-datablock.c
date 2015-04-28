@@ -47,29 +47,14 @@ u8 regularAcquire(ocrDataBlock_t *self, void** ptr, ocrFatGuid_t edt, u32 edtSlo
         hal_unlock32(&(rself->lock));
         return OCR_EACCES;
     }
-    u32 idForEdt = ocrGuidTrackerFind(&(rself->usersTracker), edt.guid);
-    if(idForEdt > 63)
-        idForEdt = ocrGuidTrackerTrack(&(rself->usersTracker), edt.guid);
-    else {
-        DPRINTF(DEBUG_LVL_VVERB, "EDT already had acquired DB (pos %d)\n", idForEdt);
-        hal_unlock32(&(rself->lock));
-        *ptr = self->ptr;
-        return OCR_EACQ;
-    }
-
-    if(idForEdt > 63) {
-        DPRINTF(DEBUG_LVL_WARN, "Warning! DataBlocks of type 'Regular' cannot be acquired by more than 64 EDTs\n");
-        hal_unlock32(&(rself->lock));
-        return OCR_EAGAIN;
-    }
     rself->attributes.numUsers += 1;
     if(isInternal)
         rself->attributes.internalUsers += 1;
 
     hal_unlock32(&(rself->lock));
     // End critical section
-    DPRINTF(DEBUG_LVL_VERB, "DB (GUID: 0x%lx) added EDT (GUID: 0x%lx) at position %d. Have %d users (of which %d runtime)\n",
-            self->guid, (u64)edt.guid, idForEdt, rself->attributes.numUsers, rself->attributes.internalUsers);
+    DPRINTF(DEBUG_LVL_VERB, "DB (GUID: 0x%lx) added EDT (GUID: 0x%lx). Have %d users (of which %d runtime)\n",
+            self->guid, (u64)edt.guid, rself->attributes.numUsers, rself->attributes.internalUsers);
 
 #ifdef OCR_ENABLE_STATISTICS
     {
@@ -84,34 +69,17 @@ u8 regularRelease(ocrDataBlock_t *self, ocrFatGuid_t edt,
                   bool isInternal) {
 
     ocrDataBlockRegular_t *rself = (ocrDataBlockRegular_t*)self;
-    u32 edtId = ocrGuidTrackerFind(&(rself->usersTracker), edt.guid);
-    bool isTracked = true;
 
-    DPRINTF(DEBUG_LVL_VERB, "Releasing DB @ 0x%lx (GUID 0x%lx) from EDT 0x%lx (%d) (runtime release: %d)\n",
-            (u64)self->ptr, rself->base.guid, edt.guid, edtId, (u32)isInternal);
+    DPRINTF(DEBUG_LVL_VERB, "Releasing DB @ 0x%lx (GUID 0x%lx) from EDT 0x%lx (runtime release: %d)\n",
+            (u64)self->ptr, rself->base.guid, edt.guid, (u32)isInternal);
+
     // Start critical section
     hal_lock32(&(rself->lock));
-    if(edtId > 63 || rself->usersTracker.slots[edtId] != edt.guid) {
-        // We did not find it. The runtime may be
-        // re-releasing it
-        if(isInternal) {
-            // This is not necessarily an error
-            rself->attributes.internalUsers -= 1;
-            isTracked = false;
-        } else {
-            // Definitely a problem here
-            hal_unlock32(&(rself->lock));
-            return OCR_EACCES;
-        }
-    }
 
-    if(isTracked) {
-        ocrGuidTrackerRemove(&(rself->usersTracker), edt.guid, edtId);
-        rself->attributes.numUsers -= 1;
-        if(isInternal) {
-            rself->attributes.internalUsers -= 1;
-        }
-    }
+    rself->attributes.numUsers -= 1;
+    if(isInternal)
+        rself->attributes.internalUsers -= 1;
+
     DPRINTF(DEBUG_LVL_VVERB, "DB (GUID: 0x%lx) attributes: numUsers %d (including %d runtime users); freeRequested %d\n",
             self->guid, rself->attributes.numUsers, rself->attributes.internalUsers, rself->attributes.freeRequested);
     // Check if we need to free the block
@@ -120,6 +88,7 @@ u8 regularRelease(ocrDataBlock_t *self, ocrFatGuid_t edt,
         statsDB_REL(getCurrentPD(), edt.guid, (ocrTask_t*)edt.metaDataPtr, self->guid, self);
     }
 #endif /* OCR_ENABLE_STATISTICS */
+
     if(rself->attributes.numUsers == 0  &&
             rself->attributes.internalUsers == 0 &&
             rself->attributes.freeRequested == 1) {
@@ -186,7 +155,6 @@ u8 regularDestruct(ocrDataBlock_t *self) {
 u8 regularFree(ocrDataBlock_t *self, ocrFatGuid_t edt, bool isInternal) {
     ocrDataBlockRegular_t *rself = (ocrDataBlockRegular_t*)self;
 
-    u32 id = ocrGuidTrackerFind(&(rself->usersTracker), edt.guid);
     DPRINTF(DEBUG_LVL_VERB, "Requesting a free for DB @ 0x%lx (GUID: 0x%lx)\n",
             (u64)self->ptr, rself->base.guid);
     // Begin critical section
@@ -200,22 +168,16 @@ u8 regularFree(ocrDataBlock_t *self, ocrFatGuid_t edt, bool isInternal) {
     // End critical section
 
 
-    if(id < 64) {
-        regularRelease(self, edt, isInternal);
+    // Critical section
+    hal_lock32(&(rself->lock));
+    if(rself->attributes.numUsers == 0 && rself->attributes.internalUsers == 0) {
+        hal_unlock32(&(rself->lock));
+        return regularDestruct(self);
     } else {
-        // We can call free without having acquired the block
-        // Now check if we can actually free the block
-
-        // Critical section
-        hal_lock32(&(rself->lock));
-        if(rself->attributes.numUsers == 0 && rself->attributes.internalUsers == 0) {
-            hal_unlock32(&(rself->lock));
-            return regularDestruct(self);
-        } else {
-            hal_unlock32(&(rself->lock));
-        }
-        // End critical section
+        hal_unlock32(&(rself->lock));
+        regularRelease(self, edt, isInternal);
     }
+    // End critical section
 
     return 0;
 }
@@ -271,7 +233,6 @@ ocrDataBlock_t* newDataBlockRegular(ocrDataBlockFactory_t *factory, ocrFatGuid_t
     result->attributes.numUsers = 0;
     result->attributes.internalUsers = 0;
     result->attributes.freeRequested = 0;
-    ocrGuidTrackerInit(&(result->usersTracker));
 
 #ifdef OCR_ENABLE_STATISTICS
     statsDB_CREATE(pd, task->guid, task, allocator.guid,

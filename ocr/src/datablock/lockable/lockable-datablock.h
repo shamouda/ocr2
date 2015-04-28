@@ -46,7 +46,6 @@ typedef struct _ocrDataBlockLockable_t {
     u32 lock; /**< Lock for this data-block */
     ocrDataBlockLockableAttr_t attributes; /**< Attributes for this data-block */
 
-    ocrGuidTracker_t usersTracker;
     struct _dbWaiter_t * ewWaiterList;  /**< EDTs waiting for exclusive write access */
     struct _dbWaiter_t * itwWaiterList; /**< EDTs waiting for intent-to-write access */
     struct _dbWaiter_t * roWaiterList;  /**< EDTs waiting for read only access */
