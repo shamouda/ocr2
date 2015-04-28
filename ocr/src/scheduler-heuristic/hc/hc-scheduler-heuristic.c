@@ -68,6 +68,7 @@ void hcSchedulerHeuristicStop(ocrSchedulerHeuristic_t * self) {
     ocrPolicyDomain_t *pd = self->scheduler->pd;
     ocrSchedulerHeuristicContextHc_t *contextAlloc = (ocrSchedulerHeuristicContextHc_t *)self->contexts[0];
     pd->fcts.pdFree(pd, contextAlloc);
+    pd->fcts.pdFree(pd, self->contexts);
 }
 
 void hcSchedulerHeuristicFinish(ocrSchedulerHeuristic_t *self) {

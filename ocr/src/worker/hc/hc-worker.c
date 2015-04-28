@@ -225,6 +225,8 @@ void* hcRunWorker(ocrWorker_t * worker) {
         ocrEdtCreate(&edtGuid, edtTemplateGuid, EDT_PARAM_DEF, /* paramv = */ NULL,
                      /* depc = */ EDT_PARAM_DEF, /* depv = */ &dbGuid,
                      EDT_PROP_NONE, affinityMasterPD, NULL);
+        // Once mainEdt is created, its template is no longer needed
+        ocrEdtTemplateDestroy(edtTemplateGuid);
     } else {
         // Set who we are
         ocrPolicyDomain_t *pd = worker->pd;

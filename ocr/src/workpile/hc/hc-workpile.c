@@ -42,6 +42,9 @@ void hcWorkpileStop(ocrWorkpile_t *base) {
     PD_MSG_STACK(msg);
     getCurrentEnv(NULL, NULL, NULL, &msg);
 
+    ocrWorkpileHc_t* derived = (ocrWorkpileHc_t*)base;
+    derived->deque->destruct(base->pd, derived->deque);
+
 #define PD_MSG (&msg)
 #define PD_TYPE PD_MSG_GUID_DESTROY
     msg.type = PD_MSG_GUID_DESTROY | PD_MSG_REQUEST;

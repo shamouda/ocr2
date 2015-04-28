@@ -146,6 +146,7 @@ void hcPolicyDomainFinish(ocrPolicyDomain_t * policy) {
         policy->workers[i]->fcts.finish(policy->workers[i]);
     }
 
+    destroyLocationPlacer(policy);
     maxCount = policy->commApiCount;
     for(i = 0; i < maxCount; i++) {
         policy->commApis[i]->fcts.finish(policy->commApis[i]);
