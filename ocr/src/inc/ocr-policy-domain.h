@@ -58,6 +58,10 @@ typedef struct _paramListPolicyDomainInst_t {
 
 #define RL_GET_PHASE_COUNT_DOWN(pd, dim1) ((pd)->phasesPerRunlevel[dim1][0] >> 16)
 
+#define IS_RL_LAST_PHASE(pd, dim1, phase) ((RL_GET_PHASE_COUNT_UP(pd, dim1) - 1) == phase)
+
+#define IS_RL_FIRST_PHASE(pd, dim1, phase) (phase == 0)
+
 /******************************************************/
 /* OCR POLICY DOMAIN INTERFACE                        */
 /******************************************************/
