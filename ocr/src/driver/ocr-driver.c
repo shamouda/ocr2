@@ -402,6 +402,28 @@ void builderPreamble(dictionary *dict) {
 
 extern bool key_exists(dictionary *dict, char *sec, char *field);
 
+/**
+ * @brief Calls platformn specific initialization code.
+ *
+ * Allows to call platform specific initialization code
+ * before OCR is built and started.
+ *
+ * The only concrete use case for this function is to
+ * call MPI_INIT. Implementers should avoid relying on
+ * it as it may be deprecated in near future.
+ */
+void platformSpecificInit(ocrConfig_t * ocrConfig) {
+#ifdef ENABLE_COMM_PLATFORM_MPI
+    extern void platformInitMPIComm(int argc, char ** argv);
+    platformInitMPIComm(ocrConfig->userArgc, ocrConfig->userArgv);
+#endif
+
+#ifdef ENABLE_COMM_PLATFORM_GASNET
+    extern void platformInitGasnetComm(int argc, char ** argv);
+    platformInitGasnetComm(ocrConfig->userArgc, ocrConfig->userArgv);
+#endif
+}
+
 void bringUpRuntime(ocrConfig_t *ocrConfig) {
     const char *inifile = ocrConfig->iniFile;
     ASSERT(inifile != NULL);
@@ -597,7 +619,7 @@ void bringUpRuntime(ocrConfig_t *ocrConfig) {
                       ==, 0);
     }
     RESULT_ASSERT(rootPolicy->fcts.switchRunlevel(rootPolicy, RL_NETWORK_OK,
-                                                  RL_REQUEST | RL_ASYNC | RL_BRING_UP | RL_AM_MASTER),
+                                                  RL_REQUEST | RL_ASYNC | RL_BRING_UP | RL_NODE_MASTER),
                   ==, 0);
 
     // Transition all PDs to PD_OK
@@ -611,22 +633,22 @@ void bringUpRuntime(ocrConfig_t *ocrConfig) {
                       ==, 0);
     }
     RESULT_ASSERT(rootPolicy->fcts.switchRunlevel(rootPolicy, RL_PD_OK,
-                                                  RL_REQUEST | RL_ASYNC | RL_BRING_UP | RL_AM_MASTER),
+                                                  RL_REQUEST | RL_ASYNC | RL_BRING_UP | RL_NODE_MASTER),
                   ==, 0);
 
     // Transition the root PD to GUID_OK and wait for all PDs to transition
     RESULT_ASSERT(rootPolicy->fcts.switchRunlevel(rootPolicy, RL_GUID_OK,
-                                                  RL_REQUEST | RL_BARRIER | RL_BRING_UP | RL_AM_MASTER),
+                                                  RL_REQUEST | RL_BARRIER | RL_BRING_UP | RL_NODE_MASTER),
                   ==, 0);
 
     // Transition the root PD to MEMORY_OK
     RESULT_ASSERT(rootPolicy->fcts.switchRunlevel(rootPolicy, RL_MEMORY_OK,
-                                                  RL_REQUEST | RL_ASYNC | RL_BRING_UP | RL_AM_MASTER),
+                                                  RL_REQUEST | RL_ASYNC | RL_BRING_UP | RL_NODE_MASTER),
                   ==, 0);
 
     // Transition the root PD to COMPUTE_OK
     RESULT_ASSERT(rootPolicy->fcts.switchRunlevel(rootPolicy, RL_COMPUTE_OK,
-                                                  RL_REQUEST | RL_ASYNC | RL_BRING_UP | RL_AM_MASTER),
+                                                  RL_REQUEST | RL_ASYNC | RL_BRING_UP | RL_NODE_MASTER),
                   ==, 0);
 
 #endif
@@ -741,28 +763,6 @@ static void * packUserArguments(int argc, char ** argv) {
     return ptr;
 }
 
-/**
- * @brief Calls platformn specific initialization code.
- *
- * Allows to call platform specific initialization code
- * before OCR is built and started.
- *
- * The only concrete use case for this function is to
- * call MPI_INIT. Implementers should avoid relying on
- * it as it may be deprecated in near future.
- */
-void platformSpecificInit(ocrConfig_t * ocrConfig) {
-#ifdef ENABLE_COMM_PLATFORM_MPI
-    extern void platformInitMPIComm(int argc, char ** argv);
-    platformInitMPIComm(ocrConfig->userArgc, ocrConfig->userArgv);
-#endif
-
-#ifdef ENABLE_COMM_PLATFORM_GASNET
-    extern void platformInitGasnetComm(int argc, char ** argv);
-    platformInitGasnetComm(ocrConfig->userArgc, ocrConfig->userArgv);
-#endif
-}
-
 // This main function is used for x86 platforms
 int __attribute__ ((weak)) main(int argc, const char* argv[]) {
     // Parse parameters. The idea is to extract the ones relevant
@@ -785,7 +785,7 @@ int __attribute__ ((weak)) main(int argc, const char* argv[]) {
     // which will start mainEdt
     getCurrentEnv(&pd, NULL, NULL, NULL);
     RESULT_ASSERT(
-        pd->fcts.switchRunlevel(pd, RL_USER_OK, RL_REQUEST | RL_ASYNC | RL_BRING_UP | RL_AM_MASTER),
+        pd->fcts.switchRunlevel(pd, RL_USER_OK, RL_REQUEST | RL_ASYNC | RL_BRING_UP | RL_NODE_MASTER),
         ==, 0);
 
     // When we return, we will be in CONFIG_PARSE runlevel

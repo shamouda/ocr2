@@ -49,10 +49,14 @@ typedef enum _ocrRLPhaseComponents_t {
 #define RL_BARRIER     0x4  /**< Set if the caller should wait for the callee to return from the runlevel change */
 #define RL_BRING_UP    0x0  /**< Set if this is for OCR bring-up */
 #define RL_TEAR_DOWN   0x8  /**< Set if this is for OCR tear-down */
-#define RL_AM_MASTER   0x10 /**< Set if the thread doing the calling is the first capable one for the PD */
-#define RL_ALREADY_CAPABLE 0x20 /**< Set if the current thread is already capable */
-#define RL_FROM_MSG    0x40 /**< Set if the transition came from another PD or was triggered internally
-                                 (as opposed to being called directly using switchRunlevel on the PD) */
+#define RL_PD_MASTER   0x10 /**< Set if the thread is the first capable thread of a PD */
+#define RL_NODE_MASTER 0x30 /**< Set if the thread is the first on the node (potentially starts multiple PDs);
+                             * implies RL_PD_MASTER */
+#define RL_BLESSED     0x40 /**< Set if the worker is the blessed worker that should initialize mainEdt */
+#define RL_FROM_MSG    0x80 /**< Set if the transition came from another PD or was triggered internally
+                                 (as opposed to being called directly using switchRunlevel on the PD).
+                                 This implies that the switchRunlevel PD call should return and not wait
+                                 for the transition*/
 
 
 /**

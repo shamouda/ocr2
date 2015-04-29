@@ -66,8 +66,11 @@ static void * pthreadRoutineWrapper(void * arg) {
     // Wrapper routine to allow initialization of local storage
     // before entering the worker routine.
     perThreadStorage_t *data = (perThreadStorage_t*)malloc(sizeof(perThreadStorage_t));
+    // This should be superfluous (done in hc-worker in hcRunWorker
+    /*
     data->pd = pthreadCompPlatform->base.pd;
     data->worker = pthreadCompPlatform->base.worker;
+    */
     RESULT_ASSERT(pthread_setspecific(selfKey, data), ==, 0);
 
 #ifdef OCR_RUNTIME_PROFILER
@@ -112,7 +115,7 @@ void pthreadDestruct (ocrCompPlatform_t * base) {
 
 
 u8 pthreadSwitchRunlevel(ocrCompPlatform_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
-                         u32 phase, u32 properties, void (*callback)(u64), u64 val) {
+                         u32 phase, u32 properties, void (*callback)(ocrPolicyDomain_t*, u64), u64 val) {
 
     u8 toReturn = 0;
 
@@ -143,18 +146,10 @@ u8 pthreadSwitchRunlevel(ocrCompPlatform_t *self, ocrPolicyDomain_t *PD, ocrRunl
     case RL_GUID_OK:
         break;
     case RL_MEMORY_OK:
-        if((properties & RL_TEAR_DOWN) && phase == 0) {
-            // We are just after the barrier in the tear-down
-            // phase which means we need to join the thread
-            // This is executed by the last capable thread
-            if(!(properties & RL_ALREADY_CAPABLE)) {
-                // We do not join with ourself
-                toReturn |= pthread_join(pthreadCompPlatform->osThread, NULL);
-            }
         break;
     case RL_COMPUTE_OK:
         if((properties & RL_BRING_UP) && phase == 0) {
-            if(properties & RL_ALREADY_CAPABLE) {
+            if(properties & RL_PD_MASTER) {
                 // We do not need to create another thread
                 // Only do the binding
                 s32 cpuBind = pthreadCompPlatform->binding;
@@ -185,6 +180,12 @@ u8 pthreadSwitchRunlevel(ocrCompPlatform_t *self, ocrPolicyDomain_t *PD, ocrRunl
                                                &attr, &pthreadRoutineWrapper,
                                                pthreadCompPlatform);
                 }
+            }
+        } else if((properties & RL_TEAR_DOWN) && phase == RL_GET_PHASE_COUNT_DOWN(PD, RL_COMPUTE_OK) - 1) {
+            // At this point, this is run only by the master thread
+            if(!(properties & RL_PD_MASTER)) {
+                // We do not join with ourself
+                toReturn |= pthread_join(pthreadCompPlatform->osThread, NULL);
             }
         }
         break;
@@ -295,7 +296,7 @@ ocrCompPlatformFactory_t *newCompPlatformFactoryPthread(ocrParamList_t *perType)
     base->destruct = &destructCompPlatformFactoryPthread;
     base->platformFcts.destruct = FUNC_ADDR(void (*)(ocrCompPlatform_t*), pthreadDestruct);
     base->platformFcts.switchRunlevel = FUNC_ADDR(u8 (*)(ocrCompPlatform_t*, ocrPolicyDomain_t*, ocrRunlevel_t,
-                                                         u32, u32, void (*)(u64), u64), pthreadSwitchRunlevel);
+                                                         u32, u32, void (*)(ocrPolicyDomain_t*, u64), u64), pthreadSwitchRunlevel);
     base->platformFcts.getThrottle = FUNC_ADDR(u8 (*)(ocrCompPlatform_t*, u64*), pthreadGetThrottle);
     base->platformFcts.setThrottle = FUNC_ADDR(u8 (*)(ocrCompPlatform_t*, u64), pthreadSetThrottle);
     base->platformFcts.setCurrentEnv = FUNC_ADDR(u8 (*)(ocrCompPlatform_t*, ocrPolicyDomain_t*, ocrWorker_t*), pthreadSetCurrentEnv);

@@ -62,7 +62,7 @@ typedef struct _ocrWorkerFcts_t {
      * at some point
      */
     u8 (*switchRunlevel)(struct _ocrWorker_t* self, struct _ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
-                         u32 phase, u32 properties, void (*callback)(u64), u64 val);
+                         u32 phase, u32 properties, void (*callback)(struct _ocrPolicyDomain_t*, u64), u64 val);
 
     /** @brief Run Worker
      */
@@ -91,16 +91,17 @@ typedef struct _ocrWorker_t {
     struct _ocrPolicyDomain_t *pd;
     ocrLocation_t location;  //!!! TO BE DEPRECATED !!!
     ocrWorkerType_t type;
+    u8 amBlessed; // TODO: Maybe merge in type?
     u64 seqId;
 
     // Workers are capable modules so
     // part of their runlevel processing happens asynchronously
     // This provides a convenient location to save
     // what is needed to do this
-    volatile ocrRunlevel_t curRL, desiredRL;
-    // TODO: Do we need something with phases?
+    // The state encodes the RL (top 16 bits) and the phase (bottom 16 bits)
+    volatile u32 curState, desiredState;
     // TODO: Do we need something with RL properties?
-    void (*callback)(u64);
+    void (*callback)(struct _ocrPolicyDomain_t*, u64);
     u64 callbackArg;
 
 #ifdef OCR_ENABLE_STATISTICS

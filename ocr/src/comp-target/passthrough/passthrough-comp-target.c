@@ -34,7 +34,7 @@ void ptDestruct(ocrCompTarget_t *compTarget) {
 }
 
 u8 ptSwitchRunlevel(ocrCompTarget_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
-                    u32 phase, u32 properties, void (*callback)(u64), u64 val) {
+                    u32 phase, u32 properties, void (*callback)(ocrPolicyDomain_t*, u64), u64 val) {
 
     u8 toReturn = 0;
 
@@ -148,7 +148,7 @@ ocrCompTargetFactory_t *newCompTargetFactoryPt(ocrParamList_t *perType) {
     base->destruct = &destructCompTargetFactoryPt;
     base->targetFcts.destruct = FUNC_ADDR(void (*)(ocrCompTarget_t*), ptDestruct);
     base->targetFcts.switchRunlevel = FUNC_ADDR(u8 (*)(ocrCompTarget_t*, ocrPolicyDomain_t*, ocrRunlevel_t,
-                                                       u32, u32, void (*)(u64), u64), ptSwitchRunlevel);
+                                                       u32, u32, void (*)(ocrPolicyDomain_t*, u64), u64), ptSwitchRunlevel);
     base->targetFcts.getThrottle = FUNC_ADDR(u8 (*)(ocrCompTarget_t*, u64*), ptGetThrottle);
     base->targetFcts.setThrottle = FUNC_ADDR(u8 (*)(ocrCompTarget_t*, u64), ptSetThrottle);
     base->targetFcts.setCurrentEnv = FUNC_ADDR(u8 (*)(ocrCompTarget_t*, ocrPolicyDomain_t*, ocrWorker_t*), ptSetCurrentEnv);

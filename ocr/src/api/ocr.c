@@ -17,19 +17,16 @@ static void ocrShutdownInternal(u8 errorCode) {
     ocrPolicyDomain_t *pd = NULL;
     PD_MSG_STACK(msg);
     ocrPolicyMsg_t * msgPtr = &msg;
-    ocrTask_t * curEdt = NULL;
-    getCurrentEnv(&pd, NULL, &curEdt, msgPtr);
+    getCurrentEnv(&pd, NULL, NULL, msgPtr);
 #define PD_MSG msgPtr
-#define PD_TYPE PD_MSG_MGT_SHUTDOWN
-    msgPtr->type = PD_MSG_MGT_SHUTDOWN | PD_MSG_REQUEST;
+#define PD_TYPE PD_MSG_MGT_RL_NOTIFY
+    msgPtr->type = PD_MSG_MGT_RL_NOTIFY | PD_MSG_REQUEST;
+    PD_MSG_FIELD_I(runlevel) = RL_COMPUTE_OK;
+    PD_MSG_FIELD_I(properties) = RL_REQUEST | RL_BARRIER | RL_TEAR_DOWN;
     PD_MSG_FIELD_I(errorCode) = errorCode;
-    PD_MSG_FIELD_I(currentEdt.guid) = curEdt ? curEdt->guid : NULL_GUID;
-    PD_MSG_FIELD_I(currentEdt.metaDataPtr) = curEdt;
     RESULT_ASSERT(pd->fcts.processMessage(pd, msgPtr, true), ==, 0);
 #undef PD_MSG
 #undef PD_TYPE
-    // TODO: Re-enable teardown for other platforms
-    //teardown(pd);
 }
 
 void ocrShutdown() {

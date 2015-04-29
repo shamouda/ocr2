@@ -28,7 +28,7 @@ void handlelessCommDestruct (ocrCommApi_t * base) {
 }
 
 u8 handlelessCommSwitchRunlevel(ocrCommApi_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
-                                u32 phase, u32 properties, void (*callback)(u64), u64 val) {
+                                u32 phase, u32 properties, void (*callback)(ocrPolicyDomain_t*, u64), u64 val) {
 
     u8 toReturn = 0;
 
@@ -204,7 +204,7 @@ ocrCommApiFactory_t *newCommApiFactoryHandleless(ocrParamList_t *perType) {
     base->destruct = destructCommApiFactoryHandleless;
     base->apiFcts.destruct = FUNC_ADDR(void (*)(ocrCommApi_t*), handlelessCommDestruct);
     base->apiFcts.switchRunlevel = FUNC_ADDR(u8 (*)(ocrCommApi_t*, ocrPolicyDomain_t*, ocrRunlevel_t,
-                                                    u32, u32, void (*)(u64), u64), handlelessCommSwitchRunlevel);
+                                                    u32, u32, void (*)(ocrPolicyDomain_t*, u64), u64), handlelessCommSwitchRunlevel);
     base->apiFcts.sendMessage = FUNC_ADDR(u8 (*)(ocrCommApi_t*, ocrLocation_t, ocrPolicyMsg_t *, ocrMsgHandle_t**, u32),
                                           handlelessCommSendMessage);
     base->apiFcts.pollMessage = FUNC_ADDR(u8 (*)(ocrCommApi_t*, ocrMsgHandle_t**),

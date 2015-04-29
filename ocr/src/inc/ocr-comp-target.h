@@ -84,7 +84,7 @@ typedef struct _ocrCompTargetFcts_t {
      * at some point
      */
     u8 (*switchRunlevel)(struct _ocrCompTarget_t* self, struct _ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
-                         u32 phase, u32 properties, void (*callback)(u64), u64 val);
+                         u32 phase, u32 properties, void (*callback)(struct _ocrPolicyDomain_t*, u64), u64 val);
 
     /**
      * @brief Gets the throttle value for this compute node

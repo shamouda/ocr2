@@ -80,7 +80,7 @@ typedef struct _ocrGuidProviderFcts_t {
      * at some point
      */
     u8 (*switchRunlevel)(struct _ocrGuidProvider_t* self, struct _ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
-                         u32 phase, u32 properties, void (*callback)(u64), u64 val);
+                         u32 phase, u32 properties, void (*callback)(struct _ocrPolicyDomain_t*, u64), u64 val);
     /**
      * @brief Gets a GUID for an object of kind 'kind'
      * and associates the value val.

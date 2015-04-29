@@ -44,7 +44,7 @@ void initializeContext(ocrSchedulerHeuristicContext_t *context, u64 contextId) {
 }
 
 u8 hcSchedulerHeuristicSwitchRunlevel(ocrSchedulerHeuristic_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
-                                      u32 phase, u32 properties, void (*callback)(u64), u64 val) {
+                                      u32 phase, u32 properties, void (*callback)(ocrPolicyDomain_t*, u64), u64 val) {
 
     u8 toReturn = 0;
 
@@ -212,7 +212,7 @@ ocrSchedulerHeuristicFactory_t * newOcrSchedulerHeuristicFactoryHc(ocrParamList_
     base->instantiate = &newSchedulerHeuristicHc;
     base->destruct = &destructSchedulerHeuristicFactoryHc;
     base->fcts.switchRunlevel = FUNC_ADDR(u8 (*)(ocrSchedulerHeuristic_t*, ocrPolicyDomain_t*, ocrRunlevel_t,
-                                                 u32, u32, void (*)(u64), u64), hcSchedulerHeuristicSwitchRunlevel);
+                                                 u32, u32, void (*)(ocrPolicyDomain_t*, u64), u64), hcSchedulerHeuristicSwitchRunlevel);
     base->fcts.destruct = FUNC_ADDR(void (*)(ocrSchedulerHeuristic_t*), hcSchedulerHeuristicDestruct);
 
     base->fcts.update = FUNC_ADDR(u8 (*)(ocrSchedulerHeuristic_t*, u32), hcSchedulerHeuristicUpdate);

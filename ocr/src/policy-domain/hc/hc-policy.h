@@ -22,12 +22,17 @@ typedef struct {
 } ocrPolicyDomainFactoryHc_t;
 
 typedef struct {
+    volatile u64 checkedIn;  // Will initially contain the number of workers we need to
+                             // check in and will decrement to zero
+    ocrRunlevel_t runlevel;
+    u32 nextPhase;
+    u32 properties;
+} pdHcResumeSwitchRL_t;
+
+typedef struct {
     ocrPolicyDomain_t base;
     u32 rank;           // For MPI use
-    u32 rl; // current RL
-    u32 * rlNbDownActions; // size is nb of runlevel
-    u32 ** rlDownActions; // size is nb of runlevel, and entries size is rlNbDownActions
-    u32 * volatile rl_completed; //TODO-RL makes sense ?
+    pdHcResumeSwitchRL_t rlSwitch; // Used for asynchronous RL switch
 } ocrPolicyDomainHc_t;
 
 typedef struct {

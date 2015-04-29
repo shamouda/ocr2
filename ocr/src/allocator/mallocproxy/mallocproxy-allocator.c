@@ -269,7 +269,7 @@ void mallocProxyDestruct(ocrAllocator_t *self) {
 }
 
 u8 mallocProxySwitchRunlevel(ocrAllocator_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
-                             u32 phase, u32 properties, void (*callback)(u64), u64 val) {
+                             u32 phase, u32 properties, void (*callback)(ocrPolicyDomain_t*, u64), u64 val) {
 
     u8 toReturn = 0;
 
@@ -380,7 +380,7 @@ ocrAllocatorFactory_t * newAllocatorFactoryMallocProxy(ocrParamList_t *perType) 
     base->destruct = &destructAllocatorFactoryMallocProxy;
     base->allocFcts.destruct = FUNC_ADDR(void (*)(ocrAllocator_t*), mallocProxyDestruct);
     base->allocFcts.switchRunlevel = FUNC_ADDR(u8 (*)(ocrAllocator_t*, ocrPolicyDomain_t*, ocrRunlevel_t,
-                                                      u32, u32, void (*)(u64), u64), mallocProxySwitchRunlevel);
+                                                      u32, u32, void (*)(ocrPolicyDomain_t*, u64), u64), mallocProxySwitchRunlevel);
     base->allocFcts.allocate = FUNC_ADDR(void* (*)(ocrAllocator_t*, u64, u64), mallocProxyAllocate);
     //base->allocFcts.free = FUNC_ADDR(void (*)(void*), mallocProxyDeallocate);
     base->allocFcts.reallocate = FUNC_ADDR(void* (*)(ocrAllocator_t*, void*, u64), mallocProxyReallocate);

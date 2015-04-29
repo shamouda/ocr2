@@ -172,7 +172,7 @@ void simpleCommApiDestruct (ocrCommApi_t * base) {
 }
 
 u8 simpleSwitchRunlevel(ocrCommApi_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
-                        u32 phase, u32 properties, void (*callback)(u64), u64 val) {
+                        u32 phase, u32 properties, void (*callback)(ocrPolicyDomain_t*, u64), u64 val) {
 
     u8 toReturn = 0;
 
@@ -258,7 +258,7 @@ ocrCommApiFactory_t *newCommApiFactorySimple(ocrParamList_t *perType) {
 
     base->apiFcts.destruct = FUNC_ADDR(void (*)(ocrCommApi_t*), simpleCommApiDestruct);
     base->apiFcts.switchRunlevel = FUNC_ADDR(u8 (*)(ocrCommApi_t*, ocrPolicyDomain_t*, ocrRunlevel_t,
-                                                      u32, u32, void (*)(u64), u64), simpleSwitchRunlevel);
+                                                      u32, u32, void (*)(ocrPolicyDomain_t*, u64), u64), simpleSwitchRunlevel);
     base->apiFcts.sendMessage = FUNC_ADDR(u8 (*)(ocrCommApi_t*, ocrLocation_t, ocrPolicyMsg_t *, ocrMsgHandle_t**, u32),
                                           sendMessageSimpleCommApi);
     base->apiFcts.pollMessage = FUNC_ADDR(u8 (*)(ocrCommApi_t*, ocrMsgHandle_t**),

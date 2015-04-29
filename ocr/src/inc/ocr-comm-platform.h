@@ -76,7 +76,7 @@ typedef struct _ocrCommPlatformFcts_t {
      * at some point
      */
     u8 (*switchRunlevel)(struct _ocrCommPlatform_t* self, struct _ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
-                         u32 phase, u32 properties, void (*callback)(u64), u64 val);
+                         u32 phase, u32 properties, void (*callback)(struct _ocrPolicyDomain_t*, u64), u64 val);
 
     /**
      * @brief Tells the communication platfrom that the biggest

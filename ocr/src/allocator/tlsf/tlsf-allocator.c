@@ -1520,7 +1520,7 @@ static void tlsfInitPool(ocrAllocatorTlsf_t *rself) {
 }
 
 u8 tlsfSwitchRunlevel(ocrAllocator_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
-                        u32 phase, u32 properties, void (*callback)(u64), u64 val) {
+                        u32 phase, u32 properties, void (*callback)(ocrPolicyDomain_t*, u64), u64 val) {
 
     u8 toReturn = 0;
 
@@ -1906,7 +1906,7 @@ ocrAllocatorFactory_t * newAllocatorFactoryTlsf(ocrParamList_t *perType) {
     base->destruct = &destructAllocatorFactoryTlsf;
     base->allocFcts.destruct = FUNC_ADDR(void (*)(ocrAllocator_t*), tlsfDestruct);
     base->allocFcts.switchRunlevel = FUNC_ADDR(u8 (*)(ocrAllocator_t*, ocrPolicyDomain_t*, ocrRunlevel_t,
-                                                      u32, u32, void (*)(u64), u64), tlsfSwitchRunlevel);
+                                                      u32, u32, void (*)(ocrPolicyDomain_t*, u64), u64), tlsfSwitchRunlevel);
     base->allocFcts.allocate = FUNC_ADDR(void* (*)(ocrAllocator_t*, u64, u64), tlsfAllocate);
     //base->allocFcts.free = FUNC_ADDR(void (*)(void*), tlsfDeallocate);
     base->allocFcts.reallocate = FUNC_ADDR(void* (*)(ocrAllocator_t*, void*, u64), tlsfReallocate);

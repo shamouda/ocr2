@@ -55,7 +55,7 @@ u8 nullSetLocationForSchedulerObject(ocrSchedulerObjectFactory_t *fact, ocrSched
 /******************************************************/
 
 u8 nullSchedulerObjectRootSwitchRunlevel(ocrSchedulerObjectRoot_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
-                                         u32 phase, u32 properties, void (*callback)(u64), u64 val) {
+                                         u32 phase, u32 properties, void (*callback)(ocrPolicyDomain_t*, u64), u64 val) {
 
     u8 toReturn = 0;
 
@@ -136,7 +136,7 @@ ocrSchedulerObjectFactory_t * newOcrSchedulerObjectFactoryNull(ocrParamList_t *p
 
     ocrSchedulerObjectRootFactory_t* rootFactory = (ocrSchedulerObjectRootFactory_t*)schedObjFact;
     rootFactory->fcts.switchRunlevel = FUNC_ADDR(u8 (*)(ocrSchedulerObjectRoot_t*, ocrPolicyDomain_t*, ocrRunlevel_t,
-                                                        u32, u32, void (*)(u64), u64), simpleSwitchRunlevel);
+                                                        u32, u32, void (*)(ocrPolicyDomain_t*, u64), u64), simpleSwitchRunlevel);
     rootFactory->fcts.begin = FUNC_ADDR(void (*)(ocrSchedulerObjectRoot_t*), nullSchedulerObjectRootBegin);
     rootFactory->fcts.start = FUNC_ADDR(void (*)(ocrSchedulerObjectRoot_t*), nullSchedulerObjectRootStart);
     rootFactory->fcts.stop = FUNC_ADDR(void (*)(ocrSchedulerObjectRoot_t*,ocrRunLevel_t,u32), nullSchedulerObjectRootStop);\

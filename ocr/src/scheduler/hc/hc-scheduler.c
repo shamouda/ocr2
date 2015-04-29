@@ -94,7 +94,7 @@ void hcSchedulerDestruct(ocrScheduler_t * self) {
 }
 
 u8 hcSchedulerSwitchRunlevel(ocrScheduler_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
-                             u32 phase, u32 properties, void (*callback)(u64), u64 val) {
+                             u32 phase, u32 properties, void (*callback)(ocrPolicyDomain_t*, u64), u64 val) {
 
     u8 toReturn = 0;
 
@@ -423,7 +423,7 @@ ocrSchedulerFactory_t * newOcrSchedulerFactoryHc(ocrParamList_t *perType) {
     base->initialize  = &initializeSchedulerHc;
     base->destruct = &destructSchedulerFactoryHc;
     base->schedulerFcts.switchRunlevel = FUNC_ADDR(u8 (*)(ocrScheduler_t*, ocrPolicyDomain_t*, ocrRunlevel_t,
-                                                          u32, u32, void (*)(u64), u64), hcSchedulerSwitchRunlevel);
+                                                          u32, u32, void (*)(ocrPolicyDomain_t*, u64), u64), hcSchedulerSwitchRunlevel);
     base->schedulerFcts.destruct = FUNC_ADDR(void (*)(ocrScheduler_t*), hcSchedulerDestruct);
     base->schedulerFcts.takeEdt = FUNC_ADDR(u8 (*)(ocrScheduler_t*, u32*, ocrFatGuid_t*), hcSchedulerTakeEdt);
     base->schedulerFcts.giveEdt = FUNC_ADDR(u8 (*)(ocrScheduler_t*, u32*, ocrFatGuid_t*), hcSchedulerGiveEdt);

@@ -229,9 +229,6 @@ typedef struct _paramListPolicyDomainInst_t {
 /**< Runlevel change notification */
 #define PD_MSG_MGT_RL_NOTIFY        0x00004200
 
-/**< Trigger a shutdown (TO BE REMOVED) */
-#define PD_MSG_MG_SHUTDOWN          0x00005200
-
 /**< AND with this and if result non-null, hint related operation.
  * Generally, these will be calls to set/get user hints
  */
@@ -939,6 +936,8 @@ typedef struct _ocrPolicyMsg_t {
                                                  - RL_BRING_UP
                                                  - RL_TEAR_DOWN
                                             */
+                    u32 errorCode;          /**< In switch from RL_USER, used to capture
+                                               error code */
                 } in;
                 struct {
                     u32 returnDetail;       /**< Out: Success or error code */
@@ -1063,7 +1062,7 @@ typedef struct _ocrPolicyDomainFcts_t {
      */
     void (*destruct)(struct _ocrPolicyDomain_t *self);
 
-    void (*switchRunlevel)(struct _ocrPolicyDomain_t* self, ocrRunlevel_t runlevel, u32 properties);
+    u8 (*switchRunlevel)(struct _ocrPolicyDomain_t* self, ocrRunlevel_t runlevel, u32 properties);
 
     /**
      * @brief Requests for the handling of the request msg
