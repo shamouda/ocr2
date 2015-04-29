@@ -594,7 +594,7 @@ void bringUpRuntime(ocrConfig_t *ocrConfig) {
                       ==, 0);
     }
     RESULT_ASSERT(rootPolicy->fcts.switchRunlevel(rootPolicy, RL_CONFIG_PARSE, RL_REQUEST |
-                                                  RL_ASYNC | RL_BRING_UP),
+                                                  RL_ASYNC | RL_BRING_UP | RL_NODE_MASTER),
                   ==, 0);
 
     // We now switch to NETWORK_OK
@@ -788,9 +788,36 @@ int __attribute__ ((weak)) main(int argc, const char* argv[]) {
         pd->fcts.switchRunlevel(pd, RL_USER_OK, RL_REQUEST | RL_ASYNC | RL_BRING_UP | RL_NODE_MASTER),
         ==, 0);
 
-    // When we return, we will be in CONFIG_PARSE runlevel
-    // and the runtime will have been brought down
     u8 returnCode = pd->shutdownCode;
+    // When we return here, we need to continue from RL_MEMORY_OK all the way down to CONFIG_PARSE
+    // TODO: Need to ensure that only NODE_MASTER comes out of here. Other PD_MASTER need to stay in their PDs
+    RESULT_ASSERT(pd->fcts.switchRunlevel(pd, RL_MEMORY_OK, RL_REQUEST | RL_ASYNC | RL_TEAR_DOWN | RL_NODE_MASTER),
+                  ==, 0);
+    RESULT_ASSERT(pd->fcts.switchRunlevel(pd, RL_GUID_OK, RL_REQUEST | RL_ASYNC | RL_TEAR_DOWN | RL_NODE_MASTER),
+                  ==, 0);
+
+    // NOTE: TODO: The switch of other PD's runlevels needs to happen with ocrPdMessages_t
+    RESULT_ASSERT(pd->fcts.switchRunlevel(pd, RL_PD_OK, RL_REQUEST | RL_ASYNC | RL_TEAR_DOWN | RL_NODE_MASTER),
+                  ==, 0);
+    // Here everyone is down except NODE_MASTER
+    u32 i;
+    ocrPolicyDomain_t *otherPolicyDomains = NULL;
+    for(i = 1; i < inst_counts[policydomain_type]; ++i) {
+        otherPolicyDomains = (ocrPolicyDomain_t*)all_instances[policydomain_type][i];
+        RESULT_ASSERT(otherPolicyDomains->fcts.switchRunlevel(otherPolicyDomains, RL_NETWORK_OK,
+                                                              RL_REQUEST | RL_ASYNC | RL_TEAR_DOWN), ==, 0);
+    }
+    RESULT_ASSERT(pd->fcts.switchRunlevel(pd, RL_NETWORK_OK, RL_REQUEST | RL_ASYNC | RL_TEAR_DOWN | RL_NODE_MASTER),
+                  ==, 0);
+
+    for(i = 1; i < inst_counts[policydomain_type]; ++i) {
+        otherPolicyDomains = (ocrPolicyDomain_t*)all_instances[policydomain_type][i];
+        RESULT_ASSERT(otherPolicyDomains->fcts.switchRunlevel(otherPolicyDomains, RL_CONFIG_PARSE,
+                                                              RL_REQUEST | RL_ASYNC | RL_TEAR_DOWN), ==, 0);
+    }
+    RESULT_ASSERT(pd->fcts.switchRunlevel(pd, RL_CONFIG_PARSE, RL_REQUEST | RL_ASYNC | RL_TEAR_DOWN | RL_NODE_MASTER),
+                  ==, 0);
+
     freeUpRuntime();
 
     return returnCode;

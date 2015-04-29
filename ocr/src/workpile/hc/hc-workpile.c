@@ -41,16 +41,46 @@ u8 hcWorkpileSwitchRunlevel(ocrWorkpile_t *self, ocrPolicyDomain_t *PD, ocrRunle
     case RL_CONFIG_PARSE:
         // On bring-up: Update PD->phasesPerRunlevel on phase 0
         // and check compatibility on phase 1
+        if((properties & RL_BRING_UP) && phase == 0) {
+            RL_ENSURE_PHASE_UP(PD, RL_GUID_OK, RL_PHASE_SCHEDULER, 2);
+            RL_ENSURE_PHASE_DOWN(PD, RL_GUID_OK, RL_PHASE_SCHEDULER, 2);
+        }
         break;
     case RL_NETWORK_OK:
         break;
     case RL_PD_OK:
+        if(properties & RL_BRING_UP)
+            self->pd = PD;
         break;
     case RL_GUID_OK:
+        if((properties & RL_BRING_UP) && phase == RL_GET_PHASE_COUNT_UP(self->pd, RL_GUID_OK) - 1) {
+            guidify(self->pd, (u64)self, &(self->fguid), OCR_GUID_WORKPILE);
+        }
+        if((properties & RL_TEAR_DOWN) && phase == 0) {
+            PD_MSG_STACK(msg);
+            getCurrentEnv(NULL, NULL, NULL, &msg);
+#define PD_MSG (&msg)
+#define PD_TYPE PD_MSG_GUID_DESTROY
+            msg.type = PD_MSG_GUID_DESTROY | PD_MSG_REQUEST;
+            PD_MSG_FIELD_I(guid) = self->fguid;
+            PD_MSG_FIELD_I(properties) = 0;
+            toReturn |= self->pd->fcts.processMessage(self->pd, &msg, false);
+#undef PD_MSG
+#undef PD_TYPE
+            self->fguid.guid = NULL_GUID;
+        }
         break;
     case RL_MEMORY_OK:
         break;
     case RL_COMPUTE_OK:
+        if((properties & RL_BRING_UP) && phase == 0) {
+            // Does this need to move up in RL_MEMORY_OK?
+            ocrWorkpileHc_t* derived = (ocrWorkpileHc_t*)self;
+            derived->deque = newDeque(self->pd, (void *) NULL_GUID, WORK_STEALING_DEQUE);
+            // Can switch to locked implementation for debugging purpose
+            // derived->deque = newDeque(self->pd, (void *) NULL_GUID, LOCKED_DEQUE);
+        }
+        // TODO: What about freeing the queue?
         break;
     case RL_USER_OK:
         break;
@@ -60,43 +90,6 @@ u8 hcWorkpileSwitchRunlevel(ocrWorkpile_t *self, ocrPolicyDomain_t *PD, ocrRunle
     }
     return toReturn;
 }
-
-#if 0
-void hcWorkpileStart(ocrWorkpile_t *base, ocrPolicyDomain_t *PD) {
-    guidify(PD, (u64)base, &(base->fguid), OCR_GUID_WORKPILE);
-    ocrWorkpileHc_t* derived = (ocrWorkpileHc_t*)base;
-    base->pd = PD;
-    derived->deque = newDeque(base->pd, (void *) NULL_GUID, WORK_STEALING_DEQUE);
-    // Can switch to locked implementation for debugging purpose
-    // derived->deque = newDeque(base->pd, (void *) NULL_GUID, LOCKED_DEQUE);
-}
-
-void hcWorkpileStop(ocrWorkpile_t *base, ocrRunLevel_t newRl, u32 action) {
-    switch(newRl) {
-        case RL_STOP: {
-            break;
-        }
-        case RL_SHUTDOWN: {
-            // Destroy the GUID
-            PD_MSG_STACK(msg);
-            getCurrentEnv(NULL, NULL, NULL, &msg);
-        #define PD_MSG (&msg)
-        #define PD_TYPE PD_MSG_GUID_DESTROY
-            msg.type = PD_MSG_GUID_DESTROY | PD_MSG_REQUEST;
-            PD_MSG_FIELD_I(guid) = base->fguid;
-            PD_MSG_FIELD_I(properties) = 0;
-            // Shutting down so ignore error
-            base->pd->fcts.processMessage(base->pd, &msg, false);
-        #undef PD_MSG
-        #undef PD_TYPE
-            base->fguid.guid = UNINITIALIZED_GUID;
-            break;
-        }
-        default:
-            ASSERT("Unknown runlevel in stop function");
-    }
-}
-#endif
 
 ocrFatGuid_t hcWorkpilePop(ocrWorkpile_t * base, ocrWorkPopType_t type,
                            ocrCost_t *cost) {

@@ -143,10 +143,55 @@ u8 wstSchedulerObjectSwitchRunlevel(ocrSchedulerObjectRoot_t *self, ocrPolicyDom
     case RL_NETWORK_OK:
         break;
     case RL_PD_OK:
+        if((properties & RL_BRING_UP) && phase == 0) {
+            ASSERT(self->scheduler);
+            u32 i;
+            // The scheduler calls this before switching itself. Do we want
+            // to invert this?
+            for(i = 0; i < PD->schedulerObjectFactoryCount; ++i) {
+                PD->schedulerObjectFactories[i]->pd = PD;
+            }
+        }
         break;
     case RL_GUID_OK:
         break;
     case RL_MEMORY_OK:
+        if(properties & RL_BRING_UP) {
+            if(phase == RL_GET_PHASE_COUNT_UP(PD, RL_MEMORY_OK) - 1) {
+                u32 i;
+                ocrScheduler_t *scheduler = self->scheduler;
+
+                ocrSchedulerObjectRootWst_t *wstRootSchedObj = (ocrSchedulerObjectRootWst_t*)self;
+                wstRootSchedObj->numDeques = scheduler->contextCount;
+                wstRootSchedObj->deques = (ocrSchedulerObject_t**)PD->fcts.pdMalloc(
+                    PD, wstRootSchedObj->numDeques * sizeof(ocrSchedulerObject_t*));
+#ifdef ENABLE_SCHEDULER_OBJECT_DEQ
+                //Instantiate the deque schedulerObjects
+                paramListSchedulerObjectDeq_t params;
+                params.base.kind = OCR_SCHEDULER_OBJECT_DEQUE;
+                params.base.count = 1;
+                params.type = WORK_STEALING_DEQUE;
+                ocrSchedulerObjectFactory_t *dequeFactory = PD->schedulerObjectFactories[schedulerObjectDeq_id];
+                for (i = 0; i < wstRootSchedObj->numDeques; i++) {
+                    wstRootSchedObj->deques[i] = dequeFactory->fcts.create(dequeFactory, (ocrParamList_t*)(&params));
+                }
+#else
+                ASSERT(0);
+#endif
+            }
+        } else {
+            // Tear down
+            if(phase == 0) {
+                u32 i;
+                ocrSchedulerObjectRootWst_t *wstRootSchedObj = (ocrSchedulerObjectRootWst_t*)self;
+                for (i = 0; i < wstRootSchedObj->numDeques; i++) {
+                    ocrSchedulerObject_t *deque = wstRootSchedObj->deques[i];
+                    ocrSchedulerObjectFactory_t *dequeFactory = PD->schedulerObjectFactories[deque->fctId];
+                    dequeFactory->fcts.destruct(dequeFactory, wstRootSchedObj->deques[i]);
+                }
+                PD->fcts.pdFree(PD, wstRootSchedObj->deques);
+            }
+        }
         break;
     case RL_COMPUTE_OK:
         break;
@@ -156,76 +201,19 @@ u8 wstSchedulerObjectSwitchRunlevel(ocrSchedulerObjectRoot_t *self, ocrPolicyDom
         ASSERT(0);
     }
     return toReturn;
+    /* RUNLEVEL-TODO: There was this code on STOP, not sure if we still need it
+       ocrSchedulerObject_t *schedObj = (ocrSchedulerObject_t*)self;
+       ocrSchedulerObjectFactory_t *fact = self->scheduler->pd->schedulerObjectFactories[schedObj->fctId];
+       ASSERT(wstSchedulerObjectCount(fact, schedObj, 0) == 0);
+    */
 }
-
-#if 0
-void wstSchedulerObjectRootBegin(ocrSchedulerObjectRoot_t * self) {
-    u32 i;
-    ASSERT(self->scheduler);
-    ocrPolicyDomain_t *pd = self->scheduler->pd;
-    for (i = 0; i < pd->schedulerObjectFactoryCount; i++)
-        pd->schedulerObjectFactories[i]->pd = pd;
-    return;
-}
-
-void wstSchedulerObjectRootStart(ocrSchedulerObjectRoot_t * self) {
-    u32 i;
-    ocrScheduler_t *scheduler = self->scheduler;
-    ocrPolicyDomain_t *pd = scheduler->pd;
-
-    ocrSchedulerObjectRootWst_t *wstRootSchedObj = (ocrSchedulerObjectRootWst_t*)self;
-    wstRootSchedObj->numDeques = scheduler->contextCount;
-    wstRootSchedObj->deques = (ocrSchedulerObject_t**)pd->fcts.pdMalloc(pd, wstRootSchedObj->numDeques * sizeof(ocrSchedulerObject_t*));
-#ifdef ENABLE_SCHEDULER_OBJECT_DEQ
-    //Instantiate the deque schedulerObjects
-    paramListSchedulerObjectDeq_t params;
-    params.base.kind = OCR_SCHEDULER_OBJECT_DEQUE;
-    params.base.count = 1;
-    params.type = WORK_STEALING_DEQUE;
-    ocrSchedulerObjectFactory_t *dequeFactory = pd->schedulerObjectFactories[schedulerObjectDeq_id];
-    for (i = 0; i < wstRootSchedObj->numDeques; i++) {
-        wstRootSchedObj->deques[i] = dequeFactory->fcts.create(dequeFactory, (ocrParamList_t*)(&params));
-    }
-#else
-    ASSERT(0);
-#endif
-    return;
-}
-
-void wstSchedulerObjectRootStop(ocrSchedulerObjectRoot_t * self, ocrRunLevel_t newRl, u32 action) {
-    switch(newRl) {
-        case RL_STOP: {
-            ocrSchedulerObject_t *schedObj = (ocrSchedulerObject_t*)self;
-            ocrSchedulerObjectFactory_t *fact = self->scheduler->pd->schedulerObjectFactories[schedObj->fctId];
-            ASSERT(wstSchedulerObjectCount(fact, schedObj, 0) == 0);
-
-            break;
-        }
-        case RL_SHUTDOWN: {
-            break;
-        }
-        default:
-            ASSERT("Unknown runlevel in stop function");
-    }
-}
-#endif
 
 void wstSchedulerObjectRootDestruct(ocrSchedulerObjectRoot_t *self) {
-    u32 i;
-    ocrPolicyDomain_t *pd = self->scheduler->pd;
-    ocrSchedulerObjectRootWst_t *wstRootSchedObj = (ocrSchedulerObjectRootWst_t*)self;
-    for (i = 0; i < wstRootSchedObj->numDeques; i++) {
-        ocrSchedulerObject_t *deque = wstRootSchedObj->deques[i];
-        ocrSchedulerObjectFactory_t *dequeFactory = pd->schedulerObjectFactories[deque->fctId];
-        dequeFactory->fcts.destruct(dequeFactory, wstRootSchedObj->deques[i]);
-    }
-    pd->fcts.pdFree(pd, wstRootSchedObj->deques);
     runtimeChunkFree((u64)self, NULL);
-    return;
 }
 
 /******************************************************/
-/* OCR-WST SCHEDULER_OBJECT FACTORY FUNCTIONS                */
+/* OCR-WST SCHEDULER_OBJECT FACTORY FUNCTIONS         */
 /******************************************************/
 
 void destructSchedulerObjectRootFactoryWst(ocrSchedulerObjectFactory_t * factory) {

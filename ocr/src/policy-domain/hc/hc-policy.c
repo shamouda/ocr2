@@ -108,16 +108,21 @@ u8 hcPdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
     u32 i, j, phaseCount, maxCount;
     u8 toReturn = 0;
     u32 origProperties = properties;
+    u32 propertiesPreComputes = properties;
 
     ocrPolicyDomainHc_t* rself = (ocrPolicyDomainHc_t*)policy;
     // Check properties
-    u8 amNodeMaster = properties & RL_NODE_MASTER;
-    u8 amPDMaster = properties & RL_PD_MASTER;
+    u32 amNodeMaster = properties & RL_NODE_MASTER;
+    u32 amPDMaster = properties & RL_PD_MASTER;
     properties &= ~(RL_NODE_MASTER); // Strip out this from the rest; only valuable for the PD and some
                                      // specific workers
 
-    u8 fromPDMsg = properties & RL_FROM_MSG;
+    u32 fromPDMsg = properties & RL_FROM_MSG;
     properties &= ~RL_FROM_MSG; // Strip this out from the rest; only valuable for the PD
+
+    // This is important before computes (some modules may do something different for the first thread)
+    propertiesPreComputes = properties;
+    if(amPDMaster) propertiesPreComputes |= RL_PD_MASTER;
 
     if(!(fromPDMsg)) {
         // RL changes called directly through switchRunlevel should
@@ -126,7 +131,7 @@ u8 hcPdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
         ASSERT(amNodeMaster || (runlevel <= RL_PD_OK));
 
         // If this is direct function call, it should only be a request
-        ASSERT((properties & RL_REQUEST) && !(properties & (RL_RESPONSE | RL_REQUEST)))
+        ASSERT((properties & RL_REQUEST) && !(properties & (RL_RESPONSE | RL_RELEASE)))
     }
 
     switch(runlevel) {
@@ -135,8 +140,8 @@ u8 hcPdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
         // Are we bringing the machine up
         if(properties & RL_BRING_UP) {
             for(i = 0; i < RL_MAX; ++i) {
-                for(j = 0; j < RL_PHASE_MAX; ++i) {
-                    policy->phasesPerRunlevel[i][j] = 1; // One phase for everything at least
+                for(j = 0; j < RL_PHASE_MAX; ++j) {
+                    policy->phasesPerRunlevel[i][j] = (1<<16) + 1; // One phase for everything at least
                 }
             }
 
@@ -148,24 +153,32 @@ u8 hcPdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
         // Both cases
         maxCount = policy->workerCount;
         for(i = 0; i < phaseCount; ++i) {
-            if(!toReturn) break;
-            toReturn |= helperSwitchInert(policy, runlevel, i, properties);
+            if(toReturn) break;
+            toReturn |= helperSwitchInert(policy, runlevel, i, propertiesPreComputes);
             for(j = 0; j < maxCount; ++j) {
                 toReturn |= policy->workers[j]->fcts.switchRunlevel(
-                    policy->workers[j], policy, runlevel, i, properties, NULL, 0);
+                    policy->workers[j], policy, runlevel, i, propertiesPreComputes, NULL, 0);
             }
         }
         if(toReturn) {
-            DPRINTF(DEBUG_LVL_WARN, "RL_CONFIG_PARSE(%d) phase %d failed: %d\n", properties, i-1, toReturn);
+            DPRINTF(DEBUG_LVL_WARN, "RL_CONFIG_PARSE(%d) phase %d failed: %d\n", propertiesPreComputes, i-1, toReturn);
         }
 
         if((!toReturn) && (properties & RL_BRING_UP)) {
-            // Coalesce the phasesPerRunLevel
+            // Coalesce the phasesPerRunLevel by taking the maximum
             for(i = 0; i < RL_MAX; ++i) {
+                u32 finalCount = policy->phasesPerRunlevel[i][0];
                 for(j = 1; j < RL_PHASE_MAX; ++j) {
-                    if(policy->phasesPerRunlevel[i][j] > policy->phasesPerRunlevel[i][0])
-                        policy->phasesPerRunlevel[i][0] = policy->phasesPerRunlevel[i][j];
+                    // Deal with UP phase count
+                    u32 newCount = 0;
+                    newCount = (policy->phasesPerRunlevel[i][j] & 0xFFFF) > (finalCount & 0xFFFF)?
+                        (policy->phasesPerRunlevel[i][j] & 0xFFFF):(finalCount & 0xFFFF);
+                    // And now the DOWN phase count
+                    newCount |= ((policy->phasesPerRunlevel[i][j] >> 16) > (finalCount >> 16)?
+                        (policy->phasesPerRunlevel[i][j] >> 16):(finalCount >> 16)) << 16;
+                    finalCount = newCount;
                 }
+                policy->phasesPerRunlevel[i][0] = finalCount;
             }
         }
         break;
@@ -174,18 +187,18 @@ u8 hcPdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
     {
         // In this single PD implementation, nothing specific to do (just pass it down)
         // In general, this is when you setup communication
-        phaseCount = (policy->phasesPerRunlevel[RL_NETWORK_OK][0] >> (properties&RL_TEAR_DOWN)?16:0) & 0xFFFF;
+        phaseCount = ((policy->phasesPerRunlevel[RL_NETWORK_OK][0]) >> ((properties&RL_TEAR_DOWN)?16:0)) & 0xFFFF;
         maxCount = policy->workerCount;
         for(i = 0; i < phaseCount; ++i) {
-            if(!toReturn) break;
-            toReturn |= helperSwitchInert(policy, runlevel, i, properties);
+            if(toReturn) break;
+            toReturn |= helperSwitchInert(policy, runlevel, i, propertiesPreComputes);
             for(j = 0; j < maxCount; ++j) {
                 toReturn |= policy->workers[j]->fcts.switchRunlevel(
-                    policy->workers[j], policy, runlevel, i, properties, NULL, 0);
+                    policy->workers[j], policy, runlevel, i, propertiesPreComputes, NULL, 0);
             }
         }
         if(toReturn) {
-            DPRINTF(DEBUG_LVL_WARN, "RL_NETWORK_OK(%d) phase %d failed: %d\n", properties, i-1, toReturn);
+            DPRINTF(DEBUG_LVL_WARN, "RL_NETWORK_OK(%d) phase %d failed: %d\n", propertiesPreComputes, i-1, toReturn);
         }
         break;
     }
@@ -195,20 +208,20 @@ u8 hcPdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
         // In general, you need to:
         //     - if not amNodeMaster, start a worker for this PD
         //     - that worker (or the master one) needs to then transition all inert modules to PD_OK
-        phaseCount = (policy->phasesPerRunlevel[RL_PD_OK][0] >> (properties&RL_TEAR_DOWN)?16:0) & 0xFFFF;
+        phaseCount = ((policy->phasesPerRunlevel[RL_PD_OK][0]) >> ((properties&RL_TEAR_DOWN)?16:0)) & 0xFFFF;
 
         maxCount = policy->workerCount;
         for(i = 0; i < phaseCount; ++i) {
-            if(!toReturn) break;
-            toReturn |= helperSwitchInert(policy, runlevel, i, properties);
+            if(toReturn) break;
+            toReturn |= helperSwitchInert(policy, runlevel, i, propertiesPreComputes);
             for(j = 0; j < maxCount; ++j) {
                 toReturn |= policy->workers[j]->fcts.switchRunlevel(
-                    policy->workers[j], policy, runlevel, i, properties, NULL, 0);
+                    policy->workers[j], policy, runlevel, i, propertiesPreComputes, NULL, 0);
             }
         }
 
         if(toReturn) {
-            DPRINTF(DEBUG_LVL_WARN, "RL_PD_OK(%d) phase %d failed: %d\n", properties, i-1, toReturn);
+            DPRINTF(DEBUG_LVL_WARN, "RL_PD_OK(%d) phase %d failed: %d\n", propertiesPreComputes, i-1, toReturn);
         }
         break;
     }
@@ -234,11 +247,11 @@ u8 hcPdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
             maxCount = policy->workerCount;
 
             for(i = 0; i < phaseCount; ++i) {
-                if(!toReturn) break;
-                toReturn |= helperSwitchInert(policy, runlevel, i, properties);
+                if(toReturn) break;
+                toReturn |= helperSwitchInert(policy, runlevel, i, propertiesPreComputes);
                 for(j = 0; j < maxCount; ++j) {
                     toReturn |= policy->workers[j]->fcts.switchRunlevel(
-                        policy->workers[j], policy, runlevel, i, properties, NULL, 0);
+                        policy->workers[j], policy, runlevel, i, propertiesPreComputes, NULL, 0);
                 }
                 if(i == phaseCount - 2) {
                     // I "guidify" myself right before the last phase
@@ -253,11 +266,11 @@ u8 hcPdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
             maxCount = policy->workerCount;
             ASSERT(phaseCount > 1); // Need two phases at least
             for(i = 0; i < phaseCount; ++i) {
-                if(!toReturn) break;
-                toReturn |= helperSwitchInert(policy, runlevel, i, properties);
+                if(toReturn) break;
+                toReturn |= helperSwitchInert(policy, runlevel, i, propertiesPreComputes);
                 for(j = 0; j < maxCount; ++j) {
                     toReturn |= policy->workers[j]->fcts.switchRunlevel(
-                        policy->workers[j], policy, runlevel, i, properties, NULL, 0);
+                        policy->workers[j], policy, runlevel, i, propertiesPreComputes, NULL, 0);
                 }
                 if(i == 0) {
                     // TODO Destroy my GUID
@@ -267,25 +280,25 @@ u8 hcPdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
         }
 
         if(toReturn) {
-            DPRINTF(DEBUG_LVL_WARN, "RL_GUID_OK(%d) phase %d failed: %d\n", properties, i-1, toReturn);
+            DPRINTF(DEBUG_LVL_WARN, "RL_GUID_OK(%d) phase %d failed: %d\n", propertiesPreComputes, i-1, toReturn);
         }
         break;
     }
     case RL_MEMORY_OK:
     {
-        phaseCount = (policy->phasesPerRunlevel[RL_MEMORY_OK][0] >> (properties&RL_TEAR_DOWN)?16:0) & 0xFFFF;
+        phaseCount = ((policy->phasesPerRunlevel[RL_MEMORY_OK][0]) >> ((properties&RL_TEAR_DOWN)?16:0)) & 0xFFFF;
 
         maxCount = policy->workerCount;
         for(i = 0; i < phaseCount; ++i) {
-            if(!toReturn) break;
-            toReturn |= helperSwitchInert(policy, runlevel, i, properties);
+            if(toReturn) break;
+            toReturn |= helperSwitchInert(policy, runlevel, i, propertiesPreComputes);
             for(j = 0; j < maxCount; ++j) {
                 toReturn |= policy->workers[j]->fcts.switchRunlevel(
-                    policy->workers[j], policy, runlevel, i, properties, NULL, 0);
+                    policy->workers[j], policy, runlevel, i, propertiesPreComputes, NULL, 0);
             }
         }
         if(toReturn) {
-            DPRINTF(DEBUG_LVL_WARN, "RL_MEMORY_OK(%d) phase %d failed: %d\n", properties, i-1, toReturn);
+            DPRINTF(DEBUG_LVL_WARN, "RL_MEMORY_OK(%d) phase %d failed: %d\n", propertiesPreComputes, i-1, toReturn);
         }
         break;
     }
@@ -312,7 +325,8 @@ u8 hcPdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
 
                 // Worker 0 is considered the capable one by convention
                 toReturn |= policy->workers[0]->fcts.switchRunlevel(
-                    policy->workers[0], policy, runlevel, i, properties | RL_PD_MASTER, &hcWorkerCallback, RL_COMPUTE_OK << 16);
+                    policy->workers[0], policy, runlevel, i, properties | RL_PD_MASTER | RL_BLESSED,
+                    &hcWorkerCallback, RL_COMPUTE_OK << 16);
 
                 for(j = 1; j < maxCount; ++j) {
                     toReturn |= policy->workers[j]->fcts.switchRunlevel(
@@ -351,7 +365,8 @@ u8 hcPdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
 
                 // Worker 0 is considered the capable one by convention
                 toReturn |= policy->workers[0]->fcts.switchRunlevel(
-                    policy->workers[0], policy, runlevel, i, properties | RL_PD_MASTER, &hcWorkerCallback, RL_COMPUTE_OK << 16);
+                    policy->workers[0], policy, runlevel, i, properties | RL_PD_MASTER | RL_BLESSED,
+                    &hcWorkerCallback, RL_COMPUTE_OK << 16);
 
                 for(j = 1; j < maxCount; ++j) {
                     toReturn |= policy->workers[j]->fcts.switchRunlevel(
@@ -372,7 +387,7 @@ u8 hcPdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
 
                 toReturn |= helperSwitchInert(policy, runlevel, phaseCount - 1, properties);
                 toReturn |= policy->workers[0]->fcts.switchRunlevel(
-                    policy->workers[0], policy, runlevel, phaseCount - 1, properties | RL_PD_MASTER, NULL, 0);
+                    policy->workers[0], policy, runlevel, phaseCount - 1, properties | RL_PD_MASTER | RL_BLESSED, NULL, 0);
                 for(j = 1; j < maxCount; ++j) {
                     toReturn |= policy->workers[j]->fcts.switchRunlevel(
                         policy->workers[j], policy, runlevel, i, properties, NULL, 0);
@@ -391,7 +406,7 @@ u8 hcPdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
             phaseCount = RL_GET_PHASE_COUNT_UP(policy, RL_USER_OK);
             maxCount = policy->workerCount;
             for(i = 0; i < phaseCount; ++i) {
-                if(!toReturn) break;
+                if(toReturn) break;
                 toReturn |= helperSwitchInert(policy, runlevel, i, properties);
                 for(j = 1; j < maxCount; ++j) {
                     // We start them in an async manner but don't need any callback (ie: we
@@ -401,7 +416,7 @@ u8 hcPdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
                 }
                 // Always do the capable worker last in this case (it will actualy start doing something useful)
                 toReturn |= policy->workers[0]->fcts.switchRunlevel(
-                    policy->workers[0], policy, runlevel, i, properties | RL_PD_MASTER, NULL, 0);
+                    policy->workers[0], policy, runlevel, i, properties | RL_PD_MASTER | RL_BLESSED, NULL, 0);
                 // When I drop out of this, I should be in RL_COMPUTE_OK at phase 0
                 // wait for everyone to check in so that I can continue shutting down
                 DPRINTF(DEBUG_LVL_VVERB, "PD_MASTER worker dropped out... waiting for others to complete RL\n");
@@ -430,7 +445,8 @@ u8 hcPdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
 
                 // Worker 0 is considered the capable one by convention
                 toReturn |= policy->workers[0]->fcts.switchRunlevel(
-                    policy->workers[0], policy, runlevel, i, properties | RL_PD_MASTER, &hcWorkerCallback, RL_COMPUTE_OK << 16);
+                    policy->workers[0], policy, runlevel, i, properties | RL_PD_MASTER | RL_BLESSED,
+                    &hcWorkerCallback, RL_COMPUTE_OK << 16);
 
                 for(j = 1; j < maxCount; ++j) {
                     toReturn |= policy->workers[j]->fcts.switchRunlevel(

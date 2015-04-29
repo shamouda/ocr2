@@ -42,18 +42,18 @@ typedef enum _ocrRLPhaseComponents_t {
 } ocrRLPhaseComponents_t;
 
 /* Flags for runlevels */
-#define RL_REQUEST     0x0  /**< Only used in policy message: request to change run-level */
-#define RL_RESPONSE    0x1  /**< Only used in policy message: in the case of a RL_BARRIER message, respond that RL transitioned */
-#define RL_RELEASE     0x2  /**< Only used in policy message: in the case of a RL_BARRIER message, release from the barrier */
-#define RL_ASYNC       0x0  /**< Set if the caller can proceed even if the runlevel change is not complete */
-#define RL_BARRIER     0x4  /**< Set if the caller should wait for the callee to return from the runlevel change */
-#define RL_BRING_UP    0x0  /**< Set if this is for OCR bring-up */
-#define RL_TEAR_DOWN   0x8  /**< Set if this is for OCR tear-down */
-#define RL_PD_MASTER   0x10 /**< Set if the thread is the first capable thread of a PD */
-#define RL_NODE_MASTER 0x30 /**< Set if the thread is the first on the node (potentially starts multiple PDs);
+#define RL_REQUEST     0x1  /**< Only used in policy message: request to change run-level */
+#define RL_RESPONSE    0x2  /**< Only used in policy message: in the case of a RL_BARRIER message, respond that RL transitioned */
+#define RL_RELEASE     0x4  /**< Only used in policy message: in the case of a RL_BARRIER message, release from the barrier */
+#define RL_ASYNC       0x10  /**< Set if the caller can proceed even if the runlevel change is not complete */
+#define RL_BARRIER     0x20  /**< Set if the caller should wait for the callee to return from the runlevel change */
+#define RL_BRING_UP    0x100  /**< Set if this is for OCR bring-up */
+#define RL_TEAR_DOWN   0x200  /**< Set if this is for OCR tear-down */
+#define RL_PD_MASTER   0x1000 /**< Set if the thread is the first capable thread of a PD */
+#define RL_NODE_MASTER 0x3000 /**< Set if the thread is the first on the node (potentially starts multiple PDs);
                              * implies RL_PD_MASTER */
-#define RL_BLESSED     0x40 /**< Set if the worker is the blessed worker that should initialize mainEdt */
-#define RL_FROM_MSG    0x80 /**< Set if the transition came from another PD or was triggered internally
+#define RL_BLESSED     0x4000 /**< Set if the worker is the blessed worker that should initialize mainEdt */
+#define RL_FROM_MSG    0x8000 /**< Set if the transition came from another PD or was triggered internally
                                  (as opposed to being called directly using switchRunlevel on the PD).
                                  This implies that the switchRunlevel PD call should return and not wait
                                  for the transition*/

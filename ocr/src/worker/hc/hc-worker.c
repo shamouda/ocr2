@@ -232,7 +232,7 @@ u8 hcWorkerSwitchRunlevel(ocrWorker_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_
             self->desiredState = RL_COMPUTE_OK << 16;
 
             // See if we are blessed
-            self->amBlessed = (properties & RL_BLESSED);
+            self->amBlessed = (properties & RL_BLESSED) != 0;
 
             if(!(properties & RL_PD_MASTER)) {
                 self->callback = callback;
@@ -241,6 +241,8 @@ u8 hcWorkerSwitchRunlevel(ocrWorker_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_
                 toReturn |= self->computes[0]->fcts.switchRunlevel(self->computes[0], PD, runlevel, phase, properties,
                                                                    NULL, 0);
             } else {
+                // First set our current environment (this is usually done by the new thread's startup code)
+                self->computes[0]->fcts.setCurrentEnv(self->computes[0], self->pd, self);
                 // We just directly call the callback after switching our underlying target
                 toReturn |= self->computes[0]->fcts.switchRunlevel(self->computes[0], PD, runlevel, phase, properties,
                                                                    NULL, 0);
@@ -278,7 +280,7 @@ u8 hcWorkerSwitchRunlevel(ocrWorker_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_
             }
             // At this point, the original capable thread goes to work
             // It will exit in the RL_MEMORY_OK state.
-            if((properties & RL_PD_MASTER) && phase == RL_GET_PHASE_COUNT_UP(PD, RL_USER_OK)) {
+            if((properties & RL_PD_MASTER) && phase == RL_GET_PHASE_COUNT_UP(PD, RL_USER_OK) - 1) {
                 self->curState = RL_USER_OK << 16;
                 workerLoop(self);
             }

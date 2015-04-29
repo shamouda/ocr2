@@ -106,21 +106,91 @@ u8 hcSchedulerSwitchRunlevel(ocrScheduler_t *self, ocrPolicyDomain_t *PD, ocrRun
            && !(properties & RL_RELEASE));
     ASSERT(!(properties & RL_FROM_MSG));
 
+    u64 i;
+    if(runlevel == RL_CONFIG_PARSE && (properties & RL_BRING_UP) && phase == 0) {
+        // First transition, setup some backpointers
+        self->rootObj->scheduler = self;
+        for(i = 0; i < self->schedulerHeuristicCount; ++i) {
+            self->schedulerHeuristics[i]->scheduler = self;
+        }
+    }
+
+    // Take care of all other sub-objects
+    for(i = 0; i < self->workpileCount; ++i) {
+        toReturn |= self->workpiles[i]->fcts.switchRunlevel(
+            self->workpiles[i], PD, runlevel, phase, properties, NULL, 0);
+    }
+    toReturn |= self->rootObj->fcts.switchRunlevel(self->rootObj, PD, runlevel, phase,
+                                                  properties, NULL, 0);
+    for(i = 0; i < self->schedulerHeuristicCount; ++i) {
+        toReturn |= self->schedulerHeuristics[i]->fcts.switchRunlevel(
+            self->schedulerHeuristics[i], PD, runlevel, phase, properties, NULL, 0);
+    }
+
     switch(runlevel) {
     case RL_CONFIG_PARSE:
         // On bring-up: Update PD->phasesPerRunlevel on phase 0
         // and check compatibility on phase 1
+        if((properties & RL_BRING_UP) && phase == 0) {
+            RL_ENSURE_PHASE_UP(PD, RL_GUID_OK, RL_PHASE_SCHEDULER, 2);
+            RL_ENSURE_PHASE_DOWN(PD, RL_GUID_OK, RL_PHASE_SCHEDULER, 2);
+            RL_ENSURE_PHASE_UP(PD, RL_MEMORY_OK, RL_PHASE_SCHEDULER, 2);
+            RL_ENSURE_PHASE_DOWN(PD, RL_MEMORY_OK, RL_PHASE_SCHEDULER, 2);
+        }
         break;
     case RL_NETWORK_OK:
-        // Nothing
         break;
     case RL_PD_OK:
+        if(properties & RL_BRING_UP) {
+            self->pd = PD;
+        }
         break;
     case RL_GUID_OK:
-        // Nothing to do
+        if(properties & RL_BRING_UP) {
+            if(phase == RL_GET_PHASE_COUNT_UP(self->pd, RL_GUID_OK) - 1) {
+                // Get a GUID
+                guidify(self->pd, (u64)self, &(self->fguid), OCR_GUID_SCHEDULER);
+                self->contextCount = self->pd->workerCount;
+            }
+        } else {
+            // Tear down
+            if(phase == 0) {
+                PD_MSG_STACK(msg);
+                getCurrentEnv(NULL, NULL, NULL, &msg);
+#define PD_MSG (&msg)
+#define PD_TYPE PD_MSG_GUID_DESTROY
+                msg.type = PD_MSG_GUID_DESTROY | PD_MSG_REQUEST;
+                PD_MSG_FIELD_I(guid) = self->fguid;
+                PD_MSG_FIELD_I(properties) = 0;
+                // Ignore failure, probably shutting down
+                toReturn |= self->pd->fcts.processMessage(self->pd, &msg, false);
+                self->fguid.guid = NULL_GUID;
+#undef PD_MSG
+#undef PD_TYPE
+            }
+        }
         break;
     case RL_MEMORY_OK:
-        // Nothing to do
+        if((properties & RL_BRING_UP) && phase == RL_GET_PHASE_COUNT_UP(self->pd, RL_MEMORY_OK) -1) {
+            // allocate steal iterator cache. Use pdMalloc since this is something
+            // local to the policy domain and that will never be shared
+            hcWorkpileIterator_t * stealIteratorsCache = self->pd->fcts.pdMalloc(
+                self->pd, sizeof(hcWorkpileIterator_t)*self->workpileCount);
+
+            // Initialize steal iterator cache
+            for(i = 0; i < self->workpileCount; ++i) {
+                // Note: here we assume workpile 'i' will match worker 'i' => Not great
+                initWorkpileIterator(&(stealIteratorsCache[i]), i, self->workpileCount,
+                                     self->workpiles);
+            }
+            ocrSchedulerHc_t * derived = (ocrSchedulerHc_t *) self;
+            derived->stealIterators = stealIteratorsCache;
+        }
+
+        if((properties & RL_TEAR_DOWN) && phase == 0) {
+            ocrSchedulerHc_t *derived = (ocrSchedulerHc_t*)self;
+            self->pd->fcts.pdFree(self->pd, derived->stealIterators);
+        }
         break;
     case RL_COMPUTE_OK:
         // We can allocate our map here because the memory is up
@@ -133,127 +203,6 @@ u8 hcSchedulerSwitchRunlevel(ocrScheduler_t *self, ocrPolicyDomain_t *PD, ocrRun
     }
     return toReturn;
 }
-
-#if 0
-void hcSchedulerBegin(ocrScheduler_t * self, ocrPolicyDomain_t * PD) {
-    u64 workpileCount = self->workpileCount;
-    u64 i;
-    for(i = 0; i < workpileCount; ++i) {
-        self->workpiles[i]->fcts.begin(self->workpiles[i], PD);
-    }
-
-    self->pd = PD;
-    self->rootObj->scheduler = self;
-    self->rootObj->fcts.begin(self->rootObj);
-
-    u64 schedulerHeuristicCount = self->schedulerHeuristicCount;
-    for(i = 0; i < schedulerHeuristicCount; ++i) {
-        self->schedulerHeuristics[i]->scheduler = self;
-        self->schedulerHeuristics[i]->fcts.begin(self->schedulerHeuristics[i]);
-    }
-}
-
-void hcSchedulerStart(ocrScheduler_t * self, ocrPolicyDomain_t * PD) {
-
-    // Get a GUID
-    guidify(PD, (u64)self, &(self->fguid), OCR_GUID_SCHEDULER);
-    self->contextCount = PD->workerCount;
-
-    u64 workpileCount = self->workpileCount;
-    u64 i;
-    for(i = 0; i < workpileCount; ++i) {
-        self->workpiles[i]->fcts.start(self->workpiles[i], PD);
-    }
-
-    //schedulerObject state
-    self->rootObj->fcts.start(self->rootObj);
-
-    //scheduler heuristics
-    u64 schedulerHeuristicCount = self->schedulerHeuristicCount;
-    for(i = 0; i < schedulerHeuristicCount; ++i) {
-        self->schedulerHeuristics[i]->fcts.start(self->schedulerHeuristics[i]);
-    }
-
-    //workpiles
-    ocrWorkpile_t ** workpiles = self->workpiles;
-
-    // allocate steal iterator cache. Use pdMalloc since this is something
-    // local to the policy domain and that will never be shared
-    hcWorkpileIterator_t * stealIteratorsCache = PD->fcts.pdMalloc(
-                PD, sizeof(hcWorkpileIterator_t)*workpileCount);
-
-    // Initialize steal iterator cache
-    i = 0;
-    while(i < workpileCount) {
-        // Note: here we assume workpile 'i' will match worker 'i' => Not great
-        initWorkpileIterator(&(stealIteratorsCache[i]), i, workpileCount, workpiles);
-        ++i;
-    }
-    ocrSchedulerHc_t * derived = (ocrSchedulerHc_t *) self;
-    derived->stealIterators = stealIteratorsCache;
-}
-
-void hcSchedulerStop(ocrScheduler_t * self, ocrRunLevel_t newRl, u32 action) {
-    switch(newRl) {
-        case RL_STOP: {
-            // Stop the workpiles
-            u64 i = 0;
-            u64 count = self->workpileCount;
-            for(i = 0; i < count; ++i) {
-                self->workpiles[i]->fcts.stop(self->workpiles[i], newRl, action);
-            }
-
-            self->rootObj->fcts.stop(self->rootObj, newRl, action);
-
-            u64 schedulerHeuristicCount = self->schedulerHeuristicCount;
-            for(i = 0; i < schedulerHeuristicCount; ++i) {
-                self->schedulerHeuristics[i]->fcts.stop(self->schedulerHeuristics[i], newRl, action);
-            }
-            break;
-        }
-        case RL_SHUTDOWN: {
-            ocrPolicyDomain_t *pd = NULL;
-            PD_MSG_STACK(msg);
-            getCurrentEnv(&pd, NULL, NULL, &msg);
-
-            // We need to destroy the stealIterators now because pdFree does not
-            // exist after stop
-            ocrSchedulerHc_t * derived = (ocrSchedulerHc_t *) self;
-            pd->fcts.pdFree(pd, derived->stealIterators);
-
-            // Destroy the GUID
-        #define PD_MSG (&msg)
-        #define PD_TYPE PD_MSG_GUID_DESTROY
-            msg.type = PD_MSG_GUID_DESTROY | PD_MSG_REQUEST;
-            PD_MSG_FIELD_I(guid) = self->fguid;
-            PD_MSG_FIELD_I(guid.metaDataPtr) = self;
-            PD_MSG_FIELD_I(properties) = 0;
-            // Ignore failure, probably shutting down
-            pd->fcts.processMessage(pd, &msg, false);
-        #undef PD_MSG
-        #undef PD_TYPE
-            self->fguid.guid = UNINITIALIZED_GUID;
-            break;
-
-            u64 i = 0;
-            u64 count = self->workpileCount;
-            for(i = 0; i < count; ++i) {
-                self->workpiles[i]->fcts.stop(self->workpiles[i], newRl, action);
-            }
-
-            self->rootObj->fcts.stop(self->rootObj, newRl, action);
-
-            u64 schedulerHeuristicCount = self->schedulerHeuristicCount;
-            for(i = 0; i < schedulerHeuristicCount; ++i) {
-                self->schedulerHeuristics[i]->fcts.stop(self->schedulerHeuristics[i], newRl, action);
-            }
-            break;
-        }
-        default:
-            ASSERT("Unknown runlevel in stop function");
-    }
-}
-#endif
 
 u8 hcSchedulerTakeEdt (ocrScheduler_t *self, u32 *count, ocrFatGuid_t *edts) {
     // Source must be a worker guid and we rely on indices to map

@@ -140,8 +140,14 @@ u8 pthreadSwitchRunlevel(ocrCompPlatform_t *self, ocrPolicyDomain_t *PD, ocrRunl
     case RL_NETWORK_OK:
         break;
     case RL_PD_OK:
-        if(properties & RL_BRING_UP)
+        if(properties & RL_BRING_UP) {
             self->pd = PD;
+            if(properties & RL_PD_MASTER) {
+                // We need to make sure we have the current environment set
+                // at least partially as the PD may be used
+                self->fcts.setCurrentEnv(self, self->pd, NULL);
+            }
+        }
         break;
     case RL_GUID_OK:
         break;
