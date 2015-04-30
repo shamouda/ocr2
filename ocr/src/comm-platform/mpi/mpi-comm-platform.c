@@ -450,22 +450,12 @@ u8 MPICommPollMessageInternal(ocrCommPlatform_t *self, ocrPolicyMsg_t **msg,
 u8 MPICommPollMessage(ocrCommPlatform_t *self, ocrPolicyMsg_t **msg,
                       u32 properties, u32 *mask) {
     ocrCommPlatformMPI_t * mpiComm = ((ocrCommPlatformMPI_t *) self);
-    switch(mpiComm->rl) {
-        case RL_RUNNING_USER:
-        case RL_RUNNING_RT:
-        {
-            return MPICommPollMessageInternal(self, msg, properties, mask);
-        }
-        default:
-        {
-            // Not supposed to be polled outside above runlevels
-            DPRINTF(DEBUG_LVL_WARN,"[MPI %d] Illegal RL[%d] reached in MPI-comm-platform pollMessage\n",
-                    mpiRankToLocation(self->pd->myLocation), mpiComm->rl);
-            ASSERT(false);
-        }
-    }
-    // shouldn't return because of the assert in default
-    return POLL_NO_MESSAGE;
+    // Not supposed to be polled outside RL_USER_OK
+    ASSERT_BLOCK_BEGIN(((mpiComm->curState >> 16) == RL_USER_OK))
+    DPRINTF(DEBUG_LVL_WARN,"[MPI %d] Illegal runlevel[%d] reached in MPI-comm-platform pollMessage\n",
+            mpiRankToLocation(self->pd->myLocation), (mpiComm->curState >> 16));
+    ASSERT_BLOCK_END
+    return MPICommPollMessageInternal(self, msg, properties, mask);
 }
 
 u8 MPICommWaitMessage(ocrCommPlatform_t *self, ocrPolicyMsg_t **msg,
@@ -478,117 +468,117 @@ u8 MPICommWaitMessage(ocrCommPlatform_t *self, ocrPolicyMsg_t **msg,
     return ret;
 }
 
-
-//
-// Comm-platform life-cycle
-//
-
-void MPICommBegin(ocrCommPlatform_t * self, ocrPolicyDomain_t * pd, ocrCommApi_t *commApi) {
-    //Initialize base
-    self->pd = pd;
-    //DIST-TODO location: both commPlatform and worker have a location, are the supposed to be the same ?
-    int nbRanks=0;
-    int rank=0;
-    MPI_Comm_size(MPI_COMM_WORLD, &nbRanks);
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    DPRINTF(DEBUG_LVL_VERB,"[MPI %d] comm-platform starts\n", rank);
-    pd->myLocation = locationToMpiRank(rank);
-    return;
-}
-
-void MPICommStart(ocrCommPlatform_t * self, ocrPolicyDomain_t * pd, ocrCommApi_t *commApi) {
-    //DIST-TODO: multi-comm-worker: multi-initialization if multiple comm-worker
-    //Initialize mpi comm internal queues
+u8 MPICommSwitchRunlevel(ocrCommPlatform_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
+                                u32 phase, u32 properties, void (*callback)(ocrPolicyDomain_t*, u64), u64 val) {
     ocrCommPlatformMPI_t * mpiComm = ((ocrCommPlatformMPI_t *) self);
-    mpiComm->msgId = 1;
-    mpiComm->incoming = newLinkedList(pd);
-    mpiComm->outgoing = newLinkedList(pd);
-    mpiComm->incomingIt = mpiComm->incoming->iterator(mpiComm->incoming);
-    mpiComm->outgoingIt = mpiComm->outgoing->iterator(mpiComm->outgoing);
+    u8 toReturn = 0;
+    // Verify properties for this call
+    ASSERT((properties & RL_REQUEST) && !(properties & RL_RESPONSE)
+           && !(properties & RL_RELEASE));
+    ASSERT(!(properties & RL_FROM_MSG));
 
-    // Default max size is customizable through setMaxExpectedMessageSize()
+    switch(runlevel) {
+    case RL_CONFIG_PARSE:
+        // On bring-up: Update PD->phasesPerRunlevel on phase 0
+        // and check compatibility on phase 1
+        break;
+    case RL_NETWORK_OK:
+        // Nothing
+        break;
+    case RL_PD_OK:
+        if ((properties & RL_BRING_UP) && RL_IS_FIRST_PHASE_UP(self->pd, RL_PD_OK, phase)) {
+            //Initialize base
+            self->pd = PD;
+            //DIST-TODO location: both commPlatform and worker have a location, are the supposed to be the same ?
+            int rank=0;
+            MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+            DPRINTF(DEBUG_LVL_VERB,"[MPI %d] comm-platform starts\n", rank);
+            PD->myLocation = locationToMpiRank(rank);
+        }
+        break;
+    case RL_MEMORY_OK:
+        // Nothing to do
+        break;
+    case RL_GUID_OK:
+        ASSERT(self->pd == PD);
+        if((properties & RL_BRING_UP) && RL_IS_LAST_PHASE_UP(self->pd, RL_GUID_OK, phase)) {
+            //DIST-TODO: multi-comm-worker: multi-initialization if multiple comm-worker
+            //Initialize mpi comm internal queues
+            mpiComm->msgId = 1;
+            mpiComm->incoming = newLinkedList(PD);
+            mpiComm->outgoing = newLinkedList(PD);
+            mpiComm->incomingIt = mpiComm->incoming->iterator(mpiComm->incoming);
+            mpiComm->outgoingIt = mpiComm->outgoing->iterator(mpiComm->outgoing);
+
+//TODO-RL I think this should be moved further down but I need to ensure this is setup
+//before any worker can call into communications when should that be ?
+
+            // Default max size is customizable through setMaxExpectedMessageSize()
 #if STRATEGY_PRE_POST_RECV
-    //DIST-TODO STRATEGY_PRE_POST_RECV doesn't support arbitrary message size
-    mpiComm->maxMsgSize = sizeof(ocrPolicyMsg_t)*2;
+            //DIST-TODO STRATEGY_PRE_POST_RECV doesn't support arbitrary message size
+            mpiComm->maxMsgSize = sizeof(ocrPolicyMsg_t)*2;
 #endif
 #if STRATEGY_PROBE_RECV
-    // Do not need that with probe
-    ASSERT(mpiComm->maxMsgSize == 0);
+            // Do not need that with probe
+            ASSERT(mpiComm->maxMsgSize == 0);
 #endif
-    // Generate the list of known neighbors (All-to-all)
-    //DIST-TODO neighbors: neighbor information should come from discovery or topology description
-    int nbRanks;
-    MPI_Comm_size(MPI_COMM_WORLD, &nbRanks);
-    pd->neighborCount = nbRanks - 1;
-    pd->neighbors = pd->fcts.pdMalloc(pd, sizeof(ocrLocation_t) * pd->neighborCount);
-    int myRank = (int) locationToMpiRank(pd->myLocation);
-    int i = 0;
-    while(i < (nbRanks-1)) {
-        pd->neighbors[i] = mpiRankToLocation((myRank+i+1)%nbRanks);
-        DPRINTF(DEBUG_LVL_VERB,"[MPI %d] Neighbors[%d] is %d\n", myRank, i, pd->neighbors[i]);
-        i++;
-    }
-
+            // Generate the list of known neighbors (All-to-all)
+            //DIST-TODO neighbors: neighbor information should come from discovery or topology description
+            int nbRanks;
+            MPI_Comm_size(MPI_COMM_WORLD, &nbRanks);
+            PD->neighborCount = nbRanks - 1;
+            PD->neighbors = PD->fcts.pdMalloc(PD, sizeof(ocrLocation_t) * PD->neighborCount);
+            int myRank = (int) locationToMpiRank(PD->myLocation);
+            int i = 0;
+            while(i < (nbRanks-1)) {
+                PD->neighbors[i] = mpiRankToLocation((myRank+i+1)%nbRanks);
+                DPRINTF(DEBUG_LVL_VERB,"[MPI %d] Neighbors[%d] is %d\n", myRank, i, PD->neighbors[i]);
+                i++;
+            }
 #if STRATEGY_PRE_POST_RECV
-    // Post a recv any to start listening to incoming communications
-    postRecvAny(self);
+            // Post a recv any to start listening to incoming communications
+            postRecvAny(self);
 #endif
-}
-
-/**
- * @brief Stops the communication platform
- * Guarantees all outgoing sends and non-outstanding recv are done
- */
-void MPICommStop(ocrCommPlatform_t * self, ocrRunLevel_t newRl, u32 action) {
-    ocrCommPlatformMPI_t * mpiComm = ((ocrCommPlatformMPI_t *) self);
-    if (action == RL_ACTION_ENTER) {
-        switch(newRl) {
-            case RL_RUNNING_RT: {
-                ASSERT(mpiComm->rl == RL_RUNNING_USER);
-                mpiComm->rl = RL_RUNNING_RT;
-                break;
-            }
-            case RL_STOP: {
-                ASSERT(mpiComm->rl == RL_RUNNING_RT);
-                mpiComm->rl = RL_STOP;
-                break;
-            }
-            case RL_SHUTDOWN: {
-                ASSERT(mpiComm->rl == RL_STOP);
-                mpiComm->rl = RL_SHUTDOWN;
-                //TODO-RL is this legal wrt pdFree ?
-                // RL0: just cleanup data-structure pdMalloc-ed
-                //NOTE: incoming may have recvs any posted
-                mpiComm->incoming->destruct(mpiComm->incoming);
-                ASSERT(mpiComm->outgoing->isEmpty(mpiComm->outgoing));
-                mpiComm->outgoing->destruct(mpiComm->outgoing);
-                mpiComm->incomingIt->destruct(mpiComm->incomingIt);
-                mpiComm->outgoingIt->destruct(mpiComm->outgoingIt);
-                break;
-            }
-            case RL_DEALLOCATE: {
-                ASSERT(mpiComm->rl == RL_SHUTDOWN);
-                mpiComm->rl = RL_DEALLOCATE;
-                //This should be called only once per rank and
-                //by the same thread that did MPI_Init.
-                platformFinalizeMPIComm();
-                runtimeChunkFree((u64)self, NULL);
-                break;
-            }
-            default:
-                ASSERT("Unknown runlevel in stop function");
         }
-    } else {
-        ASSERT(action == RL_ACTION_EXIT);
-        ASSERT("Unknown runlevel in stop function");
+        if ((properties & RL_TEAR_DOWN) && RL_IS_FIRST_PHASE_DOWN(self->pd, RL_GUID_OK, phase)) {
+            //NOTE: incoming may have recvs any posted
+            //TODO: then shouldn't we clean that up ?
+            mpiComm->incoming->destruct(mpiComm->incoming);
+            ASSERT(mpiComm->outgoing->isEmpty(mpiComm->outgoing));
+            mpiComm->outgoing->destruct(mpiComm->outgoing);
+            mpiComm->incomingIt->destruct(mpiComm->incomingIt);
+            mpiComm->outgoingIt->destruct(mpiComm->outgoingIt);
+        }
+        break;
+    case RL_COMPUTE_OK:
+        PRINTF("MPI comm-api RL_COMPUTE_OK in 0x%x\n", properties);
+        break;
+    case RL_USER_OK:
+        PRINTF("MPI comm-api RL_USER_OK in 0x%x\n", properties);
+        break;
+    default:
+        // Unknown runlevel
+        ASSERT(0);
     }
+    // Store the runlevel/phase in curState for debugging purpose
+    mpiComm->curState = ((runlevel<<16) | phase);
+    if (runlevel == RL_COMPUTE_OK) {
+        PRINTF("MPI RL_COMPUTE_OK set\n");
+    }
+    if (runlevel == RL_USER_OK) {
+        PRINTF("MPI RL_USER_OK set\n");
+    }
+    return toReturn;
 }
 
 //
 // Init and destruct
 //
 
-void MPICommDestruct (ocrCommPlatform_t * base) {
+void MPICommDestruct (ocrCommPlatform_t * self) {
+    //This should be called only once per rank and by the same thread that did MPI_Init.
+    platformFinalizeMPIComm();
+    runtimeChunkFree((u64)self, NULL);
 }
 
 ocrCommPlatform_t* newCommPlatformMPI(ocrCommPlatformFactory_t *factory,
@@ -620,8 +610,7 @@ void initializeCommPlatformMPI(ocrCommPlatformFactory_t * factory, ocrCommPlatfo
     mpiComm->incomingIt = NULL;
     mpiComm->outgoingIt = NULL;
     mpiComm->maxMsgSize = 0;
-    //TODO-RL this should be part of comm-api or base module type
-    mpiComm->rl = RL_RUNNING_USER;
+    mpiComm->curState = 0;
 }
 
 ocrCommPlatformFactory_t *newCommPlatformFactoryMPI(ocrParamList_t *perType) {
@@ -629,14 +618,11 @@ ocrCommPlatformFactory_t *newCommPlatformFactoryMPI(ocrParamList_t *perType) {
         runtimeChunkAlloc(sizeof(ocrCommPlatformFactoryMPI_t), (void *)1);
     base->instantiate = &newCommPlatformMPI;
     base->initialize = &initializeCommPlatformMPI;
-
     base->destruct = FUNC_ADDR(void (*)(ocrCommPlatformFactory_t*), destructCommPlatformFactoryMPI);
+
     base->platformFcts.destruct = FUNC_ADDR(void (*)(ocrCommPlatform_t*), MPICommDestruct);
-    base->platformFcts.begin = FUNC_ADDR(void (*)(ocrCommPlatform_t*, ocrPolicyDomain_t*,
-                                                  ocrCommApi_t*), MPICommBegin);
-    base->platformFcts.start = FUNC_ADDR(void (*)(ocrCommPlatform_t*,ocrPolicyDomain_t*,
-                                                  ocrCommApi_t*), MPICommStart);
-    base->platformFcts.stop = FUNC_ADDR(void (*)(ocrCommPlatform_t*,ocrRunLevel_t,u32), MPICommStop);
+    base->platformFcts.switchRunlevel = FUNC_ADDR(u8 (*)(ocrCommPlatform_t*, ocrPolicyDomain_t*, ocrRunlevel_t,
+                                                  u32, u32, void (*)(ocrPolicyDomain_t*,u64), u64), MPICommSwitchRunlevel);
     base->platformFcts.sendMessage = FUNC_ADDR(u8 (*)(ocrCommPlatform_t*,ocrLocation_t,
                                                ocrPolicyMsg_t*,u64*,u32,u32), MPICommSendMessage);
     base->platformFcts.pollMessage = FUNC_ADDR(u8 (*)(ocrCommPlatform_t*,ocrPolicyMsg_t**,u32,u32*),

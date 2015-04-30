@@ -31,6 +31,7 @@
 //#define SCHED_1_0 1
 
 static u8 helperSwitchInert(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 phase, u32 properties) {
+    PRINTF("helperSwitchInert RL=%d prop=0x%x\n", runlevel, properties);
     u64 i = 0;
     u64 maxCount = 0;
     u8 toReturn = 0;
@@ -84,7 +85,7 @@ void hcWorkerCallback(ocrPolicyDomain_t *self, u64 val) {
             }
             if((rself->rlSwitch.properties & RL_TEAR_DOWN) &&
                (rself->rlSwitch.nextPhase == -1)) {
-                // Switch to the next runlevel (going down
+                // Switch to the next runlevel (going down)
                 --rself->rlSwitch.runlevel;
                 rself->rlSwitch.nextPhase = RL_GET_PHASE_COUNT_DOWN(self, rself->rlSwitch.runlevel) - 1;
             }
@@ -105,7 +106,7 @@ void hcWorkerCallback(ocrPolicyDomain_t *self, u64 val) {
 
 // Function to cause run-level switches in this PD
 u8 hcPdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 properties) {
-    s32 i, j, curPhase, phaseCount;
+    s32 i=0, j, curPhase, phaseCount;
     u32 maxCount;
 
     u8 toReturn = 0;
@@ -135,6 +136,10 @@ u8 hcPdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
         ASSERT(amNodeMaster || (runlevel <= RL_PD_OK));
 
         // If this is direct function call, it should only be a request
+        // if (!((properties & RL_REQUEST) && !(properties & (RL_RESPONSE | RL_RELEASE)))) {
+        //     PRINTF("HERE\n");
+        //     while(1);
+        // }
         ASSERT((properties & RL_REQUEST) && !(properties & (RL_RESPONSE | RL_RELEASE)))
     }
 

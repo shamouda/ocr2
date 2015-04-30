@@ -613,113 +613,165 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
 #undef PD_TYPE
         break;
     }
-    case PD_MSG_MGT_RL_NOTIFY: {
-#define PD_MSG msg
-#define PD_TYPE PD_MSG_MGT_RL_NOTIFY
-        // Intercept the transition that indicates the PD is done with user code
-        // and has sent all outgoing messages related to user-code.
-        // This is where we start the distributed shutdown process
-        // Whenever we'll get a ack from all the other PDs we'll resume the local
-        // shutdown process by processing the same notify message
-        u32 runlevel = PD_MSG_FIELD_I(runlevel);
-        u32 action = PD_MSG_FIELD_I(action);
-#undef PD_MSG
-#undef PD_TYPE
-        //TODO-RL decide if we use the same function or a different to go UP RLs
-        if ((msg->srcLocation == curLoc) && (msg->destLocation == curLoc)) {
-            ocrPolicyDomainHc_t * bself = (ocrPolicyDomainHc_t *) self;
-            if ((runlevel == RL_RUNNING_USER) && (action == RL_ACTION_QUIESCE_COMM)
-                    && (bself->rl_completed[runlevel] == (bself->base.workerCount-1))) {
-                // Notify other PDs the user runlevel has completed here
-                ocrTask_t * curEdt = NULL;
-                getCurrentEnv(&self, NULL, &curEdt, NULL);
-                u32 i = 0;
-                while(i < self->neighborCount) {
-                    DPRINTF(DEBUG_LVL_VVERB,"MGT_SHUTDOWN: loop shutdown neighbors[%d] is %d\n", i, (int) self->neighbors[i]);
-                    PD_MSG_STACK(msgShutdown);
-                    getCurrentEnv(NULL, NULL, NULL, &msgShutdown);
-                #define PD_MSG (&msgShutdown)
-                #define PD_TYPE PD_MSG_MGT_SHUTDOWN
-                    msgShutdown.destLocation = self->neighbors[i];
-                    PD_MSG_FIELD_I(currentEdt.guid) = curEdt ? curEdt->guid : NULL_GUID;
-                    PD_MSG_FIELD_I(currentEdt.metaDataPtr) = curEdt;
-                    PD_MSG_FIELD_I(errorCode) = self->shutdownCode;
-                    DPRINTF(DEBUG_LVL_VVERB,"MGT_SHUTDOWN: send shutdown msg to %d\n", (int) msgShutdown.destLocation);
-                    msgShutdown.type = PD_MSG_MGT_SHUTDOWN | PD_MSG_REQUEST;
-                    u8 returnCode = self->fcts.processMessage(self, &msgShutdown, true);
-                    ASSERT(returnCode == 0);
-                #undef PD_MSG
-                #undef PD_TYPE
-                    i++;
-                }
-                // Consider the PD to have reached its local quiescence
-                ocrPolicyDomainHcDist_t * dself = (ocrPolicyDomainHcDist_t *) self;
-                u32 oldValue = hal_xadd32(&dself->shutdownAckCount, 1);
-                if (oldValue != (self->neighborCount)) {
-                    DPRINTF(DEBUG_LVL_VVERB,"MGT_SHUTDOWN: reached local quiescence. To be resumed when distributed shutdown is done\n");
-                    // If it is not the last one to increment do not fall-through
-                    // The runlevel action will be replayed whenever we get the last
-                    // shutdown ack.
-                    msg->type &= ~PD_MSG_REQUEST;
-                    return 0;
-                }
-                DPRINTF(DEBUG_LVL_VVERB,"MGT_SHUTDOWN: distributed shutdown is done. Process with local shutdown\n");
-            }
-        }
-        break; // fall-through to local processing
-    }
-    case PD_MSG_MGT_SHUTDOWN:
+    // case PD_MSG_MGT_RL_NOTIFY: {
+// #define PD_MSG msg
+// #define PD_TYPE PD_MSG_MGT_RL_NOTIFY
+//         // Intercept the transition that indicates the PD is done with user code
+//         // and has sent all outgoing messages related to user-code.
+//         // This is where we start the distributed shutdown process
+//         // Whenever we'll get a ack from all the other PDs we'll resume the local
+//         // shutdown process by processing the same notify message
+//         u32 runlevel = PD_MSG_FIELD_I(runlevel);
+//         u32 action = PD_MSG_FIELD_I(action);
+// #undef PD_MSG
+// #undef PD_TYPE
+//         //TODO-RL decide if we use the same function or a different to go UP RLs
+//         if ((msg->srcLocation == curLoc) && (msg->destLocation == curLoc)) {
+//             ocrPolicyDomainHc_t * bself = (ocrPolicyDomainHc_t *) self;
+//             if ((runlevel == RL_RUNNING_USER) && (action == RL_ACTION_QUIESCE_COMM)
+//                     && (bself->rl_completed[runlevel] == (bself->base.workerCount-1))) {
+//                 // Notify other PDs the user runlevel has completed here
+//                 ocrTask_t * curEdt = NULL;
+//                 getCurrentEnv(&self, NULL, &curEdt, NULL);
+//                 u32 i = 0;
+//                 while(i < self->neighborCount) {
+//                     DPRINTF(DEBUG_LVL_VVERB,"MGT_SHUTDOWN: loop shutdown neighbors[%d] is %d\n", i, (int) self->neighbors[i]);
+//                     PD_MSG_STACK(msgShutdown);
+//                     getCurrentEnv(NULL, NULL, NULL, &msgShutdown);
+//                 #define PD_MSG (&msgShutdown)
+//                 #define PD_TYPE PD_MSG_MGT_SHUTDOWN
+//                     msgShutdown.destLocation = self->neighbors[i];
+//                     PD_MSG_FIELD_I(currentEdt.guid) = curEdt ? curEdt->guid : NULL_GUID;
+//                     PD_MSG_FIELD_I(currentEdt.metaDataPtr) = curEdt;
+//                     PD_MSG_FIELD_I(errorCode) = self->shutdownCode;
+//                     DPRINTF(DEBUG_LVL_VVERB,"MGT_SHUTDOWN: send shutdown msg to %d\n", (int) msgShutdown.destLocation);
+//                     msgShutdown.type = PD_MSG_MGT_SHUTDOWN | PD_MSG_REQUEST;
+//                     u8 returnCode = self->fcts.processMessage(self, &msgShutdown, true);
+//                     ASSERT(returnCode == 0);
+//                 #undef PD_MSG
+//                 #undef PD_TYPE
+//                     i++;
+//                 }
+//                 // Consider the PD to have reached its local quiescence
+//                 ocrPolicyDomainHcDist_t * dself = (ocrPolicyDomainHcDist_t *) self;
+//                 u32 oldValue = hal_xadd32(&dself->shutdownAckCount, 1);
+//                 if (oldValue != (self->neighborCount)) {
+//                     DPRINTF(DEBUG_LVL_VVERB,"MGT_SHUTDOWN: reached local quiescence. To be resumed when distributed shutdown is done\n");
+//                     // If it is not the last one to increment do not fall-through
+//                     // The runlevel action will be replayed whenever we get the last
+//                     // shutdown ack.
+//                     msg->type &= ~PD_MSG_REQUEST;
+//                     return 0;
+//                 }
+//                 DPRINTF(DEBUG_LVL_VVERB,"MGT_SHUTDOWN: distributed shutdown is done. Process with local shutdown\n");
+//             }
+//         }
+    //     break; // fall-through to local processing
+    // }
+    case PD_MSG_MGT_RL_NOTIFY:
     {
+#define PD_MSG (msg)
+#define PD_TYPE PD_MSG_MGT_RL_NOTIFY
         if ((msg->srcLocation != curLoc) && (msg->destLocation == curLoc)) {
-            // Incoming shutdown message from another PD
+            ASSERT(PD_MSG_FIELD_I(runlevel) == RL_COMPUTE_OK);
+            ASSERT(PD_MSG_FIELD_I(properties) == (RL_REQUEST | RL_BARRIER | RL_TEAR_DOWN));
+            // Incoming rl notify message from another PD
             ocrPolicyDomainHcDist_t * rself = ((ocrPolicyDomainHcDist_t*)self);
-            // incr the shutdown counter
-            u32 oldValue = hal_xadd32(&rself->shutdownAckCount, 1);
+            // incr the shutdown counter (compete with hcDistPdSwitchRunlevel)
+            u32 oldAckValue = hal_xadd32(&rself->shutdownAckCount, 1);
             ocrPolicyDomainHc_t * bself = (ocrPolicyDomainHc_t *) self;
-            // the following rl_completed part is equivalent to (rself->rl == RL_RUNNING_USER)
-            DPRINTF(DEBUG_LVL_VVERB,"MGT_SHUTDOWN: incoming: old value for shutdownAckCount=%lu\n", oldValue);
-            if (oldValue == (self->neighborCount)) {
-                // Got messages from all PDs. We are done with distributed
-                // shutdown and can continue with the local shutdown.
+            DPRINTF(DEBUG_LVL_VVERB,"PD_MSG_MGT_RL_NOTIFY: incoming: old value for shutdownAckCount=%lu\n", oldAckValue);
+            if (oldAckValue == (self->neighborCount)) {
+                // Got messages from all PDs and self.
+                // Done with distributed shutdown and can continue with the local shutdown.
                 PD_MSG_STACK(msgNotifyRl);
                 getCurrentEnv(NULL, NULL, NULL, &msgNotifyRl);
-                DPRINTF(DEBUG_LVL_VVERB,"MGT_SHUTDOWN: distributed shutdown is done. Resume local shutdown\n");
-                // Process the message we've been holding back to continue
-                // the local shutdown now.
-            #define PD_MSG (&msgNotifyRl)
-            #define PD_TYPE PD_MSG_MGT_RL_NOTIFY
-                msgNotifyRl.destLocation = curLoc;
-                PD_MSG_FIELD_I(runlevel) = RL_RUNNING_USER; //TODO-RL probably should be a higher RL
-                PD_MSG_FIELD_I(action) = RL_ACTION_QUIESCE_COMM;
-                msgNotifyRl.type = PD_MSG_MGT_RL_NOTIFY | PD_MSG_REQUEST;
-                // MUST directly invoke the base implementation to avoid
-                // re-executing the distributed shutdown protocol in the
-                // 'PD_MSG_MGT_RL_NOTIFY' case
-                u8 returnCode = rself->baseProcessMessage(self, &msgNotifyRl, true);
+                DPRINTF(DEBUG_LVL_VVERB,"PD_MSG_MGT_RL_NOTIFY: distributed shutdown is done. Resume local shutdown\n");
+                u8 returnCode = rself->baseSwitchRunlevel(self, bself->rlSwitch.runlevel, bself->rlSwitch.properties);
                 ASSERT(returnCode == 0);
-            #undef PD_MSG
-            #undef PD_TYPE
             }
-            bool doLocalShutdown = ((oldValue == 0) && (bself->rl_completed[RL_RUNNING_USER] == 0));
+            bool doLocalShutdown = ((oldAckValue == 0) && RL_IS_LAST_PHASE_UP(self, RL_USER_OK, bself->rlSwitch.nextPhase));
             if (!doLocalShutdown) {
-                // We are receiving a shutdown message from another PD and both
-                // the counter was '0' and the runlevel is RL_RUNNING_USER.
-                //TODO update doc here
-                // It means ocrShutdown() did not originate from this PD, hence
-                // must fall-through to initiate the local shutdown process
-            #define PD_MSG (msg)
-            #define PD_TYPE PD_MSG_MGT_SHUTDOWN
                 PD_MSG_FIELD_O(returnDetail) = 0;
-            #undef PD_MSG
-            #undef PD_TYPE
-                //TODO-RL we should check all the return to make sure they do the write thing
+                //TODO-RL we should check all the return to make sure they do the right thing
                 //with the message parameter
                 return 0;
             }
+            // else
+            // We are receiving a shutdown message from another PD and both
+            // the ack counter is '0' and the runlevel RL_USER_OK is at its
+            // highest phase. It means ocrShutdown() did not originate from
+            // this PD, hence must initiate the local shutdown process.
         }
         // Fall-through to send to other PDs or for local processing.
+// #define PD_MSG msgPtr
+// #define PD_TYPE PD_MSG_MGT_RL_NOTIFY
+//         msgPtr->type = PD_MSG_MGT_RL_NOTIFY | PD_MSG_REQUEST;
+//         PD_MSG_FIELD_I(runlevel) = RL_COMPUTE_OK;
+//         PD_MSG_FIELD_I(properties) = RL_REQUEST | RL_BARRIER | RL_TEAR_DOWN;
+//         PD_MSG_FIELD_I(errorCode) = errorCode;
+//         RESULT_ASSERT(pd->fcts.processMessage(pd, msgPtr, true), ==, 0);
+// #undef PD_MSG
+// #undef PD_TYPE
+#undef PD_MSG
+#undef PD_TYPE
         break;
     }
+    // case PD_MSG_MGT_SHUTDOWN:
+    // {
+    //     ASSERT(false && "That's replaced by RL_NOTIFY");
+    //     if ((msg->srcLocation != curLoc) && (msg->destLocation == curLoc)) {
+    //         // Incoming shutdown message from another PD
+    //         ocrPolicyDomainHcDist_t * rself = ((ocrPolicyDomainHcDist_t*)self);
+    //         // incr the shutdown counter (compete with hcDistPdSwitchRunlevel)
+    //         u32 oldAckValue = hal_xadd32(&rself->shutdownAckCount, 1);
+    //         ocrPolicyDomainHc_t * bself = (ocrPolicyDomainHc_t *) self;
+    //         DPRINTF(DEBUG_LVL_VVERB,"MGT_SHUTDOWN: incoming: old value for shutdownAckCount=%lu\n", oldAckValue);
+    //         if (oldAckValue == (self->neighborCount)) {
+    //             // Got messages from all PDs and self.
+    //             // Done with distributed shutdown and can continue with the local shutdown.
+    //             PD_MSG_STACK(msgNotifyRl);
+    //             getCurrentEnv(NULL, NULL, NULL, &msgNotifyRl);
+    //             DPRINTF(DEBUG_LVL_VVERB,"MGT_SHUTDOWN: distributed shutdown is done. Resume local shutdown\n");
+    //             u8 returnCode = dself->baseSwitchRunlevel(self, rself->rlSwitch.runlevel, rself->rlSwitch.properties);
+    //             ASSERT(returnCode == 0);
+    //         //     // Process the message we've been holding back to continue
+    //         //     // the local shutdown now.
+    //         // #define PD_MSG (&msgNotifyRl)
+    //         // #define PD_TYPE PD_MSG_MGT_RL_NOTIFY
+    //         //     msgNotifyRl.destLocation = curLoc;
+    //         //     PD_MSG_FIELD_I(runlevel) = RL_RUNNING_USER; //TODO-RL probably should be a higher RL
+    //         //     PD_MSG_FIELD_I(action) = RL_ACTION_QUIESCE_COMM;
+    //         //     msgNotifyRl.type = PD_MSG_MGT_RL_NOTIFY | PD_MSG_REQUEST;
+    //         //     // MUST directly invoke the base implementation to avoid
+    //         //     // re-executing the distributed shutdown protocol in the
+    //         //     // 'PD_MSG_MGT_RL_NOTIFY' case
+    //         //     u8 returnCode = rself->baseProcessMessage(self, &msgNotifyRl, true);
+    //         //     ASSERT(returnCode == 0);
+    //         // #undef PD_MSG
+    //         // #undef PD_TYPE
+    //         }
+    //         // bool doLocalShutdown = ((oldAckValue == 0) && (bself->rl_completed[RL_RUNNING_USER] == 0));
+    //         bool doLocalShutdown = ((oldAckValue == 0) && RL_IS_LAST_PHASE_UP(self, RL_USER_OK, rself->rlSwitch.nextPhase));
+    //         if (!doLocalShutdown) {
+    //         #define PD_MSG (msg)
+    //         #define PD_TYPE PD_MSG_MGT_SHUTDOWN
+    //             PD_MSG_FIELD_O(returnDetail) = 0;
+    //         #undef PD_MSG
+    //         #undef PD_TYPE
+    //             //TODO-RL we should check all the return to make sure they do the write thing
+    //             //with the message parameter
+    //             return 0;
+    //         }
+    //         // else
+    //         // We are receiving a shutdown message from another PD and both
+    //         // the ack counter is '0' and the runlevel RL_USER_OK is at its
+    //         // highest phase. It means ocrShutdown() did not originate from
+    //         // this PD, hence must initiate the local shutdown process.
+    //     }
+    //     // Fall-through to send to other PDs or for local processing.
+    //     break;
+    // }
     case PD_MSG_DEP_DYNADD:
     {
 #define PD_MSG (msg)
@@ -1109,7 +1161,6 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
     case PD_MSG_SAL_WRITE:
     case PD_MSG_SAL_TERMINATE:
     case PD_MSG_MGT_OP: //DIST-TODO not-supported: PD_MSG_MGT_OP is probably not always local
-    case PD_MSG_MGT_FINISH:
     case PD_MSG_MGT_REGISTER:
     case PD_MSG_MGT_UNREGISTER:
     {
@@ -1491,6 +1542,58 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
     return ret;
 }
 
+u8 hcDistPdSwitchRunlevel(ocrPolicyDomain_t *self, ocrRunlevel_t runlevel, u32 properties) {
+    ocrPolicyDomainHc_t *rself = (ocrPolicyDomainHc_t*) self;
+    if((runlevel == RL_USER_OK) && RL_IS_LAST_PHASE_DOWN(self, RL_USER_OK, rself->rlSwitch.nextPhase)) {
+        ASSERT(rself->rlSwitch.runlevel == runlevel);
+        // The local shutdown is completed.
+        // Notify neighbors PDs and stall the phase change
+        // until we got acknoledgements from all of them.
+        // Notify other PDs the user runlevel has completed here
+        getCurrentEnv(&self, NULL, NULL, NULL);
+        u32 i = 0;
+        while(i < self->neighborCount) {
+            DPRINTF(DEBUG_LVL_VVERB,"PD_MSG_MGT_RL_NOTIFY: loop shutdown neighbors[%d] is %d\n", i, (int) self->neighbors[i]);
+            PD_MSG_STACK(msgShutdown);
+            getCurrentEnv(NULL, NULL, NULL, &msgShutdown);
+        #define PD_MSG (&msgShutdown)
+        #define PD_TYPE PD_MSG_MGT_RL_NOTIFY
+            msgShutdown.destLocation = self->neighbors[i];
+            msgShutdown.type = PD_MSG_MGT_RL_NOTIFY | PD_MSG_REQUEST;
+            PD_MSG_FIELD_I(runlevel) = RL_COMPUTE_OK;
+            PD_MSG_FIELD_I(properties) = RL_REQUEST | RL_BARRIER | RL_TEAR_DOWN;
+            PD_MSG_FIELD_I(errorCode) = self->shutdownCode;
+            DPRINTF(DEBUG_LVL_VVERB,"PD_MSG_MGT_RL_NOTIFY: send shutdown msg to %d\n", (int) msgShutdown.destLocation);
+            u8 returnCode = self->fcts.processMessage(self, &msgShutdown, true);
+            ASSERT(returnCode == 0);
+        #undef PD_MSG
+        #undef PD_TYPE
+            i++;
+        }
+        // Consider the PD to have reached its local quiescence.
+        // This code is concurrent with receiving notifications
+        // from other PDs and must detect if it is the last
+        ocrPolicyDomainHcDist_t * dself = (ocrPolicyDomainHcDist_t *) self;
+        // incr the shutdown counter (compete with processMessage PD_MSG_MGT_SHUTDOWN)
+        u32 oldAckValue = hal_xadd32(&dself->shutdownAckCount, 1);
+        if (oldAckValue != (self->neighborCount)) {
+            DPRINTF(DEBUG_LVL_VVERB,"PD_MSG_MGT_RL_NOTIFY: reached local quiescence. To be resumed when distributed shutdown is done\n");
+            // If it is not the last one to increment do not fall-through
+            // The switch runlevel will be called whenever we get the last
+            // shutdown ack.
+            // msg->type &= ~PD_MSG_REQUEST;
+            return 0;
+        } else {
+            // Last shutdown acknowledgement, resume the runlevel switch
+            DPRINTF(DEBUG_LVL_VVERB,"PD_MSG_MGT_RL_NOTIFY: distributed shutdown is done. Process with local shutdown\n");
+            return dself->baseSwitchRunlevel(self, rself->rlSwitch.runlevel, rself->rlSwitch.properties);
+        }
+    } else {
+        ocrPolicyDomainHcDist_t * dself = (ocrPolicyDomainHcDist_t *) self;
+        return dself->baseSwitchRunlevel(self, runlevel, properties);
+    }
+}
+
 u8 hcDistPdSendMessage(ocrPolicyDomain_t* self, ocrLocation_t target, ocrPolicyMsg_t *message,
                    ocrMsgHandle_t **handle, u32 properties) {
     ocrWorker_t * worker;
@@ -1573,8 +1676,7 @@ void initializePolicyDomainHcDist(ocrPolicyDomainFactory_t * factory,
 #endif
     ocrPolicyDomainHcDist_t * hcDistPd = (ocrPolicyDomainHcDist_t *) self;
     hcDistPd->baseProcessMessage = derivedFactory->baseProcessMessage;
-    // hcDistPd->baseStart = derivedFactory->baseStart;
-    // hcDistPd->baseStop = derivedFactory->baseStop;
+    hcDistPd->baseSwitchRunlevel = derivedFactory->baseSwitchRunlevel;
     hcDistPd->lockDbLookup = 0;
     hcDistPd->shutdownAckCount = 0;
 }
@@ -1595,13 +1697,11 @@ ocrPolicyDomainFactory_t * newPolicyDomainFactoryHcDist(ocrParamList_t *perType)
     derivedBase->destruct =  destructPolicyDomainFactoryHcDist;
     derivedBase->policyDomainFcts = baseFcts;
     derived->baseInitialize = baseFactory->initialize;
-    // derived->baseStart = baseFcts.start;
-    // derived->baseStop = baseFcts.stop;
     derived->baseProcessMessage = baseFcts.processMessage;
+    derived->baseSwitchRunlevel = baseFcts.switchRunlevel;
 
     // specialize some of the function pointers
-    // derivedBase->policyDomainFcts.start = FUNC_ADDR(void(*)(ocrPolicyDomain_t*), hcDistPolicyDomainStart);
-    // derivedBase->policyDomainFcts.stop = FUNC_ADDR(void(*)(ocrPolicyDomain_t*,ocrRunLevel_t,u32), hcDistPolicyDomainStop);
+    derivedBase->policyDomainFcts.switchRunlevel = FUNC_ADDR(u8 (*)(ocrPolicyDomain_t*, ocrRunlevel_t, u32), hcDistPdSwitchRunlevel);
     derivedBase->policyDomainFcts.processMessage = FUNC_ADDR(u8(*)(ocrPolicyDomain_t*,ocrPolicyMsg_t*,u8), hcDistProcessMessage);
     derivedBase->policyDomainFcts.sendMessage = FUNC_ADDR(u8 (*)(ocrPolicyDomain_t*, ocrLocation_t, ocrPolicyMsg_t *, ocrMsgHandle_t**, u32),
                                                    hcDistPdSendMessage);

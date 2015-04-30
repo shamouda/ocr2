@@ -31,8 +31,9 @@ typedef struct {
     iterator_t * incomingIt;
     iterator_t * outgoingIt;
     u64 maxMsgSize;
-    volatile int rl;
-    volatile int rl_completed [MPI_COMM_RL_MAX+1];
+    // The state encodes the RL (top 16 bits) and the phase (bottom 16 bits)
+    // This is mainly for debugging purpose
+    volatile u32 curState;
 } ocrCommPlatformMPI_t;
 
 typedef struct {

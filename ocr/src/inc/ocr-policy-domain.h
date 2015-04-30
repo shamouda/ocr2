@@ -54,8 +54,11 @@ typedef struct _paramListPolicyDomainInst_t {
         (pd)->phasesPerRunlevel[rl][comp] = _t;                         \
     } while(0)
 
+
+// Get number of phases when going up for a given runlevel
 #define RL_GET_PHASE_COUNT_UP(pd, rl) ((pd)->phasesPerRunlevel[rl][0] & 0xFFFF)
 
+// Get number of phases when going down for a given runlevel
 #define RL_GET_PHASE_COUNT_DOWN(pd, rl) ((pd)->phasesPerRunlevel[rl][0] >> 16)
 
 #define RL_IS_LAST_PHASE_UP(pd, rl, phase) ((RL_GET_PHASE_COUNT_UP(pd, rl) - 1) == (phase))

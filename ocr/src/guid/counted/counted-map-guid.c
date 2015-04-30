@@ -57,12 +57,25 @@ u8 countedMapSwitchRunlevel(ocrGuidProvider_t *self, ocrPolicyDomain_t *PD, ocrR
         // Nothing
         break;
     case RL_PD_OK:
-        break;
-    case RL_GUID_OK:
-        // Nothing to do
+        if ((properties & RL_BRING_UP) && RL_IS_FIRST_PHASE_UP(self->pd, RL_PD_OK, phase)) {
+            self->pd = PD;
+        }
         break;
     case RL_MEMORY_OK:
         // Nothing to do
+        break;
+    case RL_GUID_OK:
+        ASSERT(self->pd == PD);
+        if((properties & RL_BRING_UP) && RL_IS_LAST_PHASE_UP(PD, RL_GUID_OK, phase)) {
+            //Initialize the map now that we have an assigned policy domain
+            ocrGuidProviderCountedMap_t * derived = (ocrGuidProviderCountedMap_t *) self;
+            derived->guidImplTable = newHashtableBucketLockedModulo(PD, DEFAULT_NB_BUCKETS);
+        }
+        if ((properties & RL_TEAR_DOWN) && RL_IS_FIRST_PHASE_DOWN(PD, RL_GUID_OK, phase)) {
+            //TODO-RL: Need to think about that
+            PRINTF("TODO-RL: Cleaning up guid provider hashtable\n");
+            //destructHashtable(((ocrGuidProviderCountedMap_t *) self)->guidImplTable);
+        }
         break;
     case RL_COMPUTE_OK:
         // We can allocate our map here because the memory is up
@@ -75,29 +88,10 @@ u8 countedMapSwitchRunlevel(ocrGuidProvider_t *self, ocrPolicyDomain_t *PD, ocrR
     }
     return toReturn;
 }
+
 void countedMapDestruct(ocrGuidProvider_t* self) {
-    //destructHashtable(((ocrGuidProviderCountedMap_t *) self)->guidImplTable);
     runtimeChunkFree((u64)self, NULL);
 }
-
-#if 0
-void countedMapBegin(ocrGuidProvider_t *self, ocrPolicyDomain_t *pd) {
-    // Nothing to do
-}
-
-void countedMapStart(ocrGuidProvider_t *self, ocrPolicyDomain_t *pd) {
-    self->pd = pd;
-    //Initialize the map now that we have an assigned policy domain
-    ocrGuidProviderCountedMap_t * derived = (ocrGuidProviderCountedMap_t *) self;
-    // REC: This will be a problem. We need to do this in the GUID_OK phase but that
-    // means that we need to use runtimeChunkAlloc.
-    derived->guidImplTable = newHashtableBucketLockedModulo(pd, DEFAULT_NB_BUCKETS);
-}
-
-void countedMapStop(ocrGuidProvider_t *self, ocrRunLevel_t newRl, u32 action) {
-    // Nothing to do
-}
-#endif
 
 /**
  * @brief Utility function to extract a kind from a GUID.

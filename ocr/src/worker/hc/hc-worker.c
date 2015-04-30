@@ -125,6 +125,70 @@ static void workerLoop(ocrWorker_t * worker) {
             worker->fcts.workShift(worker);
             EXIT_PROFILE;
         }
+#ifdef DIST_SUPPORT
+        u32 PHASE_RUN = 3;
+        u32 PHASE_COMP_QUIESCE = 2;
+        u32 PHASE_COMM_QUIESCE = 1;
+        u32 PHASE_DONE = 0;
+        // Double check the setup
+        ASSERT(RL_GET_PHASE_COUNT_DOWN(worker->pd, RL_USER_OK) == PHASE_RUN);
+        // By default we are in 'run phase'
+        switch((worker->desiredState) >> 16) {
+        case RL_USER_OK: {
+            u32 desiredPhase = worker->desiredState & 0xFFFF;
+            ASSERT(desiredPhase != PHASE_RUN);
+            if (desiredPhase == PHASE_COMP_QUIESCE) {
+                // Loop has been broken, by design there should be no user-edt left
+                // (For now they are "runtime-edts", in the future they may be micro-tasks)
+                ASSERT(worker->callback != NULL);
+                worker->curState = RL_USER_OK << 16 | PHASE_COMP_QUIESCE;
+                // Callback the PD, but keep working to process runtime work
+                worker->callback(worker->pd, worker->callbackArg);
+                // Warning: Code potentially concurrent with switchRunlevel
+                break;
+            }
+            // Ignore other phases
+            if (desiredPhase == PHASE_COMM_QUIESCE) {
+                ASSERT(worker->callback != NULL);
+                worker->curState = RL_USER_OK << 16 | PHASE_COMM_QUIESCE;
+                worker->callback(worker->pd, worker->callbackArg);
+                // Warning: Code potentially concurrent with switchRunlevel
+                break;
+            }
+            if (desiredPhase == PHASE_DONE) {
+                ASSERT(worker->callback != NULL);
+                worker->curState = RL_USER_OK << 16 | PHASE_DONE;
+                worker->callback(worker->pd, worker->callbackArg);
+                // Warning: Code potentially concurrent with switchRunlevel
+            }
+            break;
+        }
+        // BEGIN copy-paste original code
+        // TODO-RL not sure we still need that
+        case RL_COMPUTE_OK: {
+            u32 phase = worker->desiredState & 0xFFFF;
+            if(RL_IS_FIRST_PHASE_DOWN(worker->pd, RL_COMPUTE_OK, phase)) {
+                DPRINTF(DEBUG_LVL_VERB, "Noticed transition to RL_COMPUTE_OK\n");
+
+                // We first change our state prior to the callback
+                // because we may end up doing some of the callback processing
+                worker->curState = worker->desiredState;
+                if(worker->callback != NULL) {
+                    worker->callback(worker->pd, worker->callbackArg);
+                }
+                // There is no need to do anything else except quit
+                continueLoop = false;
+            } else {
+                ASSERT(0);
+            }
+            break;
+        }
+        // END copy-paste original code
+        default:
+            // Only these two RL should occur
+            ASSERT(0);
+        }
+#else
         // Here we are shifting to another RL
         switch((worker->desiredState) >> 16) {
         case RL_USER_OK: {
@@ -136,6 +200,7 @@ static void workerLoop(ocrWorker_t * worker) {
                 // because we may end up doing some of the callback processing
                 worker->curState = worker->desiredState;
                 if(worker->callback != NULL) {
+                    //RL: why would that be null ?
                     worker->callback(worker->pd, worker->callbackArg);
                 }
             }
@@ -163,6 +228,7 @@ static void workerLoop(ocrWorker_t * worker) {
             // Only these two RL should occur
             ASSERT(0);
         }
+#endif
     } while(continueLoop);
 
     DPRINTF(DEBUG_LVL_VERB, "Finished worker loop ... waiting to be reapped\n");
@@ -200,6 +266,10 @@ u8 hcWorkerSwitchRunlevel(ocrWorker_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_
         // and check compatibility on phase 1
         if(properties & RL_BRING_UP) {
             if(RL_IS_FIRST_PHASE_UP(PD, RL_CONFIG_PARSE, phase)) {
+#ifdef DIST_SUPPORT
+                // We need at least three phases for the RL_USER_OK TEAR_DOWN
+                RL_ENSURE_PHASE_DOWN(PD, RL_USER_OK, RL_PHASE_WORKER, 3);
+#endif
                 // We need at least two phases for the RL_COMPUTE_OK TEAR_DOWN
                 RL_ENSURE_PHASE_DOWN(PD, RL_COMPUTE_OK, RL_PHASE_WORKER, 2);
             } else if(RL_IS_LAST_PHASE_UP(PD, RL_CONFIG_PARSE, phase)) {
@@ -207,6 +277,15 @@ u8 hcWorkerSwitchRunlevel(ocrWorker_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_
                 // count. We currently only support one user phase and two
                 // compute phase. If this changes, the workerLoop code and hcWorkerRun
                 // code will have to be modified (as well as this code of course)
+#ifdef DIST_SUPPORT
+                if(RL_GET_PHASE_COUNT_UP(PD, RL_COMPUTE_OK) != 1 ||
+                   RL_GET_PHASE_COUNT_DOWN(PD, RL_COMPUTE_OK) != 2 ||
+                   RL_GET_PHASE_COUNT_UP(PD, RL_USER_OK) != 1 ||
+                   RL_GET_PHASE_COUNT_DOWN(PD, RL_USER_OK) != 3) {
+                    DPRINTF(DEBUG_LVL_WARN, "Worker does not support compute and user counts\n");
+                    ASSERT(0);
+                }
+#else
                 if(RL_GET_PHASE_COUNT_UP(PD, RL_COMPUTE_OK) != 1 ||
                    RL_GET_PHASE_COUNT_DOWN(PD, RL_COMPUTE_OK) != 2 ||
                    RL_GET_PHASE_COUNT_UP(PD, RL_USER_OK) != 1 ||
@@ -214,6 +293,7 @@ u8 hcWorkerSwitchRunlevel(ocrWorker_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_
                     DPRINTF(DEBUG_LVL_WARN, "Worker does not support compute and user counts\n");
                     ASSERT(0);
                 }
+#endif
             }
         }
         break;
@@ -303,19 +383,74 @@ u8 hcWorkerSwitchRunlevel(ocrWorker_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_
                 }
             }
         }
+#ifdef DIST_SUPPORT
+        u32 PHASE_RUN = 3;
+        u32 PHASE_COMP_QUIESCE = 2;
+        u32 PHASE_COMM_QUIESCE = 1;
+        u32 PHASE_DONE = 0;
+        //Ignore other RL
+        if (properties & RL_TEAR_DOWN) {
+            //RL make sure the state is correctly initialized to
+            //PHASE_RUN so that the worker loop actually works
+            u32 curPhase = self->curState & 0xFFFF;
+            ASSERT(curPhase == (phase+1));
+            if (phase == PHASE_COMP_QUIESCE) {
+                // Transition from RUN to PHASE_COMP_QUIESCE
+                ASSERT((self->curState & 0xFFFF) == PHASE_RUN);
+                ASSERT(callback != NULL);
+                self->callback = callback;
+                self->callbackArg = val;
+                hal_fence();
+                // Breaks the worker's compute loop
+                self->desiredState = RL_USER_OK << 16 | PHASE_COMP_QUIESCE;
+            }
+            if (phase == PHASE_COMM_QUIESCE) {
+                // Transition to PHASE_COMM_QUIESCE
+
+                ASSERT(callback != NULL);
+                self->callback = callback;
+                self->callbackArg = val;
+                hal_fence();
+                // Breaks the worker's compute loop
+                self->desiredState = RL_USER_OK << 16 | PHASE_COMM_QUIESCE;
+
+                // // Optional, callback cleanup
+                // self->callback = NULL;
+                // self->callbackArg = NULL;
+                // ASSERT(callback != NULL);
+
+                // // Computation workers do not need to do anything here
+                // // Just callback and keep doing what they are doing.
+                // //TODO-RL: I think there's the same issue as in comm-worker here.
+                // //If we wanted to be clean we would have to transition the
+                // //(cur|desired)State and let the worker loop code do the call back.
+                // callback(self->pd, callbackArg);
+            }
+            if (RL_IS_LAST_PHASE_DOWN(PD, RL_USER_OK, phase)) {
+                ASSERT(callback != NULL);
+                self->callback = callback;
+                self->callbackArg = val;
+                hal_fence();
+                // Breaks the worker's compute loop
+                self->desiredState = RL_USER_OK << 16 | PHASE_DONE;
+            }
+        }
+#else
         if((properties & RL_TEAR_DOWN) && RL_IS_FIRST_PHASE_DOWN(PD, RL_USER_OK, phase)) {
             // We need to break out of the compute loop
             // We need to have a callback for all workers here
             ASSERT(callback != NULL);
             // We make sure that we actually fully booted before shutting down
+            //TODO-RL why is this possible ?
             while(self->curState != ((RL_USER_OK << 16) | (phase + 1))) ;
-
             ASSERT(self->curState == ((RL_USER_OK << 16) | (phase + 1)));
             self->callback = callback;
             self->callbackArg = val;
             hal_fence();
+            // Breaks the worker's compute loop
             self->desiredState = (RL_USER_OK << 16) | phase;
         }
+#endif
         break;
     default:
         // Unknown runlevel
