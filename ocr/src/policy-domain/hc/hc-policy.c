@@ -435,7 +435,8 @@ u8 hcPdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
                         policy->workers[j], policy, runlevel, i, properties, NULL, 0);
                 }
             }
-            if(i == phaseCount - 1) { // If we didn't have issue earlier
+            if(i == phaseCount - 1) { // Tests if we did not break out earlier with if(toReturn)
+                toReturn |= helperSwitchInert(policy, runlevel, i, properties);
                 for(j = 1; j < maxCount; ++j) {
                     // We start them in an async manner but don't need any callback (ie: we
                     // don't care if they have really started) since there is no bring-up barrier)
