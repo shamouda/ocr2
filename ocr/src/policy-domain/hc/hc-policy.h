@@ -25,7 +25,7 @@ typedef struct {
     volatile u64 checkedIn;  // Will initially contain the number of workers we need to
                              // check in and will decrement to zero
     ocrRunlevel_t runlevel;
-    u32 nextPhase;
+    s32 nextPhase;
     u32 properties;
 } pdHcResumeSwitchRL_t;
 

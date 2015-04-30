@@ -21,10 +21,10 @@ typedef enum _ocrRunlevels_t {
     RL_CONFIG_PARSE, /**< Configuration has been parsed; RT structures exist */
     RL_NETWORK_OK,   /**< Intra-PD communication is possible; PDs are known */
     RL_PD_OK,        /**< PDs are up. One capable module per PD */
-    RL_GUID_OK,      /**< The global naming is operational; PDs know not to step
-                        on each other's toes */
     RL_MEMORY_OK,    /**< On startup, barrier before here. Memory allocators are up
                         pdMalloc() is functional */
+    RL_GUID_OK,      /**< The global naming is operational; PDs know not to step
+                        on each other's toes */
     RL_COMPUTE_OK,   /**< All other inert modules are brought up; bring up workers */
     RL_USER_OK,      /**< One PD starts mainEDT; others are waiting for work */
     RL_MAX           /**< Not a runlevel. Internal marker */
@@ -34,8 +34,8 @@ typedef enum _ocrRunlevels_t {
 // to the subcomponents (platform/target for example)
 typedef enum _ocrRLPhaseComponents_t {
     RL_PHASE_COMMAPI,
-    RL_PHASE_GUIDPROVIDER,
     RL_PHASE_ALLOCATOR,
+    RL_PHASE_GUIDPROVIDER,
     RL_PHASE_SCHEDULER,
     RL_PHASE_WORKER,
     RL_PHASE_MAX

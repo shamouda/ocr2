@@ -74,9 +74,9 @@ u8 nullSchedulerObjectRootSwitchRunlevel(ocrSchedulerObjectRoot_t *self, ocrPoli
         break;
     case RL_PD_OK:
         break;
-    case RL_GUID_OK:
-        break;
     case RL_MEMORY_OK:
+        break;
+    case RL_GUID_OK:
         break;
     case RL_COMPUTE_OK:
         break;

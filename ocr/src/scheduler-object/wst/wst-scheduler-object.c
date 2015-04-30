@@ -143,7 +143,7 @@ u8 wstSchedulerObjectSwitchRunlevel(ocrSchedulerObjectRoot_t *self, ocrPolicyDom
     case RL_NETWORK_OK:
         break;
     case RL_PD_OK:
-        if((properties & RL_BRING_UP) && phase == 0) {
+        if((properties & RL_BRING_UP) && RL_IS_FIRST_PHASE_UP(PD, RL_PD_OK, phase)) {
             ASSERT(self->scheduler);
             u32 i;
             // The scheduler calls this before switching itself. Do we want
@@ -153,11 +153,12 @@ u8 wstSchedulerObjectSwitchRunlevel(ocrSchedulerObjectRoot_t *self, ocrPolicyDom
             }
         }
         break;
-    case RL_GUID_OK:
-        break;
     case RL_MEMORY_OK:
+        break;
+    case RL_GUID_OK:
+        // Memory is up
         if(properties & RL_BRING_UP) {
-            if(phase == RL_GET_PHASE_COUNT_UP(PD, RL_MEMORY_OK) - 1) {
+            if(RL_IS_FIRST_PHASE_UP(PD, RL_GUID_OK, phase)) {
                 u32 i;
                 ocrScheduler_t *scheduler = self->scheduler;
 
@@ -181,7 +182,7 @@ u8 wstSchedulerObjectSwitchRunlevel(ocrSchedulerObjectRoot_t *self, ocrPolicyDom
             }
         } else {
             // Tear down
-            if(phase == 0) {
+            if(RL_IS_LAST_PHASE_DOWN(PD, RL_GUID_OK, phase)) {
                 u32 i;
                 ocrSchedulerObjectRootWst_t *wstRootSchedObj = (ocrSchedulerObjectRootWst_t*)self;
                 for (i = 0; i < wstRootSchedObj->numDeques; i++) {

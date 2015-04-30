@@ -59,7 +59,6 @@ u8 mallocSwitchRunlevel(ocrMemPlatform_t *self, ocrPolicyDomain_t *PD, ocrRunlev
         // and check compatibility on phase 1
         break;
     case RL_NETWORK_OK:
-        // Nothing
         break;
     case RL_PD_OK:
         if(properties & RL_BRING_UP) {
@@ -68,11 +67,8 @@ u8 mallocSwitchRunlevel(ocrMemPlatform_t *self, ocrPolicyDomain_t *PD, ocrRunlev
             self->pd = PD;
         }
         break;
-    case RL_GUID_OK:
-        // Nothing to do
-        break;
     case RL_MEMORY_OK:
-        if(phase == 0 && (properties & RL_BRING_UP)) {
+        if((properties & RL_BRING_UP) && RL_IS_FIRST_PHASE_UP(PD, RL_MEMORY_OK, phase)) {
             // This is where we need to update the memory
             // using the sysboot functions
             self->startAddr = (u64)malloc(self->size);
@@ -83,12 +79,12 @@ u8 mallocSwitchRunlevel(ocrMemPlatform_t *self, ocrPolicyDomain_t *PD, ocrRunlev
             ocrMemPlatformMalloc_t *rself = (ocrMemPlatformMalloc_t*)self;
             rself->pRangeTracker = initializeRange(
                 16, self->startAddr, self->endAddr, USER_FREE_TAG);
-        } else if(phase == self->pd->phasesPerRunlevel[RL_MEMORY_OK][0] - 1 &&
-                  (properties & RL_TEAR_DOWN)) {
-
+        } else if((properties & RL_TEAR_DOWN) && RL_IS_LAST_PHASE_DOWN(PD, RL_MEMORY_OK, phase)) {
             // Here we can free the memory we allocated
             free((void*)(self->startAddr));
         }
+        break;
+    case RL_GUID_OK:
         break;
     case RL_COMPUTE_OK:
         break;

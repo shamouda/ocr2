@@ -26,7 +26,6 @@
  */
 typedef struct {
     ocrGuidProvider_t base;
-    ocrRunlevel_t rl; // Used to choose between runtimeChunkAlloc and pdMalloc
 } ocrGuidProviderPtr_t;
 
 typedef struct {

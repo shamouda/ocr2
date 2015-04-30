@@ -297,13 +297,8 @@ u8 mallocProxySwitchRunlevel(ocrAllocator_t *self, ocrPolicyDomain_t *PD, ocrRun
     case RL_CONFIG_PARSE:
         // On bring-up: Update PD->phasesPerRunlevel on phase 0
         // and check compatibility on phase 1
-        if((properties & RL_BRING_UP) && phase == 0) {
-            RL_ENSURE_PHASE_UP(PD, RL_GUID_OK, RL_PHASE_ALLOCATOR, 2);
-            RL_ENSURE_PHASE_DOWN(PD, RL_GUID_OK, RL_PHASE_ALLOCATOR, 2);
-        }
         break;
     case RL_NETWORK_OK:
-        // Nothing
         break;
     case RL_PD_OK:
         if(properties & RL_BRING_UP) {
@@ -312,15 +307,20 @@ u8 mallocProxySwitchRunlevel(ocrAllocator_t *self, ocrPolicyDomain_t *PD, ocrRun
             self->pd = PD;
         }
         break;
+    case RL_MEMORY_OK:
+        // Nothing to do (yes, we are an allocator but no setup is required)
+        break;
     case RL_GUID_OK:
+        break;
+    case RL_COMPUTE_OK:
         if(properties & RL_BRING_UP) {
-            if(phase == RL_GET_PHASE_COUNT_UP(self->pd, RL_GUID_OK) - 1) {
+            if(RL_IS_FIRST_PHASE_UP(PD, RL_COMPUTE_OK, phase)) {
                 // We get a GUID for ourself
                 guidify(self->pd, (u64)self, &(self->fguid), OCR_GUID_ALLOCATOR);
             }
         } else {
             // Tear-down
-            if(phase == 0) {
+            if(RL_IS_LAST_PHASE_DOWN(PD, RL_COMPUTE_OK, phase)) {
                 PD_MSG_STACK(msg);
                 getCurrentEnv(NULL, NULL, NULL, &msg);
 #define PD_MSG (&msg)
@@ -334,11 +334,6 @@ u8 mallocProxySwitchRunlevel(ocrAllocator_t *self, ocrPolicyDomain_t *PD, ocrRun
 #undef PD_TYPE
             }
         }
-        break;
-    case RL_MEMORY_OK:
-        // Nothing to do (yes, we are an allocator but no setup is required)
-        break;
-    case RL_COMPUTE_OK:
         break;
     case RL_USER_OK:
         break;

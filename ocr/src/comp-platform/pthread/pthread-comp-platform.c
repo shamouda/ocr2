@@ -133,7 +133,7 @@ u8 pthreadSwitchRunlevel(ocrCompPlatform_t *self, ocrPolicyDomain_t *PD, ocrRunl
     case RL_CONFIG_PARSE:
         // On bring-up: Update PD->phasesPerRunlevel on phase 0
         // and check compatibility on phase 1
-        if((properties & RL_BRING_UP) && phase == 0) {
+        if((properties & RL_BRING_UP) && RL_IS_FIRST_PHASE_UP(PD, RL_CONFIG_PARSE, phase)) {
             ASSERT(self->worker != NULL);
         }
         break;
@@ -149,12 +149,12 @@ u8 pthreadSwitchRunlevel(ocrCompPlatform_t *self, ocrPolicyDomain_t *PD, ocrRunl
             }
         }
         break;
-    case RL_GUID_OK:
-        break;
     case RL_MEMORY_OK:
         break;
+    case RL_GUID_OK:
+        break;
     case RL_COMPUTE_OK:
-        if((properties & RL_BRING_UP) && phase == 0) {
+        if((properties & RL_BRING_UP) && RL_IS_FIRST_PHASE_UP(PD, RL_COMPUTE_OK, phase)) {
             if(properties & RL_PD_MASTER) {
                 // We do not need to create another thread
                 // Only do the binding
@@ -187,7 +187,7 @@ u8 pthreadSwitchRunlevel(ocrCompPlatform_t *self, ocrPolicyDomain_t *PD, ocrRunl
                                                pthreadCompPlatform);
                 }
             }
-        } else if((properties & RL_TEAR_DOWN) && phase == RL_GET_PHASE_COUNT_DOWN(PD, RL_COMPUTE_OK) - 1) {
+        } else if((properties & RL_TEAR_DOWN) && RL_IS_LAST_PHASE_DOWN(PD, RL_COMPUTE_OK, phase)) {
             // At this point, this is run only by the master thread
             if(!(properties & RL_PD_MASTER)) {
                 // We do not join with ourself

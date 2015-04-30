@@ -60,28 +60,17 @@ u8 hcSchedulerHeuristicSwitchRunlevel(ocrSchedulerHeuristic_t *self, ocrPolicyDo
     case RL_CONFIG_PARSE:
         // On bring-up: Update PD->phasesPerRunlevel on phase 0
         // and check compatibility on phase 1
-        if((properties & RL_BRING_UP) && phase == 0) {
-            u32 t = PD->phasesPerRunlevel[RL_MEMORY_OK][RL_PHASE_SCHEDULER];
-            if((t >> 16) < 2) t = (2<<16) + (t & 0xFFFF);
-            PD->phasesPerRunlevel[RL_MEMORY_OK][RL_PHASE_SCHEDULER] = t;
-        }
         break;
     case RL_NETWORK_OK:
         break;
     case RL_PD_OK:
         break;
-    case RL_GUID_OK:
-        break;
     case RL_MEMORY_OK:
-        if((properties & RL_TEAR_DOWN) && phase == 0) {
-            PD->fcts.pdFree(PD, self->contexts[0]);
-            PD->fcts.pdFree(PD, self->contexts);
-        }
         break;
-    case RL_COMPUTE_OK:
+    case RL_GUID_OK:
     {
         // Memory is up at this point. We can initialize ourself
-        if((properties & RL_BRING_UP) && phase == 0) {
+        if((properties & RL_BRING_UP) && RL_IS_FIRST_PHASE_UP(PD, RL_GUID_OK, phase)) {
             u32 i;
             ocrScheduler_t *scheduler = self->scheduler;
             ASSERT(scheduler);
@@ -100,8 +89,14 @@ u8 hcSchedulerHeuristicSwitchRunlevel(ocrSchedulerHeuristic_t *self, ocrPolicyDo
                 self->contexts[i] = context;
             }
         }
+        if((properties & RL_TEAR_DOWN) && RL_IS_LAST_PHASE_DOWN(PD, RL_GUID_OK, phase)) {
+            PD->fcts.pdFree(PD, self->contexts[0]);
+            PD->fcts.pdFree(PD, self->contexts);
+        }
         break;
     }
+    case RL_COMPUTE_OK:
+        break;
     case RL_USER_OK:
         break;
     default:

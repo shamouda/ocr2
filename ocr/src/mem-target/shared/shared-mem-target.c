@@ -70,14 +70,18 @@ u8 sharedSwitchRunlevel(ocrMemTarget_t *self, ocrPolicyDomain_t *PD, ocrRunlevel
             self->pd = PD;
         }
         break;
+    case RL_MEMORY_OK:
+        break;
     case RL_GUID_OK:
-        if((properties & RL_BRING_UP) && phase == self->pd->phasesPerRunlevel[RL_GUID_OK][0] - 1) {
+        break;
+    case RL_COMPUTE_OK:
+        if((properties & RL_BRING_UP) && RL_IS_FIRST_PHASE_UP(PD, RL_COMPUTE_OK, phase)) {
             guidify(self->pd, (u64)self, &(self->fguid), OCR_GUID_MEMTARGET);
             DPRINTF(DEBUG_LVL_VERB, "SharedStart PD=%p\n", self->pd);
 #ifdef OCR_ENABLE_STATISTICS
             statsMEMTARGET_START(PD, self->fguid.guid, self->fguid.metaDataPtr);
 #endif
-        } else if((properties & RL_TEAR_DOWN) && phase == 0) {
+        } else if((properties & RL_TEAR_DOWN) && RL_IS_LAST_PHASE_DOWN(PD, RL_COMPUTE_OK, phase)) {
             PD_MSG_STACK(msg);
 #define PD_MSG (&msg)
 #define PD_TYPE PD_MSG_GUID_DESTROY
@@ -85,17 +89,11 @@ u8 sharedSwitchRunlevel(ocrMemTarget_t *self, ocrPolicyDomain_t *PD, ocrRunlevel
             PD_MSG_FIELD_I(guid) = self->fguid;
             PD_MSG_FIELD_I(properties) = 0;
             toReturn |= self->pd->fcts.processMessage(
-              self->pd, &msg, false);
+                self->pd, &msg, false);
 #undef PD_MSG
 #undef PD_TYPE
-            self->fguid.guid = UNINITIALIZED_GUID;
+            self->fguid.guid = NULL_GUID;
         }
-        break;
-    case RL_MEMORY_OK:
-        // Nothing to do
-        break;
-    case RL_COMPUTE_OK:
-        // Nothing to do
         break;
     case RL_USER_OK:
         break;

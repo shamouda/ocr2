@@ -192,7 +192,6 @@ u8 simpleSwitchRunlevel(ocrCommApi_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t
         // and check compatibility on phase 1
         break;
     case RL_NETWORK_OK:
-        // Nothing
         break;
     case RL_PD_OK:
         if(properties & RL_BRING_UP) {
@@ -201,15 +200,13 @@ u8 simpleSwitchRunlevel(ocrCommApi_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t
             self->pd = PD;
         }
         break;
-    case RL_GUID_OK:
-        // Nothing to do
-        break;
     case RL_MEMORY_OK:
-        // Nothing to do
+        break;
+    case RL_GUID_OK:
         break;
     case RL_COMPUTE_OK:
         // We can allocate our map here because the memory is up
-        if((properties & RL_BRING_UP) && phase == 0) {
+        if((properties & RL_BRING_UP) && RL_IS_FIRST_PHASE_UP(PD, RL_COMPUTE_OK)) {
             ocrCommApiSimple_t * commApiSimple = (ocrCommApiSimple_t *) self;
             commApiSimple->handleMap = newHashtableModulo(pd, HANDLE_MAP_BUCKETS);
         }

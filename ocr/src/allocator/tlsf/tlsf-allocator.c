@@ -1534,8 +1534,8 @@ u8 tlsfSwitchRunlevel(ocrAllocator_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t
 
     ocrAllocatorTlsf_t *rself = (ocrAllocatorTlsf_t*)self;
 
-    if(runlevel == RL_CONFIG_PARSE && phase == 0 &&
-       properties & RL_BRING_UP) {
+    if(runlevel == RL_CONFIG_PARSE && (properties & RL_BRING_UP) &&
+       RL_IS_FIRST_PHASE_UP(PD, RL_CONFIG_PARSE, phase)) {
         // Determine if we are the one who should be
         // bringing up the underlying memory
         // This is overly general (most likely the underlying memory
@@ -1559,8 +1559,6 @@ u8 tlsfSwitchRunlevel(ocrAllocator_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t
         // We indicate that the RL_MEMORY_OK phase requires at least 2 phases
         RL_ENSURE_PHASE_UP(PD, RL_MEMORY_OK, RL_PHASE_ALLOCATOR, 2);
         RL_ENSURE_PHASE_DOWN(PD, RL_MEMORY_OK, RL_PHASE_ALLOCATOR, 2);
-        RL_ENSURE_PHASE_UP(PD, RL_GUID_OK, RL_PHASE_ALLOCATOR, 2);
-        RL_ENSURE_PHASE_DOWN(PD, RL_GUID_OK, RL_PHASE_ALLOCATOR, 2);
     }
 
     // At this point, we can just check initAttributed. If it is
@@ -1587,37 +1585,13 @@ u8 tlsfSwitchRunlevel(ocrAllocator_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t
             self->pd = PD;
         }
         break;
-    case RL_GUID_OK:
-        if(properties & RL_BRING_UP) {
-            if(rself->initAttributed == (u64)rself &&
-               phase == RL_GET_PHASE_COUNT_UP(self->pd, RL_GUID_OK) - 1) {
-                // We get a GUID for ourself
-                guidify(self->pd, (u64)self, &(self->fguid), OCR_GUID_ALLOCATOR);
-            }
-        } else {
-            // Tear-down
-            if(rself->initAttributed == (u64)rself && phase == 0) {
-                PD_MSG_STACK(msg);
-                getCurrentEnv(NULL, NULL, NULL, &msg);
-#define PD_MSG (&msg)
-#define PD_TYPE PD_MSG_GUID_DESTROY
-                msg.type = PD_MSG_GUID_DESTROY | PD_MSG_REQUEST;
-                PD_MSG_FIELD_I(guid) = self->fguid;
-                PD_MSG_FIELD_I(properties) = 0;
-                toReturn |= self->pd->fcts.processMessage(self->pd, &msg, false);
-                self->fguid.guid = NULL_GUID;
-#undef PD_MSG
-#undef PD_TYPE
-            }
-        }
-        break;
     case RL_MEMORY_OK:
         if(properties & RL_BRING_UP) {
-            if(rself->initAttributed == (u64)rself && phase == 0) {
+            if(rself->initAttributed == (u64)rself && RL_IS_FIRST_PHASE_UP(PD, RL_MEMORY_OK, phase)) {
                 // We start the underlying memory
                 tlsfInitPool(rself);
             } else if(rself->initAttributed != (u64)rself
-                      && phase == RL_GET_PHASE_COUNT_UP(self->pd, RL_MEMORY_OK) - 1) {
+                      && RL_IS_LAST_PHASE_UP(PD, RL_MEMORY_OK, phase)) {
                 // At this point, we know that the initialization has happened (see above) so we can get
                 // the right information
                 ocrAllocatorTlsf_t *rAnchorCE = (ocrAllocatorTlsf_t*)(getAnchorCE(self));
@@ -1627,7 +1601,7 @@ u8 tlsfSwitchRunlevel(ocrAllocator_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t
             }
         } else {
             // tear-down
-            if(rself->initAttributed == (u64)rself && phase == RL_GET_PHASE_COUNT_DOWN(self->pd, RL_MEMORY_OK)) {
+            if(rself->initAttributed == (u64)rself && RL_IS_LAST_PHASE_DOWN(PD, RL_MEMORY_OK, phase)) {
 #ifdef OCR_ENABLE_STATISTICS
                 //TODO:  Should this be done by non-anchor agents too?
                 statsALLOCATOR_STOP(self->pd, self->guid, self, self->memories[0]->guid, self->memories[0]);
@@ -1651,7 +1625,30 @@ u8 tlsfSwitchRunlevel(ocrAllocator_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t
             }
         }
         break;
+    case RL_GUID_OK:
+        break;
     case RL_COMPUTE_OK:
+        if(properties & RL_BRING_UP) {
+            if(RL_IS_FIRST_PHASE_UP(PD, RL_COMPUTE_OK, phase)) {
+                // We get a GUID for ourself
+                guidify(self->pd, (u64)self, &(self->fguid), OCR_GUID_ALLOCATOR);
+            }
+        } else {
+            // Tear-down
+            if(RL_IS_LAST_PHASE_DOWN(PD, RL_COMPUTE_OK, phase)) {
+                PD_MSG_STACK(msg);
+                getCurrentEnv(NULL, NULL, NULL, &msg);
+#define PD_MSG (&msg)
+#define PD_TYPE PD_MSG_GUID_DESTROY
+                msg.type = PD_MSG_GUID_DESTROY | PD_MSG_REQUEST;
+                PD_MSG_FIELD_I(guid) = self->fguid;
+                PD_MSG_FIELD_I(properties) = 0;
+                toReturn |= self->pd->fcts.processMessage(self->pd, &msg, false);
+                self->fguid.guid = NULL_GUID;
+#undef PD_MSG
+#undef PD_TYPE
+            }
+        }
         break;
     case RL_USER_OK:
         break;

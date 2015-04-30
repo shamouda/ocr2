@@ -132,8 +132,6 @@ u8 hcSchedulerSwitchRunlevel(ocrScheduler_t *self, ocrPolicyDomain_t *PD, ocrRun
         // On bring-up: Update PD->phasesPerRunlevel on phase 0
         // and check compatibility on phase 1
         if((properties & RL_BRING_UP) && phase == 0) {
-            RL_ENSURE_PHASE_UP(PD, RL_GUID_OK, RL_PHASE_SCHEDULER, 2);
-            RL_ENSURE_PHASE_DOWN(PD, RL_GUID_OK, RL_PHASE_SCHEDULER, 2);
             RL_ENSURE_PHASE_UP(PD, RL_MEMORY_OK, RL_PHASE_SCHEDULER, 2);
             RL_ENSURE_PHASE_DOWN(PD, RL_MEMORY_OK, RL_PHASE_SCHEDULER, 2);
         }
@@ -143,35 +141,11 @@ u8 hcSchedulerSwitchRunlevel(ocrScheduler_t *self, ocrPolicyDomain_t *PD, ocrRun
     case RL_PD_OK:
         if(properties & RL_BRING_UP) {
             self->pd = PD;
-        }
-        break;
-    case RL_GUID_OK:
-        if(properties & RL_BRING_UP) {
-            if(phase == RL_GET_PHASE_COUNT_UP(self->pd, RL_GUID_OK) - 1) {
-                // Get a GUID
-                guidify(self->pd, (u64)self, &(self->fguid), OCR_GUID_SCHEDULER);
-                self->contextCount = self->pd->workerCount;
-            }
-        } else {
-            // Tear down
-            if(phase == 0) {
-                PD_MSG_STACK(msg);
-                getCurrentEnv(NULL, NULL, NULL, &msg);
-#define PD_MSG (&msg)
-#define PD_TYPE PD_MSG_GUID_DESTROY
-                msg.type = PD_MSG_GUID_DESTROY | PD_MSG_REQUEST;
-                PD_MSG_FIELD_I(guid) = self->fguid;
-                PD_MSG_FIELD_I(properties) = 0;
-                // Ignore failure, probably shutting down
-                toReturn |= self->pd->fcts.processMessage(self->pd, &msg, false);
-                self->fguid.guid = NULL_GUID;
-#undef PD_MSG
-#undef PD_TYPE
-            }
+            self->contextCount = self->pd->workerCount;
         }
         break;
     case RL_MEMORY_OK:
-        if((properties & RL_BRING_UP) && phase == RL_GET_PHASE_COUNT_UP(self->pd, RL_MEMORY_OK) -1) {
+        if((properties & RL_BRING_UP) && RL_IS_LAST_PHASE_UP(PD, RL_MEMORY_OK, phase)) {
             // allocate steal iterator cache. Use pdMalloc since this is something
             // local to the policy domain and that will never be shared
             hcWorkpileIterator_t * stealIteratorsCache = self->pd->fcts.pdMalloc(
@@ -187,13 +161,35 @@ u8 hcSchedulerSwitchRunlevel(ocrScheduler_t *self, ocrPolicyDomain_t *PD, ocrRun
             derived->stealIterators = stealIteratorsCache;
         }
 
-        if((properties & RL_TEAR_DOWN) && phase == 0) {
+        if((properties & RL_TEAR_DOWN) && RL_IS_FIRST_PHASE_DOWN(PD, RL_MEMORY_OK, phase)) {
             ocrSchedulerHc_t *derived = (ocrSchedulerHc_t*)self;
             self->pd->fcts.pdFree(self->pd, derived->stealIterators);
         }
         break;
+    case RL_GUID_OK:
+        break;
     case RL_COMPUTE_OK:
-        // We can allocate our map here because the memory is up
+        if(properties & RL_BRING_UP) {
+            if(RL_IS_FIRST_PHASE_UP(PD, RL_COMPUTE_OK, phase)) {
+                // We get a GUID for ourself
+                guidify(self->pd, (u64)self, &(self->fguid), OCR_GUID_ALLOCATOR);
+            }
+        } else {
+            // Tear-down
+            if(RL_IS_LAST_PHASE_DOWN(PD, RL_COMPUTE_OK, phase)) {
+                PD_MSG_STACK(msg);
+                getCurrentEnv(NULL, NULL, NULL, &msg);
+#define PD_MSG (&msg)
+#define PD_TYPE PD_MSG_GUID_DESTROY
+                msg.type = PD_MSG_GUID_DESTROY | PD_MSG_REQUEST;
+                PD_MSG_FIELD_I(guid) = self->fguid;
+                PD_MSG_FIELD_I(properties) = 0;
+                toReturn |= self->pd->fcts.processMessage(self->pd, &msg, false);
+                self->fguid.guid = NULL_GUID;
+#undef PD_MSG
+#undef PD_TYPE
+            }
+        }
         break;
     case RL_USER_OK:
         break;

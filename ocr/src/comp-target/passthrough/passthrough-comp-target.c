@@ -66,15 +66,19 @@ u8 ptSwitchRunlevel(ocrCompTarget_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t 
         if(properties & RL_BRING_UP)
             self->pd = PD;
         break;
+    case RL_MEMORY_OK:
+        break;
     case RL_GUID_OK:
+        break;
+    case RL_COMPUTE_OK:
         if(properties & RL_BRING_UP) {
-            if(phase == RL_GET_PHASE_COUNT_UP(self->pd, RL_GUID_OK) - 1) {
+            if(RL_IS_FIRST_PHASE_UP(PD, RL_COMPUTE_OK, phase)) {
                 // We get a GUID for ourself
                 guidify(self->pd, (u64)self, &(self->fguid), OCR_GUID_COMPTARGET);
             }
         } else {
             // Tear-down
-            if(phase == 0) {
+            if(RL_IS_LAST_PHASE_DOWN(PD, RL_COMPUTE_OK, phase)) {
                 PD_MSG_STACK(msg);
                 getCurrentEnv(NULL, NULL, NULL, &msg);
 #define PD_MSG (&msg)
@@ -89,13 +93,10 @@ u8 ptSwitchRunlevel(ocrCompTarget_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t 
             }
         }
         break;
-    case RL_MEMORY_OK:
-        break;
-    case RL_COMPUTE_OK:
+// TODO Where should this go?
 #ifdef OCR_ENABLE_STATISTICS
         statsCOMPTARGET_START(PD, compTarget->fguid.guid, compTarget->fguid.metaDataPtr);
 #endif
-        break;
     case RL_USER_OK:
         break;
     default:

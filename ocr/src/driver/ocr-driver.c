@@ -636,14 +636,14 @@ void bringUpRuntime(ocrConfig_t *ocrConfig) {
                                                   RL_REQUEST | RL_ASYNC | RL_BRING_UP | RL_NODE_MASTER),
                   ==, 0);
 
-    // Transition the root PD to GUID_OK and wait for all PDs to transition
-    RESULT_ASSERT(rootPolicy->fcts.switchRunlevel(rootPolicy, RL_GUID_OK,
-                                                  RL_REQUEST | RL_BARRIER | RL_BRING_UP | RL_NODE_MASTER),
-                  ==, 0);
-
     // Transition the root PD to MEMORY_OK
     RESULT_ASSERT(rootPolicy->fcts.switchRunlevel(rootPolicy, RL_MEMORY_OK,
                                                   RL_REQUEST | RL_ASYNC | RL_BRING_UP | RL_NODE_MASTER),
+                  ==, 0);
+
+    // Transition the root PD to GUID_OK and wait for all PDs to transition
+    RESULT_ASSERT(rootPolicy->fcts.switchRunlevel(rootPolicy, RL_GUID_OK,
+                                                  RL_REQUEST | RL_BARRIER | RL_BRING_UP | RL_NODE_MASTER),
                   ==, 0);
 
     // Transition the root PD to COMPUTE_OK
@@ -789,11 +789,11 @@ int __attribute__ ((weak)) main(int argc, const char* argv[]) {
         ==, 0);
 
     u8 returnCode = pd->shutdownCode;
-    // When we return here, we need to continue from RL_MEMORY_OK all the way down to CONFIG_PARSE
+    // When we return here, we need to continue from RL_GUID_OK all the way down to CONFIG_PARSE
     // TODO: Need to ensure that only NODE_MASTER comes out of here. Other PD_MASTER need to stay in their PDs
-    RESULT_ASSERT(pd->fcts.switchRunlevel(pd, RL_MEMORY_OK, RL_REQUEST | RL_ASYNC | RL_TEAR_DOWN | RL_NODE_MASTER),
-                  ==, 0);
     RESULT_ASSERT(pd->fcts.switchRunlevel(pd, RL_GUID_OK, RL_REQUEST | RL_ASYNC | RL_TEAR_DOWN | RL_NODE_MASTER),
+                  ==, 0);
+    RESULT_ASSERT(pd->fcts.switchRunlevel(pd, RL_MEMORY_OK, RL_REQUEST | RL_ASYNC | RL_TEAR_DOWN | RL_NODE_MASTER),
                   ==, 0);
 
     // NOTE: TODO: The switch of other PD's runlevels needs to happen with ocrPdMessages_t

@@ -42,25 +42,28 @@ typedef struct _paramListPolicyDomainInst_t {
 /******************************************************/
 /* RL macros                                          */
 /******************************************************/
-#define RL_ENSURE_PHASE_UP(pd, dim1, dim2, val) do {                    \
-        u32 _t = (pd)->phasesPerRunlevel[dim1][dim2];                   \
+#define RL_ENSURE_PHASE_UP(pd, rl, comp, val) do {                      \
+        u32 _t = (pd)->phasesPerRunlevel[rl][comp];                     \
         if((_t & 0xFFFF) < (val)) _t = (_t & 0xFFFF0000) + (val);       \
-        (pd)->phasesPerRunlevel[dim1][dim2] = _t;                       \
+        (pd)->phasesPerRunlevel[rl][comp] = _t;                         \
     } while(0)
 
-#define RL_ENSURE_PHASE_DOWN(pd, dim1, dim2, val) do {                  \
-        u32 _t = (pd)->phasesPerRunlevel[dim1][dim2];                   \
+#define RL_ENSURE_PHASE_DOWN(pd, rl, comp, val) do {                    \
+        u32 _t = (pd)->phasesPerRunlevel[rl][comp];                     \
         if((_t >> 16) < (val)) _t = ((val) << 16) + (_t & 0xFFFF);      \
-        (pd)->phasesPerRunlevel[dim1][dim2] = _t;                       \
+        (pd)->phasesPerRunlevel[rl][comp] = _t;                         \
     } while(0)
 
-#define RL_GET_PHASE_COUNT_UP(pd, dim1) ((pd)->phasesPerRunlevel[dim1][0] & 0xFFFF)
+#define RL_GET_PHASE_COUNT_UP(pd, rl) ((pd)->phasesPerRunlevel[rl][0] & 0xFFFF)
 
-#define RL_GET_PHASE_COUNT_DOWN(pd, dim1) ((pd)->phasesPerRunlevel[dim1][0] >> 16)
+#define RL_GET_PHASE_COUNT_DOWN(pd, rl) ((pd)->phasesPerRunlevel[rl][0] >> 16)
 
-#define IS_RL_LAST_PHASE(pd, dim1, phase) ((RL_GET_PHASE_COUNT_UP(pd, dim1) - 1) == phase)
+#define RL_IS_LAST_PHASE_UP(pd, rl, phase) ((RL_GET_PHASE_COUNT_UP(pd, rl) - 1) == (phase))
+#define RL_IS_LAST_PHASE_DOWN(pd, rl, phase) (phase == 0)
 
-#define IS_RL_FIRST_PHASE(pd, dim1, phase) (phase == 0)
+#define RL_IS_FIRST_PHASE_UP(pd, rl, phase)  (phase == 0)
+#define RL_IS_FIRST_PHASE_DOWN(pd, rl, phase) ((RL_GET_PHASE_COUNT_DOWN(pd, rl) - 1) == (phase))
+
 
 /******************************************************/
 /* OCR POLICY DOMAIN INTERFACE                        */
@@ -1261,7 +1264,7 @@ typedef struct _ocrPolicyDomain_t {
      * phase but part of it needs to be kept around for the shutdown
      * part. Is there a better way
      */
-    u32 phasesPerRunlevel[RL_MAX][RL_PHASE_MAX];
+    s32 phasesPerRunlevel[RL_MAX][RL_PHASE_MAX];
 
     // TODO: What to do about this?
     ocrCost_t *costFunction; /**< Cost function used to determine

@@ -558,17 +558,15 @@ u8 simpleSwitchRunlevel(ocrAllocator_t *self, ocrPolicyDomain_t *PD, ocrRunlevel
 
     ASSERT(self->memoryCount == 1);
     // Call the runlevel change on the underlying memory
-    toReturn |= self->memories[0]->fcts.switchRunlevel(self->memories[0], PD, runlevel, phase, properties,
-                                                       NULL, 0);
+    // On tear-down, we do it *AFTER* we do stuff because otherwise our mem-platform goes away
+    if(properties & RL_BRING_UP)
+        toReturn |= self->memories[0]->fcts.switchRunlevel(self->memories[0], PD, runlevel, phase, properties,
+                                                           NULL, 0);
     switch(runlevel) {
     case RL_CONFIG_PARSE:
     {
         // On bring-up: Update PD->phasesPerRunlevel on phase 0
         // and check compatibility on phase 1
-        if(properties & RL_BRING_UP && phase == 0) {
-            RL_ENSURE_PHASE_UP(PD, RL_GUID_OK, RL_PHASE_ALLOCATOR, 2);
-            RL_ENSURE_PHASE_DOWN(PD, RL_GUID_OK, RL_PHASE_ALLOCATOR, 2);
-        }
         break;
     }
     case RL_NETWORK_OK:
@@ -581,31 +579,8 @@ u8 simpleSwitchRunlevel(ocrAllocator_t *self, ocrPolicyDomain_t *PD, ocrRunlevel
             self->pd = PD;
         }
         break;
-    case RL_GUID_OK:
-        if(properties & RL_BRING_UP) {
-            if(phase == RL_GET_PHASE_COUNT_UP(self->pd, RL_GUID_OK) - 1) {
-                // We get a GUID for ourself
-                guidify(self->pd, (u64)self, &(self->fguid), OCR_GUID_ALLOCATOR);
-            }
-        } else {
-            // Tear-down
-            if(phase == 0) {
-                PD_MSG_STACK(msg);
-                getCurrentEnv(NULL, NULL, NULL, &msg);
-#define PD_MSG (&msg)
-#define PD_TYPE PD_MSG_GUID_DESTROY
-                msg.type = PD_MSG_GUID_DESTROY | PD_MSG_REQUEST;
-                PD_MSG_FIELD_I(guid) = self->fguid;
-                PD_MSG_FIELD_I(properties) = 0;
-                toReturn |= self->pd->fcts.processMessage(self->pd, &msg, false);
-                self->fguid.guid = NULL_GUID;
-#undef PD_MSG
-#undef PD_TYPE
-            }
-        }
-        break;
     case RL_MEMORY_OK:
-        if(phase == 0 && (properties & RL_BRING_UP)) {
+        if((properties & RL_BRING_UP) && RL_IS_FIRST_PHASE_UP(PD, RL_MEMORY_OK, phase)) {
             ocrAllocatorSimple_t *rself = (ocrAllocatorSimple_t*)self;
             u64 poolAddr = 0;
             DPRINTF(DEBUG_LVL_INFO, "simple bring up: poolsize 0x%llx, level %d\n",
@@ -633,7 +608,7 @@ u8 simpleSwitchRunlevel(ocrAllocator_t *self, ocrPolicyDomain_t *PD, ocrRunlevel
                     (u64)(rself->poolSize), (u64) (rself->poolStorageOffset));
 
             simpleInit( (pool_t *)addrGlobalizeOnTG((void *)rself->poolAddr, PD), rself->poolSize);
-        } else if(phase == RL_GET_PHASE_COUNT_DOWN(self->pd, RL_MEMORY_OK) - 1 && (properties & RL_TEAR_DOWN)) {
+        } else if((properties & RL_TEAR_DOWN) && RL_IS_LAST_PHASE_DOWN(PD, RL_MEMORY_OK, phase)) {
             ocrAllocatorSimple_t * rself = (ocrAllocatorSimple_t *) self;
             RESULT_ASSERT(self->memories[0]->fcts.tag(
                               rself->base.memories[0],
@@ -642,7 +617,30 @@ u8 simpleSwitchRunlevel(ocrAllocator_t *self, ocrPolicyDomain_t *PD, ocrRunlevel
                               USER_FREE_TAG), ==, 0);
         }
         break;
+    case RL_GUID_OK:
+        break;
     case RL_COMPUTE_OK:
+        if(properties & RL_BRING_UP) {
+            if(RL_IS_FIRST_PHASE_UP(PD, RL_COMPUTE_OK, phase)) {
+                // We get a GUID for ourself
+                guidify(self->pd, (u64)self, &(self->fguid), OCR_GUID_ALLOCATOR);
+            }
+        } else {
+            // Tear-down
+            if(RL_IS_LAST_PHASE_DOWN(PD, RL_COMPUTE_OK, phase)) {
+                PD_MSG_STACK(msg);
+                getCurrentEnv(NULL, NULL, NULL, &msg);
+#define PD_MSG (&msg)
+#define PD_TYPE PD_MSG_GUID_DESTROY
+                msg.type = PD_MSG_GUID_DESTROY | PD_MSG_REQUEST;
+                PD_MSG_FIELD_I(guid) = self->fguid;
+                PD_MSG_FIELD_I(properties) = 0;
+                toReturn |= self->pd->fcts.processMessage(self->pd, &msg, false);
+                self->fguid.guid = NULL_GUID;
+#undef PD_MSG
+#undef PD_TYPE
+            }
+        }
         break;
     case RL_USER_OK:
         break;
@@ -650,6 +648,9 @@ u8 simpleSwitchRunlevel(ocrAllocator_t *self, ocrPolicyDomain_t *PD, ocrRunlevel
         // Unknown runlevel
         ASSERT(0);
     }
+    if(properties & RL_TEAR_DOWN)
+        toReturn |= self->memories[0]->fcts.switchRunlevel(self->memories[0], PD, runlevel, phase, properties,
+                                                           NULL, 0);
     return toReturn;
 }
 

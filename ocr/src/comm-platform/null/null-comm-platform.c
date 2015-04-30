@@ -40,18 +40,14 @@ u8 nullSwitchRunlevel(ocrCommPlatform_t *self, ocrPolicyDomain_t *PD, ocrRunleve
         // and check compatibility on phase 1
         break;
     case RL_NETWORK_OK:
-        // Nothing
         break;
     case RL_PD_OK:
         break;
-    case RL_GUID_OK:
-        // Nothing to do
-        break;
     case RL_MEMORY_OK:
-        // Nothing to do
+        break;
+    case RL_GUID_OK:
         break;
     case RL_COMPUTE_OK:
-        // We can allocate our map here because the memory is up
         break;
     case RL_USER_OK:
         break;

@@ -49,19 +49,16 @@ u8 handlelessCommSwitchRunlevel(ocrCommApi_t *self, ocrPolicyDomain_t *PD, ocrRu
         // and check compatibility on phase 1
         break;
     case RL_NETWORK_OK:
-        // Nothing
         break;
     case RL_PD_OK:
-        self->pd = PD;
-        break;
-    case RL_GUID_OK:
-        // Nothing to do
+        if(properties & RL_BRING_UP)
+            self->pd = PD;
         break;
     case RL_MEMORY_OK:
-        // Nothing to do
+        break;
+    case RL_GUID_OK:
         break;
     case RL_COMPUTE_OK:
-        // We can allocate our map here because the memory is up
         break;
     case RL_USER_OK:
         break;

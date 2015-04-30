@@ -51,9 +51,9 @@ u8 nullSchedulerHeuristicSwitchRunlevel(ocrSchedulerHeuristc_t *self, ocrPolicyD
         break;
     case RL_PD_OK:
         break;
-    case RL_GUID_OK:
-        break;
     case RL_MEMORY_OK:
+        break;
+    case RL_GUID_OK:
         break;
     case RL_COMPUTE_OK:
         break;
