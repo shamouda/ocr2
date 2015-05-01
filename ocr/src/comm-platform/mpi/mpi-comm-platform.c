@@ -551,10 +551,14 @@ u8 MPICommSwitchRunlevel(ocrCommPlatform_t *self, ocrPolicyDomain_t *PD, ocrRunl
         }
         break;
     case RL_COMPUTE_OK:
-        PRINTF("MPI comm-api RL_COMPUTE_OK in 0x%x\n", properties);
         break;
     case RL_USER_OK:
-        PRINTF("MPI comm-api RL_USER_OK in 0x%x\n", properties);
+        if ((properties & RL_BRING_UP) && RL_IS_LAST_PHASE_UP(self->pd, RL_USER_OK, phase)) {
+            //TODO-RL: debugging... It's possible for a PD to receive
+            //a shutdown request from another PD before it has fully booted.
+            MPI_Barrier(MPI_COMM_WORLD);
+        }
+
         break;
     default:
         // Unknown runlevel
@@ -562,12 +566,6 @@ u8 MPICommSwitchRunlevel(ocrCommPlatform_t *self, ocrPolicyDomain_t *PD, ocrRunl
     }
     // Store the runlevel/phase in curState for debugging purpose
     mpiComm->curState = ((runlevel<<16) | phase);
-    if (runlevel == RL_COMPUTE_OK) {
-        PRINTF("MPI RL_COMPUTE_OK set\n");
-    }
-    if (runlevel == RL_USER_OK) {
-        PRINTF("MPI RL_USER_OK set\n");
-    }
     return toReturn;
 }
 

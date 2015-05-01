@@ -31,7 +31,6 @@
 //#define SCHED_1_0 1
 
 static u8 helperSwitchInert(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 phase, u32 properties) {
-    PRINTF("helperSwitchInert RL=%d prop=0x%x\n", runlevel, properties);
     u64 i = 0;
     u64 maxCount = 0;
     u8 toReturn = 0;
@@ -66,6 +65,8 @@ void hcWorkerCallback(ocrPolicyDomain_t *self, u64 val) {
     ocrPolicyDomainHc_t *rself = (ocrPolicyDomainHc_t*)self;
     DPRINTF(DEBUG_LVL_VERB, "Got check-in from worker %u for RL %lu\n", val & 0xFFFF, (u64)(val >> 16));
 
+    ocrWorker_t * worker;
+    getCurrentEnv(NULL, &worker, NULL, NULL);
     u32 oldVal, newVal;
     do {
         oldVal = rself->rlSwitch.checkedIn;
@@ -319,7 +320,6 @@ u8 hcPdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
         // At this stage, we have a memory to use so we can create the placer
         // This phase is the first one creating capable modules (workers) apart from myself
         if(properties & RL_BRING_UP) {
-
             phaseCount = policy->phasesPerRunlevel[RL_COMPUTE_OK][0] & 0xFFFF;
             maxCount = policy->workerCount;
             for(i = rself->rlSwitch.nextPhase; i < phaseCount; ++i) {
@@ -373,7 +373,6 @@ u8 hcPdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
             if(RL_IS_LAST_PHASE_DOWN(policy, RL_COMPUTE_OK, rself->rlSwitch.nextPhase)) {
                 ASSERT(!fromPDMsg); // This last phase is done synchronously
                 ASSERT(amPDMaster); // Only master worker should be here
-
                 toReturn |= helperSwitchInert(policy, runlevel, rself->rlSwitch.nextPhase, properties);
                 toReturn |= policy->workers[0]->fcts.switchRunlevel(
                     policy->workers[0], policy, runlevel, rself->rlSwitch.nextPhase,
@@ -1826,10 +1825,14 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             // This should not happen here as we only have one PD
             ASSERT(0);
         } else {
-            // This is from user code so it should be a request
-            // to shutdown
+            DPRINTF(DEBUG_LVL_WARN,"VV PD_MSG_MGT_RL_NOTIFY called in HC-POLICY\n");
+            // This is from user code so it should be a request to shutdown
             ocrPolicyDomainHc_t *rself = (ocrPolicyDomainHc_t*)self;
             // Set up the switching for the next phase
+            if (rself->rlSwitch.runlevel != RL_USER_OK) {
+                PRINTF("PD[%d] WARNING: forcing RL_USER_OK in PD FIXME!\n", self->myLocation);
+            }
+            rself->rlSwitch.runlevel = RL_USER_OK;
             rself->rlSwitch.nextPhase = RL_GET_PHASE_COUNT_DOWN(self, RL_USER_OK) - 1;
             ASSERT(PD_MSG_FIELD_I(properties) & RL_TEAR_DOWN);
             ASSERT(PD_MSG_FIELD_I(runlevel) & RL_COMPUTE_OK);
@@ -1838,7 +1841,6 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
                               self, RL_USER_OK, RL_TEAR_DOWN | RL_ASYNC | RL_REQUEST | RL_FROM_MSG), ==, 0);
         }
         msg->type &= ~PD_MSG_REQUEST;
-        // msg->type |= PD_MSG_RESPONSE;
         break;
 #undef PD_MSG
 #undef PD_TYPE
