@@ -1620,6 +1620,7 @@ u8 tlsfSwitchRunlevel(ocrAllocator_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t
                     poolAddr += rself->sliceSize;
                 }
                 VALGRIND_DESTROY_MEMPOOL(poolAddr);
+                ocrAllocatorTlsf_t *rAnchorCE = (ocrAllocatorTlsf_t*)(getAnchorCE(self));
                 VALGRIND_MAKE_MEM_DEFINED(poolAddr, rAnchorCE->poolSize);
 #endif
             }
