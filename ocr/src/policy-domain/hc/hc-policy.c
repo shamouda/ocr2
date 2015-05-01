@@ -12,6 +12,7 @@
 #include "ocr-errors.h"
 #include "ocr-policy-domain.h"
 #include "ocr-sysboot.h"
+#include "ocr-runtime-hints.h"
 
 #ifdef OCR_ENABLE_STATISTICS
 #include "ocr-statistics.h"
@@ -986,7 +987,7 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
 #ifdef OCR_ENABLE_EDT_NAMING
                 ASSERT(false && "no serialization of edt template string");
 #endif
-                PD_MSG_FIELD_O(size) = sizeof(ocrTaskTemplateHc_t);
+                PD_MSG_FIELD_O(size) = sizeof(ocrTaskTemplateHc_t) + (sizeof(u64) * OCR_HINT_COUNT_EDT_HC);
                 break;
             case OCR_GUID_AFFINITY:
                 localDeguidify(self, &(PD_MSG_FIELD_IO(guid)));
@@ -1098,7 +1099,13 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         opArgs.takeKind = 0;
         opArgs.takeCount = 0;
 
-        PD_MSG_FIELD_O(returnDetail) = self->schedulers[0]->fcts.op[OCR_SCHEDULER_OP_GIVE].invoke(self->schedulers[0], &opArgs, NULL);
+        ocrRuntimeHint_t *rHints = NULL;
+#ifdef ENABLE_HINTS
+        rHints = (ocrRuntimeHint_t*)(*(PD_MSG_FIELD_IO(hints)));
+#endif
+
+        PD_MSG_FIELD_O(returnDetail) = self->schedulers[0]->fcts.op[OCR_SCHEDULER_OP_GIVE].invoke(self->schedulers[0], &opArgs, rHints);
+
 #else
         if (PD_MSG_FIELD_I(type) == OCR_GUID_EDT) {
             PD_MSG_FIELD_O(returnDetail) = self->schedulers[0]->fcts.giveEdt(
@@ -1547,7 +1554,7 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             {
                 ASSERT(kind & OCR_GUID_EVENT);
                 ocrEvent_t *evt = (ocrEvent_t*)(PD_MSG_FIELD_I(guid.metaDataPtr));
-                PD_MSG_FIELD_O(returnDetail) = self->eventFactories[0]->fcts[evt->kind].setHint(evt, &(PD_MSG_FIELD_I(hint)));
+                PD_MSG_FIELD_O(returnDetail) = self->eventFactories[0]->commonFcts.setHint(evt, &(PD_MSG_FIELD_I(hint)));
             }
             break;
         case OCR_HINT_GROUP_T:
@@ -1596,7 +1603,7 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             {
                 ASSERT(kind & OCR_GUID_EVENT);
                 ocrEvent_t *evt = (ocrEvent_t*)(PD_MSG_FIELD_I(guid.metaDataPtr));
-                PD_MSG_FIELD_O(returnDetail) = self->eventFactories[0]->fcts[evt->kind].getHint(evt, &(PD_MSG_FIELD_IO(hint)));
+                PD_MSG_FIELD_O(returnDetail) = self->eventFactories[0]->commonFcts.getHint(evt, &(PD_MSG_FIELD_IO(hint)));
             }
             break;
         case OCR_HINT_GROUP_T:

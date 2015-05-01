@@ -20,6 +20,13 @@
 #include "utils/ocr-utils.h"
 #include "ocr-worker.h"
 
+#ifdef ENABLE_HINTS
+/**< The number of hint properties supported by this implementation */
+#define OCR_HINT_COUNT_DB_LOCKABLE   0
+#else
+#define OCR_HINT_COUNT_DB_LOCKABLE   0
+#endif
+
 typedef struct {
     ocrDataBlockFactory_t base;
 } ocrDataBlockFactoryLockable_t;
@@ -51,6 +58,7 @@ typedef struct _ocrDataBlockLockable_t {
     struct _dbWaiter_t * roWaiterList;  /**< EDTs waiting for read only access */
     ocrLocation_t itwLocation;
     ocrWorker_t * worker; /**< worker currently owning the DB internal lock */
+    ocrRuntimeHint_t hint;
 } ocrDataBlockLockable_t;
 
 extern ocrDataBlockFactory_t* newDataBlockFactoryLockable(ocrParamList_t *perType, u32 factoryId);

@@ -14,7 +14,7 @@
 #include "ocr-allocator.h"
 #include "ocr-types.h"
 #include "utils/ocr-utils.h"
-#include "ocr-hint.h"
+#include "ocr-runtime-hints.h"
 
 #ifdef OCR_ENABLE_STATISTICS
 #include "ocr-statistics.h"
@@ -168,6 +168,18 @@ typedef struct _ocrDataBlockFcts_t {
      * @return 0 on success and a non-zero code on failure
      */
     u8 (*getHint)(struct _ocrDataBlock_t* self, ocrHint_t *hint);
+
+    /**
+     * @brief Get runtime hints from the DB
+     *
+     * The hints structure is an array of u64 values,
+     * starting with the mask and followed by the
+     * hint values.
+     *
+     * @param[in] self        Pointer to this datablock
+     * @return pointer to hint structure
+     */
+    ocrRuntimeHint_t* (*getRuntimeHint)(struct _ocrDataBlock_t* self);
 } ocrDataBlockFcts_t;
 
 /**
@@ -234,6 +246,7 @@ typedef struct _ocrDataBlockFactory_t {
     void (*destruct)(struct _ocrDataBlockFactory_t *factory);
     u32 factoryId; /**< Corresponds to fctId in DB */
     ocrDataBlockFcts_t fcts; /**< Function pointers created instances should use */
+    u64 *hintPropMap; /**< Mapping hint properties to implementation specific packed array */
 } ocrDataBlockFactory_t;
 
 #endif /* __OCR_DATABLOCK_H__ */

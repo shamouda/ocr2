@@ -19,6 +19,12 @@
 #include "ocr-types.h"
 #include "utils/ocr-utils.h"
 
+#ifdef ENABLE_HINTS
+/**< The number of hint properties supported by this implementation */
+#define OCR_HINT_COUNT_DB_REGULAR   0
+#else
+#define OCR_HINT_COUNT_DB_REGULAR   0
+#endif
 
 typedef struct {
     ocrDataBlockFactory_t base;
@@ -39,6 +45,7 @@ typedef struct _ocrDataBlockRegular_t {
     ocrDataBlock_t base; /* Data for the data-block */
     u32 lock; /**< Lock for this data-block */
     ocrDataBlockRegularAttr_t attributes; /**< Attributes for this data-block */
+    ocrRuntimeHint_t hint;
 } ocrDataBlockRegular_t;
 
 extern ocrDataBlockFactory_t* newDataBlockFactoryRegular(ocrParamList_t *perType, u32 factoryId);

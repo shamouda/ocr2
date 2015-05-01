@@ -29,6 +29,24 @@
 
 #define DEBUG_TYPE DATABLOCK
 
+/***********************************************************/
+/* OCR-Regular Datablock Hint Properties                   */
+/* (Add implementation specific supported properties here) */
+/***********************************************************/
+
+u64 ocrHintPropDbRegular[] = {
+#ifdef ENABLE_HINTS
+#endif
+};
+
+//Make sure OCR_HINT_COUNT_DB_REGULAR in regular-datablock.h is equal to the length of array ocrHintPropDbRegular
+ocrStaticAssert((sizeof(ocrHintPropDbRegular)/sizeof(u64)) == OCR_HINT_COUNT_DB_REGULAR);
+ocrStaticAssert(OCR_HINT_COUNT_DB_REGULAR < OCR_RUNTIME_HINT_PROP_BITS);
+
+/******************************************************/
+/* OCR-Regular Datablock                              */
+/******************************************************/
+
 // Forward declaraction
 u8 regularDestruct(ocrDataBlock_t *self);
 
@@ -203,12 +221,13 @@ ocrDataBlock_t* newDataBlockRegular(ocrDataBlockFactory_t *factory, ocrFatGuid_t
 
     getCurrentEnv(&pd, NULL, &task, &msg);
 
+    u32 hintc = (flags & DB_PROP_NO_HINT) ? 0 : OCR_HINT_COUNT_DB_REGULAR;
 #define PD_MSG (&msg)
 #define PD_TYPE PD_MSG_GUID_CREATE
     msg.type = PD_MSG_GUID_CREATE | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
     PD_MSG_FIELD_IO(guid.guid) = NULL_GUID;
     PD_MSG_FIELD_IO(guid.metaDataPtr) = NULL;
-    PD_MSG_FIELD_I(size) = sizeof(ocrDataBlockRegular_t);
+    PD_MSG_FIELD_I(size) = sizeof(ocrDataBlockRegular_t) + hintc*sizeof(u64);
     PD_MSG_FIELD_I(kind) = OCR_GUID_DB;
     PD_MSG_FIELD_I(properties) = 0;
 
@@ -234,6 +253,13 @@ ocrDataBlock_t* newDataBlockRegular(ocrDataBlockFactory_t *factory, ocrFatGuid_t
     result->attributes.internalUsers = 0;
     result->attributes.freeRequested = 0;
 
+    if (hintc == 0) {
+        result->hint.hintMask = 0;
+        result->hint.hintVal = NULL;
+    } else {
+        OCR_RUNTIME_HINT_MASK_INIT(result->hint.hintMask, OCR_HINT_DB_T, factory->factoryId);
+        result->hint.hintVal = (u64*)((u64)result + sizeof(ocrDataBlockRegular_t));
+    }
 #ifdef OCR_ENABLE_STATISTICS
     statsDB_CREATE(pd, task->guid, task, allocator.guid,
                    (ocrAllocator_t*)allocator.metaDataPtr, result->base.guid,
@@ -247,11 +273,22 @@ ocrDataBlock_t* newDataBlockRegular(ocrDataBlockFactory_t *factory, ocrFatGuid_t
 }
 
 u8 regularSetHint(ocrDataBlock_t* self, ocrHint_t *hint) {
+    ocrDataBlockRegular_t *derived = (ocrDataBlockRegular_t*)self;
+    ocrRuntimeHint_t *rHint = &(derived->hint);
+    OCR_RUNTIME_HINT_SET(hint, rHint, OCR_HINT_COUNT_DB_REGULAR, ocrHintPropDbRegular, OCR_HINT_DB_PROP_START);
     return 0;
 }
 
 u8 regularGetHint(ocrDataBlock_t* self, ocrHint_t *hint) {
+    ocrDataBlockRegular_t *derived = (ocrDataBlockRegular_t*)self;
+    ocrRuntimeHint_t *rHint = &(derived->hint);
+    OCR_RUNTIME_HINT_GET(hint, rHint, OCR_HINT_COUNT_DB_REGULAR, ocrHintPropDbRegular, OCR_HINT_DB_PROP_START);
     return 0;
+}
+
+ocrRuntimeHint_t* getRuntimeHintDbRegular(ocrDataBlock_t* self) {
+    ocrDataBlockRegular_t *derived = (ocrDataBlockRegular_t*)self;
+    return &(derived->hint);
 }
 
 /******************************************************/
@@ -280,7 +317,11 @@ ocrDataBlockFactory_t *newDataBlockFactoryRegular(ocrParamList_t *perType, u32 f
                                                    u32, bool), regularUnregisterWaiter);
     base->fcts.setHint = FUNC_ADDR(u8 (*)(ocrDataBlock_t*, ocrHint_t*), regularSetHint);
     base->fcts.getHint = FUNC_ADDR(u8 (*)(ocrDataBlock_t*, ocrHint_t*), regularGetHint);
+    base->fcts.getRuntimeHint = FUNC_ADDR(ocrRuntimeHint_t* (*)(ocrDataBlock_t*), getRuntimeHintDbRegular);
     base->factoryId = factoryId;
+    //Setup hint framework
+    base->hintPropMap = (u64*)runtimeChunkAlloc(sizeof(u64)*(OCR_HINT_DB_PROP_END - OCR_HINT_DB_PROP_START - 1), PERSISTENT_CHUNK);
+    OCR_HINT_SETUP(base->hintPropMap, ocrHintPropDbRegular, OCR_HINT_COUNT_DB_REGULAR, OCR_HINT_DB_PROP_START, OCR_HINT_DB_PROP_END);
 
     return base;
 }

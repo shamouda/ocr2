@@ -59,6 +59,9 @@
 #define ENABLE_GUID_PTR
 #define ENABLE_GUID_COUNTED_MAP
 
+// Hints
+#define ENABLE_HINTS
+
 // HAL layer to use
 #define HAL_X86_64
 

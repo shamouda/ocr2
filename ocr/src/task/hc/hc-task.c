@@ -37,6 +37,22 @@ extern struct _dbWeightStruct gDbWeights[] __attribute__((weak));
 
 #define DEBUG_TYPE TASK
 
+/***********************************************************/
+/* OCR-HC Task Hint Properties                             */
+/* (Add implementation specific supported properties here) */
+/***********************************************************/
+
+u64 ocrHintPropTaskHc[] = {
+#ifdef ENABLE_HINTS
+    OCR_HINT_EDT_PRIORITY,
+    OCR_HINT_EDT_SLOT_MAX_ACCESS
+#endif
+};
+
+//Make sure OCR_HINT_COUNT_EDT_HC in hc-task.h is equal to the length of array ocrHintPropTaskHc
+ocrStaticAssert((sizeof(ocrHintPropTaskHc)/sizeof(u64)) == OCR_HINT_COUNT_EDT_HC);
+ocrStaticAssert(OCR_HINT_COUNT_EDT_HC < OCR_RUNTIME_HINT_PROP_BITS);
+
 /******************************************************/
 /* OCR-HC Task Template Factory                       */
 /******************************************************/
@@ -75,13 +91,14 @@ ocrTaskTemplate_t * newTaskTemplateHc(ocrTaskTemplateFactory_t* factory, ocrEdt_
     ocrPolicyDomain_t *pd = NULL;
     PD_MSG_STACK(msg);
 
+    u32 hintc = OCR_HINT_COUNT_EDT_HC;
     getCurrentEnv(&pd, NULL, NULL, &msg);
 #define PD_MSG (&msg)
 #define PD_TYPE PD_MSG_GUID_CREATE
     msg.type = PD_MSG_GUID_CREATE | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
     PD_MSG_FIELD_IO(guid.guid) = NULL_GUID;
     PD_MSG_FIELD_IO(guid.metaDataPtr) = NULL;
-    PD_MSG_FIELD_I(size) = sizeof(ocrTaskTemplateHc_t);
+    PD_MSG_FIELD_I(size) = sizeof(ocrTaskTemplateHc_t) + hintc*sizeof(u64);
     PD_MSG_FIELD_I(kind) = OCR_GUID_EDT_TEMPLATE;
     PD_MSG_FIELD_I(properties) = 0;
 
@@ -100,6 +117,15 @@ ocrTaskTemplate_t * newTaskTemplateHc(ocrTaskTemplateFactory_t* factory, ocrEdt_
     hal_memCopy(&(base->name[0]), fctName, ocrStrlen(fctName) + 1, false);
 #endif
     base->fctId = factory->factoryId;
+
+    ocrTaskTemplateHc_t *derived = (ocrTaskTemplateHc_t*)base;
+    if (hintc == 0) {
+        derived->hint.hintMask = 0;
+        derived->hint.hintVal = NULL;
+    } else {
+        OCR_RUNTIME_HINT_MASK_INIT(derived->hint.hintMask, OCR_HINT_EDT_T, factory->factoryId);
+        derived->hint.hintVal = (u64*)((u64)base + sizeof(ocrTaskTemplateHc_t));
+    }
 
 #ifdef OCR_ENABLE_STATISTICS
     {
@@ -138,11 +164,22 @@ ocrTaskTemplate_t * newTaskTemplateHc(ocrTaskTemplateFactory_t* factory, ocrEdt_
 }
 
 u8 setHintTaskTemplateHc(ocrTaskTemplate_t* self, ocrHint_t *hint) {
+    ocrTaskTemplateHc_t *derived = (ocrTaskTemplateHc_t*)self;
+    ocrRuntimeHint_t *rHint = &(derived->hint);
+    OCR_RUNTIME_HINT_SET(hint, rHint, OCR_HINT_COUNT_EDT_HC, ocrHintPropTaskHc, OCR_HINT_EDT_PROP_START);
     return 0;
 }
 
 u8 getHintTaskTemplateHc(ocrTaskTemplate_t* self, ocrHint_t *hint) {
+    ocrTaskTemplateHc_t *derived = (ocrTaskTemplateHc_t*)self;
+    ocrRuntimeHint_t *rHint = &(derived->hint);
+    OCR_RUNTIME_HINT_GET(hint, rHint, OCR_HINT_COUNT_EDT_HC, ocrHintPropTaskHc, OCR_HINT_EDT_PROP_START);
     return 0;
+}
+
+ocrRuntimeHint_t* getRuntimeHintTaskTemplateHc(ocrTaskTemplate_t* self) {
+    ocrTaskTemplateHc_t *derived = (ocrTaskTemplateHc_t*)self;
+    return &(derived->hint);
 }
 
 void destructTaskTemplateFactoryHc(ocrTaskTemplateFactory_t* base) {
@@ -158,6 +195,10 @@ ocrTaskTemplateFactory_t * newTaskTemplateFactoryHc(ocrParamList_t* perType, u32
     base->fcts.destruct = FUNC_ADDR(u8 (*)(ocrTaskTemplate_t*), destructTaskTemplateHc);
     base->fcts.setHint = FUNC_ADDR(u8 (*)(ocrTaskTemplate_t*, ocrHint_t*), setHintTaskTemplateHc);
     base->fcts.getHint = FUNC_ADDR(u8 (*)(ocrTaskTemplate_t*, ocrHint_t*), getHintTaskTemplateHc);
+    base->fcts.getRuntimeHint = FUNC_ADDR(ocrRuntimeHint_t* (*)(ocrTaskTemplate_t*), getRuntimeHintTaskTemplateHc);
+    //Setup hint framework
+    base->hintPropMap = (u64*)runtimeChunkAlloc(sizeof(u64)*(OCR_HINT_EDT_PROP_END - OCR_HINT_EDT_PROP_START - 1), PERSISTENT_CHUNK);
+    OCR_HINT_SETUP(base->hintPropMap, ocrHintPropTaskHc, OCR_HINT_COUNT_EDT_HC, OCR_HINT_EDT_PROP_START, OCR_HINT_EDT_PROP_END);
     return base;
 }
 
@@ -394,6 +435,12 @@ static u8 scheduleTask(ocrTask_t *self) {
     PD_MSG_FIELD_IO(guidCount) = 1;
     PD_MSG_FIELD_I(properties) = 0;
     PD_MSG_FIELD_I(type) = OCR_GUID_EDT;
+#ifdef ENABLE_HINTS
+    u64 *hints[1]; //declare static hint array
+    ocrTaskHc_t *derived = (ocrTaskHc_t*)self;
+    hints[0] = (u64*)(&(derived->hint));
+    PD_MSG_FIELD_IO(hints) = hints;
+#endif
     RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, false));
 #undef PD_MSG
 #undef PD_TYPE
@@ -526,6 +573,8 @@ u8 newTaskHc(ocrTaskFactory_t* factory, ocrFatGuid_t * edtGuid, ocrFatGuid_t edt
 #undef PD_TYPE
     }
 
+    u32 hintc = hasProperty(properties, EDT_PROP_NO_HINT) ? 0 : OCR_HINT_COUNT_EDT_HC;
+
     PD_MSG_STACK(msg);
     // Create the task itself by getting a GUID
     getCurrentEnv(NULL, NULL, NULL, &msg);
@@ -535,7 +584,7 @@ u8 newTaskHc(ocrTaskFactory_t* factory, ocrFatGuid_t * edtGuid, ocrFatGuid_t edt
     PD_MSG_FIELD_IO(guid.guid) = NULL_GUID;
     PD_MSG_FIELD_IO(guid.metaDataPtr) = NULL;
     // We allocate everything in the meta-data to keep things simple
-    PD_MSG_FIELD_I(size) = sizeof(ocrTaskHc_t) + paramc*sizeof(u64) + depc*sizeof(regNode_t);
+    PD_MSG_FIELD_I(size) = sizeof(ocrTaskHc_t) + paramc*sizeof(u64) + depc*sizeof(regNode_t) + hintc*sizeof(u64);
     PD_MSG_FIELD_I(kind) = OCR_GUID_EDT;
     PD_MSG_FIELD_I(properties) = 0;
     RESULT_PROPAGATE2(pd->fcts.processMessage(pd, &msg, true), 1);
@@ -573,6 +622,14 @@ u8 newTaskHc(ocrTaskFactory_t* factory, ocrFatGuid_t * edtGuid, ocrFatGuid_t edt
         edt->signalers[i].guid = UNINITIALIZED_GUID;
         edt->signalers[i].slot = i;
         edt->signalers[i].mode = -1; //Systematically set when adding dependence
+    }
+
+    if (hintc == 0) {
+        edt->hint.hintMask = 0;
+        edt->hint.hintVal = NULL;
+    } else {
+        OCR_RUNTIME_HINT_MASK_INIT(edt->hint.hintMask, OCR_HINT_EDT_T, factory->factoryId);
+        edt->hint.hintVal = (u64*)((u64)base + sizeof(ocrTaskHc_t) + paramc*sizeof(u64) + depc*sizeof(regNode_t));
     }
 
     // Set up HC specific stuff
@@ -1083,11 +1140,22 @@ u8 taskExecute(ocrTask_t* base) {
 }
 
 u8 setHintTaskHc(ocrTask_t* self, ocrHint_t *hint) {
+    ocrTaskHc_t *derived = (ocrTaskHc_t*)self;
+    ocrRuntimeHint_t *rHint = &(derived->hint);
+    OCR_RUNTIME_HINT_SET(hint, rHint, OCR_HINT_COUNT_EDT_HC, ocrHintPropTaskHc, OCR_HINT_EDT_PROP_START);
     return 0;
 }
 
 u8 getHintTaskHc(ocrTask_t* self, ocrHint_t *hint) {
+    ocrTaskHc_t *derived = (ocrTaskHc_t*)self;
+    ocrRuntimeHint_t *rHint = &(derived->hint);
+    OCR_RUNTIME_HINT_GET(hint, rHint, OCR_HINT_COUNT_EDT_HC, ocrHintPropTaskHc, OCR_HINT_EDT_PROP_START);
     return 0;
+}
+
+ocrRuntimeHint_t* getRuntimeHintTaskHc(ocrTask_t* self) {
+    ocrTaskHc_t *derived = (ocrTaskHc_t*)self;
+    return &(derived->hint);
 }
 
 void destructTaskFactoryHc(ocrTaskFactory_t* base) {
@@ -1111,6 +1179,10 @@ ocrTaskFactory_t * newTaskFactoryHc(ocrParamList_t* perInstance, u32 factoryId) 
     base->fcts.dependenceResolved = FUNC_ADDR(u8 (*)(ocrTask_t*, ocrGuid_t, void*, u32), dependenceResolvedTaskHc);
     base->fcts.setHint = FUNC_ADDR(u8 (*)(ocrTask_t*, ocrHint_t*), setHintTaskHc);
     base->fcts.getHint = FUNC_ADDR(u8 (*)(ocrTask_t*, ocrHint_t*), getHintTaskHc);
+    base->fcts.getRuntimeHint = FUNC_ADDR(ocrRuntimeHint_t* (*)(ocrTask_t*), getRuntimeHintTaskHc);
+    //Setup hint framework
+    base->hintPropMap = (u64*)runtimeChunkAlloc(sizeof(u64)*(OCR_HINT_EDT_PROP_END - OCR_HINT_EDT_PROP_START - 1), PERSISTENT_CHUNK);
+    OCR_HINT_SETUP(base->hintPropMap, ocrHintPropTaskHc, OCR_HINT_COUNT_EDT_HC, OCR_HINT_EDT_PROP_START, OCR_HINT_EDT_PROP_END);
     return base;
 }
 #endif /* ENABLE_TASK_HC */
