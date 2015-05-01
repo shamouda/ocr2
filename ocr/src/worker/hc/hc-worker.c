@@ -337,6 +337,8 @@ u8 hcWorkerSwitchRunlevel(ocrWorker_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_
 
         }
         if((properties & RL_TEAR_DOWN)) {
+            toReturn |= self->computes[0]->fcts.switchRunlevel(self->computes[0], PD, runlevel, phase, properties,
+	               	                                       NULL, 0);
             if(RL_IS_LAST_PHASE_DOWN(PD, RL_COMPUTE_OK, phase)) {
                 // Destroy GUID
                 PD_MSG_STACK(msg);
