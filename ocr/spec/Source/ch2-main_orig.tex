@@ -1,0 +1,26 @@
+% This is an included file. See the master file for more information.
+%
+
+\chapter{OCR API Documentation}
+\label{chap:OCRAPI}
+% Change all headers so that it fits in the chapter
+% (instead of all being different chapters)
+\let\origchapter=\chapter
+\let\origsection=\section
+\let\origsubsection=\subsection
+\let\origsubsubsection=\subsubsection
+\let\origparagraph=\paragraph
+\renewcommand\chapter{\origsection}
+\renewcommand\section{\origsubsection}
+\renewcommand\subsection{\origsubsubsection}
+\renewcommand\subsubsection{\origparagraph}
+\renewcommand\paragraph{\subparagraph}
+\input{ocr_doxygen/refman.tex}
+% Now set things back properly
+\renewcommand\chapter{\origchapter}
+\renewcommand\section{\origsection}
+\renewcommand\subsection{\origsubsection}
+\renewcommand\subsubsection{\origsubsubsection}
+\renewcommand\paragraph{\origparagraph}
+
+% This is the end of ch2-main.tex of the OCR specification.

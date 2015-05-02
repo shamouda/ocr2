@@ -1,0 +1,294 @@
+%
+% This is an included file. See the master file for more information.
+%
+
+%
+\section{Glossary}
+\label{sec:Glossary}
+\glossaryterm{Acquired}
+\index{Acquired}
+\glossarydefstart
+The state of a data block when its chunk of data is accessible to an
+OCR object. For example, an EDT must acquire a data block before it
+can read-from or write-to that data block.
+\glossarydefend
+
+\glossaryterm{Data Block (DB)}
+\index{Data Block}
+\glossarydefstart
+The data, used by an OCR object such as an EDT, that is intended for
+access by other OCR objects. A data block specifies
+a chunk of data that is entirely accessible as an offset from a starting address.
+\glossarydefend
+
+\glossaryterm{Dependence}
+\index{Dependence}
+\glossarydefstart
+A dependence is a link between the post-slot of a source event or
+data-block and the pre-slot of a destination EDT or event. The
+satisfaction of the source OCR object's post-slot will trigger the
+satisfaction of the destination OCR object's pre-slot.
+\glossarydefend
+
+\glossaryterm{Event driven Task (EDT)}
+\index{Event Driven Task}\index{EDT}
+\glossarydefstart
+An OCR object that implements the concept of a task. An EDT with $N$
+dependences will have $N$ \emph{pre-slots} numbered from $0$ to $N-1$
+and one post-slot.
+Each of the \emph{pre-slots} associated with an EDT connects to a
+single OCR object, while the EDT’s single \emph{post-slot} can connect
+to multiple OCR objects. An EDT transitions to the \emph{ready} state when all its
+pre-slots have been satisfied; the pre-slots determine which
+data blocks, if any, the EDT may access.  Once an EDT is in the ready state, it will 
+eventually run on the OCR platform.
+\glossarydefend
+
+% Vivek writes ...
+%An EDT may have zero or more pre-slots that serve as preconditions. Each pre-slot is associated with a
+% single OCR event. An EDT also has a single post-slot that is associated with the event that represents
+%the completion of the EDT's execution.
+%
+%NOTE: I really like the text below on how the DAG is defined, but I'm not sure that it belongs in
+%the glossary. It might be better to create a separate section titled something like "Computation DAG"
+%and use that to explicitly define the DAG referred to in Section 1.1. That new subsection should include
+%figures, with a graphical notation (e.g.,with input ports for each of the pre-slots) that makes the points
+% in the text very clear. I'd be happy to provide text for that  subsection, if needed.
+%
+% TGM responds ... I like much of what Vivek is saying here, but we don't have time to update the
+%definition as he suggested (we'd need to define a continuation for example). We may choose to
+% add that section, but we'll have to also discuss that for a later day. The problem is that every
+% presentation I've seen that uses the graphical representation vivek alludes to makes things
+% less clear, not more clear. This is the same problem I have with CnC which is only clear
+% and easy to understand by the handful or people who created it or worked directly with it. To
+% an application programmer, their diagrams are just a confusing mess. The same holds for OCR
+% so we need to figure out how to fix this before we work it into the spec.
+\glossaryterm{EDT function}
+\index{EDT function}
+\glossarydefstart
+The function that defines the code to be executed by an EDT. The function
+takes as arguments the number of parameters, the actual array of
+parameters, the number of dependences and the actual array of
+dependences. \emph{Parameters} are static 64-bit values known at EDT
+creation time and \emph{dependences} are dynamic control or data
+dependences. The parameter array is copied by value when the EDT is
+created and enters the \emph{available} state. The dependences (namely the array of dependences) are
+determined at runtime and are fully resolved only when the EDT is launched and 
+is ready to execute. The EDT function can optionally return the GUID of a Data Block or
+event that will be passed along its ``post'' slot.
+
+\glossarydefend
+\glossaryterm{EDT template}
+\index{EDT template}
+\glossarydefstart
+An OCR object from which an EDT instance is created. The EDT template
+stores meta-data related to the EDT definition, the EDT function, and
+the number of parameters and dependences available to EDTs
+instantiated (created) from this template. Multiple EDTs can be created from the
+same EDT template.
+\glossarydefend
+
+
+%%
+%TGM:  Rob urges us to put all the event definitions together. We may want to organize this glossary along the lines
+% of what is done in the OpenMP specification .... a high level topical break-down and alphabetical inside
+% at topic.
+
+\glossaryterm{Event}
+\index{Event}
+\glossarydefstart
+An OCR object used as an indirection mechanism between other OCR
+objects interested in each other's change of state (unsatisfied to
+satisfied). Events are the main synchronization mechanism in OCR.
+\glossarydefend
+
+\glossaryterm{Finish EDT}
+\index{Finish EDT}
+\glossarydefstart
+A special class of EDT. As an EDT runs, it may create additional EDTs
+which may themselves create even more EDTs. 
+For the case of a finish
+EDT, the EDTs created within its scope (i.e.\ its child EDTs and further
+descendants) complete and satisfy their post-slots
+before the finish EDT can satisfy its post-slot. The result is that
+any OCR object linked to the post-slot of the finish EDT will by
+necessity not be enter the \emph{ready} state (i.e. be scheduled for 
+execution) until the finish EDT and all
+EDTs created during its execution have completed.
+%
+% The following text from Vivek is more precise, but it generates a latex error when I 
+% try to typeset it.  
+%
+%For the case of a Finish EDT, F, each EDT created with F identified 
+%as its Immediately Enclosing Finish (IEF) 
+%must complete execution and satisfy its post-slot before Finish EDT F can satisfy its post-slot.
+%The result is that any OCR object linked to the post-slot of 
+%the finish~EDT will by necessity
+%wait until finish~EDT F and all EDTs that have F as their IEF have completed.
+
+\glossarydefend
+
+
+\glossaryterm{Globally Unique ID (GUID)}
+\index{Globally Unique ID}\index{GUID}
+\glossarydefstart
+A value generated by the runtime system that uniquely identifies each
+OCR object. The GUIDs for the OCR objects reside in a global name
+space visible to all EDTs.
+\glossarydefend
+
+% Vivek writes ...
+%
+%  A 64-bit value that uniquely identiﬁes each OCR object. The GUIDs for the OCR
+% objects reside in a global name space visible to all EDTs. Creation and management
+% of GUIDs is managed by the OCR runtime by default, though user input can also be
+% used to influence GUID allocation, if so desired.
+%
+% TGM responds ... two problem. Why does it have to be 64 bit as defined in the spec?   I don't
+% get that. Second, the current API doesn't provice uer input to influce GUID allocation so
+% we can't say this yet. Right?
+
+\glossaryterm{Latch Event}
+\index{Latch Event}
+\glossarydefstart
+A special type of event that propagates a satisfy signal to its post-slot
+when it has been satisfied an equal number of times on each of its two
+pre-slots. In other words, if you imagine a
+monotonically increasing counter on each of the two pre-slots, the
+latch event's post-slot will be satisfied if and only if both monotonically
+increasing counters are non-zero and equal. Note that once the latch
+event's post-slot is satisfied, satisfaction on the latch event's
+pre-slots will result in undefined behavior; the latch event will
+therefore only satisfy its post-slot at most one time.
+\glossarydefend
+
+% vivek writes ...
+%(See earlier note re. definition of pre-slots and post-slots for events.)
+%
+%Need to clarify that the post-slot of the latch event can only be triggered once.
+%
+%Also, a problematic aspect of a latch event is that it appears that a pre-slot can
+%be "triggered" multiple times. Maybe it should not be called a pre-slot?
+%
+%In general, it feels like we need an OO-style abstraction for events, in which an
+%event has a void satisfy function with a parameter list that includes the pointer to
+%the satisfy function, and an argc, argc pair that represents arguments for the function.
+% One challenge is where to store the internal state of the event. Seems like it needs
+% to be in a data block?
+
+%TGM responds ... this is another case where I didnt' want to make major changes to
+% this without a long discussion with the group. I can't tell you how much time we  spent
+%creating the current definition so changes would be problematic.
+%
+% I wanted to capture Vivek's comments espeically about the OO suggestion. I think he
+% is touching on something very important there and we need to dsicuss this in more
+% detail.
+%
+% REC: I agree with his OO-style of abstraction. I have always (but
+% probably not very clearly) tried to say that events have a mini
+% ``rule'' that determines when its post-slot get satisfied. As for
+% the state to store, it's in the metadata
+
+\glossaryterm{OCR object}
+\index{OCR object}
+\glossarydefstart
+A reference counted object managed by OCR. \emph{EDTs}, \emph{events},
+\emph{templates}, and \emph{data blocks} are the most frequently
+encountered examples of OCR objects. Each OCR object has a unique
+identifier, or GUID.
+\glossarydefend
+
+\glossaryterm{OCR program}
+\index{OCR program}
+\glossarydefstart
+A program that is conformant to the OCR specification. Statements in
+the OCR specification about the OCR program only refer to behaviors
+associated with the constructs that make up OCR. For example, if an
+OCR program were to use a parallel programming model outside of OCR,
+that program is no longer a purely conformant OCR program and its
+behavior can no longer be defined by OCR.
+\glossarydefend
+
+\glossaryterm{Released}
+\index{Released}
+\glossarydefstart
+The state of a data block that is no longer accessible by a certain OCR
+object. For example, after an EDT has finished all of its
+modification to a data block and it is ready to make those
+modifications accessible by other EDTs, it must release that data
+block.
+\glossarydefend
+
+\glossaryterm{Slot}
+\index{Slot}
+\glossarydefstart
+Positional end point for a dependence. An OCR object has one or more
+slots. Exactly one slot is a \emph{post-slot}. This is used to
+communicate the state of the OCR object to other OCR objects. The
+other zero of more slots are \emph{pre-slots}, which are used to manage
+input dependences of the OCR object. A slot can be:
+\begin{itemize}
+\item Unconnected: There are no links connecting to the slot;
+\item Connected: a link attaches a source post-slot to a destination pre-slot.
+\end{itemize}
+A slot in the \emph{connected} state can be:
+\begin{itemize}
+\item Satisfied: the source of the link has been triggered;
+%\item Triggered: see 'Trigger';
+\item Unsatisfied: the source of the link has not been triggered.
+\end{itemize}
+\glossarydefend
+
+\glossaryterm{Task}
+\index{Task}
+\glossarydefstart
+A non-blocking set of instructions that constitute the fundamental
+``unit of work'' in OCR.  By ``non-blocking'' we mean that once all
+preconditions on a task are met, the task is ``ready to execute'' 
+and it will execute at some point,
+regardless of what any other task in the system does. The concept of
+a task is realized by the OCR object ``Event Driven Task'' or EDT.
+\glossarydefend
+
+\glossaryterm{Trigger}
+\index{Trigger}
+\glossarydefstart
+This term is used to describe the action of either a ``satisfied''
+post-slot or of an event whose trigger rule is satisfied. In the
+former case, when a post slot on
+an OCR object is satisfied, it triggers any connected
+pre-slots causing them to become ``satisfied''. In the latter case,
+when an event's trigger rule is satisfied (due to satisfaction(s) on its
+pre-slot(s)), it satisfies its post-slot. Therefore, for most events,
+when the event's pre-slot becomes satisfied, this will trigger the event and
+therefore cause it to satisfy its post-slot which will in turn trigger
+the dependence link and satisfy all pre-slots connected to the event's
+post-slot. The conjugated form \emph{triggered} is used as an
+attributive past participle; that is
+``an EDT that has finished executing the code in its EDT function and  
+released its data blocks will satisfy the event associated
+with its post-slot and become a triggered EDT''.
+\glossarydefend
+
+
+\glossaryterm{Unit of Execution}
+\index{Unit of Execution}\index{UE}
+\glossarydefstart
+A generic term for a process, thread, or any other executable agent
+that carries out the work associated with a program.
+\glossarydefend
+
+% vivek wants us to consider and more carefully define the idea of the wrok assocaited with a
+% computation. See his feedback on the version 1.0 spec for details.
+
+
+\glossaryterm{Worker}
+\index{Worker}
+\glossarydefstart
+The unit of execution (e.g.\ a process or a thread) that carries out
+the sequence of instructions associated with the EDTs in an OCR
+program. The details of a worker are tied to a particular
+implementation of an OCR platform and are not defined by OCR.
+\glossarydefend
+
+% This is the end of ch1-glossary of the OCR specification.
