@@ -5,15 +5,15 @@
 \label{chap:OCR API Extensions}
 \label{chap:Appendix B}
 
-The primary purpose of OCR is to support research on the interface between 
-highly scalable hardware and runtime systems to support application level programming 
+The primary purpose of OCR is to support research on the interface between
+highly scalable hardware and runtime systems to support application level programming
 models.   Hence, within any OCR distribution are a collection of experimental features
 either in consideration for a future version of OCR as  temporary features
 provided within OCR but expected to be removed later as the specification matues.
 
 These ``extension'' features of OCR are described in this appendix.  There is no
 assurance that any of these features will ever appear in the core OCR specification.
-Therefore, programmers must approach them cautiously and carefully consider 
+Therefore, programmers must approach them cautiously and carefully consider
 all options before committing to any of these features in their software.
 
 \section{Data Block Management}
@@ -21,23 +21,23 @@ all options before committing to any of these features in their software.
 
 \subsection*{Functions}
 \begin{DoxyCompactItemize}
-\item 
+\item
 \hyperlink{group__OCRTypesGeneral_ga92c50087ca0e64fa93fc59402c55f8ca}{u8} \hyperlink{group__OCRDataBlock_ga8aa85542741b3f9e81ce1b48ee72b711}{ocr\-Db\-Malloc} (\hyperlink{group__OCRTypesGeneral_gacde3883d1ce245c051133c2c3aa82fc8}{ocr\-Guid\-\_\-t} guid, \hyperlink{group__OCRTypesGeneral_ga3f7e2bcbb0b4c338f3c4f6c937cd4234}{u64} size, void $\ast$$\ast$addr)
 \begin{DoxyCompactList}\small\item\em Allocates memory {\itshape inside} a data block in a way similar to malloc. \end{DoxyCompactList}
 
-\item 
+\item
 \hyperlink{group__OCRTypesGeneral_ga92c50087ca0e64fa93fc59402c55f8ca}{u8} \hyperlink{group__OCRDataBlock_ga9fdb9d09d5e7875453870e7c52e524ee}{ocr\-Db\-Malloc\-Offset} (\hyperlink{group__OCRTypesGeneral_gacde3883d1ce245c051133c2c3aa82fc8}{ocr\-Guid\-\_\-t} guid, \hyperlink{group__OCRTypesGeneral_ga3f7e2bcbb0b4c338f3c4f6c937cd4234}{u64} size, \hyperlink{group__OCRTypesGeneral_ga3f7e2bcbb0b4c338f3c4f6c937cd4234}{u64} $\ast$offset)
 \begin{DoxyCompactList}\small\item\em Allocates memory {\itshape inside} a data block in a way similar to malloc. \end{DoxyCompactList}
 
-\item 
+\item
 \hyperlink{group__OCRTypesGeneral_ga92c50087ca0e64fa93fc59402c55f8ca}{u8} \hyperlink{group__OCRDataBlock_ga41a15d63d118ebae3f13e86284bd929c}{ocr\-Db\-Free} (\hyperlink{group__OCRTypesGeneral_gacde3883d1ce245c051133c2c3aa82fc8}{ocr\-Guid\-\_\-t} guid, void $\ast$addr)
 \begin{DoxyCompactList}\small\item\em Frees memory allocated through \hyperlink{group__OCRDataBlock_ga8aa85542741b3f9e81ce1b48ee72b711}{ocr\-Db\-Malloc()} \end{DoxyCompactList}
 
-\item 
+\item
 \hyperlink{group__OCRTypesGeneral_ga92c50087ca0e64fa93fc59402c55f8ca}{u8} \hyperlink{group__OCRDataBlock_gad937f3dca78f1f728b9ab49f48b2da44}{ocr\-Db\-Free\-Offset} (\hyperlink{group__OCRTypesGeneral_gacde3883d1ce245c051133c2c3aa82fc8}{ocr\-Guid\-\_\-t} guid, \hyperlink{group__OCRTypesGeneral_ga3f7e2bcbb0b4c338f3c4f6c937cd4234}{u64} offset)
 \begin{DoxyCompactList}\small\item\em Frees memory allocated through \hyperlink{group__OCRDataBlock_ga9fdb9d09d5e7875453870e7c52e524ee}{ocr\-Db\-Malloc\-Offset()} \end{DoxyCompactList}
 
-\item 
+\item
 \hyperlink{group__OCRTypesGeneral_ga92c50087ca0e64fa93fc59402c55f8ca}{u8} \hyperlink{group__OCRDataBlock_ga543adf0a1f8b0c8e6d0cb1ffe9bc4d4f}{ocr\-Db\-Copy} (\hyperlink{group__OCRTypesGeneral_gacde3883d1ce245c051133c2c3aa82fc8}{ocr\-Guid\-\_\-t} destination, \hyperlink{group__OCRTypesGeneral_ga3f7e2bcbb0b4c338f3c4f6c937cd4234}{u64} destination\-Offset, \hyperlink{group__OCRTypesGeneral_gacde3883d1ce245c051133c2c3aa82fc8}{ocr\-Guid\-\_\-t} source, \hyperlink{group__OCRTypesGeneral_ga3f7e2bcbb0b4c338f3c4f6c937cd4234}{u64} source\-Offset, \hyperlink{group__OCRTypesGeneral_ga3f7e2bcbb0b4c338f3c4f6c937cd4234}{u64} size, \hyperlink{group__OCRTypesGeneral_ga3f7e2bcbb0b4c338f3c4f6c937cd4234}{u64} copy\-Type, \hyperlink{group__OCRTypesGeneral_gacde3883d1ce245c051133c2c3aa82fc8}{ocr\-Guid\-\_\-t} $\ast$completion\-Evt)
 \begin{DoxyCompactList}\small\item\em Copies data between two data blocks in an asynchronous manner. \end{DoxyCompactList}\end{DoxyCompactItemize}
 
@@ -59,7 +59,7 @@ all options before committing to any of these features in their software.
 )}}\label{group__OCRDataBlock_ga543adf0a1f8b0c8e6d0cb1ffe9bc4d4f}
 
 
-Copies data between two data blocks in an asynchronous manner. 
+Copies data between two data blocks in an asynchronous manner.
 
 This call will trigger the creation of an E\-D\-T which will perform a copy from a source data block into a destination data block. Once the copy is complete, the event with G\-U\-I\-D 'completion\-Evt'' will be satisfied. That event will carry the destination data block.
 
@@ -96,7 +96,7 @@ a status code
 \end{DoxyItemize}
 \end{DoxyReturn}
 \begin{DoxyNote}{Note}
-This call is not supported at this time. 
+This call is not supported at this time.
 \end{DoxyNote}
 
 %% OCR DB FREE
@@ -110,7 +110,7 @@ This call is not supported at this time.
 )}}\label{group__OCRDataBlock_ga41a15d63d118ebae3f13e86284bd929c}
 
 
-Frees memory allocated through \hyperlink{group__OCRDataBlock_ga8aa85542741b3f9e81ce1b48ee72b711}{ocr\-Db\-Malloc()} 
+Frees memory allocated through \hyperlink{group__OCRDataBlock_ga8aa85542741b3f9e81ce1b48ee72b711}{ocr\-Db\-Malloc()}
 
 
 \begin{DoxyParams}[1]{Parameters}
@@ -130,7 +130,7 @@ a status code
 The address 'addr' must have been allocated before the release of the containing data block. Use ocr\-Db\-Free\-Offset if allocating and freeing across E\-D\-Ts for example
 \end{DoxyWarning}
 \begin{DoxyNote}{Note}
-This call is not supported at this time. 
+This call is not supported at this time.
 \end{DoxyNote}
 
 %% OCR DB FREE OFFSET
@@ -144,7 +144,7 @@ This call is not supported at this time.
 )}}\label{group__OCRDataBlock_gad937f3dca78f1f728b9ab49f48b2da44}
 
 
-Frees memory allocated through \hyperlink{group__OCRDataBlock_ga9fdb9d09d5e7875453870e7c52e524ee}{ocr\-Db\-Malloc\-Offset()} 
+Frees memory allocated through \hyperlink{group__OCRDataBlock_ga9fdb9d09d5e7875453870e7c52e524ee}{ocr\-Db\-Malloc\-Offset()}
 
 
 \begin{DoxyParams}[1]{Parameters}
@@ -161,7 +161,7 @@ a status code
 \end{DoxyItemize}
 \end{DoxyReturn}
 \begin{DoxyNote}{Note}
-This call is not supported at this time. 
+This call is not supported at this time.
 \end{DoxyNote}
 
 
@@ -177,7 +177,7 @@ This call is not supported at this time.
 )}}\label{group__OCRDataBlock_ga8aa85542741b3f9e81ce1b48ee72b711}
 
 
-Allocates memory {\itshape inside} a data block in a way similar to malloc. 
+Allocates memory {\itshape inside} a data block in a way similar to malloc.
 
 This will allocate a chunk of size 'size' and return its address in 'addr' using the memory available in the data block. This call, and others related to it, allow you to use a data block in a heap-\/like fashion
 
@@ -202,7 +202,7 @@ a status code
 The address returned is valid {\itshape only} for the current acquire of the data block (ie\-: it is an absolute address). Use \hyperlink{group__OCRDataBlock_ga9fdb9d09d5e7875453870e7c52e524ee}{ocr\-Db\-Malloc\-Offset()} to get a more stable 'pointer'
 \end{DoxyWarning}
 \begin{DoxyNote}{Note}
-This call is not supported at this time. 
+This call is not supported at this time.
 \end{DoxyNote}
 
 
@@ -218,7 +218,7 @@ This call is not supported at this time.
 )}}\label{group__OCRDataBlock_ga9fdb9d09d5e7875453870e7c52e524ee}
 
 
-Allocates memory {\itshape inside} a data block in a way similar to malloc. 
+Allocates memory {\itshape inside} a data block in a way similar to malloc.
 
 This call is very similar to ocr\-Db\-Malloc except that it returns the location of the memory allocated as an {\itshape offset} from the start of the data block. This is a more preferred method as this allows the returned pointer to be used across E\-D\-Ts (provided they all have access to the data block).
 
@@ -240,7 +240,7 @@ a status code
 \end{DoxyItemize}
 \end{DoxyReturn}
 \begin{DoxyNote}{Note}
-This call is not supported at this time. 
+This call is not supported at this time.
 \end{DoxyNote}
 
 
@@ -248,61 +248,61 @@ This call is not supported at this time.
 
 \section{Affinity}
 
-A key aspect of performance oriented programming is to assure that the data layout 
+A key aspect of performance oriented programming is to assure that the data layout
 matches the pattern of computation.  This is particularly important in systems with complex
-memory hiearchies or cases where OCR is mapped onto a distributed memory environment.  This 
-proposed extension addresses this issue by defining ways to specify better placement for E\-D\-Ts and data blocks.  
+memory hiearchies or cases where OCR is mapped onto a distributed memory environment.  This
+proposed extension addresses this issue by defining ways to specify better placement for E\-D\-Ts and data blocks.
 
 Enumerations that define the types of affinities
 \begin{itemize}
-\item 
+\item
 enum {ocr\-Affinity\-Kind} \
-{A\-F\-F\-I\-N\-I\-T\-Y\-\_\-\-C\-U\-R\-R\-E\-N\-T}, 
-{A\-F\-F\-I\-N\-I\-T\-Y\-\_\-\-P\-D}, 
+{A\-F\-F\-I\-N\-I\-T\-Y\-\_\-\-C\-U\-R\-R\-E\-N\-T},
+{A\-F\-F\-I\-N\-I\-T\-Y\-\_\-\-P\-D},
 {A\-F\-F\-I\-N\-I\-T\-Y\-\_\-\-P\-D\-\_\-\-M\-A\-S\-T\-E\-R}
  \}
 \end{itemize}
 
 The followign functions are included in the affinity API
 \begin{itemize}
-\item 
+\item
 {u8} {ocr\-Affinity\-Count} {ocr\-Affinity\-Kind} kind, {u64} $\ast$count)
 \begin{itemize}
 \item Returns a count of affinity G\-U\-I\-Ds of a particular kind.
 \end{itemize}
 
-\item 
+\item
 {u8} {ocr\-Affinity\-Get}{ocr\-Affinity\-Kind} kind, $\ast$count, {ocr\-Guid\-\_\-t} $\ast$affinities)
 \begin{itemize}
-\item Gets the affinity G\-U\-I\-Ds of a particular kind. The 'affinities' array must have been previously 
+\item Gets the affinity G\-U\-I\-Ds of a particular kind. The 'affinities' array must have been previously
 allocated and big enough to contain 'count' G\-U\-I\-Ds.
 \end{itemize}
 
-\item 
+\item
 {u8} {ocr\-Affinity\-Get\-Current} {ocr\-Guid\-\_\-t} $\ast$affinity)
 \begin{itemize}
-\item Returns an affinity the currently executing E\-D\-T is affinitized to. 
+\item Returns an affinity the currently executing E\-D\-T is affinitized to.
 \end{itemize}
 \end{itemize}
 
 
-You can query for the affinities corresponding to policy domains as well as for your own affinities 
+You can query for the affinities corresponding to policy domains as well as for your own affinities
 \begin{itemize}
-\item 
-{A\-F\-F\-I\-N\-I\-T\-Y\-\_\-\-C\-U\-R\-R\-E\-N\-T} Affinities of the current E\-D\-T 
-\item 
-{A\-F\-F\-I\-N\-I\-T\-Y\-\_\-\-P\-D} 
-Affinities of the policy domains. You can then affinitize E\-D\-Ts and data blocks to these affinities in the creation calls 
+\item
+{A\-F\-F\-I\-N\-I\-T\-Y\-\_\-\-C\-U\-R\-R\-E\-N\-T} Affinities of the current E\-D\-T
+\item
+{A\-F\-F\-I\-N\-I\-T\-Y\-\_\-\-P\-D}
+Affinities of the policy domains. You can then affinitize E\-D\-Ts and data blocks to these affinities in the creation calls
 
 \item
 {A\-F\-F\-I\-N\-I\-T\-Y\-\_\-\-P\-D\-\_\-\-M\-A\-S\-T\-E\-R}
-Runtime reserved (do not use) 
+Runtime reserved (do not use)
 \end{itemize}
 
 
 \subsection{ocr\-Affinity\-Count}
 \summary
-Returns a count of affinity G\-U\-I\-Ds of a particular kind. 
+Returns a count of affinity G\-U\-I\-Ds of a particular kind.
 
 \begin{boxedcode}
 u8 ocrAffinityCount (ocrAffinityKind kind, u64 \*count)
@@ -322,17 +322,17 @@ u8 ocrAffinityCount (ocrAffinityKind kind, u64 \*count)
 \returns
 a status code
 \begin{itemize}
-\item 0\-: successful 
+\item 0\-: successful
 \end{itemize}
- 
+
 
 
 \subsection{ocr\-Affinity\-Get}
 \summary
-Gets the affinity G\-U\-I\-Ds of a particular kind. The 'affinities' array must have been previously allocated and big enough to contain 'count' G\-U\-I\-Ds. 
+Gets the affinity G\-U\-I\-Ds of a particular kind. The 'affinities' array must have been previously allocated and big enough to contain 'count' G\-U\-I\-Ds.
 
 \begin{boxedcode}
- u8 ocrAffinityGet (ocrAffinityKind kind,  u64 *count, 
+ u8 ocrAffinityGet (ocrAffinityKind kind,  u64 *count,
                               ocrGuid\_t *affinities)
 \end{boxedcode}
 
@@ -341,9 +341,9 @@ Gets the affinity G\-U\-I\-Ds of a particular kind. The 'affinities' array must 
 \begin{tabular}{p{0.7in} p{0.75in} p{3.5in} l l}
 \hline
 \mbox{\tt in}         & {\em kind}        & The affinity kind to query for. See ocr\-Affinity\-Kind \\
- 
+
 \mbox{\tt in,out}  & {\em count}     &  As input, requested number of elements; as output the actual number of elements returned \\
- 
+
 \mbox{\tt out}     & {\em affinities} & Affinity G\-U\-I\-D array \\
 \hline
 \end{tabular}
@@ -352,12 +352,12 @@ Gets the affinity G\-U\-I\-Ds of a particular kind. The 'affinities' array must 
 \returns
 a status code
 \begin{itemize}
-\item 0\-: successful 
+\item 0\-: successful
 \end{itemize}
 
 \subsection{ocr\-Affinity\-Get\-Current}
- 
-Returns an affinity the currently executing E\-D\-T is affinitized to. 
+
+Returns an affinity the currently executing E\-D\-T is affinitized to.
 
 \begin{boxedcode}
  u8 ocrAffinityGetCurrent ( ocrGuid\_t *affinity)
@@ -373,7 +373,7 @@ Returns an affinity the currently executing E\-D\-T is affinitized to.
 \end{table}
 
 \descr
-An E\-D\-T may have multiple affinities. The programmer should rely on 
+An E\-D\-T may have multiple affinities. The programmer should rely on
 ocr\-Affinity\-Count() and ocr\-Affinity\-Get() to query all affinities.
 
 %2.3.4: Entire section is extension
@@ -386,7 +386,7 @@ Data-structure containing the configuration parameters for the runtime
 Functions
 \begin{itemize}
 \item void ocrInit (ocrConfig\_t ocrConfig)
- 
+
 \item void ocrParseArgs (int argc, const char argv[], ocrConfig\_t ocrConfig)
  .
 \item u8 ocrFinalize ()
@@ -401,17 +401,17 @@ Functions
 Functions
 \begin{itemize}
 \item  ocrGuid\_t ocrElsUserGet (u8 offset)
- 
+
 \item void ocrElsUserSet (u8 offset, ocrGuid\_t data)
- 
+
 \item ocrGuid\_t currentEdtUserGet ()
- 
+
 \item  u64 ocrNbWorkers ()
 
 \item  ocrGuid\_t ocrCurrentWorkerGuid ()
- 
+
 \item  u8 ocrInformLegacyCodeBlocking ()
- 
+
 \end{itemize}
 
 

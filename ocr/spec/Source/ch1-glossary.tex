@@ -40,7 +40,7 @@ Each of the \emph{pre-slots} associated with an EDT connects to a
 single OCR object, while the EDT’s single \emph{post-slot} can connect
 to multiple OCR objects. An EDT transitions to the \emph{ready} state when all its
 pre-slots have been satisfied; the pre-slots determine which
-data blocks, if any, the EDT may access.  Once an EDT is in the ready state, it will 
+data blocks, if any, the EDT may access.  Once an EDT is in the ready state, it will
 eventually run on the OCR platform.
 \glossarydefend
 
@@ -73,7 +73,7 @@ dependences. \emph{Parameters} are static 64-bit values known at EDT
 creation time and \emph{dependences} are dynamic control or data
 dependences. The parameter array is copied by value when the EDT is
 created and enters the \emph{available} state. The dependences (namely the array of dependences) are
-determined at runtime and are fully resolved only when the EDT is launched and 
+determined at runtime and are fully resolved only when the EDT is launched and
 is ready to execute. The EDT function can optionally return the GUID of a Data Block or
 event that will be passed along its ``post'' slot.
 
@@ -106,23 +106,23 @@ satisfied). Events are the main synchronization mechanism in OCR.
 \index{Finish EDT}
 \glossarydefstart
 A special class of EDT. As an EDT runs, it may create additional EDTs
-which may themselves create even more EDTs. 
+which may themselves create even more EDTs.
 For the case of a finish
 EDT, the EDTs created within its scope (i.e.\ its child EDTs and further
 descendants) complete and satisfy their post-slots
 before the finish EDT can satisfy its post-slot. The result is that
 any OCR object linked to the post-slot of the finish EDT will by
-necessity not be enter the \emph{ready} state (i.e. be scheduled for 
+necessity not be enter the \emph{ready} state (i.e. be scheduled for
 execution) until the finish EDT and all
 EDTs created during its execution have completed.
 %
-% The following text from Vivek is more precise, but it generates a latex error when I 
-% try to typeset it.  
+% The following text from Vivek is more precise, but it generates a latex error when I
+% try to typeset it.
 %
-%For the case of a Finish EDT, F, each EDT created with F identified 
-%as its Immediately Enclosing Finish (IEF) 
+%For the case of a Finish EDT, F, each EDT created with F identified
+%as its Immediately Enclosing Finish (IEF)
 %must complete execution and satisfy its post-slot before Finish EDT F can satisfy its post-slot.
-%The result is that any OCR object linked to the post-slot of 
+%The result is that any OCR object linked to the post-slot of
 %the finish~EDT will by necessity
 %wait until finish~EDT F and all EDTs that have F as their IEF have completed.
 
@@ -244,7 +244,7 @@ A slot in the \emph{connected} state can be:
 \glossarydefstart
 A non-blocking set of instructions that constitute the fundamental
 ``unit of work'' in OCR.  By ``non-blocking'' we mean that once all
-preconditions on a task are met, the task is ``ready to execute'' 
+preconditions on a task are met, the task is ``ready to execute''
 and it will execute at some point,
 regardless of what any other task in the system does. The concept of
 a task is realized by the OCR object ``Event Driven Task'' or EDT.
@@ -265,7 +265,7 @@ therefore cause it to satisfy its post-slot which will in turn trigger
 the dependence link and satisfy all pre-slots connected to the event's
 post-slot. The conjugated form \emph{triggered} is used as an
 attributive past participle; that is
-``an EDT that has finished executing the code in its EDT function and  
+``an EDT that has finished executing the code in its EDT function and
 released its data blocks will satisfy the event associated
 with its post-slot and become a triggered EDT''.
 \glossarydefend

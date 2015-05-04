@@ -5,7 +5,7 @@
 \index{OCR types, macros, and error codes}
 \label{sec:OCRtypesmacros}
 
-The OCR Application Programming Interface is defined in terms of a C language binding.  
+The OCR Application Programming Interface is defined in terms of a C language binding.
 The functions comprising the OCR
 API make use of a number of basic data types defined in the include file \code{ocr.h}.
 The lowest level data types are defined in terms of the following C typedef statements.
@@ -20,10 +20,10 @@ The lowest level data types are defined in terms of the following C typedef stat
 \item \code{typedef u8 bool} 8-bit boolean
 \end{itemize}
 
-In addition to these low level types, OCR defines a number of opaque data types 
+In addition to these low level types, OCR defines a number of opaque data types
 to manage OCR objects and to interact with the OCR environment:
 \begin{itemize}
-\item \code{ocrGuid\_t}: Type of a Globally Unique Identifier used as an opaque handle 
+\item \code{ocrGuid\_t}: Type of a Globally Unique Identifier used as an opaque handle
 to reference OCR objects.
 \item \code{ocrEdtDep\_t}:  Type of values passed to an EDT on each pre-slot.
 %
@@ -32,7 +32,7 @@ to reference OCR objects.
 Data-structure containing the configuration parameters for the runtime.
 \end{itemize}
 
-The C API for OCR makes use of a set of basic macros defined 
+The C API for OCR makes use of a set of basic macros defined
  inside \code{ocr.h}.
 \begin{itemize}
 \item \code{\#define true 1}
@@ -98,7 +98,7 @@ in the \code{ocr-errors.h} include file and are described in the following table
 \section{The OCR Main EDT}
 \label{sec:mainEDT}
 
-In OCR 1.0, an OCR program always begins as a main EDT.   We need to describe the mainEDT and what a 
+In OCR 1.0, an OCR program always begins as a main EDT.   We need to describe the mainEDT and what a
 programmer can expect when they use this point of entry.
 %%%
 %%% someone needs to write this section
@@ -118,22 +118,22 @@ the execution context and cleaning shutting down the program execution.  These c
 handled through the following functions.
 
 \begin{DoxyCompactItemize}
-\item 
+\item
 void \hyperlink{group__OCRGeneral_gae115fb2dbc351416835b0fb7b91f94e5}
 {ocr\-Shutdown} ()
 \begin{DoxyCompactList}\small\item\em Called by an E\-D\-T to indicate the end of an O\-C\-R program. \end{DoxyCompactList}
 
-\item 
+\item
 void \hyperlink{group__OCRGeneral_gabcaaebe9465cd6efcfca2acb4c399cde}
 {ocr\-Abort} (\hyperlink{group__OCRTypesGeneral_ga92c50087ca0e64fa93fc59402c55f8ca}{u8} error\-Code)
 \begin{DoxyCompactList}\small\item\em Called by an E\-D\-T to indicate an abnormal end of an O\-C\-R program. \end{DoxyCompactList}
 
-\item 
+\item
 \hyperlink{group__OCRTypesGeneral_ga3f7e2bcbb0b4c338f3c4f6c937cd4234}{u64} \hyperlink{group__OCRGeneral_ga29d56cd773017a4d48d629bc13a220ce}
 {get\-Argc} (void $\ast$db\-Ptr)
 \begin{DoxyCompactList}\small\item\em Retrieves the traditional 'argc' value in main\-Edt. \end{DoxyCompactList}
 
-\item 
+\item
 char $\ast$ \hyperlink{group__OCRGeneral_gad553929187f042ce480d09e84a4c59a7}
 {get\-Argv} (void $\ast$db\-Ptr, \hyperlink{group__OCRTypesGeneral_ga3f7e2bcbb0b4c338f3c4f6c937cd4234}{u64} count)
 \begin{DoxyCompactList}\small\item\em Gets the argument 'count' from the data-\/block containing the arguments. \end{DoxyCompactList}\end{DoxyCompactItemize}
@@ -152,7 +152,7 @@ In addition, OCR defines a PRINTF macro to print message to the output console.
 \end{DoxyParamCaption}
 )}}\label{group__OCRGeneral_ga29d56cd773017a4d48d629bc13a220ce}
 
-Retrieves the traditional 'argc' value in main\-Edt. 
+Retrieves the traditional 'argc' value in main\-Edt.
 
 \begin{DoxyParams}{Parameters}
 {\em db\-Ptr} & Pointer to the start of the argument data block \\
@@ -160,10 +160,10 @@ Retrieves the traditional 'argc' value in main\-Edt.
 \end{DoxyParams}
 
 \returns
-Number of arguments 
+Number of arguments
 
 \descr
-When starting, the first E\-D\-T (called main\-Edt) gets a single data block that contains all of the 
+When starting, the first E\-D\-T (called main\-Edt) gets a single data block that contains all of the
 arguments passed to the program. These arguments are packed in the following format\-:
 \begin{DoxyItemize}
 \item first 8 bytes\-: argc
@@ -184,7 +184,7 @@ This call will extract the number of arguments (argc)
 \end{DoxyParamCaption}
 )}}\label{group__OCRGeneral_gad553929187f042ce480d09e84a4c59a7}
 
-Gets the argument 'count' from the data-\/block containing the arguments. 
+Gets the argument 'count' from the data-\/block containing the arguments.
 
 \begin{DoxyParams}{Parameters}
 {\em db\-Ptr} & Pointer to the start of the argument data-\/block \\
@@ -194,7 +194,7 @@ Gets the argument 'count' from the data-\/block containing the arguments.
 \end{DoxyParams}
 
 \returns
-A N\-U\-L\-L terminated string 
+A N\-U\-L\-L terminated string
 
 %%%%%
 %%%%% someone needs to write this section
@@ -213,7 +213,7 @@ This function supports the extraction of arguments from argv.   See \hyperlink{g
 \end{DoxyParamCaption}
 )}}\label{group__OCRGeneral_gabcaaebe9465cd6efcfca2acb4c399cde}
 
-Called by an E\-D\-T to indicate an abnormal end of an O\-C\-R program. 
+Called by an E\-D\-T to indicate an abnormal end of an O\-C\-R program.
 
 
 \begin{DoxyParams}{Parameters}
@@ -232,9 +232,9 @@ Called by an E\-D\-T to indicate an abnormal end of an O\-C\-R program.
 This call will cause the O\-C\-R runtime to shutdown with an error code. Calling this with 0 as an argument is equivalent to \hyperlink{group__OCRGeneral_gae115fb2dbc351416835b0fb7b91f94e5}{ocr\-Shutdown()}.
 
 \begin{DoxyNote}{Note}
-If using the extended \hyperlink{group__OCRExtLib_ga1de1b7c273fd6fb900feba43141881f5}{ocr\-Wait()} call 
+If using the extended \hyperlink{group__OCRExtLib_ga1de1b7c273fd6fb900feba43141881f5}{ocr\-Wait()} call
 present in ocr-\/legacy.\-h, you do not need to use \hyperlink{group__OCRGeneral_gae115fb2dbc351416835b0fb7b91f94e5}
-{ocr\-Shutdown()} as the termination of the O\-C\-R portion will be captured in the finish E\-D\-T's return 
+{ocr\-Shutdown()} as the termination of the O\-C\-R portion will be captured in the finish E\-D\-T's return
 \end{DoxyNote}
 
 %
@@ -245,7 +245,7 @@ present in ocr-\/legacy.\-h, you do not need to use \hyperlink{group__OCRGeneral
 \index{\code{PRINTF }}
 \label{sec:PRINTF }
 
-A macro that exposes the printf function from the standard C library. 
+A macro that exposes the printf function from the standard C library.
 
 \begin{boxedcode}
 \plc{u32 PRINTF (const char fmt,...)}
@@ -266,7 +266,7 @@ type &  argument   & meaning \\
 \code{u32} value for the number of bytes actually written.
 
 \descr
-OCR must support a wide variety of platforms including simulators that emmulate real systems.  
+OCR must support a wide variety of platforms including simulators that emmulate real systems.
 Often, core functionality provided by standard C librarires are not availabel on all platforms
 and as a result, an OCR program cannot depend on these functions.  There was one case, however,
 where it was felt support was critical.  This isin teh case of the following basic printf capability which
@@ -280,17 +280,17 @@ is provide in the OCR API as following function.
 \label{sec:OCRdataBlockManagement}
 
 
-Data blocks are the only form of non-\/ephemeral storage and are therefore 
-the only way to \char`\"{}share\char`\"{} data between E\-D\-Ts. Conceptually, data blocks 
+Data blocks are the only form of non-\/ephemeral storage and are therefore
+the only way to \char`\"{}share\char`\"{} data between E\-D\-Ts. Conceptually, data blocks
 are contiguous chunks of memory that have a start address and a size. They also have the following characteristics\-:
 \begin{itemize}
 \item all memory within the data block is accessible from the start-\/address using an
- offset (ie\-: addresses \mbox{[}start-\/address; start-\/address+size\mbox{[} uniquely and 
+ offset (ie\-: addresses \mbox{[}start-\/address; start-\/address+size\mbox{[} uniquely and
 totally address the entire data-\/block)
 \item non-\/overlaping with other distinct data blocks
-\item the pointer to the start of a data block is only valid between the acquire of 
+\item the pointer to the start of a data block is only valid between the acquire of
 the data-\/block (implicit when the E\-D\-T starts) and the corresponding ocr\-Db\-Release
- call (or the end of the E\-D\-T, whichever comes first) 
+ call (or the end of the E\-D\-T, whichever comes first)
 \end{itemize}
 
 The following macros and enums  are used with OCR data blocks.  QUESTION: HOW MANY OF THESE
@@ -309,35 +309,35 @@ DB\_MODE\_EW, DB\_MODE\_RO}}
 These are the modes with which an EDT can access a data block. OCR currently supports four
 modes:
 \begin{itemize}
-\item \code{DB\_MODE\_RW}  Read-Write (default mode): The EDT is stating that it may Read-from and Write-to the 
+\item \code{DB\_MODE\_RW}  Read-Write (default mode): The EDT is stating that it may Read-from and Write-to the
 data block.   The user is responsible for synchronizing between EDTs that could potentially write to
-the same data block concurrently. 
+the same data block concurrently.
 \item \code{DB\_MODE\_EW}  Exclusive-Write (EW): The EDT requires that it be the only one accessing the data block. The
 runtime will not schedule any other EDT that accesses the same data block in EW or ITW mode
-concurrently. This can limit parallelism. 
-\item \code{DB\_MODE\_RO}   Read-Only: The EDT is stating that it will only read from the data block. 
+concurrently. This can limit parallelism.
+\item \code{DB\_MODE\_RO}   Read-Only: The EDT is stating that it will only read from the data block.
 The runtime does not gaurantee, however, that concurrent writes to the data block from other
-EDTs will not be visible. 
+EDTs will not be visible.
 \item \code{DB\_MODE\_CONST}  Constant: The EDT is stating that it will only read from the data block. In this mode, the
 runtime guarantees that the data block seen by the EDT is not modified by other concurrent
 EDTs (in other words, the data block does not change "under you". Any violation of the
 "no-write" contract by the program will result in undefined behavior (the write may or may not
 be visible to other EDTs depending on the implementation and specific runtime conditions). \\
 \end{itemize}
- 
+
 \subsection*{Functions}
 \begin{DoxyCompactItemize}
-\item 
+\item
 \hyperlink{group__OCRTypesGeneral_ga92c50087ca0e64fa93fc59402c55f8ca}{u8} \hyperlink{group__OCRDataBlock_ga8781682157ebe73114af805cc3539a22}
 {ocr\-Db\-Create} (\hyperlink{group__OCRTypesGeneral_gacde3883d1ce245c051133c2c3aa82fc8}{ocr\-Guid\-\_\-t} $\ast$db, void $\ast$$\ast$addr, \hyperlink{group__OCRTypesGeneral_ga3f7e2bcbb0b4c338f3c4f6c937cd4234}{u64} len, \hyperlink{group__OCRTypesGeneral_gace9d960e74685e2cd84b36132dbbf8aa}{u16} flags, \hyperlink{group__OCRTypesGeneral_gacde3883d1ce245c051133c2c3aa82fc8}{ocr\-Guid\-\_\-t} affinity, \hyperlink{group__OCRTypesDB_gabffd082fa19860aa5a9822beba6b68a5}{ocr\-In\-Db\-Allocator\-\_\-t} allocator)
 \begin{DoxyCompactList}\small\item\em Request the creation of a data block. \end{DoxyCompactList}
 
-\item 
+\item
 \hyperlink{group__OCRTypesGeneral_ga92c50087ca0e64fa93fc59402c55f8ca}{u8} \hyperlink{group__OCRDataBlock_gabc80ea5594e5e55a541a1df4c7727821}
 {ocr\-Db\-Destroy} (\hyperlink{group__OCRTypesGeneral_gacde3883d1ce245c051133c2c3aa82fc8}{ocr\-Guid\-\_\-t} db)
 \begin{DoxyCompactList}\small\item\em Request for the destruction of a data block. \end{DoxyCompactList}
 
-\item 
+\item
 \hyperlink{group__OCRTypesGeneral_ga92c50087ca0e64fa93fc59402c55f8ca}{u8} \hyperlink{group__OCRDataBlock_ga2ec03c0b0998bdaf9ccc44a06fb05ca0}
 {ocr\-Db\-Release} (\hyperlink{group__OCRTypesGeneral_gacde3883d1ce245c051133c2c3aa82fc8}{ocr\-Guid\-\_\-t} db)
 \begin{DoxyCompactList}\small\item\em Release the D\-B (indicates that the E\-D\-T no longer needs to access it) \end{DoxyCompactList}
@@ -361,7 +361,7 @@ be visible to other EDTs depending on the implementation and specific runtime co
 \end{DoxyParamCaption}
 )}}\label{group__OCRDataBlock_ga8781682157ebe73114af805cc3539a22}
 
-Request the creation of a data block. 
+Request the creation of a data block.
 
 \begin{DoxyParams}[1]{Parameters}
 \mbox{\tt out}  & {\em db} & On successful creation, contains the G\-U\-I\-D for the newly created data block. Will be N\-U\-L\-L if the call fails \\
@@ -373,7 +373,7 @@ Request the creation of a data block.
 \mbox{\tt in}  & {\em flags} & Flags to create the data block. Currently, the following properties are supported\-:
 \begin{DoxyItemize}
 \item \hyperlink{group__OCRTypesDB_ga831208f9dcaeb2560f93988d29d80141}{D\-B\-\_\-\-P\-R\-O\-P\-\_\-\-N\-O\-N\-E}, indicates no specific properties
-\item \hyperlink{group__OCRTypesDB_gaaea245d2b799ff575c1c0b9a8a5e3f53}{D\-B\-\_\-\-P\-R\-O\-P\-\_\-\-N\-O\-\_\-\-A\-C\-Q\-U\-I\-R\-E}, the D\-B will be created but not acquired (addr will be N\-U\-L\-L). 
+\item \hyperlink{group__OCRTypesDB_gaaea245d2b799ff575c1c0b9a8a5e3f53}{D\-B\-\_\-\-P\-R\-O\-P\-\_\-\-N\-O\-\_\-\-A\-C\-Q\-U\-I\-R\-E}, the D\-B will be created but not acquired (addr will be N\-U\-L\-L).
 \end{DoxyItemize}\\
 \hline
 \mbox{\tt in,out}  & {\em affinity} & G\-U\-I\-D to indicate the affinity container of this D\-B. This is currently unsupported and N\-U\-L\-L\-\_\-\-G\-U\-I\-D should be passed \\
@@ -398,11 +398,11 @@ a status code\-:
 %%%%  someone needs to write a more complete description of the semantics of this function
 %%%%
 \descr
-On successful creation, the returned memory location will be 8 byte aligned. ocr\-Db\-Create also implicitly 
+On successful creation, the returned memory location will be 8 byte aligned. ocr\-Db\-Create also implicitly
 acquires the data-\/block for the calling E\-D\-T unless D\-B\-\_\-\-P\-R\-O\-P\-\_\-\-N\-O\-\_\-\-A\-C\-Q\-U\-I\-R\-E is specified
 
 \begin{DoxyNote}{Note}
-The default allocator (N\-O\-\_\-\-A\-L\-L\-O\-C) will disallow calls to ocr\-Db\-Malloc and ocr\-Db\-Free. If an allocator is used, part of the data block's space will be taken up by the allocator's management overhead 
+The default allocator (N\-O\-\_\-\-A\-L\-L\-O\-C) will disallow calls to ocr\-Db\-Malloc and ocr\-Db\-Free. If an allocator is used, part of the data block's space will be taken up by the allocator's management overhead
 \end{DoxyNote}
 
 %
@@ -416,7 +416,7 @@ The default allocator (N\-O\-\_\-\-A\-L\-L\-O\-C) will disallow calls to ocr\-Db
 \end{DoxyParamCaption}
 )}}\label{group__OCRDataBlock_gabc80ea5594e5e55a541a1df4c7727821}
 
-Request for the destruction of a data block. 
+Request for the destruction of a data block.
 
 \begin{DoxyParams}[1]{Parameters}
 \mbox{\tt in}  & {\em db} & Data block to destroy \\
@@ -428,12 +428,12 @@ a status code\-:
 \begin{DoxyItemize}
 \item 0\-: successful
 \item E\-P\-E\-R\-M\-: db was already destroyed
-\item E\-I\-N\-V\-A\-L\-: db does not refer to a valid data-\/block 
+\item E\-I\-N\-V\-A\-L\-: db does not refer to a valid data-\/block
 \end{DoxyItemize}
 
 \descr
 The E\-D\-T does not need to have acquired the data block to destroy it.
-\hyperlink{group__OCRDataBlock_gabc80ea5594e5e55a541a1df4c7727821}{ocr\-Db\-Destroy()} will 
+\hyperlink{group__OCRDataBlock_gabc80ea5594e5e55a541a1df4c7727821}{ocr\-Db\-Destroy()} will
 request destruction of the D\-B but the D\-B will only be destroyed once all other E\-D\-Ts that have acquired
  it release it (either implicitly at the end of the E\-D\-T or with an explicit
  \hyperlink{group__OCRDataBlock_ga2ec03c0b0998bdaf9ccc44a06fb05ca0}{ocr\-Db\-Release()} call).
@@ -443,7 +443,7 @@ If the E\-D\-T has acquired this D\-B, this call implicitly releases the D\-B.
 \end{DoxyNote}
 Once a data block has been marked as 'to-\/be-\/destroyed' by this call, the following operations on the same data block will result in an error\-:
 \begin{DoxyItemize}
-\item calling \hyperlink{group__OCRDataBlock_gabc80ea5594e5e55a541a1df4c7727821}{ocr\-Db\-Destroy()} 
+\item calling \hyperlink{group__OCRDataBlock_gabc80ea5594e5e55a541a1df4c7727821}{ocr\-Db\-Destroy()}
 again (will return E\-P\-E\-R\-M) The following operations will produce undefined behavior\-:
 \begin{DoxyItemize}
 \item accessing the actual location of the data block (through a pointer)
@@ -463,7 +463,7 @@ again (will return E\-P\-E\-R\-M) The following operations will produce undefine
 )}}\label{group__OCRDataBlock_ga2ec03c0b0998bdaf9ccc44a06fb05ca0}
 
 
-Release the D\-B (indicates that the E\-D\-T no longer needs to access it) 
+Release the D\-B (indicates that the E\-D\-T no longer needs to access it)
 
 
 \begin{DoxyParams}[1]{Parameters}
@@ -475,7 +475,7 @@ a status code\-:
 \begin{DoxyItemize}
 \item 0\-: successful
 \item E\-I\-N\-V\-A\-L\-: db does not refer to a valid data block
-\item E\-A\-C\-C\-E\-S\-: E\-D\-T has not acquired the data block and therefore cannot release it 
+\item E\-A\-C\-C\-E\-S\-: E\-D\-T has not acquired the data block and therefore cannot release it
 \end{DoxyItemize}
 \end{DoxyReturn}
 
@@ -499,7 +499,7 @@ ocr\-Db\-Release should only be called {\itshape once} at most.
 \index{Event Management APIs}
 \label{sec:OCReventManagement}
 
-Events are  used to coordinate the exection of tasks and to 
+Events are  used to coordinate the exection of tasks and to
 help establish dependences in the directed acyclic graph representing the exection of an OCR program.
 To manage the different types of events, OCR defines thefollowing enum types and values.
 \begin{itemize}
@@ -515,22 +515,22 @@ OCR\_EVENT\_LATCH\_INCR\_SLOT }}
 
 \subsection*{Functions}
 \begin{DoxyCompactItemize}
-\item 
+\item
 \hyperlink{group__OCRTypesGeneral_ga92c50087ca0e64fa93fc59402c55f8ca}{u8} \hyperlink{group__OCREvents_gab4cd41f97cc692a86f887b404b055066}
 {ocr\-Event\-Create} (\hyperlink{group__OCRTypesGeneral_gacde3883d1ce245c051133c2c3aa82fc8}{ocr\-Guid\-\_\-t} $\ast$guid, \hyperlink{group__OCRTypesEvents_ga42f4195355182edfaa79c9ef3f2c07b1}{ocr\-Event\-Types\-\_\-t} event\-Type, bool takes\-Arg)
 \begin{DoxyCompactList}\small\item\em Creates an event. \end{DoxyCompactList}
 
-\item 
+\item
 \hyperlink{group__OCRTypesGeneral_ga92c50087ca0e64fa93fc59402c55f8ca}{u8} \hyperlink{group__OCREvents_ga24d30531aaa059c1086fc74712d4f23d}
 {ocr\-Event\-Destroy} (\hyperlink{group__OCRTypesGeneral_gacde3883d1ce245c051133c2c3aa82fc8}{ocr\-Guid\-\_\-t} guid)
 \begin{DoxyCompactList}\small\item\em Explicitly destroys an event. \end{DoxyCompactList}
 
-\item 
+\item
 \hyperlink{group__OCRTypesGeneral_ga92c50087ca0e64fa93fc59402c55f8ca}{u8} \hyperlink{group__OCREvents_gab27ef5d905c01ba534e86f8e7e91eaf0}
 {ocr\-Event\-Satisfy} (\hyperlink{group__OCRTypesGeneral_gacde3883d1ce245c051133c2c3aa82fc8}{ocr\-Guid\-\_\-t} event\-Guid, \hyperlink{group__OCRTypesGeneral_gacde3883d1ce245c051133c2c3aa82fc8}{ocr\-Guid\-\_\-t} data\-Guid)
 \begin{DoxyCompactList}\small\item\em Satisfy the first pre-\/slot of an event and optionally pass a data block along to the event. \end{DoxyCompactList}
 
-\item 
+\item
 \hyperlink{group__OCRTypesGeneral_ga92c50087ca0e64fa93fc59402c55f8ca}{u8} \hyperlink{group__OCREvents_gab53103ecf0c74b55830edf5b8d14a942}
 {ocr\-Event\-Satisfy\-Slot} (\hyperlink{group__OCRTypesGeneral_gacde3883d1ce245c051133c2c3aa82fc8}{ocr\-Guid\-\_\-t} event\-Guid, \hyperlink{group__OCRTypesGeneral_gacde3883d1ce245c051133c2c3aa82fc8}{ocr\-Guid\-\_\-t} data\-Guid, \hyperlink{group__OCRTypesGeneral_gafaa62991928fb9fb18ff0db62a040aba}{u32} slot)
 \begin{DoxyCompactList}\small\item\em Satisfy the specified pre-\/slot of an event. \end{DoxyCompactList}
@@ -549,7 +549,7 @@ OCR\_EVENT\_LATCH\_INCR\_SLOT }}
 \end{DoxyParamCaption}
 )}}\label{group__OCREvents_gab4cd41f97cc692a86f887b404b055066}
 
-Creates an event. 
+Creates an event.
 
 \begin{DoxyParams}[1]{Parameters}
 \mbox{\tt out}  & {\em guid} & The G\-U\-I\-D created by the runtime for the new event \\
@@ -565,7 +565,7 @@ a status code
 \begin{DoxyItemize}
 \item 0\-: successful
 \item E\-N\-O\-M\-E\-M\-: If space cannot be found to allocate the event
-\item E\-I\-N\-V\-A\-L\-: If event\-Type was malformed or is incompatible with takes\-Arg 
+\item E\-I\-N\-V\-A\-L\-: If event\-Type was malformed or is incompatible with takes\-Arg
 \end{DoxyItemize}
 
 %%%%
@@ -584,7 +584,7 @@ This function creates a new programmer-\/managed event identified by the returne
 \end{DoxyParamCaption}
 )}}\label{group__OCREvents_ga24d30531aaa059c1086fc74712d4f23d}
 
-Explicitly destroys an event. 
+Explicitly destroys an event.
 
 \begin{DoxyParams}[1]{Parameters}
 \mbox{\tt in}  & {\em guid} & The G\-U\-I\-D of the event to destroy \\
@@ -595,14 +595,14 @@ Explicitly destroys an event.
 a statuc code
 \begin{DoxyItemize}
 \item 0\-: successful
-\item E\-I\-N\-V\-A\-L\-: If guid does not refer to a valid event to destroy 
+\item E\-I\-N\-V\-A\-L\-: If guid does not refer to a valid event to destroy
 \end{DoxyItemize}
 
 %%%%
 %%%%  Someone needs to write a proper description of this function
 %%%%
 \descr
-Events such as O\-N\-C\-E or L\-A\-T\-C\-H are automatically destroyed once they trigger; others, however, 
+Events such as O\-N\-C\-E or L\-A\-T\-C\-H are automatically destroyed once they trigger; others, however,
 need to be explicitly destroyed by the programmer. This call enables this.
 
 %
@@ -617,7 +617,7 @@ need to be explicitly destroyed by the programmer. This call enables this.
 \end{DoxyParamCaption}
 )}}\label{group__OCREvents_gab27ef5d905c01ba534e86f8e7e91eaf0}
 
-Satisfy the first pre-\/slot of an event and optionally pass a data block along to the event. 
+Satisfy the first pre-\/slot of an event and optionally pass a data block along to the event.
 
 
 
@@ -637,30 +637,30 @@ a status code
 \item E\-I\-N\-V\-A\-L\-: If the G\-U\-I\-Ds do not refer to valid events/data blocks
 \item E\-N\-O\-P\-E\-R\-M\-: If the event has already been satisfied or if the event does not take an argument and one is given or if the event takes an argument and none is given
 \end{DoxyItemize}
- 
+
 
 \descr
 Satisfying the pre-\/slot of an event will potentially trigger the satisfaction of its post-\/slot depending on its trigger rule\-:
 \begin{DoxyItemize}
 \item O\-N\-C\-E, I\-D\-E\-M and S\-T\-I\-C\-K\-Y events will satisfy their post-\/slot upon satisfaction of their pre-\/slot
-\item L\-A\-T\-C\-H events have a more complex rule; 
+\item L\-A\-T\-C\-H events have a more complex rule;
 see \hyperlink{group__OCRTypesEvents_ga42f4195355182edfaa79c9ef3f2c07b1}{ocr\-Event\-Types\-\_\-t}.
 \end{DoxyItemize}
 
-During satisfaction, the programmer may associate a data block to the pre-\/slot of the event. Depending 
+During satisfaction, the programmer may associate a data block to the pre-\/slot of the event. Depending
 on the event type, that data block will be passed along to its post-\/slot\-:
 \begin{DoxyItemize}
 \item O\-N\-C\-E, I\-D\-E\-M and S\-T\-I\-C\-K\-Y events will pass along the data block to their post-\/slot
 \item L\-A\-T\-C\-H events ignore any data block passed
 \end{DoxyItemize}
-An event satisfaction without the optional data block can be viewed as a pure control dependence 
+An event satisfaction without the optional data block can be viewed as a pure control dependence
 whereas one with a data block is a control+data dependence
 
 \begin{DoxyNote}{Note}
-On satisfaction, a O\-N\-C\-E event will pass the G\-U\-I\-D of the optionaly attached data 
-block to all O\-C\-R objects waiting on it at that time and the event will destroy itself. I\-D\-E\-M and S\-T\-I\-C\-K\-Y 
-events will pass the G\-U\-I\-D of the optionaly attached data block to all O\-C\-R objects waiting on it at that time as 
-well as any new objects linked to it until the event is destroyed. 
+On satisfaction, a O\-N\-C\-E event will pass the G\-U\-I\-D of the optionaly attached data
+block to all O\-C\-R objects waiting on it at that time and the event will destroy itself. I\-D\-E\-M and S\-T\-I\-C\-K\-Y
+events will pass the G\-U\-I\-D of the optionaly attached data block to all O\-C\-R objects waiting on it at that time as
+well as any new objects linked to it until the event is destroyed.
 \end{DoxyNote}
 
 %
@@ -677,7 +677,7 @@ well as any new objects linked to it until the event is destroyed.
 )}}\label{group__OCREvents_gab53103ecf0c74b55830edf5b8d14a942}
 
 
-Satisfy the specified pre-\/slot of an event. 
+Satisfy the specified pre-\/slot of an event.
 
 \begin{DoxyParams}[1]{Parameters}
 \mbox{\tt in}  & {\em event\-Guid} & G\-U\-I\-D of the event to satisfy \\
@@ -695,12 +695,12 @@ a status code
 \item 0\-: successful
 \item E\-N\-O\-M\-E\-M\-: If there is not enough memory. This is usually caused by a programmer error
 \item E\-I\-N\-V\-A\-L\-: If the G\-U\-I\-Ds do not refer to valid events/data blocks
-\item E\-N\-O\-P\-E\-R\-M\-: If the event has already been satisfied or if the event does not take an 
-argument and one is given or if the event takes an argument and none is given 
+\item E\-N\-O\-P\-E\-R\-M\-: If the event has already been satisfied or if the event does not take an
+argument and one is given or if the event takes an argument and none is given
 \end{DoxyItemize}
 
 \descr
-This call is used primarily for L\-A\-T\-C\-H events. ocr\-Event\-Satisfy\-Slot(event\-Guid, data\-Guid, 0) is 
+This call is used primarily for L\-A\-T\-C\-H events. ocr\-Event\-Satisfy\-Slot(event\-Guid, data\-Guid, 0) is
 equivalent to ocr\-Event\-Satisfy(event\-Guid, data\-Guid)
 
 \begin{DoxySeeAlso}{See Also}
@@ -717,11 +717,11 @@ equivalent to ocr\-Event\-Satisfy(event\-Guid, data\-Guid)
 }
 
 
-A\-P\-Is to manage E\-D\-Ts in O\-C\-R.  
+A\-P\-Is to manage E\-D\-Ts in O\-C\-R.
 Types, constants and basic macros associated with EDTs
 \begin{itemize}
-\item \#define EDT\_PROP\_NONE  
-\item \#define EDT\_PROP\_FINISH  
+\item \#define EDT\_PROP\_NONE
+\item \#define EDT\_PROP\_FINISH
 \item \#define EDT\_PARAM\_UNK: Constant indicating that the number of parameters or dependences to an EDT or EDT template is
 unknown.
 \item \#define EDT\_PARAM\_DEF: Constant indicating that the number of parameters or dependences to an EDT is the same as the one
@@ -730,23 +730,23 @@ specified in its template.
 
 The EDT API itself is defined in terms of the following macro and set of functions.
 \begin{DoxyCompactItemize}
-\item 
+\item
 \#define \hyperlink{group__OCREDT_ga9649098ffad669c1c820cd821792d67a}
 {ocr\-Edt\-Template\-Create}(guid, func\-Ptr, paramc, depc)~\hyperlink{group__OCREDT_gaa481a8e8f1a2af9aba623cb01b01bc1b}
 {ocr\-Edt\-Template\-Create\-\_\-internal}((guid), (func\-Ptr), (paramc), (depc), N\-U\-L\-L)
 \begin{DoxyCompactList}\small\item\em Creates an E\-D\-T template. \end{DoxyCompactList}
 
-\item 
+\item
 \hyperlink{group__OCRTypesGeneral_ga92c50087ca0e64fa93fc59402c55f8ca}{u8} \hyperlink{group__OCREDT_gace7063cfee522df47c64bf5013385c10}
 {ocr\-Edt\-Template\-Destroy} (\hyperlink{group__OCRTypesGeneral_gacde3883d1ce245c051133c2c3aa82fc8}{ocr\-Guid\-\_\-t} guid)
 \begin{DoxyCompactList}\small\item\em Destroy an E\-D\-T template. \end{DoxyCompactList}
 
-\item 
+\item
 \hyperlink{group__OCRTypesGeneral_ga92c50087ca0e64fa93fc59402c55f8ca}{u8} \hyperlink{group__OCREDT_gafa2443b31c38b4b7f9f59713abe12ecc}
 {ocr\-Edt\-Create} (\hyperlink{group__OCRTypesGeneral_gacde3883d1ce245c051133c2c3aa82fc8}{ocr\-Guid\-\_\-t} $\ast$guid, \hyperlink{group__OCRTypesGeneral_gacde3883d1ce245c051133c2c3aa82fc8}{ocr\-Guid\-\_\-t} template\-Guid, \hyperlink{group__OCRTypesGeneral_gafaa62991928fb9fb18ff0db62a040aba}{u32} paramc, \hyperlink{group__OCRTypesGeneral_ga3f7e2bcbb0b4c338f3c4f6c937cd4234}{u64} $\ast$paramv, \hyperlink{group__OCRTypesGeneral_gafaa62991928fb9fb18ff0db62a040aba}{u32} depc, \hyperlink{group__OCRTypesGeneral_gacde3883d1ce245c051133c2c3aa82fc8}{ocr\-Guid\-\_\-t} $\ast$depv, \hyperlink{group__OCRTypesGeneral_gace9d960e74685e2cd84b36132dbbf8aa}{u16} properties, \hyperlink{group__OCRTypesGeneral_gacde3883d1ce245c051133c2c3aa82fc8}{ocr\-Guid\-\_\-t} affinity, \hyperlink{group__OCRTypesGeneral_gacde3883d1ce245c051133c2c3aa82fc8}{ocr\-Guid\-\_\-t} $\ast$output\-Event)
 \begin{DoxyCompactList}\small\item\em Creates an E\-D\-T instance from an E\-D\-T template. \end{DoxyCompactList}
 
-\item 
+\item
 \hyperlink{group__OCRTypesGeneral_ga92c50087ca0e64fa93fc59402c55f8ca}{u8} \hyperlink{group__OCREDT_gae258a29af116794a73099e9c6d9232f8}
 {ocr\-Edt\-Destroy} (\hyperlink{group__OCRTypesGeneral_gacde3883d1ce245c051133c2c3aa82fc8}{ocr\-Guid\-\_\-t} guid)
 \begin{DoxyCompactList}\small\item\em Destroy an E\-D\-T. \end{DoxyCompactList}
@@ -768,7 +768,7 @@ The EDT API itself is defined in terms of the following macro and set of functio
 \end{DoxyParamCaption})~}
 
 
-Creates an E\-D\-T template. 
+Creates an E\-D\-T template.
 
 
 
@@ -795,17 +795,17 @@ a status code\-:
 
 
 \descr
-An E\-D\-T template encapsulates the E\-D\-T function and, optionally, the number of 
-parameters and arguments that E\-D\-Ts instanciated from this template will use. It needs to 
-be created only once for each function that will serve as an E\-D\-T; reusing the same 
-template from multiple E\-D\-Ts of the same type may improve performance as this 
-allows the runtime to collect information about multiple instances of the same 
+An E\-D\-T template encapsulates the E\-D\-T function and, optionally, the number of
+parameters and arguments that E\-D\-Ts instanciated from this template will use. It needs to
+be created only once for each function that will serve as an E\-D\-T; reusing the same
+template from multiple E\-D\-Ts of the same type may improve performance as this
+allows the runtime to collect information about multiple instances of the same
 type of E\-D\-T.
 
 \begin{DoxyNote}{Note}
 You should use \hyperlink{group__OCREDT_ga9649098ffad669c1c820cd821792d67a}{ocr\-Edt\-Template\-Create()} as opposed to the
-internal function referenced by this macro. If O\-C\-R\-\_\-\-E\-N\-A\-B\-L\-E\-\_\-\-E\-D\-T\-\_\-\-N\-A\-M\-I\-N\-G is enabled, 
-the C name of the function will be used as func\-Name. 
+internal function referenced by this macro. If O\-C\-R\-\_\-\-E\-N\-A\-B\-L\-E\-\_\-\-E\-D\-T\-\_\-\-N\-A\-M\-I\-N\-G is enabled,
+the C name of the function will be used as func\-Name.
 \end{DoxyNote}
 
 
@@ -829,7 +829,7 @@ the C name of the function will be used as func\-Name.
 )}}\label{group__OCREDT_gafa2443b31c38b4b7f9f59713abe12ecc}
 
 
-Creates an E\-D\-T instance from an E\-D\-T template. 
+Creates an E\-D\-T instance from an E\-D\-T template.
 
 
 \begin{DoxyParams}[1]{Parameters}
@@ -857,7 +857,7 @@ Creates an E\-D\-T instance from an E\-D\-T template.
 \returns
 a status code
 \begin{DoxyItemize}
-\item 0\-: successful 
+\item 0\-: successful
 \end{DoxyItemize}
 
 %%%%
@@ -877,7 +877,7 @@ This function does something very important
 \end{DoxyParamCaption}
 )}}\label{group__OCREDT_gae258a29af116794a73099e9c6d9232f8}
 
-Destroy an E\-D\-T. 
+Destroy an E\-D\-T.
 
 E\-D\-Ts are normally destroyed after they execute. This call is provided if an E\-D\-T is created and the programmer later realizes that it will never become runable.
 
@@ -890,7 +890,7 @@ E\-D\-Ts are normally destroyed after they execute. This call is provided if an 
 \returns
 a status code
 \begin{DoxyItemize}
-\item 0\-: successful 
+\item 0\-: successful
 \end{DoxyItemize}
 
 %%%%%%%
@@ -909,7 +909,7 @@ a status code
 )}}\label{group__OCREDT_gace7063cfee522df47c64bf5013385c10}
 
 
-Destroy an E\-D\-T template. 
+Destroy an E\-D\-T template.
 
 
 \begin{DoxyParams}[1]{Parameters}
@@ -920,7 +920,7 @@ Destroy an E\-D\-T template.
 \returns
 a status code
 \begin{DoxyItemize}
-\item 0\-: successful 
+\item 0\-: successful
 \end{DoxyItemize}
 
 \descr
@@ -938,11 +938,11 @@ This function can be called if no further E\-D\-Ts will be created based on this
 At the core of OCR is the concept of a directed acyclic graph that represents the evolving
 state of an OCR program.   OCR objects become runnable once their dependences are met.
 These dependences can be set explicitly when creating the OCR object or dynamically using the functions
-from this section of the API.   
+from this section of the API.
 
 
 \begin{DoxyCompactItemize}
-\item 
+\item
 \hyperlink{group__OCRTypesGeneral_ga92c50087ca0e64fa93fc59402c55f8ca}{u8} \hyperlink{group__OCRDependences_gab0eea439797c1dcde2dbbe704d701dcd}
 {ocr\-Add\-Dependence} (\hyperlink{group__OCRTypesGeneral_gacde3883d1ce245c051133c2c3aa82fc8}{ocr\-Guid\-\_\-t} source, \hyperlink{group__OCRTypesGeneral_gacde3883d1ce245c051133c2c3aa82fc8}{ocr\-Guid\-\_\-t} destination, \hyperlink{group__OCRTypesGeneral_gafaa62991928fb9fb18ff0db62a040aba}{u32} slot, \hyperlink{group__OCRTypesDB_gae72c588a0182fcee7db295e53743821a}{ocr\-Db\-Access\-Mode\-\_\-t} mode)
 \begin{DoxyCompactList}\small\item\em Adds a dependence between O\-C\-R objects\-: \end{DoxyCompactList}
@@ -983,7 +983,7 @@ a status code
 \begin{DoxyItemize}
 \item 0\-: successful
 \item E\-I\-N\-V\-A\-L\-: The slot number is invalid
-\item E\-N\-O\-P\-E\-R\-M\-: The source and destination G\-U\-I\-Ds cannot be linked with a dependence 
+\item E\-N\-O\-P\-E\-R\-M\-: The source and destination G\-U\-I\-Ds cannot be linked with a dependence
 \end{DoxyItemize}
 
 

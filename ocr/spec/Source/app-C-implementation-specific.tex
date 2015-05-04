@@ -7,14 +7,14 @@
 
 \section{Data structures}
 
-Every OCR object is identified by a Globally Unique ID or GUID.  This is an 
+Every OCR object is identified by a Globally Unique ID or GUID.  This is an
 opaque object to programmers working with OCR with type ocrGUID\_t.  This
 is defined internal to OCR as:
 
  typedef intptr\_t ocrGuid\_t
 
 macros
-\#define DB\_ACCESS\_MODE\_MASK 0x1E Runtime reserved constant to support 
+\#define DB\_ACCESS\_MODE\_MASK 0x1E Runtime reserved constant to support
 work wtih data blocks
 
 \section{Event management}
@@ -31,7 +31,7 @@ one additional ennumerated value is defined internal to OCR
 \section{EDT management}
 
 For some reason (which will be documented here) the OCR team decided that they needed
-to implement the \code{ocrEDTTemplateCreate} function as a macro.  Therefore they 
+to implement the \code{ocrEDTTemplateCreate} function as a macro.  Therefore they
 needed to define the following inside OCR:
 
 %
@@ -50,7 +50,7 @@ needed to define the following inside OCR:
 )}}\label{group__OCREDT_gaa481a8e8f1a2af9aba623cb01b01bc1b}
 
 
-Creates an E\-D\-T template. 
+Creates an E\-D\-T template.
 
 An E\-D\-T template encapsulates the E\-D\-T function and, optionally, the number of parameters and arguments that E\-D\-Ts instanciated from this template will use. It needs to be created only once for each function that will serve as an E\-D\-T; reusing the same template from multiple E\-D\-Ts of the same type may improve performance as this allows the runtime to collect information about multiple instances of the same type of E\-D\-T.
 
@@ -75,7 +75,7 @@ a status code\-:
 \end{DoxyItemize}
 \end{DoxyReturn}
 \begin{DoxyNote}{Note}
-You should use \hyperlink{group__OCREDT_ga9649098ffad669c1c820cd821792d67a}{ocr\-Edt\-Template\-Create()} as opposed to this internal function. If O\-C\-R\-\_\-\-E\-N\-A\-B\-L\-E\-\_\-\-E\-D\-T\-\_\-\-N\-A\-M\-I\-N\-G is enabled, the C name of the function will be used as func\-Name. 
+You should use \hyperlink{group__OCREDT_ga9649098ffad669c1c820cd821792d67a}{ocr\-Edt\-Template\-Create()} as opposed to this internal function. If O\-C\-R\-\_\-\-E\-N\-A\-B\-L\-E\-\_\-\-E\-D\-T\-\_\-\-N\-A\-M\-I\-N\-G is enabled, the C name of the function will be used as func\-Name.
 \end{DoxyNote}
 
 
@@ -84,9 +84,9 @@ You should use \hyperlink{group__OCREDT_ga9649098ffad669c1c820cd821792d67a}{ocr\
 
 \section{OCR interface to a limited subset of C standard library functionality}
 
-OCR must support a wide variety of platforms including simulators that emmulate real systems.  
+OCR must support a wide variety of platforms including simulators that emmulate real systems.
 Often, core functionality provided by standard C librarires are not availabel on all platforms
-and as a result, an OCR program cannot depend on these functions.  Two functions supported 
+and as a result, an OCR program cannot depend on these functions.  Two functions supported
 as macros have been included in the internal, development versions of OCR.
 
 \begin{itemize}

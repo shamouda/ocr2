@@ -1,9 +1,9 @@
 %%%%
 \subsection{Code example}
 
-The following code demonstrates the use of Finish EDTs by performing a Fast Fourier 
-Transform on a sparse array of length 256 bytes. For the sake of simplicity, the 
-array contents and sizes are hardcoded, however, the code can be used as a starting 
+The following code demonstrates the use of Finish EDTs by performing a Fast Fourier
+Transform on a sparse array of length 256 bytes. For the sake of simplicity, the
+array contents and sizes are hardcoded, however, the code can be used as a starting
 point for adding more functionality.
 
 \begin{ocrsnip}
@@ -36,7 +36,7 @@ point for adding more functionality.
 #define BLOCK_SIZE 16
 
 // The below function performs a twiddle operation on an array x_in
-// and places the results in X_real & X_imag. The other arguments 
+// and places the results in X_real & X_imag. The other arguments
 // size and step refer to the size of the array x_in and the offset therein
 void ditfft2(double *X_real, double *X_imag, double *x_in, u32 size, u32 step) {
     if(size == 1) {
@@ -70,7 +70,7 @@ void ditfft2(double *X_real, double *X_imag, double *x_in, u32 size, u32 step) {
 
 // The below function splits the given array into odd & even portions and
 // calls itself recursively via child EDTs that operate on each of the portions,
-// till the array operated upon is of size BLOCK_SIZE, a pre-defined 
+// till the array operated upon is of size BLOCK_SIZE, a pre-defined
 // parameter. It then trivially computes the FFT of this array, then spawns
 // twiddle EDTs to combine the results of the children.
 ocrGuid_t fftComputeEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) { (@ \label{line:HW_ComputeEdt} @)
@@ -180,12 +180,12 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
 \subsubsection{Details}
 
 The above code contains a total of 5 functions - a \texttt{mainEdt()} required of all
-OCR programs, a \texttt{ditfft2()} that acts as the core of the recursive FFT 
+OCR programs, a \texttt{ditfft2()} that acts as the core of the recursive FFT
 computation, calling itself on smaller sizes of the array provided to it, and three
 other EDTs that are managed by OCR. They include - \texttt{fftComputeEdt()} in
-Line~\ref{line:HW_ComputeEdt} that breaks down the FFT operation on an array into 
+Line~\ref{line:HW_ComputeEdt} that breaks down the FFT operation on an array into
 two FFT operations on the two halves of the array (by spawning two other EDTs of
-the same template), as well as an instance of \texttt{fftTwiddleEdt()} shown in 
+the same template), as well as an instance of \texttt{fftTwiddleEdt()} shown in
 Line~\ref{line:HW_TwiddleEdt} that combines the
 results from the two spawned EDTs by applying the FFT ``twiddle'' operation on the
 real and imaginary portions of the array. The \texttt{fftComputeEdt()} function stops
@@ -194,28 +194,28 @@ spawning EDTs once the size of the array it operates on drops below a pre-define
 smaller data sizes till the \texttt{BLOCK\_SIZE} value is reached, at which point the FFT value
 is directly computed, followed by a series of twiddle operations on gradualy larger
 data sizes till the entire array has undergone the operation. When this is available,
-a final EDT termed \texttt{endEdt()} in Line~\ref{line:HW_EndEdt} is called to 
+a final EDT termed \texttt{endEdt()} in Line~\ref{line:HW_EndEdt} is called to
 optionally output the value of the
 computed FFT, and terminate the program by calling \texttt{ocrShutdown()}. All the
 FFT operations are performed on a single datablock created in Line~\ref{line:HW_DBCreate}.
-This shortcut is taken for the sake of didactic simplicity. While this is 
+This shortcut is taken for the sake of didactic simplicity. While this is
 programmatically correct, a user who desires reducing contention on the single array
 may want to break down the datablock into smaller units for each of the EDTs to operate
-upon. 
+upon.
 
-For this program to execute correctly, it is apparent that each of the 
-\texttt{fftTwiddleEdt} instances can not start until all its previous instances have 
+For this program to execute correctly, it is apparent that each of the
+\texttt{fftTwiddleEdt} instances can not start until all its previous instances have
 completed execution. Further, for the sake of program simplicity, an instance of
 \texttt{fftComputeEdt}-\texttt{fftTwiddleEdt} pair cannot return until the EDTs that
 they spawn have completed execution. The above dependences are enforced using the
-concept of \emph{Finish EDTs}. As stated before, a Finish EDT does not return until 
+concept of \emph{Finish EDTs}. As stated before, a Finish EDT does not return until
 all the EDTs spawned by it have completed execution. This simplifies programming,
 and does not consume computing resources since a Finish EDT that is not running, is
 removed from any computing resources it has used. In this program, no instance of
 \texttt{fftComputeEdt} or \texttt{fftTwiddleEdt} returns before the corresponding
-EDTs that operates on smaller data sizes have returned, as illustrated in 
-Lines~\ref{line:HW_FinishEdt1},\ref{line:HW_FinishEdt2} and \ref{line:HW_FinishEdt3}. 
-Finally, the single \texttt{endEdt()} instance in Line~\ref{line:HW_FinishEdt4} is called 
-only after all the EDTs spawned by the parent \texttt{fftComputeEdt()} 
+EDTs that operates on smaller data sizes have returned, as illustrated in
+Lines~\ref{line:HW_FinishEdt1},\ref{line:HW_FinishEdt2} and \ref{line:HW_FinishEdt3}.
+Finally, the single \texttt{endEdt()} instance in Line~\ref{line:HW_FinishEdt4} is called
+only after all the EDTs spawned by the parent \texttt{fftComputeEdt()}
 in Line~\ref{line:HW_FinishEdt5}, return.
 
