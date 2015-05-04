@@ -927,7 +927,7 @@ static void removeFreeBlock(poolHdr_t * pPool, blkHdr_t * pFreeBlk) {
 
 // Assumes freeBlock OK for valgrind
 void addFreeBlock(poolHdr_t * pPool, blkHdr_t * pFreeBlock) {
-    START_PROFILE(allocator_tisf_addFreeBlock);
+    START_PROFILE(alloc_tlsf_addFreeBlock);
     u32 flIndex, slIndex;
     u64 tempSz;
 
@@ -1689,15 +1689,15 @@ void* tlsfAllocate(
     ocrAllocator_t *self,   // Allocator to attempt block allocation
     u64 size,               // Size of desired block, in bytes
     u64 hints) {            // Allocator-dependent hints; TLSF supports reduced contention
-    //START_PROFILE(allocator_tlsf_tlsfAllocate);
+    START_PROFILE(alloc_tlsfAllocate);
     ocrAllocatorTlsf_t *rself = (ocrAllocatorTlsf_t*)self;
 
     bool useRemnant = !(hints & OCR_ALLOC_HINT_REDUCE_CONTENTION);
     poolHdr_t * pPool = (poolHdr_t *) (rself->poolAddr); // Addr of remnant pool (pool shared by ALL clients of allocator)
 
     if (useRemnant == 0) {  // Attempt to allocate the requested block to a semi-private slice pool picked in round-robin fashion.
-        if (rself->sliceCount == 0) return _NULL; // Slicing is NOT implemented on this pool.  Return failure status.
-        if (rself->sliceSize < size) return _NULL; // Don't bother trying if the requested block is bigger than the pool supports.
+        if (rself->sliceCount == 0) RETURN_PROFILE(_NULL); // Slicing is NOT implemented on this pool.  Return failure status.
+        if (rself->sliceSize < size) RETURN_PROFILE(_NULL); // Don't bother trying if the requested block is bigger than the pool supports.
         // Attempt allocations to slice pools on an entirely round-robin basis, so that any number of concurrent allocations up to
         // the number of slices can be supported with NO throttling on their locks.  In the following code, the increment and
         // wrap-around of the currSliceNum round-robin rotor is NOT thread safe, but it doesn't really need to be.  In the rare
@@ -1755,12 +1755,13 @@ void* tlsfAllocate(
     if (toReturn) VALGRIND_MEMPOOL_ALLOC((u64) pPool, toReturn, size);
     VALGRIND_MAKE_MEM_NOACCESS((u64) pPool, sizeOfPoolHdr);
 #endif
-    //RETURN_PROFILE(toReturn);
+    RETURN_PROFILE(toReturn);
 }
 
 
 
 void tlsfDeallocate(void* address) {
+    START_PROFILE(alloc_tlsfDeallocate);
     blkHdr_t * pBlock = mapPayloadAddrToBlockAddr(address);
 #ifdef ENABLE_VALGRIND
     VALGRIND_MAKE_MEM_DEFINED((u64) pBlock, sizeof(blkHdr_t));
@@ -1788,6 +1789,7 @@ void tlsfDeallocate(void* address) {
 #ifdef ENABLE_VALGRIND
     VALGRIND_MAKE_MEM_NOACCESS((u64) pPool, sizeOfPoolHdrWithAnnex);
 #endif
+    EXIT_PROFILE;
 }
 
 

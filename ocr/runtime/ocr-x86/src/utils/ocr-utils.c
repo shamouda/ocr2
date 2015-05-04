@@ -142,6 +142,7 @@ u32 ocrGuidTrackerIterateAndClear(ocrGuidTracker_t *self) {
 }
 
 u32 ocrGuidTrackerFind(ocrGuidTracker_t *self, ocrGuid_t toFind) {
+    START_PROFILE(utils_ocrGuidTrackerFind);
     u32 result = 64, slot;
     u64 rstatus = ~(self->slotsStatus);
     while(rstatus) {
@@ -152,7 +153,7 @@ u32 ocrGuidTrackerFind(ocrGuidTracker_t *self, ocrGuid_t toFind) {
             break;
         }
     }
-    return result;
+    RETURN_PROFILE(result);
 }
 
 s32 ocrStrcmp(u8 *str1, u8 *str2) {

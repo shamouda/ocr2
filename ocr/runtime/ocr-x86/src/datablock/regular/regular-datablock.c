@@ -135,6 +135,7 @@ u8 regularRelease(ocrDataBlock_t *self, ocrFatGuid_t edt,
 }
 
 u8 regularDestruct(ocrDataBlock_t *self) {
+    START_PROFILE(datablock_regularDestruct);
     // We don't use a lock here. Maybe we should
     ocrDataBlockRegular_t *rself = (ocrDataBlockRegular_t*)self;
     ASSERT(rself->attributes.numUsers == 0);
@@ -179,7 +180,7 @@ u8 regularDestruct(ocrDataBlock_t *self) {
     RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, false));
 #undef PD_MSG
 #undef PD_TYPE
-    return 0;
+    RETURN_PROFILE(0);
 }
 
 u8 regularFree(ocrDataBlock_t *self, ocrFatGuid_t edt) {

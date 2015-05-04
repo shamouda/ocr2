@@ -184,7 +184,7 @@ u8 ocrEdtCreate(ocrGuid_t* edtGuid, ocrGuid_t templateGuid,
     getCurrentEnv(&pd, NULL, &curEdt, &msg);
     if((paramc == EDT_PARAM_UNK) || (depc == EDT_PARAM_UNK)) {
         DPRINTF(DEBUG_LVL_WARN, "paramc or depc cannot be set to EDT_PARAM_UNK\n");
-        return OCR_EINVAL;
+        RETURN_PROFILE(OCR_EINVAL);
     }
 #define PD_MSG (&msg)
 #define PD_TYPE PD_MSG_WORK_CREATE
