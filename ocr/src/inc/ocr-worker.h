@@ -86,6 +86,8 @@ typedef struct _ocrWorkerFcts_t {
 
 } ocrWorkerFcts_t;
 
+#define GET_STATE(rl, phase) (((rl)<<4) | (phase))
+
 typedef struct _ocrWorker_t {
     ocrFatGuid_t fguid;
     struct _ocrPolicyDomain_t *pd;

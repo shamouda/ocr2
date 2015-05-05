@@ -251,7 +251,7 @@ static void workerLoopHcCommInternal(ocrWorker_t * worker, ocrGuid_t processRequ
 static void workerLoopHcComm(ocrWorker_t * worker) {
     u8 continueLoop = true;
     // At this stage, we are in the USER_OK runlevel
-    ASSERT(worker->curState == ((RL_USER_OK << 4) | (RL_GET_PHASE_COUNT_DOWN(worker->pd, RL_USER_OK))));
+    ASSERT(worker->curState == GET_STATE(RL_USER_OK, (RL_GET_PHASE_COUNT_DOWN(worker->pd, RL_USER_OK))));
 
     if (worker->amBlessed) {
         ocrGuid_t affinityMasterPD;
@@ -285,7 +285,7 @@ static void workerLoopHcComm(ocrWorker_t * worker) {
     u8 PHASE_COMP_QUIESCE = 2;
     u8 PHASE_COMM_QUIESCE = 1;
     u8 PHASE_DONE = 0;
-    ASSERT(worker->curState == ((RL_USER_OK<<4) | PHASE_RUN));
+    ASSERT(worker->curState == GET_STATE(RL_USER_OK, PHASE_RUN));
     ocrGuid_t processRequestTemplate = NULL_GUID;
     ocrEdtTemplateCreate(&processRequestTemplate, &processRequestEdt, 1, 0);
     do {
@@ -320,7 +320,7 @@ static void workerLoopHcComm(ocrWorker_t * worker) {
             // This call returns when outgoing messages are all sent ...
             workerLoopHcCommInternal(worker, processRequestTemplate, true/*check empty queue*/);
             // Done with the quiesce comm action, callback the PD
-            worker->curState = RL_USER_OK << 4 | PHASE_COMM_QUIESCE;
+            worker->curState = GET_STATE(RL_USER_OK, PHASE_COMM_QUIESCE);
             worker->callback(worker->pd, worker->callbackArg);
             // Warning: Code potentially concurrent with switchRunlevel now on
 
@@ -347,7 +347,7 @@ static void workerLoopHcComm(ocrWorker_t * worker) {
             workerLoopHcCommInternal(worker, processRequestTemplate, true/*check empty queue*/);
             // Phase shouldn't have changed since we haven't done callback yet
             ASSERT((worker->desiredState & 0xF) == PHASE_DONE);
-            worker->curState = RL_USER_OK << 4 | PHASE_DONE;
+            worker->curState = GET_STATE(RL_USER_OK, PHASE_DONE);
             worker->callback(worker->pd, worker->callbackArg);
             // Warning: Code potentially concurrent with switchRunlevel now on
             // Need to busy wait until the PD makes workers to transition to
@@ -369,7 +369,7 @@ static void workerLoopHcComm(ocrWorker_t * worker) {
             if (desiredPhase == PHASE_COMP_QUIESCE) {
                 // No actions to take in this phase.
                 // Callback the PD and fall-through to keep working.
-                worker->curState = RL_USER_OK << 4 | PHASE_COMP_QUIESCE;
+                worker->curState = GET_STATE(RL_USER_OK, PHASE_COMP_QUIESCE);
                 worker->callback(worker->pd, worker->callbackArg);
                 //Warning: The moment this callback is invoked, This code
                 //is potentially running concurrently with the last worker
@@ -444,12 +444,12 @@ u8 hcCommWorkerSwitchRunlevel(ocrWorker_t *self, ocrPolicyDomain_t *PD, ocrRunle
                     self->callback = NULL;
                     self->callbackArg = 0ULL;
                     hal_fence();
-                    self->desiredState = (RL_USER_OK << 4) | RL_GET_PHASE_COUNT_DOWN(PD, RL_USER_OK); // We put ourself one past
+                    self->desiredState = GET_STATE(RL_USER_OK, RL_GET_PHASE_COUNT_DOWN(PD, RL_USER_OK)); // We put ourself one past
                     // so that we can then come back down when
                     // shutting down
                 } else {
                     // At this point, the original capable thread goes to work
-                    self->curState = self->desiredState = ((RL_USER_OK << 4) | RL_GET_PHASE_COUNT_DOWN(PD, RL_USER_OK));
+                    self->curState = self->desiredState = GET_STATE(RL_USER_OK, RL_GET_PHASE_COUNT_DOWN(PD, RL_USER_OK));
                     workerLoopHcComm(self);
                 }
             }
@@ -465,14 +465,14 @@ u8 hcCommWorkerSwitchRunlevel(ocrWorker_t *self, ocrPolicyDomain_t *PD, ocrRunle
                 // We make sure that we actually fully booted before shutting down.
                 // Addresses a race where a worker still hasn't started but
                 // another worker has started and executes the shutdown protocol
-                while(self->curState != ((RL_USER_OK << 4) | (phase + 1)));
-                ASSERT(self->curState == ((RL_USER_OK << 4) | (phase + 1)));
+                while(self->curState != GET_STATE(RL_USER_OK, (phase + 1)));
+                ASSERT(self->curState == GET_STATE(RL_USER_OK, (phase + 1)));
                 ASSERT((self->curState == self->desiredState));
                 ASSERT(callback != NULL);
                 self->callback = callback;
                 self->callbackArg = val;
                 hal_fence();
-                self->desiredState = RL_USER_OK << 4 | PHASE_COMP_QUIESCE;
+                self->desiredState = GET_STATE(RL_USER_OK, PHASE_COMP_QUIESCE);
             }
 
             if(phase == PHASE_COMM_QUIESCE) {
@@ -489,7 +489,7 @@ u8 hcCommWorkerSwitchRunlevel(ocrWorker_t *self, ocrPolicyDomain_t *PD, ocrRunle
                 // Either breaks the worker's loop from the PHASE_COMP_QUIESCE
                 // or is set even before that loop is reached and skip the
                 // PHASE_COMP_QUIESCE altogeher, which is fine
-                self->desiredState = RL_USER_OK << 4 | PHASE_COMM_QUIESCE;
+                self->desiredState = GET_STATE(RL_USER_OK, PHASE_COMM_QUIESCE);
             }
 
             //TODO-RL Last phase that transitions to another runlevel
@@ -503,15 +503,14 @@ u8 hcCommWorkerSwitchRunlevel(ocrWorker_t *self, ocrPolicyDomain_t *PD, ocrRunle
                 // That sounds wrong because the worker could be doing a callback
                 // that ends up calling this switch code. If the state is not set
                 // correctly it's likely we'll deadlock.
-                // while(self->curState != (RL_USER_OK << 4)) ;
+                // while(self->curState != GET_STATE(RL_USER_OK, 0)) ;
 
                 ASSERT((self->curState >> 4) == RL_USER_OK);
                 self->callback = callback;
                 self->callbackArg = val;
                 hal_fence();
-                self->desiredState = RL_USER_OK << 4 | PHASE_DONE;
+                self->desiredState = GET_STATE(RL_USER_OK, PHASE_DONE);
                 // Breaks the worker's compute loop
-                // self->desiredState = RL_COMPUTE_OK << 4;
             }
         }
         break;
@@ -549,20 +548,20 @@ void* runWorkerHcComm(ocrWorker_t * worker) {
 
     // Set the current environment
     worker->computes[0]->fcts.setCurrentEnv(worker->computes[0], worker->pd, worker);
-    worker->curState = RL_COMPUTE_OK << 4;
+    worker->curState = GET_STATE(RL_COMPUTE_OK, 0);
 
     // We wait until we transition to the next RL
     while(worker->curState == worker->desiredState) ;
 
     // At this point, we should be going to RL_USER_OK
-    ASSERT(worker->desiredState == ((RL_USER_OK << 4) | (RL_GET_PHASE_COUNT_DOWN(worker->pd, RL_USER_OK))));
+    ASSERT(worker->desiredState == GET_STATE(RL_USER_OK, RL_GET_PHASE_COUNT_DOWN(worker->pd, RL_USER_OK)));
 
     // Start the worker loop
     worker->curState = worker->desiredState;
     workerLoopHcComm(worker);
     // Worker loop will transition back down to RL_COMPUTE_OK last phase
-
-    ASSERT((worker->curState == worker->desiredState) && (worker->curState == ((RL_COMPUTE_OK << 4 ) | (RL_GET_PHASE_COUNT_DOWN(worker->pd, RL_COMPUTE_OK) - 1))));
+    ASSERT((worker->curState == worker->desiredState) &&
+           (worker->curState == GET_STATE(RL_COMPUTE_OK, RL_GET_PHASE_COUNT_DOWN(worker->pd, RL_COMPUTE_OK) - 1)));
     return NULL;
 }
 

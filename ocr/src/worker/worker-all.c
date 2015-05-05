@@ -53,7 +53,7 @@ void initializeWorkerOcr(ocrWorkerFactory_t * factory, ocrWorker_t * self, ocrPa
     self->location = 0;
     self->curTask = NULL;
     self->fcts = factory->workerFcts;
-    self->curState = self->desiredState = RL_CONFIG_PARSE << 4;
+    self->curState = self->desiredState = GET_STATE(RL_CONFIG_PARSE, 0);
     self->callback = NULL;
     self->callbackArg = 0ULL;
 }
