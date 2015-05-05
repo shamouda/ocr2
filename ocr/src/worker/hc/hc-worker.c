@@ -126,9 +126,10 @@ static void workerLoop(ocrWorker_t * worker) {
             EXIT_PROFILE;
         }
         // Here we are shifting to another runlevel or phase
-        switch((worker->desiredState) >> 4) {
+
+        switch(GET_STATE_RL(worker->desiredState)) {
         case RL_USER_OK: {
-            u8 desiredPhase = worker->desiredState & 0xF;
+            u8 desiredPhase = GET_STATE_PHASE(worker->desiredState);
             // Should never fall-through here if there has been no transition
             ASSERT(desiredPhase != RL_GET_PHASE_COUNT_DOWN(worker->pd, RL_USER_OK));
             ASSERT(worker->callback != NULL);
@@ -139,7 +140,7 @@ static void workerLoop(ocrWorker_t * worker) {
             break;
         }
         case RL_COMPUTE_OK: {
-            u8 phase = worker->desiredState & 0xF;
+            u8 phase = GET_STATE_PHASE(worker->desiredState);
             if(RL_IS_FIRST_PHASE_DOWN(worker->pd, RL_COMPUTE_OK, phase)) {
                 DPRINTF(DEBUG_LVL_VERB, "Noticed transition to RL_COMPUTE_OK\n");
 
@@ -328,7 +329,7 @@ u8 hcWorkerSwitchRunlevel(ocrWorker_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_
             }
 
             // Transition to the next phase
-            ASSERT((self->curState & 0xF) == (phase+1));
+            ASSERT(GET_STATE_PHASE(self->curState) == (phase+1));
             ASSERT(callback != NULL);
             self->callback = callback;
             self->callbackArg = val;

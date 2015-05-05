@@ -86,7 +86,10 @@ typedef struct _ocrWorkerFcts_t {
 
 } ocrWorkerFcts_t;
 
-#define GET_STATE(rl, phase) (((rl)<<4) | (phase))
+// Relies on runlevel and phases to be encoded on a maximum of 4 bits
+#define GET_STATE(rl, phase) (((rl) << 4) | (phase))
+#define GET_STATE_RL(state) ((state) >> 4)
+#define GET_STATE_PHASE(state) ((state) & 0xF)
 
 typedef struct _ocrWorker_t {
     ocrFatGuid_t fguid;
