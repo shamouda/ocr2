@@ -40,7 +40,7 @@ void sharedDestruct(ocrMemTarget_t *self) {
 }
 
 u8 sharedSwitchRunlevel(ocrMemTarget_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
-                        u32 phase, u32 properties, void (*callback)(ocrPolicyDomain_t*, u64), u64 val) {
+                        phase_t phase, u32 properties, void (*callback)(ocrPolicyDomain_t*, u64), u64 val) {
 
     u8 toReturn = 0;
 
@@ -169,7 +169,7 @@ ocrMemTargetFactory_t *newMemTargetFactoryShared(ocrParamList_t *perType) {
     base->targetFcts.destruct = FUNC_ADDR(void (*)(ocrMemTarget_t*), sharedDestruct);
     base->targetFcts.switchRunlevel = FUNC_ADDR(
         u8 (*)(ocrMemTarget_t*, ocrPolicyDomain_t*, ocrRunlevel_t,
-               u32, u32, void (*)(ocrPolicyDomain_t*, u64), u64), sharedSwitchRunlevel);
+               phase_t, u32, void (*)(ocrPolicyDomain_t*, u64), u64), sharedSwitchRunlevel);
     base->targetFcts.getThrottle = FUNC_ADDR(u8 (*)(ocrMemTarget_t*, u64*), sharedGetThrottle);
     base->targetFcts.setThrottle = FUNC_ADDR(u8 (*)(ocrMemTarget_t*, u64), sharedSetThrottle);
     base->targetFcts.getRange = FUNC_ADDR(void (*)(ocrMemTarget_t*, u64*, u64*), sharedGetRange);

@@ -451,9 +451,9 @@ u8 MPICommPollMessage(ocrCommPlatform_t *self, ocrPolicyMsg_t **msg,
                       u32 properties, u32 *mask) {
     ocrCommPlatformMPI_t * mpiComm = ((ocrCommPlatformMPI_t *) self);
     // Not supposed to be polled outside RL_USER_OK
-    ASSERT_BLOCK_BEGIN(((mpiComm->curState >> 16) == RL_USER_OK))
+    ASSERT_BLOCK_BEGIN(((mpiComm->curState >> 4) == RL_USER_OK))
     DPRINTF(DEBUG_LVL_WARN,"[MPI %d] Illegal runlevel[%d] reached in MPI-comm-platform pollMessage\n",
-            mpiRankToLocation(self->pd->myLocation), (mpiComm->curState >> 16));
+            mpiRankToLocation(self->pd->myLocation), (mpiComm->curState >> 4));
     ASSERT_BLOCK_END
     return MPICommPollMessageInternal(self, msg, properties, mask);
 }
@@ -469,7 +469,7 @@ u8 MPICommWaitMessage(ocrCommPlatform_t *self, ocrPolicyMsg_t **msg,
 }
 
 u8 MPICommSwitchRunlevel(ocrCommPlatform_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
-                                u32 phase, u32 properties, void (*callback)(ocrPolicyDomain_t*, u64), u64 val) {
+                                phase_t phase, u32 properties, void (*callback)(ocrPolicyDomain_t*, u64), u64 val) {
     ocrCommPlatformMPI_t * mpiComm = ((ocrCommPlatformMPI_t *) self);
     u8 toReturn = 0;
     // Verify properties for this call
@@ -565,7 +565,7 @@ u8 MPICommSwitchRunlevel(ocrCommPlatform_t *self, ocrPolicyDomain_t *PD, ocrRunl
         ASSERT(0);
     }
     // Store the runlevel/phase in curState for debugging purpose
-    mpiComm->curState = ((runlevel<<16) | phase);
+    mpiComm->curState = ((runlevel<<4) | phase);
     return toReturn;
 }
 
@@ -620,7 +620,7 @@ ocrCommPlatformFactory_t *newCommPlatformFactoryMPI(ocrParamList_t *perType) {
 
     base->platformFcts.destruct = FUNC_ADDR(void (*)(ocrCommPlatform_t*), MPICommDestruct);
     base->platformFcts.switchRunlevel = FUNC_ADDR(u8 (*)(ocrCommPlatform_t*, ocrPolicyDomain_t*, ocrRunlevel_t,
-                                                  u32, u32, void (*)(ocrPolicyDomain_t*,u64), u64), MPICommSwitchRunlevel);
+                                                  phase_t, u32, void (*)(ocrPolicyDomain_t*,u64), u64), MPICommSwitchRunlevel);
     base->platformFcts.sendMessage = FUNC_ADDR(u8 (*)(ocrCommPlatform_t*,ocrLocation_t,
                                                ocrPolicyMsg_t*,u64*,u32,u32), MPICommSendMessage);
     base->platformFcts.pollMessage = FUNC_ADDR(u8 (*)(ocrCommPlatform_t*,ocrPolicyMsg_t**,u32,u32*),

@@ -21,7 +21,7 @@ typedef struct {
     void (*baseInitialize)(struct _ocrSchedulerFactory_t * factory,
                            struct _ocrScheduler_t *self, ocrParamList_t *perInstance);
     u8 (*baseSwitchRunlevel)(struct _ocrScheduler_t* self, struct _ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
-                             u32 phase, u32 properties, void (*callback)(struct _ocrPolicyDomain_t*,u64), u64 val);
+                             phase_t phase, u32 properties, void (*callback)(struct _ocrPolicyDomain_t*,u64), u64 val);
     u8 (*baseMonitorProgress)(struct _ocrScheduler_t *self, ocrMonitorProgress_t type, void * monitoree);
 } ocrSchedulerFactoryHcComm_t;
 
@@ -33,7 +33,7 @@ typedef struct {
     deque_t ** inboxes;
     // cached base function pointers
     u8 (*baseSwitchRunlevel)(struct _ocrScheduler_t* self, struct _ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
-                             u32 phase, u32 properties, void (*callback)(struct _ocrPolicyDomain_t*,u64), u64 val);
+                             phase_t phase, u32 properties, void (*callback)(struct _ocrPolicyDomain_t*,u64), u64 val);
     u8 (*baseMonitorProgress)(struct _ocrScheduler_t *self, ocrMonitorProgress_t type, void * monitoree);
 } ocrSchedulerHcCommDelegate_t;
 

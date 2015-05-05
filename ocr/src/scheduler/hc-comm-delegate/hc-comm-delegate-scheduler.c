@@ -28,7 +28,7 @@
  */
 
 u8 hcCommSchedulerSwitchRunlevel(ocrScheduler_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
-                                u32 phase, u32 properties, void (*callback)(ocrPolicyDomain_t*,u64), u64 val) {
+                                phase_t phase, u32 properties, void (*callback)(ocrPolicyDomain_t*,u64), u64 val) {
     u8 toReturn = 0;
     // This is an inert module, we do not handle callbacks (caller needs to wait on us)
     ASSERT(callback == NULL);
@@ -333,7 +333,7 @@ ocrSchedulerFactory_t * newOcrSchedulerFactoryHcCommDelegate(ocrParamList_t *per
     base->schedulerFcts = baseFcts;
     // and specialize some
     base->schedulerFcts.switchRunlevel = FUNC_ADDR(u8 (*)(ocrScheduler_t*, ocrPolicyDomain_t*, ocrRunlevel_t,
-                                                  u32, u32, void (*)(ocrPolicyDomain_t*,u64), u64), hcCommSchedulerSwitchRunlevel);
+                                                  phase_t, u32, void (*)(ocrPolicyDomain_t*,u64), u64), hcCommSchedulerSwitchRunlevel);
     base->schedulerFcts.takeComm = FUNC_ADDR(u8 (*)(ocrScheduler_t*, u32*, ocrFatGuid_t*, u32), hcCommSchedulerTakeComm);
     base->schedulerFcts.giveComm = FUNC_ADDR(u8 (*)(ocrScheduler_t*, u32*, ocrFatGuid_t*, u32), hcCommSchedulerGiveComm);
     base->schedulerFcts.monitorProgress = FUNC_ADDR(u8 (*)(ocrScheduler_t*, ocrMonitorProgress_t, void*), hcCommMonitorProgress);

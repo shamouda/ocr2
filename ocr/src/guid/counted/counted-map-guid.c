@@ -36,7 +36,7 @@
 static u64 guidCounter = 0;
 
 u8 countedMapSwitchRunlevel(ocrGuidProvider_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
-                      u32 phase, u32 properties, void (*callback)(ocrPolicyDomain_t*, u64), u64 val) {
+                      phase_t phase, u32 properties, void (*callback)(ocrPolicyDomain_t*, u64), u64 val) {
 
     u8 toReturn = 0;
 
@@ -268,7 +268,7 @@ ocrGuidProviderFactory_t *newGuidProviderFactoryCountedMap(ocrParamList_t *typeA
     base->factoryId = factoryId;
     base->providerFcts.destruct = &countedMapDestruct;
     base->providerFcts.switchRunlevel = FUNC_ADDR(u8 (*)(ocrGuidProvider_t*, ocrPolicyDomain_t*, ocrRunlevel_t,
-                                                         u32, u32, void (*)(ocrPolicyDomain_t*, u64), u64), countedMapSwitchRunlevel);
+                                                         phase_t, u32, void (*)(ocrPolicyDomain_t*, u64), u64), countedMapSwitchRunlevel);
     // TODO: Why are these not wrapped with FUNC_ADDR?
     base->providerFcts.getGuid = &countedMapGetGuid;
     base->providerFcts.createGuid = &countedMapCreateGuid;

@@ -41,7 +41,7 @@ void mallocDestruct(ocrMemPlatform_t *self) {
 }
 
 u8 mallocSwitchRunlevel(ocrMemPlatform_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
-                        u32 phase, u32 properties, void (*callback)(ocrPolicyDomain_t*, u64), u64 val) {
+                        phase_t phase, u32 properties, void (*callback)(ocrPolicyDomain_t*, u64), u64 val) {
 
     u8 toReturn = 0;
 
@@ -198,7 +198,7 @@ ocrMemPlatformFactory_t *newMemPlatformFactoryMalloc(ocrParamList_t *perType) {
     base->destruct = &destructMemPlatformFactoryMalloc;
     base->platformFcts.destruct = FUNC_ADDR(void (*) (ocrMemPlatform_t *), mallocDestruct);
     base->platformFcts.switchRunlevel = FUNC_ADDR(u8 (*)(ocrMemPlatform_t*, ocrPolicyDomain_t*, ocrRunlevel_t,
-                                                         u32, u32, void (*)(ocrPolicyDomain_t*, u64), u64), mallocSwitchRunlevel);
+                                                         phase_t, u32, void (*)(ocrPolicyDomain_t*, u64), u64), mallocSwitchRunlevel);
     base->platformFcts.getThrottle = FUNC_ADDR(u8 (*) (ocrMemPlatform_t *, u64 *), mallocGetThrottle);
     base->platformFcts.setThrottle = FUNC_ADDR(u8 (*) (ocrMemPlatform_t *, u64), mallocSetThrottle);
     base->platformFcts.getRange = FUNC_ADDR(void (*) (ocrMemPlatform_t *, u64 *, u64 *), mallocGetRange);

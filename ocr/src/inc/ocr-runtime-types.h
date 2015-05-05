@@ -30,6 +30,8 @@ typedef enum _ocrRunlevels_t {
     RL_MAX           /**< Not a runlevel. Internal marker */
 } ocrRunlevel_t;
 
+typedef u8 phase_t;
+
 // TODO: Do we need to explicitly expand this
 // to the subcomponents (platform/target for example)
 typedef enum _ocrRLPhaseComponents_t {

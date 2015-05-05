@@ -31,9 +31,9 @@ typedef struct {
     iterator_t * incomingIt;
     iterator_t * outgoingIt;
     u64 maxMsgSize;
-    // The state encodes the RL (top 16 bits) and the phase (bottom 16 bits)
+    // The state encodes the RL (top 4 bits) and the phase (bottom 4 bits)
     // This is mainly for debugging purpose
-    volatile u32 curState;
+    volatile u8 curState;
 } ocrCommPlatformMPI_t;
 
 typedef struct {

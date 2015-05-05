@@ -179,7 +179,7 @@ typedef struct _ocrSchedulerHeuristicFcts_t {
      * at some point
      */
     u8 (*switchRunlevel)(struct _ocrSchedulerHeuristic_t* self, struct _ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
-                         u32 phase, u32 properties, void (*callback)(struct _ocrPolicyDomain_t*, u64), u64 val);
+                         phase_t phase, u32 properties, void (*callback)(struct _ocrPolicyDomain_t*, u64), u64 val);
 
     /**
      * @brief Update this scheduler heuristic proactively

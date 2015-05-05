@@ -20,14 +20,14 @@ typedef struct {
     void (*baseInitialize) (struct _ocrWorkerFactory_t * factory,
                                   struct _ocrWorker_t *self, ocrParamList_t *perInstance);
     u8 (*baseSwitchRunlevel)(struct _ocrWorker_t* self, struct _ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
-                     u32 phase, u32 properties, void (*callback)(struct _ocrPolicyDomain_t*, u64), u64 val);
+                     phase_t phase, u32 properties, void (*callback)(struct _ocrPolicyDomain_t*, u64), u64 val);
 } ocrWorkerFactoryHcComm_t;
 
 typedef struct {
     ocrWorkerHc_t worker;
     // cached base function pointers
     u8 (*baseSwitchRunlevel)(struct _ocrWorker_t* self, struct _ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
-                     u32 phase, u32 properties, void (*callback)(struct _ocrPolicyDomain_t*, u64), u64 val);
+                     phase_t phase, u32 properties, void (*callback)(struct _ocrPolicyDomain_t*, u64), u64 val);
 } ocrWorkerHcComm_t;
 
 ocrWorkerFactory_t* newOcrWorkerFactoryHcComm(ocrParamList_t *perType);

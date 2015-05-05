@@ -22,7 +22,7 @@ void nullCommDestruct (ocrCommPlatform_t * base) {
 }
 
 u8 nullSwitchRunlevel(ocrCommPlatform_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
-                      u32 phase, u32 properties, void (*callback)(ocrPolicyDomain_t*, u64), u64 val) {
+                      phase_t phase, u32 properties, void (*callback)(ocrPolicyDomain_t*, u64), u64 val) {
 
     u8 toReturn = 0;
 
@@ -119,7 +119,7 @@ ocrCommPlatformFactory_t *newCommPlatformFactoryNull(ocrParamList_t *perType) {
 
     base->platformFcts.destruct = FUNC_ADDR(void (*)(ocrCommPlatform_t*), nullCommDestruct);
     base->platformFcts.switchRunlevel = FUNC_ADDR(u8 (*)(ocrCommPlatform_t*, ocrPolicyDomain_t*, ocrRunlevel_t,
-                                                         u32, u32, void (*)(ocrPolicyDomain_t*, u64), u64), nullSwitchRunlevel);
+                                                         phase_t, u32, void (*)(ocrPolicyDomain_t*, u64), u64), nullSwitchRunlevel);
     base->platformFcts.setMaxExpectedMessageSize = FUNC_ADDR(u8 (*)(ocrCommPlatform_t*, u64, u32),
                                                              nullCommSetMaxExpectedMessageSize);
     base->platformFcts.sendMessage = FUNC_ADDR(u8 (*)(ocrCommPlatform_t*, ocrLocation_t,

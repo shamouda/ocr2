@@ -108,7 +108,7 @@ typedef struct _ocrSchedulerFcts_t {
      * at some point
      */
     u8 (*switchRunlevel)(struct _ocrScheduler_t* self, struct _ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
-                         u32 phase, u32 properties, void (*callback)(struct _ocrPolicyDomain_t*, u64), u64 val);
+                         phase_t phase, u32 properties, void (*callback)(struct _ocrPolicyDomain_t*, u64), u64 val);
 
     // TODO: Check this call
     // u8 (*yield)(struct _ocrScheduler_t *self, ocrGuid_t workerGuid,

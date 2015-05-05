@@ -88,7 +88,7 @@ static void hcWorkShift(ocrWorker_t * worker) {
 static void workerLoop(ocrWorker_t * worker) {
     u8 continueLoop = true;
     // At this stage, we are in the USER_OK runlevel
-    ASSERT(worker->curState == ((RL_USER_OK << 16) | (RL_GET_PHASE_COUNT_DOWN(worker->pd, RL_USER_OK))));
+    ASSERT(worker->curState == ((RL_USER_OK << 4) | (RL_GET_PHASE_COUNT_DOWN(worker->pd, RL_USER_OK))));
 
     if (worker->amBlessed) {
         ocrGuid_t affinityMasterPD;
@@ -125,89 +125,21 @@ static void workerLoop(ocrWorker_t * worker) {
             worker->fcts.workShift(worker);
             EXIT_PROFILE;
         }
-#ifdef DIST_SUPPORT
-        u32 PHASE_RUN = 3;
-        u32 PHASE_COMP_QUIESCE = 2;
-        u32 PHASE_COMM_QUIESCE = 1;
-        u32 PHASE_DONE = 0;
-        // Double check the setup
-        ASSERT(RL_GET_PHASE_COUNT_DOWN(worker->pd, RL_USER_OK) == PHASE_RUN);
-        // By default we are in 'run phase'
-        switch((worker->desiredState) >> 16) {
+        // Here we are shifting to another runlevel or phase
+        switch((worker->desiredState) >> 4) {
         case RL_USER_OK: {
-            u32 desiredPhase = worker->desiredState & 0xFFFF;
-            ASSERT(desiredPhase != PHASE_RUN);
-            if (desiredPhase == PHASE_COMP_QUIESCE) {
-                // Loop has been broken, by design there should be no user-edt left
-                // (For now they are "runtime-edts", in the future they may be micro-tasks)
-                ASSERT(worker->callback != NULL);
-                worker->curState = RL_USER_OK << 16 | PHASE_COMP_QUIESCE;
-                // Callback the PD, but keep working to process runtime work
-                worker->callback(worker->pd, worker->callbackArg);
-                // Warning: Code potentially concurrent with switchRunlevel
-                break;
-            }
-            // Ignore other phases
-            if (desiredPhase == PHASE_COMM_QUIESCE) {
-                ASSERT(worker->callback != NULL);
-                worker->curState = RL_USER_OK << 16 | PHASE_COMM_QUIESCE;
-                worker->callback(worker->pd, worker->callbackArg);
-                // Warning: Code potentially concurrent with switchRunlevel
-                break;
-            }
-            if (desiredPhase == PHASE_DONE) {
-                ASSERT(worker->callback != NULL);
-                worker->curState = RL_USER_OK << 16 | PHASE_DONE;
-                worker->callback(worker->pd, worker->callbackArg);
-                // Warning: Code potentially concurrent with switchRunlevel
-            }
-            break;
-        }
-        // BEGIN copy-paste original code
-        // TODO-RL not sure we still need that
-        case RL_COMPUTE_OK: {
-            u32 phase = worker->desiredState & 0xFFFF;
-            if(RL_IS_FIRST_PHASE_DOWN(worker->pd, RL_COMPUTE_OK, phase)) {
-                DPRINTF(DEBUG_LVL_VERB, "Noticed transition to RL_COMPUTE_OK\n");
-
-                // We first change our state prior to the callback
-                // because we may end up doing some of the callback processing
-                worker->curState = worker->desiredState;
-                if(worker->callback != NULL) {
-                    worker->callback(worker->pd, worker->callbackArg);
-                }
-                // There is no need to do anything else except quit
-                continueLoop = false;
-            } else {
-                ASSERT(0);
-            }
-            break;
-        }
-        // END copy-paste original code
-        default:
-            // Only these two RL should occur
-            ASSERT(0);
-        }
-#else
-        // Here we are shifting to another RL
-        switch((worker->desiredState) >> 16) {
-        case RL_USER_OK: {
-            u32 phase = worker->desiredState & 0xFFFF;
-            // We support 1 phase so the last phase is the first phase
-            if(phase == 0) {
-                DPRINTF(DEBUG_LVL_VERB, "Noticed first transition out of loop\n");
-                // We first change our state prior to the callback
-                // because we may end up doing some of the callback processing
-                worker->curState = worker->desiredState;
-                if(worker->callback != NULL) {
-                    //RL: why would that be null ?
-                    worker->callback(worker->pd, worker->callbackArg);
-                }
-            }
+            u8 desiredPhase = worker->desiredState & 0xF;
+            // Should never fall-through here if there has been no transition
+            ASSERT(desiredPhase != RL_GET_PHASE_COUNT_DOWN(worker->pd, RL_USER_OK));
+            ASSERT(worker->callback != NULL);
+            worker->curState = RL_USER_OK << 4 | desiredPhase;
+            // Callback the PD, but keep working
+            worker->callback(worker->pd, worker->callbackArg);
+            // Warning: Code potentially concurrent with switchRunlevel
             break;
         }
         case RL_COMPUTE_OK: {
-            u32 phase = worker->desiredState & 0xFFFF;
+            u8 phase = worker->desiredState & 0xF;
             if(RL_IS_FIRST_PHASE_DOWN(worker->pd, RL_COMPUTE_OK, phase)) {
                 DPRINTF(DEBUG_LVL_VERB, "Noticed transition to RL_COMPUTE_OK\n");
 
@@ -228,7 +160,6 @@ static void workerLoop(ocrWorker_t * worker) {
             // Only these two RL should occur
             ASSERT(0);
         }
-#endif
     } while(continueLoop);
 
     DPRINTF(DEBUG_LVL_VERB, "Finished worker loop ... waiting to be reapped\n");
@@ -238,7 +169,7 @@ void destructWorkerHc(ocrWorker_t * base) {
 }
 
 u8 hcWorkerSwitchRunlevel(ocrWorker_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
-                          u32 phase, u32 properties, void (*callback)(ocrPolicyDomain_t *, u64), u64 val) {
+                          phase_t phase, u32 properties, void (*callback)(ocrPolicyDomain_t *, u64), u64 val) {
 
     u8 toReturn = 0;
 
@@ -313,20 +244,12 @@ u8 hcWorkerSwitchRunlevel(ocrWorker_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_
             guidify(self->pd, (u64)self, &(self->fguid), OCR_GUID_WORKER);
             // We need a way to inform the PD
             ASSERT(callback != NULL);
-            self->curState = RL_MEMORY_OK << 16; // Technically last phase of memory OK but doesn't really matter
-            self->desiredState = RL_COMPUTE_OK << 16 | phase;
+            self->curState = RL_MEMORY_OK << 4; // Technically last phase of memory OK but doesn't really matter
+            self->desiredState = RL_COMPUTE_OK << 4 | phase;
 
             // See if we are blessed
-#ifdef DIST_SUPPORT
-            ocrGuid_t affinityMasterPD;
-            u64 count = 0;
-            // There should be a single master PD
-            ASSERT(!ocrAffinityCount(AFFINITY_PD_MASTER, &count) && (count == 1));
-            ocrAffinityGet(AFFINITY_PD_MASTER, &count, &affinityMasterPD);
-            self->amBlessed = ((properties & RL_BLESSED) != 0) & (self->pd->myLocation == affinityToLocation(affinityMasterPD));
-#else
             self->amBlessed = (properties & RL_BLESSED) != 0;
-#endif
+
             if(!(properties & RL_PD_MASTER)) {
                 self->callback = callback;
                 self->callbackArg = val;
@@ -340,7 +263,7 @@ u8 hcWorkerSwitchRunlevel(ocrWorker_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_
                 toReturn |= self->computes[0]->fcts.switchRunlevel(self->computes[0], PD, runlevel, phase, properties,
                                                                    NULL, 0);
                 callback(self->pd, val);
-                self->curState = RL_COMPUTE_OK << 16;
+                self->curState = RL_COMPUTE_OK << 4;
             }
 
         }
@@ -364,14 +287,14 @@ u8 hcWorkerSwitchRunlevel(ocrWorker_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_
                 // capable
                 DPRINTF(DEBUG_LVL_VERB, "Last phase in RL_COMPUTE_OK DOWN for 0x%llx (am PD master: %d)\n",
                     self, properties & RL_PD_MASTER);
-                self->desiredState = self->curState = (RL_COMPUTE_OK << 16) | phase;
+                self->desiredState = self->curState = (RL_COMPUTE_OK << 4) | phase;
             } else if(RL_IS_FIRST_PHASE_DOWN(PD, RL_COMPUTE_OK, phase)) {
-                ASSERT(self->curState == (RL_USER_OK << 16));
+                ASSERT(self->curState == (RL_USER_OK << 4));
                 ASSERT(callback != NULL);
                 self->callback = callback;
                 self->callbackArg = val;
                 hal_fence();
-                self->desiredState = RL_COMPUTE_OK << 16 | phase;
+                self->desiredState = RL_COMPUTE_OK << 4 | phase;
             } else {
                 ASSERT(false && "Unexpected phase on runlevel RL_COMPUTE_OK teardown");
             }
@@ -385,76 +308,33 @@ u8 hcWorkerSwitchRunlevel(ocrWorker_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_
                     self->callback = NULL;
                     self->callbackArg = 0ULL;
                     hal_fence();
-                    self->desiredState = (RL_USER_OK << 16) | RL_GET_PHASE_COUNT_DOWN(PD, RL_USER_OK); // We put ourself one past
+                    self->desiredState = (RL_USER_OK << 4) | RL_GET_PHASE_COUNT_DOWN(PD, RL_USER_OK); // We put ourself one past
                     // so that we can then come back down when
                     // shutting down
                 } else {
                     // At this point, the original capable thread goes to work
-                    self->curState = self->desiredState = ((RL_USER_OK << 16) | RL_GET_PHASE_COUNT_DOWN(PD, RL_USER_OK));
+                    self->curState = self->desiredState = ((RL_USER_OK << 4) | RL_GET_PHASE_COUNT_DOWN(PD, RL_USER_OK));
                     workerLoop(self);
                 }
             }
         }
-#ifdef DIST_SUPPORT
-        u32 PHASE_RUN = 3;
-        u32 PHASE_COMP_QUIESCE = 2;
-        u32 PHASE_COMM_QUIESCE = 1;
-        u32 PHASE_DONE = 0;
-        //Ignore other RL
         if (properties & RL_TEAR_DOWN) {
-            if (phase == PHASE_COMP_QUIESCE) {
+            if (RL_IS_FIRST_PHASE_DOWN(PD, RL_USER_OK, phase)) {
                 // We make sure that we actually fully booted before shutting down.
                 // Addresses a race where a worker still hasn't started but
                 // another worker has started and executes the shutdown protocol
-                while(self->curState != ((RL_USER_OK << 16) | (phase + 1)));
-                ASSERT(self->curState == ((RL_USER_OK << 16) | (phase + 1)));
-
-                // Transition from RUN to PHASE_COMP_QUIESCE
-                ASSERT((self->curState & 0xFFFF) == PHASE_RUN);
-                ASSERT(callback != NULL);
-                self->callback = callback;
-                self->callbackArg = val;
-                hal_fence();
-                // Breaks the worker's compute loop
-                self->desiredState = RL_USER_OK << 16 | PHASE_COMP_QUIESCE;
+                while(self->curState != ((RL_USER_OK << 4) | (phase + 1)));
+                ASSERT(self->curState == ((RL_USER_OK << 4) | (phase + 1)));
             }
-            if (phase == PHASE_COMM_QUIESCE) {
-                // Transition to PHASE_COMM_QUIESCE
-                ASSERT((self->curState & 0xFFFF) == (phase+1));
-                ASSERT(callback != NULL);
-                self->callback = callback;
-                self->callbackArg = val;
-                hal_fence();
-                // Breaks the worker's compute loop
-                self->desiredState = RL_USER_OK << 16 | PHASE_COMM_QUIESCE;
-            }
-            if (RL_IS_LAST_PHASE_DOWN(PD, RL_USER_OK, phase)) {
-                ASSERT((self->curState & 0xFFFF) == (phase+1));
-                ASSERT(callback != NULL);
-                self->callback = callback;
-                self->callbackArg = val;
-                hal_fence();
-                // Breaks the worker's compute loop
-                self->desiredState = RL_USER_OK << 16 | PHASE_DONE;
-            }
-        }
-#else
-        if((properties & RL_TEAR_DOWN) && RL_IS_FIRST_PHASE_DOWN(PD, RL_USER_OK, phase)) {
-            // We need to break out of the compute loop
-            // We need to have a callback for all workers here
+            // Transition to the next phase
+            ASSERT((self->curState & 0xF) == (phase+1));
             ASSERT(callback != NULL);
-            // We make sure that we actually fully booted before shutting down.
-            // Addresses a race where a worker still hasn't started but
-            // another worker has started and executes the shutdown protocol
-            while(self->curState != ((RL_USER_OK << 16) | (phase + 1))) ;
-            ASSERT(self->curState == ((RL_USER_OK << 16) | (phase + 1)));
             self->callback = callback;
             self->callbackArg = val;
             hal_fence();
             // Breaks the worker's compute loop
-            self->desiredState = (RL_USER_OK << 16) | phase;
+            self->desiredState = RL_USER_OK << 4 | phase;
         }
-#endif
         break;
     default:
         // Unknown runlevel
@@ -462,25 +342,6 @@ u8 hcWorkerSwitchRunlevel(ocrWorker_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_
     }
     return toReturn;
 }
-
-/*
-static bool isMainEdtForker(ocrWorker_t * worker, ocrGuid_t * affinityMasterPD) {
-    // Determine if current worker is the master worker of this PD
-    bool blessedWorker = (worker->type == MASTER_WORKERTYPE);
-    // When OCR is used in library mode, there's no mainEdt
-    blessedWorker &= (mainEdtGet() != NULL);
-    if (blessedWorker) {
-        // Determine if current master worker is part of master PD
-        u64 count = 0;
-        // There should be a single master PD
-        ASSERT(!ocrAffinityCount(AFFINITY_PD_MASTER, &count) && (count == 1));
-        ocrAffinityGet(AFFINITY_PD_MASTER, &count, affinityMasterPD);
-        ASSERT(count == 1);
-        blessedWorker &= (worker->pd->myLocation == affinityToLocation(*affinityMasterPD));
-    }
-    return blessedWorker;
-}
-*/
 
 void* hcRunWorker(ocrWorker_t * worker) {
     // TODO: This probably needs to go away and be set directly
@@ -507,13 +368,13 @@ void* hcRunWorker(ocrWorker_t * worker) {
 
     // Set the current environment
     worker->computes[0]->fcts.setCurrentEnv(worker->computes[0], worker->pd, worker);
-    worker->curState = RL_COMPUTE_OK << 16;
+    worker->curState = RL_COMPUTE_OK << 4;
 
     // We wait until we transition to the next RL
     while(worker->curState == worker->desiredState) ;
 
     // At this point, we should be going to RL_USER_OK
-    ASSERT(worker->desiredState == ((RL_USER_OK << 16) | (RL_GET_PHASE_COUNT_DOWN(worker->pd, RL_USER_OK))));
+    ASSERT(worker->desiredState == ((RL_USER_OK << 4) | (RL_GET_PHASE_COUNT_DOWN(worker->pd, RL_USER_OK))));
 
     // Start the worker loop
     worker->curState = worker->desiredState;
@@ -521,13 +382,13 @@ void* hcRunWorker(ocrWorker_t * worker) {
     // Worker loop will transition back down to RL_COMPUTE_OK last phase
 
     ASSERT((worker->curState == worker->desiredState) &&
-            (worker->curState == ((RL_COMPUTE_OK << 16 ) | (RL_GET_PHASE_COUNT_DOWN(worker->pd, RL_COMPUTE_OK) - 1))));
+            (worker->curState == ((RL_COMPUTE_OK << 4 ) | (RL_GET_PHASE_COUNT_DOWN(worker->pd, RL_COMPUTE_OK) - 1))));
     return NULL;
 }
 
 bool hcIsRunningWorker(ocrWorker_t * base) {
     // TODO: This states that we are in USER mode. Do we want to include RL_COMPUTE_OK?
-    return (base->curState == (RL_USER_OK << 16));
+    return (base->curState == (RL_USER_OK << 4));
 }
 
 /**
@@ -570,7 +431,7 @@ ocrWorkerFactory_t * newOcrWorkerFactoryHc(ocrParamList_t * perType) {
 
     base->workerFcts.destruct = FUNC_ADDR(void (*) (ocrWorker_t *), destructWorkerHc);
     base->workerFcts.switchRunlevel = FUNC_ADDR(u8 (*)(ocrWorker_t*, ocrPolicyDomain_t*, ocrRunlevel_t,
-                                                       u32, u32, void (*)(ocrPolicyDomain_t*, u64), u64), hcWorkerSwitchRunlevel);
+                                                       phase_t, u32, void (*)(ocrPolicyDomain_t*, u64), u64), hcWorkerSwitchRunlevel);
     base->workerFcts.run = FUNC_ADDR(void* (*) (ocrWorker_t *), hcRunWorker);
     base->workerFcts.workShift = FUNC_ADDR(void* (*) (ocrWorker_t *), hcWorkShift);
     base->workerFcts.isRunning = FUNC_ADDR(bool (*) (ocrWorker_t *), hcIsRunningWorker);

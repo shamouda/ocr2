@@ -33,7 +33,7 @@
 
 //#define SCHED_1_0 1
 
-static u8 helperSwitchInert(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 phase, u32 properties) {
+static u8 helperSwitchInert(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, phase_t phase, u32 properties) {
     u64 i = 0;
     u64 maxCount = 0;
     u8 toReturn = 0;
@@ -64,6 +64,7 @@ static u8 helperSwitchInert(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u
 }
 
 // Callback from the capable modules
+// val contains worker id on lower 16 bits and RL on next 16 bits
 void hcWorkerCallback(ocrPolicyDomain_t *self, u64 val) {
     ocrPolicyDomainHc_t *rself = (ocrPolicyDomainHc_t*)self;
     DPRINTF(DEBUG_LVL_VERB, "Got check-in from worker %u for RL %lu\n", val & 0xFFFF, (u64)(val >> 16));
@@ -110,7 +111,8 @@ void hcWorkerCallback(ocrPolicyDomain_t *self, u64 val) {
 
 // Function to cause run-level switches in this PD
 u8 hcPdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 properties) {
-    s32 i=0, j, curPhase, phaseCount;
+    s32 j;
+    phase_t i=0, curPhase, phaseCount;
     u32 maxCount;
 
     u8 toReturn = 0;
@@ -290,7 +292,7 @@ u8 hcPdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
                 }
                 if(i == phaseCount - 2) {
                     // I "guidify" myself right before the last phase
-
+                    ASSERT(false && "incomplete code"); // TODO-RL: that looks incomplete
                 }
             }
         } else {

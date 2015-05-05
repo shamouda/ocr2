@@ -25,7 +25,7 @@ void delegateCommDestruct (ocrCommApi_t * base) {
 }
 
 u8 delegateCommSwitchRunlevel(ocrCommApi_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
-                                u32 phase, u32 properties, void (*callback)(ocrPolicyDomain_t*,u64), u64 val) {
+                                phase_t phase, u32 properties, void (*callback)(ocrPolicyDomain_t*,u64), u64 val) {
     u8 toReturn = 0;
 
     // This is an inert module, we do not handle callbacks (caller needs to wait on us)
@@ -260,7 +260,7 @@ ocrCommApiFactory_t *newCommApiFactoryDelegate(ocrParamList_t *perType) {
     base->destruct = destructCommApiFactoryDelegate;
     base->apiFcts.destruct = FUNC_ADDR(void (*)(ocrCommApi_t*), delegateCommDestruct);
     base->apiFcts.switchRunlevel = FUNC_ADDR(u8 (*)(ocrCommApi_t*, ocrPolicyDomain_t*, ocrRunlevel_t,
-                                                    u32, u32, void (*)(ocrPolicyDomain_t*,u64), u64), delegateCommSwitchRunlevel);
+                                                    phase_t, u32, void (*)(ocrPolicyDomain_t*,u64), u64), delegateCommSwitchRunlevel);
     base->apiFcts.sendMessage = FUNC_ADDR(u8 (*)(ocrCommApi_t*, ocrLocation_t,
                                                       ocrPolicyMsg_t *, ocrMsgHandle_t **, u32), delegateCommSendMessage);
     base->apiFcts.pollMessage = FUNC_ADDR(u8 (*)(ocrCommApi_t*, ocrMsgHandle_t**),

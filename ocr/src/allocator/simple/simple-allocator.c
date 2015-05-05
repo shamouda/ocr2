@@ -545,7 +545,7 @@ void simpleDestruct(ocrAllocator_t *self) {
 }
 
 u8 simpleSwitchRunlevel(ocrAllocator_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
-                        u32 phase, u32 properties, void (*callback)(ocrPolicyDomain_t*, u64), u64 val) {
+                        phase_t phase, u32 properties, void (*callback)(ocrPolicyDomain_t*, u64), u64 val) {
 
     u8 toReturn = 0;
     // This is an inert module, we do not handle callbacks (caller needs to wait on us)
@@ -721,7 +721,7 @@ ocrAllocatorFactory_t * newAllocatorFactorySimple(ocrParamList_t *perType) {
     base->destruct = &destructAllocatorFactorySimple;
     base->allocFcts.destruct = FUNC_ADDR(void (*)(ocrAllocator_t*), simpleDestruct);
     base->allocFcts.switchRunlevel = FUNC_ADDR(u8 (*)(ocrAllocator_t*, ocrPolicyDomain_t*, ocrRunlevel_t,
-                                                      u32, u32, void (*)(ocrPolicyDomain_t*, u64), u64), simpleSwitchRunlevel);
+                                                      phase_t, u32, void (*)(ocrPolicyDomain_t*, u64), u64), simpleSwitchRunlevel);
     base->allocFcts.allocate = FUNC_ADDR(void* (*)(ocrAllocator_t*, u64, u64), simpleAllocate);
     //base->allocFcts.free = FUNC_ADDR(void (*)(void*), simpleDeallocate);
     base->allocFcts.reallocate = FUNC_ADDR(void* (*)(ocrAllocator_t*, void*, u64), simpleReallocate);
