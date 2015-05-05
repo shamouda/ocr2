@@ -151,14 +151,14 @@ u8 hcPdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
         if(properties & RL_BRING_UP) {
             for(i = 0; i < RL_MAX; ++i) {
                 for(j = 0; j < RL_PHASE_MAX; ++j) {
-                    policy->phasesPerRunlevel[i][j] = (1<<16) + 1; // One phase for everything at least
+                    policy->phasesPerRunlevel[i][j] = (1<<4) + 1; // One phase for everything at least
                 }
             }
 
             phaseCount = 2;
         } else {
             // Tear down
-            phaseCount = policy->phasesPerRunlevel[RL_CONFIG_PARSE][0] >> 16;
+            phaseCount = policy->phasesPerRunlevel[RL_CONFIG_PARSE][0] >> 4;
         }
         // Both cases
         maxCount = policy->workerCount;
@@ -182,11 +182,11 @@ u8 hcPdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
                 for(j = 1; j < RL_PHASE_MAX; ++j) {
                     // Deal with UP phase count
                     u32 newCount = 0;
-                    newCount = (policy->phasesPerRunlevel[i][j] & 0xFFFF) > (finalCount & 0xFFFF)?
-                        (policy->phasesPerRunlevel[i][j] & 0xFFFF):(finalCount & 0xFFFF);
+                    newCount = (policy->phasesPerRunlevel[i][j] & 0xF) > (finalCount & 0xF)?
+                        (policy->phasesPerRunlevel[i][j] & 0xF):(finalCount & 0xF);
                     // And now the DOWN phase count
-                    newCount |= ((policy->phasesPerRunlevel[i][j] >> 16) > (finalCount >> 16)?
-                        (policy->phasesPerRunlevel[i][j] >> 16):(finalCount >> 16)) << 16;
+                    newCount |= ((policy->phasesPerRunlevel[i][j] >> 4) > (finalCount >> 4)?
+                        (policy->phasesPerRunlevel[i][j] >> 4):(finalCount >> 4)) << 4;
                     finalCount = newCount;
                 }
                 policy->phasesPerRunlevel[i][0] = finalCount;
@@ -198,7 +198,7 @@ u8 hcPdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
     {
         // In this single PD implementation, nothing specific to do (just pass it down)
         // In general, this is when you setup communication
-        phaseCount = ((policy->phasesPerRunlevel[RL_NETWORK_OK][0]) >> ((properties&RL_TEAR_DOWN)?16:0)) & 0xFFFF;
+        phaseCount = ((policy->phasesPerRunlevel[RL_NETWORK_OK][0]) >> ((properties&RL_TEAR_DOWN)?4:0)) & 0xF;
         maxCount = policy->workerCount;
         for(i = 0; i < phaseCount; ++i) {
             if(toReturn) break;
@@ -220,7 +220,7 @@ u8 hcPdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
         // In general, you need to:
         //     - if not amNodeMaster, start a worker for this PD
         //     - that worker (or the master one) needs to then transition all inert modules to PD_OK
-        phaseCount = ((policy->phasesPerRunlevel[RL_PD_OK][0]) >> ((properties&RL_TEAR_DOWN)?16:0)) & 0xFFFF;
+        phaseCount = ((policy->phasesPerRunlevel[RL_PD_OK][0]) >> ((properties&RL_TEAR_DOWN)?4:0)) & 0xF;
 
         maxCount = policy->workerCount;
         for(i = 0; i < phaseCount; ++i) {
@@ -240,7 +240,7 @@ u8 hcPdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
     }
     case RL_MEMORY_OK:
     {
-        phaseCount = ((policy->phasesPerRunlevel[RL_MEMORY_OK][0]) >> ((properties&RL_TEAR_DOWN)?16:0)) & 0xFFFF;
+        phaseCount = ((policy->phasesPerRunlevel[RL_MEMORY_OK][0]) >> ((properties&RL_TEAR_DOWN)?4:0)) & 0xF;
 
         maxCount = policy->workerCount;
         for(i = 0; i < phaseCount; ++i) {
@@ -274,7 +274,7 @@ u8 hcPdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
             // We assert that there are two phases. The first phase is mostly to bring
             // up the GUID provider and the last phase is to actually get GUIDs for
             // the various components if needed
-            phaseCount = policy->phasesPerRunlevel[RL_GUID_OK][0] & 0xFFFF;
+            phaseCount = policy->phasesPerRunlevel[RL_GUID_OK][0] & 0xF;
             maxCount = policy->workerCount;
 
             for(i = 0; i < phaseCount; ++i) {
@@ -293,7 +293,7 @@ u8 hcPdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
             // Tear down. We also need a minimum of 2 phases
             // In the first phase, components destroy their GUIDs
             // In the last phase, the GUID provider can go down
-            phaseCount = policy->phasesPerRunlevel[RL_GUID_OK][0] >> 16;
+            phaseCount = policy->phasesPerRunlevel[RL_GUID_OK][0] >> 4;
             maxCount = policy->workerCount;
             for(i = 0; i < phaseCount; ++i) {
                 if(toReturn) break;
@@ -320,7 +320,7 @@ u8 hcPdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
         // At this stage, we have a memory to use so we can create the placer
         // This phase is the first one creating capable modules (workers) apart from myself
         if(properties & RL_BRING_UP) {
-            phaseCount = policy->phasesPerRunlevel[RL_COMPUTE_OK][0] & 0xFFFF;
+            phaseCount = policy->phasesPerRunlevel[RL_COMPUTE_OK][0] & 0xF;
             maxCount = policy->workerCount;
             for(i = rself->rlSwitch.nextPhase; i < phaseCount; ++i) {
                 if(RL_IS_FIRST_PHASE_UP(policy, RL_COMPUTE_OK, i)) {

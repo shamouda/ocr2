@@ -43,23 +43,22 @@ typedef struct _paramListPolicyDomainInst_t {
 /* RL macros                                          */
 /******************************************************/
 #define RL_ENSURE_PHASE_UP(pd, rl, comp, val) do {                      \
-        u32 _t = (pd)->phasesPerRunlevel[rl][comp];                     \
-        if((_t & 0xFFFF) < (val)) _t = (_t & 0xFFFF0000) + (val);       \
+        u8 _t = (pd)->phasesPerRunlevel[rl][comp];                     \
+        if((_t & 0xF) < (val)) _t = (_t & 0xF0) + (val);       \
         (pd)->phasesPerRunlevel[rl][comp] = _t;                         \
     } while(0)
 
 #define RL_ENSURE_PHASE_DOWN(pd, rl, comp, val) do {                    \
         u32 _t = (pd)->phasesPerRunlevel[rl][comp];                     \
-        if((_t >> 16) < (val)) _t = ((val) << 16) + (_t & 0xFFFF);      \
+        if((_t >> 4) < (val)) _t = ((val) << 4) + (_t & 0xF);      \
         (pd)->phasesPerRunlevel[rl][comp] = _t;                         \
     } while(0)
 
-
 // Get number of phases when going up for a given runlevel
-#define RL_GET_PHASE_COUNT_UP(pd, rl) ((pd)->phasesPerRunlevel[rl][0] & 0xFFFF)
+#define RL_GET_PHASE_COUNT_UP(pd, rl) ((pd)->phasesPerRunlevel[rl][0] & 0xF)
 
 // Get number of phases when going down for a given runlevel
-#define RL_GET_PHASE_COUNT_DOWN(pd, rl) ((pd)->phasesPerRunlevel[rl][0] >> 16)
+#define RL_GET_PHASE_COUNT_DOWN(pd, rl) ((pd)->phasesPerRunlevel[rl][0] >> 4)
 
 #define RL_IS_LAST_PHASE_UP(pd, rl, phase) ((RL_GET_PHASE_COUNT_UP(pd, rl) - 1) == (phase))
 #define RL_IS_LAST_PHASE_DOWN(pd, rl, phase) (phase == 0)
@@ -1267,7 +1266,7 @@ typedef struct _ocrPolicyDomain_t {
      * phase but part of it needs to be kept around for the shutdown
      * part. Is there a better way
      */
-    s32 phasesPerRunlevel[RL_MAX][RL_PHASE_MAX];
+    s8 phasesPerRunlevel[RL_MAX][RL_PHASE_MAX];
 
     // TODO: What to do about this?
     ocrCost_t *costFunction; /**< Cost function used to determine
