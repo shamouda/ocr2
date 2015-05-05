@@ -21,6 +21,13 @@
 
 #define DEBUG_TYPE WORKER
 
+
+// Phase numbering is ad-hoc. We just know the last phase of RL_USER_OK is zero.
+#define PHASE_RUN ((u8) 3)
+#define PHASE_COMP_QUIESCE ((u8) 2)
+#define PHASE_COMM_QUIESCE ((u8) 1)
+#define PHASE_DONE ((u8) 0)
+
 /******************************************************/
 /* OCR-HC COMMUNICATION WORKER                        */
 /* Extends regular HC workers                         */
@@ -175,77 +182,80 @@ static u8 createProcessRequestEdt(ocrPolicyDomain_t * pd, ocrGuid_t templateGuid
 #undef PD_TYPE
 }
 
-//TODO-RL to make the workShift pointer happy
-static void workerLoopHcComm_DUMMY() {
-    ASSERT(false);
+static void workerLoopHcCommInternal(ocrWorker_t * worker, ocrPolicyDomain_t *pd, ocrGuid_t processRequestTemplate, bool flushOutgoingComm) {
+    // In outgoing flush mode:
+    // - Send all outgoing communications
+    // - Loop until pollMessage says there's no more outgoing
+    //   messages to be processed by the underlying comm-platform.
+    // In regular mode:
+    // - Try to take from the scheduler and send outgoing communication
+    // - Poll to receive an incoming communication
+    u8 ret;
+    do {
+        ret = takeFromSchedulerAndSend(pd);
+    } while (flushOutgoingComm && (ret == POLL_MORE_MESSAGE));
+
+    do {
+        ocrMsgHandle_t * handle = NULL;
+        ret = pd->fcts.pollMessage(pd, &handle);
+        if (ret == POLL_MORE_MESSAGE) {
+            //IMPL: for now only support successful polls on incoming request and responses
+            ASSERT((handle->status == HDL_RESPONSE_OK)||(handle->status == HDL_NORMAL));
+            ocrPolicyMsg_t * message = (handle->status == HDL_RESPONSE_OK) ? handle->response : handle->msg;
+            //To catch misuses, assert src is not self and dst is self
+            ASSERT((message->srcLocation != pd->myLocation) && (message->destLocation == pd->myLocation));
+            // Poll a response to a message we had sent.
+            if ((message->type & PD_MSG_RESPONSE) && !(handle->properties & ASYNC_MSG_PROP)) {
+                DPRINTF(DEBUG_LVL_VVERB,"hc-comm-worker: Received message response for msgId: %ld\n",  message->msgId); // debug
+                // Someone is expecting this response, give it back to the PD
+                ocrFatGuid_t fatGuid;
+                fatGuid.metaDataPtr = handle;
+                PD_MSG_STACK(giveMsg);
+                getCurrentEnv(NULL, NULL, NULL, &giveMsg);
+            #define PD_MSG (&giveMsg)
+            #define PD_TYPE PD_MSG_COMM_GIVE
+                giveMsg.type = PD_MSG_COMM_GIVE | PD_MSG_REQUEST;
+                PD_MSG_FIELD_IO(guids) = &fatGuid;
+                PD_MSG_FIELD_IO(guidCount) = 1;
+                PD_MSG_FIELD_I(properties) = 0;
+                PD_MSG_FIELD_I(type) = OCR_GUID_COMM;
+                ret = pd->fcts.processMessage(pd, &giveMsg, false);
+                ASSERT(ret == 0);
+            #undef PD_MSG
+            #undef PD_TYPE
+                //For now, assumes all the responses are for workers that are
+                //waiting on the response handler provided by sendMessage, reusing
+                //the request msg as an input buffer for the response.
+            } else {
+                ASSERT((message->type & PD_MSG_REQUEST) || ((message->type & PD_MSG_RESPONSE) && (handle->properties & ASYNC_MSG_PROP)));
+                // else it's a request or a response with ASYNC_MSG_PROP set (i.e. two-way but asynchronous handling of response).
+                DPRINTF(DEBUG_LVL_VVERB,"hc-comm-worker: Received message, msgId: %ld type:0x%x prop:0x%x\n",
+                                        message->msgId, message->type, handle->properties);
+                // This is an outstanding request, delegate to PD for processing
+                u64 msgParamv = (u64) message;
+            #ifdef HYBRID_COMM_COMP_WORKER // Experimental see documentation
+                // Execute selected 'sterile' messages on the spot
+                if ((message->type & PD_MSG_TYPE_ONLY) == PD_MSG_DB_ACQUIRE) {
+                    DPRINTF(DEBUG_LVL_VVERB,"hc-comm-worker: Execute message, msgId: %ld\n", pd->myLocation, message->msgId);
+                    processRequestEdt(1, &msgParamv, 0, NULL);
+                } else {
+                    createProcessRequestEdt(pd, processRequestTemplate, &msgParamv);
+                }
+            #else
+                createProcessRequestEdt(pd, processRequestTemplate, &msgParamv);
+            #endif
+                // We do not need the handle anymore
+                handle->destruct(handle);
+                //DIST-TODO-3: depending on comm-worker implementation, the received message could
+                //then be 'wrapped' in an EDT and pushed to the deque for load-balancing purpose.
+            }
+        }
+    } while (flushOutgoingComm && !(ret & POLL_NO_OUTGOING_MESSAGE));
 }
 
-static void workerLoopHcCommInternal(ocrWorker_t * worker, ocrGuid_t processRequestTemplate, bool checkEmptyOutgoing) {
-    ocrPolicyDomain_t *pd = worker->pd;
-
-    // First, Ask the scheduler if there are any communication to be scheduled and sent them if any.
-    takeFromSchedulerAndSend(pd);
-
-    ocrMsgHandle_t * handle = NULL;
-    u8 ret = pd->fcts.pollMessage(pd, &handle);
-    if (ret == POLL_MORE_MESSAGE) {
-        //IMPL: for now only support successful polls on incoming request and responses
-        ASSERT((handle->status == HDL_RESPONSE_OK)||(handle->status == HDL_NORMAL));
-        ocrPolicyMsg_t * message = (handle->status == HDL_RESPONSE_OK) ? handle->response : handle->msg;
-        //To catch misuses, assert src is not self and dst is self
-        ASSERT((message->srcLocation != pd->myLocation) && (message->destLocation == pd->myLocation));
-        // Poll a response to a message we had sent.
-        if ((message->type & PD_MSG_RESPONSE) && !(handle->properties & ASYNC_MSG_PROP)) {
-            DPRINTF(DEBUG_LVL_VVERB,"hc-comm-worker: Received message response for msgId: %ld\n",  message->msgId); // debug
-            // Someone is expecting this response, give it back to the PD
-            ocrFatGuid_t fatGuid;
-            fatGuid.metaDataPtr = handle;
-            PD_MSG_STACK(giveMsg);
-            getCurrentEnv(NULL, NULL, NULL, &giveMsg);
-        #define PD_MSG (&giveMsg)
-        #define PD_TYPE PD_MSG_COMM_GIVE
-            giveMsg.type = PD_MSG_COMM_GIVE | PD_MSG_REQUEST;
-            PD_MSG_FIELD_IO(guids) = &fatGuid;
-            PD_MSG_FIELD_IO(guidCount) = 1;
-            PD_MSG_FIELD_I(properties) = 0;
-            PD_MSG_FIELD_I(type) = OCR_GUID_COMM;
-            ret = pd->fcts.processMessage(pd, &giveMsg, false);
-            ASSERT(ret == 0);
-        #undef PD_MSG
-        #undef PD_TYPE
-            //For now, assumes all the responses are for workers that are
-            //waiting on the response handler provided by sendMessage, reusing
-            //the request msg as an input buffer for the response.
-        } else {
-            ASSERT((message->type & PD_MSG_REQUEST) || ((message->type & PD_MSG_RESPONSE) && (handle->properties & ASYNC_MSG_PROP)));
-            // else it's a request or a response with ASYNC_MSG_PROP set (i.e. two-way but asynchronous handling of response).
-            DPRINTF(DEBUG_LVL_VVERB,"hc-comm-worker: Received message, msgId: %ld type:0x%x prop:0x%x\n",
-                                    message->msgId, message->type, handle->properties);
-            // This is an outstanding request, delegate to PD for processing
-            u64 msgParamv = (u64) message;
-        #ifdef HYBRID_COMM_COMP_WORKER // Experimental see documentation
-            // Execute selected 'sterile' messages on the spot
-            if ((message->type & PD_MSG_TYPE_ONLY) == PD_MSG_DB_ACQUIRE) {
-                DPRINTF(DEBUG_LVL_VVERB,"hc-comm-worker: Execute message, msgId: %ld\n", pd->myLocation, message->msgId);
-                processRequestEdt(1, &msgParamv, 0, NULL);
-            } else {
-                createProcessRequestEdt(pd, processRequestTemplate, &msgParamv);
-            }
-        #else
-            createProcessRequestEdt(pd, processRequestTemplate, &msgParamv);
-        #endif
-            // We do not need the handle anymore
-            handle->destruct(handle);
-            //DIST-TODO-3: depending on comm-worker implementation, the received message could
-            //then be 'wrapped' in an EDT and pushed to the deque for load-balancing purpose.
-        }
-
-    } else {
-        //DIST-TODO No messages ready for processing, ask PD for EDT work.
-        if (checkEmptyOutgoing && (ret & POLL_NO_OUTGOING_MESSAGE)) {
-            return;
-        }
-    }
+static void workShiftHcComm(ocrWorker_t * worker) {
+    ocrWorkerHcComm_t * rworker = (ocrWorkerHcComm_t *) worker;
+    workerLoopHcCommInternal(worker, worker->pd, rworker->processRequestTemplate, rworker->flushOutgoingComm);
 }
 
 static void workerLoopHcComm(ocrWorker_t * worker) {
@@ -281,13 +291,11 @@ static void workerLoopHcComm(ocrWorker_t * worker) {
                      EDT_PROP_NONE, affinityMasterPD, NULL);
     }
 
-    u8 PHASE_RUN = 3;
-    u8 PHASE_COMP_QUIESCE = 2;
-    u8 PHASE_COMM_QUIESCE = 1;
-    u8 PHASE_DONE = 0;
     ASSERT(worker->curState == GET_STATE(RL_USER_OK, PHASE_RUN));
-    ocrGuid_t processRequestTemplate = NULL_GUID;
-    ocrEdtTemplateCreate(&processRequestTemplate, &processRequestEdt, 1, 0);
+    // Setup the template EDT for asynchronous processing of incoming communications
+    ocrWorkerHcComm_t * rworker = (ocrWorkerHcComm_t *) worker;
+    ocrEdtTemplateCreate(&(rworker->processRequestTemplate), &processRequestEdt, 1, 0);
+    rworker->flushOutgoingComm = false;
     do {
         // 'communication' loop: take, send / poll, dispatch, execute
         // Double check the setup
@@ -296,7 +304,7 @@ static void workerLoopHcComm(ocrWorker_t * worker) {
         if ((phase == PHASE_RUN) ||
             (phase == PHASE_COMP_QUIESCE)) {
             while(worker->curState == worker->desiredState) {
-                workerLoopHcCommInternal(worker, processRequestTemplate, false);
+                worker->fcts.workShift(worker);
             }
         } else if (phase == PHASE_COMM_QUIESCE) {
             // All workers in this PD are not executing user EDTs anymore.
@@ -311,14 +319,9 @@ static void workerLoopHcComm(ocrWorker_t * worker) {
 
             // Goal of this phase is to make sure this PD is done processing
             // the communication it has generated.
-
-            // First: Flush all outgoing communications out of the PD
-            while(takeFromSchedulerAndSend(worker->pd) == POLL_MORE_MESSAGE);
-
-            // Second: Loop until pollMessage says there's no more outgoing
-            // messages to be processed by the underlying comm-platform.
-            // This call returns when outgoing messages are all sent ...
-            workerLoopHcCommInternal(worker, processRequestTemplate, true/*check empty queue*/);
+            rworker->flushOutgoingComm = true;
+            // This call returns when all outgoing messages are sent.
+            worker->fcts.workShift(worker);
             // Done with the quiesce comm action, callback the PD
             worker->curState = GET_STATE(RL_USER_OK, PHASE_COMM_QUIESCE);
             worker->callback(worker->pd, worker->callbackArg);
@@ -329,8 +332,9 @@ static void workerLoopHcComm(ocrWorker_t * worker) {
             // When all PDs have answered to the shutdown message, the phase change is enacted.
 
             // Until that happens, keep working to process communications shutdown generates.
+            rworker->flushOutgoingComm = false;
             while(worker->curState == worker->desiredState) {
-                workerLoopHcCommInternal(worker, processRequestTemplate, false);
+                worker->fcts.workShift(worker);
             }
             // The comm-worker has been transitioned
             ASSERT(GET_STATE_PHASE(worker->desiredState) == PHASE_DONE);
@@ -341,10 +345,9 @@ static void workerLoopHcComm(ocrWorker_t * worker) {
             // we need to make sure there's no outgoing messages pending (i.e. a one-way shutdown)
             // for other PDs before wrapping up the user runlevel.
             //TODO-RL: Need to revisit that and think about what messages could be present here.
-            // Empty outgoing messages from the scheduler
-            while(takeFromSchedulerAndSend(worker->pd) == POLL_MORE_MESSAGE);
-            // Loop until pollMessage says there's no more outgoing messages to be sent
-            workerLoopHcCommInternal(worker, processRequestTemplate, true/*check empty queue*/);
+            rworker->flushOutgoingComm = true;
+            // This call returns when all outgoing messages are sent.
+            worker->fcts.workShift(worker);
             // Phase shouldn't have changed since we haven't done callback yet
             ASSERT(GET_STATE_PHASE(worker->desiredState) == PHASE_DONE);
             worker->curState = GET_STATE(RL_USER_OK, PHASE_DONE);
@@ -455,10 +458,6 @@ u8 hcCommWorkerSwitchRunlevel(ocrWorker_t *self, ocrPolicyDomain_t *PD, ocrRunle
             }
         }
 
-        u8 PHASE_RUN = 3;
-        u8 PHASE_COMP_QUIESCE = 2;
-        u8 PHASE_COMM_QUIESCE = 1;
-        u8 PHASE_DONE = 0;
         if (properties & RL_TEAR_DOWN) {
             if(phase == PHASE_COMP_QUIESCE) {
                 // Transitions from RUN to PHASE_COMP_QUIESCE
@@ -584,6 +583,8 @@ void initializeWorkerHcComm(ocrWorkerFactory_t * factory, ocrWorker_t *self, ocr
     // Initialize comm worker's members
     ocrWorkerHcComm_t * workerHcComm = (ocrWorkerHcComm_t *) self;
     workerHcComm->baseSwitchRunlevel = derivedFactory->baseSwitchRunlevel;
+    workerHcComm->processRequestTemplate = NULL_GUID;
+    workerHcComm->flushOutgoingComm = false;
 }
 
 /******************************************************/
@@ -612,8 +613,7 @@ ocrWorkerFactory_t * newOcrWorkerFactoryHcComm(ocrParamList_t * perType) {
     base->workerFcts = baseFcts;
     // Specialize comm functions
     base->workerFcts.run = FUNC_ADDR(void* (*)(ocrWorker_t*), runWorkerHcComm);
-    //TODO This doesn't really work out for communication-workers
-    base->workerFcts.workShift = FUNC_ADDR(void* (*) (ocrWorker_t *), workerLoopHcComm_DUMMY);
+    base->workerFcts.workShift = FUNC_ADDR(void* (*) (ocrWorker_t *), workShiftHcComm);
     base->workerFcts.switchRunlevel = FUNC_ADDR(u8 (*)(ocrWorker_t*, ocrPolicyDomain_t*, ocrRunlevel_t,
                                                        phase_t, u32, void (*)(ocrPolicyDomain_t*, u64), u64), hcCommWorkerSwitchRunlevel);
     baseFactory->destruct(baseFactory);

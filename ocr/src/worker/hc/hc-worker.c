@@ -198,10 +198,8 @@ u8 hcWorkerSwitchRunlevel(ocrWorker_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_
         // and check compatibility on phase 1
         if(properties & RL_BRING_UP) {
             if(RL_IS_FIRST_PHASE_UP(PD, RL_CONFIG_PARSE, phase)) {
-#ifdef DIST_SUPPORT
-                // We need at least three phases for the RL_USER_OK TEAR_DOWN
-                RL_ENSURE_PHASE_DOWN(PD, RL_USER_OK, RL_PHASE_WORKER, 3);
-#endif
+                // This worker implementation supports an arbitrary number
+                // of down phases in RL_USER_OK. Each phase goes into the work loop.
                 // We need at least two phases for the RL_COMPUTE_OK TEAR_DOWN
                 RL_ENSURE_PHASE_DOWN(PD, RL_COMPUTE_OK, RL_PHASE_WORKER, 2);
             } else if(RL_IS_LAST_PHASE_UP(PD, RL_CONFIG_PARSE, phase)) {
@@ -209,15 +207,6 @@ u8 hcWorkerSwitchRunlevel(ocrWorker_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_
                 // count. We currently only support one user phase and two
                 // compute phase. If this changes, the workerLoop code and hcWorkerRun
                 // code will have to be modified (as well as this code of course)
-#ifdef DIST_SUPPORT
-                if(RL_GET_PHASE_COUNT_UP(PD, RL_COMPUTE_OK) != 1 ||
-                   RL_GET_PHASE_COUNT_DOWN(PD, RL_COMPUTE_OK) != 2 ||
-                   RL_GET_PHASE_COUNT_UP(PD, RL_USER_OK) != 1 ||
-                   RL_GET_PHASE_COUNT_DOWN(PD, RL_USER_OK) != 3) {
-                    DPRINTF(DEBUG_LVL_WARN, "Worker does not support compute and user counts\n");
-                    ASSERT(0);
-                }
-#else
                 if(RL_GET_PHASE_COUNT_UP(PD, RL_COMPUTE_OK) != 1 ||
                    RL_GET_PHASE_COUNT_DOWN(PD, RL_COMPUTE_OK) != 2 ||
                    RL_GET_PHASE_COUNT_UP(PD, RL_USER_OK) != 1 ||
@@ -225,7 +214,6 @@ u8 hcWorkerSwitchRunlevel(ocrWorker_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_
                     DPRINTF(DEBUG_LVL_WARN, "Worker does not support compute and user counts\n");
                     ASSERT(0);
                 }
-#endif
             }
         }
         break;

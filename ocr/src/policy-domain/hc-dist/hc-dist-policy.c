@@ -1435,6 +1435,7 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
 
 u8 hcDistPdSwitchRunlevel(ocrPolicyDomain_t *self, ocrRunlevel_t runlevel, u32 properties) {
     ocrPolicyDomainHc_t *rself = (ocrPolicyDomainHc_t*) self;
+
     if((runlevel == RL_USER_OK) && RL_IS_LAST_PHASE_DOWN(self, RL_USER_OK, rself->rlSwitch.nextPhase)) {
         ASSERT(rself->rlSwitch.runlevel == runlevel);
         // The local shutdown is completed.
@@ -1481,7 +1482,22 @@ u8 hcDistPdSwitchRunlevel(ocrPolicyDomain_t *self, ocrRunlevel_t runlevel, u32 p
         }
     } else {
         ocrPolicyDomainHcDist_t * dself = (ocrPolicyDomainHcDist_t *) self;
-        return dself->baseSwitchRunlevel(self, runlevel, properties);
+        u8 isUp = ((properties & RL_BRING_UP) != 0);
+        phase_t phase = rself->rlSwitch.nextPhase;
+        u8 res = dself->baseSwitchRunlevel(self, runlevel, properties);
+        if ((isUp) && RL_IS_FIRST_PHASE_UP(PD, RL_CONFIG_PARSE, phase)) {
+            // In distributed the shutdown protocol requires three phases
+            // for the RL_USER_OK TEAR_DOWN. The communication worker must be
+            // aware of those while computation workers can be generic and rely
+            // on the switchRunlevel/callback mecanism
+            // Because we want to keep the computation worker implementation more generic
+            // we request phases directly from here through the coalesced number of phases on 0.
+            //TODO-RL this feel hackish, both setting it here, and use index 0 because we know
+            //the base implementation...
+            RL_ENSURE_PHASE_DOWN(self, RL_USER_OK, 0, 3);
+        }
+
+        return res;
     }
 }
 

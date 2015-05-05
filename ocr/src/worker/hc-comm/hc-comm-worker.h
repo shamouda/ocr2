@@ -28,6 +28,8 @@ typedef struct {
     // cached base function pointers
     u8 (*baseSwitchRunlevel)(struct _ocrWorker_t* self, struct _ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
                      phase_t phase, u32 properties, void (*callback)(struct _ocrPolicyDomain_t*, u64), u64 val);
+    ocrGuid_t processRequestTemplate;
+    bool flushOutgoingComm;
 } ocrWorkerHcComm_t;
 
 ocrWorkerFactory_t* newOcrWorkerFactoryHcComm(ocrParamList_t *perType);

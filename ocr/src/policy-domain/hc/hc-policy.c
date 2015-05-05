@@ -1838,7 +1838,6 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             // This should not happen here as we only have one PD
             ASSERT(0);
         } else {
-            DPRINTF(DEBUG_LVL_WARN,"VV PD_MSG_MGT_RL_NOTIFY called in HC-POLICY\n");
             // This is from user code so it should be a request to shutdown
             ocrPolicyDomainHc_t *rself = (ocrPolicyDomainHc_t*)self;
             // Set up the switching for the next phase
