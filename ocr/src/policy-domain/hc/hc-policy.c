@@ -26,6 +26,9 @@
 #include "task/hc/hc-task.h"
 #include "event/hc/hc-event.h"
 
+// Currently required to find out if self is the blessed PD
+#include "extensions/ocr-affinity.h"
+
 #define DEBUG_TYPE POLICY
 
 //#define SCHED_1_0 1
@@ -151,7 +154,8 @@ u8 hcPdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
         if(properties & RL_BRING_UP) {
             for(i = 0; i < RL_MAX; ++i) {
                 for(j = 0; j < RL_PHASE_MAX; ++j) {
-                    policy->phasesPerRunlevel[i][j] = (1<<4) + 1; // One phase for everything at least
+                     // Everything has at least one phase on both up and down
+                    policy->phasesPerRunlevel[i][j] = (1<<4) + 1;
                 }
             }
 
@@ -339,8 +343,15 @@ u8 hcPdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
                 hal_fence();
 
                 // Worker 0 is considered the capable one by convention
+                // Still need to find out if the current PD is the "blessed" with mainEdt execution
+                ocrGuid_t affinityMasterPD;
+                u64 count = 0;
+                // There should be a single master PD
+                ASSERT(!ocrAffinityCount(AFFINITY_PD_MASTER, &count) && (count == 1));
+                ocrAffinityGet(AFFINITY_PD_MASTER, &count, &affinityMasterPD);
+                u16 blessed = ((policy->myLocation == affinityToLocation(affinityMasterPD)) ? RL_BLESSED : 0);
                 toReturn |= policy->workers[0]->fcts.switchRunlevel(
-                    policy->workers[0], policy, runlevel, i, properties | RL_PD_MASTER | RL_BLESSED,
+                    policy->workers[0], policy, runlevel, i, properties | RL_PD_MASTER | blessed,
                     &hcWorkerCallback, RL_COMPUTE_OK << 16);
 
                 for(j = 1; j < maxCount; ++j) {
