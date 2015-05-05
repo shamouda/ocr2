@@ -188,13 +188,14 @@ void * wstDequePopTail(deque_t * deq, u8 doTry) {
  * the steal protocol
  */
 void * wstDequePopHead(deque_t * deq, u8 doTry) {
+    START_PROFILE(util_wstDequePopHead);
     s32 head, tail;
     do {
         head = deq->head;
         hal_fence();
         tail = deq->tail;
         if (tail <= head) {
-            return NULL;
+            RETURN_PROFILE(NULL);
         }
 
         // The data must be read here, BEFORE the cas succeeds.
@@ -208,10 +209,10 @@ void * wstDequePopHead(deque_t * deq, u8 doTry) {
         if (hal_cmpswap32(&deq->head, head, head + 1) == head) { /* competing */
             DPRINTF(DEBUG_LVL_VERB, "Popping (head) h:%d t:%d deq[%d] elt:0x%lx from conc deque @ 0x%lx\n",
                      head, tail, head % INIT_DEQUE_CAPACITY, (u64)rt, (u64)deq);
-            return rt;
+            RETURN_PROFILE(rt);
         }
     } while (doTry == 0);
-    return NULL;
+    RETURN_PROFILE(NULL);
 }
 
 /******************************************************/

@@ -82,7 +82,7 @@ u8 regularAcquire(ocrDataBlock_t *self, void** ptr, ocrFatGuid_t edt, u32 edtSlo
 
 u8 regularRelease(ocrDataBlock_t *self, ocrFatGuid_t edt,
                   bool isInternal) {
-
+    START_PROFILE(datablock_regularRelease);
     ocrDataBlockRegular_t *rself = (ocrDataBlockRegular_t*)self;
     u32 edtId = ocrGuidTrackerFind(&(rself->usersTracker), edt.guid);
     bool isTracked = true;
@@ -101,7 +101,7 @@ u8 regularRelease(ocrDataBlock_t *self, ocrFatGuid_t edt,
         } else {
             // Definitely a problem here
             hal_unlock32(&(rself->lock));
-            return OCR_EACCES;
+            RETURN_PROFILE(OCR_EACCES);
         }
     }
 
@@ -125,13 +125,13 @@ u8 regularRelease(ocrDataBlock_t *self, ocrFatGuid_t edt,
             rself->attributes.freeRequested == 1) {
         // We need to actually free the data-block
         hal_unlock32(&(rself->lock));
-        return regularDestruct(self);
+        RETURN_PROFILE(regularDestruct(self));
     } else {
         hal_unlock32(&(rself->lock));
     }
     // End critical section
 
-    return 0;
+    RETURN_PROFILE(0);
 }
 
 u8 regularDestruct(ocrDataBlock_t *self) {
