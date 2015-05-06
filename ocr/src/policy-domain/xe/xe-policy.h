@@ -33,9 +33,10 @@ ocrPolicyDomainFactory_t *newPolicyDomainFactoryXe(ocrParamList_t *perType);
 #ifdef ENABLE_SYSBOOT_FSIM
 #include "rmd-bin-files.h"
 #define myStaticAssert(e) extern char (*myStaticAssert(void))[sizeof(char[1-2*!(e)])]
-myStaticAssert(offsetof(ocrPolicyDomain_t, fcts) + offsetof(ocrPolicyDomainFcts_t, begin) == PDBEGIN_OFFSET); // If this fails, go to ss/common/include/rmd-bin-files.h and change PDBEGIN_OFFSET
-myStaticAssert(offsetof(ocrPolicyDomain_t, fcts) + offsetof(ocrPolicyDomainFcts_t, start) == PDSTART_OFFSET); // If this fails, go to ss/common/include/rmd-bin-files.h and change PDSTART_OFFSET
-myStaticAssert(offsetof(ocrPolicyDomainXe_t, packedArgsLocation) == XE_PDARGS_OFFSET);                        // If this fails, go to ss/common/include/rmd-bin-files.h and change XE_PDARGS_OFFSET
+myStaticAssert(offsetof(ocrPolicyDomain_t, fcts) + offsetof(ocrPolicyDomainFcts_t, switchRunlevel) == PD_SWITCH_RL_OFFSET);
+               // If this fails, go to ss/common/include/rmd-bin-files.h and change PD_SWITCH_RL_OFFSET
+myStaticAssert(offsetof(ocrPolicyDomainXe_t, packedArgsLocation) == XE_PDARGS_OFFSET);
+               // If this fails, go to ss/common/include/rmd-bin-files.h and change XE_PDARGS_OFFSET
 #endif
 
 

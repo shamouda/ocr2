@@ -45,6 +45,7 @@ static void workerLoop(ocrWorker_t * worker) {
     ocrPolicyDomain_t *pd = worker->pd;
 
     DPRINTF(DEBUG_LVL_VERB, "Starting scheduler routine of CE worker %ld\n", getWorkerId(worker));
+    pd->fcts.switchRunlevel(pd, RL_COMPUTE_OK, 0);
     while(worker->fcts.isRunning(worker)) {
         ocrMsgHandle_t *handle = NULL;
         RESULT_ASSERT(pd->fcts.waitMessage(pd, &handle), ==, 0);
@@ -53,6 +54,7 @@ static void workerLoop(ocrWorker_t * worker) {
         RESULT_ASSERT(pd->fcts.processMessage(pd, msg, true), ==, 0);
         handle->destruct(handle);
     } /* End of while loop */
+
 }
 
 void destructWorkerCe(ocrWorker_t * base) {
@@ -81,57 +83,42 @@ void initializeWorkerCe(ocrWorkerFactory_t * factory, ocrWorker_t* base, ocrPara
     ocrWorkerCe_t * workerCe = (ocrWorkerCe_t *) base;
     workerCe->id = ((paramListWorkerCeInst_t*)perInstance)->workerId;
     workerCe->running = false;
-    workerCe->secondStart = false;
 }
 
-void ceBeginWorker(ocrWorker_t * base, ocrPolicyDomain_t * policy) {
 
-    // Starts everybody, the first comp-platform has specific
-    // code to represent the master thread.
-    u64 computeCount = base->computeCount;
+u8 ceWorkerSwitchRunlevel(ocrWorker_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
+                          phase_t phase, u32 properties, void (*callback)(ocrPolicyDomain_t *, u64), u64 val) {
 
-    ASSERT(computeCount == 1);
-    u64 i = 0;
-    for(i = 0; i < computeCount; ++i) {
-        base->computes[i]->fcts.begin(base->computes[i], policy, base->type);
-#ifdef OCR_ENABLE_STATISTICS
-        statsWORKER_START(policy, base->guid, base, base->computes[i]->guid, base->computes[i]);
-#endif
-        base->computes[i]->fcts.setCurrentEnv(base->computes[i], policy, base);
+    u8 toReturn = 0;
+
+    // Verify properties
+    ASSERT((properties & RL_REQUEST) && !(properties & RL_RESPONSE)
+           && !(properties & RL_RELEASE));
+    ASSERT(!(properties & RL_FROM_MSG));
+
+    // Call the runlevel change on the underlying platform
+    switch (runlevel) {
+        case RL_PD_OK:
+            // Set the worker properly the first time
+            ASSERT(self->computeCount == 1);
+            self->computes[0]->worker = self;
+            self->pd = PD;
+            break;
+        case RL_COMPUTE_OK:
+            self->location = PD->myLocation;
+            self->pd = PD;
+            ((ocrWorkerCe_t *) self)->running = true;
+            break;
+        case RL_USER_OK:
+            ((ocrWorkerCe_t *) self)->running = false;
+            break;
+        default:
+            break;
     }
-}
 
-void ceStartWorker(ocrWorker_t * base, ocrPolicyDomain_t * policy) {
-
-    ocrWorkerCe_t * ceWorker = (ocrWorkerCe_t *) base;
-
-    DPRINTF(DEBUG_LVL_VVERB, "Starting worker\n");
-    //TODO-RL check if RL fixes this scenario
-#ifdef ENABLE_COMP_PLATFORM_PTHREAD  //FIXME: Trac bugs #76 and #80
-    if(base->type == MASTER_WORKERTYPE && !ceWorker->secondStart) {
-        ceWorker->secondStart = true;
-        return; // Don't start right away
-    }
-#endif
-
-    base->location = policy->myLocation;
-    // Get a GUID
-    guidify(policy, (u64)base, &(base->fguid), OCR_GUID_WORKER);
-    base->pd = policy;
-
-    ceWorker->running = true;
-
-    // Starts everybody, the first comp-platform has specific
-    // code to represent the master thread.
-    u64 computeCount = base->computeCount;
-    ASSERT(computeCount == 1);
-    u64 i = 0;
-    for(i = 0; i < computeCount; i++) {
-        base->computes[i]->fcts.start(base->computes[i], policy, base);
-#ifdef OCR_ENABLE_STATISTICS
-        statsWORKER_START(policy, base->guid, base, base->computes[i]->guid, base->computes[i]);
-#endif
-    }
+    toReturn |= self->computes[0]->fcts.switchRunlevel(self->computes[0], PD, runlevel, phase, properties,
+                                                           callback, val);
+    return toReturn;
 }
 
 void* ceRunWorker(ocrWorker_t * worker) {
@@ -151,54 +138,6 @@ void* ceRunWorker(ocrWorker_t * worker) {
 void* ceWorkShift(ocrWorker_t * worker) {
     ASSERT(0); // Not supported
     return NULL;
-}
-
-void ceStopWorker(ocrWorker_t * base, ocrRunLevel_t newRl) {
-    switch(newRl) {
-        case RL_STOP: {
-            ocrWorkerCe_t * ceWorker = (ocrWorkerCe_t *) base;
-            ceWorker->running = false;
-
-            u64 computeCount = base->computeCount;
-            u64 i = 0;
-            // This code should be called by the master thread to join others
-            for(i = 0; i < computeCount; i++) {
-                base->computes[i]->fcts.stop(base->computes[i], newRl);
-        #ifdef OCR_ENABLE_STATISTICS
-                statsWORKER_STOP(base->pd, base->fguid.guid, base->fguid.metaDataPtr,
-                                 base->computes[i]->fguid.guid,
-                                 base->computes[i]->fguid.metaDataPtr);
-        #endif
-            }
-            DPRINTF(DEBUG_LVL_INFO, "Stopping worker %ld\n", getWorkerId(base));
-
-            // Destroy the GUID
-            PD_MSG_STACK(msg);
-            getCurrentEnv(NULL, NULL, NULL, &msg);
-
-        #define PD_MSG (&msg)
-        #define PD_TYPE PD_MSG_GUID_DESTROY
-            msg.type = PD_MSG_GUID_DESTROY | PD_MSG_REQUEST;
-            PD_MSG_FIELD_I(guid) = base->fguid;
-            PD_MSG_FIELD_I(properties) = 0;
-            RESULT_ASSERT(base->pd->fcts.processMessage(base->pd, &msg, false), ==, 0);
-        #undef PD_MSG
-        #undef PD_TYPE
-            base->fguid.guid = UNINITIALIZED_GUID;
-            break;
-        }
-        case RL_SHUTDOWN: {
-            DPRINTF(DEBUG_LVL_INFO, "Finishing worker routine %ld\n", getWorkerId(base));
-            ASSERT(base->computeCount == 1);
-            u64 i = 0;
-            for(i = 0; i < base->computeCount; i++) {
-                base->computes[i]->fcts.stop(base->computes[i], RL_SHUTDOWN);
-            }
-            break;
-        }
-        default:
-            ASSERT("Unknown runlevel in stop function");
-    }
 }
 
 bool ceIsRunningWorker(ocrWorker_t * base) {
@@ -233,11 +172,10 @@ ocrWorkerFactory_t * newOcrWorkerFactoryCe(ocrParamList_t * perType) {
     base->destruct = &destructWorkerFactoryCe;
 
     base->workerFcts.destruct = FUNC_ADDR(void (*)(ocrWorker_t*), destructWorkerCe);
-    base->workerFcts.begin = FUNC_ADDR(void (*)(ocrWorker_t*, ocrPolicyDomain_t*), ceBeginWorker);
-    base->workerFcts.start = FUNC_ADDR(void (*)(ocrWorker_t*, ocrPolicyDomain_t*), ceStartWorker);
+    base->workerFcts.switchRunlevel = FUNC_ADDR(u8 (*)(ocrWorker_t*, ocrPolicyDomain_t*, ocrRunlevel_t,
+                                                       phase_t, u32, void (*)(ocrPolicyDomain_t*, u64), u64), ceWorkerSwitchRunlevel);
     base->workerFcts.run = FUNC_ADDR(void* (*)(ocrWorker_t*), ceRunWorker);
     base->workerFcts.workShift = FUNC_ADDR(void* (*)(ocrWorker_t*), ceWorkShift);
-    base->workerFcts.stop = FUNC_ADDR(void (*)(ocrWorker_t*,ocrRunLevel_t,u32), ceStopWorker);
     base->workerFcts.isRunning = FUNC_ADDR(bool (*)(ocrWorker_t*), ceIsRunningWorker);
     base->workerFcts.printLocation = FUNC_ADDR(void (*)(ocrWorker_t*, char* location), cePrintLocation);
     return base;

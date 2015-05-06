@@ -23,7 +23,7 @@ jobtype_ocr_build_kernel_tg = {
     'isLocal': True,
     'run-cmd': '${JJOB_SHARED_HOME}/xstack/ocr/jenkins/scripts/kernel-build.sh',
     'param-cmd': '${JJOB_SHARED_HOME}/xstack/jenkins/scripts/empty-cmd.sh',
-    'keywords': ('disabled_ocr', 'percommit'),
+    'keywords': ('ocr', 'percommit'),
     'timeout': 300,
     'sandbox': ('local', 'shared', 'shareOK'),
     'req-repos': ('xstack', 'intel'),
@@ -55,7 +55,7 @@ jobtype_ocr_run_kernel_remote_tg = {
     'run-cmd': '${JJOB_SHARED_HOME}/xstack/ocr/jenkins/scripts/kernel-run-remote.sh',
     'param-cmd': '${JJOB_SHARED_HOME}/intel/ss/jenkins/scripts/fsim-param-cmd.sh',
     'epilogue-cmd': '${JJOB_ENVDIR}/bin/fsim-scripts/fsim-epilogue.sh',
-    'keywords': ('disabled_ocr', 'percommit'),
+    'keywords': ('ocr', 'percommit'),
     'timeout': 300,
     'sandbox': ('shared', 'shareOK'),
     'req-repos': ('xstack', 'intel'),
@@ -80,7 +80,7 @@ jobtype_ocr_verify_kernel_remote = {
     'isLocal': True,
     'run-cmd': '${JJOB_SHARED_HOME}/xstack/ocr/jenkins/scripts/fsim-verify.sh',
     'param-cmd': '${JJOB_SHARED_HOME}/xstack/jenkins/scripts/empty-cmd.sh',
-    'keywords': ('disabled_ocr', 'percommit'),
+    'keywords': ('ocr', 'percommit'),
     'timeout': 300,
     'sandbox': ('shared', 'shareOK'),
     'req-repos': ('xstack',)
@@ -750,12 +750,12 @@ job_ocr_run_kernel_cholesky_tg = {
                   'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/ocr-apps/cholesky/install'}
 }
 
-# job_ocr_verify_kernel_cholesky_tg = {
-#     'name': 'ocr-verify-kernel-cholesky-tg',
-#     'depends': ('ocr-run-kernel-cholesky-tg',),
-#     'jobtype': 'ocr-verify-diff',
-#     'run-args': '${WORKLOAD_EXEC}/cholesky.out.txt ${JJOB_SHARED_HOME}/xstack/apps/cholesky/datasets/cholesky_out_50.txt',
-#     'sandbox': ('inherit0',),
-#     'env-vars': { 'WORKLOAD_EXEC': '${JJOB_SHARED_HOME}/xstack/ocr/ocr-apps/cholesky/install/tg' }
-# }
+job_ocr_verify_kernel_cholesky_tg = {
+    'name': 'ocr-verify-kernel-cholesky-tg',
+    'depends': ('ocr-run-kernel-cholesky-tg',),
+    'jobtype': 'ocr-verify-diff',
+    'run-args': '${WORKLOAD_EXEC}/cholesky.out.txt ${JJOB_SHARED_HOME}/xstack/apps/cholesky/datasets/cholesky_out_50.txt',
+    'sandbox': ('inherit0',),
+    'env-vars': { 'WORKLOAD_EXEC': '${JJOB_SHARED_HOME}/xstack/ocr/ocr-apps/cholesky/install/tg' }
+}
 

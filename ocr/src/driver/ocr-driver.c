@@ -593,8 +593,6 @@ void bringUpRuntime(ocrConfig_t *ocrConfig) {
 
     // START EXECUTION
     DPRINTF(DEBUG_LVL_INFO, "========= Start execution ==========\n");
-    ocrPolicyDomain_t *rootPolicy;
-    rootPolicy = (ocrPolicyDomain_t *) all_instances[policydomain_type][0];
 
 #ifdef ENABLE_BUILDER_ONLY
     {
@@ -605,6 +603,8 @@ void bringUpRuntime(ocrConfig_t *ocrConfig) {
         free_functions();
     }
 #else
+    ocrPolicyDomain_t *rootPolicy;
+    rootPolicy = (ocrPolicyDomain_t *) all_instances[policydomain_type][0];
     ocrPolicyDomain_t *otherPolicyDomains = NULL;
     // Runlevel switch. Everything is initialized at this point and so we switch
     // to the first runlevel (CONFIG_PARSE). This will, in particular, enable all

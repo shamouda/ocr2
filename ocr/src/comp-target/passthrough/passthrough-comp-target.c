@@ -55,7 +55,7 @@ u8 ptSwitchRunlevel(ocrCompTarget_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t 
     }
     if(properties & RL_BRING_UP) {
         toReturn |= self->platforms[0]->fcts.switchRunlevel(self->platforms[0], PD, runlevel, phase, properties,
-                                                            NULL, 0);
+                                                            callback, val);
     }
 
     switch(runlevel) {
@@ -68,6 +68,7 @@ u8 ptSwitchRunlevel(ocrCompTarget_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t 
     case RL_PD_OK:
         if(properties & RL_BRING_UP)
             self->pd = PD;
+        self->platforms[0]->worker = self->worker;
         break;
     case RL_MEMORY_OK:
         break;

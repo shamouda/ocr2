@@ -78,12 +78,14 @@ u8 ptrGuidReserve(ocrGuidProvider_t *self, ocrGuid_t* startGuid, u64* skipGuid,
                   u64 numberGuids, ocrGuidKind guidType) {
     // Non supported; use labeled provider
     ASSERT(0);
+    return 0;
 }
 
 u8 ptrGuidUnreserve(ocrGuidProvider_t *self, ocrGuid_t startGuid, u64 skipGuid,
                     u64 numberGuids) {
     // Non supported; use labeled provider
     ASSERT(0);
+    return 0;
 }
 
 u8 ptrGetGuid(ocrGuidProvider_t* self, ocrGuid_t* guid, u64 val, ocrGuidKind kind) {

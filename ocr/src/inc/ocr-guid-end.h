@@ -72,7 +72,7 @@ static inline u8 guidify(struct _ocrPolicyDomain_t * pd, u64 val,
                          ocrFatGuid_t * guidRes, ocrGuidKind kind) {
     u8 returnCode = 0;
     PD_MSG_STACK(msg);
-    getCurrentEnv(&pd, NULL, NULL, &msg);
+    getCurrentEnv(NULL, NULL, NULL, &msg);
 
     ASSERT(guidRes->guid == NULL_GUID || guidRes->guid == UNINITIALIZED_GUID);
 
@@ -85,6 +85,7 @@ static inline u8 guidify(struct _ocrPolicyDomain_t * pd, u64 val,
     PD_MSG_FIELD_I(size) = 0;
     PD_MSG_FIELD_I(kind) = kind;
     PD_MSG_FIELD_I(properties) = 0;
+
     returnCode = pd->fcts.processMessage(pd, &msg, true);
 
     if(returnCode == 0) {

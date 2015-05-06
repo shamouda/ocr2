@@ -9,9 +9,9 @@
 
 #include "ocr-hal.h"
 
-extern u32 salPause();
+extern u32 salPause(bool isBlocking);
 
-extern ocrGuid_t salQuery(u32 flag, ocrQueryType_t query, ocrGuid_t guid, void **result, u32 *size, u8 flags);
+extern ocrGuid_t salQuery(ocrQueryType_t query, ocrGuid_t guid, void **result, u32 *size, u8 flags);
 
 extern void salResume(u32 flag);
 

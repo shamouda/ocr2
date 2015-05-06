@@ -38,37 +38,53 @@ void fsimDestruct(ocrMemPlatform_t *self) {
 
 struct _ocrPolicyDomain_t;
 
-void fsimBegin(ocrMemPlatform_t *self, struct _ocrPolicyDomain_t * PD ) {
-    // This is where we need to update the memory
-    // using the sysboot functions
-    ASSERT(self->startAddr);
-    self->endAddr = self->startAddr + self->size;
+u8 fsimSwitchRunlevel(ocrMemPlatform_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
+                        phase_t phase, u32 properties, void (*callback)(ocrPolicyDomain_t*, u64), u64 val) {
 
-    DPRINTF(DEBUG_LVL_VERB, "Initializing memory range %lx to %lx\n", self->startAddr, self->endAddr);
-    ocrMemPlatformFsim_t *rself = (ocrMemPlatformFsim_t*)self;
-    rself->pRangeTracker = initializeRange(16, self->startAddr,
-                    self->endAddr, USER_FREE_TAG);
-}
+    u8 toReturn = 0;
 
-void fsimStart(ocrMemPlatform_t *self, struct _ocrPolicyDomain_t * PD ) {
-    self->pd = PD;
-    // Nothing much else to do
-}
+    // This is an inert module, we do not handle callbacks (caller needs to wait on us)
+    ASSERT(callback == NULL);
 
-void fsimStop(ocrMemPlatform_t *self, ocrRunLevel_t newRl, u32 action) {
-    switch(newRl) {
-        case RL_STOP: {
-            // Nothing to do
-            break;
-        }
-        case RL_SHUTDOWN: {
+    // Verify properties for this call
+    ASSERT((properties & RL_REQUEST) && !(properties & RL_RESPONSE)
+           && !(properties & RL_RELEASE));
+    ASSERT(!(properties & RL_FROM_MSG));
+
+    switch(runlevel) {
+    case RL_CONFIG_PARSE:
+        // On bring-up: Update PD->phasesPerRunlevel on phase 0
+        // and check compatibility on phase 1
+        break;
+    case RL_NETWORK_OK:
+        break;
+    case RL_PD_OK:
+        break;
+    case RL_MEMORY_OK:
+        if(properties & RL_BRING_UP) {
+            // We can now set our PD (before this, we couldn't because
+            // "our" PD might not have been started
+            self->pd = PD;
+            ASSERT(self->startAddr);
+            self->endAddr = self->startAddr + self->size;
+
+            DPRINTF(DEBUG_LVL_VERB, "Initializing memory range %lx to %lx\n", self->startAddr, self->endAddr);
             ocrMemPlatformFsim_t *rself = (ocrMemPlatformFsim_t*)self;
-            destroyRange(rself->pRangeTracker);
-            break;
+            rself->pRangeTracker = initializeRange(16, self->startAddr,
+                    self->endAddr, USER_FREE_TAG);
         }
-        default:
-            ASSERT("Unknown runlevel in stop function");
+        break;
+    case RL_GUID_OK:
+        break;
+    case RL_COMPUTE_OK:
+        break;
+    case RL_USER_OK:
+        break;
+    default:
+        // Unknown runlevel
+        ASSERT(0);
     }
+    return toReturn;
 }
 
 u8 fsimGetThrottle(ocrMemPlatform_t *self, u64 *value) {
@@ -231,9 +247,8 @@ ocrMemPlatformFactory_t *newMemPlatformFactoryFsim(ocrParamList_t *perType) {
     base->initialize = &initializeMemPlatformFsim;
     base->destruct = &destructMemPlatformFactoryFsim;
     base->platformFcts.destruct = FUNC_ADDR(void (*)(ocrMemPlatform_t*), fsimDestruct);
-    base->platformFcts.begin = FUNC_ADDR(void (*)(ocrMemPlatform_t*, struct _ocrPolicyDomain_t*), fsimBegin);
-    base->platformFcts.start = FUNC_ADDR(void (*)(ocrMemPlatform_t*, struct _ocrPolicyDomain_t*), fsimStart);
-    base->platformFcts.stop = FUNC_ADDR(void (*)(ocrMemPlatform_t*,ocrRunLevel_t,u32), fsimStop);
+    base->platformFcts.switchRunlevel = FUNC_ADDR(u8 (*)(ocrMemPlatform_t*, ocrPolicyDomain_t*, ocrRunlevel_t,
+                                                         phase_t, u32, void (*)(ocrPolicyDomain_t*, u64), u64), fsimSwitchRunlevel);
     base->platformFcts.getThrottle = FUNC_ADDR(u8 (*)(ocrMemPlatform_t*, u64*), fsimGetThrottle);
     base->platformFcts.setThrottle = FUNC_ADDR(u8 (*)(ocrMemPlatform_t*, u64), fsimSetThrottle);
     base->platformFcts.getRange = FUNC_ADDR(void (*)(ocrMemPlatform_t*, u64*, u64*), fsimGetRange);

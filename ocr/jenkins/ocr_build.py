@@ -34,7 +34,7 @@ jobtype_ocr_build_tg = {
     'isLocal': True,
     'run-cmd': '${JJOB_PRIVATE_HOME}/xstack/ocr/jenkins/scripts/build.sh',
     'param-cmd': '${JJOB_PRIVATE_HOME}/xstack/jenkins/scripts/empty-cmd.sh',
-    'keywords': ('disabled_ocr', 'percommit'),
+    'keywords': ('ocr', 'percommit'),
     'timeout': 180,
     'sandbox': ('local', 'shared', 'shareOK'),
     'req-repos': ('xstack', 'intel'),
