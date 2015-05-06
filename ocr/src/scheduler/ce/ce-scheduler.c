@@ -80,6 +80,114 @@ void ceSchedulerDestruct(ocrScheduler_t * self) {
     runtimeChunkFree((u64)self, NULL);
 }
 
+u8 ceSchedulerSwitchRunlevel(ocrScheduler_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
+                             u32 phase, u32 properties, void (*callback)(ocrPolicyDomain_t*, u64), u64 val) {
+
+    u8 toReturn = 0;
+
+    // This is an inert module, we do not handle callbacks (caller needs to wait on us)
+    ASSERT(callback == NULL);
+
+    // Verify properties for this call
+    ASSERT((properties & RL_REQUEST) && !(properties & RL_RESPONSE)
+           && !(properties & RL_RELEASE));
+    ASSERT(!(properties & RL_FROM_MSG));
+
+    u64 i;
+    if(runlevel == RL_CONFIG_PARSE && (properties & RL_BRING_UP) && phase == 0) {
+        // First transition, setup some backpointers
+        self->rootObj->scheduler = self;
+        for(i = 0; i < self->schedulerHeuristicCount; ++i) {
+            self->schedulerHeuristics[i]->scheduler = self;
+        }
+    }
+
+    // Take care of all other sub-objects
+    for(i = 0; i < self->workpileCount; ++i) {
+        toReturn |= self->workpiles[i]->fcts.switchRunlevel(
+            self->workpiles[i], PD, runlevel, phase, properties, NULL, 0);
+    }
+    toReturn |= self->rootObj->fcts.switchRunlevel(self->rootObj, PD, runlevel, phase,
+                                                  properties, NULL, 0);
+    for(i = 0; i < self->schedulerHeuristicCount; ++i) {
+        toReturn |= self->schedulerHeuristics[i]->fcts.switchRunlevel(
+            self->schedulerHeuristics[i], PD, runlevel, phase, properties, NULL, 0);
+    }
+
+    switch(runlevel) {
+    case RL_CONFIG_PARSE:
+        // On bring-up: Update PD->phasesPerRunlevel on phase 0
+        // and check compatibility on phase 1
+        if((properties & RL_BRING_UP) && phase == 0) {
+            RL_ENSURE_PHASE_UP(PD, RL_MEMORY_OK, RL_PHASE_SCHEDULER, 2);
+            RL_ENSURE_PHASE_DOWN(PD, RL_MEMORY_OK, RL_PHASE_SCHEDULER, 2);
+        }
+        break;
+    case RL_NETWORK_OK:
+        break;
+    case RL_PD_OK:
+        if(properties & RL_BRING_UP) {
+            self->pd = PD;
+            self->contextCount = self->pd->workerCount;
+        }
+        break;
+    case RL_MEMORY_OK:
+        if((properties & RL_BRING_UP) && RL_IS_LAST_PHASE_UP(PD, RL_MEMORY_OK, phase)) {
+            // allocate steal iterator cache. Use pdMalloc since this is something
+            // local to the policy domain and that will never be shared
+            ceWorkpileIterator_t * stealIteratorsCache = self->pd->fcts.pdMalloc(
+                self->pd, sizeof(ceWorkpileIterator_t)*self->workpileCount);
+
+            // Initialize steal iterator cache
+            for(i = 0; i < self->workpileCount; ++i) {
+                // Note: here we assume workpile 'i' will match worker 'i' => Not great
+                initWorkpileIterator(&(stealIteratorsCache[i]), i, self->workpileCount,
+                                     self->workpiles);
+            }
+            ocrSchedulerCe_t * derived = (ocrSchedulerCe_t *) self;
+            derived->stealIterators = stealIteratorsCache;
+        }
+
+        if((properties & RL_TEAR_DOWN) && RL_IS_FIRST_PHASE_DOWN(PD, RL_MEMORY_OK, phase)) {
+            ocrSchedulerCe_t *derived = (ocrSchedulerCe_t*)self;
+            self->pd->fcts.pdFree(self->pd, derived->stealIterators);
+        }
+        break;
+    case RL_GUID_OK:
+        break;
+    case RL_COMPUTE_OK:
+        if(properties & RL_BRING_UP) {
+            if(RL_IS_FIRST_PHASE_UP(PD, RL_COMPUTE_OK, phase)) {
+                // We get a GUID for ourself
+                guidify(self->pd, (u64)self, &(self->fguid), OCR_GUID_ALLOCATOR);
+            }
+        } else {
+            // Tear-down
+            if(RL_IS_LAST_PHASE_DOWN(PD, RL_COMPUTE_OK, phase)) {
+                PD_MSG_STACK(msg);
+                getCurrentEnv(NULL, NULL, NULL, &msg);
+#define PD_MSG (&msg)
+#define PD_TYPE PD_MSG_GUID_DESTROY
+                msg.type = PD_MSG_GUID_DESTROY | PD_MSG_REQUEST;
+                PD_MSG_FIELD_I(guid) = self->fguid;
+                PD_MSG_FIELD_I(properties) = 0;
+                toReturn |= self->pd->fcts.processMessage(self->pd, &msg, false);
+                self->fguid.guid = NULL_GUID;
+#undef PD_MSG
+#undef PD_TYPE
+            }
+        }
+        break;
+    case RL_USER_OK:
+        break;
+    default:
+        // Unknown runlevel
+        ASSERT(0);
+    }
+    return toReturn;
+}
+
+#if 0
 void ceSchedulerBegin(ocrScheduler_t * self, ocrPolicyDomain_t * PD) {
     // Nothing to do locally
     u64 workpileCount = self->workpileCount;
@@ -169,7 +277,7 @@ void ceSchedulerStop(ocrScheduler_t * self, ocrRunLevel_t newRl, u32 action) {
             ASSERT("Unknown runlevel in stop function");
     }
 }
-
+#endif
 // What is this for?
 #if 0
 static u8 ceSchedulerYield (ocrScheduler_t* self, ocrGuid_t workerGuid,
@@ -305,9 +413,8 @@ ocrSchedulerFactory_t * newOcrSchedulerFactoryCe(ocrParamList_t *perType) {
     base->instantiate = &newSchedulerCe;
     base->initialize  = &initializeSchedulerCe;
     base->destruct = &destructSchedulerFactoryCe;
-    base->schedulerFcts.begin = FUNC_ADDR(void (*)(ocrScheduler_t*, ocrPolicyDomain_t*), ceSchedulerBegin);
-    base->schedulerFcts.start = FUNC_ADDR(void (*)(ocrScheduler_t*, ocrPolicyDomain_t*), ceSchedulerStart);
-    base->schedulerFcts.stop = FUNC_ADDR(void (*)(ocrScheduler_t*,ocrRunLevel_t,u32), ceSchedulerStop);
+    base->schedulerFcts.switchRunlevel = FUNC_ADDR(u8 (*)(ocrScheduler_t*, ocrPolicyDomain_t*, ocrRunlevel_t,
+                                                          u32, u32, void (*)(ocrPolicyDomain_t*, u64), u64), ceSchedulerSwitchRunlevel);
     base->schedulerFcts.destruct = FUNC_ADDR(void (*)(ocrScheduler_t*), ceSchedulerDestruct);
     base->schedulerFcts.takeEdt = FUNC_ADDR(u8 (*)(ocrScheduler_t*, u32*, ocrFatGuid_t*), ceSchedulerTake);
     base->schedulerFcts.giveEdt = FUNC_ADDR(u8 (*)(ocrScheduler_t*, u32*, ocrFatGuid_t*), ceSchedulerGive);

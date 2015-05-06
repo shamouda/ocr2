@@ -52,13 +52,13 @@ u8 nullSwitchRunlevel(ocrAllocator_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t
         break;
     case RL_COMPUTE_OK:
         if(properties & RL_BRING_UP) {
-            if(RL_IS_FIRST_PHASE_UP(PD, RL_COMPUTE_OK)) {
+            if(RL_IS_FIRST_PHASE_UP(PD, RL_COMPUTE_OK, phase)) {
                 // We get a GUID for ourself
                 guidify(self->pd, (u64)self, &(self->fguid), OCR_GUID_ALLOCATOR);
             }
         } else {
             // Tear-down
-            if(RL_IS_LAST_PHASE_DOWN(PD, RL_COMPUTE_OK)) {
+            if(RL_IS_LAST_PHASE_DOWN(PD, RL_COMPUTE_OK, phase)) {
                 PD_MSG_STACK(msg);
                 getCurrentEnv(NULL, NULL, NULL, &msg);
 #define PD_MSG (&msg)

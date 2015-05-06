@@ -53,6 +53,97 @@ void fsimCompDestruct (ocrCompPlatform_t * base) {
     runtimeChunkFree((u64)base, NULL);
 }
 
+u8 fsimCompSwitchRunlevel(ocrCompPlatform_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
+                         u32 phase, u32 properties, void (*callback)(ocrPolicyDomain_t*, u64), u64 val) {
+
+    u8 toReturn = 0;
+
+    // The worker is the capable module and we operate as
+    // inert wrt it
+    ASSERT(callback == NULL);
+
+    // Verify properties for this call
+    ASSERT((properties & RL_REQUEST) && !(properties & RL_RESPONSE)
+           && !(properties & RL_RELEASE));
+    ASSERT(!(properties & RL_FROM_MSG));
+
+    ocrCompPlatformFsim_t *pthreadCompPlatform = (ocrCompPlatformFsim_t*)self;
+    switch(runlevel) {
+    case RL_CONFIG_PARSE:
+        // On bring-up: Update PD->phasesPerRunlevel on phase 0
+        // and check compatibility on phase 1
+        if((properties & RL_BRING_UP) && RL_IS_FIRST_PHASE_UP(PD, RL_CONFIG_PARSE, phase)) {
+            ASSERT(self->worker != NULL);
+        }
+        break;
+    case RL_NETWORK_OK:
+        break;
+    case RL_PD_OK:
+        if(properties & RL_BRING_UP) {
+            self->pd = PD;
+            if(properties & RL_PD_MASTER) {
+                // We need to make sure we have the current environment set
+                // at least partially as the PD may be used
+                self->fcts.setCurrentEnv(self, self->pd, NULL);
+            }
+        }
+        break;
+    case RL_MEMORY_OK:
+        break;
+    case RL_GUID_OK:
+        break;
+    case RL_COMPUTE_OK:
+#if 0
+        if((properties & RL_BRING_UP) && RL_IS_FIRST_PHASE_UP(PD, RL_COMPUTE_OK, phase)) {
+            if(properties & RL_PD_MASTER) {
+                // We do not need to create another thread
+                // Only do the binding
+                s32 cpuBind = pthreadCompPlatform->binding;
+                if(cpuBind != -1) {
+                    DPRINTF(DEBUG_LVL_INFO, "Binding comp-platform to cpu_id %d\n", cpuBind);
+                    bindThread(cpuBind);
+                }
+#ifdef OCR_RUNTIME_PROFILER
+                {
+                    _profilerData *d = (_profilerData*)malloc(sizeof(_profilerData));
+                    char buffer[50];
+                    snprintf(buffer, 50, "profiler_%lx-%lx", PD->myLocation, 0UL);
+                    d->output = fopen(buffer, "w");
+                    ASSERT(d->output);
+                    RESULT_ASSERT(pthread_setspecific(_profilerThreadData, d), ==, 0);
+                }
+#endif
+            } else {
+                // We need to create another capable module
+                ocrCompPlatformPthread_t * pthreadCompPlatform = (ocrCompPlatformPthread_t *)self;
+                pthread_attr_t attr;
+                toReturn |= pthread_attr_init(&attr);
+                //Note this call may fail if the system doesn't like the stack size asked for.
+                if(!toReturn)
+                    toReturn |= pthread_attr_setstacksize(&attr, pthreadCompPlatform->stackSize);
+                if(!toReturn) {
+                    toReturn |= pthread_create(&(pthreadCompPlatform->osThread),
+                                               &attr, &pthreadRoutineWrapper,
+                                               pthreadCompPlatform);
+                }
+            }
+        } else if((properties & RL_TEAR_DOWN) && RL_IS_LAST_PHASE_DOWN(PD, RL_COMPUTE_OK, phase)) {
+            // At this point, this is run only by the master thread
+            if(!(properties & RL_PD_MASTER)) {
+                // We do not join with ourself
+                toReturn |= pthread_join(pthreadCompPlatform->osThread, NULL);
+            }
+        }
+#endif
+        break;
+    case RL_USER_OK:
+        break;
+    default:
+        ASSERT(0);
+    }
+    return toReturn;
+}
+
 void fsimCompBegin(ocrCompPlatform_t * compPlatform, ocrPolicyDomain_t * PD, ocrWorkerType_t workerType) {
     compPlatform->pd = PD;
 }
@@ -62,7 +153,7 @@ void fsimCompStart(ocrCompPlatform_t * compPlatform, ocrPolicyDomain_t * PD, ocr
     fsimRoutineExecute(worker);
 }
 
-void fsimCompStop(ocrCompPlatform_t * compPlatform, ocrRunLevel_t newRl, u32 action) {
+void fsimCompStop(ocrCompPlatform_t * compPlatform, ocrRunlevel_t newRl, u32 action) {
     // Nothing to do really
 }
 
@@ -126,9 +217,8 @@ ocrCompPlatformFactory_t *newCompPlatformFactoryFsim(ocrParamList_t *perType) {
     base->initialize = &initializeCompPlatformFsim;
     base->destruct = &destructCompPlatformFactoryFsim;
     base->platformFcts.destruct = FUNC_ADDR(void (*)(ocrCompPlatform_t*), fsimCompDestruct);
-    base->platformFcts.begin = FUNC_ADDR(void (*)(ocrCompPlatform_t*, ocrPolicyDomain_t*, ocrWorkerType_t), fsimCompBegin);
-    base->platformFcts.start = FUNC_ADDR(void (*)(ocrCompPlatform_t*, ocrPolicyDomain_t*, ocrWorker_t*), fsimCompStart);
-    base->platformFcts.stop = FUNC_ADDR(void (*)(ocrCompPlatform_t*,ocrRunLevel_t,u32), fsimCompStop);
+    base->platformFcts.switchRunlevel = FUNC_ADDR(u8 (*)(ocrCompPlatform_t*, ocrPolicyDomain_t*, ocrRunlevel_t,
+                                                         u32, u32, void (*)(ocrPolicyDomain_t*, u64), u64), fsimCompSwitchRunlevel);
     base->platformFcts.getThrottle = FUNC_ADDR(u8 (*)(ocrCompPlatform_t*, u64*), fsimCompGetThrottle);
     base->platformFcts.setThrottle = FUNC_ADDR(u8 (*)(ocrCompPlatform_t*, u64), fsimCompSetThrottle);
     base->platformFcts.setCurrentEnv = FUNC_ADDR(u8 (*)(ocrCompPlatform_t*, ocrPolicyDomain_t*, ocrWorker_t*), fsimCompSetCurrentEnv);
