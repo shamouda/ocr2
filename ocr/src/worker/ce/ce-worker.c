@@ -102,6 +102,7 @@ void ceStartWorker(ocrWorker_t * base, ocrPolicyDomain_t * policy) {
     ocrWorkerCe_t * ceWorker = (ocrWorkerCe_t *) base;
 
     DPRINTF(DEBUG_LVL_VVERB, "Starting worker\n");
+    //TODO-RL check if RL fixes this scenario
 #ifdef ENABLE_COMP_PLATFORM_PTHREAD  //FIXME: Trac bugs #76 and #80
     if(base->type == MASTER_WORKERTYPE && !ceWorker->secondStart) {
         ceWorker->secondStart = true;

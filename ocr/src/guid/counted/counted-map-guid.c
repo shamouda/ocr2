@@ -12,6 +12,8 @@
 #include "ocr-policy-domain.h"
 #include "ocr-sysboot.h"
 
+#define DEBUG_TYPE GUID
+
 // Default hashtable's number of buckets
 //PERF: This parameter heavily impacts the GUID provider scalability !
 #define DEFAULT_NB_BUCKETS 10000
@@ -34,6 +36,16 @@
 
 // GUID 'id' counter, atomically incr when a new GUID is requested
 static u64 guidCounter = 0;
+
+#ifdef COUNTED_MAP_DESTRUCT_CHECK
+// Fwd declaration
+static ocrGuidKind getKindFromGuid(ocrGuid_t guid);
+
+void countedMapHashmapEntryDestructChecker(void * key, void * value) {
+    ocrGuid_t guid = (ocrGuid_t) key;
+    DPRINTF(DEBUG_LVL_WARN, "Remnant GUID 0x%x of kind %d still registered on GUID provider\n", guid, getKindFromGuid(guid));
+}
+#endif
 
 u8 countedMapSwitchRunlevel(ocrGuidProvider_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
                       phase_t phase, u32 properties, void (*callback)(ocrPolicyDomain_t*, u64), u64 val) {
@@ -63,6 +75,18 @@ u8 countedMapSwitchRunlevel(ocrGuidProvider_t *self, ocrPolicyDomain_t *PD, ocrR
         break;
     case RL_MEMORY_OK:
         // Nothing to do
+        if ((properties & RL_TEAR_DOWN) && RL_IS_FIRST_PHASE_DOWN(PD, RL_GUID_OK, phase)) {
+            // What could the map contain at that point ?
+            // - Non-freed OCR objects from the user program.
+            // - GUIDs internally used by the runtime (module's guids)
+            // Since this is below GUID_OK, nobody should have access to those GUIDs
+            // anymore and we can dispose of them safely.
+            //TODO-RL: do we want (and can we) destroy user objects ? i.e. need to
+            //TODO-RL  call their specific destructors which may not work in MEM_OK ?
+            //TODO-RL  Runtime stuff not deallocated is a bug.
+            deallocFct entryDeallocator = (COUNTED_MAP_DESTRUCT_CHECK) ? countedMapHashmapEntryDestructChecker : NULL;
+            destructHashtable(((ocrGuidProviderCountedMap_t *) self)->guidImplTable, entryDeallocator);
+        }
         break;
     case RL_GUID_OK:
         ASSERT(self->pd == PD);
@@ -70,11 +94,6 @@ u8 countedMapSwitchRunlevel(ocrGuidProvider_t *self, ocrPolicyDomain_t *PD, ocrR
             //Initialize the map now that we have an assigned policy domain
             ocrGuidProviderCountedMap_t * derived = (ocrGuidProviderCountedMap_t *) self;
             derived->guidImplTable = newHashtableBucketLockedModulo(PD, DEFAULT_NB_BUCKETS);
-        }
-        if ((properties & RL_TEAR_DOWN) && RL_IS_FIRST_PHASE_DOWN(PD, RL_GUID_OK, phase)) {
-            //TODO-RL: Need to think about that
-            PRINTF("TODO-RL: Cleaning up guid provider hashtable\n");
-            //destructHashtable(((ocrGuidProviderCountedMap_t *) self)->guidImplTable);
         }
         break;
     case RL_COMPUTE_OK:

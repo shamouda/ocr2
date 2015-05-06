@@ -50,13 +50,14 @@ void platformFinalizeMPIComm() {
 //
 
 // Pre-post an irecv to listen to outstanding request and for every
-// request that requires a response.
-// Only supports fixed size receives.
+// request that requires a response. Only supports fixed size receives.
+// Warning: This mode impl is usually lagging behind the other
+//          mode (i.e. less tested, may be broken).
 #define STRATEGY_PRE_POST_RECV 0
 
 // Use iprobe to scan for outstanding request (tag matches RECV_ANY_ID)
 // and incoming responses for requests (using src/tag pairs)
-#define STRATEGY_PROBE_RECV 1
+#define STRATEGY_PROBE_RECV (!STRATEGY_PRE_POST_RECV)
 
 // To tag outstanding send/recv
 #define RECV_ANY_ID 0
@@ -112,7 +113,7 @@ static mpiCommHandle_t * createMpiHandle(ocrCommPlatform_t * self, u64 id, u32 p
 static void postRecvAny(ocrCommPlatform_t * self) {
     ocrCommPlatformMPI_t * mpiComm = (ocrCommPlatformMPI_t *) self;
     ocrPolicyMsg_t * msg = allocateNewMessage(self, mpiComm->maxMsgSize);
-    mpiCommHandle_t * handle = createMpiHandle(self, RECV_ANY_ID, PERSIST_MSG_PROP, msg);
+    mpiCommHandle_t * handle = createMpiHandle(self, RECV_ANY_ID, PERSIST_MSG_PROP, msg, false);
     void * buf = msg; // Reuse request message as receive buffer
     int count = mpiComm->maxMsgSize; // don't know what to expect, upper-bound on message size
     MPI_Datatype datatype = MPI_BYTE;
@@ -219,7 +220,7 @@ u8 MPICommSendMessage(ocrCommPlatform_t * self,
         ocrPolicyMsg_t * respMsg = messageBuffer;
         int respTag = mpiId;
         // Prepare a handle for the incoming response
-        mpiCommHandle_t * respHandle = createMpiHandle(self, respTag, properties, respMsg);
+        mpiCommHandle_t * respHandle = createMpiHandle(self, respTag, properties, respMsg, false);
         //PERF: (STRATEGY_PRE_POST_RECV) could do better if the response for this message's type is of fixed-length.
         int respCount = mpiComm->maxMsgSize;
         MPI_Request * status = &(respHandle->status);
@@ -413,9 +414,9 @@ u8 MPICommPollMessageInternal(ocrCommPlatform_t *self, ocrPolicyMsg_t **msg,
             *msg = receivedMsg;
             // We need to unmarshall the message here
             // Check the size for sanity (I think it should be OK but not sure in this case)
-            u64 baseSize;
+            u64 baseSize, marshalledSize;
             ocrPolicyMsgGetMsgSize(*msg, &baseSize, &marshalledSize, MARSHALL_DBPTR | MARSHALL_NSADDR);
-            ASSERT(baseSize + marshalledSize <= count);
+            ASSERT(baseSize + marshalledSize <= mpiComm->maxMsgSize);
             ocrPolicyMsgUnMarshallMsg((u8*)*msg, NULL, *msg,
                                       MARSHALL_APPEND | MARSHALL_DBPTR | MARSHALL_NSADDR);
             pd->fcts.pdFree(pd, mpiHandle);
@@ -510,9 +511,6 @@ u8 MPICommSwitchRunlevel(ocrCommPlatform_t *self, ocrPolicyDomain_t *PD, ocrRunl
             mpiComm->incomingIt = mpiComm->incoming->iterator(mpiComm->incoming);
             mpiComm->outgoingIt = mpiComm->outgoing->iterator(mpiComm->outgoing);
 
-//TODO-RL I think this should be moved further down but I need to ensure this is setup
-//before any worker can call into communications when should that be ?
-
             // Default max size is customizable through setMaxExpectedMessageSize()
 #if STRATEGY_PRE_POST_RECV
             //DIST-TODO STRATEGY_PRE_POST_RECV doesn't support arbitrary message size
@@ -535,14 +533,26 @@ u8 MPICommSwitchRunlevel(ocrCommPlatform_t *self, ocrPolicyDomain_t *PD, ocrRunl
                 DPRINTF(DEBUG_LVL_VERB,"[MPI %d] Neighbors[%d] is %d\n", myRank, i, PD->neighbors[i]);
                 i++;
             }
+            // Runlevel barrier across policy-domains
+            MPI_Barrier(MPI_COMM_WORLD);
+
 #if STRATEGY_PRE_POST_RECV
             // Post a recv any to start listening to incoming communications
             postRecvAny(self);
 #endif
         }
         if ((properties & RL_TEAR_DOWN) && RL_IS_FIRST_PHASE_DOWN(self->pd, RL_GUID_OK, phase)) {
-            //NOTE: incoming may have recvs any posted
-            //TODO: then shouldn't we clean that up ?
+#if STRATEGY_PROBE_RECV
+            iterator_t * incomingIt = mpiComm->incomingIt;
+            incomingIt->reset(incomingIt);
+            if (incomingIt->hasNext(incomingIt)) {
+                mpiCommHandle_t * mpiHandle = (mpiCommHandle_t *) incomingIt->next(incomingIt);
+                self->pd->fcts.pdFree(self->pd, mpiHandle->msg);
+                self->pd->fcts.pdFree(self->pd, mpiHandle);
+                incomingIt->removeCurrent(incomingIt);
+            }
+#endif
+            ASSERT(mpiComm->incoming->isEmpty(mpiComm->incoming));
             mpiComm->incoming->destruct(mpiComm->incoming);
             ASSERT(mpiComm->outgoing->isEmpty(mpiComm->outgoing));
             mpiComm->outgoing->destruct(mpiComm->outgoing);
@@ -553,12 +563,10 @@ u8 MPICommSwitchRunlevel(ocrCommPlatform_t *self, ocrPolicyDomain_t *PD, ocrRunl
     case RL_COMPUTE_OK:
         break;
     case RL_USER_OK:
-        if ((properties & RL_BRING_UP) && RL_IS_LAST_PHASE_UP(self->pd, RL_USER_OK, phase)) {
-            //TODO-RL: debugging... It's possible for a PD to receive
-            //a shutdown request from another PD before it has fully booted.
-            MPI_Barrier(MPI_COMM_WORLD);
-        }
-
+        // Note: This PD may reach this runlevel after other PDs. It is not
+        // an issue for MPI since the library is already up and will buffer
+        // the messages. The communication worker wll pick that up whenever
+        // it has started
         break;
     default:
         // Unknown runlevel

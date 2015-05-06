@@ -637,18 +637,20 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
             }
             if (oldAckValue == 0) {
                 if (bself->rlSwitch.runlevel != RL_USER_OK) {
+                    //TODO-RL: check with romain what's the correct way to do that. It seems the PD itself
+                    //never goes up to RL_USER_OK, but its modules do
                     PRINTF("PD[%d] WARNING: forcing RL_USER_OK in PD FIXME!\n", self->myLocation);
                 }
                 bself->rlSwitch.runlevel = RL_USER_OK;
                 bself->rlSwitch.nextPhase = RL_GET_PHASE_COUNT_UP(self, RL_USER_OK) - 1;
             }
-            //TODO-RL: Does checking RL_IS_LAST_PHASE_UP is an issue if the two PDs runlevels are out of sync ?
+            //Note: Per current implementation, even if PDs are not in the same runlevel,
+            //      the first time a PD receives a ack it has to be in the last phase up
+            //      otherwise it couldn't have received the message
             bool doLocalShutdown = ((oldAckValue == 0) && RL_IS_LAST_PHASE_UP(self, RL_USER_OK, bself->rlSwitch.nextPhase));
             if (!doLocalShutdown) {
                 DPRINTF(DEBUG_LVL_VVERB,"PD_MSG_MGT_RL_NOTIFY: got notification RL=%d PH=%d\n", bself->rlSwitch.runlevel, bself->rlSwitch.nextPhase);
                 PD_MSG_FIELD_O(returnDetail) = 0;
-                //TODO-RL we should check all the return to make sure they do the right thing
-                //with the message parameter
                 return 0;
             } else {
                 DPRINTF(DEBUG_LVL_VVERB,"PD_MSG_MGT_RL_NOTIFY: fall-through\n");

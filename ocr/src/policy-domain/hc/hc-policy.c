@@ -309,7 +309,7 @@ u8 hcPdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
                         policy->workers[j], policy, runlevel, i, propertiesPreComputes, NULL, 0);
                 }
                 if(i == 0) {
-                    // TODO Destroy my GUID
+                    //TODO-RL Destroy my GUID
                     // May not be needed but cleaner
                 }
             }

@@ -499,7 +499,6 @@ u8 xePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
     }
     case PD_MSG_MGT_FINISH: {
         START_PROFILE(pd_xe_Finish);
-        //TODO-RL
         self->fcts.finish(self);
         EXIT_PROFILE;
         break;

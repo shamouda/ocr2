@@ -340,7 +340,6 @@ static void workerLoopHcComm(ocrWorker_t * worker) {
             ASSERT(GET_STATE_PHASE(worker->desiredState) == PHASE_DONE);
         } else {
             ASSERT(phase == PHASE_DONE);
-            //TODO-RL: this needs to happen wrt to the generation of shutdown messages
             // When the comm-worker quiesce and it already had all its neighbors PD's shutdown msg
             // we need to make sure there's no outgoing messages pending (i.e. a one-way shutdown)
             // for other PDs before wrapping up the user runlevel.
@@ -387,8 +386,7 @@ static void workerLoopHcComm(ocrWorker_t * worker) {
             worker->curState = desiredState;
             break;
         }
-        // BEGIN copy-paste original code
-        // TODO-RL not sure we still need that
+        // BEGIN copy-paste from hc-worker code
         case RL_COMPUTE_OK: {
             u8 phase = GET_STATE_PHASE(worker->desiredState);
             if(RL_IS_FIRST_PHASE_DOWN(worker->pd, RL_COMPUTE_OK, phase)) {
@@ -406,7 +404,7 @@ static void workerLoopHcComm(ocrWorker_t * worker) {
             }
             break;
         }
-        // END copy-paste original code
+        // END copy-paste from hc-worker code
         default:
             // Only these two RL should occur
             ASSERT(0);

@@ -43,6 +43,7 @@ pthread_key_t selfKey;
  * The keyInit boolean allows threads to know if they can lookup the TLS key or not.
  * TODO: may disappear once we clearly define runlevels trac #80
  */
+//TODO-RL: We should be able to check the PD's RL instead
 static bool keyInit = false;
 
 #ifdef OCR_RUNTIME_PROFILER
@@ -277,8 +278,7 @@ void getCurrentEnv(ocrPolicyDomain_t** pd, ocrWorker_t** worker,
             *pd = vals->pd;
         if(worker)
             *worker = vals->worker;
-        if(vals->worker && task && ((vals->worker->curTask != ((ocrTask_t*)0x1))))
-            //TODO the 0x1 is going away with the fix for runlevel trac #80)
+        if(task && vals->worker)
             *task = vals->worker->curTask;
         if(msg) {
             //By default set src and dest location to current location.
