@@ -1,0 +1,13 @@
+This version of Fib requires the ENABLE_EXTENSION_LABELING to work.
+
+It will only compute fib(X) once thereby limiting parallelism but demonstrating
+the use of the labeling API.
+
+There are blocks/events which are not freed/released in this code.
+
+ONLY TESTED ON x86-pthread-x86
+Running:
+
+OCR_CONFIG=$PWD/default.cfg make -f Makefile.<OCR_TYPE> run <fib_num>
+
+where fib_num is the optional number you want to run fibonacci for; default 10

@@ -152,11 +152,16 @@ typedef struct _paramListPolicyDomainInst_t {
 /**< Request a copy of the GUID's metadata */
 #define PD_MSG_GUID_METADATA_CLONE  0x00013020
 
+/**< Reserve GUID space for labeled GUIDs */
+#define PD_MSG_GUID_RESERVE    0x00004020
+
+/**< Remove the reservation for GUID space */
+#define PD_MSG_GUID_UNRESERVE   0x00005020
+
 /**< Release the GUID (destroy the association between the u64
  * value and the GUID and optionally destroy the associated
  * metadata */
-#define PD_MSG_GUID_DESTROY     0x00044020
-// TODO: Add stuff about GUID reservation
+#define PD_MSG_GUID_DESTROY     0x00045020
 
 /**< AND with this and if result non-null, GUID distribution related
  * operation (taking/giving EDTs, DBs, events, etc)
@@ -671,6 +676,33 @@ typedef struct _ocrPolicyMsg_t {
                 } out;
             } inOrOut __attribute__ (( aligned(8) ));
         } PD_MSG_STRUCT_NAME(PD_MSG_GUID_METADATA_CLONE);
+
+        struct {
+            union {
+                struct {
+                    u64 numberGuids;      /**< In: Number of GUIDs being reserved */
+                    ocrGuidKind guidKind; /**< In: GUID type for the GUIDs being reserved */
+                } in;
+                struct {
+                    ocrGuid_t startGuid;  /**< Out: First GUID usable in the reserved range */
+                    u64 skipGuid;         /**< Out: Skip value between two consecutive GUIDs in the range */
+                    u32 returnDetail;     /**< Out: Return value; 0 on success */
+                } out;
+            } inOrOut __attribute__ (( aligned(8) ));
+        } PD_MSG_STRUCT_NAME(PD_MSG_GUID_RESERVE);
+
+        struct {
+            union {
+                struct {
+                    ocrGuid_t startGuid;  /**< In: First GUID of the range to un-reserve */
+                    u64 skipGuid;         /**< In: Skip value between consecutive GUIDs in the range */
+                    u64 numberGuids;      /**< In: Number of GUIDs in the range */
+                } in;
+                struct {
+                    u32 returnDetail;     /**< Out: Return value; 0 on success */
+                } out;
+            } inOrOut __attribute__ (( aligned(8) ));
+        } PD_MSG_STRUCT_NAME(PD_MSG_GUID_UNRESERVE);
 
         struct {
             union {

@@ -82,6 +82,35 @@ typedef struct _ocrGuidProviderFcts_t {
     u8 (*switchRunlevel)(struct _ocrGuidProvider_t* self, struct _ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
                          phase_t phase, u32 properties, void (*callback)(struct _ocrPolicyDomain_t*, u64), u64 val);
     /**
+     * @brief Reserves a GUID range to be used by a user mapping function
+     *
+     * @param[in] self             GUID provider reserving the GUIDs
+     * @param[out] startGuid       Returns the first GUID of the range
+     * @param[out] skipGuid        Returns the "step" between valid GUIDs in the range
+     * @param[in] numberGuids      Number of GUIDs to reserve
+     * @param[in] guidType         Type of GUIDs this range will be used to store
+     * @return 0 on success a non-zero error code
+     */
+    u8 (*guidReserve)(struct _ocrGuidProvider_t *self, ocrGuid_t *startGuid, u64* skipGuid,
+                      u64 numberGuids, ocrGuidKind guidType);
+
+    /**
+     * @brief Un-reserves a GUID range when no longer needed.
+     *
+     * Note that this function does not free/unallocate any
+     * GUIDs that are active in the range, it un-reserves all non-used
+     * GUIDs.
+     *
+     * @param[in] self            GUID provider un-reserving the GUIDs
+     * @param[in] startGuid       First GUID of the range
+     * @param[in] skipGuid        "Step" between valid GUIDs in the range
+     * @param[in] numberGuids     Number of GUIDs to release
+     * @return 0 on success a non-zero error code
+     */
+    u8 (*guidUnreserve)(struct _ocrGuidProvider_t *self, ocrGuid_t startGuid, u64 skipGuid,
+                        u64 numberGuids);
+
+    /**
      * @brief Gets a GUID for an object of kind 'kind'
      * and associates the value val.
      *
@@ -109,13 +138,19 @@ typedef struct _ocrGuidProviderFcts_t {
      *
      *
      * @param[in] self          Pointer to this GUID provider
-     * @param[out] fguid        GUID returned (with metaDataPtr)
+     * @param[in/out] fguid     GUID returned (with metaDataPtr)
+     *                          If properties has GUID_PROP_IS_LABELED
+     *                          the fguid.guid field should contain
+     *                          the GUID that is requested
      * @param[in] size          Size of the storage to be created
      * @param[in] kind          Kind of the object that will be associated with the GUID
-     * @return 0 on success or an error code
+     * @param[in] properties    Properties for the creation. Mostly contains stuff
+     *                          related to GUID labeling
+     * @return 0 on success or an error code:
+     *     - OCR_EGUIDEXISTS if GUID_PROP_CHECK is set and the GUID already exists
      */
     u8 (*createGuid)(struct _ocrGuidProvider_t* self, ocrFatGuid_t* fguid,
-                     u64 size, ocrGuidKind kind);
+                     u64 size, ocrGuidKind kind, u32 properties);
 
     /**
      * @brief Resolve the associated value to the GUID 'guid'

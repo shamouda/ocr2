@@ -12,6 +12,7 @@
 #ifdef ENABLE_GUID_PTR
 
 #include "debug.h"
+#include "ocr-types.h"
 #include "guid/ptr/ptr-guid.h"
 #include "ocr-policy-domain.h"
 
@@ -73,6 +74,18 @@ u8 ptrSwitchRunlevel(ocrGuidProvider_t *self, ocrPolicyDomain_t *PD, ocrRunlevel
     return toReturn;
 }
 
+u8 ptrGuidReserve(ocrGuidProvider_t *self, ocrGuid_t* startGuid, u64* skipGuid,
+                  u64 numberGuids, ocrGuidKind guidType) {
+    // Non supported; use labeled provider
+    ASSERT(0);
+}
+
+u8 ptrGuidUnreserve(ocrGuidProvider_t *self, ocrGuid_t startGuid, u64 skipGuid,
+                    u64 numberGuids) {
+    // Non supported; use labeled provider
+    ASSERT(0);
+}
+
 u8 ptrGetGuid(ocrGuidProvider_t* self, ocrGuid_t* guid, u64 val, ocrGuidKind kind) {
     ocrGuidImpl_t *guidInst = NULL;
     PD_MSG_STACK(msg);
@@ -99,9 +112,11 @@ u8 ptrGetGuid(ocrGuidProvider_t* self, ocrGuid_t* guid, u64 val, ocrGuidKind kin
     return 0;
 }
 
-u8 ptrCreateGuid(ocrGuidProvider_t* self, ocrFatGuid_t *fguid, u64 size, ocrGuidKind kind) {
-    // Here we only the creation of GUIDs after the memory is up
-    // We can modify this if needed but it should not be needed
+u8 ptrCreateGuid(ocrGuidProvider_t* self, ocrFatGuid_t *fguid, u64 size, ocrGuidKind kind, u32 properties) {
+    if(properties & GUID_PROP_IS_LABELED) {
+        ASSERT(0); // Not supported; use labeled provider
+    }
+
     PD_MSG_STACK(msg);
     ocrTask_t *task = NULL;
     ocrPolicyDomain_t *policy = NULL;
@@ -216,8 +231,10 @@ ocrGuidProviderFactory_t *newGuidProviderFactoryPtr(ocrParamList_t *typeArg, u32
     base->providerFcts.destruct = FUNC_ADDR(void (*)(ocrGuidProvider_t*), ptrDestruct);
     base->providerFcts.switchRunlevel = FUNC_ADDR(u8 (*)(ocrGuidProvider_t*, ocrPolicyDomain_t*, ocrRunlevel_t,
                                                          phase_t, u32, void (*)(ocrPolicyDomain_t*, u64), u64), ptrSwitchRunlevel);
+    base->providerFcts.guidReserve = FUNC_ADDR(u8 (*)(ocrGuidProvider_t*, ocrGuid_t*, u64*, u64, ocrGuidKind), ptrGuidReserve);
+    base->providerFcts.guidUnreserve = FUNC_ADDR(u8 (*)(ocrGuidProvider_t*, ocrGuid_t, u64, u64), ptrGuidUnreserve);
     base->providerFcts.getGuid = FUNC_ADDR(u8 (*)(ocrGuidProvider_t*, ocrGuid_t*, u64, ocrGuidKind), ptrGetGuid);
-    base->providerFcts.createGuid = FUNC_ADDR(u8 (*)(ocrGuidProvider_t*, ocrFatGuid_t*, u64, ocrGuidKind), ptrCreateGuid);
+    base->providerFcts.createGuid = FUNC_ADDR(u8 (*)(ocrGuidProvider_t*, ocrFatGuid_t*, u64, ocrGuidKind, u32), ptrCreateGuid);
     base->providerFcts.getVal = FUNC_ADDR(u8 (*)(ocrGuidProvider_t*, ocrGuid_t, u64*, ocrGuidKind*), ptrGetVal);
     base->providerFcts.getKind = FUNC_ADDR(u8 (*)(ocrGuidProvider_t*, ocrGuid_t, ocrGuidKind*), ptrGetKind);
     base->providerFcts.getLocation = FUNC_ADDR(u8 (*)(ocrGuidProvider_t*, ocrGuid_t, ocrLocation_t*), ptrGetLocation);

@@ -913,13 +913,10 @@ static u8 hcCreateEdtTemplate(ocrPolicyDomain_t *self, ocrFatGuid_t *guid,
 }
 
 static u8 hcCreateEvent(ocrPolicyDomain_t *self, ocrFatGuid_t *guid,
-                        ocrEventTypes_t type, bool takesArg) {
+                        ocrEventTypes_t type, u32 properties) {
 
-    ocrEvent_t *base = self->eventFactories[0]->instantiate(
-                           self->eventFactories[0], type, takesArg, NULL);
-    (*guid).guid = base->guid;
-    (*guid).metaDataPtr = base;
-    return 0;
+    return self->eventFactories[0]->instantiate(
+        self->eventFactories[0], guid, type, properties, NULL);
 }
 
 static u8 convertDepAddToSatisfy(ocrPolicyDomain_t *self, ocrFatGuid_t dbGuid,
@@ -1311,7 +1308,7 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
 #define PD_TYPE PD_MSG_EVT_CREATE
         PD_MSG_FIELD_O(returnDetail) = hcCreateEvent(
             self, &(PD_MSG_FIELD_IO(guid)),
-            PD_MSG_FIELD_I(type), PD_MSG_FIELD_I(properties) & 1);
+            PD_MSG_FIELD_I(type), PD_MSG_FIELD_I(properties));
 #undef PD_MSG
 #undef PD_TYPE
         msg->type &= ~PD_MSG_REQUEST;
@@ -1359,7 +1356,7 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             // Here we need to create a metadata area as well
             PD_MSG_FIELD_O(returnDetail) = self->guidProviders[0]->fcts.createGuid(
                 self->guidProviders[0], &(PD_MSG_FIELD_IO(guid)), PD_MSG_FIELD_I(size),
-                PD_MSG_FIELD_I(kind));
+                PD_MSG_FIELD_I(kind), PD_MSG_FIELD_I(properties));
         } else {
             // Here we just need to associate a GUID
             ocrGuid_t temp;
@@ -1441,7 +1438,33 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         msg->type |= PD_MSG_RESPONSE;
         break;
     }
+    case PD_MSG_GUID_RESERVE:
+    {
+#define PD_MSG msg
+#define PD_TYPE PD_MSG_GUID_RESERVE
+        PD_MSG_FIELD_O(returnDetail) = self->guidProviders[0]->fcts.guidReserve(
+            self->guidProviders[0], &(PD_MSG_FIELD_O(startGuid)), &(PD_MSG_FIELD_O(skipGuid)),
+            PD_MSG_FIELD_I(numberGuids), PD_MSG_FIELD_I(guidKind));
+#undef PD_MSG
+#undef PD_TYPE
+        msg->type &= ~PD_MSG_REQUEST;
+        msg->type |= PD_MSG_RESPONSE;
+        break;
+    }
 
+    case PD_MSG_GUID_UNRESERVE:
+    {
+#define PD_MSG msg
+#define PD_TYPE PD_MSG_GUID_RESERVE
+        PD_MSG_FIELD_O(returnDetail) = self->guidProviders[0]->fcts.guidUnreserve(
+            self->guidProviders[0], PD_MSG_FIELD_O(startGuid), PD_MSG_FIELD_O(skipGuid),
+            PD_MSG_FIELD_I(numberGuids));
+#undef PD_MSG
+#undef PD_TYPE
+        msg->type &= ~PD_MSG_REQUEST;
+        msg->type |= PD_MSG_RESPONSE;
+        break;
+    }
     case PD_MSG_GUID_DESTROY: {
         START_PROFILE(pd_hc_GuidDestroy);
 #define PD_MSG msg
