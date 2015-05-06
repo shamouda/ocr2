@@ -22,6 +22,67 @@ void xeWorkpileDestruct ( ocrWorkpile_t * base ) {
     runtimeChunkFree((u64)base, NULL);
 }
 
+u8 xeWorkpileSwitchRunlevel(ocrWorkpile_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
+                            u32 phase, u32 properties, void (*callback)(ocrPolicyDomain_t*, u64), u64 val) {
+
+    u8 toReturn = 0;
+
+    // This is an inert module, we do not handle callbacks (caller needs to wait on us)
+    ASSERT(callback == NULL);
+
+    // Verify properties for this call
+    ASSERT((properties & RL_REQUEST) && !(properties & RL_RESPONSE)
+           && !(properties & RL_RELEASE));
+    ASSERT(!(properties & RL_FROM_MSG));
+
+    switch(runlevel) {
+    case RL_CONFIG_PARSE:
+        // On bring-up: Update PD->phasesPerRunlevel on phase 0
+        // and check compatibility on phase 1
+        break;
+    case RL_NETWORK_OK:
+        break;
+    case RL_PD_OK:
+        if(properties & RL_BRING_UP)
+            self->pd = PD;
+        break;
+    case RL_MEMORY_OK:
+        break;
+    case RL_GUID_OK:
+        break;
+    case RL_COMPUTE_OK:
+        if(properties & RL_BRING_UP) {
+            if(RL_IS_FIRST_PHASE_UP(PD, RL_COMPUTE_OK, phase)) {
+                // We get a GUID for ourself
+                guidify(self->pd, (u64)self, &(self->fguid), OCR_GUID_ALLOCATOR);
+            }
+        } else {
+            // Tear-down
+            if(RL_IS_LAST_PHASE_DOWN(PD, RL_COMPUTE_OK, phase)) {
+                PD_MSG_STACK(msg);
+                getCurrentEnv(NULL, NULL, NULL, &msg);
+#define PD_MSG (&msg)
+#define PD_TYPE PD_MSG_GUID_DESTROY
+                msg.type = PD_MSG_GUID_DESTROY | PD_MSG_REQUEST;
+                PD_MSG_FIELD_I(guid) = self->fguid;
+                PD_MSG_FIELD_I(properties) = 0;
+                toReturn |= self->pd->fcts.processMessage(self->pd, &msg, false);
+                self->fguid.guid = NULL_GUID;
+#undef PD_MSG
+#undef PD_TYPE
+            }
+        }
+        break;
+    case RL_USER_OK:
+        break;
+    default:
+        // Unknown runlevel
+        ASSERT(0);
+    }
+    return toReturn;
+}
+
+#if 0
 void xeWorkpileBegin(ocrWorkpile_t *base, ocrPolicyDomain_t *PD) {
     // Nothing to do
 }
@@ -29,7 +90,7 @@ void xeWorkpileBegin(ocrWorkpile_t *base, ocrPolicyDomain_t *PD) {
 void xeWorkpileStart(ocrWorkpile_t *base, ocrPolicyDomain_t *PD) {
 }
 
-void xeWorkpileStop(ocrWorkpile_t *base, ocrRunLevel_t newRl, u32 action) {
+void xeWorkpileStop(ocrWorkpile_t *base, ocrRunlevel_t newRl, u32 action) {
     switch(newRl) {
         case RL_STOP: {
             base->fguid.guid = UNINITIALIZED_GUID;
@@ -43,6 +104,7 @@ void xeWorkpileStop(ocrWorkpile_t *base, ocrRunLevel_t newRl, u32 action) {
             ASSERT("Unknown runlevel in stop function");
     }
 }
+#endif
 
 ocrFatGuid_t xeWorkpilePop(ocrWorkpile_t * base, ocrWorkPopType_t type,
                            ocrCost_t *cost) {
@@ -82,9 +144,8 @@ ocrWorkpileFactory_t * newOcrWorkpileFactoryXe(ocrParamList_t *perType) {
     base->destruct = &destructWorkpileFactoryXe;
 
     base->workpileFcts.destruct = FUNC_ADDR(void (*)(ocrWorkpile_t*), xeWorkpileDestruct);
-    base->workpileFcts.begin = FUNC_ADDR(void (*)(ocrWorkpile_t*, ocrPolicyDomain_t*), xeWorkpileBegin);
-    base->workpileFcts.start = FUNC_ADDR(void (*)(ocrWorkpile_t*, ocrPolicyDomain_t*), xeWorkpileStart);
-    base->workpileFcts.stop = FUNC_ADDR(void (*)(ocrWorkpile_t*,ocrRunLevel_t,u32), xeWorkpileStop);
+    base->workpileFcts.switchRunlevel = FUNC_ADDR(u8 (*)(ocrWorkpile_t*, ocrPolicyDomain_t*, ocrRunlevel_t,
+                                                         u32, u32, void (*)(ocrPolicyDomain_t*, u64), u64), xeWorkpileSwitchRunlevel);
     base->workpileFcts.pop = FUNC_ADDR(ocrFatGuid_t (*)(ocrWorkpile_t*, ocrWorkPopType_t, ocrCost_t*), xeWorkpilePop);
     base->workpileFcts.push = FUNC_ADDR(void (*)(ocrWorkpile_t*, ocrWorkPushType_t, ocrFatGuid_t), xeWorkpilePush);
 

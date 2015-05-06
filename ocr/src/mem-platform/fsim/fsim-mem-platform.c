@@ -38,6 +38,66 @@ void fsimDestruct(ocrMemPlatform_t *self) {
 
 struct _ocrPolicyDomain_t;
 
+u8 fsimSwitchRunlevel(ocrMemPlatform_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
+                        u32 phase, u32 properties, void (*callback)(ocrPolicyDomain_t*, u64), u64 val) {
+
+    u8 toReturn = 0;
+
+    // This is an inert module, we do not handle callbacks (caller needs to wait on us)
+    ASSERT(callback == NULL);
+
+    // Verify properties for this call
+    ASSERT((properties & RL_REQUEST) && !(properties & RL_RESPONSE)
+           && !(properties & RL_RELEASE));
+    ASSERT(!(properties & RL_FROM_MSG));
+
+    switch(runlevel) {
+    case RL_CONFIG_PARSE:
+        // On bring-up: Update PD->phasesPerRunlevel on phase 0
+        // and check compatibility on phase 1
+        break;
+    case RL_NETWORK_OK:
+        break;
+    case RL_PD_OK:
+        if(properties & RL_BRING_UP) {
+            // We can now set our PD (before this, we couldn't because
+            // "our" PD might not have been started
+            self->pd = PD;
+        }
+        break;
+    case RL_MEMORY_OK:
+#if 0
+        if((properties & RL_BRING_UP) && RL_IS_FIRST_PHASE_UP(PD, RL_MEMORY_OK, phase)) {
+            // This is where we need to update the memory
+            // using the sysboot functions
+            self->startAddr = (u64)malloc(self->size);
+            // Check that the mem-platform size in config file is reasonable
+            ASSERT(self->startAddr);
+            self->endAddr = self->startAddr + self->size;
+
+            ocrMemPlatformMalloc_t *rself = (ocrMemPlatformMalloc_t*)self;
+            rself->pRangeTracker = initializeRange(
+                16, self->startAddr, self->endAddr, USER_FREE_TAG);
+        } else if((properties & RL_TEAR_DOWN) && RL_IS_LAST_PHASE_DOWN(PD, RL_MEMORY_OK, phase)) {
+            // Here we can free the memory we allocated
+            free((void*)(self->startAddr));
+        }
+#endif
+        break;
+    case RL_GUID_OK:
+        break;
+    case RL_COMPUTE_OK:
+        break;
+    case RL_USER_OK:
+        break;
+    default:
+        // Unknown runlevel
+        ASSERT(0);
+    }
+    return toReturn;
+}
+
+#if 0
 void fsimBegin(ocrMemPlatform_t *self, struct _ocrPolicyDomain_t * PD ) {
     // This is where we need to update the memory
     // using the sysboot functions
@@ -55,7 +115,7 @@ void fsimStart(ocrMemPlatform_t *self, struct _ocrPolicyDomain_t * PD ) {
     // Nothing much else to do
 }
 
-void fsimStop(ocrMemPlatform_t *self, ocrRunLevel_t newRl, u32 action) {
+void fsimStop(ocrMemPlatform_t *self, ocrRunlevel_t newRl, u32 action) {
     switch(newRl) {
         case RL_STOP: {
             // Nothing to do
@@ -70,6 +130,7 @@ void fsimStop(ocrMemPlatform_t *self, ocrRunLevel_t newRl, u32 action) {
             ASSERT("Unknown runlevel in stop function");
     }
 }
+#endif
 
 u8 fsimGetThrottle(ocrMemPlatform_t *self, u64 *value) {
     return 1; // Not supported
@@ -231,9 +292,8 @@ ocrMemPlatformFactory_t *newMemPlatformFactoryFsim(ocrParamList_t *perType) {
     base->initialize = &initializeMemPlatformFsim;
     base->destruct = &destructMemPlatformFactoryFsim;
     base->platformFcts.destruct = FUNC_ADDR(void (*)(ocrMemPlatform_t*), fsimDestruct);
-    base->platformFcts.begin = FUNC_ADDR(void (*)(ocrMemPlatform_t*, struct _ocrPolicyDomain_t*), fsimBegin);
-    base->platformFcts.start = FUNC_ADDR(void (*)(ocrMemPlatform_t*, struct _ocrPolicyDomain_t*), fsimStart);
-    base->platformFcts.stop = FUNC_ADDR(void (*)(ocrMemPlatform_t*,ocrRunLevel_t,u32), fsimStop);
+    base->platformFcts.switchRunlevel = FUNC_ADDR(u8 (*)(ocrMemPlatform_t*, ocrPolicyDomain_t*, ocrRunlevel_t,
+                                                         u32, u32, void (*)(ocrPolicyDomain_t*, u64), u64), fsimSwitchRunlevel);
     base->platformFcts.getThrottle = FUNC_ADDR(u8 (*)(ocrMemPlatform_t*, u64*), fsimGetThrottle);
     base->platformFcts.setThrottle = FUNC_ADDR(u8 (*)(ocrMemPlatform_t*, u64), fsimSetThrottle);
     base->platformFcts.getRange = FUNC_ADDR(void (*)(ocrMemPlatform_t*, u64*, u64*), fsimGetRange);

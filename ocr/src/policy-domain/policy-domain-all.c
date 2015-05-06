@@ -85,9 +85,11 @@ u64 ocrPolicyMsgGetMsgBaseSize(ocrPolicyMsg_t *msg, bool isIn) {
 #undef PER_TYPE
     default:
 #ifdef ENABLE_POLICY_DOMAIN_CE
+#if 0
         // Special case for CEs
         msg->type = PD_MSG_REQUEST | PD_CE_CE_MESSAGE | PD_MSG_MGT_SHUTDOWN;
         baseSize = _PD_MSG_SIZE_IN(PD_MSG_MGT_SHUTDOWN);
+#endif
         // This can typically happen during shutdown when comms is closed, to be fixed in #134
         return 0;
 #else
