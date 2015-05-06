@@ -35,9 +35,9 @@
 //   .             . * Blocks have a header, space, tail     .                 .
 //   .             .   =================================     .                 .
 //   .             .                                         .                 .
-//   . used block: . . . . . . . . . . . .         . . . . . . free block:     . . . . . . .
-//   .                                   .         .                                       .
-//   . blkHdr_t   payload                .         . blkHdr_t   free space                 .
+//   . used block: . . . . . . . . . . . . . .     . . . . . . free block:     . . . . . . .
+//   .                                       .     .                                       .
+//   . blkHdr_t   payload                    .     . blkHdr_t   free space                 .
 //   +----------+------------------------+---+     +----------+------------------------+---+
 //   |          |                        |   |     |          |                        |   |
 //   | see      |                        | T |     | see      |                        | T |
@@ -444,6 +444,10 @@ static void *simpleMalloc(pool_t *pool,u64 size, struct _ocrPolicyDomain_t *pd)
             VALGRIND_CHUNK_OPEN(p);
             INFO1(p) = (u64)addrGlobalizeOnTG((void *)pool, pd);   // old : INFO1(p) = (u64)pool;
             INFO2(p) = (u64)addrGlobalizeOnTG((void *)ret, pd);    // old : INFO2(p) = (u64)ret;
+
+            ASSERT((*(u8 *)(&INFO2(p)) & POOL_HEADER_TYPE_MASK) == 0);
+            *(u8 *)(&INFO2(p)) |= allocatorSimple_id;
+
             ASSERT_BLOCK_BEGIN((*(u8 *)(&INFO2(p)) & POOL_HEADER_TYPE_MASK) == allocatorSimple_id)
             DPRINTF(DEBUG_LVL_WARN, "SimpleAlloc : id != allocatorSimple_id \n");
             ASSERT_BLOCK_END
@@ -490,6 +494,10 @@ void simpleFree(void *p)
     u64 end   = (u64)pool->pool_end;
     hal_lock32(&(pool->lock));
     VALGRIND_POOL_CLOSE(pool);
+
+    ASSERT((*(u8 *)(&INFO2(q)) & POOL_HEADER_TYPE_MASK) == allocatorSimple_id);
+    *(u8 *)(&INFO2(q)) &= ~POOL_HEADER_TYPE_MASK;
+
     q = USER_TO_HEAD(INFO2(q)); // For TG. no effects on x86
 
     ASSERT_BLOCK_BEGIN ( GET_MARK(HEAD(q)) == MARK )

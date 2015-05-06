@@ -189,8 +189,8 @@ ocrMemPlatform_t* newMemPlatformFsim(ocrMemPlatformFactory_t * factory,
                                      ocrParamList_t *perInstance) {
 
     // TODO: This will be replaced by the runtime/GUID meta-data allocator
-    // For now, we cheat and use good-old fsim which is kind of counter productive with
-    // all the trouble we are going through to *not* use fsim...
+    // For now, we cheat and use good-old fsimRuntimeChunkAlloc which is kind of counter productive with
+    // all the trouble we are going through to *not* use fsimRuntimeChunkAlloc...
     ocrMemPlatform_t *result = (ocrMemPlatform_t*)
                                runtimeChunkAlloc(sizeof(ocrMemPlatformFsim_t), PERSISTENT_CHUNK);
     factory->initialize(factory, result, perInstance);
