@@ -1453,11 +1453,9 @@ void tlsfDestruct(ocrAllocator_t *self) {
     DPRINTF(DEBUG_LVL_INFO, "Entered tlsfDesctruct on allocator 0x%lx\n", (u64) self);
     ASSERT(self->memoryCount == 1);
     self->memories[0]->fcts.destruct(self->memories[0]);
-    // TODO: Should we do this? It is the clean thing to do but may
-    // cause mismatch between way it was created and freed
-    runtimeChunkFree((u64)self->memories, NULL);
+    runtimeChunkFree((u64)self->memories, PERSISTENT_CHUNK);
 
-    runtimeChunkFree((u64)self, NULL);
+    runtimeChunkFree((u64)self, PERSISTENT_CHUNK);
     DPRINTF(DEBUG_LVL_INFO, "Leaving tlsfDesctruct on allocator 0x%lx\n", (u64) self);
 }
 
@@ -1898,7 +1896,7 @@ void initializeAllocatorTlsf(ocrAllocatorFactory_t * factory, ocrAllocator_t * s
 /******************************************************/
 
 static void destructAllocatorFactoryTlsf(ocrAllocatorFactory_t * factory) {
-    runtimeChunkFree((u64)factory, NULL);
+    runtimeChunkFree((u64)factory, NONPERSISTENT_CHUNK);
 }
 
 ocrAllocatorFactory_t * newAllocatorFactoryTlsf(ocrParamList_t *perType) {

@@ -296,12 +296,12 @@ ocrRuntimeHint_t* getRuntimeHintDbRegular(ocrDataBlock_t* self) {
 /******************************************************/
 
 void destructRegularFactory(ocrDataBlockFactory_t *factory) {
-    runtimeChunkFree((u64)factory, NULL);
+    runtimeChunkFree((u64)factory, PERSISTENT_CHUNK);
 }
 
 ocrDataBlockFactory_t *newDataBlockFactoryRegular(ocrParamList_t *perType, u32 factoryId) {
     ocrDataBlockFactory_t *base = (ocrDataBlockFactory_t*)
-                                  runtimeChunkAlloc(sizeof(ocrDataBlockFactoryRegular_t), NULL);
+                                  runtimeChunkAlloc(sizeof(ocrDataBlockFactoryRegular_t), PERSISTENT_CHUNK);
 
     base->instantiate = FUNC_ADDR(ocrDataBlock_t* (*)
                                   (ocrDataBlockFactory_t*, ocrFatGuid_t, ocrFatGuid_t,

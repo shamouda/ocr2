@@ -133,7 +133,7 @@ void initializeWorkpileHc(ocrWorkpileFactory_t * factory, ocrWorkpile_t* self, o
 /******************************************************/
 
 void destructWorkpileFactoryHc(ocrWorkpileFactory_t * factory) {
-    runtimeChunkFree((u64)factory, NULL);
+    runtimeChunkFree((u64)factory, NONPERSISTENT_CHUNK);
 }
 
 ocrWorkpileFactory_t * newOcrWorkpileFactoryHc(ocrParamList_t *perType) {

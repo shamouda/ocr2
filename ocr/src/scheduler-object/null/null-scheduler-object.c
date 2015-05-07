@@ -90,7 +90,7 @@ u8 nullSchedulerObjectRootSwitchRunlevel(ocrSchedulerObjectRoot_t *self, ocrPoli
 }
 
 void nullSchedulerObjectRootDestruct(ocrSchedulerObjectRoot_t *self) {
-    runtimeChunkFree((u64)self, NULL);
+    runtimeChunkFree((u64)self, PERSISTENT_CHUNK);
     return;
 }
 
@@ -112,7 +112,7 @@ ocrSchedulerObject_t* newSchedulerObjectRootNull(ocrSchedulerObjectFactory_t *fa
 }
 
 void destructSchedulerObjectRootFactoryNull(ocrSchedulerObjectFactory_t * factory) {
-    runtimeChunkFree((u64)factory, NULL);
+    runtimeChunkFree((u64)factory, PERSISTENT_CHUNK);
 }
 
 ocrSchedulerObjectFactory_t * newOcrSchedulerObjectFactoryNull(ocrParamList_t *perType, u32 factoryId) {

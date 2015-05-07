@@ -525,7 +525,6 @@ ocrCommPlatformFactory_t *newCommPlatformFactoryGasnet(ocrParamList_t *perType) 
 
     ocrCommPlatformFactory_t *base = (ocrCommPlatformFactory_t*)
     runtimeChunkAlloc(sizeof(ocrCommPlatformFactoryGasnet_t), NONPERSISTENT_CHUNK);
-
     base->instantiate = &newCommPlatformGasnet;
     base->initialize = &initializeCommPlatformGasnet;
     base->destruct = FUNC_ADDR(void (*)(ocrCommPlatformFactory_t*), destructCommPlatformFactoryGasnet);

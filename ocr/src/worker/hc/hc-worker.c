@@ -190,6 +190,7 @@ static void workerLoop(ocrWorker_t * worker) {
 }
 
 void destructWorkerHc(ocrWorker_t * base) {
+    runtimeChunkFree((u64)base, PERSISTENT_CHUNK);
 }
 
 u8 hcWorkerSwitchRunlevel(ocrWorker_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
@@ -501,7 +502,7 @@ void hcDumpWorkPile(ocrWorker_t *worker){
 /******************************************************/
 
 void destructWorkerFactoryHc(ocrWorkerFactory_t * factory) {
-    runtimeChunkFree((u64)factory, NULL);
+    runtimeChunkFree((u64)factory, NONPERSISTENT_CHUNK);
 }
 
 ocrWorkerFactory_t * newOcrWorkerFactoryHc(ocrParamList_t * perType) {

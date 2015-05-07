@@ -569,7 +569,7 @@ void* runWorkerHcComm(ocrWorker_t * worker) {
  */
 ocrWorker_t* newWorkerHcComm(ocrWorkerFactory_t * factory, ocrParamList_t * perInstance) {
     ocrWorker_t * worker = (ocrWorker_t*)
-            runtimeChunkAlloc(sizeof(ocrWorkerHcComm_t), NULL);
+            runtimeChunkAlloc(sizeof(ocrWorkerHcComm_t), PERSISTENT_CHUNK);
     factory->initialize(factory, worker, perInstance);
     return (ocrWorker_t *) worker;
 }
@@ -592,14 +592,14 @@ void initializeWorkerHcComm(ocrWorkerFactory_t * factory, ocrWorker_t *self, ocr
 /******************************************************/
 
 void destructWorkerFactoryHcComm(ocrWorkerFactory_t * factory) {
-    runtimeChunkFree((u64)factory, NULL);
+    runtimeChunkFree((u64)factory, NONPERSISTENT_CHUNK);
 }
 
 ocrWorkerFactory_t * newOcrWorkerFactoryHcComm(ocrParamList_t * perType) {
     ocrWorkerFactory_t * baseFactory = newOcrWorkerFactoryHc(perType);
     ocrWorkerFcts_t baseFcts = baseFactory->workerFcts;
 
-    ocrWorkerFactoryHcComm_t* derived = (ocrWorkerFactoryHcComm_t*)runtimeChunkAlloc(sizeof(ocrWorkerFactoryHcComm_t), (void *)1);
+    ocrWorkerFactoryHcComm_t* derived = (ocrWorkerFactoryHcComm_t*)runtimeChunkAlloc(sizeof(ocrWorkerFactoryHcComm_t), NONPERSISTENT_CHUNK);
     ocrWorkerFactory_t * base = (ocrWorkerFactory_t *) derived;
     base->instantiate = FUNC_ADDR(ocrWorker_t* (*)(ocrWorkerFactory_t*, ocrParamList_t*), newWorkerHcComm);
     base->initialize  = FUNC_ADDR(void (*)(ocrWorkerFactory_t*, ocrWorker_t*, ocrParamList_t*), initializeWorkerHcComm);

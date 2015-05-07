@@ -24,7 +24,7 @@ void handlelessCommDestruct (ocrCommApi_t * base) {
         base->commPlatform->fcts.destruct(base->commPlatform);
         base->commPlatform = NULL;
     }
-    runtimeChunkFree((u64)base, NULL);
+    runtimeChunkFree((u64)base, PERSISTENT_CHUNK);
 }
 
 u8 handlelessCommSwitchRunlevel(ocrCommApi_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
@@ -196,7 +196,7 @@ void initializeCommApiHandleless(ocrCommApiFactory_t * factory, ocrCommApi_t* se
 /******************************************************/
 
 void destructCommApiFactoryHandleless(ocrCommApiFactory_t *factory) {
-    runtimeChunkFree((u64)factory, NULL);
+    runtimeChunkFree((u64)factory, NONPERSISTENT_CHUNK);
 }
 
 ocrCommApiFactory_t *newCommApiFactoryHandleless(ocrParamList_t *perType) {

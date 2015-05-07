@@ -500,7 +500,7 @@ void bringUpRuntime(ocrConfig_t *ocrConfig) {
                 factory_names[j][count] = populate_type(&type_params[j][count], j, dict, secname);
                 all_factories[j][count] = create_factory(j, factory_names[j][count], type_params[j][count]);
                 if (all_factories[j][count] == NULL) {
-                    runtimeChunkFree((u64)factory_names[j][count], NULL);
+                    runtimeChunkFree((u64)factory_names[j][count], NONPERSISTENT_CHUNK);
                     factory_names[j][count] = NULL;
                 }
                 count++;
@@ -573,7 +573,7 @@ void bringUpRuntime(ocrConfig_t *ocrConfig) {
                 ASSERT(neighbors_count == pd->neighborCount);
                 pd->neighbors = (ocrLocation_t*)runtimeChunkAlloc(sizeof(ocrLocation_t) * neighbors_count, PERSISTENT_CHUNK);
 #ifndef ENABLE_BUILDER_ONLY
-                pd->neighborPDs = (ocrPolicyDomain_t**)runtimeChunkAlloc(sizeof(ocrPolicyDomain_t*) * neighbors_count, (void *)1);
+                pd->neighborPDs = (ocrPolicyDomain_t**)runtimeChunkAlloc(sizeof(ocrPolicyDomain_t*) * neighbors_count, NONPERSISTENT_CHUNK);
                 int idx = 0;
                 DPRINTF(DEBUG_LVL_VERB, "PD%lu neighbors (%d): ", (u64)pd->myLocation, neighbors_count);
                 for (j = neighbors_low; j <= neighbors_high; j++) {
@@ -714,24 +714,24 @@ void freeUpRuntime (bool doTeardown) {
     for (i = 0; i < total_types; i++) {
         for (j = 0; j < type_counts[i]; j++) {
             if(i<=policydomain_type)
-                runtimeChunkFree((u64)all_factories[i][j], NULL);
-            runtimeChunkFree((u64)type_params[i][j], NULL);
-            runtimeChunkFree((u64)factory_names[i][j], NULL);
+                runtimeChunkFree((u64)all_factories[i][j], NONPERSISTENT_CHUNK);
+            runtimeChunkFree((u64)type_params[i][j], NONPERSISTENT_CHUNK);
+            runtimeChunkFree((u64)factory_names[i][j], NONPERSISTENT_CHUNK);
         }
-        runtimeChunkFree((u64)all_factories[i], NULL);
-        runtimeChunkFree((u64)type_params[i], NULL);
-        runtimeChunkFree((u64)factory_names[i], NULL);
+        runtimeChunkFree((u64)all_factories[i], NONPERSISTENT_CHUNK);
+        runtimeChunkFree((u64)type_params[i], NONPERSISTENT_CHUNK);
+        runtimeChunkFree((u64)factory_names[i], NONPERSISTENT_CHUNK);
     }
 
     for (i = 0; i < total_types; i++) {
         for (j = 0; j < inst_counts[i]; j++) {
             if(inst_params[i][j])
-                runtimeChunkFree((u64)inst_params[i][j], NULL);
+                runtimeChunkFree((u64)inst_params[i][j], NONPERSISTENT_CHUNK);
         }
         if(inst_params[i])
-            runtimeChunkFree((u64)inst_params[i], NULL);
+            runtimeChunkFree((u64)inst_params[i], NONPERSISTENT_CHUNK);
         if(all_instances[i])
-            runtimeChunkFree((u64)all_instances[i], NULL);
+            runtimeChunkFree((u64)all_instances[i], NONPERSISTENT_CHUNK);
     }
 }
 
@@ -808,7 +808,7 @@ static void * packUserArguments(int argc, char ** argv) {
         strcpy(dbAsChar + extraOffset + offsets[63 - pos], argv[63 - pos]);
     }
 
-    runtimeChunkFree((u64) offsets, NULL);
+    runtimeChunkFree((u64) offsets, NONPERSISTENT_CHUNK);
     return ptr;
 }
 

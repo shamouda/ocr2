@@ -291,7 +291,7 @@ u8 hcCommMonitorProgress(ocrScheduler_t *self, ocrMonitorProgress_t type, void *
 }
 
 ocrScheduler_t* newSchedulerHcComm(ocrSchedulerFactory_t * factory, ocrParamList_t *perInstance) {
-    ocrScheduler_t* base = (ocrScheduler_t*) runtimeChunkAlloc(sizeof(ocrSchedulerHcCommDelegate_t), NULL);
+    ocrScheduler_t* base = (ocrScheduler_t*) runtimeChunkAlloc(sizeof(ocrSchedulerHcCommDelegate_t), PERSISTENT_CHUNK);
     factory->initialize(factory, base, perInstance);
     return base;
 }
@@ -310,7 +310,7 @@ void initializeSchedulerHcComm(ocrSchedulerFactory_t * factory, ocrScheduler_t *
 }
 
 void destructSchedulerFactoryHcComm(ocrSchedulerFactory_t * factory) {
-    runtimeChunkFree((u64)factory, NULL);
+    runtimeChunkFree((u64)factory, NONPERSISTENT_CHUNK);
 }
 
 ocrSchedulerFactory_t * newOcrSchedulerFactoryHcCommDelegate(ocrParamList_t *perType) {
@@ -318,7 +318,7 @@ ocrSchedulerFactory_t * newOcrSchedulerFactoryHcCommDelegate(ocrParamList_t *per
     ocrSchedulerFactory_t * baseFactory = newOcrSchedulerFactoryHc(perType);
     ocrSchedulerFcts_t baseFcts = baseFactory->schedulerFcts;
     ocrSchedulerFactoryHcComm_t* derived = (ocrSchedulerFactoryHcComm_t*) runtimeChunkAlloc(
-        sizeof(ocrSchedulerFactoryHcComm_t), (void *)1);
+        sizeof(ocrSchedulerFactoryHcComm_t), NONPERSISTENT_CHUNK);
 
     // Store function pointers we need from the base implementation
     derived->baseInitialize = baseFactory->initialize;

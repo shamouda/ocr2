@@ -21,16 +21,16 @@
 
 
 void ptDestruct(ocrCompTarget_t *compTarget) {
-//     u32 i = 0;
-//     while(i < compTarget->platformCount) {
-//         compTarget->platforms[i]->fcts.destruct(compTarget->platforms[i]);
-//         ++i;
-//     }
-//     runtimeChunkFree((u64)(compTarget->platforms), NULL);
-// #ifdef OCR_ENABLE_STATISTICS
-//     statsCOMPTARGET_STOP(compTarget->pd, compTarget->fguid.guid, compTarget);
-// #endif
-//     runtimeChunkFree((u64)compTarget, NULL);
+    u32 i = 0;
+    while(i < compTarget->platformCount) {
+        compTarget->platforms[i]->fcts.destruct(compTarget->platforms[i]);
+        ++i;
+    }
+    runtimeChunkFree((u64)(compTarget->platforms), PERSISTENT_CHUNK);
+#ifdef OCR_ENABLE_STATISTICS
+    statsCOMPTARGET_STOP(compTarget->pd, compTarget->fguid.guid, compTarget);
+#endif
+    runtimeChunkFree((u64)compTarget, PERSISTENT_CHUNK);
 }
 
 u8 ptSwitchRunlevel(ocrCompTarget_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
@@ -145,7 +145,7 @@ void initializeCompTargetPt(ocrCompTargetFactory_t * factory, ocrCompTarget_t * 
 /* OCR COMP TARGET HC FACTORY                         */
 /******************************************************/
 static void destructCompTargetFactoryPt(ocrCompTargetFactory_t *factory) {
-    runtimeChunkFree((u64)factory, NULL);
+    runtimeChunkFree((u64)factory, NONPERSISTENT_CHUNK);
 }
 
 ocrCompTargetFactory_t *newCompTargetFactoryPt(ocrParamList_t *perType) {

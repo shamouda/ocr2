@@ -582,13 +582,8 @@ void simpleDestruct(ocrAllocator_t *self) {
     DPRINTF(DEBUG_LVL_VERB, "Entered simpleDesctruct (This is x86 only?) on allocator 0x%lx\n", (u64) self);
     ASSERT(self->memoryCount == 1);
     self->memories[0]->fcts.destruct(self->memories[0]);
-    /*
-    // TODO: Should we do this? It is the clean thing to do but may
-    // cause mismatch between way it was created and freed
-    runtimeChunkFree((u64)self->memories, NULL);
-    DPRINTF(DEBUG_LVL_WARN, "simpleDestruct free %p\n", (u64)self->memories );
-    */
-    runtimeChunkFree((u64)self, NULL);
+    runtimeChunkFree((u64)self->memories, PERSISTENT_CHUNK);
+    runtimeChunkFree((u64)self, PERSISTENT_CHUNK);
     DPRINTF(DEBUG_LVL_INFO, "Leaving simpleDestruct on allocator 0x%lx (free)\n", (u64) self);
 }
 
@@ -758,7 +753,7 @@ void initializeAllocatorSimple(ocrAllocatorFactory_t * factory, ocrAllocator_t *
 
 static void destructAllocatorFactorySimple(ocrAllocatorFactory_t * factory) {
     DPRINTF(DEBUG_LVL_VERB, "destructSimple called. (This is x86 only?) free %p\n", factory);
-    runtimeChunkFree((u64)factory, NULL);
+    runtimeChunkFree((u64)factory, NONPERSISTENT_CHUNK);
 }
 
 ocrAllocatorFactory_t * newAllocatorFactorySimple(ocrParamList_t *perType) {
