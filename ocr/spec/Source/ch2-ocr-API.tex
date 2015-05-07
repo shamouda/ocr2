@@ -328,7 +328,7 @@ be visible to other EDTs depending on the implementation and specific runtime co
 \subsection*{Functions}
 \begin{DoxyCompactItemize}
 \item
-\hyperlink{group__OCRTypesGeneral_ga92c50087ca0e64fa93fc59402c55f8ca}{u8} \hyperlink{group__OCRDataBlock_ga8781682157ebe73114af805cc3539a22}
+\hyperlink{group__OCRTypesGeneral_ga92c50087ca0e64fa93fc59402c55f8ca}{u8} \hyperlink{func_ocrDbCreate}
 {ocr\-Db\-Create} (\hyperlink{group__OCRTypesGeneral_gacde3883d1ce245c051133c2c3aa82fc8}{ocr\-Guid\-\_\-t} $\ast$db, void $\ast$$\ast$addr, \hyperlink{group__OCRTypesGeneral_ga3f7e2bcbb0b4c338f3c4f6c937cd4234}{u64} len, \hyperlink{group__OCRTypesGeneral_gace9d960e74685e2cd84b36132dbbf8aa}{u16} flags, \hyperlink{group__OCRTypesGeneral_gacde3883d1ce245c051133c2c3aa82fc8}{ocr\-Guid\-\_\-t} affinity, \hyperlink{group__OCRTypesDB_gabffd082fa19860aa5a9822beba6b68a5}{ocr\-In\-Db\-Allocator\-\_\-t} allocator)
 \begin{DoxyCompactList}\small\item\em Request the creation of a data block. \end{DoxyCompactList}
 
@@ -348,9 +348,9 @@ be visible to other EDTs depending on the implementation and specific runtime co
 %
 %  ocdDbCreate
 %
-\hypertarget{group__OCRDataBlock_ga8781682157ebe73114af805cc3539a22}{\index{Data-\/block management for O\-C\-R@{Data-\/block management for O\-C\-R}!ocr\-Db\-Create@{ocr\-Db\-Create}}
+\hypertarget{func_ocrDbCreate}{\index{Data-\/block management for O\-C\-R@{Data-\/block management for O\-C\-R}!ocr\-Db\-Create@{ocr\-Db\-Create}}
 \index{ocr\-Db\-Create@{ocr\-Db\-Create}!Data-block management for OCR@{Data-\/block management for O\-C\-R}}
-\subsection[{ocr\-Db\-Create}]{\setlength{\rightskip}{0pt plus 5cm}{\bf u8} ocr\-Db\-Create (
+\subsection[{ocr\-Db\-Create}]{\setlength{\rightskip}{0pt plus 5cm}{\bf u8} ocr\-Db\-Create(
 \begin{DoxyParamCaption}
 \item[{{\bf ocr\-Guid\-\_\-t} $\ast$}]{db, }
 \item[{void $\ast$$\ast$}]{addr, }
@@ -359,50 +359,100 @@ be visible to other EDTs depending on the implementation and specific runtime co
 \item[{{\bf ocr\-Guid\-\_\-t}}]{affinity, }
 \item[{{\bf ocr\-In\-Db\-Allocator\-\_\-t}}]{allocator}
 \end{DoxyParamCaption}
-)}}\label{group__OCRDataBlock_ga8781682157ebe73114af805cc3539a22}
+)}}\label{func_ocrDbCreate}
 
-Request the creation of a data block.
+Requests the runtime to create a data-block of a specified size. After
+a succesfull call, the runtime will return the GUID for the newly
+created data-block and a pointer to it (if requested).
 
 \begin{DoxyParams}[1]{Parameters}
-\mbox{\tt out}  & {\em db} & On successful creation, contains the G\-U\-I\-D for the newly created data block. Will be N\-U\-L\-L if the call fails \\
+\mbox{\tt out}  & {\em db} & On successful creation, contains the GUID
+of the data-block. If the call fails, the returned value is undefined \\
 \hline
-\mbox{\tt out}  & {\em addr} & On successful creation, contains the 64 bit address if D\-B\-\_\-\-P\-R\-O\-P\-\_\-\-N\-O\-\_\-\-A\-C\-Q\-U\-I\-R\-E is not specified. N\-U\-L\-L otherwise \\
+\mbox{\tt out}  & {\em addr} & On successful creation and if the
+DB_PROP_NO_ACQUIRE is not specified in {\em flags}, this call will
+acquire the data-block and its address will be returned in this
+parameter. If DB_PROP_NO_ACQUIRE is specified in {\em flags}, the
+value returned will be NULL. If the call fails, the returned value is
+undefined \\
 \hline
-\mbox{\tt in}  & {\em len} & Size in bytes of the block to allocate. \\
+\mbox{\tt in}  & {\em len} & Size, in bytes, of the data-block to create  \\
 \hline
-\mbox{\tt in}  & {\em flags} & Flags to create the data block. Currently, the following properties are supported\-:
+\mbox{\tt in}  & {\em flags} & Flags controlling the behavior of the
+data-block creation. The following flags are supported:
 \begin{DoxyItemize}
-\item \hyperlink{group__OCRTypesDB_ga831208f9dcaeb2560f93988d29d80141}{D\-B\-\_\-\-P\-R\-O\-P\-\_\-\-N\-O\-N\-E}, indicates no specific properties
-\item \hyperlink{group__OCRTypesDB_gaaea245d2b799ff575c1c0b9a8a5e3f53}{D\-B\-\_\-\-P\-R\-O\-P\-\_\-\-N\-O\-\_\-\-A\-C\-Q\-U\-I\-R\-E}, the D\-B will be created but not acquired (addr will be N\-U\-L\-L).
+\item DB_PROP_NONE: Default behavior (described in this section)
+\item DB_PROP_NO_ACQUIRE: The created data-block may not be used by
+  this EDT (NULL will be returned in \em{addr}). Note that the actual
+  data-block may be delayed until it is needed
 \end{DoxyItemize}\\
 \hline
-\mbox{\tt in,out}  & {\em affinity} & G\-U\-I\-D to indicate the affinity container of this D\-B. This is currently unsupported and N\-U\-L\-L\-\_\-\-G\-U\-I\-D should be passed \\
+\mbox{\tt in,out}  & {\em affinity} & Currently unsupported. Reserved
+for future use. Parameter value should be NULL_GUID\\
 \hline
-\mbox{\tt in}  & {\em allocator} & Allocator to use to allocate within the data block. Supported values are given by \hyperlink{group__OCRTypesDB_gabffd082fa19860aa5a9822beba6b68a5}{ocr\-In\-Db\-Allocator\-\_\-t}\\
+\mbox{\tt in}  & {\em allocator} & A data-block can be used as the
+backing memory for malloc/free-like operations. This parameter
+specifies the allocator to use for these operations inside this
+data-block. Note that if an in data-block allocator is used, the user
+should not write directly to the data-block as this may overwrite the
+metadata used by the allocator. The 'NO_ALLOC' allocator is used to
+indicate that the data-block is not used by any allocator and is
+therefore usable as POD. Supported values for this parameter are given
+by \hyperlink{type_ocrInDbAllocator_t}{ocrInDbAllocator_t}.\\
 \hline
 \end{DoxyParams}
 
 
 \returns
-a status code\-:
+A status code:
 \begin{DoxyItemize}
-\item -\/ \-: successful
-\item E\-N\-X\-I\-O \-: affinity is invalid
-\item E\-N\-O\-M\-E\-M\-: allocation failed because of insufficient memory
-\item E\-I\-N\-V\-A\-L\-: invalid arguments (flags or something else)
-\item E\-B\-U\-S\-Y \-: the agent that is needed to process this request is busy. Retry is possible.
-\item E\-P\-E\-R\-M \-: trying to allocate in an area of memory that is not allowed
+\item 0: Successful
+\item OCR_ENOMEM: The runtime could not provide a data-block of size
+  'len' due to insufficient memory
+\item OCR_EINVAL: The arguments passed (flags, allocator, etc.) were
+  not valid
+\item OCR_EBUSY: A resource required for this call was busy. A retry
+  is possible
 \end{DoxyItemize}
 
 %%%%
 %%%%  someone needs to write a more complete description of the semantics of this function
 %%%%
 \descr
-On successful creation, the returned memory location will be 8 byte aligned. ocr\-Db\-Create also implicitly
-acquires the data-\/block for the calling E\-D\-T unless D\-B\-\_\-\-P\-R\-O\-P\-\_\-\-N\-O\-\_\-\-A\-C\-Q\-U\-I\-R\-E is specified
+This API is used to create the basic unit of data in OCR: the
+data-block. Unless DB_PROP_NO_ACQUIRE is specified in \em{flags}, this
+API call also acquires the newly created data-block and returns a
+pointer to the memory region (in \em{addr}).
+
+The created data-block:
+\begin{DoxyItemize}
+\item Will always be 8-byte aligned (ie: if \em{addr} is returned, it
+  will be 8-byte aligned);
+\item Will not necessarily be zeroed out; the value of the created
+  data-block is undefined;
+\item Will have a GUID that is unique from this call until the user
+  calls \bf{ocrDbDestroy()} on this data-block.
+\end{DoxyItemize}
+If a valid address is returned in \em{addr}, it will point to the
+first byte of the data-block and the user can safely read or write
+to a range of length \emph{len} starting at \em{addr} until the end of
+the EDT or a call to \bf{ocrDbRelease()} on this data-block, whichever
+comes first.
 
 \begin{DoxyNote}{Note}
-The default allocator (N\-O\-\_\-\-A\-L\-L\-O\-C) will disallow calls to ocr\-Db\-Malloc and ocr\-Db\-Free. If an allocator is used, part of the data block's space will be taken up by the allocator's management overhead
+\begin{DoxyItemize}
+\item Using the DB_PROP_NO_ACQUIRE flag is recommended to allow the
+  runtime to make placement decisions for newly created
+  data-blocks. Not specifiying this flag may result in a sub-optimal
+  memory placement for the created data-block.
+\item When DB_PROP_NO_ACQUIRE is specified, a conformant
+  implementation may choose not to create the data-block immediately
+  and instead create it lazily before the using EDT runs.
+\item Like all GUIDs, the uniqueness of a data-block's GUID is not
+  necessarily unique throughout the entire program. A data-block's
+  GUID is guaranteed unique only as long as the data-block exists
+  (between \bf{ocrDbCreate()} and \bf{ocrDbDestroy()}).
+\end{DoxyItemize}
 \end{DoxyNote}
 
 %
@@ -998,10 +1048,3 @@ The following dependences can be added\-:
 
 
 % This is the end of ch2-ocrAPI.tex of the OCR specification.
-
-
-
-
-
-
-
