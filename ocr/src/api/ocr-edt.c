@@ -200,6 +200,23 @@ u8 ocrEdtCreate(ocrGuid_t* edtGuid, ocrGuid_t templateGuid,
 #define PD_TYPE PD_MSG_WORK_CREATE
     msg.type = PD_MSG_WORK_CREATE | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
     PD_MSG_FIELD_IO(guid.guid) = *edtGuid;
+
+    ocrFatGuid_t * depvFatGuids = NULL;
+    // EDT_DEPV_DELAYED allows to use the older implementation
+    // where dependences were always added by the caller instead
+    // of the callee
+#ifndef EDT_DEPV_DELAYED
+    u32 depvSize = ((depv != NULL) && (depc != EDT_PARAM_DEF)) ? depc : 0;
+    ocrFatGuid_t depvArray[depvSize];
+    depvFatGuids = ((depvSize) ? depvArray : NULL);
+    u32 i = 0;
+    for(i=0; i<depvSize; i++) {
+        depvArray[i].guid = depv[i];
+        depvArray[i].metaDataPtr = NULL;
+    }
+#endif
+
+    PD_MSG_FIELD_IO(guid.guid) = *edtGuid;
     PD_MSG_FIELD_IO(guid.metaDataPtr) = NULL;
     if(outputEvent) {
         PD_MSG_FIELD_IO(outputEvent.guid) = UNINITIALIZED_GUID;
@@ -218,7 +235,7 @@ u8 ocrEdtCreate(ocrGuid_t* edtGuid, ocrGuid_t templateGuid,
     PD_MSG_FIELD_I(currentEdt.guid) = curEdt ? curEdt->guid : NULL_GUID;
     PD_MSG_FIELD_I(currentEdt.metaDataPtr) = curEdt;
     PD_MSG_FIELD_I(paramv) = paramv;
-    PD_MSG_FIELD_I(depv) = NULL;
+    PD_MSG_FIELD_I(depv) = depvFatGuids;
     PD_MSG_FIELD_I(workType) = EDT_USER_WORKTYPE;
     PD_MSG_FIELD_I(properties) = properties;
 
@@ -234,15 +251,18 @@ u8 ocrEdtCreate(ocrGuid_t* edtGuid, ocrGuid_t templateGuid,
     if(outputEvent)
         *outputEvent = PD_MSG_FIELD_IO(outputEvent.guid);
 
-    // If guids dependences were provided, add them now
-    // TODO: This should probably just send the messages
-    // to the PD
-    if(depv != NULL) {
+#ifndef EDT_DEPV_DELAYED
+    // We still need to do that in case depc was EDT_PARAM_DEF
+    // and the actual number of dependences was unknown then.
+    if ((depv != NULL) && (depvSize == 0)) {
+#else
+    // Delayed addDependence: if guids dependences were provided, add them now.
+    if (depv != NULL) {
+#endif
         // Please check that # of dependences agrees with depv vector
         ASSERT(depc != 0);
         u32 i = 0;
         while(i < depc) {
-            // FIXME: Not really good. We would need to undo maybe
             if(depv[i] != UNINITIALIZED_GUID) {
                 // We only add dependences that are not UNINITIALIZED_GUID
                 returnCode = ocrAddDependence(depv[i], *edtGuid, i, DB_DEFAULT_MODE);
@@ -255,6 +275,7 @@ u8 ocrEdtCreate(ocrGuid_t* edtGuid, ocrGuid_t templateGuid,
             }
         }
     }
+
     if(outputEvent) {
         DPRINTF(DEBUG_LVL_INFO, "EXIT ocrEdtCreate -> 0; GUID: 0x%lx; outEvt: 0x%lx\n", *edtGuid, *outputEvent);
     } else {

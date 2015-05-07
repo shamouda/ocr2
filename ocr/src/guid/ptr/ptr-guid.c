@@ -136,6 +136,7 @@ u8 ptrCreateGuid(ocrGuidProvider_t* self, ocrFatGuid_t *fguid, u64 size, ocrGuid
 }
 
 u8 ptrGetVal(ocrGuidProvider_t* self, ocrGuid_t guid, u64* val, ocrGuidKind* kind) {
+    ASSERT(guid != NULL_GUID);
     ocrGuidImpl_t * guidInst = (ocrGuidImpl_t *) guid;
     *val = (u64) guidInst->guid;
     if(kind)
@@ -144,12 +145,14 @@ u8 ptrGetVal(ocrGuidProvider_t* self, ocrGuid_t guid, u64* val, ocrGuidKind* kin
 }
 
 u8 ptrGetKind(ocrGuidProvider_t* self, ocrGuid_t guid, ocrGuidKind* kind) {
+    ASSERT(guid != NULL_GUID);
     ocrGuidImpl_t * guidInst = (ocrGuidImpl_t *) guid;
     *kind = guidInst->kind;
     return 0;
 }
 
 u8 ptrGetLocation(ocrGuidProvider_t* self, ocrGuid_t guid, ocrLocation_t* location) {
+    ASSERT(guid != NULL_GUID);
     ocrGuidImpl_t * guidInst = (ocrGuidImpl_t *) guid;
     *location = guidInst->location;
     return 0;

@@ -119,7 +119,8 @@ u8 ocrPolicyMsgGetMsgSize(ocrPolicyMsg_t *msg, u64 *baseSize,
 #define PD_TYPE PD_MSG_WORK_CREATE
         if(isIn) {
             ASSERT(MAX_ALIGN % sizeof(u64) == 0);
-            *marshalledSize = PD_MSG_FIELD_I(paramv)?sizeof(u64)*PD_MSG_FIELD_IO(paramc):0ULL;
+            *marshalledSize = (PD_MSG_FIELD_I(paramv)?sizeof(u64)*PD_MSG_FIELD_IO(paramc):0ULL) +
+                              (PD_MSG_FIELD_I(depv)?sizeof(ocrFatGuid_t)*PD_MSG_FIELD_IO(depc):0ULL);
         }
         break;
 #undef PD_TYPE
@@ -285,11 +286,8 @@ u8 ocrPolicyMsgMarshallMsg(ocrPolicyMsg_t* msg, u64 baseSize, u8* buffer, u32 mo
     switch(outputMsg->type & PD_MSG_TYPE_ONLY) {
     case PD_MSG_WORK_CREATE: {
 #define PD_TYPE PD_MSG_WORK_CREATE
-        // Implementation: So far, we do not pass depv directly as part of this message
-        // If we do, we need to implement marshalling for that as well
-        ASSERT(PD_MSG_FIELD_I(depv) == NULL);
         if(isIn) {
-            // Catch misues for paramc
+            // Catch misuse for paramc
             ASSERT(((PD_MSG_FIELD_IO(paramc) != 0) && (PD_MSG_FIELD_I(paramv) != NULL))
                    || ((PD_MSG_FIELD_IO(paramc) == 0) && (PD_MSG_FIELD_I(paramv) == NULL)));
 
@@ -312,6 +310,27 @@ u8 ocrPolicyMsgMarshallMsg(ocrPolicyMsg_t* msg, u64 baseSize, u8* buffer, u32 mo
                 curPtr += s;
             } else {
                 PD_MSG_FIELD_I(paramv) = NULL;
+            }
+
+            // First copy things over
+            // depc is always set but the pointer may be NULL because dependences are to be added later/
+            s = ((PD_MSG_FIELD_I(depv) != NULL) ? (sizeof(ocrFatGuid_t)*PD_MSG_FIELD_IO(depc)) : 0);
+            if(s) {
+                hal_memCopy(curPtr, PD_MSG_FIELD_I(depv), s, false);
+                // Now fixup the pointer
+                if(fixupPtrs) {
+                    DPRINTF(DEBUG_LVL_VVERB, "Converting depv (0x%lx) to 0x%lx\n",
+                            (u64)PD_MSG_FIELD_I(depv), ((u64)(curPtr - startPtr)<<1) + isAddl);
+                    PD_MSG_FIELD_I(depv) = (void*)((((u64)(curPtr - startPtr))<<1) + isAddl);
+                } else {
+                    DPRINTF(DEBUG_LVL_VVERB, "Copying depv (0x%lx) to 0x%lx\n",
+                            (u64)PD_MSG_FIELD_I(depv), curPtr);
+                    PD_MSG_FIELD_I(depv) = (void*)curPtr;
+                }
+                // Finally move the curPtr for the next object (none as of now)
+                curPtr += s;
+            } else {
+                PD_MSG_FIELD_I(depv) = NULL;
             }
         }
         break;
@@ -641,6 +660,12 @@ u8 ocrPolicyMsgUnMarshallMsg(u8* mainBuffer, u8* addlBuffer,
                 DPRINTF(DEBUG_LVL_VVERB, "Converted field paramv from 0x%lx to 0x%lx\n",
                         t, (u64)PD_MSG_FIELD_I(paramv));
             }
+            if(((PD_MSG_FIELD_I(depv) != NULL) && PD_MSG_FIELD_IO(depc) > 0)) {
+                u64 t = (u64)(PD_MSG_FIELD_I(depv));
+                PD_MSG_FIELD_I(depv) = (void*)((t&1?localAddlPtr:localMainPtr) + (t>>1));
+                DPRINTF(DEBUG_LVL_VVERB, "Converted field depv from 0x%lx to 0x%lx\n",
+                        t, (u64)PD_MSG_FIELD_I(depv));
+            }
         }
         break;
 #undef PD_TYPE
@@ -818,6 +843,9 @@ u8 ocrPolicyMsgUnMarshallMsg(u8* mainBuffer, u8* addlBuffer,
             if(isIn) {
                 count = PD_MSG_FG_I_COUNT_ONLY_GET(msg->type);
                 DPRINTF(DEBUG_LVL_VVERB, "Invalidating %d ocrFatGuid_t I pointers\n", count);
+                // Here we should invalidate PD_MSG_WORK_CREATE's depv. However, in the current
+                // implementation the GUIDs metaDataPtr should always be NULL. Avoid this
+                // overhead for now.
             } else {
                 count = PD_MSG_FG_O_COUNT_ONLY_GET(msg->type);
                 DPRINTF(DEBUG_LVL_VVERB, "Invalidating %d ocrFatGuid_t O pointers\n", count);

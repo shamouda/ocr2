@@ -1179,11 +1179,68 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         if((PD_MSG_FIELD_I(workType) != EDT_USER_WORKTYPE) && (PD_MSG_FIELD_I(workType) != EDT_RT_WORKTYPE))
             DPRINTF(DEBUG_LVL_WARN, "Invalid worktype %x\n", PD_MSG_FIELD_I(workType));
         ASSERT((PD_MSG_FIELD_I(workType) == EDT_USER_WORKTYPE) || (PD_MSG_FIELD_I(workType) == EDT_RT_WORKTYPE));
+        u32 depc = PD_MSG_FIELD_IO(depc); // intentionally read before processing
+        ocrFatGuid_t * depv = PD_MSG_FIELD_I(depv);
         PD_MSG_FIELD_O(returnDetail) = hcCreateEdt(
                 self, &(PD_MSG_FIELD_IO(guid)), PD_MSG_FIELD_I(templateGuid),
                 &(PD_MSG_FIELD_IO(paramc)), PD_MSG_FIELD_I(paramv), &(PD_MSG_FIELD_IO(depc)),
                 PD_MSG_FIELD_I(properties), PD_MSG_FIELD_I(affinity), outputEvent,
                 (ocrTask_t*)(PD_MSG_FIELD_I(currentEdt).metaDataPtr), PD_MSG_FIELD_I(parentLatch));
+#ifndef EDT_DEPV_DELAYED
+        if (depv != NULL) {
+            ASSERT(depc != EDT_PARAM_DEF);
+            ocrGuid_t destination = PD_MSG_FIELD_IO(guid).guid;
+            u32 i = 0;
+            ocrTask_t * curEdt = NULL;
+            getCurrentEnv(NULL, NULL, &curEdt, NULL);
+            ocrFatGuid_t curEdtFatGuid = {.guid = curEdt ? curEdt->guid : NULL_GUID, .metaDataPtr = curEdt};
+            while(i < depc) {
+                if(depv[i].guid != UNINITIALIZED_GUID) {
+                    // We only add dependences that are not UNINITIALIZED_GUID
+                    PD_MSG_STACK(msgAddDep);
+                #undef PD_MSG
+                #undef PD_TYPE
+                    //NOTE: Could systematically call DEP_ADD but it's faster to disambiguate
+                    //      NULL_GUID here instead of having DEP_ADD find out and do a satisfy.
+                    if(depv[i].guid != NULL_GUID) {
+                #define PD_MSG (&msgAddDep)
+                #define PD_TYPE PD_MSG_DEP_ADD
+                        msgAddDep.type = PD_MSG_DEP_ADD | PD_MSG_REQUEST;
+                        PD_MSG_FIELD_I(source.guid) = depv[i].guid;
+                        PD_MSG_FIELD_I(source.metaDataPtr) = NULL;
+                        PD_MSG_FIELD_I(dest.guid) = destination;
+                        PD_MSG_FIELD_I(dest.metaDataPtr) = NULL;
+                        PD_MSG_FIELD_I(slot) = i;
+                        PD_MSG_FIELD_IO(properties) = DB_DEFAULT_MODE;
+                        PD_MSG_FIELD_I(currentEdt) = curEdtFatGuid;
+                #undef PD_MSG
+                #undef PD_TYPE
+                    } else {
+                      //Handle 'NULL_GUID' case here to avoid overhead of
+                      //going through dep_add and end-up doing the same thing.
+                #define PD_MSG (&msgAddDep)
+                #define PD_TYPE PD_MSG_DEP_SATISFY
+                        msgAddDep.type = PD_MSG_DEP_SATISFY | PD_MSG_REQUEST;
+                        PD_MSG_FIELD_I(satisfierGuid.guid) = curEdtFatGuid.guid;
+                        PD_MSG_FIELD_I(guid.guid) = destination;
+                        PD_MSG_FIELD_I(guid.metaDataPtr) = NULL;
+                        PD_MSG_FIELD_I(payload.guid) = NULL_GUID;
+                        PD_MSG_FIELD_I(payload.metaDataPtr) = NULL;
+                        PD_MSG_FIELD_I(slot) = i;
+                        PD_MSG_FIELD_I(properties) = 0;
+                        PD_MSG_FIELD_I(currentEdt) = curEdtFatGuid;
+                #undef PD_MSG
+                #undef PD_TYPE
+                    }
+#define PD_MSG msg
+#define PD_TYPE PD_MSG_WORK_CREATE
+                    u8 toReturn = self->fcts.processMessage(self, &msgAddDep, true);
+                    ASSERT(!toReturn);
+                }
+                ++i;
+            }
+        }
+#endif
         msg->type &= ~PD_MSG_REQUEST;
         msg->type |= PD_MSG_RESPONSE;
 #undef PD_MSG
@@ -1523,9 +1580,13 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         //(but fragile) because the HC event/task does not try to use it
         //Querying the kind through the PD's interface should be ok as it's
         //the problem of the guid provider to give this information
-        self->guidProviders[0]->fcts.getVal(
-            self->guidProviders[0], PD_MSG_FIELD_I(source.guid),
-            (u64*)(&(PD_MSG_FIELD_I(source.metaDataPtr))), &srcKind);
+        if (PD_MSG_FIELD_I(source.guid) == NULL_GUID) {
+            srcKind = OCR_GUID_NONE;
+        } else {
+            self->guidProviders[0]->fcts.getVal(
+                self->guidProviders[0], PD_MSG_FIELD_I(source.guid),
+                (u64*)(&(PD_MSG_FIELD_I(source.metaDataPtr))), &srcKind);
+        }
         self->guidProviders[0]->fcts.getVal(
             self->guidProviders[0], PD_MSG_FIELD_I(dest.guid),
             (u64*)(&(PD_MSG_FIELD_I(dest.metaDataPtr))), &dstKind);
