@@ -683,7 +683,6 @@ ocrAllocator_t * newAllocatorSimple(ocrAllocatorFactory_t * factory, ocrParamLis
         runtimeChunkAlloc(sizeof(ocrAllocatorSimple_t), PERSISTENT_CHUNK);
     DPRINTF(DEBUG_LVL_VERB, "newAllocator called. (This is x86 only ? ? ) alloc %p\n", result);
     ocrAllocator_t * base = (ocrAllocator_t *) result;
-    SET_MODULE_STATE(SIMPLE-ALLOCATOR, base, NEW);
     factory->initialize(factory, base, perInstance);
     return (ocrAllocator_t *) result;
 }

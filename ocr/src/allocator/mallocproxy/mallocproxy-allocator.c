@@ -349,7 +349,6 @@ ocrAllocator_t * newAllocatorMallocProxy(ocrAllocatorFactory_t * factory, ocrPar
     ocrAllocatorMallocProxy_t *result = (ocrAllocatorMallocProxy_t*)
         runtimeChunkAlloc(sizeof(ocrAllocatorMallocProxy_t), PERSISTENT_CHUNK);
     ocrAllocator_t * base = (ocrAllocator_t *) result;
-    SET_MODULE_STATE(MALLOCPROXY-ALLOCATOR, base, NEW);
     factory->initialize(factory, base, perInstance);
     return (ocrAllocator_t *) result;
 }

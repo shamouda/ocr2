@@ -33,10 +33,6 @@
 /******************************************************/
 
 void mallocDestruct(ocrMemPlatform_t *self) {
-    ocrMemPlatformMalloc_t *rself = (ocrMemPlatformMalloc_t*)self;
-    if (rself->pRangeTracker)    // in case of mallocproxy, pRangeTracker==0
-        destroyRange(rself->pRangeTracker);
-    free((void*)self->startAddr);
     runtimeChunkFree((u64)self, PERSISTENT_CHUNK);
 }
 
@@ -80,6 +76,9 @@ u8 mallocSwitchRunlevel(ocrMemPlatform_t *self, ocrPolicyDomain_t *PD, ocrRunlev
             rself->pRangeTracker = initializeRange(
                 16, self->startAddr, self->endAddr, USER_FREE_TAG);
         } else if((properties & RL_TEAR_DOWN) && RL_IS_LAST_PHASE_DOWN(PD, RL_MEMORY_OK, phase)) {
+            ocrMemPlatformMalloc_t *rself = (ocrMemPlatformMalloc_t*)self;
+            if(rself->pRangeTracker)    // in case of mallocproxy, pRangeTracker==0
+                destroyRange(rself->pRangeTracker);
             // Here we can free the memory we allocated
             free((void*)(self->startAddr));
         }

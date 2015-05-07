@@ -84,7 +84,11 @@ u8 countedMapSwitchRunlevel(ocrGuidProvider_t *self, ocrPolicyDomain_t *PD, ocrR
             //TODO-RL: do we want (and can we) destroy user objects ? i.e. need to
             //TODO-RL  call their specific destructors which may not work in MEM_OK ?
             //TODO-RL  Runtime stuff not deallocated is a bug.
-            deallocFct entryDeallocator = (COUNTED_MAP_DESTRUCT_CHECK) ? countedMapHashmapEntryDestructChecker : NULL;
+#ifdef COUNTED_MAP_DESTRUCT_CHECK
+            deallocFct entryDeallocator = countedMapHashmapEntryDestructChecker;
+#else
+            deallocFct entryDeallocator = NULL;
+#endif
             destructHashtable(((ocrGuidProviderCountedMap_t *) self)->guidImplTable, entryDeallocator);
         }
         break;

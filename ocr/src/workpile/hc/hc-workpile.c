@@ -19,8 +19,6 @@
 /******************************************************/
 
 void hcWorkpileDestruct ( ocrWorkpile_t * base ) {
-    ocrWorkpileHc_t* derived = (ocrWorkpileHc_t*) base;
-    derived->deque->destruct(base->pd, derived->deque);
     runtimeChunkFree((u64)base, PERSISTENT_CHUNK);
 }
 
@@ -58,7 +56,10 @@ u8 hcWorkpileSwitchRunlevel(ocrWorkpile_t *self, ocrPolicyDomain_t *PD, ocrRunle
             // Can switch to locked implementation for debugging purpose
             // derived->deque = newDeque(self->pd, (void *) NULL_GUID, LOCKED_DEQUE);
         }
-        // TODO: What about freeing the queue?
+        if((properties & RL_TEAR_DOWN) && RL_IS_LAST_PHASE_DOWN(PD, RL_GUID_OK, phase)) {
+            ocrWorkpileHc_t* derived = (ocrWorkpileHc_t*) self;
+            derived->deque->destruct(PD, derived->deque);
+        }
         break;
     case RL_COMPUTE_OK:
         if(properties & RL_BRING_UP) {

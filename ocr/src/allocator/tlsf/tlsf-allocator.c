@@ -1856,7 +1856,6 @@ ocrAllocator_t * newAllocatorTlsf(ocrAllocatorFactory_t * factory, ocrParamList_
     ocrAllocatorTlsf_t *result = (ocrAllocatorTlsf_t*)
         runtimeChunkAlloc(sizeof(ocrAllocatorTlsf_t), PERSISTENT_CHUNK);
     ocrAllocator_t * base = (ocrAllocator_t *) result;
-    SET_MODULE_STATE(TLSF-ALLOCATOR, base, NEW);
     factory->initialize(factory, base, perInstance);
     return (ocrAllocator_t *) result;
 }

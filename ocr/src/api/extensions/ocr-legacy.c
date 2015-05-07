@@ -18,7 +18,7 @@
 
 #define DEBUG_TYPE API
 
-extern void freeUpRuntime(void);
+extern void freeUpRuntime(bool);
 extern void bringUpRuntime(const char*);
 
 void ocrLegacyInit(ocrGuid_t *legacyContext, ocrConfig_t * ocrConfig) {
@@ -33,31 +33,23 @@ void ocrLegacyInit(ocrGuid_t *legacyContext, ocrConfig_t * ocrConfig) {
 u8 ocrLegacyFinalize(ocrGuid_t legacyContext, bool runUntilShutdown) {
     // Bug #492: legacyContext is ignored
     ocrPolicyDomain_t *pd = NULL;
-    ocrWorker_t *worker = NULL;
     u8 returnCode;
     if(runUntilShutdown) {
-        getCurrentEnv(&pd, &worker, NULL, NULL);
-        // We start the current worker. After it starts, it will loop
-        // until ocrShutdown is called which will cause the entire PD
-        // to stop (including this worker). The currently executing
-        // worker then fallthrough from start to finish.
-        ASSERT(0);
-        /*
-          RUNLEVEL-TODO
-        worker->fcts.start(worker, pd);
+        // Here, we are in COMPUTE_OK. We just need to transition to USER_OK
+        // which will start mainEdt
+        getCurrentEnv(&pd, NULL, NULL, NULL);
+        RESULT_ASSERT(
+            pd->fcts.switchRunlevel(pd, RL_USER_OK, RL_REQUEST | RL_ASYNC | RL_BRING_UP | RL_NODE_MASTER),
+            ==, 0);
 
-        // When the worker exits 'start' the PD runlevel has been
-        // decremented to RL_STOP
-        // Transition from stop to shutdown
-        pd->fcts.setRunlevel(pd, RL_SHUTDOWN);
         returnCode = pd->shutdownCode;
-        pd->fcts.setRunlevel(pd, RL_DEALLOCATE);
-        */
+        freeUpRuntime(true);
     } else {
         getCurrentEnv(&pd, NULL, NULL, NULL);
         returnCode = pd->shutdownCode;
+        freeUpRuntime(false);
     }
-    freeUpRuntime();
+
 // #ifdef OCR_ENABLE_STATISTICS
 //     ocrStatsProcessDestruct(&GfakeProcess);
 //     GocrFilterAggregator->destruct(GocrFilterAggregator);

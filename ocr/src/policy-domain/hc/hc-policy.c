@@ -290,15 +290,9 @@ u8 hcPdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
                     toReturn |= policy->workers[j]->fcts.switchRunlevel(
                         policy->workers[j], policy, runlevel, i, propertiesPreComputes, NULL, 0);
                 }
-                if(i == phaseCount - 2) {
-                    // I "guidify" myself right before the last phase
-                    ASSERT(false && "incomplete code"); // TODO-RL: that looks incomplete
-                }
+
             }
         } else {
-            // Tear down. We also need a minimum of 2 phases
-            // In the first phase, components destroy their GUIDs
-            // In the last phase, the GUID provider can go down
             phaseCount = policy->phasesPerRunlevel[RL_GUID_OK][0] >> 4;
             maxCount = policy->workerCount;
             for(i = 0; i < phaseCount; ++i) {
@@ -307,10 +301,6 @@ u8 hcPdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
                 for(j = 0; j < maxCount; ++j) {
                     toReturn |= policy->workers[j]->fcts.switchRunlevel(
                         policy->workers[j], policy, runlevel, i, propertiesPreComputes, NULL, 0);
-                }
-                if(i == 0) {
-                    //TODO-RL Destroy my GUID
-                    // May not be needed but cleaner
                 }
             }
         }
@@ -394,6 +384,19 @@ u8 hcPdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
                     toReturn |= policy->workers[j]->fcts.switchRunlevel(
                         policy->workers[j], policy, runlevel, rself->rlSwitch.nextPhase, properties, NULL, 0);
                 }
+
+                // We need to deguidify ourself here
+                PD_MSG_STACK(msg);
+                getCurrentEnv(NULL, NULL, NULL, &msg);
+#define PD_MSG (&msg)
+#define PD_TYPE PD_MSG_GUID_DESTROY
+                msg.type = PD_MSG_GUID_DESTROY | PD_MSG_REQUEST;
+                PD_MSG_FIELD_I(guid) = policy->fguid;
+                PD_MSG_FIELD_I(properties) = 0;
+                toReturn |= policy->fcts.processMessage(policy, &msg, false);
+                policy->fguid.guid = NULL_GUID;
+#undef PD_MSG
+#undef PD_TYPE
             } else {
                 for(i = rself->rlSwitch.nextPhase; i > 0; --i) {
                     toReturn |= helperSwitchInert(policy, runlevel, i, properties);
@@ -456,6 +459,9 @@ u8 hcPdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
                         policy->workers[j], policy, runlevel, i, properties, NULL, 0);
                 }
                 // Always do the capable worker last in this case (it will actualy start doing something useful)
+
+                rself->rlSwitch.runlevel = RL_USER_OK;
+                rself->rlSwitch.nextPhase = phaseCount;
                 toReturn |= policy->workers[0]->fcts.switchRunlevel(
                     policy->workers[0], policy, runlevel, i, properties | RL_PD_MASTER | RL_BLESSED, NULL, 0);
                 // When I drop out of this, I should be in RL_COMPUTE_OK at phase 0
@@ -1841,10 +1847,9 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             // This is from user code so it should be a request to shutdown
             ocrPolicyDomainHc_t *rself = (ocrPolicyDomainHc_t*)self;
             // Set up the switching for the next phase
-            if (rself->rlSwitch.runlevel != RL_USER_OK) {
-                PRINTF("PD[%d] WARNING: forcing RL_USER_OK in PD FIXME!\n", self->myLocation);
-            }
-            rself->rlSwitch.runlevel = RL_USER_OK;
+            ASSERT(rself->rlSwitch.runlevel == RL_USER_OK && rself->rlSwitch.nextPhase == RL_GET_PHASE_COUNT_UP(self, RL_USER_OK));
+
+            // We want to transition down now
             rself->rlSwitch.nextPhase = RL_GET_PHASE_COUNT_DOWN(self, RL_USER_OK) - 1;
             ASSERT(PD_MSG_FIELD_I(properties) & RL_TEAR_DOWN);
             ASSERT(PD_MSG_FIELD_I(runlevel) & RL_COMPUTE_OK);
