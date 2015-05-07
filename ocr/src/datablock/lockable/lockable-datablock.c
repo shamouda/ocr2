@@ -580,12 +580,12 @@ u8 lockableGetHint(ocrDataBlock_t* self, ocrHint_t *hint) {
 /******************************************************/
 
 void destructLockableFactory(ocrDataBlockFactory_t *factory) {
-    runtimeChunkFree((u64)factory, NULL);
+    runtimeChunkFree((u64)factory, PERSISTENT_CHUNK);
 }
 
 ocrDataBlockFactory_t *newDataBlockFactoryLockable(ocrParamList_t *perType, u32 factoryId) {
     ocrDataBlockFactory_t *base = (ocrDataBlockFactory_t*)
-                                  runtimeChunkAlloc(sizeof(ocrDataBlockFactoryLockable_t), NULL);
+                                  runtimeChunkAlloc(sizeof(ocrDataBlockFactoryLockable_t), PERSISTENT_CHUNK);
 
     base->instantiate = FUNC_ADDR(ocrDataBlock_t* (*)
                                   (ocrDataBlockFactory_t*, ocrFatGuid_t, ocrFatGuid_t,

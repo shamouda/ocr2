@@ -18,7 +18,7 @@
 #define DEBUG_TYPE COMM_PLATFORM
 
 void nullCommDestruct (ocrCommPlatform_t * base) {
-    runtimeChunkFree((u64)base, NULL);
+    runtimeChunkFree((u64)base, PERSISTENT_CHUNK);
 }
 
 u8 nullSwitchRunlevel(ocrCommPlatform_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
@@ -106,7 +106,7 @@ void initializeCommPlatformNull(ocrCommPlatformFactory_t * factory, ocrCommPlatf
 /******************************************************/
 
 void destructCommPlatformFactoryNull(ocrCommPlatformFactory_t *factory) {
-    runtimeChunkFree((u64)factory, NULL);
+    runtimeChunkFree((u64)factory, NONPERSISTENT_CHUNK);
 }
 
 ocrCommPlatformFactory_t *newCommPlatformFactoryNull(ocrParamList_t *perType) {

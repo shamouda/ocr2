@@ -21,7 +21,7 @@
 void hcWorkpileDestruct ( ocrWorkpile_t * base ) {
     ocrWorkpileHc_t* derived = (ocrWorkpileHc_t*) base;
     derived->deque->destruct(base->pd, derived->deque);
-    runtimeChunkFree((u64)base, NULL);
+    runtimeChunkFree((u64)base, PERSISTENT_CHUNK);
 }
 
 u8 hcWorkpileSwitchRunlevel(ocrWorkpile_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
@@ -132,7 +132,7 @@ void initializeWorkpileHc(ocrWorkpileFactory_t * factory, ocrWorkpile_t* self, o
 /******************************************************/
 
 void destructWorkpileFactoryHc(ocrWorkpileFactory_t * factory) {
-    runtimeChunkFree((u64)factory, NULL);
+    runtimeChunkFree((u64)factory, NONPERSISTENT_CHUNK);
 }
 
 ocrWorkpileFactory_t * newOcrWorkpileFactoryHc(ocrParamList_t *perType) {

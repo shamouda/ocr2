@@ -37,7 +37,7 @@ void mallocDestruct(ocrMemPlatform_t *self) {
     if (rself->pRangeTracker)    // in case of mallocproxy, pRangeTracker==0
         destroyRange(rself->pRangeTracker);
     free((void*)self->startAddr);
-    runtimeChunkFree((u64)self, NULL);
+    runtimeChunkFree((u64)self, PERSISTENT_CHUNK);
 }
 
 u8 mallocSwitchRunlevel(ocrMemPlatform_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
@@ -186,7 +186,7 @@ void initializeMemPlatformMalloc(ocrMemPlatformFactory_t * factory, ocrMemPlatfo
 /******************************************************/
 
 void destructMemPlatformFactoryMalloc(ocrMemPlatformFactory_t *factory) {
-    runtimeChunkFree((u64)factory, NULL);
+    runtimeChunkFree((u64)factory, NONPERSISTENT_CHUNK);
 }
 
 ocrMemPlatformFactory_t *newMemPlatformFactoryMalloc(ocrParamList_t *perType) {

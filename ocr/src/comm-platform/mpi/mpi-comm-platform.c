@@ -584,13 +584,13 @@ u8 MPICommSwitchRunlevel(ocrCommPlatform_t *self, ocrPolicyDomain_t *PD, ocrRunl
 void MPICommDestruct (ocrCommPlatform_t * self) {
     //This should be called only once per rank and by the same thread that did MPI_Init.
     platformFinalizeMPIComm();
-    runtimeChunkFree((u64)self, NULL);
+    runtimeChunkFree((u64)self, PERSISTENT_CHUNK);
 }
 
 ocrCommPlatform_t* newCommPlatformMPI(ocrCommPlatformFactory_t *factory,
                                        ocrParamList_t *perInstance) {
     ocrCommPlatformMPI_t * commPlatformMPI = (ocrCommPlatformMPI_t*)
-        runtimeChunkAlloc(sizeof(ocrCommPlatformMPI_t), NULL);
+        runtimeChunkAlloc(sizeof(ocrCommPlatformMPI_t), PERSISTENT_CHUNK);
     //DIST-TODO location: what is a comm-platform location ? is it the same as the PD ?
     commPlatformMPI->base.location = ((paramListCommPlatformInst_t *)perInstance)->location;
     commPlatformMPI->base.fcts = factory->platformFcts;
@@ -604,7 +604,7 @@ ocrCommPlatform_t* newCommPlatformMPI(ocrCommPlatformFactory_t *factory,
 /******************************************************/
 
 void destructCommPlatformFactoryMPI(ocrCommPlatformFactory_t *factory) {
-    runtimeChunkFree((u64)factory, NULL);
+    runtimeChunkFree((u64)factory, NONPERSISTENT_CHUNK);
 }
 
 void initializeCommPlatformMPI(ocrCommPlatformFactory_t * factory, ocrCommPlatform_t * base, ocrParamList_t * perInstance) {
@@ -621,7 +621,7 @@ void initializeCommPlatformMPI(ocrCommPlatformFactory_t * factory, ocrCommPlatfo
 
 ocrCommPlatformFactory_t *newCommPlatformFactoryMPI(ocrParamList_t *perType) {
     ocrCommPlatformFactory_t *base = (ocrCommPlatformFactory_t*)
-        runtimeChunkAlloc(sizeof(ocrCommPlatformFactoryMPI_t), (void *)1);
+        runtimeChunkAlloc(sizeof(ocrCommPlatformFactoryMPI_t), NONPERSISTENT_CHUNK);
     base->instantiate = &newCommPlatformMPI;
     base->initialize = &initializeCommPlatformMPI;
     base->destruct = FUNC_ADDR(void (*)(ocrCommPlatformFactory_t*), destructCommPlatformFactoryMPI);

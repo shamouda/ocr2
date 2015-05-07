@@ -87,7 +87,7 @@ static void * pthreadRoutineWrapper(void * arg) {
 }
 
 static void destroyKey(void* arg) {
-    runtimeChunkFree((u64)arg, NULL);
+    runtimeChunkFree((u64)arg, PERSISTENT_CHUNK);
 }
 
 /**
@@ -111,7 +111,7 @@ static void initializeKey() {
 }
 
 void pthreadDestruct (ocrCompPlatform_t * base) {
-    // runtimeChunkFree((u64)base, NULL);
+    runtimeChunkFree((u64)base, PERSISTENT_CHUNK);
 }
 
 
@@ -264,7 +264,7 @@ void initializeCompPlatformPthread(ocrCompPlatformFactory_t * factory, ocrCompPl
 /******************************************************/
 
 void destructCompPlatformFactoryPthread(ocrCompPlatformFactory_t *factory) {
-    runtimeChunkFree((u64)factory, NULL);
+    runtimeChunkFree((u64)factory, NONPERSISTENT_CHUNK);
 }
 
 void getCurrentEnv(ocrPolicyDomain_t** pd, ocrWorker_t** worker,

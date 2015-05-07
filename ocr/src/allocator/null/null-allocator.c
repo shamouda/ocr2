@@ -15,7 +15,7 @@
 #include "null-allocator.h"
 
 void nullDestruct(ocrAllocator_t *self) {
-    runtimeChunkFree((u64)self, NULL);
+    runtimeChunkFree((u64)self, PERSISTENT_CHUNK);
 }
 
 u8 nullSwitchRunlevel(ocrAllocator_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
@@ -110,7 +110,7 @@ void initializeAllocatorNull(ocrAllocatorFactory_t * factory, ocrAllocator_t * s
 /******************************************************/
 
 static void destructAllocatorFactoryNull(ocrAllocatorFactory_t * factory) {
-    runtimeChunkFree((u64)factory, NULL);
+    runtimeChunkFree((u64)factory, NONPERSISTENT_CHUNK);
 }
 
 ocrAllocatorFactory_t * newAllocatorFactoryNull(ocrParamList_t *perType) {

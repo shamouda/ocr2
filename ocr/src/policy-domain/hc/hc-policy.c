@@ -693,17 +693,17 @@ void hcPolicyDomainDestruct(ocrPolicyDomain_t * policy) {
     }
 
     // Destroy self
-    runtimeChunkFree((u64)policy->workers, NULL);
-    runtimeChunkFree((u64)policy->commApis, NULL);
-    runtimeChunkFree((u64)policy->schedulers, NULL);
-    runtimeChunkFree((u64)policy->allocators, NULL);
-    runtimeChunkFree((u64)policy->taskFactories, NULL);
-    runtimeChunkFree((u64)policy->taskTemplateFactories, NULL);
-    runtimeChunkFree((u64)policy->dbFactories, NULL);
-    runtimeChunkFree((u64)policy->eventFactories, NULL);
-    runtimeChunkFree((u64)policy->guidProviders, NULL);
-    runtimeChunkFree((u64)policy->schedulerObjectFactories, NULL);
-    runtimeChunkFree((u64)policy, NULL);
+    runtimeChunkFree((u64)policy->workers, PERSISTENT_CHUNK);
+    runtimeChunkFree((u64)policy->commApis, PERSISTENT_CHUNK);
+    runtimeChunkFree((u64)policy->schedulers, PERSISTENT_CHUNK);
+    runtimeChunkFree((u64)policy->allocators, PERSISTENT_CHUNK);
+    runtimeChunkFree((u64)policy->taskFactories, PERSISTENT_CHUNK);
+    runtimeChunkFree((u64)policy->taskTemplateFactories, PERSISTENT_CHUNK);
+    runtimeChunkFree((u64)policy->dbFactories, PERSISTENT_CHUNK);
+    runtimeChunkFree((u64)policy->eventFactories, PERSISTENT_CHUNK);
+    runtimeChunkFree((u64)policy->guidProviders, PERSISTENT_CHUNK);
+    runtimeChunkFree((u64)policy->schedulerObjectFactories, PERSISTENT_CHUNK);
+    runtimeChunkFree((u64)policy, PERSISTENT_CHUNK);
 }
 
 static void localDeguidify(ocrPolicyDomain_t *self, ocrFatGuid_t *guid) {
@@ -2066,7 +2066,7 @@ void initializePolicyDomainHc(ocrPolicyDomainFactory_t * factory, ocrPolicyDomai
 }
 
 static void destructPolicyDomainFactoryHc(ocrPolicyDomainFactory_t * factory) {
-    runtimeChunkFree((u64)factory, NULL);
+    runtimeChunkFree((u64)factory, NONPERSISTENT_CHUNK);
 }
 
 ocrPolicyDomainFactory_t * newPolicyDomainFactoryHc(ocrParamList_t *perType) {

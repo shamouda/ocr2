@@ -478,7 +478,7 @@ void GasnetCommStop(ocrCommPlatform_t * self, ocrRunLevel_t newRl, u32 action) {
 
 void GasnetCommDestruct(ocrCommPlatform_t * base) {
     platformFinalizeGasnetComm();
-    runtimeChunkFree((u64)base, NULL);
+    runtimeChunkFree((u64)base, PERSISTENT_CHUNK);
 }
 
 
@@ -486,7 +486,7 @@ ocrCommPlatform_t* newCommPlatformGasnet(ocrCommPlatformFactory_t *factory,
                                        ocrParamList_t *perInstance) {
 
     ocrCommPlatformGasnet_t * commPlatformGasnet = (ocrCommPlatformGasnet_t*)
-        runtimeChunkAlloc(sizeof(ocrCommPlatformGasnet_t), NULL);
+        runtimeChunkAlloc(sizeof(ocrCommPlatformGasnet_t), PERSISTENT_CHUNK);
 
     commPlatformGasnet->base.location = ((paramListCommPlatformInst_t *)perInstance)->location;
     commPlatformGasnet->base.fcts = factory->platformFcts;
@@ -501,7 +501,7 @@ ocrCommPlatform_t* newCommPlatformGasnet(ocrCommPlatformFactory_t *factory,
 /******************************************************/
 
  void destructCommPlatformFactoryGasnet(ocrCommPlatformFactory_t *factory) {
-    runtimeChunkFree((u64)factory, NULL);
+    runtimeChunkFree((u64)factory, NONPERSISTENT_CHUNK);
 }
 
 void initializeCommPlatformGasnet(ocrCommPlatformFactory_t * factory, ocrCommPlatform_t * base, ocrParamList_t * perInstance) {
@@ -520,7 +520,7 @@ void initializeCommPlatformGasnet(ocrCommPlatformFactory_t * factory, ocrCommPla
 
 ocrCommPlatformFactory_t *newCommPlatformFactoryGasnet(ocrParamList_t *perType) {
     ocrCommPlatformFactory_t *base = (ocrCommPlatformFactory_t*)
-        runtimeChunkAlloc(sizeof(ocrCommPlatformFactoryGasnet_t), (void *)1);
+        runtimeChunkAlloc(sizeof(ocrCommPlatformFactoryGasnet_t), NONPERSISTENT_CHUNK);
     base->instantiate = &newCommPlatformGasnet;
     base->initialize = &initializeCommPlatformGasnet;
 
