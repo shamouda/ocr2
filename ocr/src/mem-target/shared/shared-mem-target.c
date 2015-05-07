@@ -32,11 +32,11 @@
 void sharedDestruct(ocrMemTarget_t *self) {
     ASSERT(self->memoryCount == 1);
     self->memories[0]->fcts.destruct(self->memories[0]);
-    runtimeChunkFree((u64)self->memories, NULL);
+    runtimeChunkFree((u64)self->memories, PERSISTENT_CHUNK);
 #ifdef OCR_ENABLE_STATISTICS
     statsMEMTARGET_STOP(self->pd, self->fguid.guid, self->fguid.metaDataPtr);
 #endif
-    runtimeChunkFree((u64)self, NULL);
+    runtimeChunkFree((u64)self, PERSISTENT_CHUNK);
 }
 
 u8 sharedSwitchRunlevel(ocrMemTarget_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
@@ -157,7 +157,7 @@ void initializeMemTargetShared(ocrMemTargetFactory_t * factory, ocrMemTarget_t *
 /******************************************************/
 
 static void destructMemTargetFactoryShared(ocrMemTargetFactory_t *factory) {
-    runtimeChunkFree((u64)factory, NULL);
+    runtimeChunkFree((u64)factory, NONPERSISTENT_CHUNK);
 }
 
 ocrMemTargetFactory_t *newMemTargetFactoryShared(ocrParamList_t *perType) {

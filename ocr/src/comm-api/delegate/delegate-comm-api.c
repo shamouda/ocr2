@@ -21,7 +21,11 @@
 #define MAX_ACTIVE_WAIT 100
 
 void delegateCommDestruct (ocrCommApi_t * base) {
-    runtimeChunkFree((u64)base, NULL);
+    if(base->commPlatform != NULL) {
+        base->commPlatform->fcts.destruct(base->commPlatform);
+        base->commPlatform = NULL;
+    }
+    runtimeChunkFree((u64)base, PERSISTENT_CHUNK);
 }
 
 u8 delegateCommSwitchRunlevel(ocrCommApi_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
@@ -231,7 +235,7 @@ u8 delegateCommWaitMessage(ocrCommApi_t *self, ocrMsgHandle_t **handle) {
 ocrCommApi_t* newCommApiDelegate(ocrCommApiFactory_t *factory,
                                        ocrParamList_t *perInstance) {
     ocrCommApiDelegate_t * commPlatformDelegate = (ocrCommApiDelegate_t*)
-        runtimeChunkAlloc(sizeof(ocrCommApiDelegate_t), NULL);
+        runtimeChunkAlloc(sizeof(ocrCommApiDelegate_t), PERSISTENT_CHUNK);
     factory->initialize(factory, (ocrCommApi_t*) commPlatformDelegate, perInstance);
     return (ocrCommApi_t*) commPlatformDelegate;
 }
@@ -248,12 +252,12 @@ void initializeCommApiDelegate(ocrCommApiFactory_t * factory, ocrCommApi_t* self
 /******************************************************/
 
 void destructCommApiFactoryDelegate(ocrCommApiFactory_t *factory) {
-    runtimeChunkFree((u64)factory, NULL);
+    runtimeChunkFree((u64)factory, NONPERSISTENT_CHUNK);
 }
 
 ocrCommApiFactory_t *newCommApiFactoryDelegate(ocrParamList_t *perType) {
     ocrCommApiFactory_t *base = (ocrCommApiFactory_t*)
-        runtimeChunkAlloc(sizeof(ocrCommApiFactoryDelegate_t), (void *)1);
+        runtimeChunkAlloc(sizeof(ocrCommApiFactoryDelegate_t), NONPERSISTENT_CHUNK);
 
     base->instantiate = newCommApiDelegate;
     base->initialize = initializeCommApiDelegate;

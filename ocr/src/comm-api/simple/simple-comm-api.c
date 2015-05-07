@@ -167,8 +167,11 @@ u8 waitMessageSimpleCommApi(ocrCommApi_t *self, ocrMsgHandle_t **handle) {
 }
 
 void simpleCommApiDestruct (ocrCommApi_t * base) {
-    base->commPlatform->fcts.destruct(base->commPlatform);
-    runtimeChunkFree((u64)base, NULL);
+    if(base->commPlatform != NULL) {
+        base->commPlatform->fcts.destruct(base->commPlatform);
+        base->commPlatform = NULL;
+    }
+    runtimeChunkFree((u64)base, PERSISTENT_CHUNK);
 }
 
 u8 simpleCommApiSwitchRunlevel(ocrCommApi_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
@@ -230,7 +233,7 @@ u8 simpleCommApiSwitchRunlevel(ocrCommApi_t *self, ocrPolicyDomain_t *PD, ocrRun
 ocrCommApi_t* newCommApiSimple(ocrCommApiFactory_t *factory,
                            ocrParamList_t *perInstance) {
     ocrCommApiSimple_t * commApiSimple = (ocrCommApiSimple_t*)
-        runtimeChunkAlloc(sizeof(ocrCommApiSimple_t), NULL);
+        runtimeChunkAlloc(sizeof(ocrCommApiSimple_t), PERSISTENT_CHUNK);
     factory->initialize(factory, (ocrCommApi_t*) commApiSimple, perInstance);
     return (ocrCommApi_t*)commApiSimple;
 }
@@ -249,12 +252,12 @@ void initializeCommApiSimple(ocrCommApiFactory_t * factory, ocrCommApi_t* self, 
 /******************************************************/
 
 void destructCommApiFactorySimple(ocrCommApiFactory_t *factory) {
-    runtimeChunkFree((u64)factory, NULL);
+    runtimeChunkFree((u64)factory, NONPERSISTENT_CHUNK);
 }
 
 ocrCommApiFactory_t *newCommApiFactorySimple(ocrParamList_t *perType) {
     ocrCommApiFactory_t *base = (ocrCommApiFactory_t*)
-        runtimeChunkAlloc(sizeof(ocrCommApiFactorySimple_t), (void *)1);
+        runtimeChunkAlloc(sizeof(ocrCommApiFactorySimple_t), NONPERSISTENT_CHUNK);
 
     base->instantiate = newCommApiSimple;
     base->initialize = initializeCommApiSimple;

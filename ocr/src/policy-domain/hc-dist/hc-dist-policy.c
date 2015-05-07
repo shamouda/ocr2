@@ -1544,7 +1544,7 @@ ocrPolicyDomain_t * newPolicyDomainHcDist(ocrPolicyDomainFactory_t * factory,
 #endif
                                       ocrCost_t *costFunction, ocrParamList_t *perInstance) {
 
-    ocrPolicyDomainHcDist_t * derived = (ocrPolicyDomainHcDist_t *) runtimeChunkAlloc(sizeof(ocrPolicyDomainHcDist_t), NULL);
+    ocrPolicyDomainHcDist_t * derived = (ocrPolicyDomainHcDist_t *) runtimeChunkAlloc(sizeof(ocrPolicyDomainHcDist_t), PERSISTENT_CHUNK);
     ocrPolicyDomain_t * base = (ocrPolicyDomain_t *) derived;
 
 #ifdef OCR_ENABLE_STATISTICS
@@ -1575,14 +1575,14 @@ void initializePolicyDomainHcDist(ocrPolicyDomainFactory_t * factory,
 }
 
 static void destructPolicyDomainFactoryHcDist(ocrPolicyDomainFactory_t * factory) {
-    runtimeChunkFree((u64)factory, NULL);
+    runtimeChunkFree((u64)factory, NONPERSISTENT_CHUNK);
 }
 
 ocrPolicyDomainFactory_t * newPolicyDomainFactoryHcDist(ocrParamList_t *perType) {
     ocrPolicyDomainFactory_t * baseFactory = newPolicyDomainFactoryHc(perType);
     ocrPolicyDomainFcts_t baseFcts = baseFactory->policyDomainFcts;
 
-    ocrPolicyDomainFactoryHcDist_t* derived = (ocrPolicyDomainFactoryHcDist_t*) runtimeChunkAlloc(sizeof(ocrPolicyDomainFactoryHcDist_t), (void *)10);
+    ocrPolicyDomainFactoryHcDist_t* derived = (ocrPolicyDomainFactoryHcDist_t*) runtimeChunkAlloc(sizeof(ocrPolicyDomainFactoryHcDist_t), NONPERSISTENT_CHUNK);
     ocrPolicyDomainFactory_t* derivedBase = (ocrPolicyDomainFactory_t*) derived;
     // Set up factory function pointers and members
     derivedBase->instantiate = newPolicyDomainHcDist;

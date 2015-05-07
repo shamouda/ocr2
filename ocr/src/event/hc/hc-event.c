@@ -975,12 +975,12 @@ ocrEvent_t * newEventHc(ocrEventFactory_t * factory, ocrEventTypes_t eventType,
 }
 
 void destructEventFactoryHc(ocrEventFactory_t * base) {
-    runtimeChunkFree((u64)base, NULL);
+    runtimeChunkFree((u64)base, PERSISTENT_CHUNK);
 }
 
 ocrEventFactory_t * newEventFactoryHc(ocrParamList_t *perType, u32 factoryId) {
     ocrEventFactory_t* base = (ocrEventFactory_t*) runtimeChunkAlloc(
-                                  sizeof(ocrEventFactoryHc_t), NULL);
+                                  sizeof(ocrEventFactoryHc_t), PERSISTENT_CHUNK);
 
     base->instantiate = FUNC_ADDR(ocrEvent_t* (*)(ocrEventFactory_t*,
                                   ocrEventTypes_t, bool, ocrParamList_t*), newEventHc);

@@ -263,9 +263,9 @@ void mallocProxyDestruct(ocrAllocator_t *self) {
         for(i=0; i < self->memoryCount; i++) {
             self->memories[i]->fcts.destruct(self->memories[i]);
         }
-        runtimeChunkFree((u64)self->memories, NULL);
+        runtimeChunkFree((u64)self->memories, PERSISTENT_CHUNK);
     }
-    runtimeChunkFree((u64)self, NULL);
+    runtimeChunkFree((u64)self, PERSISTENT_CHUNK);
 }
 
 u8 mallocProxySwitchRunlevel(ocrAllocator_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
@@ -362,7 +362,7 @@ void initializeAllocatorMallocProxy(ocrAllocatorFactory_t * factory, ocrAllocato
 /******************************************************/
 
 static void destructAllocatorFactoryMallocProxy(ocrAllocatorFactory_t * factory) {
-    runtimeChunkFree((u64)factory, NULL);
+    runtimeChunkFree((u64)factory, NONPERSISTENT_CHUNK);
 }
 
 ocrAllocatorFactory_t * newAllocatorFactoryMallocProxy(ocrParamList_t *perType) {

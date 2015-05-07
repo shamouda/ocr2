@@ -185,7 +185,7 @@ void initializeMemPlatformMalloc(ocrMemPlatformFactory_t * factory, ocrMemPlatfo
 /******************************************************/
 
 void destructMemPlatformFactoryMalloc(ocrMemPlatformFactory_t *factory) {
-    runtimeChunkFree((u64)factory, NULL);
+    runtimeChunkFree((u64)factory, NONPERSISTENT_CHUNK);
 }
 
 ocrMemPlatformFactory_t *newMemPlatformFactoryMalloc(ocrParamList_t *perType) {

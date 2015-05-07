@@ -210,7 +210,7 @@ u8 wstSchedulerObjectSwitchRunlevel(ocrSchedulerObjectRoot_t *self, ocrPolicyDom
 }
 
 void wstSchedulerObjectRootDestruct(ocrSchedulerObjectRoot_t *self) {
-    runtimeChunkFree((u64)self, NULL);
+    runtimeChunkFree((u64)self, PERSISTENT_CHUNK);
 }
 
 /******************************************************/
@@ -218,7 +218,7 @@ void wstSchedulerObjectRootDestruct(ocrSchedulerObjectRoot_t *self) {
 /******************************************************/
 
 void destructSchedulerObjectRootFactoryWst(ocrSchedulerObjectFactory_t * factory) {
-    runtimeChunkFree((u64)factory, NULL);
+    runtimeChunkFree((u64)factory, PERSISTENT_CHUNK);
 }
 
 static ocrSchedulerObjectFactory_t* newOcrSchedulerObjectRootFactoryWst(ocrParamList_t *perType, u32 factoryId) {

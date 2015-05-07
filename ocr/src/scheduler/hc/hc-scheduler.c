@@ -88,9 +88,9 @@ void hcSchedulerDestruct(ocrScheduler_t * self) {
         self->schedulerHeuristics[i]->fcts.destruct(self->schedulerHeuristics[i]);
     }
 
-    runtimeChunkFree((u64)(self->workpiles), NULL);
-    runtimeChunkFree((u64)(self->schedulerHeuristics), NULL);
-    runtimeChunkFree((u64)self, NULL);
+    runtimeChunkFree((u64)(self->workpiles), PERSISTENT_CHUNK);
+    runtimeChunkFree((u64)(self->schedulerHeuristics), PERSISTENT_CHUNK);
+    runtimeChunkFree((u64)self, PERSISTENT_CHUNK);
 }
 
 u8 hcSchedulerSwitchRunlevel(ocrScheduler_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
@@ -344,7 +344,7 @@ u8 hcSchedulerUpdate(ocrScheduler_t *self, ocrSchedulerOpArgs_t *opArgs) {
 }
 
 ocrScheduler_t* newSchedulerHc(ocrSchedulerFactory_t * factory, ocrParamList_t *perInstance) {
-    ocrScheduler_t* base = (ocrScheduler_t*) runtimeChunkAlloc(sizeof(ocrSchedulerHc_t), NULL);
+    ocrScheduler_t* base = (ocrScheduler_t*) runtimeChunkAlloc(sizeof(ocrSchedulerHc_t), PERSISTENT_CHUNK);
     factory->initialize(factory, base, perInstance);
     return base;
 }
@@ -357,12 +357,12 @@ void initializeSchedulerHc(ocrSchedulerFactory_t * factory, ocrScheduler_t *self
 }
 
 void destructSchedulerFactoryHc(ocrSchedulerFactory_t * factory) {
-    runtimeChunkFree((u64)factory, NULL);
+    runtimeChunkFree((u64)factory, NONPERSISTENT_CHUNK);
 }
 
 ocrSchedulerFactory_t * newOcrSchedulerFactoryHc(ocrParamList_t *perType) {
     ocrSchedulerFactory_t* base = (ocrSchedulerFactory_t*) runtimeChunkAlloc(
-                                      sizeof(ocrSchedulerFactoryHc_t), (void *)1);
+        sizeof(ocrSchedulerFactoryHc_t), NONPERSISTENT_CHUNK);
 
     base->instantiate = &newSchedulerHc;
     base->initialize  = &initializeSchedulerHc;

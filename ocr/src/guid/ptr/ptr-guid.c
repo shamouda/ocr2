@@ -30,7 +30,7 @@ typedef struct {
 } ocrGuidImpl_t;
 
 void ptrDestruct(ocrGuidProvider_t* self) {
-    runtimeChunkFree((u64)self, NULL);
+    runtimeChunkFree((u64)self, PERSISTENT_CHUNK);
 }
 
 
@@ -199,7 +199,7 @@ ocrGuidProvider_t* newGuidProviderPtr(ocrGuidProviderFactory_t *factory,
 /****************************************************/
 
 void destructGuidProviderFactoryPtr(ocrGuidProviderFactory_t *factory) {
-    runtimeChunkFree((u64)factory, NULL);
+    runtimeChunkFree((u64)factory, NONPERSISTENT_CHUNK);
 }
 
 ocrGuidProviderFactory_t *newGuidProviderFactoryPtr(ocrParamList_t *typeArg, u32 factoryId) {

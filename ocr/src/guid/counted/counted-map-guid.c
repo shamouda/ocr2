@@ -113,7 +113,7 @@ u8 countedMapSwitchRunlevel(ocrGuidProvider_t *self, ocrPolicyDomain_t *PD, ocrR
 }
 
 void countedMapDestruct(ocrGuidProvider_t* self) {
-    runtimeChunkFree((u64)self, NULL);
+    runtimeChunkFree((u64)self, PERSISTENT_CHUNK);
 }
 
 /**
@@ -279,7 +279,7 @@ static ocrGuidProvider_t* newGuidProviderCountedMap(ocrGuidProviderFactory_t *fa
 /****************************************************/
 
 static void destructGuidProviderFactoryCountedMap(ocrGuidProviderFactory_t *factory) {
-    runtimeChunkFree((u64)factory, NULL);
+    runtimeChunkFree((u64)factory, NONPERSISTENT_CHUNK);
 }
 
 ocrGuidProviderFactory_t *newGuidProviderFactoryCountedMap(ocrParamList_t *typeArg, u32 factoryId) {
