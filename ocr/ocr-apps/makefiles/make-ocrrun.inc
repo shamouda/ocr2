@@ -66,9 +66,11 @@ OBJS := $(addprefix $(WORKLOAD_BUILD)/,$(OBJS))
 
 FULL_REQ_LIBS := $(addprefix $(APPS_ROOT)/libs/src/,$(REQ_LIBS))
 
-.PHONY: install
+### Install rules ###
+
+.PHONY: install_internal
 .ONESHELL:
-install: | $(WORKLOAD_INSTALL)
+install_internal: preinstall | $(WORKLOAD_INSTALL)
 	@echo "Installing from $(WORKLOAD_BUILD) into $(WORKLOAD_INSTALL)..."
 	@echo ""
 	@echo "####"
@@ -79,6 +81,13 @@ install: | $(WORKLOAD_INSTALL)
 	@echo "####"
 	@$(RM) -f $(WORKLOAD_INSTALL)/$(TARGET)
 	@$(CP) $(WORKLOAD_BUILD)/$(TARGET) $(WORKLOAD_INSTALL)/
+
+postinstall: install_internal
+
+.PHONY: install
+install: postinstall
+
+### Run rules ###
 
 ifeq (yes, $(DEBUGMAKE))
 .PHONY: debug_pre_prerun
@@ -101,7 +110,8 @@ run_internal: OCR_CONFIG ?= $(OCR_INSTALL)/config/default.cfg
 ifeq ($(RUN_JENKINS), run)
 run_internal: debug_post_prerun
 else
-run_internal: debug_post_prerun install
+debug_post_prerun: install
+run_internal: install debug_post_prerun
 endif
 ifeq ($(HOSTNAME), bar1)
 	$(error Please refrain from running jobs on bar1!)
@@ -114,8 +124,21 @@ postrun: run_internal
 .PHONY: run
 run: postrun
 
+### Build rules ###
+
+# Enforce order for build_internal
+$(WORKLOAD_BUILD)/$(TARGET): prebuild
+prebuild: reqlibs
+
+# The next three rules force postbuild to run after build_internal
+# and default to run postbuild
+.PHONY: build_internal
+build_internal: reqlibs prebuild $(WORKLOAD_BUILD)/$(TARGET)
+
+postbuild: build_internal
+
 .PHONY: default
-default: reqlibs $(WORKLOAD_BUILD)/$(TARGET)
+default: postbuild
 
 # Builds any libraries required by the workload
 .PHONY: parallel-reqlibs
@@ -123,8 +146,10 @@ parallel-reqlibs: $(FULL_REQ_LIBS)
 
 .PHONY: $(FULL_REQ_LIBS)
 $(FULL_REQ_LIBS):
+	lockfile $@/.lock; \
 	ARCH=x86 APPS_ROOT=$(APPS_ROOT) APPS_LIBS_ROOT=$(APPS_LIBS_ROOT) \
-	$(MAKE) -C $@ install
+	$(MAKE) -C $@ install; \
+	rm -f $@/.lock
 
 .PHONY: reqlibs
 reqlibs: parallel-reqlibs
@@ -180,3 +205,15 @@ $(WORKLOAD_BUILD):
 
 $(WORKLOAD_INSTALL):
 	mkdir -p $(WORKLOAD_INSTALL)
+
+# Default rules. If the user defines them later, those recipes will be used
+# Otherwise, the recipe does nothing by default
+
+# The rules obviously run before/after the build, install and run phases
+.PHONY: prebuild postbuild preinstall postinstall prerun postrun
+prebuild:
+postbuild:
+preinstall:
+postintall:
+prerun:
+postrun:

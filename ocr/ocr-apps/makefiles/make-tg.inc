@@ -93,12 +93,14 @@ RUN_CMD := $(TG_INSTALL)/bin/fsim-scripts/fsim-torque.sh
 MACHINE_CONFIG :=
 endif
 
-.PHONY: install
+### Install rules ###
+.PHONY: install_internal
 .ONESHELL:
 ifeq ($(RUN_JENKINS), run)
-install: | ${WORKLOAD_INSTALL}
+install_internal: preinstall | ${WORKLOAD_INSTALL}
 else
-install: $(WORKLOAD_SRC)/config.cfg | ${WORKLOAD_INSTALL}
+# Order of both should not matter here
+install: preinstall $(WORKLOAD_SRC)/config.cfg | ${WORKLOAD_INSTALL}
 endif
 	@echo "Installing from $(WORKLOAD_BUILD) into $(WORKLOAD_INSTALL)..."
 	@echo ""
@@ -113,6 +115,12 @@ endif
 	@$(CP) $(WORKLOAD_SRC)/config.cfg $(WORKLOAD_INSTALL)/
 	@$(CP) $(WORKLOAD_BUILD)/build.rmdkrnl/rmdkrnl $(WORKLOAD_INSTALL)/
 
+postinstall: install_internal
+
+.PHONY: install
+install: postinstall
+
+### Run rules ###
 ifeq (yes, $(DEBUGMAKE))
 .PHONY: debug_pre_prerun
 debug_pre_prerun:
@@ -153,9 +161,23 @@ postrun: WORKLOAD_OUTS := `find -L $(WORKLOAD_EXEC)/logs/* -name '*.app_output' 
 .PHONY: run
 run: postrun
 
-.PHONY: default
-default: reqlibs $(WORKLOAD_BUILD)/$(TARGET) $(WORKLOAD_BUILD)/$(TARGET).blob \
+### Build rules ###
+
+# Enforce ordering
+$(WORKLOAD_BUILD)/$(TARGET).blob: | prebuild
+$(WORKLOAD_BUILD)/$(TARGET): | prebuild
+prebuild: reqlibs
+
+# The next three rules force postbuild to run after build_internal
+# and default to run postbuild
+.PHONY: build_internal
+build_internal: reqlibs prebuild $(WORKLOAD_BUILD)/$(TARGET) $(WORKLOAD_BUILD)/$(TARGET).blob \
   $(WORKLOAD_BUILD)/build.rmdkrnl/rmdkrnl
+
+postbuild: build_internal
+
+.PHONY: default
+default: postbuild
 
 # Builds any libraries required by the workload
 .PHONY: parallel-reqlibs
@@ -163,8 +185,10 @@ parallel-reqlibs: $(FULL_REQ_LIBS)
 
 .PHONY: $(FULL_REQ_LIBS)
 $(FULL_REQ_LIBS):
+	lockfile $@/.lock ; \
 	ARCH=tg APPS_ROOT=$(APPS_ROOT) APPS_LIBS_ROOT=$(APPS_LIBS_ROOT) \
-	$(MAKE) -C $@ install
+	$(MAKE) -C $@ install; \
+	rm -f $@/.lock
 
 .PHONY: reqlibs
 reqlibs: parallel-reqlibs
@@ -195,6 +219,7 @@ $(WORKLOAD_BUILD)/$(TARGET): $(WORKLOAD_BUILD)/$(TARGET).dbg | $(WORKLOAD_BUILD)
 $(WORKLOAD_BUILD)/$(TARGET).blob: $(OCR_ROOT)/scripts/Blob/aggregate_binary_files.sh \
 $(WORKLOAD_BUILD)/$(TARGET).blob.ce $(WORKLOAD_BUILD)/$(TARGET).blob.xe \
 $(WORKLOAD_BUILD)/$(TARGET).blob.arg | $(WORKLOAD_BUILD)
+	echo "WORKLOAD_INPUTS is $(WORKLOAD_INPUTS) and args are ###$^###"
 	$^ $(WORKLOAD_INPUTS) $@
 
 # Build the CE blob
@@ -209,8 +234,9 @@ $(OCR_INSTALL_ROOT)/$(CE_BUILDER)/bin/builder.exe -ocr:cfg $(OCR_CE_CONFIG)
 $(OCR_CE_CONFIG): | rmdkrnl
 
 # Build the XE blob
-$(WORKLOAD_BUILD)/$(TARGET).blob.xe: debug_post_prerun $(OCR_INSTALL_XE)/config/default.cfg \
-$(WORKLOAD_BUILD)/$(TARGET).dbg $(OCR_INSTALL_ROOT)/$(XE_BUILDER)/bin/builder.exe | builderxe $(WORKLOAD_BUILD)
+$(WORKLOAD_BUILD)/$(TARGET).dbg: | debug_post_prerun
+$(WORKLOAD_BUILD)/$(TARGET).blob.xe: $(OCR_XE_CONFIG) \
+$(WORKLOAD_BUILD)/$(TARGET).dbg $(OCR_INSTALL_ROOT)/$(XE_BUILDER)/bin/builder.exe | debug_post_prerun builderxe $(WORKLOAD_BUILD)
 	@echo "#### BUILDING XE BLOB ####"
 	TG_INSTALL=$(TG_INSTALL) WORKLOAD_BUILD=$(WORKLOAD_BUILD) STRUCT_OUT=$(WORKLOAD_BUILD)/$(TARGET).blob.xe \
 	ARGS_OUT=$(WORKLOAD_BUILD)/$(TARGET).blob.arg APP_FILE=$(WORKLOAD_BUILD)/$(TARGET).dbg \
@@ -353,3 +379,15 @@ $(WORKLOAD_BUILD)/build.rmdkrnl: $(TG_ROOT)/build/build.rmdkrnl/make-me.make | $
 
 $(WORKLOAD_INSTALL):
 	mkdir -p $(WORKLOAD_INSTALL)
+
+# Default rules. If the user defines them later, those recipes will be used
+# Otherwise, the recipe does nothing by default
+
+# The rules obviously run before/after the build, install and run phases
+.PHONY: prebuild postbuild preinstall postinstall prerun postrun
+prebuild:
+postbuild:
+preinstall:
+postintall:
+prerun:
+postrun:
