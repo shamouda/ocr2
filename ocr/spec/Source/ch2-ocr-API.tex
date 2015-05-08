@@ -551,16 +551,35 @@ ocr\-Db\-Release should only be called {\itshape once} at most.
 
 Events are  used to coordinate the exection of tasks and to
 help establish dependences in the directed acyclic graph representing the exection of an OCR program.
-To manage the different types of events, OCR defines thefollowing enum types and values.
+%To manage the different types of events, OCR defines the following enum types and values.
+
+
+Each OCR event has a type that is specified at creation.
+The type of the event determines its behavior, specifically,
+its persistency after it triggers its post-slot, its trigger rule and
+its behavior when satisfied multiple times.
+
 \begin{itemize}
-\item \code{enum ocrEventTypes\_t {
-OCR\_EVENT\_ONCE\_T, OCR\_EVENT\_IDEM\_T, OCR\_EVENT\_STICKY\_T,
-OCR\_EVENT\_LATCH\_T,
-OCR\_EVENT\_T\_MAX }}
+\item \code{OCR\_EVENT\_ONCE\_T} - \emph{Once} Event: A ONCE event simply passes along a satisfaction on its
+unique pre-slot to its post-slot. Once all OCR objects linked to its post-slot have been satisfied,
+the ONCE event is automatically destroyed.
+\item \code{OCR\_EVENT\_IDEM\_T} - \emph{Idempotent} Event: An IDEM event also passes along a satisfaction on its
+unique pre-slot to its post-slot. The IDEM event persists until ocrEventDestroy() is explicitly called on it.
+It can only be satisfied once and susequent satisfactions are ignored.
+\item \code{OCR\_EVENT\_STICKY\_T} - \emph{Sticky} Event: A STICKY event is identical to an IDEM event except that
+multiple satisfactions result in an error.
+\item \code{OCR\_EVENT\_LATCH\_T} - \emph{Latch} Event: A LATCH event has two pre-slots: a INCR and a DECR.
+Each slot is associated with an internal monotonically increasing counter that starts at 0.
+On each satisfaction of one of the pre-slots, the counter for that slot is incremented by 1.
+When both counters are equal (and non-zero), the post-slot of the latch event is triggered.
+Any data block passed along its pre-slots is ignored. A LATCH event is similarly persistent
+as a ONCE event and is automatically destroyed when its post-slot is triggered.
+\end{itemize}
 
-\item \code{enum ocrLatchEventSlot\_t { OCR\_EVENT\_LATCH\_DECR\_SLOT,
-OCR\_EVENT\_LATCH\_INCR\_SLOT }}
-
+Currently, only the LATCH event has more than one pre-slot.
+\begin{itemize}
+\item \code{OCR\_EVENT\_LATCH\_DECR\_SLOT} - This is the decrement slot of a LATCH event
+\item \code{OCR\_EVENT\_LATCH\_INCR\_SLOT} - This is the increment slot of a LATCH event
 \end{itemize}
 
 \subsection*{Functions}
@@ -595,7 +614,7 @@ OCR\_EVENT\_LATCH\_INCR\_SLOT }}
 \begin{DoxyParamCaption}
 \item[{{\bf ocr\-Guid\-\_\-t} $\ast$}]{guid, }
 \item[{{\bf ocr\-Event\-Types\-\_\-t}}]{event\-Type, }
-\item[{bool}]{takes\-Arg}
+\item[{u16}]{properties}
 \end{DoxyParamCaption}
 )}}\label{group__OCREvents_gab4cd41f97cc692a86f887b404b055066}
 
@@ -606,7 +625,11 @@ Creates an event.
 \hline
 \mbox{\tt in}  & {\em event\-Type} & The type of event to create. See \hyperlink{group__OCRTypesEvents_ga42f4195355182edfaa79c9ef3f2c07b1}{ocr\-Event\-Types\-\_\-t} \\
 \hline
-\mbox{\tt in}  & {\em takes\-Arg} & True if this event will potentially carry a data block on satisfaction, false othersie \\
+\mbox{\tt in}  & {\em properties} & Properties used to create the event. Currently, the following properties are supported\-:
+\begin{DoxyItemize}
+\item {E\-V\-T\-\_\-\-P\-R\-O\-P\-\_\-\-N\-O\-N\-E}, indicates no specific properties
+\item {E\-V\-T\-\_\-\-P\-R\-O\-P\-\_\-\-T\-A\-K\-E\-S\-\_\-\-A\-R\-G}, if this event will potentially carry a data block on satisfaction.
+\end{DoxyItemize}\\
 \hline
 \end{DoxyParams}
 
@@ -621,6 +644,7 @@ a status code
 %%%%
 %%%%  Someone needs to write a proper description of this function.
 %%%%
+\descr
 This function creates a new programmer-\/managed event identified by the returned G\-U\-I\-D.
 
 %
@@ -652,8 +676,8 @@ a statuc code
 %%%%  Someone needs to write a proper description of this function
 %%%%
 \descr
-Events such as O\-N\-C\-E or L\-A\-T\-C\-H are automatically destroyed once they trigger; others, however,
-need to be explicitly destroyed by the programmer. This call enables this.
+Events such as O\-N\-C\-E or L\-A\-T\-C\-H are automatically destroyed by the runtime once they trigger;
+others, however, need to be explicitly destroyed by the programmer using this call.
 
 %
 % ocrEventSatisfy
