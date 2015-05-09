@@ -145,7 +145,7 @@ space visible to all EDTs.
 % used to influence GUID allocation, if so desired.
 %
 % TGM responds ... two problem. Why does it have to be 64 bit as defined in the spec?   I don't
-% get that. Second, the current API doesn't provice uer input to influce GUID allocation so
+% get that. Second, the current API doesn't provide user input to influence GUID allocation so
 % we can't say this yet. Right?
 
 \glossaryterm{Latch Event}
@@ -164,8 +164,6 @@ therefore only satisfy its post-slot at most one time.
 
 % vivek writes ...
 %(See earlier note re. definition of pre-slots and post-slots for events.)
-%
-%Need to clarify that the post-slot of the latch event can only be triggered once.
 %
 %Also, a problematic aspect of a latch event is that it appears that a pre-slot can
 %be "triggered" multiple times. Maybe it should not be called a pre-slot?
@@ -188,6 +186,16 @@ therefore only satisfy its post-slot at most one time.
 % probably not very clearly) tried to say that events have a mini
 % ``rule'' that determines when its post-slot get satisfied. As for
 % the state to store, it's in the metadata
+
+
+\glossaryterm{Link}
+\index{Link}
+\glossarydefstart
+A dependence between OCR objects typically expressed as a connection
+between the post=slot of one OCR object and the pre-slot of another.  Data-Blocks
+exposed through the pre-slots of an EDT are said to be ``linked to the EDT''.
+\glossarydefend
+
 
 \glossaryterm{OCR object}
 \index{OCR object}
@@ -278,7 +286,7 @@ A generic term for a process, thread, or any other executable agent
 that carries out the work associated with a program.
 \glossarydefend
 
-% vivek wants us to consider and more carefully define the idea of the wrok assocaited with a
+% vivek wants us to consider and more carefully define the idea of the work associated with a
 % computation. See his feedback on the version 1.0 spec for details.
 
 

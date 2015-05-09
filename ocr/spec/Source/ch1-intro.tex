@@ -25,39 +25,45 @@ scaling across the entire exascale system.
 
 \end{itemize}
 
-There are a number of research projects in progress to develop a runtime system
+There are a number of active research projects to develop a runtime system
 for extreme scale computers. This specification describes one of
 these research runtime systems: the \emph{Open Community Runtime} or \emph{OCR}.
 
 The fundamental idea behind OCR is to consider a computation as a
-dynamically generated directed acyclic graph (DAG) of tasks operating on
-relocatable blocks of data (Data Blocks). Task execution is managed by events;
-when the data blocks and events a task depends upon are satisfied, the
-task is ready and will at some later point run on the system.
-Representing a computation in terms of this event-driven DAG of tasks
+dynamically generated directed acyclic graph (DAG) \index{DAG}~\cite{TaSa11,Tasirlar11,Zuckerman:2011:UCP:2000417.2000424}of tasks
+operating on relocatable blocks of data (Data Blocks). Task execution is managed by events.
+When the data blocks and events a task depends upon are satisfied, the
+preconditions for the execution of the task~\cite{SSWS13} are met and the
+task will at some later point run on the system.   OCR tasks are
+\emph{non-blocking}\index{non-blocking}. This means that once all
+preconditions on a task have been met,  the task will eventually run to completion
+regardless of the behavior of any other OCR objects.
+
+Representing a computation in terms of an event-driven DAG of tasks
 decouples the work of a computation
 from the ``Units of execution'' that carry out the computation.  The work
-of a computation is virtualized so it can be relocated within a scalable computer to
-optimize execution of the parallel program. More importantly,
-virtualization allows a program to respond to hardware issues by
-relocating work from failed components onto working
-components~\cite{Vrvilo14}.
+of a computation is virtualized giving OCR has the flexibility to relocate tasks and data
+to respond to failures in the system~\cite{Vrvilo14}, achieve a better balance of load
+among the processing elements of the computer, or to optimize memory
+and energy consumption~\cite{GZCS10,Guo10,CTBCCGYS13,SbBS14}.
 
-OCR provides a global name space that holds references to tasks,
-events and data blocks\footnote{Data blocks, described in
-Section~\ref{sec:datablocks} are exposed through a global ID which
-provides a reference to the data block itself. A task can access the
-contents of data blocks either {\bf a)} created inside the task and
-{\bf b)} data blocks whose IDs are listed as requisite input to the
-task before it is scheduled for execution.}, which supports the transparent
-scheduling and relocation of these data across hardware resources.
+Representing the data in terms of data-blocks
+decouples the data in a computation from the computer's memory subsystem.
+This supports transparent scheduling and dynamic migration of data
+across hardware resources.
 
-A DAG of Event driven tasks can be used to support a wide range of execution models,
+OCR is a low level runtime system designed to map onto a wide range of scalable
+computer systems.
+It provides the capabilities needed to support support a wide range of programming models
 including data-flow (when events are associated with data-blocks),
 fork-join (when events enable the execution of post-join
 continuations), bulk-synchronous processing (when event trees can be
 used to build scalable barriers and collective operations), and
-combinations thereof.
+combinations thereof.  While some programmers will choose to program directly
+at the level of the OCR API, we expect most will use higher level
+programming environments that map onto OCR; hence why we describe OCR as a
+runtime system rather than an application level programming environment.
+
 
 \section{Scope}
 \label{sec:Scope}
@@ -106,8 +112,8 @@ OCR.
 
 OCR tasks are expressed as event driven tasks (EDTs).
 The overheads associated with OCR API calls depend on the underlying system software and
-hardware in an extreme scale platform.  On current systems, the overhead of
-creating and scheduling an event driven task can be fairly heavy-weight.
+hardware.  On current systems, the overhead of
+creating and scheduling an event driven task can be fairly high.
 On system with hardware support for task queues, the
 overheads can be significantly lower.  An OCR programmer should experiment with their
 implementation of OCR to understand the overheads associated with managing EDTs and
