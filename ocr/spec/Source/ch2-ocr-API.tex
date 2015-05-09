@@ -86,7 +86,7 @@ in the \code{ocr-errors.h} include file and are described in the following table
 \plc{OCR\_ERANGE} & Math result not representable\\
 \plc{OCR\_ENOSYS} & Function not implemented\\
 \plc{OCR\_ENOTSUP} & Function is not supported\\
-\plc{OCR\_EGUIDEXISTS} & The objected referered to by GUID already exists\\
+\plc{OCR\_EGUIDEXISTS} & The objected referred to by GUID already exists\\
 \plc{OCR\_EACQ} & Data block is already acquired\\
 \plc{OCR\_EPEND} & Operation is pending\\
 \plc{OCR\_ECANCELED} & Operation canceled\\
@@ -114,7 +114,7 @@ programmer can expect when they use this point of entry.
 \label{sec:supportFuncs}
 
 An OCR program needs to manage the basic execution environment; bringing external arguments into
-the execution context and cleaning shutting down the program execution.  These capabilties are
+the execution context and cleaning shutting down the program execution.  These capabilities are
 handled through the following functions.
 
 \begin{DoxyCompactItemize}
@@ -255,7 +255,7 @@ A macro that exposes the printf function from the standard C library.
 \begin{tabular}{l l l}
 type &  argument   & meaning \\
 \hline
-\code{const char}   & \code{fmt}  &in: the standard C format string assocaited with printf() .\\
+\code{const char}   & \code{fmt}  &in: the standard C format string associated with printf() .\\
 \code{...}   & \code{....}  &in: a variable length list of arguments in agreement with \code{fmt}..\\
 \hline
 \end{tabular}
@@ -266,10 +266,10 @@ type &  argument   & meaning \\
 \code{u32} value for the number of bytes actually written.
 
 \descr
-OCR must support a wide variety of platforms including simulators that emmulate real systems.
-Often, core functionality provided by standard C librarires are not availabel on all platforms
+OCR must support a wide variety of platforms including simulators that emulate real systems.
+Often, core functionality provided by standard C libraries are not available on all platforms
 and as a result, an OCR program cannot depend on these functions.  There was one case, however,
-where it was felt support was critical.  This isin teh case of the following basic printf capability which
+where it was felt support was critical.  This is in the case of the following basic printf capability which
 is provide in the OCR API as following function.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -287,7 +287,7 @@ are contiguous chunks of memory that have a start address and a size. They also 
 \item all memory within the data block is accessible from the start-\/address using an
  offset (ie\-: addresses \mbox{[}start-\/address; start-\/address+size\mbox{[} uniquely and
 totally address the entire data-\/block)
-\item non-\/overlaping with other distinct data blocks
+\item non-\/overlapping with other distinct data blocks
 \item the pointer to the start of a data block is only valid between the acquire of
 the data-\/block (implicit when the E\-D\-T starts) and the corresponding ocr\-Db\-Release
  call (or the end of the E\-D\-T, whichever comes first)
@@ -362,7 +362,7 @@ be visible to other EDTs depending on the implementation and specific runtime co
 )}}\label{func_ocrDbCreate}
 
 Requests the runtime to create a data-block of a specified size. After
-a succesfull call, the runtime will return the GUID for the newly
+a successful call, the runtime will return the GUID for the newly
 created data-block and a pointer to it (if requested).
 
 \begin{DoxyParams}[1]{Parameters}
@@ -370,9 +370,9 @@ created data-block and a pointer to it (if requested).
 of the data-block. If the call fails, the returned value is undefined \\
 \hline
 \mbox{\tt out}  & {\em addr} & On successful creation and if the
-DB_PROP_NO_ACQUIRE is not specified in {\em flags}, this call will
+DB\_PROP\_NO\_ACQUIRE is not specified in {\em flags}, this call will
 acquire the data-block and its address will be returned in this
-parameter. If DB_PROP_NO_ACQUIRE is specified in {\em flags}, the
+parameter. If DB\_PROP\_NO\_ACQUIRE is specified in {\em flags}, the
 value returned will be NULL. If the call fails, the returned value is
 undefined \\
 \hline
@@ -381,24 +381,24 @@ undefined \\
 \mbox{\tt in}  & {\em flags} & Flags controlling the behavior of the
 data-block creation. The following flags are supported:
 \begin{DoxyItemize}
-\item DB_PROP_NONE: Default behavior (described in this section)
-\item DB_PROP_NO_ACQUIRE: The created data-block may not be used by
+\item DB\_PROP\_NONE: Default behavior (described in this section)
+\item DB\_PROP\_NO\_ACQUIRE: The created data-block may not be used by
   this EDT (NULL will be returned in \em{addr}). Note that the actual
   data-block may be delayed until it is needed
 \end{DoxyItemize}\\
 \hline
 \mbox{\tt in,out}  & {\em affinity} & Currently unsupported. Reserved
-for future use. Parameter value should be NULL_GUID\\
+for future use. Parameter value should be NULL\_GUID\\
 \hline
 \mbox{\tt in}  & {\em allocator} & A data-block can be used as the
 backing memory for malloc/free-like operations. This parameter
 specifies the allocator to use for these operations inside this
 data-block. Note that if an in data-block allocator is used, the user
 should not write directly to the data-block as this may overwrite the
-metadata used by the allocator. The 'NO_ALLOC' allocator is used to
+meta data used by the allocator. The 'NO\_ALLOC' allocator is used to
 indicate that the data-block is not used by any allocator and is
 therefore usable as POD. Supported values for this parameter are given
-by \hyperlink{type_ocrInDbAllocator_t}{ocrInDbAllocator_t}.\\
+by \hyperlink{type_ocrInDbAllocator_t}{ocrInDbAllocator\_t}.\\
 \hline
 \end{DoxyParams}
 
@@ -407,11 +407,11 @@ by \hyperlink{type_ocrInDbAllocator_t}{ocrInDbAllocator_t}.\\
 A status code:
 \begin{DoxyItemize}
 \item 0: Successful
-\item OCR_ENOMEM: The runtime could not provide a data-block of size
+\item OCR\_ENOMEM: The runtime could not provide a data-block of size
   'len' due to insufficient memory
-\item OCR_EINVAL: The arguments passed (flags, allocator, etc.) were
+\item OCR\_EINVAL: The arguments passed (flags, allocator, etc.) were
   not valid
-\item OCR_EBUSY: A resource required for this call was busy. A retry
+\item OCR\_EBUSY: A resource required for this call was busy. A retry
   is possible
 \end{DoxyItemize}
 
@@ -419,39 +419,39 @@ A status code:
 %%%%  someone needs to write a more complete description of the semantics of this function
 %%%%
 \descr
-This API is used to create the basic unit of data in OCR: the
-data-block. Unless DB_PROP_NO_ACQUIRE is specified in \em{flags}, this
-API call also acquires the newly created data-block and returns a
-pointer to the memory region (in \em{addr}).
+This function is used to create the basic unit of data in OCR: the
+data-block. Unless DB\_PROP\_NO\_ACQUIRE is specified in \emph{flags}, this
+function call also acquires the newly created data-block and returns a
+pointer to the memory region (in \emph{addr}).
 
 The created data-block:
 \begin{DoxyItemize}
-\item Will always be 8-byte aligned (ie: if \em{addr} is returned, it
+\item Will always be 8-byte aligned (ie: if \emph{addr} is returned, it
   will be 8-byte aligned);
 \item Will not necessarily be zeroed out; the value of the created
   data-block is undefined;
 \item Will have a GUID that is unique from this call until the user
   calls \bf{ocrDbDestroy()} on this data-block.
 \end{DoxyItemize}
-If a valid address is returned in \em{addr}, it will point to the
+If a valid address is returned in \emph{addr}, it will point to the
 first byte of the data-block and the user can safely read or write
-to a range of length \emph{len} starting at \em{addr} until the end of
-the EDT or a call to \bf{ocrDbRelease()} on this data-block, whichever
+to a range of length \emph{len} starting at \emph{addr} until the end of
+the EDT or a call to \code{ocrDbRelease()} on this data-block, whichever
 comes first.
 
 \begin{DoxyNote}{Note}
 \begin{DoxyItemize}
-\item Using the DB_PROP_NO_ACQUIRE flag is recommended to allow the
+\item Using the DB\_PROP\_NO\_ACQUIRE flag is recommended to allow the
   runtime to make placement decisions for newly created
-  data-blocks. Not specifiying this flag may result in a sub-optimal
+  data-blocks. Not specifying this flag may result in a sub-optimal
   memory placement for the created data-block.
-\item When DB_PROP_NO_ACQUIRE is specified, a conformant
+\item When DB\_PROP\_NO\_ACQUIRE is specified, a conformant
   implementation may choose not to create the data-block immediately
   and instead create it lazily before the using EDT runs.
 \item Like all GUIDs, the uniqueness of a data-block's GUID is not
   necessarily unique throughout the entire program. A data-block's
   GUID is guaranteed unique only as long as the data-block exists
-  (between \bf{ocrDbCreate()} and \bf{ocrDbDestroy()}).
+  (between \code{ocrDbCreate()} and \code{ocrDbDestroy()}).
 \end{DoxyItemize}
 \end{DoxyNote}
 
@@ -549,8 +549,8 @@ ocr\-Db\-Release should only be called {\itshape once} at most.
 \index{Event Management APIs}
 \label{sec:OCReventManagement}
 
-Events are  used to coordinate the exection of tasks and to
-help establish dependences in the directed acyclic graph representing the exection of an OCR program.
+Events are  used to coordinate the execution of tasks and to
+help establish dependences in the directed acyclic graph representing the execution of an OCR program.
 %To manage the different types of events, OCR defines the following enum types and values.
 
 
@@ -565,7 +565,7 @@ unique pre-slot to its post-slot. Once all OCR objects linked to its post-slot h
 the ONCE event is automatically destroyed.
 \item \code{OCR\_EVENT\_IDEM\_T} - \emph{Idempotent} Event: An IDEM event also passes along a satisfaction on its
 unique pre-slot to its post-slot. The IDEM event persists until ocrEventDestroy() is explicitly called on it.
-It can only be satisfied once and susequent satisfactions are ignored.
+It can only be satisfied once and subsequent satisfactions are ignored.
 \item \code{OCR\_EVENT\_STICKY\_T} - \emph{Sticky} Event: A STICKY event is identical to an IDEM event except that
 multiple satisfactions result in an error.
 \item \code{OCR\_EVENT\_LATCH\_T} - \emph{Latch} Event: A LATCH event has two pre-slots: a INCR and a DECR.
@@ -666,7 +666,7 @@ Explicitly destroys an event.
 \end{DoxyParams}
 
 \returns
-a statuc code
+a status code
 \begin{DoxyItemize}
 \item 0\-: successful
 \item E\-I\-N\-V\-A\-L\-: If guid does not refer to a valid event to destroy
@@ -731,9 +731,9 @@ An event satisfaction without the optional data block can be viewed as a pure co
 whereas one with a data block is a control+data dependence
 
 \begin{DoxyNote}{Note}
-On satisfaction, a O\-N\-C\-E event will pass the G\-U\-I\-D of the optionaly attached data
+On satisfaction, a O\-N\-C\-E event will pass the G\-U\-I\-D of the optionally attached data
 block to all O\-C\-R objects waiting on it at that time and the event will destroy itself. I\-D\-E\-M and S\-T\-I\-C\-K\-Y
-events will pass the G\-U\-I\-D of the optionaly attached data block to all O\-C\-R objects waiting on it at that time as
+events will pass the G\-U\-I\-D of the optionally attached data block to all O\-C\-R objects waiting on it at that time as
 well as any new objects linked to it until the event is destroyed.
 \end{DoxyNote}
 
@@ -870,7 +870,7 @@ a status code\-:
 
 \descr
 An E\-D\-T template encapsulates the E\-D\-T function and, optionally, the number of
-parameters and arguments that E\-D\-Ts instanciated from this template will use. It needs to
+parameters and arguments that E\-D\-Ts instantiated from this template will use. It needs to
 be created only once for each function that will serve as an E\-D\-T; reusing the same
 template from multiple E\-D\-Ts of the same type may improve performance as this
 allows the runtime to collect information about multiple instances of the same
@@ -1065,9 +1065,9 @@ a status code
 The following dependences can be added\-:
 \begin{DoxyItemize}
 \item Event to Event\-: The sink event's pre-\/slot will become satisfied upon satisfaction of the source event's post-\/slot. Any data block associated with the source event's post-\/slot will be associated with the sink event's pres-\/slot.
-\item Event to E\-D\-T \-: Upon satisfaction of the source event's post-\/slot, the pre-\/slot of the E\-D\-T will be satisfied. When the E\-D\-T runs, the data block associated with the post-\/slot of the event will be passed in through the depv array. This represents a control or a control+data dependence.
+\item Event to E\-D\-T \-: Upon satisfaction of the source event's post-\/slot, the pre-\/slot of the E\-D\-T will be satisfied. When the E\-D\-T runs, the data block associated with the post-\/slot of the event will be passed in through the \code{depv} array. This represents a control or a control+data dependence.
 \item D\-B to Event \-: ocr\-Add\-Dependence(db, evt, slot) is equivalent to ocr\-Satisfy\-Slot(evt, db, slot)
-\item D\-B to E\-D\-T \-: This represents a pure data dependence. Adding a dependence between a data block and an E\-D\-T immediately satisfies the pre-\/slot of the E\-D\-T. When the E\-D\-T runs, the data block will be passed in through the depv array.
+\item D\-B to E\-D\-T \-: This represents a pure data dependence. Adding a dependence between a data block and an E\-D\-T immediately satisfies the pre-\/slot of the E\-D\-T. When the E\-D\-T runs, the data block will be passed in through the \code{depv} array.
 \end{DoxyItemize}
 
 
