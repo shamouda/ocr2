@@ -122,8 +122,9 @@ connected.
 
 The fundamental unit of work in OCR is
 the \emph{Event Driven Task} \index{Event Driven Task}or \emph{EDT}.
-Once all pre-conditions on an EDT have been met and its
-input data blocks are acquired, the EDT is runnable\index{Runnable}.  The OCR
+When all pre-conditions on an EDT have been met it becomes a runnable EDT.
+Later when its
+input data blocks are acquired, the EDT is ready to ready to execute.  The OCR
 runtime guarantees that a runnable EDT will execute at some point and once running,
 the EDT will progress to its terminal state
 and cannot be halted by the action of other OCR objects; hence why the

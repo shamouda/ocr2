@@ -65,15 +65,15 @@ EDT is created and once its GUID is available for use in API function, the EDT i
 to be \emph{Available}\index{Available}.  At some point, the dependences
 are fully defined for the EDT and it becomes \emph{resolved}\index{resolved}.
 Note that the transition from Available to Resolved is not called out as a named transition.
-This implies that it is not generally possible for the system to define a distinct time-stamp
+This implies that it is not generally possible for the system to set a distinct time-stamp
 corresponding to when the transition occurred.  In this case, the transition is un-named
 because dependencies may be added dynamically up until the
 EDT \emph{Launch}\index{Launch} transition.  At this point point the
-EDT is \emph{Ready}\index{Ready} to execute.
+EDT is \emph{Runnable}\index{Runable}.
 
-Once an EDT enters the ready state,  it will run at some point during the normal execution
+Once an EDT is runnable,  it will execute at some point during the normal execution
 of the OCR program.   At some point all data blocks linked to an EDT will be acquired and the
-EDT becomes \emph{Runnable}\index{Runnable}. The
+EDT becomes \emph{Ready}\index{Ready}. The
 EDT  and any resources required
 to support its execution are then submitted to
 \emph{workers}\index{Worker}~\cite{GBRS09} which execute the tasks on
@@ -106,7 +106,7 @@ system will \emph{Clean-up}\index{Clean-up} resources used by the EDT (including
 the EDT is Destroyed.
 
 Since an EDT is non-blocking, once it
-enters the ``ready state'' it will run on the OCR platform at some point in the
+becomes ``runnable'' it will run on the OCR platform at some point in the
 future. During its run:
 \begin{itemize}
 \item The EDT can only access data blocks that have been passed in

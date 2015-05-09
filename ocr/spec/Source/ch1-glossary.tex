@@ -38,9 +38,9 @@ dependences will have $N$ \emph{pre-slots} numbered from $0$ to $N-1$
 and one post-slot.
 Each of the \emph{pre-slots} associated with an EDT connects to a
 single OCR object, while the EDT’s single \emph{post-slot} can connect
-to multiple OCR objects. An EDT transitions to the \emph{ready} state when all its
+to multiple OCR objects. An EDT transitions to the \emph{runnable} state when all its
 pre-slots have been satisfied; the pre-slots determine which
-data blocks, if any, the EDT may access.  Once an EDT is in the ready state, it will
+data blocks, if any, the EDT may access.  Once an EDT is runnable, it guaranteed to
 eventually run on the OCR platform.
 \glossarydefend
 
@@ -74,7 +74,7 @@ creation time and \emph{dependences} are dynamic control or data
 dependences. The parameter array is copied by value when the EDT is
 created and enters the \emph{available} state. The dependences (namely the array of dependences) are
 determined at runtime and are fully resolved only when the EDT is launched and
-is ready to execute. The EDT function can optionally return the GUID of a Data Block or
+is runnable. The EDT function can optionally return the GUID of a Data Block or
 event that will be passed along its ``post'' slot.
 
 \glossarydefend
@@ -112,7 +112,7 @@ EDT, the EDTs created within its scope (i.e.\ its child EDTs and further
 descendants) complete and satisfy their post-slots
 before the finish EDT can satisfy its post-slot. The result is that
 any OCR object linked to the post-slot of the finish EDT will by
-necessity not be enter the \emph{ready} state (i.e. be scheduled for
+necessity not become runnable (i.e. be scheduled for
 execution) until the finish EDT and all
 EDTs created during its execution have completed.
 %
@@ -252,7 +252,7 @@ A slot in the \emph{connected} state can be:
 \glossarydefstart
 A non-blocking set of instructions that constitute the fundamental
 ``unit of work'' in OCR.  By ``non-blocking'' we mean that once all
-preconditions on a task are met, the task is ``ready to execute''
+preconditions on a task are met, the task is runnable
 and it will execute at some point,
 regardless of what any other task in the system does. The concept of
 a task is realized by the OCR object ``Event Driven Task'' or EDT.
