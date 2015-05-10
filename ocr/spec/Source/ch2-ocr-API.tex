@@ -98,8 +98,34 @@ in the \code{ocr-errors.h} include file and are described in the following table
 \section{The OCR Main EDT}
 \label{sec:mainEDT}
 
-In OCR 1.0, an OCR program always begins as a main EDT.   We need to describe the mainEDT and what a
-programmer can expect when they use this point of entry.
+In OCR 1.0, an OCR program's single point of entry is the user-defined main EDT.
+This EDT has a function prototype that is identical to any other EDT.
+This special EDT has no parameters and has one datablock that consists of all the
+arguments passed to it from the command line. These can be accessed using the
+\hyperlink{group__OCRGeneral_ga29d56cd773017a4d48d629bc13a220ce}{get\-Argc} and
+\hyperlink{group__OCRGeneral_gad553929187f042ce480d09e84a4c59a7}{get\-Argv} calls
+defined further below.
+
+\begin{boxedcode}
+\plc{ocrGuid\_t mainEdt (u32 paramc, u64* paramv, u32 depc, ocrEdtDep\_t depv[])}
+\end{boxedcode}
+
+\begin{table}[h]
+\begin{tabular}{l l l}
+type &  argument   & meaning \\
+\hline
+\code{u32}   & \code{paramc}  &in: Parameter count is always 0.\\
+\code{u64*}   & \code{paramv}  &in: Parameter vector is always NULL.\\
+\code{u32}   & \code{depc}  &in: Dependence count is always 1.\\
+\code{u64*}   & \code{depv}  &in: Dependence vector has exactly 1 entry consisting of the command line arguments\\
+\hline
+\end{tabular}
+\end{table}
+
+\returns
+ It returns a
+\code{ocrGuid\_t} value for compatibility purposes, but is ignored by the runtime.
+
 %%%
 %%% someone needs to write this section
 %%%
@@ -113,15 +139,14 @@ programmer can expect when they use this point of entry.
 \section{Supporting functions for OCR}
 \label{sec:supportFuncs}
 
-An OCR program needs to manage the basic execution environment; bringing external arguments into
-the execution context and cleaning shutting down the program execution.  These capabilities are
+OCR provides a set of basic capabilities to support a program execution environment,
 handled through the following functions.
 
 \begin{DoxyCompactItemize}
 \item
 void \hyperlink{group__OCRGeneral_gae115fb2dbc351416835b0fb7b91f94e5}
-{ocr\-Shutdown} ()
-\begin{DoxyCompactList}\small\item\em Called by an E\-D\-T to indicate the end of an O\-C\-R program. \end{DoxyCompactList}
+{ocr\-Shutdown} (void)
+\begin{DoxyCompactList}\small\item\em Called by an E\-D\-T to indicate the normal end of an O\-C\-R program. \end{DoxyCompactList}
 
 \item
 void \hyperlink{group__OCRGeneral_gabcaaebe9465cd6efcfca2acb4c399cde}
@@ -142,7 +167,49 @@ In addition, OCR defines a PRINTF macro to print message to the output console.
 
 
 %
-% getARgc
+% ocrShutdown
+%
+\hypertarget{group__OCRGeneral_gae115fb2dbc351416835b0fb7b91f94e5}{\index{Support calls for O\-C\-R@{Support calls for O\-C\-R}!ocr\-Shutdown@{ocr\-Shutdown}}
+\index{ocr\-Shutdown@{ocr\-Shutdown}!Support calls for OCR@{Support calls for O\-C\-R}}
+\subsection[{ocr\-Shutdown}]{\setlength{\rightskip}{0pt plus 5cm}void ocr\-Shutdown (
+\begin{DoxyParamCaption}
+{}
+\end{DoxyParamCaption}
+)}}\label{group__OCRGeneral_gae115fb2dbc351416835b0fb7b91f94e5}
+
+Called by an E\-D\-\T to indicate the normal end of the program and allows for the termination of the runtime.
+Program behavior after this call is undefined, hence all program functionality should be completed prior to calling this function.
+
+\begin{DoxyNote}{Note}
+If using the extended \hyperlink{group__OCRExtLib_ga1de1b7c273fd6fb900feba43141881f5}{ocr\-Wait()} call
+present in ocr-\/legacy.\-h, you do not need to use \hyperlink{group__OCRGeneral_gae115fb2dbc351416835b0fb7b91f94e5}
+{ocr\-Shutdown()} as the termination of the O\-C\-R portion will be captured in the finish E\-D\-T's return
+\end{DoxyNote}
+
+%
+% ocrAbort
+%
+\hypertarget{group__OCRGeneral_gabcaaebe9465cd6efcfca2acb4c399cde}{\index{Support calls for O\-C\-R@{Support calls for O\-C\-R}!ocr\-Abort@{ocr\-Abort}}
+\index{ocr\-Abort@{ocr\-Abort}!Support calls for OCR@{Support calls for O\-C\-R}}
+\subsection[{ocr\-Abort}]{\setlength{\rightskip}{0pt plus 5cm}void ocr\-Abort (
+\begin{DoxyParamCaption}
+\item[{{\bf u8}}]{error\-Code}
+\end{DoxyParamCaption}
+)}}\label{group__OCRGeneral_gabcaaebe9465cd6efcfca2acb4c399cde}
+
+Called by an E\-D\-T to indicate an abnormal end of an O\-C\-R program.
+Program behavior after this call is undefined. The error code for the reason for abort is passed to the runtime, and its handling is implementation dependent.
+
+\begin{DoxyParams}{Parameters}
+{\em error\-Code} & User defined error code returned to the environment \\
+\hline
+\end{DoxyParams}
+
+\descr
+This call will cause the O\-C\-R runtime to shutdown with an error code. Calling this with 0 as an argument is equivalent to \hyperlink{group__OCRGeneral_gae115fb2dbc351416835b0fb7b91f94e5}{ocr\-Shutdown()}.
+
+%
+% getArgc
 %
 \hypertarget{group__OCRGeneral_ga29d56cd773017a4d48d629bc13a220ce}{\index{Support calls for O\-C\-R@{Support calls for O\-C\-R}!get\-Argc@{get\-Argc}}
 \index{get\-Argc@{get\-Argc}!Support calls for OCR@{Support calls for O\-C\-R}}
@@ -153,6 +220,7 @@ In addition, OCR defines a PRINTF macro to print message to the output console.
 )}}\label{group__OCRGeneral_ga29d56cd773017a4d48d629bc13a220ce}
 
 Retrieves the traditional 'argc' value in main\-Edt.
+The single parameter for this function is the pointer to the sole datablock passed to main\-Edt from the runtime.
 
 \begin{DoxyParams}{Parameters}
 {\em db\-Ptr} & Pointer to the start of the argument data block \\
@@ -202,40 +270,6 @@ A N\-U\-L\-L terminated string
 \descr
 This function supports the extraction of arguments from argv.   See \hyperlink{group__OCRGeneral_ga29d56cd773017a4d48d629bc13a220ce}{get\-Argc()} for an explanation.
 
-%
-% ocrAbort
-%
-\hypertarget{group__OCRGeneral_gabcaaebe9465cd6efcfca2acb4c399cde}{\index{Support calls for O\-C\-R@{Support calls for O\-C\-R}!ocr\-Abort@{ocr\-Abort}}
-\index{ocr\-Abort@{ocr\-Abort}!Support calls for OCR@{Support calls for O\-C\-R}}
-\subsubsection[{ocr\-Abort}]{\setlength{\rightskip}{0pt plus 5cm}void ocr\-Abort (
-\begin{DoxyParamCaption}
-\item[{{\bf u8}}]{error\-Code}
-\end{DoxyParamCaption}
-)}}\label{group__OCRGeneral_gabcaaebe9465cd6efcfca2acb4c399cde}
-
-Called by an E\-D\-T to indicate an abnormal end of an O\-C\-R program.
-
-
-\begin{DoxyParams}{Parameters}
-{\em error\-Code} & User defined error code returned to the environment \\
-\hline
-\end{DoxyParams}
-\hypertarget{group__OCRGeneral_gae115fb2dbc351416835b0fb7b91f94e5}{\index{Support calls for O\-C\-R@{Support calls for O\-C\-R}!ocr\-Shutdown@{ocr\-Shutdown}}
-\index{ocr\-Shutdown@{ocr\-Shutdown}!Support calls for OCR@{Support calls for O\-C\-R}}
-\subsubsection[{ocr\-Shutdown}]{\setlength{\rightskip}{0pt plus 5cm}void ocr\-Shutdown (
-\begin{DoxyParamCaption}
-{}
-\end{DoxyParamCaption}
-)}}\label{group__OCRGeneral_gae115fb2dbc351416835b0fb7b91f94e5}
-
-\descr
-This call will cause the O\-C\-R runtime to shutdown with an error code. Calling this with 0 as an argument is equivalent to \hyperlink{group__OCRGeneral_gae115fb2dbc351416835b0fb7b91f94e5}{ocr\-Shutdown()}.
-
-\begin{DoxyNote}{Note}
-If using the extended \hyperlink{group__OCRExtLib_ga1de1b7c273fd6fb900feba43141881f5}{ocr\-Wait()} call
-present in ocr-\/legacy.\-h, you do not need to use \hyperlink{group__OCRGeneral_gae115fb2dbc351416835b0fb7b91f94e5}
-{ocr\-Shutdown()} as the termination of the O\-C\-R portion will be captured in the finish E\-D\-T's return
-\end{DoxyNote}
 
 %
 % PRINTF
@@ -790,9 +824,10 @@ equivalent to ocr\-Event\-Satisfy(event\-Guid, data\-Guid)
 \label{group__OCREDT}\index{Event Driven Task A\-P\-I@{Event Driven Task A\-P\-I}}
 }
 
+Event Driven Tasks -- E\-D\-Ts -- act as the task abstraction of O\-C\-R, and all
+program computations are expressed using E\-D\-Ts.
 
-A\-P\-Is to manage E\-D\-Ts in O\-C\-R.
-Types, constants and basic macros associated with EDTs
+
 \begin{itemize}
 \item \#define EDT\_PROP\_NONE
 \item \#define EDT\_PROP\_FINISH
@@ -802,18 +837,19 @@ unknown.
 specified in its template.
 \end{itemize}
 
-The EDT API itself is defined in terms of the following macro and set of functions.
+E\-D\-T instances are created from their corresponding E\-D\-T templates, that also contain metadata of all E\-D\-Ts
+of that type. O\-C\-R provides A\-P\-I functions to manage E\-D\-Ts, for creating and destroying E\-D\-Ts and templates, as shown below.
 \begin{DoxyCompactItemize}
 \item
-\#define \hyperlink{group__OCREDT_ga9649098ffad669c1c820cd821792d67a}
-{ocr\-Edt\-Template\-Create}(guid, func\-Ptr, paramc, depc)~\hyperlink{group__OCREDT_gaa481a8e8f1a2af9aba623cb01b01bc1b}
-{ocr\-Edt\-Template\-Create\-\_\-internal}((guid), (func\-Ptr), (paramc), (depc), N\-U\-L\-L)
+\hyperlink{group__OCRTypesGeneral_ga92c50087ca0e64fa93fc59402c55f8ca}{u8}
+\hyperlink{group__OCREDT_ga9649098ffad669c1c820cd821792d67a}
+{ocr\-Edt\-Template\-Create}(\hyperlink{group__OCRTypesGeneral_gacde3883d1ce245c051133c2c3aa82fc8}{ocr\-Guid\-\_\-t} guid, func\-Ptr,\hyperlink{group__OCRTypesGeneral_gafaa62991928fb9fb18ff0db62a040aba}{u32} paramc, \hyperlink{group__OCRTypesGeneral_gafaa62991928fb9fb18ff0db62a040aba}{u32} depc)
 \begin{DoxyCompactList}\small\item\em Creates an E\-D\-T template. \end{DoxyCompactList}
 
 \item
 \hyperlink{group__OCRTypesGeneral_ga92c50087ca0e64fa93fc59402c55f8ca}{u8} \hyperlink{group__OCREDT_gace7063cfee522df47c64bf5013385c10}
 {ocr\-Edt\-Template\-Destroy} (\hyperlink{group__OCRTypesGeneral_gacde3883d1ce245c051133c2c3aa82fc8}{ocr\-Guid\-\_\-t} guid)
-\begin{DoxyCompactList}\small\item\em Destroy an E\-D\-T template. \end{DoxyCompactList}
+\begin{DoxyCompactList}\small\item\em Destroys an E\-D\-T template. \end{DoxyCompactList}
 
 \item
 \hyperlink{group__OCRTypesGeneral_ga92c50087ca0e64fa93fc59402c55f8ca}{u8} \hyperlink{group__OCREDT_gafa2443b31c38b4b7f9f59713abe12ecc}
@@ -823,7 +859,7 @@ The EDT API itself is defined in terms of the following macro and set of functio
 \item
 \hyperlink{group__OCRTypesGeneral_ga92c50087ca0e64fa93fc59402c55f8ca}{u8} \hyperlink{group__OCREDT_gae258a29af116794a73099e9c6d9232f8}
 {ocr\-Edt\-Destroy} (\hyperlink{group__OCRTypesGeneral_gacde3883d1ce245c051133c2c3aa82fc8}{ocr\-Guid\-\_\-t} guid)
-\begin{DoxyCompactList}\small\item\em Destroy an E\-D\-T. \end{DoxyCompactList}
+\begin{DoxyCompactList}\small\item\em Destroys an E\-D\-T. \end{DoxyCompactList}
 
 \end{DoxyCompactItemize}
 
@@ -921,7 +957,7 @@ Creates an E\-D\-T instance from an E\-D\-T template.
 \hline
 \mbox{\tt in}  & {\em properties} & Used to indicate if this is a finish E\-D\-T (see \hyperlink{group__OCRTypesEDT_ga043f0aab623cbc9db6fa90a0b7ad876a}{E\-D\-T\-\_\-\-P\-R\-O\-P\-\_\-\-F\-I\-N\-I\-S\-H}). Use \hyperlink{group__OCRTypesEDT_gae9f46354fe64d7a4b245fc23dfde5660}{E\-D\-T\-\_\-\-P\-R\-O\-P\-\_\-\-N\-O\-N\-E} as a default value. \\
 \hline
-\mbox{\tt in}  & {\em affinity} & Affinity container for this E\-D\-T. Can be N\-U\-L\-L\-\_\-\-G\-U\-I\-D. This is currently an experimental feature \\
+\mbox{\tt in}  & {\em affinity} & Affinity container for this E\-D\-T. This is currently an experimental feature and must be N\-U\-L\-L\-\_\-\-G\-U\-I\-D.\\
 \hline
 \mbox{\tt in,out}  & {\em output\-Event} & If not N\-U\-L\-L on input, on successful return of this call, this will return the G\-U\-I\-D of the event associated with the post-\/slot of the E\-D\-T. For a F\-I\-N\-I\-S\-H E\-D\-T, the post-\/slot of this event will be satisfied when the E\-D\-T and all of the child E\-D\-Ts have completed execution. For a non F\-I\-N\-I\-S\-H E\-D\-T, the post-\/slot of this event will be satisfied when the E\-D\-T completes execution and will carry the data block returned by the E\-D\-T. If N\-U\-L\-L, no event will be associated with the E\-D\-T's post-\/slot\\
 \hline
@@ -934,11 +970,13 @@ a status code
 \item 0\-: successful
 \end{DoxyItemize}
 
-%%%%
-%%%%  Someone needs to write a description of this function
-%%%%
 \descr
-This function does something very important
+The E\-D\-T is created based on the function provided during the creation of its template. It is required that the number of parameters
+(paramc) and number of dependences (depc) are resolved at this time, if E\-D\-T\-\_\-\-P\-A\-R\-A\-M\-\_\-\-U\-N\-K was specified for
+either argument at the time of creation of its corresponding template. The properties field indicates what type of E\-D\-T gets created.
+Currently, O\-C\-R supports (i) the default type of E\-D\-T where the lifetime of the created E\-D\-T has no relationship with that of
+other E\-D\-Ts created by it, and (ii) a finish E\-D\-T, where the lifetime of the created E\-D\-T is guaranteed to exceed that of all
+E\-D\-Ts transitively created by it.
 
 %
 % ocrEdtDestroy
@@ -953,7 +991,7 @@ This function does something very important
 
 Destroy an E\-D\-T.
 
-E\-D\-Ts are normally destroyed after they execute. This call is provided if an E\-D\-T is created and the programmer later realizes that it will never become runable.
+E\-D\-Ts are automatically destroyed after they execute. This call is provided if an E\-D\-T is created and the programmer later realizes that it will never become runnable.
 
 \begin{DoxyParams}[1]{Parameters}
 \mbox{\tt in}  & {\em guid} & G\-U\-I\-D of the E\-D\-T to destroy\\
@@ -966,10 +1004,6 @@ a status code
 \begin{DoxyItemize}
 \item 0\-: successful
 \end{DoxyItemize}
-
-%%%%%%%
-%%%%%%%  Someone needs to write a description of this function
-%%%%%%%
 
 %
 %  ocrEdtTemplateDestroy
@@ -998,7 +1032,9 @@ a status code
 \end{DoxyItemize}
 
 \descr
-This function can be called if no further E\-D\-Ts will be created based on this template
+This function can be called if no further E\-D\-Ts will be created based on this template, and the
+memory allocated for this template can be recovered by the runtime. The template can be destroyed
+even if any of the E\-D\-Ts created from it aren't ready to run.
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
