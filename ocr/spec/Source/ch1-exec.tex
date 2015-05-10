@@ -68,7 +68,7 @@ Note that the transition from Available to Resolved is not called out as a named
 This implies that it is not generally possible for the system to set a distinct time-stamp
 corresponding to when the transition occurred.  In this case, the transition is un-named
 because dependencies may be added dynamically up until the
-EDT \emph{Launch}\index{Launch} transition.  At this point point the
+EDT \emph{Launch}\index{Launch} transition.  At this point the
 EDT is \emph{Runnable}\index{Runable}.
 
 Once an EDT is runnable,  it will execute at some point during the normal execution
@@ -87,6 +87,20 @@ persistent state visible to an OCR program and are logically opaque to
 OCR constructs. The scheduler inside the implementation of OCR
 will then schedule the EDT for execution and the EDT  \emph{Starts}\index{Start} to execute and
 becomes a \emph{Running}\index{Running} EDT.
+
+% Vincent writes:
+%
+%   I think the graph misses direct transitions from certain states to
+%  destroyed. Basically when calling ocrEdtDestroy in “available” state
+%  and eventually, in “resolved” state. The user respectively knows not
+%   all dependences will be added and not all dependences will be satisfied
+%  ever. It’s a limited way for the user to “cancel” an edt. If we do that then
+%  we need to define when the “reference count” for an EDT is set to 1 so
+%  that subsequent ocrEdtDestroy will have to wait for the edt to complete
+%  execution. Future specification/apis could also introduce cancellation
+%  arrows from other state.
+%
+%    .... we need to think about his comments and update the following figure accordingly
 
 \begin{figure*}
 \centering
@@ -122,12 +136,12 @@ blocks, EDTs and events.
 accomplished through the \code{ocrAddDependence()} function of the OCR
 API. The following types of dependences can be created:
 \begin{itemize}
-\item \emph{Event to Event} The destination event’s pre-slot is chained
+\item \emph{Event to Event}: The destination event’s pre-slot is chained
 directly to the source event’s post-slot.
 For all events but the latch event, this means that the triggering of
 the source event will trigger the destination event.
 
-\item \emph{Event to EDT} One of the destination EDT’s pre-slot is chained
+\item \emph{Event to EDT}:  One of the destination EDT’s pre-slot is chained
 directly to the source event’s post-slot. When the source event is
 triggered, this will satisfy the EDT’s pre-slot. If a data-block was
 associated with the triggering of the source event, that data-block
@@ -136,10 +150,10 @@ position of the pre-slot. This is a “control + data” dependence. In
 the other case, no data-block will be made available and the
 dependence is akin to a pure control dependence.
 
-\item \emph{Data Block to Event} Adding a dependence between a data-block and an
+\item \emph{Data Block to Event}: Adding a dependence between a data-block and an
 event is equivalent to satisfying the event with the data-block.
 
-\item \emph{Data Block to EDT} Directly adding a dependence between a data-block and
+\item \emph{Data Block to EDT}:  Directly adding a dependence between a data-block and
 an EDT (a pure data-dependence) immediately satisfies the EDT’s
 pre-slot and makes the data-block available to the EDT in the
 dependence array in the position of the pre-slot.
@@ -153,6 +167,20 @@ through the events that link OCR objects, which are explicit to the
 runtime.
 
 \end{itemize}
+
+
+%  Vincent writes (pertaining to the following paragraph) ...
+%
+% "Typically, the EDT that terminates the program is the last EDT in the
+%  program DAG, and the programmer has assured that all other EDTs in the
+%  DAG have completed execution before the function to terminate the program is called.”
+%  => That goes back to my comment on page 12 (the figure with teh execution states of an EDT).
+%   I think it depends how you define “completed execution” or for which EDT state one
+% should assume the EDT “has to necessarily complete" at some point. For instance, I don’t
+%   see a correctness issue calling shutdown while some edts are available/resolved but will
+%  never transition to their next state because the programer ensures it. Am I presuming too
+%   much because I know the implementation or does the spec defined as it is allowed me that
+%  and we’re ok with it ?
 
 A computation is complete when an EDT terminates the program
 (e.g.\ with a call to \code{ocrShutdown()}). Typically, the EDT that

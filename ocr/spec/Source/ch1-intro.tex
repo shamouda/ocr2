@@ -37,12 +37,12 @@ preconditions for the execution of the task~\cite{SSWS13} are met and the
 task will at some later point run on the system.   OCR tasks are
 \emph{non-blocking}\index{non-blocking}. This means that once all
 preconditions on a task have been met,  the task will eventually run to completion
-regardless of the behavior of any other OCR objects.
+regardless of the behavior of any other tasks or events.
 
 Representing a computation in terms of an event-driven DAG of tasks
 decouples the work of a computation
 from the ``Units of execution'' that carry out the computation.  The work
-of a computation is virtualized giving OCR has the flexibility to relocate tasks and data
+of a computation is virtualized giving OCR the flexibility to relocate tasks and data
 to respond to failures in the system~\cite{Vrvilo14}, achieve a better balance of load
 among the processing elements of the computer, or to optimize memory
 and energy consumption~\cite{GZCS10,Guo10,CTBCCGYS13,SbBS14}.
@@ -54,7 +54,7 @@ across hardware resources.
 
 OCR is a low level runtime system designed to map onto a wide range of scalable
 computer systems.
-It provides the capabilities needed to support support a wide range of programming models
+It provides the capabilities needed to support a wide range of programming models
 including data-flow (when events are associated with data-blocks),
 fork-join (when events enable the execution of post-join
 continuations), bulk-synchronous processing (when event trees can be

@@ -9,11 +9,11 @@ An OCR object is a reference counted entity managed by OCR. Every OCR
 object has a globally unique ID (GUID) used to identify the
 object. An OCR program is defined in terms of three fundamental objects.
 \begin{itemize}
-\item \emph{Event Driven Task (EDT)} A non-blocking unit of work in an OCR
+\item \emph{Event Driven Task (EDT)}: A non-blocking unit of work in an OCR
 program.
-\item\emph{Data block (DB)}A contiguous block of memory managed by the
+\item\emph{Data block (DB)}: A contiguous block of memory managed by the
 OCR runtime accessible to any OCR objects to which it is linked.
-\item\emph{Event} An object to manage dependences between OCR objects and
+\item\emph{Event}: An object to manage dependences between OCR objects and
 to define ordering relationships (synchronization) between them.
 \end{itemize}
 
@@ -37,7 +37,7 @@ destruction when the destruction command executes. A destroyed object, its GUID,
 and any resources associated with the destroyed object are no longer
 defined. The object is not actually destroyed and the associated
 resources are not freed until the reference count is zero\footnote{As
-an optimization, the runtime may choose to reuse of the same physical
+an optimization, the runtime may choose to reuse the same physical
 object for different logical objects~\cite{USBCSS12,SbKS12}.}.
 %
 %  Vivek suggest we call this "Dead" instead of "destroyed".  He provided new text in his feedback to
@@ -75,8 +75,8 @@ single \emph{post-slot}\index{post-slot}.
 For example, when an EDT finishes the work
 assigned to it, the EDT sets its post-slot to the state \emph{satisfied}.
 This triggers any links between that EDT's post-slot and the pre-slot of later OCR
-objects in the program DAG.   The rules
-defining when a post slot triggers, the so-called \emph{post-slot
+objects in the program DAG.  The rules
+defining when a post-slot triggers, the so-called \emph{post-slot
 trigger rule}\index{post-slot trigger rule} depends on the type of OCR
 object and is discussed in Section~\ref{sec:Event}.
 
@@ -92,7 +92,7 @@ to establish an immediately satisfied data dependence.
 Slots are used along with data blocks to define data
 dependences\index{data dependence} between OCR objects. For example,
 consider a producer consumer relationships\index{producer consumer
-relationships} between a pair of EDTs.  The post slot of the producer EDT is connected to
+relationships} between a pair of EDTs.  The post-slot of the producer EDT is connected to
 the pre-slot of the consumer EDT. When the producer finishes its work
 and updates the data block it wishes to share, it associates that data
 block with its post-slot and changes the post-slot's state to ``satisfied''.  This triggers
@@ -113,7 +113,7 @@ A slot in the \emph{connected} state can be:
 \end{itemize}
 
 All slots are initially in the \code{unconnected} state. Data
-block post slots are immediately \code{satisfied} as soon as they are
+block post-slots are immediately \code{satisfied} as soon as they are
 connected.
 
 \subsection{Event Driven Task (EDT)}
@@ -139,14 +139,14 @@ when the EDT is created.
 \item Dynamic dependences expressed through a dependence array that is
 formed at runtime from explicit user-specified dependences.
 \item An optional GUID of a OCR object holding data (a \emph{data
-block}) that will be used to satisfy the EDT’s post slot. This is the
+block}) that will be used to satisfy the EDT’s post-slot. This is the
 return value of the function.
 \end{itemize}
 
 When the OCR API is used to create an EDT (using the \code{ocrEdtCreate()} function)
 one or two GUIDs are created.  The first (always returned) is the GUID for the EDT itself.
 The second (returned only on programmer request) is the GUID of the
-event implied by the post slot of the EDT\footnote{It is important to
+event implied by the post-slot of the EDT\footnote{It is important to
 note that although, semantically, an EDT can be the source of a
 dependence, when adding a dependence, the programmer must use the
 GUID of the associated event as the source.}
@@ -171,7 +171,7 @@ finish EDT, however, will not trigger its post-slot until all EDTs
 launched within its scope (i.e.\ its child EDTs and EDTs created
 within its child EDTs) have completed.  The finish EDT still executes
 asynchronously and without blocking. The implied event associated with
-the post slot of a finish EDT is a \emph{latch event}, i.e.\ it is
+the post-slot of a finish EDT is a \emph{latch event}, i.e.\ it is
 connected to the post-slots of all EDTs created within its scope and
 does not trigger until they have all finished.
 
@@ -203,7 +203,7 @@ patterns of synchronization required by a parallel
 algorithm~\cite{ImSa14-2}.
 
 When an event is satisfied, it can optionally include an attached data block on its
-the post slot. Hence, events not only provide synchronization
+post-slot. Hence, events not only provide synchronization
 (control dependences) but they are also the mechanism OCR uses to
 establish data flow dependences. In other words, a classic data flow
 algorithm defines tasks as waiting until data is ``ready''. In OCR
@@ -246,9 +246,9 @@ triggers; in this regard, it is similar to a \emph{once event}.
 Events ``trigger'' when the appropriate \emph{trigger
 rule}\index{trigger rule} is met. The default trigger rule for events
 is when the link on their pre-slot is satisfied, the event triggers
-and passes the state from the pre-slot to its post slot. For example,
+and passes the state from the pre-slot to its post-slot. For example,
 if the pre-slot has an associated data block GUID, that data block
-GUID will be propagated through the event's post slot.
+GUID will be propagated through the event's post-slot.
 
 The trigger rule for a latch event is somewhat more complicated. The
 latch event has two pre-slots; an increment slot and a decrement
@@ -328,7 +328,9 @@ the execution of these EDTs.
 will only read from the Data Block. The OCR Runtime does
 not restrict the ability of other EDTs to write to the data block,
 even if the writes from one EDT might overlap with reads by the EDT
-with read only access.
+with read only access.   If an EDT writes to a data block
+it has acquired in constant mode,
+the results of those writes are undefined should other EDT's later acquire the same data block.
 
 \item \emph{Constant}\index{Data Block, constant}: The EDT will only read from the
 data block and the OCR runtime will assure that once the data block is acquired,

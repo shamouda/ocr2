@@ -88,6 +88,30 @@ in addition to the event associated with its post-slot. We can reason
 about the behavior of the memory model and establish happens-before
 relationship if we define the following rule.
 
+%Vincent's feedback....
+%
+%"If an EDT uses a Data Block to satisfy an event, all writes to that data block from the EDT must complete
+%before the event is triggered.” => I think we already discussed that but I believe you should wait for all the
+%db releases that are sequenced-before the satisfy.
+%1) This is in case of a db storing guids. db1 has data the edt has written to,  db2 has the guid of db1. %Satisfying ev1 with db2, potentially enables edt2, which spawns edt3 that depends on db1’s guid read from
+%db2. With the current rule, db1 may or may not have been released when edt3 acquires it.
+%
+%db1[0]=1
+%db2[0]=db1Guid
+%ocrDbRelease(db1)
+%ocrDbRelease(db2)
+%ocrEventSatisfy(ev1,db2)
+%
+% TGM responds:
+% I submit that since ocrDbRelease(db1) is sequenced before ocrDbRelease(db2) the rules in the memory
+%model forces the releases to occur in that order and therefore the model already covers your case.     Can
+%you tell me what I'm missing ... because I agree with you completely that the model must force the releases
+%to occur in that order prior to the satisfy ... I just think the normal sequenced before relations cover this.
+%
+
+
+
+
 \begin{quote}
 If an EDT uses a Data Block to satisfy an event, all writes to that data block
 from the EDT must complete before the event is triggered.
@@ -185,7 +209,7 @@ interact with the OCR memory model are listed as follows.
 
 \item \emph{Read-Write} (default mode)\index{Data Block, read-write}: The EDT may read
 and write to the data block.  Multiple EDTs may
-write to the same data bock at the same time with values constrained according to the
+write to the same data block at the same time with values constrained according to the
 rules in the OCR memory model.
 
 \item \emph{Exclusive write}\index{Data Block, exclusive write}: The

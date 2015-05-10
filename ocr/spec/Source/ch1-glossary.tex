@@ -40,8 +40,8 @@ Each of the \emph{pre-slots} associated with an EDT connects to a
 single OCR object, while the EDT’s single \emph{post-slot} can connect
 to multiple OCR objects. An EDT transitions to the \emph{runnable} state when all its
 pre-slots have been satisfied; the pre-slots determine which
-data blocks, if any, the EDT may access.  Once an EDT is runnable, it guaranteed to
-eventually run on the OCR platform.
+data blocks, if any, the EDT may access.  Once an EDT is runnable, it is guaranteed to
+eventually run.
 \glossarydefend
 
 % Vivek writes ...
@@ -192,7 +192,7 @@ therefore only satisfy its post-slot at most one time.
 \index{Link}
 \glossarydefstart
 A dependence between OCR objects typically expressed as a connection
-between the post=slot of one OCR object and the pre-slot of another.  Data-Blocks
+between the post-slot of one OCR object and the pre-slot of another.  Data-Blocks
 exposed through the pre-slots of an EDT are said to be ``linked to the EDT''.
 \glossarydefend
 
@@ -200,7 +200,8 @@ exposed through the pre-slots of an EDT are said to be ``linked to the EDT''.
 \glossaryterm{OCR object}
 \index{OCR object}
 \glossarydefstart
-A reference counted object managed by OCR. \emph{EDTs}, \emph{events},
+%  A reference counted <-- Vincent was uneasy wtih this claim
+An object managed by OCR. \emph{EDTs}, \emph{events},
 \emph{templates}, and \emph{data blocks} are the most frequently
 encountered examples of OCR objects. Each OCR object has a unique
 identifier, or GUID.
@@ -233,7 +234,7 @@ block.
 Positional end point for a dependence. An OCR object has one or more
 slots. Exactly one slot is a \emph{post-slot}. This is used to
 communicate the state of the OCR object to other OCR objects. The
-other zero of more slots are \emph{pre-slots}, which are used to manage
+other zero or more slots are \emph{pre-slots}, which are used to manage
 input dependences of the OCR object. A slot can be:
 \begin{itemize}
 \item Unconnected: There are no links connecting to the slot;
