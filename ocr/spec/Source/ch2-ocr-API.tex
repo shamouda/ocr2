@@ -10,26 +10,28 @@ The functions comprising the OCR
 API make use of a number of basic data types defined in the include file \code{ocr.h}.
 The lowest level data types are defined in terms of the following C typedef statements.
 \begin{itemize}
-\item \code{typedef uint64\_t u64} 64-bit unsigned integer
-\item \code{typedef uint32\_t u32} 32-bit unsigned integer
-\item \code{typedef uint16\_t u16} 16-bit unsigned integer
-\item \code{typedef uint8\_t u8} 8-bit unsigned integer
-\item \code{typedef int64\_t s64} 64-bit signed integer
-\item \code{typedef int32\_t s32} 32-bit signed integer
-\item \code{typedef int8\_t s8} 8-bit signed integer
-\item \code{typedef u8 bool} 8-bit boolean
+\item \hypertarget{type_u64}\code{typedef uint64\_t u64} 64-bit unsigned integer
+\item \hypertarget{type_u32}\code{typedef uint32\_t u32} 32-bit unsigned integer
+\item \hypertarget{type_u16}\code{typedef uint16\_t u16} 16-bit unsigned integer
+\item \hypertarget{type_u8}\code{typedef uint8\_t u8} 8-bit unsigned integer
+\item \hypertarget{type_s64}\code{typedef int64\_t s64} 64-bit signed integer
+\item \hypertarget{type_s32}\code{typedef int32\_t s32} 32-bit signed integer
+\item \hypertarget{type_s8}\code{typedef int8\_t s8} 8-bit signed integer
+\item \hypertarget{type_bool}\code{typedef u8 bool} 8-bit boolean
 \end{itemize}
 
 In addition to these low level types, OCR defines a number of opaque data types
 to manage OCR objects and to interact with the OCR environment:
 \begin{itemize}
-\item \code{ocrGuid\_t}: Type of a Globally Unique Identifier used as an opaque handle
-to reference OCR objects.
-\item \code{ocrEdtDep\_t}:  Type of values passed to an EDT on each pre-slot.
-%
+\item \hypertarget{type_ocrGuid_t}\code{ocrGuid\_t}: Opaque handle used to
+reference all OCR objects;
+\item \hypertarget{type_ocrEdtDep_t}\code{ocrEdtDep\_t}: Type of dependences as
+passed into the EDTs; it contains both the GUID and the pointer to any data block
+passed as a dependence;
+% REC: Move to extension; this is part of the ``library mode''
 %  Is this exposed as part of the API?  Or does this belong in one of the appendices?
-\item \code{ocrConfig\_t Struct}:  Reference
-Data-structure containing the configuration parameters for the runtime.
+%\item \code{ocrConfig\_t Struct}:  Reference
+%Data-structure containing the configuration parameters for the runtime.
 \end{itemize}
 
 The C API for OCR makes use of a set of basic macros defined
@@ -44,7 +46,7 @@ The C API for OCR makes use of a set of basic macros defined
 \item \code{\#define ERROR\_GUID}: An invalid GUID.
 \end{itemize}
 
-Most functions in the OCR API return an error code.  These are found
+Most functions in the OCR API return an error code. These are found
 in the \code{ocr-errors.h} include file and are described in the following table.
 
 \tablefirsthead{%
@@ -309,82 +311,101 @@ is provide in the OCR API as following function.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Data Block Management
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\section{data-block management for OCR}
-\index{Data Block Management APIs}
+\section{Data block management}
+\index{Data block management APIs}
 \label{sec:OCRdataBlockManagement}
 
-
 Data blocks are the only form of non-\/ephemeral storage and are therefore
-the only way to \char`\"{}share\char`\"{} data between E\-D\-Ts. Conceptually, data blocks
-are contiguous chunks of memory that have a start address and a size. They also have the following characteristics\-:
+the only way to ``share'' data between E\-D\-Ts. Conceptually, data blocks
+are contiguous chunks of memory that have a start address and a size.
+They also have the following characteristics\-:
 \begin{itemize}
-\item all memory within the data block is accessible from the start-\/address using an
- offset (ie\-: addresses \mbox{[}start-\/address; start-\/address+size\mbox{[} uniquely and
-totally address the entire data-\/block)
-\item non-\/overlapping with other distinct data blocks
-\item the pointer to the start of a data block is only valid between the acquire of
-the data-\/block (implicit when the E\-D\-T starts) and the corresponding ocr\-Db\-Release
- call (or the end of the E\-D\-T, whichever comes first)
+\item all memory within the data block is accessible from the start-\/address
+  using an offset (ie\-: addresses \mbox{[}start-\/address; start-\/address+size\mbox{[}
+  uniquely and totally address the entire data-\/block);
+\item a data block is non-\/overlapping with other distinct data blocks
+\item the pointer to the start of a data block is only valid between the start
+of the E\-D\-T (or the data block creation) and the corresponding \code{ocrDbRelease}
+(or the end of the E\-D\-T).
 \end{itemize}
 
-The following macros and enums  are used with OCR data blocks.  QUESTION: HOW MANY OF THESE
-ARE CORE API and HOW MANY BELONG IN THE IMPLEMENTATION SECTION?
+The following macros and enums are used with OCR data blocks.
 \begin{itemize}
-\item \code{enum ocrInDbAllocator\_t { NO\_ALLOC }}
-\item \code{enum ocrDbAccessMode\_t { DB\_MODE\_CONST, DB\_MODE\_RW ,
-DB\_MODE\_EW, DB\_MODE\_RO}}
-\item \code{DB\_DEFAULT\_MODE ((ocrDbAccessMode\_t)DB\_MODE\_RW)}
-\item \code{DB\_PROP\_NONE}
-\item \code{DB\_PROP\_NO\_ACQUIRE}
-\item \code{DB\_PROP\_SINGLE\_ASSIGNMENT}
+\item \hypertarget{type_ocrInDbAllocator_t}\code{enum ocrInDbAllocator\_t} containing:
+  \begin{itemize}
+  \item \code{NO\_ALLOC} The data block is not used as a heap
+  \end{itemize}
+\item \code{enum ocrDbAccessMode\_t} containing the four access modes:
+  \begin{itemize}
+    \item \code{DB\_MODE\_RW}
+    \item \code{DB\_MODE\_EW}
+    \item \code{DB\_MODE\_RO}
+    \item \ocde{DB\_MODE\_CONST}
+  \end{itemize}
+\item \code{DB\_DEFAULT\_MODE} which is an alias of \code{DB\_MODE\_RW}
+\item \code{DB\_PROP\_NONE} which specifies no special properties on the data block
+\item \code{DB\_PROP\_NO\_ACQUIRE} which specifies that the data block should
+  not be acquired on creation
+% REC: Removed SINGLE_ASSIGNMENT; only used in distributed and not part of the
+% described modes/functionality
 \end{itemize}
 
-
-These are the modes with which an EDT can access a data block. OCR currently supports four
-modes:
+These are the modes with which an EDT can access a data block.
+OCR currently supports four modes:
 \begin{itemize}
-\item \code{DB\_MODE\_RW}  Read-Write (default mode): The EDT is stating that it may Read-from and Write-to the
-data block.   The user is responsible for synchronizing between EDTs that could potentially write to
-the same data block concurrently.
-\item \code{DB\_MODE\_EW}  Exclusive-Write (EW): The EDT requires that it be the only one accessing the data block. The
-runtime will not schedule any other EDT that accesses the same data block in EW or ITW mode
-concurrently. This can limit parallelism.
-\item \code{DB\_MODE\_RO}   Read-Only: The EDT is stating that it will only read from the data block.
-The runtime does not gaurantee, however, that concurrent writes to the data block from other
-EDTs will not be visible.
-\item \code{DB\_MODE\_CONST}  Constant: The EDT is stating that it will only read from the data block. In this mode, the
-runtime guarantees that the data block seen by the EDT is not modified by other concurrent
-EDTs (in other words, the data block does not change "under you". Any violation of the
-"no-write" contract by the program will result in undefined behavior (the write may or may not
-be visible to other EDTs depending on the implementation and specific runtime conditions). \\
+\item \code{DB\_MODE\_RW} Read-Write (default mode): The EDT is stating that it
+may read from and write-to the data block. The user is responsible for
+synchronizing between EDTs that could potentially write to the same data block
+concurrently.
+\item \code{DB\_MODE\_EW} Exclusive-Write (EW): The EDT requires that it be
+the only one writing to the data block. The runtime will not schedule any other
+EDT that accesses the same data block in RW or EW mode concurrently.
+This can limit parallelism.
+\item \code{DB\_MODE\_RO} Read-Only: The EDT is stating that it will only read
+from the data block. The runtime will not enforce this restriction but the
+visibility of any writes done by the EDT is undefined. The runtime also does
+not guarantee that concurrent writes to the data block from other EDTs
+will not be visible. In other words, another concurrent EDT in EW or RW mode may
+concurrently access the data block and modify it while this EDT is accessing it in
+RO mode.
+\item \code{DB\_MODE\_CONST} Constant: Similarly to the RO mode, the EDT is
+again stating that it will not write to the data block. In this mode, however,
+the runtime guarantees that the data block seen by the EDT will not be modified
+by other concurrent EDTs. Similarly to the RO mode, the visibility of any writes
+by this EDT (in violation of the ``contract'') is undefined.
 \end{itemize}
 
 \subsection*{Functions}
 \begin{DoxyCompactItemize}
 \item
-\hyperlink{group__OCRTypesGeneral_ga92c50087ca0e64fa93fc59402c55f8ca}{u8} \hyperlink{func_ocrDbCreate}
-{ocr\-Db\-Create} (\hyperlink{group__OCRTypesGeneral_gacde3883d1ce245c051133c2c3aa82fc8}{ocr\-Guid\-\_\-t} $\ast$db, void $\ast$$\ast$addr, \hyperlink{group__OCRTypesGeneral_ga3f7e2bcbb0b4c338f3c4f6c937cd4234}{u64} len, \hyperlink{group__OCRTypesGeneral_gace9d960e74685e2cd84b36132dbbf8aa}{u16} flags, \hyperlink{group__OCRTypesGeneral_gacde3883d1ce245c051133c2c3aa82fc8}{ocr\-Guid\-\_\-t} affinity, \hyperlink{group__OCRTypesDB_gabffd082fa19860aa5a9822beba6b68a5}{ocr\-In\-Db\-Allocator\-\_\-t} allocator)
-\begin{DoxyCompactList}\small\item\em Request the creation of a data block. \end{DoxyCompactList}
-
+  \hyperlink{type_u8}{u8} \hyperlink{func_ocrDbCreate}
+            {\code{ocrDbCreate}}(\hyperlink{type_ocrGuid_t}}{ocr\-Guid\-\_\-t} $\ast$db,
+    void $\ast$$\ast$addr, \hyperlink{type_u64}{u64} len, \hyperlink{type_u16}{u16} flags,
+    \hyperlink{type_ocrGuid_t}{ocr\-Guid\-\_\-t} affinity,
+    \hyperlink{type_ocrInDbAllocator_t}{ocr\-In\-Db\-Allocator\-\_\-t} allocator)
+    \begin{DoxyCompactList}
+      \small\item \emph{Request the creation of a data block.}
+    \end{DoxyCompactList}
 \item
-\hyperlink{group__OCRTypesGeneral_ga92c50087ca0e64fa93fc59402c55f8ca}{u8} \hyperlink{group__OCRDataBlock_gabc80ea5594e5e55a541a1df4c7727821}
-{ocr\-Db\-Destroy} (\hyperlink{group__OCRTypesGeneral_gacde3883d1ce245c051133c2c3aa82fc8}{ocr\-Guid\-\_\-t} db)
-\begin{DoxyCompactList}\small\item\em Request for the destruction of a data block. \end{DoxyCompactList}
-
+  \hyperlink{type_u8}{u8} \hyperlink{func_ocrDbDestroy}
+            {\code{ocrDbDestroy}}(\hyperlink{type_ocrGuid_t}{ocr\-Guid\-\_\-t} db)
+    \begin{DoxyCompactList}
+      \small\item \emph{Request the destruction of a data block.}
+    \end{DoxyCompactList}
 \item
-\hyperlink{group__OCRTypesGeneral_ga92c50087ca0e64fa93fc59402c55f8ca}{u8} \hyperlink{group__OCRDataBlock_ga2ec03c0b0998bdaf9ccc44a06fb05ca0}
-{ocr\-Db\-Release} (\hyperlink{group__OCRTypesGeneral_gacde3883d1ce245c051133c2c3aa82fc8}{ocr\-Guid\-\_\-t} db)
-\begin{DoxyCompactList}\small\item\em Release the D\-B (indicates that the E\-D\-T no longer needs to access it) \end{DoxyCompactList}
-
+  \hyperlink{type_u8}{u8} \hyperlink{func_ocrDbRelease}
+            {\code{ocrDbRelease}(\hyperlink{type_ocrGuid_t}{ocr\-Guid\-\_\-t} db)
+    \begin{DoxyCompactList}
+      \small\item \emph{Release the data block indicating the end of its use by
+        the EDT.}
+    \end{DoxyCompactList}
 \end{DoxyCompactItemize}
-
-
 %
 %  ocdDbCreate
 %
-\hypertarget{func_ocrDbCreate}{\index{Data-\/block management for O\-C\-R@{Data-\/block management for O\-C\-R}!ocr\-Db\-Create@{ocr\-Db\-Create}}
-\index{ocr\-Db\-Create@{ocr\-Db\-Create}!Data-block management for OCR@{Data-\/block management for O\-C\-R}}
-\subsection[{ocr\-Db\-Create}]{\setlength{\rightskip}{0pt plus 5cm}{\bf u8} ocr\-Db\-Create(
+\hypertarget{func_ocrDbCreate}{
+  \index{Data block management@{Data block management}!ocr\-Db\-Create@{ocr\-Db\-Create}}
+  \subsection[{ocr\-Db\-Create}]{\setlength{\rightskip}{0pt plus 5cm}{\bf u8} ocr\-Db\-Create(
 \begin{DoxyParamCaption}
 \item[{{\bf ocr\-Guid\-\_\-t} $\ast$}]{db, }
 \item[{void $\ast$$\ast$}]{addr, }
@@ -393,49 +414,51 @@ be visible to other EDTs depending on the implementation and specific runtime co
 \item[{{\bf ocr\-Guid\-\_\-t}}]{affinity, }
 \item[{{\bf ocr\-In\-Db\-Allocator\-\_\-t}}]{allocator}
 \end{DoxyParamCaption}
-)}}\label{func_ocrDbCreate}
+)}}
+\label{func_ocrDbCreate}
 
-Requests the runtime to create a data-block of a specified size. After
+Requests the creation of a data block of the specified size. After
 a successful call, the runtime will return the GUID for the newly
-created data-block and a pointer to it (if requested).
+created data block and a pointer to it (if requested).
 
 \begin{DoxyParams}[1]{Parameters}
-\mbox{\tt out}  & {\em db} & On successful creation, contains the GUID
-of the data-block. If the call fails, the returned value is undefined \\
+\mbox{\tt out}  & \code{db} & On successful creation, contains the GUID
+of the data block. If the call fails, the returned value is undefined \\
 \hline
-\mbox{\tt out}  & {\em addr} & On successful creation and if the
-DB\_PROP\_NO\_ACQUIRE is not specified in {\em flags}, this call will
-acquire the data-block and its address will be returned in this
-parameter. If DB\_PROP\_NO\_ACQUIRE is specified in {\em flags}, the
+\mbox{\tt out}  & \code{addr} & On successful creation and if the
+DB\_PROP\_NO\_ACQUIRE is not specified in \code{flags}, the created
+data block will be acquired and its starting address will be
+returned in this parameter.
+If DB\_PROP\_NO\_ACQUIRE is specified in \code{flags}, the
 value returned will be NULL. If the call fails, the returned value is
 undefined \\
 \hline
-\mbox{\tt in}  & {\em len} & Size, in bytes, of the data-block to create  \\
+\mbox{\tt in}  & \code{len} & Size, in bytes, of the datablock to create \\
 \hline
-\mbox{\tt in}  & {\em flags} & Flags controlling the behavior of the
-data-block creation. The following flags are supported:
+\mbox{\tt in}  & \code{flags} & Flags controlling the behavior of the
+data block creation. The supported flags are:
 \begin{DoxyItemize}
 \item DB\_PROP\_NONE: Default behavior (described in this section)
-\item DB\_PROP\_NO\_ACQUIRE: The created data-block may not be used by
-  this EDT (NULL will be returned in \em{addr}). Note that the actual
-  data-block may be delayed until it is needed
+\item DB\_PROP\_NO\_ACQUIRE: The created data block may not be used by
+  this EDT (NULL will be returned in \code{addr}). Note that a conforming
+  implementation may delay the creation of the data block until it is
+  acquired by another EDT.
 \end{DoxyItemize}\\
 \hline
-\mbox{\tt in,out}  & {\em affinity} & Currently unsupported. Reserved
-for future use. Parameter value should be NULL\_GUID\\
+\mbox{\tt in,out}  & \code{affinity} & Reserved for future use. This parameter
+should be NULL\_GUID \\
 \hline
-\mbox{\tt in}  & {\em allocator} & A data-block can be used as the
+\mbox{\tt in}  & \code{allocator} & A data block can be used as the
 backing memory for malloc/free-like operations. This parameter
 specifies the allocator to use for these operations inside this
-data-block. Note that if an in data-block allocator is used, the user
-should not write directly to the data-block as this may overwrite the
+data block. Note that if a data block allocator is used, the user
+should not write directly to the data block as this may overwrite the
 meta data used by the allocator. The 'NO\_ALLOC' allocator is used to
-indicate that the data-block is not used by any allocator and is
+indicate that the data block is not used by any allocator and is
 therefore usable as POD. Supported values for this parameter are given
 by \hyperlink{type_ocrInDbAllocator_t}{ocrInDbAllocator\_t}.\\
 \hline
 \end{DoxyParams}
-
 
 \returns
 A status code:
@@ -449,42 +472,33 @@ A status code:
   is possible
 \end{DoxyItemize}
 
-%%%%
-%%%%  someone needs to write a more complete description of the semantics of this function
-%%%%
 \descr
 This function is used to create the basic unit of data in OCR: the
-data-block. Unless DB\_PROP\_NO\_ACQUIRE is specified in \emph{flags}, this
-function call also acquires the newly created data-block and returns a
-pointer to the memory region (in \emph{addr}).
+data block. Unless DB\_PROP\_NO\_ACQUIRE is specified in \code{flags}, this
+function also acquires the newly created data block and returns a
+pointer to the start of the data block in \code{addr}.
 
-The created data-block:
+The created data block:
 \begin{DoxyItemize}
-\item Will always be 8-byte aligned (ie: if \emph{addr} is returned, it
-  will be 8-byte aligned);
+\item Will always be 8-byte aligned
 \item Will not necessarily be zeroed out; the value of the created
-  data-block is undefined;
+  data block is undefined;
 \item Will have a GUID that is unique from this call until the user
-  calls \bf{ocrDbDestroy()} on this data-block.
+  calls \code{ocrDbDestroy()} on this data block.
 \end{DoxyItemize}
-If a valid address is returned in \emph{addr}, it will point to the
-first byte of the data-block and the user can safely read or write
-to a range of length \emph{len} starting at \emph{addr} until the end of
-the EDT or a call to \code{ocrDbRelease()} on this data-block, whichever
-comes first.
 
 \begin{DoxyNote}{Note}
 \begin{DoxyItemize}
 \item Using the DB\_PROP\_NO\_ACQUIRE flag is recommended to allow the
   runtime to make placement decisions for newly created
-  data-blocks. Not specifying this flag may result in a sub-optimal
-  memory placement for the created data-block.
+  data blocks. Not specifying this flag may result in a sub-optimal
+  memory placement for the created data block.
 \item When DB\_PROP\_NO\_ACQUIRE is specified, a conformant
   implementation may choose not to create the data-block immediately
   and instead create it lazily before the using EDT runs.
-\item Like all GUIDs, the uniqueness of a data-block's GUID is not
-  necessarily unique throughout the entire program. A data-block's
-  GUID is guaranteed unique only as long as the data-block exists
+\item Like all GUIDs, the uniqueness of a data block's GUID is not
+  necessarily unique throughout the entire program. A data block's
+  GUID is guaranteed unique only as long as the data block exists
   (between \code{ocrDbCreate()} and \code{ocrDbDestroy()}).
 \end{DoxyItemize}
 \end{DoxyNote}
@@ -492,91 +506,99 @@ comes first.
 %
 %  ocrDbDestroy
 %
-\hypertarget{group__OCRDataBlock_gabc80ea5594e5e55a541a1df4c7727821}{\index{Data-\/block management for O\-C\-R@{Data-\/block management for O\-C\-R}!ocr\-Db\-Destroy@{ocr\-Db\-Destroy}}
-\index{ocr\-Db\-Destroy@{ocr\-Db\-Destroy}!Data-block management for OCR@{Data-\/block management for O\-C\-R}}
-\subsection[{ocr\-Db\-Destroy}]{\setlength{\rightskip}{0pt plus 5cm}{\bf u8} ocr\-Db\-Destroy (
+\hypertarget{func_ocrDbDestroy}{
+  \index{Data block management@{Data block management}!ocr\-Db\-Destroy@{ocr\-Db\-Destroy}}
+  \subsection[{ocr\-Db\-Destroy}]{\setlength{\rightskip}{0pt plus 5cm}{\bf u8} ocr\-Db\-Destroy(
 \begin{DoxyParamCaption}
 \item[{{\bf ocr\-Guid\-\_\-t}}]{db}
 \end{DoxyParamCaption}
-)}}\label{group__OCRDataBlock_gabc80ea5594e5e55a541a1df4c7727821}
+)}}
+\label{func_ocrDbDestroy}
 
-Request for the destruction of a data block.
+Request for the destruction of a data block. All created data blocks should be
+destroyed when no longer needed to reclaim the space they utilize.
 
 \begin{DoxyParams}[1]{Parameters}
-\mbox{\tt in}  & {\em db} & Data block to destroy \\
+\mbox{\tt in}  & \code{db} & GUID of the data block to destroy \\
 \hline
 \end{DoxyParams}
 
 \returns
-a status code\-:
+A status code:
 \begin{DoxyItemize}
-\item 0\-: successful
-\item E\-P\-E\-R\-M\-: db was already destroyed
-\item E\-I\-N\-V\-A\-L\-: db does not refer to a valid data-\/block
+\item 0: successful
+\item OCR\_EPERM: The data block was already destroyed
+\item OCR\_EINVAL: The GUID passed as argument does not refer to
+  a valid data block
 \end{DoxyItemize}
 
 \descr
-The E\-D\-T does not need to have acquired the data block to destroy it.
-\hyperlink{group__OCRDataBlock_gabc80ea5594e5e55a541a1df4c7727821}{ocr\-Db\-Destroy()} will
-request destruction of the D\-B but the D\-B will only be destroyed once all other E\-D\-Ts that have acquired
- it release it (either implicitly at the end of the E\-D\-T or with an explicit
- \hyperlink{group__OCRDataBlock_ga2ec03c0b0998bdaf9ccc44a06fb05ca0}{ocr\-Db\-Release()} call).
+OCR does not perform automatic garbage collection; all created data blocks therefore
+need to be explicitly destroyed by the user. This function will request the
+destruction of a data block but said destruction will be delayed until all
+EDTs that have acquired the data block have released it (either explicitly with
+\hyperlink{func_ocrDbRelease}{\code{ocrDbRelease()}} or by transitioning to the
+\emph{released} state).
+
+This function does not need to be called by an EDT that has acquired the data block.
+If the EDT did acquire the data block, however, this function will implicitly
+release it (equivalent to calling \hyperlink{func_ocrDbRelease}{\code{ocrDbRelease()}}.
 
 \begin{DoxyNote}{Note}
-If the E\-D\-T has acquired this D\-B, this call implicitly releases the D\-B.
+Not all instances of the errors indicated by the error codes can be caught. In
+other words, attempting the destroy a data block multiple times may result in the
+return of an error code but may also result in undefined behavior.
 \end{DoxyNote}
-Once a data block has been marked as 'to-\/be-\/destroyed' by this call, the following operations on the same data block will result in an error\-:
-\begin{DoxyItemize}
-\item calling \hyperlink{group__OCRDataBlock_gabc80ea5594e5e55a541a1df4c7727821}{ocr\-Db\-Destroy()}
-again (will return E\-P\-E\-R\-M) The following operations will produce undefined behavior\-:
-\begin{DoxyItemize}
-\item accessing the actual location of the data block (through a pointer)
-\item acquiring the data block (implicit on E\-D\-T start)
-\end{DoxyItemize}
-\end{DoxyItemize}
 
 %
 % ocrDbRelease
 %
-\hypertarget{group__OCRDataBlock_ga2ec03c0b0998bdaf9ccc44a06fb05ca0}{\index{Data-\/block management for O\-C\-R@{Data-\/block management for O\-C\-R}!ocr\-Db\-Release@{ocr\-Db\-Release}}
-\index{ocr\-Db\-Release@{ocr\-Db\-Release}!Data-block management for OCR@{Data-\/block management for O\-C\-R}}
-\subsection[{ocr\-Db\-Release}]{\setlength{\rightskip}{0pt plus 5cm}{\bf u8} ocr\-Db\-Release (
+\hypertarget{func_ocrDbRelease}{
+  \index{Data block management@{Data-\/block management}!ocr\-Db\-Release@{ocr\-Db\-Release}}
+  \subsection[{ocr\-Db\-Release}]{\setlength{\rightskip}{0pt plus 5cm}{\bf u8} ocr\-Db\-Release(
 \begin{DoxyParamCaption}
 \item[{{\bf ocr\-Guid\-\_\-t}}]{db}
 \end{DoxyParamCaption}
-)}}\label{group__OCRDataBlock_ga2ec03c0b0998bdaf9ccc44a06fb05ca0}
+)}}
+\label{func_ocrDbRelease}
 
-
-Release the D\-B (indicates that the E\-D\-T no longer needs to access it)
-
+An EDT acquires a data block either on creation with \hyperlink{func_ocrDbCreate}{\code{ocrDbCreate()}}
+or implicitly when it transitions to the \emph{ready} state. All acquired data blocks
+will be implicitly released by the runtime when the EDT transitions to the
+\emph{released} state but they can be released earlier using this function.
+Releasing a data block indicates that the EDT no longer has use for it and also
+enables other EDTs to ``see'' the eventual changes to the data block (release consistency).
 
 \begin{DoxyParams}[1]{Parameters}
-\mbox{\tt in}  & {\em db} & Data block to release\\
+\mbox{\tt in}  & \code{db} & GUID of the data block to release\\
 \hline
 \end{DoxyParams}
-\begin{DoxyReturn}{Returns}
-a status code\-:
+
+\returns
+A status code:
 \begin{DoxyItemize}
-\item 0\-: successful
-\item E\-I\-N\-V\-A\-L\-: db does not refer to a valid data block
-\item E\-A\-C\-C\-E\-S\-: E\-D\-T has not acquired the data block and therefore cannot release it
+\item 0: successful
+\item OCR\_EINVAL: The GUID passed as argument does not refer to a
+  valid data block
+\item OCR\_EACCESS: The calling EDT has not acquired the data block
+  and therefore cannot release it
 \end{DoxyItemize}
-\end{DoxyReturn}
 
 \descr
-This call can be used to indicate an early release of the data block (ie\-: it is not needed in the rest of the E\-D\-T). Once the data block is released, pointers that were previously associated with it are invalid and should not be used to access the data.
-
-The functionality of \hyperlink{group__OCRDataBlock_ga2ec03c0b0998bdaf9ccc44a06fb05ca0}{ocr\-Db\-Release()} is implicitly contained in\-:
-\begin{DoxyItemize}
-\item \hyperlink{group__OCRDataBlock_gabc80ea5594e5e55a541a1df4c7727821}{ocr\-Db\-Destroy()}
-\item E\-D\-T exit
-\end{DoxyItemize}
+This function is critical in ensuring proper memory ordering in OCR. A data block
+can be ``shared'' with another EDT B by satisfying an event that B depends on. B
+is only guaranteed to see the changes made to the data block by this EDT if this
+EDT releases the data block before satisfying the event B depends on with this
+data block.
 
 \begin{DoxyNote}{Note}
-ocr\-Db\-Release should only be called {\itshape once} at most.
+Once the EDT releases a data block, it can no longer read or write to it (the
+pointer it had to it should be considered invalid). Violating this rule will
+result in undefined behavior. A consequence of this is that a data block can
+only be released at most once by an EDT.
 \end{DoxyNote}
 
- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Event Management
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Event Management for OCR}
