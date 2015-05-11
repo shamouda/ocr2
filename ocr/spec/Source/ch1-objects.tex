@@ -132,7 +132,7 @@ execution of an EDT is said to be \emph{non-blocking}.
 
 The work carried out by an EDT is defined by
 the \emph{EDT function}\index{EDT function}. The EDT function prototype
-and return values are defined in the OCR API (see section~\ref{group__OCREDT}).
+and return values are defined in the OCR API (see section~\ref{sec:OCRTaskManagement}).
 \begin{itemize}
 \item The parameters of the EDT function which are copied by value
 when the EDT is created.
@@ -296,7 +296,7 @@ EDT, whichever comes first)
 \end{itemize}
 
 Data blocks can be explicitly connected to other OCR objects through the OCR
-dependence API (see Chapter~\ref{group__OCRDependences}).
+dependence API (see Chapter~\ref{sec:OCRDependenceManagement}).
 The more common usage pattern, however, is
 to attach data blocks to events and pass them through the
 directed acyclic graph associated with an OCR program to support a

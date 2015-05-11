@@ -88,7 +88,7 @@ in the \code{ocr-errors.h} include file and described in Table~\ref{tab:errorcod
 \plc{OCR\_EFAULT} & Bad address\\
 \plc{OCR\_EBUSY} & Device or resource busy\\
 \plc{OCR\_ENODEV} & No such device\\
-\plc{OCR\_EINVA} &L Invalid argument\\
+\plc{OCR\_EINVAL} & Invalid argument\\
 \plc{OCR\_ENOSPC} & No space left on device\\
 \plc{OCR\_ESPIPE} & Illegal seek\\
 \plc{OCR\_EROFS} & Read-only file system\\
@@ -104,7 +104,8 @@ in the \code{ocr-errors.h} include file and described in Table~\ref{tab:errorcod
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% The OCR Main EDT
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\section{OCR entry point: \code{mainEdt}}
+\hypertarget{func_mainEdt}{
+\section{OCR entry point: \code{mainEdt}}}
 \label{sec:mainEDT}
 
 An OCR program's single point of entry is the user-defined main EDT (\code{mainEdt()}).
@@ -350,7 +351,7 @@ output string.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Data block management}
 \index{Data block management APIs}
-\label{sec:OCRdataBlockManagement}
+\label{sec:OCRDataBlockManagement}
 
 Data blocks are the only form of non-\/ephemeral storage and are therefore
 the only way to ``share'' data between E\-D\-Ts. Conceptually, data blocks
@@ -372,8 +373,9 @@ The following macros and enums are used with OCR data blocks.
   \begin{itemize}
   \item \code{NO\_ALLOC} The data block is not used as a heap
   \end{itemize}
-\item \code{enum ocrDbAccessMode\_t} containing the four access modes. The
-meaning of the access modes is given in Section~\ref{sec:datablocks}:
+\item \hypertarget{type_ocrDbAccessMode_t}{\code{enum ocrDbAccessMode\_t}}
+  containing the four access modes. The
+  meaning of the access modes is given in Section~\ref{sec:datablocks}:
   \begin{itemize}
     \item \code{DB\_MODE\_RW}
     \item \code{DB\_MODE\_EW}
@@ -642,7 +644,7 @@ only be released at most once by an EDT.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Event Management}
 \index{Event management APIs}
-\label{sec:OCReventManagement}
+\label{sec:OCREventManagement}
 
 Events are used to coordinate the execution of tasks and to
 help establish dependences in the directed acyclic graph representing the
@@ -915,111 +917,165 @@ have been released when that EDT finished and moved to the \emph{release} stage.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% EDT API
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\hypertarget{group__OCREDT}{\section{Event Driven Task A\-P\-I}
-\label{group__OCREDT}\index{Event Driven Task A\-P\-I@{Event Driven Task A\-P\-I}}
-}
+\section{Task management}
+\index{Event Driven Task management API}
+\label{sec:OCRTaskManagement}
 
-Event Driven Tasks -- E\-D\-Ts -- act as the task abstraction of O\-C\-R, and all
+Event driven tasks -- EDTs -- act as the task abstraction in OCR, and all
 program computations are expressed using E\-D\-Ts.
 
+A support type for EDTs is the EDT template which factor out some information
+about EDTs. To create an EDT, an EDT template first needs to be created. The EDT
+template can be reused for all instances of an EDT of the same type.
 
+The following macros and enums are used with OCR tasks.
 \begin{itemize}
-\item \#define EDT\_PROP\_NONE
-\item \#define EDT\_PROP\_FINISH
-\item \#define EDT\_PARAM\_UNK: Constant indicating that the number of parameters or dependences to an EDT or EDT template is
-unknown.
-\item \#define EDT\_PARAM\_DEF: Constant indicating that the number of parameters or dependences to an EDT is the same as the one
-specified in its template.
+\item \code{EDT\_PROP\_NONE} which specifies no special properties
+  for the creation of an EDT
+\item \code{EDT\_PROP\_FINISH} which specifies that the created EDT
+  is a \emph{finish} EDT
+\item \code{EDT\_PARAM\_UNK} which specifies that the number of
+  parameters or dependences to an EDT or EDT template is unknown at this time
+\item \code{EDT\_PARAM\_DEF} which specifies that the number of parameters
+  or dependences to an EDT is the same as the one specified in its template
 \end{itemize}
 
-E\-D\-T instances are created from their corresponding E\-D\-T templates, that also contain metadata of all E\-D\-Ts
-of that type. O\-C\-R provides A\-P\-I functions to manage E\-D\-Ts, for creating and destroying E\-D\-Ts and templates, as shown below.
+The prototype of an EDT function is given by
+\hypertarget{type_ocrEdt_t}{
+  \hypertarget{type_ocrGuid_t}{ocrGuid\_t} (\code{$\ast$ocrEdt\_t})(
+  \hypertarget{type_u32}{u32} \code{paramc}, \hypertarget{type_u64}{u64} \code{$\ast$paramv},
+  \hypertarget{type_u32}{u32} \code{depc}, \hypertarget{type_ocrEdtDep_t}
+              {ocrEdtDep\_t} \code{depv[]})}
+
+\subsection*{Functions}
 \begin{DoxyCompactItemize}
 \item
-\hyperlink{type_u8}{u8}
-\hyperlink{group__OCREDT_ga9649098ffad669c1c820cd821792d67a}
-{ocr\-Edt\-Template\-Create}(\hyperlink{type_ocrGuid_t}{ocr\-Guid\-\_\-t} guid, func\-Ptr,\hyperlink{type_u32}{u32} paramc, \hyperlink{type_u32}{u32} depc)
-\begin{DoxyCompactList}\small\item\em Creates an E\-D\-T template. \end{DoxyCompactList}
-
+  \hyperlink{type_u8}{u8} \hyperlink{func_ocrEdtTemplateCreate}
+            {\code{ocrEdtTemplateCreate}}(\hyperlink{type_ocrGuid_t}{ocr\-Guid\-\_\-t} guid,
+    ocrEdt\_t funcPtr, \hyperlink{type_u32}{u32} paramc, \hyperlink{type_u32}{u32} depc)
+    \begin{DoxyCompactList}
+      \small\item \emph{Request the creation of an EDT template.}
+    \end{DoxyCompactList}
 \item
-\hyperlink{type_u8}{u8} \hyperlink{group__OCREDT_gace7063cfee522df47c64bf5013385c10}
-{ocr\-Edt\-Template\-Destroy} (\hyperlink{type_ocrGuid_t}{ocr\-Guid\-\_\-t} guid)
-\begin{DoxyCompactList}\small\item\em Destroys an E\-D\-T template. \end{DoxyCompactList}
-
+  \hyperlink{type_u8}{u8} \hyperlink{func_ocrEdtTemplateDestroy}
+            {\code{ocrEdtTemplateDestroy}}(\hyperlink{type_ocrGuid_t}{ocr\-Guid\-\_\-t} guid)
+  \begin{DoxyCompactList}
+    \small\item \emph{Request the destruction of an EDT template.}
+  \end{DoxyCompactList}
 \item
-\hyperlink{type_u8}{u8} \hyperlink{group__OCREDT_gafa2443b31c38b4b7f9f59713abe12ecc}
-{ocr\-Edt\-Create} (\hyperlink{type_ocrGuid_t}{ocr\-Guid\-\_\-t} $\ast$guid, \hyperlink{type_ocrGuid_t}{ocr\-Guid\-\_\-t} template\-Guid, \hyperlink{type_u32}{u32} paramc, \hyperlink{group__OCRTypesGeneral_ga3f7e2bcbb0b4c338f3c4f6c937cd4234}{u64} $\ast$paramv, \hyperlink{type_u32}{u32} depc, \hyperlink{type_ocrGuid_t}{ocr\-Guid\-\_\-t} $\ast$depv, \hyperlink{group__OCRTypesGeneral_gace9d960e74685e2cd84b36132dbbf8aa}{u16} properties, \hyperlink{type_ocrGuid_t}{ocr\-Guid\-\_\-t} affinity, \hyperlink{type_ocrGuid_t}{ocr\-Guid\-\_\-t} $\ast$output\-Event)
-\begin{DoxyCompactList}\small\item\em Creates an E\-D\-T instance from an E\-D\-T template. \end{DoxyCompactList}
-
+  \hyperlink{type_u8}{u8} \hyperlink{func_ocrEdtCreate}
+            {\code{ocrEdtCreate}}(\hyperlink{type_ocrGuid_t}{ocr\-Guid\-\_\-t} $\ast$guid,
+    \hyperlink{type_ocrGuid_t}{ocr\-Guid\-\_\-t} template\-Guid,
+    \hyperlink{type_u32}{u32} paramc, \hyperlink{type_u64}{u64} $\ast$paramv,
+    \hyperlink{type_u32}{u32} depc, \hyperlink{type_ocrGuid_t}{ocr\-Guid\-\_\-t} $\ast$depv,
+    \hyperlink{type_u16}{u16} flags, \hyperlink{type_ocrGuid_t}{ocr\-Guid\-\_\-t} affinity,
+    \hyperlink{type_ocrGuid_t}{ocr\-Guid\-\_\-t} $\ast$output\-Event)
+    \begin{DoxyCompactList}
+      \small\item \emph{Request the creation of an EDT instance using
+        the specified EDT template}
+    \end{DoxyCompactList}
 \item
-\hyperlink{type_u8}{u8} \hyperlink{group__OCREDT_gae258a29af116794a73099e9c6d9232f8}
-{ocr\-Edt\-Destroy} (\hyperlink{type_ocrGuid_t}{ocr\-Guid\-\_\-t} guid)
-\begin{DoxyCompactList}\small\item\em Destroys an E\-D\-T. \end{DoxyCompactList}
-
+  \hyperlink{type_u8}{u8} \hyperlink{func_ocrEdtDestroy}
+            {\code{ocrEdtDestroy}}(\hyperlink{type_ocrGuid_t}{ocr\-Guid\-\_\-t} guid)
+    \begin{DoxyCompactList}
+      \small\item \emph{Request the explicit destruction of an EDT.}
+    \end{DoxyCompactList}
 \end{DoxyCompactItemize}
-
-
 %
 % ocrEdtTemplateCreate (macro)
 %
-\index{Event Driven Task A\-P\-I@{Event Driven Task A\-P\-I}!ocr\-Edt\-Template\-Create@{ocr\-Edt\-Template\-Create}}
-\index{ocr\-Edt\-Template\-Create@{ocr\-Edt\-Template\-Create}!Event Driven Task API@{Event Driven Task A\-P\-I}}
-\subsection[{ocr\-Edt\-Template\-Create}]{\setlength{\rightskip}{0pt plus 5cm}\#define ocr\-Edt\-Template\-Create(
+\hypertarget{func_ocrEdtTemplateCreate}{
+  \index{Task management@{Task management}!ocr\-Edt\-Template\-Create@{ocr\-Edt\-Template\-Create}}
+  \subsection[{ocr\-Edt\-Template\-Create}]{\setlength{\rightskip}{0pt plus 5cm}{\bf u8}ocr\-Edt\-Template\-Create(
 \begin{DoxyParamCaption}
 \item[{{\bf ocr\-Guid\-\_\-t} $\ast$}]{guid, }
 \item[{{\bf ocr\-Edt\-\_\-t}}]{func\-Ptr, }
 \item[{{\bf u32}}]{paramc, }
 \item[{{\bf u32}}]{depc, }
-\end{DoxyParamCaption})~}
+\end{DoxyParamCaption}
+)}}
+\label{func_ocrEdtTemplateCreate}
 
-
-Creates an E\-D\-T template.
-
-
-
+The EDT template encapsulates information concerning the basic signature and behavior
+of all EDTs created based on the template. This function creats an EDT template.
 
 \begin{DoxyParams}[1]{Parameters}
-\mbox{\tt out}  & {\em guid} & Runtime created G\-U\-I\-D for the newly created E\-D\-T Template \\
+\mbox{\tt out}  & \code{guid} & On successful creation, contains the GUID of the
+EDT template. If the call fails, the returned value is undefined.\\
 \hline
-\mbox{\tt in}  & {\em func\-Ptr} & E\-D\-T function. This function must be of type \hyperlink{group__OCRTypesEDT_ga6d853145262e968a06fbe8a6799bef64}{ocr\-Edt\-\_\-t}. \\
+\mbox{\tt in}  & \code{funcPtr} & The function the EDT will execute when it runs.
+This function must be of type \hyperlink{type_ocrEdt_t}{\code{ocrEdt\_t}}.\\
 \hline
-\mbox{\tt in}  & {\em paramc} & Number of parameters that the E\-D\-Ts will take. If not known or variable, this can be E\-D\-T\-\_\-\-P\-A\-R\-A\-M\-\_\-\-U\-N\-K \\
+\mbox{\tt in}  & \code{paramc} & The number of parameters EDTs created based on
+this template will take. If EDTs created based on this template can take a variable
+number of arguments, the constant EDT\_PARAM\_UNK can be used.\\
 \hline
-\mbox{\tt in}  & {\em depc} & Number of pre-\/slots that the E\-D\-Ts will have. If not known or variable, this can be E\-D\-T\-\_\-\-P\-A\-R\-A\-M\-\_\-\-U\-N\-K \\
-
+\mbox{\tt in}  & \code{depc} & The number of pre-slots that EDTs created based on
+this template will take. If EDTs created based on this template can take a varaible
+number of arguments, the constant EDT\_PARAM\_UNK can be used.\\
 \hline
 \end{DoxyParams}
 
-
 \returns
-a status code\-:
+A status code:
 \begin{DoxyItemize}
-\item 0\-: successful
-\item E\-N\-O\-M\-E\-M\-: No memory available to allocate the template
+\item 0: Successful
+\item OCR\_ENOMEM: The runtime could not allocate the metadata
+  for the template
 \end{DoxyItemize}
 
+\descr
+An EDT template encapsulates the EDT function and, optionally, the number of
+parameters and arguments that EDTs instantiated from this template will use. It needs to
+be created only once for each function that will serve as an EDT.
+%template from multiple EDTs of the same type may improve performance as this
+%allows the runtime to collect information about multiple instances of the same
+%type of E\-D\-T.
+\begin{DoxyNote}{Note}
+If the runtime is compiled with OCR\_ENABLE\_EDT\_NAMING, the name of the function
+will also be stored in the EDT template object to aid in debugging.
+\end{DoxyNote}
+%
+%  ocrEdtTemplateDestroy
+%
+\hypertarget{func_ocrEdtTemplateDestroy}{
+  \index{Task management@{Task management}!ocr\-Edt\-Template\-Destroy@{ocr\-Edt\-Template\-Destroy}}
+  \subsection[{ocr\-Edt\-Template\-Destroy}]{\setlength{\rightskip}{0pt plus 5cm}{\bf u8} ocr\-Edt\-Template\-Destroy(
+\begin{DoxyParamCaption}
+\item[{{\bf ocr\-Guid\-\_\-t}}]{guid}
+\end{DoxyParamCaption}
+)}}
+\label{func_ocrEdtTemplateDestroy}
+
+Destroy an EDT template.
+
+\begin{DoxyParams}[1]{Parameters}
+\mbox{\tt in}  & \code{guid} & GUID of the EDT template to destroy\\
+\hline
+\end{DoxyParams}
+
+\returns
+A status code:
+\begin{DoxyItemize}
+\item 0: Successful
+\item OCR\_EINVAL: The GUID passed as argument does not refer to a valid
+  EDT template
+\end{DoxyItemize}
 
 \descr
-An E\-D\-T template encapsulates the E\-D\-T function and, optionally, the number of
-parameters and arguments that E\-D\-Ts instantiated from this template will use. It needs to
-be created only once for each function that will serve as an E\-D\-T; reusing the same
-template from multiple E\-D\-Ts of the same type may improve performance as this
-allows the runtime to collect information about multiple instances of the same
-type of E\-D\-T.
+This function will destroy the EDT template object.
 
 \begin{DoxyNote}{Note}
-You should use \hyperlink{group__OCREDT_ga9649098ffad669c1c820cd821792d67a}{ocr\-Edt\-Template\-Create()} as opposed to the
-internal function referenced by this macro. If O\-C\-R\-\_\-\-E\-N\-A\-B\-L\-E\-\_\-\-E\-D\-T\-\_\-\-N\-A\-M\-I\-N\-G is enabled,
-the C name of the function will be used as func\-Name.
+The destruction of the EDT template can occur even if all
+EDTs created from it have not run to completion. The EDT template cannot,
+however, be used to create new EDTs once it has been destroyed.
 \end{DoxyNote}
-
-
 %
 % ocrEdtCreate
 %
-\hypertarget{group__OCREDT_gafa2443b31c38b4b7f9f59713abe12ecc}{\index{Event Driven Task A\-P\-I@{Event Driven Task A\-P\-I}!ocr\-Edt\-Create@{ocr\-Edt\-Create}}
-\index{ocr\-Edt\-Create@{ocr\-Edt\-Create}!Event Driven Task API@{Event Driven Task A\-P\-I}}
-\subsection[{ocr\-Edt\-Create}]{\setlength{\rightskip}{0pt plus 5cm}{\bf u8} ocr\-Edt\-Create (
+\hypertarget{func_ocrEdtCreate}{
+  \index{Task management@{Task management}!ocr\-Edt\-Create@{ocr\-Edt\-Create}}
+  \subsection[{ocr\-Edt\-Create}]{\setlength{\rightskip}{0pt plus 5cm}{\bf u8} ocr\-Edt\-Create(
 \begin{DoxyParamCaption}
 \item[{{\bf ocr\-Guid\-\_\-t} $\ast$}]{guid, }
 \item[{{\bf ocr\-Guid\-\_\-t}}]{template\-Guid, }
@@ -1027,179 +1083,216 @@ the C name of the function will be used as func\-Name.
 \item[{{\bf u64} $\ast$}]{paramv, }
 \item[{{\bf u32}}]{depc, }
 \item[{{\bf ocr\-Guid\-\_\-t} $\ast$}]{depv, }
-\item[{{\bf u16}}]{properties, }
+\item[{{\bf u16}}]{flags, }
 \item[{{\bf ocr\-Guid\-\_\-t}}]{affinity, }
 \item[{{\bf ocr\-Guid\-\_\-t} $\ast$}]{output\-Event}
 \end{DoxyParamCaption}
-)}}\label{group__OCREDT_gafa2443b31c38b4b7f9f59713abe12ecc}
+)}}
+\label{func_ocrEdtCreate}
 
-
-Creates an E\-D\-T instance from an E\-D\-T template.
-
+Creates a new instance of an EDT based on the specified EDT template. In OCR,
+an EDT will run at most once and be automatically destroyed once it completes
+execution.
 
 \begin{DoxyParams}[1]{Parameters}
-\mbox{\tt out}  & {\em guid} & G\-U\-I\-D of the newly created E\-D\-T type \\
+\mbox{\tt out}  & \code{guid} & On successful creation, contains the GUID of the
+EDT. If the call fails, the returned value is undefined.\\
 \hline
-\mbox{\tt in}  & {\em template\-Guid} & G\-U\-I\-D of the template to use to create this E\-D\-T \\
+\mbox{\tt in}  & \code{template\-Guid} & GUID of the template to use to
+create the EDT.\\
 \hline
-\mbox{\tt in}  & {\em paramc} & Number of parameters (64-\/bit values). Set to \hyperlink{group__OCRTypesEDT_gaefeb8d48e96e11daf99edf909921ff3d}{E\-D\-T\-\_\-\-P\-A\-R\-A\-M\-\_\-\-D\-E\-F} if you want to use the 'paramc' value specified at the time of the E\-D\-T template's creation \\
+\mbox{\tt in}  & \code{paramc} & Number of parameters (64-bit values) contained
+in the \code{paramv} array. Use \code{EDT\_PARAM\_DEF} to use the value specified
+for the EDT template.\\
 \hline
-\mbox{\tt in}  & {\em paramv} & 64-\/bit values for the parameters. This must be an array of paramc 64-\/bit values. These values are copied in. If paramc is 0, this must be N\-U\-L\-L. \\
+\mbox{\tt in}  & \code{paramv} & Pointer to an array of \code{paramc}
+\hyperlink{type_u64}{u64} values. The values are copied in and can therefore be
+freed/reused after this call returns. If \code{paramc} is 0, this parameter must be
+set to NULL.\\
 \hline
-\mbox{\tt in}  & {\em depc} & Number of dependences for this E\-D\-T. Set to \hyperlink{group__OCRTypesEDT_gaefeb8d48e96e11daf99edf909921ff3d}{E\-D\-T\-\_\-\-P\-A\-R\-A\-M\-\_\-\-D\-E\-F} if you want to use the 'depc' value specified at the time of the E\-D\-T template's creation \\
+\mbox{\tt in}  & \code{depc} & Number of pre-slots for this EDT. Use
+\code{EDT\_PARAM\_DEF} to use the value specified for the EDT template.\\
 \hline
-\mbox{\tt in}  & {\em depv} & Values for the G\-U\-I\-Ds of the dependences (if known). Note that all dependences added by this method will be in the \hyperlink{group__OCRTypesDB_ga305e2c2c25da246a1ba54b8f4d1dbacb}{D\-B\-\_\-\-D\-E\-F\-A\-U\-L\-T\-\_\-\-M\-O\-D\-E}. Use \hyperlink{group__OCRDependences_gab0eea439797c1dcde2dbbe704d701dcd}{ocr\-Add\-Dependence()} to add unknown dependences or dependences with another mode. This pointer should either be N\-U\-L\-L or point to an array of size 'depc'. \\
+\mbox{\tt in}  & \code{depv} & Pointer to an array of \code{depc}
+\hyperlink{ocrGuid_t}{ocrGuid\_t} values or NULL. All pre-slots specified
+in this way will be acquired using \code{DB\_DEFAULT\_MODE}. Use
+\hyperlink{func_ocrAddDependence}{\code{ocrAddDependence()}} to specify an alternate
+mode. If you only want to specify only some of the pre-slots use
+\code{UNINITIALIZED\_GUID} for the unkown ones.\\
 \hline
-\mbox{\tt in}  & {\em properties} & Used to indicate if this is a finish E\-D\-T (see \hyperlink{group__OCRTypesEDT_ga043f0aab623cbc9db6fa90a0b7ad876a}{E\-D\-T\-\_\-\-P\-R\-O\-P\-\_\-\-F\-I\-N\-I\-S\-H}). Use \hyperlink{group__OCRTypesEDT_gae9f46354fe64d7a4b245fc23dfde5660}{E\-D\-T\-\_\-\-P\-R\-O\-P\-\_\-\-N\-O\-N\-E} as a default value. \\
+\mbox{\tt in}  & \code{flags} & Flags controlling the behavior of EDT creation.
+The supported flags are:
+\begin{DoxyItemize}
+\item EDT\_PROP\_NONE: Regular EDT
+\item EDT\_PROP\_FINISH: Create a \emph{finish} EDT
+\end{DoxyItemize}\\
 \hline
-\mbox{\tt in}  & {\em affinity} & Affinity container for this E\-D\-T. This is currently an experimental feature and must be N\-U\-L\-L\-\_\-\-G\-U\-I\-D.\\
+\mbox{\tt in}  & \code{affinity} & Unsupported and reserved for future use. Set
+to NULL\_GUID.\\
 \hline
-\mbox{\tt in,out}  & {\em output\-Event} & If not N\-U\-L\-L on input, on successful return of this call, this will return the G\-U\-I\-D of the event associated with the post-\/slot of the E\-D\-T. For a F\-I\-N\-I\-S\-H E\-D\-T, the post-\/slot of this event will be satisfied when the E\-D\-T and all of the child E\-D\-Ts have completed execution. For a non F\-I\-N\-I\-S\-H E\-D\-T, the post-\/slot of this event will be satisfied when the E\-D\-T completes execution and will carry the data block returned by the E\-D\-T. If N\-U\-L\-L, no event will be associated with the E\-D\-T's post-\/slot\\
+\mbox{\tt in,out}  & \code{outputEvent} & If non-NULL on input, on successful creation,
+contains the GUID of the event associated with the post-slot of the EDT. For a
+\emph{finish} EDT, the post-slot of this event will be satisfied when the EDT
+and all of its descendent EDTs (the closure of all EDTs created in this EDT and
+its children) have completed execution. For a non finish EDT, the post-slot of
+this event will be satisfied when the EDT completes execution and will carry the
+data block returned by the EDT. If NULL, no event will be associated with the
+EDT's post-slot. Note that in all cases, the event returned is an event that
+is automatically destroyed on satisfaction. It is therefore crucial to ensure that all
+waiters on this event are set up properly \emph{before} the EDT transitions to the
+\emph{runnable} state.\\
 \hline
 \end{DoxyParams}
 
-
 \returns
-a status code
+A status code:
 \begin{DoxyItemize}
-\item 0\-: successful
+\item 0: Successful
+\item OCR\_ENOMEM: The runtime could not create the metadata required for the
+EDT
+\item OCR\_EINVAL: The GUID specifying the template is invalid or the number
+  of parameters or pre-slots is not fully resolved
 \end{DoxyItemize}
 
 \descr
-The E\-D\-T is created based on the function provided during the creation of its template. It is required that the number of parameters
-(paramc) and number of dependences (depc) are resolved at this time, if E\-D\-T\-\_\-\-P\-A\-R\-A\-M\-\_\-\-U\-N\-K was specified for
-either argument at the time of creation of its corresponding template. The properties field indicates what type of E\-D\-T gets created.
-Currently, O\-C\-R supports (i) the default type of E\-D\-T where the lifetime of the created E\-D\-T has no relationship with that of
-other E\-D\-Ts created by it, and (ii) a finish E\-D\-T, where the lifetime of the created E\-D\-T is guaranteed to exceed that of all
-E\-D\-Ts transitively created by it.
-
+The EDT is created based on the function provided during the creation of its template.
+It is required that the number of parameters (\code{paramc}) and number of
+pre-slots (\code{depc}) be resolved at this time. In other words, if
+\code{EDT\_PARAM\_UNK} was specified for either \code{paramc} or \code{depc} when
+creating the template, this function may not specify \code{EDT\_PARAM\_DEF}.
+\begin{DoxyNote}{Note}
+If the EDT is created with all its pre-slots specified and resolved, it may execute
+immediately which means that the GUIDs returned (\code{guid} and \code{outputEvent})
+may be invalid by the time this function returns. It is the responsability of
+the programmer to ensure, if he needs to use these returned values, that the EDT
+cannot start until a later time (by inserting a ``fake'' pre-slot for example).
+\end{DoxyNote}
 %
 % ocrEdtDestroy
 %
-\hypertarget{group__OCREDT_gae258a29af116794a73099e9c6d9232f8}{\index{Event Driven Task A\-P\-I@{Event Driven Task A\-P\-I}!ocr\-Edt\-Destroy@{ocr\-Edt\-Destroy}}
-\index{ocr\-Edt\-Destroy@{ocr\-Edt\-Destroy}!Event Driven Task API@{Event Driven Task A\-P\-I}}
-\subsection[{ocr\-Edt\-Destroy}]{\setlength{\rightskip}{0pt plus 5cm}{\bf u8} ocr\-Edt\-Destroy (
+\hypertarget{func_ocrEdtDestroy}{
+  \index{Task management@{Task management}!ocr\-Edt\-Destroy@{ocr\-Edt\-Destroy}}
+  \subsection[{ocr\-Edt\-Destroy}]{\setlength{\rightskip}{0pt plus 5cm}{\bf u8} ocr\-Edt\-Destroy(
 \begin{DoxyParamCaption}
 \item[{{\bf ocr\-Guid\-\_\-t}}]{guid}
 \end{DoxyParamCaption}
-)}}\label{group__OCREDT_gae258a29af116794a73099e9c6d9232f8}
+)}}
+\label{func_ocrEdtDestroy}
 
-Destroy an E\-D\-T.
-
-E\-D\-Ts are automatically destroyed after they execute. This call is provided if an E\-D\-T is created and the programmer later realizes that it will never become runnable.
-
-\begin{DoxyParams}[1]{Parameters}
-\mbox{\tt in}  & {\em guid} & G\-U\-I\-D of the E\-D\-T to destroy\\
-\hline
-\end{DoxyParams}
-
-
-\returns
-a status code
-\begin{DoxyItemize}
-\item 0\-: successful
-\end{DoxyItemize}
-
-%
-%  ocrEdtTemplateDestroy
-%
-\hypertarget{group__OCREDT_gace7063cfee522df47c64bf5013385c10}{\index{Event Driven Task A\-P\-I@{Event Driven Task A\-P\-I}!ocr\-Edt\-Template\-Destroy@{ocr\-Edt\-Template\-Destroy}}
-\index{ocr\-Edt\-Template\-Destroy@{ocr\-Edt\-Template\-Destroy}!Event Driven Task API@{Event Driven Task A\-P\-I}}
-\subsection[{ocr\-Edt\-Template\-Destroy}]{\setlength{\rightskip}{0pt plus 5cm}{\bf u8} ocr\-Edt\-Template\-Destroy (
-\begin{DoxyParamCaption}
-\item[{{\bf ocr\-Guid\-\_\-t}}]{guid}
-\end{DoxyParamCaption}
-)}}\label{group__OCREDT_gace7063cfee522df47c64bf5013385c10}
-
-
-Destroy an E\-D\-T template.
-
+EDTs are automatically destroyed after they execute. This call provides a way
+to explicitly destroy a created EDT if the programmer later realizes that it
+will never become \emph{runnable}.
 
 \begin{DoxyParams}[1]{Parameters}
-\mbox{\tt in}  & {\em guid} & G\-U\-I\-D of the E\-D\-T template to destroy \\
+\mbox{\tt in}  & \code{guid} & GUID of the EDT to destroy\\
 \hline
 \end{DoxyParams}
-
-\returns
-a status code
-\begin{DoxyItemize}
-\item 0\-: successful
-\end{DoxyItemize}
 
 \descr
-This function can be called if no further E\-D\-Ts will be created based on this template, and the
-memory allocated for this template can be recovered by the runtime. The template can be destroyed
-even if any of the E\-D\-Ts created from it aren't ready to run.
+Most programmers will not have use for this function as OCR implicitly destroys all
+EDTs that execute. There are some cases, however, where an EDT is created and the
+programmer later realizes that the task will never execute. This function allows the
+programmer to reclaim the memory used by the EDT
+\begin{DoxyNote}{Note}
+Destroying an EDT that is in the \emph{runnable} state or later will result in
+undefined behavior.
 
+If the EDT had an associated \code{outputEvent}, that event will also be explictly
+destroyed.
+\end{DoxyNote}
 
+\returns
+A status code
+\begin{DoxyItemize}
+\item 0: Successful
+\end{DoxyItemize}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% OCR Dependences
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-\hypertarget{group__OCRDependences}{\section{O\-C\-R dependence A\-P\-Is}
-\label{group__OCRDependences}\index{O\-C\-R dependence A\-P\-Is@{O\-C\-R dependence A\-P\-Is}}
-}
+\section{Dependence management}
+\label{sec:OCRDependenceManagement}
+\index{Dependence management@{Dependence management}}
 
 At the core of OCR is the concept of a directed acyclic graph that represents the evolving
-state of an OCR program.   OCR objects become runnable once their dependences are met.
-These dependences can be set explicitly when creating the OCR object or dynamically using the functions
-from this section of the API.
+state of an OCR program. EDTs become runnable once their dependences are met.
+These dependences can be set explicitly when creating the EDT or dynamically using
+the functions from this section of the API.
 
-
+\subsection*{Functions}
 \begin{DoxyCompactItemize}
 \item
-\hyperlink{type_u8}{u8} \hyperlink{group__OCRDependences_gab0eea439797c1dcde2dbbe704d701dcd}
-{ocr\-Add\-Dependence} (\hyperlink{type_ocrGuid_t}{ocr\-Guid\-\_\-t} source, \hyperlink{type_ocrGuid_t}{ocr\-Guid\-\_\-t} destination, \hyperlink{type_u32}{u32} slot, \hyperlink{group__OCRTypesDB_gae72c588a0182fcee7db295e53743821a}{ocr\-Db\-Access\-Mode\-\_\-t} mode)
-\begin{DoxyCompactList}\small\item\em Adds a dependence between O\-C\-R objects\-: \end{DoxyCompactList}
+  \hyperlink{type_u8}{u8} \hyperlink{func_ocrAddDependence}
+            {\code{ocrAddDependence}}(\hyperlink{type_ocrGuid_t}{ocr\-Guid\-\_\-t}
+    source, \hyperlink{type_ocrGuid_t}{ocr\-Guid\-\_\-t} destination,
+    \hyperlink{type_u32}{u32} slot, \hyperlink{type_ocrDbAccessMode_t}{ocr\-Db\-Access\-Mode\-\_\-t} mode)
+    \begin{DoxyCompactList}
+      \small\item \emph{Adds a dependence between OCR objects}
+    \end{DoxyCompactList}
 \end{DoxyCompactItemize}
-
 %
 %  OcrAddDependence
 %
-\hypertarget{group__OCRDependences_gab0eea439797c1dcde2dbbe704d701dcd}{\index{O\-C\-R dependence A\-P\-Is@{O\-C\-R dependence A\-P\-Is}!ocr\-Add\-Dependence@{ocr\-Add\-Dependence}}
-\index{ocr\-Add\-Dependence@{ocr\-Add\-Dependence}!OCR dependence APIs@{O\-C\-R dependence A\-P\-Is}}
-\subsection[{ocr\-Add\-Dependence}]{\setlength{\rightskip}{0pt plus 5cm}{\bf u8} ocr\-Add\-Dependence (
+\hypertarget{func_ocrAddDependence}{
+  \index{Dependence management@{Dependence management}!ocr\-Add\-Dependence@{ocr\-Add\-Dependence}}
+  \subsection[{ocr\-Add\-Dependence}]{\setlength{\rightskip}{0pt plus 5cm}{\bf u8} ocr\-Add\-Dependence(
 \begin{DoxyParamCaption}
 \item[{{\bf ocr\-Guid\-\_\-t}}]{source, }
 \item[{{\bf ocr\-Guid\-\_\-t}}]{destination, }
 \item[{{\bf u32}}]{slot, }
 \item[{{\bf ocr\-Db\-Access\-Mode\-\_\-t}}]{mode}
 \end{DoxyParamCaption}
-)}}\label{group__OCRDependences_gab0eea439797c1dcde2dbbe704d701dcd}
+)}}
+\label{func_ocrAddDependence}
 
-
-Adds a dependence between O\-C\-R objects.
-
-
+Adds a dependence between two OCR objects. Concretely, this will link the post-slot
+of the \code{source} object to the \code{slot}$^{th}$ pre-slot of \code{destination}.
+When a dependence exists between post-slot $A$ and pre-slot $B$, when $A$ becomes
+satisfied, $B$ will also become satisfied.
 
 \begin{DoxyParams}[1]{Parameters}
-\mbox{\tt in}  & {\em source} & G\-U\-I\-D of the source \\
+\mbox{\tt in}  & \code{source} & GUID of the source OCR object. The source
+can be a data block or an event or NULL\_GUID\\
 \hline
-\mbox{\tt in}  & {\em destination} & G\-U\-I\-D of the destination \\
+\mbox{\tt in}  & \code{destination} & GUID of the destination OCR object. The
+destination can be an event or an EDT\\
 \hline
-\mbox{\tt in}  & {\em slot} & Index of the pre-\/slot on the destination O\-C\-R object \\
+\mbox{\tt in}  & \code{slot} & Index of the pre-slot on \code{destination}\\
 \hline
-\mbox{\tt in}  & {\em mode} & Access mode of the destination for the data block. See \hyperlink{group__OCRTypesDB_gae72c588a0182fcee7db295e53743821a}{ocr\-Db\-Access\-Mode\-\_\-t}.\\
+\mbox{\tt in}  & \code{mode} & If \code{destination} is an EDT, access mode with
+which the EDT will access the data block. If \code{destination} is an event, this
+value is ignored.\\
 \hline
 \end{DoxyParams}
 
 \returns
-a status code
+A status code
 \begin{DoxyItemize}
 \item 0\-: successful
-\item E\-I\-N\-V\-A\-L\-: The slot number is invalid
-\item E\-N\-O\-P\-E\-R\-M\-: The source and destination G\-U\-I\-Ds cannot be linked with a dependence
+\item OCR\_EINVAL: \code{slot} is invalid
+\item OCR\_ENOPERM: \code{source} and \code{destination} cannot be linked with
+  a dependence (for example, if \code{destination} is a data block)
 \end{DoxyItemize}
-
 
 \descr
-The following dependences can be added\-:
+The following dependences can be added:
 \begin{DoxyItemize}
-\item Event to Event\-: The sink event's pre-\/slot will become satisfied upon satisfaction of the source event's post-\/slot. Any data block associated with the source event's post-\/slot will be associated with the sink event's pres-\/slot.
-\item Event to E\-D\-T \-: Upon satisfaction of the source event's post-\/slot, the pre-\/slot of the E\-D\-T will be satisfied. When the E\-D\-T runs, the data block associated with the post-\/slot of the event will be passed in through the \code{depv} array. This represents a control or a control+data dependence.
-\item D\-B to Event \-: ocr\-Add\-Dependence(db, evt, slot) is equivalent to ocr\-Satisfy\-Slot(evt, db, slot)
-\item D\-B to E\-D\-T \-: This represents a pure data dependence. Adding a dependence between a data block and an E\-D\-T immediately satisfies the pre-\/slot of the E\-D\-T. When the E\-D\-T runs, the data block will be passed in through the \code{depv} array.
+\item Event to event: The destination event's pre-slot will become satisfied
+  upon satisfaction of the source event's post-slot. Any data block associated
+  with the source event's post-slot will be associated with the sink event's pre-slot.
+  This allows the formation of event chains.
+\item Event to EDT: Upon satisfaction of the source event's post-slot, the EDT's
+  pre-slot will be satisfied. When the runtime transitions the EDT from the
+  \emph{runnable} to \emph{ready} state, the data block associated with the
+  post-slot of the event will be acquired using the \code{mode} specified.
+\item Data block to event: Equivalent to \hyperlink{func_ocrEventSatisfySlot}{
+  \code{ocrEventSatisfySlot}}:\code{ocrAddDependence(db, evt, slot)} is
+  equivalent to \code{ocrEventSatisfySlot(evt, db, slot)}.
+\item Data block to EDT: This represents a pure data dependence. Adding a
+  dependence between a data block and an EDT immediately satisfies the pre-slot
+  of the EDT. When the runtime transitions the EDT from the \emph{runnable}
+  to the \emph{ready} state, the data block will be acquired using the
+  \code{mode} specified.
+\item NULL\_GUID to event or EDT: This is equivalent to ``data block to event''
+  or ``data block to EDT'' where the data is non-existant.
 \end{DoxyItemize}
-
-
 % This is the end of ch2-ocrAPI.tex of the OCR specification.
