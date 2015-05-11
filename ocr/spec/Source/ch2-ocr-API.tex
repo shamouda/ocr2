@@ -5,50 +5,58 @@
 \index{OCR types, macros, and error codes}
 \label{sec:OCRtypesmacros}
 
-The OCR Application Programming Interface is defined in terms of a C language binding.
-The functions comprising the OCR
-API make use of a number of basic data types defined in the include file \code{ocr.h}.
-The lowest level data types are defined in terms of the following C typedef statements.
+The OCR Application Programming Interface (API) is defined in terms of a
+C language binding. The functions comprising the OCR API make use of a number of
+basic data types defined in the include file \code{ocr.h}.
+%%
+\paragraph*{Base low-level types}
+The lowest level data types are defined in terms of the following C typedef
+statements:
 \begin{itemize}
-\item \hypertarget{type_u64}\code{typedef uint64\_t u64} 64-bit unsigned integer
-\item \hypertarget{type_u32}\code{typedef uint32\_t u32} 32-bit unsigned integer
-\item \hypertarget{type_u16}\code{typedef uint16\_t u16} 16-bit unsigned integer
-\item \hypertarget{type_u8}\code{typedef uint8\_t u8} 8-bit unsigned integer
-\item \hypertarget{type_s64}\code{typedef int64\_t s64} 64-bit signed integer
-\item \hypertarget{type_s32}\code{typedef int32\_t s32} 32-bit signed integer
-\item \hypertarget{type_s8}\code{typedef int8\_t s8} 8-bit signed integer
-\item \hypertarget{type_bool}\code{typedef u8 bool} 8-bit boolean
+\item \hypertarget{type_u64}{\code{typedef uint64\_t u64}} 64-bit unsigned integer;
+\item \hypertarget{type_u32}{\code{typedef uint32\_t u32}} 32-bit unsigned integer;
+\item \hypertarget{type_u16}{\code{typedef uint16\_t u16}} 16-bit unsigned integer;
+\item \hypertarget{type_u8}{\code{typedef uint8\_t u8}} 8-bit unsigned integer;
+\item \hypertarget{type_s64}{\code{typedef int64\_t s64}} 64-bit signed integer;
+\item \hypertarget{type_s32}{\code{typedef int32\_t s32}} 32-bit signed integer;
+\item \hypertarget{type_s8}{\code{typedef int8\_t s8}} 8-bit signed integer;
+\item \hypertarget{type_bool}{\code{typedef u8 bool}} 8-bit boolean.
 \end{itemize}
-
+%%
+\paragraph*{OCR opaque types}
 In addition to these low level types, OCR defines a number of opaque data types
 to manage OCR objects and to interact with the OCR environment:
 \begin{itemize}
-\item \hypertarget{type_ocrGuid_t}\code{ocrGuid\_t}: Opaque handle used to
+\item \hypertarget{type_ocrGuid_t}{\code{ocrGuid\_t}}: Opaque handle used to
 reference all OCR objects;
-\item \hypertarget{type_ocrEdtDep_t}\code{ocrEdtDep\_t}: Type of dependences as
+\item \hypertarget{type_ocrEdtDep_t}{\code{ocrEdtDep\_t}}: Type of dependences as
 passed into the EDTs; it contains both the GUID and the pointer to any data block
-passed as a dependence;
+passed as a dependence.
 % REC: Move to extension; this is part of the ``library mode''
 %  Is this exposed as part of the API?  Or does this belong in one of the appendices?
 %\item \code{ocrConfig\_t Struct}:  Reference
 %Data-structure containing the configuration parameters for the runtime.
 \end{itemize}
-
+%%
+\paragraph*{Other constants}
 The C API for OCR makes use of a set of basic macros defined
- inside \code{ocr.h}.
+inside \code{ocr.h}:
 \begin{itemize}
-\item \code{\#define true 1}
-\item \code{\#define TRUE 1}
-\item \code{\#define false 0}
-\item \code{\#define FALSE 0}
-\item \code{\#define NULL\_GUID}: A NULL ocrGuid\_t
-\item \code{\#define UNINITIALIZED\_GUID}: An Unitialized GUID (ie: never set)
+\item \code{\#define true 1};
+\item \code{\#define TRUE 1};
+\item \code{\#define false 0};
+\item \code{\#define FALSE 0};
+\item \code{\#define NULL\_GUID}: A NULL ocrGuid\_t;
+\item \code{\#define UNINITIALIZED\_GUID}: An Unitialized GUID (ie: never set);
 \item \code{\#define ERROR\_GUID}: An invalid GUID.
 \end{itemize}
-
-Most functions in the OCR API return an error code. These are found
-in the \code{ocr-errors.h} include file and are described in the following table.
-
+%%
+\paragraph*{OCR error codes}
+The OCR error codes are derived from standard error codes. They are defined
+internally to limit OCR's dependence on standard libraries. Most functions in the
+OCR API will return a status code where 0 signifies successful completion. A non-zero
+return code will be one of the following error codes. These codes are found
+in the \code{ocr-errors.h} include file and described in Table~\ref{tab:errorcodes}.
 \tablefirsthead{%
 \hline
 \textsf{\textbf{Error code}} & \textsf{\textbf{Generic Interpretation}}\\
@@ -61,7 +69,7 @@ in the \code{ocr-errors.h} include file and are described in the following table
 \hline \\[-3ex]
 }
 \tabletail{%
-\hline\\[-4ex]
+\hline\\[-1ex]
 \multicolumn{2}{l}{\small\sl table continued on next page}\\
 }
 \tablelasttail{\hline}
@@ -93,221 +101,250 @@ in the \code{ocr-errors.h} include file and are described in the following table
 \plc{OCR\_EPEND} & Operation is pending\\
 \plc{OCR\_ECANCELED} & Operation canceled\\
 \end{supertabular}
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% The OCR Main EDT
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\section{The OCR Main EDT}
+\section{OCR entry point: \code{mainEdt}}
 \label{sec:mainEDT}
 
-In OCR 1.0, an OCR program's single point of entry is the user-defined main EDT.
-This EDT has a function prototype that is identical to any other EDT.
-This special EDT has no parameters and has one datablock that consists of all the
-arguments passed to it from the command line. These can be accessed using the
-\hyperlink{group__OCRGeneral_ga29d56cd773017a4d48d629bc13a220ce}{get\-Argc} and
-\hyperlink{group__OCRGeneral_gad553929187f042ce480d09e84a4c59a7}{get\-Argv} calls
-defined further below.
+An OCR program's single point of entry is the user-defined main EDT (\code{mainEdt()}).
+This EDT has a function prototype that is identical to any other EDT; its parameters
+and dependences are however special: the main EDT has no parameters and has a single
+input data block that encodes the araguments passed to the program from the
+command line. The arguments can be accessed using \hyperlink{func_getArgc}{\code{getArgc()}}
+and \hyperlink{func_getArgv}{\code{getArgv()}}.
 
 \begin{boxedcode}
-\plc{ocrGuid\_t mainEdt (u32 paramc, u64* paramv, u32 depc, ocrEdtDep\_t depv[])}
+\plc{ocrGuid\_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep\_t depv[])}
 \end{boxedcode}
 
-\begin{table}[h]
-\begin{tabular}{l l l}
-type &  argument   & meaning \\
+\begin{DoxyParams}[1]{Parameters}
+\mbox{\tt in} & \code{paramc} & Parameters count will always be 0.\\
 \hline
-\code{u32}   & \code{paramc}  &in: Parameter count is always 0.\\
-\code{u64*}   & \code{paramv}  &in: Parameter vector is always NULL.\\
-\code{u32}   & \code{depc}  &in: Dependence count is always 1.\\
-\code{u64*}   & \code{depv}  &in: Dependence vector has exactly 1 entry consisting of the command line arguments\\
+\mbox{\tt in} & \code{paramv} & Parameter version will always be NULL.\\
 \hline
-\end{tabular}
-\end{table}
+\mbox{\tt in} & \code{depc} & Dependence count will always be 1.\\
+\hline
+\mbox{\tt in} & \code{depv} & Dependence vector will have exactly 1 entry
+containing a data block that encodes the command line arguments.\\
+\hline
+\end{DoxyParams}
 
 \returns
- It returns a
-\code{ocrGuid\_t} value for compatibility purposes, but is ignored by the runtime.
-
-%%%
-%%% someone needs to write this section
-%%%
-%%%
-
-
-
+\code{mainEdt} returns a \hyperlink{type_ocrGuid_t}{\code{ocrGuid\_t}} which is
+ignored by the runtime. The returned value of an OCR program is set using
+\hyperlink{func_ocrShutdown}{\code{ocrShutdown()}} or \hyperlink{func_ocrAbort}{
+  \code{ocrAbort()}}.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Supporting Functions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\section{Supporting functions for OCR}
+\section{Supporting functions}
 \label{sec:supportFuncs}
 
 OCR provides a set of basic capabilities to support a program execution environment,
 handled through the following functions.
 
+\subsection*{Functions}
 \begin{DoxyCompactItemize}
 \item
-void \hyperlink{group__OCRGeneral_gae115fb2dbc351416835b0fb7b91f94e5}
-{ocr\-Shutdown} (void)
-\begin{DoxyCompactList}\small\item\em Called by an E\-D\-T to indicate the normal end of an O\-C\-R program. \end{DoxyCompactList}
-
+  void \hyperlink{func_ocrShutdown}{\code{ocrShutdown}}(void)
+    \begin{DoxyCompactList}
+      \small\item \emph{Called by an EDT to indicate the normal end of an OCR program.}
+    \end{DoxyCompactList}
 \item
-void \hyperlink{group__OCRGeneral_gabcaaebe9465cd6efcfca2acb4c399cde}
-{ocr\-Abort} (\hyperlink{group__OCRTypesGeneral_ga92c50087ca0e64fa93fc59402c55f8ca}{u8} error\-Code)
-\begin{DoxyCompactList}\small\item\em Called by an E\-D\-T to indicate an abnormal end of an O\-C\-R program. \end{DoxyCompactList}
-
+  void \hyperlink{func_ocrAbort}{\code{ocrAbort}}(\hyperlink{type_u8}{u8} errorCode)
+    \begin{DoxyCompactList}
+      \small\item \emph{Called by an EDT to indicate an abnormal end of an OCR program.}
+    \end{DoxyCompactList}
 \item
-\hyperlink{group__OCRTypesGeneral_ga3f7e2bcbb0b4c338f3c4f6c937cd4234}{u64} \hyperlink{group__OCRGeneral_ga29d56cd773017a4d48d629bc13a220ce}
-{get\-Argc} (void $\ast$db\-Ptr)
-\begin{DoxyCompactList}\small\item\em Retrieves the traditional 'argc' value in main\-Edt. \end{DoxyCompactList}
-
+  \hyperlink{type_u64}{u64} \hyperlink{func_getArgc}{\code{getArgc}}(void $\ast$dbPtr)
+    \begin{DoxyCompactList}
+      \small\item \emph{Retrieves the traditional `argc' value from
+        \hyperlink{func_mainEdt}{\code{mainEdt()}}'s input data block.}
+    \end{DoxyCompactList}
 \item
-char $\ast$ \hyperlink{group__OCRGeneral_gad553929187f042ce480d09e84a4c59a7}
-{get\-Argv} (void $\ast$db\-Ptr, \hyperlink{group__OCRTypesGeneral_ga3f7e2bcbb0b4c338f3c4f6c937cd4234}{u64} count)
-\begin{DoxyCompactList}\small\item\em Gets the argument 'count' from the data-\/block containing the arguments. \end{DoxyCompactList}\end{DoxyCompactItemize}
-
-In addition, OCR defines a PRINTF macro to print message to the output console.
-
-
+  char $\ast$ \hyperlink{func_getArgv}{\code{getArgv}}(void $\ast$dbPtr,
+  \hyperlink{type_u64}{u64} count)
+    \begin{DoxyCompactList}
+      \small\item \emph{Retrieves the `count' argument from
+        \hyperlink{func_mainEdt}{\code{mainEdt()}}'s input data block.}
+    \end{DoxyCompactList}
+\item
+  \hyperlink{type_u32}{u32} \hyperlink{func_PRINTF}{PRINTF}(const char $\ast$format, ...)
+    \begin{DoxyCompactList}
+      \small\item \emph{\code{printf()} equivalent for OCR.}
+    \end{DoxyCompactList}
+\end{DoxyCompactItemize}
 %
 % ocrShutdown
 %
-\hypertarget{group__OCRGeneral_gae115fb2dbc351416835b0fb7b91f94e5}{\index{Support calls for O\-C\-R@{Support calls for O\-C\-R}!ocr\-Shutdown@{ocr\-Shutdown}}
-\index{ocr\-Shutdown@{ocr\-Shutdown}!Support calls for OCR@{Support calls for O\-C\-R}}
-\subsection[{ocr\-Shutdown}]{\setlength{\rightskip}{0pt plus 5cm}void ocr\-Shutdown (
-\begin{DoxyParamCaption}
-{}
-\end{DoxyParamCaption}
-)}}\label{group__OCRGeneral_gae115fb2dbc351416835b0fb7b91f94e5}
+\hypertarget{func_ocrShutdown}{
+  \index{Supporting functions@{Supporting function}!ocr\-Shutdown@{ocr\-Shutdown}}
+  \subsection[{ocr\-Shutdown}]{\setlength{\rightskip}{0pt plus 5cm}void ocr\-Shutdown(
+)}}
+\label{func_ocrShutdown}
 
-Called by an E\-D\-\T to indicate the normal end of the program and allows for the termination of the runtime.
-Program behavior after this call is undefined, hence all program functionality should be completed prior to calling this function.
+The user is responsible for indicating the end of an OCR program using an explicit
+shutdown call (either this function or \hyperlink{func_ocrAbort}{\code{ocrAbort()}}).
+Any EDTs which have not reached the \emph{runnable} state will never be executed.
+EDTs in the \emph{runnable} or \emph{ready} state may or may not execute.
 
 \begin{DoxyNote}{Note}
-If using the extended \hyperlink{group__OCRExtLib_ga1de1b7c273fd6fb900feba43141881f5}{ocr\-Wait()} call
-present in ocr-\/legacy.\-h, you do not need to use \hyperlink{group__OCRGeneral_gae115fb2dbc351416835b0fb7b91f94e5}
-{ocr\-Shutdown()} as the termination of the O\-C\-R portion will be captured in the finish E\-D\-T's return
-\end{DoxyNote}
+Program behavior after this call is undefined. Specifically:
+\begin{itemize}
+  \item The statements in the calling EDT \emph{after} this function
+    call may or may not be executed;
+  \item EDTs in the \emph{runnable} or \emph{ready} state may or may not
+    execute.
+\end{itemize}
 
+Although most programs will choose to call \code{ocrShutdown()} in the ``last'' EDT,
+OCR specifically allows another EDT to call \code{ocrShutdown()} to support, for
+example, a computation of the type ``find-first-of''; in such a computation, the
+program can successfully complete even if all EDTs have not executed.
+\end{DoxyNote}
 %
 % ocrAbort
 %
-\hypertarget{group__OCRGeneral_gabcaaebe9465cd6efcfca2acb4c399cde}{\index{Support calls for O\-C\-R@{Support calls for O\-C\-R}!ocr\-Abort@{ocr\-Abort}}
-\index{ocr\-Abort@{ocr\-Abort}!Support calls for OCR@{Support calls for O\-C\-R}}
-\subsection[{ocr\-Abort}]{\setlength{\rightskip}{0pt plus 5cm}void ocr\-Abort (
+\hypertarget{func_ocrAbort}{
+  \index{Supporting functions@{Supporting functions}!ocr\-Abort@{ocr\-Abort}}
+  \subsection[{ocr\-Abort}]{\setlength{\rightskip}{0pt plus 5cm}void ocr\-Abort(
 \begin{DoxyParamCaption}
 \item[{{\bf u8}}]{error\-Code}
 \end{DoxyParamCaption}
-)}}\label{group__OCRGeneral_gabcaaebe9465cd6efcfca2acb4c399cde}
+)}}
+\label{func_ocrAbort}
 
-Called by an E\-D\-T to indicate an abnormal end of an O\-C\-R program.
-Program behavior after this call is undefined. The error code for the reason for abort is passed to the runtime, and its handling is implementation dependent.
+This function is very similar to \hyperlink{func_ocrShutdown}{\code{ocrShutdown()}}
+except that it allows for the return of a non-zero value.
 
-\begin{DoxyParams}{Parameters}
-{\em error\-Code} & User defined error code returned to the environment \\
+The abort error code is passed back to the runtime and its handling is
+implementation dependent
+
+\begin{DoxyParams}[1]{Parameters}
+\mbox{\tt in} & \code{errorCode} & User defined error code returned to the runtime.\\
 \hline
 \end{DoxyParams}
 
 \descr
-This call will cause the O\-C\-R runtime to shutdown with an error code. Calling this with 0 as an argument is equivalent to \hyperlink{group__OCRGeneral_gae115fb2dbc351416835b0fb7b91f94e5}{ocr\-Shutdown()}.
-
+See notes in Section~\ref{func_ocrShutdown}.
 %
 % getArgc
 %
-\hypertarget{group__OCRGeneral_ga29d56cd773017a4d48d629bc13a220ce}{\index{Support calls for O\-C\-R@{Support calls for O\-C\-R}!get\-Argc@{get\-Argc}}
-\index{get\-Argc@{get\-Argc}!Support calls for OCR@{Support calls for O\-C\-R}}
-\subsection[{get\-Argc}]{\setlength{\rightskip}{0pt plus 5cm}{\bf u64} get\-Argc (
+\hypertarget{func_getArgc}{
+  \index{Supporting functions@{Supporting function}!get\-Argc@{get\-Argc}}
+  \subsection[{get\-Argc}]{\setlength{\rightskip}{0pt plus 5cm}{\bf u64} get\-Argc(
 \begin{DoxyParamCaption}
 \item[{void $\ast$}]{db\-Ptr}
 \end{DoxyParamCaption}
-)}}\label{group__OCRGeneral_ga29d56cd773017a4d48d629bc13a220ce}
+)}}
+\label{func_getArgc}
 
-Retrieves the traditional 'argc' value in main\-Edt.
-The single parameter for this function is the pointer to the sole datablock passed to main\-Edt from the runtime.
+Returns the number of arguments (traditionally called `argc') passed to the OCR program.
+The value is extracted from the unique data block passed to \hyperlink{func_mainEdt}{\code{mainEdt}}.
 
-\begin{DoxyParams}{Parameters}
-{\em db\-Ptr} & Pointer to the start of the argument data block \\
+\begin{DoxyParams}[1]{Parameters}
+\mbox{\tt in} & \code{dbPtr} & Pointer to the start of the argument data block\\
 \hline
 \end{DoxyParams}
 
 \returns
-Number of arguments
+The number of arguments passed to the OCR program on the command line
 
 \descr
-When starting, the first E\-D\-T (called main\-Edt) gets a single data block that contains all of the
-arguments passed to the program. These arguments are packed in the following format\-:
+When starting, the first EDT (called \hyperlink{func_mainEdt}{\code{mainEdt}}) is
+passed a single input data block which encodes the arguments passed to the main
+program:
 \begin{DoxyItemize}
-\item first 8 bytes\-: argc
-\item argc count of 8 byte values indicating the offsets from the start of the data block to the argument (ie\-: the first 8 byte value indicates the offset in bytes to the first argument)
-\item the arguments (N\-U\-L\-L terminated character arrays)
+\item The first 8 bytes encode `argc';
+\item The following `argc' 8-byte values encode the offset
+  from the start of the data block to the arguments;
+\item The arguments are then appended as NULL terminated
+  character arrays.
 \end{DoxyItemize}
-
-This call will extract the number of arguments (argc)
 %
 % getArgv
 %
-\hypertarget{group__OCRGeneral_gad553929187f042ce480d09e84a4c59a7}{\index{Support calls for O\-C\-R@{Support calls for O\-C\-R}!get\-Argv@{get\-Argv}}
-\index{get\-Argv@{get\-Argv}!Support calls for OCR@{Support calls for O\-C\-R}}
-\subsection[{get\-Argv}]{\setlength{\rightskip}{0pt plus 5cm}char$\ast$ get\-Argv (
+\hypertarget{func_getArgv}{
+  \index{Supporting functions@{Supporting function}!get\-Argv@{get\-Argv}}
+  \subsection[{get\-Argv}]{\setlength{\rightskip}{0pt plus 5cm}{\bf char $\ast$} get\-Argv(
 \begin{DoxyParamCaption}
-\item[{void $\ast$}]{db\-Ptr, }
+\item[{void $\ast$}]{db\-Ptr}
 \item[{{\bf u64}}]{count}
 \end{DoxyParamCaption}
-)}}\label{group__OCRGeneral_gad553929187f042ce480d09e84a4c59a7}
+)}}
+\label{func_getArgv}
 
-Gets the argument 'count' from the data-\/block containing the arguments.
+Returns the `count' argument passed to the OCR program.
+The value is extracted from the unique data block passed to \hyperlink{func_mainEdt}{\code{mainEdt}}.
 
-\begin{DoxyParams}{Parameters}
-{\em db\-Ptr} & Pointer to the start of the argument data-\/block \\
+\begin{DoxyParams}[1]{Parameters}
+\mbox{\tt in} & \code{dbPtr} & Pointer to the start of the argument data block\\
 \hline
-{\em count} & Index of the argument to extract \\
+\mbox{\tt in} & \code{count} & Index of the argument to extract\\
 \hline
 \end{DoxyParams}
 
 \returns
-A N\-U\-L\-L terminated string
+A NULL terminated string corresponding to \code{argv[count]}.
 
-%%%%%
-%%%%% someone needs to write this section
-%%%%%
 \descr
-This function supports the extraction of arguments from argv.   See \hyperlink{group__OCRGeneral_ga29d56cd773017a4d48d629bc13a220ce}{get\-Argc()} for an explanation.
-
-
+See Section~\ref{func_getArgc} for details.
+\begin{DoxyNote}{Note}
+Attempting to extract an argument with \code{count} greater or equal to the value
+returned by \hyperlink{func_getArgc}{\code{getArgc}} will result in undefined
+behavior.
+\end{DoxyNote}
 %
 % PRINTF
 %
+\hypertarget{func_PRINTF}{
+  \index{Supporting functions@{Supporting function}!PRINTF@{PRINTF}}
+  \subsection[{PRINTF}]{\setlength{\rightskip}{0pt plus 5cm}{\bf u32} PRINTF(
+\begin{DoxyParamCaption}
+\item[{const char $\ast$}]{fmt}
+\item[{}]{...}
+\end{DoxyParamCaption}
+)}}
+\label{func_PRINTF}
 
-\subsection{\code{PRINTF } }
-\index{\code{PRINTF }}
-\label{sec:PRINTF }
+A platform independent limited \code{printf} functionality.
 
-A macro that exposes the printf function from the standard C library.
-
-\begin{boxedcode}
-\plc{u32 PRINTF (const char fmt,...)}
-\end{boxedcode}
-
-\begin{table}[h]
-\begin{tabular}{l l l}
-type &  argument   & meaning \\
+\begin{DoxyParams}[1]{Parameters}
+\mbox{\tt in} & \code{fmt} & NULL terminated C format string containing the
+format of the output string\\
 \hline
-\code{const char}   & \code{fmt}  &in: the standard C format string associated with printf() .\\
-\code{...}   & \code{....}  &in: a variable length list of arguments in agreement with \code{fmt}..\\
+\mbox{\tt in} & \code{...} & A varaible length list of arguments in agreement with
+\code{fmt}\\
 \hline
-\end{tabular}
-\end{table}
+\end{DoxyParams}
 
 \returns
- It returns a
-\code{u32} value for the number of bytes actually written.
+This function returns the number of bytes written out as a
+\hyperlink{type_u32}{\code{u32}}.
 
 \descr
-OCR must support a wide variety of platforms including simulators that emulate real systems.
-Often, core functionality provided by standard C libraries are not available on all platforms
-and as a result, an OCR program cannot depend on these functions.  There was one case, however,
-where it was felt support was critical.  This is in the case of the following basic printf capability which
-is provide in the OCR API as following function.
+OCR must support a wide variety of platforms including simulators that emulate
+real systems. Often, core functionality provided by standard C libraries are not
+available on all platforms, and, as a result, an OCR program cannot depend on
+these functions. There was one case, however, where it was felt support was
+critical: basic printf. This function supports basic printing functionality
+and supports the following format specifiers:
+\begin{itemize}
+\item Strings using \code{\%s};
+\item 32-bit integers using \code{\%d}, \code{\%u}, \code{\%x} and \code{\%X};
+\item 64-bit integers using \code{\%ld}, \code{\%lu}, \code{\%lx}, \code{\%lX},
+  and versions with two `l';
+\item 64-bit pointers using \code{\%p};
+\item Floating point numbers using \code{\%f}, \code{\%e} and \code{\%E};
+\item The `\#' flag is supported for \code{\%x}, \code{\%lx} and \code{\%llx};
+\item Precision modifiers are also supported for \code{\%f}, \code{\%e} and \code{\%E}.
+\end{itemize}
 
+\begin{DoxyNote}{Note}
+A conformant implementation may limit the number of characters in the
+output string.
+\end{DoxyNote}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Data Block Management
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -331,16 +368,17 @@ of the E\-D\-T (or the data block creation) and the corresponding \code{ocrDbRel
 
 The following macros and enums are used with OCR data blocks.
 \begin{itemize}
-\item \hypertarget{type_ocrInDbAllocator_t}\code{enum ocrInDbAllocator\_t} containing:
+\item \hypertarget{type_ocrInDbAllocator_t}{\code{enum ocrInDbAllocator\_t}} containing:
   \begin{itemize}
   \item \code{NO\_ALLOC} The data block is not used as a heap
   \end{itemize}
-\item \code{enum ocrDbAccessMode\_t} containing the four access modes:
+\item \code{enum ocrDbAccessMode\_t} containing the four access modes. The
+meaning of the access modes is given in Section~\ref{sec:datablocks}:
   \begin{itemize}
     \item \code{DB\_MODE\_RW}
     \item \code{DB\_MODE\_EW}
     \item \code{DB\_MODE\_RO}
-    \item \ocde{DB\_MODE\_CONST}
+    \item \code{DB\_MODE\_CONST}
   \end{itemize}
 \item \code{DB\_DEFAULT\_MODE} which is an alias of \code{DB\_MODE\_RW}
 \item \code{DB\_PROP\_NONE} which specifies no special properties on the data block
@@ -350,36 +388,38 @@ The following macros and enums are used with OCR data blocks.
 % described modes/functionality
 \end{itemize}
 
-These are the modes with which an EDT can access a data block.
-OCR currently supports four modes:
-\begin{itemize}
-\item \code{DB\_MODE\_RW} Read-Write (default mode): The EDT is stating that it
-may read from and write-to the data block. The user is responsible for
-synchronizing between EDTs that could potentially write to the same data block
-concurrently.
-\item \code{DB\_MODE\_EW} Exclusive-Write (EW): The EDT requires that it be
-the only one writing to the data block. The runtime will not schedule any other
-EDT that accesses the same data block in RW or EW mode concurrently.
-This can limit parallelism.
-\item \code{DB\_MODE\_RO} Read-Only: The EDT is stating that it will only read
-from the data block. The runtime will not enforce this restriction but the
-visibility of any writes done by the EDT is undefined. The runtime also does
-not guarantee that concurrent writes to the data block from other EDTs
-will not be visible. In other words, another concurrent EDT in EW or RW mode may
-concurrently access the data block and modify it while this EDT is accessing it in
-RO mode.
-\item \code{DB\_MODE\_CONST} Constant: Similarly to the RO mode, the EDT is
-again stating that it will not write to the data block. In this mode, however,
-the runtime guarantees that the data block seen by the EDT will not be modified
-by other concurrent EDTs. Similarly to the RO mode, the visibility of any writes
-by this EDT (in violation of the ``contract'') is undefined.
-\end{itemize}
+%% This is a repeat of sec:datablocks. Keeping for now commented.
+
+%% These are the modes with which an EDT can access a data block.
+%% OCR currently supports four modes:
+%% \begin{itemize}
+%% \item \code{DB\_MODE\_RW} Read-Write (default mode): The EDT is stating that it
+%% may read from and write-to the data block. The user is responsible for
+%% synchronizing between EDTs that could potentially write to the same data block
+%% concurrently.
+%% \item \code{DB\_MODE\_EW} Exclusive-Write (EW): The EDT requires that it be
+%% the only one writing to the data block. The runtime will not schedule any other
+%% EDT that accesses the same data block in RW or EW mode concurrently.
+%% This can limit parallelism.
+%% \item \code{DB\_MODE\_RO} Read-Only: The EDT is stating that it will only read
+%% from the data block. The runtime will not enforce this restriction but the
+%% visibility of any writes done by the EDT is undefined. The runtime also does
+%% not guarantee that concurrent writes to the data block from other EDTs
+%% will not be visible. In other words, another concurrent EDT in EW or RW mode may
+%% concurrently access the data block and modify it while this EDT is accessing it in
+%% RO mode.
+%% \item \code{DB\_MODE\_CONST} Constant: Similarly to the RO mode, the EDT is
+%% again stating that it will not write to the data block. In this mode, however,
+%% the runtime guarantees that the data block seen by the EDT will not be modified
+%% by other concurrent EDTs. Similarly to the RO mode, the visibility of any writes
+%% by this EDT (in violation of the ``contract'') is undefined.
+%% \end{itemize}
 
 \subsection*{Functions}
 \begin{DoxyCompactItemize}
 \item
   \hyperlink{type_u8}{u8} \hyperlink{func_ocrDbCreate}
-            {\code{ocrDbCreate}}(\hyperlink{type_ocrGuid_t}}{ocr\-Guid\-\_\-t} $\ast$db,
+            {\code{ocrDbCreate}}(\hyperlink{type_ocrGuid_t}{ocr\-Guid\-\_\-t} $\ast$db,
     void $\ast$$\ast$addr, \hyperlink{type_u64}{u64} len, \hyperlink{type_u16}{u16} flags,
     \hyperlink{type_ocrGuid_t}{ocr\-Guid\-\_\-t} affinity,
     \hyperlink{type_ocrInDbAllocator_t}{ocr\-In\-Db\-Allocator\-\_\-t} allocator)
@@ -394,14 +434,14 @@ by this EDT (in violation of the ``contract'') is undefined.
     \end{DoxyCompactList}
 \item
   \hyperlink{type_u8}{u8} \hyperlink{func_ocrDbRelease}
-            {\code{ocrDbRelease}(\hyperlink{type_ocrGuid_t}{ocr\-Guid\-\_\-t} db)
+            {\code{ocrDbRelease}}(\hyperlink{type_ocrGuid_t}{ocr\-Guid\-\_\-t} db)
     \begin{DoxyCompactList}
       \small\item \emph{Release the data block indicating the end of its use by
         the EDT.}
     \end{DoxyCompactList}
 \end{DoxyCompactItemize}
 %
-%  ocdDbCreate
+%  ocrDbCreate
 %
 \hypertarget{func_ocrDbCreate}{
   \index{Data block management@{Data block management}!ocr\-Db\-Create@{ocr\-Db\-Create}}
@@ -423,7 +463,7 @@ created data block and a pointer to it (if requested).
 
 \begin{DoxyParams}[1]{Parameters}
 \mbox{\tt out}  & \code{db} & On successful creation, contains the GUID
-of the data block. If the call fails, the returned value is undefined \\
+of the data block. If the call fails, the returned value is undefined.\\
 \hline
 \mbox{\tt out}  & \code{addr} & On successful creation and if the
 DB\_PROP\_NO\_ACQUIRE is not specified in \code{flags}, the created
@@ -597,251 +637,284 @@ pointer it had to it should be considered invalid). Violating this rule will
 result in undefined behavior. A consequence of this is that a data block can
 only be released at most once by an EDT.
 \end{DoxyNote}
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Event Management
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\section{Event Management for OCR}
-\index{Event Management APIs}
+\section{Event Management}
+\index{Event management APIs}
 \label{sec:OCReventManagement}
 
-Events are  used to coordinate the execution of tasks and to
-help establish dependences in the directed acyclic graph representing the execution of an OCR program.
-%To manage the different types of events, OCR defines the following enum types and values.
+Events are used to coordinate the execution of tasks and to
+help establish dependences in the directed acyclic graph representing the
+execution of an OCR program.
 
-
-Each OCR event has a type that is specified at creation.
-The type of the event determines its behavior, specifically,
-its persistency after it triggers its post-slot, its trigger rule and
-its behavior when satisfied multiple times.
-
+The following macros and enums are used with OCR events:
 \begin{itemize}
-\item \code{OCR\_EVENT\_ONCE\_T} - \emph{Once} Event: A ONCE event simply passes along a satisfaction on its
-unique pre-slot to its post-slot. Once all OCR objects linked to its post-slot have been satisfied,
-the ONCE event is automatically destroyed.
-\item \code{OCR\_EVENT\_IDEM\_T} - \emph{Idempotent} Event: An IDEM event also passes along a satisfaction on its
-unique pre-slot to its post-slot. The IDEM event persists until ocrEventDestroy() is explicitly called on it.
-It can only be satisfied once and subsequent satisfactions are ignored.
-\item \code{OCR\_EVENT\_STICKY\_T} - \emph{Sticky} Event: A STICKY event is identical to an IDEM event except that
-multiple satisfactions result in an error.
-\item \code{OCR\_EVENT\_LATCH\_T} - \emph{Latch} Event: A LATCH event has two pre-slots: a INCR and a DECR.
-Each slot is associated with an internal monotonically increasing counter that starts at 0.
-On each satisfaction of one of the pre-slots, the counter for that slot is incremented by 1.
-When both counters are equal (and non-zero), the post-slot of the latch event is triggered.
-Any data block passed along its pre-slots is ignored. A LATCH event is similarly persistent
-as a ONCE event and is automatically destroyed when its post-slot is triggered.
-\end{itemize}
-
-Currently, only the LATCH event has more than one pre-slot.
-\begin{itemize}
-\item \code{OCR\_EVENT\_LATCH\_DECR\_SLOT} - This is the decrement slot of a LATCH event
-\item \code{OCR\_EVENT\_LATCH\_INCR\_SLOT} - This is the increment slot of a LATCH event
+\item \hypertarget{type_ocrEventTypes_t}{\code{enum ocrEventTypes\_t}} containing the types of supported events. The
+meaning of these event types is given in Section~\ref{sec:Event}:
+  \begin{itemize}
+    \item \code{OCR\_EVENT\_ONCE\_T}
+    \item \code{OCR\_EVENT\_IDEM\_T}
+    \item \code{OCR\_EVENT\_STICKY\_T}
+    \item \code{OCR\_EVENT\_LATCH\_T}
+  \end{itemize}
+%% \code{OCR\_EVENT\_ONCE\_T} - \emph{Once} Event: A ONCE event simply passes along a satisfaction on its
+%% unique pre-slot to its post-slot. Once all OCR objects linked to its post-slot have been satisfied,
+%% the ONCE event is automatically destroyed.
+%% \item \code{OCR\_EVENT\_IDEM\_T} - \emph{Idempotent} Event: An IDEM event also passes along a satisfaction on its
+%% unique pre-slot to its post-slot. The IDEM event persists until ocrEventDestroy() is explicitly called on it.
+%% It can only be satisfied once and subsequent satisfactions are ignored.
+%% \item \code{OCR\_EVENT\_STICKY\_T} - \emph{Sticky} Event: A STICKY event is identical to an IDEM event except that
+%% multiple satisfactions result in an error.
+%% \item \code{OCR\_EVENT\_LATCH\_T} - \emph{Latch} Event: A LATCH event has two pre-slots: a INCR and a DECR.
+%% Each slot is associated with an internal monotonically increasing counter that starts at 0.
+%% On each satisfaction of one of the pre-slots, the counter for that slot is incremented by 1.
+%% When both counters are equal (and non-zero), the post-slot of the latch event is triggered.
+%% Any data block passed along its pre-slots is ignored. A LATCH event is similarly persistent
+%% as a ONCE event and is automatically destroyed when its post-slot is triggered.
+\item \code{enum ocrLatchEventSlots\_t} containing constants to identify the two
+pre-slots of the latch event type:
+  \begin{itemize}
+    \item \code{OCR\_EVENT\_LATCH\_DECR\_SLOT} identifying the decrement slot of
+      the latch event
+    \item \code{OCR\_EVENT\_LATCH\_INCR\_SLOT} identifying the increment slot of
+      the latch event
+  \end{itemize}
 \end{itemize}
 
 \subsection*{Functions}
 \begin{DoxyCompactItemize}
 \item
-\hyperlink{group__OCRTypesGeneral_ga92c50087ca0e64fa93fc59402c55f8ca}{u8} \hyperlink{group__OCREvents_gab4cd41f97cc692a86f887b404b055066}
-{ocr\-Event\-Create} (\hyperlink{group__OCRTypesGeneral_gacde3883d1ce245c051133c2c3aa82fc8}{ocr\-Guid\-\_\-t} $\ast$guid, \hyperlink{group__OCRTypesEvents_ga42f4195355182edfaa79c9ef3f2c07b1}{ocr\-Event\-Types\-\_\-t} event\-Type, bool takes\-Arg)
-\begin{DoxyCompactList}\small\item\em Creates an event. \end{DoxyCompactList}
-
+  \hyperlink{type_u8}{u8} \hyperlink{func_ocrEventCreate}
+            {\code{ocrEventCreate}}(\hyperlink{type_ocrGuid_t}{ocr\-Guid\-\_\-t} $\ast$guid,
+    \hyperlink{type_ocrEventTypes_t}{ocr\-Event\-Types\-\_\-t} event\-Type,
+    \hyperlink{type_u16}{u16} flags)
+    \begin{DoxyCompactList}
+      \small\item \emph{Request the creation of an event.}
+    \end{DoxyCompactList}
 \item
-\hyperlink{group__OCRTypesGeneral_ga92c50087ca0e64fa93fc59402c55f8ca}{u8} \hyperlink{group__OCREvents_ga24d30531aaa059c1086fc74712d4f23d}
-{ocr\-Event\-Destroy} (\hyperlink{group__OCRTypesGeneral_gacde3883d1ce245c051133c2c3aa82fc8}{ocr\-Guid\-\_\-t} guid)
-\begin{DoxyCompactList}\small\item\em Explicitly destroys an event. \end{DoxyCompactList}
-
+  \hyperlink{type_u8}{u8} \hyperlink{func_ocrEventDestroy}
+            {\code{ocrEventDestroy}}(\hyperlink{type_ocrGuid_t}{ocr\-Guid\-\_\-t} guid)
+    \begin{DoxyCompactList}
+      \small\item \emph{Explicitly destroys an event.}
+    \end{DoxyCompactList}
 \item
-\hyperlink{group__OCRTypesGeneral_ga92c50087ca0e64fa93fc59402c55f8ca}{u8} \hyperlink{group__OCREvents_gab27ef5d905c01ba534e86f8e7e91eaf0}
-{ocr\-Event\-Satisfy} (\hyperlink{group__OCRTypesGeneral_gacde3883d1ce245c051133c2c3aa82fc8}{ocr\-Guid\-\_\-t} event\-Guid, \hyperlink{group__OCRTypesGeneral_gacde3883d1ce245c051133c2c3aa82fc8}{ocr\-Guid\-\_\-t} data\-Guid)
-\begin{DoxyCompactList}\small\item\em Satisfy the first pre-\/slot of an event and optionally pass a data block along to the event. \end{DoxyCompactList}
-
+  \hyperlink{type_u8}{u8} \hyperlink{func_ocrEventSatisfy}
+            {\code{ocrEventSatisfy}}(\hyperlink{type_ocrGuid_t}{ocr\-Guid\-\_\-t} event\-Guid,
+   \hyperlink{type_ocrGuid_t}{ocr\-Guid\-\_\-t} data\-Guid)
+   \begin{DoxyCompactList}
+     \small\item \emph{Satisfy the first pre-slot of an event and optionally pass
+       a data block to the event.}
+   \end{DoxyCompactList}
 \item
-\hyperlink{group__OCRTypesGeneral_ga92c50087ca0e64fa93fc59402c55f8ca}{u8} \hyperlink{group__OCREvents_gab53103ecf0c74b55830edf5b8d14a942}
-{ocr\-Event\-Satisfy\-Slot} (\hyperlink{group__OCRTypesGeneral_gacde3883d1ce245c051133c2c3aa82fc8}{ocr\-Guid\-\_\-t} event\-Guid, \hyperlink{group__OCRTypesGeneral_gacde3883d1ce245c051133c2c3aa82fc8}{ocr\-Guid\-\_\-t} data\-Guid, \hyperlink{group__OCRTypesGeneral_gafaa62991928fb9fb18ff0db62a040aba}{u32} slot)
-\begin{DoxyCompactList}\small\item\em Satisfy the specified pre-\/slot of an event. \end{DoxyCompactList}
+  \hyperlink{type_u8}{u8} \hyperlink{func_ocrEventSatisfySlot}
+            {\code{ocrEventSatisfySlot}}(\hyperlink{type_ocrGuid_t}{ocr\-Guid\-\_\-t} event\-Guid,
+    \hyperlink{type_ocrGuid_t}{ocr\-Guid\-\_\-t} data\-Guid, \hyperlink{type_u32}{u32} slot)
+    \begin{DoxyCompactList}
+      \small\item \emph{Satisfy the specified pre-slot of an event and optionally
+        pass a data block to the event.}
+    \end{DoxyCompactList}
 \end{DoxyCompactItemize}
-
 %
 % ocrEventCreate
 %
-\hypertarget{group__OCREvents_gab4cd41f97cc692a86f887b404b055066}{\index{Event Management for O\-C\-R@{Event Management for O\-C\-R}!ocr\-Event\-Create@{ocr\-Event\-Create}}
-\index{ocr\-Event\-Create@{ocr\-Event\-Create}!Event Management for OCR@{Event Management for O\-C\-R}}
-\subsection[{ocr\-Event\-Create}]{\setlength{\rightskip}{0pt plus 5cm}{\bf u8} ocr\-Event\-Create (
+\hypertarget{func_ocrEventCreate}{
+  \index{Event management@{Event management}!ocr\-Event\-Create@{ocr\-Event\-Create}}
+  \subsection[{ocr\-Event\-Create}]{\setlength{\rightskip}{0pt plus 5cm}{\bf u8} ocr\-Event\-Create(
 \begin{DoxyParamCaption}
 \item[{{\bf ocr\-Guid\-\_\-t} $\ast$}]{guid, }
 \item[{{\bf ocr\-Event\-Types\-\_\-t}}]{event\-Type, }
-\item[{u16}]{properties}
+\item[{\bf u16}]{flags}
 \end{DoxyParamCaption}
-)}}\label{group__OCREvents_gab4cd41f97cc692a86f887b404b055066}
+)}}
+\label{func_ocrEventCreate}
 
-Creates an event.
+Requests the creation of an event of the specified type. After a successful call,
+the runtime will return the GUID for the newly created event. The returned GUID
+is immediately usable.
 
 \begin{DoxyParams}[1]{Parameters}
-\mbox{\tt out}  & {\em guid} & The G\-U\-I\-D created by the runtime for the new event \\
+\mbox{\tt out}  & \code{guid} & On successful creation, contains the GUID of the
+event. If the call fails, the returned value is undefined.\\
 \hline
-\mbox{\tt in}  & {\em event\-Type} & The type of event to create. See \hyperlink{group__OCRTypesEvents_ga42f4195355182edfaa79c9ef3f2c07b1}{ocr\-Event\-Types\-\_\-t} \\
+\mbox{\tt in}  & \code{eventType} & The type of event to create. See \hyperlink{type_ocrEventTypes_t}.\\
 \hline
-\mbox{\tt in}  & {\em properties} & Properties used to create the event. Currently, the following properties are supported\-:
+\mbox{\tt in}  & {\em flags} & Flags impacting the creation of the event. Currently,
+the following flags are supported:
 \begin{DoxyItemize}
-\item {E\-V\-T\-\_\-\-P\-R\-O\-P\-\_\-\-N\-O\-N\-E}, indicates no specific properties
-\item {E\-V\-T\-\_\-\-P\-R\-O\-P\-\_\-\-T\-A\-K\-E\-S\-\_\-\-A\-R\-G}, if this event will potentially carry a data block on satisfaction.
+\item EVT\_PROP\_NONE: Default behavior
+\item EVT\_PROP\_TAKES\_ARG: The created event will potentially
+  carry a data block on satisfaction.
 \end{DoxyItemize}\\
 \hline
 \end{DoxyParams}
 
 \returns
-a status code
+A status code:
 \begin{DoxyItemize}
 \item 0\-: successful
-\item E\-N\-O\-M\-E\-M\-: If space cannot be found to allocate the event
-\item E\-I\-N\-V\-A\-L\-: If event\-Type was malformed or is incompatible with takes\-Arg
+\item OCR\_ENOMEM: The runtime could not create the event due to insufficient memory
+\item OCR\_EINVAL: The \code{eventType} argument is invalid or incompatible
+  with \code{takesArg}
 \end{DoxyItemize}
 
-%%%%
-%%%%  Someone needs to write a proper description of this function.
-%%%%
 \descr
-This function creates a new programmer-\/managed event identified by the returned G\-U\-I\-D.
-
+This function is used to create the basic synchronization mechanism is OCR: the event.
+The lifetime of the created event is dependent on its type. See Section~\ref{sec:Event}
+for more detail.
 %
 % ocrEventDestroy
 %
-\hypertarget{group__OCREvents_ga24d30531aaa059c1086fc74712d4f23d}{\index{Event Management for O\-C\-R@{Event Management for O\-C\-R}!ocr\-Event\-Destroy@{ocr\-Event\-Destroy}}
-\index{ocr\-Event\-Destroy@{ocr\-Event\-Destroy}!Event Management for OCR@{Event Management for O\-C\-R}}
-\subsection[{ocr\-Event\-Destroy}]{\setlength{\rightskip}{0pt plus 5cm}{\bf u8} ocr\-Event\-Destroy (
+\hypertarget{func_ocrEventDestroy}{
+  \index{Event management@{Event management}!ocr\-Event\-Destroy@{ocr\-Event\-Destroy}}
+  \subsection[{ocr\-Event\-Destroy}]{\setlength{\rightskip}{0pt plus 5cm}{\bf u8} ocr\-Event\-Destroy(
 \begin{DoxyParamCaption}
 \item[{{\bf ocr\-Guid\-\_\-t}}]{guid}
 \end{DoxyParamCaption}
-)}}\label{group__OCREvents_ga24d30531aaa059c1086fc74712d4f23d}
+)}}
+\label{func_ocrEventDestroy}
 
-Explicitly destroys an event.
+Certain event types, specifically \emph{sticky} or \emph{idempotent} events do
+not get automatically destroyed when they are satisfied. The user must explicitly
+destroy these events when they are no longer needed.
 
 \begin{DoxyParams}[1]{Parameters}
-\mbox{\tt in}  & {\em guid} & The G\-U\-I\-D of the event to destroy \\
+\mbox{\tt in}  & \code{guid} & GUID of the event to destroy.\\
 \hline
 \end{DoxyParams}
 
 \returns
-a status code
+A status code:
 \begin{DoxyItemize}
-\item 0\-: successful
-\item E\-I\-N\-V\-A\-L\-: If guid does not refer to a valid event to destroy
+\item 0: Successful
+\item OCR\_EINVAL: The GUID passed as argument does not refer to a
+  valid event
 \end{DoxyItemize}
 
-%%%%
-%%%%  Someone needs to write a proper description of this function
-%%%%
 \descr
-Events such as O\-N\-C\-E or L\-A\-T\-C\-H are automatically destroyed by the runtime once they trigger;
-others, however, need to be explicitly destroyed by the programmer using this call.
+\emph{Once} and \emph{latch} events are automatically destroyed by the runtime
+when they trigger and propagate their satisfaction to the objects connected to
+their post-slots; those events should not be destroyed using this function. Other
+events, however, need to be destroyed when they are no longer needed.
+\begin{DoxyNote}{Note}
+If, before this call, the event has EDTs waiting on it that are not yet in
+the \emph{ready} state, those EDTs will never start unless their
+dependences are reset to another event. If the waiting EDTs are
+in the \emph{runnable} state, the behavior is undefined.
 
+Using the GUID of an event after it has been destroyed using this call
+will result in undefined behavior.
+\end{DoxyNote}
 %
 % ocrEventSatisfy
 %
-\hypertarget{group__OCREvents_gab27ef5d905c01ba534e86f8e7e91eaf0}{\index{Event Management for O\-C\-R@{Event Management for O\-C\-R}!ocr\-Event\-Satisfy@{ocr\-Event\-Satisfy}}
-\index{ocr\-Event\-Satisfy@{ocr\-Event\-Satisfy}!Event Management for OCR@{Event Management for O\-C\-R}}
-\subsection[{ocr\-Event\-Satisfy}]{\setlength{\rightskip}{0pt plus 5cm}{\bf u8} ocr\-Event\-Satisfy (
+\hypertarget{func_ocrEventSatisfy}{
+  \index{Event management@{Event management}!ocr\-Event\-Satisfy@{ocr\-Event\-Satisfy}}
+  \subsection[{ocr\-Event\-Satisfy}]{\setlength{\rightskip}{0pt plus 5cm}{\bf u8} ocr\-Event\-Satisfy(
 \begin{DoxyParamCaption}
 \item[{{\bf ocr\-Guid\-\_\-t}}]{event\-Guid, }
 \item[{{\bf ocr\-Guid\-\_\-t}}]{data\-Guid}
 \end{DoxyParamCaption}
-)}}\label{group__OCREvents_gab27ef5d905c01ba534e86f8e7e91eaf0}
+)}}
+\label{func_ocrEventSatisfy}
 
-Satisfy the first pre-\/slot of an event and optionally pass a data block along to the event.
-
-
+Equivalent to \code{ocrEventSatisfySlot(eventGuid, dataGuid, 0)}. See Section~\ref{func_ocrEventSatisfySlot}
+for more detail.
 
 \begin{DoxyParams}[1]{Parameters}
-\mbox{\tt in}  & {\em event\-Guid} & G\-U\-I\-D of the event to satisfy \\
+\mbox{\tt in}  & \code{eventGuid} & GUID of the event to satisfy\\
 \hline
-\mbox{\tt in}  & {\em data\-Guid} & G\-U\-I\-D of the data block to pass along or N\-U\-L\-L\-\_\-\-G\-U\-I\-D\\
+\mbox{\tt in}  & \code{dataGuid} & GUID of the data block to pass to the event or
+NULL\_GUID if this event does not take any data blocks (pure control dependence)\\
 \hline
 \end{DoxyParams}
 
-
 \returns
-a status code
+A status code
 \begin{DoxyItemize}
 \item 0\-: successful
-\item E\-N\-O\-M\-E\-M\-: If there is not enough memory. This is usually caused by a programmer error
-\item E\-I\-N\-V\-A\-L\-: If the G\-U\-I\-Ds do not refer to valid events/data blocks
-\item E\-N\-O\-P\-E\-R\-M\-: If the event has already been satisfied or if the event does not take an argument and one is given or if the event takes an argument and none is given
+\item OCR\_ENOMEM: The runtime could not satisfy the event due to insufficent
+  memory
+\item OCR\_EINVAL: \code{eventGuid} or \code{dataGuid} do not refer
+  to valid event or data block GUIDs respectively
+\item OCR\_EPERM: The event has already been satisfied and does not support
+  multiple satisfactions or a data block was passed to an event which does
+  not take arguments
 \end{DoxyItemize}
-
 
 \descr
-Satisfying the pre-\/slot of an event will potentially trigger the satisfaction of its post-\/slot depending on its trigger rule\-:
-\begin{DoxyItemize}
-\item O\-N\-C\-E, I\-D\-E\-M and S\-T\-I\-C\-K\-Y events will satisfy their post-\/slot upon satisfaction of their pre-\/slot
-\item L\-A\-T\-C\-H events have a more complex rule;
-see \hyperlink{group__OCRTypesEvents_ga42f4195355182edfaa79c9ef3f2c07b1}{ocr\-Event\-Types\-\_\-t}.
-\end{DoxyItemize}
-
-During satisfaction, the programmer may associate a data block to the pre-\/slot of the event. Depending
-on the event type, that data block will be passed along to its post-\/slot\-:
-\begin{DoxyItemize}
-\item O\-N\-C\-E, I\-D\-E\-M and S\-T\-I\-C\-K\-Y events will pass along the data block to their post-\/slot
-\item L\-A\-T\-C\-H events ignore any data block passed
-\end{DoxyItemize}
-An event satisfaction without the optional data block can be viewed as a pure control dependence
-whereas one with a data block is a control+data dependence
-
-\begin{DoxyNote}{Note}
-On satisfaction, a O\-N\-C\-E event will pass the G\-U\-I\-D of the optionally attached data
-block to all O\-C\-R objects waiting on it at that time and the event will destroy itself. I\-D\-E\-M and S\-T\-I\-C\-K\-Y
-events will pass the G\-U\-I\-D of the optionally attached data block to all O\-C\-R objects waiting on it at that time as
-well as any new objects linked to it until the event is destroyed.
-\end{DoxyNote}
-
+See Section~\ref{func_ocrEventSatisfySlot} for a detailed discussion of this function.
 %
 % ocrEventSatisfySlot
 %
-\hypertarget{group__OCREvents_gab53103ecf0c74b55830edf5b8d14a942}{\index{Event Management for O\-C\-R@{Event Management for O\-C\-R}!ocr\-Event\-Satisfy\-Slot@{ocr\-Event\-Satisfy\-Slot}}
-\index{ocr\-Event\-Satisfy\-Slot@{ocr\-Event\-Satisfy\-Slot}!Event Management for OCR@{Event Management for O\-C\-R}}
-\subsection[{ocr\-Event\-Satisfy\-Slot}]{\setlength{\rightskip}{0pt plus 5cm}{\bf u8} ocr\-Event\-Satisfy\-Slot (
+\hypertarget{func_ocrEventSatisfySlot}{
+  \index{Event management@{Event management}!ocr\-Event\-Satisfy\-Slot@{ocr\-Event\-Satisfy\-Slot}}
+  \subsection[{ocr\-Event\-Satisfy\-Slot}]{\setlength{\rightskip}{0pt plus 5cm}{\bf u8} ocr\-Event\-Satisfy\-Slot(
 \begin{DoxyParamCaption}
 \item[{{\bf ocr\-Guid\-\_\-t}}]{event\-Guid, }
 \item[{{\bf ocr\-Guid\-\_\-t}}]{data\-Guid, }
 \item[{{\bf u32}}]{slot}
 \end{DoxyParamCaption}
-)}}\label{group__OCREvents_gab53103ecf0c74b55830edf5b8d14a942}
+)}}
+\label{func_ocrEventSatisfySlot}
 
-
-Satisfy the specified pre-\/slot of an event.
+Satisfy the specified pre-slot of an event thereby potentially causing waiting
+EDTs to become \emph{runnable}. This function is the primary method of
+synchronization in OCR.
 
 \begin{DoxyParams}[1]{Parameters}
-\mbox{\tt in}  & {\em event\-Guid} & G\-U\-I\-D of the event to satisfy \\
+\mbox{\tt in}  & \code{eventGuid} & GUID of the event to satisfy\\
 \hline
-\mbox{\tt in}  & {\em data\-Guid} & G\-U\-I\-D of the data block to pass along or N\-U\-L\-L\-\_\-\-G\-U\-I\-D \\
+\mbox{\tt in}  & \code{dataGuid} & GUID of the data block to pass to the event or
+NULL\_GUID if this event does not take any data blocks (pure control dependence)\\
 \hline
-\mbox{\tt in}  & {\em slot} & Pre-\/slot on the destination event to satisfy\\
+\mbox{\tt in}  & \code{slot} & Pre-slot on the destination event to satisfy\\
 \hline
 \end{DoxyParams}
 
-
 \returns
-a status code
+A status code
 \begin{DoxyItemize}
 \item 0\-: successful
-\item E\-N\-O\-M\-E\-M\-: If there is not enough memory. This is usually caused by a programmer error
-\item E\-I\-N\-V\-A\-L\-: If the G\-U\-I\-Ds do not refer to valid events/data blocks
-\item E\-N\-O\-P\-E\-R\-M\-: If the event has already been satisfied or if the event does not take an
-argument and one is given or if the event takes an argument and none is given
+\item OCR\_ENOMEM: The runtime could not satisfy the event due to insufficent
+  memory
+\item OCR\_EINVAL: \code{eventGuid} or \code{dataGuid} do not refer
+  to valid event or data block GUIDs respectively
+\item OCR\_EPERM: The event has already been satisfied and does not support
+  multiple satisfactions or a data block was passed to an event which does
+  not take arguments
 \end{DoxyItemize}
 
 \descr
-This call is used primarily for L\-A\-T\-C\-H events. ocr\-Event\-Satisfy\-Slot(event\-Guid, data\-Guid, 0) is
-equivalent to ocr\-Event\-Satisfy(event\-Guid, data\-Guid)
+Satisfying the pre-slot of an event will potentially trigger the satisfaction of
+its post-\/slot depending on its trigger rule:
+\begin{DoxyItemize}
+\item \emph{Once}, \emph{idempotentent} and \emph{sticky} events will
+  satisfy their post-slot upon satisfaction of their pre-slot
+\item \emph{Latch} events will trigger if and only if the number of
+  satisfactions on both their pre-slots is equal. See Section~\ref{sec:Event} for
+  more detail.
+\end{DoxyItemize}
 
-\begin{DoxySeeAlso}{See Also}
-\hyperlink{group__OCREvents_gab27ef5d905c01ba534e86f8e7e91eaf0}{ocr\-Event\-Satisfy()}
-\end{DoxySeeAlso}
+The \code{dataGuid} argument is used to associate a data block with the event.
+\emph{Once}, \emph{idempotent} and \emph{sticky} events will pass this data block
+down their post slot. An EDT connected to the post-slot of the event (or the post-slot
+of a chain of events connected to this event) will acquire the data block
+associated with this event when it transitions to the \emph{ready} state.
+A data block passed to a \emph{latch} event is ignored.
 
-
+\begin{DoxyNote}{Note}
+OCR's memory model (see Section~\ref{sec:MemoryModel}) imposes that, to guarantee
+the visibility of the writes to a data block passed to an event (and therefore
+potentially immediately acquired by an EDT), data blocks need to be
+\emph{released} with \hyperlink{func_ocrDbRelease}{\code{ocrDbRelease}} prior to
+the satisfaction of the event. Failure to follow this rule will result in
+undefined behavior. Note that data blocks written to by a preceding EDT will already
+have been released when that EDT finished and moved to the \emph{release} stage.
+\end{DoxyNote}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% EDT API
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
 \hypertarget{group__OCREDT}{\section{Event Driven Task A\-P\-I}
 \label{group__OCREDT}\index{Event Driven Task A\-P\-I@{Event Driven Task A\-P\-I}}
 }
@@ -863,24 +936,24 @@ E\-D\-T instances are created from their corresponding E\-D\-T templates, that a
 of that type. O\-C\-R provides A\-P\-I functions to manage E\-D\-Ts, for creating and destroying E\-D\-Ts and templates, as shown below.
 \begin{DoxyCompactItemize}
 \item
-\hyperlink{group__OCRTypesGeneral_ga92c50087ca0e64fa93fc59402c55f8ca}{u8}
+\hyperlink{type_u8}{u8}
 \hyperlink{group__OCREDT_ga9649098ffad669c1c820cd821792d67a}
-{ocr\-Edt\-Template\-Create}(\hyperlink{group__OCRTypesGeneral_gacde3883d1ce245c051133c2c3aa82fc8}{ocr\-Guid\-\_\-t} guid, func\-Ptr,\hyperlink{group__OCRTypesGeneral_gafaa62991928fb9fb18ff0db62a040aba}{u32} paramc, \hyperlink{group__OCRTypesGeneral_gafaa62991928fb9fb18ff0db62a040aba}{u32} depc)
+{ocr\-Edt\-Template\-Create}(\hyperlink{type_ocrGuid_t}{ocr\-Guid\-\_\-t} guid, func\-Ptr,\hyperlink{type_u32}{u32} paramc, \hyperlink{type_u32}{u32} depc)
 \begin{DoxyCompactList}\small\item\em Creates an E\-D\-T template. \end{DoxyCompactList}
 
 \item
-\hyperlink{group__OCRTypesGeneral_ga92c50087ca0e64fa93fc59402c55f8ca}{u8} \hyperlink{group__OCREDT_gace7063cfee522df47c64bf5013385c10}
-{ocr\-Edt\-Template\-Destroy} (\hyperlink{group__OCRTypesGeneral_gacde3883d1ce245c051133c2c3aa82fc8}{ocr\-Guid\-\_\-t} guid)
+\hyperlink{type_u8}{u8} \hyperlink{group__OCREDT_gace7063cfee522df47c64bf5013385c10}
+{ocr\-Edt\-Template\-Destroy} (\hyperlink{type_ocrGuid_t}{ocr\-Guid\-\_\-t} guid)
 \begin{DoxyCompactList}\small\item\em Destroys an E\-D\-T template. \end{DoxyCompactList}
 
 \item
-\hyperlink{group__OCRTypesGeneral_ga92c50087ca0e64fa93fc59402c55f8ca}{u8} \hyperlink{group__OCREDT_gafa2443b31c38b4b7f9f59713abe12ecc}
-{ocr\-Edt\-Create} (\hyperlink{group__OCRTypesGeneral_gacde3883d1ce245c051133c2c3aa82fc8}{ocr\-Guid\-\_\-t} $\ast$guid, \hyperlink{group__OCRTypesGeneral_gacde3883d1ce245c051133c2c3aa82fc8}{ocr\-Guid\-\_\-t} template\-Guid, \hyperlink{group__OCRTypesGeneral_gafaa62991928fb9fb18ff0db62a040aba}{u32} paramc, \hyperlink{group__OCRTypesGeneral_ga3f7e2bcbb0b4c338f3c4f6c937cd4234}{u64} $\ast$paramv, \hyperlink{group__OCRTypesGeneral_gafaa62991928fb9fb18ff0db62a040aba}{u32} depc, \hyperlink{group__OCRTypesGeneral_gacde3883d1ce245c051133c2c3aa82fc8}{ocr\-Guid\-\_\-t} $\ast$depv, \hyperlink{group__OCRTypesGeneral_gace9d960e74685e2cd84b36132dbbf8aa}{u16} properties, \hyperlink{group__OCRTypesGeneral_gacde3883d1ce245c051133c2c3aa82fc8}{ocr\-Guid\-\_\-t} affinity, \hyperlink{group__OCRTypesGeneral_gacde3883d1ce245c051133c2c3aa82fc8}{ocr\-Guid\-\_\-t} $\ast$output\-Event)
+\hyperlink{type_u8}{u8} \hyperlink{group__OCREDT_gafa2443b31c38b4b7f9f59713abe12ecc}
+{ocr\-Edt\-Create} (\hyperlink{type_ocrGuid_t}{ocr\-Guid\-\_\-t} $\ast$guid, \hyperlink{type_ocrGuid_t}{ocr\-Guid\-\_\-t} template\-Guid, \hyperlink{type_u32}{u32} paramc, \hyperlink{group__OCRTypesGeneral_ga3f7e2bcbb0b4c338f3c4f6c937cd4234}{u64} $\ast$paramv, \hyperlink{type_u32}{u32} depc, \hyperlink{type_ocrGuid_t}{ocr\-Guid\-\_\-t} $\ast$depv, \hyperlink{group__OCRTypesGeneral_gace9d960e74685e2cd84b36132dbbf8aa}{u16} properties, \hyperlink{type_ocrGuid_t}{ocr\-Guid\-\_\-t} affinity, \hyperlink{type_ocrGuid_t}{ocr\-Guid\-\_\-t} $\ast$output\-Event)
 \begin{DoxyCompactList}\small\item\em Creates an E\-D\-T instance from an E\-D\-T template. \end{DoxyCompactList}
 
 \item
-\hyperlink{group__OCRTypesGeneral_ga92c50087ca0e64fa93fc59402c55f8ca}{u8} \hyperlink{group__OCREDT_gae258a29af116794a73099e9c6d9232f8}
-{ocr\-Edt\-Destroy} (\hyperlink{group__OCRTypesGeneral_gacde3883d1ce245c051133c2c3aa82fc8}{ocr\-Guid\-\_\-t} guid)
+\hyperlink{type_u8}{u8} \hyperlink{group__OCREDT_gae258a29af116794a73099e9c6d9232f8}
+{ocr\-Edt\-Destroy} (\hyperlink{type_ocrGuid_t}{ocr\-Guid\-\_\-t} guid)
 \begin{DoxyCompactList}\small\item\em Destroys an E\-D\-T. \end{DoxyCompactList}
 
 \end{DoxyCompactItemize}
@@ -1075,8 +1148,8 @@ from this section of the API.
 
 \begin{DoxyCompactItemize}
 \item
-\hyperlink{group__OCRTypesGeneral_ga92c50087ca0e64fa93fc59402c55f8ca}{u8} \hyperlink{group__OCRDependences_gab0eea439797c1dcde2dbbe704d701dcd}
-{ocr\-Add\-Dependence} (\hyperlink{group__OCRTypesGeneral_gacde3883d1ce245c051133c2c3aa82fc8}{ocr\-Guid\-\_\-t} source, \hyperlink{group__OCRTypesGeneral_gacde3883d1ce245c051133c2c3aa82fc8}{ocr\-Guid\-\_\-t} destination, \hyperlink{group__OCRTypesGeneral_gafaa62991928fb9fb18ff0db62a040aba}{u32} slot, \hyperlink{group__OCRTypesDB_gae72c588a0182fcee7db295e53743821a}{ocr\-Db\-Access\-Mode\-\_\-t} mode)
+\hyperlink{type_u8}{u8} \hyperlink{group__OCRDependences_gab0eea439797c1dcde2dbbe704d701dcd}
+{ocr\-Add\-Dependence} (\hyperlink{type_ocrGuid_t}{ocr\-Guid\-\_\-t} source, \hyperlink{type_ocrGuid_t}{ocr\-Guid\-\_\-t} destination, \hyperlink{type_u32}{u32} slot, \hyperlink{group__OCRTypesDB_gae72c588a0182fcee7db295e53743821a}{ocr\-Db\-Access\-Mode\-\_\-t} mode)
 \begin{DoxyCompactList}\small\item\em Adds a dependence between O\-C\-R objects\-: \end{DoxyCompactList}
 \end{DoxyCompactItemize}
 
