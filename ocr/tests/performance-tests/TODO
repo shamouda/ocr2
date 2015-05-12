@@ -1,4 +1,2 @@
-1. Separate the timing methods to be platform-neutral
 2. Mirror the makefile of apps for platform-neutrality
-3. Convert #def values into config.h files to make it more intuitive
 4. Add scripts to clean up several passes & graphing

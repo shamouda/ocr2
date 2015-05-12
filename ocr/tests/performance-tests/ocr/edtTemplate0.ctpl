@@ -1,4 +1,5 @@
 // DESC: Template to creates NB_INSTANCES edt templates and vary deallocation scheme
+// TIME: This is a template. Timing info is defined in the file including this one.
 // FREQ: Done 'NB_ITERS' times.
 
 //

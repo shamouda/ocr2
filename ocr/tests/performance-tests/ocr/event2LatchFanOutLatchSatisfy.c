@@ -9,13 +9,12 @@
 // - NB_ITERS
 // - FAN_OUT
 
-#define NB_ITERS 10
-
 #define PRODUCER_EVENT_TYPE_IS_LATCH 1
 #define PRODUCER_EVENT_TYPE  OCR_EVENT_LATCH_T
 #define CONSUMER_EVENT_TYPE  OCR_EVENT_LATCH_T
 
-#define CLEAN_UP_ITERATION   1
+// Cannot clean-up iteration for non-persistent events
+#define CLEAN_UP_ITERATION   0
 
 #define TIME_SATISFY 1
 #define TIME_ADD_DEP 0

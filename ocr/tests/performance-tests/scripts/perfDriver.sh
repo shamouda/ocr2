@@ -27,10 +27,6 @@ export CORE_SCALING=${CORE_SCALING-"2 4 8 16"}
 # Number of nodes to use
 export OCR_NUM_NODES=${OCR_NUM_NODES-"1"}
 
-# Base OCR cfg file to use for core scaling
-# The runner script replaces "1w" by nb of required cores
-export OCR_CONFIG_BASE=${OCR_CONFIG_BASE-mach-hc-1w-bind-mallocproxy.cfg}
-
 # Default runlog and report naming
 export LOGDIR=${LOGDIR-$PWD}
 export RUNLOG_FILENAME_BASE=${RUNLOG_FILENAME_BASE-"runlog"}

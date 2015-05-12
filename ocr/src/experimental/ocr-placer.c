@@ -126,9 +126,8 @@ void destroyLocationPlacer(ocrPolicyDomain_t *pd) {
 #define PD_MSG (&msg)
 #define PD_TYPE PD_MSG_GUID_DESTROY
       msg.type = PD_MSG_GUID_DESTROY | PD_MSG_REQUEST;
-      // These next two statements may be not required. Just to be safe
       PD_MSG_FIELD_I(guid.guid) = placer->pdLocAffinities[pd->neighbors[i]];
-      //PD_MSG_FIELD_I(guid.metaDataPtr) = base;
+      PD_MSG_FIELD_I(guid.metaDataPtr) = NULL;
       PD_MSG_FIELD_I(properties) = 0; // Free metadata
       pd->fcts.processMessage(pd, &msg, false);
 #undef PD_MSG
@@ -138,9 +137,8 @@ void destroyLocationPlacer(ocrPolicyDomain_t *pd) {
 #define PD_MSG (&msg)
 #define PD_TYPE PD_MSG_GUID_DESTROY
       msg.type = PD_MSG_GUID_DESTROY | PD_MSG_REQUEST;
-      // These next two statements may be not required. Just to be safe
       PD_MSG_FIELD_I(guid.guid) = placer->pdLocAffinities[placer->current];
-      //PD_MSG_FIELD_I(guid.metaDataPtr) = base;
+      PD_MSG_FIELD_I(guid.metaDataPtr) = NULL;
       PD_MSG_FIELD_I(properties) = 0; // Free metadata
       pd->fcts.processMessage(pd, &msg, false);
 #undef PD_MSG
@@ -148,6 +146,8 @@ void destroyLocationPlacer(ocrPolicyDomain_t *pd) {
 
     pd->fcts.pdFree(pd, placer->pdLocAffinities);
     pd->fcts.pdFree(pd, placer);
+    // Necessary for the PD implementation to avoid placement
+    pd->placer = NULL;
 }
 
 u8 suggestLocationPlacement(ocrPolicyDomain_t *pd, ocrLocation_t curLoc, ocrLocationPlacer_t * placer, ocrPolicyMsg_t * msg) {

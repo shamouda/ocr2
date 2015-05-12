@@ -3,7 +3,7 @@
 #include "ocr.h"
 
 // DESC: Create a producer event and 'FAN_OUT' consumer event depending on it.
-// TIME: Satisfy the producer event
+// TIME: This is a template. Timing info is defined in the file including this one.
 // FREQ: Done 'NB_ITERS' times
 // NOTE: The driver EDT is a finish EDT to collect created EDTs
 //
@@ -11,9 +11,10 @@
 // - NB_ITERS
 // - FAN_OUT
 
-//TODO DEFAULT
-#undef NB_ITERS
-#define NB_ITERS 5000
+// !! These define are for internal use and should NOT be defined externally !!
+#define TPL_DRIVER_PARAMC 2
+#define TPL_DRIVER_DEPV 0
+#define TPL_DRIVER_PROP EDT_PROP_FINISH
 
 ocrGuid_t consumerEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     return NULL_GUID;
@@ -161,13 +162,13 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
 
     // spawn first iteration
     ocrGuid_t driverEdtTemplateGuid;
-    ocrEdtTemplateCreate(&driverEdtTemplateGuid, driverEdt, DRIVER_PARAMC, DRIVER_DEPV);
-    u64 driverParamv[DRIVER_PARAMC];
+    ocrEdtTemplateCreate(&driverEdtTemplateGuid, driverEdt, TPL_DRIVER_PARAMC, TPL_DRIVER_DEPV);
+    u64 driverParamv[TPL_DRIVER_PARAMC];
     driverParamv[0] = (u64) accTimer;
     driverParamv[1] = iteration;
     ocrGuid_t driverEdtGuid;
     ocrEdtCreate(&driverEdtGuid, driverEdtTemplateGuid,
-                 DRIVER_PARAMC, driverParamv, DRIVER_DEPV, NULL, DRIVER_PROP, NULL_GUID, NULL);
+                 TPL_DRIVER_PARAMC, driverParamv, TPL_DRIVER_DEPV, NULL, TPL_DRIVER_PROP, NULL_GUID, NULL);
     ocrEdtTemplateDestroy(driverEdtTemplateGuid);
 
     return NULL_GUID;

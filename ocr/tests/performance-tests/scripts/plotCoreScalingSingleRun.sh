@@ -29,18 +29,15 @@ WU_FILE=${TMP_FOLDER}/tmp.wu
 DATA_FILE=${TMP_FOLDER}/tmp.data
 DATA_BUFFER_FILE=${TMP_FOLDER}/tmp.databuffer
 XLABEL_FILE=${TMP_FOLDER}/tmp.xlabel
-IGNORE_TOP_LINES=4
+IGNORE_TOP_LINES=5
 
 #
 # Extract data for workloads
 #
 
-echo "11"
 ${SCRIPT_ROOT}/extractors/extractWorkloadUniq.sh ${LOGFILE} > ${WU_FILE}
 NB_WORKLOADS=`more ${WU_FILE} | wc -l`
 echo "Workload" > ${WU_FILE}
-echo "wload"
-
 
 #
 # Extract data for x-axis labels (i.e. cores used for each run)
@@ -49,7 +46,7 @@ echo "wload"
 COL_THROUGHPUT_ID=1
 REPORT_FILES=${LOGFILE}
 ${SCRIPT_ROOT}/extractors/extractReportColDataPoint.sh ${COL_THROUGHPUT_ID} ${IGNORE_TOP_LINES} ${XLABEL_FILE} "${REPORT_FILES}"
-echo "through"
+
 #
 # Extract data for throughput
 #
@@ -73,9 +70,9 @@ OUTPUT_PLOT_NAME=${TMP_FOLDER}/tmp.plt
 OUTPUT_IMG_FORMAT=svg
 FILENAME=${LOGFILE##*/}
 FILENAME_NOEXT=${FILENAME%.scaling}
-TITLE="Workers scaling for ${FILENAME_NOEXT}"
+TITLE="Core scaling for ${FILENAME_NOEXT}"
 IMG_NAME="plotCoreScaling_${FILENAME_NOEXT}".${OUTPUT_IMG_FORMAT}
-XLABEL="Number Of Workers"
+XLABEL="Number of cores"
 YLABEL="Throughput (op\/s)"
 
 DATA_COL_IDX=2

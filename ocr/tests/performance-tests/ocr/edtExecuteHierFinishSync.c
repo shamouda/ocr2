@@ -39,7 +39,7 @@ ocrGuid_t spawnerEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
         while (i < LEAF_FANOUT) {
             ocrGuid_t workEdtGuid;
             ocrEdtCreate(&workEdtGuid, workEdtTemplateGuid,
-                         0, &depth, 0, NULL_GUID, EDT_PROP_NONE, NULL_GUID, NULL);
+                         0, NULL, 0, NULL_GUID, EDT_PROP_NONE, NULL_GUID, NULL);
             i++;
         }
         ocrEdtTemplateDestroy(workEdtTemplateGuid);

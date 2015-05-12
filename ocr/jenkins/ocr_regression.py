@@ -74,7 +74,7 @@ job_ocr_regression_x86_pthread_gasnet_lockableDB = {
                  'GASNET_CONDUIT': 'ibv',
                  'GASNET_TYPE': 'par',
                  'GASNET_EXTRA_LIBS': '-L/usr/lib64 -lrt -libverbs',
-                 'TEST_CC': 'mpicc', # gasnet built with mpi
+                 'CC': 'mpicc', # gasnet built with mpi
                  # picked up by non-regression test script
                  'OCR_LDFLAGS': '-L${GASNET_ROOT}/lib -lgasnet-${GASNET_CONDUIT}-${GASNET_TYPE} ${GASNET_EXTRA_LIBS}',}
 }

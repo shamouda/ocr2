@@ -2,19 +2,17 @@
 # How many DBs to create at a time?
 DB_NBS ?= 32
 # Number of iterations to run
-NB_ITERS ?= 50000
+NB_ITERS ?= 1000
 # How many (EDTs/Events) to create at once
-NB_INSTANCES ?= 99999
+NB_INSTANCES ?= 1000
 
 # Event Tests
-# No of deps each EDT has, to start with
-DRIVER_DEPV ?= 0
-# No of params each EDT has
-DRIVER_PARAMC ?= 2
+# Nb of paramc each EDT has
+PARAMC_SZ ?= 2
+# Nb of deps each EDT has
+DEPV_SZ ?= 0
 # Fan out of EDTs
-FAN_OUT ?= 1000
-# What type of EDT to create (finish/none)
-DRIVER_PROP ?= EDT_PROP_NONE
+FAN_OUT ?= 100
 
 # Run Information set by the driver
 # Nb of OCR workers
@@ -38,12 +36,10 @@ TREE_DEPTH ?= 8
 DB_NB_ELT ?= 10
 # Size of each unit in the above
 DB_TYPE ?= u64
-# Number of params for each EDT
-PARAMC_SIZE ?= 0
 
-C_DEFINES := -DDB_NBS=$(DB_NBS) -DNB_ITERS=$(NB_ITERS) -DNB_INSTANCES=$(NB_INSTANCES)\
-             -DDRIVER_DEPV=$(DRIVER_DEPV) -DDRIVER_PARAMC=$(DRIVER_PARAMC) -DFAN_OUT=$(FAN_OUT)\
-             -DDRIVER_PROP=$(DRIVER_PROP) -DDB_SZ=$(DB_SZ) -DNODE_FANOUT=$(NODE_FANOUT)\
+C_DEFINES := -DENABLE_EXTENSION_AFFINITY -DENABLE_EXTENSION_RTITF\
+             -DDB_NBS=$(DB_NBS) -DNB_ITERS=$(NB_ITERS) -DNB_INSTANCES=$(NB_INSTANCES)\
+             -DDEPV_SZ=$(DEPV_SZ) -DPARAMC_SZ=$(PARAMC_SZ) -DFAN_OUT=$(FAN_OUT)\
+             -DDB_SZ=$(DB_SZ) -DNODE_FANOUT=$(NODE_FANOUT)\
              -DLEAF_FANOUT=$(LEAF_FANOUT) -DTREE_DEPTH=$(TREE_DEPTH) -DDB_NB_ELT=$(DB_NB_ELT)\
-             -DDB_TYPE=$(DB_TYPE) -DPARAMC_SIZE=$(PARAMC_SIZE) \
-             -DNB_WORKERS=$(NB_WORKERS) -DNB_NODES=$(NB_NODES)
+             -DDB_TYPE=$(DB_TYPE) -DNB_WORKERS=$(NB_WORKERS) -DNB_NODES=$(NB_NODES)

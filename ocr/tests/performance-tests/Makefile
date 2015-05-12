@@ -28,12 +28,14 @@ OCR_CONFIG=${OCR_INSTALL}/config/default.cfg
 $(warning OCR_CONFIG not set, defaulting to ${OCR_CONFIG})
 endif
 
-INCS=-I./inc
-#comment Werror because of ocr-affinity.h
-#CFLAGS=-O3 -g -Werror -Iinc -I. -I../../inc -c
+ifndef CC
 CC=gcc
+$(warning CC not set, defaulting to ${CC})
+endif
+
+INCS=-I./inc
 CFLAGS=-O3 -g -Wp,-w $(INCS) -c
-OCR_FLAGS=-L${OCR_INSTALL}/lib -I${OCR_INSTALL}/include -locr #-lpthread -lm
+OCR_FLAGS=-L${OCR_INSTALL}/lib -I${OCR_INSTALL}/include -locr -lpthread -lm ${OCR_LDFLAGS}
 
 OCR_RUN_FLAGS=-ocr:cfg ${OCR_CONFIG}
 
@@ -46,6 +48,9 @@ all: build
 C_FILES=$(wildcard ocr/*.c)
 OUT_FILES=$(subst ocr,build,$(C_FILES))
 BIN_FILES=$(patsubst %.c,%,$(OUT_FILES))
+
+RUN_FILES=$(subst ocr,run,$(C_FILES))
+RUNBIN_FILES=$(patsubst %.c,%,$(RUN_FILES))
 
 benchmark: $(PROG) build/$(TYPE).o
 	$(CC) -o $(EXECUTABLE) $(PROG) $(INCS) $(C_DEFINES) build/$(TYPE).o $(OCR_FLAGS)
