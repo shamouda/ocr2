@@ -33,12 +33,20 @@ typedef struct {
     //  - 1010b: Stop completed successfully, can 'finish' the PD
     //  - 1110b: Policy domain fully shut down
     // The upper bits count the number of users ('readers')
+    volatile u32 pausingWorker; //Worker responsible for pause
+    volatile bool runtimePause; //flag to indicate pause
+    volatile u32 pauseCounter; //number of paused workers
+    volatile u32 queryCounter; //number of workers succesfully queried
+
 } ocrPolicyDomainHc_t;
 
 typedef struct {
     paramListPolicyDomainInst_t base;
     u32 rank;
 } paramListPolicyDomainHcInst_t;
+
+//TODO: Cleanup
+void hcDumpWorkerData(ocrPolicyDomainHc_t *rself);
 
 ocrPolicyDomainFactory_t *newPolicyDomainFactoryHc(ocrParamList_t *perType);
 

@@ -39,8 +39,21 @@ typedef struct {
     // Master workers need to be started twice (once by the PD and once
     // when they actually start running. This helps keep track of this
     bool secondStart;
+
+    //Pause/Query/Resume variables for displaying EDTS
+    //TODO: Possibly wrap in ifdef
+    ocrGuid_t templateGuid;
+    ocrGuid_t edtGuid;
+    ocrEdt_t fctPtr;
+#ifdef OCR_ENABLE_EDT_NAMING
+    char * name;
+#endif
+
     hcWorkerType_t hcType;
 } ocrWorkerHc_t;
+
+//TODO: Cleanup
+void hcDumpWorkPile(ocrWorker_t *worker);
 
 ocrWorkerFactory_t* newOcrWorkerFactoryHc(ocrParamList_t *perType);
 

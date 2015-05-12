@@ -23,9 +23,10 @@
 #include "policy-domain/hc/hc-policy.h"
 #include "allocator/allocator-all.h"
 
-//DIST-TODO cloning: hack to support edt templates
+//DIST-TODO cloning: hack to support edt templates, and pause\resume
 #include "task/hc/hc-task.h"
 #include "event/hc/hc-event.h"
+#include "worker/hc/hc-worker.h"
 
 #define DEBUG_TYPE POLICY
 
@@ -78,7 +79,17 @@ void hcPolicyDomainBegin(ocrPolicyDomain_t * policy) {
     ASSERT(oldState == 0); // No EDT should be able
     // to run at this point since mainEDT
     // is started AFTER this function completes
+
+    registerSignalHandler();
+
+    //Initialize pause/query/resume variables
+    rself->runtimePause = false;
+    rself->pauseCounter = 0;
+    rself->queryCounter = 0;
+    rself->pausingWorker = -1;
+
 }
+
 
 void hcPolicyDomainStart(ocrPolicyDomain_t * policy) {
     // The PD should have been brought up by now and everything instantiated
@@ -571,6 +582,17 @@ static void hcReleasePd(ocrPolicyDomainHc_t *rself) {
     } while(newState != oldState);
     RETURN_PROFILE();
 }
+
+void hcDumpWorkerData(ocrPolicyDomainHc_t *rself){
+    u64 maxCount = 0;
+    u64 i = 0;
+
+    maxCount = rself->base.workerCount;
+    for(i = 0; i < maxCount; i++){
+        hcDumpWorkPile(rself->base.workers[i]);
+    }
+}
+
 
 u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlocking) {
 

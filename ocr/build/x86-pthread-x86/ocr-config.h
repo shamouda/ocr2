@@ -104,5 +104,8 @@
 // Runtime extension support (disabled by default)
 #define ENABLE_EXTENSION_RTITF
 
+// Build pause/resume support
+#define ENABLE_EXTENSION_PAUSE
+
 #endif /* __OCR_CONFIG_H__ */
 
