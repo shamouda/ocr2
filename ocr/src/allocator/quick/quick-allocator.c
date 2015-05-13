@@ -277,7 +277,7 @@ typedef void blkPayload_t; // Strongly type-check the ptr-to-void that comprises
 
 //#define FINE_LOCKING     // WIP, disabled at this moment.
 
-// start of tlsf core part (part of poolHdr_t is shared, though)
+// start of tlsf core part
 /*
  * Number of subdivisions in the second-level list
  * Can be 2 to 5; 6 if slAvailOrNot is changed from u32 to u64.
