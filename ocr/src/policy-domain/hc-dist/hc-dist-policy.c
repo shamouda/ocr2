@@ -454,7 +454,7 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
 #define PD_TYPE PD_MSG_WORK_CREATE
         DPRINTF(DEBUG_LVL_VVERB,"Processing WORK_CREATE for template GUID 0x%lx\n", PD_MSG_FIELD_I(templateGuid.guid));
         // First query the guid provider to determine if we know the edtTemplate.
-        resolveRemoteMetaData(self, &PD_MSG_FIELD_I(templateGuid), sizeof(ocrTaskTemplateHc_t));
+        resolveRemoteMetaData(self, &PD_MSG_FIELD_I(templateGuid), sizeof(ocrTaskTemplateHc_t) + sizeof(u64) * OCR_HINT_COUNT_EDT_HC);
         // Now that we have the template, we can set paramc and depc correctly
         // This needs to be done because the marshalling of messages relies on paramc and
         // depc being correctly set (so no negative values)

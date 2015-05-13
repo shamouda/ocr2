@@ -15,6 +15,13 @@
 #include "ocr-types.h"
 #include "utils/ocr-utils.h"
 
+#ifdef ENABLE_HINTS
+/**< The number of hint properties supported by this implementation */
+#define OCR_HINT_COUNT_EVT_HC   0
+#else
+#define OCR_HINT_COUNT_EVT_HC   0
+#endif
+
 typedef struct {
     ocrEventFactory_t base;
 } ocrEventFactoryHc_t;
@@ -30,6 +37,7 @@ typedef struct ocrEventHc_t {
     u32 signalersCount; /**< Number of signalers in signalersDb */
     u32 signalersMax; /**< Maximum number of signalers in signalersDb */
     volatile u32 waitersLock;
+    ocrRuntimeHint_t hint;
 } ocrEventHc_t;
 
 // STICKY or IDEM events need a lock

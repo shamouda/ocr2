@@ -22,6 +22,7 @@
 // Allocator
 #define ENABLE_ALLOCATOR_TLSF
 #define ENABLE_ALLOCATOR_SIMPLE
+#define ENABLE_ALLOCATOR_QUICK
 #define ENABLE_ALLOCATOR_MALLOCPROXY
 #define ENABLE_ALLOCATOR_NULL
 
@@ -100,6 +101,9 @@
 // Extensions
 #define ENABLE_EXTENSION_AFFINITY
 #define ENABLE_EXTENSION_LEGACY
+
+// Build pause/resume support
+#define ENABLE_EXTENSION_PAUSE
 
 #endif /* __OCR_CONFIG_H__ */
 

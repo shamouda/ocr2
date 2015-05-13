@@ -16,7 +16,7 @@
 #include "ocr-runtime-types.h"
 #include "ocr-types.h"
 #include "utils/ocr-utils.h"
-#include "ocr-hint.h"
+#include "ocr-runtime-hints.h"
 
 #ifdef OCR_ENABLE_STATISTICS
 #include "ocr-statistics.h"
@@ -138,7 +138,9 @@ typedef struct _ocrEventFcts_t {
      */
     u8 (*unregisterWaiter)(struct _ocrEvent_t *self, ocrFatGuid_t waiter, u32 slot,
                            bool isDepRem);
+} ocrEventFcts_t;
 
+typedef struct _ocrEventCommonFcts_t {
     /**
      * @brief Set user hints for the Event
      *
@@ -162,7 +164,19 @@ typedef struct _ocrEventFcts_t {
      * @return 0 on success and a non-zero code on failure
      */
     u8 (*getHint)(struct _ocrEvent_t* self, ocrHint_t *hint);
-} ocrEventFcts_t;
+
+    /**
+     * @brief Get runtime hints from the Event
+     *
+     * The hints structure is an array of u64 values,
+     * starting with the mask and followed by the
+     * hint values.
+     *
+     * @param[in] self        Pointer to this event
+     * @return pointer to hint structure
+     */
+    ocrRuntimeHint_t* (*getRuntimeHint)(struct _ocrEvent_t* self);
+} ocrEventCommonFcts_t;
 
 /**
  * @brief Abstract class to represent OCR events.
@@ -205,7 +219,9 @@ typedef struct _ocrEventFactory_t {
     void (*destruct)(struct _ocrEventFactory_t* factory);
 
     u32 factoryId;             /**< Factory ID (matches fctId in event */
-    ocrEventFcts_t fcts[OCR_EVENT_T_MAX]; /**< Functions for all the types of events */
+    ocrEventCommonFcts_t commonFcts; /**< Functions common for all the types of events */
+    ocrEventFcts_t fcts[OCR_EVENT_T_MAX]; /**< Functions for specific types of events */
+    u64* hintPropMap; /**< Mapping hint properties to implementation specific packed array */
 } ocrEventFactory_t;
 
 #endif /* __OCR_EVENT_H_ */

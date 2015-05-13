@@ -39,6 +39,7 @@ struct _ocrPolicyMsg_t;
 ocrLocation_t affinityToLocation(ocrGuid_t affinityGuid);
 
 ocrPlacer_t * createLocationPlacer(struct _ocrPolicyDomain_t * pd);
+void destroyLocationPlacer(struct _ocrPolicyDomain_t * pd);
 u8 suggestLocationPlacement(struct _ocrPolicyDomain_t *pd, ocrLocation_t curLoc, ocrLocationPlacer_t * placer, struct _ocrPolicyMsg_t * msg);
 
 #endif /* __OCR_PLACER_H__ */

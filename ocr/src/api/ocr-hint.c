@@ -8,9 +8,9 @@
 #include "debug.h"
 #include "ocr-policy-domain.h"
 #include "ocr-sal.h"
-#include "ocr-hint.h"
 #include "ocr-errors.h"
 #include "ocr-runtime-hints.h"
+#include "extensions/ocr-hints.h"
 
 #define DEBUG_TYPE API
 

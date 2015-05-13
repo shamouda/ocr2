@@ -309,5 +309,10 @@ typedef u64 ocrLocation_t;
         if(__result) RETURN_PROFILE(returnValue);       \
     } while(0);
 
+/**
+ * @brief Static assertion check macro
+ */
+#define ocrStaticAssert(e) extern char (*ocrStaticAssert(void))[sizeof(char[1-2*!(e)])]
+
 #endif /* __OCR_RUNTIME_TYPES_H__ */
 

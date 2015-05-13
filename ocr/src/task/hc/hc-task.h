@@ -19,11 +19,19 @@
 #include "ocr-task.h"
 #include "utils/ocr-utils.h"
 
+#ifdef ENABLE_HINTS
+/**< The number of hint properties supported by this implementation */
+#define OCR_HINT_COUNT_EDT_HC   2
+#else
+#define OCR_HINT_COUNT_EDT_HC   0
+#endif
+
 #ifdef ENABLE_TASKTEMPLATE_HC
 /*! \brief Event Driven Task(EDT) template implementation
  */
 typedef struct {
     ocrTaskTemplate_t base;
+    ocrRuntimeHint_t hint;
 } ocrTaskTemplateHc_t;
 
 typedef struct {
@@ -49,6 +57,7 @@ typedef struct {
     volatile u32 lock; /**< TODO: We can probably do with just atomics on frontierSlot and slotSatisfiedCount */
     ocrEdtDep_t * resolvedDeps; /**< List of satisfied dependences */
     u64 doNotReleaseSlots[OCR_MAX_MULTI_SLOT];
+    ocrRuntimeHint_t hint;
 } ocrTaskHc_t;
 
 #define HC_TASK_PARAMV_PTR(edt) ((u64*)(((u64)edt) + sizeof(ocrTaskHc_t)))

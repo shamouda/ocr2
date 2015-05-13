@@ -22,6 +22,7 @@
 // Allocator
 #define ENABLE_ALLOCATOR_TLSF
 #define ENABLE_ALLOCATOR_SIMPLE
+#define ENABLE_ALLOCATOR_QUICK
 
 // CommApi
 #define ENABLE_COMM_API_HANDLELESS
@@ -92,6 +93,10 @@
 
 // Build the OCR-legacy support
 #define ENABLE_EXTENSION_LEGACY
+
+// Build pause/resume support
+#define ENABLE_EXTENSION_PAUSE
+
 #endif /* __OCR_CONFIG_H__ */
 
 

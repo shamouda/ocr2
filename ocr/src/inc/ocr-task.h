@@ -12,7 +12,7 @@
 #include "ocr-runtime-types.h"
 #include "ocr-types.h"
 #include "utils/ocr-utils.h"
-#include "ocr-hint.h"
+#include "ocr-runtime-hints.h"
 
 #ifdef OCR_ENABLE_STATISTICS
 #include "ocr-statistics.h"
@@ -20,6 +20,12 @@
 
 #ifdef OCR_ENABLE_EDT_PROFILING
 #include "ocr-edt-profiling.h"
+#endif
+
+#ifdef OCR_ENABLE_EDT_NAMING
+#ifndef OCR_EDT_NAME_SIZE
+#define OCR_EDT_NAME_SIZE 32
+#endif
 #endif
 
 struct _ocrTask_t;
@@ -75,6 +81,18 @@ typedef struct ocrTaskTemplateFcts_t {
      * @return 0 on success and a non-zero code on failure
      */
     u8 (*getHint)(struct _ocrTaskTemplate_t* self, ocrHint_t *hint);
+
+    /**
+     * @brief Get runtime hints from the EDT template
+     *
+     * The hints structure is an array of u64 values,
+     * starting with the mask and followed by the
+     * hint values.
+     *
+     * @param[in] self        Pointer to this task
+     * @return pointer to hint structure
+     */
+    ocrRuntimeHint_t* (*getRuntimeHint)(struct _ocrTaskTemplate_t* self);
 } ocrTaskTemplateFcts_t;
 
 /** @brief Abstract class to represent OCR task templates.
@@ -92,7 +110,7 @@ typedef struct _ocrTaskTemplate_t {
     // going to be a problem...
     ocrEdt_t executePtr;    /**< Function pointer to execute */
 #ifdef OCR_ENABLE_EDT_NAMING
-    const char* name;       /**< Name of the EDT */
+    const char name[OCR_EDT_NAME_SIZE];       /**< Name of the EDT */
 #endif
 #ifdef OCR_ENABLE_EDT_PROFILING
     struct _profileStruct *profileData;
@@ -126,6 +144,7 @@ typedef struct _ocrTaskTemplateFactory_t {
 
     u32 factoryId;
     ocrTaskTemplateFcts_t fcts;
+    u64 *hintPropMap; /**< Mapping hint properties to implementation specific packed array */
 } ocrTaskTemplateFactory_t;
 
 /****************************************************/
@@ -277,6 +296,18 @@ typedef struct _ocrTaskFcts_t {
      * @return 0 on success and a non-zero code on failure
      */
     u8 (*getHint)(struct _ocrTask_t* self, ocrHint_t *hint);
+
+    /**
+     * @brief Get runtime hints from the EDT
+     *
+     * The hints structure is an array of u64 values,
+     * starting with the mask and followed by the
+     * hint values.
+     *
+     * @param[in] self        Pointer to this task
+     * @return pointer to hint structure
+     */
+    ocrRuntimeHint_t* (*getRuntimeHint)(struct _ocrTask_t* self);
 } ocrTaskFcts_t;
 
 #define ELS_RUNTIME_SIZE 0
@@ -299,7 +330,7 @@ typedef struct _ocrTask_t {
     ocrEdt_t funcPtr;       /**< Function to execute */
     u64* paramv;            /**< Pointer to the paramaters; should be inside task metadata */
 #ifdef OCR_ENABLE_EDT_NAMING
-    const char* name;       /**< Name of the EDT (for debugging purposes */
+    const char name[OCR_EDT_NAME_SIZE];       /**< Name of the EDT (for debugging purposes */
 #endif
     ocrGuid_t outputEvent;  /**< Event to notify when the EDT is done */
     ocrGuid_t finishLatch;  /**< Latch event for this EDT (if this is a finish EDT) */
@@ -342,6 +373,7 @@ typedef struct _ocrTaskFactory_t {
 
     u32 factoryId;
     ocrTaskFcts_t fcts;
+    u64 *hintPropMap; /**< Mapping hint properties to implementation specific packed array */
 } ocrTaskFactory_t;
 
 #endif /* __OCR_TASK_H__ */

@@ -12,6 +12,16 @@
 #include <assert.h>
 #include <stdio.h>
 
+void sig_handler(u32 sigNum);
+
+extern u32 salPause();
+
+extern void salQuery(u32 flag);
+
+extern void salResume(u32 flag);
+
+extern void registerSignalHandler();
+
 #define sal_abort()   hal_abort()
 
 #define sal_exit(x)   hal_exit(x)

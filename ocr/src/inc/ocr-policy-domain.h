@@ -20,7 +20,6 @@
 #include "ocr-task.h"
 #include "ocr-types.h"
 #include "ocr-worker.h"
-#include "ocr-hint.h"
 
 #include "experimental/ocr-placer.h"
 #include "experimental/ocr-tuning.h"
@@ -701,6 +700,10 @@ typedef struct _ocrPolicyMsg_t {
             u32 guidCount;       /**< In/Out: Number of GUID(s) in guids
                                   * In: Number of GUIDs the caller wants to hand-off
                                   * Out: Number of GUIDs rejected (in guids) */
+#ifdef ENABLE_HINTS
+            u64 **hints;         /**< In/Out: Array of pointers to hints for the guids.
+                                  * The array length should be equal to guidCount */
+#endif
             union {
                 struct {
                     ocrGuidKind type;    /**< In: Kind of GUIDs given */
