@@ -266,6 +266,17 @@ class JobObject(object):
         self._myLog.debug("%s now has depth %d" % (str(self), self._depth))
         return True
 
+    def extendDependenceList(self, count):
+        """Adds additional dependence slots"""
+        if self._recomputeStatus:
+            self._updateStatus()
+        if self._jobStatus == JobObject.UNCONFIGURED_JOB or self._jobStatus == JobObject.WAITING_JOB:
+            self._dependence.extend([None]*count)
+            self._recomputeStatus = True
+        else:
+            self._myLog.error("Cannot extend the dependence list of %s because its status is not UNCONFIGURED or WAITING" % (str(self)))
+            assert(False)
+
     def addDependence(self, signalingJob):
         """Adds a job to the list of dependence.
            Returns the slot used for this dependence

@@ -388,20 +388,6 @@ def importFromFile(name, tempJobs, jobTypetoName, alternateJobs):
             alternateJobs[alternateJobs['__count']] = v
             alternateJobs['__count'] = alternateJobs['__count'] + 1
 
-        # Parsing tempJobs and resolving all job type dependencies
-        for k,v in tempJobs.iteritems():
-            depTup = v['depends']
-            depList = list(depTup)
-            replaceList = []
-            for item in depList:
-                if item.split()[0] == "__type" and len(item.split())==2:
-                    replaceList.append(item)
-            for item in replaceList:
-                depList.remove(item)
-                if  item.split()[1] in jobTypetoName :
-                    depList = depList + jobTypetoName[item.split()[1]]
-            depTup = tuple(depList)
-            v['depends'] = depTup
 
 # Main function
 def main(argv=None):
@@ -614,6 +600,17 @@ def main(argv=None):
         - JJOB_PARENT_SHARED_HOME_X   Same as JJOB_PARENT_PRIVATE_HOME_X
                                       for the shared directory. Same comments
                                       as well
+        - Any environment variables passed using env-vars in the job-type or job.
+        - Note that you can use environment variables inside other environment variables (one-level
+          of substitution). The rules for substitution are:
+            -w $$ will be replaced by $
+            - $identifier or ${identifier} will be replaced by the value of 'identifier'
+            - Unknown identifiers will be ignored (ie: $foobar if foobar does not refer to
+              a valid substitution will be left as $foobar)
+          The script will run over the following list of variables as identifiers for substitution:
+            - Normal environment variables ($PATH, etc.)
+            - The set of environment variables for the job (ie: if you set FOOBAR as a job or
+              job-type environment variable, you can use $FOOBAR is another environment variable)
 
     References:
         - Prologue error codes for Torque: http://docs.adaptivecomputing.com/torque/4-2-8/help.htm#topics/12-appendices/prologueErrorProc.htm
@@ -729,12 +726,10 @@ def main(argv=None):
         # At this point we have all the job types and we can do other checks
         # and create the jobs
 
-        # Pick the appropriate alternative
-        # Do this first to deal with alternatives that may not yet match the keywords but that will
-        # be added back later
-
         repoMissingJobs = dict() # Jobs that don't have all the repos they need. Keeping track of separately
                                  # to properly inform the user
+
+        # First step: filter based on repositories
         toRemoveKeys = []
         for k, v in tempJobs.iteritems():
             jobType = allJobTypes.get(v['jobtype'])
@@ -745,6 +740,7 @@ def main(argv=None):
             repoMissingJobs[k] = tempJobs[k]
             del tempJobs[k]
 
+        # Second step: selecting the best alternative for each job
         toRemoveKeys = []
         if alternateJobs['__count'] > 0:
             for i in range(0, alternateJobs['__count']):
@@ -770,7 +766,7 @@ def main(argv=None):
                 del tempJobs[k]
         #end if
 
-        # Second step: check for __alternate
+        # Third step: check for __alternate
         # We do this now because if the job is pushed aside and re-added later
         # we will have issues
         toRemoveKeys = []
@@ -787,8 +783,8 @@ def main(argv=None):
                     newList.append(item)
             v['depends'] = tuple(newList)
 
-        # Third step: check the keywords. Remove all jobs that don't match the keywords.
-        # They may be re-added later as dependences
+        # Fourth step: check the keywords. Remove all jobs that don't match the keywords.
+        # They may be re-added later as dependences (ie: if another job depends on it)
         toRemoveKeys = []
         sideJobs = dict() # Jobs that don't match keyword restrictions. May be re-added due to dependences
         for k, v in tempJobs.iteritems():
@@ -798,15 +794,37 @@ def main(argv=None):
             if not hasKeywords(jobType.keywords, testKeywords, True):
                 myLog.info("Ignoring job '%s' due to keyword restrictions" % (v['name']))
                 toRemoveKeys.append(k)
-            else:
-                # This is a job we will use
-                if jobType.isLocal:
-                    allRemainingJobs[k] = LocalJobObject(v, jobType, len(v['depends']))
-                else:
-                    allRemainingJobs[k] = TorqueJobObject(v, jobType, len(v['depends']))
         for k in toRemoveKeys:
             sideJobs[k] = tempJobs[k]
             del tempJobs[k]
+
+        # Fifth step: Look at __type dependences
+        # This allows us to wait only on the jobs that are currently enabled
+
+        # Keep track of jobs that depend on a given type if
+        # a job of that type is re-added
+        jobTypeToDependentJobs = dict()
+        for k,v in tempJobs.iteritems():
+            depTup = v['depends']
+            depList = list(depTup)
+            replaceList = []
+            for item in depList:
+                if item.split()[0] == "__type" and len(item.split())==2:
+                    replaceList.append(item)
+            for item in replaceList:
+                t = jobTypeToDependentJobs.get(item, [])
+                jobTypeToDependentJobs[item] = t.append(k)
+                depList.remove(item)
+                if  item.split()[1] in jobTypetoName :
+                    depList = depList + jobTypetoName[item.split()[1]]
+            depTup = tuple(depList)
+            v['depends'] = depTup
+            # Now create the jobs
+            jobType = allJobTypes.get(v['jobtype'])
+            if jobType.isLocal:
+                allRemainingJobs[k] = LocalJobObject(v, jobType, len(v['depends']))
+            else:
+                allRemainingJobs[k] = TorqueJobObject(v, jobType, len(v['depends']))
 
         # Do another loop to set up the dependences properly
         changedJobs = True
@@ -846,10 +864,29 @@ def main(argv=None):
                                                    TorqueJobObject(tjob, jobType, len(tjob['depends']))
                                 changedJobs = True
                                 myLog.info("Re-adding job %s due to dependence by %s" % (signalingJob, waitingJob))
-
+                                t = jobTypeToDependentJobs.get(tjob['jobtype'], None)
+                                if t is not None:
+                                    # This means that there are other jobs depending on '__type' that need to be updated
+                                    for jobName in t:
+                                        otherWaitingJob = allRemainingJobs[jobName]
+                                        myLog.debug("Updating Job %s's list of '__type' dependence; adding Job %s" % (otherWaitingJob, signalingJob))
+                                        otherWaitingJob.extendDependenceList(1)
+                                        slot = otherWaitingJob.addDependence(signalingJob)
+                                        if signalingJob.addWaiter(otherWaitingJob, slot) == False:
+                                            # See below for why this may occur
+                                            myLog.debug("Job %s's dependence %d is being satisfied due to completed producer (%s)"
+                                                        % (otherWaitingJob, slot, signalingJob))
+                                            otherWaitingJob.satisfyDependence(signalingJob, slot)
+                                        # end if addWaiter
+                                    # end for jobName
+                                # end t is not None
+                            # end else (tjob exists)
+                        # end signalingJob is None
                         if signalingJob is not None:
                             slot = waitingJob.addDependence(signalingJob)
                             if signalingJob.addWaiter(waitingJob, slot) == False:
+                                # Not quite 100% sure if this actually happens. Old explanation below
+                                # Leaving for now
                                 # This means that the job already "completed". This happens
                                 # if the signaler was removed (missing dep or whatever)
                                 myLog.debug("Job %s's dependence %d is being satisfied due to completed producer (%s)"
