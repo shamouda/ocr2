@@ -16,6 +16,8 @@
 #include "ocr-types.h"
 #include "ocr-worker.h"
 #include "worker/hc/hc-worker.h"
+#include "policy-domain/hc/hc-policy.h"
+#include "workpile/hc/hc-workpile.h"
 
 #include "experimental/ocr-placer.h"
 #include "extensions/ocr-affinity.h"
@@ -45,6 +47,11 @@ static void hcWorkShift(ocrWorker_t * worker) {
     ocrPolicyDomain_t * pd;
     PD_MSG_STACK(msg);
     getCurrentEnv(&pd, NULL, NULL, &msg);
+
+    ocrPolicyDomainHc_t *self = (ocrPolicyDomainHc_t *)pd;
+    ocrWorkerHc_t *hcWorker = (ocrWorkerHc_t *) worker;
+
+
     ocrFatGuid_t taskGuid = {.guid = NULL_GUID, .metaDataPtr = NULL};
     u32 count = 1;
 #define PD_MSG (&msg)
@@ -65,6 +72,15 @@ static void hcWorkShift(ocrWorker_t * worker) {
             DPRINTF(DEBUG_LVL_VERB, "Worker shifting to execute EDT GUID 0x%lx\n", taskGuid.guid);
             u8 (*executeFunc)(ocrTask_t *) = (u8 (*)(ocrTask_t*))PD_MSG_FIELD_IO(extra); // Execute is stored in extra
             executeFunc(worker->curTask);
+
+            //Store state at worker level to report most recent state on pause.
+            hcWorker->templateGuid = worker->curTask->templateGuid;
+            hcWorker->edtGuid = worker->curTask->guid;
+            hcWorker->fctPtr  = worker->curTask->funcPtr;
+#ifdef OCR_ENABLE_EDT_NAMING
+            hcWorker->name = worker->curTask->name;
+#endif
+
             // Mark the task. Allows the PD to check the state of workers
             // and detect quiescence, without weird behavior because curTask
             // is being deallocated in parallel
@@ -85,9 +101,16 @@ static void hcWorkShift(ocrWorker_t * worker) {
 #undef PD_MSG
 #undef PD_TYPE
             // Important for this to be the last
+
             worker->curTask = NULL;
         }
     }
+
+    //Pause called - stop workers
+    while(self->runtimePause == true){
+        hal_pause();
+    }
+
 }
 
 /**
@@ -225,6 +248,8 @@ void* hcRunWorker(ocrWorker_t * worker) {
         ocrEdtCreate(&edtGuid, edtTemplateGuid, EDT_PARAM_DEF, /* paramv = */ NULL,
                      /* depc = */ EDT_PARAM_DEF, /* depv = */ &dbGuid,
                      EDT_PROP_NONE, affinityMasterPD, NULL);
+        // Once mainEdt is created, its template is no longer needed
+        ocrEdtTemplateDestroy(edtTemplateGuid);
     } else {
         // Set who we are
         ocrPolicyDomain_t *pd = worker->pd;
@@ -287,6 +312,10 @@ bool hcIsRunningWorker(ocrWorker_t * base) {
     return hcWorker->running;
 }
 
+void hcPrintLocation(ocrWorker_t *base, char* location) {
+    SNPRINTF(location, 32, "Worker 0x%lx", base->location);
+}
+
 /**
  * @brief Builds an instance of a HC worker
  */
@@ -313,6 +342,69 @@ void initializeWorkerHc(ocrWorkerFactory_t * factory, ocrWorker_t* self, ocrPara
     workerHc->hcType = HC_WORKER_COMP;
 }
 
+//Dump workiple contents of each workpile
+//TODO: This is a temporary function to demonstrate basal functionality of querying runtime
+//      contents.  In the future, this will be modified to accomodate multiple query types.
+void hcDumpWorkPile(ocrWorker_t *worker){
+
+    PRINTF("Worker %lu - guid: 0x%llx\n", worker->seqId, worker->fguid);
+
+    ocrPolicyDomain_t * pd;
+    getCurrentEnv(&pd, NULL, NULL, NULL);
+    ocrPolicyDomainHc_t *self = (ocrPolicyDomainHc_t *) pd;
+
+    ocrWorkpileHc_t *workpile = (ocrWorkpileHc_t *)pd->schedulers[0]->workpiles[worker->seqId];
+    ocrTask_t *curTask = NULL;
+
+    u32 i = 0;
+    u32 head = (workpile->deque->head%INIT_DEQUE_CAPACITY);
+    u32 tail = (workpile->deque->tail%INIT_DEQUE_CAPACITY);
+
+    u32 workpileSize = (tail-head);
+
+    PRINTF("Workpile size: %u\n\n", workpileSize);
+
+    u32 queuePos = 0;
+    if(workpileSize > 0){
+        for(i = head; i < tail; i++){
+
+            PD_MSG_STACK(msg);
+            getCurrentEnv(NULL, NULL, NULL, &msg);
+
+            ocrFatGuid_t fguid;
+            fguid.guid = (ocrGuid_t)workpile->deque->data[i];
+            fguid.metaDataPtr = NULL;
+
+#define PD_MSG (&msg)
+#define PD_TYPE PD_MSG_GUID_INFO
+            msg.type = PD_MSG_GUID_INFO | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
+            PD_MSG_FIELD_IO(guid.guid) = fguid.guid;
+            PD_MSG_FIELD_IO(guid.metaDataPtr) = fguid.metaDataPtr;
+            PD_MSG_FIELD_I(properties) = RMETA_GUIDPROP | KIND_GUIDPROP;
+            RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, true));
+            ocrGuidKind msgKind = PD_MSG_FIELD_O(kind);
+            curTask = (ocrTask_t *)PD_MSG_FIELD_IO(guid.metaDataPtr);
+#undef PD_MSG
+#undef PD_TYPE
+
+            if(msgKind != OCR_GUID_EDT){
+                PRINTF("\nNon-EDT guidKind returned from GUID_INFO message - Kind: %d\n", msgKind);
+            }else if(curTask != NULL){
+#ifdef OCR_ENABLE_EDT_NAMING
+                PRINTF("Queued task [%lu] - guid: 0x%lx template: 0x%llx fctPtr: %p name: %s\n", queuePos, curTask->guid, curTask->templateGuid, curTask->funcPtr, curTask->name);
+#else
+                PRINTF("Queued task [%lu] - guid: 0x%lx template: 0x%llx fctPtr: %p\n", queuePos, curTask->guid, curTask->templateGuid, curTask->funcPtr);
+#endif
+            }
+            queuePos++;
+        }
+    hal_xadd32((u32*)&self->queryCounter, 1);
+    }else{
+        PRINTF("Empty workpile on current worker... \n");
+        hal_xadd32((u32*)&self->queryCounter, 1);
+    }
+}
+
 /******************************************************/
 /* OCR-HC WORKER FACTORY                              */
 /******************************************************/
@@ -336,6 +428,7 @@ ocrWorkerFactory_t * newOcrWorkerFactoryHc(ocrParamList_t * perType) {
     base->workerFcts.stop = FUNC_ADDR(void (*) (ocrWorker_t *), hcStopWorker);
     base->workerFcts.finish = FUNC_ADDR(void (*) (ocrWorker_t *), hcFinishWorker);
     base->workerFcts.isRunning = FUNC_ADDR(bool (*) (ocrWorker_t *), hcIsRunningWorker);
+    base->workerFcts.printLocation = FUNC_ADDR(void (*)(ocrWorker_t*, char*), hcPrintLocation);
     return base;
 }
 

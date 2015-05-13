@@ -20,7 +20,7 @@ extern "C" {
 #include "ocr-errors.h"
 #include "ocr-types.h"
 #include "ocr-std.h"
-#include "ocr-hint.h"
+#include "extensions/ocr-hints.h"
 
 /**
  * @defgroup OCRGeneral Support calls for OCR

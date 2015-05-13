@@ -12,6 +12,7 @@
 #include "ocr-errors.h"
 #include "ocr-policy-domain.h"
 #include "ocr-sysboot.h"
+#include "ocr-runtime-hints.h"
 
 #ifdef OCR_ENABLE_STATISTICS
 #include "ocr-statistics.h"
@@ -22,9 +23,10 @@
 #include "policy-domain/hc/hc-policy.h"
 #include "allocator/allocator-all.h"
 
-//DIST-TODO cloning: hack to support edt templates
+//DIST-TODO cloning: hack to support edt templates, and pause\resume
 #include "task/hc/hc-task.h"
 #include "event/hc/hc-event.h"
+#include "worker/hc/hc-worker.h"
 
 #define DEBUG_TYPE POLICY
 
@@ -77,7 +79,17 @@ void hcPolicyDomainBegin(ocrPolicyDomain_t * policy) {
     ASSERT(oldState == 0); // No EDT should be able
     // to run at this point since mainEDT
     // is started AFTER this function completes
+
+    registerSignalHandler();
+
+    //Initialize pause/query/resume variables
+    rself->runtimePause = false;
+    rself->pauseCounter = 0;
+    rself->queryCounter = 0;
+    rself->pausingWorker = -1;
+
 }
+
 
 void hcPolicyDomainStart(ocrPolicyDomain_t * policy) {
     // The PD should have been brought up by now and everything instantiated
@@ -146,6 +158,7 @@ void hcPolicyDomainFinish(ocrPolicyDomain_t * policy) {
         policy->workers[i]->fcts.finish(policy->workers[i]);
     }
 
+    destroyLocationPlacer(policy);
     maxCount = policy->commApiCount;
     for(i = 0; i < maxCount; i++) {
         policy->commApis[i]->fcts.finish(policy->commApis[i]);
@@ -570,6 +583,17 @@ static void hcReleasePd(ocrPolicyDomainHc_t *rself) {
     RETURN_PROFILE();
 }
 
+void hcDumpWorkerData(ocrPolicyDomainHc_t *rself){
+    u64 maxCount = 0;
+    u64 i = 0;
+
+    maxCount = rself->base.workerCount;
+    for(i = 0; i < maxCount; i++){
+        hcDumpWorkPile(rself->base.workers[i]);
+    }
+}
+
+
 u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlocking) {
 
     START_PROFILE(pd_hc_ProcessMessage);
@@ -985,7 +1009,7 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
 #ifdef OCR_ENABLE_EDT_NAMING
                 ASSERT(false && "no serialization of edt template string");
 #endif
-                PD_MSG_FIELD_O(size) = sizeof(ocrTaskTemplateHc_t);
+                PD_MSG_FIELD_O(size) = sizeof(ocrTaskTemplateHc_t) + (sizeof(u64) * OCR_HINT_COUNT_EDT_HC);
                 break;
             case OCR_GUID_AFFINITY:
                 localDeguidify(self, &(PD_MSG_FIELD_IO(guid)));
@@ -1097,7 +1121,13 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         opArgs.takeKind = 0;
         opArgs.takeCount = 0;
 
-        PD_MSG_FIELD_O(returnDetail) = self->schedulers[0]->fcts.op[OCR_SCHEDULER_OP_GIVE].invoke(self->schedulers[0], &opArgs, NULL);
+        ocrRuntimeHint_t *rHints = NULL;
+#ifdef ENABLE_HINTS
+        rHints = (ocrRuntimeHint_t*)(*(PD_MSG_FIELD_IO(hints)));
+#endif
+
+        PD_MSG_FIELD_O(returnDetail) = self->schedulers[0]->fcts.op[OCR_SCHEDULER_OP_GIVE].invoke(self->schedulers[0], &opArgs, rHints);
+
 #else
         if (PD_MSG_FIELD_I(type) == OCR_GUID_EDT) {
             PD_MSG_FIELD_O(returnDetail) = self->schedulers[0]->fcts.giveEdt(
@@ -1546,7 +1576,7 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             {
                 ASSERT(kind & OCR_GUID_EVENT);
                 ocrEvent_t *evt = (ocrEvent_t*)(PD_MSG_FIELD_I(guid.metaDataPtr));
-                PD_MSG_FIELD_O(returnDetail) = self->eventFactories[0]->fcts[evt->kind].setHint(evt, &(PD_MSG_FIELD_I(hint)));
+                PD_MSG_FIELD_O(returnDetail) = self->eventFactories[0]->commonFcts.setHint(evt, &(PD_MSG_FIELD_I(hint)));
             }
             break;
         case OCR_HINT_GROUP_T:
@@ -1595,7 +1625,7 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             {
                 ASSERT(kind & OCR_GUID_EVENT);
                 ocrEvent_t *evt = (ocrEvent_t*)(PD_MSG_FIELD_I(guid.metaDataPtr));
-                PD_MSG_FIELD_O(returnDetail) = self->eventFactories[0]->fcts[evt->kind].getHint(evt, &(PD_MSG_FIELD_IO(hint)));
+                PD_MSG_FIELD_O(returnDetail) = self->eventFactories[0]->commonFcts.getHint(evt, &(PD_MSG_FIELD_IO(hint)));
             }
             break;
         case OCR_HINT_GROUP_T:

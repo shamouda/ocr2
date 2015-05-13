@@ -99,7 +99,7 @@ void destructSchedulerObjectRootFactoryNull(ocrSchedulerObjectFactory_t * factor
 
 ocrSchedulerObjectFactory_t * newOcrSchedulerObjectFactoryNull(ocrParamList_t *perType, u32 factoryId) {
     ocrSchedulerObjectFactory_t* schedObjFact = (ocrSchedulerObjectFactory_t*) runtimeChunkAlloc(
-                                      sizeof(ocrSchedulerObjectRootFactoryNull_t), PERSISTENT_CHUNK);
+                                      sizeof(ocrSchedulerObjectRootFactoryNull_t), NONPERSISTENT_CHUNK);
 
     schedObjFact->factoryId = factoryId;
     schedObjFact->kind = OCR_SCHEDULER_OBJECT_UNDEFINED;

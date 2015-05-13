@@ -8,6 +8,7 @@
  * removed or modified.
  */
 
+
 #ifndef __OCR_CONFIG_H__
 #define __OCR_CONFIG_H__
 
@@ -21,15 +22,17 @@
 // Allocator
 #define ENABLE_ALLOCATOR_TLSF
 #define ENABLE_ALLOCATOR_SIMPLE
+#define ENABLE_ALLOCATOR_QUICK
 #define ENABLE_ALLOCATOR_MALLOCPROXY
 
 // Comm-api
 #define ENABLE_COMM_API_DELEGATE
 #define ENABLE_COMM_API_SIMPLE
 
-// Gasnet Comm-platform
+// Comm-platform
 #define ENABLE_COMM_PLATFORM_NULL
 #define ENABLE_COMM_PLATFORM_GASNET
+#define COMM_PLATFORM_GASNET_AMLONG
 
 // Comp-platform
 #define ENABLE_COMP_PLATFORM_PTHREAD
@@ -45,6 +48,7 @@
 
 // Datablock
 #define ENABLE_DATABLOCK_REGULAR
+#define ENABLE_DATABLOCK_LOCKABLE
 
 // Event
 #define ENABLE_EVENT_HC
@@ -76,6 +80,7 @@
 // Scheduler
 #define ENABLE_SCHEDULER_HC
 #define ENABLE_SCHEDULER_HC_COMM_DELEGATE
+#define ENABLE_SCHEDULER_BLOCKING_SUPPORT
 
 // Sysboot layer to use
 #define ENABLE_SYSBOOT_LINUX
@@ -95,4 +100,8 @@
 
 // Build the OCR-legacy support
 #define ENABLE_EXTENSION_LEGACY
+
+// Affinity support
+#define ENABLE_EXTENSION_AFFINITY
+
 #endif /* __OCR_CONFIG_H__ */

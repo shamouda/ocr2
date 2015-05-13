@@ -17,6 +17,10 @@
 #include "ocr-db.h"
 #include "worker/xe/xe-worker.h"
 
+#ifdef HAL_FSIM_XE
+#include "rmd-map.h"
+#endif
+
 #ifdef OCR_ENABLE_STATISTICS
 #include "ocr-statistics.h"
 #include "ocr-statistics-callbacks.h"
@@ -261,6 +265,14 @@ bool xeIsRunningWorker(ocrWorker_t * base) {
     ocrWorkerXe_t * xeWorker = (ocrWorkerXe_t *) base;
     return xeWorker->running;
 }
+void xePrintLocation(ocrWorker_t *base, char* location) {
+#ifdef HAL_FSIM_XE
+    SNPRINTF(location, 32, "XE %d Block %d Unit %d", AGENT_FROM_ID(base->location),
+             BLOCK_FROM_ID(base->location), UNIT_FROM_ID(base->location));
+#else
+    SNPRINTF(location, 32, "XE");
+#endif
+}
 
 /******************************************************/
 /* OCR-XE WORKER FACTORY                              */
@@ -285,6 +297,7 @@ ocrWorkerFactory_t * newOcrWorkerFactoryXe(ocrParamList_t * perType) {
     base->workerFcts.stop = FUNC_ADDR(void (*)(ocrWorker_t*), xeStopWorker);
     base->workerFcts.finish = FUNC_ADDR(void (*)(ocrWorker_t*), xeFinishWorker);
     base->workerFcts.isRunning = FUNC_ADDR(bool (*)(ocrWorker_t*), xeIsRunningWorker);
+    base->workerFcts.printLocation = FUNC_ADDR(void (*)(ocrWorker_t*, char* location), xePrintLocation);
     return base;
 }
 

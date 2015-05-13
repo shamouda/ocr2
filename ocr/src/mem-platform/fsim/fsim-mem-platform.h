@@ -24,6 +24,10 @@ typedef struct {
 typedef struct {
     ocrMemPlatform_t base;
     rangeTracker_t *pRangeTracker;
+/* ocrMemPlatformFsim_t (and rangeTracker, too) exists in every L1. i.e. multiple copies and multiple locks.
+ * So, locking does not work. What I did is to move rangeTracker structure into each memory level, not L1,
+ * so that there would be a single lock variable for each memory it manages.
+ */
     u32 lock;   // this does not work on fsim, so I'll use pRangeTracker->lockChunkAndTag instead. See Bug #497
 } ocrMemPlatformFsim_t;
 

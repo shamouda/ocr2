@@ -111,15 +111,15 @@ typedef struct _paramListSchedulerObject_t {
 /*! \brief OCR schedulerObject data structures.
  */
 typedef struct _ocrSchedulerObject_t {
-    ocrGuid_t guid;                     /**< GUID for this schedulerObject
-                                             For singleton schedulerObjects this field is
-                                             used to carry the element guid */
-    ocrSchedulerObjectKind kind;              /**< Kind of schedulerObject */
-    u32 fctId;                          /**< ID determining factory; Not used for singleton schedulerObjects. */
-    ocrLocation_t loc;                  /**< Current location mapping for this schedulerObject.
-                                             The mapping can be updated by the scheduler
-                                             during the lifetime of the schedulerObject. */
-    ocrSchedulerObjectMappingKind mapping;    /**< Mapping kind */
+    ocrGuid_t guid;                         /**< GUID for this schedulerObject
+                                                 For singleton schedulerObjects this field is
+                                                 used to carry the element guid */
+    ocrSchedulerObjectKind kind;            /**< Kind of schedulerObject */
+    u32 fctId;                              /**< ID determining factory; Not used for singleton schedulerObjects. */
+    ocrLocation_t loc;                      /**< Current location mapping for this schedulerObject.
+                                                 The mapping can be updated by the scheduler
+                                                 during the lifetime of the schedulerObject. */
+    ocrSchedulerObjectMappingKind mapping;  /**< Mapping kind */
 } ocrSchedulerObject_t;
 
 /****************************************************/

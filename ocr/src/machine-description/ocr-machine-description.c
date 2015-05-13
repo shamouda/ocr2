@@ -446,7 +446,7 @@ ocrPolicyDomainFactory_t *create_factory_policydomain(char *name, ocrParamList_t
         DPRINTF(DEBUG_LVL_WARN, "Unrecognized type %s. Check name and ocr-config header\n", name);
         return NULL;
     } else {
-        DPRINTF(DEBUG_LVL_INFO, "Creating a worker factory of type %d\n", mytype);
+        DPRINTF(DEBUG_LVL_INFO, "Creating a policy domain factory of type %d\n", mytype);
         return (ocrPolicyDomainFactory_t *)newPolicyDomainFactory(mytype, paramlist);
     }
 }

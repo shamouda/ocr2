@@ -32,6 +32,24 @@
 #define DB_LOCKED_EW 1
 #define DB_LOCKED_ITW 2
 
+/***********************************************************/
+/* OCR-Lockable Datablock Hint Properties                  */
+/* (Add implementation specific supported properties here) */
+/***********************************************************/
+
+u64 ocrHintPropDbLockable[] = {
+#ifdef ENABLE_HINTS
+#endif
+};
+
+//Make sure OCR_HINT_COUNT_DB_LOCKABLE in regular-datablock.h is equal to the length of array ocrHintPropDbLockable
+ocrStaticAssert((sizeof(ocrHintPropDbLockable)/sizeof(u64)) == OCR_HINT_COUNT_DB_LOCKABLE);
+ocrStaticAssert(OCR_HINT_COUNT_DB_LOCKABLE < OCR_RUNTIME_HINT_PROP_BITS);
+
+/******************************************************/
+/* OCR-Lockable Datablock                             */
+/******************************************************/
+
 // Data-structure to store EDT waiting to be be granted access to the DB
 typedef struct _dbWaiter_t {
     ocrGuid_t guid;
@@ -526,12 +544,13 @@ ocrDataBlock_t* newDataBlockLockable(ocrDataBlockFactory_t *factory, ocrFatGuid_
 
     getCurrentEnv(&pd, NULL, &task, &msg);
 
+    u32 hintc = (flags & DB_PROP_NO_HINT) ? 0 : OCR_HINT_COUNT_DB_LOCKABLE;
 #define PD_MSG (&msg)
 #define PD_TYPE PD_MSG_GUID_CREATE
     msg.type = PD_MSG_GUID_CREATE | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
     PD_MSG_FIELD_IO(guid.guid) = NULL_GUID;
     PD_MSG_FIELD_IO(guid.metaDataPtr) = NULL;
-    PD_MSG_FIELD_I(size) = sizeof(ocrDataBlockLockable_t);
+    PD_MSG_FIELD_I(size) = sizeof(ocrDataBlockLockable_t) + hintc*sizeof(u64);
     PD_MSG_FIELD_I(kind) = OCR_GUID_DB;
     PD_MSG_FIELD_I(properties) = 0;
 
@@ -562,8 +581,14 @@ ocrDataBlock_t* newDataBlockLockable(ocrDataBlockFactory_t *factory, ocrFatGuid_
     result->itwWaiterList = NULL;
     result->itwLocation = -1;
     result->worker = NULL;
-    ocrGuidTrackerInit(&(result->usersTracker));
 
+    if (hintc == 0) {
+        result->hint.hintMask = 0;
+        result->hint.hintVal = NULL;
+    } else {
+        OCR_RUNTIME_HINT_MASK_INIT(result->hint.hintMask, OCR_HINT_DB_T, factory->factoryId);
+        result->hint.hintVal = (u64*)((u64)result + sizeof(ocrDataBlockLockable_t));
+    }
 #ifdef OCR_ENABLE_STATISTICS
     statsDB_CREATE(pd, task->guid, task, allocator.guid,
                    (ocrAllocator_t*)allocator.metaDataPtr, result->base.guid,
@@ -577,11 +602,22 @@ ocrDataBlock_t* newDataBlockLockable(ocrDataBlockFactory_t *factory, ocrFatGuid_
 }
 
 u8 lockableSetHint(ocrDataBlock_t* self, ocrHint_t *hint) {
+    ocrDataBlockLockable_t *derived = (ocrDataBlockLockable_t*)self;
+    ocrRuntimeHint_t *rHint = &(derived->hint);
+    OCR_RUNTIME_HINT_SET(hint, rHint, OCR_HINT_COUNT_DB_LOCKABLE, ocrHintPropDbLockable, OCR_HINT_DB_PROP_START);
     return 0;
 }
 
 u8 lockableGetHint(ocrDataBlock_t* self, ocrHint_t *hint) {
+    ocrDataBlockLockable_t *derived = (ocrDataBlockLockable_t*)self;
+    ocrRuntimeHint_t *rHint = &(derived->hint);
+    OCR_RUNTIME_HINT_GET(hint, rHint, OCR_HINT_COUNT_DB_LOCKABLE, ocrHintPropDbLockable, OCR_HINT_DB_PROP_START);
     return 0;
+}
+
+ocrRuntimeHint_t* getRuntimeHintDbLockable(ocrDataBlock_t* self) {
+    ocrDataBlockLockable_t *derived = (ocrDataBlockLockable_t*)self;
+    return &(derived->hint);
 }
 
 /******************************************************/
@@ -610,7 +646,11 @@ ocrDataBlockFactory_t *newDataBlockFactoryLockable(ocrParamList_t *perType, u32 
                                                    u32, bool), lockableUnregisterWaiter);
     base->fcts.setHint = FUNC_ADDR(u8 (*)(ocrDataBlock_t*, ocrHint_t*), lockableSetHint);
     base->fcts.getHint = FUNC_ADDR(u8 (*)(ocrDataBlock_t*, ocrHint_t*), lockableGetHint);
+    base->fcts.getRuntimeHint = FUNC_ADDR(ocrRuntimeHint_t* (*)(ocrDataBlock_t*), getRuntimeHintDbLockable);
     base->factoryId = factoryId;
+    //Setup hint framework
+    base->hintPropMap = (u64*)runtimeChunkAlloc(sizeof(u64)*(OCR_HINT_DB_PROP_END - OCR_HINT_DB_PROP_START - 1), PERSISTENT_CHUNK);
+    OCR_HINT_SETUP(base->hintPropMap, ocrHintPropDbLockable, OCR_HINT_COUNT_DB_LOCKABLE, OCR_HINT_DB_PROP_START, OCR_HINT_DB_PROP_END);
 
     return base;
 }

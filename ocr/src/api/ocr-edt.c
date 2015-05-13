@@ -106,7 +106,7 @@ u8 ocrEventSatisfy(ocrGuid_t eventGuid, ocrGuid_t dataGuid /*= INVALID_GUID*/) {
     return ocrEventSatisfySlot(eventGuid, dataGuid, 0);
 }
 
-u8 ocrEdtTemplateCreate_internal(ocrGuid_t *guid, ocrEdt_t funcPtr, u32 paramc, u32 depc, const char* funcName) {
+u8 ocrEdtTemplateCreate_internal(ocrGuid_t *guid, ocrEdt_t funcPtr, u32 paramc, u32 depc, char* funcName) {
     START_PROFILE(api_EdtTemplateCreate);
     DPRINTF(DEBUG_LVL_INFO, "ENTER ocrEdtTemplateCreate(*guid=0x%lx, funcPtr=0x%lx, paramc=%d, depc=%d, name=%s)\n",
             *guid, funcPtr, (s32)paramc, (s32)depc, funcName?funcName:"");
@@ -131,8 +131,15 @@ u8 ocrEdtTemplateCreate_internal(ocrGuid_t *guid, ocrEdt_t funcPtr, u32 paramc, 
     PD_MSG_FIELD_I(depc) = depc;
     PD_MSG_FIELD_I(properties) = 0;
 #ifdef OCR_ENABLE_EDT_NAMING
-    PD_MSG_FIELD_I(funcName) = funcName;
-    PD_MSG_FIELD_I(funcNameLen) = ocrStrlen(funcName);
+    {
+        u32 t = ocrStrlen(funcName);
+        if(t >= OCR_EDT_NAME_SIZE) {
+            funcName[OCR_EDT_NAME_SIZE-1] = '\0';
+            t = OCR_EDT_NAME_SIZE-1;
+        }
+        PD_MSG_FIELD_I(funcName) = funcName;
+        PD_MSG_FIELD_I(funcNameLen) = t;
+    }
 #endif
 
     returnCode = pd->fcts.processMessage(pd, &msg, true);

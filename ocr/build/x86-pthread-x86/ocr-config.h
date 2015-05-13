@@ -22,6 +22,7 @@
 // Allocator
 #define ENABLE_ALLOCATOR_TLSF
 #define ENABLE_ALLOCATOR_SIMPLE
+#define ENABLE_ALLOCATOR_QUICK
 #define ENABLE_ALLOCATOR_MALLOCPROXY
 
 // Comm-api
@@ -58,6 +59,9 @@
 // GUID provider
 #define ENABLE_GUID_PTR
 #define ENABLE_GUID_COUNTED_MAP
+
+// Hints
+#define ENABLE_HINTS
 
 // HAL layer to use
 #define HAL_X86_64
@@ -100,6 +104,9 @@
 
 // Runtime extension support (disabled by default)
 #define ENABLE_EXTENSION_RTITF
+
+// Build pause/resume support
+#define ENABLE_EXTENSION_PAUSE
 
 #endif /* __OCR_CONFIG_H__ */
 

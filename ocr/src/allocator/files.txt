@@ -1,4 +1,5 @@
 null        - a placeholder allocator with no functionality
-simple      - a simple best-fit allocator
+simple      - a simple first-fit allocator
+quick       - Quick allocator based on tlsf (and fine-grained locking, coming soon)
 mallocproxy - mallocProxy (Not available on FSIM)
 tlsf        - TLSF (Two Level Segregate Fit) allocator

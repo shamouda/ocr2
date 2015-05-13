@@ -9,6 +9,12 @@
 
 #include "ocr-hal.h"
 
+extern u32 salPause();
+
+extern void salQuery(u32 flag);
+
+extern void salResume(u32 flag);
+
 #define sal_abort()   hal_abort()
 
 #define sal_exit(x)   hal_exit(x)

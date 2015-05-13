@@ -142,6 +142,7 @@ typedef enum {
                                                *   @note This property is experimental and not
                                                *   implemented consistently.
                                                */
+#define DB_PROP_NO_HINT       ((u16)0x40) /**< Property for a data block indicating no hints can be set on the datablock */
 
 /**
  * @}
@@ -170,8 +171,9 @@ typedef struct {
 } ocrEdtDep_t;
 
 
-#define EDT_PROP_NONE   ((u16) 0x0) /**< Property bits indicating a regular EDT */
-#define EDT_PROP_FINISH ((u16) 0x1) /**< Property bits indicating a FINISH EDT */
+#define EDT_PROP_NONE    ((u16) 0x0) /**< Property bits indicating a regular EDT */
+#define EDT_PROP_FINISH  ((u16) 0x1) /**< Property bits indicating a FINISH EDT */
+#define EDT_PROP_NO_HINT ((u16) 0x2) /**< Property bits indicating the EDT does not take hints */
 
 /**
  * @brief Constant indicating that the number of parameters or dependences

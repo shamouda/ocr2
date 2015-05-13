@@ -115,6 +115,40 @@ ocrPlacer_t * createLocationPlacer(ocrPolicyDomain_t *pd) {
     return (ocrPlacer_t *) placer;
 }
 
+void destroyLocationPlacer(ocrPolicyDomain_t *pd) {
+    ocrLocationPlacer_t *placer = pd->placer;
+    u64 i=0;
+    PD_MSG_STACK(msg);
+    getCurrentEnv(NULL, NULL, NULL, &msg);
+
+    for(i=0; i < pd->neighborCount; i++) {
+#define PD_MSG (&msg)
+#define PD_TYPE PD_MSG_GUID_DESTROY
+      msg.type = PD_MSG_GUID_DESTROY | PD_MSG_REQUEST;
+      // These next two statements may be not required. Just to be safe
+      PD_MSG_FIELD_I(guid.guid) = placer->pdLocAffinities[pd->neighbors[i]];
+      //PD_MSG_FIELD_I(guid.metaDataPtr) = base;
+      PD_MSG_FIELD_I(properties) = 0; // Free metadata
+      pd->fcts.processMessage(pd, &msg, false);
+#undef PD_MSG
+#undef PD_TYPE
+    }
+
+#define PD_MSG (&msg)
+#define PD_TYPE PD_MSG_GUID_DESTROY
+      msg.type = PD_MSG_GUID_DESTROY | PD_MSG_REQUEST;
+      // These next two statements may be not required. Just to be safe
+      PD_MSG_FIELD_I(guid.guid) = placer->pdLocAffinities[placer->current];
+      //PD_MSG_FIELD_I(guid.metaDataPtr) = base;
+      PD_MSG_FIELD_I(properties) = 0; // Free metadata
+      pd->fcts.processMessage(pd, &msg, false);
+#undef PD_MSG
+#undef PD_TYPE
+
+    pd->fcts.pdFree(pd, placer->pdLocAffinities);
+    pd->fcts.pdFree(pd, placer);
+}
+
 u8 suggestLocationPlacement(ocrPolicyDomain_t *pd, ocrLocation_t curLoc, ocrLocationPlacer_t * placer, ocrPolicyMsg_t * msg) {
     u64 msgType = (msg->type & PD_MSG_TYPE_ONLY);
     // Incoming messages have been directed to the current location. Don't try to place them again.

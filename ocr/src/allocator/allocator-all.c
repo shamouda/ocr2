@@ -17,6 +17,9 @@ const char * allocator_types[] = {
 #ifdef ENABLE_ALLOCATOR_SIMPLE
     "simple",
 #endif
+#ifdef ENABLE_ALLOCATOR_QUICK
+    "quick",
+#endif
     "tlsf",
 
 #ifdef ENABLE_ALLOCATOR_MALLOCPROXY
@@ -31,6 +34,10 @@ ocrAllocatorFactory_t *newAllocatorFactory(allocatorType_t type, ocrParamList_t 
 #ifdef ENABLE_ALLOCATOR_SIMPLE
     case allocatorSimple_id:
         return newAllocatorFactorySimple(typeArg);
+#endif
+#ifdef ENABLE_ALLOCATOR_QUICK
+    case allocatorQuick_id:
+        return newAllocatorFactoryQuick(typeArg);
 #endif
 #ifdef ENABLE_ALLOCATOR_TLSF
     case allocatorTlsf_id:
@@ -84,6 +91,11 @@ void allocatorFreeFunction(void* blockPayloadAddr) {
 #ifdef ENABLE_ALLOCATOR_SIMPLE
     case allocatorSimple_id:
         simpleDeallocate(blockPayloadAddr);
+        return;
+#endif
+#ifdef ENABLE_ALLOCATOR_QUICK
+    case allocatorQuick_id:
+        quickDeallocate(blockPayloadAddr);
         return;
 #endif
 #ifdef ENABLE_ALLOCATOR_MALLOCPROXY

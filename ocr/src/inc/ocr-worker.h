@@ -77,6 +77,13 @@ typedef struct _ocrWorkerFcts_t {
      */
     bool (*isRunning)(struct _ocrWorker_t *self);
 
+    /** @brief Prints the location of this worker
+     *
+     *  The location field should be allocated (stack or heap) by the caller
+     *  and be able to hold 32 characters at least.
+     */
+    void (*printLocation)(struct _ocrWorker_t *self, char* location);
+
 } ocrWorkerFcts_t;
 
 typedef struct _ocrWorker_t {

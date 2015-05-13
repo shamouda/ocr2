@@ -1,0 +1,65 @@
+This directory contains the implementation of GASNet's communication platform.
+
+amhandler.h: the interface for methods needed for managing GASNet active messages
+    gasnet_handlerentry_t *amhandler_table();
+    int amhandler_count();
+    gasnet_handler_t amhandler_register(amhandler_fn_t handler);
+
+amhandler.c: the implementation of interfaces defined in amhandler.h
+
+gasnet-am.h: interface to be included in gasnet-comm-platform.* for handling long and huge messages.
+    The interface is then implemented by gasnet-amlong.c which uses GASNET AM long and gasnet-ammedium.c
+    which uses GASNet AM medium by splitting a message into several medium messages.
+    The supported interfaces :
+        gasnetSendLongMessage()
+        gasnetSendHugeMessage()
+
+gasnet-amlong.c: the implementation of gasnet-am.h using GASNet AM long
+        the file is built if COMM_PLATFORM_GASNET_AMLONG is defined
+gasnet-ammedium.c: the implementation of gasnet-am.h using GASNet AM medium
+        the file is built if COMM_PLATFORM_GASNET_AMLONG is NOT defined
+
+gasnet-comm-platform.h : the main interface of GASNet's communication platform.
+    The interface to be called by OCR:
+        ocrCommPlatformFactory_t* newCommPlatformFactoryGasnet(ocrParamList_t *perType);
+
+gasnet-comm-platform.c: the implementation of GASNet's communication platform.
+
+gasnet-message.h: the interface to split a message into several messages
+    void * gasnet_message_push(ocrPolicyDomain_t* pd, int messageID, void *message, int size,
+       int position, int tot_parts, int tot_msg_size);
+        pushing a message into the database. The caller has to check the return of this function.
+        If the returns is NULL, it means we need to wait for other parts of the message
+        but if the returns is not NULL (a memory address of the complete message), the message is complete, and
+        the caller can use the message.
+
+    void gasnet_message_pop(ocrPolicyDomain_t* pd, int messageID);
+        Removing a message from the database, including the allocated memory.
+
+gasnet-message.c : the implementation of gasnet-message.h
+
+gasnet-policy-domain.c: managing multiple policy domains in a communication platform
+gasnet-policy-domain.h: the interface to manage multiple policy-domains
+    ocrCommPlatformGasnet_t* getCommPlatform() : get the current policy domain
+    void addCommPlatform(ocrCommPlatform_t * self) : register a new policy domain
+    void pdLookingForWork( ocrCommPlatformGasnet_t* self ): the policy-domain has nothing to do, and
+        looking for a work by polling a message ( see GasnetCommPollMessage_RL2() )
+
+gasnet-share-segment.c: the implementation of managing GASNet share segment
+gasnet-share-segment.h:
+
+    void gasnetBlockInit(); setup initialization
+
+    gasnetCommBlockSender_t* gasnetReserveSegmentBlock();
+        get and reserve a segment block
+        if no more block available, it returns null
+
+    void gasnetReleaseSegmentBlock(void *addr);
+        release a segment block
+
+    void gasnetSegmentBlockPush(ocrPolicyDomain_t * pd, u32 node, gasnetCommBlock_t *block);
+        push a segment block into the database
+
+    gasnetCommBlock_t *gasnetSegmentBlockGet(ocrPolicyDomain_t * pd, u32 provider);
+        retrieve a segment block of a remote node ID
+        if there's no block for this node, it returns null

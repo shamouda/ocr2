@@ -28,13 +28,10 @@ typedef struct {
     ocrCommPlatform_t base;
     u64 msgId;
     linkedlist_t * incoming;
-    linkedlist_t * outgoing;
-    u64 maxMsgSize;
+    iterator_t * incomingIt;
     volatile int rl;
     volatile int rl_completed [GASNET_COMM_RL_MAX+1];
-#ifdef CONCURRENT_GASNET
     u32 queueLock;
-#endif
 } ocrCommPlatformGasnet_t;
 
 typedef struct {

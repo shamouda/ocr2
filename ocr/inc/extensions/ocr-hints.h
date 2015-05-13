@@ -204,19 +204,19 @@ u8 ocrCreateGroup(ocrGuid_t *groupGuid, ocrGroupType_t groupType);
 /**
  * @brief Associates a EDT/DB/Group guid with application group
  *
- * An EDT/DB/Group guid is given an application group. This makes the guid
+ * An EDT/DB/Group guid is added to an application group. This makes the guid
  * become an element of the application group. If the guid is already an
  * element of another group of the same type, then it is removed from that
  * original group and then added to this new group.
  *
- * @param[in] dstGuid          The guid which is given a new group
  * @param[in] groupGuid        The guid of the application group
+ * @param[in] elGuid           The guid which is given a new group
  *
  * @return a status code
  *     - 0: successful
- *     - EINVAL: If groupGuid could not be set for dstGuid
+ *     - EINVAL: If element could not be added to group
  */
-u8 ocrAddGroup(ocrGuid_t dstGuid, ocrGuid_t groupGuid);
+u8 ocrAddToGroup(ocrGuid_t groupGuid, ocrGuid_t elGuid);
 
 /**
  * @brief Dissociate a EDT/DB/Group guid with a group type
@@ -225,30 +225,30 @@ u8 ocrAddGroup(ocrGuid_t dstGuid, ocrGuid_t groupGuid);
  * groupType, then it is removed from that group. If no application group
  * was already set on the guid for that groupType, then this call is a no-op.
  *
- * @param[in] dstGuid          The guid which dissociates itself from the group
- * @param[in] groupType        The type of the group to unset
+ * @param[in] groupType        The type of the group that element is removed from
+ * @param[in] elGuid           The guid which dissociates itself from the group
  *
  * @return a status code
  *     - 0: successful
- *     - EINVAL: If groupGuid could not be unset for dstGuid
+ *     - EINVAL: If groupGuid could not be unset for elGuid
  */
-u8 ocrRemoveGroup(ocrGuid_t dstGuid, ocrGroupType_t groupType);
+u8 ocrRemoveFromGroup(ocrGroupType_t groupType, ocrGuid_t elGuid);
 
 /**
  * @brief Gets the guid of the application group associated with a guid
  *
  * This retrieves the application group of type groupType that is associated
- * with srcGuid.
+ * with elGuid.
  *
- * @param[in]  srcGuid         The guid to get the application group from
- * @param[in]  groupType       The type of the group to get
  * @param[out] groupGuid       The guid of the application group
+ * @param[in]  groupType       The type of the group to get
+ * @param[in]  elGuid          The element guid from which group guid is retrieved
  *
  * @return a status code
  *     - 0: successful
- *     - EINVAL: If srcGuid has no group of type groupType set
+ *     - EINVAL: If elGuid has no group of type groupType set
  */
-u8 ocrGetGroup(ocrGuid_t srcGuid, ocrGroupType_t groupType, ocrGuid_t *groupGuid);
+u8 ocrGetGroup(ocrGuid_t *groupGuid, ocrGroupType_t groupType, ocrGuid_t elGuid);
 
 /**
  * @brief Destroys the an application group object

@@ -57,6 +57,19 @@ static char * eventTypeToString(ocrEvent_t * base) {
 }
 #endif
 
+/***********************************************************/
+/* OCR-HC Event Hint Properties                             */
+/* (Add implementation specific supported properties here) */
+/***********************************************************/
+
+u64 ocrHintPropEventHc[] = {
+#ifdef ENABLE_HINTS
+#endif
+};
+
+//Make sure OCR_HINT_COUNT_EVT_HC in hc-task.h is equal to the length of array ocrHintPropEventHc
+ocrStaticAssert((sizeof(ocrHintPropEventHc)/sizeof(u64)) == OCR_HINT_COUNT_EVT_HC);
+ocrStaticAssert(OCR_HINT_COUNT_EVT_HC < OCR_RUNTIME_HINT_PROP_BITS);
 
 /******************************************************/
 /* OCR-HC Events Implementation                       */
@@ -848,11 +861,22 @@ u8 unregisterWaiterEventHcPersist(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slo
 }
 
 u8 setHintEventHc(ocrEvent_t* self, ocrHint_t *hint) {
+    ocrEventHc_t *derived = (ocrEventHc_t*)self;
+    ocrRuntimeHint_t *rHint = &(derived->hint);
+    OCR_RUNTIME_HINT_SET(hint, rHint, OCR_HINT_COUNT_EVT_HC, ocrHintPropEventHc, OCR_HINT_EVT_PROP_START);
     return 0;
 }
 
 u8 getHintEventHc(ocrEvent_t* self, ocrHint_t *hint) {
+    ocrEventHc_t *derived = (ocrEventHc_t*)self;
+    ocrRuntimeHint_t *rHint = &(derived->hint);
+    OCR_RUNTIME_HINT_GET(hint, rHint, OCR_HINT_COUNT_EVT_HC, ocrHintPropEventHc, OCR_HINT_EVT_PROP_START);
     return 0;
+}
+
+ocrRuntimeHint_t* getRuntimeHintEventHc(ocrEvent_t* self) {
+    ocrEventHc_t *derived = (ocrEventHc_t*)self;
+    return &(derived->hint);
 }
 
 /******************************************************/
@@ -880,6 +904,7 @@ ocrEvent_t * newEventHc(ocrEventFactory_t * factory, ocrEventTypes_t eventType,
     if((eventType == OCR_EVENT_IDEM_T) || (eventType == OCR_EVENT_STICKY_T)) {
         sizeOfGuid = sizeof(ocrEventHcPersist_t);
     }
+    u32 hintc = OCR_HINT_COUNT_EVT_HC;
 
     ocrGuidKind kind;
     switch(eventType) {
@@ -906,7 +931,7 @@ ocrEvent_t * newEventHc(ocrEventFactory_t * factory, ocrEventTypes_t eventType,
     PD_MSG_FIELD_IO(guid.guid) = UNINITIALIZED_GUID;
     PD_MSG_FIELD_IO(guid.metaDataPtr) = NULL;
     // We allocate everything in the meta-data to keep things simple
-    PD_MSG_FIELD_I(size) = sizeOfGuid;
+    PD_MSG_FIELD_I(size) = sizeOfGuid + hintc*sizeof(u64);
     PD_MSG_FIELD_I(kind) = kind;
     PD_MSG_FIELD_I(properties) = 0;
     RESULT_PROPAGATE2(pd->fcts.processMessage(pd, &msg, true), NULL);
@@ -932,6 +957,14 @@ ocrEvent_t * newEventHc(ocrEventFactory_t * factory, ocrEventTypes_t eventType,
     }
     if(eventType == OCR_EVENT_IDEM_T || eventType == OCR_EVENT_STICKY_T) {
         ((ocrEventHcPersist_t*)event)->data = UNINITIALIZED_GUID;
+    }
+
+    if (hintc == 0) {
+        event->hint.hintMask = 0;
+        event->hint.hintVal = NULL;
+    } else {
+        OCR_RUNTIME_HINT_MASK_INIT(event->hint.hintMask, OCR_HINT_EVT_T, factory->factoryId);
+        event->hint.hintVal = (u64*)((u64)base + sizeOfGuid);
     }
 
     // Now we need to get the GUIDs for the waiters and
@@ -1011,15 +1044,19 @@ ocrEventFactory_t * newEventFactoryHc(ocrParamList_t *perType, u32 factoryId) {
                                   ocrEventTypes_t, bool, ocrParamList_t*), newEventHc);
     base->destruct =  FUNC_ADDR(void (*)(ocrEventFactory_t*), destructEventFactoryHc);
     // Initialize the function pointers
-    u32 i;
+
+    // Setup common functions
+    base->commonFcts.setHint = FUNC_ADDR(u8 (*)(ocrEvent_t*, ocrHint_t*), setHintEventHc);
+    base->commonFcts.getHint = FUNC_ADDR(u8 (*)(ocrEvent_t*, ocrHint_t*), getHintEventHc);
+    base->commonFcts.getRuntimeHint = FUNC_ADDR(ocrRuntimeHint_t* (*)(ocrEvent_t*), getRuntimeHintEventHc);
+
     // Setup functions properly
+    u32 i;
     for(i = 0; i < (u32)OCR_EVENT_T_MAX; ++i) {
         base->fcts[i].destruct = FUNC_ADDR(u8 (*)(ocrEvent_t*), destructEventHc);
         base->fcts[i].get = FUNC_ADDR(ocrFatGuid_t (*)(ocrEvent_t*), getEventHc);
         base->fcts[i].registerSignaler = FUNC_ADDR(u8 (*)(ocrEvent_t*, ocrFatGuid_t, u32, ocrDbAccessMode_t, bool), registerSignalerHc);
         base->fcts[i].unregisterSignaler = FUNC_ADDR(u8 (*)(ocrEvent_t*, ocrFatGuid_t, u32, bool), unregisterSignalerHc);
-        base->fcts[i].setHint = FUNC_ADDR(u8 (*)(ocrEvent_t*, ocrHint_t*), setHintEventHc);
-        base->fcts[i].getHint = FUNC_ADDR(u8 (*)(ocrEvent_t*, ocrHint_t*), getHintEventHc);
     }
     // Setup satisfy function pointers
     base->fcts[OCR_EVENT_ONCE_T].satisfy =
@@ -1047,6 +1084,9 @@ ocrEventFactory_t * newEventFactoryHc(ocrParamList_t *perType, u32 factoryId) {
 
     base->factoryId = factoryId;
 
+    //Setup hint framework
+    base->hintPropMap = (u64*)runtimeChunkAlloc(sizeof(u64)*(OCR_HINT_EVT_PROP_END - OCR_HINT_EVT_PROP_START - 1), PERSISTENT_CHUNK);
+    OCR_HINT_SETUP(base->hintPropMap, ocrHintPropEventHc, OCR_HINT_COUNT_EVT_HC, OCR_HINT_EVT_PROP_START, OCR_HINT_EVT_PROP_END);
     return base;
 }
 #endif /* ENABLE_EVENT_HC */

@@ -152,11 +152,22 @@ u8 ocrPolicyMsgGetMsgSize(ocrPolicyMsg_t *msg, u64 *baseSize,
         break;
 #undef PD_TYPE
 
-    case PD_MSG_COMM_GIVE:
+    case PD_MSG_COMM_GIVE: {
 #define PD_TYPE PD_MSG_COMM_GIVE
         *marshalledSize = sizeof(ocrFatGuid_t)*PD_MSG_FIELD_IO(guidCount);
+#ifdef ENABLE_HINTS
+        *marshalledSize += sizeof(u64*) * PD_MSG_FIELD_IO(guidCount); //Size of the hint array
+        *marshalledSize += sizeof(ocrRuntimeHint_t) * PD_MSG_FIELD_IO(guidCount); //Runtime hint structs
+        u32 i, hintSize;
+        for (i = 0, hintSize = 0; i < PD_MSG_FIELD_IO(guidCount); i++) {
+            ocrRuntimeHint_t *rHint = (ocrRuntimeHint_t*)(PD_MSG_FIELD_IO(hints)[i]);
+            hintSize += OCR_RUNTIME_HINT_GET_SIZE(rHint->hintMask); //count the set vals
+        }
+        *marshalledSize += sizeof(u64) * hintSize; //Runtime hint vals
+#endif
         break;
 #undef PD_TYPE
+        }
 
     case PD_MSG_GUID_METADATA_CLONE:
 #define PD_TYPE PD_MSG_GUID_METADATA_CLONE
@@ -400,8 +411,44 @@ u8 ocrPolicyMsgMarshallMsg(ocrPolicyMsg_t* msg, u64 baseSize, u8* buffer, u32 mo
             }
             // Finally move the curPtr for the next object (none as of now)
             curPtr += s;
+
+#ifdef ENABLE_HINTS
+            u64 **hintArr = (u64**)curPtr;
+            u64 sizeHintArr = sizeof(u64*)*PD_MSG_FIELD_IO(guidCount);
+            u8 *rtHintPtr = curPtr + sizeHintArr;
+            u64 sizeRtHints = sizeof(ocrRuntimeHint_t)*PD_MSG_FIELD_IO(guidCount);
+            u8 *hintValPtr = curPtr + sizeHintArr + sizeRtHints;
+            u32 i;
+            for (i = 0; i < PD_MSG_FIELD_IO(guidCount); i++) {
+                hintArr[i] = (fixupPtrs) ? (u64*)(((u64)(rtHintPtr - startPtr)<<1) + isAddl) : (u64*)rtHintPtr;
+                ocrRuntimeHint_t *rHintBuf = (ocrRuntimeHint_t*)rtHintPtr;
+                ocrRuntimeHint_t *rHint = (ocrRuntimeHint_t*)(PD_MSG_FIELD_IO(hints)[i]);
+                u64 h = sizeof(u64) * OCR_RUNTIME_HINT_GET_SIZE(rHint->hintMask); //count the set vals
+                hal_memCopy(hintValPtr, rHint->hintVal, h, false);
+                rHintBuf->hintMask = rHint->hintMask;
+                rHintBuf->hintVal = (fixupPtrs) ? (u64*)(((u64)(hintValPtr - startPtr)<<1) + isAddl) : (u64*)hintValPtr;
+                rtHintPtr += sizeof(ocrRuntimeHint_t);
+                hintValPtr += h;
+            }
+
+            // Now fixup the pointer
+            if(fixupPtrs) {
+                DPRINTF(DEBUG_LVL_VVERB, "Converting hints (0x%lx) to 0x%lx\n",
+                        (u64)PD_MSG_FIELD_IO(hints), ((u64)(curPtr - startPtr)<<1) + isAddl);
+                PD_MSG_FIELD_IO(hints) = (u64**)(((u64)(curPtr - startPtr)<<1) + isAddl);
+            } else {
+                DPRINTF(DEBUG_LVL_VVERB, "Copying hints (0x%lx) to 0x%lx\n",
+                        (u64)PD_MSG_FIELD_IO(hints), curPtr);
+                PD_MSG_FIELD_IO(hints) = (u64**)curPtr;
+            }
+            // Finally move the curPtr for the next object (none as of now)
+            curPtr = hintValPtr;
+#endif
         } else {
             PD_MSG_FIELD_IO(guids) = NULL;
+#ifdef ENABLE_HINTS
+            PD_MSG_FIELD_IO(hints) = NULL;
+#endif
         }
         break;
 #undef PD_TYPE
@@ -646,6 +693,21 @@ u8 ocrPolicyMsgUnMarshallMsg(u8* mainBuffer, u8* addlBuffer,
             PD_MSG_FIELD_IO(guids) = (ocrFatGuid_t*)((t&1?localAddlPtr:localMainPtr) + (t>>1));
             DPRINTF(DEBUG_LVL_VVERB, "Converted field guids from 0x%lx to 0x%lx\n",
                     t, (u64)PD_MSG_FIELD_IO(guids));
+
+#ifdef ENABLE_HINTS
+            u64 h = (u64)(PD_MSG_FIELD_IO(hints));
+            PD_MSG_FIELD_IO(hints) = (u64**)((h&1?localAddlPtr:localMainPtr) + (h>>1));
+            DPRINTF(DEBUG_LVL_VVERB, "Converted field hints from 0x%lx to 0x%lx\n",
+                    h, (u64)PD_MSG_FIELD_IO(hints));
+            u32 i;
+            for (i = 0; i < PD_MSG_FIELD_IO(guidCount); i++) {
+                h = (u64)(PD_MSG_FIELD_IO(hints)[i]);
+                PD_MSG_FIELD_IO(hints)[i] = (u64*)((h&1?localAddlPtr:localMainPtr) + (h>>1));
+                ocrRuntimeHint_t *rtHint = (ocrRuntimeHint_t*)PD_MSG_FIELD_IO(hints)[i];
+                h = (u64)(rtHint->hintVal);
+                rtHint->hintVal = (u64*)((h&1?localAddlPtr:localMainPtr) + (h>>1));
+            }
+#endif
         }
         break;
 #undef PD_TYPE

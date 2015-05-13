@@ -72,6 +72,7 @@
 #else
 #define OCR_DEBUG_ALLOCATOR 0
 #endif
+
 #define OCR_DEBUG_ALLOCATOR_STR "ALLOC"
 #ifndef DEBUG_LVL_ALLOCATOR
 #define DEBUG_LVL_ALLOCATOR OCR_DEBUG_LVL
@@ -82,36 +83,43 @@
 #else
 #define OCR_DEBUG_API 0
 #endif
+
 #define OCR_DEBUG_API_STR "API"
 #ifndef DEBUG_LVL_API
 #define DEBUG_LVL_API OCR_DEBUG_LVL
 #endif
+
 
 #ifdef OCR_DEBUG_COMP_PLATFORM
 #define OCR_DEBUG_COMP_PLATFORM 1
 #else
 #define OCR_DEBUG_COMP_PLATFORM 0
 #endif
+
 #define OCR_DEBUG_COMP_PLATFORM_STR "COMP-PLAT"
 #ifndef DEBUG_LVL_COMP_PLATFORM
 #define DEBUG_LVL_COMP_PLATFORM OCR_DEBUG_LVL
 #endif
+
 
 #ifdef OCR_DEBUG_COMM_PLATFORM
 #define OCR_DEBUG_COMM_PLATFORM 1
 #else
 #define OCR_DEBUG_COMM_PLATFORM 0
 #endif
+
 #define OCR_DEBUG_COMM_PLATFORM_STR "COMM-PLAT"
 #ifndef DEBUG_LVL_COMM_PLATFORM
 #define DEBUG_LVL_COMM_PLATFORM OCR_DEBUG_LVL
 #endif
+
 
 #ifdef OCR_DEBUG_COMM_API
 #define OCR_DEBUG_COMM_API 1
 #else
 #define OCR_DEBUG_COMM_API 0
 #endif
+
 #define OCR_DEBUG_COMM_API_STR "COMM-API"
 #ifndef DEBUG_LVL_COMM_API
 #define DEBUG_LVL_COMM_API OCR_DEBUG_LVL
@@ -122,176 +130,211 @@
 #else
 #define OCR_DEBUG_COMM_WORKER 0
 #endif
+
 #define OCR_DEBUG_COMM_WORKER_STR "COMM-WORK"
 #ifndef DEBUG_LVL_COMM_WORKER
 #define DEBUG_LVL_COMM_WORKER OCR_DEBUG_LVL
 #endif
+
 
 #ifdef OCR_DEBUG_COMP_TARGET
 #define OCR_DEBUG_COMP_TARGET 1
 #else
 #define OCR_DEBUG_COMP_TARGET 0
 #endif
+
 #define OCR_DEBUG_COMP_TARGET_STR "COMP-TARG"
 #ifndef DEBUG_LVL_COMP_TARGET
 #define DEBUG_LVL_COMP_TARGET OCR_DEBUG_LVL
 #endif
+
 
 #ifdef OCR_DEBUG_DATABLOCK
 #define OCR_DEBUG_DATABLOCK 1
 #else
 #define OCR_DEBUG_DATABLOCK 0
 #endif
+
 #define OCR_DEBUG_DATABLOCK_STR "DB"
 #ifndef DEBUG_LVL_DATABLOCK
 #define DEBUG_LVL_DATABLOCK OCR_DEBUG_LVL
 #endif
+
 
 #ifdef OCR_DEBUG_EVENT
 #define OCR_DEBUG_EVENT 1
 #else
 #define OCR_DEBUG_EVENT 0
 #endif
+
 #define OCR_DEBUG_EVENT_STR "EVT"
 #ifndef DEBUG_LVL_EVENT
 #define DEBUG_LVL_EVENT OCR_DEBUG_LVL
 #endif
+
 
 #ifdef OCR_DEBUG_GUID
 #define OCR_DEBUG_GUID 1
 #else
 #define OCR_DEBUG_GUID 0
 #endif
+
 #define OCR_DEBUG_GUID_STR "GUID"
 #ifndef DEBUG_LVL_GUID
 #define DEBUG_LVL_GUID OCR_DEBUG_LVL
 #endif
+
 
 #ifdef OCR_DEBUG_INIPARSING
 #define OCR_DEBUG_INIPARSING 1
 #else
 #define OCR_DEBUG_INIPARSING 0
 #endif
+
 #define OCR_DEBUG_INIPARSING_STR "INI-PARSING"
 #ifndef DEBUG_LVL_INIPARSING
 #define DEBUG_LVL_INIPARSING OCR_DEBUG_LVL
 #endif
+
 
 #ifdef OCR_DEBUG_MACHINE
 #define OCR_DEBUG_MACHINE 1
 #else
 #define OCR_DEBUG_MACHINE 0
 #endif
+
 #define OCR_DEBUG_MACHINE_STR "MACHINE-DESC"
 #ifndef DEBUG_LVL_MACHINE
 #define DEBUG_LVL_MACHINE OCR_DEBUG_LVL
 #endif
+
 
 #ifdef OCR_DEBUG_MEM_PLATFORM
 #define OCR_DEBUG_MEM_PLATFORM 1
 #else
 #define OCR_DEBUG_MEM_PLATFORM 0
 #endif
+
 #define OCR_DEBUG_MEM_PLATFORM_STR "MEM-PLAT"
 #ifndef DEBUG_LVL_MEM_PLATFORM
 #define DEBUG_LVL_MEM_PLATFORM OCR_DEBUG_LVL
 #endif
+
 
 #ifdef OCR_DEBUG_MEM_TARGET
 #define OCR_DEBUG_MEM_TARGET 1
 #else
 #define OCR_DEBUG_MEM_TARGET 0
 #endif
+
 #define OCR_DEBUG_MEM_TARGET_STR "MEM-TARG"
 #ifndef DEBUG_LVL_MEM_TARGET
 #define DEBUG_LVL_MEM_TARGET OCR_DEBUG_LVL
 #endif
+
 
 #ifdef OCR_DEBUG_POLICY
 #define OCR_DEBUG_POLICY 1
 #else
 #define OCR_DEBUG_POLICY 0
 #endif
+
 #define OCR_DEBUG_POLICY_STR "POLICY"
 #ifndef DEBUG_LVL_POLICY
 #define DEBUG_LVL_POLICY OCR_DEBUG_LVL
 #endif
+
 
 #ifdef OCR_DEBUG_SCHEDULER
 #define OCR_DEBUG_SCHEDULER 1
 #else
 #define OCR_DEBUG_SCHEDULER 0
 #endif
+
 #define OCR_DEBUG_SCHEDULER_STR "SCHED"
 #ifndef DEBUG_LVL_SCHEDULER
 #define DEBUG_LVL_SCHEDULER OCR_DEBUG_LVL
 #endif
+
 
 #ifdef OCR_DEBUG_STATS
 #define OCR_DEBUG_STATS 1
 #else
 #define OCR_DEBUG_STATS 0
 #endif
+
 #define OCR_DEBUG_STATS_STR "STATS"
 #ifndef DEBUG_LVL_STATS
 #define DEBUG_LVL_STATS OCR_DEBUG_LVL
 #endif
+
 
 #ifdef OCR_DEBUG_SYNC
 #define OCR_DEBUG_SYNC 1
 #else
 #define OCR_DEBUG_SYNC 0
 #endif
+
 #define OCR_DEBUG_SYNC_STR "SYNC"
 #ifndef DEBUG_LVL_SYNC
 #define DEBUG_LVL_SYNC OCR_DEBUG_LVL
 #endif
+
 
 #ifdef OCR_DEBUG_SYSBOOT
 #define OCR_DEBUG_SYSBOOT 1
 #else
 #define OCR_DEBUG_SYSBOOT 0
 #endif
+
 #define OCR_DEBUG_SYSBOOT_STR "SYSBOOT"
 #ifndef DEBUG_LVL_SYSBOOT
 #define DEBUG_LVL_SYSBOOT OCR_DEBUG_LVL
 #endif
+
 
 #ifdef OCR_DEBUG_TASK
 #define OCR_DEBUG_TASK 1
 #else
 #define OCR_DEBUG_TASK 0
 #endif
+
 #define OCR_DEBUG_TASK_STR "EDT"
 #ifndef DEBUG_LVL_TASK
 #define DEBUG_LVL_TASK OCR_DEBUG_LVL
 #endif
+
 
 #ifdef OCR_DEBUG_WORKER
 #define OCR_DEBUG_WORKER 1
 #else
 #define OCR_DEBUG_WORKER 0
 #endif
+
 #define OCR_DEBUG_WORKER_STR "WORKER"
 #ifndef DEBUG_LVL_WORKER
 #define DEBUG_LVL_WORKER OCR_DEBUG_LVL
 #endif
+
 
 #ifdef OCR_DEBUG_WORKPILE
 #define OCR_DEBUG_WORKPILE 1
 #else
 #define OCR_DEBUG_WORKPILE 0
 #endif
+
 #define OCR_DEBUG_WORKPILE_STR "WORKPILE"
 #ifndef DEBUG_LVL_WORKPILE
 #define DEBUG_LVL_WORKPILE OCR_DEBUG_LVL
 #endif
+
 
 #ifdef OCR_DEBUG_UTIL
 #define OCR_DEBUG_UTIL 1
 #else
 #define OCR_DEBUG_UTIL 0
 #endif
+
 #define OCR_DEBUG_UTIL_STR "UTIL"
 #ifndef DEBUG_LVL_UTIL
 #define DEBUG_LVL_UTIL OCR_DEBUG_LVL
@@ -327,10 +370,166 @@
 
 #else
 #define DO_DEBUG_TYPE(level) if(0) {
-#define DEBUG(format, ...)
 #define DPRINTF_TYPE(type, level, format, ...)
 #define DPRINTF_TYPE_COND_LVL(type, cond, levelT, levelF, format, ...)
 #endif /* OCR_DEBUG */
+
+#ifdef OCR_TRACE
+
+#ifdef OCR_TRACE_ALLOCATOR
+#define OCR_TRACE_ALLOCATOR 1
+#else
+#define OCR_TRACE_ALLOCATOR 0
+#endif
+
+#ifdef OCR_TRACE_API
+#define OCR_TRACE_API 1
+#else
+#define OCR_TRACE_API 0
+#endif
+
+#ifdef OCR_TRACE_COMP_PLATFORM
+#define OCR_TRACE_COMP_PLATFORM 1
+#else
+#define OCR_TRACE_COMP_PLATFORM 0
+#endif
+
+#ifdef OCR_TRACE_COMM_PLATFORM
+#define OCR_TRACE_COMM_PLATFORM 1
+#else
+#define OCR_TRACE_COMM_PLATFORM 0
+#endif
+
+#ifdef OCR_TRACE_COMM_API
+#define OCR_TRACE_COMM_API 1
+#else
+#define OCR_TRACE_COMM_API 0
+#endif
+
+#ifdef OCR_TRACE_COMM_WORKER
+#define OCR_TRACE_COMM_WORKER 1
+#else
+#define OCR_TRACE_COMM_WORKER 0
+#endif
+
+#ifdef OCR_TRACE_COMP_TARGET
+#define OCR_TRACE_COMP_TARGET 1
+#else
+#define OCR_TRACE_COMP_TARGET 0
+#endif
+
+#ifdef OCR_TRACE_DATABLOCK
+#define OCR_TRACE_DATABLOCK 1
+#else
+#define OCR_TRACE_DATABLOCK 0
+#endif
+
+#ifdef OCR_TRACE_EVENT
+#define OCR_TRACE_EVENT 1
+#else
+#define OCR_TRACE_EVENT 0
+#endif
+
+#ifdef OCR_TRACE_GUID
+#define OCR_TRACE_GUID 1
+#else
+#define OCR_TRACE_GUID 0
+#endif
+
+#ifdef OCR_TRACE_INIPARSING
+#define OCR_TRACE_INIPARSING 1
+#else
+#define OCR_TRACE_INIPARSING 0
+#endif
+
+#ifdef OCR_TRACE_MACHINE
+#define OCR_TRACE_MACHINE 1
+#else
+#define OCR_TRACE_MACHINE 0
+#endif
+
+#ifdef OCR_TRACE_MEM_PLATFORM
+#define OCR_TRACE_MEM_PLATFORM 1
+#else
+#define OCR_TRACE_MEM_PLATFORM 0
+#endif
+
+#ifdef OCR_TRACE_MEM_TARGET
+#define OCR_TRACE_MEM_TARGET 1
+#else
+#define OCR_TRACE_MEM_TARGET 0
+#endif
+
+#ifdef OCR_TRACE_POLICY
+#define OCR_TRACE_POLICY 1
+#else
+#define OCR_TRACE_POLICY 0
+#endif
+
+#ifdef OCR_TRACE_SCHEDULER
+#define OCR_TRACE_SCHEDULER 1
+#else
+#define OCR_TRACE_SCHEDULER 0
+#endif
+
+#ifdef OCR_TRACE_STATS
+#define OCR_TRACE_STATS 1
+#else
+#define OCR_TRACE_STATS 0
+#endif
+
+#ifdef OCR_TRACE_SYNC
+#define OCR_TRACE_SYNC 1
+#else
+#define OCR_TRACE_SYNC 0
+#endif
+
+#ifdef OCR_TRACE_SYSBOOT
+#define OCR_TRACE_SYSBOOT 1
+#else
+#define OCR_TRACE_SYSBOOT 0
+#endif
+
+#ifdef OCR_TRACE_TASK
+#define OCR_TRACE_TASK 1
+#else
+#define OCR_TRACE_TASK 0
+#endif
+
+#ifdef OCR_TRACE_WORKER
+#define OCR_TRACE_WORKER 1
+#else
+#define OCR_TRACE_WORKER 0
+#endif
+
+#ifdef OCR_TRACE_WORKPILE
+#define OCR_TRACE_WORKPILE 1
+#else
+#define OCR_TRACE_WORKPILE 0
+#endif
+
+#ifdef OCR_TRACE_UTIL
+#define OCR_TRACE_UTIL 1
+#else
+#define OCR_TRACE_UTIL 0
+#endif
+
+
+#define TPRINTF_TYPE(type, format, ...) do {                            \
+        if(OCR_TRACE_##type) {                                          \
+            ocrTask_t *_task = NULL; ocrWorker_t *_worker = NULL;       \
+            struct _ocrPolicyDomain_t *_pd = NULL;                      \
+            getCurrentEnv(&_pd, &_worker, &_task, NULL);                \
+            PRINTF(OCR_DEBUG_##type##_STR "(TRACE) "                    \
+                   "[PD:0x%lx W:0x%lx EDT:0x%lx] " format,              \
+                   _pd?(u64)_pd->myLocation:0,                          \
+                   _worker?(u64)_worker->location:0,                    \
+                   _task?_task->guid:0, ## __VA_ARGS__);                \
+        }} while(0)
+
+#else
+#define TPRINTF_TYPE(type, level, format, ...)
+#endif /* OCR_TRACE */
 
 #define DO_DEBUG_TYPE_INT(type, level) DO_DEBUG_TYPE(type, level)
 #define DO_DEBUG(level) DO_DEBUG_TYPE_INT(DEBUG_TYPE, level)
@@ -341,6 +540,9 @@
     DPRINTF_TYPE_COND_LVL(DEBUG_TYPE, cond, levelT, levelF, format, ## __VA_ARGS__)
 
 #define END_DEBUG }
+
+#define TPRINTF_TYPE_INT(type, format, ...) TPRINTF_TYPE(type, format, ## __VA_ARGS__)
+#define TPRINTF(format, ...) TPRINTF_TYPE_INT(DEBUG_TYPE, format, ## __VA_ARGS__)
 
 #ifdef OCR_ASSERT
 #define ASSERT(a) do { sal_assert((bool)((a) != 0), __FILE__, __LINE__); } while(0);
@@ -373,3 +575,4 @@
 #endif
 
 #endif /* __DEBUG_H__ */
+
