@@ -40,30 +40,40 @@ ocrGuid_t processRequestEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[
     getCurrentEnv(&pd, NULL, NULL, NULL);
     // This is meant to execute incoming request and asynchronously processed responses (two-way asynchronous)
     // Regular responses are routed back to requesters by the scheduler and are processed by them.
-    ASSERT((msg->type & PD_MSG_REQUEST) ||
-        ((msg->type & PD_MSG_RESPONSE) && ((msg->type & PD_MSG_TYPE_ONLY) == PD_MSG_DB_ACQUIRE)));
+    ASSERT((msg->type & PD_MSG_REQUEST) || ((msg->type & PD_MSG_RESPONSE) &&
+                (((msg->type & PD_MSG_TYPE_ONLY) == PD_MSG_DB_ACQUIRE) ||
+                ((msg->type & PD_MSG_TYPE_ONLY) == PD_MSG_GUID_METADATA_CLONE))));
     // Important to read this before calling processMessage. If the message requires
     // a response, the runtime reuses the request's message to post the response.
     // Hence there's a race between this code and the code posting the response.
     bool processResponse = !!(msg->type & PD_MSG_RESPONSE); // mainly for debug
-    // DB_ACQUIRE are potentially asynchronous
-    bool syncProcess = ((msg->type & PD_MSG_TYPE_ONLY) != PD_MSG_DB_ACQUIRE);
+    bool syncProcess = !((msg->type & PD_MSG_TYPE_ONLY) == PD_MSG_DB_ACQUIRE);
+
+    // All one-way request can be freed after processing
     bool toBeFreed = !(msg->type & PD_MSG_REQ_RESPONSE);
     DPRINTF(DEBUG_LVL_VVERB,"hc-comm-worker: Process incoming EDT request @ %p of type 0x%x\n", msg, msg->type);
     u8 res = pd->fcts.processMessage(pd, msg, syncProcess);
     DPRINTF(DEBUG_LVL_VVERB,"hc-comm-worker: [done] Process incoming EDT @ %p request of type 0x%x\n", msg, msg->type);
-    // Either flagged or was an asynchronous processing, the implementation should
-    // have setup a callback and we can free the request message
-    if (toBeFreed || (!syncProcess && (res == OCR_EPEND))) {
-        // Makes sure the runtime doesn't try to reuse this message
-        // even though it was not supposed to issue a response.
-        // If that's the case, this check is racy
-        ASSERT(!(msg->type & PD_MSG_RESPONSE) || processResponse);
-        DPRINTF(DEBUG_LVL_VVERB,"hc-comm-worker: Deleted incoming EDT request @ %p of type 0x%x\n", msg, msg->type);
-        // if request was an incoming one-way we can delete the message now.
-        pd->fcts.pdFree(pd, msg);
+    //TODO probably want a return code that tells if the message can be discarded or not
+    if (res == OCR_EPEND) {
+        if ((msg->type & PD_MSG_TYPE_ONLY) == PD_MSG_DB_ACQUIRE) {
+            // Acquire requests are consumed and can be discarded.
+            pd->fcts.pdFree(pd, msg);
+        } else {
+            ASSERT((msg->type & PD_MSG_TYPE_ONLY) == PD_MSG_WORK_CREATE);
+            // Do not deallocate: Message has been enqueued for further processing.
+        }
+    } else {
+        if (toBeFreed) {
+            // Makes sure the runtime doesn't try to reuse this message
+            // even though it was not supposed to issue a response.
+            // If that's the case, this check is racy
+            ASSERT(!(msg->type & PD_MSG_RESPONSE) || processResponse);
+            DPRINTF(DEBUG_LVL_VVERB,"hc-comm-worker: Deleted incoming EDT request @ %p of type 0x%x\n", msg, msg->type);
+            // if request was an incoming one-way we can delete the message now.
+            pd->fcts.pdFree(pd, msg);
+        }
     }
-
     return NULL_GUID;
 }
 
@@ -205,6 +215,7 @@ static void workerLoopHcCommInternal(ocrWorker_t * worker, ocrPolicyDomain_t *pd
             ocrPolicyMsg_t * message = (handle->status == HDL_RESPONSE_OK) ? handle->response : handle->msg;
             //To catch misuses, assert src is not self and dst is self
             ASSERT((message->srcLocation != pd->myLocation) && (message->destLocation == pd->myLocation));
+
             // Poll a response to a message we had sent.
             if ((message->type & PD_MSG_RESPONSE) && !(handle->properties & ASYNC_MSG_PROP)) {
                 DPRINTF(DEBUG_LVL_VVERB,"hc-comm-worker: Received message response for msgId: %ld\n",  message->msgId); // debug

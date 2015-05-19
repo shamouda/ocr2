@@ -25,7 +25,9 @@ typedef struct {
                              u8 isBlocking);
     u8 (*baseSwitchRunlevel)(struct _ocrPolicyDomain_t *self, ocrRunlevel_t, u32);
     u64 shutdownAckCount;
-    u32 lockDbLookup; /**< Lock for querying proxies for remote DB */
+    u32 lockDbLookup;  /**< Lock for querying proxies for remote DB */
+    u32 lockTplLookup; /**< Lock for querying proxies for remote template */
+    hashtable_t * proxyTplMap;
 } ocrPolicyDomainHcDist_t;
 
 typedef struct {

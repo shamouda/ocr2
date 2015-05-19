@@ -36,6 +36,7 @@ ocrGuid_t locationToAffinity(ocrLocationPlacer_t * placer, ocrLocation_t locatio
     return placer->pdLocAffinities[idx];
 }
 
+//Fetch remote affinity guid information
 //TODO nasty copy from hc-dist-policy.c until we don't have proper remote guid metdata resolve impl in PD
 static u8 resolveRemoteMetaData(ocrPolicyDomain_t * self, ocrFatGuid_t * fGuid, u64 metaDataSize) {
     ocrGuid_t remoteGuid = fGuid->guid;

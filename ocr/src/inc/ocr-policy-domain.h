@@ -667,6 +667,7 @@ typedef struct _ocrPolicyMsg_t {
                 } in;
                 struct {
                     u64 size;          /**< Out: Size of the metadata that was cloned */
+                    u32 returnDetail;  /**< Out: Success or error code */
                 } out;
             } inOrOut __attribute__ (( aligned(8) ));
         } PD_MSG_STRUCT_NAME(PD_MSG_GUID_METADATA_CLONE);

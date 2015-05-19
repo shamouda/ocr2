@@ -1434,10 +1434,12 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
                 ASSERT(false && "no serialization of edt template string");
 #endif
                 PD_MSG_FIELD_O(size) = sizeof(ocrTaskTemplateHc_t) + (sizeof(u64) * OCR_HINT_COUNT_EDT_HC);
+                PD_MSG_FIELD_O(returnDetail) = 0;
                 break;
             case OCR_GUID_AFFINITY:
                 localDeguidify(self, &(PD_MSG_FIELD_IO(guid)));
                 PD_MSG_FIELD_O(size) = sizeof(ocrAffinity_t);
+                PD_MSG_FIELD_O(returnDetail) = 0;
                 break;
             default:
                 ASSERT(false && "Unsupported GUID kind cloning");
