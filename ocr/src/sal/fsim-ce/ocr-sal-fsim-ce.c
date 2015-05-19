@@ -14,8 +14,8 @@ u32 salPause(void){
     return 1;
 }
 
-void salQuery(u32 flag){
-     return;
+ocrGuid_t salQuery(u32 flag, ocrQueryType_t query, ocrGuid_t guid, void **result, u32 *size, u8 flags){
+     return NULL_GUID;
 }
 
 void salResume(u32 flag){

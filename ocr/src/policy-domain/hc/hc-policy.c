@@ -9,6 +9,7 @@
 #ifdef ENABLE_POLICY_DOMAIN_HC
 
 #include "debug.h"
+#include "ocr-db.h"
 #include "ocr-errors.h"
 #include "ocr-policy-domain.h"
 #include "ocr-sysboot.h"
@@ -250,7 +251,6 @@ u8 hcPdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
             //Initialize pause/query/resume variables
             rself->runtimePause = false;
             rself->pauseCounter = 0;
-            rself->queryCounter = 0;
             rself->pausingWorker = -1;
         }
 
@@ -946,21 +946,12 @@ static u8 convertDepAddToSatisfy(ocrPolicyDomain_t *self, ocrFatGuid_t dbGuid,
 #undef PD_TYPE
     return 0;
 }
+
 #ifdef OCR_ENABLE_STATISTICS
 static ocrStats_t* hcGetStats(ocrPolicyDomain_t *self) {
     return self->statsObject;
 }
 #endif
-
-void hcDumpWorkerData(ocrPolicyDomainHc_t *rself){
-    u64 maxCount = 0;
-    u64 i = 0;
-
-    maxCount = rself->base.workerCount;
-    for(i = 0; i < maxCount; i++){
-        hcDumpWorkPile(rself->base.workers[i]);
-    }
-}
 
 u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlocking) {
 
@@ -2112,6 +2103,25 @@ u8 hcPdPollMessage(ocrPolicyDomain_t *self, ocrMsgHandle_t **handle) {
 u8 hcPdWaitMessage(ocrPolicyDomain_t *self,  ocrMsgHandle_t **handle) {
     ASSERT(0);
     return 0;
+}
+
+ocrGuid_t hcQueryNextEdts(ocrPolicyDomainHc_t *rself, void **result, u32 *qSize){
+    u64 i;
+    *qSize = 0;
+    ocrGuid_t *workpileGuids;
+    ocrGuid_t dataDb;
+
+    ocrDbCreate(&dataDb, (void **)&workpileGuids, sizeof(ocrGuid_t)*(rself->base.workerCount),
+                0, NULL_GUID, NO_ALLOC);
+
+    for(i = 0; i < rself->base.workerCount; i++){
+        u32 wrkrSize;
+        workpileGuids[i] = hcDumpNextEdt(rself->base.workers[i], &wrkrSize);
+        *qSize = (*qSize) + wrkrSize;
+    }
+
+    *result = workpileGuids;
+    return dataDb;
 }
 
 void* hcPdMalloc(ocrPolicyDomain_t *self, u64 size) {

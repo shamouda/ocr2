@@ -46,8 +46,7 @@ typedef struct {
     hcWorkerType_t hcType;
 } ocrWorkerHc_t;
 
-//TODO: Cleanup
-void hcDumpWorkPile(ocrWorker_t *worker);
+ocrGuid_t hcDumpNextEdt(ocrWorker_t *worker, u32 *wrkrSize);
 
 ocrWorkerFactory_t* newOcrWorkerFactoryHc(ocrParamList_t *perType);
 

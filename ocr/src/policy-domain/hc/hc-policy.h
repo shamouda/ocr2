@@ -35,7 +35,6 @@ typedef struct {
     volatile u32 pausingWorker; //Worker responsible for pause
     volatile bool runtimePause; //flag to indicate pause
     volatile u32 pauseCounter; //number of paused workers
-    volatile u32 queryCounter; //number of workers succesfully queried
 
     pdHcResumeSwitchRL_t rlSwitch; // Used for asynchronous RL switch
 } ocrPolicyDomainHc_t;
@@ -45,8 +44,7 @@ typedef struct {
     u32 rank;
 } paramListPolicyDomainHcInst_t;
 
-//TODO: Cleanup
-void hcDumpWorkerData(ocrPolicyDomainHc_t *rself);
+ocrGuid_t hcQueryNextEdts(ocrPolicyDomainHc_t *rself, void **result, u32 *size);
 
 ocrPolicyDomainFactory_t *newPolicyDomainFactoryHc(ocrParamList_t *perType);
 

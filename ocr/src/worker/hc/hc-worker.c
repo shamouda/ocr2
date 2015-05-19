@@ -99,9 +99,13 @@ static void hcWorkShift(ocrWorker_t * worker) {
         }
     }
 
-    //Pause called - stop workers
-    while(self->runtimePause == true){
-        hal_pause();
+    if(self->runtimePause == true) {
+        hal_xadd32((u32*)&self->pauseCounter, 1);
+        //Pause called - stop workers
+        while(self->runtimePause == true) {
+            hal_pause();
+        }
+        hal_xadd32((u32*)&self->pauseCounter, -1);
     }
 
 }
@@ -432,69 +436,56 @@ void initializeWorkerHc(ocrWorkerFactory_t * factory, ocrWorker_t* self, ocrPara
     workerHc->hcType = HC_WORKER_COMP;
 }
 
-//Dump workiple contents of each workpile
-//TODO: This is a temporary function to demonstrate basal functionality of querying runtime
-//      contents.  In the future, this will be modified to accomodate multiple query types.
-void hcDumpWorkPile(ocrWorker_t *worker){
-
-    PRINTF("Worker %lu - guid: 0x%llx\n", worker->seqId, worker->fguid);
-
-    ocrPolicyDomain_t * pd;
+//return guid of next EDT on specified worker's workpile
+ocrGuid_t hcDumpNextEdt(ocrWorker_t *worker, u32 *size){
+    ocrPolicyDomain_t *pd;
     getCurrentEnv(&pd, NULL, NULL, NULL);
     ocrPolicyDomainHc_t *self = (ocrPolicyDomainHc_t *) pd;
-
     ocrWorkpileHc_t *workpile = (ocrWorkpileHc_t *)pd->schedulers[0]->workpiles[worker->seqId];
     ocrTask_t *curTask = NULL;
 
-    u32 i = 0;
     u32 head = (workpile->deque->head%INIT_DEQUE_CAPACITY);
     u32 tail = (workpile->deque->tail%INIT_DEQUE_CAPACITY);
+    u32 workpileSize = tail-head;
 
-    u32 workpileSize = (tail-head);
-
-    PRINTF("Workpile size: %u\n\n", workpileSize);
-
-    u32 queuePos = 0;
     if(workpileSize > 0){
-        for(i = head; i < tail; i++){
 
-            PD_MSG_STACK(msg);
-            getCurrentEnv(NULL, NULL, NULL, &msg);
+        PD_MSG_STACK(msg);
+        getCurrentEnv(NULL, NULL, NULL, &msg);
+        ocrFatGuid_t fguid;
+        fguid.guid = (ocrGuid_t)workpile->deque->data[tail-1];
+        fguid.metaDataPtr = NULL;
 
-            ocrFatGuid_t fguid;
-            fguid.guid = (ocrGuid_t)workpile->deque->data[i];
-            fguid.metaDataPtr = NULL;
+    #define PD_MSG (&msg)
+    #define PD_TYPE PD_MSG_GUID_INFO
+        msg.type = PD_MSG_GUID_INFO | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
+        PD_MSG_FIELD_IO(guid.guid) = fguid.guid;
+        PD_MSG_FIELD_IO(guid.metaDataPtr) = fguid.metaDataPtr;
+        PD_MSG_FIELD_I(properties) = RMETA_GUIDPROP | KIND_GUIDPROP;
+        RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, true));
+        ocrGuidKind msgKind = PD_MSG_FIELD_O(kind);
+        curTask = (ocrTask_t *)PD_MSG_FIELD_IO(guid.metaDataPtr);
+    #undef PD_MSG
+    #undef PD_TYPE
 
-#define PD_MSG (&msg)
-#define PD_TYPE PD_MSG_GUID_INFO
-            msg.type = PD_MSG_GUID_INFO | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
-            PD_MSG_FIELD_IO(guid.guid) = fguid.guid;
-            PD_MSG_FIELD_IO(guid.metaDataPtr) = fguid.metaDataPtr;
-            PD_MSG_FIELD_I(properties) = RMETA_GUIDPROP | KIND_GUIDPROP;
-            if(pd->fcts.processMessage(pd, &msg, true) != 0) {
-                return;
-            }
-            ocrGuidKind msgKind = PD_MSG_FIELD_O(kind);
-            curTask = (ocrTask_t *)PD_MSG_FIELD_IO(guid.metaDataPtr);
-#undef PD_MSG
-#undef PD_TYPE
+        if(msgKind != OCR_GUID_EDT){
+            PRINTF("\nNon-EDT guid type return from GUID_INFO message - Kind: %d\n", msgKind);
+            return NULL_GUID;
 
-            if(msgKind != OCR_GUID_EDT){
-                PRINTF("\nNon-EDT guidKind returned from GUID_INFO message - Kind: %d\n", msgKind);
-            }else if(curTask != NULL){
-#ifdef OCR_ENABLE_EDT_NAMING
-                PRINTF("Queued task [%lu] - guid: 0x%lx template: 0x%llx fctPtr: %p name: %s\n", queuePos, curTask->guid, curTask->templateGuid, curTask->funcPtr, curTask->name);
-#else
-                PRINTF("Queued task [%lu] - guid: 0x%lx template: 0x%llx fctPtr: %p\n", queuePos, curTask->guid, curTask->templateGuid, curTask->funcPtr);
-#endif
-            }
-            queuePos++;
+        }else if(curTask != NULL){
+            //One queried task per worker (next EDT guid)
+            *size = 1;
+
+            return curTask->guid;
         }
-    hal_xadd32((u32*)&self->queryCounter, 1);
+
     }else{
-        PRINTF("Empty workpile on current worker... \n");
-        hal_xadd32((u32*)&self->queryCounter, 1);
+        //One queried task per worker (next EDT guid)
+        *size = 1;
+
+        return NULL_GUID;
     }
+    return NULL_GUID;
 }
 
 /******************************************************/

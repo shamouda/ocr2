@@ -339,6 +339,20 @@ typedef struct {
 } ocrHint_t;
 
 /**
+ * @brief OCR query types
+ *
+ * Note: User facing options for queryable sections
+ *       of paused runtime.
+ *
+ */
+typedef enum {
+    OCR_QUERY_WORKPILE_EDTS,
+    OCR_QUERY_EVENTS,
+    OCR_QUERY_DATABLOCKS,
+    OCR_QUERY_ALL_EDTS,
+} ocrQueryType_t;
+
+/**
  * @}
  * @}
  */
