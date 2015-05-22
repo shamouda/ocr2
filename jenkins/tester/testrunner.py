@@ -93,12 +93,12 @@ element is the JobObject
 """
 allReadyJobs = RECSortedList(key=itemgetter(0))
 
-"""Number of jobs blocked"""
-countBlockedJobs = 0
-
 """Jobs that are "terminal" (ie: no waiters). The
 results of the jobs in this list will be printed out"""
 allTerminalJobs = []
+
+"""Jobs based on their exit status"""
+allJobsStatus = dict()
 
 """All running jobs by paths. The dictionary contains:
     - Key: The path where the job is running
@@ -179,14 +179,46 @@ class Usage:
     def __init__(self, msg):
         self.msg = msg
 
+# Goes through the list of dependences for a job and updates it
+# stripping out __alltype, __type and __skippable
+def updateDependsList(jobName, deps, jobTypeToDependentJobs, jobTypeToName):
+    myLog = logging.getLogger()
+    replaceList = []
+    depList = []
+    for item in deps:
+        splitItem = item.split()
+        if splitItem[0] == "__type" and len(splitItem) == 2:
+            # In this case, it is "skippable" (ie: if the test fails, it
+            # won't block things)
+            replaceList.append((splitItem[1], True))
+            myLog.debug("Adding '%s' as a skippable job-type dependence to '%s'" % (splitItem[1], jobName))
+        elif splitItem[0] == "__alltype" and len(splitItem) == 2:
+            myLog.debug("Adding '%s' as a job-type dependence to '%s'" % (splitItem[1], jobName))
+            replaceList.append((splitItem[1], False))
+        elif splitItem[0] == "__skippable" and len(splitItem) == 2:
+            # Add the dependence as a skippable one
+            myLog.debug("Adding '%s' as a skippable dependence to '%s'" % (splitItem[1], jobName))
+            depList.append((splitItem[1], True))
+        else:
+            # All other cases, just say that you cannot skip the dependence
+            myLog.debug("Adding '%s' as a dependence to '%s'" % (item, jobName))
+            depList.append((item, False))
+    for item in replaceList:
+        t = jobTypeToDependentJobs.get(item[0], ([], False))
+        # Make sure the skippable value is correct
+        assert(len(t[0]) == 0 or t[1] == item[1])
+        jobTypeToDependentJobs[item[0]] = (t[0].append(jobName), item[1])
+        if item[0] in jobTypeToName:
+            depList = depList + [(k, item[1]) for k in jobTypeToName[item[0]]]
+    return depList
+
 # Main loop: loops that continuously looks for
 # tasks to run and collects their results. It will return
 # when there are no tasks that can be run
 def mainLoop():
     global cleanDirectories, envDirectory, sharedRoot, privateRoot, sleepInterval
-    global allRemainingJobs, allJobTypes, allRunningJobs, allReadyJobs, allTerminalJobs
+    global allRemainingJobs, allJobTypes, allRunningJobs, allReadyJobs, allTerminalJobs, allJobsStatus
     global allUsedPaths
-    global countBlockedJobs
 
     waitForJobDrain = None # Environment producing job to run
     envJobRunning = False
@@ -199,7 +231,7 @@ def mainLoop():
                                                            waitForJobDrain is not None and " and %s environment job" % (waitForJobDrain)
                                                            or ""))
         myLog.debug("Have %d blocked jobs and %d ready jobs" %
-                    (countBlockedJobs, len(allReadyJobs)))
+                    (len(allJobsStatus['blocked']), len(allReadyJobs)))
         needWholeMachine = False;
         # Go over the running jobs and see if they
         # are done
@@ -210,6 +242,12 @@ def mainLoop():
                 if job.getIsWholeMachine():
                     needWholeMachine = True
             else:
+                returnedStatus = job.getStatus()
+                assert(returnedStatus & 0x40)
+                if returnedStatus == JobObject.DONE_OK:
+                    allJobsStatus['ok'].append(job.name)
+                else:
+                    allJobsStatus['fail'].append(job.name)
                 if job.getIsTerminalJob():
                     allTerminalJobs.append(job)
         allRunningJobs = tempAllRunning
@@ -251,6 +289,7 @@ def mainLoop():
                                       % (waitForJobDrain))
                         if waitForJobDrain.getIsTerminalJob():
                             allTerminalJobs.append(waitForJobDrain)
+                        allJobsStatus['fail'].append(waitForJobDrain.name)
                         waitForJobDrain = None
                         # This next statement should be redundant. Being safe
                         envJobRunning = False
@@ -290,7 +329,7 @@ def mainLoop():
             elif jobStatus == JobObject.BLOCKED_JOB:
                 myLog.warning("%s is now blocked -- it will never run." % (v))
                 keysToRemove.append(k)
-                countBlockedJobs += 1
+                allJobsStatus['blocked'].append(k)
                 if v.getIsTerminalJob():
                     allTerminalJobs.append(v)
             else:
@@ -331,6 +370,7 @@ def mainLoop():
                 myLog.warning("%s failed to launch properly... it will be reported as a failure" % (str(allReadyJobs[i][1])))
                 if allReadyJobs[i][1].getIsTerminalJob():
                     allTerminalJobs.append(allReadyJobs[i][1])
+                allJobsStatus['fail'].append(k)
             else:
                 myLog.error("Status returned by execute not allowed for %s (got %d)" % (str(allReadyJobs[i][1]), returnedStatus))
                 # I don't really know what to do here. It should never happen
@@ -344,7 +384,7 @@ def mainLoop():
     # End of while loop on allRemainingJobs
 
 # Importing job definitions
-def importFromFile(name, tempJobs, jobTypetoName, alternateJobs):
+def importFromFile(name, tempJobs, jobTypeToName, alternateJobs):
     global allJobTypes
 
     myLog = logging.getLogger()
@@ -360,10 +400,10 @@ def importFromFile(name, tempJobs, jobTypetoName, alternateJobs):
                 if checkJob(v):
                     tempJobs[v['name']] = v
                     # Add jobname and jobtype to dictionary
-                    if jobTypetoName.has_key(v['jobtype']):
-                        jobTypetoName[v['jobtype']].append(v['name'])
+                    if jobTypeToName.has_key(v['jobtype']):
+                        jobTypeToName[v['jobtype']].append(v['name'])
                     else:
-                        jobTypetoName.setdefault(v['jobtype'],[v['name']])
+                        jobTypeToName.setdefault(v['jobtype'],[v['name']])
                 else:
                     raise Usage("JobObject '%s' is incorectly formated" % (v['name']))
             except KeyError:
@@ -393,10 +433,14 @@ def importFromFile(name, tempJobs, jobTypetoName, alternateJobs):
 def main(argv=None):
     global cleanDirectories, envDirectory, sharedRoot, privateRoot, sleepInterval
     global allRemainingJobs, allJobTypes, allRunningJobs, allReadyJobs, allTerminalJobs
+    global allJobsStatus
     global allUsedPaths
     global streamHandlerStdOut
-    global countBlockedJobs
     testKeywords = []
+
+    allJobsStatus['blocked'] = []
+    allJobsStatus['ok'] = []
+    allJobsStatus['fail'] = []
 
     KEEP_NONE = 0
     KEEP_FAILURE = 1
@@ -419,16 +463,24 @@ def main(argv=None):
                            # alternateJobs[X]: a dict: name -> nameOfAlternate; alternates -> name of alternate versions
                            # alternateJobs['name'] = alternatePicked
     alternateJobs['__count'] = 0
-    jobTypetoName =  dict() # Contains list of all job types and jobs belonging to each category
+    jobTypeToName =  dict() # Contains list of all job types and jobs belonging to each category
     resultFileName = None
+    defaultTimeout = 300 # 5 min for all jobs if no other timeout specified
     try:
         try:
             opts, args = getopt.getopt(argv[1:], "hc:i:e:s:p:t:k:o:dr:", [
                 "help", "config=", "initdir=", "envdir=", "shared=", "private=",
                 "time=", "repo=", "keyword=", "output=", "full-help", "debug",
-                "local-only", "no-clean=", "hier-results"])
+                "local-only", "no-clean=", "hier-results", "deftimeout="])
         except getopt.error, err:
             raise Usage(err)
+        # Need to parse deftimeout first
+        for o, a in opts:
+            if o in ('--deftimeout'):
+                defaultTimeout = int(a)
+                break
+        myLog.debug("Default timeout set to %d seconds" % (defaultTimeout))
+        JobObject.setGlobals(defaultTimeout=defaultTimeout)
         for o, a in opts:
             if o in ("-h", "--help"):
                 raise Usage(\
@@ -463,6 +515,7 @@ def main(argv=None):
     --no-clean:     Can be either 'all' or 'failure'. If 'all', all build directories
                     will be maintained after completion of the test. If 'failure', all
                     directories with at least one failure in them will be maintained.
+    --deftimeout    Default timeout for jobs without timeouts. Defaults to 300 seconds
 """)
             elif o in ('--full-help'):
                 raise Usage(\
@@ -509,9 +562,15 @@ def main(argv=None):
 
     Each job must specify the following arguments:
         - name:        (string) Name of the job (must be unique)
-        - depends:     (tuple of strings): Name of other jobs or jobtypes (e.g. '__type xyz') or
-                       alternate (e.g. '__alternate xyz') or all three
-                       on which this job depends. If the dependence is on an alternate, the system
+        - depends:     (tuple of strings): Specifies the dependences this job needs to wait on. It can
+                       be one of. A dependence is either skippable or non-skippable. A skippable dependence
+                       will not block the execution of this job
+                         - job name (non skippable)
+                         - a job type where all specific jobs are skippable ('__type xyz')
+                         - a job type where all specific jobs are not skippable ('__alltype xyz')
+                         - a skippable job name ('__skippable xyz')
+                         - one of a set of alternate jobs ('__alternate xyz')
+                       If the dependence is on an alternate, the system
                        will replace it with the choice it makes in "pick_one_of_" for the name given.
                        If the dependence is on a jobtype,
                        this job will wait on all jobs of that jobtype to complete before running.
@@ -624,7 +683,7 @@ def main(argv=None):
                 savePath = list(sys.path)
                 sys.path.append(importPath)
                 try:
-                    importFromFile(name, tempJobs, jobTypetoName, alternateJobs)
+                    importFromFile(name, tempJobs, jobTypeToName, alternateJobs)
                 except ImportError:
                     raise Usage("File '%s' could not be imported" % (a))
                 sys.path = savePath
@@ -654,6 +713,9 @@ def main(argv=None):
                     raise Usage("Value %s is not valid for '--no-clean'" % (a))
             elif o in ("--local-only"):
                 runRemoteJobs = False
+            elif o in ("--deftimeout"):
+                # Ignore, we already parsed this
+                pass
             else:
                 raise Usage("Unhandled option")
         if args is not None and len(args) > 0:
@@ -673,7 +735,7 @@ def main(argv=None):
                 savePath = list(sys.path)
                 sys.path.append(realPath + "/jenkins")
                 try:
-                    importFromFile(k + "_all", tempJobs, jobTypetoName, alternateJobs)
+                    importFromFile(k + "_all", tempJobs, jobTypeToName, alternateJobs)
                 except ImportError:
                     myLog.debug("File '%s_all.py' in repository '%s' not found -- ignoring ('%s')" %
                                 (k, k, realPath + "/jenkins"))
@@ -805,20 +867,9 @@ def main(argv=None):
         # a job of that type is re-added
         jobTypeToDependentJobs = dict()
         for k,v in tempJobs.iteritems():
-            depTup = v['depends']
-            depList = list(depTup)
+            depList = []
             replaceList = []
-            for item in depList:
-                if item.split()[0] == "__type" and len(item.split())==2:
-                    replaceList.append(item)
-            for item in replaceList:
-                t = jobTypeToDependentJobs.get(item, [])
-                jobTypeToDependentJobs[item] = t.append(k)
-                depList.remove(item)
-                if  item.split()[1] in jobTypetoName :
-                    depList = depList + jobTypetoName[item.split()[1]]
-            depTup = tuple(depList)
-            v['depends'] = depTup
+            v['depends'] = tuple(updateDependsList(k, v['depends'], jobTypeToDependentJobs, jobTypeToName))
             # Now create the jobs
             jobType = allJobTypes.get(v['jobtype'])
             if jobType.isLocal:
@@ -835,24 +886,34 @@ def main(argv=None):
             for k, v in tempJobs.iteritems():
                 if len(v['depends']):
                     waitingJob = allRemainingJobs[k]
-                    for dep in v['depends']:
+                    for dep, isSkippable in v['depends']:
                         signalingJob = allRemainingJobs.get(dep, None)
                         if signalingJob is None:
                             tjob = sideJobs.get(dep, None)
                             if tjob is None:
                                 tjob = repoMissingJobs.get(dep, None)
                                 if tjob is None:
-                                    myLog.error("<JobObject '%s'> has unknown dependence '%s'" % (k, dep))
-                                    waitingJob.signalJobDone(-3, False, "<JobObject '%s'> has unknown dependence '%s'" % (k, dep))
-                                    toRemoveKeys.append(k)
-                                    changedJobs = True
+                                    if isSkippable:
+                                        myLog.error("<JobObject '%s'> has unknown dependence '%s' (skipping)" % (k, dep))
+                                        waitingJob.satisfyDependence(None, dep, -1)
+                                    else:
+                                        myLog.error("<JobObject '%s'> has unknown dependence '%s'" % (k, dep))
+                                        waitingJob.signalJobDone(-3, False, "<JobObject '%s'> has unknown dependence '%s'" % (k, dep))
+                                        toRemoveKeys.append(k)
+                                        changedJobs = True
                                 else:
                                     myLog.debug("<JobObject '%s'> has a known dependence '%s' but that dependence was removed because of insufficient repository information" % (k, dep))
-                                    waitingJob.signalJobDone(-3, False, "<JobObject '%s'> has a dependence with insufficient reps '%s'; required %s" %
+                                    if isSkippable:
+                                        waitingJob.signalJobDone(-3, False, "<JobObject '%s'> has a dependence with insufficient repos '%s'; required %s (skipping)" %
                                                              (k, dep, repr(allJobTypes.get(tjob['jobtype']).req_repos + tjob.get('req-repos', ()))))
-                                    toRemoveKeys.append(k)
-                                    changedJobs = True
+                                        waitingJob.satisfyDependence(None, dep, -1)
+                                    else:
+                                        waitingJob.signalJobDone(-3, False, "<JobObject '%s'> has a dependence with insufficient repos '%s'; required %s" %
+                                                             (k, dep, repr(allJobTypes.get(tjob['jobtype']).req_repos + tjob.get('req-repos', ()))))
+                                        toRemoveKeys.append(k)
+                                        changedJobs = True
                             else:
+                                tjob['depends'] = updateDependsList(dep, tjob['depends'], jobTypeToDependentJobs, jobTypeToName)
                                 ttempJobs[dep] = tjob
                                 jobType = allJobTypes.get(tjob['jobtype'])
                                 assert(jobType is not None)
@@ -867,13 +928,14 @@ def main(argv=None):
                                 t = jobTypeToDependentJobs.get(tjob['jobtype'], None)
                                 if t is not None:
                                     # This means that there are other jobs depending on '__type' that need to be updated
-                                    for jobName in t:
+                                    for jobName in t[0]:
                                         otherWaitingJob = allRemainingJobs[jobName]
-                                        myLog.debug("Updating Job %s's list of '__type' dependence; adding Job %s" % (otherWaitingJob, signalingJob))
-                                        otherWaitingJob.extendDependenceList(1)
-                                        slot = otherWaitingJob.addDependence(signalingJob)
+                                        myLog.debug("Updating Job %s's list of '__type'/'__alltype' dependence; adding Job %s" % (otherWaitingJob, signalingJob))
+                                        slot = otherWaitingJob.extendDependenceList(signalingJob, t[1])
                                         if signalingJob.addWaiter(otherWaitingJob, slot) == False:
-                                            # See below for why this may occur
+                                            # This can happen because the signaling job may have been 'signalJobDone' above
+                                            # due to a missing dependence for that job (ie: A -> signalingJob -> otherWaitingJob
+                                            # and A is missing; signalingJob will be "satisfied")
                                             myLog.debug("Job %s's dependence %d is being satisfied due to completed producer (%s)"
                                                         % (otherWaitingJob, slot, signalingJob))
                                             otherWaitingJob.satisfyDependence(signalingJob, slot)
@@ -885,10 +947,7 @@ def main(argv=None):
                         if signalingJob is not None:
                             slot = waitingJob.addDependence(signalingJob)
                             if signalingJob.addWaiter(waitingJob, slot) == False:
-                                # Not quite 100% sure if this actually happens. Old explanation below
-                                # Leaving for now
-                                # This means that the job already "completed". This happens
-                                # if the signaler was removed (missing dep or whatever)
+                                # This can happen because the signaling job may have been 'signalJobDone' above
                                 myLog.debug("Job %s's dependence %d is being satisfied due to completed producer (%s)"
                                             % (waitingJob, slot, signalingJob))
                                 waitingJob.satisfyDependence(signalingJob, slot)
@@ -899,6 +958,13 @@ def main(argv=None):
                 # end of len(v['depends'])
             # Got all dependence information
             for k in toRemoveKeys:
+                # Update the proper status for the job
+                returnedStatus = allRemainingJobs[k].getStatus()
+                assert(returnedStatus != JobObject.DONE_OK)
+                if returnedStatus == JobObject.BLOCKED_JOB:
+                    allJobsStatus['blocked'].append(k)
+                elif returnedStatus > JobObject.DONE_OK:
+                    allJobsStatus['fail'].append(k)
                 del allRemainingJobs[k]
             tempJobs = ttempJobs.copy()
             ttempJobs.clear()
@@ -911,6 +977,7 @@ def main(argv=None):
             if v.getStatus() == JobObject.UNCONFIGURED_JOB:
                 myLog.error("<JobObject '%s'> has missing dependences" % (k))
                 v.signalJobDone(-3, False, "<JobObject '%s'> has missing dependences" % (k))
+                allJobsStatus['fail'].append(k)
                 toRemoveKeys.append(k)
         for k in toRemoveKeys:
             del allRemainingJobs[k]
@@ -947,12 +1014,19 @@ def main(argv=None):
                (totalJobCount, str(startTime)))
     mainLoop()
     endTime = datetime.now()
-    totalFailures = 0
-    for v in allUsedPaths.itervalues():
-        totalFailures += v[2]
     myLog.info("---- Finished jobs (took %d seconds: %d terminal jobs; %d blocked jobs; %d failures), now cleaning up ----" %
-               ((endTime - startTime).seconds, len(allTerminalJobs), countBlockedJobs, totalFailures))
+               ((endTime - startTime).seconds, len(allTerminalJobs), len(allJobsStatus['blocked']), len(allJobsStatus['fail'])))
 
+    myLog.info("---- Failed jobs ----")
+    for j in allJobsStatus['fail']:
+        myLog.info("%s" % (j))
+    myLog.info("--- Successful jobs ----")
+    for j in allJobsStatus['ok']:
+        myLog.info("%s" % (j))
+    myLog.info("--- Blocked jobs ----")
+    for j in allJobsStatus['blocked']:
+        myLog.info("%s" % (j))
+    myLog.info("--------")
     # Output results
     allTestSuites = [job.getTestSuite() for job in allTerminalJobs]
     if resultFileName:
@@ -981,7 +1055,7 @@ def main(argv=None):
             shutil.rmtree(k)
 
     myLog.info("---- Done ----")
-    if totalFailures > 0 or countBlockedJobs > 0:
+    if len(allJobsStatus['fail']) > 0 or len(allJobsStatus['blocked']) > 0:
         return 1
     return 0
 
