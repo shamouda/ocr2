@@ -1703,7 +1703,7 @@ u8 hcDistPdSwitchRunlevel(ocrPolicyDomain_t *self, ocrRunlevel_t runlevel, u32 p
         // This code is concurrent with receiving notifications
         // from other PDs and must detect if it is the last
         ocrPolicyDomainHcDist_t * dself = (ocrPolicyDomainHcDist_t *) self;
-        // incr the shutdown counter (compete with processMessage PD_MSG_MGT_SHUTDOWN)
+        // incr the shutdown counter (compete with processMessage PD_MSG_MGT_RL_NOTIFY)
         u32 oldAckValue = hal_xadd32(&dself->shutdownAckCount, 1);
         if (oldAckValue != (self->neighborCount)) {
             DPRINTF(DEBUG_LVL_VVERB,"PD_MSG_MGT_RL_NOTIFY: reached local quiescence. To be resumed when distributed shutdown is done\n");
