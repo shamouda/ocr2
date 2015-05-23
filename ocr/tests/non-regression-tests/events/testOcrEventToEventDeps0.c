@@ -36,8 +36,8 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrEventCreate(&e2, OCR_EVENT_STICKY_T, true);
 
     // Event chaining
-    ocrAddDependence(e0, e1, 0, DB_MODE_RO);
-    ocrAddDependence(e1, e2, 0, DB_MODE_RO);
+    ocrAddDependence(e0, e1, 0, DB_MODE_CONST);
+    ocrAddDependence(e1, e2, 0, DB_MODE_CONST);
 
     // Creates the EDT
     ocrGuid_t edtGuid;
@@ -47,7 +47,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
                  /*properties=*/0, NULL_GUID, /*outEvent=*/NULL);
 
     // Register a dependence between an event and an edt
-    ocrAddDependence(e2, edtGuid, 0, DB_MODE_RO);
+    ocrAddDependence(e2, edtGuid, 0, DB_MODE_CONST);
 
     int *k;
     ocrGuid_t db_guid;

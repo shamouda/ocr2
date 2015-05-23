@@ -381,8 +381,8 @@ static void relProxyDb(ocrPolicyDomain_t * pd, ProxyDb_t * proxyDb) {
  * This implementation allows RO over RO and ITW over ITW.
  */
 static bool isAcquireEligibleForProxy(ocrDbAccessMode_t proxyDbMode, ocrDbAccessMode_t acquireMode) {
-    return (((proxyDbMode == DB_MODE_RO) && (acquireMode == DB_MODE_RO)) ||
-     ((proxyDbMode == DB_MODE_ITW) && (acquireMode == DB_MODE_ITW)));
+    return (((proxyDbMode == DB_MODE_CONST) && (acquireMode == DB_MODE_CONST)) ||
+     ((proxyDbMode == DB_MODE_RW) && (acquireMode == DB_MODE_RW)));
 }
 
 /**
@@ -416,7 +416,7 @@ static void enqueueAcquireMessageInProxy(ocrPolicyDomain_t * pd, ProxyDb_t * pro
  * Warning: The caller must own the proxy DB internal's lock.
  */
 static Queue_t * dequeueCompatibleAcquireMessageInProxy(ocrPolicyDomain_t * pd, Queue_t * candidateQueue, ocrDbAccessMode_t acquireMode) {
-    if ((candidateQueue != NULL) && ((acquireMode == DB_MODE_RO) || (acquireMode == DB_MODE_ITW))) {
+    if ((candidateQueue != NULL) && ((acquireMode == DB_MODE_CONST) || (acquireMode == DB_MODE_RW))) {
         u32 idx = 0;
         Queue_t * eligibleQueue = NULL;
         // Iterate the candidate queue
@@ -424,7 +424,7 @@ static Queue_t * dequeueCompatibleAcquireMessageInProxy(ocrPolicyDomain_t * pd, 
             ocrPolicyMsg_t * msg = queueGet(candidateQueue, idx);
 #define PD_MSG (msg)
 #define PD_TYPE PD_MSG_DB_ACQUIRE
-            if ((PD_MSG_FIELD_IO(properties) & DB_PROP_MODE_MASK) == acquireMode) {
+            if ((PD_MSG_FIELD_IO(properties) & DB_ACCESS_MODE_MASK) == acquireMode) {
                 // Found a match
                 if (eligibleQueue == NULL) {
                     eligibleQueue = newBoundedQueue(pd, PROXY_DB_QUEUE_SIZE_DEFAULT);
@@ -473,7 +473,7 @@ static void * acquireLocalDb(ocrPolicyDomain_t * pd, ocrGuid_t dbGuid, ocrDbAcce
     PD_MSG_STACK(msg);
     getCurrentEnv(NULL, NULL, &curTask, &msg);
     u32 properties = mode | DB_PROP_RT_ACQUIRE;
-    if (mode == DB_MODE_NCR) {
+    if (mode == DB_MODE_RO) {
         //BUG #587 DBX temporary to avoid interfering with the DB lock protocol
         properties |= DB_PROP_RT_OBLIVIOUS;
     }
@@ -687,7 +687,7 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
 #undef PD_TYPE
 #define PD_TYPE PD_MSG_DEP_ADD
                 msg2.type = PD_MSG_DEP_ADD | PD_MSG_REQUEST;
-                PD_MSG_FIELD_IO(properties) = DB_MODE_RO; // not called from add-dependence
+                PD_MSG_FIELD_IO(properties) = DB_MODE_CONST; // not called from add-dependence
                 PD_MSG_FIELD_I(source) = latchFGuid;
                 PD_MSG_FIELD_I(dest) = parentLatch;
                 PD_MSG_FIELD_I(currentEdt) = currentEdt;
@@ -942,7 +942,7 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
                     case PROXY_DB_RUN:
                         // The DB is already in use locally
                         // Check if the acquire is compatible with the current usage
-                        if (isAcquireEligibleForProxy(proxyDb->mode, (PD_MSG_FIELD_IO(properties) & DB_PROP_MODE_MASK))) {
+                        if (isAcquireEligibleForProxy(proxyDb->mode, (PD_MSG_FIELD_IO(properties) & DB_ACCESS_MODE_MASK))) {
                             DPRINTF(DEBUG_LVL_VVERB,"DB_ACQUIRE: Outgoing request for DB GUID 0x%lx with properties=0x%x, intercepted for local proxy DB\n",
                                     PD_MSG_FIELD_IO(guid.guid), PD_MSG_FIELD_IO(properties));
                             //Use the local cached version of the DB
@@ -999,7 +999,7 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
                         // Update message properties
                         PD_MSG_FIELD_IO(properties) &= ~DB_FLAG_RT_FETCH;
                         //BUG #587 double check but I think we don't need the WB flag anymore since we have the mode
-                        bool doWriteBack = !((PD_MSG_FIELD_IO(properties) & DB_MODE_NCR) || (PD_MSG_FIELD_IO(properties) & DB_MODE_RO) ||
+                        bool doWriteBack = !((PD_MSG_FIELD_IO(properties) & DB_MODE_RO) || (PD_MSG_FIELD_IO(properties) & DB_MODE_CONST) ||
                                              (PD_MSG_FIELD_IO(properties) & DB_PROP_SINGLE_ASSIGNMENT));
                         if (doWriteBack) {
                             PD_MSG_FIELD_IO(properties) |= DB_FLAG_RT_WRITE_BACK;
@@ -1014,7 +1014,7 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
                         ASSERT(proxyDb->nbUsers == 0);
                         proxyDb->nbUsers++; // checks in as a proxy user
                         proxyDb->state = PROXY_DB_RUN;
-                        proxyDb->mode = (PD_MSG_FIELD_IO(properties) & DB_PROP_MODE_MASK);
+                        proxyDb->mode = (PD_MSG_FIELD_IO(properties) & DB_ACCESS_MODE_MASK);
                         proxyDb->size = PD_MSG_FIELD_O(size);
                         proxyDb->flags = PD_MSG_FIELD_IO(properties);
                         // Deserialize the data pointer from the message
@@ -1207,7 +1207,7 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
                 // Do it in OB mode so as to make sure the acquire goes through
                 // We perform the write-back and then fall-through for the actual db release.
                 //BUG #587 DBX DB_MODE_NCR is not implemented, we're converting the call to a special
-                void * localData = acquireLocalDb(self, PD_MSG_FIELD_IO(guid.guid), DB_MODE_NCR);
+                void * localData = acquireLocalDb(self, PD_MSG_FIELD_IO(guid.guid), DB_MODE_RO);
                 ASSERT(localData != NULL);
                 hal_memCopy(localData, data, size, false);
                 // BUG #587 DBX We do not release here because we've been using this special mode to do the write back
@@ -1355,10 +1355,10 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
                 proxyDb->state = PROXY_DB_RUN;
                 proxyDb->nbUsers = 1; // self
                 proxyDb->refCount = 0; // ref hasn't been shared yet so '0' is fine.
-                proxyDb->mode = (PD_MSG_FIELD_IO(properties) & DB_PROP_MODE_MASK); //BUG #273
+                proxyDb->mode = (PD_MSG_FIELD_IO(properties) & DB_ACCESS_MODE_MASK); //BUG #273
                 if (proxyDb->mode == 0) {
                     printf("WARNING: DB create mode not found !!!, default to ITW\n");
-                    proxyDb->mode = DB_MODE_ITW;
+                    proxyDb->mode = DB_MODE_RW;
                 }
                 //BUG #273: The easy patch is to make 'size' an IO, otherwise we need to make sure
                 //the request message is copied on send, so that we can keep it around and when

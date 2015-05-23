@@ -43,7 +43,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrEdtTemplateCreate(&terminateEdtTemplateGuid, terminateEDT, 0 /*paramc*/, 1 /*depc*/);
     ocrEdtCreate(&terminateEDTGuid, terminateEdtTemplateGuid, EDT_PARAM_DEF, /*paramv=*/NULL, EDT_PARAM_DEF, /*depv=*/NULL,
                  /*properties=*/0, NULL_GUID, /*outEvent=*/NULL);
-    ocrAddDependence(latchGuid, terminateEDTGuid, 0, DB_MODE_RO);
+    ocrAddDependence(latchGuid, terminateEDTGuid, 0, DB_MODE_CONST);
 
     // Check in the current finish scope
     ocrEventSatisfySlot(latchGuid, NULL_GUID, OCR_EVENT_LATCH_INCR_SLOT);
@@ -65,8 +65,8 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
         ocrEdtCreate(&childEdtGuid, childEdtTemplateGuid, EDT_PARAM_DEF, /*paramv=*/NULL, EDT_PARAM_DEF, /*depv=*/NULL,
                      /*properties=*/0, NULL_GUID, /*outEvent=*/NULL);
 
-        ocrAddDependence(dbLatchGuid, childEdtGuid, 0, DB_MODE_RO);
-        ocrAddDependence(idxGuid, childEdtGuid, 1, DB_MODE_RO);
+        ocrAddDependence(dbLatchGuid, childEdtGuid, 0, DB_MODE_CONST);
+        ocrAddDependence(idxGuid, childEdtGuid, 1, DB_MODE_CONST);
 
         i++;
     }

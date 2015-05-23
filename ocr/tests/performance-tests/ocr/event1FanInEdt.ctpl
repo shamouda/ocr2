@@ -99,7 +99,7 @@ ocrGuid_t driverEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
 
         // Because we're going to satisfy the consumer event before spawning the next iteration
         // we hook cleanupDone which is a once event to a sticky one nextIterEvt
-        ocrAddDependence(cleanupDone, nextIterEvt, 0, DB_MODE_RO);
+        ocrAddDependence(cleanupDone, nextIterEvt, 0, DB_MODE_CONST);
 #if TIME_CONSUMER_CREATE
         get_time(&stop);
         accTimerConsCreate += elapsed_usec(&start, &stop);
@@ -110,8 +110,8 @@ ocrGuid_t driverEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
 #endif
         i = 0;
         while (i < FAN_OUT) {
-            ocrAddDependence(prodGuid, consGuids[i], 0, DB_MODE_RO);
-            ocrAddDependence(consGuids[i], consEdtGuid, i, DB_MODE_RO);
+            ocrAddDependence(prodGuid, consGuids[i], 0, DB_MODE_CONST);
+            ocrAddDependence(consGuids[i], consEdtGuid, i, DB_MODE_CONST);
             i++;
         }
 #if TIME_ADD_DEP
@@ -138,8 +138,8 @@ ocrGuid_t driverEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
 #if TIME_ADD_DEP
             get_time(&start);
 #endif
-            ocrAddDependence(prodGuid, consGuid, 0, DB_MODE_RO);
-            ocrAddDependence(consGuid, consEdtGuid, i, DB_MODE_RO);
+            ocrAddDependence(prodGuid, consGuid, 0, DB_MODE_CONST);
+            ocrAddDependence(consGuid, consEdtGuid, i, DB_MODE_CONST);
 #if TIME_ADD_DEP
             get_time(&stop);
             accTimerAddDep += elapsed_usec(&start, &stop);

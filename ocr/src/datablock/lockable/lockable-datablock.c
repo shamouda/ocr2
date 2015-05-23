@@ -161,7 +161,7 @@ static u8 lockableAcquireInternal(ocrDataBlock_t *self, void** ptr, ocrFatGuid_t
         return 0;
     }
 
-    if (mode == DB_MODE_RO) {
+    if (mode == DB_MODE_CONST) {
         if (rself->attributes.modeLock) {
             ASSERT(edtSlot != EDT_SLOT_NONE);
             ocrPolicyDomain_t * pd = NULL;
@@ -198,7 +198,7 @@ static u8 lockableAcquireInternal(ocrDataBlock_t *self, void** ptr, ocrFatGuid_t
         }
     }
 
-    if (mode == DB_MODE_ITW) {
+    if (mode == DB_MODE_RW) {
         bool enque = false;
         if (rself->attributes.modeLock == DB_LOCKED_ITW) {
             ocrPolicyDomain_t * pd = NULL;
@@ -359,7 +359,7 @@ u8 lockableRelease(ocrDataBlock_t *self, ocrFatGuid_t edt, bool isInternal) {
             do {
                 dbWaiter_t * next = waiter->next;
                 if (itwLocation == guidToLocation(pd, waiter->guid)) {
-                    processAcquireCallback(self, waiter, DB_MODE_ITW, waiter->properties, &msg);
+                    processAcquireCallback(self, waiter, DB_MODE_RW, waiter->properties, &msg);
                     if (prev == waiter) { // removing head
                         prev = next;
                         rself->itwWaiterList = prev;
@@ -413,7 +413,7 @@ u8 lockableRelease(ocrDataBlock_t *self, ocrFatGuid_t edt, bool isInternal) {
                 getCurrentEnv(&pd, NULL, NULL, NULL);
                 rself->roWaiterList = NULL;
                 do {
-                    processAcquireCallback(self, waiter, DB_MODE_RO, waiter->properties, &msg);
+                    processAcquireCallback(self, waiter, DB_MODE_CONST, waiter->properties, &msg);
                     dbWaiter_t * next = waiter->next;
                     pd->fcts.pdFree(pd, waiter);
                     //PERF: Would be nice to do that outside the lock but it incurs allocating

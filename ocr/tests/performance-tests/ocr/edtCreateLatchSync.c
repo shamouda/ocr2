@@ -33,7 +33,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
 
     ocrGuid_t evLchGuid;
     ocrEventCreate(&evLchGuid, OCR_EVENT_LATCH_T, false);
-    ocrAddDependence(evLchGuid, terminateEdtGuid, 0, DB_MODE_RO);
+    ocrAddDependence(evLchGuid, terminateEdtGuid, 0, DB_MODE_CONST);
 
     u32 k = 0;
     while (k < (NB_INSTANCES+1)) {
@@ -62,7 +62,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
 
     get_time(&dbPtr[1]);
     ocrDbRelease(dbGuid);
-    ocrAddDependence(dbGuid, terminateEdtGuid, 1, DB_MODE_RO);
+    ocrAddDependence(dbGuid, terminateEdtGuid, 1, DB_MODE_CONST);
 
     ocrEventSatisfySlot(evLchGuid, NULL_GUID, OCR_EVENT_LATCH_DECR_SLOT);
     return NULL_GUID;

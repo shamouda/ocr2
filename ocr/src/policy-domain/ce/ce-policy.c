@@ -622,7 +622,7 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             ASSERT(db->fctId == self->dbFactories[0]->factoryId);
             PD_MSG_FIELD_O(returnDetail) = self->dbFactories[0]->fcts.acquire(
                 db, &(PD_MSG_FIELD_O(ptr)), edtFatGuid, EDT_SLOT_NONE,
-                DB_MODE_ITW, PD_MSG_FIELD_IO(properties) & DB_PROP_RT_ACQUIRE, (u32)DB_MODE_ITW);
+                DB_MODE_RW, !!(PD_MSG_FIELD_IO(properties) & DB_PROP_RT_ACQUIRE), (u32)DB_MODE_RW);
         } else {
             // Cannot acquire
             PD_MSG_FIELD_O(ptr) = NULL;
@@ -652,7 +652,7 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             PD_MSG_FIELD_O(returnDetail) = self->dbFactories[0]->fcts.acquire(
                 db, &(PD_MSG_FIELD_O(ptr)), PD_MSG_FIELD_IO(edt), PD_MSG_FIELD_IO(edtSlot),
                 (ocrDbAccessMode_t)(PD_MSG_FIELD_IO(properties) & (u32)DB_ACCESS_MODE_MASK),
-                PD_MSG_FIELD_IO(properties) & DB_PROP_RT_ACQUIRE, PD_MSG_FIELD_IO(properties));
+                !!(PD_MSG_FIELD_IO(properties) & DB_PROP_RT_ACQUIRE), PD_MSG_FIELD_IO(properties));
             PD_MSG_FIELD_O(size) = db->size;
             PD_MSG_FIELD_IO(properties) |= db->flags;
             // NOTE: at this point the DB may not have been acquired.
@@ -693,7 +693,7 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         DPRINTF(DEBUG_LVL_VVERB, "DB_RELEASE req/resp from 0x%lx for GUID 0x%lx\n",
                 msg->srcLocation, PD_MSG_FIELD_IO(guid.guid));
         PD_MSG_FIELD_O(returnDetail) =
-            self->dbFactories[0]->fcts.release(db, PD_MSG_FIELD_I(edt), PD_MSG_FIELD_I(properties) & DB_PROP_RT_ACQUIRE);
+            self->dbFactories[0]->fcts.release(db, PD_MSG_FIELD_I(edt), !!(PD_MSG_FIELD_I(properties) & DB_PROP_RT_ACQUIRE));
         returnCode = ceProcessResponse(self, msg, 0);
 #undef PD_MSG
 #undef PD_TYPE
@@ -714,7 +714,7 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         ASSERT(db->fctId == self->dbFactories[0]->factoryId);
         ASSERT(!(msg->type & PD_MSG_REQ_RESPONSE));
         PD_MSG_FIELD_O(returnDetail) =
-            self->dbFactories[0]->fcts.free(db, PD_MSG_FIELD_I(edt), PD_MSG_FIELD_I(properties) & DB_PROP_RT_ACQUIRE);
+            self->dbFactories[0]->fcts.free(db, PD_MSG_FIELD_I(edt), !!(PD_MSG_FIELD_I(properties) & DB_PROP_RT_ACQUIRE));
         returnCode = ceProcessResponse(self, msg, 0);
 #undef PD_MSG
 #undef PD_TYPE
@@ -1142,7 +1142,7 @@ ASSERT(ceMsg.destLocation != self->parentLocation); // Parent's not dead
 
         ocrFatGuid_t src = PD_MSG_FIELD_I(source);
         ocrFatGuid_t dest = PD_MSG_FIELD_I(dest);
-        ocrDbAccessMode_t mode = (PD_MSG_FIELD_IO(properties) & DB_PROP_MODE_MASK); //lower 3-bits is mode //TODO not pretty
+        ocrDbAccessMode_t mode = (PD_MSG_FIELD_IO(properties) & DB_ACCESS_MODE_MASK);
         if (srcKind == NULL_GUID) {
             //NOTE: Handle 'NULL_GUID' case here to be safe although
             //we've already caught it in ocrAddDependence for performance
@@ -1195,12 +1195,12 @@ ASSERT(ceMsg.destLocation != self->parentLocation); // Parent's not dead
                 ocrTask_t *task = (ocrTask_t*)(dest.metaDataPtr);
                 ASSERT(task->fctId == self->taskFactories[0]->factoryId);
                 self->taskFactories[0]->fcts.registerSignaler(task, src, PD_MSG_FIELD_I(slot),
-                    PD_MSG_FIELD_IO(properties) & DB_PROP_MODE_MASK, true);
+                    PD_MSG_FIELD_IO(properties) & DB_ACCESS_MODE_MASK, true);
             } else if(dstKind & OCR_GUID_EVENT) {
                 ocrEvent_t *evt = (ocrEvent_t*)(dest.metaDataPtr);
                 ASSERT(evt->fctId == self->eventFactories[0]->factoryId);
                 self->eventFactories[0]->fcts[evt->kind].registerSignaler(
-                    evt, src, PD_MSG_FIELD_I(slot), PD_MSG_FIELD_IO(properties) & DB_PROP_MODE_MASK, true);
+                    evt, src, PD_MSG_FIELD_I(slot), PD_MSG_FIELD_IO(properties) & DB_ACCESS_MODE_MASK, true);
             } else {
                 ASSERT(0); // Cannot have other types of destinations
             }

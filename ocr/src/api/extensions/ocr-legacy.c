@@ -157,9 +157,8 @@ u8 ocrLegacyBlockProgress(ocrGuid_t handle, ocrGuid_t* guid, void** result, u64*
             PD_MSG_FIELD_IO(guid) = dbResult;
             PD_MSG_FIELD_IO(edt) = currentEdt;
             PD_MSG_FIELD_IO(edtSlot) = EDT_SLOT_NONE;
-            PD_MSG_FIELD_IO(properties) = DB_MODE_ITW;
+            PD_MSG_FIELD_IO(properties) = DB_MODE_RW;
             RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, true));
-
             if(result != NULL)
                 *result = PD_MSG_FIELD_O(ptr);
             dbResult = PD_MSG_FIELD_IO(guid);

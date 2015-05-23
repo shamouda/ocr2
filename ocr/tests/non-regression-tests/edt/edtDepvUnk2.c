@@ -26,7 +26,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrEdtTemplateCreate(&terminateEdtTemplateGuid, terminateEdt, 0 /*paramc*/, EDT_PARAM_UNK /*depc*/);
     ocrEdtCreate(&terminateEdtGuid, terminateEdtTemplateGuid, EDT_PARAM_DEF, NULL, 1, NULL,
                  /*properties=*/EDT_PROP_FINISH, NULL_GUID, /*outEvent=*/ NULL);
-    ocrAddDependence(e0, terminateEdtGuid, 0, DB_MODE_RO);
+    ocrAddDependence(e0, terminateEdtGuid, 0, DB_MODE_CONST);
     ocrEventSatisfy(e0, NULL_GUID);
     return NULL_GUID;
 }

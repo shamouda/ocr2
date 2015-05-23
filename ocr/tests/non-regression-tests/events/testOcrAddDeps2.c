@@ -43,11 +43,11 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrEdtCreate(&edtGuid, taskForEdtTemplateGuid, EDT_PARAM_DEF, /*paramv=*/NULL, EDT_PARAM_DEF, /*depv=*/NULL,
                  /*properties=*/0, NULL_GUID, /*outEvent=*/NULL);
 
-    ocrAddDependence(eventGuid, edtGuid, 0, DB_MODE_RO);
+    ocrAddDependence(eventGuid, edtGuid, 0, DB_MODE_CONST);
 
     // Register a dependence between a db and an event
     // (equivalent to directly satisfying the DB)
-    ocrAddDependence(dbGuid, eventGuid, 0, DB_MODE_RO);
+    ocrAddDependence(dbGuid, eventGuid, 0, DB_MODE_CONST);
 
     // No need to satisfy as addDependence is equivalent to a satisfy
     // when the source is a datablock

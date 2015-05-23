@@ -176,7 +176,7 @@ u8 satisfyEventHcOnce(ocrEvent_t *base, ocrFatGuid_t db, u32 slot) {
         PD_MSG_FIELD_IO(guid) = event->waitersDb;
         PD_MSG_FIELD_IO(edt) = currentEdt;
         PD_MSG_FIELD_IO(edtSlot) = EDT_SLOT_NONE;
-        PD_MSG_FIELD_IO(properties) = DB_MODE_RO | DB_PROP_RT_ACQUIRE;
+        PD_MSG_FIELD_IO(properties) = DB_MODE_CONST | DB_PROP_RT_ACQUIRE;
         //Should be a local DB
         u8 res = pd->fcts.processMessage(pd, &msg, true);
         ASSERT(!res); // Possible corruption of waitersDb
@@ -280,7 +280,7 @@ u8 satisfyEventHcPersist(ocrEvent_t *base, ocrFatGuid_t db, u32 slot) {
         PD_MSG_FIELD_IO(edtSlot) = EDT_SLOT_NONE;
         // !! Warning !! ITW here (and not RO) works in pair with the lock
         // being unlocked before DB_RELEASE is called in 'registerWaiterEventHcPersist'
-        PD_MSG_FIELD_IO(properties) = DB_MODE_ITW | DB_PROP_RT_ACQUIRE;
+        PD_MSG_FIELD_IO(properties) = DB_MODE_RW | DB_PROP_RT_ACQUIRE;
         //Should be a local DB
         u8 res = pd->fcts.processMessage(pd, &msg, true);
         ASSERT(!res); // Possible corruption of waitersDb
@@ -384,7 +384,7 @@ u8 satisfyEventHcLatch(ocrEvent_t *base, ocrFatGuid_t db, u32 slot) {
         PD_MSG_FIELD_IO(guid) = event->base.waitersDb;
         PD_MSG_FIELD_IO(edt) = currentEdt;
         PD_MSG_FIELD_IO(edtSlot) = EDT_SLOT_NONE;
-        PD_MSG_FIELD_IO(properties) = DB_MODE_RO | DB_PROP_RT_ACQUIRE;
+        PD_MSG_FIELD_IO(properties) = DB_MODE_CONST | DB_PROP_RT_ACQUIRE;
         //Should be a local DB
         u8 res = pd->fcts.processMessage(pd, &msg, true);
         ASSERT(!res); // Possible corruption of waitersDb
@@ -478,7 +478,7 @@ u8 registerWaiterEventHc(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot, bool i
     PD_MSG_FIELD_IO(guid) = event->waitersDb;
     PD_MSG_FIELD_IO(edt) = curEdt;
     PD_MSG_FIELD_IO(edtSlot) = EDT_SLOT_NONE;
-    PD_MSG_FIELD_IO(properties) = DB_MODE_ITW | DB_PROP_RT_ACQUIRE;
+    PD_MSG_FIELD_IO(properties) = DB_MODE_RW | DB_PROP_RT_ACQUIRE;
     //Should be a local DB
     u8 res = pd->fcts.processMessage(pd, &msg, true);
     ASSERT(!res); // Possible corruption of waitersDb
@@ -638,7 +638,7 @@ u8 registerWaiterEventHcPersist(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot,
     PD_MSG_FIELD_IO(guid) = event->base.waitersDb;
     PD_MSG_FIELD_IO(edt) = currentEdt;
     PD_MSG_FIELD_IO(edtSlot) = EDT_SLOT_NONE;
-    PD_MSG_FIELD_IO(properties) = DB_MODE_ITW | DB_PROP_RT_ACQUIRE;
+    PD_MSG_FIELD_IO(properties) = DB_MODE_RW | DB_PROP_RT_ACQUIRE;
     //Should be a local DB
     if((toReturn = pd->fcts.processMessage(pd, &msg, true))) {
         // should be the only writer active on the waiter DB since we have the lock
@@ -750,7 +750,7 @@ u8 unregisterWaiterEventHc(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot, bool
     PD_MSG_FIELD_IO(guid) = event->waitersDb;
     PD_MSG_FIELD_IO(edt) = curEdt;
     PD_MSG_FIELD_IO(edtSlot) = EDT_SLOT_NONE;
-    PD_MSG_FIELD_IO(properties) = DB_MODE_ITW | DB_PROP_RT_ACQUIRE;
+    PD_MSG_FIELD_IO(properties) = DB_MODE_RW | DB_PROP_RT_ACQUIRE;
     //Should be a local DB
     u8 res = pd->fcts.processMessage(pd, &msg, true);
     ASSERT(!res); // Possible corruption of waitersDb
@@ -819,7 +819,7 @@ u8 unregisterWaiterEventHcPersist(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slo
     PD_MSG_FIELD_IO(guid) = event->base.waitersDb;
     PD_MSG_FIELD_IO(edt) = curEdt;
     PD_MSG_FIELD_IO(edtSlot) = EDT_SLOT_NONE;
-    PD_MSG_FIELD_IO(properties) = DB_MODE_ITW | DB_PROP_RT_ACQUIRE;
+    PD_MSG_FIELD_IO(properties) = DB_MODE_RW | DB_PROP_RT_ACQUIRE;
     //Should be a local DB
     if((toReturn = pd->fcts.processMessage(pd, &msg, true))) {
         ASSERT(!toReturn); // Possible corruption of waitersDb

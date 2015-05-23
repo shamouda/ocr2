@@ -38,7 +38,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
                  /*properties=*/0, NULL_GUID, /*outEvent=*/NULL);
 
     // Register a dependence between a db and an edt
-    ocrAddDependence(NULL_GUID, edtGuid, 0, DB_MODE_RO);
+    ocrAddDependence(NULL_GUID, edtGuid, 0, DB_MODE_CONST);
 
     // No need to satisfy as addDependence is equivalent to a satisfy
     // when the source is a datablock

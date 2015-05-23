@@ -43,7 +43,7 @@ ocrGuid_t mainEdt(u32 paramc, u64 paramv[], u32 depc, ocrEdtDep_t depv[]) {
     ocrEdtTemplateCreate(&A_template, A, 1, 1);
     ocrEdtTemplateCreate(&done_template, done, 0, 1);
     ocrEventCreate(&latch_guid, OCR_EVENT_LATCH_T, FALSE);
-    ocrAddDependence(NULL_GUID, latch_guid, OCR_EVENT_LATCH_INCR_SLOT, DB_MODE_RO);
+    ocrAddDependence(NULL_GUID, latch_guid, OCR_EVENT_LATCH_INCR_SLOT, DB_MODE_CONST);
     ocrEdtCreate(&done_edt, done_template, 0, NULL, 1, &latch_guid, EDT_PROP_NONE, NULL_GUID, NULL);
 
     for(i = 0; i < N; i++) {
@@ -52,15 +52,15 @@ ocrGuid_t mainEdt(u32 paramc, u64 paramv[], u32 depc, ocrEdtDep_t depv[]) {
 
     for(i = 0; i < N; i++) {
         ocrGuid_t A_edt;
-        ocrAddDependence(NULL_GUID     , latch_guid, OCR_EVENT_LATCH_INCR_SLOT, DB_MODE_RO);
-        ocrAddDependence(event_array[i], latch_guid, OCR_EVENT_LATCH_DECR_SLOT, DB_MODE_RO);
+        ocrAddDependence(NULL_GUID     , latch_guid, OCR_EVENT_LATCH_INCR_SLOT, DB_MODE_CONST);
+        ocrAddDependence(event_array[i], latch_guid, OCR_EVENT_LATCH_DECR_SLOT, DB_MODE_CONST);
         ocrEdtCreate(&A_edt, A_template,
                      1, &i,
                      1, &event_array_guid,
                      EDT_PROP_NONE, NULL_GUID, NULL);
     }
 
-    ocrAddDependence(NULL_GUID, latch_guid, OCR_EVENT_LATCH_DECR_SLOT, DB_MODE_RO);
+    ocrAddDependence(NULL_GUID, latch_guid, OCR_EVENT_LATCH_DECR_SLOT, DB_MODE_CONST);
 
     return NULL_GUID;
 }
