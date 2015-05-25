@@ -39,6 +39,34 @@ typedef struct _paramListPolicyDomainInst_t {
 
 
 /******************************************************/
+/* RL macros                                          */
+/******************************************************/
+#define RL_ENSURE_PHASE_UP(pd, rl, comp, val) do {                      \
+        u8 _t = (pd)->phasesPerRunlevel[rl][comp];                     \
+        if((_t & 0xF) < (val)) _t = (_t & 0xF0) + (val);       \
+        (pd)->phasesPerRunlevel[rl][comp] = _t;                         \
+    } while(0)
+
+#define RL_ENSURE_PHASE_DOWN(pd, rl, comp, val) do {                    \
+        u32 _t = (pd)->phasesPerRunlevel[rl][comp];                     \
+        if((_t >> 4) < (val)) _t = ((val) << 4) + (_t & 0xF);      \
+        (pd)->phasesPerRunlevel[rl][comp] = _t;                         \
+    } while(0)
+
+// Get number of phases when going up for a given runlevel
+#define RL_GET_PHASE_COUNT_UP(pd, rl) ((pd)->phasesPerRunlevel[rl][0] & 0xF)
+
+// Get number of phases when going down for a given runlevel
+#define RL_GET_PHASE_COUNT_DOWN(pd, rl) ((pd)->phasesPerRunlevel[rl][0] >> 4)
+
+#define RL_IS_LAST_PHASE_UP(pd, rl, phase) ((RL_GET_PHASE_COUNT_UP(pd, rl) - 1) == (phase))
+#define RL_IS_LAST_PHASE_DOWN(pd, rl, phase) (phase == 0)
+
+#define RL_IS_FIRST_PHASE_UP(pd_, rl, phase)  (phase == 0)
+#define RL_IS_FIRST_PHASE_DOWN(pd, rl, phase) ((RL_GET_PHASE_COUNT_DOWN(pd, rl) - 1) == (phase))
+
+
+/******************************************************/
 /* OCR POLICY DOMAIN INTERFACE                        */
 /******************************************************/
 
@@ -124,11 +152,16 @@ typedef struct _paramListPolicyDomainInst_t {
 /**< Request a copy of the GUID's metadata */
 #define PD_MSG_GUID_METADATA_CLONE  0x00013020
 
+/**< Reserve GUID space for labeled GUIDs */
+#define PD_MSG_GUID_RESERVE    0x00004020
+
+/**< Remove the reservation for GUID space */
+#define PD_MSG_GUID_UNRESERVE   0x00005020
+
 /**< Release the GUID (destroy the association between the u64
  * value and the GUID and optionally destroy the associated
  * metadata */
-#define PD_MSG_GUID_DESTROY     0x00044020
-// TODO: Add stuff about GUID reservation
+#define PD_MSG_GUID_DESTROY     0x00045020
 
 /**< AND with this and if result non-null, GUID distribution related
  * operation (taking/giving EDTs, DBs, events, etc)
@@ -193,27 +226,21 @@ typedef struct _paramListPolicyDomainInst_t {
 
 /**< And with this and if the result is non-null, PD management operations */
 #define PD_MSG_MGT_OP           0x200
-/**< Shutdown operation (indicates the PD should
- * shut-down. Another call "finish" will actually
- * cause their destruction */
-#define PD_MSG_MGT_SHUTDOWN     0x00041200
-
-/**< Finish operation (indicates the PD should
- * destroy itself. The existence of other PDs can
- * no longer be assumed */
-#define PD_MSG_MGT_FINISH       0x00002200
 
 /**< Register a policy-domain with another
  * one. This registration is one way (ie: the
  * source of this call already knows of the destination
  * since it is sending it a message) */
-#define PD_MSG_MGT_REGISTER     0x00003200
+#define PD_MSG_MGT_REGISTER     0x00001200
 
 /**< Opposite of register */
-#define PD_MSG_MGT_UNREGISTER   0x00004200
+#define PD_MSG_MGT_UNREGISTER   0x00002200
 
 /**< For a worker to request the policy-domain to monitor an operation progress */
-#define PD_MSG_MGT_MONITOR_PROGRESS 0x00005200
+#define PD_MSG_MGT_MONITOR_PROGRESS 0x00003200
+
+/**< Runlevel change notification */
+#define PD_MSG_MGT_RL_NOTIFY        0x00004200
 
 /**< AND with this and if result non-null, hint related operation.
  * Generally, these will be calls to set/get user hints
@@ -223,7 +250,6 @@ typedef struct _paramListPolicyDomainInst_t {
 #define PD_MSG_HINT_SET      0x00041400
 /**< Get hint from guid */
 #define PD_MSG_HINT_GET      0x00042400
-
 
 /**< And this to just get the type of the message (note that the number
  * of ocrFatGuid_t is part of the type as for a given type, this won't change)
@@ -646,9 +672,37 @@ typedef struct _ocrPolicyMsg_t {
                 } in;
                 struct {
                     u64 size;          /**< Out: Size of the metadata that was cloned */
+                    u32 returnDetail;  /**< Out: Success or error code */
                 } out;
             } inOrOut __attribute__ (( aligned(8) ));
         } PD_MSG_STRUCT_NAME(PD_MSG_GUID_METADATA_CLONE);
+
+        struct {
+            union {
+                struct {
+                    u64 numberGuids;      /**< In: Number of GUIDs being reserved */
+                    ocrGuidKind guidKind; /**< In: GUID type for the GUIDs being reserved */
+                } in;
+                struct {
+                    ocrGuid_t startGuid;  /**< Out: First GUID usable in the reserved range */
+                    u64 skipGuid;         /**< Out: Skip value between two consecutive GUIDs in the range */
+                    u32 returnDetail;     /**< Out: Return value; 0 on success */
+                } out;
+            } inOrOut __attribute__ (( aligned(8) ));
+        } PD_MSG_STRUCT_NAME(PD_MSG_GUID_RESERVE);
+
+        struct {
+            union {
+                struct {
+                    ocrGuid_t startGuid;  /**< In: First GUID of the range to un-reserve */
+                    u64 skipGuid;         /**< In: Skip value between consecutive GUIDs in the range */
+                    u64 numberGuids;      /**< In: Number of GUIDs in the range */
+                } in;
+                struct {
+                    u32 returnDetail;     /**< Out: Return value; 0 on success */
+                } out;
+            } inOrOut __attribute__ (( aligned(8) ));
+        } PD_MSG_STRUCT_NAME(PD_MSG_GUID_UNRESERVE);
 
         struct {
             union {
@@ -914,6 +968,31 @@ typedef struct _ocrPolicyMsg_t {
         struct {
             union {
                 struct {
+                    ocrRunlevel_t runlevel; /**< In: Runlevel involved */
+                    u32 properties;         /**< Properties: OR of the following flags
+                                               One of:
+                                                 - RL_REQUEST
+                                                 - RL_RESPONSE
+                                                 - RL_RELEASE
+                                               One of:
+                                                 - RL_ASYNC
+                                                 - RL_BARRIER
+                                               One of:
+                                                 - RL_BRING_UP
+                                                 - RL_TEAR_DOWN
+                                            */
+                    u32 errorCode;          /**< In switch from RL_USER, used to capture
+                                               error code */
+                } in;
+                struct {
+                    u32 returnDetail;       /**< Out: Success or error code */
+                } out;
+            } inOrOut __attribute__ (( aligned(8) ));
+        } PD_MSG_STRUCT_NAME(PD_MSG_MGT_RL_NOTIFY);
+
+        struct {
+            union {
+                struct {
                     ocrLocation_t loc;      /**< In: Location registering */
                     // TODO: Add things having to do with cost and relationship
                     u32 properties;         /**< In */
@@ -1028,38 +1107,7 @@ typedef struct _ocrPolicyDomainFcts_t {
      */
     void (*destruct)(struct _ocrPolicyDomain_t *self);
 
-    void (*begin)(struct _ocrPolicyDomain_t *self);
-
-    /**
-     * @brief Starts this policy domain
-     *
-     * This starts the portion of OCR that manages the resources contained
-     * in this policy domain.
-     *
-     * @param self                This policy domain
-     */
-    void (*start)(struct _ocrPolicyDomain_t *self);
-
-    /**
-     * @brief Stops this policy domain
-     *
-     * This stops the portion of OCR that manages the resources
-     * contained in this policy domain. The policy domain will also stop
-     * responding to requests from other policy domains. Called before finish
-     *
-     * @param self                This policy domain
-     */
-    void (*stop)(struct _ocrPolicyDomain_t *self);
-
-    /**
-     * @brief Finish the execution of the policy domain
-     *
-     * Ask the policy domain to wrap up currently executing
-     * task and shutdown workers. Finish is called after stop
-     *
-     * @param self                This policy domain
-     */
-    void (*finish)(struct _ocrPolicyDomain_t *self);
+    u8 (*switchRunlevel)(struct _ocrPolicyDomain_t* self, ocrRunlevel_t runlevel, u32 properties);
 
     /**
      * @brief Requests for the handling of the request msg
@@ -1195,35 +1243,66 @@ typedef struct _ocrPolicyDomain_t {
 
     ocrFatGuid_t fguid;                         /**< GUID for this policy */
 
-    u64 schedulerCount;                         /**< Number of schedulers */
-    u64 allocatorCount;                         /**< Number of allocators */
-    u64 workerCount;                            /**< Number of workers */
+    /* Inert modules */
     u64 commApiCount;                           /**< Number of comm APIs */
     u64 guidProviderCount;                      /**< Number of GUID providers */
+    u64 allocatorCount;                         /**< Number of allocators */
+    u64 schedulerCount;                         /**< Number of schedulers */
+
+    /* Capable modules */
+    u64 workerCount;                            /**< Number of workers */
+
+
+    /* Factories */
     u64 taskFactoryCount;                       /**< Number of task factories */
     u64 taskTemplateFactoryCount;               /**< Number of task-template factories */
     u64 dbFactoryCount;                         /**< Number of data-block factories */
     u64 eventFactoryCount;                      /**< Number of event factories */
-    u64 schedulerObjectFactoryCount;                  /**< Number of schedulerObject factories */
+    u64 schedulerObjectFactoryCount;            /**< Number of schedulerObject factories */
 
-    ocrScheduler_t  ** schedulers;              /**< All the schedulers */
-    ocrAllocator_t  ** allocators;              /**< All the allocators */
-    ocrWorker_t     ** workers;                 /**< All the workers */
+    /* Objects based on counts above */
     ocrCommApi_t    ** commApis;                /**< All the communication interfaces */
+    ocrGuidProvider_t ** guidProviders;         /**< GUID generators */
+    ocrAllocator_t  ** allocators;              /**< All the allocators */
+    ocrScheduler_t  ** schedulers;              /**< All the schedulers */
+
+    ocrWorker_t     ** workers;                 /**< All the workers */
 
     ocrTaskFactory_t  **taskFactories;          /**< Factory to produce tasks
                                                  * (EDTs) */
-
     ocrTaskTemplateFactory_t  ** taskTemplateFactories; /**< Factories to produce
                                                          * task templates */
     ocrDataBlockFactory_t ** dbFactories;       /**< Factories to produce
                                                  * data-blocks */
     ocrEventFactory_t ** eventFactories;        /**< Factories to produce events*/
-    ocrGuidProvider_t ** guidProviders;         /**< GUID generators */
     ocrSchedulerObjectFactory_t **schedulerObjectFactories; /**< All the schedulerObject factories
                                                  * known to this policy domain */
+
     ocrPlacer_t * placer;                       /**< Affinity and placement
                                                  * (work in progress) */
+
+    /**
+     * @brief Two dimensional array:
+     * phasesPerRunLevel[i][j]:
+     *     - i: runlevel
+     *     - j: component from ocrRLPhaseComponents_t. After RL_CONFIG_PARSE
+     *          phase, only j=0 is useful
+     * The RL_CONFIG_PARSE always has two phases on bringup
+     *     - the first phase all components in the order of
+     *       ocrRLPhaseComponents_t are given the opportunity to say
+     *       how many phases they need. If multiple components exist
+     *       of the same type, this value should be updated to the
+     *       maximum among all components of that type
+     *     - in the second phase, the components get to see what the
+     *       other components provided and this allows them to ensure
+     *       a minimum level of compatibility
+     * The bottom 32 bits encode the number of phases on BRING_UP
+     * and the top 32 bits encode the number of phases on TEAR_DOWN
+     * @todo The entire structure is only useful in the RL_CONFIG_PARSE
+     * phase but part of it needs to be kept around for the shutdown
+     * part. Is there a better way
+     */
+    s8 phasesPerRunlevel[RL_MAX][RL_PHASE_MAX];
 
     // TODO: What to do about this?
     ocrCost_t *costFunction; /**< Cost function used to determine
@@ -1305,6 +1384,8 @@ void initializePolicyDomainOcr(ocrPolicyDomainFactory_t * factory, ocrPolicyDoma
 /* UTILITY FUNCTIONS                                */
 /****************************************************/
 
+// The u32 property flag of send/recv/poll API calls
+// relies on ocrMarshallMode_t to be 8 bits wide.
 typedef enum {
     MARSHALL_FULL_COPY = 0x1,
     MARSHALL_DUPLICATE = 0x2,

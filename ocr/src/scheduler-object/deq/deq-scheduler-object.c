@@ -135,7 +135,7 @@ ocrSchedulerObject_t* newSchedulerObjectDeq(ocrSchedulerObjectFactory_t *factory
 }
 
 void destructSchedulerObjectFactoryDeq(ocrSchedulerObjectFactory_t * factory) {
-    runtimeChunkFree((u64)factory, NULL);
+    runtimeChunkFree((u64)factory, PERSISTENT_CHUNK);
 }
 
 ocrSchedulerObjectFactory_t * newOcrSchedulerObjectAggregateFactoryDeq(ocrParamList_t *perType, u32 factoryId) {

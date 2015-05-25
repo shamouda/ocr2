@@ -1,4 +1,12 @@
-
+#
+# Extract and prints unique values for 'workload' data
+# from a log file to standard output formatted as one
+# workload unit per line
+#
+# Arguments:
+#   FILE:               The file to be parsed
+#
+# Expected input format:
 # "Workload    (unit): 7"
 # "Workload    (unit): 7"
 # "Workload    (unit): 9"

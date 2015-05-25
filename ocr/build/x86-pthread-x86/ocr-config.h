@@ -59,6 +59,7 @@
 // GUID provider
 #define ENABLE_GUID_PTR
 #define ENABLE_GUID_COUNTED_MAP
+#define ENABLE_GUID_LABELED
 
 // Hints
 #define ENABLE_HINTS
@@ -107,6 +108,9 @@
 
 // Build pause/resume support
 #define ENABLE_EXTENSION_PAUSE
+
+// GUID labeling extension
+#define ENABLE_EXTENSION_LABELING
 
 #endif /* __OCR_CONFIG_H__ */
 

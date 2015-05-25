@@ -25,22 +25,34 @@ extern "C" {
  * @This call will cause workers to suspend all future EDT execution
  * until ocrResume() is called, where execution will then continue normally
  *
- * @param isBlocking   Flag to indicate whether to block to avoid worker pause
- * contention
+ * @param[in] isBlocking   Flag to indicate whether to perform a blocking pause
+ *
+ * @return a status code
+ *      - 0: not paused by caller
+ *      - 1: paused by caller
+ *
  **/
 u32 ocrPause(bool isBlocking);
 
 /**
  * @brief queries the contents of runtime while runtime is paused
  *
+ * The query results are put in a datablock of a suitable size, which is the
+ * caller's responsibility to destroy.
+ *
  * @note If ocrQuery() gets called while runtime is not paused it will be
  * ignored.
  *
- * @param flag   Used to indicate whether or not query should be executed
- * depending on whether pause was succesful
+ * @param[in] query     The type of query performed. See inc/ocr-types.h
+ * @param[in] guid      Guid of previous <query type>, NULL_GUID for first
+ * @param[out] result   Pointer to the results of the query
+ * @param[out] size     Size of query result (datablock) in bytes
+ * @param[in] flags     flags vary based on query type
+ *                      TODO: work toward defining these as query evolves
  *
+ * @return a guid of datablock created to hold the query results
  **/
-void ocrQuery(u32 flag);
+ocrGuid_t ocrQuery(ocrQueryType_t query, ocrGuid_t guid, void **result, u32 *size, u8 flags);
 
 /**
  * @brief Continues execution of a paused OCR program.
@@ -50,8 +62,8 @@ void ocrQuery(u32 flag);
  * @note If ocrResume() is called while a paused runtime state is not detected
  * the call will effectively be ignored.
  *
- * @param flag   Used to indicate whether or not resume hook should be executed
- * depending on whether pause was succesful
+ * @param[in] flag      Currently unused, placeholder for future control
+ *
  **/
 void ocrResume(u32 flag);
 

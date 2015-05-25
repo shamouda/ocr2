@@ -13,6 +13,8 @@
 #define TIME_DESTRUCTION 1
 #define CLEAN_UP_ITERATION 1
 
+// Can clean-up non-persistent event here because events
+// are only created but not satisfied in this test.
 #define EVENT_TYPE OCR_EVENT_LATCH_T
 
 #include "event0.ctpl"

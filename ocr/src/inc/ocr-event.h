@@ -206,12 +206,19 @@ typedef struct _ocrEventFactory_t {
     /** @brief Instantiates an Event and returns its corresponding GUID
      *  @param[in] factory          Pointer to this factory
      *  @param[in] eventType        Type of event to instantiate
-     *  @param[in] takesArg         Does the event will take an argument
+     *  @param[in/out] guid         GUID for the object. If GUID_PROP_IS_LABELED is
+     *                              specified in properties, guid.guid contains the
+     *                              GUID to use. guid.metaDataPtr will contain
+     *                              the pointer to the object (an ocrEvent_t*)
+     *  @param[in] properties       Properties for the creation. Currently:
+     *                              GUID_PROP_* and EVT_PROP_*
      *  @param[in] instanceArg      Arguments specific for this instance
-     *  @return a new instance of an event
+     *  @return 0 on success or an error code on failure:
+     *      - OCR_EGUIDEXISTS if the object exists (if GUID_PROP_IS_LABELED)
      */
-    ocrEvent_t* (*instantiate)(struct _ocrEventFactory_t* factory, ocrEventTypes_t eventType,
-                               bool takesArg, ocrParamList_t *instanceArg);
+    u8 (*instantiate)(struct _ocrEventFactory_t* factory, ocrFatGuid_t *guid,
+                      ocrEventTypes_t eventType, u32 properties,
+                      ocrParamList_t *instanceArg);
 
     /** @brief Virtual destructor for the factory
      *  @param[in] factory          Pointer to this factory

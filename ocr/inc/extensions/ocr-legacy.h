@@ -160,11 +160,21 @@ ocrGuid_t ocrWait(ocrGuid_t outputEvent);
  *                       the void* to the data-block
  * @param[out] size      If non NULL, it this call succeeds, will contain the
  *                       size in bytes of the returned data-block
- * @return 0 on success or an error code on failure (from ocr-errors.h)
+ * @param[in] properties Flags for the wait. Currently supported:
+ *                           - LEGACY_PROP_NONE: Default behavior
+ *                           - LEGACY_PROP_WAIT_FOR_CREATE: Wait for handle to be created if
+ *                             it is not yet a valid event GUID
+ * @return 0 on success or an error code on failure (from ocr-errors.h):
+ *   - OCR_EINVAL: 'handle' does not point to a valid event and LEGACY_PROP_WAIT_FOR_CREATE
+ *                 is not specified
  */
 
-u8 ocrLegacyBlockProgress(ocrGuid_t handle, ocrGuid_t *guid, void **result, u64* size);
-
+u8 ocrLegacyBlockProgress(ocrGuid_t handle, ocrGuid_t *guid, void **result, u64* size,
+                          u16 properties);
+// Temporary flag due to addition of properties.
+// Will be eliminated
+// See BUG #562
+#define LEGACY_BLOCK_PROGRESS_5_ARGS 1
 /**
  * @}
  * @}

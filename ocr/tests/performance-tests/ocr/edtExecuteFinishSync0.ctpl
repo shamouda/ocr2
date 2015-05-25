@@ -6,7 +6,7 @@
 //
 // VARIABLES:
 // - NB_INSTANCES
-// - PARAMC_SIZE: the size of paramc for the created EDTs
+// - PARAMC_SZ: the size of paramc for the created EDTs
 
 ocrGuid_t terminateEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     timestamp_t * timers = (timestamp_t *) depv[1].ptr;
@@ -25,12 +25,12 @@ ocrGuid_t finishEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     timestamp_t * dbPtr = (timestamp_t *) depv[0].ptr;
 
     get_time(&dbPtr[0]);
-    PRINTF("PARAMC_SIZE %d\n", PARAMC_SIZE);
+    PRINTF("PARAMC_SZ %d\n", PARAMC_SZ);
     ocrGuid_t workEdtTemplateGuid;
-    ocrEdtTemplateCreate(&workEdtTemplateGuid, workEdt, PARAMC_SIZE, 0);
+    ocrEdtTemplateCreate(&workEdtTemplateGuid, workEdt, PARAMC_SZ, 0);
 
-#ifdef PARAMC_SIZE
-    u64 paramcPtr[PARAMC_SIZE];
+#ifdef PARAMC_SZ
+    u64 paramcPtr[PARAMC_SZ];
 #else
     u64 * paramcPtr = NULL;
 #endif
@@ -38,7 +38,7 @@ ocrGuid_t finishEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     while (i < NB_INSTANCES) {
         ocrGuid_t workEdtGuid;
         ocrEdtCreate(&workEdtGuid, workEdtTemplateGuid,
-                     PARAMC_SIZE, paramcPtr, 0, NULL_GUID, EDT_PROP_NONE, NULL_GUID, NULL);
+                     PARAMC_SZ, paramcPtr, 0, NULL_GUID, EDT_PROP_NONE, NULL_GUID, NULL);
         i++;
     }
 

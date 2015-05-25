@@ -62,20 +62,26 @@ typedef struct _ocrMemTargetFcts_t {
      */
     void (*destruct)(struct _ocrMemTarget_t* self);
 
-    void (*begin)(struct _ocrMemTarget_t* self, struct _ocrPolicyDomain_t * PD);
-
-    /** @brief Starts the mem-target
-     *  @param[in] self          Pointer to this mem-target
-     *  @param[in] PD            Current policy domain
+    /**
+     * @brief Switch runlevel
+     *
+     * @param[in] self         Pointer to this object
+     * @param[in] PD           Policy domain this object belongs to
+     * @param[in] runlevel     Runlevel to switch to
+     * @param[in] phase        Phase for this runlevel
+     * @param[in] properties   Properties (see ocr-runtime-types.h)
+     * @param[in] callback     Callback to call when the runlevel switch
+     *                         is complete. NULL if no callback is required
+     * @param[in] val          Value to pass to the callback
+     *
+     * @return 0 if the switch command was successful and a non-zero error
+     * code otherwise. Note that the return value does not indicate that the
+     * runlevel switch occured (the callback will be called when it does) but only
+     * that the call to switch runlevel was well formed and will be processed
+     * at some point
      */
-    void (*start)(struct _ocrMemTarget_t* self, struct _ocrPolicyDomain_t * PD);
-
-    /** @brief Stops the mem-target
-     *  @param[in] self          Pointer to this mem-target
-     */
-    void (*stop)(struct _ocrMemTarget_t* self);
-
-    void (*finish)(struct _ocrMemTarget_t* self);
+    u8 (*switchRunlevel)(struct _ocrMemTarget_t* self, struct _ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
+                         phase_t phase, u32 properties, void (*callback)(struct _ocrPolicyDomain_t*, u64), u64 val);
 
     /**
      * @brief Gets the throttle value for this memory

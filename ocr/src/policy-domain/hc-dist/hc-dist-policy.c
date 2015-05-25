@@ -49,16 +49,233 @@
     ASSERT(!res);
 
 #define PROCESS_MESSAGE_RETURN_NOW(pd, retCode) \
-    hcDistReleasePd((ocrPolicyDomainHc_t *) pd); \
     return retCode;
 
+
+/****************************************************/
+/* PROXY TEMPLATE MANAGEMENT                        */
+/****************************************************/
+//TODO-536: To be replaced by a general metadata cloning framework
+
+extern ocrGuid_t processRequestEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]);
+
+static u8 createProcessRequestEdtDistPolicy(ocrPolicyDomain_t * pd, ocrGuid_t templateGuid, u64 * paramv) {
+
+    ocrGuid_t edtGuid;
+    u32 paramc = 1;
+    u32 depc = 0;
+    u32 properties = 0;
+    ocrWorkType_t workType = EDT_RT_WORKTYPE;
+
+    START_PROFILE(api_EdtCreate);
+    PD_MSG_STACK(msg);
+    u8 returnCode = 0;
+    ocrTask_t *curEdt = NULL;
+    getCurrentEnv(NULL, NULL, &curEdt, &msg);
+
+#define PD_MSG (&msg)
+#define PD_TYPE PD_MSG_WORK_CREATE
+    msg.type = PD_MSG_WORK_CREATE | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
+    PD_MSG_FIELD_IO(guid.guid) = NULL_GUID;
+    PD_MSG_FIELD_IO(guid.metaDataPtr) = NULL;
+    PD_MSG_FIELD_I(templateGuid.guid) = templateGuid;
+    PD_MSG_FIELD_I(templateGuid.metaDataPtr) = NULL;
+    PD_MSG_FIELD_I(affinity.guid) = NULL_GUID;
+    PD_MSG_FIELD_I(affinity.metaDataPtr) = NULL;
+    PD_MSG_FIELD_IO(outputEvent.guid) = NULL_GUID;
+    PD_MSG_FIELD_IO(outputEvent.metaDataPtr) = NULL;
+    PD_MSG_FIELD_I(paramv) = paramv;
+    PD_MSG_FIELD_IO(paramc) = paramc;
+    PD_MSG_FIELD_IO(depc) = depc;
+    PD_MSG_FIELD_I(depv) = NULL;
+    PD_MSG_FIELD_I(properties) = properties;
+    PD_MSG_FIELD_I(workType) = workType;
+    // This is a "fake" EDT so it has no "parent"
+    PD_MSG_FIELD_I(currentEdt.guid) = NULL_GUID;
+    PD_MSG_FIELD_I(currentEdt.metaDataPtr) = NULL;
+    PD_MSG_FIELD_I(parentLatch.guid) = NULL_GUID;
+    PD_MSG_FIELD_I(parentLatch.metaDataPtr) = NULL;
+    returnCode = pd->fcts.processMessage(pd, &msg, true);
+    if(returnCode) {
+        edtGuid = PD_MSG_FIELD_IO(guid.guid);
+        DPRINTF(DEBUG_LVL_VVERB,"hc-comm-worker: Created processRequest EDT GUID 0x%lx\n", edtGuid);
+        RETURN_PROFILE(returnCode);
+    }
+
+    RETURN_PROFILE(0);
+#undef PD_MSG
+#undef PD_TYPE
+}
+
+typedef struct _ProxyTplNode_t {
+    ocrPolicyMsg_t * msg;
+    struct _ProxyTplNode_t * next;
+} ProxyTplNode_t;
+
+typedef struct {
+    u64 count;
+    ProxyTplNode_t * queueHead;
+} ProxyTpl_t;
+
+static u8 registerRemoteMetaData(ocrPolicyDomain_t * pd, ocrFatGuid_t tplFatGuid) {
+    ocrPolicyDomainHcDist_t * dself = (ocrPolicyDomainHcDist_t *) pd;
+    // The lock allows to not give out reference to the proxy while we work.
+    hal_lock32(&dself->lockTplLookup);
+    pd->guidProviders[0]->fcts.registerGuid(pd->guidProviders[0], tplFatGuid.guid, (u64) tplFatGuid.metaDataPtr);
+    ProxyTpl_t * proxyTpl = NULL;
+    bool found = hashtableNonConcRemove(dself->proxyTplMap, (void *) tplFatGuid.guid, (void **) &proxyTpl);
+    ASSERT(found && (proxyTpl != NULL));
+    proxyTpl->count++;
+    hal_unlock32(&dself->lockTplLookup);
+    // At this point all calls to 'resolveRemoteMetaData' see the update pointer
+    // in the guid provider and do not try to get a reference on the proxy.
+    // Other workers may already own a reference to the proxy and try to enqueue themselves.
+    // Hence, compete to close registration by setting the proxy's queueHead to NULL.
+    u64 curValue = 0;
+    u64 oldValue = 0;
+    do {
+        curValue = (u64) proxyTpl->queueHead;
+        oldValue = hal_cmpswap64((u64*) &(proxyTpl->queueHead), curValue, 0);
+    } while(curValue != oldValue);
+
+    // Also need to compete to check out and destroy the proxy
+    hal_lock32(&dself->lockTplLookup);
+    proxyTpl->count--;
+    if (proxyTpl->count == 0) {
+        pd->fcts.pdFree(pd, proxyTpl);
+    }
+    hal_unlock32(&dself->lockTplLookup);
+
+    ocrGuid_t processRequestTemplateGuid;
+    ocrEdtTemplateCreate(&processRequestTemplateGuid, &processRequestEdt, 1, 0);
+    ProxyTplNode_t * queueHead = (ProxyTplNode_t *) oldValue;
+    DPRINTF(DEBUG_LVL_VVERB,"About to process stored clone requests for template 0x%lx queueHead=%x)\n", tplFatGuid.guid, queueHead);
+    while (queueHead != ((void*) 0x1)) { // sentinel value
+        DPRINTF(DEBUG_LVL_VVERB,"Processing stored clone requests for template 0x%lx)\n", tplFatGuid.guid);
+        u64 paramv = (u64) queueHead->msg;
+        createProcessRequestEdtDistPolicy(pd, processRequestTemplateGuid, &paramv);
+        ProxyTplNode_t * currNode = queueHead;
+        queueHead = currNode->next;
+        pd->fcts.pdFree(pd, currNode);
+    }
+    ocrEdtTemplateDestroy(processRequestTemplateGuid);
+    return 0;
+}
+
+static u8 resolveRemoteMetaData(ocrPolicyDomain_t * pd, ocrFatGuid_t * tplFatGuid, ocrPolicyMsg_t * msg) {
+    // Check if known locally
+    u64 val;
+    pd->guidProviders[0]->fcts.getVal(pd->guidProviders[0], tplFatGuid->guid, &val, NULL);
+    if (val == 0) {
+        // If the source of the work creation is the current policy-domain,
+        // it most likely means edtCreate is called from the user-code which
+        // is a blocking call. In that case we fetch the metadata in a blocking
+        // manner. Conversely, if the source is not the current PD, it means we
+        // can fetch the metadata asynchronously and return a pending status.
+        // The edt will be rescheduled at a later time once the metadata has been resolved
+        bool isBlocking = (msg->srcLocation == pd->myLocation);
+        ocrPolicyDomainHcDist_t * dself = (ocrPolicyDomainHcDist_t *) pd;
+        // Nope, check the proxy template map
+        hal_lock32(&dself->lockTplLookup);
+        // Double check again if the template has been resolved.
+        // Helps preserve the invariant that once a template is resolved
+        // its proxy's reference count cannot increment. (lock compete in registerRemoteMetaData)
+        pd->guidProviders[0]->fcts.getVal(pd->guidProviders[0], tplFatGuid->guid, &val, NULL);
+        if (val != 0) {
+            tplFatGuid->metaDataPtr = (void *) val;
+            hal_unlock32(&dself->lockTplLookup);
+            return 0;
+        }
+        // Check if the proxy exists or not.
+        ProxyTpl_t * proxyTpl = (ProxyTpl_t *) hashtableNonConcGet(dself->proxyTplMap, (void *) tplFatGuid->guid);
+        if (proxyTpl == NULL) {
+            proxyTpl = (ProxyTpl_t *) pd->fcts.pdMalloc(pd, sizeof(ProxyTpl_t));
+            proxyTpl->count = 1;
+            proxyTpl->queueHead = (void *) 0x1; // sentinel value
+            void * ret = hashtableNonConcTryPut(dself->proxyTplMap, (void *) tplFatGuid->guid, (void *) proxyTpl);
+            ASSERT(ret == proxyTpl);
+            hal_unlock32(&dself->lockTplLookup);
+
+            // GUID is unknown, request a copy of the metadata
+            PD_MSG_STACK(msgClone);
+            getCurrentEnv(NULL, NULL, NULL, &msgClone);
+            DPRINTF(DEBUG_LVL_VVERB,"Resolving metadata -> need to query remote node (using msg @ 0x%lx)\n", &msgClone);
+#define PD_MSG (&msgClone)
+#define PD_TYPE PD_MSG_GUID_METADATA_CLONE
+                msgClone.type = PD_MSG_GUID_METADATA_CLONE | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
+                PD_MSG_FIELD_IO(guid.guid) = tplFatGuid->guid;
+                PD_MSG_FIELD_IO(guid.metaDataPtr) = NULL;
+                u8 returnCode = pd->fcts.processMessage(pd, &msgClone, false);
+                ASSERT(returnCode == OCR_EPEND);
+#undef PD_MSG
+#undef PD_TYPE
+        } else {
+            proxyTpl->count++;
+            hal_unlock32(&dself->lockTplLookup);
+        }
+
+        if (isBlocking) {
+            // Busy-wait and return only when the metadata is resolved
+            DPRINTF(DEBUG_LVL_VVERB,"Resolving metadata: enter busy-wait for blocking call\n");
+            do {
+                // Let the scheduler know we are blocked
+                PD_MSG_STACK(msg);
+                getCurrentEnv(NULL, NULL, NULL, &msg);
+#define PD_MSG (&msg)
+#define PD_TYPE PD_MSG_MGT_MONITOR_PROGRESS
+                msg.type = PD_MSG_MGT_MONITOR_PROGRESS | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
+                PD_MSG_FIELD_I(monitoree) = NULL;
+                PD_MSG_FIELD_IO(properties) = (0 | MONITOR_PROGRESS_COMM);
+                RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, true));
+#undef PD_MSG
+#undef PD_TYPE
+                pd->guidProviders[0]->fcts.getVal(pd->guidProviders[0], tplFatGuid->guid, &val, NULL);
+            } while(val == 0);
+            tplFatGuid->metaDataPtr = (void *) val;
+            DPRINTF(DEBUG_LVL_VVERB,"Resolving metadata: exit busy-wait for blocking call\n");
+        } else {
+            // Enqueue itself, the caller will be rescheduled for execution
+            ProxyTplNode_t * node = (ProxyTplNode_t *) pd->fcts.pdMalloc(pd, sizeof(ProxyTplNode_t));
+            node->msg = msg;
+            u64 newValue = (u64) node;
+            bool notSucceed = true;
+            do {
+                ProxyTplNode_t * head = proxyTpl->queueHead;
+                if (head == 0) { // registration is closed
+                    break;
+                }
+                node->next = head;
+                u64 curValue = (u64) head;
+                u64 oldValue = hal_cmpswap64((u64*) &(proxyTpl->queueHead), curValue, newValue);
+                notSucceed = (oldValue != curValue);
+            } while(notSucceed);
+
+            if (notSucceed) { // registration has closed
+                pd->fcts.pdFree(pd, node);
+                pd->guidProviders[0]->fcts.getVal(pd->guidProviders[0], tplFatGuid->guid, &val, NULL);
+                ASSERT(val != 0);
+                tplFatGuid->metaDataPtr = (void *) val;
+            }
+        }
+        // Compete to check out of the proxy
+        hal_lock32(&dself->lockTplLookup);
+        proxyTpl->count--;
+        if ((proxyTpl->count == 0) && (proxyTpl->queueHead == NULL)) {
+            pd->fcts.pdFree(pd, proxyTpl);
+        }
+        hal_unlock32(&dself->lockTplLookup);
+        return (val == 0) ? OCR_EPEND : 0;
+    } else {
+        tplFatGuid->metaDataPtr = (void *) val;
+        return 0;
+    }
+}
 
 /****************************************************/
 /* PROXY DATABLOCK MANAGEMENT                       */
 /****************************************************/
 
-//DIST-TODO: This is a poor's man meta-data cloning for datablocks.
-// May be part of the datablock implementation at some point.
+//TODO-536: To be replaced by a general metadata cloning framework
 
 /**
  * @brief State of a Proxy for a DataBlock
@@ -229,7 +446,6 @@ static Queue_t * dequeueCompatibleAcquireMessageInProxy(ocrPolicyDomain_t * pd, 
     return NULL;
 }
 
-
 /**
  * @brief Update an acquire message with information from a proxy DB
  */
@@ -243,98 +459,6 @@ static void updateAcquireMessage(ocrPolicyMsg_t * msg, ProxyDb_t * proxyDb) {
 #undef PD_TYPE
 }
 
-ocrGuid_t hcDistRtEdtRemoteSatisfy(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
-    //Need to send a message to the rank targeted by the localProxy
-    //Need to downcast to proxyEvent, retrieve the original dest guid
-    //TODO resolve dstGuid from a proxyEvent data-structure or just pass it as paramv ?
-    ocrGuid_t dstGuid = (ocrGuid_t) paramv[0];
-    // TODO is it always ok depv's guid is the guid the proxyEvent has been satisfied with ?
-    ocrGuid_t value = depv[0].guid;
-    ocrEventSatisfy(dstGuid, value);
-    return NULL_GUID;
-}
-
-//DIST-TODO grad/release PD: copy-pasted from hc-policy.c, this stuff need to be refactored
-static u8 hcDistGrabPd(ocrPolicyDomainHc_t *rself) {
-    START_PROFILE(pd_hc_GrabPd);
-    u32 newState = rself->state;
-    u32 oldState;
-    if((newState & 0xF) == 1) {
-        do {
-            // Try to grab it
-            oldState = newState;
-            newState += 16; // Increment the user count by 1, skips the bottom 4 bits
-            newState = hal_cmpswap32(&(rself->state), oldState, newState);
-            if(newState == oldState) {
-                RETURN_PROFILE(0);
-            } else {
-                if(newState & 0x2) {
-                    // The PD is shutting down
-                    RETURN_PROFILE(OCR_EAGAIN);
-                }
-                // Some other thread incremented the reader count so
-                // we try again
-                ASSERT((newState & 0xF) == 1); // Just to make sure
-            }
-        } while(true);
-    } else {
-        RETURN_PROFILE(OCR_EAGAIN);
-    }
-}
-
-//DIST-TODO grad/release PD: copy-pasted from hc-policy.c, this stuff need to be refactored
-static void hcDistReleasePd(ocrPolicyDomainHc_t *rself) {
-    START_PROFILE(pd_hc_ReleasePd);
-    u32 oldState = 0;
-    u32 newState = rself->state;
-    do {
-        ASSERT(newState > 16); // We must at least be a user
-        oldState = newState;
-        newState -= 16;
-        newState = hal_cmpswap32(&(rself->state), oldState, newState);
-    } while(newState != oldState);
-    RETURN_PROFILE();
-}
-
-u8 resolveRemoteMetaData(ocrPolicyDomain_t * self, ocrFatGuid_t * fGuid, u64 metaDataSize) {
-    ocrGuid_t remoteGuid = fGuid->guid;
-    u64 val;
-    self->guidProviders[0]->fcts.getVal(self->guidProviders[0], remoteGuid, &val, NULL);
-    if (val == 0) {
-        // GUID is unknown, request a copy of the metadata
-        PD_MSG_STACK(msgClone);
-        getCurrentEnv(NULL, NULL, NULL, &msgClone);
-        DPRINTF(DEBUG_LVL_VVERB,"Resolving metadata -> need to query remote node (using msg @ 0x%lx)\n", &msgClone);
-#define PD_MSG (&msgClone)
-#define PD_TYPE PD_MSG_GUID_METADATA_CLONE
-            msgClone.type = PD_MSG_GUID_METADATA_CLONE | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
-            PD_MSG_FIELD_IO(guid.guid) = remoteGuid;
-            PD_MSG_FIELD_IO(guid.metaDataPtr) = NULL;
-            u8 returnCode = self->fcts.processMessage(self, &msgClone, true);
-            ASSERT(returnCode == 0);
-            ASSERT(PD_MSG_FIELD_IO(guid.metaDataPtr) != NULL);
-            ASSERT(PD_MSG_FIELD_IO(guid.guid) == remoteGuid);
-            ASSERT(PD_MSG_FIELD_O(size) == metaDataSize);
-            //TODO need to find a better way for hosting a foreign metadataPtr.
-            //Warning: Here the implementation guarantees the metaDataPtr is valid
-            //         and persistent in the current PD.
-            //See same comment in post 2-way unmarshalling code
-            void * metaDataPtr = PD_MSG_FIELD_IO(guid.metaDataPtr);
-
-            //DIST-TODO Potentially multiple concurrent registerGuid on the same template
-            //Until this is changed there's a potential leak as multiple EDTs trying to clone
-            //the same template all get an answer simultaneously but only one succeed and other
-            //copies are not deallocated.
-            self->guidProviders[0]->fcts.registerGuid(self->guidProviders[0], remoteGuid, (u64) metaDataPtr);
-            val = (u64) metaDataPtr;
-            DPRINTF(DEBUG_LVL_VVERB,"GUID 0x%lx locally registered @ 0x%lx\n", remoteGuid, val);
-#undef PD_MSG
-#undef PD_TYPE
-    }
-    fGuid->metaDataPtr = (void *) val;
-    return 0;
-}
-
 void getTemplateParamcDepc(ocrPolicyDomain_t * self, ocrFatGuid_t * fatGuid, u32 * paramc, u32 * depc) {
     // Need to deguidify the edtTemplate to know how many elements we're really expecting
     self->guidProviders[0]->fcts.getVal(self->guidProviders[0], fatGuid->guid,
@@ -344,10 +468,6 @@ void getTemplateParamcDepc(ocrPolicyDomain_t * self, ocrFatGuid_t * fatGuid, u32
     if(*depc == EDT_PARAM_DEF) *depc = edtTemplate->depc;
 }
 
-
-/*
- * flags : flags of the acquired DB.
- */
 static void * acquireLocalDb(ocrPolicyDomain_t * pd, ocrGuid_t dbGuid, ocrDbAccessMode_t mode) {
     ocrTask_t *curTask = NULL;
     PD_MSG_STACK(msg);
@@ -380,7 +500,7 @@ static void * acquireLocalDb(ocrPolicyDomain_t * pd, ocrGuid_t dbGuid, ocrDbAcce
 // Might be resurrected when we finish NCR DB mode implementation
 // static void releaseLocalDb(ocrPolicyDomain_t * pd, ocrGuid_t dbGuid, u64 size) {
 //     ocrTask_t *curTask = NULL;
-//     ocrPolicyMsg_t msg;
+//     PD_MSG_STACK(msg);
 //     getCurrentEnv(NULL, NULL, &curTask, &msg);
 // #define PD_MSG (&msg)
 // #define PD_TYPE PD_MSG_DB_RELEASE
@@ -412,7 +532,9 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
     // This check is only meant to prevent erroneous uses of non-blocking processing for messages
     // that require a response. For now, only PD_MSG_DEP_REGWAITER message is using this feature.
     if ((isBlocking == false) && (msg->type & PD_MSG_REQ_RESPONSE)) {
-        ASSERT((msg->type & PD_MSG_TYPE_ONLY) == PD_MSG_DB_ACQUIRE);
+        ASSERT(((msg->type & PD_MSG_TYPE_ONLY) == PD_MSG_DB_ACQUIRE)
+            || ((msg->type & PD_MSG_TYPE_ONLY) == PD_MSG_GUID_METADATA_CLONE));
+        // for a clone the cloning should actually be of an edt template
     }
 
     //DIST-TODO msg setup: how to double check that: msg->srcLocation has been filled by getCurrentEnv(..., &msg) ?
@@ -426,10 +548,6 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
     // Else assume destination is the current location
 
     u8 ret = 0;
-    ret = hcDistGrabPd((ocrPolicyDomainHc_t*)self);
-    if(ret) {
-        return ret;
-    }
     // Pointer we keep around in case we create a copy original message
     // and need to get back to it
     ocrPolicyMsg_t * originalMsg = msg;
@@ -452,9 +570,16 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
     {
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_WORK_CREATE
-        DPRINTF(DEBUG_LVL_VVERB,"Processing WORK_CREATE for template GUID 0x%lx\n", PD_MSG_FIELD_I(templateGuid.guid));
         // First query the guid provider to determine if we know the edtTemplate.
-        resolveRemoteMetaData(self, &PD_MSG_FIELD_I(templateGuid), sizeof(ocrTaskTemplateHc_t) + sizeof(u64) * OCR_HINT_COUNT_EDT_HC);
+        u8 res = resolveRemoteMetaData(self, &PD_MSG_FIELD_I(templateGuid), msg);
+        if (res == OCR_EPEND) {
+            // We do not handle pending if it an edt spawned locally because
+            // the edt creation is likely invoked from another local EDT.
+            ASSERT(msg->srcLocation != curLoc);
+            // template's metadata not available, message processing will be rescheduled.
+            PROCESS_MESSAGE_RETURN_NOW(self, OCR_EPEND);
+        }
+        DPRINTF(DEBUG_LVL_VVERB,"WORK_CREATE: try to resolve template GUID 0x%lx\n", PD_MSG_FIELD_I(templateGuid.guid));
         // Now that we have the template, we can set paramc and depc correctly
         // This needs to be done because the marshalling of messages relies on paramc and
         // depc being correctly set (so no negative values)
@@ -474,6 +599,26 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
         if (msg->destLocation == curLoc) {
             DPRINTF(DEBUG_LVL_VVERB,"WORK_CREATE: local EDT creation for template GUID 0x%lx\n", PD_MSG_FIELD_I(templateGuid.guid));
         } else {
+            // For asynchronous EDTs we check the content of depv.
+            // If it contains non-persistent events the creation
+            // must be synchronous and we change the message flags here.
+            if (!(msg->type & PD_MSG_REQ_RESPONSE)) {
+                ocrFatGuid_t * depv = PD_MSG_FIELD_I(depv);
+                u32 depc = ((depv != NULL) ? PD_MSG_FIELD_IO(depc) : 0);
+                u32 i;
+                for(i=0; i<depc; i++) {
+                    ASSERT(depv[i].guid != UNINITIALIZED_GUID);
+                    ocrGuidKind kind;
+                    u8 ret = self->guidProviders[0]->fcts.getKind(self->guidProviders[0], depv[i].guid, &kind);
+                    ASSERT(!ret);
+                    if ((kind == OCR_GUID_EVENT_ONCE) || (kind == OCR_GUID_EVENT_LATCH)) {
+                        msg->type |= PD_MSG_REQ_RESPONSE;
+                        DPRINTF(DEBUG_LVL_WARN,"NULL-GUID EDT creation made synchronous: depv[%d] is (ONCE|LATCH)\n", i);
+                        break;
+                    }
+                }
+            }
+
             // Outgoing EDT create message
             DPRINTF(DEBUG_LVL_VVERB,"WORK_CREATE: remote EDT creation at %lu for template GUID 0x%lx\n", (u64)msg->destLocation, PD_MSG_FIELD_I(templateGuid.guid));
 #undef PD_MSG
@@ -636,7 +781,6 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
 #define PD_MSG (msg)
 #define PD_TYPE PD_MSG_GUID_INFO
         //DIST-TODO cloning: What's the meaning of guid info in distributed ?
-        // TODO PD_MSG_FIELD_??(guid);
         msg->destLocation = curLoc;
 #undef PD_MSG
 #undef PD_TYPE
@@ -646,8 +790,46 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
     {
 #define PD_MSG (msg)
 #define PD_TYPE PD_MSG_GUID_METADATA_CLONE
-        RETRIEVE_LOCATION_FROM_GUID_MSG(self, msg->destLocation, IO);
-        DPRINTF(DEBUG_LVL_VVERB, "METADATA_CLONE: target is %d\n", (int)msg->destLocation);
+        if (msg->type & PD_MSG_REQUEST) {
+            RETRIEVE_LOCATION_FROM_GUID_MSG(self, msg->destLocation, IO);
+            DPRINTF(DEBUG_LVL_VVERB,"METADATA_CLONE: request for guid=0x%lx src=%d dest=%d\n",
+                    PD_MSG_FIELD_IO(guid.guid), (int)msg->srcLocation);
+            if ((msg->destLocation != curLoc) && (msg->srcLocation == curLoc)) {
+                // Outgoing request
+                // NOTE: In the current implementation when we call metadata-clone
+                //       it is because we've already checked the guid provider and
+                //       the guid is not available
+                // If it's a non-blocking processing, will set the returnDetail to busy after the request is sent out
+#ifdef OCR_ASSERT
+                u64 val;
+                self->guidProviders[0]->fcts.getVal(self->guidProviders[0], PD_MSG_FIELD_IO(guid.guid), &val, NULL);
+                ASSERT(val == 0);
+#endif
+            }
+        }
+        if ((msg->destLocation == curLoc) && (msg->srcLocation != curLoc) && (msg->type & PD_MSG_RESPONSE)) {
+            // Incoming response to a clone request posted earlier
+            ocrGuidKind tkind;
+            self->guidProviders[0]->fcts.getKind(self->guidProviders[0], PD_MSG_FIELD_IO(guid.guid), &tkind);
+            if (tkind == OCR_GUID_EDT_TEMPLATE) {
+                DPRINTF(DEBUG_LVL_VVERB,"METADATA_CLONE: Incoming response for template=0x%lx)\n", PD_MSG_FIELD_IO(guid.guid));
+                // Incoming response to an asynchronous metadata clone
+                u64 metaDataSize = sizeof(ocrTaskTemplateHc_t) + (sizeof(u64) * OCR_HINT_COUNT_EDT_HC);
+                void * metaDataPtr = self->fcts.pdMalloc(self, metaDataSize);
+                ASSERT(PD_MSG_FIELD_IO(guid.metaDataPtr) != NULL);
+                ASSERT(PD_MSG_FIELD_O(size) == metaDataSize);
+                // Register the metadata, process the waiter queue and checks out from the proxy.
+                hal_memCopy(metaDataPtr, PD_MSG_FIELD_IO(guid.metaDataPtr), metaDataSize, false);
+                ocrFatGuid_t tplFatGuid;
+                tplFatGuid.guid = PD_MSG_FIELD_IO(guid.guid);
+                tplFatGuid.metaDataPtr = metaDataPtr;
+                registerRemoteMetaData(self, tplFatGuid);
+                PROCESS_MESSAGE_RETURN_NOW(self, 0);
+            } else {
+                ASSERT(tkind == OCR_GUID_AFFINITY);
+                DPRINTF(DEBUG_LVL_VVERB,"METADATA_CLONE: Incoming response for affinity 0x%lx)\n", PD_MSG_FIELD_IO(guid.guid));
+            }
+        }
 #undef PD_MSG
 #undef PD_TYPE
         break;
@@ -662,40 +844,47 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
 #undef PD_TYPE
         break;
     }
-    case PD_MSG_MGT_SHUTDOWN:
+    case PD_MSG_MGT_RL_NOTIFY:
     {
-        if ((msg->srcLocation == curLoc) && (msg->destLocation == curLoc)) {
+#define PD_MSG (msg)
+#define PD_TYPE PD_MSG_MGT_RL_NOTIFY
+        if ((msg->srcLocation != curLoc) && (msg->destLocation == curLoc)) {
+            ASSERT(PD_MSG_FIELD_I(runlevel) == RL_COMPUTE_OK);
+            ASSERT(PD_MSG_FIELD_I(properties) == (RL_REQUEST | RL_BARRIER | RL_TEAR_DOWN));
+            // Incoming rl notify message from another PD
             ocrPolicyDomainHcDist_t * rself = ((ocrPolicyDomainHcDist_t*)self);
-            DPRINTF(DEBUG_LVL_VERB,"MGT_SHUTDOWN: ocrShutdown invoked\n");
-        #define PD_MSG (msg)
-        #define PD_TYPE PD_MSG_MGT_SHUTDOWN
-            self->shutdownCode = PD_MSG_FIELD_I(errorCode);
-        #undef PD_MSG
-        #undef PD_TYPE
-            rself->shutdownAckCount++; // Allow quiescence detection code in 'take'
-            // return right away
-            PROCESS_MESSAGE_RETURN_NOW(self, 0);
-        } else if ((msg->srcLocation != curLoc) && (msg->destLocation == curLoc)) {
-            // Incoming shutdown message from another PD
-            ocrPolicyDomainHcDist_t * rself = ((ocrPolicyDomainHcDist_t*)self);
-            DPRINTF(DEBUG_LVL_VERB,"MGT_SHUTDOWN: incoming shutdown message: ackCount=%lu\n",rself->shutdownAckCount);
-
-            if (rself->shutdownAckCount == 0) {
-            #define PD_MSG (msg)
-            #define PD_TYPE PD_MSG_MGT_SHUTDOWN
-                self->shutdownCode = PD_MSG_FIELD_I(errorCode);
-            #undef PD_MSG
-            #undef PD_TYPE
-                // If we get a shutdown msg and the current PD count is zero it
-                // means it's another PD that got to execute ocrShutdown.
-                // Hence incr, to allow quiescence detection code in 'take'
-                rself->shutdownAckCount++;
+            // incr the shutdown counter (compete with hcDistPdSwitchRunlevel)
+            u32 oldAckValue = hal_xadd32(&rself->shutdownAckCount, 1);
+            ocrPolicyDomainHc_t * bself = (ocrPolicyDomainHc_t *) self;
+            DPRINTF(DEBUG_LVL_VVERB,"PD_MSG_MGT_RL_NOTIFY: incoming: old value for shutdownAckCount=%lu\n", oldAckValue);
+            if (oldAckValue == (self->neighborCount)) {
+                // Got messages from all PDs and self.
+                // Done with distributed shutdown and can continue with the local shutdown.
+                PD_MSG_STACK(msgNotifyRl);
+                getCurrentEnv(NULL, NULL, NULL, &msgNotifyRl);
+                DPRINTF(DEBUG_LVL_VVERB,"PD_MSG_MGT_RL_NOTIFY: distributed shutdown is done. Resume local shutdown\n");
+                u8 returnCode = rself->baseSwitchRunlevel(self, bself->rlSwitch.runlevel, bself->rlSwitch.properties);
+                ASSERT(returnCode == 0);
             }
-            rself->shutdownAckCount++;
-            // let worker '1' do the stop
-            PROCESS_MESSAGE_RETURN_NOW(self, 0);
+            //Note: Per current implementation, even if PDs are not in the same runlevel,
+            //      the first time a PD receives a ack it has to be in the last phase up
+            //      otherwise it couldn't have received the message
+            bool doLocalShutdown = ((oldAckValue == 0) && (RL_GET_PHASE_COUNT_UP(self, RL_USER_OK) == bself->rlSwitch.nextPhase));
+            if (!doLocalShutdown) {
+                DPRINTF(DEBUG_LVL_VVERB,"PD_MSG_MGT_RL_NOTIFY: got notification RL=%d PH=%d\n", bself->rlSwitch.runlevel, bself->rlSwitch.nextPhase);
+                PD_MSG_FIELD_O(returnDetail) = 0;
+                return 0;
+            } else {
+                DPRINTF(DEBUG_LVL_VVERB,"PD_MSG_MGT_RL_NOTIFY: fall-through\n");
+            }
+            // else
+            // We are receiving a shutdown message from another PD and both
+            // the ack counter is '0' and the runlevel RL_USER_OK is at its
+            // highest phase. It means ocrShutdown() did not originate from
+            // this PD, hence must initiate the local shutdown process.
         }
-        // Fall-through to send to other PD or local processing.
+#undef PD_MSG
+#undef PD_TYPE
         break;
     }
     case PD_MSG_DEP_DYNADD:
@@ -1053,96 +1242,22 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
         break;
     }
     case PD_MSG_COMM_TAKE: {
-        ocrPolicyDomainHcDist_t* rself = (ocrPolicyDomainHcDist_t*)self;
-        if (rself->shutdownAckCount > 0) {
-            ocrWorker_t * worker;
-            getCurrentEnv(NULL, &worker, NULL, NULL);
-            //DIST-TODO sep-concern: The PD should not know about underlying worker impl
-            ocrWorkerHc_t * hcWorker = (ocrWorkerHc_t *) worker;
-            int wid = hcWorker->id;
-            if ((wid == 1) && (rself->piledWorkerCtx == 0)) {
-                // Shutdown was called and there's no helper-mode in progress
-                // Check if other comp-workers are busy
-                DPRINTF(DEBUG_LVL_VVERB,"MGT_SHUTDOWN: wait for comp-worker to wrap-up before shutdown %d\n");
-                u32 i = 0;
-                while(i < self->workerCount) {
-                    if ((hcWorker->hcType == HC_WORKER_COMP) && (self->workers[i]->curTask != NULL)) {
-                        break; // still some busy worker, will fall-through to do the regular take.
-                    }
-                    i++;
-                }
-                //Note: there's still a potential race when a RT EDT is in the deque but we failed to see it
-                if ((i == self->workerCount) && (!rself->shutdownSent)) {
-                    // Everybody was quiet, there might be in-flight wrap up messages (dbRelease and so in epilogue EDTs)
-                    // still attempt to notify all other PDs, they should be denied PD access thanks to grabLock
-                    //DIST-TODO These should be sent in parallel
-                    i = 0;
-                    while(i < self->neighborCount) {
-                        DPRINTF(DEBUG_LVL_VVERB,"MGT_SHUTDOWN: loop shutdown neighbors[%d] is %d\n", i, (int) self->neighbors[i]);
-                        PD_MSG_STACK(msgShutdown);
-                        getCurrentEnv(NULL, NULL, NULL, &msgShutdown);
-                    #define PD_MSG (&msgShutdown)
-                    #define PD_TYPE PD_MSG_MGT_SHUTDOWN
-                        msgShutdown.destLocation = self->neighbors[i];
-                        PD_MSG_FIELD_I(currentEdt.guid) = NULL_GUID;
-                        PD_MSG_FIELD_I(currentEdt.metaDataPtr) = NULL;
-                        PD_MSG_FIELD_I(errorCode) = self->shutdownCode;
-                        PD_MSG_FIELD_I(properties) = 0;
-                        DPRINTF(DEBUG_LVL_VERB,"MGT_SHUTDOWN: send shutdown msg to %d\n", (int) msgShutdown.destLocation);
-                        // Shutdown is a two-way message. It gives the target the opportunity to drain and
-                        // finalize some of its pending communication (think dbRelease called after the EDT
-                        // that triggered shutdown on another node)
-                        msgShutdown.type = PD_MSG_MGT_SHUTDOWN | PD_MSG_REQUEST;
-                        u8 returnCode = self->fcts.processMessage(self, &msgShutdown, true);
-                        ASSERT(returnCode == 0);
-                    #undef PD_MSG
-                    #undef PD_TYPE
-                        i++;
-                    }
-                    rself->shutdownSent = true;
-                }
-                if (rself->shutdownSent && (rself->shutdownAckCount == (self->neighborCount+1))) {
-                    //Note: there's still a potential race when a RT EDT is in the deque but we failed to see it
-                    // We need to do this again because when we receive shutdown ack as soon as shutdownAckCount
-                    // is incremented we can come here although the EDT that did the increment is still running
-                    i = 0;
-                    while(i < self->workerCount) {
-                        if ((hcWorker->hcType == HC_WORKER_COMP) && (self->workers[i]->curTask != NULL)) {
-                            break; // still some busy worker, will fall-through to do the regular take.
-                        }
-                        i++;
-                    }
-                    if (i == self->workerCount) {
-                        DPRINTF(DEBUG_LVL_VERB,"MGT_SHUTDOWN: received all shutdown\n");
-                    #define PD_MSG (msg)
-                    #define PD_TYPE PD_MSG_COMM_TAKE
-                        PD_MSG_FIELD_IO(guidCount) = 0;
-                        msg->type &= ~PD_MSG_REQUEST;
-                        msg->type |= PD_MSG_RESPONSE;
-                    #undef PD_MSG
-                    #undef PD_TYPE
-                        // Received all the shutdown, we stop
-                        //NOTE: We shutdown here otherwise we need to change the state
-                        //to spin on from 18 to 34 in hcPolicyDomainStop because the double
-                        //acquisition caused by calling the base impl.
-                        //Shutdown are one way messages in distributed. Avoids having to
-                        //send a response when the comms are shutting down.
-                        self->fcts.stop(self);
-                        PROCESS_MESSAGE_RETURN_NOW(self, 0);
-                    } // else should only go for another round until the EDT that did the ack increment is alive
-               }
-            }
-        } // fall-through and do regular take
+        // fall-through and do regular take
         break;
     }
     case PD_MSG_MGT_MONITOR_PROGRESS:
     {
         msg->destLocation = curLoc;
-        // This is to temporarily help with the shutdown process see issue #200
-        hal_lock32(&((ocrPolicyDomainHcDist_t*)self)->piledWorkerCtxLock);
-        ((ocrPolicyDomainHcDist_t*)self)->piledWorkerCtx++;
-        hal_unlock32(&((ocrPolicyDomainHcDist_t*)self)->piledWorkerCtxLock);
-        // fall-through and let local PD to process
+        break;
+    }
+    case PD_MSG_DEP_UNREGSIGNALER: {
+        //Not implemented: see #521, #522
+        ASSERT(false && "Not implemented PD_MSG_DEP_UNREGSIGNALER");
+        break;
+    }
+    case PD_MSG_DEP_UNREGWAITER: {
+        //Not implemented: see #521, #522
+        ASSERT(false && "Not implemented PD_MSG_DEP_UNREGWAITER");
         break;
     }
     // filter out local messages
@@ -1156,17 +1271,12 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
     case PD_MSG_EVT_GET:
     case PD_MSG_GUID_CREATE:
     case PD_MSG_COMM_GIVE:
-    case PD_MSG_DEP_UNREGSIGNALER:
-        //DIST-TODO not-supported: I don't think PD_MSG_DEP_UNREGSIGNALER is supported yet even in shared-memory
-    case PD_MSG_DEP_UNREGWAITER:
-        //DIST-TODO not-supported: I don't think PD_MSG_DEP_UNREGWAITER is support yet even in shared-memory
     case PD_MSG_SAL_OP:
     case PD_MSG_SAL_PRINT:
     case PD_MSG_SAL_READ:
     case PD_MSG_SAL_WRITE:
     case PD_MSG_SAL_TERMINATE:
     case PD_MSG_MGT_OP: //DIST-TODO not-supported: PD_MSG_MGT_OP is probably not always local
-    case PD_MSG_MGT_FINISH:
     case PD_MSG_MGT_REGISTER:
     case PD_MSG_MGT_UNREGISTER:
     {
@@ -1361,19 +1471,8 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
             }
             case PD_MSG_GUID_METADATA_CLONE:
             {
-                // Fix up metadataPtr
-                //TODO need to find a better way for hosting a foreign metadataPtr.
-                //Warning: Here we make a copy so that the calling context can keep
-                //         the reference to the metadataPtr beyond the lifetime of the
-                //         message currently backing it.
-#define PD_MSG (handle->response)
-#define PD_TYPE PD_MSG_GUID_METADATA_CLONE
-                void * metaDataPtr = self->fcts.pdMalloc(self, PD_MSG_FIELD_O(size));
-                hal_memCopy(metaDataPtr, PD_MSG_FIELD_IO(guid.metaDataPtr), PD_MSG_FIELD_O(size), false);
-                // Set the copy as the metaDataPtr
-                PD_MSG_FIELD_IO(guid.metaDataPtr) = metaDataPtr;
-#undef PD_TYPE
-#undef PD_MSG
+                // Do not need to perform a copy here as the template proxy mecanism
+                // is systematically making a copy on write in the guid provider.
             break;
             }
             default: {
@@ -1449,7 +1548,8 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
                 sendProp = ASYNC_MSG_PROP;
                 // Outgoing asynchronous response for a two-way communication
                 // Should be the only asynchronous two-way msg kind for now
-                ASSERT((msg->type & PD_MSG_TYPE_ONLY) == PD_MSG_DB_ACQUIRE);
+                ASSERT(((msg->type & PD_MSG_TYPE_ONLY) == PD_MSG_DB_ACQUIRE)
+                        || ((msg->type & PD_MSG_TYPE_ONLY) == PD_MSG_GUID_METADATA_CLONE));
                 // Marshall outgoing DB_ACQUIRE Response
                 switch(msg->type & PD_MSG_TYPE_ONLY) {
                 case PD_MSG_DB_ACQUIRE:
@@ -1464,12 +1564,28 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
                 }
                 default: { }
                 }
+            } else {
+                ASSERT(msg->type & PD_MSG_REQUEST);
+#define PD_MSG msg
+#define PD_TYPE PD_MSG_WORK_CREATE
+                if (((msg->type & PD_MSG_TYPE_ONLY) == PD_MSG_WORK_CREATE) && !(msg->type & PD_MSG_REQ_RESPONSE)) {
+                    ASSERT(PD_MSG_FIELD_IO(guid.guid) == NULL_GUID);
+                    // Do a full marshalling to make sure we capture paramv/depv
+                    ocrMarshallMode_t marshallMode = MARSHALL_FULL_COPY;
+                    sendProp |= (((u32)marshallMode) << COMM_PROP_BEHAVIOR_OFFSET);
+                }
+#undef PD_MSG
+#undef PD_TYPE
             }
 
             // one-way request, several options:
             // - make a copy in sendMessage (current strategy)
             // - submit the message to be sent and wait for delivery
             self->fcts.sendMessage(self, msg->destLocation, msg, NULL, sendProp);
+
+            //NOTE: For PD_MSG_GUID_METADATA_CLONE we do not need to set OCR_EBUSY in the
+            //      message's returnDetail field as being the PD issuing the call we can
+            //      rely on the PEND return status.
         }
     } else {
         // Local PD handles the message. msg's destination is curLoc
@@ -1521,6 +1637,11 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
             ASSERT(msg->type & PD_MSG_RESPONSE);
             ASSERT((msg->type & PD_MSG_TYPE_ONLY) != PD_MSG_MGT_MONITOR_PROGRESS);
             switch(msg->type & PD_MSG_TYPE_ONLY) {
+            case PD_MSG_GUID_METADATA_CLONE:
+            {
+                sendProp |= ASYNC_MSG_PROP;
+                break;
+            }
             case PD_MSG_DB_ACQUIRE:
             {
 #define PD_MSG (msg)
@@ -1537,22 +1658,82 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
             }
             // Send the response message
             self->fcts.sendMessage(self, msg->destLocation, msg, NULL, sendProp);
+
             if ((msgInCopy != NULL) && (msgInCopy != msg)) {
                 // A copy of the original message had been made to accomodate
                 // the response that was larger. Free the request message.
                 self->fcts.pdFree(self, msgInCopy);
             }
-        } else {
-            // local post-processing
-            if ((msg->type & PD_MSG_TYPE_ONLY) == PD_MSG_MGT_MONITOR_PROGRESS) {
-                // This is to temporarily help with the shutdown process see issue #200
-                hal_lock32(&((ocrPolicyDomainHcDist_t*)self)->piledWorkerCtxLock);
-                ((ocrPolicyDomainHcDist_t*)self)->piledWorkerCtx--;
-                hal_unlock32(&((ocrPolicyDomainHcDist_t*)self)->piledWorkerCtxLock);
-            }
         }
     }
-    PROCESS_MESSAGE_RETURN_NOW(self, ret);
+    return ret;
+}
+
+u8 hcDistPdSwitchRunlevel(ocrPolicyDomain_t *self, ocrRunlevel_t runlevel, u32 properties) {
+    ocrPolicyDomainHc_t *rself = (ocrPolicyDomainHc_t*) self;
+
+    if((runlevel == RL_USER_OK) && RL_IS_LAST_PHASE_DOWN(self, RL_USER_OK, rself->rlSwitch.nextPhase)) {
+        ASSERT(rself->rlSwitch.runlevel == runlevel);
+        // The local shutdown is completed.
+        // Notify neighbors PDs and stall the phase change
+        // until we got acknoledgements from all of them.
+        // Notify other PDs the user runlevel has completed here
+        getCurrentEnv(&self, NULL, NULL, NULL);
+        u32 i = 0;
+        while(i < self->neighborCount) {
+            DPRINTF(DEBUG_LVL_VVERB,"PD_MSG_MGT_RL_NOTIFY: loop shutdown neighbors[%d] is %d\n", i, (int) self->neighbors[i]);
+            PD_MSG_STACK(msgShutdown);
+            getCurrentEnv(NULL, NULL, NULL, &msgShutdown);
+        #define PD_MSG (&msgShutdown)
+        #define PD_TYPE PD_MSG_MGT_RL_NOTIFY
+            msgShutdown.destLocation = self->neighbors[i];
+            msgShutdown.type = PD_MSG_MGT_RL_NOTIFY | PD_MSG_REQUEST;
+            PD_MSG_FIELD_I(runlevel) = RL_COMPUTE_OK;
+            PD_MSG_FIELD_I(properties) = RL_REQUEST | RL_BARRIER | RL_TEAR_DOWN;
+            PD_MSG_FIELD_I(errorCode) = self->shutdownCode;
+            DPRINTF(DEBUG_LVL_VVERB,"PD_MSG_MGT_RL_NOTIFY: send shutdown msg to %d\n", (int) msgShutdown.destLocation);
+            u8 returnCode = self->fcts.processMessage(self, &msgShutdown, true);
+            ASSERT(returnCode == 0);
+        #undef PD_MSG
+        #undef PD_TYPE
+            i++;
+        }
+        // Consider the PD to have reached its local quiescence.
+        // This code is concurrent with receiving notifications
+        // from other PDs and must detect if it is the last
+        ocrPolicyDomainHcDist_t * dself = (ocrPolicyDomainHcDist_t *) self;
+        // incr the shutdown counter (compete with processMessage PD_MSG_MGT_SHUTDOWN)
+        u32 oldAckValue = hal_xadd32(&dself->shutdownAckCount, 1);
+        if (oldAckValue != (self->neighborCount)) {
+            DPRINTF(DEBUG_LVL_VVERB,"PD_MSG_MGT_RL_NOTIFY: reached local quiescence. To be resumed when distributed shutdown is done\n");
+            // If it is not the last one to increment do not fall-through
+            // The switch runlevel will be called whenever we get the last
+            // shutdown ack.
+            return 0;
+        } else {
+            // Last shutdown acknowledgement, resume the runlevel switch
+            DPRINTF(DEBUG_LVL_VVERB,"PD_MSG_MGT_RL_NOTIFY: distributed shutdown is done. Process with local shutdown\n");
+            return dself->baseSwitchRunlevel(self, rself->rlSwitch.runlevel, rself->rlSwitch.properties);
+        }
+    } else { // other runlevels than RL_USER_OK
+        ocrPolicyDomainHcDist_t * dself = (ocrPolicyDomainHcDist_t *) self;
+        u8 res = dself->baseSwitchRunlevel(self, runlevel, properties);
+        if (properties & RL_BRING_UP) {
+            if (runlevel == RL_GUID_OK) {
+                dself->proxyTplMap = newHashtableModulo(self, 10);
+            }
+            if (runlevel == RL_CONFIG_PARSE) {
+                // In distributed the shutdown protocol requires three phases
+                // for the RL_USER_OK TEAR_DOWN. The communication worker must be
+                // aware of those while computation workers can be generic and rely
+                // on the switchRunlevel/callback mecanism.
+                // Because we want to keep the computation worker implementation more generic
+                // we request phases directly from here through the coalesced number of phases at slot 0.
+                RL_ENSURE_PHASE_DOWN(self, RL_USER_OK, 0, 3);
+            }
+        }
+        return res;
+    }
 }
 
 u8 hcDistPdSendMessage(ocrPolicyDomain_t* self, ocrLocation_t target, ocrPolicyMsg_t *message,
@@ -1567,7 +1748,6 @@ u8 hcDistPdSendMessage(ocrPolicyDomain_t* self, ocrLocation_t target, ocrPolicyM
     ocrWorkerHc_t * hcWorker = (ocrWorkerHc_t *) worker;
     int id = hcWorker->id;
     u8 ret = self->commApis[id]->fcts.sendMessage(self->commApis[id], target, message, handle, properties);
-
     return ret;
 }
 
@@ -1578,7 +1758,6 @@ u8 hcDistPdPollMessage(ocrPolicyDomain_t *self, ocrMsgHandle_t **handle) {
     ocrWorkerHc_t * hcWorker = (ocrWorkerHc_t *) worker;
     int id = hcWorker->id;
     u8 ret = self->commApis[id]->fcts.pollMessage(self->commApis[id], handle);
-
     return ret;
 }
 
@@ -1589,52 +1768,7 @@ u8 hcDistPdWaitMessage(ocrPolicyDomain_t *self,  ocrMsgHandle_t **handle) {
     ocrWorkerHc_t * hcWorker = (ocrWorkerHc_t *) worker;
     int id = hcWorker->id;
     u8 ret = self->commApis[id]->fcts.waitMessage(self->commApis[id], handle);
-
     return ret;
-}
-
-void hcDistPolicyDomainStart(ocrPolicyDomain_t * pd) {
-    ocrPolicyDomainHcDist_t * distPd = (ocrPolicyDomainHcDist_t *) pd;
-    // initialize parent
-    distPd->baseStart(pd);
-}
-
-void hcDistPolicyDomainStop(ocrPolicyDomain_t * pd) {
-    ocrWorker_t * worker;
-    getCurrentEnv(NULL, &worker, NULL, NULL);
-    // In OCR-distributed we need to drain messages from the
-    // communication sub-system. This is to make sure the
-    // runtime doesn't abruptely stop while shutdown messages
-    // are being issued.
-    // DIST-TODO stop: standardize runlevels
-    int runlevel = 3;
-    u64 i = 0;
-    while (runlevel > 0) {
-        DPRINTF(DEBUG_LVL_VVERB,"HC-DIST stop begin at RL %d\n", runlevel);
-        u64 maxCount = pd->workerCount;
-        for(i = 0; i < maxCount; i++) {
-            //DIST-TODO stop: until runlevels get standardized, we only
-            //make communication workers go through runlevels
-            ocrWorkerHc_t * hcWorker = (ocrWorkerHc_t *) pd->workers[i];
-            if (hcWorker->hcType == HC_WORKER_COMM) {
-                DPRINTF(DEBUG_LVL_VVERB,"HC-DIST stop comm-worker at RL %d\n", runlevel);
-                pd->workers[i]->fcts.stop(pd->workers[i]);
-            }
-        }
-        //DIST-TODO stop: Same thing here we assume all the comm-api are runlevel compatible
-        maxCount = pd->commApiCount;
-        for(i = 0; i < maxCount; i++) {
-            DPRINTF(DEBUG_LVL_VVERB,"HC-DIST stop comm-api at RL %d\n", runlevel);
-            pd->commApis[i]->fcts.stop(pd->commApis[i]);
-        }
-        DPRINTF(DEBUG_LVL_VVERB,"HC-DIST stop end at RL %d END\n", runlevel);
-        runlevel--;
-    }
-
-    // call the regular stop
-    DPRINTF(DEBUG_LVL_VVERB,"HC-DIST stop calling base stop\n");
-    ocrPolicyDomainHcDist_t * distPd = (ocrPolicyDomainHcDist_t *) pd;
-    distPd->baseStop(pd);
 }
 
 ocrPolicyDomain_t * newPolicyDomainHcDist(ocrPolicyDomainFactory_t * factory,
@@ -1643,7 +1777,7 @@ ocrPolicyDomain_t * newPolicyDomainHcDist(ocrPolicyDomainFactory_t * factory,
 #endif
                                       ocrCost_t *costFunction, ocrParamList_t *perInstance) {
 
-    ocrPolicyDomainHcDist_t * derived = (ocrPolicyDomainHcDist_t *) runtimeChunkAlloc(sizeof(ocrPolicyDomainHcDist_t), NULL);
+    ocrPolicyDomainHcDist_t * derived = (ocrPolicyDomainHcDist_t *) runtimeChunkAlloc(sizeof(ocrPolicyDomainHcDist_t), PERSISTENT_CHUNK);
     ocrPolicyDomain_t * base = (ocrPolicyDomain_t *) derived;
 
 #ifdef OCR_ENABLE_STATISTICS
@@ -1668,24 +1802,21 @@ void initializePolicyDomainHcDist(ocrPolicyDomainFactory_t * factory,
 #endif
     ocrPolicyDomainHcDist_t * hcDistPd = (ocrPolicyDomainHcDist_t *) self;
     hcDistPd->baseProcessMessage = derivedFactory->baseProcessMessage;
-    hcDistPd->baseStart = derivedFactory->baseStart;
-    hcDistPd->baseStop = derivedFactory->baseStop;
-    hcDistPd->shutdownSent = false;
-    hcDistPd->shutdownAckCount = 0;
-    hcDistPd->piledWorkerCtx = 0;
-    hcDistPd->piledWorkerCtxLock = 0;
+    hcDistPd->baseSwitchRunlevel = derivedFactory->baseSwitchRunlevel;
     hcDistPd->lockDbLookup = 0;
+    hcDistPd->lockTplLookup = 0;
+    hcDistPd->shutdownAckCount = 0;
 }
 
 static void destructPolicyDomainFactoryHcDist(ocrPolicyDomainFactory_t * factory) {
-    runtimeChunkFree((u64)factory, NULL);
+    runtimeChunkFree((u64)factory, NONPERSISTENT_CHUNK);
 }
 
 ocrPolicyDomainFactory_t * newPolicyDomainFactoryHcDist(ocrParamList_t *perType) {
     ocrPolicyDomainFactory_t * baseFactory = newPolicyDomainFactoryHc(perType);
     ocrPolicyDomainFcts_t baseFcts = baseFactory->policyDomainFcts;
 
-    ocrPolicyDomainFactoryHcDist_t* derived = (ocrPolicyDomainFactoryHcDist_t*) runtimeChunkAlloc(sizeof(ocrPolicyDomainFactoryHcDist_t), (void *)10);
+    ocrPolicyDomainFactoryHcDist_t* derived = (ocrPolicyDomainFactoryHcDist_t*) runtimeChunkAlloc(sizeof(ocrPolicyDomainFactoryHcDist_t), NONPERSISTENT_CHUNK);
     ocrPolicyDomainFactory_t* derivedBase = (ocrPolicyDomainFactory_t*) derived;
     // Set up factory function pointers and members
     derivedBase->instantiate = newPolicyDomainHcDist;
@@ -1693,13 +1824,11 @@ ocrPolicyDomainFactory_t * newPolicyDomainFactoryHcDist(ocrParamList_t *perType)
     derivedBase->destruct =  destructPolicyDomainFactoryHcDist;
     derivedBase->policyDomainFcts = baseFcts;
     derived->baseInitialize = baseFactory->initialize;
-    derived->baseStart = baseFcts.start;
-    derived->baseStop = baseFcts.stop;
     derived->baseProcessMessage = baseFcts.processMessage;
+    derived->baseSwitchRunlevel = baseFcts.switchRunlevel;
 
     // specialize some of the function pointers
-    derivedBase->policyDomainFcts.start = FUNC_ADDR(void(*)(ocrPolicyDomain_t*), hcDistPolicyDomainStart);
-    derivedBase->policyDomainFcts.stop = FUNC_ADDR(void(*)(ocrPolicyDomain_t*), hcDistPolicyDomainStop);
+    derivedBase->policyDomainFcts.switchRunlevel = FUNC_ADDR(u8 (*)(ocrPolicyDomain_t*, ocrRunlevel_t, u32), hcDistPdSwitchRunlevel);
     derivedBase->policyDomainFcts.processMessage = FUNC_ADDR(u8(*)(ocrPolicyDomain_t*,ocrPolicyMsg_t*,u8), hcDistProcessMessage);
     derivedBase->policyDomainFcts.sendMessage = FUNC_ADDR(u8 (*)(ocrPolicyDomain_t*, ocrLocation_t, ocrPolicyMsg_t *, ocrMsgHandle_t**, u32),
                                                    hcDistPdSendMessage);

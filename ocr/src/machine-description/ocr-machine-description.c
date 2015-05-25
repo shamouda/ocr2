@@ -997,7 +997,7 @@ void add_dependence (type_enum fromtype, type_enum totype, char *refstr,
 
         if (f->memoryCount == 0) {
             f->memoryCount = dependence_count;
-            f->memories = (ocrMemPlatform_t **)runtimeChunkAlloc(dependence_count * sizeof(ocrMemPlatform_t *), NULL);
+            f->memories = (ocrMemPlatform_t **)runtimeChunkAlloc(dependence_count * sizeof(ocrMemPlatform_t *), PERSISTENT_CHUNK);
         }
         f->memories[dependence_index] = (ocrMemPlatform_t *)toinstance;
         break;
@@ -1007,7 +1007,7 @@ void add_dependence (type_enum fromtype, type_enum totype, char *refstr,
         DPRINTF(DEBUG_LVL_INFO, "Allocator %d to %d\n", fromtype, totype);
         if (f->memoryCount == 0) {
             f->memoryCount = dependence_count;
-            f->memories = (ocrMemTarget_t **)runtimeChunkAlloc(dependence_count * sizeof(ocrMemTarget_t *), NULL);
+            f->memories = (ocrMemTarget_t **)runtimeChunkAlloc(dependence_count * sizeof(ocrMemTarget_t *), PERSISTENT_CHUNK);
         }
         f->memories[dependence_index] = (ocrMemTarget_t *)toinstance;
         break;
@@ -1018,7 +1018,7 @@ void add_dependence (type_enum fromtype, type_enum totype, char *refstr,
 
         if (f->platformCount == 0) {
             f->platformCount = dependence_count;
-            f->platforms = (ocrCompPlatform_t **)runtimeChunkAlloc(dependence_count * sizeof(ocrCompPlatform_t *),  NULL);
+            f->platforms = (ocrCompPlatform_t **)runtimeChunkAlloc(dependence_count * sizeof(ocrCompPlatform_t *), PERSISTENT_CHUNK);
         }
         f->platforms[dependence_index] = (ocrCompPlatform_t *)toinstance;
         break;
@@ -1029,7 +1029,7 @@ void add_dependence (type_enum fromtype, type_enum totype, char *refstr,
 
         if (f->computeCount == 0) {
             f->computeCount = dependence_count;
-            f->computes = (ocrCompTarget_t **)runtimeChunkAlloc(dependence_count * sizeof(ocrCompTarget_t *), NULL);
+            f->computes = (ocrCompTarget_t **)runtimeChunkAlloc(dependence_count * sizeof(ocrCompTarget_t *), PERSISTENT_CHUNK);
         }
         f->computes[dependence_index] = (ocrCompTarget_t *)toinstance;
         break;
@@ -1041,7 +1041,7 @@ void add_dependence (type_enum fromtype, type_enum totype, char *refstr,
         case workpile_type: {
             if (f->workpileCount == 0) {
                 f->workpileCount = dependence_count;
-                f->workpiles = (ocrWorkpile_t **)runtimeChunkAlloc(dependence_count * sizeof(ocrWorkpile_t *), NULL);
+                f->workpiles = (ocrWorkpile_t **)runtimeChunkAlloc(dependence_count * sizeof(ocrWorkpile_t *), PERSISTENT_CHUNK);
             }
             f->workpiles[dependence_index] = (ocrWorkpile_t *)toinstance;
             break;
@@ -1056,7 +1056,7 @@ void add_dependence (type_enum fromtype, type_enum totype, char *refstr,
         case schedulerHeuristic_type: {
             if (f->schedulerHeuristicCount == 0) {
                 f->schedulerHeuristicCount = dependence_count;
-                f->schedulerHeuristics = (ocrSchedulerHeuristic_t **)runtimeChunkAlloc(dependence_count * sizeof(ocrSchedulerHeuristic_t *), NULL);
+                f->schedulerHeuristics = (ocrSchedulerHeuristic_t **)runtimeChunkAlloc(dependence_count * sizeof(ocrSchedulerHeuristic_t *), PERSISTENT_CHUNK);
             }
             ocrSchedulerHeuristic_t* t = (ocrSchedulerHeuristic_t *)toinstance;
             f->schedulerHeuristics[dependence_index] = t;
@@ -1075,7 +1075,7 @@ void add_dependence (type_enum fromtype, type_enum totype, char *refstr,
             ASSERT(dependence_count==1);
             if (f->guidProviders == NULL) {
                 f->guidProviderCount = dependence_count;
-                f->guidProviders = (ocrGuidProvider_t **)runtimeChunkAlloc(dependence_count * sizeof(ocrGuidProvider_t *), NULL);
+                f->guidProviders = (ocrGuidProvider_t **)runtimeChunkAlloc(dependence_count * sizeof(ocrGuidProvider_t *), PERSISTENT_CHUNK);
             }
             f->guidProviders[dependence_index] = (ocrGuidProvider_t *)toinstance;
             break;
@@ -1083,7 +1083,7 @@ void add_dependence (type_enum fromtype, type_enum totype, char *refstr,
         case allocator_type: {
             if (f->allocators == NULL) {
                 f->allocatorCount = dependence_count;
-                f->allocators = (ocrAllocator_t **)runtimeChunkAlloc(dependence_count * sizeof(ocrAllocator_t *), NULL);
+                f->allocators = (ocrAllocator_t **)runtimeChunkAlloc(dependence_count * sizeof(ocrAllocator_t *), PERSISTENT_CHUNK);
             }
             f->allocators[dependence_index] = (ocrAllocator_t *)toinstance;
             break;
@@ -1091,7 +1091,7 @@ void add_dependence (type_enum fromtype, type_enum totype, char *refstr,
         case commapi_type: {
             if (f->commApis == NULL) {
                 f->commApiCount = dependence_count;
-                f->commApis = (ocrCommApi_t **)runtimeChunkAlloc(dependence_count * sizeof(ocrCommApi_t *), NULL);
+                f->commApis = (ocrCommApi_t **)runtimeChunkAlloc(dependence_count * sizeof(ocrCommApi_t *), PERSISTENT_CHUNK);
             }
             f->commApis[dependence_index] = (ocrCommApi_t *)toinstance;
             break;
@@ -1099,7 +1099,7 @@ void add_dependence (type_enum fromtype, type_enum totype, char *refstr,
         case worker_type: {
             if (f->workers == NULL) {
                 f->workerCount = dependence_count;
-                f->workers = (ocrWorker_t **)runtimeChunkAlloc(dependence_count * sizeof(ocrWorker_t *), NULL);
+                f->workers = (ocrWorker_t **)runtimeChunkAlloc(dependence_count * sizeof(ocrWorker_t *), PERSISTENT_CHUNK);
             }
             f->workers[dependence_index] = (ocrWorker_t *)toinstance;
             break;
@@ -1107,7 +1107,7 @@ void add_dependence (type_enum fromtype, type_enum totype, char *refstr,
         case scheduler_type: {
             if (f->schedulers == NULL) {
                 f->schedulerCount = dependence_count;
-                f->schedulers = (ocrScheduler_t **)runtimeChunkAlloc(dependence_count * sizeof(ocrScheduler_t *), NULL);
+                f->schedulers = (ocrScheduler_t **)runtimeChunkAlloc(dependence_count * sizeof(ocrScheduler_t *), PERSISTENT_CHUNK);
             }
             f->schedulers[dependence_index] = (ocrScheduler_t *)toinstance;
             break;
@@ -1115,7 +1115,7 @@ void add_dependence (type_enum fromtype, type_enum totype, char *refstr,
         case taskfactory_type: {
             if (f->taskFactories == NULL) {
                 f->taskFactoryCount = dependence_count;
-                f->taskFactories = (ocrTaskFactory_t **)runtimeChunkAlloc(dependence_count * sizeof(ocrTaskFactory_t *), NULL);
+                f->taskFactories = (ocrTaskFactory_t **)runtimeChunkAlloc(dependence_count * sizeof(ocrTaskFactory_t *), PERSISTENT_CHUNK);
             }
             f->taskFactories[dependence_index] = (ocrTaskFactory_t *)toinstance;
             break;
@@ -1123,7 +1123,7 @@ void add_dependence (type_enum fromtype, type_enum totype, char *refstr,
         case tasktemplatefactory_type: {
             if (f->taskTemplateFactories == NULL) {
                 f->taskTemplateFactoryCount = dependence_count;
-                f->taskTemplateFactories = (ocrTaskTemplateFactory_t **)runtimeChunkAlloc(dependence_count * sizeof(ocrTaskTemplateFactory_t *), NULL);
+                f->taskTemplateFactories = (ocrTaskTemplateFactory_t **)runtimeChunkAlloc(dependence_count * sizeof(ocrTaskTemplateFactory_t *), PERSISTENT_CHUNK);
             }
             f->taskTemplateFactories[dependence_index] = (ocrTaskTemplateFactory_t *)toinstance;
             break;
@@ -1131,7 +1131,7 @@ void add_dependence (type_enum fromtype, type_enum totype, char *refstr,
         case datablockfactory_type: {
             if (f->dbFactories == NULL) {
                 f->dbFactoryCount = dependence_count;
-                f->dbFactories = (ocrDataBlockFactory_t **)runtimeChunkAlloc(dependence_count * sizeof(ocrDataBlockFactory_t *), NULL);
+                f->dbFactories = (ocrDataBlockFactory_t **)runtimeChunkAlloc(dependence_count * sizeof(ocrDataBlockFactory_t *), PERSISTENT_CHUNK);
             }
             f->dbFactories[dependence_index] = (ocrDataBlockFactory_t *)toinstance;
             break;
@@ -1139,7 +1139,7 @@ void add_dependence (type_enum fromtype, type_enum totype, char *refstr,
         case eventfactory_type: {
             if (f->eventFactories == NULL) {
                 f->eventFactoryCount = dependence_count;
-                f->eventFactories = (ocrEventFactory_t **)runtimeChunkAlloc(dependence_count * sizeof(ocrEventFactory_t *), NULL);
+                f->eventFactories = (ocrEventFactory_t **)runtimeChunkAlloc(dependence_count * sizeof(ocrEventFactory_t *), PERSISTENT_CHUNK);
             }
             f->eventFactories[dependence_index] = (ocrEventFactory_t *)toinstance;
             break;
@@ -1148,7 +1148,7 @@ void add_dependence (type_enum fromtype, type_enum totype, char *refstr,
             ASSERT(strcasecmp(refstr, "schedulerObjectfactory") == 0);
             if (f->schedulerObjectFactories == NULL) {
                 f->schedulerObjectFactoryCount = dependence_count;
-                f->schedulerObjectFactories = (ocrSchedulerObjectFactory_t **)runtimeChunkAlloc(dependence_count * sizeof(ocrSchedulerObjectFactory_t *), NULL);
+                f->schedulerObjectFactories = (ocrSchedulerObjectFactory_t **)runtimeChunkAlloc(dependence_count * sizeof(ocrSchedulerObjectFactory_t *), PERSISTENT_CHUNK);
             }
             f->schedulerObjectFactories[dependence_index] = (ocrSchedulerObjectFactory_t *)toinstance;
             break;

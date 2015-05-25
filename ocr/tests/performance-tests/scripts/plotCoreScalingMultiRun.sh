@@ -29,7 +29,7 @@ WU_FILE=${TMPDIR}/tmp.wu
 DATA_FILE=${TMPDIR}/tmp.data
 DATA_BUFFER_FILE=${TMPDIR}/tmp.databuffer
 XLABEL_FILE=${TMPDIR}/tmp.xlabel
-IGNORE_TOP_LINES=4
+IGNORE_TOP_LINES=5
 
 #
 # Extract data for workload labels (run names)
@@ -81,11 +81,11 @@ RES=$?
 
 if [[ $RES == 0 ]]; then
     echo "Plot generated ${IMG_NAME}"
-    # rm -Rf ${WU_FILE} 2>/dev/null
-    # rm -Rf ${DATA_FILE}
-    # rm -Rf ${DATA_BUFFER_FILE}
-    # rm -Rf ${XLABEL_FILE}
-    # rm -Rf ${OUTPUT_PLOT_NAME}
+    rm -Rf ${WU_FILE} 2>/dev/null
+    rm -Rf ${DATA_FILE}
+    rm -Rf ${DATA_BUFFER_FILE}
+    rm -Rf ${XLABEL_FILE}
+    rm -Rf ${OUTPUT_PLOT_NAME}
 else
     echo "An error occured generating the plot ${IMG_NAME}"
 fi

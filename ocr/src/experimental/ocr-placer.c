@@ -11,6 +11,7 @@
 #include "debug.h"
 
 #include "ocr-policy-domain.h"
+#include "ocr-types.h"
 #include "experimental/ocr-placer.h"
 #include "extensions/ocr-affinity.h"
 
@@ -36,6 +37,7 @@ ocrGuid_t locationToAffinity(ocrLocationPlacer_t * placer, ocrLocation_t locatio
     return placer->pdLocAffinities[idx];
 }
 
+//Fetch remote affinity guid information
 //TODO nasty copy from hc-dist-policy.c until we don't have proper remote guid metdata resolve impl in PD
 static u8 resolveRemoteMetaData(ocrPolicyDomain_t * self, ocrFatGuid_t * fGuid, u64 metaDataSize) {
     ocrGuid_t remoteGuid = fGuid->guid;
@@ -97,14 +99,14 @@ ocrPlacer_t * createLocationPlacer(ocrPolicyDomain_t *pd) {
     for(i=0; i < pd->neighborCount; i++) {
         ASSERT(pd->neighbors[i] < countAff);
         ocrFatGuid_t fguid;
-        pd->guidProviders[0]->fcts.createGuid(pd->guidProviders[0], &fguid, sizeof(ocrAffinity_t), OCR_GUID_AFFINITY);
+        pd->guidProviders[0]->fcts.createGuid(pd->guidProviders[0], &fguid, sizeof(ocrAffinity_t), OCR_GUID_AFFINITY, GUID_PROP_NONE);
         ((ocrAffinity_t*)fguid.metaDataPtr)->place = pd->neighbors[i];
         placer->pdLocAffinities[pd->neighbors[i]] = fguid.guid;
     }
     // Do current PD
     placer->current = (u32)pd->myLocation;
     ocrFatGuid_t fguid;
-    pd->guidProviders[0]->fcts.createGuid(pd->guidProviders[0], &fguid, sizeof(ocrAffinity_t), OCR_GUID_AFFINITY);
+    pd->guidProviders[0]->fcts.createGuid(pd->guidProviders[0], &fguid, sizeof(ocrAffinity_t), OCR_GUID_AFFINITY, GUID_PROP_NONE);
     ((ocrAffinity_t*)fguid.metaDataPtr)->place = pd->myLocation;
     placer->pdLocAffinities[placer->current] = fguid.guid;
 
@@ -116,7 +118,7 @@ ocrPlacer_t * createLocationPlacer(ocrPolicyDomain_t *pd) {
 }
 
 void destroyLocationPlacer(ocrPolicyDomain_t *pd) {
-    ocrLocationPlacer_t *placer = pd->placer;
+    ocrLocationPlacer_t *placer = (ocrLocationPlacer_t*)(pd->placer);
     u64 i=0;
     PD_MSG_STACK(msg);
     getCurrentEnv(NULL, NULL, NULL, &msg);
@@ -125,9 +127,8 @@ void destroyLocationPlacer(ocrPolicyDomain_t *pd) {
 #define PD_MSG (&msg)
 #define PD_TYPE PD_MSG_GUID_DESTROY
       msg.type = PD_MSG_GUID_DESTROY | PD_MSG_REQUEST;
-      // These next two statements may be not required. Just to be safe
       PD_MSG_FIELD_I(guid.guid) = placer->pdLocAffinities[pd->neighbors[i]];
-      //PD_MSG_FIELD_I(guid.metaDataPtr) = base;
+      PD_MSG_FIELD_I(guid.metaDataPtr) = NULL;
       PD_MSG_FIELD_I(properties) = 0; // Free metadata
       pd->fcts.processMessage(pd, &msg, false);
 #undef PD_MSG
@@ -137,9 +138,8 @@ void destroyLocationPlacer(ocrPolicyDomain_t *pd) {
 #define PD_MSG (&msg)
 #define PD_TYPE PD_MSG_GUID_DESTROY
       msg.type = PD_MSG_GUID_DESTROY | PD_MSG_REQUEST;
-      // These next two statements may be not required. Just to be safe
       PD_MSG_FIELD_I(guid.guid) = placer->pdLocAffinities[placer->current];
-      //PD_MSG_FIELD_I(guid.metaDataPtr) = base;
+      PD_MSG_FIELD_I(guid.metaDataPtr) = NULL;
       PD_MSG_FIELD_I(properties) = 0; // Free metadata
       pd->fcts.processMessage(pd, &msg, false);
 #undef PD_MSG
@@ -147,6 +147,8 @@ void destroyLocationPlacer(ocrPolicyDomain_t *pd) {
 
     pd->fcts.pdFree(pd, placer->pdLocAffinities);
     pd->fcts.pdFree(pd, placer);
+    // Necessary for the PD implementation to avoid placement
+    pd->placer = NULL;
 }
 
 u8 suggestLocationPlacement(ocrPolicyDomain_t *pd, ocrLocation_t curLoc, ocrLocationPlacer_t * placer, ocrPolicyMsg_t * msg) {

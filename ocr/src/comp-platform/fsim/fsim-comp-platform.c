@@ -53,20 +53,49 @@ void fsimCompDestruct (ocrCompPlatform_t * base) {
     runtimeChunkFree((u64)base, NULL);
 }
 
-void fsimCompBegin(ocrCompPlatform_t * compPlatform, ocrPolicyDomain_t * PD, ocrWorkerType_t workerType) {
-    compPlatform->pd = PD;
-}
+u8 fsimCompSwitchRunlevel(ocrCompPlatform_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
+                         phase_t phase, u32 properties, void (*callback)(ocrPolicyDomain_t*, u64), u64 val) {
 
-void fsimCompStart(ocrCompPlatform_t * compPlatform, ocrPolicyDomain_t * PD, ocrWorker_t * worker) {
-    compPlatform->worker = worker;
-    fsimRoutineExecute(worker);
-}
+    u8 toReturn = 0;
 
-void fsimCompStop(ocrCompPlatform_t * compPlatform) {
-    // Nothing to do really
-}
+    // The worker is the capable module and we operate as
+    // inert wrt it
+    ASSERT(callback == NULL);
 
-void fsimCompFinish(ocrCompPlatform_t *compPlatform) {
+    // Verify properties for this call
+    ASSERT((properties & RL_REQUEST) && !(properties & RL_RESPONSE)
+           && !(properties & RL_RELEASE));
+    ASSERT(!(properties & RL_FROM_MSG));
+
+    switch(runlevel) {
+    case RL_CONFIG_PARSE:
+        // On bring-up: Update PD->phasesPerRunlevel on phase 0
+        // and check compatibility on phase 1
+        if((properties & RL_BRING_UP) && RL_IS_FIRST_PHASE_UP(PD, RL_CONFIG_PARSE, phase)) {
+            ASSERT(self->worker != NULL);
+        }
+        break;
+    case RL_NETWORK_OK:
+        break;
+    case RL_PD_OK:
+        if(properties & RL_BRING_UP) {
+            self->pd = PD;
+            self->fcts.setCurrentEnv(self, self->pd, self->worker);
+        }
+        break;
+    case RL_MEMORY_OK:
+        break;
+    case RL_GUID_OK:
+        break;
+    case RL_COMPUTE_OK:
+        fsimRoutineExecute(self->worker);
+        break;
+    case RL_USER_OK:
+        break;
+    default:
+        ASSERT(0);
+    }
+    return toReturn;
 }
 
 u8 fsimCompGetThrottle(ocrCompPlatform_t *self, u64* value) {
@@ -80,8 +109,8 @@ u8 fsimCompSetThrottle(ocrCompPlatform_t *self, u64 value) {
 u8 fsimCompSetCurrentEnv(ocrCompPlatform_t *self, ocrPolicyDomain_t *pd,
                          ocrWorker_t *worker) {
 
-    myPD = pd;
-    myWorker = worker;
+    if(pd) myPD = pd;
+    if(worker) myWorker = worker;
     return 0;
 }
 
@@ -129,10 +158,8 @@ ocrCompPlatformFactory_t *newCompPlatformFactoryFsim(ocrParamList_t *perType) {
     base->initialize = &initializeCompPlatformFsim;
     base->destruct = &destructCompPlatformFactoryFsim;
     base->platformFcts.destruct = FUNC_ADDR(void (*)(ocrCompPlatform_t*), fsimCompDestruct);
-    base->platformFcts.begin = FUNC_ADDR(void (*)(ocrCompPlatform_t*, ocrPolicyDomain_t*, ocrWorkerType_t), fsimCompBegin);
-    base->platformFcts.start = FUNC_ADDR(void (*)(ocrCompPlatform_t*, ocrPolicyDomain_t*, ocrWorker_t*), fsimCompStart);
-    base->platformFcts.stop = FUNC_ADDR(void (*)(ocrCompPlatform_t*), fsimCompStop);
-    base->platformFcts.finish = FUNC_ADDR(void (*)(ocrCompPlatform_t*), fsimCompFinish);
+    base->platformFcts.switchRunlevel = FUNC_ADDR(u8 (*)(ocrCompPlatform_t*, ocrPolicyDomain_t*, ocrRunlevel_t,
+                                                         phase_t, u32, void (*)(ocrPolicyDomain_t*, u64), u64), fsimCompSwitchRunlevel);
     base->platformFcts.getThrottle = FUNC_ADDR(u8 (*)(ocrCompPlatform_t*, u64*), fsimCompGetThrottle);
     base->platformFcts.setThrottle = FUNC_ADDR(u8 (*)(ocrCompPlatform_t*, u64), fsimCompSetThrottle);
     base->platformFcts.setCurrentEnv = FUNC_ADDR(u8 (*)(ocrCompPlatform_t*, ocrPolicyDomain_t*, ocrWorker_t*), fsimCompSetCurrentEnv);

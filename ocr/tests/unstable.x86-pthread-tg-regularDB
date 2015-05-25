@@ -4,3 +4,4 @@ testDistDbEw2.c
 testDistDbEwRo2.c
 testDistDbEwRo3.c
 edtForkBomb.c
+testEdtDestroy0.c

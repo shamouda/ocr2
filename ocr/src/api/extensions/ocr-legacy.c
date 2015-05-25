@@ -9,6 +9,7 @@
 
 #include "debug.h"
 #include "extensions/ocr-legacy.h"
+#include "ocr-errors.h"
 #include "ocr-hal.h"
 #include "ocr-policy-domain.h"
 #include "ocr-types.h"
@@ -18,7 +19,7 @@
 
 #define DEBUG_TYPE API
 
-extern void freeUpRuntime(void);
+extern void freeUpRuntime(bool);
 extern void bringUpRuntime(const char*);
 
 void ocrLegacyInit(ocrGuid_t *legacyContext, ocrConfig_t * ocrConfig) {
@@ -33,25 +34,23 @@ void ocrLegacyInit(ocrGuid_t *legacyContext, ocrConfig_t * ocrConfig) {
 u8 ocrLegacyFinalize(ocrGuid_t legacyContext, bool runUntilShutdown) {
     // Bug #492: legacyContext is ignored
     ocrPolicyDomain_t *pd = NULL;
-    ocrWorker_t *worker = NULL;
     u8 returnCode;
     if(runUntilShutdown) {
-        getCurrentEnv(&pd, &worker, NULL, NULL);
-        // We start the current worker. After it starts, it will loop
-        // until ocrShutdown is called which will cause the entire PD
-        // to stop (including this worker). The currently executing
-        // worker then fallthrough from start to finish.
-        worker->fcts.start(worker, pd);
+        // Here, we are in COMPUTE_OK. We just need to transition to USER_OK
+        // which will start mainEdt
+        getCurrentEnv(&pd, NULL, NULL, NULL);
+        RESULT_ASSERT(
+            pd->fcts.switchRunlevel(pd, RL_USER_OK, RL_REQUEST | RL_ASYNC | RL_BRING_UP | RL_NODE_MASTER),
+            ==, 0);
 
-        // NOTE: finish blocks until stop has completed
-        pd->fcts.finish(pd);
-        pd->fcts.destruct(pd);
+        returnCode = pd->shutdownCode;
+        freeUpRuntime(true);
     } else {
         getCurrentEnv(&pd, NULL, NULL, NULL);
         returnCode = pd->shutdownCode;
+        freeUpRuntime(false);
     }
-    returnCode = pd->shutdownCode;
-    freeUpRuntime();
+
 // #ifdef OCR_ENABLE_STATISTICS
 //     ocrStatsProcessDestruct(&GfakeProcess);
 //     GocrFilterAggregator->destruct(GocrFilterAggregator);
@@ -95,13 +94,13 @@ u8 ocrLegacySpawnOCR(ocrGuid_t* handle, ocrGuid_t finishEdtTemplate, u64 paramc,
 ocrGuid_t ocrWait(ocrGuid_t outputEvent) {
     //DPRINTF(DEBUG_LVL_WARN, "ocrWait is deprecated -- use ocrLegacyBlockProgress instead\n");
     ocrGuid_t outputGuid;
-    if(ocrLegacyBlockProgress(outputEvent, &outputGuid, NULL, NULL) == 0) {
+    if(ocrLegacyBlockProgress(outputEvent, &outputGuid, NULL, NULL, LEGACY_PROP_NONE) == 0) {
         return outputGuid;
     }
     return ERROR_GUID;
 }
 
-u8 ocrLegacyBlockProgress(ocrGuid_t handle, ocrGuid_t* guid, void** result, u64* size) {
+u8 ocrLegacyBlockProgress(ocrGuid_t handle, ocrGuid_t* guid, void** result, u64* size, u16 properties) {
     ocrPolicyDomain_t *pd = NULL;
     ocrEvent_t *eventToYieldFor = NULL;
     ocrFatGuid_t dbResult = {.guid = ERROR_GUID, .metaDataPtr = NULL};
@@ -115,12 +114,29 @@ u8 ocrLegacyBlockProgress(ocrGuid_t handle, ocrGuid_t* guid, void** result, u64*
 
 #define PD_MSG (&msg)
 #define PD_TYPE PD_MSG_GUID_INFO
-    msg.type = PD_MSG_GUID_INFO | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
-    PD_MSG_FIELD_IO(guid.guid) = handle;
-    PD_MSG_FIELD_IO(guid.metaDataPtr) = NULL;
-    PD_MSG_FIELD_I(properties) = KIND_GUIDPROP | RMETA_GUIDPROP;
-    RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, true));
-    eventToYieldFor = (ocrEvent_t *)PD_MSG_FIELD_IO(guid.metaDataPtr);
+    u64 backoff = 1024;
+    do {
+        getCurrentEnv(NULL, NULL, NULL, &msg);
+        msg.type = PD_MSG_GUID_INFO | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
+        PD_MSG_FIELD_IO(guid.guid) = handle;
+        PD_MSG_FIELD_IO(guid.metaDataPtr) = NULL;
+        PD_MSG_FIELD_I(properties) = KIND_GUIDPROP | RMETA_GUIDPROP;
+        RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, true));
+        eventToYieldFor = (ocrEvent_t *)PD_MSG_FIELD_IO(guid.metaDataPtr);
+
+        if(PD_MSG_FIELD_IO(guid.guid) == NULL_GUID) {
+            if(properties == LEGACY_PROP_NONE) {
+                return OCR_EINVAL;
+            } else if(properties == LEGACY_PROP_WAIT_FOR_CREATE) {
+                // We are going to loop
+                u64 origBackoff = backoff;
+                while(--backoff) hal_pause();
+                backoff = origBackoff << 1;
+            }
+        } else {
+            break;
+        }
+    } while(true);
 #undef PD_TYPE
 
     // We can't wait on once/latch events since they could get freed asynchronously

@@ -17,6 +17,9 @@
 // that does not contribute to building the policy domain
 //#define ENABLE_BUILDER_ONLY
 
+// Bug #556
+#define EDT_DEPV_DELAYED
+
 // Allocator
 #define ENABLE_ALLOCATOR_TLSF
 #define ENABLE_ALLOCATOR_SIMPLE

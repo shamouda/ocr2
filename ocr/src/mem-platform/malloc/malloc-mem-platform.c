@@ -18,6 +18,7 @@
 #include "ocr-sysboot.h"
 #include "ocr-types.h"
 #include "ocr-mem-platform.h"
+#include "ocr-policy-domain.h"
 #include "mem-platform/malloc/malloc-mem-platform.h"
 
 #include <stdlib.h>
@@ -33,43 +34,73 @@
 /******************************************************/
 
 void mallocDestruct(ocrMemPlatform_t *self) {
-    ocrMemPlatformMalloc_t *rself = (ocrMemPlatformMalloc_t*)self;
-    if (rself->pRangeTracker)    // in case of mallocproxy, pRangeTracker==0
-        destroyRange(rself->pRangeTracker);
-    free((void*)self->startAddr);
-    runtimeChunkFree((u64)self, NULL);
+    runtimeChunkFree((u64)self, PERSISTENT_CHUNK);
 }
 
-struct _ocrPolicyDomain_t;
+u8 mallocSwitchRunlevel(ocrMemPlatform_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
+                        phase_t phase, u32 properties, void (*callback)(ocrPolicyDomain_t*, u64), u64 val) {
 
-void mallocBegin(ocrMemPlatform_t *self, struct _ocrPolicyDomain_t * PD ) {
-    // This is where we need to update the memory
-    // using the sysboot functions
-    self->startAddr = (u64)malloc(self->size);
-    ASSERT(self->startAddr); // Check that the mem-platform size in config file is reasonable
-    self->endAddr = self->startAddr + self->size;
+    u8 toReturn = 0;
 
-    // rangeTracker will be located at self->startAddr, and it should be zero'ed
-    // since initializeRange() assumes zero-ed 'lock' and 'inited' variables
-    ASSERT(self->size >= MEM_PLATFORM_ZEROED_AREA_SIZE);    // make sure no buffer overrun
-    // zero beginning part to cover rangeTracker and pad, and allocator metadata part i.e. pool header (pool_t)
-    memset((void *)self->startAddr , 0, MEM_PLATFORM_ZEROED_AREA_SIZE);
+    // This is an inert module, we do not handle callbacks (caller needs to wait on us)
+    ASSERT(callback == NULL);
 
-    ocrMemPlatformMalloc_t *rself = (ocrMemPlatformMalloc_t*)self;
-    rself->pRangeTracker = initializeRange(16, self->startAddr,
-                    self->endAddr, USER_FREE_TAG);
-}
+    // Verify properties for this call
+    ASSERT((properties & RL_REQUEST) && !(properties & RL_RESPONSE)
+           && !(properties & RL_RELEASE));
+    ASSERT(!(properties & RL_FROM_MSG));
 
-void mallocStart(ocrMemPlatform_t *self, struct _ocrPolicyDomain_t * PD ) {
-    self->pd = PD;
-    // Nothing much else to do
-}
+    switch(runlevel) {
+    case RL_CONFIG_PARSE:
+        // On bring-up: Update PD->phasesPerRunlevel on phase 0
+        // and check compatibility on phase 1
+        break;
+    case RL_NETWORK_OK:
+        break;
+    case RL_PD_OK:
+        if(properties & RL_BRING_UP) {
+            // We can now set our PD (before this, we couldn't because
+            // "our" PD might not have been started
+            self->pd = PD;
+        }
+        break;
+    case RL_MEMORY_OK:
+        if((properties & RL_BRING_UP) && RL_IS_FIRST_PHASE_UP(PD, RL_MEMORY_OK, phase)) {
+            // This is where we need to update the memory
+            // using the sysboot functions
+            self->startAddr = (u64)malloc(self->size);
+            // Check that the mem-platform size in config file is reasonable
+            ASSERT(self->startAddr);
+            self->endAddr = self->startAddr + self->size;
 
-void mallocStop(ocrMemPlatform_t *self) {
-    // Nothing to do
-}
+            // rangeTracker will be located at self->startAddr, and it should be zero'ed
+            // since initializeRange() assumes zero-ed 'lock' and 'inited' variables
+            ASSERT(self->size >= MEM_PLATFORM_ZEROED_AREA_SIZE);    // make sure no buffer overrun
+            // zero beginning part to cover rangeTracker and pad, and allocator metadata part i.e. pool header (pool_t)
+            memset((void *)self->startAddr , 0, MEM_PLATFORM_ZEROED_AREA_SIZE);
 
-void mallocFinish(ocrMemPlatform_t *self) {
+            ocrMemPlatformMalloc_t *rself = (ocrMemPlatformMalloc_t*)self;
+            rself->pRangeTracker = initializeRange(
+                16, self->startAddr, self->endAddr, USER_FREE_TAG);
+        } else if((properties & RL_TEAR_DOWN) && RL_IS_LAST_PHASE_DOWN(PD, RL_MEMORY_OK, phase)) {
+            ocrMemPlatformMalloc_t *rself = (ocrMemPlatformMalloc_t*)self;
+            if(rself->pRangeTracker)    // in case of mallocproxy, pRangeTracker==0
+                destroyRange(rself->pRangeTracker);
+            // Here we can free the memory we allocated
+            free((void*)(self->startAddr));
+        }
+        break;
+    case RL_GUID_OK:
+        break;
+    case RL_COMPUTE_OK:
+        break;
+    case RL_USER_OK:
+        break;
+    default:
+        // Unknown runlevel
+        ASSERT(0);
+    }
+    return toReturn;
 }
 
 u8 mallocGetThrottle(ocrMemPlatform_t *self, u64 *value) {
@@ -161,7 +192,7 @@ void initializeMemPlatformMalloc(ocrMemPlatformFactory_t * factory, ocrMemPlatfo
 /******************************************************/
 
 void destructMemPlatformFactoryMalloc(ocrMemPlatformFactory_t *factory) {
-    runtimeChunkFree((u64)factory, NULL);
+    runtimeChunkFree((u64)factory, NONPERSISTENT_CHUNK);
 }
 
 ocrMemPlatformFactory_t *newMemPlatformFactoryMalloc(ocrParamList_t *perType) {
@@ -172,10 +203,8 @@ ocrMemPlatformFactory_t *newMemPlatformFactoryMalloc(ocrParamList_t *perType) {
     base->initialize = &initializeMemPlatformMalloc;
     base->destruct = &destructMemPlatformFactoryMalloc;
     base->platformFcts.destruct = FUNC_ADDR(void (*) (ocrMemPlatform_t *), mallocDestruct);
-    base->platformFcts.begin = FUNC_ADDR(void (*) (ocrMemPlatform_t *, struct _ocrPolicyDomain_t *), mallocBegin);
-    base->platformFcts.start = FUNC_ADDR(void (*) (ocrMemPlatform_t *, struct _ocrPolicyDomain_t *), mallocStart);
-    base->platformFcts.stop = FUNC_ADDR(void (*) (ocrMemPlatform_t *), mallocStop);
-    base->platformFcts.finish = FUNC_ADDR(void (*) (ocrMemPlatform_t *), mallocFinish);
+    base->platformFcts.switchRunlevel = FUNC_ADDR(u8 (*)(ocrMemPlatform_t*, ocrPolicyDomain_t*, ocrRunlevel_t,
+                                                         phase_t, u32, void (*)(ocrPolicyDomain_t*, u64), u64), mallocSwitchRunlevel);
     base->platformFcts.getThrottle = FUNC_ADDR(u8 (*) (ocrMemPlatform_t *, u64 *), mallocGetThrottle);
     base->platformFcts.setThrottle = FUNC_ADDR(u8 (*) (ocrMemPlatform_t *, u64), mallocSetThrottle);
     base->platformFcts.getRange = FUNC_ADDR(void (*) (ocrMemPlatform_t *, u64 *, u64 *), mallocGetRange);

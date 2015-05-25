@@ -1,2 +1,4 @@
 counted          - Counter based GUID implementation (uses hashtables)
+labeled          - Hashtable based GUID implementation supporting GUID labels
+                   (based on counted)
 ptr              - Pointer base GUID implementation (the pointer is the GUID)

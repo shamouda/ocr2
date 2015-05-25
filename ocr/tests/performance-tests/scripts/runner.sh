@@ -143,7 +143,7 @@ function defaultConfigTarget() {
     local target=$1
     case "$target" in
         X86)
-            export CFGARG_GUID=${CFGARG_GUID-"GUID"}
+            export CFGARG_GUID=${CFGARG_GUID-"PTR"}
             export CFGARG_PLATFORM=${CFGARG_PLATFORM-"X86"}
             export CFGARG_TARGET=${CFGARG_TARGET-"X86"}
             export CFGARG_BINDING=${CFGARG_BINDING-"seq"}
@@ -226,8 +226,8 @@ function scalingTest {
             echo "error: run failed !"
             exit 1
         fi
-        # TODO keep that around for now to peek at the cfg file
         # Everything went fine, delete the generated cfg file
+        # unless instructed otherwise by NOCLEAN_OPT
         deleteFiles ${CFGARG_OUTPUT}
     done
 }
@@ -261,7 +261,7 @@ function runTest() {
     ${SCRIPT_ROOT}/reportGenerator.sh ${reportGenOpt} ${runlog} >> ${report}
 }
 
-echo "Running core scaling for ${PROG_ARG} with OCR base config file ${OCR_CONFIG_BASE}"
+echo "Running core scaling for ${PROG_ARG}"
 
 # Setting up env variables for the cfg file generator
 defaultConfigTarget ${TARGET_ARG}

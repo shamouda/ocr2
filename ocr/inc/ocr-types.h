@@ -272,6 +272,9 @@ typedef enum {
     OCR_EVENT_LATCH_INCR_SLOT = 1  /**< The increment slot of a LATCH event */
 } ocrLatchEventSlot_t;
 
+#define EVT_PROP_NONE      ((u16) 0x0) /**< Property bits indicating a regular event */
+#define EVT_PROP_TAKES_ARG ((u16) 0x1) /**< Property bits indicating that the event takes an argument */
+
 /**
  * @}
  *
@@ -339,7 +342,53 @@ typedef struct {
 } ocrHint_t;
 
 /**
+ * @brief OCR query types
+ *
+ * Note: User facing options for queryable sections
+ *       of paused runtime.
+ *
+ */
+typedef enum {
+    OCR_QUERY_WORKPILE_EDTS,
+    OCR_QUERY_EVENTS,
+    OCR_QUERY_DATABLOCKS,
+    OCR_QUERY_ALL_EDTS,
+} ocrQueryType_t;
+
+/**
  * @}
+ */
+/**
+ * @defgroup OCRTypesLabels Constants for GUID labels
+ *
+ * @{
+ */
+#define GUID_PROP_NONE       ((u16)(0x0))   /**< No specific property */
+#define GUID_PROP_IS_LABELED ((u16)(0x100)) /**< Property to indicate the GUID passed as
+                                             * argument to the create call is a labeled GUID and
+                                             * should not be ignored (the default behavior is
+                                             * to ignore the field) */
+#define GUID_PROP_CHECK ((u16)(0x300))      /**< Property to indicate that, on creation, the
+                                             * runtime should check if the GUID exists already,
+                                             * and, if so, return an error code. The default behavior
+                                             * is to not check (and therefore potentially create
+                                             * the same object multiple times leading to undefined
+                                             * behavior). Note that checking will incur
+                                             * additional overhead. This implies
+                                             * GUID_PROP_IS_LABELED. */
+#define GUID_PROP_BLOCK ((u16)(0x500))      /**< Property to indicate that, on creation, the
+                                             * runtime should check if the GUID exists already, and
+                                             * if so, block until it can be re-created. See
+                                             * comments for #GUID_PROP_CHECK
+                                             */
+#define LEGACY_PROP_NONE            ((u16)(0x0))
+#define LEGACY_PROP_WAIT_FOR_CREATE ((u16)(0x1)) /**< For ocrLegacyBlockProgress, wait for the handle to
+                                                  * be created */
+/**
+ * @}
+ */
+
+/**
  * @}
  */
 

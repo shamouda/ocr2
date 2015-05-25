@@ -15,21 +15,21 @@
 #include "utils/list.h"
 #include "ocr-worker.h"
 
-#define HC_COMM_WORKER_RL_MAX 3
-
 typedef struct {
     ocrWorkerFactoryHc_t base;
     void (*baseInitialize) (struct _ocrWorkerFactory_t * factory,
                                   struct _ocrWorker_t *self, ocrParamList_t *perInstance);
-    void (*baseStop)(struct _ocrWorker_t *self);
+    u8 (*baseSwitchRunlevel)(struct _ocrWorker_t* self, struct _ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
+                     phase_t phase, u32 properties, void (*callback)(struct _ocrPolicyDomain_t*, u64), u64 val);
 } ocrWorkerFactoryHcComm_t;
 
 typedef struct {
     ocrWorkerHc_t worker;
     // cached base function pointers
-    void (*baseStop)(struct _ocrWorker_t *self);
-    volatile int rl;
-    volatile int rl_completed [HC_COMM_WORKER_RL_MAX+1];
+    u8 (*baseSwitchRunlevel)(struct _ocrWorker_t* self, struct _ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
+                     phase_t phase, u32 properties, void (*callback)(struct _ocrPolicyDomain_t*, u64), u64 val);
+    ocrGuid_t processRequestTemplate;
+    bool flushOutgoingComm;
 } ocrWorkerHcComm_t;
 
 ocrWorkerFactory_t* newOcrWorkerFactoryHcComm(ocrParamList_t *perType);

@@ -21,25 +21,61 @@
 #define MAX_ACTIVE_WAIT 100
 
 void delegateCommDestruct (ocrCommApi_t * base) {
-    runtimeChunkFree((u64)base, NULL);
+    if(base->commPlatform != NULL) {
+        base->commPlatform->fcts.destruct(base->commPlatform);
+        base->commPlatform = NULL;
+    }
+    runtimeChunkFree((u64)base, PERSISTENT_CHUNK);
 }
 
-void delegateCommBegin(ocrCommApi_t * self, ocrPolicyDomain_t * pd) {
-    //Initialize base
-    self->pd = pd;
-    self->commPlatform->fcts.begin(self->commPlatform, pd, self);
-}
+u8 delegateCommSwitchRunlevel(ocrCommApi_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
+                                phase_t phase, u32 properties, void (*callback)(ocrPolicyDomain_t*,u64), u64 val) {
+    u8 toReturn = 0;
 
-void delegateCommStart(ocrCommApi_t * self, ocrPolicyDomain_t * pd) {
-    self->commPlatform->fcts.start(self->commPlatform, pd, self);
-}
+    // This is an inert module, we do not handle callbacks (caller needs to wait on us)
+    ASSERT(callback == NULL);
 
-void delegateCommStop(ocrCommApi_t * self) {
-    self->commPlatform->fcts.stop(self->commPlatform);
-}
+    // Verify properties for this call
+    ASSERT((properties & RL_REQUEST) && !(properties & RL_RESPONSE)
+           && !(properties & RL_RELEASE));
+    ASSERT(!(properties & RL_FROM_MSG));
 
-void delegateCommFinish(ocrCommApi_t *self) {
-    self->commPlatform->fcts.finish(self->commPlatform);
+    if(properties & RL_BRING_UP) {
+        toReturn |= self->commPlatform->fcts.switchRunlevel(self->commPlatform, PD, runlevel, phase,
+                                                            properties, NULL, 0);
+    }
+
+    switch(runlevel) {
+    case RL_CONFIG_PARSE:
+        // On bring-up: Update PD->phasesPerRunlevel on phase 0
+        // and check compatibility on phase 1
+        break;
+    case RL_NETWORK_OK:
+        // Nothing
+        break;
+    case RL_PD_OK:
+        if(properties & RL_BRING_UP) {
+            // We can now set our PD (before this, we couldn't because
+            // "our" PD might not have been started
+            self->pd = PD;
+        }
+        break;
+    case RL_MEMORY_OK:
+    case RL_GUID_OK:
+    case RL_COMPUTE_OK:
+    case RL_USER_OK:
+        // Nothing to do
+        break;
+    default:
+        // Unknown runlevel
+        ASSERT(0);
+    }
+
+    if(properties & RL_TEAR_DOWN) {
+        toReturn |= self->commPlatform->fcts.switchRunlevel(self->commPlatform, PD, runlevel, phase,
+                                                            properties, NULL, 0);
+    }
+    return toReturn;
 }
 
 static ocrPolicyMsg_t * allocateNewMessage(ocrCommApi_t * self, u32 size) {
@@ -84,14 +120,28 @@ u8 delegateCommSendMessage(ocrCommApi_t *self, ocrLocation_t target,
     ASSERT((pd->myLocation == message->srcLocation) && (target == message->destLocation));
     ASSERT(pd->myLocation != target); //DIST-TODO not tested sending a message to self
 
+    // If the message is not persistent and the marshall mode is set, we do the specified
+    // copy. Otherwise it is just the mode the buffer has been copied in the first place.
+
+    // Modified this to experiment with asynchronous remote edt creation
     if (!(properties & PERSIST_MSG_PROP)) {
-        // Need to make a copy of the message. Recall send is returning as soon as
-        // the handle is handed over to the scheduler.
+        // Need to make a copy of the message. Recall that send is returning
+        // as soon as the handle is handed over to the scheduler.
+        ocrMarshallMode_t marshallMode = (ocrMarshallMode_t) GET_PROP_U8_MARSHALL(properties);
+
+        if (marshallMode == 0) {
+            marshallMode = MARSHALL_DUPLICATE; // impl choice
+        }
+
+        // NOTE: here we could support _APPEND or _ADDL although we would still
+        //       have to create a new message anyway because of PERSIST_MSG_PROP
+        ASSERT((marshallMode & MARSHALL_DUPLICATE) || (marshallMode & MARSHALL_FULL_COPY));
+
         u64 baseSize = 0, marshalledSize = 0;
-        ocrPolicyMsgGetMsgSize(message, &baseSize, &marshalledSize, 0);
+        ocrPolicyMsgGetMsgSize(message, &baseSize, &marshalledSize, marshallMode);
         u64 fullSize = baseSize + marshalledSize;
         ocrPolicyMsg_t * msgCpy = allocateNewMessage(self, fullSize);
-        ocrPolicyMsgMarshallMsg(message, baseSize, (u8*)msgCpy, MARSHALL_DUPLICATE);
+        ocrPolicyMsgMarshallMsg(message, baseSize, (u8*)msgCpy, marshallMode);
         message = msgCpy;
         // Indicates to entities down the line the message is now persistent
         // The rationale is that one-way calls are always deallocated by the
@@ -208,7 +258,7 @@ u8 delegateCommWaitMessage(ocrCommApi_t *self, ocrMsgHandle_t **handle) {
 ocrCommApi_t* newCommApiDelegate(ocrCommApiFactory_t *factory,
                                        ocrParamList_t *perInstance) {
     ocrCommApiDelegate_t * commPlatformDelegate = (ocrCommApiDelegate_t*)
-        runtimeChunkAlloc(sizeof(ocrCommApiDelegate_t), NULL);
+        runtimeChunkAlloc(sizeof(ocrCommApiDelegate_t), PERSISTENT_CHUNK);
     factory->initialize(factory, (ocrCommApi_t*) commPlatformDelegate, perInstance);
     return (ocrCommApi_t*) commPlatformDelegate;
 }
@@ -225,21 +275,19 @@ void initializeCommApiDelegate(ocrCommApiFactory_t * factory, ocrCommApi_t* self
 /******************************************************/
 
 void destructCommApiFactoryDelegate(ocrCommApiFactory_t *factory) {
-    runtimeChunkFree((u64)factory, NULL);
+    runtimeChunkFree((u64)factory, NONPERSISTENT_CHUNK);
 }
 
 ocrCommApiFactory_t *newCommApiFactoryDelegate(ocrParamList_t *perType) {
     ocrCommApiFactory_t *base = (ocrCommApiFactory_t*)
-        runtimeChunkAlloc(sizeof(ocrCommApiFactoryDelegate_t), (void *)1);
+        runtimeChunkAlloc(sizeof(ocrCommApiFactoryDelegate_t), NONPERSISTENT_CHUNK);
 
     base->instantiate = newCommApiDelegate;
     base->initialize = initializeCommApiDelegate;
     base->destruct = destructCommApiFactoryDelegate;
     base->apiFcts.destruct = FUNC_ADDR(void (*)(ocrCommApi_t*), delegateCommDestruct);
-    base->apiFcts.begin = FUNC_ADDR(void (*)(ocrCommApi_t*, ocrPolicyDomain_t*), delegateCommBegin);
-    base->apiFcts.start = FUNC_ADDR(void (*)(ocrCommApi_t*, ocrPolicyDomain_t*), delegateCommStart);
-    base->apiFcts.stop = FUNC_ADDR(void (*)(ocrCommApi_t*), delegateCommStop);
-    base->apiFcts.finish = FUNC_ADDR(void (*)(ocrCommApi_t*), delegateCommFinish);
+    base->apiFcts.switchRunlevel = FUNC_ADDR(u8 (*)(ocrCommApi_t*, ocrPolicyDomain_t*, ocrRunlevel_t,
+                                                    phase_t, u32, void (*)(ocrPolicyDomain_t*,u64), u64), delegateCommSwitchRunlevel);
     base->apiFcts.sendMessage = FUNC_ADDR(u8 (*)(ocrCommApi_t*, ocrLocation_t,
                                                       ocrPolicyMsg_t *, ocrMsgHandle_t **, u32), delegateCommSendMessage);
     base->apiFcts.pollMessage = FUNC_ADDR(u8 (*)(ocrCommApi_t*, ocrMsgHandle_t**),

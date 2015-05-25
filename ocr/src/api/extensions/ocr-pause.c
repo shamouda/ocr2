@@ -13,18 +13,12 @@
 #include "ocr-sal.h"
 
 u32 ocrPause(bool isBlocking){
-   u32 ret;
-    do{
-        ret = salPause();
-        if(ret) break;
-    }while(isBlocking);
-    return ret;
+    return salPause(isBlocking);
 }
 
-//Note - Only queries runnable EDTs currently as a base case
-//TODO: Expand to include specific query types.
-void ocrQuery(u32 flag){
-    salQuery(flag);
+ocrGuid_t ocrQuery(ocrQueryType_t query, ocrGuid_t guid, void **result, u32 *size, u8 flags){
+    ocrGuid_t ret = salQuery(query, guid, result, size, flags);
+    return ret;
 }
 
 void ocrResume(u32 flag){

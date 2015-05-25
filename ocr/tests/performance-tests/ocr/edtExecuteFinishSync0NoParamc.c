@@ -8,7 +8,6 @@
 //
 // VARIABLES:
 // - NB_INSTANCES
-// - PARAMC_SIZE: the size of paramc for the created EDTs
+// - PARAMC_SZ: the size of paramc for the created EDTs
 
-// TODO DEFAULT VALUE HERE
 #include "edtExecuteFinishSync0.ctpl"

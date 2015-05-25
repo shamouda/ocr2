@@ -13,14 +13,22 @@
 #include "utils/ocr-utils.h"
 
 typedef enum _guidType_t {
+#ifdef ENABLE_GUID_PTR
     guidPtr_id,
+#endif
+#ifdef ENABLE_GUID_COUNTED_MAP
     guidCountedMap_id,
+#endif
+#ifdef ENABLE_GUID_LABELED
+    guidLabeled_id,
+#endif
     guidMax_id
 } guidType_t;
 
 const char * guid_types[] __attribute__ ((weak)) = {
     "PTR",
     "COUNTED_MAP",
+    "LABELED",
     NULL
 };
 
@@ -28,6 +36,9 @@ const char * guid_types[] __attribute__ ((weak)) = {
 #include "guid/ptr/ptr-guid.h"
 // Counted GUID provider backed my map
 #include "guid/counted/counted-map-guid.h"
+// Similar to counted GUID but with experimental
+// labeling support
+#include "guid/labeled/labeled-guid.h"
 
 // Add other GUID providers if needed
 static inline ocrGuidProviderFactory_t *newGuidProviderFactory(guidType_t type, ocrParamList_t *typeArg) {
@@ -39,6 +50,10 @@ static inline ocrGuidProviderFactory_t *newGuidProviderFactory(guidType_t type, 
 #ifdef ENABLE_GUID_COUNTED_MAP
     case guidCountedMap_id:
         return newGuidProviderFactoryCountedMap(typeArg, (u32)type);
+#endif
+#ifdef ENABLE_GUID_LABELED
+    case guidLabeled_id:
+        return newGuidProviderFactoryLabeled(typeArg, (u32)type);
 #endif
     default:
         ASSERT(0);

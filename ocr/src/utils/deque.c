@@ -11,7 +11,6 @@
 #include "ocr-policy-domain.h"
 #include "ocr-types.h"
 #include "utils/deque.h"
-#include "worker/hc/hc-worker.h"
 
 #define DEBUG_TYPE UTIL
 
@@ -35,7 +34,9 @@ void dequeDestroy(ocrPolicyDomain_t *pd, deque_t* deq) {
 static void baseDequeInit(deque_t* deq, ocrPolicyDomain_t *pd, void * initValue) {
     deq->head = 0;
     deq->tail = 0;
+    deq->data = NULL;
     deq->data = (volatile void **)pd->fcts.pdMalloc(pd, sizeof(void*)*INIT_DEQUE_CAPACITY);
+    ASSERT(deq->data != NULL);
     u32 i=0;
     while(i < INIT_DEQUE_CAPACITY) {
         deq->data[i] = initValue;

@@ -1,6 +1,6 @@
 #
 # Input: a string of values
-# Output: avg stddev
+# Output: avg stddev count
 
 if [[ -z "$SCRIPT_ROOT" ]]; then
     echo "SCRIPT_ROOT environment variable is not defined"
@@ -37,4 +37,4 @@ done
 
 stddev=`echo "scale=$SCALE; sqrt(($diffs / $count))" | bc`
 
-echo "$avg ${stddev}"
+echo "$avg ${stddev} ${count}"

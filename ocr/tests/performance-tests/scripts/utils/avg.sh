@@ -6,7 +6,6 @@ VALUES="$1"
 # significant digits
 SCALE=3
 
-
 acc=0
 count=0
 

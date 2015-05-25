@@ -883,15 +883,16 @@ ocrRuntimeHint_t* getRuntimeHintEventHc(ocrEvent_t* self) {
 /* OCR-HC Events Factory                              */
 /******************************************************/
 
-// takesArg indicates whether or not this event carries any data
-ocrEvent_t * newEventHc(ocrEventFactory_t * factory, ocrEventTypes_t eventType,
-                        bool takesArg, ocrParamList_t *perInstance) {
+u8 newEventHc(ocrEventFactory_t * factory, ocrFatGuid_t *guid,
+              ocrEventTypes_t eventType, u32 properties,
+              ocrParamList_t *perInstance) {
 
     // Get the current environment
     ocrPolicyDomain_t *pd = NULL;
     PD_MSG_STACK(msg);
     ocrTask_t *curTask = NULL;
     u32 i;
+    u8 returnValue = 0;
 
     getCurrentEnv(&pd, NULL, &curTask, &msg);
     ocrFatGuid_t curEdt = {.guid = curTask!=NULL?curTask->guid:NULL_GUID, .metaDataPtr = curTask};
@@ -928,16 +929,20 @@ ocrEvent_t * newEventHc(ocrEventFactory_t * factory, ocrEventTypes_t eventType,
 #define PD_MSG (&msg)
 #define PD_TYPE PD_MSG_GUID_CREATE
     msg.type = PD_MSG_GUID_CREATE | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
-    PD_MSG_FIELD_IO(guid.guid) = UNINITIALIZED_GUID;
-    PD_MSG_FIELD_IO(guid.metaDataPtr) = NULL;
+    PD_MSG_FIELD_IO(guid) = *guid;
     // We allocate everything in the meta-data to keep things simple
     PD_MSG_FIELD_I(size) = sizeOfGuid + hintc*sizeof(u64);
     PD_MSG_FIELD_I(kind) = kind;
-    PD_MSG_FIELD_I(properties) = 0;
-    RESULT_PROPAGATE2(pd->fcts.processMessage(pd, &msg, true), NULL);
+    PD_MSG_FIELD_I(properties) = properties;
+    RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, true));
     ocrEventHc_t *event = (ocrEventHc_t*)PD_MSG_FIELD_IO(guid.metaDataPtr);
     ocrEvent_t *base = (ocrEvent_t*)event;
+    returnValue = PD_MSG_FIELD_O(returnDetail);
     ASSERT(event);
+
+    if(returnValue != 0) {
+        return returnValue;
+    }
 
     // Set-up base structures
     base->guid = PD_MSG_FIELD_IO(guid.guid);
@@ -988,7 +993,7 @@ ocrEvent_t * newEventHc(ocrEventFactory_t * factory, ocrEventTypes_t eventType,
     PD_MSG_FIELD_I(affinity.metaDataPtr) = NULL;
     PD_MSG_FIELD_I(dbType) = RUNTIME_DBTYPE;
     PD_MSG_FIELD_I(allocator) = NO_ALLOC;
-    RESULT_PROPAGATE2(pd->fcts.processMessage(pd, &msg, true), NULL);
+    RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, true));
     event->waitersDb = PD_MSG_FIELD_IO(guid);
     temp = (regNode_t*)PD_MSG_FIELD_O(ptr);
     event->waitersDb = PD_MSG_FIELD_IO(guid);
@@ -1021,7 +1026,7 @@ ocrEvent_t * newEventHc(ocrEventFactory_t * factory, ocrEventTypes_t eventType,
     PD_MSG_FIELD_I(ptr) = NULL;
     PD_MSG_FIELD_I(size) = 0;
     PD_MSG_FIELD_I(properties) = DB_PROP_RT_ACQUIRE;
-    RESULT_PROPAGATE2(pd->fcts.processMessage(pd, &msg, true), NULL);
+    RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, true));
 #undef PD_MSG
 #undef PD_TYPE
 
@@ -1029,19 +1034,23 @@ ocrEvent_t * newEventHc(ocrEventFactory_t * factory, ocrEventTypes_t eventType,
 #ifdef OCR_ENABLE_STATISTICS
     statsEVT_CREATE(getCurrentPD(), getCurrentEDT(), NULL, base->guid, base);
 #endif
-    return base;
+    if(returnValue == 0) {
+        guid->guid = base->guid;
+        guid->metaDataPtr = base;
+    }
+    return returnValue;
 }
 
 void destructEventFactoryHc(ocrEventFactory_t * base) {
-    runtimeChunkFree((u64)base, NULL);
+    runtimeChunkFree((u64)base, PERSISTENT_CHUNK);
 }
 
 ocrEventFactory_t * newEventFactoryHc(ocrParamList_t *perType, u32 factoryId) {
     ocrEventFactory_t* base = (ocrEventFactory_t*) runtimeChunkAlloc(
-                                  sizeof(ocrEventFactoryHc_t), NULL);
+                                  sizeof(ocrEventFactoryHc_t), PERSISTENT_CHUNK);
 
-    base->instantiate = FUNC_ADDR(ocrEvent_t* (*)(ocrEventFactory_t*,
-                                  ocrEventTypes_t, bool, ocrParamList_t*), newEventHc);
+    base->instantiate = FUNC_ADDR(u8 (*)(ocrEventFactory_t*, ocrFatGuid_t*,
+                                  ocrEventTypes_t, u32, ocrParamList_t*), newEventHc);
     base->destruct =  FUNC_ADDR(void (*)(ocrEventFactory_t*), destructEventFactoryHc);
     // Initialize the function pointers
 

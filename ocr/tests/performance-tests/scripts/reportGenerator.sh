@@ -84,7 +84,7 @@ echo "$SPUP" | tr ' ' '\n' > ${TMPDIR}/tmp-agg-results-spup
 # Format core-scaling information
 echo "${CORE_SCALING}" | tr ' ' '\n' > ${TMPDIR}/tmp-core-scaling
 
-# final formatting: core-scaling | avg | stddev | speed-up
+# final formatting: core-scaling | avg | stddev | count | speed-up
 paste ${TMPDIR}/tmp-core-scaling ${TMPDIR}/tmp-agg-results ${TMPDIR}/tmp-agg-results-spup | column -t
 
 # delete left-over temporary file

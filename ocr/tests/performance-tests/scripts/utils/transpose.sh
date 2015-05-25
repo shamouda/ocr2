@@ -1,4 +1,4 @@
-#Look for a transpose.data file as input
+#Looks for a transpose.data file as input
 
 FILE=$1
 
