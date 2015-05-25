@@ -222,6 +222,7 @@ ocrGuid_t smith_waterman_task ( u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t d
     /* If this is the last tile (bottom right most tile), finish */
     if ( i == n_tiles_height && j == n_tiles_width ) {
         PRINTF("score: %d\n", curr_bottom_row[tile_width-1]);
+        VERIFY(curr_bottom_row[tile_width-1] == paramv[5], "Expected score: %d\n", (s32)paramv[5]);
         ocrShutdown();
     }
     return NULL_GUID;
@@ -288,35 +289,40 @@ static void initialize_border_values( Tile_t** tile_matrix, s32 n_tiles_width, s
     }
 }
 
-static u32 __attribute__ ((noinline)) ioHandling ( void* marshalled, s32* p_n_tiles_height, s32* p_n_tiles_width, s32* p_tile_width, s32* p_tile_height, s8** p_string_1, s8** p_string_2) {
+static u32 __attribute__ ((noinline)) ioHandling ( void* marshalled, s32* p_n_tiles_height, s32* p_n_tiles_width, s32* p_tile_width, s32* p_tile_height, s8** p_string_1, s8** p_string_2, u32 *check_score) {
     u64 argc = getArgc(marshalled);
 
-    if(argc < 5) {
+    if(argc < 6) {
 #ifdef TG_ARCH
-        PRINTF("Usage: %s tileWidth tileHeight string1Length string2Length\n", getArgv(marshalled, 0)/*argv[0]*/);
+        PRINTF("Usage: %s tileWidth tileHeight string1Length string2Length scoreLength\n", getArgv(marshalled, 0)/*argv[0]*/);
 #else
-        PRINTF("Usage: %s tileWidth tileHeight fileName1 fileName2\n", getArgv(marshalled, 0)/*argv[0]*/);
+        PRINTF("Usage: %s tileWidth tileHeight fileName1 fileName2 scoreFile\n", getArgv(marshalled, 0)/*argv[0]*/);
 #endif
         return 1;
     }
 
     u32 n_char_in_file_1 = 0;
     u32 n_char_in_file_2 = 0;
+    u32 n_char_in_file_score = 0;
     s8 *file_name_1;
     s8 *file_name_2;
+    s8 *file_name_score;
 
 #ifdef TG_ARCH
     *p_tile_width = (s32) atoi(getArgv(marshalled, 1));
     *p_tile_height = (s32) atoi(getArgv(marshalled, 2));
     n_char_in_file_1 = (s32) atoi(getArgv(marshalled, 3));
     n_char_in_file_2 = (s32) atoi(getArgv(marshalled, 4));
+    n_char_in_file_score = (s32) atoi(getArgv(marshalled, 5));
     file_name_1 = NULL; // Doesn't matter anyway
     file_name_2 = NULL; // since the filename is immaterial
+    file_name_score = NULL;
 #else
     *p_tile_width = (s32) atoi(getArgv(marshalled, 1));
     *p_tile_height = (s32) atoi(getArgv(marshalled, 2));
     file_name_1 = getArgv(marshalled, 3);
     file_name_2 = getArgv(marshalled, 4);
+    file_name_score = getArgv(marshalled, 5);
 #endif
 
     *p_string_1 = read_file(file_name_1, &n_char_in_file_1);
@@ -327,6 +333,8 @@ static u32 __attribute__ ((noinline)) ioHandling ( void* marshalled, s32* p_n_ti
     if(*p_string_2 == NULL) return 1;
     PRINTF("Size of input string 2 is %d\n", n_char_in_file_2 );
 
+    *check_score = atoi(read_file(file_name_score, &n_char_in_file_score));
+    PRINTF("Score to get it %u\n", *check_score);
     PRINTF("Tile width is %d\n", *p_tile_width);
     PRINTF("Tile height is %d\n", *p_tile_height);
 
@@ -349,8 +357,9 @@ ocrGuid_t mainEdt ( u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     s32 tile_height;
     s8* string_1;
     s8* string_2;
+    u32 check_score;
 
-    if(ioHandling(depv[0].ptr, &n_tiles_height, &n_tiles_width, &tile_width, &tile_height, &string_1, &string_2))
+    if(ioHandling(depv[0].ptr, &n_tiles_height, &n_tiles_width, &tile_width, &tile_height, &string_1, &string_2, &check_score))
     {
         ocrShutdown();
         return NULL_GUID;
@@ -377,7 +386,7 @@ ocrGuid_t mainEdt ( u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     initialize_border_values(tile_matrix, n_tiles_width, n_tiles_height, tile_width, tile_height);
 
     ocrGuid_t smith_waterman_task_template_guid;
-    ocrEdtTemplateCreate(&smith_waterman_task_template_guid, smith_waterman_task, 5 /*paramc*/, 4 /*depc*/);
+    ocrEdtTemplateCreate(&smith_waterman_task_template_guid, smith_waterman_task, 6 /*paramc*/, 4 /*depc*/);
 
     // Common information to all tasks
     u64 string1Length = tile_width * n_tiles_width;
@@ -421,11 +430,13 @@ ocrGuid_t mainEdt ( u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     for ( i = 1; i < n_tiles_height+1; ++i ) {
         for ( j = 1; j < n_tiles_width+1; ++j ) {
             /* Box function parameters and put them on the heap for lifetime */
-            u64 indices[5] = {(u64)i,(u64)j,
-                // forcefully pass guids we need to satisfy on completion
-                (u64)tile_matrix[i][j].bottom_right_event_guid,
-                (u64)tile_matrix[i][j].right_column_event_guid,
-                (u64)tile_matrix[i][j].bottom_row_event_guid};
+            u64 indices[6] = {(u64)i,(u64)j,
+                              // forcefully pass guids we need to satisfy on completion
+                              (u64)tile_matrix[i][j].bottom_right_event_guid,
+                              (u64)tile_matrix[i][j].right_column_event_guid,
+                              (u64)tile_matrix[i][j].bottom_row_event_guid,
+                              check_score
+            };
             /* Create an event-driven tasks of smith_waterman tasks */
             ocrGuid_t task_guid;
             ocrEdtCreate(&task_guid, smith_waterman_task_template_guid,

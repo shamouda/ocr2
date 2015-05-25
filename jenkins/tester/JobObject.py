@@ -51,22 +51,31 @@ class Dependence(object):
     """Convenience class to describe a dependence between
        two jobs
     """
-    UNKNOWN = 0x0
-    SUCCESS = 0x1
+    UNINIT  = 0x0
+    UNKNOWN = 0x1
+    SUCCESS = 0x2
     FAIL    = 0x3
 
-    def __init__(self, job, slot):
+    def __init__(self, jobName, slot, isSkippable):
         """Initializes a dependence. The 'slot'
            parameter is the dependence slot on the
            destination job and the 'job' parameter is
            the source job (what the dependence is waiting
-           on)
+           on). isSkippable is T if the dependence can be
+           ignored if it fails
         """
         # Public variables
-        self.job = job
+        self.jobName = jobName
+        self.job = None
         self.slot = slot
 
         # Private variables
+        self._status = Dependence.UNINIT
+        self._isSkippable = isSkippable
+
+    def setJob(self, job):
+        assert(job.name == self.jobName)
+        self.job = job
         self._status = Dependence.UNKNOWN
 
     def setStatus(self, status):
@@ -75,18 +84,27 @@ class Dependence(object):
     def getStatus(self):
         return self._status
 
-    def isCleared(self):
-        """Returns True if the dependence has been met
-           This is very simple for now but in the future,
-           we may want to include things like ignore failure, etc
+    def isUninitialized(self):
+        """Returns True if the dependence hasn't yet been
+           fully initialized
         """
-        return self._status == Dependence.SUCCESS
+        return self._status == Dependence.UNINIT
 
     def isUnknown(self):
         """Returns True if the dependence is still being
            evaluated
         """
         return self._status == Dependence.UNKNOWN
+
+    def isFail(self):
+        """Returns True if the dependence failed
+        """
+        return self._status == Dependence.FAIL
+
+    def isSkippable(self):
+        """Returns True if the dependence can be ignored
+        """
+        return self._isSkippable
 
 class JobTypeObject(object):
     """Describes a job type to be run. A job type
@@ -108,7 +126,7 @@ class JobTypeObject(object):
         self.epilogue_cmd = inputDict.get('epilogue-cmd', "")
         self.sandbox = inputDict['sandbox']
         self.req_repos = inputDict['req-repos']
-        self.timeout = inputDict.get('timeout', 0) # Defaults to 0
+        self.timeout = inputDict.get('timeout', JobObject.defaultTimeout) # Defaults to defaultTimeout
         self.env_vars = inputDict.get('env-vars', {}).copy() # Defaults to empty dir
 
 
@@ -157,7 +175,7 @@ class JobObject(object):
     def __init__(self, inputDict, jobType, dependenceCount):
         """Create a new job. The parameters are:
             - inputDict is a dictionary with 'name', 'run-args',
-              'param-args' and optionally 'sandbox', 'timeout',
+              'param-args', 'depends' and optionally 'sandbox', 'timeout',
               and 'env-vars'
             - jobType is an object of type JobTypeObject
             - dependenceCount is the number of dependences
@@ -189,8 +207,12 @@ class JobObject(object):
 
         # Dependence stuff
         self._waiters = dict() # Key is name, value is pair of job and slot
-        self._dependence = [None] * dependenceCount  # List of jobs that we depend on
-        self._lastDependenceSet = 0
+        self._dependence = []
+        self._signalerToProp = dict() # Key is the name of the signaling job and value is
+                                      # tuple (position, isSkippable)
+        for inDep, count in zip(inputDict['depends'], range(0, len(inputDict['depends']))):
+            self._dependence.append(Dependence(inDep[0], count, inDep[1]))
+
         self._depth = 0
 
         self._sharedRootDirectory = None  # Name of the root directory for this job
@@ -232,7 +254,7 @@ class JobObject(object):
             self._sandbox = jobType.sandbox
         else:
             self._sandbox = jobType.sandbox + self._sandbox
-        if self.timeout is None:
+        if self.timeout is None or self.timeout == 0:
             self.timeout = jobType.timeout
 
         # Parse the sandbox information
@@ -266,25 +288,50 @@ class JobObject(object):
         self._myLog.debug("%s now has depth %d" % (str(self), self._depth))
         return True
 
+    def extendDependenceList(self, job, isSkippable):
+        """Adds additional dependence slots"""
+        if self._recomputeStatus:
+            self._updateStatus()
+        if self._jobStatus == JobObject.UNCONFIGURED_JOB or self._jobStatus == JobObject.WAITING_JOB:
+            slotId = len(self._dependence)
+            self._dependence.append(Dependence(job.name, slotId, isSkippable))
+            self._dependence[slotId].setJob(job)
+            self._recomputeStatus = True
+            return slotId
+        else:
+            self._myLog.error("Cannot extend the dependence list of %s because its status is not UNCONFIGURED or WAITING" % (str(self)))
+            assert(False)
+
     def addDependence(self, signalingJob):
         """Adds a job to the list of dependence.
-           Returns the slot used for this dependence
+           Returns the slot used for that dependence
         """
-        assert(self._lastDependenceSet < len(self._dependence))
-        self._dependence[self._lastDependenceSet] = Dependence(signalingJob,
-                                                               self._lastDependenceSet)
+        depCount = 0
+        for dep in self._dependence:
+            if dep.jobName == signalingJob.name:
+                dep.setJob(signalingJob)
+                break
+            depCount += 1
+        assert(depCount < len(self._dependence))
         self._myLog.debug("%s depends on %s at slot %d" % (
-            str(self), str(signalingJob), self._lastDependenceSet))
-        self._lastDependenceSet += 1
+            str(self), str(signalingJob), depCount))
         self._recomputeStatus = True # Status will need to be recomputed
-        return self._lastDependenceSet - 1
+        return depCount
 
     def satisfyDependence(self, signalingJob, slot):
         """Notifies this job that a dependence is satisfied"""
-        self._myLog.debug("Satisfying dependence slot %d of %s with %s" % (slot, str(self), str(signalingJob)))
-        assert(self._dependence[slot].job == signalingJob)
+        if slot < 0:
+            # Special case of satisfying a skippable slot. We have to find the proper slot
+            self._myLog.debug("Noting skippable dependence for %s (skipping %s" % (str(self), signalingJob))
+            for dep in self._dependence:
+                if dep.jobName == signalingJob:
+                    assert(self._dependence[slot].isSkippable())
+                    self._dependence[slot].setStatus(Dependence.FAIL)
+        else:
+            self._myLog.debug("Satisfying dependence slot %d of %s with %s" % (slot, str(self), str(signalingJob)))
+            assert(self._dependence[slot].job is signalingJob)
 
-        self._dependence[slot].setStatus((Dependence.SUCCESS if signalingJob.getStatus() == JobObject.DONE_OK else Dependence.FAIL))
+            self._dependence[slot].setStatus((Dependence.SUCCESS if signalingJob.getStatus() == JobObject.DONE_OK else Dependence.FAIL))
         self._recomputeStatus = True
         self._updateStatus()
         if self._jobStatus == JobObject.READY_JOB:
@@ -295,7 +342,7 @@ class JobObject(object):
 
             # We note a failure test case and record the "path" it took us to get here
             testCase = TestCase("_main_" + self.name, self.name, 0, '', '')
-            testCase.add_error_info("JobObject was not run due to a dependence failure", '')
+            testCase.add_skipped_info("JobObject was not run due to a dependence failure", '')
             self._testSuite.add_test_case(testCase)
             for dep in self._dependence:
                 self._testSuite.merge_cases(dep.job._testSuite)
@@ -360,8 +407,26 @@ class JobObject(object):
 
         self._dirs['private'] = self._dirs['shared'] = self._dirs['copy-private'] = self._dirs['copy-shared'] = None
 
+        # We get our status because some jobs may start running even if they
+        # have skipped us as a dependence
+        # If that's the case, we return no directories
+        status = self.getStatus()
+        # READY_JOB (job wants to start running) and DONE_OK (job is parent of other job)
+        if status is not JobObject.DONE_OK and status is not JobObject.READY_JOB:
+            self._recomputeDirs = False
+            return self._dirs
+
         inheritFrom = max(self._requirePrivateRoot, self._requireSharedRoot)
         if inheritFrom >= 0:
+            # Check to see if the one we inherit from is a failure (skippable)
+            if self._dependence[inheritFrom].job.getStatus() is not JobObject.DONE_OK:
+                # We look for another one
+                inheritFrom += 1
+                while inheritFrom < len(self._dependence) and \
+                      self._dependence[inheritFrom].job.getStatus() is not JobObject.DONE_OK:
+                    inheritFrom += 1
+            # It's possible we don't find anything
+
             dirs = self._dependence[inheritFrom].job.getDirectories()
             inheritFrom = (dirs['private'], dirs['shared'])
         else:
@@ -528,10 +593,9 @@ class JobObject(object):
             for dep in self._dependence:
                 self._testSuite.merge_cases(dep.job._testSuite)
 
-            # Notify all waiters
-            for v in self._waiters.itervalues():
-                v[0].satisfyDependence(self, v[1])
-        #endif
+        # Notify all waiters
+        for v in self._waiters.itervalues():
+            v[0].satisfyDependence(self, v[1])
 
         # Release hold on directories
         if releaseDirs:
@@ -645,7 +709,7 @@ class JobObject(object):
         """Helper function to update the depth of parents
         """
         for dep in self._dependence:
-            if dep is not None and not dep.isUnknown():
+            if not dep.isUninitialized():
                 # For other dependences we don't care since
                 # they have already fired away
                 dep.job.updateDepth(self._depth + 1)
@@ -654,16 +718,22 @@ class JobObject(object):
         if not (self._jobStatus & 0xF0):
             self._jobStatus = None
             for dep in self._dependence:
-                if dep is None:
+                # Note that we only break out if UNCONFIGURED_JOB because,
+                # in the other cases, we want to only return the other
+                # status if the job is fully configured. In other words,
+                # if there is one unitialized dependence, this will return
+                # UNCONFIGURED_JOB. BLOCKED_JOB also overrides WAITING_JOB
+                if dep.isUninitialized():
                     self._jobStatus = JobObject.UNCONFIGURED_JOB
                     break
                 if dep.isUnknown():
-                    self._jobStatus = JobObject.WAITING_JOB
-                    break
-                if not dep.isCleared():
+                    if self._jobStatus is None:
+                        # Don't set if we have BLOCKED_JOB (only other
+                        # possibility)
+                        self._jobStatus = JobObject.WAITING_JOB
+                elif dep.isFail() and not dep.isSkippable():
                     # At this point, it means that a dependence failed
                     self._jobStatus = JobObject.BLOCKED_JOB
-                    break
             if self._jobStatus is None:
                 self._jobStatus = JobObject.READY_JOB # Nothing happened so we are all good
         #end if
@@ -799,15 +869,9 @@ class JobObject(object):
 
     def _getEnvironment(self, ignorePbs = False):
         env = os.environ.copy()
-        # We do this afterwards because we will over-ride whatever is already there
-        # The env_vars trump whatever is in the environment and JJ* trump those
-        localEnv = {}
-        # Allow the update of default variables like PATH
-        for k, v in self.env_vars.iteritems():
-            t = Template(v)
-            v = t.safe_substitute(env)
-            localEnv[k] = v
+        localEnv = self.env_vars.copy()
 
+        # JJ* variables override anything set in env_vars
         localEnv['JJOB_NAME'] = self.name
         localEnv['JJOB_PRIVATE_HOME'] = self._dirs['private'] if self._dirs['private'] is not None else ""
         localEnv['JJOB_SHARED_HOME'] = self._dirs['shared'] if self._dirs['shared'] is not None else ""
@@ -831,16 +895,28 @@ class JobObject(object):
         # Substitute environments in definitions of env_vars
         # This allows (in particular), the users to have things
         # like ${JJOB_NAME} in env-vars
-        substLocalEnv = {}
-        for k, v in localEnv.iteritems():
-            t = Template(v)
-            # Do in this order to make sure localEnv has precedence
-            v = t.safe_substitute(localEnv)
-            t = Template(v);
-            v = t.safe_substitute(env)
-            substLocalEnv[k] = v
+        # We do at most 5 levels of nesting
+        for i in range(0, 5):
+            substLocalEnv = {}
+            doBreak = True
+            for k, v in localEnv.iteritems():
+                initV = v
+                t = Template(v)
+                # Do in this order to make sure localEnv has precedence
+                v = t.safe_substitute(localEnv)
+                t = Template(v);
+                v = t.safe_substitute(env)
+                if initV is not v:
+                    doBreak = False
+                substLocalEnv[k] = v
+            localEnv = substLocalEnv
+            if doBreak:
+                break
+        # End while
 
         self._myLog.debug("Local environment additions/overrides for %s are: %s" % (str(self), str(substLocalEnv)))
+
+        # We override anything that is set in the environment
         env.update(substLocalEnv)
         if ignorePbs:
             # We remove anything that starts with PBS_
@@ -953,23 +1029,19 @@ class LocalJobObject(JobObject):
             # timeout
             now = datetime.now()
             self._endTime = now
-            if self.timeout > 0:
-                # We have a timeout
-                if (now - self._startTime).seconds > self.timeout:
-                    self._myLog.info("%s timed-out... Killing" % (str(self)))
-                    self._process.kill()
-                    self._process.wait()
-                    # Run the epilogue script if it exists
-                    self._cleanUp()
-                    self.signalJobDone(-1, True, "Local job timed-out")
-                    self._process = None
-                    return True
-                else:
-                    self._myLog.debug("%s allowed to continue, ran for %d seconds but has %d seconds" %
-                                      (str(self), (now - self._startTime).seconds, self.timeout))
+            assert(self.timeout is not None and self.timeout > 0)
+            if (now - self._startTime).seconds > self.timeout:
+                self._myLog.info("%s timed-out... Killing" % (str(self)))
+                self._process.kill()
+                self._process.wait()
+                # Run the epilogue script if it exists
+                self._cleanUp()
+                self.signalJobDone(-1, True, "Local job timed-out")
+                self._process = None
+                return True
             else:
-                self._myLog.debug("%s allowed to continue, ran for %d seconds and does not have a timeout" %
-                                  (str(self), (now - self._startTime).seconds))
+                self._myLog.debug("%s allowed to continue, ran for %d seconds but has %d seconds" %
+                                  (str(self), (now - self._startTime).seconds, self.timeout))
         else:
             # JobObject finished
             self._myLog.info("%s finished running and returned %d" % (str(self), returnCode))
@@ -1127,9 +1199,8 @@ class TorqueJobObject(JobObject):
 
             resourceString = resourceStringNew
             # Set the timeout
-            if self.timeout > 0:
-                self._myLog.debug("%s has a timeout, adding walltime restriction to Torque job (%d seconds)" % (str(self), self.timeout))
-                resourceString = resourceString + ",walltime=%d" % (self.timeout)
+            assert(self.timeout is not None and self.timeout > 0)
+            resourceString = resourceString + ",walltime=%d" % (self.timeout)
 
             # Create files for the error and output streams
             self._outFile = tempfile.NamedTemporaryFile(mode="w+b", suffix="out", prefix="jjob_" + self.name + "_",

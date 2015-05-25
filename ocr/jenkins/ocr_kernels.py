@@ -468,11 +468,18 @@ job_ocr_run_kernel_sw_x86 = {
     'run-args': 'smith-waterman x86-pthread-x86',
     'sandbox': ('inherit0',),
     'env-vars': { 'APPS_LIBS_ROOT': '${JJOB_SHARED_HOME}/xstack/apps/libs/x86',
-                  'WORKLOAD_ARGS': '10 10 ${JJOB_SHARED_HOME}/xstack/apps/smithwaterman/datasets/string1-medium.txt  ${JJOB_SHARED_HOME}/xstack/apps/smithwaterman/datasets/string2-medium.txt',
+                  'WORKLOAD_ARGS': '10 10 ${JJOB_SHARED_HOME}/xstack/apps/smithwaterman/datasets/string1-medium.txt  ${JJOB_SHARED_HOME}/xstack/apps/smithwaterman/datasets/string2-medium.txt ${JJOB_SHARED_HOME}/xstack/apps/smithwaterman/datasets/score-medium.txt',
                   'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/ocr-apps/smith-waterman/install' }
 }
 
-#TODO smith-waterman verification
+job_ocr_verify_kernel_sw_x86 = {
+    'name': 'ocr-verify-kernel-sw-x86',
+    'depends': ('ocr-run-kernel-sw-x86',),
+    'jobtype': 'ocr-verify-kernel-local',
+    'run-args': '-w -c 1',
+    'sandbox': ('inherit0',),
+    'env-vars': { 'WORKLOAD_EXEC': '${JJOB_SHARED_HOME}/xstack/ocr/ocr-apps/smith-waterman/install/x86-pthread-x86'}
+}
 
 job_ocr_build_kernel_sw_mpi = {
     'name': 'ocr-build-kernel-sw-mpi',
@@ -494,9 +501,19 @@ job_ocr_run_kernel_sw_mpi = {
     'sandbox': ('inherit0',),
     'env-vars': { 'PATH': '/opt/intel/tools/impi_latest/bin64:${PATH}',
                   'APPS_LIBS_ROOT': '${JJOB_SHARED_HOME}/xstack/apps/libs/x86',
-                  'WORKLOAD_ARGS': '100 100 ${JJOB_SHARED_HOME}/xstack/apps/smithwaterman/datasets/string1-medium-large.txt  ${JJOB_SHARED_HOME}/xstack/apps/smithwaterman/datasets/string2-medium-large.txt',
+                  'WORKLOAD_ARGS': '100 100 ${JJOB_SHARED_HOME}/xstack/apps/smithwaterman/datasets/string1-medium-large.txt  ${JJOB_SHARED_HOME}/xstack/apps/smithwaterman/datasets/string2-medium-large.txt ${JJOB_SHARED_HOME}/xstack/apps/smithwaterman/datasets/score-medium-large.txt',
                   'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/ocr-apps/smith-waterman/install' }
 }
+
+job_ocr_verify_kernel_sw_mpi = {
+    'name': 'ocr-verify-kernel-sw-mpi',
+    'depends': ('ocr-run-kernel-sw-mpi',),
+    'jobtype': 'ocr-verify-kernel-local',
+    'run-args': '-w -c 1',
+    'sandbox': ('inherit0',),
+    'env-vars': { 'WORKLOAD_EXEC': '${JJOB_SHARED_HOME}/xstack/ocr/ocr-apps/smith-waterman/install/x86-pthread-mpi'}
+}
+
 
 job_ocr_build_kernel_sw_gasnet = {
     'name': 'ocr-build-kernel-sw-gasnet',
@@ -526,11 +543,20 @@ job_ocr_run_kernel_sw_gasnet = {
     'sandbox': ('inherit0',),
     'env-vars': { 'PATH': '/opt/intel/tools/impi_latest/bin64:${PATH}',
                   'APPS_LIBS_ROOT': '${JJOB_SHARED_HOME}/xstack/apps/libs/x86',
-                  'WORKLOAD_ARGS': '100 100 ${JJOB_SHARED_HOME}/xstack/apps/smithwaterman/datasets/string1-medium-large.txt  ${JJOB_SHARED_HOME}/xstack/apps/smithwaterman/datasets/string2-medium-large.txt',
+                  'WORKLOAD_ARGS': '100 100 ${JJOB_SHARED_HOME}/xstack/apps/smithwaterman/datasets/string1-medium-large.txt  ${JJOB_SHARED_HOME}/xstack/apps/smithwaterman/datasets/string2-medium-large.txt ${JJOB_SHARED_HOME}/xstack/apps/smithwaterman/datasets/score-medium-large.txt',
                   'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/ocr-apps/smith-waterman/install',
                   'GASNET_ROOT': '/opt/rice/GASNet/1.24.0-impi',
                   'PATH': '${GASNET_ROOT}/bin:${MPI_ROOT}/bin64:${PATH}',
                   'GASNET_CONDUIT': 'ibv'}
+}
+
+job_ocr_verify_kernel_sw_gasnet = {
+    'name': 'ocr-verify-kernel-sw-gasnet',
+    'depends': ('ocr-run-kernel-sw-gasnet',),
+    'jobtype': 'ocr-verify-kernel-local',
+    'run-args': '-w -c 1',
+    'sandbox': ('inherit0',),
+    'env-vars': { 'WORKLOAD_EXEC': '${JJOB_SHARED_HOME}/xstack/ocr/ocr-apps/smith-waterman/install/x86-pthread-gasnet'}
 }
 
 # job_ocr_build_kernel_sw_tgemul = {
@@ -552,8 +578,17 @@ job_ocr_run_kernel_sw_gasnet = {
 #     'run-args': 'smith-waterman x86-pthread-tg',
 #     'sandbox': ('inherit0',),
 #     'env-vars': { 'APPS_LIBS_ROOT': '${JJOB_SHARED_HOME}/xstack/apps/libs/x86',
-#                   'WORKLOAD_ARGS': '100 100 ${JJOB_SHARED_HOME}/xstack/apps/smithwaterman/datasets/string1-medium-large.txt  ${JJOB_SHARED_HOME}/xstack/apps/smithwaterman/datasets/string2-medium-large.txt',
+#                   'WORKLOAD_ARGS': '100 100 ${JJOB_SHARED_HOME}/xstack/apps/smithwaterman/datasets/string1-medium-large.txt  ${JJOB_SHARED_HOME}/xstack/apps/smithwaterman/datasets/string2-medium-large.txt ${JJOB_SHARED_HOME}/xstack/apps/smithwaterman/datasets/score-medium-large.txt',
 #                   'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/ocr-apps/smith-waterman/install' }
+# }
+
+# job_ocr_verify_kernel_sw_tgemul = {
+#     'name': 'ocr-verify-kernel-sw-tgemul',
+#     'depends': ('ocr-run-kernel-sw-tgemul',),
+#     'jobtype': 'ocr-verify-kernel-local',
+#     'run-args': '-w -c 1',
+#     'sandbox': ('inherit0',),
+#     'env-vars': { 'WORKLOAD_EXEC': '${JJOB_SHARED_HOME}/xstack/ocr/ocr-apps/smith-waterman/install/x86-pthread-tg'}
 # }
 
 job_ocr_build_kernel_sw_tg = {
@@ -581,6 +616,14 @@ job_ocr_run_kernel_sw_tg = {
                   'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/ocr-apps/smith-waterman/install'}
 }
 
+job_ocr_verify_kernel_sw_tg = {
+    'name': 'ocr-verify-kernel-sw-tg',
+    'depends': ('ocr-run-kernel-sw-tg',),
+    'jobtype': 'ocr-verify-kernel-remote',
+    'run-args': '-w -c 1',
+    'sandbox': ('inherit0',),
+    'env-vars': { 'WORKLOAD_EXEC': '${JJOB_SHARED_HOME}/xstack/ocr/ocr-apps/smith-waterman/install/tg'}
+}
 # Cholesky
 
 job_ocr_build_kernel_cholesky_x86 = {
