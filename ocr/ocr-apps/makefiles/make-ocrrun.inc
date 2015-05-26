@@ -38,7 +38,12 @@ WORKLOAD_INSTALL := ${WORKLOAD_INSTALL_ROOT}/${OCR_TYPE}
 
 REQ_LIBS ?=
 
+ifeq ($(OCR_TYPE), x86-pthread-mic)
+CC = icc
+else
 CC ?= gcc
+endif
+
 ifeq ($(CFLAGS_WARN_ERROR), no)
 CFLAGS_BASE_WARN_ERROR =
 else

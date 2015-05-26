@@ -69,6 +69,7 @@ clean:
 .PHONY: squeaky
 squeaky:
 	OCR_TYPE=x86-pthread-x86 $(MAKE) -C x86-pthread-x86 clean uninstall
+	OCR_TYPE=x86-pthread-mic $(MAKE) -C x86-pthread-mic clean uninstall
 	OCR_TYPE=x86-pthread-tg $(MAKE) -C x86-pthread-tg clean uninstall
 	OCR_TYPE=tg-null-tg-ce $(MAKE) -C tg-null-tg-ce clean uninstall
 	OCR_TYPE=tg-null-tg-xe $(MAKE) -C tg-null-tg-xe clean uninstall
