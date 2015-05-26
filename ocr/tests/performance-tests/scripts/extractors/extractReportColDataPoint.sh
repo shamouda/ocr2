@@ -4,7 +4,7 @@
 # Extract columns from a set of files and paste them together into a single file
 # All files must be formatted identically.
 #
-# Args
+# Arguments:
 #   RESULT_COL:         The column number to extract (1-based)
 #   IGNORE_TOP_LINES:   Number of top lines to ignore from input files
 #   OUTFILE:            File to write the output to

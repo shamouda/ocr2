@@ -65,25 +65,27 @@ typedef struct _ocrCompTargetFcts_t {
     */
     void (*destruct)(struct _ocrCompTarget_t *self);
 
-    void (*begin)(struct _ocrCompTarget_t *self, struct _ocrPolicyDomain_t *PD,
-                  ocrWorkerType_t workerType);
     /**
-     * @brief Starts a comp-target (a thread of execution).
+     * @brief Switch runlevel
      *
-     * @param[in] self          Pointer to this comp-target
-     * @param[in] PD            Policy domain of this comp-target
-     * @param[in] worker        Worker running on this comp-target
+     * @param[in] self         Pointer to this object
+     * @param[in] PD           Policy domain this object belongs to
+     * @param[in] runlevel     Runlevel to switch to
+     * @param[in] phase        Phase for this runlevel
+     * @param[in] properties   Properties (see ocr-runtime-types.h)
+     * @param[in] callback     Callback to call when the runlevel switch
+     *                         is complete. NULL if no callback is required
+     * @param[in] val          Value to pass to the callback
+     *
+     * @return 0 if the switch command was successful and a non-zero error
+     * code otherwise. Note that the return value does not indicate that the
+     * runlevel switch occured (the callback will be called when it does) but only
+     * that the call to switch runlevel was well formed and will be processed
+     * at some point
      */
-    void (*start)(struct _ocrCompTarget_t *self, struct _ocrPolicyDomain_t *PD,
-                  struct _ocrWorker_t * worker);
+    u8 (*switchRunlevel)(struct _ocrCompTarget_t* self, struct _ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
+                         phase_t phase, u32 properties, void (*callback)(struct _ocrPolicyDomain_t*, u64), u64 val);
 
-    /**
-     * @brief Stops this comp-target
-     * @param[in] self          Pointer to this comp-target
-     */
-    void (*stop)(struct _ocrCompTarget_t *self);
-
-    void (*finish)(struct _ocrCompTarget_t *self);
     /**
      * @brief Gets the throttle value for this compute node
      *

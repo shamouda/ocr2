@@ -77,26 +77,126 @@
 
 // Ugly globals below, but would go away once FSim has QMA support trac #232
 #define OUTSTANDING_CE_MSGS 4
-u64 msgAddresses[OUTSTANDING_CE_MSGS] = {0, 0, 0, 0};
+u64 msgAddresses[OUTSTANDING_CE_MSGS] = {0xbadf00d, 0xbadf00d, 0xbadf00d, 0xbadf00d};
 ocrPolicyMsg_t sendBuf, recvBuf; // Currently size of 1 msg each.
 // TODO: The above need to be placed in the CE's scratchpad, but once QMAs are ready, should
 // be no problem. trac #232
 
-u8 ceCommCheckCEMessage(ocrCommPlatform_t *self, ocrPolicyMsg_t **msg);
+void ceCommsInit(ocrCommPlatform_t * commPlatform, ocrPolicyDomain_t * PD);
 u8 ceCommDestructMessage(ocrCommPlatform_t *self, ocrPolicyMsg_t *msg);
 u8 ceCommDestructCEMessage(ocrCommPlatform_t *self, ocrPolicyMsg_t *msg);
 u8 ceCommCheckSeqIdRecv(ocrCommPlatform_t *self, ocrPolicyMsg_t *msg);
+
+u64 parentOf(u64 location) {
+    // XE's parent is its CE
+    if ((location & ID_AGENT_CE) != ID_AGENT_CE)
+        return ((location & ~ID_AGENT_MASK ) | ID_AGENT_CE);
+    else if (BLOCK_FROM_ID(location)) // Non-zero block has zero block as parent
+        return (location & ~ID_BLOCK_MASK);
+    else if (UNIT_FROM_ID(location)) // Non-zero unit has zero unit & zero block as parent
+        return (location & ~ID_UNIT_MASK);
+    return location;
+}
 
 void ceCommDestruct (ocrCommPlatform_t * base) {
 
     runtimeChunkFree((u64)base, NULL);
 }
 
-void ceCommBegin(ocrCommPlatform_t * commPlatform, ocrPolicyDomain_t * PD, ocrCommApi_t * api) {
+u8 ceCommSwitchRunlevel(ocrCommPlatform_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
+                      phase_t phase, u32 properties, void (*callback)(ocrPolicyDomain_t*, u64), u64 val) {
+
+    u8 toReturn = 0;
+
+#ifndef ENABLE_BUILDER_ONLY
+    u64 i, tmp;
+    s8 j;
+
+    // This is an inert module, we do not handle callbacks (caller needs to wait on us)
+    ASSERT(callback == NULL);
+
+    // Verify properties for this call
+    ASSERT((properties & RL_REQUEST) && !(properties & RL_RESPONSE)
+           && !(properties & RL_RELEASE));
+    ASSERT(!(properties & RL_FROM_MSG));
+
+    switch(runlevel) {
+    case RL_CONFIG_PARSE:
+        // On bring-up: Update PD->phasesPerRunlevel on phase 0
+        // and check compatibility on phase 1
+        break;
+    case RL_NETWORK_OK:
+        ceCommsInit(self, PD);
+        break;
+    case RL_PD_OK:
+        break;
+    case RL_MEMORY_OK:
+        break;
+    case RL_GUID_OK:
+        break;
+    case RL_COMPUTE_OK:
+        {
+            for(i = 0; i < OUTSTANDING_CE_MSGS; i++)
+                msgAddresses[i] = 0;
+            // If I have any CE children, wait for all of them to be ready
+            for(i = 0; i<PD->neighborCount; i++) {
+                u64 target = PD->neighbors[i] & 0xFFFFFFFF;
+                if(PD->myLocation == parentOf(target)) {
+                    u64 *rmbox = (u64 *) (DR_CE_BASE(CHIP_FROM_ID(target),
+                                      UNIT_FROM_ID(target), BLOCK_FROM_ID(target))
+                                      + (u64)(msgAddresses));
+                    while((*(volatile u64 *)(&rmbox[3])) != 0xfeedf00d) hal_pause();
+                    ASSERT(rmbox[3] == 0xfeedf00d);
+                    *(volatile u64 *)&rmbox[3] = 0;
+                }
+            }
+
+            // Signal to my parent that I'm ready after all my children CE are ready
+            if(PD->myLocation != PD->parentLocation) {
+                msgAddresses[3] = 0xfeedf00d;
+                while((*(volatile u64 *)(&msgAddresses[3])) != 0) hal_pause();
+                ASSERT(*(volatile u64 *)(&msgAddresses[3]) == 0);
+            }
+
+            // Send a dummy mesg to get XEs to exit their barrier
+            for(j = ((ocrPolicyDomainCe_t *)PD)->xeCount-1; j>=0; j--) {
+                u64 * rq = ((ocrCommPlatformCe_t *)self)->rq[((u64)j) & ID_AGENT_MASK];
+
+                (((ocrCommPlatformCe_t *)self)->lq[j])[0] = 0;
+                (((ocrCommPlatformCe_t *)self)->lq[j])[1] = 0;
+                // Wait till XE is in the barrier
+                do {
+                    tmp = rmd_ld64((u64)rq);
+                } while(tmp != 0xfeedf00d);
+                ASSERT(tmp == 0xfeedf00d);
+                // Exit the XE out of the barrier
+                tmp = rmd_mmio_xchg64((u64)rq, (u64)2);
+                ASSERT(tmp == 0xfeedf00d);
+            }
+        }
+        break;
+    case RL_USER_OK:
+        {
+            for(i=0; i< OUTSTANDING_CE_MSGS; i++)
+                msgAddresses[i] = 0xdead;
+
+            recvBuf.type = 0xdead;
+        }
+        break;
+    default:
+        // Unknown runlevel
+        ASSERT(0);
+    }
+#endif
+
+    return toReturn;
+}
+
+void ceCommsInit(ocrCommPlatform_t * commPlatform, ocrPolicyDomain_t * PD) {
 
     u64 i;
 
-    ASSERT(commPlatform != NULL && PD != NULL && api != NULL);
+    ASSERT(commPlatform != NULL && PD != NULL);
 
     ocrCommPlatformCe_t * cp = (ocrCommPlatformCe_t *)commPlatform;
     commPlatform->pd = PD;
@@ -152,61 +252,24 @@ void ceCommBegin(ocrCommPlatform_t * commPlatform, ocrPolicyDomain_t * PD, ocrCo
     COMPILE_TIME_ASSERT(MSG_QUEUE_SIZE >= (sizeof(u64) + sizeof(ocrPolicyMsg_t)));
 }
 
-void ceCommStart(ocrCommPlatform_t * commPlatform, ocrPolicyDomain_t * PD, ocrCommApi_t * api) {
-
-    ASSERT(commPlatform != NULL && PD != NULL && api != NULL);
-}
-
-void ceCommStop(ocrCommPlatform_t * commPlatform) {
-    u32 i;
-    ASSERT(commPlatform != NULL);
-    for(i=0; i< OUTSTANDING_CE_MSGS; i++) {
-        ((ocrPolicyMsg_t *)msgAddresses[i])->type = 0xdead;
-        msgAddresses[i] = 0xdead;
-    }
-    recvBuf.type = 0;
-    sendBuf.type = 0;
-}
-
-void ceCommFinish(ocrCommPlatform_t *commPlatform) {
-
-    u32 i;
-
-    ASSERT(commPlatform != NULL);
-
-    ocrCommPlatformCe_t * cp = (ocrCommPlatformCe_t *)commPlatform;
-
-    // Clear settings
-    cp->pdPtr->myLocation = cp->pdPtr->parentLocation = (ocrLocation_t)0x0;
-    commPlatform->location = (ocrLocation_t)0x0;
-    cp->pdPtr = NULL;
-    for(i=0; i<MAX_NUM_XE; i++) {
-        cp->rq[i] = NULL;
-        cp->lq[i] = NULL;
-    }
-    cp->pollq = 0;
-}
-
-u8 ceCommSetMaxExpectedMessageSize(ocrCommPlatform_t *self, u64 size, u32 mask) {
-
-    ASSERT(0);
-    return 0;
-}
-
 u8 ceCommSendMessageToCE(ocrCommPlatform_t *self, ocrLocation_t target,
                      ocrPolicyMsg_t *message, u64 *id,
                      u32 properties, u32 mask) {
 
     u32 i;
+    u64 retval;
     u64 msgAbsAddr;
     static u64 msgId = 0xace00000000;         // Known signature to aid grepping
     if(msgId==0xace00000000)
         msgId |= (self->location & 0xFF)<<16; // Embed the src location onto msgId
     ASSERT(self->location != target);
 
-    // If this is not a blocking message, return if busy
-    if(!(properties & BLOCKING_SEND_MSG_PROP) && sendBuf.type) {
-        if(sendBuf.type == 0xdead) sendBuf.type = 0;
+    if(sendBuf.type) {
+        // Check if remote target is already dead
+        u64 *rmbox = (u64 *) (DR_CE_BASE(CHIP_FROM_ID(sendBuf.destLocation),
+                              UNIT_FROM_ID(sendBuf.destLocation), BLOCK_FROM_ID(sendBuf.destLocation))
+                              + (u64)(msgAddresses));
+        if(rmbox[0] == 0xdead) sendBuf.type = 0;
         return 1;
     }
 
@@ -225,23 +288,29 @@ u8 ceCommSendMessageToCE(ocrCommPlatform_t *self, ocrLocation_t target,
 
     msgAbsAddr = DR_CE_BASE(CHIP_FROM_ID(self->location),
                             UNIT_FROM_ID(self->location), BLOCK_FROM_ID(self->location))
-        + (u64)(&sendBuf);
+                            + (u64)(&sendBuf);
 
     u64 *rmbox = (u64 *) (DR_CE_BASE(CHIP_FROM_ID(target),
-                                     UNIT_FROM_ID(target), BLOCK_FROM_ID(target))
+                          UNIT_FROM_ID(target), BLOCK_FROM_ID(target))
                           + (u64)(msgAddresses));
     u32 k = 0;
     do {
         for(i = 0; i<OUTSTANDING_CE_MSGS; i++, k++) {
-            if(hal_cmpswap64(&rmbox[i], 0, msgAbsAddr) == 0) break;
+            retval = hal_cmpswap64(&rmbox[i], 0, msgAbsAddr);
+            if(retval == 0) break;    // Send successful
+            else if(retval == 0xdead) {
+                     sendBuf.type = 0;
+                     return 2;        // Target dead, give up
+            } else if(retval == 0xbadf00d) {
+                     sendBuf.type = 0;
+                     return 1;        // Target busy, retry later
+            }
         }
-    } while((i == OUTSTANDING_CE_MSGS) && ((k<10000)));
+    } while(retval && ((k<100)));
     // TODO: This value is arbitrary.
     // What is a reasonable number of tries before giving up?
 
-    // FIXME: Receiver is busy, we need to cancel & retry later.
-    // Any other ways to get around this?
-    if(i==OUTSTANDING_CE_MSGS) {
+    if(retval) {
         sendBuf.type = 0;
         DPRINTF(DEBUG_LVL_INFO, "Cancel send msg %lx type %lx, properties %x; (%lx->%lx)\n",
                                  message->msgId, message->type, properties, self->location,
@@ -249,7 +318,6 @@ u8 ceCommSendMessageToCE(ocrCommPlatform_t *self, ocrLocation_t target,
         if(rmbox[0] == 0xdead) return 2; // Shutdown in progress - no retry
         return 1;                        // otherwise, retry send
     }
-
     DPRINTF(DEBUG_LVL_VVERB, "Sent msg %lx type %lx; (%lx->%lx)\n", message->msgId, message->type, self->location, target);
     return 0;
 }
@@ -257,7 +325,6 @@ u8 ceCommSendMessageToCE(ocrCommPlatform_t *self, ocrLocation_t target,
 u8 ceCommSendMessage(ocrCommPlatform_t *self, ocrLocation_t target,
                      ocrPolicyMsg_t *message, u64 *id,
                      u32 properties, u32 mask) {
-
     ASSERT(self != NULL);
     ASSERT(message != NULL);
     ASSERT(target != self->location);
@@ -278,7 +345,7 @@ u8 ceCommSendMessage(ocrCommPlatform_t *self, ocrLocation_t target,
         {
             u64 tmp = rmd_ld64((u64)rq);
             if(tmp) return 1; // Temporary workaround till bug #134 is fixed
-//            ASSERT(tmp == 0);
+            ASSERT(tmp == 0);
         }
 
 #ifndef ENABLE_BUILDER_ONLY
@@ -310,15 +377,39 @@ u8 ceCommSendMessage(ocrCommPlatform_t *self, ocrLocation_t target,
             ASSERT(tmp == 0);
         }
 #endif
-
-        return 0;
     }
+    return 0;
 }
 
 u8 ceCommCheckSeqIdRecv(ocrCommPlatform_t *self, ocrPolicyMsg_t *msg) {
     u64 mask = msg->srcLocation & self->location;
     msg->seqId = (mask >> fls64(mask)) & 0xF; // Assumption: that there are always <= 0xF neighbors
     return 0;
+}
+
+u8 ceCommCheckCEMessage(ocrCommPlatform_t *self, ocrPolicyMsg_t **msg) {
+    u32 j;
+
+    // Go through our mbox to check for valid messages
+    for(j=0; j<OUTSTANDING_CE_MSGS; j++)
+        if(msgAddresses[j]) {
+            // We fixup pointers
+            u64 baseSize = 0, marshalledSize = 0;
+            ocrPolicyMsgGetMsgSize((ocrPolicyMsg_t*)msgAddresses[j], &baseSize, &marshalledSize, 0);
+            if(baseSize + marshalledSize > recvBuf.bufferSize) {
+                DPRINTF(DEBUG_LVL_WARN, "Comm platform only handles messages up to size %ld\n",
+                                         recvBuf.bufferSize);
+                ASSERT(0);
+            }
+            ocrPolicyMsgUnMarshallMsg((u8*)msgAddresses[j], NULL, &recvBuf, MARSHALL_FULL_COPY);
+            ceCommCheckSeqIdRecv(self, (ocrPolicyMsg_t*)msgAddresses[j]);
+            ceCommDestructCEMessage(self, (ocrPolicyMsg_t*)msgAddresses[j]);
+            *msg = &recvBuf;
+
+            return 0;
+        }
+    *msg = NULL;
+    return 1;
 }
 
 u8 ceCommPollMessage(ocrCommPlatform_t *self, ocrPolicyMsg_t **msg,
@@ -378,38 +469,6 @@ u8 ceCommPollMessage(ocrCommPlatform_t *self, ocrPolicyMsg_t **msg,
     }
 }
 
-u8 ceCommCheckCEMessage(ocrCommPlatform_t *self, ocrPolicyMsg_t **msg) {
-    u32 j;
-
-    // Go through our mbox to check for valid messages
-    for(j=0; j<OUTSTANDING_CE_MSGS; j++)
-    //for(j=OUTSTANDING_CE_MSGS-1; j >=0; j--)
-        if(msgAddresses[j])
-            break;
-
-    // Found a valid message, process it
-    if(j<OUTSTANDING_CE_MSGS) {
-        ASSERT(msgAddresses[j]);
-        *msg = (ocrPolicyMsg_t *)(msgAddresses[j]);
-        // We fixup pointers
-        u64 baseSize = 0, marshalledSize = 0;
-
-        ocrPolicyMsgGetMsgSize(*msg, &baseSize, &marshalledSize, 0);
-        if(baseSize + marshalledSize > recvBuf.bufferSize) {
-            DPRINTF(DEBUG_LVL_WARN, "Comm platform only handles messages up to size %ld\n",
-                    recvBuf.bufferSize);
-            ASSERT(0);
-        }
-        DPRINTF(DEBUG_LVL_VVERB, "Got message %lx from CE of type %x\n", (*msg)->msgId, (*msg)->type);
-        ocrPolicyMsgUnMarshallMsg((u8*)*msg, NULL, &recvBuf, MARSHALL_FULL_COPY);
-        ceCommCheckSeqIdRecv(self, *msg);
-        ceCommDestructCEMessage(self, *msg);
-        *msg = &recvBuf;
-        return 0;
-    }
-    return 1;
-}
-
 u8 ceCommWaitMessage(ocrCommPlatform_t *self,  ocrPolicyMsg_t **msg,
                      u32 properties, u32 *mask) {
 
@@ -426,7 +485,7 @@ u8 ceCommWaitMessage(ocrCommPlatform_t *self,  ocrPolicyMsg_t **msg,
 
     DPRINTF(DEBUG_LVL_VVERB, "Going to wait for message (starting at %d)\n",
             cp->pollq);
-    // Loop throught the stages till we receive something
+    // Loop through the stages till we receive something
     for(i = cp->pollq, j=(cp->pollq - 1 + MAX_NUM_XE) % MAX_NUM_XE;
            (cp->lq[i])[0] != 2; i = (i+1) % MAX_NUM_XE) {
         // Halt the CPU, instead of burning rubber
@@ -476,14 +535,12 @@ u8 ceCommDestructCEMessage(ocrCommPlatform_t *self, ocrPolicyMsg_t *msg) {
    u32 i;
 
    for(i = 0; i<OUTSTANDING_CE_MSGS; i++)
-       if(msgAddresses[i] == (u64)msg)
-           break;
-
-   if(i<OUTSTANDING_CE_MSGS) {
-       DPRINTF(DEBUG_LVL_VVERB, "Destructing msg %lx\n", msg->msgId);
-       msg->type = 0;
-       msgAddresses[i] = 0;
-   }
+       if(msgAddresses[i] == (u64)msg) {
+           DPRINTF(DEBUG_LVL_VVERB, "Destructing msg %lx\n", msg->msgId);
+           msgAddresses[i] = 0;
+           msg->type = 0;
+           msg->msgId = 0xdead;
+       }
 
    return 0;
 }
@@ -495,7 +552,7 @@ u8 ceCommDestructMessage(ocrCommPlatform_t *self, ocrPolicyMsg_t *msg) {
 
     ocrCommPlatformCe_t * cp = (ocrCommPlatformCe_t *)self;
 
-    if(msg->type == 0) return 0; // FIXME: This is needed to ignore shutdown
+    if(msg->type == 0xdead) return 0; // FIXME: This is needed to ignore shutdown
                                  // messages. To go away once #134 is fixed
     if(msg->type & PD_CE_CE_MESSAGE) {
         if (msg->destLocation == self->location)
@@ -541,6 +598,11 @@ ocrCommPlatform_t* newCommPlatformCe(ocrCommPlatformFactory_t *factory,
     return derived;
 }
 
+u8 ceCommSetMaxExpectedMessageSize(ocrCommPlatform_t *self, u64 size, u32 mask) {
+    ASSERT(0);
+    return 0;
+}
+
 void initializeCommPlatformCe(ocrCommPlatformFactory_t * factory, ocrCommPlatform_t * derived, ocrParamList_t * perInstance) {
     initializeCommPlatformOcr(factory, derived, perInstance);
 }
@@ -562,14 +624,10 @@ ocrCommPlatformFactory_t *newCommPlatformFactoryCe(ocrParamList_t *perType) {
     base->destruct = &destructCommPlatformFactoryCe;
 
     base->platformFcts.destruct = FUNC_ADDR(void (*)(ocrCommPlatform_t*), ceCommDestruct);
-    base->platformFcts.begin = FUNC_ADDR(void (*)(ocrCommPlatform_t*, ocrPolicyDomain_t*, ocrCommApi_t *),
-                                         ceCommBegin);
-    base->platformFcts.start = FUNC_ADDR(void (*)(ocrCommPlatform_t*, ocrPolicyDomain_t*, ocrCommApi_t *),
-                                         ceCommStart);
-    base->platformFcts.stop = FUNC_ADDR(void (*)(ocrCommPlatform_t*), ceCommStop);
-    base->platformFcts.finish = FUNC_ADDR(void (*)(ocrCommPlatform_t*), ceCommFinish);
+    base->platformFcts.switchRunlevel = FUNC_ADDR(u8 (*)(ocrCommPlatform_t*, ocrPolicyDomain_t*, ocrRunlevel_t,
+                                                         phase_t, u32, void (*)(ocrPolicyDomain_t*, u64), u64), ceCommSwitchRunlevel);
     base->platformFcts.setMaxExpectedMessageSize = FUNC_ADDR(u8 (*)(ocrCommPlatform_t*, u64, u32),
-            ceCommSetMaxExpectedMessageSize);
+                                                        ceCommSetMaxExpectedMessageSize);
     base->platformFcts.sendMessage = FUNC_ADDR(u8 (*)(ocrCommPlatform_t*, ocrLocation_t,
                                      ocrPolicyMsg_t *, u64*, u32, u32), ceCommSendMessage);
     base->platformFcts.pollMessage = FUNC_ADDR(u8 (*)(ocrCommPlatform_t*, ocrPolicyMsg_t**, u32, u32*),

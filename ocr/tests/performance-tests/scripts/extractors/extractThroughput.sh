@@ -1,11 +1,20 @@
+#
+# Extract and prints 'Throughput' data from a log file
+# to standard output formatted as rows of 'CR' elements
+#
+# Arguments:
+#   FILE:               The file to be parsed
+#   CR:                 Number of element per rows
+#
+# Expected input format:
+# Throughput  (op/s): 1191.414997
+#
+
 FILE=$1
 CR=$2
 
 DATA=`grep Throughput $FILE | cut -d' ' -f 4-4`
 
-#
-# Output DATA as rows with 'CR' elements
-#
 COL_DATA=""
 let i=0
 let ub=${CR}-1

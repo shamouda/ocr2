@@ -41,7 +41,7 @@ XTICKS=`more $XLABELS_FILE | tr '\n' ',' | sed  s/,$//g`
 sed -e "s|TITLE_VAR|${TITLE}|g"  \
     -e "s|XLABEL_VAR|${XLABEL}|g" \
     -e "s|YLABEL_VAR|${YLABEL}|g" \
-    -e s/XTICKS_VAR/"${XTICKS}"/g \
+    -e "s|XTICKS_VAR|${XTICKS}|g" \
     -e "s|CURVES_VAR|${CURVES_DEFS}|g" \
     -e s/OUTPUT_IMG_FORMAT_VAR/"${OUTPUT_IMG_FORMAT}"/g \
     -e s/OUTPUT_NAME_VAR/"${OUTPUT_IMG_NAME}"/g ${TMPL} > ${OUTPUT_PLOT_NAME}

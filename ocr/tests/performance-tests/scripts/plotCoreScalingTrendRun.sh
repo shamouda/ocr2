@@ -31,7 +31,7 @@ WU_FILE=${TMPDIR}/tmp.wu
 DATA_FILE=${TMPDIR}/tmp.data
 DATA_BUFFER_FILE=${TMPDIR}/tmp.databuffer
 XLABEL_FILE=${TMPDIR}/tmp.xlabel
-IGNORE_TOP_LINES=4
+IGNORE_TOP_LINES=5
 
 #
 # Extract data for workload labels (i.e. cores used for each run)
@@ -70,7 +70,7 @@ OUTPUT_PLOT_NAME=${TMPDIR}/tmp.plt
 OUTPUT_IMG_FORMAT=svg
 TITLE="Core Scaling Trend: ${REPORT_FILENAME} (${NB_REPORTS})"
 IMG_NAME="trend-graph-${REPORT_FILENAME}".${OUTPUT_IMG_FORMAT}
-XLABEL="Daily Run"
+XLABEL="Trend Run"
 YLABEL="Throughput (op\/s)"
 
 DATA_COL_IDX=2

@@ -21,7 +21,7 @@ jobtype_ocr_build = {
     'run-cmd': '${JJOB_PRIVATE_HOME}/xstack/ocr/jenkins/scripts/build.sh',
     'param-cmd': '${JJOB_PRIVATE_HOME}/xstack/jenkins/scripts/empty-cmd.sh',
     'keywords': ('ocr', 'percommit'),
-    'timeout': 180,
+    'timeout': 240,
     'sandbox': ('local', 'shared', 'shareOK'),
     'req-repos': ('xstack',),
     'env-vars': {'OCR_ROOT': '${JJOB_PRIVATE_HOME}/xstack/ocr',
@@ -98,13 +98,13 @@ job_ocr_build_x86_pthread_gasnet = {
                  'GASNET_TYPE': 'par'}
 }
 
-job_ocr_build_x86_pthread_tg = {
-    'name': 'ocr-build-x86-pthread-tg',
-    'depends': ('__alternate ocr-init',),
-    'jobtype': 'ocr-build',
-    'run-args': 'x86-pthread-tg',
-    'sandbox': ('inherit0',)
-}
+# job_ocr_build_x86_pthread_tg = {
+#     'name': 'ocr-build-x86-pthread-tg',
+#     'depends': ('__alternate ocr-init',),
+#     'jobtype': 'ocr-build',
+#     'run-args': 'x86-pthread-tg',
+#     'sandbox': ('inherit0',)
+# }
 
 job_ocr_build_x86_builder_tg_ce = {
     'name': 'ocr-build-x86-builder-tg-ce',
@@ -137,4 +137,3 @@ job_ocr_build_tg_null_tg_xe = {
     'run-args': 'tg-null-tg-xe',
     'sandbox': ('inherit0',)
 }
-

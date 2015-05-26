@@ -29,12 +29,10 @@
 #define DEBUG_TYPE POLICY
 
 
-void xePolicyDomainStart(ocrPolicyDomain_t * policy);
-
 extern void ocrShutdown(void);
 
-void xePolicyDomainBegin(ocrPolicyDomain_t * policy) {
-    DPRINTF(DEBUG_LVL_VVERB, "xePolicyDomainBegin called on policy at 0x%lx\n", (u64) policy);
+// Function to cause run-level switches in this PD
+u8 xePdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 properties) {
 #ifdef ENABLE_SYSBOOT_FSIM
     if (XE_PDARGS_OFFSET != offsetof(ocrPolicyDomainXe_t, packedArgsLocation)) {
         DPRINTF(DEBUG_LVL_WARN, "XE_PDARGS_OFFSET (in .../ss/common/include/rmd-bin-files.h) is 0x%lx.  Should be 0x%lx\n",
@@ -49,26 +47,55 @@ void xePolicyDomainBegin(ocrPolicyDomain_t * policy) {
 
     ((ocrPolicyDomainXe_t*)policy)->shutdownInitiated = 0;
 
+
     maxCount = policy->guidProviderCount;
     for(i = 0; i < maxCount; ++i) {
-        policy->guidProviders[i]->fcts.begin(policy->guidProviders[i], policy);
-    }
-
-    maxCount = policy->allocatorCount;
-    for(i = 0; i < maxCount; ++i) {
-        policy->allocators[i]->fcts.begin(policy->allocators[i], policy);
+        policy->guidProviders[i]->fcts.switchRunlevel(policy->guidProviders[i], policy, RL_PD_OK,
+                                                 0, RL_REQUEST | RL_BRING_UP | RL_BARRIER, NULL, 0);
     }
 
     maxCount = policy->schedulerCount;
     for(i = 0; i < maxCount; ++i) {
-        policy->schedulers[i]->fcts.begin(policy->schedulers[i], policy);
+        policy->schedulers[i]->fcts.switchRunlevel(policy->schedulers[i], policy, RL_PD_OK,
+                                                 0, RL_REQUEST | RL_BRING_UP | RL_BARRIER, NULL, 0);
+        policy->schedulers[i]->fcts.switchRunlevel(policy->schedulers[i], policy, RL_MEMORY_OK,
+                                                 0, RL_REQUEST | RL_BRING_UP | RL_BARRIER, NULL, 0);
     }
 
     maxCount = policy->commApiCount;
     for(i = 0; i < maxCount; i++) {
-        policy->commApis[i]->fcts.begin(policy->commApis[i], policy);
+        policy->commApis[i]->fcts.switchRunlevel(policy->commApis[i], policy, RL_PD_OK,
+                                                 0, RL_REQUEST | RL_BRING_UP | RL_BARRIER, NULL, 0);
+    }
+    // REC: Moved all workers to start here.
+    // Note: it's important to first logically start all workers.
+    // Once they are all up, start the runtime.
+    // Workers should start the underlying target and platforms
+    maxCount = policy->workerCount;
+    for(i = 0; i < maxCount; i++) {
+        policy->workers[i]->fcts.switchRunlevel(policy->workers[i], policy, RL_PD_OK,
+                                                 0, RL_REQUEST | RL_BRING_UP | RL_BARRIER, NULL, 0);
+    }
+
+    maxCount = policy->allocatorCount;
+    for(i = 0; i < maxCount; ++i) {
+        policy->allocators[i]->fcts.switchRunlevel(policy->allocators[i], policy, RL_MEMORY_OK,
+                                                 0, RL_REQUEST | RL_BRING_UP | RL_BARRIER, NULL, 0);
+    }
+
+    maxCount = policy->schedulerCount;
+    for(i = 0; i < maxCount; ++i) {
+        policy->schedulers[i]->fcts.switchRunlevel(policy->schedulers[i], policy, RL_COMPUTE_OK,
+                                                 0, RL_REQUEST | RL_BRING_UP | RL_BARRIER, NULL, 0);
+    }
+
+    maxCount = policy->commApiCount;
+    for(i = 0; i < maxCount; i++) {
+        policy->commApis[i]->fcts.switchRunlevel(policy->commApis[i], policy, RL_MEMORY_OK,
+                                                 0, RL_REQUEST | RL_BRING_UP | RL_BARRIER, NULL, 0);
     }
     policy->placer = NULL;
+    guidify(policy, (u64)policy, &(policy->fguid), OCR_GUID_POLICY);
 
     // REC: Moved all workers to start here.
     // Note: it's important to first logically start all workers.
@@ -76,141 +103,18 @@ void xePolicyDomainBegin(ocrPolicyDomain_t * policy) {
     // Workers should start the underlying target and platforms
     maxCount = policy->workerCount;
     for(i = 0; i < maxCount; i++) {
-        policy->workers[i]->fcts.begin(policy->workers[i], policy);
+        policy->workers[i]->fcts.switchRunlevel(policy->workers[i], policy, RL_COMPUTE_OK,
+                                                 0, RL_REQUEST | RL_BRING_UP | RL_BARRIER, NULL, 0);
     }
 
 #if defined(SAL_FSIM_XE) // If running on FSim XE
-    xePolicyDomainStart(policy);
+    PRINTF("XE shutting down\n");
     hal_exit(0);
 #endif
 
-#ifdef TEMPORARY_FSIM_HACK_TILL_WE_FIGURE_OCR_START_STOP_HANDSHAKES
-    hal_exit(0);
-#endif
+    return 0;
 }
 
-void xePolicyDomainStart(ocrPolicyDomain_t * policy) {
-    DPRINTF(DEBUG_LVL_VVERB, "xePolicyDomainStart called on policy at 0x%lx\n", (u64) policy);
-    // The PD should have been brought up by now and everything instantiated
-    // This is a bit ugly but I can't find a cleaner solution:
-    //   - we need to associate the environment with the
-    //   currently running worker/PD so that we can use getCurrentEnv
-
-    u64 i = 0;
-    u64 maxCount = 0;
-
-    maxCount = policy->guidProviderCount;
-    for(i = 0; i < maxCount; ++i) {
-        policy->guidProviders[i]->fcts.start(policy->guidProviders[i], policy);
-    }
-
-    guidify(policy, (u64)policy, &(policy->fguid), OCR_GUID_POLICY);
-
-    /*maxCount = policy->allocatorCount;
-    for(i = 0; i < maxCount; ++i) {
-        policy->allocators[i]->fcts.start(policy->allocators[i], policy);
-    }
-
-    maxCount = policy->schedulerCount;
-    for(i = 0; i < maxCount; ++i) {
-        policy->schedulers[i]->fcts.start(policy->schedulers[i], policy);
-    }*/
-
-    maxCount = policy->commApiCount;
-    for(i = 0; i < maxCount; i++) {
-        policy->commApis[i]->fcts.start(policy->commApis[i], policy);
-    }
-
-    // REC: Moved all workers to start here.
-    // Note: it's important to first logically start all workers.
-    // Once they are all up, start the runtime.
-    // Workers should start the underlying target and platforms
-    maxCount = policy->workerCount;
-    for(i = 0; i < maxCount; i++) {
-        policy->workers[i]->fcts.start(policy->workers[i], policy);
-    }
-}
-
-void xePolicyDomainFinish(ocrPolicyDomain_t * policy) {
-    // Finish everything in reverse order
-    u64 i = 0;
-    u64 maxCount = 0;
-
-    // Note: As soon as worker '0' is stopped; its thread is
-    // free to fall-through and continue shutting down the
-    // policy domain
-    maxCount = policy->workerCount;
-    for(i = 0; i < maxCount; i++) {
-        policy->workers[i]->fcts.finish(policy->workers[i]);
-    }
-
-    maxCount = policy->commApiCount;
-    for(i = 0; i < maxCount; i++) {
-        policy->commApis[i]->fcts.finish(policy->commApis[i]);
-    }
-
-    maxCount = policy->schedulerCount;
-    for(i = 0; i < maxCount; ++i) {
-        policy->schedulers[i]->fcts.finish(policy->schedulers[i]);
-    }
-
-    maxCount = policy->allocatorCount;
-    for(i = 0; i < maxCount; ++i) {
-        policy->allocators[i]->fcts.finish(policy->allocators[i]);
-    }
-
-    maxCount = policy->guidProviderCount;
-    for(i = 0; i < maxCount; ++i) {
-        policy->guidProviders[i]->fcts.finish(policy->guidProviders[i]);
-    }
-
-}
-
-void xePolicyDomainStop(ocrPolicyDomain_t * policy) {
-
-    // Finish everything in reverse order
-    // In XE, we MUST call stop on the master worker first.
-    // The master worker enters its work routine loop and will
-    // be unlocked by ocrShutdown
-    u64 i = 0;
-    u64 maxCount = 0;
-
-    // Note: As soon as worker '0' is stopped; its thread is
-    // free to fall-through and continue shutting down the
-    // policy domain
-    maxCount = policy->workerCount;
-    for(i = 0; i < maxCount; i++) {
-        policy->workers[i]->fcts.stop(policy->workers[i]);
-    }
-    // WARNING: Do not add code here unless you know what you're doing !!
-    // If we are here, it means an EDT called ocrShutdown which
-    // logically finished workers and can make thread '0' executes this
-    // code before joining the other threads.
-
-    // Thread '0' joins the other (N-1) threads.
-
-    maxCount = policy->commApiCount;
-    for(i = 0; i < maxCount; i++) {
-        policy->commApis[i]->fcts.stop(policy->commApis[i]);
-    }
-
-    maxCount = policy->schedulerCount;
-    for(i = 0; i < maxCount; ++i) {
-        policy->schedulers[i]->fcts.stop(policy->schedulers[i]);
-    }
-
-    maxCount = policy->allocatorCount;
-    for(i = 0; i < maxCount; ++i) {
-        policy->allocators[i]->fcts.stop(policy->allocators[i]);
-    }
-
-    // We could release our GUID here but not really required
-
-    maxCount = policy->guidProviderCount;
-    for(i = 0; i < maxCount; ++i) {
-        policy->guidProviders[i]->fcts.stop(policy->guidProviders[i]);
-    }
-}
 
 void xePolicyDomainDestruct(ocrPolicyDomain_t * policy) {
     // Destroying instances
@@ -409,7 +313,8 @@ u8 xePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
     case PD_MSG_SAL_READ: case PD_MSG_SAL_WRITE:
     case PD_MSG_MGT_REGISTER: case PD_MSG_MGT_UNREGISTER:
     case PD_MSG_SAL_TERMINATE:
-    case PD_MSG_GUID_METADATA_CLONE: case PD_MSG_MGT_MONITOR_PROGRESS:
+    case PD_MSG_GUID_METADATA_CLONE: case PD_MSG_GUID_RESERVE:
+    case PD_MSG_GUID_UNRESERVE: case PD_MSG_MGT_MONITOR_PROGRESS:
     {
         DPRINTF(DEBUG_LVL_WARN, "XE PD does not handle call of type 0x%x\n",
                 (u32)(msg->type & PD_MSG_TYPE_ONLY));
@@ -460,15 +365,17 @@ u8 xePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
 #undef PD_TYPE
         break;
     }
-    case PD_MSG_MGT_SHUTDOWN: {
+    case PD_MSG_MGT_RL_NOTIFY: {
         START_PROFILE(pd_xe_Shutdown);
         ocrPolicyDomainXe_t *rself = (ocrPolicyDomainXe_t*)self;
         rself->shutdownInitiated = 1;
-        self->fcts.stop(self);
+        // Shutdown here
         if(msg->srcLocation == self->myLocation) {
-            DPRINTF(DEBUG_LVL_VVERB, "MGT_SHUTDOWN initiation from 0x%lx\n",
-                    msg->srcLocation);
+            DPRINTF(DEBUG_LVL_INFO, "SHUTDOWN initiation from 0x%lx %lx\n",
+                    msg->srcLocation, msg->destLocation);
             returnCode = xeProcessCeRequest(self, &msg);
+            self->workers[0]->fcts.switchRunlevel(self->workers[0], self, RL_USER_OK,
+                                                  0, RL_REQUEST, NULL, 0);
             // HACK: We force the return code to be 0 here
             // because otherwise something will complain
             returnCode = 0;
@@ -477,7 +384,7 @@ u8 xePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             //Keeping it for now until we fix the shutdown protocol
             //Bug #134
             ASSERT(0);
-            DPRINTF(DEBUG_LVL_VVERB, "MGT_SHUTDOWN(slave) from 0x%lx\n",
+            DPRINTF(DEBUG_LVL_INFO, "SHUTDOWN(slave) from 0x%lx\n",
                     msg->srcLocation);
             // Send the message back saying that
             // we did the shutdown
@@ -489,13 +396,6 @@ u8 xePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
                           ==, 0);
             returnCode = 0;
         }
-        EXIT_PROFILE;
-        break;
-    }
-    case PD_MSG_MGT_FINISH: {
-        START_PROFILE(pd_xe_Finish);
-        DPRINTF(DEBUG_LVL_VVERB, "MGT_FINISH req/resp\n");
-        self->fcts.finish(self);
         EXIT_PROFILE;
         break;
     }
@@ -647,11 +547,8 @@ ocrPolicyDomainFactory_t * newPolicyDomainFactoryXe(ocrParamList_t *perType) {
     base->initialize = &initializePolicyDomainXe;
     base->destruct = &destructPolicyDomainFactoryXe;
 
+    base->policyDomainFcts.switchRunlevel = FUNC_ADDR(u8 (*)(ocrPolicyDomain_t*, ocrRunlevel_t, u32), xePdSwitchRunlevel);
     base->policyDomainFcts.destruct = FUNC_ADDR(void(*)(ocrPolicyDomain_t*), xePolicyDomainDestruct);
-    base->policyDomainFcts.begin = FUNC_ADDR(void(*)(ocrPolicyDomain_t*), xePolicyDomainBegin);
-    base->policyDomainFcts.start = FUNC_ADDR(void(*)(ocrPolicyDomain_t*), xePolicyDomainStart);
-    base->policyDomainFcts.stop = FUNC_ADDR(void(*)(ocrPolicyDomain_t*), xePolicyDomainStop);
-    base->policyDomainFcts.finish = FUNC_ADDR(void(*)(ocrPolicyDomain_t*), xePolicyDomainFinish);
     base->policyDomainFcts.processMessage = FUNC_ADDR(u8(*)(ocrPolicyDomain_t*,ocrPolicyMsg_t*,u8), xePolicyDomainProcessMessage);
     base->policyDomainFcts.sendMessage = FUNC_ADDR(u8(*)(ocrPolicyDomain_t*, ocrLocation_t, ocrPolicyMsg_t*, ocrMsgHandle_t**, u32),
                                          xePdSendMessage);

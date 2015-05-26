@@ -31,14 +31,14 @@ extern "C" {
  *
  * @param[out] guid       The GUID created by the runtime for the new event
  * @param[in] eventType   The type of event to create. See #ocrEventTypes_t
- * @param[in] takesArg    True if this event will potentially carry a data block on
+ * @param[in] properties  True if this event will potentially carry a data block on
  *                        satisfaction, false othersie
  * @return a status code
  *     - 0: successful
  *     - ENOMEM: If space cannot be found to allocate the event
  *     - EINVAL: If eventType was malformed or is incompatible with takesArg
  **/
-u8 ocrEventCreate(ocrGuid_t *guid, ocrEventTypes_t eventType, bool takesArg);
+u8 ocrEventCreate(ocrGuid_t *guid, ocrEventTypes_t eventType, u16 properties);
 
 /**
  * @brief Explicitly destroys an event

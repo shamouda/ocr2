@@ -79,9 +79,9 @@ void xeCommDestruct (ocrCommPlatform_t * base) {
     runtimeChunkFree((u64)base, NULL);
 }
 
-void xeCommBegin(ocrCommPlatform_t * commPlatform, ocrPolicyDomain_t * PD, ocrCommApi_t *api) {
+void xeCommBegin(ocrCommPlatform_t * commPlatform, ocrPolicyDomain_t * PD) {
 
-    ASSERT(commPlatform != NULL && PD != NULL && api != NULL);
+    ASSERT(commPlatform != NULL && PD != NULL);
 
 #ifndef ENABLE_BUILDER_ONLY
     u64 i;
@@ -109,31 +109,54 @@ void xeCommBegin(ocrCommPlatform_t * commPlatform, ocrPolicyDomain_t * PD, ocrCo
 #endif
 }
 
-void xeCommStart(ocrCommPlatform_t * commPlatform, ocrPolicyDomain_t * PD, ocrCommApi_t *api) {
+void xeInitBarrier(void)
+{
+    volatile u64 * lq = 0x0;
 
-    ASSERT(commPlatform != NULL && PD != NULL && api != NULL);
+    lq[0] = 0xfeedf00d;
+    // While local stage non-Full, keep looping. (FIXME: sleep?)
+    while(lq[0] != 2);
+    lq[0] = 0;
 }
 
-void xeCommStop(ocrCommPlatform_t * commPlatform) {
-    ASSERT(commPlatform != NULL);
-}
+u8 xeCommSwitchRunlevel(ocrCommPlatform_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
+                      phase_t phase, u32 properties, void (*callback)(ocrPolicyDomain_t*, u64), u64 val) {
 
-void xeCommFinish(ocrCommPlatform_t *commPlatform) {
+    u8 toReturn = 0;
 
-    ASSERT(commPlatform != NULL);
+    // This is an inert module, we do not handle callbacks (caller needs to wait on us)
+    ASSERT(callback == NULL);
 
-    ocrCommPlatformXe_t * cp = (ocrCommPlatformXe_t *)commPlatform;
+    // Verify properties for this call
+    ASSERT((properties & RL_REQUEST) && !(properties & RL_RESPONSE)
+           && !(properties & RL_RELEASE));
+    ASSERT(!(properties & RL_FROM_MSG));
 
-    // Clear settings
-    cp->pdPtr->myLocation = cp->pdPtr->parentLocation = (ocrLocation_t)0x0;
-    cp->pdPtr = NULL;
-    cp->N = 0;
-    cp->rq = NULL;
-}
-
-u8 xeCommSetMaxExpectedMessageSize(ocrCommPlatform_t *self, u64 size, u32 mask) {
-    ASSERT(0);
-    return 0;
+    switch(runlevel) {
+    case RL_CONFIG_PARSE:
+        // On bring-up: Update PD->phasesPerRunlevel on phase 0
+        // and check compatibility on phase 1
+        break;
+    case RL_NETWORK_OK:
+        break;
+    case RL_PD_OK:
+        xeCommBegin(self, PD);
+        // Barrier - wait for CE's go signal
+        xeInitBarrier();
+        break;
+    case RL_MEMORY_OK:
+        break;
+    case RL_GUID_OK:
+        break;
+    case RL_COMPUTE_OK:
+        break;
+    case RL_USER_OK:
+        break;
+    default:
+        // Unknown runlevel
+        ASSERT(0);
+    }
+    return toReturn;
 }
 
 u8 xeCommSendMessage(ocrCommPlatform_t *self, ocrLocation_t target,
@@ -150,6 +173,8 @@ u8 xeCommSendMessage(ocrCommPlatform_t *self, ocrLocation_t target,
     ocrCommPlatformXe_t * cp = (ocrCommPlatformXe_t *)self;
 
     // For now, XEs only sent to their CE; make sure!
+    if(target != cp->pdPtr->parentLocation)
+        DPRINTF(DEBUG_LVL_WARN, "XE trying to send to %lx not parent %lx\n", target, cp->pdPtr->parentLocation);
     ASSERT(target == cp->pdPtr->parentLocation);
 
     // - Atomically test & set remote stage to Busy. Error if already non-Empty.
@@ -272,6 +297,11 @@ u8 xeCommWaitMessage(ocrCommPlatform_t *self,  ocrPolicyMsg_t **msg,
     return 0;
 }
 
+u8 xeCommSetMaxExpectedMessageSize(ocrCommPlatform_t *self, u64 size, u32 mask) {
+    ASSERT(0);
+    return 0;
+}
+
 u8 xeCommDestructMessage(ocrCommPlatform_t *self, ocrPolicyMsg_t *msg) {
 
     ASSERT(self != NULL);
@@ -321,12 +351,8 @@ ocrCommPlatformFactory_t *newCommPlatformFactoryXe(ocrParamList_t *perType) {
     base->destruct = &destructCommPlatformFactoryXe;
 
     base->platformFcts.destruct = FUNC_ADDR(void (*)(ocrCommPlatform_t*), xeCommDestruct);
-    base->platformFcts.begin = FUNC_ADDR(void (*)(ocrCommPlatform_t*, ocrPolicyDomain_t*,
-                                                  ocrCommApi_t*), xeCommBegin);
-    base->platformFcts.start = FUNC_ADDR(void (*)(ocrCommPlatform_t*, ocrPolicyDomain_t*,
-                                                  ocrCommApi_t*), xeCommStart);
-    base->platformFcts.stop = FUNC_ADDR(void (*)(ocrCommPlatform_t*), xeCommStop);
-    base->platformFcts.finish = FUNC_ADDR(void (*)(ocrCommPlatform_t*), xeCommFinish);
+    base->platformFcts.switchRunlevel = FUNC_ADDR(u8 (*)(ocrCommPlatform_t*, ocrPolicyDomain_t*, ocrRunlevel_t,
+                                                         phase_t, u32, void (*)(ocrPolicyDomain_t*, u64), u64), xeCommSwitchRunlevel);
     base->platformFcts.setMaxExpectedMessageSize = FUNC_ADDR(u8 (*)(ocrCommPlatform_t*, u64, u32),
                                                              xeCommSetMaxExpectedMessageSize);
     base->platformFcts.sendMessage = FUNC_ADDR(u8 (*)(ocrCommPlatform_t*, ocrLocation_t,

@@ -12,6 +12,8 @@
 #include "ocr-types.h"
 #include "utils/hashtable.h"
 
+#define DEBUG_TYPE UTIL
+
 /* Hashtable entries */
 typedef struct _ocr_hashtable_entry_struct {
     void * key;
@@ -89,14 +91,17 @@ hashtable_t * newHashtable(ocrPolicyDomain_t * pd, u32 nbBuckets, hashFct hashin
 /**
  * @brief Destruct the hashtable and all its entries (do not deallocate keys and values pointers).
  */
-void destructHashtable(hashtable_t * hashtable) {
+void destructHashtable(hashtable_t * hashtable, deallocFct entryDeallocator) {
     ocrPolicyDomain_t * pd = hashtable->pd;
     // go over each bucket and deallocate entries
     u32 i = 0;
     while(i < hashtable->nbBuckets) {
-        struct _ocr_hashtable_entry_struct * bucketHead = hashtable->table[i];
+        ocr_hashtable_entry * bucketHead = hashtable->table[i];
         while (bucketHead != NULL) {
-            struct _ocr_hashtable_entry_struct * next = bucketHead->nxt;
+            ocr_hashtable_entry * next = bucketHead->nxt;
+            if (entryDeallocator != NULL) {
+                entryDeallocator(bucketHead->key, bucketHead->value);
+            }
             pd->fcts.pdFree(pd, bucketHead);
             bucketHead = next;
         }
@@ -125,11 +130,11 @@ hashtable_t * newHashtableBucketLocked(ocrPolicyDomain_t * pd, u32 nbBuckets, ha
 /**
  * @brief Destruct the hashtable and all its entries (do not deallocate keys and values pointers).
  */
-void destructHashtableBucketLocked(hashtable_t * hashtable) {
+void destructHashtableBucketLocked(hashtable_t * hashtable, deallocFct entryDeallocator) {
     ocrPolicyDomain_t * pd = hashtable->pd;
     hashtableBucketLocked_t * rhashtable = (hashtableBucketLocked_t *) hashtable;
     pd->fcts.pdFree(pd, rhashtable->bucketLock);
-    destructHashtable(hashtable);
+    destructHashtable(hashtable, entryDeallocator);
 }
 
 /******************************************************/

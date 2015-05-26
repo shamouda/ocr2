@@ -61,18 +61,54 @@ typedef struct _ocrGuidProviderFcts_t {
      */
     void (*destruct)(struct _ocrGuidProvider_t* self);
 
-    void (*begin)(struct _ocrGuidProvider_t *self, struct _ocrPolicyDomain_t *pd);
+    /**
+     * @brief Switch runlevel
+     *
+     * @param[in] self         Pointer to this object
+     * @param[in] PD           Policy domain this object belongs to
+     * @param[in] runlevel     Runlevel to switch to
+     * @param[in] phase        Phase for this runlevel
+     * @param[in] properties   Properties (see ocr-runtime-types.h)
+     * @param[in] callback     Callback to call when the runlevel switch
+     *                         is complete. NULL if no callback is required
+     * @param[in] val          Value to pass to the callback
+     *
+     * @return 0 if the switch command was successful and a non-zero error
+     * code otherwise. Note that the return value does not indicate that the
+     * runlevel switch occured (the callback will be called when it does) but only
+     * that the call to switch runlevel was well formed and will be processed
+     * at some point
+     */
+    u8 (*switchRunlevel)(struct _ocrGuidProvider_t* self, struct _ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
+                         phase_t phase, u32 properties, void (*callback)(struct _ocrPolicyDomain_t*, u64), u64 val);
+    /**
+     * @brief Reserves a GUID range to be used by a user mapping function
+     *
+     * @param[in] self             GUID provider reserving the GUIDs
+     * @param[out] startGuid       Returns the first GUID of the range
+     * @param[out] skipGuid        Returns the "step" between valid GUIDs in the range
+     * @param[in] numberGuids      Number of GUIDs to reserve
+     * @param[in] guidType         Type of GUIDs this range will be used to store
+     * @return 0 on success a non-zero error code
+     */
+    u8 (*guidReserve)(struct _ocrGuidProvider_t *self, ocrGuid_t *startGuid, u64* skipGuid,
+                      u64 numberGuids, ocrGuidKind guidType);
 
     /**
-     * @brief "Starts" the GUID provider
+     * @brief Un-reserves a GUID range when no longer needed.
      *
-     * @param[in] self      Pointer to this GUID provider
-     * @param[in] pd        Policy domain this provider belongs to
+     * Note that this function does not free/unallocate any
+     * GUIDs that are active in the range, it un-reserves all non-used
+     * GUIDs.
+     *
+     * @param[in] self            GUID provider un-reserving the GUIDs
+     * @param[in] startGuid       First GUID of the range
+     * @param[in] skipGuid        "Step" between valid GUIDs in the range
+     * @param[in] numberGuids     Number of GUIDs to release
+     * @return 0 on success a non-zero error code
      */
-    void (*start)(struct _ocrGuidProvider_t* self, struct _ocrPolicyDomain_t* pd);
-
-    void (*stop)(struct _ocrGuidProvider_t* self);
-    void (*finish)(struct _ocrGuidProvider_t* self);
+    u8 (*guidUnreserve)(struct _ocrGuidProvider_t *self, ocrGuid_t startGuid, u64 skipGuid,
+                        u64 numberGuids);
 
     /**
      * @brief Gets a GUID for an object of kind 'kind'
@@ -102,13 +138,19 @@ typedef struct _ocrGuidProviderFcts_t {
      *
      *
      * @param[in] self          Pointer to this GUID provider
-     * @param[out] fguid        GUID returned (with metaDataPtr)
+     * @param[in/out] fguid     GUID returned (with metaDataPtr)
+     *                          If properties has GUID_PROP_IS_LABELED
+     *                          the fguid.guid field should contain
+     *                          the GUID that is requested
      * @param[in] size          Size of the storage to be created
      * @param[in] kind          Kind of the object that will be associated with the GUID
-     * @return 0 on success or an error code
+     * @param[in] properties    Properties for the creation. Mostly contains stuff
+     *                          related to GUID labeling
+     * @return 0 on success or an error code:
+     *     - OCR_EGUIDEXISTS if GUID_PROP_CHECK is set and the GUID already exists
      */
     u8 (*createGuid)(struct _ocrGuidProvider_t* self, ocrFatGuid_t* fguid,
-                     u64 size, ocrGuidKind kind);
+                     u64 size, ocrGuidKind kind, u32 properties);
 
     /**
      * @brief Resolve the associated value to the GUID 'guid'

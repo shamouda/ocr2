@@ -9,13 +9,13 @@
  *       Currently no functionality on tg.
  */
 
-u32 salPause(void){
+u32 salPause(bool isBlocking){
     DPRINTF(DEBUG_LVL_VERB, "ocrPause/ocrQuery/ocrResume not yet supported on tg\n");
     return 1;
 }
 
-void salQuery(u32 flag){
-     return;
+ocrGuid_t salQuery(ocrQueryType_t query, ocrGuid_t guid, void **result, u32 *size, u8 flags){
+     return NULL_GUID;
 }
 
 void salResume(u32 flag){

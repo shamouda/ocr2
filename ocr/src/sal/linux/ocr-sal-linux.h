@@ -14,9 +14,9 @@
 
 void sig_handler(u32 sigNum);
 
-extern u32 salPause();
+extern u32 salPause(bool isBlocking);
 
-extern void salQuery(u32 flag);
+extern ocrGuid_t salQuery(ocrQueryType_t query, ocrGuid_t guid, void **result, u32 *size, u8 flags);
 
 extern void salResume(u32 flag);
 

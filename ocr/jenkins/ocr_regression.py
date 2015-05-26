@@ -33,21 +33,21 @@ job_ocr_regression_x86_pthread_x86_lockableDB = {
     'sandbox': ('inherit0',)
 }
 
-job_ocr_regression_x86_pthread_tg_regularDB = {
-    'name': 'ocr-regression-x86-pthread-tg-regularDB',
-    'depends': ('ocr-build-x86-pthread-tg',),
-    'jobtype': 'ocr-regression',
-    'run-args': 'x86-pthread-tg jenkins-1block-regularDB.cfg regularDB',
-    'sandbox': ('inherit0',)
-}
+# job_ocr_regression_x86_pthread_tg_regularDB = {
+#     'name': 'ocr-regression-x86-pthread-tg-regularDB',
+#     'depends': ('ocr-build-x86-pthread-tg',),
+#     'jobtype': 'ocr-regression',
+#     'run-args': 'x86-pthread-tg jenkins-1block-regularDB.cfg regularDB',
+#     'sandbox': ('inherit0',)
+# }
 
-job_ocr_regression_x86_pthread_tg_lockableDB = {
-    'name': 'ocr-regression-x86-pthread-tg-lockableDB',
-    'depends': ('ocr-build-x86-pthread-tg',),
-    'jobtype': 'ocr-regression',
-    'run-args': 'x86-pthread-tg jenkins-1block-lockableDB.cfg lockableDB',
-    'sandbox': ('inherit0',)
-}
+# job_ocr_regression_x86_pthread_tg_lockableDB = {
+#     'name': 'ocr-regression-x86-pthread-tg-lockableDB',
+#     'depends': ('ocr-build-x86-pthread-tg',),
+#     'jobtype': 'ocr-regression',
+#     'run-args': 'x86-pthread-tg jenkins-1block-lockableDB.cfg lockableDB',
+#     'sandbox': ('inherit0',)
+# }
 
 #TODO: not sure how to not hardcode MPI_ROOT here
 job_ocr_regression_x86_pthread_mpi_lockableDB = {
@@ -74,7 +74,7 @@ job_ocr_regression_x86_pthread_gasnet_lockableDB = {
                  'GASNET_CONDUIT': 'ibv',
                  'GASNET_TYPE': 'par',
                  'GASNET_EXTRA_LIBS': '-L/usr/lib64 -lrt -libverbs',
-                 'TEST_CC': 'mpicc', # gasnet built with mpi
+                 'CC': 'mpicc', # gasnet built with mpi
                  # picked up by non-regression test script
                  'OCR_LDFLAGS': '-L${GASNET_ROOT}/lib -lgasnet-${GASNET_CONDUIT}-${GASNET_TYPE} ${GASNET_EXTRA_LIBS}',}
 }

@@ -6,18 +6,6 @@
 # removed or modified.
 #
 
-
-#
-# WARNING
-#
-# This file is auto-generated, do not edit it or your changes
-# will be lost the next time this script is generated.
-#
-# contact ocr mailing list if you need to make permanent changes.
-#
-# WARNING
-#
-
 #
 # Begin extension specific option parsing and checking
 #
@@ -82,9 +70,9 @@ fi
 # Default compilation option for ocr
 #
 
-if [ -z "${TEST_CC}" ]; then
-    echo "TEST_CC is not defined, defaulting to gcc"
-    TEST_CC=gcc
+if [ -z "${CC}" ]; then
+    echo "CC is not defined, defaulting to gcc"
+    CC=gcc
 fi
 
 export INCLUDES="-I${OCR_INSTALL}/include"
@@ -162,6 +150,7 @@ function usage () {
     echo "       -report_error : IF one of the test has failed, returns with exit code != 0"
     echo "       -co           : Compile only"
     echo "       -ro           : Run Only"
+    echo "       -perftest     : Run performance tests as non-regression tests"
     echo "       -showoutput   : Show test output on console"
     echo "       -v            : Prints additionnal information"
     echo "  (-h) --help        : Prints this message"
@@ -211,11 +200,23 @@ function find_options () {
 
 function steps_list () {
     if [[ "${STEP_COMPILE_ONLY}" == "yes" ]]; then
-        RES_STEPS_LIST="clean compile"
+        if [[ -n "${PERFTEST}" ]]; then
+            RES_STEPS_LIST="perfClean perfBuild"
+        else
+            RES_STEPS_LIST="clean compile"
+        fi
     elif [[ "${STEP_RUN_ONLY}" == "yes" ]]; then
-        RES_STEPS_LIST="run"
+        if [[ -n "${PERFTEST}" ]]; then
+            RES_STEPS_LIST="perfBenchmark"
+        else
+            RES_STEPS_LIST="run"
+        fi
     else
-        RES_STEPS_LIST="clean compile run"
+        if [[ -n "${PERFTEST}" ]]; then
+            RES_STEPS_LIST="perfClean perfBuild perfBenchmark"
+        else
+            RES_STEPS_LIST="clean compile run"
+        fi
     fi
 }
 
@@ -237,6 +238,15 @@ function clean_binaries() {
     fi
 }
 
+function clean_cores() {
+    local FILE=$1
+    local FOLDER=$2
+    for file in `find $FOLDER -name 'core.[0-9]*'`; do
+        echo "rm $file"
+        rm $file;
+    done
+}
+
 function rename_binary() {
     local FILE=$1
     NAME=
@@ -254,6 +264,9 @@ function clean () {
     # cleaning previously created binaries
     clean_binaries ${FILE}
 
+    # cleaning core files
+    clean_cores ${FILE} ${FOLDER}
+
     cd -
     return 0
 }
@@ -265,8 +278,8 @@ function compile () {
     cd $FOLDER;
     NAME=
     get_name ${FILE}
-    echo "${TEST_CC} ${OCR_CFLAGS} ${CFLAGS} ${INCLUDES} ${FILE} -o ${BIN_GEN_DIR}/${NAME} ${LDFLAGS}"
-    ${TEST_CC} ${OCR_CFLAGS} ${CFLAGS} ${INCLUDES} ${FILE} -o ${BIN_GEN_DIR}/${NAME} ${LDFLAGS}
+    echo "${CC} ${OCR_CFLAGS} ${CFLAGS} ${INCLUDES} ${FILE} -o ${BIN_GEN_DIR}/${NAME} ${LDFLAGS}"
+    ${CC} ${OCR_CFLAGS} ${CFLAGS} ${INCLUDES} ${FILE} -o ${BIN_GEN_DIR}/${NAME} ${LDFLAGS}
     RES=$?
 
     rename_binary ${FILE}
@@ -310,6 +323,46 @@ function run () {
     return $RES
 }
 
+#
+# Support to run performance-tests as non-regression tests
+#
+function perfClean () {
+    local FILE=$1
+    local FOLDER=$2
+
+    # Override folder to be the root folder of performance-tests
+    clean $FILE $TEST_DIR/..
+
+    return 0
+}
+
+function perfBuild () {
+    local FILE=$1
+    local FOLDER=$2
+    cd $FOLDER/..;
+    NAME=
+    get_name ${FILE}
+    make benchmark build/${NAME} PROG=ocr/${FILE}
+    RES=$?
+    cd -;
+    return $RES
+}
+
+function perfBenchmark () {
+    local FILE=$1
+    local FOLDER=$2
+    TEST_RES=0
+    cd $FOLDER/..;
+    NAME=
+    get_name ${FILE}
+    make run build/${NAME}
+    RES=$?
+    cd -;
+    return $RES
+}
+#
+# End Support to run performance-tests as non-regression tests
+#
 
 function find_tests () {
     local TEST_FOLDER=$1
@@ -852,6 +905,10 @@ function runTests () {
             shift
             TEST_DIR=("$@")
             shift
+        elif [[ "$1" = "-perftest" ]]; then
+            shift
+            PERFTEST="yes"
+            TEST_DIR=($PWD/performance-tests/ocr)
         elif [[ "$1" = "-include" || "$1" = "-i" && $# -ge 2 ]]; then
             shift
             INCL_PATTERN=("$@")

@@ -14,12 +14,24 @@ else
 
     CFG_FILE=$2;
     export OCR_CONFIG=${OCR_INSTALL}/config/${CFG_FILE}
-    echo "regression.sh: Setting OCR_CONFIG to ${OCR_CONFIG}"
+    echo "regression.sh: Setting OCR_CONFIG to ${OCR_CONFIG} =${CC}"
 
     DB_IMPL=$3;
 
     cd ${JJOB_PRIVATE_HOME}/xstack/ocr/tests/
 
     ./ocrTests -unstablefile unstable.${ARCH}-${DB_IMPL}
-    exit $?
+    RES=$?
+
+    #Conditionally execute to preserve logs if previous run failed.
+    if [[ $RES -eq 0 ]]; then
+        #TODO: disable gasnet tests for now
+        if [[ "${ARCH}" != "x86-pthread-gasnet" ]]; then
+            #Run performance tests as non-regression tests too
+            ./ocrTests -unstablefile unstable.${ARCH}-${DB_IMPL} -perftest
+            RES=$?
+        fi
+    fi
+
+    exit $RES
 fi

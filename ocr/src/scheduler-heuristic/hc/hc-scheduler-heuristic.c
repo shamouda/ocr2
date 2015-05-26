@@ -30,11 +30,6 @@ ocrSchedulerHeuristic_t* newSchedulerHeuristicHc(ocrSchedulerHeuristicFactory_t 
     return self;
 }
 
-void hcSchedulerHeuristicBegin(ocrSchedulerHeuristic_t * self) {
-    ASSERT(self->scheduler != NULL);
-    ASSERT(self->scheduler->rootObj->base.kind == OCR_SCHEDULER_OBJECT_ROOT_WST);
-}
-
 void initializeContext(ocrSchedulerHeuristicContext_t *context, u64 contextId) {
     context->id = contextId;
     context->actionSet = NULL;
@@ -48,31 +43,67 @@ void initializeContext(ocrSchedulerHeuristicContext_t *context, u64 contextId) {
     return;
 }
 
-void hcSchedulerHeuristicStart(ocrSchedulerHeuristic_t * self) {
-    u32 i;
-    ocrScheduler_t *scheduler = self->scheduler;
-    ASSERT(scheduler->pd != NULL);
-    ASSERT(scheduler->contextCount > 0);
-    ocrPolicyDomain_t *pd = scheduler->pd;
-    self->contextCount = scheduler->contextCount;
-    self->contexts = (ocrSchedulerHeuristicContext_t **)pd->fcts.pdMalloc(pd, self->contextCount * sizeof(ocrSchedulerHeuristicContext_t*));
-    ocrSchedulerHeuristicContextHc_t *contextAlloc = (ocrSchedulerHeuristicContextHc_t *)pd->fcts.pdMalloc(pd, self->contextCount * sizeof(ocrSchedulerHeuristicContextHc_t));
-    for (i = 0; i < self->contextCount; i++) {
-        ocrSchedulerHeuristicContext_t *context = (ocrSchedulerHeuristicContext_t *)&(contextAlloc[i]);
-        initializeContext(context, i);
-        self->contexts[i] = context;
+u8 hcSchedulerHeuristicSwitchRunlevel(ocrSchedulerHeuristic_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
+                                      phase_t phase, u32 properties, void (*callback)(ocrPolicyDomain_t*, u64), u64 val) {
+
+    u8 toReturn = 0;
+
+    // This is an inert module, we do not handle callbacks (caller needs to wait on us)
+    ASSERT(callback == NULL);
+
+    // Verify properties for this call
+    ASSERT((properties & RL_REQUEST) && !(properties & RL_RESPONSE)
+           && !(properties & RL_RELEASE));
+    ASSERT(!(properties & RL_FROM_MSG));
+
+    switch(runlevel) {
+    case RL_CONFIG_PARSE:
+        // On bring-up: Update PD->phasesPerRunlevel on phase 0
+        // and check compatibility on phase 1
+        break;
+    case RL_NETWORK_OK:
+        break;
+    case RL_PD_OK:
+        break;
+    case RL_MEMORY_OK:
+        break;
+    case RL_GUID_OK:
+    {
+        // Memory is up at this point. We can initialize ourself
+        if((properties & RL_BRING_UP) && RL_IS_FIRST_PHASE_UP(PD, RL_GUID_OK, phase)) {
+            u32 i;
+            ocrScheduler_t *scheduler = self->scheduler;
+            ASSERT(scheduler);
+            ASSERT(self->scheduler->rootObj->base.kind == OCR_SCHEDULER_OBJECT_ROOT_WST);
+            ASSERT(scheduler->pd != NULL);
+            ASSERT(scheduler->contextCount > 0);
+            ocrPolicyDomain_t *pd = scheduler->pd;
+            ASSERT(pd == PD);
+
+            self->contextCount = scheduler->contextCount;
+            self->contexts = (ocrSchedulerHeuristicContext_t **)pd->fcts.pdMalloc(pd, self->contextCount * sizeof(ocrSchedulerHeuristicContext_t*));
+            ocrSchedulerHeuristicContextHc_t *contextAlloc = (ocrSchedulerHeuristicContextHc_t *)pd->fcts.pdMalloc(pd, self->contextCount * sizeof(ocrSchedulerHeuristicContextHc_t));
+            for (i = 0; i < self->contextCount; i++) {
+                ocrSchedulerHeuristicContext_t *context = (ocrSchedulerHeuristicContext_t *)&(contextAlloc[i]);
+                initializeContext(context, i);
+                self->contexts[i] = context;
+            }
+        }
+        if((properties & RL_TEAR_DOWN) && RL_IS_LAST_PHASE_DOWN(PD, RL_GUID_OK, phase)) {
+            PD->fcts.pdFree(PD, self->contexts[0]);
+            PD->fcts.pdFree(PD, self->contexts);
+        }
+        break;
     }
-}
-
-void hcSchedulerHeuristicStop(ocrSchedulerHeuristic_t * self) {
-    ocrPolicyDomain_t *pd = self->scheduler->pd;
-    ocrSchedulerHeuristicContextHc_t *contextAlloc = (ocrSchedulerHeuristicContextHc_t *)self->contexts[0];
-    pd->fcts.pdFree(pd, contextAlloc);
-    pd->fcts.pdFree(pd, self->contexts);
-}
-
-void hcSchedulerHeuristicFinish(ocrSchedulerHeuristic_t *self) {
-    // Nothing to do locally
+    case RL_COMPUTE_OK:
+        break;
+    case RL_USER_OK:
+        break;
+    default:
+        // Unknown runlevel
+        ASSERT(0);
+    }
+    return toReturn;
 }
 
 void hcSchedulerHeuristicDestruct(ocrSchedulerHeuristic_t * self) {
@@ -175,10 +206,8 @@ ocrSchedulerHeuristicFactory_t * newOcrSchedulerHeuristicFactoryHc(ocrParamList_
                                       sizeof(ocrSchedulerHeuristicFactoryHc_t), NONPERSISTENT_CHUNK);
     base->instantiate = &newSchedulerHeuristicHc;
     base->destruct = &destructSchedulerHeuristicFactoryHc;
-    base->fcts.begin = FUNC_ADDR(void (*)(ocrSchedulerHeuristic_t*), hcSchedulerHeuristicBegin);
-    base->fcts.start = FUNC_ADDR(void (*)(ocrSchedulerHeuristic_t*), hcSchedulerHeuristicStart);
-    base->fcts.stop = FUNC_ADDR(void (*)(ocrSchedulerHeuristic_t*), hcSchedulerHeuristicStop);
-    base->fcts.finish = FUNC_ADDR(void (*)(ocrSchedulerHeuristic_t*), hcSchedulerHeuristicFinish);
+    base->fcts.switchRunlevel = FUNC_ADDR(u8 (*)(ocrSchedulerHeuristic_t*, ocrPolicyDomain_t*, ocrRunlevel_t,
+                                                 phase_t, u32, void (*)(ocrPolicyDomain_t*, u64), u64), hcSchedulerHeuristicSwitchRunlevel);
     base->fcts.destruct = FUNC_ADDR(void (*)(ocrSchedulerHeuristic_t*), hcSchedulerHeuristicDestruct);
 
     base->fcts.update = FUNC_ADDR(u8 (*)(ocrSchedulerHeuristic_t*, u32), hcSchedulerHeuristicUpdate);

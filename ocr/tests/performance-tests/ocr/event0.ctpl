@@ -2,7 +2,7 @@
 #include "ocr.h"
 
 // DESC: One worker creates all the events.
-// TIME: Creation of all events
+// TIME: This is a template. Timing info is defined in the file including this one.
 //
 // VARIABLES:
 // - NB_INSTANCES

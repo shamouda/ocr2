@@ -81,15 +81,8 @@ static void hcWorkShift(ocrWorker_t * worker) {
             hcWorker->name = worker->curTask->name;
 #endif
 
-            // Mark the task. Allows the PD to check the state of workers
-            // and detect quiescence, without weird behavior because curTask
-            // is being deallocated in parallel
-            //TODO this is going away with the fix for runlevel #80
-            worker->curTask = (ocrTask_t*) 0x1;
-            // Destroy the work
 #undef PD_TYPE
-
-#define PD_MSG (&msg)
+            // Destroy the work
 #define PD_TYPE PD_MSG_WORK_DESTROY
             getCurrentEnv(NULL, NULL, NULL, &msg);
             msg.type = PD_MSG_WORK_DESTROY | PD_MSG_REQUEST;
@@ -106,109 +99,271 @@ static void hcWorkShift(ocrWorker_t * worker) {
         }
     }
 
-    //Pause called - stop workers
-    while(self->runtimePause == true){
-        hal_pause();
+    if(self->runtimePause == true) {
+        hal_xadd32((u32*)&self->pauseCounter, 1);
+        //Pause called - stop workers
+        while(self->runtimePause == true) {
+            hal_pause();
+        }
+        hal_xadd32((u32*)&self->pauseCounter, -1);
     }
 
 }
 
-/**
- * The computation worker routine that asks work to the scheduler
- */
 static void workerLoop(ocrWorker_t * worker) {
-    //Start the worker loop
-    while(worker->fcts.isRunning(worker)) {
-        START_PROFILE(wo_hc_workerLoop);
-        worker->fcts.workShift(worker);
-        EXIT_PROFILE;
-    } /* End of while loop */
-}
+    u8 continueLoop = true;
+    // At this stage, we are in the USER_OK runlevel
+    ASSERT(worker->curState == GET_STATE(RL_USER_OK, (RL_GET_PHASE_COUNT_DOWN(worker->pd, RL_USER_OK))));
 
-void destructWorkerHc(ocrWorker_t * base) {
-    u64 i = 0;
-    while(i < base->computeCount) {
-        base->computes[i]->fcts.destruct(base->computes[i]);
-        ++i;
-    }
-    runtimeChunkFree((u64)(base->computes), NULL);
-    runtimeChunkFree((u64)base, NULL);
-}
-
-void hcBeginWorker(ocrWorker_t * base, ocrPolicyDomain_t * policy) {
-
-    // Starts everybody, the first comp-platform has specific
-    // code to represent the master thread.
-    u64 computeCount = base->computeCount;
-    base->location = (ocrLocation_t)base;
-    ASSERT(computeCount == 1);
-    u64 i = 0;
-    for(i = 0; i < computeCount; ++i) {
-        base->computes[i]->fcts.begin(base->computes[i], policy, base->type);
-#ifdef OCR_ENABLE_STATISTICS
-        statsWORKER_START(policy, base->guid, base, base->computes[i]->guid, base->computes[i]);
-#endif
-    }
-
-    if(base->type == MASTER_WORKERTYPE) {
-        // For the master thread, we need to set the PD and worker
-        // The other threads will set this when they start
-        for(i = 0; i < computeCount; ++i) {
-            base->computes[i]->fcts.setCurrentEnv(base->computes[i], policy, base);
-        }
-    }
-}
-
-void hcStartWorker(ocrWorker_t * base, ocrPolicyDomain_t * policy) {
-
-    ocrWorkerHc_t * hcWorker = (ocrWorkerHc_t *) base;
-
-    if(!hcWorker->secondStart) {
-        // Get a GUID
-        guidify(policy, (u64)base, &(base->fguid), OCR_GUID_WORKER);
-        base->pd = policy;
-        hcWorker->running = true;
-        if(base->type == MASTER_WORKERTYPE) {
-            hcWorker->secondStart = true; // Only relevant for MASTER_WORKERTYPE
-            return; // Don't start right away
-        }
-    }
-
-    ASSERT(base->type != MASTER_WORKERTYPE || hcWorker->secondStart);
-
-    // Starts everybody, the first comp-platform has specific
-    // code to represent the master thread.
-    u64 computeCount = base->computeCount;
-    // What the compute target will execute
-    ASSERT(computeCount == 1);
-    u64 i = 0;
-    for(i = 0; i < computeCount; ++i) {
-        base->computes[i]->fcts.start(base->computes[i], policy, base);
-#ifdef OCR_ENABLE_STATISTICS
-        statsWORKER_START(policy, base->guid, base, base->computes[i]->guid, base->computes[i]);
-#endif
-    }
-    // Otherwise, it is highly likely that we are shutting down
-}
-
-static bool isMainEdtForker(ocrWorker_t * worker, ocrGuid_t * affinityMasterPD) {
-    // Determine if current worker is the master worker of this PD
-    bool blessedWorker = (worker->type == MASTER_WORKERTYPE);
-    // When OCR is used in library mode, there's no mainEdt
-    blessedWorker &= (mainEdtGet() != NULL);
-    if (blessedWorker) {
-        // Determine if current master worker is part of master PD
+    if (worker->amBlessed) {
+        ocrGuid_t affinityMasterPD;
         u64 count = 0;
         // There should be a single master PD
         ASSERT(!ocrAffinityCount(AFFINITY_PD_MASTER, &count) && (count == 1));
-        ocrAffinityGet(AFFINITY_PD_MASTER, &count, affinityMasterPD);
-        ASSERT(count == 1);
-        blessedWorker &= (worker->pd->myLocation == affinityToLocation(*affinityMasterPD));
+        ocrAffinityGet(AFFINITY_PD_MASTER, &count, &affinityMasterPD);
+
+        // This is all part of the mainEdt setup
+        // and should be executed by the "blessed" worker.
+        void * packedUserArgv = userArgsGet();
+        ocrEdt_t mainEdt = mainEdtGet();
+        u64 totalLength = ((u64*) packedUserArgv)[0]; // already exclude this first arg
+        // strip off the 'totalLength first argument'
+        packedUserArgv = (void *) (((u64)packedUserArgv) + sizeof(u64)); // skip first totalLength argument
+        ocrGuid_t dbGuid;
+        void* dbPtr;
+        ocrDbCreate(&dbGuid, &dbPtr, totalLength,
+                    DB_PROP_IGNORE_WARN, affinityMasterPD, NO_ALLOC);
+        // copy packed args to DB
+        hal_memCopy(dbPtr, packedUserArgv, totalLength, 0);
+        // Prepare the mainEdt for scheduling
+        ocrGuid_t edtTemplateGuid = NULL_GUID, edtGuid = NULL_GUID;
+        ocrEdtTemplateCreate(&edtTemplateGuid, mainEdt, 0, 1);
+        ocrEdtCreate(&edtGuid, edtTemplateGuid, EDT_PARAM_DEF, /* paramv = */ NULL,
+                     /* depc = */ EDT_PARAM_DEF, /* depv = */ &dbGuid,
+                     EDT_PROP_NONE, affinityMasterPD, NULL);
+        // Once mainEdt is created, its template is no longer needed
+        ocrEdtTemplateDestroy(edtTemplateGuid);
     }
-    return blessedWorker;
+
+    // Actual loop
+    do {
+        while(worker->curState == worker->desiredState) {
+            START_PROFILE(wo_hc_workerLoop);
+            worker->fcts.workShift(worker);
+            EXIT_PROFILE;
+        }
+        // Here we are shifting to another runlevel or phase
+
+        switch(GET_STATE_RL(worker->desiredState)) {
+        case RL_USER_OK: {
+            u8 desiredPhase = GET_STATE_PHASE(worker->desiredState);
+            // Should never fall-through here if there has been no transition
+            ASSERT(desiredPhase != RL_GET_PHASE_COUNT_DOWN(worker->pd, RL_USER_OK));
+            ASSERT(worker->callback != NULL);
+            worker->curState = GET_STATE(RL_USER_OK, desiredPhase);
+            // Callback the PD, but keep working
+            worker->callback(worker->pd, worker->callbackArg);
+            // Warning: Code potentially concurrent with switchRunlevel
+            break;
+        }
+        case RL_COMPUTE_OK: {
+            u8 phase = GET_STATE_PHASE(worker->desiredState);
+            if(RL_IS_FIRST_PHASE_DOWN(worker->pd, RL_COMPUTE_OK, phase)) {
+                DPRINTF(DEBUG_LVL_VERB, "Noticed transition to RL_COMPUTE_OK\n");
+
+                // We first change our state prior to the callback
+                // because we may end up doing some of the callback processing
+                worker->curState = worker->desiredState;
+                if(worker->callback != NULL) {
+                    worker->callback(worker->pd, worker->callbackArg);
+                }
+                // There is no need to do anything else except quit
+                continueLoop = false;
+            } else {
+                ASSERT(0);
+            }
+            break;
+        }
+        default:
+            // Only these two RL should occur
+            ASSERT(0);
+        }
+    } while(continueLoop);
+
+    DPRINTF(DEBUG_LVL_VERB, "Finished worker loop ... waiting to be reapped\n");
+}
+
+void destructWorkerHc(ocrWorker_t * base) {
+    runtimeChunkFree((u64)base, PERSISTENT_CHUNK);
+}
+
+u8 hcWorkerSwitchRunlevel(ocrWorker_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
+                          phase_t phase, u32 properties, void (*callback)(ocrPolicyDomain_t *, u64), u64 val) {
+
+    u8 toReturn = 0;
+
+    // Verify properties
+    ASSERT((properties & RL_REQUEST) && !(properties & RL_RESPONSE)
+           && !(properties & RL_RELEASE));
+    ASSERT(!(properties & RL_FROM_MSG));
+
+    // Call the runlevel change on the underlying platform
+    if(runlevel == RL_CONFIG_PARSE && (properties & RL_BRING_UP) && phase == 0) {
+        // Set the worker properly the first time
+        ASSERT(self->computeCount == 1);
+        self->computes[0]->worker = self;
+    }
+    // Even if we have a callback, we make things synchronous for the computes
+    if(runlevel != RL_COMPUTE_OK) {
+        // For compute OK, we need to do things BEFORE calling this
+        toReturn |= self->computes[0]->fcts.switchRunlevel(self->computes[0], PD, runlevel, phase, properties,
+                                                           NULL, 0);
+    }
+
+    switch(runlevel) {
+    case RL_CONFIG_PARSE:
+        // On bring-up: Update PD->phasesPerRunlevel on phase 0
+        // and check compatibility on phase 1
+        if(properties & RL_BRING_UP) {
+            if(RL_IS_FIRST_PHASE_UP(PD, RL_CONFIG_PARSE, phase)) {
+                // This worker implementation supports an arbitrary number
+                // of down phases in RL_USER_OK. Each phase goes into the work loop.
+                // We need at least two phases for the RL_COMPUTE_OK TEAR_DOWN
+                RL_ENSURE_PHASE_DOWN(PD, RL_COMPUTE_OK, RL_PHASE_WORKER, 2);
+            } else if(RL_IS_LAST_PHASE_UP(PD, RL_CONFIG_PARSE, phase)) {
+                // We check that the compute and user phases have the right
+                // count. We currently only support one user phase and two
+                // compute phase. If this changes, the workerLoop code and hcWorkerRun
+                // code will have to be modified (as well as this code of course)
+                if(RL_GET_PHASE_COUNT_UP(PD, RL_COMPUTE_OK) != 1 ||
+                   RL_GET_PHASE_COUNT_DOWN(PD, RL_COMPUTE_OK) != 2 ||
+                   RL_GET_PHASE_COUNT_UP(PD, RL_USER_OK) != 1 ||
+                   RL_GET_PHASE_COUNT_DOWN(PD, RL_USER_OK) != 1) {
+                    DPRINTF(DEBUG_LVL_WARN, "Worker does not support compute and user counts\n");
+                    ASSERT(0);
+                }
+            }
+        }
+        break;
+    case RL_NETWORK_OK:
+        break;
+    case RL_PD_OK:
+        if(properties & RL_BRING_UP)
+            self->pd = PD;
+        break;
+    case RL_MEMORY_OK:
+        break;
+    case RL_GUID_OK:
+        break;
+    case RL_COMPUTE_OK:
+        if((properties & RL_BRING_UP) && RL_IS_FIRST_PHASE_UP(PD, RL_COMPUTE_OK, phase)) {
+            // Guidify ourself
+            guidify(self->pd, (u64)self, &(self->fguid), OCR_GUID_WORKER);
+            // We need a way to inform the PD
+            ASSERT(callback != NULL);
+            self->curState = GET_STATE(RL_MEMORY_OK, 0); // Technically last phase of memory OK but doesn't really matter
+            self->desiredState = GET_STATE(RL_COMPUTE_OK, phase);
+
+            // See if we are blessed
+            self->amBlessed = (properties & RL_BLESSED) != 0;
+
+            if(!(properties & RL_PD_MASTER)) {
+                self->callback = callback;
+                self->callbackArg = val;
+                hal_fence();
+                toReturn |= self->computes[0]->fcts.switchRunlevel(self->computes[0], PD, runlevel, phase, properties,
+                                                                   NULL, 0);
+            } else {
+                // First set our current environment (this is usually done by the new thread's startup code)
+                self->computes[0]->fcts.setCurrentEnv(self->computes[0], self->pd, self);
+                // We just directly call the callback after switching our underlying target
+                toReturn |= self->computes[0]->fcts.switchRunlevel(self->computes[0], PD, runlevel, phase, properties,
+                                                                   NULL, 0);
+                callback(self->pd, val);
+                self->curState = GET_STATE(RL_COMPUTE_OK, 0);
+            }
+
+        }
+        if((properties & RL_TEAR_DOWN)) {
+            toReturn |= self->computes[0]->fcts.switchRunlevel(self->computes[0], PD, runlevel, phase, properties,
+                                                               NULL, 0);
+            if(RL_IS_LAST_PHASE_DOWN(PD, RL_COMPUTE_OK, phase)) {
+                // Destroy GUID
+                PD_MSG_STACK(msg);
+                getCurrentEnv(NULL, NULL, NULL, &msg);
+#define PD_MSG (&msg)
+#define PD_TYPE PD_MSG_GUID_DESTROY
+                msg.type = PD_MSG_GUID_DESTROY | PD_MSG_REQUEST;
+                PD_MSG_FIELD_I(guid) = self->fguid;
+                PD_MSG_FIELD_I(properties) = 0;
+                toReturn |= self->pd->fcts.processMessage(self->pd, &msg, false);
+                self->fguid.guid = NULL_GUID;
+#undef PD_MSG
+#undef PD_TYPE
+                // At this stage, only the RL_PD_MASTER should be actually
+                // capable
+                DPRINTF(DEBUG_LVL_VERB, "Last phase in RL_COMPUTE_OK DOWN for 0x%llx (am PD master: %d)\n",
+                    self, properties & RL_PD_MASTER);
+                self->desiredState = self->curState = GET_STATE(RL_COMPUTE_OK, phase);
+            } else if(RL_IS_FIRST_PHASE_DOWN(PD, RL_COMPUTE_OK, phase)) {
+                ASSERT(self->curState == GET_STATE(RL_USER_OK, 0));
+                ASSERT(callback != NULL);
+                self->callback = callback;
+                self->callbackArg = val;
+                hal_fence();
+                self->desiredState = GET_STATE(RL_COMPUTE_OK, phase);
+            } else {
+                ASSERT(false && "Unexpected phase on runlevel RL_COMPUTE_OK teardown");
+            }
+        }
+        break;
+    case RL_USER_OK:
+        if((properties & RL_BRING_UP)) {
+            if(RL_IS_LAST_PHASE_UP(PD, RL_USER_OK, phase)) {
+                if(!(properties & RL_PD_MASTER)) {
+                    // No callback required on the bring-up
+                    self->callback = NULL;
+                    self->callbackArg = 0ULL;
+                    hal_fence();
+                    self->desiredState = GET_STATE(RL_USER_OK, (RL_GET_PHASE_COUNT_DOWN(PD, RL_USER_OK))); // We put ourself one past
+                    // so that we can then come back down when
+                    // shutting down
+                } else {
+                    // At this point, the original capable thread goes to work
+                    self->curState = self->desiredState = GET_STATE(RL_USER_OK, (RL_GET_PHASE_COUNT_DOWN(PD, RL_USER_OK)));
+                    workerLoop(self);
+                }
+            }
+        }
+        if (properties & RL_TEAR_DOWN) {
+            if (RL_IS_FIRST_PHASE_DOWN(PD, RL_USER_OK, phase)) {
+                // We make sure that we actually fully booted before shutting down.
+                // Addresses a race where a worker still hasn't started but
+                // another worker has started and executes the shutdown protocol
+                while(self->curState != GET_STATE(RL_USER_OK, (phase+1)));
+                ASSERT(self->curState == GET_STATE(RL_USER_OK, (phase+1)));
+            }
+
+            // Transition to the next phase
+            ASSERT(GET_STATE_PHASE(self->curState) == (phase+1));
+            ASSERT(callback != NULL);
+            self->callback = callback;
+            self->callbackArg = val;
+            hal_fence();
+            // Breaks the worker's compute loop
+            self->desiredState = GET_STATE(RL_USER_OK, phase);
+        }
+        break;
+    default:
+        // Unknown runlevel
+        ASSERT(0);
+    }
+    return toReturn;
 }
 
 void* hcRunWorker(ocrWorker_t * worker) {
+    // TODO: This probably needs to go away and be set directly
+    // by the PD during one of the RLs
     //Register this worker and get a context id
     ocrPolicyDomain_t *pd = worker->pd;
     PD_MSG_STACK(msg);
@@ -224,92 +379,34 @@ void* hcRunWorker(ocrWorker_t * worker) {
 #undef PD_MSG
 #undef PD_TYPE
 
-    ocrGuid_t affinityMasterPD;
-    bool forkMain = isMainEdtForker(worker, &affinityMasterPD);
-    if (forkMain) {
-        // This is all part of the mainEdt setup
-        // and should be executed by the "blessed" worker.
-        void * packedUserArgv = userArgsGet();
-        ocrEdt_t mainEdt = mainEdtGet();
-        u64 totalLength = ((u64*) packedUserArgv)[0]; // already exclude this first arg
-        // strip off the 'totalLength first argument'
-        packedUserArgv = (void *) (((u64)packedUserArgv) + sizeof(u64)); // skip first totalLength argument
-        ocrGuid_t dbGuid;
-        void* dbPtr;
-        ocrDbCreate(&dbGuid, &dbPtr, totalLength,
-                    DB_PROP_IGNORE_WARN, affinityMasterPD, NO_ALLOC);
+    // At this point, we should have a callback to inform the PD
+    // that we have successfully achieved the RL_COMPUTE_OK RL
+    ASSERT(worker->callback != NULL);
+    worker->callback(worker->pd, worker->callbackArg);
 
-        // copy packed args to DB
-        hal_memCopy(dbPtr, packedUserArgv, totalLength, 0);
+    // Set the current environment
+    worker->computes[0]->fcts.setCurrentEnv(worker->computes[0], worker->pd, worker);
+    worker->curState = GET_STATE(RL_COMPUTE_OK, 0);
 
-        // Prepare the mainEdt for scheduling
-        ocrGuid_t edtTemplateGuid = NULL_GUID, edtGuid = NULL_GUID;
-        ocrEdtTemplateCreate(&edtTemplateGuid, mainEdt, 0, 1);
-        ocrEdtCreate(&edtGuid, edtTemplateGuid, EDT_PARAM_DEF, /* paramv = */ NULL,
-                     /* depc = */ EDT_PARAM_DEF, /* depv = */ &dbGuid,
-                     EDT_PROP_NONE, affinityMasterPD, NULL);
-        // Once mainEdt is created, its template is no longer needed
-        ocrEdtTemplateDestroy(edtTemplateGuid);
-    } else {
-        // Set who we are
-        ocrPolicyDomain_t *pd = worker->pd;
-        u32 i;
-        for(i = 0; i < worker->computeCount; ++i) {
-            worker->computes[i]->fcts.setCurrentEnv(worker->computes[i], pd, worker);
-        }
-    }
+    // We wait until we transition to the next RL
+    while(worker->curState == worker->desiredState) ;
 
-    DPRINTF(DEBUG_LVL_INFO, "Starting scheduler routine of worker %ld\n", getWorkerId(worker));
+    // At this point, we should be going to RL_USER_OK
+    ASSERT(worker->desiredState == GET_STATE(RL_USER_OK, (RL_GET_PHASE_COUNT_DOWN(worker->pd, RL_USER_OK))));
+
+    // Start the worker loop
+    worker->curState = worker->desiredState;
     workerLoop(worker);
+    // Worker loop will transition back down to RL_COMPUTE_OK last phase
+
+    ASSERT((worker->curState == worker->desiredState) &&
+            (worker->curState == GET_STATE(RL_COMPUTE_OK, (RL_GET_PHASE_COUNT_DOWN(worker->pd, RL_COMPUTE_OK) - 1))));
     return NULL;
 }
 
-void hcFinishWorker(ocrWorker_t * base) {
-    DPRINTF(DEBUG_LVL_INFO, "Finishing worker routine %ld\n", getWorkerId(base));
-    ASSERT(base->computeCount == 1);
-    u64 i = 0;
-    for(i = 0; i < base->computeCount; i++) {
-        base->computes[i]->fcts.finish(base->computes[i]);
-    }
-}
-
-void hcStopWorker(ocrWorker_t * base) {
-    ocrWorkerHc_t * hcWorker = (ocrWorkerHc_t *) base;
-    // Makes worker threads to exit their routine.
-    hcWorker->running = false;
-    ASSERT(base->pd != NULL);
-    u64 computeCount = base->computeCount;
-    u64 i = 0;
-    for(i = 0; i < computeCount; i++) {
-        base->computes[i]->fcts.stop(base->computes[i]);
-#ifdef OCR_ENABLE_STATISTICS
-        statsWORKER_STOP(base->pd, base->fguid.guid, base->fguid.metaDataPtr,
-                         base->computes[i]->fguid.guid,
-                         base->computes[i]->fguid.metaDataPtr);
-#endif
-    }
-    DPRINTF(DEBUG_LVL_INFO, "Stopping worker %ld\n", getWorkerId(base));
-
-    // Destroy the GUID
-    PD_MSG_STACK(msg);
-    getCurrentEnv(NULL, NULL, NULL, &msg);
-
-#define PD_MSG (&msg)
-#define PD_TYPE PD_MSG_GUID_DESTROY
-    msg.type = PD_MSG_GUID_DESTROY | PD_MSG_REQUEST;
-    PD_MSG_FIELD_I(guid) = base->fguid;
-    PD_MSG_FIELD_I(properties) = 0;
-    ASSERT(base->pd != NULL);
-    // Ignore failure here, we are most likely shutting down
-    base->pd->fcts.processMessage(base->pd, &msg, false);
-#undef PD_MSG
-#undef PD_TYPE
-    base->fguid.guid = UNINITIALIZED_GUID;
-}
-
 bool hcIsRunningWorker(ocrWorker_t * base) {
-    ocrWorkerHc_t * hcWorker = (ocrWorkerHc_t *) base;
-    return hcWorker->running;
+    // TODO: This states that we are in USER mode. Do we want to include RL_COMPUTE_OK?
+    return (base->curState == GET_STATE(RL_USER_OK, 0));
 }
 
 void hcPrintLocation(ocrWorker_t *base, char* location) {
@@ -334,75 +431,61 @@ void initializeWorkerHc(ocrWorkerFactory_t * factory, ocrWorker_t* self, ocrPara
     u64 workerId = ((paramListWorkerHcInst_t*)perInstance)->workerId;;
     ASSERT((workerId && self->type == SLAVE_WORKERTYPE) ||
            (workerId == 0 && self->type == MASTER_WORKERTYPE));
-
     ocrWorkerHc_t * workerHc = (ocrWorkerHc_t*) self;
     workerHc->id = workerId;
-    workerHc->running = false;
-    workerHc->secondStart = false;
     workerHc->hcType = HC_WORKER_COMP;
 }
 
-//Dump workiple contents of each workpile
-//TODO: This is a temporary function to demonstrate basal functionality of querying runtime
-//      contents.  In the future, this will be modified to accomodate multiple query types.
-void hcDumpWorkPile(ocrWorker_t *worker){
-
-    PRINTF("Worker %lu - guid: 0x%llx\n", worker->seqId, worker->fguid);
-
-    ocrPolicyDomain_t * pd;
+//return guid of next EDT on specified worker's workpile
+ocrGuid_t hcDumpNextEdt(ocrWorker_t *worker, u32 *size){
+    ocrPolicyDomain_t *pd;
     getCurrentEnv(&pd, NULL, NULL, NULL);
     ocrPolicyDomainHc_t *self = (ocrPolicyDomainHc_t *) pd;
-
     ocrWorkpileHc_t *workpile = (ocrWorkpileHc_t *)pd->schedulers[0]->workpiles[worker->seqId];
     ocrTask_t *curTask = NULL;
 
-    u32 i = 0;
     u32 head = (workpile->deque->head%INIT_DEQUE_CAPACITY);
     u32 tail = (workpile->deque->tail%INIT_DEQUE_CAPACITY);
+    u32 workpileSize = tail-head;
 
-    u32 workpileSize = (tail-head);
-
-    PRINTF("Workpile size: %u\n\n", workpileSize);
-
-    u32 queuePos = 0;
     if(workpileSize > 0){
-        for(i = head; i < tail; i++){
 
-            PD_MSG_STACK(msg);
-            getCurrentEnv(NULL, NULL, NULL, &msg);
+        PD_MSG_STACK(msg);
+        getCurrentEnv(NULL, NULL, NULL, &msg);
+        ocrFatGuid_t fguid;
+        fguid.guid = (ocrGuid_t)workpile->deque->data[tail-1];
+        fguid.metaDataPtr = NULL;
 
-            ocrFatGuid_t fguid;
-            fguid.guid = (ocrGuid_t)workpile->deque->data[i];
-            fguid.metaDataPtr = NULL;
+    #define PD_MSG (&msg)
+    #define PD_TYPE PD_MSG_GUID_INFO
+        msg.type = PD_MSG_GUID_INFO | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
+        PD_MSG_FIELD_IO(guid.guid) = fguid.guid;
+        PD_MSG_FIELD_IO(guid.metaDataPtr) = fguid.metaDataPtr;
+        PD_MSG_FIELD_I(properties) = RMETA_GUIDPROP | KIND_GUIDPROP;
+        RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, true));
+        ocrGuidKind msgKind = PD_MSG_FIELD_O(kind);
+        curTask = (ocrTask_t *)PD_MSG_FIELD_IO(guid.metaDataPtr);
+    #undef PD_MSG
+    #undef PD_TYPE
 
-#define PD_MSG (&msg)
-#define PD_TYPE PD_MSG_GUID_INFO
-            msg.type = PD_MSG_GUID_INFO | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
-            PD_MSG_FIELD_IO(guid.guid) = fguid.guid;
-            PD_MSG_FIELD_IO(guid.metaDataPtr) = fguid.metaDataPtr;
-            PD_MSG_FIELD_I(properties) = RMETA_GUIDPROP | KIND_GUIDPROP;
-            RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, true));
-            ocrGuidKind msgKind = PD_MSG_FIELD_O(kind);
-            curTask = (ocrTask_t *)PD_MSG_FIELD_IO(guid.metaDataPtr);
-#undef PD_MSG
-#undef PD_TYPE
+        if(msgKind != OCR_GUID_EDT){
+            PRINTF("\nNon-EDT guid type return from GUID_INFO message - Kind: %d\n", msgKind);
+            return NULL_GUID;
 
-            if(msgKind != OCR_GUID_EDT){
-                PRINTF("\nNon-EDT guidKind returned from GUID_INFO message - Kind: %d\n", msgKind);
-            }else if(curTask != NULL){
-#ifdef OCR_ENABLE_EDT_NAMING
-                PRINTF("Queued task [%lu] - guid: 0x%lx template: 0x%llx fctPtr: %p name: %s\n", queuePos, curTask->guid, curTask->templateGuid, curTask->funcPtr, curTask->name);
-#else
-                PRINTF("Queued task [%lu] - guid: 0x%lx template: 0x%llx fctPtr: %p\n", queuePos, curTask->guid, curTask->templateGuid, curTask->funcPtr);
-#endif
-            }
-            queuePos++;
+        }else if(curTask != NULL){
+            //One queried task per worker (next EDT guid)
+            *size = 1;
+
+            return curTask->guid;
         }
-    hal_xadd32((u32*)&self->queryCounter, 1);
+
     }else{
-        PRINTF("Empty workpile on current worker... \n");
-        hal_xadd32((u32*)&self->queryCounter, 1);
+        //One queried task per worker (next EDT guid)
+        *size = 1;
+
+        return NULL_GUID;
     }
+    return NULL_GUID;
 }
 
 /******************************************************/
@@ -410,7 +493,7 @@ void hcDumpWorkPile(ocrWorker_t *worker){
 /******************************************************/
 
 void destructWorkerFactoryHc(ocrWorkerFactory_t * factory) {
-    runtimeChunkFree((u64)factory, NULL);
+    runtimeChunkFree((u64)factory, NONPERSISTENT_CHUNK);
 }
 
 ocrWorkerFactory_t * newOcrWorkerFactoryHc(ocrParamList_t * perType) {
@@ -421,12 +504,10 @@ ocrWorkerFactory_t * newOcrWorkerFactoryHc(ocrParamList_t * perType) {
     base->destruct = &destructWorkerFactoryHc;
 
     base->workerFcts.destruct = FUNC_ADDR(void (*) (ocrWorker_t *), destructWorkerHc);
-    base->workerFcts.begin = FUNC_ADDR(void (*) (ocrWorker_t *, ocrPolicyDomain_t *), hcBeginWorker);
-    base->workerFcts.start = FUNC_ADDR(void (*) (ocrWorker_t *, ocrPolicyDomain_t *), hcStartWorker);
+    base->workerFcts.switchRunlevel = FUNC_ADDR(u8 (*)(ocrWorker_t*, ocrPolicyDomain_t*, ocrRunlevel_t,
+                                                       phase_t, u32, void (*)(ocrPolicyDomain_t*, u64), u64), hcWorkerSwitchRunlevel);
     base->workerFcts.run = FUNC_ADDR(void* (*) (ocrWorker_t *), hcRunWorker);
     base->workerFcts.workShift = FUNC_ADDR(void* (*) (ocrWorker_t *), hcWorkShift);
-    base->workerFcts.stop = FUNC_ADDR(void (*) (ocrWorker_t *), hcStopWorker);
-    base->workerFcts.finish = FUNC_ADDR(void (*) (ocrWorker_t *), hcFinishWorker);
     base->workerFcts.isRunning = FUNC_ADDR(bool (*) (ocrWorker_t *), hcIsRunningWorker);
     base->workerFcts.printLocation = FUNC_ADDR(void (*)(ocrWorker_t*, char*), hcPrintLocation);
     return base;

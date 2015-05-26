@@ -18,7 +18,7 @@
  * SIGUSR2: Query the contents of queued tasks (will only
  *          succeed if runtime is paused)
  */
-void sig_handler(u32 sigNum){
+void sig_handler(u32 sigNum) {
 
     ocrPolicyDomain_t *pd;
     getCurrentEnv(&pd, NULL, NULL, NULL);
@@ -27,7 +27,7 @@ void sig_handler(u32 sigNum){
 
     if(sigNum == SIGUSR1 && globalPD->runtimePause == false){
         PRINTF("Pausing Runtime\n");
-        salPause();
+        salPause(true);
         return;
     }
 
@@ -37,8 +37,9 @@ void sig_handler(u32 sigNum){
     }
 
     if(sigNum == SIGUSR2 && globalPD->runtimePause == true){
-        PRINTF("\nDumping Worker Data...\n");
-        salQuery(1);
+        //TODO: Support this with new querying methodology?
+        PRINTF("\nQuery Not Supported via signalling\n");
+        //salQuery(1, OCR_QUERY_WORKPILE_EDTS, NULL_GUID, &sigRes, &sigSize, 0);
         return;
     }
 
@@ -49,110 +50,94 @@ void sig_handler(u32 sigNum){
 
 }
 
-u32 salPause(void){
+u32 salPause(bool isBlocking){
 
     ocrPolicyDomain_t *pd;
     ocrWorker_t *baseWorker;
     getCurrentEnv(&pd, &baseWorker, NULL, NULL);
     ocrPolicyDomainHc_t *self = (ocrPolicyDomainHc_t *) pd;
-    ocrWorkerHc_t *wrkr = (ocrWorkerHc_t *) baseWorker;
 
-    if(hal_cmpswap32((u32*)&self->pausingWorker, -1, wrkr->worker.seqId) != -1){
-        return 0;
-    }
-
-    hal_cmpswap32((u32*)&self->runtimePause, false, true);
-
-    PRINTF("\n\n\nPausing Runtime...\n\n\n");
-    u32 i = 0;
-    for(i = 0; i < self->base.workerCount; i++){
-        //Query from here, check each of the worker's flags
-        ocrWorkerHc_t *hcWorker = (ocrWorkerHc_t *) self->base.workers[i];
-
-        #ifdef OCR_ENABLE_EDT_NAMING
-            char * name = hcWorker->name;
-        #else
-            char * name = "OCR_EDT_NAMING not defined";
-        #endif
-
-        if(hcWorker->id == self->pausingWorker){
-            PRINTF("Last EDT executed before pause on worker %lu - guid: 0x%llx template: 0x%llx fctPtr: %p name: %s (pausing worker)\n",
-                    hcWorker->id, hcWorker->edtGuid, hcWorker->templateGuid, hcWorker->fctPtr, name);
-        }else{
-            PRINTF("Last EDT executed before pause on worker %lu - guid: 0x%llx template: 0x%llx fctPtr: %p name: %s\n",
-                    hcWorker->id, hcWorker->edtGuid, hcWorker->templateGuid, hcWorker->fctPtr, name);
-            //TODO:  This needs to change. It is assuming the runtime is fully paused.
-            //workaround for now, but should be moved to worker level later.
-            self->pauseCounter++;
+    while(hal_cmpswap32((u32*)&self->runtimePause, false, true) == true) {
+        // Already paused - try to pause self only if blocked
+        if(isBlocking == false)
+            return 0;
+        // Blocking pause
+        if(self->runtimePause == true) {
+            hal_xadd32((u32*)&self->pauseCounter, 1);
+            //Pause called - stop workers
+            while(self->runtimePause == true) {
+                hal_pause();
+            }
+            hal_xadd32((u32*)&self->pauseCounter, -1);
         }
     }
 
-    while(self->pauseCounter != self->base.workerCount-1){//-1){
-        PRINTF("%d\n", self->pauseCounter);
+    hal_xadd32((u32*)&self->pauseCounter, 1);
+
+    while(self->pauseCounter < self->base.workerCount){
         hal_pause();
     }
 
     return 1;
 }
 
-void salQuery(u32 flag){
-    //Indicates pause was contended by this worker.  Do not perform query
-    if(flag == 0){
-        return;
-    }
+ocrGuid_t salQuery(ocrQueryType_t query, ocrGuid_t guid, void **result, u32 *size, u8 flags){
+
     ocrPolicyDomain_t *pd;
     getCurrentEnv(&pd, NULL, NULL, NULL);
     ocrPolicyDomainHc_t *self = (ocrPolicyDomainHc_t *) pd;
+    ocrGuid_t dataDb = NULL_GUID;
 
-    if(self->queryCounter == 0){
-        hcDumpWorkerData(self);
+    if(self->runtimePause == false)
+        return NULL_GUID;
+
+    switch(query){
+        case OCR_QUERY_WORKPILE_EDTS:
+            dataDb = hcQueryNextEdts(self, result, size);
+            *size = (*size)*sizeof(ocrGuid_t);
+            break;
+
+        case OCR_QUERY_EVENTS:
+            //TODO: Call Query Event Function
+            break;
+
+        case OCR_QUERY_DATABLOCKS:
+            //TODO: Query Datablock Function
+            break;
+
+        case OCR_QUERY_ALL_EDTS:
+            //TODO: Query all Edts function
+            break;
+
+        default:
+            break;
     }
 
-    while(self->queryCounter != self->base.workerCount){
-        hal_pause();
-    }
-    return;
+    return dataDb;
 }
 
 void salResume(u32 flag){
-    //Indicates pause was contended by this worker.  Do not perform resume
-    if(flag == 0){
-        return;
-    }
-
     ocrPolicyDomain_t *pd;
     getCurrentEnv(&pd, NULL, NULL, NULL);
     ocrPolicyDomainHc_t *self = (ocrPolicyDomainHc_t *) pd;
 
+    if(hal_cmpswap32((u32*)&self->runtimePause, true, false) == true)
+        hal_xadd32((u32*)&self->pauseCounter, -1);
 
-    u32 oldQueryCounter = self->queryCounter;
-    hal_cmpswap32((u32*)&self->queryCounter, oldQueryCounter, 0);
-
-    u32 oldPauseCounter = self->pauseCounter;
-    hal_cmpswap32((u32*)&self->pauseCounter, oldPauseCounter, 0);
-
-    u32 oldPausingWorker = self->pausingWorker;
-    hal_cmpswap32((u32*)&self->pausingWorker, oldPausingWorker, -1);
-
-    bool oldRuntimePause = self->runtimePause;
-    hal_cmpswap32((u32*)&self->runtimePause, oldRuntimePause, false);
-
-    PRINTF("\n\nResuming Runtime...\n\n\n");
     return;
-
 }
 
 void registerSignalHandler(){
 
     struct sigaction action;
-    action.sa_handler = &sig_handler;
+    action.sa_handler = ((void (*)(int))&sig_handler);
     action.sa_flags = SA_RESTART;
     sigfillset(&action.sa_mask);
-    if(sigaction(SIGUSR1, &action, NULL) == SIG_ERR){
-        PRINTF("Couldn't catch SIGUSR1... SIG_ERR Encountered\n");
+    if(sigaction(SIGUSR1, &action, NULL) != 0) {
+        PRINTF("Couldn't catch SIGUSR1...\n");
     }
-     if(sigaction(SIGUSR2, &action, NULL) == SIG_ERR){
-        PRINTF("Couldn't catch SIGUSR2... SIG_ERR Encountered\n");
+     if(sigaction(SIGUSR2, &action, NULL) != 0) {
+        PRINTF("Couldn't catch SIGUSR2...\n");
     }
 }
 
