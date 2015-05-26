@@ -601,7 +601,7 @@ job_ocr_build_kernel_sw_tg = {
     'env-vars': { 'APPS_LIBS_ROOT': '${JJOB_SHARED_HOME}/xstack/apps/libs/tg',
                   'WORKLOAD_SRC': '${JJOB_INITDIR_XSTACK}/ocr/ocr-apps/smith-waterman',
                   'WORKLOAD_BUILD_ROOT': '${JJOB_PRIVATE_HOME}/xstack/ocr/ocr-apps/smith-waterman/build',
-                  'WORKLOAD_ARGS': '10 10 ${JJOB_SHARED_HOME}/xstack/apps/smithwaterman/datasets/string1-medium.txt ${JJOB_SHARED_HOME}/xstack/apps/smithwaterman/datasets/string2-medium.txt',
+                  'WORKLOAD_ARGS': '10 10 ${JJOB_SHARED_HOME}/xstack/apps/smithwaterman/datasets/string1-medium.txt ${JJOB_SHARED_HOME}/xstack/apps/smithwaterman/datasets/string2-medium.txt ${JJOB_SHARED_HOME}/xstack/apps/smithwaterman/datasets/score-medium.txt',
                   'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/ocr-apps/smith-waterman/install'}
 }
 

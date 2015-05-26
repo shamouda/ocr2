@@ -21,7 +21,7 @@ jobtype_ocr_build = {
     'run-cmd': '${JJOB_PRIVATE_HOME}/xstack/ocr/jenkins/scripts/build.sh',
     'param-cmd': '${JJOB_PRIVATE_HOME}/xstack/jenkins/scripts/empty-cmd.sh',
     'keywords': ('ocr', 'percommit'),
-    'timeout': 180,
+    'timeout': 240,
     'sandbox': ('local', 'shared', 'shareOK'),
     'req-repos': ('xstack',),
     'env-vars': {'OCR_ROOT': '${JJOB_PRIVATE_HOME}/xstack/ocr',
