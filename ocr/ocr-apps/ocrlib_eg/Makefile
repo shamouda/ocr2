@@ -7,10 +7,10 @@ APPS_ROOT       ?= ../../../apps
 APPS_LIBS_ROOT  ?= ../../../apps/libs/x86
 
 # OCR_TYPE
-OCR_TYPE        ?= x86-pthread-x86
+OCR_TYPE        ?= x86
 
 # OCR
-OCR_TARGET   ?= x86-pthread-x86
+OCR_TARGET   ?= x86
 OCR_INSTALL_ROOT ?= ../../../ocr/install
 OCR_ROOT         ?= ../../../ocr
 OCR_BUILD_ROOT   ?= ../../../ocr/build

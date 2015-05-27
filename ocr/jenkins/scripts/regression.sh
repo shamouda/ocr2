@@ -26,7 +26,7 @@ else
     #Conditionally execute to preserve logs if previous run failed.
     if [[ $RES -eq 0 ]]; then
         #TODO: disable gasnet tests for now
-        if [[ "${ARCH}" != "x86-pthread-gasnet" ]]; then
+        if [[ "${ARCH}" != "x86-gasnet" ]]; then
             #Run performance tests as non-regression tests too
             ./ocrTests -unstablefile unstable.${ARCH}-${DB_IMPL} -perftest
             RES=$?

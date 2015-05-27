@@ -58,8 +58,8 @@ done
 
 # try to lookup for a default ocr install
 if [ -z "${OCR_INSTALL}" ]; then
-    echo "OCR_INSTALL is not set, defaulting to ../install/x86-pthread-x86"
-    OCR_INSTALL_TMP=`pwd`/../install/x86-pthread-x86
+    echo "OCR_INSTALL is not set, defaulting to ../install/x86"
+    OCR_INSTALL_TMP=`pwd`/../install/x86
     if [ -x ${OCR_INSTALL_TMP}/lib/libocr.so ]; then
         export OCR_INSTALL=${OCR_INSTALL_TMP}
     fi

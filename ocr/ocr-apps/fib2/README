@@ -5,7 +5,7 @@ the use of the labeling API.
 
 There are blocks/events which are not freed/released in this code.
 
-ONLY TESTED ON x86-pthread-x86
+ONLY TESTED ON x86
 Running:
 
 OCR_CONFIG=$PWD/default.cfg make -f Makefile.<OCR_TYPE> run <fib_num>
