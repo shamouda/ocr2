@@ -6,7 +6,6 @@
 # subfolders to do make and that screws up the relative
 # paths
 ifeq ($(RUN_JENKINS), run)
-OCR_ROOT               :=
 OCR_BUILD_ROOT        :=
 OCR_BUILD             :=
 WORKLOAD_BUILD_ROOT   :=
@@ -35,6 +34,9 @@ OCR_INSTALL      := ${OCR_INSTALL_ROOT}/${OCR_TARGET}
 
 WORKLOAD_INSTALL_ROOT := $(shell mkdir -p "${WORKLOAD_INSTALL_ROOT}" && cd "${WORKLOAD_INSTALL_ROOT}" && pwd)
 WORKLOAD_INSTALL      := ${WORKLOAD_INSTALL_ROOT}/${OCR_TYPE}
+
+CONFIG_GENERATE       := ${OCR_ROOT}/scripts/Configs/config-generator.py
+CONFIG_FILE           := ${WORKLOAD_INSTALL}/generated.cfg
 
 REQ_LIBS ?=
 
@@ -101,7 +103,10 @@ endif
 .PHONY: run_internal
 .ONESHELL:
 run_internal: WORKLOAD_EXEC ?= $(WORKLOAD_INSTALL)
-run_internal: OCR_CONFIG ?= $(OCR_INSTALL)/config/default.cfg
+
+ifeq ($(strip $(OCR_CONFIG)),)
+OCR_CONFIG = $(CONFIG_FILE)
+endif
 
 ifeq ($(RUN_JENKINS), run)
 run_internal: debug_post_prerun
@@ -111,6 +116,11 @@ run_internal: install debug_post_prerun
 endif
 ifeq ($(HOSTNAME), bar1)
 	$(error Please refrain from running jobs on bar1!)
+endif
+ifeq ($(ENABLE_VISUALIZER), yes)
+	$(CONFIG_GENERATE) --guid COUNTED_MAP --dbtype Regular --remove-destination --output $(CONFIG_FILE)
+else
+	$(CONFIG_GENERATE) --remove-destination --output $(CONFIG_FILE)
 endif
 	LD_LIBRARY_PATH=$(OCR_INSTALL)/lib:$(APPS_LIBS_ROOT) OCR_CONFIG=$(OCR_CONFIG) \
 	bash -c 'cd $(WORKLOAD_EXEC) && $(RUN_TOOL) ./$(TARGET) $(WORKLOAD_ARGS) $(WORKLOAD_INPUTS)'
