@@ -1108,7 +1108,7 @@ typedef struct _ocrPolicyDomainFcts_t {
      *
      * @param[in]     self       This policy domain
      * @param[in/out] msg        Message to process. Response will be
-     *                           contained in msg if a response i
+     *                           contained in msg if a response is
      *                           required and isBlocking is true. In all
      *                           cases, the message pointer must be
      *                           freed by the caller

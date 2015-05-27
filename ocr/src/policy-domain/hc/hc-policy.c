@@ -1005,6 +1005,7 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
 #undef PD_MSG
 #undef PD_TYPE
         msg->type &= ~PD_MSG_REQUEST;
+        ASSERT(!(msg->type & PD_MSG_REQ_RESPONSE));
         // msg->type |= PD_MSG_RESPONSE;
         EXIT_PROFILE;
         break;
@@ -1071,13 +1072,17 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         ASSERT((PD_MSG_FIELD_I(workType) == EDT_USER_WORKTYPE) || (PD_MSG_FIELD_I(workType) == EDT_RT_WORKTYPE));
         u32 depc = PD_MSG_FIELD_IO(depc); // intentionally read before processing
         ocrFatGuid_t * depv = PD_MSG_FIELD_I(depv);
-        PD_MSG_FIELD_O(returnDetail) = createEdtHelper(
+        u8 returnCode = createEdtHelper(
                 self, &(PD_MSG_FIELD_IO(guid)), PD_MSG_FIELD_I(templateGuid),
                 &(PD_MSG_FIELD_IO(paramc)), PD_MSG_FIELD_I(paramv), &(PD_MSG_FIELD_IO(depc)),
                 PD_MSG_FIELD_I(properties), PD_MSG_FIELD_I(affinity), outputEvent,
                 (ocrTask_t*)(PD_MSG_FIELD_I(currentEdt).metaDataPtr), PD_MSG_FIELD_I(parentLatch));
+        if (msg->type & PD_MSG_REQ_RESPONSE) {
+            PD_MSG_FIELD_O(returnDetail) = returnCode;
+        }
+        ASSERT(returnCode == 0);
 #ifndef EDT_DEPV_DELAYED
-        if (depv != NULL) {
+        if ((depv != NULL) && (returnCode == 0)) {
             ASSERT(depc != EDT_PARAM_DEF);
             ocrGuid_t destination = PD_MSG_FIELD_IO(guid).guid;
             u32 i = 0;
@@ -1241,6 +1246,9 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         ocrEvent_t *evt = (ocrEvent_t*)PD_MSG_FIELD_I(guid.metaDataPtr);
         ASSERT(evt->fctId == self->eventFactories[0]->factoryId);
         PD_MSG_FIELD_O(data) = self->eventFactories[0]->fcts[evt->kind].get(evt);
+        // There's no way to check if this call has been
+        // successful without changing the 'get' signature
+        PD_MSG_FIELD_O(returnDetail) = 0;
 #undef PD_MSG
 #undef PD_TYPE
         msg->type &= ~PD_MSG_REQUEST;
@@ -1332,6 +1340,7 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
                 break;
             default:
                 ASSERT(false && "Unsupported GUID kind cloning");
+                PD_MSG_FIELD_O(returnDetail) = OCR_ENOTSUP;
         }
 #undef PD_MSG
 #undef PD_TYPE
@@ -1416,13 +1425,16 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             PD_MSG_FIELD_O(returnDetail) = self->schedulers[0]->fcts.takeEdt(
                 self->schedulers[0], &(PD_MSG_FIELD_IO(guidCount)),
                 PD_MSG_FIELD_IO(guids));
-            // For now, we return the execute function for EDTs
-            PD_MSG_FIELD_IO(extra) = (u64)(self->taskFactories[0]->fcts.execute);
-            // We also consider that the task to be executed is local so we
-            // return it's fully deguidified value (BUG #586: this may need revising)
-            u64 i = 0, maxCount = PD_MSG_FIELD_IO(guidCount);
-            for( ; i < maxCount; ++i) {
-                localDeguidify(self, &(PD_MSG_FIELD_IO(guids)[i]));
+            ASSERT(PD_MSG_FIELD_O(returnDetail) == 0);
+            if (PD_MSG_FIELD_O(returnDetail) == 0) {
+                // For now, we return the execute function for EDTs
+                PD_MSG_FIELD_IO(extra) = (u64)(self->taskFactories[0]->fcts.execute);
+                // We also consider that the task to be executed is local so we
+                // return it's fully deguidified value (BUG #586: this may need revising)
+                u64 i = 0, maxCount = PD_MSG_FIELD_IO(guidCount);
+                for( ; i < maxCount; ++i) {
+                    localDeguidify(self, &(PD_MSG_FIELD_IO(guids)[i]));
+                }
             }
         } else {
             ASSERT(PD_MSG_FIELD_IO(type) == OCR_GUID_COMM);
@@ -1547,11 +1559,14 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
                 PD_MSG_FIELD_I(slot) = slot;
                 PD_MSG_FIELD_I(mode) = mode;
                 PD_MSG_FIELD_I(properties) = true; // Specify context is add-dependence
-                RESULT_PROPAGATE(self->fcts.processMessage(self, &registerMsg, true));
+                u8 returnCode = self->fcts.processMessage(self, &registerMsg, true);
+                u8 returnDetail = (returnCode == 0) ? PD_MSG_FIELD_O(returnDetail) : returnCode;
             #undef PD_MSG
             #undef PD_TYPE
             #define PD_MSG msg
             #define PD_TYPE PD_MSG_DEP_ADD
+                PD_MSG_FIELD_O(returnDetail) = returnDetail;
+                RESULT_PROPAGATE(returnCode);
             }
         } else {
             if(!(srcKind & OCR_GUID_EVENT)) {
@@ -1582,11 +1597,18 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
                 PD_MSG_FIELD_I(dest) = src;
                 PD_MSG_FIELD_I(slot) = slot;
                 PD_MSG_FIELD_I(properties) = true; // Specify context is add-dependence
-                RESULT_PROPAGATE(self->fcts.processMessage(self, &registerMsg, true));
+                u8 returnCode = self->fcts.processMessage(self, &registerMsg, true);
+                u8 returnDetail = (returnCode == 0) ? PD_MSG_FIELD_O(returnDetail) : returnCode;
                 // We should be looking at the returnDetail to determine if we need to call
                 // the signaler too. However, the current implementation requires to do the
                 // signaler registration anyway to be able to record the mode.
                 needSignalerReg = 1;
+            #undef PD_MSG
+            #undef PD_TYPE
+            #define PD_MSG msg
+            #define PD_TYPE PD_MSG_DEP_ADD
+                PD_MSG_FIELD_O(returnDetail) = returnDetail;
+                RESULT_PROPAGATE(returnCode);
             #undef PD_MSG
             #undef PD_TYPE
             }
@@ -1607,7 +1629,14 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
                 PD_MSG_FIELD_I(slot) = slot;
                 PD_MSG_FIELD_I(mode) = mode;
                 PD_MSG_FIELD_I(properties) = true; // Specify context is add-dependence
-                RESULT_PROPAGATE(self->fcts.processMessage(self, &registerMsg, true));
+                u8 returnCode = self->fcts.processMessage(self, &registerMsg, true);
+                u8 returnDetail = (returnCode == 0) ? PD_MSG_FIELD_O(returnDetail) : returnCode;
+            #undef PD_MSG
+            #undef PD_TYPE
+            #define PD_MSG msg
+            #define PD_TYPE PD_MSG_DEP_ADD
+                PD_MSG_FIELD_O(returnDetail) = returnDetail;
+                RESULT_PROPAGATE(returnCode);
             #undef PD_MSG
             #undef PD_TYPE
             }
@@ -1735,6 +1764,7 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
                     edt, PD_MSG_FIELD_I(payload), PD_MSG_FIELD_I(slot));
             } else {
                 DPRINTF(DEBUG_LVL_WARN, "Attempting to satisfy a GUID of type %x, expected EDT\n", dstKind);
+                PD_MSG_FIELD_O(returnDetail) = OCR_ENOTSUP;
                 ASSERT(0); // We can't satisfy anything else
             }
         }
@@ -1868,8 +1898,9 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             ASSERT(PD_MSG_FIELD_I(properties) & RL_TEAR_DOWN);
             ASSERT(PD_MSG_FIELD_I(runlevel) & RL_COMPUTE_OK);
             self->shutdownCode = PD_MSG_FIELD_I(errorCode);
-            RESULT_ASSERT(self->fcts.switchRunlevel(
-                              self, RL_USER_OK, RL_TEAR_DOWN | RL_ASYNC | RL_REQUEST | RL_FROM_MSG), ==, 0);
+            u8 returnCode = self->fcts.switchRunlevel(
+                              self, RL_USER_OK, RL_TEAR_DOWN | RL_ASYNC | RL_REQUEST | RL_FROM_MSG);
+            ASSERT(returnCode == 0);
         }
         msg->type &= ~PD_MSG_REQUEST;
         break;
