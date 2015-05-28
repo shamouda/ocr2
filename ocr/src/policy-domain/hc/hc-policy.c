@@ -27,8 +27,6 @@
 //BUG #204: cloning: hack to support edt templates, and pause\resume
 #include "task/hc/hc-task.h"
 #include "event/hc/hc-event.h"
-#include "worker/hc/hc-worker.h"
-#include "policy-domain/hc/hc-policy.h"
 #include "workpile/hc/hc-workpile.h"
 
 // Currently required to find out if self is the blessed PD
@@ -2030,6 +2028,9 @@ u8 hcPdWaitMessage(ocrPolicyDomain_t *self,  ocrMsgHandle_t **handle) {
     ASSERT(0);
     return 0;
 }
+
+//fwd declare hcDumpNextEdt since we do not include hc-worker.h anymore
+extern ocrGuid_t hcDumpNextEdt(ocrWorker_t *worker, u32 *wrkrSize);
 
 ocrGuid_t hcQueryNextEdts(ocrPolicyDomainHc_t *rself, void **result, u32 *qSize){
     u64 i;

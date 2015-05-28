@@ -17,11 +17,6 @@
 #include "scheduler/hc/scheduler-blocking-support.h"
 #include "scheduler-heuristic/hc/hc-scheduler-heuristic.h"
 
-// TODO: This relies on data in hc-worker (its ID to do the mapping)
-// This is non-portable (HC scheduler does not work with non
-// HC worker) but works for now
-#include "worker/hc/hc-worker.h" // NON PORTABLE FOR NOW
-
 /******************************************************/
 /* Support structures                                 */
 /******************************************************/
@@ -224,9 +219,7 @@ u8 hcSchedulerTakeEdt (ocrScheduler_t *self, u32 *count, ocrFatGuid_t *edts) {
     if(*count == 0) return 1; // No room to put anything
 
     ocrWorker_t *worker = NULL;
-    ocrWorkerHc_t *hcWorker = NULL;
     getCurrentEnv(NULL, &worker, NULL, NULL);
-    hcWorker = (ocrWorkerHc_t*)worker;
     ocrFatGuid_t popped;
     u64 workerId;
 
@@ -234,7 +227,7 @@ u8 hcSchedulerTakeEdt (ocrScheduler_t *self, u32 *count, ocrFatGuid_t *edts) {
 
     {
         START_PROFILE(sched_hc_Pop);
-        workerId = hcWorker->id;
+        workerId = worker->seqId;
         // First try to pop
         ocrWorkpile_t * wpToPop = popMappingOneToOne(self, workerId);
         popped = wpToPop->fcts.pop(wpToPop, POP_WORKPOPTYPE, NULL);
@@ -269,13 +262,9 @@ u8 hcSchedulerGiveEdt (ocrScheduler_t* base, u32* count, ocrFatGuid_t* edts) {
     // workers to workpiles (one-to-one)
     // BUG #586: This is a non-portable assumption but will do for now.
     ocrWorker_t *worker = NULL;
-    ocrWorkerHc_t *hcWorker = NULL;
     getCurrentEnv(NULL, &worker, NULL, NULL);
-    hcWorker = (ocrWorkerHc_t*)worker;
-
     // Source must be a worker guid
-    u64 workerId = hcWorker->id;
-    ocrWorkpile_t * wpToPush = pushMappingOneToOne(base, workerId);
+    ocrWorkpile_t * wpToPush = pushMappingOneToOne(base, worker->seqId);
     u32 i = 0;
     for ( ; i < *count; ++i ) {
         if (((ocrTask_t *)edts[i].metaDataPtr)->state == ALLACQ_EDTSTATE) {

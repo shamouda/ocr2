@@ -37,11 +37,6 @@
 /* OCR-HC WORKER                                      */
 /******************************************************/
 
-// Convenient to have an id to index workers in pools
-static inline u64 getWorkerId(ocrWorker_t * worker) {
-    ocrWorkerHc_t * hcWorker = (ocrWorkerHc_t *) worker;
-    return hcWorker->id;
-}
 
 static void hcWorkShift(ocrWorker_t * worker) {
     ocrPolicyDomain_t * pd;
@@ -263,7 +258,6 @@ u8 hcWorkerSwitchRunlevel(ocrWorker_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_
             ASSERT(callback != NULL);
             self->curState = GET_STATE(RL_MEMORY_OK, 0); // Technically last phase of memory OK but doesn't really matter
             self->desiredState = GET_STATE(RL_COMPUTE_OK, phase);
-            self->location = (u64)self; // BUG #308: Temporary, to be replaced with seqId once implemented
 
             // See if we are blessed
             self->amBlessed = (properties & RL_BLESSED) != 0;
@@ -373,7 +367,8 @@ void* hcRunWorker(ocrWorker_t * worker) {
 #define PD_MSG (&msg)
 #define PD_TYPE PD_MSG_MGT_REGISTER
     msg.type = PD_MSG_MGT_REGISTER | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
-    PD_MSG_FIELD_I(loc) = (ocrLocation_t)getWorkerId(worker);
+    // The original 'id' value is read from the CFG file
+    PD_MSG_FIELD_I(loc) = (ocrLocation_t) worker->seqId;
     PD_MSG_FIELD_I(properties) = 0;
     pd->fcts.processMessage(pd, &msg, true);
     worker->seqId = PD_MSG_FIELD_O(seqId);
@@ -429,11 +424,10 @@ ocrWorker_t* newWorkerHc(ocrWorkerFactory_t * factory, ocrParamList_t * perInsta
 void initializeWorkerHc(ocrWorkerFactory_t * factory, ocrWorker_t* self, ocrParamList_t * perInstance) {
     initializeWorkerOcr(factory, self, perInstance);
     self->type = ((paramListWorkerHcInst_t*)perInstance)->workerType;
-    u64 workerId = ((paramListWorkerHcInst_t*)perInstance)->workerId;;
+    u64 workerId = ((paramListWorkerInst_t*)perInstance)->workerId;
     ASSERT((workerId && self->type == SLAVE_WORKERTYPE) ||
            (workerId == 0 && self->type == MASTER_WORKERTYPE));
     ocrWorkerHc_t * workerHc = (ocrWorkerHc_t*) self;
-    workerHc->id = workerId;
     workerHc->hcType = HC_WORKER_COMP;
 }
 

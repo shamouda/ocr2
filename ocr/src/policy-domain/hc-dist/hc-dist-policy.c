@@ -23,7 +23,6 @@
 
 #include "policy-domain/hc-dist/hc-dist-policy.h"
 
-//BUG #204 sep-concern: bad ! This is to use a worker's wid to map to a comm-api
 #include "worker/hc/hc-worker.h"
 //BUG #204 cloning: sep-concern: need to know end type to support edt templates cloning
 #include "task/hc/hc-task.h"
@@ -721,7 +720,7 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
 #define PD_MSG (msg)
 #define PD_TYPE PD_MSG_WORK_DESTROY
         RETRIEVE_LOCATION_FROM_GUID_MSG(self, msg->destLocation, I);
-        DPRINTF(DEBUG_LVL_VVERB, "WORK_DESTROY: target is %d\n", (int)msg->destLocation);
+        DPRINTF(DEBUG_LVL_VVERB, "WORK_DESTROY: target is %d\n", (u32)msg->destLocation);
 #undef PD_MSG
 #undef PD_TYPE
         break;
@@ -731,7 +730,7 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
 #define PD_MSG (msg)
 #define PD_TYPE PD_MSG_DEP_SATISFY
         RETRIEVE_LOCATION_FROM_GUID_MSG(self, msg->destLocation, I);
-        DPRINTF(DEBUG_LVL_VVERB,"DEP_SATISFY: target is %d\n", (int) msg->destLocation);
+        DPRINTF(DEBUG_LVL_VVERB,"DEP_SATISFY: target is %d\n", (u32) msg->destLocation);
 #undef PD_MSG
 #undef PD_TYPE
         break;
@@ -741,7 +740,7 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
 #define PD_MSG (msg)
 #define PD_TYPE PD_MSG_EVT_DESTROY
         RETRIEVE_LOCATION_FROM_GUID_MSG(self, msg->destLocation, I);
-        DPRINTF(DEBUG_LVL_VVERB, "EVT_DESTROY: target is %d\n", (int)msg->destLocation);
+        DPRINTF(DEBUG_LVL_VVERB, "EVT_DESTROY: target is %d\n", (u32)msg->destLocation);
 #undef PD_MSG
 #undef PD_TYPE
         break;
@@ -751,7 +750,7 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
 #define PD_MSG (msg)
 #define PD_TYPE PD_MSG_DB_DESTROY
         RETRIEVE_LOCATION_FROM_GUID_MSG(self, msg->destLocation, I);
-        DPRINTF(DEBUG_LVL_VVERB, "DB_DESTROY: target is %d\n", (int)msg->destLocation);
+        DPRINTF(DEBUG_LVL_VVERB, "DB_DESTROY: target is %d\n", (u32)msg->destLocation);
 #undef PD_MSG
 #undef PD_TYPE
         break;
@@ -761,7 +760,7 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
 #define PD_MSG (msg)
 #define PD_TYPE PD_MSG_DB_FREE
         RETRIEVE_LOCATION_FROM_GUID_MSG(self, msg->destLocation, I);
-        DPRINTF(DEBUG_LVL_VVERB, "DB_FREE: target is %d\n", (int)msg->destLocation);
+        DPRINTF(DEBUG_LVL_VVERB, "DB_FREE: target is %d\n", (u32)msg->destLocation);
 #undef PD_MSG
 #undef PD_TYPE
         break;
@@ -771,7 +770,7 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
 #define PD_MSG (msg)
 #define PD_TYPE PD_MSG_EDTTEMP_DESTROY
         RETRIEVE_LOCATION_FROM_GUID_MSG(self, msg->destLocation, I);
-        DPRINTF(DEBUG_LVL_VVERB, "EDTTEMP_DESTROY: target is %d\n", (int)msg->destLocation);
+        DPRINTF(DEBUG_LVL_VVERB, "EDTTEMP_DESTROY: target is %d\n", (u32)msg->destLocation);
 #undef PD_MSG
 #undef PD_TYPE
         break;
@@ -793,7 +792,7 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
         if (msg->type & PD_MSG_REQUEST) {
             RETRIEVE_LOCATION_FROM_GUID_MSG(self, msg->destLocation, IO);
             DPRINTF(DEBUG_LVL_VVERB,"METADATA_CLONE: request for guid=0x%lx src=%d dest=%d\n",
-                    PD_MSG_FIELD_IO(guid.guid), (int)msg->srcLocation);
+                    PD_MSG_FIELD_IO(guid.guid), (u32)msg->srcLocation);
             if ((msg->destLocation != curLoc) && (msg->srcLocation == curLoc)) {
                 // Outgoing request
                 // NOTE: In the current implementation when we call metadata-clone
@@ -839,7 +838,7 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
 #define PD_MSG (msg)
 #define PD_TYPE PD_MSG_GUID_DESTROY
         RETRIEVE_LOCATION_FROM_GUID_MSG(self, msg->destLocation, I);
-        DPRINTF(DEBUG_LVL_VVERB, "GUID_DESTROY: target is %d\n", (int)msg->destLocation);
+        DPRINTF(DEBUG_LVL_VVERB, "GUID_DESTROY: target is %d\n", (u32)msg->destLocation);
 #undef PD_MSG
 #undef PD_TYPE
         break;
@@ -892,7 +891,7 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
 #define PD_MSG (msg)
 #define PD_TYPE PD_MSG_DEP_DYNADD
         RETRIEVE_LOCATION_FROM_MSG(self, edt, msg->destLocation, I);
-        DPRINTF(DEBUG_LVL_VVERB, "DEP_DYNADD: target is %d\n", (int)msg->destLocation);
+        DPRINTF(DEBUG_LVL_VVERB, "DEP_DYNADD: target is %d\n", (u32)msg->destLocation);
 #undef PD_MSG
 #undef PD_TYPE
         break;
@@ -902,7 +901,7 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
 #define PD_MSG (msg)
 #define PD_TYPE PD_MSG_DEP_DYNREMOVE
         RETRIEVE_LOCATION_FROM_MSG(self, edt, msg->destLocation, I);
-        DPRINTF(DEBUG_LVL_VVERB, "DEP_DYNREMOVE: target is %d\n", (int)msg->destLocation);
+        DPRINTF(DEBUG_LVL_VVERB, "DEP_DYNREMOVE: target is %d\n", (u32)msg->destLocation);
 #undef PD_MSG
 #undef PD_TYPE
         break;
@@ -1226,7 +1225,7 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
 #define PD_MSG (msg)
 #define PD_TYPE PD_MSG_DEP_REGSIGNALER
         RETRIEVE_LOCATION_FROM_MSG(self, dest, msg->destLocation, I);
-        DPRINTF(DEBUG_LVL_VVERB, "DEP_REGSIGNALER: target is %d\n", (int)msg->destLocation);
+        DPRINTF(DEBUG_LVL_VVERB, "DEP_REGSIGNALER: target is %d\n", (u32)msg->destLocation);
 #undef PD_MSG
 #undef PD_TYPE
         break;
@@ -1236,7 +1235,7 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
 #define PD_MSG (msg)
 #define PD_TYPE PD_MSG_DEP_REGWAITER
         RETRIEVE_LOCATION_FROM_MSG(self, dest, msg->destLocation, I);
-        DPRINTF(DEBUG_LVL_VVERB, "DEP_REGWAITER: target is %d\n", (int)msg->destLocation);
+        DPRINTF(DEBUG_LVL_VVERB, "DEP_REGWAITER: target is %d\n", (u32)msg->destLocation);
 #undef PD_MSG
 #undef PD_TYPE
         break;
@@ -1306,7 +1305,7 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
         if ((msg->type & PD_MSG_REQ_RESPONSE) && isBlocking) {
             DPRINTF(DEBUG_LVL_VVERB,"Can't process message locally sending and "
                     "processing a two-way message @ (orig: 0x%lx, now: 0x%lx) to %d\n", originalMsg, msg,
-                    (int)msg->destLocation);
+                    (u32)msg->destLocation);
             // Since it's a two-way, we'll be waiting for the response and set PERSIST.
             // NOTE: underlying comm-layer may or may not make a copy of msg.
             properties |= TWOWAY_MSG_PROP;
@@ -1315,10 +1314,10 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
 
             self->fcts.sendMessage(self, msg->destLocation, msg, &handle, properties);
             // Wait on the response handle for the communication to complete.
-            DPRINTF(DEBUG_LVL_VVERB,"Waiting for reply from %d\n", (int)msg->destLocation);
+            DPRINTF(DEBUG_LVL_VVERB,"Waiting for reply from %d\n", (u32)msg->destLocation);
             self->fcts.waitMessage(self, &handle);
             DPRINTF(DEBUG_LVL_VVERB,"Received reply from %d for original message @ 0x%lx\n",
-                    (int)msg->destLocation, originalMsg);
+                    (u32)msg->destLocation, originalMsg);
             ASSERT(handle->response != NULL);
 
             // Check if we need to copy the response header over to the request msg.
@@ -1533,7 +1532,7 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
         } else {
             // Either a one-way request or an asynchronous two-way
             DPRINTF(DEBUG_LVL_VVERB,"Sending a one-way request or response to asynchronous two-way msg @ 0x%lx to %d\n",
-                    msg, (int) msg->destLocation);
+                    msg, (u32) msg->destLocation);
 
             if (msg->type & PD_MSG_REQ_RESPONSE) {
                 ret = OCR_EPEND; // return to upper layer the two-way is pending
@@ -1557,7 +1556,7 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
 #define PD_MSG (msg)
 #define PD_TYPE PD_MSG_DB_ACQUIRE
                     DPRINTF(DEBUG_LVL_VVERB,"DB_ACQUIRE: Outgoing response for DB GUID 0x%lx with properties=0x%x and dest=%d\n",
-                            PD_MSG_FIELD_IO(guid.guid), PD_MSG_FIELD_IO(properties), (int) msg->destLocation);
+                            PD_MSG_FIELD_IO(guid.guid), PD_MSG_FIELD_IO(properties), (u32) msg->destLocation);
 #undef PD_MSG
 #undef PD_TYPE
                 break;
@@ -1647,7 +1646,7 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
 #define PD_MSG (msg)
 #define PD_TYPE PD_MSG_DB_ACQUIRE
                 DPRINTF(DEBUG_LVL_VVERB,"DB_ACQUIRE: post-process response, GUID=0x%lx serialize DB's ptr, dest is %d\n",
-                        PD_MSG_FIELD_IO(guid.guid), (int) msg->destLocation);
+                        PD_MSG_FIELD_IO(guid.guid), (u32) msg->destLocation);
 
                 sendProp |= ASYNC_MSG_PROP;
 #undef PD_MSG
@@ -1681,7 +1680,7 @@ u8 hcDistPdSwitchRunlevel(ocrPolicyDomain_t *self, ocrRunlevel_t runlevel, u32 p
         getCurrentEnv(&self, NULL, NULL, NULL);
         u32 i = 0;
         while(i < self->neighborCount) {
-            DPRINTF(DEBUG_LVL_VVERB,"PD_MSG_MGT_RL_NOTIFY: loop shutdown neighbors[%d] is %d\n", i, (int) self->neighbors[i]);
+            DPRINTF(DEBUG_LVL_VVERB,"PD_MSG_MGT_RL_NOTIFY: loop shutdown neighbors[%d] is %d\n", i, (u32) self->neighbors[i]);
             PD_MSG_STACK(msgShutdown);
             getCurrentEnv(NULL, NULL, NULL, &msgShutdown);
         #define PD_MSG (&msgShutdown)
@@ -1691,7 +1690,7 @@ u8 hcDistPdSwitchRunlevel(ocrPolicyDomain_t *self, ocrRunlevel_t runlevel, u32 p
             PD_MSG_FIELD_I(runlevel) = RL_COMPUTE_OK;
             PD_MSG_FIELD_I(properties) = RL_REQUEST | RL_BARRIER | RL_TEAR_DOWN;
             PD_MSG_FIELD_I(errorCode) = self->shutdownCode;
-            DPRINTF(DEBUG_LVL_VVERB,"PD_MSG_MGT_RL_NOTIFY: send shutdown msg to %d\n", (int) msgShutdown.destLocation);
+            DPRINTF(DEBUG_LVL_VVERB,"PD_MSG_MGT_RL_NOTIFY: send shutdown msg to %d\n", (u32) msgShutdown.destLocation);
             u8 returnCode = self->fcts.processMessage(self, &msgShutdown, true);
             ASSERT(returnCode == 0);
         #undef PD_MSG
@@ -1740,13 +1739,11 @@ u8 hcDistPdSendMessage(ocrPolicyDomain_t* self, ocrLocation_t target, ocrPolicyM
                    ocrMsgHandle_t **handle, u32 properties) {
     ocrWorker_t * worker;
     getCurrentEnv(NULL, &worker, NULL, NULL);
-    ASSERT(((int)target) > -1);
+    ASSERT(((s32)target) > -1);
     ASSERT(message->srcLocation == self->myLocation);
     ASSERT(message->destLocation != self->myLocation);
 
-    //BUG #204: sep-concern: The PD should not know about underlying worker impl
-    ocrWorkerHc_t * hcWorker = (ocrWorkerHc_t *) worker;
-    int id = hcWorker->id;
+    u32 id = worker->seqId;
     u8 ret = self->commApis[id]->fcts.sendMessage(self->commApis[id], target, message, handle, properties);
     return ret;
 }
@@ -1754,9 +1751,7 @@ u8 hcDistPdSendMessage(ocrPolicyDomain_t* self, ocrLocation_t target, ocrPolicyM
 u8 hcDistPdPollMessage(ocrPolicyDomain_t *self, ocrMsgHandle_t **handle) {
     ocrWorker_t * worker;
     getCurrentEnv(NULL, &worker, NULL, NULL);
-    //BUG #204: sep-concern: The PD should not know about underlying worker impl
-    ocrWorkerHc_t * hcWorker = (ocrWorkerHc_t *) worker;
-    int id = hcWorker->id;
+    u32 id = worker->seqId;
     u8 ret = self->commApis[id]->fcts.pollMessage(self->commApis[id], handle);
     return ret;
 }
@@ -1764,9 +1759,7 @@ u8 hcDistPdPollMessage(ocrPolicyDomain_t *self, ocrMsgHandle_t **handle) {
 u8 hcDistPdWaitMessage(ocrPolicyDomain_t *self,  ocrMsgHandle_t **handle) {
     ocrWorker_t * worker;
     getCurrentEnv(NULL, &worker, NULL, NULL);
-    //BUG #204: sep-concern: The PD should not know about underlying worker impl
-    ocrWorkerHc_t * hcWorker = (ocrWorkerHc_t *) worker;
-    int id = hcWorker->id;
+    u32 id = worker->seqId;
     u8 ret = self->commApis[id]->fcts.waitMessage(self->commApis[id], handle);
     return ret;
 }

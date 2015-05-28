@@ -822,7 +822,7 @@ s32 populate_inst(ocrParamList_t **inst_param, void **instance, s32 *type_counts
                     if (workertype == MAX_WORKERTYPE) workertype = SLAVE_WORKERTYPE; // TODO: is this a reasonable default?
                     ALLOC_PARAM_LIST(inst_param[j], paramListWorkerHcInst_t);
                     ((paramListWorkerHcInst_t *)inst_param[j])->workerType = workertype;
-                    ((paramListWorkerHcInst_t *)inst_param[j])->workerId = j; // using "id" for now; TODO: decide if a separate key is needed
+                    ((paramListWorkerInst_t *)inst_param[j])->workerId = j; // using "id" for now; TODO: decide if a separate key is needed
                 }
                 break;
 #endif
@@ -839,7 +839,7 @@ s32 populate_inst(ocrParamList_t **inst_param, void **instance, s32 *type_counts
                 if (workertype == MAX_WORKERTYPE) workertype = SLAVE_WORKERTYPE; // TODO: is this a reasonable default?
                 ALLOC_PARAM_LIST(inst_param[j], paramListWorkerCeInst_t);
                 ((paramListWorkerCeInst_t *)inst_param[j])->workerType = workertype;
-                ((paramListWorkerCeInst_t *)inst_param[j])->workerId = j; // using "id" for now; TODO: decide if a separate key is needed
+                ((paramListWorkerInst_t *)inst_param[j])->workerId = j; // using "id" for now; TODO: decide if a separate key is needed
             }
             break;
 #endif
@@ -855,8 +855,7 @@ s32 populate_inst(ocrParamList_t **inst_param, void **instance, s32 *type_counts
                 workertype += 1;  // because workertype is 1-indexed, not 0-indexed
                 if (workertype == MAX_WORKERTYPE) workertype = SLAVE_WORKERTYPE; // TODO: is this a reasonable default?
                 ALLOC_PARAM_LIST(inst_param[j], paramListWorkerXeInst_t);
-                // ((paramListWorkerXeInst_t *)inst_param[j])->workerType = workertype;  TODO: This field doesn't exist for XE's.  Should it?  BRN
-                ((paramListWorkerXeInst_t *)inst_param[j])->workerId = j; // using "id" for now; TODO: decide if a separate key is needed
+                ((paramListWorkerInst_t *)inst_param[j])->workerId = j; // using "id" for now; TODO: decide if a separate key is needed
             }
             break;
 #endif

@@ -5,7 +5,6 @@
 #include "ocr-types.h"
 #include <signal.h>
 #include "policy-domain/hc/hc-policy.h"
-#include "worker/hc/hc-worker.h"
 #include "comp-platform/pthread/pthread-comp-platform.h"
 #include "ocr-policy-domain.h"
 
