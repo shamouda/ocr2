@@ -5,20 +5,21 @@
 \index{Execution Model}
 \label{sec:ExecutionModel}
 
-OCR is based on an asynchronous task model.   The work of an OCR program
+OCR is based on an asynchronous task model. The work of an OCR program
 is defined in terms of a collection of tasks  organized
 into a directed acyclic graph (DAG)\index{DAG}~\cite{TaSa11,Tasirlar11,Zuckerman:2011:UCP:2000417.2000424}.
-Task execution is managed by the availability of data (the ``data blocks'') and events; hence why
-the tasks are called ``Event Driven Tasks'' or EDTs.
+Task execution is managed by the availability of data (the ``data
+blocks'') and events; hence the reason the tasks are called ``Event
+Driven Tasks'' or EDTs.
 
 An OCR program executes on an abstract machine called the \emph{OCR
-Platform}\index{OCR Platform}.  The OCR platform is a resource that can carry out
+Platform}\index{OCR Platform}. The OCR platform is a resource that can carry out
 computations. It consists of:
 \begin{itemize}
 \item A collection of network connected nodes where any two nodes can
 communicate with each other.
 \item Each node consists of one or more processing elements each of
-which has its own private memory\footnote{By ``private'' we mean a
+which may have its own private memory\footnote{By ``private'' we mean a
 memory region that is not accessible to other processing
 elements.}.
 \item Workers that run on the processing elements to execute enqueued EDTs.
@@ -27,7 +28,6 @@ denoted by a globally unique ID (GUID).
 \end{itemize}
 OCR is designed to be portable and scalable, hence, the OCR Platform
 places minimal constraints on the physical hardware.
-
 
 %
 %  Library mode is an extension so we do not have to settle on the name just yet.
@@ -39,15 +39,15 @@ places minimal constraints on the physical hardware.
 %to either the entire OCR program if it is running alone or the OCR
 %portion of the program if running library mode.
 
-The OCR program logically starts as a single  EDT called  \code{mainEDT()}.
+The OCR program logically starts as a single EDT called \code{mainEDT()}.
 In other words, the programmer does not provide a \code{main()} function.
 The OCR runtime system creates the \code{main()} function on the programmer`s
-behalf to set up the
-OCR environment and then calls the user provided \code{mainEDT()}. The expected
-function prototype for the \code{mainEDT()} is described in section~\ref{sec:mainEDT}.
+behalf to set up the OCR environment and then calls the user provided
+\code{mainEDT()}. The expected function prototype for the
+\code{mainEDT()} is described in section~\ref{sec:mainEDT}.
 
-The DAG corresponding
-to the executing program is constructed dynamically and completes when the
+The DAG corresponding to the executing program is constructed
+dynamically and completes when the
 \code{ocrShutdown()} or \code{ocrAbort()} function is called.
 This rather simple model can handle a wide range of
 design patterns including branch and bound, data flow, and divide and
@@ -60,22 +60,24 @@ conquer.
 %
 
 To understand the execution model of OCR, consider the discrete states and
-transitions of an executing EDT as defined in figure~\ref{fig:EDTexec}.  An
-EDT is created and once its GUID is available for use in API function, the EDT is said
-to be \emph{Available}\index{Available}.  At some point, the dependences
-are fully defined for the EDT and it becomes \emph{resolved}\index{resolved}.
-Note that the transition from Available to Resolved is not called out as a named transition.
-This implies that it is not generally possible for the system to set a distinct time-stamp
-corresponding to when the transition occurred.  In this case, the transition is un-named
-because dependencies may be added dynamically up until the
-EDT \emph{Launch}\index{Launch} transition.  At this point the
+transitions of an executing EDT as defined in figure~\ref{fig:EDTexec}. An
+EDT is created and once its GUID is available for use in API
+functions, the EDT is said to be \emph{Available}\index{EDT state,
+  available}. At some point, the dependences are fully defined (all
+pre-slots of the EDT are ``connected'') for the EDT and it becomes
+\emph{Resolved}\index{EDT state, resolved}.
+Note that the transition from \emph{Available} to \emph{Resolved} is
+not called out as a named transition. This implies that it is not
+generally possible for the system to set a distinct time-stamp
+corresponding to when the transition occurred. In this case, the transition is un-named
+because dependences may be added dynamically up until the
+EDT \emph{Launch}\index{Launch} transition. At this point the
 EDT is \emph{Runnable}\index{Runable}.
 
-Once an EDT is runnable,  it will execute at some point during the normal execution
-of the OCR program.   At some point all data blocks linked to an EDT will be acquired and the
-EDT becomes \emph{Ready}\index{Ready}. The
-EDT  and any resources required
-to support its execution are then submitted to
+Once an EDT is runnable, it will execute at some point during the normal execution
+of the OCR program. At some point all data blocks linked to an EDT
+will be acquired and the EDT becomes \emph{Ready}\index{EDT state, ready}. The
+EDT and any resources required to support its execution are then submitted to
 \emph{workers}\index{Worker}~\cite{GBRS09} which execute the tasks on
 the processing elements within the OCR platform. The workers and the
 data-structures used to store tasks waiting to execute
@@ -85,8 +87,9 @@ balancing, programmers may need to explicitly reason about the
 behavior of the workers~\cite{Chatterjee13}, but they do not hold
 persistent state visible to an OCR program and are logically opaque to
 OCR constructs. The scheduler inside the implementation of OCR
-will then schedule the EDT for execution and the EDT  \emph{Starts}\index{Start} to execute and
-becomes a \emph{Running}\index{Running} EDT.
+will then schedule the EDT for execution and the EDT
+\emph{Starts}\index{EDT state, start} to execute and
+becomes a \emph{Running}\index{EDT state, running} EDT.
 
 % Vincent writes:
 %
@@ -109,18 +112,21 @@ becomes a \emph{Running}\index{Running} EDT.
 \label{fig:EDTexec}
 \end{figure*}
 
-Normal EDT execution continues until the EDT function returns.   The EDT undergoes
-a \emph{Finish}\index{Finish} transition and the EDT is in the \emph{End}\index{End} state.
-At some point the EDT will release the data blocks associated with the EDTs execution and the
-EDT enters the \emph{Released} state.   At this point, any changes made to data blocks will
+Normal EDT execution continues until the EDT function returns. The EDT undergoes
+a \emph{Finish}\index{EDT transition, finish} transition and the EDT is in
+the \emph{End}\index{EDT state, end} state. At some point the EDT will
+release the data blocks associated with the EDTs execution and the
+EDT enters the \emph{Released}\index{EDT state, released} state.
+At this point, any changes made to data blocks will
 be available for use by other OCR objects. Later the EDT will
-mark its post-slot as satisfied\index{Satisfied} to \emph{Trigger}\index{Trigger} the event
-associated with the EDT; thereby becoming a \emph{Triggered} EDT.  At some later point the
-system will \emph{Clean-up}\index{Clean-up} resources used by the EDT (including its GUID) and
-the EDT is Destroyed.
+mark its post-slot as satisfied to \emph{Trigger}\index{Trigger} the event
+associated with the EDT; thereby becoming a \emph{Triggered} EDT. At
+some later point the
+system will \emph{Clean-up}\index{EDT transition, clean-up} resources
+used by the EDT (including its GUID) and the EDT is destroyed.
 
 Since an EDT is non-blocking, once it
-becomes ``runnable'' it will run on the OCR platform at some point in the
+becomes \emph{Runnable} it will run on the OCR platform at some point in the
 future. During its run:
 \begin{itemize}
 \item The EDT can only access data blocks that have been passed in
@@ -132,7 +138,8 @@ created within the EDT).
 \item The EDT can call into the runtime to create and destroy data
 blocks, EDTs and events.
 
-\item The EDT can create \emph{links} or \emph{dependences}. This is
+\item The EDT can create \emph{links} between the various OCR
+software constructs, termed \\emph{dependences}. This is
 accomplished through the \code{ocrAddDependence()} function of the OCR
 API. The following types of dependences can be created:
 \begin{itemize}
@@ -141,7 +148,7 @@ directly to the source event’s post-slot.
 For all events but the latch event, this means that the triggering of
 the source event will trigger the destination event.
 
-\item \emph{Event to EDT}:  One of the destination EDT’s pre-slot is chained
+\item \emph{Event to EDT}: One of the destination EDT’s pre-slot is chained
 directly to the source event’s post-slot. When the source event is
 triggered, this will satisfy the EDT’s pre-slot. If a data-block was
 associated with the triggering of the source event, that data-block
@@ -153,11 +160,10 @@ dependence is akin to a pure control dependence.
 \item \emph{Data Block to Event}: Adding a dependence between a data-block and an
 event is equivalent to satisfying the event with the data-block.
 
-\item \emph{Data Block to EDT}:  Directly adding a dependence between a data-block and
+\item \emph{Data Block to EDT}: Directly adding a dependence between a data-block and
 an EDT (a pure data-dependence) immediately satisfies the EDT’s
 pre-slot and makes the data-block available to the EDT in the
 dependence array in the position of the pre-slot.
-
 \end{itemize}
 
 \item The EDT cannot perform any synchronization operations that would
@@ -165,7 +171,6 @@ cause it to block inside the body of the task (i.e.\ the EDT must be
 non-blocking). The only mechanism for synchronization within OCR is
 through the events that link OCR objects, which are explicit to the
 runtime.
-
 \end{itemize}
 
 
@@ -213,7 +218,7 @@ execution before the function to terminate the program is called.
 %The details behind the parameters and dependences are described in
 %Chapter~\ref{chap:OCRAPI}.
 Since the OCR runtime creates the \code{main()}
-function, the programmer doesn't need to manage the low level
+function, the programmer does not need to manage the low level
 details of initializing and cleanly shutting down OCR.
 %This approach,
 %however, does not work if the programmer wishes to use OCR inside a
@@ -228,11 +233,10 @@ details of initializing and cleanly shutting down OCR.
 %use the functions \code{getArgc} and \code{getArgv} to gain access to
 %these values. These functions are defined in Chapter~\ref{chap:OCRAPI}.
 
-
-Links can imply control dependences or, when a data block is
-associated with an event, they imply data flow between OCR objects.
-In either case, the events constrain the order of execution of EDTs
-typically executing the program as a data flow program.
+% Links can imply control dependences or, when a data block is
+% associated with an event, they imply data flow between OCR objects.
+% In either case, the events constrain the order of execution of EDTs
+% typically executing the program as a data flow program.
 
 With both data and tasks conceptually decoupled from their realization
 on a computer system, OCR has the flexibility to relocate tasks and data
@@ -241,9 +245,9 @@ among the processing elements of the computer, or to optimize memory
 and energy consumption~\cite{GZCS10,Guo10,CTBCCGYS13,SbBS14}.
 This requires that the state of an OCR program can be defined
 strictly in terms of which tasks have completed their execution
-and the history of updates to data blocks. By saving a log of updates to Data Blocks
-relative to the Tasks that have completed execution, the system can recover
-the state of a computation should components of the system fail.  This requires,
+and the history of updates to data blocks. By saving a log of updates to Data blocks
+relative to the tasks that have completed execution, the system can recover
+the state of a computation should components of the system fail. This requires,
 however, that EDTs execute with transactional semantics.
 
 % This is the end of ch1-exec.tex of the OCR specification.
