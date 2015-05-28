@@ -72,9 +72,13 @@ static u8 helperSwitchInert(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, p
 void hcWorkerCallback(ocrPolicyDomain_t *self, u64 val) {
     ocrPolicyDomainHc_t *rself = (ocrPolicyDomainHc_t*)self;
     DPRINTF(DEBUG_LVL_VERB, "Got check-in from worker %u for RL %lu\n", val & 0xFFFF, (u64)(val >> 16));
-
-    ocrWorker_t * worker;
-    getCurrentEnv(NULL, &worker, NULL, NULL);
+    // Read these now and fence because on TEAR_DOWN as soon
+    // as checkedIn reaches zero the master thread falls-through
+    // and write to rlSwitch.
+    ocrRunlevel_t runlevel = rself->rlSwitch.runlevel;
+    s8 nextPhase = rself->rlSwitch.nextPhase;
+    u32 properties = rself->rlSwitch.properties;
+    hal_fence();
     u32 oldVal, newVal;
     do {
         oldVal = rself->rlSwitch.checkedIn;
@@ -83,26 +87,31 @@ void hcWorkerCallback(ocrPolicyDomain_t *self, u64 val) {
     if(oldVal == 1) {
         // This means we managed to set it to 0
         DPRINTF(DEBUG_LVL_VVERB, "All workers checked in, moving to the next stage: RL %u; phase %d\n",
-                rself->rlSwitch.runlevel, rself->rlSwitch.nextPhase);
-        if(rself->rlSwitch.properties & RL_FROM_MSG) {
+                runlevel, nextPhase);
+        if(properties & RL_FROM_MSG) {
             // We need to re-enter switchRunlevel
-            if((rself->rlSwitch.properties & RL_BRING_UP) &&
-               (rself->rlSwitch.nextPhase == RL_GET_PHASE_COUNT_UP(self, rself->rlSwitch.runlevel))) {
+            if((properties & RL_BRING_UP) &&
+               (nextPhase == RL_GET_PHASE_COUNT_UP(self, runlevel))) {
                 // Switch to the next runlevel
                 ++rself->rlSwitch.runlevel;
                 rself->rlSwitch.nextPhase = 0;
             }
-            if((rself->rlSwitch.properties & RL_TEAR_DOWN) &&
-               (rself->rlSwitch.nextPhase == -1)) {
+            if((properties & RL_TEAR_DOWN) && (nextPhase == -1)) {
                 // Switch to the next runlevel (going down)
                 --rself->rlSwitch.runlevel;
                 rself->rlSwitch.nextPhase = RL_GET_PHASE_COUNT_DOWN(self, rself->rlSwitch.runlevel) - 1;
+                hal_fence(); // for LEGACY MASTER loop probably not needed
             }
-            if(rself->rlSwitch.runlevel == RL_COMPUTE_OK && rself->rlSwitch.nextPhase == 0) {
+            // Ok to read cached value here since in this case, the previous
+            // 'if' couldn't have updated next phase to zero.
+            if(runlevel == RL_COMPUTE_OK && nextPhase == 0) {
                 // In this case, we do not re-enter the switchRunlevel because the master worker
                 // will drop out of its computation (at some point) and take over
                 DPRINTF(DEBUG_LVL_VVERB, "PD_MASTER thread will pick up for switch to RL_COMPUTE_OK\n");
             } else {
+                PRINTF("Re-entering switchRunlevel with RL %u; phase %u; prop 0x%x\n",
+                        rself->rlSwitch.runlevel, rself->rlSwitch.nextPhase, rself->rlSwitch.properties);
+
                 DPRINTF(DEBUG_LVL_VVERB, "Re-entering switchRunlevel with RL %u; phase %u; prop 0x%x\n",
                         rself->rlSwitch.runlevel, rself->rlSwitch.nextPhase, rself->rlSwitch.properties);
                 RESULT_ASSERT(self->fcts.switchRunlevel(self, rself->rlSwitch.runlevel, rself->rlSwitch.properties), ==, 0);
@@ -144,12 +153,7 @@ u8 hcPdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
         // only transition until PD_OK. After that, transitions should
         // occur using policy messages
         ASSERT(amNodeMaster || (runlevel <= RL_PD_OK));
-
         // If this is direct function call, it should only be a request
-        // if (!((properties & RL_REQUEST) && !(properties & (RL_RESPONSE | RL_RELEASE)))) {
-        //     PRINTF("HERE\n");
-        //     while(1);
-        // }
         ASSERT((properties & RL_REQUEST) && !(properties & (RL_RESPONSE | RL_RELEASE)))
     }
 
@@ -164,7 +168,6 @@ u8 hcPdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
                     policy->phasesPerRunlevel[i][j] = (1<<4) + 1;
                 }
             }
-
             phaseCount = 2;
         } else {
             // Tear down
@@ -262,7 +265,6 @@ u8 hcPdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
     case RL_MEMORY_OK:
     {
         phaseCount = ((policy->phasesPerRunlevel[RL_MEMORY_OK][0]) >> ((properties&RL_TEAR_DOWN)?4:0)) & 0xF;
-
         maxCount = policy->workerCount;
         for(i = 0; i < phaseCount; ++i) {
             if(toReturn) break;
@@ -414,7 +416,8 @@ u8 hcPdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
                 policy->fguid.guid = NULL_GUID;
 #undef PD_MSG
 #undef PD_TYPE
-            } else {
+            } else { // Tear-down RL_USER_OK not last phase
+
                 for(i = rself->rlSwitch.nextPhase; i > 0; --i) {
                     toReturn |= helperSwitchInert(policy, runlevel, i, properties);
 
@@ -453,6 +456,32 @@ u8 hcPdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
     case RL_USER_OK:
     {
         if(properties & RL_BRING_UP) {
+            // This branch is only taken in legacy mode the second time RL_USER_OK is entered
+            if (rself->rlSwitch.legacySecondStart) {
+                toReturn |= policy->workers[0]->fcts.switchRunlevel(
+                    policy->workers[0], policy, runlevel, i, properties | RL_PD_MASTER | RL_BLESSED, NULL, 0);
+                // When I drop out of this, I should be in RL_COMPUTE_OK at phase 0
+                // wait for everyone to check in so that I can continue shutting down
+                DPRINTF(DEBUG_LVL_VVERB, "PD_MASTER worker LEGACY mode, dropped out... waiting for others to complete RL\n");
+
+                //Warning: here make sure the code in hcWorkerCallback reads all the rlSwitch
+                //info BEFORE decrementing checkedIn. Otherwise there's a race on rlSwitch
+                //between the following code and hcWorkerCallback.
+                while(rself->rlSwitch.checkedIn != 0);
+
+                ASSERT(rself->rlSwitch.runlevel == RL_COMPUTE_OK && rself->rlSwitch.nextPhase == 0);
+                DPRINTF(DEBUG_LVL_VVERB, "PD_MASTER worker LEGACY mode, wrapping up shutdown\n");
+                // We complete the RL_COMPUTE_OK stage which will bring us down to RL_MEMORY_OK which will
+                // get wrapped up by the outside code
+                rself->rlSwitch.properties &= ~RL_FROM_MSG;
+                toReturn |= policy->fcts.switchRunlevel(policy, rself->rlSwitch.runlevel,
+                                                        rself->rlSwitch.properties | RL_PD_MASTER);
+                return toReturn;
+            }
+            // BRING_UP is called twice in RL_LEGACY mode, record we've seen the first call.
+            rself->rlSwitch.legacySecondStart = true;
+            // Register properties here to allow tear down to read special flags set on bring up
+            rself->rlSwitch.properties = properties;
             phaseCount = RL_GET_PHASE_COUNT_UP(policy, RL_USER_OK);
             maxCount = policy->workerCount;
             for(i = 0; i < phaseCount - 1; ++i) {
@@ -478,24 +507,33 @@ u8 hcPdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
                 // Always do the capable worker last in this case (it will actualy start doing something useful)
                 rself->rlSwitch.runlevel = RL_USER_OK;
                 rself->rlSwitch.nextPhase = phaseCount;
-                toReturn |= policy->workers[0]->fcts.switchRunlevel(
-                    policy->workers[0], policy, runlevel, i, properties | RL_PD_MASTER | RL_BLESSED, NULL, 0);
-                // When I drop out of this, I should be in RL_COMPUTE_OK at phase 0
-                // wait for everyone to check in so that I can continue shutting down
-                DPRINTF(DEBUG_LVL_VVERB, "PD_MASTER worker dropped out... waiting for others to complete RL\n");
+                if (properties & RL_LEGACY) {
+                    // In legacy mode the master worker just do its setup and falls-through
+                    DPRINTF(DEBUG_LVL_VVERB, "Starting PD_MASTER worker in LEGACY mode\n");
+                    toReturn |= policy->workers[0]->fcts.switchRunlevel(
+                        policy->workers[0], policy, runlevel, i, properties | RL_PD_MASTER | RL_BLESSED, NULL, 0);
+                } else {
+                    toReturn |= policy->workers[0]->fcts.switchRunlevel(
+                        policy->workers[0], policy, runlevel, i, properties | RL_PD_MASTER | RL_BLESSED, NULL, 0);
+                    // When I drop out of this, I should be in RL_COMPUTE_OK at phase 0
+                    // wait for everyone to check in so that I can continue shutting down
+                    DPRINTF(DEBUG_LVL_VVERB, "PD_MASTER worker dropped out... waiting for others to complete RL\n");
 
-                while(rself->rlSwitch.checkedIn != 0) ;
+                    //Warning: here make sure the code in hcWorkerCallback reads all the rlSwitch
+                    //info BEFORE decrementing checkedIn. Otherwise there's a race on rlSwitch
+                    //between the following code and hcWorkerCallback.
+                    while(rself->rlSwitch.checkedIn != 0);
 
-                ASSERT(rself->rlSwitch.runlevel == RL_COMPUTE_OK && rself->rlSwitch.nextPhase == 0);
-                DPRINTF(DEBUG_LVL_VVERB, "PD_MASTER worker wrapping up shutdown\n");
-                // We complete the RL_COMPUTE_OK stage which will bring us down to RL_MEMORY_OK which will
-                // get wrapped up by the outside code
-                rself->rlSwitch.properties &= ~RL_FROM_MSG;
-                toReturn |= policy->fcts.switchRunlevel(policy, rself->rlSwitch.runlevel,
-                                                        rself->rlSwitch.properties | RL_PD_MASTER);
+                    ASSERT(rself->rlSwitch.runlevel == RL_COMPUTE_OK && rself->rlSwitch.nextPhase == 0);
+                    DPRINTF(DEBUG_LVL_VVERB, "PD_MASTER worker wrapping up shutdown\n");
+                    // We complete the RL_COMPUTE_OK stage which will bring us down to RL_MEMORY_OK which will
+                    // get wrapped up by the outside code
+                    rself->rlSwitch.properties &= ~RL_FROM_MSG;
+                    toReturn |= policy->fcts.switchRunlevel(policy, rself->rlSwitch.runlevel,
+                                                            rself->rlSwitch.properties | RL_PD_MASTER);
+                }
             }
-        } else {
-            // Tear down
+        } else { // Tear down
             phaseCount = RL_GET_PHASE_COUNT_DOWN(policy, RL_USER_OK);
             maxCount = policy->workerCount;
             for(i = rself->rlSwitch.nextPhase; i >= 0; --i) {
@@ -1892,7 +1930,6 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             ocrPolicyDomainHc_t *rself = (ocrPolicyDomainHc_t*)self;
             // Set up the switching for the next phase
             ASSERT(rself->rlSwitch.runlevel == RL_USER_OK && rself->rlSwitch.nextPhase == RL_GET_PHASE_COUNT_UP(self, RL_USER_OK));
-
             // We want to transition down now
             rself->rlSwitch.nextPhase = RL_GET_PHASE_COUNT_DOWN(self, RL_USER_OK) - 1;
             ASSERT(PD_MSG_FIELD_I(properties) & RL_TEAR_DOWN);
@@ -2203,7 +2240,7 @@ void initializePolicyDomainHc(ocrPolicyDomainFactory_t * factory, ocrPolicyDomai
 
     ocrPolicyDomainHc_t* derived = (ocrPolicyDomainHc_t*) self;
     derived->rank = ((paramListPolicyDomainHcInst_t*)perInstance)->rank;
-    //derived->state = 0;
+    derived->rlSwitch.legacySecondStart = false;
 }
 
 static void destructPolicyDomainFactoryHc(ocrPolicyDomainFactory_t * factory) {

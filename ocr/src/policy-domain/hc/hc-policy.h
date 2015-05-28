@@ -27,6 +27,7 @@ typedef struct {
     ocrRunlevel_t runlevel;
     s8 nextPhase;
     u32 properties;
+    bool legacySecondStart;
 } pdHcResumeSwitchRL_t;
 
 typedef struct {
