@@ -9,7 +9,7 @@
 #include "ocr.h"
 
 /**
- * DESC: Illegal use of EDT_PARAM_UNK in ocrEdtCreate
+ * DESC: Test runtime checks paramv is NULL if paramc is EDT_PARAM_DEF => 0
  */
 
 ocrGuid_t terminateEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
@@ -21,8 +21,9 @@ ocrGuid_t terminateEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
 ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrGuid_t terminateEdtGuid;
     ocrGuid_t terminateEdtTemplateGuid;
-    ocrEdtTemplateCreate(&terminateEdtTemplateGuid, terminateEdt, 1 /*paramc*/, 0 /*depc*/);
-    u8 res = ocrEdtCreate(&terminateEdtGuid, terminateEdtTemplateGuid, EDT_PARAM_UNK, NULL, 0, NULL_GUID,
+    ocrEdtTemplateCreate(&terminateEdtTemplateGuid, terminateEdt, 0 /*paramc*/, 0 /*depc*/);
+    u64 nparamv = 1;
+    u8 res = ocrEdtCreate(&terminateEdtGuid, terminateEdtTemplateGuid, EDT_PARAM_DEF, &nparamv, 0, NULL_GUID,
                  /*properties=*/EDT_PROP_FINISH, NULL_GUID, /*outEvent=*/ NULL);
     ASSERT(!res);
     return NULL_GUID;

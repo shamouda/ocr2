@@ -589,7 +589,8 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
         ASSERT(PD_MSG_FIELD_IO(paramc) != EDT_PARAM_UNK && PD_MSG_FIELD_IO(depc) != EDT_PARAM_UNK);
         if((PD_MSG_FIELD_I(paramv) == NULL) && (PD_MSG_FIELD_IO(paramc) != 0)) {
             // User error, paramc non zero but no parameters
-            DPRINTF(DEBUG_LVL_WARN, "Paramc is non-zero but no paramv was given\n");
+            DPRINTF(DEBUG_LVL_WARN, "error: paramc is non-zero but paramv is NULL\n");
+            ASSERT(false);
             PROCESS_MESSAGE_RETURN_NOW(self, OCR_EINVAL);
         }
         ocrFatGuid_t currentEdt = PD_MSG_FIELD_I(currentEdt);

@@ -194,9 +194,11 @@ u8 ocrEdtCreate(ocrGuid_t* edtGuidPtr, ocrGuid_t templateGuid,
     ocrTask_t * curEdt = NULL;
     getCurrentEnv(&pd, NULL, &curEdt, &msg);
     if((paramc == EDT_PARAM_UNK) || (depc == EDT_PARAM_UNK)) {
-        DPRINTF(DEBUG_LVL_WARN, "paramc or depc cannot be set to EDT_PARAM_UNK\n");
-        return OCR_EINVAL;
+        DPRINTF(DEBUG_LVL_WARN, "error: paramc or depc cannot be set to EDT_PARAM_UNK\n");
+        ASSERT(false);
+        RETURN_PROFILE(OCR_EINVAL);
     }
+
 #define PD_MSG (&msg)
 #define PD_TYPE PD_MSG_WORK_CREATE
     msg.type = PD_MSG_WORK_CREATE | PD_MSG_REQUEST;
@@ -206,8 +208,9 @@ u8 ocrEdtCreate(ocrGuid_t* edtGuidPtr, ocrGuid_t templateGuid,
     } else {
         if ((depc != 0) && (depv == NULL)) {
             // Error since we do not return a GUID, dependences can never be added
-            ASSERT(false && "Error: NULL-GUID EDT depv not provided");
-            return OCR_EPERM;
+            DPRINTF(DEBUG_LVL_WARN,"error: NULL-GUID EDT depv not provided\n");
+            ASSERT(false);
+            RETURN_PROFILE(OCR_EPERM);
         } else if (depc == EDT_PARAM_DEF) {
             // Because we'd like to avoid deguidifying the template here
             // make the creation synchronous if EDT_PARAM_DEF is set.

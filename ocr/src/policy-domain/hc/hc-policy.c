@@ -847,13 +847,14 @@ static u8 hcMemUnAlloc(ocrPolicyDomain_t *self, ocrFatGuid_t* allocator,
 #endif
 }
 
-static u8 hcCreateEdt(ocrPolicyDomain_t *self, ocrFatGuid_t *guid,
+/**
+ * Checks validity of EDT create arguments and create an instance
+ */
+static u8 createEdtHelper(ocrPolicyDomain_t *self, ocrFatGuid_t *guid,
                       ocrFatGuid_t  edtTemplate, u32 *paramc, u64* paramv,
                       u32 *depc, u32 properties, ocrFatGuid_t affinity,
                       ocrFatGuid_t * outputEvent, ocrTask_t * currentEdt,
                       ocrFatGuid_t parentLatch) {
-
-
     ocrTaskTemplate_t *taskTemplate = (ocrTaskTemplate_t*)edtTemplate.metaDataPtr;
     DPRINTF(DEBUG_LVL_VVERB, "Creating EDT with template GUID 0x%lx (0x%lx) (paramc=%d; depc=%d)"
             " and have paramc=%d; depc=%d\n", edtTemplate.guid, edtTemplate.metaDataPtr,
@@ -883,27 +884,32 @@ static u8 hcCreateEdt(ocrPolicyDomain_t *self, ocrFatGuid_t *guid,
     if(*depc == EDT_PARAM_DEF) {
         *depc = taskTemplate->depc;
     }
-    // If paramc are expected, double check paramv is not NULL
+
+    // Check paramc/paramv combination validity
     if((*paramc > 0) && (paramv == NULL)) {
-        DPRINTF(DEBUG_LVL_WARN, "Expected %d parameters but got none\n", *paramc);
-        ASSERT(0);
+        DPRINTF(DEBUG_LVL_WARN,"error: EDT paramc set to %d but paramv is NULL\n", *paramc);
+        ASSERT(false);
         return OCR_EINVAL;
     }
-
-    u8 res = self->taskFactories[0]->instantiate(
+    if((*paramc == 0) && (paramv != NULL)) {
+        DPRINTF(DEBUG_LVL_WARN,"error: EDT paramc set to zero but paramv not NULL\n");
+        ASSERT(false);
+        return OCR_EINVAL;
+    }
+    u8 returnCode = self->taskFactories[0]->instantiate(
                            self->taskFactories[0], guid, edtTemplate, *paramc, paramv,
                            *depc, properties, affinity, outputEvent, currentEdt,
                            parentLatch, NULL);
-    if(res)
-        DPRINTF(DEBUG_LVL_WARN, "Unable to create EDT, got code %x\n", res);
+    if(returnCode) {
+        DPRINTF(DEBUG_LVL_WARN, "unable to create EDT, instantiate returnCode is %x\n", returnCode);
+        ASSERT(false);
+    }
 
-    ASSERT(!res);
-    return 0;
+    return returnCode;
 }
 
-static u8 hcCreateEdtTemplate(ocrPolicyDomain_t *self, ocrFatGuid_t *guid,
+static u8 createEdtTemplateHelper(ocrPolicyDomain_t *self, ocrFatGuid_t *guid,
                               ocrEdt_t func, u32 paramc, u32 depc, const char* funcName) {
-
 
     ocrTaskTemplate_t *base = self->taskTemplateFactories[0]->instantiate(
                                   self->taskTemplateFactories[0], func, paramc, depc, funcName, NULL);
@@ -912,7 +918,7 @@ static u8 hcCreateEdtTemplate(ocrPolicyDomain_t *self, ocrFatGuid_t *guid,
     return 0;
 }
 
-static u8 hcCreateEvent(ocrPolicyDomain_t *self, ocrFatGuid_t *guid,
+static u8 createEventHelper(ocrPolicyDomain_t *self, ocrFatGuid_t *guid,
                         ocrEventTypes_t type, u32 properties) {
 
     return self->eventFactories[0]->instantiate(
@@ -1159,17 +1165,21 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         localDeguidify(self, &(PD_MSG_FIELD_I(affinity)));
         localDeguidify(self, &(PD_MSG_FIELD_I(currentEdt)));
         localDeguidify(self, &(PD_MSG_FIELD_I(parentLatch)));
+
         ocrFatGuid_t *outputEvent = NULL;
         if(PD_MSG_FIELD_IO(outputEvent.guid) == UNINITIALIZED_GUID) {
             outputEvent = &(PD_MSG_FIELD_IO(outputEvent));
         }
 
-        if((PD_MSG_FIELD_I(workType) != EDT_USER_WORKTYPE) && (PD_MSG_FIELD_I(workType) != EDT_RT_WORKTYPE))
+        if((PD_MSG_FIELD_I(workType) != EDT_USER_WORKTYPE) && (PD_MSG_FIELD_I(workType) != EDT_RT_WORKTYPE)) {
+            // This is a runtime error and should be reported as such
             DPRINTF(DEBUG_LVL_WARN, "Invalid worktype %x\n", PD_MSG_FIELD_I(workType));
+        }
+
         ASSERT((PD_MSG_FIELD_I(workType) == EDT_USER_WORKTYPE) || (PD_MSG_FIELD_I(workType) == EDT_RT_WORKTYPE));
         u32 depc = PD_MSG_FIELD_IO(depc); // intentionally read before processing
         ocrFatGuid_t * depv = PD_MSG_FIELD_I(depv);
-        PD_MSG_FIELD_O(returnDetail) = hcCreateEdt(
+        PD_MSG_FIELD_O(returnDetail) = createEdtHelper(
                 self, &(PD_MSG_FIELD_IO(guid)), PD_MSG_FIELD_I(templateGuid),
                 &(PD_MSG_FIELD_IO(paramc)), PD_MSG_FIELD_I(paramv), &(PD_MSG_FIELD_IO(depc)),
                 PD_MSG_FIELD_I(properties), PD_MSG_FIELD_I(affinity), outputEvent,
@@ -1234,7 +1244,6 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             msg->type &= ~PD_MSG_REQUEST;
             msg->type |= PD_MSG_RESPONSE;
         }
-
 #undef PD_MSG
 #undef PD_TYPE
         EXIT_PROFILE;
@@ -1274,7 +1283,7 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
 #else
             const char* edtName = "";
 #endif
-        PD_MSG_FIELD_O(returnDetail) = hcCreateEdtTemplate(
+        PD_MSG_FIELD_O(returnDetail) = createEdtTemplateHelper(
             self, &(PD_MSG_FIELD_IO(guid)),
             PD_MSG_FIELD_I(funcPtr), PD_MSG_FIELD_I(paramc),
             PD_MSG_FIELD_I(depc), edtName);
@@ -1306,7 +1315,7 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         START_PROFILE(pd_hc_EvtCreate);
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_EVT_CREATE
-        PD_MSG_FIELD_O(returnDetail) = hcCreateEvent(
+        PD_MSG_FIELD_O(returnDetail) = createEventHelper(
             self, &(PD_MSG_FIELD_IO(guid)),
             PD_MSG_FIELD_I(type), PD_MSG_FIELD_I(properties));
 #undef PD_MSG
