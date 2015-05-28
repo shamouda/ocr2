@@ -1,12 +1,19 @@
-***********************************************************
-Usage Instruction for EDT Exectution Timeline
-***********************************************************
+##
+# License
+##
+
+This file is subject to the license agreement located in the file
+LICENSE and cannot be distributed without it.  This notice
+cannot be removed or modified.
+
+##
+# Usage Instructions
+##
 
 This visualization tool records the timeline for thread
 execution. It currently has a time.h dependency, thus
 supported platforms are restricted to:
     -x86-pthread-x86
-    -x86-pthread-mpi
 
 -In ocr/build/common.mk:
     -Debug option needs to be set at DEBUG_LVL_INFO

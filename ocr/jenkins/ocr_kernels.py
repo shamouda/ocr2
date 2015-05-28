@@ -45,6 +45,7 @@ jobtype_ocr_run_kernel_local = {
     'sandbox': ('shared', 'shareOK'),
     'req-repos': ('xstack',),
     'env-vars': { 'APPS_ROOT': '${JJOB_SHARED_HOME}/xstack/apps', # Use this for the makefiles
+                  'OCR_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr',
                   'OCR_BUILD_ROOT': '${JJOB_PARENT_PRIVATE_HOME_0}/xstack/ocr/build',
                   'OCR_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/install'}
 }

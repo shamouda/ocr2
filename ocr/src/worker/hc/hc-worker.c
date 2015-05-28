@@ -263,6 +263,7 @@ u8 hcWorkerSwitchRunlevel(ocrWorker_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_
             ASSERT(callback != NULL);
             self->curState = GET_STATE(RL_MEMORY_OK, 0); // Technically last phase of memory OK but doesn't really matter
             self->desiredState = GET_STATE(RL_COMPUTE_OK, phase);
+            self->location = (u64)self; // FIXME: Temporary, to be replaced with seqId once implemented
 
             // See if we are blessed
             self->amBlessed = (properties & RL_BLESSED) != 0;
@@ -438,9 +439,7 @@ void initializeWorkerHc(ocrWorkerFactory_t * factory, ocrWorker_t* self, ocrPara
 
 //return guid of next EDT on specified worker's workpile
 ocrGuid_t hcDumpNextEdt(ocrWorker_t *worker, u32 *size){
-    ocrPolicyDomain_t *pd;
-    getCurrentEnv(&pd, NULL, NULL, NULL);
-    ocrPolicyDomainHc_t *self = (ocrPolicyDomainHc_t *) pd;
+    ocrPolicyDomain_t *pd = worker->pd;
     ocrWorkpileHc_t *workpile = (ocrWorkpileHc_t *)pd->schedulers[0]->workpiles[worker->seqId];
     ocrTask_t *curTask = NULL;
 
