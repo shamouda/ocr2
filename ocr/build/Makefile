@@ -10,16 +10,16 @@
 default:
 	@echo "Must specify an OCR version/type to build, e.g.:"
 	@echo ""
-	@echo "   OCR_TYPE=x86-pthread-x86 make all"
+	@echo "   OCR_TYPE=x86 make all"
 	@echo ""
 	@echo "Valid version are:"
 	@echo ""
-	@echo "   x86-pthread-x86     -- OCR for X86 Linux machines"
-	@echo "   x86-pthread-tg      -- OCR for Traleika Glacier but emulated on X86"
-	@echo "   tg-null-tg-ce       -- CE parts of OCR for Traleika Glacier"
-	@echo "   tg-null-tg-xe       -- XE parts of OCR for Traleika Glacier"
-	@echo "   x86-builder-tg-ce   -- CE struct builder for Traleika Glacier on X86"
-	@echo "   x86-builder-tg-xe   -- XE struct builder for Traleika Glacier on X86"
+	@echo "   x86     -- OCR for X86 Linux machines"
+	@echo "   tg-x86      -- OCR for Traleika Glacier but emulated on X86"
+	@echo "   tg-ce       -- CE parts of OCR for Traleika Glacier"
+	@echo "   tg-xe       -- XE parts of OCR for Traleika Glacier"
+	@echo "   builder-ce   -- CE struct builder for Traleika Glacier on X86"
+	@echo "   builder-xe   -- XE struct builder for Traleika Glacier on X86"
 	@echo ""
 	@echo "Valid targets are:"
 	@echo ""
@@ -68,13 +68,13 @@ clean:
 
 .PHONY: squeaky
 squeaky:
-	OCR_TYPE=x86-pthread-x86 $(MAKE) -C x86-pthread-x86 clean uninstall
-	OCR_TYPE=x86-pthread-tg $(MAKE) -C x86-pthread-tg clean uninstall
-	OCR_TYPE=tg-null-tg-ce $(MAKE) -C tg-null-tg-ce clean uninstall
-	OCR_TYPE=tg-null-tg-xe $(MAKE) -C tg-null-tg-xe clean uninstall
-	OCR_TYPE=x86-builder-tg-ce $(MAKE) -C x86-builder-tg-ce clean uninstall
-	OCR_TYPE=x86-builder-tg-xe $(MAKE) -C x86-builder-tg-xe clean uninstall
-	OCR_TYPE=x86-pthread-mpi $(MAKE) -C x86-pthread-mpi clean uninstall
-#	OCR_TYPE=x86-pthread-gasnet $(MAKE) -C x86-pthread-gasnet clean uninstall
+	OCR_TYPE=x86 $(MAKE) -C x86 clean uninstall
+	OCR_TYPE=tg-x86 $(MAKE) -C tg-x86 clean uninstall
+	OCR_TYPE=tg-ce $(MAKE) -C tg-ce clean uninstall
+	OCR_TYPE=tg-xe $(MAKE) -C tg-xe clean uninstall
+	OCR_TYPE=builder-ce $(MAKE) -C builder-ce clean uninstall
+	OCR_TYPE=builder-xe $(MAKE) -C builder-xe clean uninstall
+	OCR_TYPE=x86-mpi $(MAKE) -C x86-mpi clean uninstall
+#	OCR_TYPE=x86-gasnet $(MAKE) -C x86-gasnet clean uninstall
 
 

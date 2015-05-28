@@ -1,6 +1,14 @@
-***********************************************************
-   Script to identify data and time overhead per EDT
-***********************************************************
+##
+# License
+##
+
+This file is subject to the license agreement located in the file
+LICENSE and cannot be distributed without it.  This notice
+cannot be removed or modified.
+
+##
+# Usage Instructions
+##
 
 This script postprocesses log data and generates a console
 summary, and .csv readout of data overhead and execution
@@ -18,15 +26,6 @@ Instructions:
 Script Instructions:
 
 -Navigate to desired application directory.
-    -NOTE: The default ocr-config GuidType (PTR) reuses guids.  If used with this tool, it is possible
-     for GUID collisions with previosuly observed EDTs and data blocks which will give incorrect results.
-     GuidType of COUNTED_MAP is needed in the ocr-config file to use this tool.  Run the following
-     command to use the proper GuidType.
-
-        -export OCR_CONFIG=~/xstack/ocr/scripts/EdtStats/x86_edtOverhead.cfg
-
-     If you wish to customize a config file using COUNTED_MAP, consider using the config-generator tool
-     locate in /ocr/scripts/Configs/.
 
 -Before running an application an environment variable must be set via:
     -export ENABLE_VISUALIZER=yes
@@ -34,16 +33,13 @@ Script Instructions:
 -NOTE: The above env. variable will issue -DOCR_ENABLE_EDT_NAMING and
   -DOCR_OCR_ENABLE_VISUALIZER to the targeted app only if you are compiling
   your program with the default common Makefile.  If you are using a custom
-  Makefile, you must issue these compiler flags explicitely.
+  Makefile, you must issue these compiler flags explicitely and use the config-generator
+  script to create a config file using guid type COUNTED_MAP.
 
 -Application logging output must be redirected to
  to the /ocr/scripts/EdtStats directory
-    The command would look like: make -f Makefile.x86-pthread-x86 run > ~/xstack/ocr/scripts/EdtStats/<log_ouput_file_name>
+    The command would look like: make -f Makefile.x86 run > ~/xstack/ocr/scripts/EdtStats/<log_ouput_file_name>
 
 -Navigate to ~/xstack/ocr/scripts/EdtStats, and run: python edtStats.py <log_ouput_file_name>
 
 -Output will be a .csv file which can be opened in a spreadsheet program.
-
-
-
-

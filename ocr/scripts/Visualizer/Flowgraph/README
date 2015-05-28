@@ -1,6 +1,14 @@
-***********************************************************
-Usage Instruction for Application Flowgraph
-***********************************************************
+##
+# License
+##
+
+This file is subject to the license agreement located in the file
+LICENSE and cannot be distributed without it.  This notice
+cannot be removed or modified.
+
+##
+# Usage Instructions
+##
 
 This visualization tool represents an OCR application as a
 directed acyclic graph, showing satisfactions between
@@ -14,14 +22,6 @@ EDTs and events.
 Script Instructions:
 
 -Navigate to desired application directory.
-    -NOTE: The default ocr-config GuidType (PTR) reuses guids, and is not compitable with this tool.
-     GuidType of COUNTED_MAP is needed in the ocr-config file to use this tool.  Run the following
-     command to use the proper GuidType.
-
-        -export OCR_CONFIG=~/xstack/ocr/machine-configs/x86-pthread-x86/mach-hc-4w-countedMap.cfg
-
-     If you wish to customize a config file using COUNTED_MAP, consider using the config-generator tool
-     located in /ocr/scripts/Configs/.
 
 -Before running an application an environment variable must be set via:
     -export ENABLE_VISUALIZER=yes
@@ -29,14 +29,18 @@ Script Instructions:
 -NOTE: The above env. variable will issue -DOCR_ENABLE_EDT_NAMING and
   -DOCR_OCR_ENABLE_VISUALIZER to the targeted app only if you are compiling
   your program with the default Makefile.  If you are using a custom Makefile,
-  you must issue these compiler flags explicitely.
+  you must issue these compiler flags explicitely, and use the config-generator
+  script to create a config file using guid type COUNTED_MAP.
 
 -Application logging output must be redirected to
  to the /ocr/scripts/Visualizer/Flowgraph directory
-    The command would look like: make -f Makefile.x86-pthread-x86 run > ~/xstack/ocr/scripts/Visualizer/Flowgraph/<log_ouput_file_name>
+    The command would look like: make -f Makefile.x86 run > ~/xstack/ocr/scripts/Visualizer/Flowgraph/<log_ouput_file_name>
 
 -Navigate to ~/xstack/ocr/scripts/Visualizer/Flowgraph, and run: python flowgraph.py <log_ouput_file_name>
 -The output will be an HTML file called flowgraph.html
+
+-NOTE: flowgraph.py depends on an external package called pygraph which can be
+       found here: https://pypi.python.org/pypi/python-graph-core/
 
 -Copy html file to local machine, and open flowgraph.html in a web browser.
 

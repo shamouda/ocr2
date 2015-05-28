@@ -1,0 +1,2 @@
+This directory contains a LLVM pass to account for reads and writes to/from data-blocks.
+This code has not been maintained.

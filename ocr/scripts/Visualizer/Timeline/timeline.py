@@ -1,3 +1,10 @@
+#
+# This file is subject to the license agreement located in the file
+# LICENSE and cannot be distributed without it.  This notice
+# cannot be removed or modified
+#
+
+
 import sys
 import re
 import subprocess
@@ -31,16 +38,16 @@ def postProcessData(inString, outFile, offSet, lastLineFlag, counter, color):
     words = inString.split()
     workerID = words[WORKER_ID_INDEX][WORKER_ID_INDEX:]
     fctName = words[FCT_NAME_INDEX]
-    startTime = (int(words[START_TIME_INDEX]) - offSet)/float(1000000) #Ns to Ms
-    endTime = (int(words[END_TIME_INDEX]) - offSet)/float(1000000) #Ns to Ms
+    startTime = (int(words[START_TIME_INDEX]) - offSet)
+    endTime = (int(words[END_TIME_INDEX]) - offSet)
     totalTime = "{0:.2f}".format(endTime - startTime)
     whichNode = words[PD_ID_INDEX][1:]
 
     if lastLineFlag == True:
-        outFile.write('\t\t{id: ' + str(counter) + ', group: ' + '\'' + str(workerID) + '\'' + ', title: \'EDT Name: ' + str(fctName) + '\\nExecution Time: ' + str(totalTime) + 'Ms\', content: \'' + str(fctName) + '\', start: new Date(' + str(startTime) + '), end: new Date(' +  str(endTime) + '), style: "background-color: ' + str(color) + ';"}\n')
+        outFile.write('\t\t{id: ' + str(counter) + ', group: ' + '\'' + str(workerID) + '\'' + ', title: \'EDT Name: ' + str(fctName) + '\\nExecution Time: ' + str(totalTime) + 'Ns\', content: \'' + str(fctName) + '\', start: new Date(' + str(startTime) + '), end: new Date(' +  str(endTime) + '), style: "background-color: ' + str(color) + ';"}\n')
         outFile.write('\t]);\n\n')
     else:
-        outFile.write('\t\t{id: ' + str(counter) + ', group: ' + '\'' + str(workerID) + '\'' + ', title: \'EDT Name: ' + str(fctName) + '\\nExecution Time: ' + str(totalTime) + 'Ms\', content: \'' + str(fctName) + '\', start: new Date(' + str(startTime) + '), end: new Date(' +  str(endTime) + '), style: "background-color: ' + str(color) + ';"},\n')
+        outFile.write('\t\t{id: ' + str(counter) + ', group: ' + '\'' + str(workerID) + '\'' + ', title: \'EDT Name: ' + str(fctName) + '\\nExecution Time: ' + str(totalTime) + 'Ns\', content: \'' + str(fctName) + '\', start: new Date(' + str(startTime) + '), end: new Date(' +  str(endTime) + '), style: "background-color: ' + str(color) + ';"},\n')
 
 #========== Strip Un-needed events from OCR debug log ========
 def runShellStrip(dbgLog):
@@ -52,7 +59,7 @@ def appendPreHTML(outFile, exeTime, numThreads, numEDTs, totalTime):
     outFile.write('<!DOCTYPE HTML>\n')
     outFile.write('<html>\n')
     outFile.write('<head>\n')
-    outFile.write('<p>Total (CPU) execution time: ' + str(exeTime) + ' milliseconds</p>\n')
+    outFile.write('<p>Total (CPU) execution time: ' + str(exeTime) + ' nanoseconds</p>\n')
     outFile.write('<p>Total number of executing workers (threads): ' + str(numThreads) + '</p>\n')
     outFile.write('<p>Total number of executed tasks: ' + str(numEDTs) + '</p>\n')
     outFile.write('<BR><BR>\n')
@@ -94,8 +101,8 @@ def appendWorkerIdHTML(outFile, uniqueWorkers):
 
 #========== Write Common closing HTML tags to output file ========
 def appendPostHTML(outFile, flag, pageNum, start, end, timeOffset, numThreads):
-    modStart = math.ceil((int(start) - timeOffset) / float(1000000))
-    modEnd = math.ceil((int(end) - timeOffset) / float(1000000))
+    modStart = math.ceil((int(start) - timeOffset))
+    modEnd = math.ceil((int(end) - timeOffset))
 
     outFile.write('\tvar container = document.getElementById(\'visualization\');\n')
     outFile.write('\tvar options = {\n')
@@ -107,7 +114,8 @@ def appendPostHTML(outFile, flag, pageNum, start, end, timeOffset, numThreads):
     outFile.write('\t\tmin: new Date(' + str(modStart) + '),\n')
     outFile.write('\t\tmax: new Date(' + str(modEnd) + '),\n')
     outFile.write('\t\tzoomMax: ' + str(modEnd) + ',\n')
-    outFile.write('\t\teditable: true,\n')
+    outFile.write('\t\teditable: false,\n')
+    outFile.write('\t\tshowMinorLabels: false,\n')
     outFile.write('\t\tshowMajorLabels: false\n')
     outFile.write('\t};\n\n')
     outFile.write('\tvar timeline = new vis.Timeline(container);\n')
@@ -161,7 +169,7 @@ def getExecutionTime(logFile):
     firstLine = logFile[0].split()
     lastLine = logFile[-1].split()
     offset = int(firstLine[START_TIME_INDEX])
-    totalTime = (int(lastLine[END_TIME_INDEX]) - offset) / 1000000 #Ns to Ms
+    totalTime = (int(lastLine[END_TIME_INDEX]) - offset)
     return totalTime
 
 #======== Gathers unique EDT names to be mapped to color ======
