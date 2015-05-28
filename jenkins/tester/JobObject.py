@@ -426,9 +426,11 @@ class JobObject(object):
                       self._dependence[inheritFrom].job.getStatus() is not JobObject.DONE_OK:
                     inheritFrom += 1
             # It's possible we don't find anything
-
-            dirs = self._dependence[inheritFrom].job.getDirectories()
-            inheritFrom = (dirs['private'], dirs['shared'])
+            if inheritFrom >= len(self._dependence):
+                inheritFrom = None
+            else:
+                dirs = self._dependence[inheritFrom].job.getDirectories()
+                inheritFrom = (dirs['private'], dirs['shared'])
         else:
             inheritFrom = None
 
@@ -436,16 +438,19 @@ class JobObject(object):
             if self._modePrivateRoot == 1:
                 self._dirs['private'] = ""
             elif self._modePrivateRoot == 2:
-                assert(inheritFrom is not None)
-                self._dirs['private'] = inheritFrom[0]
-                # Check if it doesn't exist and if so, use the shared copy
-                # Need to copy to deal with base path issues
-                self._dirs['copy-private'] = self._checkForNoneDir(self._dirs['private'],
-                                                                   inheritFrom[1], ("private", "shared"))
-                if self._dirs['private'] is None:
-                    self._dirs['private'] = ""
+                if inheritFrom is None:
+                    self._myLog.warning("Changing from 'same directory' to 'empty' for private directory of %s (no valid ancestors)"
+                                        % (str(self)))
                 else:
-                    self._dirs['copy-private'] = None
+                    self._dirs['private'] = inheritFrom[0]
+                    # Check if it doesn't exist and if so, use the shared copy
+                    # Need to copy to deal with base path issues
+                    self._dirs['copy-private'] = self._checkForNoneDir(self._dirs['private'],
+                                                                       inheritFrom[1], ("private", "shared"))
+                    if self._dirs['private'] is None:
+                        self._dirs['private'] = ""
+                    else:
+                        self._dirs['copy-private'] = None
             elif self._modePrivateRoot == 4:
                 self._dirs['private'] = ""
                 if inheritFrom is None:
@@ -462,16 +467,20 @@ class JobObject(object):
             if self._modeSharedRoot == 1:
                 self._dirs['shared'] = ""
             elif self._modeSharedRoot == 2:
-                assert(inheritFrom is not None)
-                self._dirs['shared'] = inheritFrom[1]
-                # Check if it doesn't exist and if so, use the shared copy
-                # Need to copy to deal with base path issues
-                self._dirs['copy-shared'] = self._checkForNoneDir(self._dirs['shared'],
-                                                                  inheritFrom[0], ("shared", "private"))
-                if self._dirs['shared'] is None:
+                if inheritFrom is None:
+                    self._myLog.warning("Changing from 'same directory' to 'empty' for shared directory of %s (no valid ancestors)"
+                                        % (str(self)))
                     self._dirs['shared'] = ""
                 else:
-                    self._dirs['copy-shared'] = None
+                    self._dirs['shared'] = inheritFrom[1]
+                    # Check if it doesn't exist and if so, use the shared copy
+                    # Need to copy to deal with base path issues
+                    self._dirs['copy-shared'] = self._checkForNoneDir(self._dirs['shared'],
+                                                                      inheritFrom[0], ("shared", "private"))
+                    if self._dirs['shared'] is None:
+                        self._dirs['shared'] = ""
+                    else:
+                        self._dirs['copy-shared'] = None
             elif self._modeSharedRoot == 4:
                 self._dirs['shared'] = ""
                 if inheritFrom is None:
@@ -984,6 +993,9 @@ class LocalJobObject(JobObject):
                                           env=myEnv, shell=False)
                 except subprocess.CalledProcessError:
                     self._myLog.error("Could not run the prologue for %s" % (self))
+                    self._startTime = self._endTime = datetime.now()
+                    self.signalJobDone(-2, True, "Local job could not run prologue script '%s'" % (str(args)))
+                    return self._jobStatus
             # Now go and run the executable
             # Form the command line
             cmdLine = Template(self.jobType.run_cmd + " " + self.run_args)
@@ -993,8 +1005,14 @@ class LocalJobObject(JobObject):
             self._myLog.debug("%s will execute with: %s" % (str(self), str(args)))
 
             self._startTime = datetime.now()
-            self._process = subprocess.Popen(args, stdout=self._outFile, stderr=self._errFile,
-                                             cwd=myEnv['JJOB_START_HOME'], env=myEnv, shell=False)
+            try:
+                self._process = subprocess.Popen(args, stdout=self._outFile, stderr=self._errFile,
+                                                 cwd=myEnv['JJOB_START_HOME'], env=myEnv, shell=False)
+            except OSError:
+                self._myLog.error("Could not run job script for %s" % (self))
+                self._startTime = self._endTime = datetime.now()
+                self.signalJobDone(-2, True, "Local job could not run '%s'" % (str(args)))
+                return self._jobStatus
 
             return JobObject.RUNNING_LOCAL
         else:
@@ -1014,7 +1032,7 @@ class LocalJobObject(JobObject):
                 subprocess.check_call(args, cwd=myEnv['JJOB_START_HOME'],
                                       env=myEnv, shell=False)
             except subprocess.CalledProcessError:
-                self._myLog.error("Could not run the epilogue for %s" % (self))
+                self._myLog.error("Could not run the epilogue for %s ... ignoring" % (self))
 
     def poll(self):
         """Function to check whether a job has finished and if

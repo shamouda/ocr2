@@ -370,7 +370,7 @@ def mainLoop():
                 myLog.warning("%s failed to launch properly... it will be reported as a failure" % (str(allReadyJobs[i][1])))
                 if allReadyJobs[i][1].getIsTerminalJob():
                     allTerminalJobs.append(allReadyJobs[i][1])
-                allJobsStatus['fail'].append(k)
+                allJobsStatus['fail'].append(allReadyJobs[i][1].name)
             else:
                 myLog.error("Status returned by execute not allowed for %s (got %d)" % (str(allReadyJobs[i][1]), returnedStatus))
                 # I don't really know what to do here. It should never happen
@@ -977,7 +977,7 @@ def main(argv=None):
             if v.getStatus() == JobObject.UNCONFIGURED_JOB:
                 myLog.error("<JobObject '%s'> has missing dependences" % (k))
                 v.signalJobDone(-3, False, "<JobObject '%s'> has missing dependences" % (k))
-                allJobsStatus['fail'].append(k)
+                allJobsStatus['blocked'].append(k)
                 toRemoveKeys.append(k)
         for k in toRemoveKeys:
             del allRemainingJobs[k]
