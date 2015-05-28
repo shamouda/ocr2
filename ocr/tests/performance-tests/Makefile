@@ -19,7 +19,7 @@ ifeq (benchmark, $(GOAL))
 endif
 
 ifndef OCR_INSTALL
-OCR_INSTALL?=../../install/x86-pthread-x86
+OCR_INSTALL?=../../install/x86
 $(warning OCR_INSTALL not set, defaulting to ${OCR_INSTALL})
 endif
 

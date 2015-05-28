@@ -68,29 +68,29 @@ job_ocr_init_tg = {
 }
 
 job_ocr_build_x86_pthread_x86 = {
-    'name': 'ocr-build-x86-pthread-x86',
+    'name': 'ocr-build-x86',
     'depends': ('__alternate ocr-init',),
     'jobtype': 'ocr-build',
-    'run-args': 'x86-pthread-x86',
+    'run-args': 'x86',
     'sandbox': ('inherit0',)
 }
 
 #TODO: not sure how to not hardcode MPI_ROOT here
 job_ocr_build_x86_pthread_mpi = {
-    'name': 'ocr-build-x86-pthread-mpi',
+    'name': 'ocr-build-x86-mpi',
     'depends': ('__alternate ocr-init',),
     'jobtype': 'ocr-build',
-    'run-args': 'x86-pthread-mpi',
+    'run-args': 'x86-mpi',
     'sandbox': ('inherit0',),
     'env-vars': {'MPI_ROOT': '/opt/intel/tools/impi/5.0.1.035',
                  'PATH': '${MPI_ROOT}/bin64:'+os.environ['PATH'],}
 }
 
 job_ocr_build_x86_pthread_gasnet = {
-    'name': 'ocr-build-x86-pthread-gasnet',
+    'name': 'ocr-build-x86-gasnet',
     'depends': ('__alternate ocr-init',),
     'jobtype': 'ocr-build',
-    'run-args': 'x86-pthread-gasnet',
+    'run-args': 'x86-gasnet',
     'sandbox': ('inherit0',),
     'env-vars': {'GASNET_ROOT': '/opt/rice/GASNet/1.24.0-impi',
                  'PATH': '${GASNET_ROOT}/bin:'+os.environ['PATH'],
@@ -99,41 +99,41 @@ job_ocr_build_x86_pthread_gasnet = {
 }
 
 # job_ocr_build_x86_pthread_tg = {
-#     'name': 'ocr-build-x86-pthread-tg',
+#     'name': 'ocr-build-tg-x86',
 #     'depends': ('__alternate ocr-init',),
 #     'jobtype': 'ocr-build',
-#     'run-args': 'x86-pthread-tg',
+#     'run-args': 'tg-x86',
 #     'sandbox': ('inherit0',)
 # }
 
 job_ocr_build_x86_builder_tg_ce = {
-    'name': 'ocr-build-x86-builder-tg-ce',
+    'name': 'ocr-build-builder-ce',
     'depends': ('__alternate ocr-init',),
     'jobtype': 'ocr-build-tg',
-    'run-args': 'x86-builder-tg-ce',
+    'run-args': 'builder-ce',
     'sandbox': ('inherit0',)
 }
 
 job_ocr_build_x86_builder_tg_xe = {
-    'name': 'ocr-build-x86-builder-tg-xe',
+    'name': 'ocr-build-builder-xe',
     'depends': ('__alternate ocr-init',),
     'jobtype': 'ocr-build-tg',
-    'run-args': 'x86-builder-tg-xe',
+    'run-args': 'builder-xe',
     'sandbox': ('inherit0',)
 }
 
 job_ocr_build_tg_null_tg_ce = {
-    'name': 'ocr-build-tg-null-tg-ce',
+    'name': 'ocr-build-tg-ce',
     'depends': ('__alternate ocr-init',),
     'jobtype': 'ocr-build-tg',
-    'run-args': 'tg-null-tg-ce',
+    'run-args': 'tg-ce',
     'sandbox': ('inherit0',)
 }
 
 job_ocr_build_tg_null_tg_xe = {
-    'name': 'ocr-build-tg-null-tg-xe',
+    'name': 'ocr-build-tg-xe',
     'depends': ('__alternate ocr-init',),
     'jobtype': 'ocr-build-tg',
-    'run-args': 'tg-null-tg-xe',
+    'run-args': 'tg-xe',
     'sandbox': ('inherit0',)
 }

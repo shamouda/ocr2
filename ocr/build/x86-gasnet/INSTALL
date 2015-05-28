@@ -1,0 +1,53 @@
+
+* Compiling OCR with GASNet support
+
+Mandatory environment variable to be defined
+    GASNET_ROOT             Path to the gasnet installation
+    GASNET_CONDUIT          Name of GASNet conduit to use
+    GASNET_TYPE             (seq|par)
+    GASNET_EXTRA_LIBS       Extra linking dependences
+
+The runtime build system tries to find the right GASNet library to link with
+using the provided environment variables. One can accomodate extra dependences
+throught the GASNET_EXTRA_LIBS.
+
+
+* Running OCR programs with GASNet support
+
+The 'ocrrun' command uses environment variable to determine how to spawn GASNet processes
+
+Mandatory environment variables:
+    GASNET_CONDUIT          Name of GASNet conduit to use
+
+Optional environment variables:
+    OCR_NUM_NODES           Number of GASNet process to spawn (must be coherent with OCR_NODEFILE)
+    OCR_NODEFILE            Specifies a host file to spawn processes to (must be coherent with OCR_NUM_NODES)
+    GASNET_LAUNCHER         Specify the name of the gasnet launcher (usually guessed from GASNET_CONDUIT)
+    GASNET_IBV_SPAWNER      Set to 'ssh' or 'mpi' spawn for ibv conduit (default intel mpi)
+
+
+* Running OCR tests with GASNet support
+
+'ocrTests' needs to be able to both compile and run non-regression tests.
+
+To get setup quickly the best is to keep environment variable previously defined to
+build OCR: GASNET_ROOT, GASNET_CONDUIT, GASNET_TYPE, GASNET_EXTRA_LIBS
+
+Then make sure to define the following mandatory variables:
+    GASNET_CONDUIT          Name of GASNet conduit to use
+    OCR_LDFLAGS             Linking flags for OCR applications to link with GASNet librarie
+    PATH                    Updated PATH including ${GASNET_ROOT}/bin to use GASNet launchers
+
+OCR_LDFLAGS can typically be defined as:
+
+    export OCR_LDFLAGS="-L${GASNET_ROOT}/lib -lgasnet-${GASNET_CONDUIT}-${GASNET_TYPE} ${GASNET_EXTRA_LIBS}"
+
+
+* Running OCR applications with GASNet support
+
+OCR provides a makefile skeleton 'x86-gasnet' to build and run your applications.
+
+- To compile the makefile needs the following environment variables to be defined:
+    GASNET_ROOT, GASNET_CONDUIT, GASNET_TYPE, GASNET_EXTRA_LIBS
+
+- Refer to the ocrrun section above for runtime environment variables.

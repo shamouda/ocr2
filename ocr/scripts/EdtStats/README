@@ -38,7 +38,7 @@ Script Instructions:
 
 -Application logging output must be redirected to
  to the /ocr/scripts/EdtStats directory
-    The command would look like: make -f Makefile.x86-pthread-x86 run > ~/xstack/ocr/scripts/EdtStats/<log_ouput_file_name>
+    The command would look like: make -f Makefile.x86 run > ~/xstack/ocr/scripts/EdtStats/<log_ouput_file_name>
 
 -Navigate to ~/xstack/ocr/scripts/EdtStats, and run: python edtStats.py <log_ouput_file_name>
 

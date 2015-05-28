@@ -1,6 +1,0 @@
-*.dbg
-*.bin
-*.dis
-blob
-out.map
-build/

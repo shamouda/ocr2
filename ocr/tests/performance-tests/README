@@ -37,7 +37,7 @@ inefficient in one way or another to stress the runtime implementation.
 
 ** Current Limitations
 
-- Only tested for OCR x86-pthread-x86
+- Only tested for OCR x86
 
 ** Setting up OCR build
 

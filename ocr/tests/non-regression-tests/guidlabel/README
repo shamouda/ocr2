@@ -1,0 +1,4 @@
+This is a small Fibonacci example which uses GUID labels to
+avoid recomputing the same fib(X) value and reuses it.
+
+You need to use the counted map GUID provider for this to work
