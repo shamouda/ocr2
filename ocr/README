@@ -2,16 +2,29 @@
 ** Open Community Runtime **
 ****************************
 
+
 *************************
 ** Directory structure **
 *************************
 
+    - build/
+        Build directory for OCR
+    - doc/
+        Destination for Doxygen (ocr.dox) output
     - examples/
-        (deprecated)
+        Example code and mini-tutorial of OCR
     - inc/
         user-level ocr api header files
-    - ocr-apps/
-        example applications written in OCR
+    - install/
+        Installed libraries will go here
+    - jenkins/
+        Automatic regression testing support
+    - machine-configs/
+        OCR configuration files for various platforms
+    - scripts/
+        OCR support scripts (profilers, visualizers)
+    - spec/
+        OCR specification
     - src/
         OCR implementation source code
     - tests/
@@ -22,7 +35,7 @@
 ** Installation instructions **
 *******************************
 
-See the 'INSTALL' file
+See the 'INSTALL.make' file
 
 
 ******************************
@@ -31,7 +44,7 @@ See the 'INSTALL' file
 
 This section's instructions requires you have set the
 OCR_INSTALL environment variable as described in the
-INSTALL file.
+INSTALL.make file.
 
 
 *** Compiling code
@@ -85,13 +98,11 @@ The 'tests' folder contains a collection of non-regression tests.
 After installing and setting the OCR_INSTALL environment variable, one can
 run non-regression tests running the 'ocrTests' script.
 
+*** Examples
 
-***********************
-** Known Limitations **
-***********************
-
-- The deque-based workpile does not resize automatically
-    - the macro INIT_DEQUE_CAPACITY defined in deque.h can be customized through CFLAGS
+All examples in the 'examples' directory contain a README indicating how they
+can be run. The Makefiles included in those directories will properly build and
+setup OCR, link it with the application and run the application
 
 *******************
 ** Documentation **

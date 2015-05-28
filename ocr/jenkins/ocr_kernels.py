@@ -111,9 +111,9 @@ job_ocr_build_kernel_fib_x86 = {
     'run-args': 'fib x86',
     'sandbox': ('inherit0',),
     'env-vars': { 'APPS_LIBS_ROOT': '${JJOB_SHARED_HOME}/xstack/apps/libs/x86',
-                  'WORKLOAD_SRC': '${JJOB_INITDIR_XSTACK}/ocr/ocr-apps/fib',
-                  'WORKLOAD_BUILD_ROOT': '${JJOB_PRIVATE_HOME}/xstack/ocr/ocr-apps/fib/build',
-                  'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/ocr-apps/fib/install'}
+                  'WORKLOAD_SRC': '${JJOB_INITDIR_XSTACK}/ocr/examples/fib',
+                  'WORKLOAD_BUILD_ROOT': '${JJOB_PRIVATE_HOME}/xstack/ocr/examples/fib/build',
+                  'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/examples/fib/install'}
 }
 
 job_ocr_run_kernel_fib_x86 = {
@@ -123,7 +123,7 @@ job_ocr_run_kernel_fib_x86 = {
     'run-args': 'fib x86',
     'sandbox': ('inherit0',),
     'env-vars': { 'APPS_LIBS_ROOT': '${JJOB_SHARED_HOME}/xstack/apps/libs/x86',
-                  'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/ocr-apps/fib/install' }
+                  'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/examples/fib/install' }
 }
 
 job_ocr_verify_kernel_fib_x86 = {
@@ -132,7 +132,7 @@ job_ocr_verify_kernel_fib_x86 = {
     'jobtype': 'ocr-verify-kernel-local',
     'run-args': '-w -c 1',
     'sandbox': ('inherit0',),
-    'env-vars': { 'WORKLOAD_EXEC': '${JJOB_SHARED_HOME}/xstack/ocr/ocr-apps/fib/install/x86'}
+    'env-vars': { 'WORKLOAD_EXEC': '${JJOB_SHARED_HOME}/xstack/ocr/examples/fib/install/x86'}
 }
 
 job_ocr_build_kernel_fib_mpi = {
@@ -142,9 +142,9 @@ job_ocr_build_kernel_fib_mpi = {
     'run-args': 'fib x86-mpi',
     'sandbox': ('inherit0',),
     'env-vars': { 'APPS_LIBS_ROOT': '${JJOB_SHARED_HOME}/xstack/apps/libs/x86',
-                  'WORKLOAD_SRC': '${JJOB_INITDIR_XSTACK}/ocr/ocr-apps/fib',
-                  'WORKLOAD_BUILD_ROOT': '${JJOB_PRIVATE_HOME}/xstack/ocr/ocr-apps/fib/build',
-                  'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/ocr-apps/fib/install'}
+                  'WORKLOAD_SRC': '${JJOB_INITDIR_XSTACK}/ocr/examples/fib',
+                  'WORKLOAD_BUILD_ROOT': '${JJOB_PRIVATE_HOME}/xstack/ocr/examples/fib/build',
+                  'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/examples/fib/install'}
 }
 
 job_ocr_run_kernel_fib_mpi = {
@@ -155,7 +155,7 @@ job_ocr_run_kernel_fib_mpi = {
     'sandbox': ('inherit0',),
     'env-vars': { 'PATH': '/opt/intel/tools/impi_latest/bin64:${PATH}',
                   'APPS_LIBS_ROOT': '${JJOB_SHARED_HOME}/xstack/apps/libs/x86',
-                  'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/ocr-apps/fib/install' }
+                  'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/examples/fib/install' }
 }
 
 job_ocr_verify_kernel_fib_mpi = {
@@ -164,7 +164,7 @@ job_ocr_verify_kernel_fib_mpi = {
     'jobtype': 'ocr-verify-kernel-local',
     'run-args': '-w -c 1',
     'sandbox': ('inherit0',),
-    'env-vars': { 'WORKLOAD_EXEC': '${JJOB_SHARED_HOME}/xstack/ocr/ocr-apps/fib/install/x86-mpi'}
+    'env-vars': { 'WORKLOAD_EXEC': '${JJOB_SHARED_HOME}/xstack/ocr/examples/fib/install/x86-mpi'}
 }
 
 job_ocr_build_kernel_fib_gasnet = {
@@ -174,9 +174,9 @@ job_ocr_build_kernel_fib_gasnet = {
     'run-args': 'fib x86-gasnet',
     'sandbox': ('inherit0',),
     'env-vars': { 'APPS_LIBS_ROOT': '${JJOB_SHARED_HOME}/xstack/apps/libs/x86',
-                  'WORKLOAD_SRC': '${JJOB_INITDIR_XSTACK}/ocr/ocr-apps/fib',
-                  'WORKLOAD_BUILD_ROOT': '${JJOB_PRIVATE_HOME}/xstack/ocr/ocr-apps/fib/build',
-                  'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/ocr-apps/fib/install',
+                  'WORKLOAD_SRC': '${JJOB_INITDIR_XSTACK}/ocr/examples/fib',
+                  'WORKLOAD_BUILD_ROOT': '${JJOB_PRIVATE_HOME}/xstack/ocr/examples/fib/build',
+                  'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/examples/fib/install',
                   'MPI_ROOT': '/opt/intel/tools/impi/5.0.1.035',
                   'GASNET_ROOT': '/opt/rice/GASNet/1.24.0-impi',
                   'PATH': '${GASNET_ROOT}/bin:${MPI_ROOT}/bin64:${PATH}',
@@ -195,7 +195,7 @@ job_ocr_run_kernel_fib_gasnet = {
     'sandbox': ('inherit0',),
     'env-vars': { 'PATH': '/opt/intel/tools/impi_latest/bin64:${PATH}',
                   'APPS_LIBS_ROOT': '${JJOB_SHARED_HOME}/xstack/apps/libs/x86',
-                  'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/ocr-apps/fib/install',
+                  'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/examples/fib/install',
                   'GASNET_ROOT': '/opt/rice/GASNet/1.24.0-impi',
                   'PATH': '${GASNET_ROOT}/bin:${MPI_ROOT}/bin64:${PATH}',
                   'GASNET_CONDUIT': 'ibv'}
@@ -207,7 +207,7 @@ job_ocr_verify_kernel_fib_gasnet = {
     'jobtype': 'ocr-verify-kernel-local',
     'run-args': '-w -c 1',
     'sandbox': ('inherit0',),
-    'env-vars': { 'WORKLOAD_EXEC': '${JJOB_SHARED_HOME}/xstack/ocr/ocr-apps/fib/install/x86-gasnet'}
+    'env-vars': { 'WORKLOAD_EXEC': '${JJOB_SHARED_HOME}/xstack/ocr/examples/fib/install/x86-gasnet'}
 }
 
 # job_ocr_build_kernel_fib_tgemul = {
@@ -217,9 +217,9 @@ job_ocr_verify_kernel_fib_gasnet = {
 #     'run-args': 'fib tg-x86',
 #     'sandbox': ('inherit0',),
 #     'env-vars': { 'APPS_LIBS_ROOT': '${JJOB_SHARED_HOME}/xstack/apps/libs/x86',
-#                   'WORKLOAD_SRC': '${JJOB_INITDIR_XSTACK}/ocr/ocr-apps/fib',
-#                   'WORKLOAD_BUILD_ROOT': '${JJOB_PRIVATE_HOME}/xstack/ocr/ocr-apps/fib/build',
-#                   'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/ocr-apps/fib/install'}
+#                   'WORKLOAD_SRC': '${JJOB_INITDIR_XSTACK}/ocr/examples/fib',
+#                   'WORKLOAD_BUILD_ROOT': '${JJOB_PRIVATE_HOME}/xstack/ocr/examples/fib/build',
+#                   'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/examples/fib/install'}
 # }
 
 # job_ocr_run_kernel_fib_tgemul = {
@@ -229,7 +229,7 @@ job_ocr_verify_kernel_fib_gasnet = {
 #     'run-args': 'fib tg-x86',
 #     'sandbox': ('inherit0',),
 #     'env-vars': { 'APPS_LIBS_ROOT': '${JJOB_SHARED_HOME}/xstack/apps/libs/x86',
-#                   'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/ocr-apps/fib/install'}
+#                   'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/examples/fib/install'}
 # }
 
 # job_ocr_verify_kernel_fib_tgemul = {
@@ -238,7 +238,7 @@ job_ocr_verify_kernel_fib_gasnet = {
 #     'jobtype': 'ocr-verify-kernel-local',
 #     'run-args': '-w -c 1',
 #     'sandbox': ('inherit0',),
-#     'env-vars': { 'WORKLOAD_EXEC': '${JJOB_SHARED_HOME}/xstack/ocr/ocr-apps/fib/install/tg-x86'}
+#     'env-vars': { 'WORKLOAD_EXEC': '${JJOB_SHARED_HOME}/xstack/ocr/examples/fib/install/tg-x86'}
 # }
 
 job_ocr_build_kernel_fib_tg = {
@@ -249,10 +249,10 @@ job_ocr_build_kernel_fib_tg = {
     'run-args': 'fib tg',
     'sandbox': ('inherit0',),
     'env-vars': { 'APPS_LIBS_ROOT': '${JJOB_SHARED_HOME}/xstack/apps/libs/tg',
-                  'WORKLOAD_SRC': '${JJOB_INITDIR_XSTACK}/ocr/ocr-apps/fib',
-                  'WORKLOAD_BUILD_ROOT': '${JJOB_PRIVATE_HOME}/xstack/ocr/ocr-apps/fib/build',
+                  'WORKLOAD_SRC': '${JJOB_INITDIR_XSTACK}/ocr/examples/fib',
+                  'WORKLOAD_BUILD_ROOT': '${JJOB_PRIVATE_HOME}/xstack/ocr/examples/fib/build',
                   'WORKLOAD_ARGS': '9',
-                  'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/ocr-apps/fib/install'}
+                  'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/examples/fib/install'}
 }
 
 job_ocr_run_kernel_fib_tg = {
@@ -263,7 +263,7 @@ job_ocr_run_kernel_fib_tg = {
     'param-args': '-c ${WORKLOAD_INSTALL_ROOT}/tg/config.cfg',
     'sandbox': ('inherit0',),
     'env-vars': { 'APPS_LIBS_ROOT': '${JJOB_SHARED_HOME}/xstack/apps/libs/tg',
-                  'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/ocr-apps/fib/install'}
+                  'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/examples/fib/install'}
 }
 
 job_ocr_verify_kernel_fib_tg = {
@@ -272,7 +272,7 @@ job_ocr_verify_kernel_fib_tg = {
     'jobtype': 'ocr-verify-kernel-remote',
     'run-args': '-w -c 1',
     'sandbox': ('inherit0',),
-    'env-vars': { 'WORKLOAD_EXEC': '${JJOB_SHARED_HOME}/xstack/ocr/ocr-apps/fib/install/tg'}
+    'env-vars': { 'WORKLOAD_EXEC': '${JJOB_SHARED_HOME}/xstack/ocr/examples/fib/install/tg'}
 }
 
 # # FFT
@@ -284,9 +284,9 @@ job_ocr_build_kernel_fft_x86 = {
     'run-args': 'fft x86',
     'sandbox': ('inherit0',),
     'env-vars': { 'APPS_LIBS_ROOT': '${JJOB_SHARED_HOME}/xstack/apps/libs/x86',
-                  'WORKLOAD_SRC': '${JJOB_INITDIR_XSTACK}/ocr/ocr-apps/fft',
-                  'WORKLOAD_BUILD_ROOT': '${JJOB_PRIVATE_HOME}/xstack/ocr/ocr-apps/fft/build',
-                  'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/ocr-apps/fft/install'}
+                  'WORKLOAD_SRC': '${JJOB_INITDIR_XSTACK}/ocr/examples/fft',
+                  'WORKLOAD_BUILD_ROOT': '${JJOB_PRIVATE_HOME}/xstack/ocr/examples/fft/build',
+                  'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/examples/fft/install'}
 }
 
 job_ocr_run_kernel_fft_x86 = {
@@ -296,7 +296,7 @@ job_ocr_run_kernel_fft_x86 = {
     'run-args': 'fft x86',
     'sandbox': ('inherit0',),
     'env-vars': { 'APPS_LIBS_ROOT': '${JJOB_SHARED_HOME}/xstack/apps/libs/x86',
-                  'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/ocr-apps/fft/install' }
+                  'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/examples/fft/install' }
 }
 
 job_ocr_verify_kernel_fft_x86 = {
@@ -305,7 +305,7 @@ job_ocr_verify_kernel_fft_x86 = {
     'jobtype': 'ocr-verify-kernel-local',
     'run-args': '-w -c 1',
     'sandbox': ('inherit0',),
-    'env-vars': { 'WORKLOAD_EXEC': '${JJOB_SHARED_HOME}/xstack/ocr/ocr-apps/fft/install/x86'}
+    'env-vars': { 'WORKLOAD_EXEC': '${JJOB_SHARED_HOME}/xstack/ocr/examples/fft/install/x86'}
 }
 
 job_ocr_build_kernel_fft_mpi = {
@@ -315,9 +315,9 @@ job_ocr_build_kernel_fft_mpi = {
     'run-args': 'fft x86-mpi',
     'sandbox': ('inherit0',),
     'env-vars': { 'APPS_LIBS_ROOT': '${JJOB_SHARED_HOME}/xstack/apps/libs/x86',
-                  'WORKLOAD_SRC': '${JJOB_INITDIR_XSTACK}/ocr/ocr-apps/fft',
-                  'WORKLOAD_BUILD_ROOT': '${JJOB_PRIVATE_HOME}/xstack/ocr/ocr-apps/fft/build',
-                  'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/ocr-apps/fft/install'}
+                  'WORKLOAD_SRC': '${JJOB_INITDIR_XSTACK}/ocr/examples/fft',
+                  'WORKLOAD_BUILD_ROOT': '${JJOB_PRIVATE_HOME}/xstack/ocr/examples/fft/build',
+                  'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/examples/fft/install'}
 }
 
 job_ocr_run_kernel_fft_mpi = {
@@ -328,7 +328,7 @@ job_ocr_run_kernel_fft_mpi = {
     'sandbox': ('inherit0',),
     'env-vars': { 'PATH': '/opt/intel/tools/impi_latest/bin64:${PATH}',
                   'APPS_LIBS_ROOT': '${JJOB_SHARED_HOME}/xstack/apps/libs/x86',
-                  'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/ocr-apps/fft/install' }
+                  'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/examples/fft/install' }
 }
 
 job_ocr_verify_kernel_fft_mpi = {
@@ -337,7 +337,7 @@ job_ocr_verify_kernel_fft_mpi = {
     'jobtype': 'ocr-verify-kernel-local',
     'run-args': '-w -c 1',
     'sandbox': ('inherit0',),
-    'env-vars': { 'WORKLOAD_EXEC': '${JJOB_SHARED_HOME}/xstack/ocr/ocr-apps/fft/install/x86-mpi'}
+    'env-vars': { 'WORKLOAD_EXEC': '${JJOB_SHARED_HOME}/xstack/ocr/examples/fft/install/x86-mpi'}
 }
 
 job_ocr_build_kernel_fft_gasnet = {
@@ -347,9 +347,9 @@ job_ocr_build_kernel_fft_gasnet = {
     'run-args': 'fft x86-gasnet',
     'sandbox': ('inherit0',),
     'env-vars': { 'APPS_LIBS_ROOT': '${JJOB_SHARED_HOME}/xstack/apps/libs/x86',
-                  'WORKLOAD_SRC': '${JJOB_INITDIR_XSTACK}/ocr/ocr-apps/fft',
-                  'WORKLOAD_BUILD_ROOT': '${JJOB_PRIVATE_HOME}/xstack/ocr/ocr-apps/fft/build',
-                  'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/ocr-apps/fft/install',
+                  'WORKLOAD_SRC': '${JJOB_INITDIR_XSTACK}/ocr/examples/fft',
+                  'WORKLOAD_BUILD_ROOT': '${JJOB_PRIVATE_HOME}/xstack/ocr/examples/fft/build',
+                  'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/examples/fft/install',
                   'MPI_ROOT': '/opt/intel/tools/impi/5.0.1.035',
                   'GASNET_ROOT': '/opt/rice/GASNet/1.24.0-impi',
                   'PATH': '${GASNET_ROOT}/bin:${MPI_ROOT}/bin64:${PATH}',
@@ -368,7 +368,7 @@ job_ocr_run_kernel_fft_gasnet = {
     'sandbox': ('inherit0',),
     'env-vars': { 'PATH': '/opt/intel/tools/impi_latest/bin64:${PATH}',
                   'APPS_LIBS_ROOT': '${JJOB_SHARED_HOME}/xstack/apps/libs/x86',
-                  'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/ocr-apps/fft/install',
+                  'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/examples/fft/install',
                   'GASNET_ROOT': '/opt/rice/GASNet/1.24.0-impi',
                   'PATH': '${GASNET_ROOT}/bin:${MPI_ROOT}/bin64:${PATH}',
                   'GASNET_CONDUIT': 'ibv'}
@@ -380,7 +380,7 @@ job_ocr_verify_kernel_fft_gasnet = {
     'jobtype': 'ocr-verify-kernel-local',
     'run-args': '-w -c 1',
     'sandbox': ('inherit0',),
-    'env-vars': { 'WORKLOAD_EXEC': '${JJOB_SHARED_HOME}/xstack/ocr/ocr-apps/fft/install/x86-gasnet'}
+    'env-vars': { 'WORKLOAD_EXEC': '${JJOB_SHARED_HOME}/xstack/ocr/examples/fft/install/x86-gasnet'}
 }
 
 # job_ocr_build_kernel_fft_tgemul = {
@@ -390,9 +390,9 @@ job_ocr_verify_kernel_fft_gasnet = {
 #     'run-args': 'fft tg-x86',
 #     'sandbox': ('inherit0',),
 #     'env-vars': { 'APPS_LIBS_ROOT': '${JJOB_SHARED_HOME}/xstack/apps/libs/x86',
-#                   'WORKLOAD_SRC': '${JJOB_INITDIR_XSTACK}/ocr/ocr-apps/fft',
-#                   'WORKLOAD_BUILD_ROOT': '${JJOB_PRIVATE_HOME}/xstack/ocr/ocr-apps/fft/build',
-#                   'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/ocr-apps/fft/install'}
+#                   'WORKLOAD_SRC': '${JJOB_INITDIR_XSTACK}/ocr/examples/fft',
+#                   'WORKLOAD_BUILD_ROOT': '${JJOB_PRIVATE_HOME}/xstack/ocr/examples/fft/build',
+#                   'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/examples/fft/install'}
 # }
 
 # job_ocr_run_kernel_fft_tgemul = {
@@ -402,7 +402,7 @@ job_ocr_verify_kernel_fft_gasnet = {
 #     'run-args': 'fft tg-x86',
 #     'sandbox': ('inherit0',),
 #     'env-vars': { 'APPS_LIBS_ROOT': '${JJOB_SHARED_HOME}/xstack/apps/libs/x86',
-#                   'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/ocr-apps/fft/install'}
+#                   'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/examples/fft/install'}
 # }
 
 # job_ocr_verify_kernel_fft_tgemul = {
@@ -411,7 +411,7 @@ job_ocr_verify_kernel_fft_gasnet = {
 #     'jobtype': 'ocr-verify-kernel-local',
 #     'run-args': '-w -c 1',
 #     'sandbox': ('inherit0',),
-#     'env-vars': { 'WORKLOAD_EXEC': '${JJOB_SHARED_HOME}/xstack/ocr/ocr-apps/fft/install/tg-x86'}
+#     'env-vars': { 'WORKLOAD_EXEC': '${JJOB_SHARED_HOME}/xstack/ocr/examples/fft/install/tg-x86'}
 # }
 
 job_ocr_build_kernel_fft_tg = {
@@ -422,10 +422,10 @@ job_ocr_build_kernel_fft_tg = {
     'run-args': 'fft tg',
     'sandbox': ('inherit0',),
     'env-vars': { 'APPS_LIBS_ROOT': '${JJOB_SHARED_HOME}/xstack/apps/libs/tg',
-                  'WORKLOAD_SRC': '${JJOB_INITDIR_XSTACK}/ocr/ocr-apps/fft',
-                  'WORKLOAD_BUILD_ROOT': '${JJOB_PRIVATE_HOME}/xstack/ocr/ocr-apps/fft/build',
+                  'WORKLOAD_SRC': '${JJOB_INITDIR_XSTACK}/ocr/examples/fft',
+                  'WORKLOAD_BUILD_ROOT': '${JJOB_PRIVATE_HOME}/xstack/ocr/examples/fft/build',
                   'WORKLOAD_ARGS': '9',
-                  'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/ocr-apps/fft/install'}
+                  'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/examples/fft/install'}
 }
 
 job_ocr_run_kernel_fft_tg = {
@@ -436,7 +436,7 @@ job_ocr_run_kernel_fft_tg = {
     'param-args': '-c ${WORKLOAD_INSTALL_ROOT}/tg/config.cfg',
     'sandbox': ('inherit0',),
     'env-vars': { 'APPS_LIBS_ROOT': '${JJOB_SHARED_HOME}/xstack/apps/libs/tg',
-                  'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/ocr-apps/fft/install'}
+                  'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/examples/fft/install'}
 }
 
 job_ocr_verify_kernel_fft_tg = {
@@ -445,7 +445,7 @@ job_ocr_verify_kernel_fft_tg = {
     'jobtype': 'ocr-verify-kernel-remote',
     'run-args': '-w -c 1',
     'sandbox': ('inherit0',),
-    'env-vars': { 'WORKLOAD_EXEC': '${JJOB_SHARED_HOME}/xstack/ocr/ocr-apps/fft/install/tg'}
+    'env-vars': { 'WORKLOAD_EXEC': '${JJOB_SHARED_HOME}/xstack/ocr/examples/fft/install/tg'}
 }
 
 # Smith-Waterman
@@ -457,9 +457,9 @@ job_ocr_build_kernel_sw_x86 = {
     'run-args': 'smith-waterman x86',
     'sandbox': ('inherit0',),
     'env-vars': { 'APPS_LIBS_ROOT': '${JJOB_SHARED_HOME}/xstack/apps/libs/x86',
-                  'WORKLOAD_SRC': '${JJOB_INITDIR_XSTACK}/ocr/ocr-apps/smith-waterman',
-                  'WORKLOAD_BUILD_ROOT': '${JJOB_PRIVATE_HOME}/xstack/ocr/ocr-apps/smith-waterman/build',
-                  'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/ocr-apps/smith-waterman/install'}
+                  'WORKLOAD_SRC': '${JJOB_INITDIR_XSTACK}/ocr/examples/smith-waterman',
+                  'WORKLOAD_BUILD_ROOT': '${JJOB_PRIVATE_HOME}/xstack/ocr/examples/smith-waterman/build',
+                  'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/examples/smith-waterman/install'}
 }
 
 job_ocr_run_kernel_sw_x86 = {
@@ -470,7 +470,7 @@ job_ocr_run_kernel_sw_x86 = {
     'sandbox': ('inherit0',),
     'env-vars': { 'APPS_LIBS_ROOT': '${JJOB_SHARED_HOME}/xstack/apps/libs/x86',
                   'WORKLOAD_ARGS': '10 10 ${JJOB_SHARED_HOME}/xstack/apps/smithwaterman/datasets/string1-medium.txt  ${JJOB_SHARED_HOME}/xstack/apps/smithwaterman/datasets/string2-medium.txt ${JJOB_SHARED_HOME}/xstack/apps/smithwaterman/datasets/score-medium.txt',
-                  'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/ocr-apps/smith-waterman/install' }
+                  'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/examples/smith-waterman/install' }
 }
 
 job_ocr_verify_kernel_sw_x86 = {
@@ -479,7 +479,7 @@ job_ocr_verify_kernel_sw_x86 = {
     'jobtype': 'ocr-verify-kernel-local',
     'run-args': '-w -c 1',
     'sandbox': ('inherit0',),
-    'env-vars': { 'WORKLOAD_EXEC': '${JJOB_SHARED_HOME}/xstack/ocr/ocr-apps/smith-waterman/install/x86'}
+    'env-vars': { 'WORKLOAD_EXEC': '${JJOB_SHARED_HOME}/xstack/ocr/examples/smith-waterman/install/x86'}
 }
 
 job_ocr_build_kernel_sw_mpi = {
@@ -489,9 +489,9 @@ job_ocr_build_kernel_sw_mpi = {
     'run-args': 'smith-waterman x86-mpi',
     'sandbox': ('inherit0',),
     'env-vars': { 'APPS_LIBS_ROOT': '${JJOB_SHARED_HOME}/xstack/apps/libs/x86',
-                  'WORKLOAD_SRC': '${JJOB_INITDIR_XSTACK}/ocr/ocr-apps/smith-waterman',
-                  'WORKLOAD_BUILD_ROOT': '${JJOB_PRIVATE_HOME}/xstack/ocr/ocr-apps/smith-waterman/build',
-                  'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/ocr-apps/smith-waterman/install'}
+                  'WORKLOAD_SRC': '${JJOB_INITDIR_XSTACK}/ocr/examples/smith-waterman',
+                  'WORKLOAD_BUILD_ROOT': '${JJOB_PRIVATE_HOME}/xstack/ocr/examples/smith-waterman/build',
+                  'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/examples/smith-waterman/install'}
 }
 
 job_ocr_run_kernel_sw_mpi = {
@@ -503,7 +503,7 @@ job_ocr_run_kernel_sw_mpi = {
     'env-vars': { 'PATH': '/opt/intel/tools/impi_latest/bin64:${PATH}',
                   'APPS_LIBS_ROOT': '${JJOB_SHARED_HOME}/xstack/apps/libs/x86',
                   'WORKLOAD_ARGS': '100 100 ${JJOB_SHARED_HOME}/xstack/apps/smithwaterman/datasets/string1-medium-large.txt  ${JJOB_SHARED_HOME}/xstack/apps/smithwaterman/datasets/string2-medium-large.txt ${JJOB_SHARED_HOME}/xstack/apps/smithwaterman/datasets/score-medium-large.txt',
-                  'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/ocr-apps/smith-waterman/install' }
+                  'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/examples/smith-waterman/install' }
 }
 
 job_ocr_verify_kernel_sw_mpi = {
@@ -512,7 +512,7 @@ job_ocr_verify_kernel_sw_mpi = {
     'jobtype': 'ocr-verify-kernel-local',
     'run-args': '-w -c 1',
     'sandbox': ('inherit0',),
-    'env-vars': { 'WORKLOAD_EXEC': '${JJOB_SHARED_HOME}/xstack/ocr/ocr-apps/smith-waterman/install/x86-mpi'}
+    'env-vars': { 'WORKLOAD_EXEC': '${JJOB_SHARED_HOME}/xstack/ocr/examples/smith-waterman/install/x86-mpi'}
 }
 
 
@@ -523,9 +523,9 @@ job_ocr_build_kernel_sw_gasnet = {
     'run-args': 'smith-waterman x86-gasnet',
     'sandbox': ('inherit0',),
     'env-vars': { 'APPS_LIBS_ROOT': '${JJOB_SHARED_HOME}/xstack/apps/libs/x86',
-                  'WORKLOAD_SRC': '${JJOB_INITDIR_XSTACK}/ocr/ocr-apps/smith-waterman',
-                  'WORKLOAD_BUILD_ROOT': '${JJOB_PRIVATE_HOME}/xstack/ocr/ocr-apps/smith-waterman/build',
-                  'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/ocr-apps/smith-waterman/install',
+                  'WORKLOAD_SRC': '${JJOB_INITDIR_XSTACK}/ocr/examples/smith-waterman',
+                  'WORKLOAD_BUILD_ROOT': '${JJOB_PRIVATE_HOME}/xstack/ocr/examples/smith-waterman/build',
+                  'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/examples/smith-waterman/install',
                   'MPI_ROOT': '/opt/intel/tools/impi/5.0.1.035',
                   'GASNET_ROOT': '/opt/rice/GASNet/1.24.0-impi',
                   'PATH': '${GASNET_ROOT}/bin:${MPI_ROOT}/bin64:${PATH}',
@@ -545,7 +545,7 @@ job_ocr_run_kernel_sw_gasnet = {
     'env-vars': { 'PATH': '/opt/intel/tools/impi_latest/bin64:${PATH}',
                   'APPS_LIBS_ROOT': '${JJOB_SHARED_HOME}/xstack/apps/libs/x86',
                   'WORKLOAD_ARGS': '100 100 ${JJOB_SHARED_HOME}/xstack/apps/smithwaterman/datasets/string1-medium-large.txt  ${JJOB_SHARED_HOME}/xstack/apps/smithwaterman/datasets/string2-medium-large.txt ${JJOB_SHARED_HOME}/xstack/apps/smithwaterman/datasets/score-medium-large.txt',
-                  'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/ocr-apps/smith-waterman/install',
+                  'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/examples/smith-waterman/install',
                   'GASNET_ROOT': '/opt/rice/GASNet/1.24.0-impi',
                   'PATH': '${GASNET_ROOT}/bin:${MPI_ROOT}/bin64:${PATH}',
                   'GASNET_CONDUIT': 'ibv'}
@@ -557,7 +557,7 @@ job_ocr_verify_kernel_sw_gasnet = {
     'jobtype': 'ocr-verify-kernel-local',
     'run-args': '-w -c 1',
     'sandbox': ('inherit0',),
-    'env-vars': { 'WORKLOAD_EXEC': '${JJOB_SHARED_HOME}/xstack/ocr/ocr-apps/smith-waterman/install/x86-gasnet'}
+    'env-vars': { 'WORKLOAD_EXEC': '${JJOB_SHARED_HOME}/xstack/ocr/examples/smith-waterman/install/x86-gasnet'}
 }
 
 # job_ocr_build_kernel_sw_tgemul = {
@@ -567,9 +567,9 @@ job_ocr_verify_kernel_sw_gasnet = {
 #     'run-args': 'smith-waterman tg-x86',
 #     'sandbox': ('inherit0',),
 #     'env-vars': { 'APPS_LIBS_ROOT': '${JJOB_SHARED_HOME}/xstack/apps/libs/x86',
-#                   'WORKLOAD_SRC': '${JJOB_INITDIR_XSTACK}/ocr/ocr-apps/smith-waterman',
-#                   'WORKLOAD_BUILD_ROOT': '${JJOB_PRIVATE_HOME}/xstack/ocr/ocr-apps/smith-waterman/build',
-#                   'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/ocr-apps/smith-waterman/install'}
+#                   'WORKLOAD_SRC': '${JJOB_INITDIR_XSTACK}/ocr/examples/smith-waterman',
+#                   'WORKLOAD_BUILD_ROOT': '${JJOB_PRIVATE_HOME}/xstack/ocr/examples/smith-waterman/build',
+#                   'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/examples/smith-waterman/install'}
 # }
 
 # job_ocr_run_kernel_sw_tgemul = {
@@ -580,7 +580,7 @@ job_ocr_verify_kernel_sw_gasnet = {
 #     'sandbox': ('inherit0',),
 #     'env-vars': { 'APPS_LIBS_ROOT': '${JJOB_SHARED_HOME}/xstack/apps/libs/x86',
 #                   'WORKLOAD_ARGS': '100 100 ${JJOB_SHARED_HOME}/xstack/apps/smithwaterman/datasets/string1-medium-large.txt  ${JJOB_SHARED_HOME}/xstack/apps/smithwaterman/datasets/string2-medium-large.txt ${JJOB_SHARED_HOME}/xstack/apps/smithwaterman/datasets/score-medium-large.txt',
-#                   'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/ocr-apps/smith-waterman/install' }
+#                   'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/examples/smith-waterman/install' }
 # }
 
 # job_ocr_verify_kernel_sw_tgemul = {
@@ -589,7 +589,7 @@ job_ocr_verify_kernel_sw_gasnet = {
 #     'jobtype': 'ocr-verify-kernel-local',
 #     'run-args': '-w -c 1',
 #     'sandbox': ('inherit0',),
-#     'env-vars': { 'WORKLOAD_EXEC': '${JJOB_SHARED_HOME}/xstack/ocr/ocr-apps/smith-waterman/install/tg-x86'}
+#     'env-vars': { 'WORKLOAD_EXEC': '${JJOB_SHARED_HOME}/xstack/ocr/examples/smith-waterman/install/tg-x86'}
 # }
 
 job_ocr_build_kernel_sw_tg = {
@@ -600,10 +600,10 @@ job_ocr_build_kernel_sw_tg = {
     'run-args': 'smith-waterman tg',
     'sandbox': ('inherit0',),
     'env-vars': { 'APPS_LIBS_ROOT': '${JJOB_SHARED_HOME}/xstack/apps/libs/tg',
-                  'WORKLOAD_SRC': '${JJOB_INITDIR_XSTACK}/ocr/ocr-apps/smith-waterman',
-                  'WORKLOAD_BUILD_ROOT': '${JJOB_PRIVATE_HOME}/xstack/ocr/ocr-apps/smith-waterman/build',
+                  'WORKLOAD_SRC': '${JJOB_INITDIR_XSTACK}/ocr/examples/smith-waterman',
+                  'WORKLOAD_BUILD_ROOT': '${JJOB_PRIVATE_HOME}/xstack/ocr/examples/smith-waterman/build',
                   'WORKLOAD_ARGS': '10 10 ${JJOB_SHARED_HOME}/xstack/apps/smithwaterman/datasets/string1-medium.txt ${JJOB_SHARED_HOME}/xstack/apps/smithwaterman/datasets/string2-medium.txt ${JJOB_SHARED_HOME}/xstack/apps/smithwaterman/datasets/score-medium.txt',
-                  'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/ocr-apps/smith-waterman/install'}
+                  'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/examples/smith-waterman/install'}
 }
 
 job_ocr_run_kernel_sw_tg = {
@@ -614,7 +614,7 @@ job_ocr_run_kernel_sw_tg = {
     'param-args': '-c ${WORKLOAD_INSTALL_ROOT}/tg/config.cfg',
     'sandbox': ('inherit0',),
     'env-vars': { 'APPS_LIBS_ROOT': '${JJOB_SHARED_HOME}/xstack/apps/libs/tg',
-                  'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/ocr-apps/smith-waterman/install'}
+                  'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/examples/smith-waterman/install'}
 }
 
 job_ocr_verify_kernel_sw_tg = {
@@ -623,7 +623,7 @@ job_ocr_verify_kernel_sw_tg = {
     'jobtype': 'ocr-verify-kernel-remote',
     'run-args': '-w -c 1',
     'sandbox': ('inherit0',),
-    'env-vars': { 'WORKLOAD_EXEC': '${JJOB_SHARED_HOME}/xstack/ocr/ocr-apps/smith-waterman/install/tg'}
+    'env-vars': { 'WORKLOAD_EXEC': '${JJOB_SHARED_HOME}/xstack/ocr/examples/smith-waterman/install/tg'}
 }
 # Cholesky
 
@@ -634,9 +634,9 @@ job_ocr_build_kernel_cholesky_x86 = {
     'run-args': 'cholesky x86',
     'sandbox': ('inherit0',),
     'env-vars': { 'APPS_LIBS_ROOT': '${JJOB_SHARED_HOME}/xstack/apps/libs/x86',
-                  'WORKLOAD_SRC': '${JJOB_INITDIR_XSTACK}/ocr/ocr-apps/cholesky',
-                  'WORKLOAD_BUILD_ROOT': '${JJOB_PRIVATE_HOME}/xstack/ocr/ocr-apps/cholesky/build',
-                  'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/ocr-apps/cholesky/install'}
+                  'WORKLOAD_SRC': '${JJOB_INITDIR_XSTACK}/ocr/examples/cholesky',
+                  'WORKLOAD_BUILD_ROOT': '${JJOB_PRIVATE_HOME}/xstack/ocr/examples/cholesky/build',
+                  'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/examples/cholesky/install'}
 }
 
 job_ocr_run_kernel_cholesky_x86 = {
@@ -647,7 +647,7 @@ job_ocr_run_kernel_cholesky_x86 = {
     'sandbox': ('inherit0',),
     'env-vars': { 'APPS_LIBS_ROOT': '${JJOB_SHARED_HOME}/xstack/apps/libs/x86',
                   'WORKLOAD_ARGS': '--ds 1000 --ts 50 --fi ${JJOB_SHARED_HOME}/xstack/apps/cholesky/datasets/m_1000.in',
-                  'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/ocr-apps/cholesky/install' }
+                  'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/examples/cholesky/install' }
 }
 
 job_ocr_verify_kernel_cholesky_x86 = {
@@ -656,7 +656,7 @@ job_ocr_verify_kernel_cholesky_x86 = {
     'jobtype': 'ocr-verify-diff',
     'run-args': '${WORKLOAD_EXEC}/cholesky.out.txt ${JJOB_SHARED_HOME}/xstack/apps/cholesky/datasets/cholesky_out_1000.txt',
     'sandbox': ('inherit0',),
-    'env-vars': { 'WORKLOAD_EXEC': '${JJOB_SHARED_HOME}/xstack/ocr/ocr-apps/cholesky/install/x86' }
+    'env-vars': { 'WORKLOAD_EXEC': '${JJOB_SHARED_HOME}/xstack/ocr/examples/cholesky/install/x86' }
 }
 
 job_ocr_build_kernel_cholesky_mpi = {
@@ -666,9 +666,9 @@ job_ocr_build_kernel_cholesky_mpi = {
     'run-args': 'cholesky x86-mpi',
     'sandbox': ('inherit0',),
     'env-vars': { 'APPS_LIBS_ROOT': '${JJOB_SHARED_HOME}/xstack/apps/libs/x86',
-                  'WORKLOAD_SRC': '${JJOB_INITDIR_XSTACK}/ocr/ocr-apps/cholesky',
-                  'WORKLOAD_BUILD_ROOT': '${JJOB_PRIVATE_HOME}/xstack/ocr/ocr-apps/cholesky/build',
-                  'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/ocr-apps/cholesky/install'}
+                  'WORKLOAD_SRC': '${JJOB_INITDIR_XSTACK}/ocr/examples/cholesky',
+                  'WORKLOAD_BUILD_ROOT': '${JJOB_PRIVATE_HOME}/xstack/ocr/examples/cholesky/build',
+                  'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/examples/cholesky/install'}
 }
 
 job_ocr_run_kernel_cholesky_mpi = {
@@ -680,7 +680,7 @@ job_ocr_run_kernel_cholesky_mpi = {
     'env-vars': { 'PATH': '/opt/intel/tools/impi_latest/bin64:${PATH}',
                   'APPS_LIBS_ROOT': '${JJOB_SHARED_HOME}/xstack/apps/libs/x86',
                   'WORKLOAD_ARGS': '--ds 1000 --ts 50 --fi ${JJOB_SHARED_HOME}/xstack/apps/cholesky/datasets/m_1000.in',
-                  'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/ocr-apps/cholesky/install' }
+                  'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/examples/cholesky/install' }
 }
 
 job_ocr_verify_kernel_cholesky_mpi = {
@@ -689,7 +689,7 @@ job_ocr_verify_kernel_cholesky_mpi = {
     'jobtype': 'ocr-verify-diff',
     'run-args': '${WORKLOAD_EXEC}/cholesky.out.txt ${JJOB_SHARED_HOME}/xstack/apps/cholesky/datasets/cholesky_out_1000.txt',
     'sandbox': ('inherit0',),
-    'env-vars': { 'WORKLOAD_EXEC': '${JJOB_SHARED_HOME}/xstack/ocr/ocr-apps/cholesky/install/x86-mpi' }
+    'env-vars': { 'WORKLOAD_EXEC': '${JJOB_SHARED_HOME}/xstack/ocr/examples/cholesky/install/x86-mpi' }
 }
 
 job_ocr_build_kernel_cholesky_gasnet = {
@@ -699,9 +699,9 @@ job_ocr_build_kernel_cholesky_gasnet = {
     'run-args': 'cholesky x86-gasnet',
     'sandbox': ('inherit0',),
     'env-vars': { 'APPS_LIBS_ROOT': '${JJOB_SHARED_HOME}/xstack/apps/libs/x86',
-                  'WORKLOAD_SRC': '${JJOB_INITDIR_XSTACK}/ocr/ocr-apps/cholesky',
-                  'WORKLOAD_BUILD_ROOT': '${JJOB_PRIVATE_HOME}/xstack/ocr/ocr-apps/cholesky/build',
-                  'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/ocr-apps/cholesky/install',
+                  'WORKLOAD_SRC': '${JJOB_INITDIR_XSTACK}/ocr/examples/cholesky',
+                  'WORKLOAD_BUILD_ROOT': '${JJOB_PRIVATE_HOME}/xstack/ocr/examples/cholesky/build',
+                  'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/examples/cholesky/install',
                   'MPI_ROOT': '/opt/intel/tools/impi/5.0.1.035',
                   'GASNET_ROOT': '/opt/rice/GASNet/1.24.0-impi',
                   'PATH': '${GASNET_ROOT}/bin:${MPI_ROOT}/bin64:${PATH}',
@@ -721,7 +721,7 @@ job_ocr_run_kernel_cholesky_gasnet = {
     'env-vars': { 'PATH': '/opt/intel/tools/impi_latest/bin64:${PATH}',
                   'APPS_LIBS_ROOT': '${JJOB_SHARED_HOME}/xstack/apps/libs/x86',
                   'WORKLOAD_ARGS': '--ds 1000 --ts 50 --fi ${JJOB_SHARED_HOME}/xstack/apps/cholesky/datasets/m_1000.in',
-                  'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/ocr-apps/cholesky/install',
+                  'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/examples/cholesky/install',
                   'GASNET_ROOT': '/opt/rice/GASNet/1.24.0-impi',
                   'PATH': '${GASNET_ROOT}/bin:${MPI_ROOT}/bin64:${PATH}',
                   'GASNET_CONDUIT': 'ibv'}
@@ -733,7 +733,7 @@ job_ocr_verify_kernel_cholesky_gasnet = {
     'jobtype': 'ocr-verify-diff',
     'run-args': '${WORKLOAD_EXEC}/cholesky.out.txt ${JJOB_SHARED_HOME}/xstack/apps/cholesky/datasets/cholesky_out_1000.txt',
     'sandbox': ('inherit0',),
-    'env-vars': { 'WORKLOAD_EXEC': '${JJOB_SHARED_HOME}/xstack/ocr/ocr-apps/cholesky/install/x86-gasnet' }
+    'env-vars': { 'WORKLOAD_EXEC': '${JJOB_SHARED_HOME}/xstack/ocr/examples/cholesky/install/x86-gasnet' }
 }
 
 # job_ocr_build_kernel_cholesky_tgemul = {
@@ -743,9 +743,9 @@ job_ocr_verify_kernel_cholesky_gasnet = {
 #     'run-args': 'cholesky tg-x86',
 #     'sandbox': ('inherit0',),
 #     'env-vars': { 'APPS_LIBS_ROOT': '${JJOB_SHARED_HOME}/xstack/apps/libs/x86',
-#                   'WORKLOAD_SRC': '${JJOB_INITDIR_XSTACK}/ocr/ocr-apps/cholesky',
-#                   'WORKLOAD_BUILD_ROOT': '${JJOB_PRIVATE_HOME}/xstack/ocr/ocr-apps/cholesky/build',
-#                   'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/ocr-apps/cholesky/install'}
+#                   'WORKLOAD_SRC': '${JJOB_INITDIR_XSTACK}/ocr/examples/cholesky',
+#                   'WORKLOAD_BUILD_ROOT': '${JJOB_PRIVATE_HOME}/xstack/ocr/examples/cholesky/build',
+#                   'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/examples/cholesky/install'}
 # }
 
 # job_ocr_run_kernel_cholesky_tgemul = {
@@ -756,7 +756,7 @@ job_ocr_verify_kernel_cholesky_gasnet = {
 #     'sandbox': ('inherit0',),
 #     'env-vars': { 'APPS_LIBS_ROOT': '${JJOB_SHARED_HOME}/xstack/apps/libs/x86',
 #                   'WORKLOAD_ARGS': '--ds 1000 --ts 50 --fi ${JJOB_SHARED_HOME}/xstack/apps/cholesky/datasets/m_1000.in',
-#                   'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/ocr-apps/cholesky/install' }
+#                   'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/examples/cholesky/install' }
 # }
 
 # job_ocr_verify_kernel_cholesky_tgemul = {
@@ -765,7 +765,7 @@ job_ocr_verify_kernel_cholesky_gasnet = {
 #     'jobtype': 'ocr-verify-diff',
 #     'run-args': '${WORKLOAD_EXEC}/cholesky.out.txt ${JJOB_SHARED_HOME}/xstack/apps/cholesky/datasets/cholesky_out_1000.txt',
 #     'sandbox': ('inherit0',),
-#     'env-vars': { 'WORKLOAD_EXEC': '${JJOB_SHARED_HOME}/xstack/ocr/ocr-apps/cholesky/install/tg-x86' }
+#     'env-vars': { 'WORKLOAD_EXEC': '${JJOB_SHARED_HOME}/xstack/ocr/examples/cholesky/install/tg-x86' }
 # }
 
 job_ocr_build_kernel_cholesky_tg = {
@@ -776,10 +776,10 @@ job_ocr_build_kernel_cholesky_tg = {
     'run-args': 'cholesky tg',
     'sandbox': ('inherit0',),
     'env-vars': { 'APPS_LIBS_ROOT': '${JJOB_SHARED_HOME}/xstack/apps/libs/tg',
-                  'WORKLOAD_SRC': '${JJOB_INITDIR_XSTACK}/ocr/ocr-apps/cholesky',
-                  'WORKLOAD_BUILD_ROOT': '${JJOB_PRIVATE_HOME}/xstack/ocr/ocr-apps/cholesky/build',
+                  'WORKLOAD_SRC': '${JJOB_INITDIR_XSTACK}/ocr/examples/cholesky',
+                  'WORKLOAD_BUILD_ROOT': '${JJOB_PRIVATE_HOME}/xstack/ocr/examples/cholesky/build',
                   'WORKLOAD_ARGS': '--ds 50 --ts 10 --fi ${JJOB_SHARED_HOME}/xstack/apps/cholesky/datasets/m_50.in',
-                  'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/ocr-apps/cholesky/install'}
+                  'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/examples/cholesky/install'}
 }
 
 job_ocr_run_kernel_cholesky_tg = {
@@ -791,7 +791,7 @@ job_ocr_run_kernel_cholesky_tg = {
     'sandbox': ('inherit0',),
     'env-vars': { 'APPS_LIBS_ROOT': '${JJOB_SHARED_HOME}/xstack/apps/libs/tg',
                   'WORKLOAD_ARGS': '--ds 50 --ts 10 --fi ${JJOB_SHARED_HOME}/xstack/apps/cholesky/datasets/m_50.in',
-                  'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/ocr-apps/cholesky/install'}
+                  'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/examples/cholesky/install'}
 }
 
 job_ocr_verify_kernel_cholesky_tg = {
@@ -800,6 +800,6 @@ job_ocr_verify_kernel_cholesky_tg = {
     'jobtype': 'ocr-verify-diff',
     'run-args': '${WORKLOAD_EXEC}/cholesky.out.txt ${JJOB_SHARED_HOME}/xstack/apps/cholesky/datasets/cholesky_out_50.txt',
     'sandbox': ('inherit0',),
-    'env-vars': { 'WORKLOAD_EXEC': '${JJOB_SHARED_HOME}/xstack/ocr/ocr-apps/cholesky/install/tg' }
+    'env-vars': { 'WORKLOAD_EXEC': '${JJOB_SHARED_HOME}/xstack/ocr/examples/cholesky/install/tg' }
 }
 

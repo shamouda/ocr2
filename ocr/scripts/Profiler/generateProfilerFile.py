@@ -2,7 +2,7 @@
 
 # Modified in 2014 by Romain Cledat (now at Intel). The original
 # license (BSD) is below. This file is also subject to the license
-# aggrement located in the file LICENSE and cannot be distributed
+# aggrement located in the OCR LICENSE file and cannot be distributed
 # without it. This notice cannot be removed or modified
 
 # Copyright (c) 2011, Romain Cledat

@@ -70,7 +70,6 @@ ocrGuid_t fibEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrGuid_t fibEdt;
     ocrGuid_t evt0, evt1;
     ocrGuid_t comp;
-    ocrGuid_t fib0, fib1;
     s64 t;
 
     mapGuid = (ocrGuid_t)paramv[0];
@@ -192,7 +191,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrEventSatisfy(evtGuid, ans1);
 
     // Now create the EDTs and what not
-    ocrGuid_t fibC, totallyDoneEvent, absFinalEdt, templateGuid;
+    ocrGuid_t fibC, totallyDoneEvent, absFinalEdt;
     {
         ocrGuid_t templateGuid;
         ocrEdtTemplateCreate(&templateGuid, absFinal, 1, 1);

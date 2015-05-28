@@ -1,5 +1,0 @@
-Running:
-
-make -f Makefile.<OCR_TYPE> run <fib_num>
-
-where fib_num is the optional number you want to run fibonacci for; default 10
