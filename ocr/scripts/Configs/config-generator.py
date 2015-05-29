@@ -16,7 +16,7 @@ parser.add_argument('--guid', dest='guid', default='PTR', choices=['PTR', 'COUNT
                    help='guid type to use (default: PTR)')
 parser.add_argument('--platform', dest='platform', default='X86', choices=['X86', 'FSIM'],
                    help='platform type to use (default: X86)')
-parser.add_argument('--target', dest='target', default='X86', choices=['X86', 'FSIM', 'MPI'],
+parser.add_argument('--target', dest='target', default='x86', choices=['x86', 'fsim', 'mpi', 'gasnet'],
                    help='target type to use (default: X86)')
 parser.add_argument('--threads', dest='threads', type=int, default=4,
                    help='number of threads available to OCR (default: 4)')
@@ -37,7 +37,7 @@ parser.add_argument('--remove-destination', dest='rmdest', action='store_true',
 args = parser.parse_args()
 guid = args.guid
 platform = args.platform
-target = args.target
+target = args.target.upper()
 threads = args.threads
 binding = args.binding
 alloc = args.alloc
@@ -119,10 +119,10 @@ def GenerateComm(output, comms, pdtype, threads):
         output.write("[CommPlatformInst0]\n")
         output.write("\tid\t=\t1-%d\n" % (threads-1))
         output.write("\ttype\t=\t%s\n" % ("None"))
-        output.write("[CommPlatformType1]\n\tname\t=\t%s\n" % ("MPI"))
+        output.write("[CommPlatformType1]\n\tname\t=\t%s\n" % (comms))
         output.write("[CommPlatformInst1]\n")
         output.write("\tid\t=\t0\n")
-        output.write("\ttype\t=\t%s\n" % ("MPI"))
+        output.write("\ttype\t=\t%s\n" % (comms))
     else:
         output.write("[CommPlatformType0]\n\tname\t=\t%s\n" % ("None"))
         output.write("[CommPlatformInst0]\n")
@@ -259,14 +259,33 @@ def GenerateConfig(filehandle, guid, platform, target, threads, binding, alloc, 
             raise
         if guid != 'COUNTED_MAP':
             print 'MPI target only supports counted-map guid provider'
+            print guid, ' ', target
+        pdtype="HCDist"
+        GeneratePd(filehandle, pdtype, dbtype, threads)
+        #Intentionally use "HC" here
+        GenerateCommon(filehandle, "HC", dbtype)
+        GenerateMem(filehandle, alloc, 1, alloctype)
+        GenerateComm(filehandle, "MPI", pdtype, threads)
+        GenerateComp(filehandle, pdtype, threads, binding, "HC_COMM_DELEGATE")
+    elif target=='GASNET':
+        # catch default value errors for distributed
+        if dbtype != 'Lockable':
+            print 'GASNet target only supports Lockable datablocks'
+            raise
+        if guid != 'COUNTED_MAP':
+            print 'GASNet target only supports counted-map guid provider'
             raise
         pdtype="HCDist"
         GeneratePd(filehandle, pdtype, dbtype, threads)
         #Intentionally use "HC" here
         GenerateCommon(filehandle, "HC", dbtype)
         GenerateMem(filehandle, alloc, 1, alloctype)
-        GenerateComm(filehandle, "null", pdtype, threads)
+        GenerateComm(filehandle, "GASNet", pdtype, threads)
         GenerateComp(filehandle, pdtype, threads, binding, "HC_COMM_DELEGATE")
+    else:
+        print 'Target ', target, ' unsupported'
+        sys.exit(0)
+
 
 def GetString(prompt, default):
     prompt = "%s [%s] " % (prompt, default)
