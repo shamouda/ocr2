@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-import logging, os, re, shlex, shutil, subprocess, tempfile
+import logging, os, re, shlex, shutil, signal, subprocess, tempfile
 from datetime import datetime, timedelta
 from junit_xml import TestCase, TestCasesFile, TestSuite
 from stat import *
@@ -1006,8 +1006,11 @@ class LocalJobObject(JobObject):
 
             self._startTime = datetime.now()
             try:
+                # Note, we use os.setpgid before running the process so that we can kill the
+                # entire process tree (hopefully) if we need to kill the job
                 self._process = subprocess.Popen(args, stdout=self._outFile, stderr=self._errFile,
-                                                 cwd=myEnv['JJOB_START_HOME'], env=myEnv, shell=False)
+                                                 cwd=myEnv['JJOB_START_HOME'], env=myEnv, shell=False,
+                                                 preexec_fn=os.setpgrp)
             except OSError:
                 self._myLog.error("Could not run job script for %s" % (self))
                 self._startTime = self._endTime = datetime.now()
@@ -1049,8 +1052,11 @@ class LocalJobObject(JobObject):
             self._endTime = now
             assert(self.timeout is not None and self.timeout > 0)
             if (now - self._startTime).seconds > self.timeout:
-                self._myLog.info("%s timed-out... Killing" % (str(self)))
-                self._process.kill()
+                self._myLog.info("%s timed-out... Killing (PID: %d)" % (str(self), self._process.pid))
+                try:
+                    os.killpg(self._process.pid, signal.SIGKILL)
+                except OSError, e:
+                    self._myLog.warning("Killing failed with error: %s" % (e))
                 self._process.wait()
                 # Run the epilogue script if it exists
                 self._cleanUp()
