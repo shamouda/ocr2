@@ -1,5 +1,5 @@
 %%%%
-This example illustrates the usage model for datablocks accessed with the {\tt Intent-To-Write (RW)} mode.
+This example illustrates the usage model for datablocks accessed with the {\tt Read-Write (RW)} mode.
 The {\tt RW} mode ensures that only one master copy of the datablock exists at any time inside a shared address space.
 Parallel EDTs can concurrently access a datablock under this mode if they execute inside the same address space.
 It is the programmer's responsibility to avoid data races. For example, two parallel EDTs can concurrently update
@@ -7,7 +7,7 @@ separate memory regions of the same datablock with the {\tt RW} mode.
 
 \subsection{Code example}
 \begin{ocrsnip}
-/* Example usage of RW (Intent-To-Write)
+/* Example usage of RW (Read-Write)
  * datablock access mode in OCR
  *
  * Implements the following dependence graph:

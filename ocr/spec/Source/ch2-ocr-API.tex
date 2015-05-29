@@ -1278,8 +1278,8 @@ The following dependences can be added:
 \begin{DoxyItemize}
 \item Event to event: The destination event's pre-slot will become satisfied
   upon satisfaction of the source event's post-slot. Any data block associated
-  with the source event's post-slot will be associated with the sink event's pre-slot.
-  This allows the formation of event chains.
+  with the source event's post-slot will be associated with the sink event's pre-slot,
+  except when the sink event is a latch event. This allows the formation of event chains.
 \item Event to EDT: Upon satisfaction of the source event's post-slot, the EDT's
   pre-slot will be satisfied. When the runtime transitions the EDT from the
   \emph{runnable} to \emph{ready} state, the data block associated with the

@@ -67,7 +67,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrGuid_t dbGuid;
     u32 nbElem = NB_ELEM_DB;
     // Create a DataBlock (DB). Note that the currently executing EDT
-    // acquires the DB in Intent-To-Write (RW) mode
+    // acquires the DB in Read-Write (RW) mode
     ocrDbCreate(&dbGuid, &dbPtr, sizeof(u64) * NB_ELEM_DB, 0, NULL_GUID, NO_ALLOC);
     u64 i = 0;
     int * data = (int *) dbPtr;
@@ -124,7 +124,6 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrAddDependence(dbGuid, writer1Guid, 0, DB_MODE_RW);
     // EDT1 depends on the start event on its slot '1'
     ocrAddDependence(eventStartGuid, writer1Guid, 1, DB_MODE_CONST);
-    // At this poomt EDT
 
     // RW '2' from N/2 to N (potentially concurrent with writer 0, but different range)
     ocrGuid_t oeWriter2Guid;
