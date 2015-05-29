@@ -33,7 +33,7 @@ def mycopytree(src, dest):
         except OSError as why:
             errors.append((srcname, destname, str(why)))
         except shutil.Error as err:
-            errors.extend(err)
+            errors.extend(err[0])
     # End of for over names
     try:
         shutil.copystat(src, dest)
@@ -497,6 +497,11 @@ class JobObject(object):
         self._myLog.debug("%s's initial directories are %s" % (str(self), str(self._dirs)))
         return self._dirs
 
+    def isLocal(self):
+        """Returns true if the job runs on the local machine"""
+        self._myLog.error("%s needs to define its own isLocal!!" % (str(self)))
+        assert(False)
+
     def execute(self):
         """Tries to execute the job. Will return
            the status of the job. If the job was
@@ -948,6 +953,9 @@ class JobObject(object):
 class LocalJobObject(JobObject):
     """A job that executes on the local machine"""
 
+    def isLocal(self):
+        return True
+
     def execute(self):
         """Executes the job locally"""
         if self._recomputeStatus:
@@ -1078,6 +1086,9 @@ class TorqueJobObject(JobObject):
         super(TorqueJobObject, self).__init__(inputDict, jobType, dependenceCount)
         self._prologueFile = None
         self._epilogueFile = None
+
+    def isLocal(self):
+        return False
 
     def execute(self):
         """Executes the job using Torque"""
