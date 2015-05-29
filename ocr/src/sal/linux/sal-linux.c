@@ -106,7 +106,8 @@ ocrGuid_t salQuery(ocrQueryType_t query, ocrGuid_t guid, void **result, u32 *siz
             break;
 
         case OCR_QUERY_ALL_EDTS:
-            //TODO: Query all Edts function
+            dataDb = hcQueryAllEdts(self, result, size);
+            *size = (*size)*(sizeof(ocrGuid_t));
             break;
 
         default:

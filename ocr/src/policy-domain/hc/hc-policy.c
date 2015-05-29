@@ -28,6 +28,8 @@
 #include "task/hc/hc-task.h"
 #include "event/hc/hc-event.h"
 #include "worker/hc/hc-worker.h"
+#include "policy-domain/hc/hc-policy.h"
+#include "workpile/hc/hc-workpile.h"
 
 // Currently required to find out if self is the blessed PD
 #include "extensions/ocr-affinity.h"
@@ -2045,6 +2047,76 @@ ocrGuid_t hcQueryNextEdts(ocrPolicyDomainHc_t *rself, void **result, u32 *qSize)
     }
 
     *result = workpileGuids;
+    return dataDb;
+}
+
+ocrGuid_t hcQueryAllEdts(ocrPolicyDomainHc_t *rself, void **result, u32 *qsize){
+    ocrPolicyDomain_t  *pd = &rself->base;
+    ocrWorkpileHc_t *workpile;
+
+    u64 dataBlockSize = 0;
+    u64 i;
+
+    //Get number of runnable EDTs to create DB of proper size.
+    for(i = 0; i < rself->base.workerCount; i++){
+        workpile = (ocrWorkpileHc_t *)pd->schedulers[0]->workpiles[i];
+        u32 head = (workpile->deque->head%INIT_DEQUE_CAPACITY);
+        u32 tail = (workpile->deque->tail%INIT_DEQUE_CAPACITY);
+        u32 workpileSize = tail-head;
+
+        if(workpileSize > 0){
+            dataBlockSize += workpileSize;
+        }
+    }
+
+    ocrGuid_t *workpileGuids = NULL_GUID;
+    ocrGuid_t dataDb;
+    u32 idxOffset = -1;
+
+    ocrDbCreate(&dataDb, (void **)&workpileGuids, sizeof(ocrGuid_t)*(dataBlockSize),
+                0, NULL_GUID, NO_ALLOC);
+
+    //Populate datablock with workpile EDTs.
+    for(i = 0; i < rself->base.workerCount; i++){
+        workpile = (ocrWorkpileHc_t *)pd->schedulers[0]->workpiles[i];
+        u32 head = (workpile->deque->head%INIT_DEQUE_CAPACITY);
+        u32 tail = (workpile->deque->tail%INIT_DEQUE_CAPACITY);
+        u32 workpileSize = tail-head;
+
+        if(workpileSize > 0){
+            u32 j;
+            for(j = head; j < tail; j++){
+                idxOffset++;
+                PD_MSG_STACK(msg);
+                getCurrentEnv(NULL, NULL, NULL, &msg);
+                ocrFatGuid_t fguid;
+                fguid.guid = (ocrGuid_t)workpile->deque->data[j];
+                fguid.metaDataPtr = NULL;
+
+            #define PD_MSG (&msg)
+            #define PD_TYPE PD_MSG_GUID_INFO
+                msg.type = PD_MSG_GUID_INFO | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
+                PD_MSG_FIELD_IO(guid.guid) = fguid.guid;
+                PD_MSG_FIELD_IO(guid.metaDataPtr) = fguid.metaDataPtr;
+                PD_MSG_FIELD_I(properties) = RMETA_GUIDPROP | KIND_GUIDPROP;
+                RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, true));
+                ocrGuidKind msgKind = PD_MSG_FIELD_O(kind);
+                ocrTask_t *curTask = (ocrTask_t *)PD_MSG_FIELD_IO(guid.metaDataPtr);
+            #undef PD_MSG
+            #undef PD_TYPE
+
+                if(msgKind != OCR_GUID_EDT){
+                    workpileGuids[idxOffset] = NULL_GUID;
+                    continue;
+                }else if(curTask != NULL){
+                    workpileGuids[idxOffset] = curTask->guid;
+                }
+            }
+        }
+    }
+
+    *result = workpileGuids;
+    *qsize = dataBlockSize;
     return dataDb;
 }
 
