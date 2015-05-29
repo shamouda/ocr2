@@ -12,7 +12,7 @@
  *       mainEdt
  *       [ DB ]
  *      / |     \
- *(ITW)/  |(ITW) \(EW)
+ * (RW)/  |(RW)  \(EW)
  *    /   |       \
  * EDT1  EDT2    EDT3
  *    \   |      /
@@ -71,7 +71,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrGuid_t shutdownGuid;
     ocrEdtCreate(&shutdownGuid, shutdownEdtTemplateGuid, 0, NULL, EDT_PARAM_DEF, NULL,
                  EDT_PROP_NONE, NULL_GUID, NULL);
-    ocrAddDependence(dbGuid, shutdownGuid, 3, DB_MODE_RO);
+    ocrAddDependence(dbGuid, shutdownGuid, 3, DB_MODE_CONST);
 
     ocrGuid_t writeEdtTemplateGuid;
     ocrEdtTemplateCreate(&writeEdtTemplateGuid, writerEdt, 3, 2);
@@ -79,25 +79,25 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrGuid_t eventStartGuid;
     ocrEventCreate(&eventStartGuid, OCR_EVENT_ONCE_T, false);
 
-    // ITW '1' from 0 to N/2 (potentially concurrent with writer 1, but different range)
+    // RW '1' from 0 to N/2 (potentially concurrent with writer 1, but different range)
     ocrGuid_t oeWriter0Guid;
     ocrGuid_t writer0Guid;
     u64 writerParamv0[3] = {0, NB_ELEM_DB/2, 1};
     ocrEdtCreate(&writer0Guid, writeEdtTemplateGuid, EDT_PARAM_DEF, writerParamv0, EDT_PARAM_DEF, NULL,
                  EDT_PROP_NONE, NULL_GUID, &oeWriter0Guid);
     ocrAddDependence(oeWriter0Guid, shutdownGuid, 0, false);
-    ocrAddDependence(dbGuid, writer0Guid, 0, DB_MODE_ITW);
-    ocrAddDependence(eventStartGuid, writer0Guid, 1, DB_MODE_RO);
+    ocrAddDependence(dbGuid, writer0Guid, 0, DB_MODE_RW);
+    ocrAddDependence(eventStartGuid, writer0Guid, 1, DB_MODE_CONST);
 
-    // ITW '2' from N/2 to N (potentially concurrent with writer 0, but different range)
+    // RW '2' from N/2 to N (potentially concurrent with writer 0, but different range)
     ocrGuid_t oeWriter1Guid;
     ocrGuid_t writer1Guid;
     u64 writerParamv1[3] = {NB_ELEM_DB/2, NB_ELEM_DB, 2};
     ocrEdtCreate(&writer1Guid, writeEdtTemplateGuid, EDT_PARAM_DEF, writerParamv1, EDT_PARAM_DEF, NULL,
                  EDT_PROP_NONE, NULL_GUID, &oeWriter1Guid);
     ocrAddDependence(oeWriter1Guid, shutdownGuid, 1, false);
-    ocrAddDependence(dbGuid, writer1Guid, 0, DB_MODE_ITW);
-    ocrAddDependence(eventStartGuid, writer1Guid, 1, DB_MODE_RO);
+    ocrAddDependence(dbGuid, writer1Guid, 0, DB_MODE_RW);
+    ocrAddDependence(eventStartGuid, writer1Guid, 1, DB_MODE_CONST);
 
     // EW '3' from N/4 to 3N/4
     ocrGuid_t oeWriter2Guid;
@@ -107,7 +107,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
                  EDT_PROP_NONE, NULL_GUID, &oeWriter2Guid);
     ocrAddDependence(oeWriter2Guid, shutdownGuid, 2, false);
     ocrAddDependence(dbGuid, writer2Guid, 0, DB_MODE_EW);
-    ocrAddDependence(eventStartGuid, writer2Guid, 1, DB_MODE_RO);
+    ocrAddDependence(eventStartGuid, writer2Guid, 1, DB_MODE_CONST);
 
     ocrEventSatisfy(eventStartGuid, NULL_GUID);
 

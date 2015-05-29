@@ -4,7 +4,7 @@
  *  removed or modified.
  */
 
-/* Example usage of ITW (Intent-To-Write)
+/* Example usage of RW (Read-Write)
  * datablock access mode in OCR
  *
  * Implements the following dependence graph:
@@ -12,7 +12,7 @@
  *     mainEdt
  *     [ DB ]
  *      /  \
- *(ITW)/    \(ITW)
+ * (RW)/    \(RW)
  *    /      \
  * EDT1      EDT2
  *    \      /
@@ -90,14 +90,14 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrEdtTemplateCreate(&awaitingTemplGuid, awaitingEdt, 0 /*paramc*/, 3 /*depc*/);
     ocrEdtCreate(&awaitingEdtGuid, awaitingTemplGuid, EDT_PARAM_DEF, NULL, EDT_PARAM_DEF, NULL,
         EDT_PROP_NONE, NULL_GUID, NULL);
-    ocrAddDependence(dbGuid,            awaitingEdtGuid, 0, DB_MODE_RO);
+    ocrAddDependence(dbGuid,            awaitingEdtGuid, 0, DB_MODE_CONST);
     ocrAddDependence(exampleEventGuid1, awaitingEdtGuid, 1, DB_DEFAULT_MODE);
     ocrAddDependence(exampleEventGuid2, awaitingEdtGuid, 2, DB_DEFAULT_MODE);
 
     // START
     PRINTF("Start!\n");
-    ocrAddDependence(dbGuid, exampleEdtGuid1, 0, DB_MODE_ITW);
-    ocrAddDependence(dbGuid, exampleEdtGuid2, 0, DB_MODE_ITW);
+    ocrAddDependence(dbGuid, exampleEdtGuid1, 0, DB_MODE_RW);
+    ocrAddDependence(dbGuid, exampleEdtGuid2, 0, DB_MODE_RW);
 
     return NULL_GUID;
 }

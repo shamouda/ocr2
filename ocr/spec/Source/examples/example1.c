@@ -63,8 +63,8 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrEdtCreate(&edt3, edt3_template, EDT_PARAM_DEF, NULL, 2, NULL, EDT_PROP_NONE, NULL_GUID, NULL);
 
     //Setup dependences for the shutdown EDT
-    ocrAddDependence(outputEvent1, edt3, 0, DB_MODE_RO);
-    ocrAddDependence(outputEvent2, edt3, 1, DB_MODE_RO);
+    ocrAddDependence(outputEvent1, edt3, 0, DB_MODE_CONST);
+    ocrAddDependence(outputEvent2, edt3, 1, DB_MODE_CONST);
 
     //Start execution of the parallel EDTs
     ocrAddDependence(NULL_GUID, edt1, 0, DB_DEFAULT_MODE);

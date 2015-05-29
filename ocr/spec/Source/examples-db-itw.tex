@@ -1,13 +1,13 @@
 %%%%
-This example illustrates the usage model for datablocks accessed with the {\tt Intent-To-Write (ITW)} mode.
-The {\tt ITW} mode ensures that only one master copy of the datablock exists at any time inside a shared address space.
+This example illustrates the usage model for datablocks accessed with the {\tt Intent-To-Write (RW)} mode.
+The {\tt RW} mode ensures that only one master copy of the datablock exists at any time inside a shared address space.
 Parallel EDTs can concurrently access a datablock under this mode if they execute inside the same address space.
 It is the programmer's responsibility to avoid data races. For example, two parallel EDTs can concurrently update
-separate memory regions of the same datablock with the {\tt ITW} mode.
+separate memory regions of the same datablock with the {\tt RW} mode.
 
 \subsection{Code example}
 \begin{ocrsnip}
-/* Example usage of ITW (Intent-To-Write)
+/* Example usage of RW (Intent-To-Write)
  * datablock access mode in OCR
  *
  * Implements the following dependence graph:
@@ -15,7 +15,7 @@ separate memory regions of the same datablock with the {\tt ITW} mode.
  *     mainEdt
  *     [ DB ]
  *      /  \
- *(ITW)/    \(ITW)
+ * (RW)/    \(RW)
  *    /      \
  * EDT1      EDT2
  *    \      /
@@ -93,14 +93,14 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrEdtTemplateCreate(&awaitingTemplGuid, awaitingEdt, 0 /*paramc*/, 3 /*depc*/);
     ocrEdtCreate(&awaitingEdtGuid, awaitingTemplGuid, EDT_PARAM_DEF, NULL, EDT_PARAM_DEF, NULL,
         EDT_PROP_NONE, NULL_GUID, NULL);
-    ocrAddDependence(dbGuid,            awaitingEdtGuid, 0, DB_MODE_RO);
+    ocrAddDependence(dbGuid,            awaitingEdtGuid, 0, DB_MODE_CONST);
     ocrAddDependence(exampleEventGuid1, awaitingEdtGuid, 1, DB_DEFAULT_MODE);
     ocrAddDependence(exampleEventGuid2, awaitingEdtGuid, 2, DB_DEFAULT_MODE);
 
     // START
     PRINTF("Start!\n");
-    ocrAddDependence(dbGuid, exampleEdtGuid1, 0, DB_MODE_ITW);
-    ocrAddDependence(dbGuid, exampleEdtGuid2, 0, DB_MODE_ITW);
+    ocrAddDependence(dbGuid, exampleEdtGuid1, 0, DB_MODE_RW);
+    ocrAddDependence(dbGuid, exampleEdtGuid2, 0, DB_MODE_RW);
 
     return NULL_GUID;
 }
@@ -110,7 +110,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
 %%%
 \subsubsection{Details}
 The mainEdt creates a datablock ({\tt dbGuid}) that may be concurrently updated by two children EDTs
-({\tt exampleEdtGuid1} and {\tt exampleEdtGuid2}) using the {\tt ITW} mode.
+({\tt exampleEdtGuid1} and {\tt exampleEdtGuid2}) using the {\tt RW} mode.
 {\tt exampleEdtGuid1} and {\tt exampleEdtGuid2} are each created with one dependence on each of them,
 while after execution, each of them will satisfy an output event ({\tt exampleEventGuid1} and {\tt exampleEventGuid2}).
 The satisfaction of these output events will trigger the execution of an awaiting EDT ({\tt awaitingEdtGuid})

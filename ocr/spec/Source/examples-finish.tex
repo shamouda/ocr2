@@ -109,8 +109,8 @@ ocrGuid_t fftComputeEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
         ocrEdtCreate(&twiddleEdtGuid, twiddleGuid, EDT_PARAM_DEF, paramv, 3,
                      twiddleDependencies, EDT_PROP_FINISH, NULL_GUID, NULL); (@ \label{line:HW_FinishEdt3} @)
 
-        ocrAddDependence(dataGuid, edtGuid, 0, DB_MODE_ITW);
-        ocrAddDependence(dataGuid, edtGuid2, 0, DB_MODE_ITW);
+        ocrAddDependence(dataGuid, edtGuid, 0, DB_MODE_RW);
+        ocrAddDependence(dataGuid, edtGuid2, 0, DB_MODE_RW);
     }
 
     return NULL_GUID;
@@ -170,8 +170,8 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
                  EDT_PARAM_DEF, NULL, EDT_PROP_FINISH, NULL_GUID,
                  NULL); (@ \label{line:HW_FinishEdt5} @)
 
-    ocrAddDependence(dataGuid, edtGuid, 0, DB_MODE_ITW); (@ \label{line:HW_DBDep} @)
-    ocrAddDependence(eventGuid, endGuid, 0, DB_MODE_ITW); (@ \label{line:HW_EventDep} @)
+    ocrAddDependence(dataGuid, edtGuid, 0, DB_MODE_RW); (@ \label{line:HW_DBDep} @)
+    ocrAddDependence(eventGuid, endGuid, 0, DB_MODE_RW); (@ \label{line:HW_EventDep} @)
 
     return NULL_GUID;
 }
