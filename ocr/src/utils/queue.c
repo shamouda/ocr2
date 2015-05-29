@@ -59,7 +59,7 @@ void * queueRemoveLast(Queue_t * queue) {
 }
 
 void * queueRemove(Queue_t * queue, u32 idx) {
-    // TODO shrink queue
+    // BUG #592 shrink queue
     ASSERT(idx < queue->tail);
     // Exchange last element and current
     void * elt = queue->head[idx];

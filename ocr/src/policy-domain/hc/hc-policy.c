@@ -24,7 +24,7 @@
 #include "policy-domain/hc/hc-policy.h"
 #include "allocator/allocator-all.h"
 
-//DIST-TODO cloning: hack to support edt templates, and pause\resume
+//BUG #204: cloning: hack to support edt templates, and pause\resume
 #include "task/hc/hc-task.h"
 #include "event/hc/hc-event.h"
 #include "worker/hc/hc-worker.h"
@@ -246,7 +246,7 @@ u8 hcPdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
         }
 
         if((!toReturn) && (properties & RL_BRING_UP)) {
-        //TODO-RL is it important to do that at the first phase or ?
+        //BUG #583: is it important to do that at the first phase or ?
         // if((properties & RL_BRING_UP) && RL_IS_FIRST_PHASE_UP(PD, RL_PD_OK, phase)) {
             registerSignalHandler();
             ocrPolicyDomainHc_t *rself = (ocrPolicyDomainHc_t*)policy;
@@ -546,7 +546,7 @@ void hcPolicyDomainDestruct(ocrPolicyDomain_t * policy) {
     u64 i = 0;
     u64 maxCount = 0;
 
-    //TODO-RL should transform all these to stop RL_DEALLOCATE
+    //BUG #583: should transform all these to stop RL_DEALLOCATE
 
     // Note: As soon as worker '0' is stopped; its thread is
     // free to fall-through and continue shutting down the
@@ -569,7 +569,7 @@ void hcPolicyDomainDestruct(ocrPolicyDomain_t * policy) {
         policy->schedulers[i]->fcts.destruct(policy->schedulers[i]);
     }
 
-    //TODO Need a scheme to deallocate neighbors
+    //BUG #583 Need a scheme to deallocate neighbors
     //ASSERT(policy->neighbors == NULL);
 
     // Destruct factories
@@ -874,7 +874,7 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         START_PROFILE(pd_hc_DbCreate);
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_DB_CREATE
-        // TODO: Add properties whether DB needs to be acquired or not
+        // BUG #584: Add properties whether DB needs to be acquired or not
         // This would impact where we do the PD_MSG_MEM_ALLOC for ex
         // For now we deal with both USER and RT dbs the same way
         ASSERT(PD_MSG_FIELD_I(dbType) == USER_DBTYPE || PD_MSG_FIELD_I(dbType) == RUNTIME_DBTYPE);
@@ -891,7 +891,7 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             if(db==NULL)
                 DPRINTF(DEBUG_LVL_WARN, "DB Create failed for size %lx\n", PD_MSG_FIELD_IO(size));
             ASSERT(db);
-            // TODO: Check if properties want DB acquired
+            // BUG #584: Check if properties want DB acquired
             ASSERT(db->fctId == self->dbFactories[0]->factoryId);
             PD_MSG_FIELD_O(returnDetail) = self->dbFactories[0]->fcts.acquire(
                 db, &(PD_MSG_FIELD_O(ptr)), tEdt, EDT_SLOT_NONE, DB_MODE_ITW, PD_MSG_FIELD_IO(properties) & DB_PROP_RT_ACQUIRE,
@@ -924,7 +924,7 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         #define PD_MSG msg
         #define PD_TYPE PD_MSG_DB_ACQUIRE
             localDeguidify(self, &(PD_MSG_FIELD_IO(guid)));
-            //DIST-TODO rely on the call to set the fatguid ptr to NULL and not crash if edt acquiring is not local
+            //BUG #273 rely on the call to set the fatguid ptr to NULL and not crash if edt acquiring is not local
             localDeguidify(self, &(PD_MSG_FIELD_IO(edt)));
             ocrDataBlock_t *db = (ocrDataBlock_t*)(PD_MSG_FIELD_IO(guid.metaDataPtr));
             ASSERT(db->fctId == self->dbFactories[0]->factoryId);
@@ -932,10 +932,10 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
                 db, &(PD_MSG_FIELD_O(ptr)), PD_MSG_FIELD_IO(edt), PD_MSG_FIELD_IO(edtSlot),
                 (ocrDbAccessMode_t) (PD_MSG_FIELD_IO(properties) & (u32)DB_ACCESS_MODE_MASK),
                 PD_MSG_FIELD_IO(properties) & DB_PROP_RT_ACQUIRE, PD_MSG_FIELD_IO(properties));
-            //DIST-TODO db: modify the acquire call if we agree on changing the api
+            //BUG #273 db: modify the acquire call if we agree on changing the api
             PD_MSG_FIELD_O(size) = db->size;
             // conserve acquire's msg properties and add the DB's one.
-            // TODO: This is related to bug #273
+            //BUG #273: This is related to bug #273
             PD_MSG_FIELD_IO(properties) |= db->flags;
             // Acquire message can be asynchronously responded to
             if (PD_MSG_FIELD_O(returnDetail) == OCR_EBUSY) {
@@ -979,7 +979,7 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         localDeguidify(self, &(PD_MSG_FIELD_I(edt)));
         ocrDataBlock_t *db = (ocrDataBlock_t*)(PD_MSG_FIELD_IO(guid.metaDataPtr));
         ASSERT(db->fctId == self->dbFactories[0]->factoryId);
-        //DIST-TODO db: release is a blocking two-way message to make sure it executed at destination
+        //BUG #585: db: release is a blocking two-way message to make sure it executed at destination
         PD_MSG_FIELD_O(returnDetail) = self->dbFactories[0]->fcts.release(
             db, PD_MSG_FIELD_I(edt), PD_MSG_FIELD_I(properties) & DB_PROP_RT_ACQUIRE);
 #undef PD_MSG
@@ -1421,7 +1421,7 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             // For now, we return the execute function for EDTs
             PD_MSG_FIELD_IO(extra) = (u64)(self->taskFactories[0]->fcts.execute);
             // We also consider that the task to be executed is local so we
-            // return it's fully deguidified value (TODO: this may need revising)
+            // return it's fully deguidified value (BUG #586: this may need revising)
             u64 i = 0, maxCount = PD_MSG_FIELD_IO(guidCount);
             for( ; i < maxCount; ++i) {
                 localDeguidify(self, &(PD_MSG_FIELD_IO(guids)[i]));
@@ -1515,7 +1515,7 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
 
         ocrFatGuid_t src = PD_MSG_FIELD_I(source);
         ocrFatGuid_t dest = PD_MSG_FIELD_I(dest);
-        ocrDbAccessMode_t mode = (PD_MSG_FIELD_IO(properties) & DB_PROP_MODE_MASK); //lower bits is the mode //TODO not pretty
+        ocrDbAccessMode_t mode = (PD_MSG_FIELD_IO(properties) & DB_PROP_MODE_MASK); //lower bits is the mode //BUG 550: not pretty
         u32 slot = PD_MSG_FIELD_I(slot);
 
         if (srcKind == OCR_GUID_NONE) {
@@ -1615,7 +1615,7 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             }
         }
 #ifdef OCR_ENABLE_STATISTICS
-        // TODO: Fixme
+        // BUG #225: Fixme
         statsDEP_ADD(pd, getCurrentEDT(), NULL, signalerGuid, waiterGuid, NULL, slot);
 #endif
 #undef PD_MSG
@@ -1661,7 +1661,7 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             ASSERT(0); // No other things we can register signalers on
         }
 #ifdef OCR_ENABLE_STATISTICS
-        // TODO: Fixme
+        // BUG #225: Fixme
         statsDEP_ADD(pd, getCurrentEDT(), NULL, signalerGuid, waiterGuid, NULL, slot);
 #endif
 #undef PD_MSG
@@ -1700,7 +1700,7 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
                 db, waiter, PD_MSG_FIELD_I(slot), isAddDep);
         }
 #ifdef OCR_ENABLE_STATISTICS
-        // TODO: Fixme
+        // BUG #225: Fixme
         statsDEP_ADD(pd, getCurrentEDT(), NULL, signalerGuid, waiterGuid, NULL, slot);
 #endif
 #undef PD_MSG
@@ -1741,7 +1741,7 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             }
         }
 #ifdef OCR_ENABLE_STATISTICS
-        // TODO: Fixme
+        // BUG #225: Fixme
         statsDEP_ADD(pd, getCurrentEDT(), NULL, signalerGuid, waiterGuid, NULL, slot);
 #endif
 #undef PD_MSG
@@ -2170,7 +2170,6 @@ void initializePolicyDomainHc(ocrPolicyDomainFactory_t * factory, ocrPolicyDomai
     initializePolicyDomainOcr(factory, self, perInstance);
 
     ocrPolicyDomainHc_t* derived = (ocrPolicyDomainHc_t*) self;
-    //DIST-TODO ((paramListPolicyDomainHcInst_t*)perInstance)->rank;
     derived->rank = ((paramListPolicyDomainHcInst_t*)perInstance)->rank;
     //derived->state = 0;
 }

@@ -61,7 +61,7 @@ static void hcWorkShift(ocrWorker_t * worker) {
     PD_MSG_FIELD_IO(guidCount) = count;
     PD_MSG_FIELD_I(properties) = 0;
     PD_MSG_FIELD_IO(type) = OCR_GUID_EDT;
-    // TODO: In the future, potentially take more than one)
+    // BUG #586: In the future, potentially take more than one)
     if(pd->fcts.processMessage(pd, &msg, true) == 0) {
         // We got a response
         count = PD_MSG_FIELD_IO(guidCount);
@@ -263,7 +263,7 @@ u8 hcWorkerSwitchRunlevel(ocrWorker_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_
             ASSERT(callback != NULL);
             self->curState = GET_STATE(RL_MEMORY_OK, 0); // Technically last phase of memory OK but doesn't really matter
             self->desiredState = GET_STATE(RL_COMPUTE_OK, phase);
-            self->location = (u64)self; // FIXME: Temporary, to be replaced with seqId once implemented
+            self->location = (u64)self; // BUG #308: Temporary, to be replaced with seqId once implemented
 
             // See if we are blessed
             self->amBlessed = (properties & RL_BLESSED) != 0;
@@ -363,7 +363,7 @@ u8 hcWorkerSwitchRunlevel(ocrWorker_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_
 }
 
 void* hcRunWorker(ocrWorker_t * worker) {
-    // TODO: This probably needs to go away and be set directly
+    // BUG #583: This probably needs to go away and be set directly
     // by the PD during one of the RLs
     //Register this worker and get a context id
     ocrPolicyDomain_t *pd = worker->pd;
@@ -406,7 +406,7 @@ void* hcRunWorker(ocrWorker_t * worker) {
 }
 
 bool hcIsRunningWorker(ocrWorker_t * base) {
-    // TODO: This states that we are in USER mode. Do we want to include RL_COMPUTE_OK?
+    // BUG #583: This states that we are in USER mode. Do we want to include RL_COMPUTE_OK?
     return (base->curState == GET_STATE(RL_USER_OK, 0));
 }
 

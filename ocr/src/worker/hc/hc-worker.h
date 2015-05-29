@@ -36,7 +36,7 @@ typedef struct {
     u64 id;
 
     //Pause/Query/Resume variables for displaying EDTS
-    //TODO: Possibly wrap in ifdef
+    //BUG #559: Possibly wrap in ifdef
     ocrGuid_t templateGuid;
     ocrGuid_t edtGuid;
     ocrEdt_t fctPtr;

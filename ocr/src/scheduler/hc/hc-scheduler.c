@@ -219,7 +219,7 @@ u8 hcSchedulerSwitchRunlevel(ocrScheduler_t *self, ocrPolicyDomain_t *PD, ocrRun
 u8 hcSchedulerTakeEdt (ocrScheduler_t *self, u32 *count, ocrFatGuid_t *edts) {
     // Source must be a worker guid and we rely on indices to map
     // workers to workpiles (one-to-one)
-    // TODO: This is a non-portable assumption but will do for now.
+    // BUG #586: This is a non-portable assumption but will do for now.
 
     if(*count == 0) return 1; // No room to put anything
 
@@ -267,7 +267,7 @@ u8 hcSchedulerTakeEdt (ocrScheduler_t *self, u32 *count, ocrFatGuid_t *edts) {
 u8 hcSchedulerGiveEdt (ocrScheduler_t* base, u32* count, ocrFatGuid_t* edts) {
     // Source must be a worker guid and we rely on indices to map
     // workers to workpiles (one-to-one)
-    // TODO: This is a non-portable assumption but will do for now.
+    // BUG #586: This is a non-portable assumption but will do for now.
     ocrWorker_t *worker = NULL;
     ocrWorkerHc_t *hcWorker = NULL;
     getCurrentEnv(NULL, &worker, NULL, NULL);

@@ -14,13 +14,13 @@
 #include "ocr-workpile.h"
 
 #define DEBUG_TYPE SCHEDULER
-//TODO this should be set by configure or something
+//BUG #476 this should be set by configure or something
 #define HELPER_MODE 1
 
 #ifdef HELPER_MODE
 static u8 masterHelper(ocrWorker_t * worker) {
     // Save current worker context
-    //TODO this should be implemented in the worker
+    //BUG #204 this should be implemented in the worker
     ocrTask_t * suspendedTask = worker->curTask;
     DPRINTF(DEBUG_LVL_VERB, "Shifting worker from EDT GUID 0x%lx\n",
             suspendedTask->guid);
@@ -30,7 +30,7 @@ static u8 masterHelper(ocrWorker_t * worker) {
     worker->fcts.workShift(worker);
 
     // restore worker context
-    //TODO this should be implemented in the worker
+    //BUG #204 this should be implemented in the worker
     DPRINTF(DEBUG_LVL_VERB, "Worker shifting back to EDT GUID 0x%lx\n",
             suspendedTask->guid);
     worker->curTask = suspendedTask;
