@@ -76,13 +76,13 @@ OCRRUNNER=ocrrun
 # CFLAGS += -DOCR_ENABLE_VISUALIZER -DOCR_ENABLE_EDT_NAMING
 
 ifndef GASNET_ROOT
-	$(error GASNET_ROOT not specified)
+$(error GASNET_ROOT not specified)
 endif
 ifndef GASNET_CONDUIT
-	$(error GASNET_CONDUIT not specified)
+$(error GASNET_CONDUIT not specified)
 endif
 ifndef GASNET_TYPE
-	$(error GASNET_TYPE not specified)
+$(error GASNET_TYPE not specified)
 endif
 
 ########################################################################
