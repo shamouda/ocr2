@@ -111,7 +111,7 @@ in the \code{ocr-errors.h} include file and described in Table~\ref{tab:errorcod
 An OCR program's single point of entry is the user-defined main EDT (\code{mainEdt()}).
 This EDT has a function prototype that is identical to any other EDT; its parameters
 and dependences are however special: the main EDT has no parameters and has a single
-input data block that encodes the araguments passed to the program from the
+input data block that encodes the arguments passed to the program from the
 command line. The arguments can be accessed using \hyperlink{func_getArgc}{\code{getArgc()}}
 and \hyperlink{func_getArgv}{\code{getArgv()}}.
 
@@ -315,7 +315,7 @@ A platform independent limited \code{printf} functionality.
 \mbox{\tt in} & \code{fmt} & NULL terminated C format string containing the
 format of the output string\\
 \hline
-\mbox{\tt in} & \code{...} & A varaible length list of arguments in agreement with
+\mbox{\tt in} & \code{...} & A variable length list of arguments in agreement with
 \code{fmt}\\
 \hline
 \end{DoxyParams}
@@ -891,7 +891,7 @@ A status code
 Satisfying the pre-slot of an event will potentially trigger the satisfaction of
 its post-\/slot depending on its trigger rule:
 \begin{DoxyItemize}
-\item \emph{Once}, \emph{idempotentent} and \emph{sticky} events will
+\item \emph{Once}, \emph{idempotent} and \emph{sticky} events will
   satisfy their post-slot upon satisfaction of their pre-slot
 \item \emph{Latch} events will trigger if and only if the number of
   satisfactions on both their pre-slots is equal. See Section~\ref{sec:Event} for
@@ -900,7 +900,7 @@ its post-\/slot depending on its trigger rule:
 
 The \code{dataGuid} argument is used to associate a data block with the event.
 \emph{Once}, \emph{idempotent} and \emph{sticky} events will pass this data block
-down their post slot. An EDT connected to the post-slot of the event (or the post-slot
+down their post-slot. An EDT connected to the post-slot of the event (or the post-slot
 of a chain of events connected to this event) will acquire the data block
 associated with this event when it transitions to the \emph{ready} state.
 A data block passed to a \emph{latch} event is ignored.
@@ -935,7 +935,7 @@ The following macros and enums are used with OCR tasks.
 \item \code{EDT\_PROP\_FINISH} which specifies that the created EDT
   is a \emph{finish} EDT
 \item \code{EDT\_PARAM\_UNK} which specifies that the number of
-  parameters or dependences to an EDT or EDT template is unknown at this time
+  parameters or dependences to an EDT template is unknown at this time
 \item \code{EDT\_PARAM\_DEF} which specifies that the number of parameters
   or dependences to an EDT is the same as the one specified in its template
 \end{itemize}
@@ -986,18 +986,18 @@ The prototype of an EDT function is given by
 %
 \hypertarget{func_ocrEdtTemplateCreate}{
   \index{Task management@{Task management}!ocr\-Edt\-Template\-Create@{ocr\-Edt\-Template\-Create}}
-  \subsection[{ocr\-Edt\-Template\-Create}]{\setlength{\rightskip}{0pt plus 5cm}{\bf u8}ocr\-Edt\-Template\-Create(
+  \subsection[{ocr\-Edt\-Template\-Create}]{\setlength{\rightskip}{0pt plus 5cm}{\bf u8} ocr\-Edt\-Template\-Create(
 \begin{DoxyParamCaption}
 \item[{{\bf ocr\-Guid\-\_\-t} $\ast$}]{guid, }
 \item[{{\bf ocr\-Edt\-\_\-t}}]{func\-Ptr, }
 \item[{{\bf u32}}]{paramc, }
-\item[{{\bf u32}}]{depc, }
+\item[{{\bf u32}}]{depc}
 \end{DoxyParamCaption}
 )}}
 \label{func_ocrEdtTemplateCreate}
 
 The EDT template encapsulates information concerning the basic signature and behavior
-of all EDTs created based on the template. This function creats an EDT template.
+of all EDTs created based on the template. This function creates an EDT template.
 
 \begin{DoxyParams}[1]{Parameters}
 \mbox{\tt out}  & \code{guid} & On successful creation, contains the GUID of the
@@ -1011,7 +1011,7 @@ this template will take. If EDTs created based on this template can take a varia
 number of arguments, the constant EDT\_PARAM\_UNK can be used.\\
 \hline
 \mbox{\tt in}  & \code{depc} & The number of pre-slots that EDTs created based on
-this template will take. If EDTs created based on this template can take a varaible
+this template will take. If EDTs created based on this template can take a variable
 number of arguments, the constant EDT\_PARAM\_UNK can be used.\\
 \hline
 \end{DoxyParams}
@@ -1020,8 +1020,7 @@ number of arguments, the constant EDT\_PARAM\_UNK can be used.\\
 A status code:
 \begin{DoxyItemize}
 \item 0: Successful
-\item OCR\_ENOMEM: The runtime could not allocate the metadata
-  for the template
+\item OCR\_ENOMEM: The runtime could not allocate the template
 \end{DoxyItemize}
 
 \descr
@@ -1117,8 +1116,8 @@ set to NULL.\\
 \hyperlink{ocrGuid_t}{ocrGuid\_t} values or NULL. All pre-slots specified
 in this way will be acquired using \code{DB\_DEFAULT\_MODE}. Use
 \hyperlink{func_ocrAddDependence}{\code{ocrAddDependence()}} to specify an alternate
-mode. If you only want to specify only some of the pre-slots use
-\code{UNINITIALIZED\_GUID} for the unkown ones.\\
+mode. If you only want to specify some of the pre-slots use
+\code{UNINITIALIZED\_GUID} for the unknown ones.\\
 \hline
 \mbox{\tt in}  & \code{flags} & Flags controlling the behavior of EDT creation.
 The supported flags are:
@@ -1148,10 +1147,9 @@ waiters on this event are set up properly \emph{before} the EDT transitions to t
 A status code:
 \begin{DoxyItemize}
 \item 0: Successful
-\item OCR\_ENOMEM: The runtime could not create the metadata required for the
-EDT
+\item OCR\_ENOMEM: The runtime could not create the EDT
 \item OCR\_EINVAL: The GUID specifying the template is invalid or the number
-  of parameters or pre-slots is not fully resolved
+  of parameters or pre-slots are invalid
 \end{DoxyItemize}
 
 \descr
@@ -1197,7 +1195,7 @@ programmer to reclaim the memory used by the EDT
 Destroying an EDT that is in the \emph{runnable} state or later will result in
 undefined behavior.
 
-If the EDT had an associated \code{outputEvent}, that event will also be explictly
+If the EDT had an associated \code{outputEvent}, that event will also be explicitly
 destroyed.
 \end{DoxyNote}
 
@@ -1285,7 +1283,7 @@ The following dependences can be added:
   \emph{runnable} to \emph{ready} state, the data block associated with the
   post-slot of the event will be acquired using the \code{mode} specified.
 \item Data block to event: Equivalent to \hyperlink{func_ocrEventSatisfySlot}{
-  \code{ocrEventSatisfySlot}}:\code{ocrAddDependence(db, evt, slot)} is
+  \code{ocrEventSatisfySlot}}; \code{ocrAddDependence(db, evt, slot, mode)} is
   equivalent to \code{ocrEventSatisfySlot(evt, db, slot)}.
 \item Data block to EDT: This represents a pure data dependence. Adding a
   dependence between a data block and an EDT immediately satisfies the pre-slot
@@ -1293,6 +1291,6 @@ The following dependences can be added:
   to the \emph{ready} state, the data block will be acquired using the
   \code{mode} specified.
 \item NULL\_GUID to event or EDT: This is equivalent to ``data block to event''
-  or ``data block to EDT'' where the data is non-existant.
+  or ``data block to EDT'' where the data is non-existent.
 \end{DoxyItemize}
 % This is the end of ch2-ocrAPI.tex of the OCR specification.
