@@ -50,14 +50,14 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrEdtTemplateCreate(&chainedEdtTemplateGuid, chainedEdt, 0 /*paramc*/, 2 /*depc*/);
     ocrEdtCreate(&chainedEdtGuid, chainedEdtTemplateGuid, EDT_PARAM_DEF, /*paramv=*/NULL, EDT_PARAM_DEF, /*depv=*/NULL,
                  /*properties=*/ EDT_PROP_FINISH, NULL_GUID, /*outEvent=*/NULL);
-    ocrAddDependence(output_event_guid, chainedEdtGuid, 0, DB_MODE_RO);
-    ocrAddDependence(input_event_guid, chainedEdtGuid, 1, DB_MODE_RO);
+    ocrAddDependence(output_event_guid, chainedEdtGuid, 0, DB_MODE_CONST);
+    ocrAddDependence(input_event_guid, chainedEdtGuid, 1, DB_MODE_CONST);
 
     // parent edt: Add dependence, schedule and trigger
     // Note: we don't strictly need to have a dependence here, it's just
     // to get a little bit more control so as to when the root edt gets
     // a chance to be scheduled.
-    ocrAddDependence(event_guid, edtGuid, 0, DB_MODE_RO);
+    ocrAddDependence(event_guid, edtGuid, 0, DB_MODE_CONST);
 
     // Transmit the parent edt's guid as a parameter to the chained edt
     // Build input db for the chained edt

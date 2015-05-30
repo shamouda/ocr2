@@ -38,7 +38,10 @@ u8 ocrGuidMapCreate(ocrGuid_t *mapGuid, u32 numParams,
     PD_MSG_FIELD_I(size) = ((sizeof(ocrGuidMap_t) + sizeof(s64) - 1) & ~(sizeof(s64)-1)) + numParams*sizeof(s64);
     PD_MSG_FIELD_I(kind) = OCR_GUID_GUIDMAP;
     PD_MSG_FIELD_I(properties) = 0;
-    RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, true));
+    u8 returnCode = pd->fcts.processMessage(pd, &msg, true);
+    if(!((returnCode == 0) && ((returnCode = PD_MSG_FIELD_O(returnDetail)) == 0))) {
+        return returnCode;
+    }
     myMap = PD_MSG_FIELD_IO(guid.metaDataPtr);
     *mapGuid = PD_MSG_FIELD_IO(guid.guid);
 #undef PD_TYPE
@@ -56,7 +59,11 @@ u8 ocrGuidMapCreate(ocrGuid_t *mapGuid, u32 numParams,
     PD_MSG_FIELD_I(numberGuids) = numberGuid;
     PD_MSG_FIELD_I(guidKind) = (ocrGuidKind)kind;
     // TODO: There is a leak if this fails
-    RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, true));
+    returnCode = pd->fcts.processMessage(pd, &msg, true);
+    if(!((returnCode == 0) && ((returnCode = PD_MSG_FIELD_O(returnDetail)) == 0))) {
+        return returnCode;
+    }
+
     myMap->startGuid = PD_MSG_FIELD_O(startGuid);
     myMap->skipGuid = PD_MSG_FIELD_O(skipGuid);
 #undef PD_TYPE
@@ -80,7 +87,11 @@ u8 ocrGuidRangeCreate(ocrGuid_t *mapGuid,
     PD_MSG_FIELD_I(size) = sizeof(ocrGuidMap_t);
     PD_MSG_FIELD_I(kind) = OCR_GUID_GUIDMAP;
     PD_MSG_FIELD_I(properties) = 0;
-    RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, true));
+    u8 returnCode = pd->fcts.processMessage(pd, &msg, true);
+    if(!((returnCode == 0) && ((returnCode = PD_MSG_FIELD_O(returnDetail)) == 0))) {
+        return returnCode;
+    }
+
     myMap = PD_MSG_FIELD_IO(guid.metaDataPtr);
     *mapGuid = PD_MSG_FIELD_IO(guid.guid);
 #undef PD_TYPE
@@ -97,7 +108,10 @@ u8 ocrGuidRangeCreate(ocrGuid_t *mapGuid,
     PD_MSG_FIELD_I(numberGuids) = numberGuid;
     PD_MSG_FIELD_I(guidKind) = (ocrGuidKind)kind;
     // TODO: There is a leak if this fails
-    RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, true));
+    returnCode = pd->fcts.processMessage(pd, &msg, true);
+    if(!((returnCode == 0) && ((returnCode = PD_MSG_FIELD_O(returnDetail)) == 0))) {
+        return returnCode;
+    }
     myMap->startGuid = PD_MSG_FIELD_O(startGuid);
     myMap->skipGuid = PD_MSG_FIELD_O(skipGuid);
 #undef PD_TYPE
@@ -128,7 +142,10 @@ u8 ocrGuidMapDestroy(ocrGuid_t mapGuid) {
     PD_MSG_FIELD_I(startGuid) = myMap->startGuid;
     PD_MSG_FIELD_I(skipGuid) = myMap->skipGuid;
     PD_MSG_FIELD_I(numberGuids) = myMap->numGuids;
-    RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, true));
+    u8 returnCode = pd->fcts.processMessage(pd, &msg, true);
+    if(!((returnCode == 0) && ((returnCode = PD_MSG_FIELD_O(returnDetail)) == 0))) {
+        return returnCode;
+    }
 #undef PD_TYPE
 
     // Now free the GUID
@@ -165,7 +182,11 @@ u8 ocrGuidFromLabel(ocrGuid_t *outGuid, ocrGuid_t mapGuid, s64* tuple) {
     PD_MSG_FIELD_IO(guid.guid) = mapGuid;
     PD_MSG_FIELD_IO(guid.metaDataPtr) = NULL;
     PD_MSG_FIELD_I(properties) = RMETA_GUIDPROP;
-    RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, true));
+    u8 returnCode = pd->fcts.processMessage(pd, &msg, true);
+    //Warning PD_MSG_GUID_INFO returns GUID properties as 'returnDetail', not error code
+    if(returnCode != 0) {
+        return returnCode;
+    }
     myMap = (ocrGuidMap_t*)PD_MSG_FIELD_IO(guid.metaDataPtr);
 #undef PD_TYPE
 #undef PD_MSG
@@ -197,7 +218,11 @@ u8 ocrGuidFromIndex(ocrGuid_t *outGuid, ocrGuid_t rangeGuid, u64 idx) {
     PD_MSG_FIELD_IO(guid.guid) = rangeGuid;
     PD_MSG_FIELD_IO(guid.metaDataPtr) = NULL;
     PD_MSG_FIELD_I(properties) = RMETA_GUIDPROP;
-    RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, true));
+    u8 returnCode = pd->fcts.processMessage(pd, &msg, true);
+    //Warning PD_MSG_GUID_INFO returns GUID properties as 'returnDetail', not error code
+    if(returnCode != 0) {
+        return returnCode;
+    }
     myMap = (ocrGuidMap_t*)PD_MSG_FIELD_IO(guid.metaDataPtr);
 #undef PD_TYPE
 #undef PD_MSG

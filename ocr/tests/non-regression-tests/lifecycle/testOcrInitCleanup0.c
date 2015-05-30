@@ -34,7 +34,7 @@ void test () {
                  EDT_PARAM_DEF, /*depv=*/NULL, 0, NULL_GUID, NULL);
 
     // Register a dependence between an event and an edt
-    ocrAddDependence(eventGuid, edtGuid, 0, DB_MODE_RO);
+    ocrAddDependence(eventGuid, edtGuid, 0, DB_MODE_CONST);
 
     int *k;
     ocrGuid_t db_guid;

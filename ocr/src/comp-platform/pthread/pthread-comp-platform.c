@@ -41,9 +41,9 @@ pthread_key_t selfKey;
 
 /**
  * The keyInit boolean allows threads to know if they can lookup the TLS key or not.
- * TODO: may disappear once we clearly define runlevels trac #80
+ * BUG #583: may disappear once we clearly define runlevels trac #80
  */
-// TODO-RL: We should be able to check the PD's RL instead
+// BUG #583: RL: We should be able to check the PD's RL instead
 // REC: I was wondering about that and it looked like
 //static bool keyInit = false;
 

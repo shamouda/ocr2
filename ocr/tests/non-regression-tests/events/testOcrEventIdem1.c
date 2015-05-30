@@ -38,8 +38,8 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
                  /*properties=*/0, NULL_GUID, /*outEvent=*/NULL);
 
     // Register a dependence between an event and an edt
-    ocrAddDependence(e0, edtGuid, 0, DB_MODE_RO);
-    ocrAddDependence(e1, edtGuid, 1, DB_MODE_RO);
+    ocrAddDependence(e0, edtGuid, 0, DB_MODE_CONST);
+    ocrAddDependence(e1, edtGuid, 1, DB_MODE_CONST);
 
     int *k0;
     ocrGuid_t dbGuid0;

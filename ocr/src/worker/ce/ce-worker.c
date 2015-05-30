@@ -81,7 +81,7 @@ void initializeWorkerCe(ocrWorkerFactory_t * factory, ocrWorker_t* base, ocrPara
     base->type = ((paramListWorkerCeInst_t*)perInstance)->workerType;
 
     ocrWorkerCe_t * workerCe = (ocrWorkerCe_t *) base;
-    workerCe->id = ((paramListWorkerCeInst_t*)perInstance)->workerId;
+    workerCe->id = ((paramListWorkerInst_t*)perInstance)->workerId;
     workerCe->running = false;
 }
 

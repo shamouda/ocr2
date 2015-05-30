@@ -103,7 +103,7 @@
 // Affinity support
 #define ENABLE_EXTENSION_AFFINITY
 
-// Runtime extension support (disabled by default)
+// Runtime extension support
 #define ENABLE_EXTENSION_RTITF
 
 // Build pause/resume support

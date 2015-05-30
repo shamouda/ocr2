@@ -54,7 +54,7 @@ ocrGuid_t processRequestEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[
     DPRINTF(DEBUG_LVL_VVERB,"hc-comm-worker: Process incoming EDT request @ %p of type 0x%x\n", msg, msg->type);
     u8 res = pd->fcts.processMessage(pd, msg, syncProcess);
     DPRINTF(DEBUG_LVL_VVERB,"hc-comm-worker: [done] Process incoming EDT @ %p request of type 0x%x\n", msg, msg->type);
-    //TODO probably want a return code that tells if the message can be discarded or not
+    //BUG #587 probably want a return code that tells if the message can be discarded or not
     if (res == OCR_EPEND) {
         if ((msg->type & PD_MSG_TYPE_ONLY) == PD_MSG_DB_ACQUIRE) {
             // Acquire requests are consumed and can be discarded.
@@ -116,12 +116,12 @@ static u8 takeFromSchedulerAndSend(ocrPolicyDomain_t * pd) {
             ASSERT(outgoingHandle->response == NULL);
             u32 properties = outgoingHandle->properties;
             ASSERT(properties & PERSIST_MSG_PROP);
-            //DIST-TODO design: Not sure where to draw the line between one-way with/out ack implementation
+            //BUG #587 design: Not sure where to draw the line between one-way with/out ack implementation
             //If the worker was not aware of the no-ack policy, is it ok to always give a handle
             //and the comm-api contract is to at least set the HDL_SEND_OK flag ?
             ocrMsgHandle_t ** sendHandle = ((properties & TWOWAY_MSG_PROP) && !(properties & ASYNC_MSG_PROP))
                 ? &outgoingHandle : NULL;
-            //DIST-TODO design: who's responsible for deallocating the handle ?
+            //BUG #587 design: who's responsible for deallocating the handle ?
             //If the message is two-way, the creator of the handle is responsible for deallocation
             //If one-way, the comm-layer disposes of the handle when it is not needed anymore
             //=> Sounds like if an ack is expected, caller is responsible for dealloc, else callee
@@ -258,7 +258,7 @@ static void workerLoopHcCommInternal(ocrWorker_t * worker, ocrPolicyDomain_t *pd
             #endif
                 // We do not need the handle anymore
                 handle->destruct(handle);
-                //DIST-TODO-3: depending on comm-worker implementation, the received message could
+                //BUG #587: depending on comm-worker implementation, the received message could
                 //then be 'wrapped' in an EDT and pushed to the deque for load-balancing purpose.
             }
         }
@@ -503,7 +503,7 @@ u8 hcCommWorkerSwitchRunlevel(ocrWorker_t *self, ocrPolicyDomain_t *PD, ocrRunle
                 self->desiredState = GET_STATE(RL_USER_OK, PHASE_COMM_QUIESCE);
             }
 
-            //TODO-RL Last phase that transitions to another runlevel
+            //BUG #583: RL Last phase that transitions to another runlevel
             if(RL_IS_LAST_PHASE_DOWN(PD, RL_USER_OK, phase)) {
                 ASSERT(phase == PHASE_DONE);
                 // We need to break out of the compute loop
@@ -534,7 +534,7 @@ u8 hcCommWorkerSwitchRunlevel(ocrWorker_t *self, ocrPolicyDomain_t *PD, ocrRunle
 
 // NOTE: This is exactly the same as the runWorkerHc beside the call to the different work loop
 void* runWorkerHcComm(ocrWorker_t * worker) {
-    // TODO: This probably needs to go away and be set directly
+    // BUG #583: This probably needs to go away and be set directly
     // by the PD during one of the RLs
     //Register this worker and get a context id
     ocrPolicyDomain_t *pd = worker->pd;

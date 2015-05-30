@@ -31,6 +31,7 @@ typedef struct _paramListWorkerFact_t {
 
 typedef struct _paramListWorkerInst_t {
     ocrParamList_t base;
+    u64 workerId;
 } paramListWorkerInst_t;
 
 /******************************************************/

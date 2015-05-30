@@ -637,7 +637,7 @@ void destroyRange(rangeTracker_t *self) {
 // 'skipLock' is used by initializeRange() function
 u8 splitRange(rangeTracker_t *range, u64 startAddr, u64 size, ocrMemoryTag_t tag, u32 skipLock) {
 
-    // TODO: Convert some asserts to return error codes
+    // BUG #593: Convert some asserts to return error codes
     /*
      * Explanation: to split the range, we are actually going to insert
      * two points S and E at startAddr and startAddr+size. The following
@@ -735,7 +735,7 @@ u8 getRegionWithTag(rangeTracker_t *range, ocrMemoryTag_t tag, u64 *startRange, 
         *startRange = tagNode->node->key;
         avlBinaryNode_t *upperBound = avlSearch(range->rangeSplits, *startRange, 2);
         *endRange = upperBound?upperBound->key:range->maximum;
-        *iterate = iterationCount + 1; // TODO: Not good for last range
+        *iterate = iterationCount + 1; // BUG #593: Not good for last range
 
         UNLOCK(&(range->lock));
         return 0;

@@ -20,7 +20,6 @@ typedef struct {
 
 typedef struct _paramListWorkerHcInst_t {
     paramListWorkerInst_t base;
-    u64 workerId;
     ocrWorkerType_t workerType;
 } paramListWorkerHcInst_t;
 
@@ -34,9 +33,8 @@ typedef struct {
     // The HC implementation relies on integer ids to
     // map workers, schedulers and workpiles together
     u64 id;
-
     //Pause/Query/Resume variables for displaying EDTS
-    //TODO: Possibly wrap in ifdef
+    //BUG #559: Possibly wrap in ifdef
     ocrGuid_t templateGuid;
     ocrGuid_t edtGuid;
     ocrEdt_t fctPtr;
@@ -44,6 +42,7 @@ typedef struct {
     char * name;
 #endif
     hcWorkerType_t hcType;
+    u8 legacySecondStart;
 } ocrWorkerHc_t;
 
 ocrGuid_t hcDumpNextEdt(ocrWorker_t *worker, u32 *wrkrSize);

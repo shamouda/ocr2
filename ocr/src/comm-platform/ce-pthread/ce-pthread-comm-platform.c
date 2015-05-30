@@ -165,7 +165,7 @@ u8 cePthreadCommSendMessage(ocrCommPlatform_t *self, ocrLocation_t target, ocrPo
                 channel->message = &(channel->messageBuffer);
                 hal_fence();
                 ++(channel->remoteCounter);
-            } else if ((msg->type & PD_MSG_TYPE_ONLY) == PD_MSG_MGT_SHUTDOWN && channelMessage != &(channel->overwriteBuffer)) {
+            } else if ((msg->type & PD_MSG_TYPE_ONLY) == PD_MSG_RL_NOTIFY && channelMessage != &(channel->overwriteBuffer)) {
                 //Special case for shutdown: Overwrite any exisiting messages in the buffer
                 ASSERT(channel->overwriteBuffer.bufferSize >= baseSize + marshalledSize);
                 ocrPolicyMsgMarshallMsg(msg, baseSize, (u8*)(&(channel->overwriteBuffer)), MARSHALL_FULL_COPY);

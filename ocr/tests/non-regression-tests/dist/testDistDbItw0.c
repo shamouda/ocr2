@@ -79,8 +79,8 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrGuid_t shutdownGuid;
     ocrEdtCreate(&shutdownGuid, shutdownEdtTemplateGuid, 0, NULL, NB_WRITERS+1, NULL,
                  EDT_PROP_NONE, affinity, NULL);
-    ocrAddDependence(dbGuid, shutdownGuid, 0, DB_MODE_RO);
-    // ocrAddDependence(NULL_GUID, shutdownGuid, 0, DB_MODE_RO);
+    ocrAddDependence(dbGuid, shutdownGuid, 0, DB_MODE_CONST);
+    // ocrAddDependence(NULL_GUID, shutdownGuid, 0, DB_MODE_CONST);
 
     // create writer EDT for the DB in ITW mode @ affinity
     ocrGuid_t writerEdtTemplateGuid;
@@ -92,9 +92,9 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
         ocrGuid_t writerEdtGuid;
         ocrEdtCreate(&writerEdtGuid, writerEdtTemplateGuid, 1, &i, 1, NULL,
                      EDT_PROP_NONE, affinities[i % affinityCount], &outputEventGuid);
-        ocrAddDependence(outputEventGuid, shutdownGuid, i+1, DB_MODE_RO);
-        ocrAddDependence(dbGuid, writerEdtGuid, 0, DB_MODE_ITW);
-        // ocrAddDependence(NULL_GUID, writerEdtGuid, 0, DB_MODE_ITW);
+        ocrAddDependence(outputEventGuid, shutdownGuid, i+1, DB_MODE_CONST);
+        ocrAddDependence(dbGuid, writerEdtGuid, 0, DB_MODE_RW);
+        // ocrAddDependence(NULL_GUID, writerEdtGuid, 0, DB_MODE_RW);
         i++;
     }
 

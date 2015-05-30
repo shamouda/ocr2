@@ -97,7 +97,7 @@ u8 ptSwitchRunlevel(ocrCompTarget_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t 
             }
         }
         break;
-// TODO Where should this go?
+// BUG #225 Where should this go?
 #ifdef OCR_ENABLE_STATISTICS
         statsCOMPTARGET_START(PD, compTarget->fguid.guid, compTarget->fguid.metaDataPtr);
 #endif

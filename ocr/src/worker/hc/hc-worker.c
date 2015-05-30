@@ -37,11 +37,6 @@
 /* OCR-HC WORKER                                      */
 /******************************************************/
 
-// Convenient to have an id to index workers in pools
-static inline u64 getWorkerId(ocrWorker_t * worker) {
-    ocrWorkerHc_t * hcWorker = (ocrWorkerHc_t *) worker;
-    return hcWorker->id;
-}
 
 static void hcWorkShift(ocrWorker_t * worker) {
     ocrPolicyDomain_t * pd;
@@ -61,7 +56,7 @@ static void hcWorkShift(ocrWorker_t * worker) {
     PD_MSG_FIELD_IO(guidCount) = count;
     PD_MSG_FIELD_I(properties) = 0;
     PD_MSG_FIELD_IO(type) = OCR_GUID_EDT;
-    // TODO: In the future, potentially take more than one)
+    // BUG #586: In the future, potentially take more than one)
     if(pd->fcts.processMessage(pd, &msg, true) == 0) {
         // We got a response
         count = PD_MSG_FIELD_IO(guidCount);
@@ -152,8 +147,11 @@ static void workerLoop(ocrWorker_t * worker) {
             worker->fcts.workShift(worker);
             EXIT_PROFILE;
         }
-        // Here we are shifting to another runlevel or phase
+        DPRINTF(DEBUG_LVL_VERB, "Dropped out of curState(%u,%u) going to desiredState(%u,%u)\n", worker->seqId,
+                                GET_STATE_RL(worker->curState), GET_STATE_PHASE(worker->curState),
+                                GET_STATE_RL(worker->desiredState), GET_STATE_PHASE(worker->desiredState));
 
+        // Here we are shifting to another runlevel or phase
         switch(GET_STATE_RL(worker->desiredState)) {
         case RL_USER_OK: {
             u8 desiredPhase = GET_STATE_PHASE(worker->desiredState);
@@ -170,7 +168,6 @@ static void workerLoop(ocrWorker_t * worker) {
             u8 phase = GET_STATE_PHASE(worker->desiredState);
             if(RL_IS_FIRST_PHASE_DOWN(worker->pd, RL_COMPUTE_OK, phase)) {
                 DPRINTF(DEBUG_LVL_VERB, "Noticed transition to RL_COMPUTE_OK\n");
-
                 // We first change our state prior to the callback
                 // because we may end up doing some of the callback processing
                 worker->curState = worker->desiredState;
@@ -263,11 +260,9 @@ u8 hcWorkerSwitchRunlevel(ocrWorker_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_
             ASSERT(callback != NULL);
             self->curState = GET_STATE(RL_MEMORY_OK, 0); // Technically last phase of memory OK but doesn't really matter
             self->desiredState = GET_STATE(RL_COMPUTE_OK, phase);
-            self->location = (u64)self; // FIXME: Temporary, to be replaced with seqId once implemented
 
             // See if we are blessed
             self->amBlessed = (properties & RL_BLESSED) != 0;
-
             if(!(properties & RL_PD_MASTER)) {
                 self->callback = callback;
                 self->callbackArg = val;
@@ -327,12 +322,25 @@ u8 hcWorkerSwitchRunlevel(ocrWorker_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_
                     self->callbackArg = 0ULL;
                     hal_fence();
                     self->desiredState = GET_STATE(RL_USER_OK, (RL_GET_PHASE_COUNT_DOWN(PD, RL_USER_OK))); // We put ourself one past
-                    // so that we can then come back down when
-                    // shutting down
+                    // so that we can then come back down when shutting down
                 } else {
                     // At this point, the original capable thread goes to work
-                    self->curState = self->desiredState = GET_STATE(RL_USER_OK, (RL_GET_PHASE_COUNT_DOWN(PD, RL_USER_OK)));
-                    workerLoop(self);
+                    self->curState = GET_STATE(RL_USER_OK, (RL_GET_PHASE_COUNT_DOWN(PD, RL_USER_OK)));
+                    if (!((ocrWorkerHc_t*) self)->legacySecondStart) {
+                        self->desiredState = self->curState;
+                        if (properties & RL_LEGACY) {
+                            // amBlessed was set to true when the runtime is brought up in COMPUTE_OK
+                            // but it is not known whether we are in legacy mode or not at that point.
+                            // There's no blessed worker in legacy mode, flip to false so that
+                            // the master thread legacy's second start does not try to execute a mainEdt.
+                            self->amBlessed = false;
+                        }
+                        ((ocrWorkerHc_t*) self)->legacySecondStart = true;
+                    }
+
+                    if (!(properties & RL_LEGACY)) {
+                        workerLoop(self);
+                    }
                 }
             }
         }
@@ -363,7 +371,7 @@ u8 hcWorkerSwitchRunlevel(ocrWorker_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_
 }
 
 void* hcRunWorker(ocrWorker_t * worker) {
-    // TODO: This probably needs to go away and be set directly
+    // BUG #583: This probably needs to go away and be set directly
     // by the PD during one of the RLs
     //Register this worker and get a context id
     ocrPolicyDomain_t *pd = worker->pd;
@@ -373,7 +381,8 @@ void* hcRunWorker(ocrWorker_t * worker) {
 #define PD_MSG (&msg)
 #define PD_TYPE PD_MSG_MGT_REGISTER
     msg.type = PD_MSG_MGT_REGISTER | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
-    PD_MSG_FIELD_I(loc) = (ocrLocation_t)getWorkerId(worker);
+    // The original 'id' value is read from the CFG file
+    PD_MSG_FIELD_I(loc) = (ocrLocation_t) worker->seqId;
     PD_MSG_FIELD_I(properties) = 0;
     pd->fcts.processMessage(pd, &msg, true);
     worker->seqId = PD_MSG_FIELD_O(seqId);
@@ -406,7 +415,7 @@ void* hcRunWorker(ocrWorker_t * worker) {
 }
 
 bool hcIsRunningWorker(ocrWorker_t * base) {
-    // TODO: This states that we are in USER mode. Do we want to include RL_COMPUTE_OK?
+    // BUG #583: This states that we are in USER mode. Do we want to include RL_COMPUTE_OK?
     return (base->curState == GET_STATE(RL_USER_OK, 0));
 }
 
@@ -429,12 +438,12 @@ ocrWorker_t* newWorkerHc(ocrWorkerFactory_t * factory, ocrParamList_t * perInsta
 void initializeWorkerHc(ocrWorkerFactory_t * factory, ocrWorker_t* self, ocrParamList_t * perInstance) {
     initializeWorkerOcr(factory, self, perInstance);
     self->type = ((paramListWorkerHcInst_t*)perInstance)->workerType;
-    u64 workerId = ((paramListWorkerHcInst_t*)perInstance)->workerId;;
+    u64 workerId = ((paramListWorkerInst_t*)perInstance)->workerId;
     ASSERT((workerId && self->type == SLAVE_WORKERTYPE) ||
            (workerId == 0 && self->type == MASTER_WORKERTYPE));
     ocrWorkerHc_t * workerHc = (ocrWorkerHc_t*) self;
-    workerHc->id = workerId;
     workerHc->hcType = HC_WORKER_COMP;
+    workerHc->legacySecondStart = false;
 }
 
 //return guid of next EDT on specified worker's workpile

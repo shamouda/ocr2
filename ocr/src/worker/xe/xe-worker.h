@@ -20,7 +20,6 @@ typedef struct {
 
 typedef struct _paramListWorkerXeInst_t {
     paramListWorkerInst_t base;
-    u64 workerId;
 } paramListWorkerXeInst_t;
 
 typedef struct {

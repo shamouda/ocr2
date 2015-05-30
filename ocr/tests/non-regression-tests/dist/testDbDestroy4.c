@@ -75,14 +75,14 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrGuid_t destroyEdtGuid;
     ocrEdtCreate(&destroyEdtGuid, destroyEdtTemplateGuid, 0, NULL, 1, NULL,
                  EDT_PROP_NONE, NULL_GUID, NULL);
-    ocrAddDependence(eventGuid, destroyEdtGuid, 0, DB_MODE_RO);
+    ocrAddDependence(eventGuid, destroyEdtGuid, 0, DB_MODE_CONST);
 
     // Setup reader EDT, takes the array of guid as depv
     ocrGuid_t readerEdtGuid;
     ocrEdtCreate(&readerEdtGuid, readerEdtTemplateGuid, 0, NULL, 2, NULL,
                  EDT_PROP_NONE, NULL_GUID, NULL);
-    ocrAddDependence(dbGuid, readerEdtGuid, 0, DB_MODE_RO);
-    ocrAddDependence(evGuidArray, readerEdtGuid, 1, DB_MODE_RO);
+    ocrAddDependence(dbGuid, readerEdtGuid, 0, DB_MODE_CONST);
+    ocrAddDependence(evGuidArray, readerEdtGuid, 1, DB_MODE_CONST);
 
     return NULL_GUID;
 }

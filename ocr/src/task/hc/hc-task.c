@@ -228,7 +228,7 @@ static u8 finishLatchCheckin(ocrPolicyDomain_t *pd, ocrPolicyMsg_t *msg,
 #undef PD_TYPE
 #define PD_TYPE PD_MSG_DEP_ADD
     msg->type = PD_MSG_DEP_ADD | PD_MSG_REQUEST;
-    PD_MSG_FIELD_IO(properties) = DB_MODE_RO; // not called from add-dependence
+    PD_MSG_FIELD_IO(properties) = DB_MODE_CONST; // not called from add-dependence
     PD_MSG_FIELD_I(source) = sourceEvent;
     PD_MSG_FIELD_I(dest) = latchEvent;
     PD_MSG_FIELD_I(slot) = OCR_EVENT_LATCH_DECR_SLOT;
@@ -1107,7 +1107,7 @@ u8 taskExecute(ocrTask_t* base) {
             PD_MSG_FIELD_I(currentEdt.metaDataPtr) = base;
             PD_MSG_FIELD_I(slot) = 0; // Always satisfy on slot 0. This will trickle to
             // the finish latch if needed
-            PD_MSG_FIELD_IO(properties) = DB_MODE_RO;
+            PD_MSG_FIELD_IO(properties) = DB_MODE_CONST;
             // Ignore failure for now
             // FIXME: Probably need to be a bit more selective
             pd->fcts.processMessage(pd, &msg, false);

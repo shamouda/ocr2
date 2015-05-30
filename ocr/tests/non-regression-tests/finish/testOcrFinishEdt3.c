@@ -76,15 +76,15 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrEdtTemplateCreate(&terminateEdtTemplateGuid, terminateEdt, 0 /*paramc*/, 2 /*depc*/);
     ocrEdtCreate(&terminateEdtGuid, terminateEdtTemplateGuid, EDT_PARAM_DEF, /*paramv=*/NULL, EDT_PARAM_DEF, /*depv=*/NULL,
                  /*properties=*/0, NULL_GUID, /*outEvent=*/NULL);
-    ocrAddDependence(dbGuid, terminateEdtGuid, 0, DB_MODE_RO);
-    ocrAddDependence(finishEdtOutputEventGuid, terminateEdtGuid, 1, DB_MODE_RO);
+    ocrAddDependence(dbGuid, terminateEdtGuid, 0, DB_MODE_CONST);
+    ocrAddDependence(finishEdtOutputEventGuid, terminateEdtGuid, 1, DB_MODE_CONST);
 
     // Use an event to channel the db guid to the main edt
     // Could also pass it directly as a depv
     ocrGuid_t dbEventGuid;
     ocrEventCreate(&dbEventGuid, OCR_EVENT_STICKY_T, true);
 
-    ocrAddDependence(dbEventGuid, computeEdtGuid, 0, DB_MODE_RO);
+    ocrAddDependence(dbEventGuid, computeEdtGuid, 0, DB_MODE_CONST);
 
     ocrEventSatisfy(dbEventGuid, dbGuid);
 

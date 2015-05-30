@@ -40,6 +40,6 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrEdtCreate(&edtHead, tspawn, 2, args, 1, NULL, EDT_PROP_FINISH, NULL_GUID, &eventDone);
     ocrEdtCreate(&edtDone, tdone , 0, NULL, 1, &eventDone, EDT_PROP_NONE, NULL_GUID, NULL);
     // Triggers the head spawn edt
-    ocrAddDependence(NULL_GUID, edtHead, 0, DB_MODE_RO);
+    ocrAddDependence(NULL_GUID, edtHead, 0, DB_MODE_CONST);
     return NULL_GUID;
 }

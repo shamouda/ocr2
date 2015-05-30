@@ -161,7 +161,7 @@ typedef struct _paramListPolicyDomainInst_t {
 /**< Release the GUID (destroy the association between the u64
  * value and the GUID and optionally destroy the associated
  * metadata */
-#define PD_MSG_GUID_DESTROY     0x00045020
+#define PD_MSG_GUID_DESTROY     0x00046020
 
 /**< AND with this and if result non-null, GUID distribution related
  * operation (taking/giving EDTs, DBs, events, etc)
@@ -180,7 +180,7 @@ typedef struct _paramListPolicyDomainInst_t {
 #define PD_MSG_DEP_OP           0x080
 /**< Add a dependence. This will call registerSignaler and registerWaiter
  * on both sides of the dependence as appropriate*/
-#define PD_MSG_DEP_ADD          0x000C1080
+#define PD_MSG_DEP_ADD          0x000c1080
 
 /**< Register a signaler on a waiter. This is called internally by the PD
  * as a result of PD_MSG_DEP_ADD (potentially). DEP_ADD is effectively
@@ -944,19 +944,6 @@ typedef struct _ocrPolicyMsg_t {
         struct {
             union {
                 struct {
-                    ocrFatGuid_t currentEdt;   /**< In: EDT that is calling shutdown */
-                    u32 properties;            /**< In: Properties */
-                    u8 errorCode;              /**< In: User provided error code */
-                } in;
-                struct {
-                    u32 returnDetail;          /**< Out: Success or error code */
-                } out;
-            } inOrOut __attribute__ (( aligned(8) ));
-        } PD_MSG_STRUCT_NAME(PD_MSG_MGT_SHUTDOWN);
-
-        struct {
-            union {
-                struct {
                     u32 properties;    /**< In */
                 } in;
                 struct {
@@ -1121,7 +1108,7 @@ typedef struct _ocrPolicyDomainFcts_t {
      *
      * @param[in]     self       This policy domain
      * @param[in/out] msg        Message to process. Response will be
-     *                           contained in msg if a response i
+     *                           contained in msg if a response is
      *                           required and isBlocking is true. In all
      *                           cases, the message pointer must be
      *                           freed by the caller

@@ -204,17 +204,14 @@ typedef struct _ocrDataBlock_t {
 } ocrDataBlock_t;
 
 // User DB properties
-// Mask to extract the db mode when carried through properties
-#define DB_PROP_MODE_MASK 0xE
+#define DB_ACCESS_MODE_MASK 0xF /**< Bits encodinf the access modes (see inc/ocr-types.h) */
 
 // Runtime DB properties (upper 16 bits of a u32)
-//Properties
-#define DB_PROP_RT_ACQUIRE     0x1 // DB acquired by runtime
-#define DB_PROP_RT_OBLIVIOUS    0x20 // TODO DBX Runtime acquires local DB, write and do not release
+#define DB_PROP_RT_ACQUIRE     0x10000 // DB acquired by runtime
+#define DB_PROP_RT_OBLIVIOUS   0x20000 // TODO DBX Runtime acquires local DB, write and do not release
 
-//Runtime Flags (4 bits)
-#define DB_FLAG_RT_FETCH       0x1000
-#define DB_FLAG_RT_WRITE_BACK  0x2000
+#define DB_FLAG_RT_FETCH       0x100000
+#define DB_FLAG_RT_WRITE_BACK  0x200000
 
 /****************************************************/
 /* OCR DATABLOCK FACTORY                            */

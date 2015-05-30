@@ -74,7 +74,7 @@ ocrGuid_t driverEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
 #if TIME_ADD_DEP
             get_time(&start);
 #endif
-            ocrAddDependence(prodGuid, consGuid, 0, DB_MODE_RO);
+            ocrAddDependence(prodGuid, consGuid, 0, DB_MODE_CONST);
 #if TIME_ADD_DEP
             get_time(&stop);
             accTimerAddDep += elapsed_usec(&start, &stop);
