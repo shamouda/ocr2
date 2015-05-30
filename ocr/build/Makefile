@@ -14,10 +14,10 @@ default:
 	@echo ""
 	@echo "Valid version are:"
 	@echo ""
-	@echo "   x86     -- OCR for X86 Linux machines"
-	@echo "   tg-x86      -- OCR for Traleika Glacier but emulated on X86"
-	@echo "   tg-ce       -- CE parts of OCR for Traleika Glacier"
-	@echo "   tg-xe       -- XE parts of OCR for Traleika Glacier"
+	@echo "   x86          -- OCR for X86 Linux machines"
+	@echo "   tg-x86       -- OCR for Traleika Glacier but emulated on X86 (WIP)"
+	@echo "   tg-ce        -- CE parts of OCR for Traleika Glacier"
+	@echo "   tg-xe        -- XE parts of OCR for Traleika Glacier"
 	@echo "   builder-ce   -- CE struct builder for Traleika Glacier on X86"
 	@echo "   builder-xe   -- XE struct builder for Traleika Glacier on X86"
 	@echo ""
@@ -69,7 +69,7 @@ clean:
 .PHONY: squeaky
 squeaky:
 	OCR_TYPE=x86 $(MAKE) -C x86 clean uninstall
-	OCR_TYPE=tg-x86 $(MAKE) -C tg-x86 clean uninstall
+#	OCR_TYPE=tg-x86 $(MAKE) -C tg-x86 clean uninstall
 	OCR_TYPE=tg-ce $(MAKE) -C tg-ce clean uninstall
 	OCR_TYPE=tg-xe $(MAKE) -C tg-xe clean uninstall
 	OCR_TYPE=builder-ce $(MAKE) -C builder-ce clean uninstall

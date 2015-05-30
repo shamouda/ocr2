@@ -152,7 +152,7 @@ def hasKeywords(enclosingList, keywords, allKeywords):
 
 # Check whether a job has the proper format
 def checkJob(inputDict):
-    checkStruct = {'name': "", 'depends': (),
+    checkStruct = {'name': "", 'keywords': (), 'depends': (),
                    'jobtype': "", 'run-args': "",
                    'param-args': "",
                    'sandbox': (), 'req-repos': (),
@@ -596,6 +596,8 @@ def main(argv=None):
         - run-args:    (string) Arguments for this job (will be concatenated with 'run-cmd'
                        from its job type to actually run the job
     It can optionally specify:
+        - keywords:    (tuple) Additional keywords specific to this job. These keywords will be
+                       appended to the keywords defined for the jobtype
         - param-args:  (string) Arguments for this job to get parameter information for this
                        job. Will be concatenated with 'param-cmd' from its job type AFTER
                        the type of parameter required.
@@ -875,7 +877,7 @@ def main(argv=None):
             jobType = allJobTypes.get(v['jobtype'])
             if jobType is None:
                 raise Usage("JobObject '%s' uses a job type '%s' which is not defined" % (k, v['jobtype']))
-            if not hasKeywords(jobType.keywords, testKeywords, True):
+            if not hasKeywords(jobType.keywords + v.get('keywords', ()), testKeywords, True):
                 myLog.info("Ignoring job '%s' due to keyword restrictions" % (v['name']))
                 toRemoveKeys.append(k)
         for k in toRemoveKeys:

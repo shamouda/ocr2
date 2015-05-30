@@ -90,7 +90,8 @@ export LDFLAGS="-L${OCR_INSTALL}/lib -locr -lpthread ${OCR_LDFLAGS}"
 export OCR_TESTS_BIN_OUTPUT=
 
 if [ -z "${OCR_CONFIG}" ]; then
-    export OCR_CONFIG=${OCR_INSTALL}/config/default.cfg
+    export OCR_CONFIG=${OCR_INSTALL}/config/generated.cfg
+    ../scripts/Configs/config-generator.py --output ${OCR_CONFIG}
     echo "OCR_CONFIG is not set, defaulting to ${OCR_CONFIG}"
 fi
 
