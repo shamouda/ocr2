@@ -5,7 +5,6 @@
 #include "ocr-types.h"
 #include <signal.h>
 #include "policy-domain/hc/hc-policy.h"
-#include "worker/hc/hc-worker.h"
 #include "comp-platform/pthread/pthread-comp-platform.h"
 #include "ocr-policy-domain.h"
 
@@ -106,7 +105,8 @@ ocrGuid_t salQuery(ocrQueryType_t query, ocrGuid_t guid, void **result, u32 *siz
             break;
 
         case OCR_QUERY_ALL_EDTS:
-            //TODO: Query all Edts function
+            dataDb = hcQueryAllEdts(self, result, size);
+            *size = (*size)*(sizeof(ocrGuid_t));
             break;
 
         default:

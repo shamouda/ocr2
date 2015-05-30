@@ -121,14 +121,18 @@ typedef enum {
  */
 typedef enum {
     DB_MODE_NULL = 0x0,   /**< No mode specified; useful for pure control dependences */
-    DB_MODE_RO   = 0x2,   /**< Read-only mode */
-    DB_MODE_ITW  = 0x4,   /**< Intent-to-write mode (default mode) */
-    DB_MODE_EW   = 0x8,   /**< Exclusive write mode */
-    DB_MODE_NCR  = 0x10   /**< Non-coherent read */
+    DB_MODE_CONST= 0x1,   /**< Constant mode */
+    DB_MODE_RW   = 0x2,   /**< Read-write (default mode) */
+    DB_MODE_EW   = 0x4,   /**< Exclusive write mode */
+    DB_MODE_RO   = 0x8    /**< Read-only mode */
 } ocrDbAccessMode_t; // Warning: only 5 bits starting at bit 1 (leave bit 0 as 0)
 
-#define DB_ACCESS_MODE_MASK 0x1E /**< Runtime reserved constant */
-#define DB_DEFAULT_MODE ((ocrDbAccessMode_t)DB_MODE_ITW) /**< Default access mode */
+// Legacy name of the mode
+// This will be deprecated and removed
+// BUG #575
+#define DB_MODE_ITW ((ocrDbAccessMode_t)DB_MODE_RW)
+
+#define DB_DEFAULT_MODE ((ocrDbAccessMode_t)DB_MODE_RW) /**< Default access mode */
 
 #define DB_PROP_NONE       ((u16)0x0) /**< Property for a data block indicating no special behavior */
 #define DB_PROP_NO_ACQUIRE ((u16)0x10) /**< Property for a data block indicating that the data-block

@@ -33,7 +33,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
                  /*properties=*/0, NULL_GUID, /*outEvent=*/NULL);
 
     // Register a dependence between an event and an edt
-    ocrAddDependence(latchGuid, edtGuid, 0, DB_MODE_RO);
+    ocrAddDependence(latchGuid, edtGuid, 0, DB_MODE_CONST);
 
     // decr first and then incr (reaching zero from negative)
     ocrEventSatisfySlot(latchGuid, NULL_GUID, OCR_EVENT_LATCH_DECR_SLOT);

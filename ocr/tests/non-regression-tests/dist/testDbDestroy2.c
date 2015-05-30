@@ -41,6 +41,6 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrEdtCreate(&destroyEdtGuid, destroyEdtTemplateGuid, 0, NULL, 1, NULL,
                  EDT_PROP_NONE, NULL_GUID, NULL);
     // Intentionally did not release the DB @ dbPtrArray[0]
-    ocrAddDependence(dbGuidArray, destroyEdtGuid, 0, DB_MODE_RO);
+    ocrAddDependence(dbGuidArray, destroyEdtGuid, 0, DB_MODE_CONST);
     return NULL_GUID;
 }

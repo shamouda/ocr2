@@ -39,7 +39,7 @@ void allEventDeps(ocrEventTypes_t eventType) {
     while (i < MAX_SLOT) {
         ocrGuid_t e0;
         ocrEventCreate(&e0, eventType, false);
-        ocrAddDependence(e0, workEdtGuid, i, DB_MODE_RO);
+        ocrAddDependence(e0, workEdtGuid, i, DB_MODE_CONST);
         i++;
     }
     ocrEdtDestroy(workEdtGuid);
@@ -58,7 +58,7 @@ void eventDeps(u32 slot, bool isPreSatisfied, bool isPostSatisfied, ocrEventType
     ocrEdtTemplateCreate(&workEdtTplGuid, workEdt, 0 /*paramc*/, MAX_SLOT /*depc*/);
     ocrEdtCreate(&workEdtGuid, workEdtTplGuid, 0, NULL, MAX_SLOT, NULL_GUID,
                  /*properties=*/EDT_PROP_NONE, NULL_GUID, /*outEvent=*/ NULL);
-    ocrAddDependence(e0, workEdtGuid, slot, DB_MODE_RO);
+    ocrAddDependence(e0, workEdtGuid, slot, DB_MODE_CONST);
     ocrEdtDestroy(workEdtGuid);
     if (isPostSatisfied) {
         ocrEventSatisfy(e0, NULL_GUID);

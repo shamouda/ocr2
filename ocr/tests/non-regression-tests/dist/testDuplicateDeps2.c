@@ -49,11 +49,11 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrGuid_t ev0Guid;
     ocrEventCreate(&ev0Guid, OCR_EVENT_STICKY_T, true);
 
-    ocrAddDependence(dbGuid, readerEdtGuid, 0, DB_MODE_RO);
-    ocrAddDependence(dbGuid, readerEdtGuid, 1, DB_MODE_RO);
-    ocrAddDependence(ev0Guid, readerEdtGuid, 2, DB_MODE_RO);
-    ocrAddDependence(NULL_GUID, readerEdtGuid, 3, DB_MODE_RO);
-    ocrAddDependence(ev0Guid, readerEdtGuid, 4, DB_MODE_RO);
+    ocrAddDependence(dbGuid, readerEdtGuid, 0, DB_MODE_CONST);
+    ocrAddDependence(dbGuid, readerEdtGuid, 1, DB_MODE_CONST);
+    ocrAddDependence(ev0Guid, readerEdtGuid, 2, DB_MODE_CONST);
+    ocrAddDependence(NULL_GUID, readerEdtGuid, 3, DB_MODE_CONST);
+    ocrAddDependence(ev0Guid, readerEdtGuid, 4, DB_MODE_CONST);
 
     ocrEventSatisfy(ev0Guid, dbGuid);
 

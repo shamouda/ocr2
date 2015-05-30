@@ -39,7 +39,7 @@
 #include <stdio.h>
 #include <pthread.h>
 
-// TODO: FIXME
+// BUG #591: FIXME
 extern pthread_key_t _profilerThreadData;
 
 /* _profiler functions */

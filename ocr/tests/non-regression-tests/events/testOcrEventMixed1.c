@@ -62,10 +62,10 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
                  /*properties=*/0, NULL_GUID, /*outEvent=*/NULL);
 
     // Register a dependence between an event and an edt
-    ocrAddDependence(sticky0, edtGuid, 0, DB_MODE_RO);
-    ocrAddDependence(once0, edtGuid, 1, DB_MODE_RO);
-    ocrAddDependence(sticky1, edtGuid, 2, DB_MODE_RO);
-    ocrAddDependence(once1, edtGuid, 3, DB_MODE_RO);
+    ocrAddDependence(sticky0, edtGuid, 0, DB_MODE_CONST);
+    ocrAddDependence(once0, edtGuid, 1, DB_MODE_CONST);
+    ocrAddDependence(sticky1, edtGuid, 2, DB_MODE_CONST);
+    ocrAddDependence(once1, edtGuid, 3, DB_MODE_CONST);
 
     ocrEventSatisfy(once0, db1Guid);
     ocrEventSatisfy(sticky1, db2Guid);

@@ -43,7 +43,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
                  /*properties=*/EDT_PROP_FINISH, NULL_GUID, /*outEvent=*/&outputEventGuid);
 
     PRINTF("Add dependence\n");
-    ocrAddDependence(outputEventGuid, terminateEdtGuid, 0, DB_MODE_RO);
+    ocrAddDependence(outputEventGuid, terminateEdtGuid, 0, DB_MODE_CONST);
 
     // Now we start the userEdt (we start *after* adding the dependence)
     ocrAddDependence(NULL_GUID, userEdtGuid, 0, DB_DEFAULT_MODE);

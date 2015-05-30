@@ -91,7 +91,7 @@ int main(int argc, const char * argv[]) {
 
     // When output-event will be satisfied, the whole task sub-tree
     // spawned by rootEdt will be done, and shutdownEdt is called.
-    ocrAddDependence(outputEventGuid, terminateEdtGuid, 0, DB_MODE_RO);
+    ocrAddDependence(outputEventGuid, terminateEdtGuid, 0, DB_MODE_CONST);
 
     ocrLegacyFinalize(legacyCtx, true);
     return 0;

@@ -75,7 +75,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     *k = edtGuid;
 
     // Pass down the db to the edt
-    ocrAddDependence(dbGuid, edtGuid, 0, DB_MODE_RO);
+    ocrAddDependence(dbGuid, edtGuid, 0, DB_MODE_CONST);
 
     return NULL_GUID;
 }

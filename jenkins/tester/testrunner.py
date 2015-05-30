@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 
-import getopt, logging, os, re, shutil, sys, time
+import getopt, logging, math, multiprocessing, os, re, shutil, sys, time
 from datetime import datetime
 from operator import itemgetter
 
@@ -219,7 +219,9 @@ def mainLoop():
     global cleanDirectories, envDirectory, sharedRoot, privateRoot, sleepInterval
     global allRemainingJobs, allJobTypes, allRunningJobs, allReadyJobs, allTerminalJobs, allJobsStatus
     global allUsedPaths
+    global maxLocalJobs
 
+    localJobCount = 0      # Number of local jobs running
     waitForJobDrain = None # Environment producing job to run
     envJobRunning = False
     envLockFile = filelock.FileLock(os.path.join(envDirectory, ".jenkinstestrunner.lock"),
@@ -250,6 +252,8 @@ def mainLoop():
                     allJobsStatus['fail'].append(job.name)
                 if job.getIsTerminalJob():
                     allTerminalJobs.append(job)
+                if job.isLocal():
+                    localJobCount -= 1
         allRunningJobs = tempAllRunning
 
         if waitForJobDrain is not None:
@@ -283,6 +287,8 @@ def mainLoop():
                         myLog.info("Starting %s" % (waitForJobDrain))
                         envJobRunning = True
                         allRunningJobs.append(waitForJobDrain)
+                        if waitForJobDrain.isLocal():
+                            localJobCount += 1
                     elif returnedStatus > JobObject.DONE_OK:
                         # This means the job did not launch properly
                         myLog.warning("%s failed to launch properly... it will be reported as a failure"
@@ -356,6 +362,10 @@ def mainLoop():
                 break
             if needWholeMachine:
                 break # We can't run any more jobs right now
+            if allReadyJobs[i][1].isLocal() and localJobCount == maxLocalJobs:
+                # We can't run local jobs anymore
+                myLog.debug("Not launching local job %s (too many jobs running)" % (str(allReadyJobs[i][1])))
+                continue
             myLog.debug("Trying to run %s" % (str(allReadyJobs[i][1])))
             assert(allReadyJobs[i][1].getIsEnvProducer() is False)
             returnedStatus = allReadyJobs[i][1].execute()
@@ -365,6 +375,8 @@ def mainLoop():
                 if allReadyJobs[i][1].getIsWholeMachine():
                     myLog.debug("%s requires the entire machine, not launching others" % (str(allReadyJobs[i][1])))
                     needWholeMachine = True
+                if allReadyJobs[i][1].isLocal():
+                    localJobCount += 1
             elif returnedStatus > JobObject.DONE_OK:
                 # This means the job did not launch properly
                 myLog.warning("%s failed to launch properly... it will be reported as a failure" % (str(allReadyJobs[i][1])))
@@ -436,6 +448,7 @@ def main(argv=None):
     global allJobsStatus
     global allUsedPaths
     global streamHandlerStdOut
+    global maxLocalJobs
     testKeywords = []
 
     allJobsStatus['blocked'] = []
@@ -455,6 +468,7 @@ def main(argv=None):
         argv = sys.argv
 
     doHierarchicalResults = False
+    maxLocalJobs = int(math.ceil(multiprocessing.cpu_count() / 4.0))
     myLog.info("---- Starting ----")
     tempJobs = dict() # Contains the jobs until we have parsed all the job types
     alternateJobs = dict() # Certain jobs have one version depending on what repos are accessible
@@ -471,7 +485,7 @@ def main(argv=None):
             opts, args = getopt.getopt(argv[1:], "hc:i:e:s:p:t:k:o:dr:", [
                 "help", "config=", "initdir=", "envdir=", "shared=", "private=",
                 "time=", "repo=", "keyword=", "output=", "full-help", "debug",
-                "local-only", "no-clean=", "hier-results", "deftimeout="])
+                "local-only", "local-max=", "no-clean=", "hier-results", "deftimeout="])
         except getopt.error, err:
             raise Usage(err)
         # Need to parse deftimeout first
@@ -512,6 +526,8 @@ def main(argv=None):
                     package and all tests (terminal or not) will be listed as independent
                     classes.
     --local-only:   Runs only local tests (tests that do not require Torque and/or LUSTRE)
+    --local-max:    Maximum number of local jobs that will be concurrently running. Defaults to
+                    ceil(#CPUs/4).
     --no-clean:     Can be either 'all' or 'failure'. If 'all', all build directories
                     will be maintained after completion of the test. If 'failure', all
                     directories with at least one failure in them will be maintained.
@@ -715,6 +731,10 @@ def main(argv=None):
                     raise Usage("Value %s is not valid for '--no-clean'" % (a))
             elif o in ("--local-only"):
                 runRemoteJobs = False
+            elif o in ("--local-max"):
+                maxLocalJobs = int(a)
+                if maxLocalJobs < 1:
+                    maxLocalJobs = 1
             elif o in ("--deftimeout"):
                 # Ignore, we already parsed this
                 pass
@@ -785,6 +805,8 @@ def main(argv=None):
     JobObject.setGlobals(cleanDirectories=cleanDirectories, envDirectory=envDirectory,
                          sharedRoot=sharedRoot, privateRoot=privateRoot,
                          allUsedPaths=allUsedPaths, runRemoteJobs=runRemoteJobs)
+
+    myLog.info("Max concurrent local jobs is: %d" % (maxLocalJobs))
 
     try:
         # At this point we have all the job types and we can do other checks

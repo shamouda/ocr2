@@ -154,7 +154,7 @@ void initializeWorkerXe(ocrWorkerFactory_t * factory, ocrWorker_t* base, ocrPara
 
 
     ocrWorkerXe_t* workerXe = (ocrWorkerXe_t*) base;
-    workerXe->id = ((paramListWorkerXeInst_t*)perInstance)->workerId;
+    workerXe->id = ((paramListWorkerInst_t*)perInstance)->workerId;
     workerXe->running = false;
 }
 

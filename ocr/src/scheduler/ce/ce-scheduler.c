@@ -203,7 +203,6 @@ u8 ceSchedulerTake (ocrScheduler_t *self, u32 *count, ocrFatGuid_t *edts) {
     u64 workerId = ceWorker->id;
     // First try to pop
     ocrWorkpile_t * wpToPop = popMappingOneToOne(self, workerId);
-    // TODO sagnak, just to get it to compile, I am trickling down the 'cost' though it most probably is not the same
     // TODO: Add cost again
     ocrFatGuid_t popped = wpToPop->fcts.pop(wpToPop, POP_WORKPOPTYPE, NULL);
     // In this implementation we expect the caller to have

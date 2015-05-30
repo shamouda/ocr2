@@ -97,10 +97,10 @@ u8 ocrSetHint(ocrGuid_t guid, ocrHint_t *hint) {
     PD_MSG_FIELD_I(guid.guid) = guid;
     PD_MSG_FIELD_I(guid.metaDataPtr) = NULL;
     PD_MSG_FIELD_I(hint) = *hint;
-    u8 toReturn = pd->fcts.processMessage(pd, &msg, false);
-    DPRINTF_COND_LVL(toReturn, DEBUG_LVL_WARN, DEBUG_LVL_INFO,
-                     "EXIT ocrSetHint(guid=0x%lx) -> %u\n", guid, toReturn);
-    RETURN_PROFILE(toReturn);
+    u8 returnCode = pd->fcts.processMessage(pd, &msg, false);
+    DPRINTF_COND_LVL(returnCode, DEBUG_LVL_WARN, DEBUG_LVL_INFO,
+                     "EXIT ocrSetHint(guid=0x%lx) -> %u\n", guid, returnCode);
+    RETURN_PROFILE(returnCode);
 #undef PD_MSG
 #undef PD_TYPE
 }
@@ -123,11 +123,16 @@ u8 ocrGetHint(ocrGuid_t guid, ocrHint_t *hint) {
     PD_MSG_FIELD_I(guid.guid) = guid;
     PD_MSG_FIELD_I(guid.metaDataPtr) = NULL;
     PD_MSG_FIELD_IO(hint) = *hint;
-    u8 toReturn = pd->fcts.processMessage(pd, &msg, true);
-    *hint = PD_MSG_FIELD_IO(hint);
-    DPRINTF_COND_LVL(toReturn, DEBUG_LVL_WARN, DEBUG_LVL_INFO,
-                     "EXIT ocrSetHint(guid=0x%lx) -> %u\n", guid, toReturn);
-    RETURN_PROFILE(toReturn);
+    u8 returnCode = pd->fcts.processMessage(pd, &msg, true);
+    if (returnCode == 0) {
+        returnCode = PD_MSG_FIELD_O(returnDetail);
+        if (returnCode == 0) {
+            *hint = PD_MSG_FIELD_IO(hint);
+        }
+    }
+    DPRINTF_COND_LVL(returnCode, DEBUG_LVL_WARN, DEBUG_LVL_INFO,
+                     "EXIT ocrSetHint(guid=0x%lx) -> %u\n", guid, returnCode);
+    RETURN_PROFILE(returnCode);
 #undef PD_MSG
 #undef PD_TYPE
 }

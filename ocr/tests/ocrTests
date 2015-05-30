@@ -859,6 +859,7 @@ function exec_makefile() {
 ########################
 
 VERBOSE=
+REPORT_ERROR="yes"
 
 function convert_to_absolute() {
     local  A_PATH=$1
@@ -943,9 +944,9 @@ function runTests () {
             OPTION_SWEEPING=("$@")
             OPTION_SWEEPING=`echo ${OPTION_SWEEPING} | sed s/,/\ /g`
             shift
-        elif [[ "$1" = "-report_error" ]]; then
+        elif [[ "$1" = "-no_error_report" ]]; then
             shift
-            REPORT_ERROR="yes"
+            REPORT_ERROR="no"
         elif [[ "$1" = "-h"  || "$1" = "--help" ]]; then
             usage
             exit 0
@@ -1164,14 +1165,17 @@ function runTests () {
                         # Increment status
                         STEPS_COMPLETED=`expr $STEPS_COMPLETED \+ 1`
                     else
-                        RET_CODE=1
-                        break
+			determine_test_status ${TEST_NAME} ${STEPS_COMPLETED} TEST_STATUS
+			if [[ ${TEST_STATUS} -ne ${RUN_STATUS} ]]; then
+                            RET_CODE=1
+                            break
+			fi
                     fi
                 done
 
                 # determine test status and stores it in TEST_STATUS
                 # here it's important to use the original TEST_NAME so that implementations
-                # can pattern match correctly on test names
+                # can pattern match correctly on test name
                 determine_test_status ${TEST_NAME} ${STEPS_COMPLETED} TEST_STATUS
                 if [[ -n "$RUN_UNSTABLE" ]]; then
                     negate_test_status ${TEST_STATUS} TEST_STATUS
@@ -1197,7 +1201,7 @@ function runTests () {
     xunit_print_report ${LOG_DIR} >${XUNIT_REPORT_OUTPUT}
     mv ${XUNIT_REPORT_OUTPUT} ${XUNIT_REPORT_OUTPUT}.xml
 
-    if [[ -n "$REPORT_ERROR" ]]; then
+    if [[ "$REPORT_ERROR" == "yes" ]]; then
         return $RET_CODE
     else
         return 0

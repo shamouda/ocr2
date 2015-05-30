@@ -114,7 +114,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
             ocrEdtCreate(&edtGuid, eReaderEdtTemplateGuid, 0, NULL, 1, NULL,
                          EDT_PROP_NONE, affinity, &outputEventGuid);
             ocrAddDependence(outputEventGuid, shutdownGuid, (i*(NB_READERS_PER_WRITER+1))+j+1, false);
-            ocrAddDependence(dbGuid, edtGuid, 0, DB_MODE_RO);
+            ocrAddDependence(dbGuid, edtGuid, 0, DB_MODE_CONST);
             j++;
         }
         i++;

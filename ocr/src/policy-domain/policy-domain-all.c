@@ -12,8 +12,8 @@
 // Everything in the marshalling code will be
 // aligned with this alignment. This has to be the LCM of
 // all required alignments. 8 is usually a safe value
-// TODO: It needs to be consistent across PDs
-// TODO: Do we make this configurable in ocr-config.h?
+// BUG #581: It needs to be consistent across PDs
+// BUG #581: Do we make this configurable in ocr-config.h?
 // NOTE: MUST BE POWER OF 2
 #define MAX_ALIGN 8
 
@@ -27,7 +27,7 @@ const char * policyDomain_types [] = {
 
 void initializePolicyMessage(ocrPolicyMsg_t* msg, u64 bufferSize) {
     msg->bufferSize = bufferSize;
-    //TODO-225: Shouldn't be mandatory
+    //BUG #581: Shouldn't be mandatory
     // ASSERT(bufferSize >= sizeof(ocrPolicyMsg_t));
     msg->usefulSize = 0;
 }
@@ -167,7 +167,7 @@ u8 ocrPolicyMsgGetMsgSize(ocrPolicyMsg_t *msg, u64 *baseSize,
         if(!isIn) {
             *marshalledSize = PD_MSG_FIELD_O(size);
             // Make sure that if we have a size, we have a PTR
-            //TODO commented because it bombs when I try to get the size of an out which
+            //BUG #581 commented because it bombs when I try to get the size of an out which
             //is an in. (need a real api parameter)
             //ASSERT((*marshalledSize == 0) || (PD_MSG_FIELD_IO(guid.metaDataPtr) != NULL));
         }
@@ -775,7 +775,7 @@ u8 ocrPolicyMsgUnMarshallMsg(u8* mainBuffer, u8* addlBuffer,
 #undef PD_MSG
 
     // Invalidate all ocrFatGuid_t pointers
-    //TODO-225: There's the issue of understanding when a 'foreign' metadataPtr should be
+    //BUG #581: There's the issue of understanding when a 'foreign' metadataPtr should be
     // nullify and when it was actually marshalled as part of the payload.
 
     // We only invalidate if crossing address-spaces
@@ -799,7 +799,7 @@ u8 ocrPolicyMsgUnMarshallMsg(u8* mainBuffer, u8* addlBuffer,
             while(count) {
                 if (guids->guid != NULL_GUID) {
                     // Determine if GUID is local
-                    //TODO-225: what we should really do is compare the PD location and the guid's one
+                    //BUG #581: what we should really do is compare the PD location and the guid's one
                     // but the overhead going through the current api sounds unreasonnable.
                     // For now rely on the provider not knowing the GUID. Note there's a potential race
                     // here with code in hc-dist-policy that may be setting
@@ -841,7 +841,7 @@ u8 ocrPolicyMsgUnMarshallMsg(u8* mainBuffer, u8* addlBuffer,
                 count = PD_MSG_FG_O_COUNT_ONLY_GET(msg->type);
                 DPRINTF(DEBUG_LVL_VVERB, "Invalidating %d ocrFatGuid_t O pointers\n", count);
             }
-            // TODO: I really don't like this...
+            // BUG #581: I really don't like this...
             switch(msg->type & PD_MSG_TYPE_ONLY) {
 #define PER_TYPE(type)                                                  \
                 case type:                                              \
@@ -856,7 +856,7 @@ u8 ocrPolicyMsgUnMarshallMsg(u8* mainBuffer, u8* addlBuffer,
             while(count) {
                 if (guids->guid != NULL_GUID) {
                     // Determine if GUID is local
-                    //TODO-225: what we should really do is compare the PD location and the guid's one
+                    //BUG #581: what we should really do is compare the PD location and the guid's one
                     // but the overhead going through the current api sounds unreasonnable.
                     // For now rely on the provider not knowing the GUID. Note there's a potential race
                     // here with code in hc-dist-policy that may be setting

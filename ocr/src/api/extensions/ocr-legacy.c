@@ -20,7 +20,7 @@
 #define DEBUG_TYPE API
 
 extern void freeUpRuntime(bool);
-extern void bringUpRuntime(const char*);
+extern void bringUpRuntime(ocrConfig_t *ocrConfig);
 
 void ocrLegacyInit(ocrGuid_t *legacyContext, ocrConfig_t * ocrConfig) {
     // Bug #492: legacyContext is ignored
@@ -28,7 +28,18 @@ void ocrLegacyInit(ocrGuid_t *legacyContext, ocrConfig_t * ocrConfig) {
     if(ocrConfig->iniFile == NULL)
         PRINTF("ERROR: Set OCR_CONFIG to point to OCR configuration file\n");
     ASSERT(ocrConfig->iniFile);
-    bringUpRuntime(ocrConfig->iniFile);
+
+    bringUpRuntime(ocrConfig);
+
+    ocrPolicyDomain_t * pd = NULL;
+    getCurrentEnv(&pd, NULL, NULL, NULL);
+    // Transition to USER_OK in RL_LEGACY mode so that the current thread
+    // switches to USER_OK but do not try to start its worker loop.
+    DPRINTF(DEBUG_LVL_INFO, "ocrLegacyInit calls switchRunlevel RL_USER_OK | RL_BRING_UP | RL_LEGACY\n");
+    RESULT_ASSERT(
+        pd->fcts.switchRunlevel(pd, RL_USER_OK, RL_REQUEST | RL_ASYNC | RL_BRING_UP | RL_NODE_MASTER | RL_LEGACY),
+        ==, 0);
+    DPRINTF(DEBUG_LVL_INFO, "ocrLegacyInit switchRunlevel RL_USER_OK | RL_BRING_UP returned\n");
 }
 
 u8 ocrLegacyFinalize(ocrGuid_t legacyContext, bool runUntilShutdown) {
@@ -39,22 +50,26 @@ u8 ocrLegacyFinalize(ocrGuid_t legacyContext, bool runUntilShutdown) {
         // Here, we are in COMPUTE_OK. We just need to transition to USER_OK
         // which will start mainEdt
         getCurrentEnv(&pd, NULL, NULL, NULL);
+        // Here we should enter the worker loop in non-legacy mode so that
+        // the worker goes into its work loop. Do NOT set RL_LEGACY here
+        // but the runtime figures out it's the second call to BRING_UP.
+        // This code may happen before, simultaneous or after ocrShutdown is called
+        DPRINTF(DEBUG_LVL_INFO, "ocrLegacyFinalize calls switchRunlevel RL_USER_OK | RL_BRING_UP\n");
         RESULT_ASSERT(
             pd->fcts.switchRunlevel(pd, RL_USER_OK, RL_REQUEST | RL_ASYNC | RL_BRING_UP | RL_NODE_MASTER),
             ==, 0);
-
+        DPRINTF(DEBUG_LVL_INFO, "ocrLegacyFinalize switchRunlevel RL_USER_OK | RL_BRING_UP returned\n");
         returnCode = pd->shutdownCode;
         freeUpRuntime(true);
     } else {
-        getCurrentEnv(&pd, NULL, NULL, NULL);
+        // This mode just tears down the runtime (does not wait for an ocrShutdown() call)
+        // This is useful in a program that calls OCR from time to time:
+        // ocrLegacyInit()
+        //  calls to ocrLegacySpawnOCR() and ocrLegacyBlockProgress
+        // ocrLegacyFinalize()
         returnCode = pd->shutdownCode;
         freeUpRuntime(false);
     }
-
-// #ifdef OCR_ENABLE_STATISTICS
-//     ocrStatsProcessDestruct(&GfakeProcess);
-//     GocrFilterAggregator->destruct(GocrFilterAggregator);
-// #endif
     return returnCode;
 }
 
@@ -121,7 +136,11 @@ u8 ocrLegacyBlockProgress(ocrGuid_t handle, ocrGuid_t* guid, void** result, u64*
         PD_MSG_FIELD_IO(guid.guid) = handle;
         PD_MSG_FIELD_IO(guid.metaDataPtr) = NULL;
         PD_MSG_FIELD_I(properties) = KIND_GUIDPROP | RMETA_GUIDPROP;
-        RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, true));
+        u8 returnCode = pd->fcts.processMessage(pd, &msg, true);
+        //Warning PD_MSG_GUID_INFO returns GUID properties as 'returnDetail', not error code
+        if(returnCode != 0) {
+            return returnCode;
+        }
         eventToYieldFor = (ocrEvent_t *)PD_MSG_FIELD_IO(guid.metaDataPtr);
 
         if(PD_MSG_FIELD_IO(guid.guid) == NULL_GUID) {
@@ -157,9 +176,11 @@ u8 ocrLegacyBlockProgress(ocrGuid_t handle, ocrGuid_t* guid, void** result, u64*
             PD_MSG_FIELD_IO(guid) = dbResult;
             PD_MSG_FIELD_IO(edt) = currentEdt;
             PD_MSG_FIELD_IO(edtSlot) = EDT_SLOT_NONE;
-            PD_MSG_FIELD_IO(properties) = DB_MODE_ITW;
-            RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, true));
-
+            PD_MSG_FIELD_IO(properties) = DB_MODE_RW;
+            u8 returnCode = pd->fcts.processMessage(pd, &msg, true);
+            if(!((returnCode == 0) && ((returnCode = PD_MSG_FIELD_O(returnDetail)) == 0))) {
+                return returnCode;
+            }
             if(result != NULL)
                 *result = PD_MSG_FIELD_O(ptr);
             dbResult = PD_MSG_FIELD_IO(guid);

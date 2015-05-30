@@ -17,7 +17,7 @@ ocrGuid_t done(u32 paramc, u64 *paramv, u32 depc, ocrEdtDep_t *depv) {
 ocrGuid_t parallel_finish(u32 paramc, u64 *paramv, u32 depc, ocrEdtDep_t *depv) {
     ocrGuid_t done_edt = paramv[0];
     int       i        = paramv[1];
-    ocrAddDependence(NULL_GUID, done_edt, i, DB_MODE_RO);
+    ocrAddDependence(NULL_GUID, done_edt, i, DB_MODE_CONST);
     return NULL_GUID;
 }
 

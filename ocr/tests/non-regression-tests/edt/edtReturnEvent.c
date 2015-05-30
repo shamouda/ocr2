@@ -40,8 +40,8 @@ ocrGuid_t producer1(u32 paramc, u64 *paramv, u32 depc, ocrEdtDep_t *depv) {
     ocrEventCreate(&complete_event, OCR_EVENT_STICKY_T, false);
     ocrEdtCreate(&producer_edt, producer_template, 0, NULL, 1, NULL,
                  EDT_PROP_NONE, NULL_GUID, &producer_done_event);
-    ocrAddDependence(producer_done_event, complete_event, 0, DB_MODE_RO);
-    ocrAddDependence(NULL_GUID, producer_edt, 0, DB_MODE_RO);
+    ocrAddDependence(producer_done_event, complete_event, 0, DB_MODE_CONST);
+    ocrAddDependence(NULL_GUID, producer_edt, 0, DB_MODE_CONST);
     return complete_event;
     // return producer_done_event; // WRONG: race condition !
 }
@@ -60,7 +60,7 @@ ocrGuid_t mainEdt(u32 paramc, u64 *paramv, u32 depc, ocrEdtDep_t *depv) {
     ocrEdtCreate(&consumer_edt, consumer_template, 0, NULL, 1, NULL,
                  EDT_PROP_NONE, NULL_GUID, NULL);
     // create consumer dependency on producer output
-    ocrAddDependence(producer_done_event,consumer_edt,0,DB_MODE_RO);
+    ocrAddDependence(producer_done_event,consumer_edt,0,DB_MODE_CONST);
     ocrEventSatisfy(ready_event, NULL_GUID);
     return NULL_GUID;
 }

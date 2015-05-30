@@ -25,7 +25,7 @@ static int getTimeNs_initialized = 0;
 /******************************************************/
 /*  ABORT / EXIT OCR                                  */
 /******************************************************/
-// TODO: These need to move. SAL or HAL?
+// BUG #590: These need to move. SAL or HAL?
 void ocr_abort() {
     hal_abort();
 }

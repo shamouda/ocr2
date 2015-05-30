@@ -43,6 +43,9 @@ Script Instructions:
        found here: https://pypi.python.org/pypi/python-graph-core/
 
 -Copy html file to local machine, and open flowgraph.html in a web browser.
+-NOTE: The html file depends on an external JavaScript package called visJs.
+
+       Download instructions can be found here: http://visjs.org/#download_install
 
 
 

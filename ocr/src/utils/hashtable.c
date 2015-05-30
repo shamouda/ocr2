@@ -237,7 +237,7 @@ void * hashtableConcTryPut(hashtable_t * hashtable, void * key, void * value) {
         // Lookup for the key
         ocr_hashtable_entry * oldHead = hashtable->table[bucket];
         // Ensure oldHead is read before iterating
-        //TODO not sure which hashtable members should be volatile
+        //BUG #589 not sure which hashtable members should be volatile
         hal_fence();
         ocr_hashtable_entry * entry = hashtableFindEntry(hashtable, key);
         if (entry == NULL) {
@@ -293,7 +293,7 @@ bool hashtableConcPut(hashtable_t * hashtable, void * key, void * value) {
  * Returns true if entry has been found and removed.
  */
 bool hashtableConcRemove(hashtable_t * hashtable, void * key, void ** value) {
-    //TODO implement concurrent removal
+    //BUG #589 implement concurrent removal
     ASSERT(false);
     return false;
 }

@@ -38,7 +38,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     int k = 0;
     while (k < NB_INSTANCES) {
         ocrEventCreate(&dbEvtPtr[k], OCR_EVENT_STICKY_T, false);
-        ocrAddDependence(dbEvtPtr[k], terminateEdtGuid, k, DB_MODE_RO);
+        ocrAddDependence(dbEvtPtr[k], terminateEdtGuid, k, DB_MODE_CONST);
         k++;
     }
 
@@ -62,6 +62,6 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
 
     ocrDbRelease(dbEvtGuid);
     ocrDbRelease(dbGuid);
-    ocrAddDependence(dbGuid, terminateEdtGuid, NB_INSTANCES, DB_MODE_RO);
+    ocrAddDependence(dbGuid, terminateEdtGuid, NB_INSTANCES, DB_MODE_CONST);
     return NULL_GUID;
 }

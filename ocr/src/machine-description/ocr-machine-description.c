@@ -621,6 +621,7 @@ s32 populate_inst(ocrParamList_t **inst_param, void **instance, s32 *type_counts
                 extern u64 end_marker;
                 ALLOC_PARAM_LIST(inst_param[j], paramListMemPlatformFsim_t);
                 ((paramListMemPlatformFsim_t *)inst_param[j])->start = end_marker;
+                ((paramListMemPlatformInst_t *)inst_param[j])->size = end_marker;
                 break;
             }
 #endif
@@ -629,15 +630,16 @@ s32 populate_inst(ocrParamList_t **inst_param, void **instance, s32 *type_counts
                 break;
             }
 
-#ifdef ENABLE_MEM_PLATFORM_FSIM
-            snprintf(key, MAX_KEY_SZ, "%s:%s", secname, "start");
-            ((paramListMemPlatformFsim_t*)inst_param[j])->start += (u64)iniparser_getlonglong(dict, key, 0);
-            // REC: I don't think we need to revise the size as it was done because that implies that
-            // all memories are L1s
-            // This needs to be revised anyways because whatever we do, it is brittle
-#endif
             snprintf(key, MAX_KEY_SZ, "%s:%s", secname, "size");
             ((paramListMemPlatformInst_t *)inst_param[j])->size = (u64)iniparser_getlonglong(dict, key, 0);
+
+#ifdef ENABLE_MEM_PLATFORM_FSIM
+            // Adjust the start and size according to size of ELF binary
+            // FIXME: Bug #594
+            ((paramListMemPlatformInst_t *)inst_param[j])->size -= ((paramListMemPlatformFsim_t*)inst_param[j])->start;
+            snprintf(key, MAX_KEY_SZ, "%s:%s", secname, "start");
+            ((paramListMemPlatformFsim_t*)inst_param[j])->start += (u64)iniparser_getlonglong(dict, key, 0);
+#endif
 
             instance[j] = (void *)((ocrMemPlatformFactory_t *)factory)->instantiate(factory, inst_param[j]);
             if (instance[j])
@@ -820,7 +822,7 @@ s32 populate_inst(ocrParamList_t **inst_param, void **instance, s32 *type_counts
                     if (workertype == MAX_WORKERTYPE) workertype = SLAVE_WORKERTYPE; // TODO: is this a reasonable default?
                     ALLOC_PARAM_LIST(inst_param[j], paramListWorkerHcInst_t);
                     ((paramListWorkerHcInst_t *)inst_param[j])->workerType = workertype;
-                    ((paramListWorkerHcInst_t *)inst_param[j])->workerId = j; // using "id" for now; TODO: decide if a separate key is needed
+                    ((paramListWorkerInst_t *)inst_param[j])->workerId = j; // using "id" for now; TODO: decide if a separate key is needed
                 }
                 break;
 #endif
@@ -837,7 +839,7 @@ s32 populate_inst(ocrParamList_t **inst_param, void **instance, s32 *type_counts
                 if (workertype == MAX_WORKERTYPE) workertype = SLAVE_WORKERTYPE; // TODO: is this a reasonable default?
                 ALLOC_PARAM_LIST(inst_param[j], paramListWorkerCeInst_t);
                 ((paramListWorkerCeInst_t *)inst_param[j])->workerType = workertype;
-                ((paramListWorkerCeInst_t *)inst_param[j])->workerId = j; // using "id" for now; TODO: decide if a separate key is needed
+                ((paramListWorkerInst_t *)inst_param[j])->workerId = j; // using "id" for now; TODO: decide if a separate key is needed
             }
             break;
 #endif
@@ -853,8 +855,7 @@ s32 populate_inst(ocrParamList_t **inst_param, void **instance, s32 *type_counts
                 workertype += 1;  // because workertype is 1-indexed, not 0-indexed
                 if (workertype == MAX_WORKERTYPE) workertype = SLAVE_WORKERTYPE; // TODO: is this a reasonable default?
                 ALLOC_PARAM_LIST(inst_param[j], paramListWorkerXeInst_t);
-                // ((paramListWorkerXeInst_t *)inst_param[j])->workerType = workertype;  TODO: This field doesn't exist for XE's.  Should it?  BRN
-                ((paramListWorkerXeInst_t *)inst_param[j])->workerId = j; // using "id" for now; TODO: decide if a separate key is needed
+                ((paramListWorkerInst_t *)inst_param[j])->workerId = j; // using "id" for now; TODO: decide if a separate key is needed
             }
             break;
 #endif

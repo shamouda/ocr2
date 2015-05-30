@@ -38,7 +38,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     PRINTF("[local] mainEdt: create local event\n");
     ocrEventCreate(&eventGuid, OCR_EVENT_STICKY_T, true);
     PRINTF("[local] mainEdt: add-dependence local Event, remote EDT\n");
-    ocrAddDependence(eventGuid, edtGuid, 0, DB_MODE_RO);
+    ocrAddDependence(eventGuid, edtGuid, 0, DB_MODE_CONST);
     PRINTF("[local] mainEdt: satisfy local Event\n");
     ocrEventSatisfy(eventGuid, NULL_GUID);
     return NULL_GUID;
