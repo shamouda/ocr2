@@ -32,7 +32,7 @@ typedef struct _ocrTaskTemplate_t ocrTaskTemplate_t;
 typedef struct _ocrTask_t ocrTask_t;
 typedef struct _ocrWorker_t ocrWorker_t;
 
-// TODO: Add all documentation
+// BUG #225: Implement statistics
 
 /**
  * @brief Function to use when creating a template

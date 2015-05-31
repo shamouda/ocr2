@@ -11,7 +11,6 @@
 #ifndef __DEBUG_H__
 #define __DEBUG_H__
 
-// TODO: Rework this to make it more platform independent
 #include "ocr-hal.h"
 #include "ocr-sal.h"
 #include "ocr-task.h"

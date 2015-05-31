@@ -1677,7 +1677,6 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             }
         }
 #ifdef OCR_ENABLE_STATISTICS
-        // BUG #225: Fixme
         statsDEP_ADD(pd, getCurrentEDT(), NULL, signalerGuid, waiterGuid, NULL, slot);
 #endif
 #undef PD_MSG
@@ -1723,7 +1722,6 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             ASSERT(0); // No other things we can register signalers on
         }
 #ifdef OCR_ENABLE_STATISTICS
-        // BUG #225: Fixme
         statsDEP_ADD(pd, getCurrentEDT(), NULL, signalerGuid, waiterGuid, NULL, slot);
 #endif
 #undef PD_MSG
@@ -1762,7 +1760,6 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
                 db, waiter, PD_MSG_FIELD_I(slot), isAddDep);
         }
 #ifdef OCR_ENABLE_STATISTICS
-        // BUG #225: Fixme
         statsDEP_ADD(pd, getCurrentEDT(), NULL, signalerGuid, waiterGuid, NULL, slot);
 #endif
 #undef PD_MSG
@@ -1804,7 +1801,6 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             }
         }
 #ifdef OCR_ENABLE_STATISTICS
-        // BUG #225: Fixme
         statsDEP_ADD(pd, getCurrentEDT(), NULL, signalerGuid, waiterGuid, NULL, slot);
 #endif
 #undef PD_MSG

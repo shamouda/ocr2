@@ -74,7 +74,7 @@ typedef enum {
     //    These have associated schedulerObject factories and support ocrSchedulerObjectFcts_t.
     OCR_SCHEDULER_OBJECT_AGGREGATE         =0x02,
     OCR_SCHEDULER_OBJECT_DEQUE             =0x12,
-    OCR_SCHEDULER_OBJECT_ARRAY             =0x22, //Implementation TODO.
+    OCR_SCHEDULER_OBJECT_ARRAY             =0x22, // BUG #613: No implementation of this yet
 
     //root schedulerObjects:
     //    These are derived aggregate schedulerObjects that act as the single top-level

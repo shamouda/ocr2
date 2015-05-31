@@ -61,7 +61,6 @@ static void workerLoop(ocrWorker_t * worker) {
             // We got a response
             count = PD_MSG_FIELD_IO(guidCount);
             if(count == 1) {
-                // REC: TODO: Do we need a message to execute this
                 taskGuid = PD_MSG_FIELD_IO(guids[0]);
                 ASSERT(taskGuid.guid != NULL_GUID && taskGuid.metaDataPtr != NULL);
                 worker->curTask = (ocrTask_t*)taskGuid.metaDataPtr;
@@ -81,7 +80,7 @@ static void workerLoop(ocrWorker_t * worker) {
 #undef PD_MSG
 #undef PD_TYPE
             } else if (count > 1) {
-                // TODO: In the future, potentially take more than one)
+                // BUG #586: GIVE/TAKE will go away and multiple work items may be transferred
                 ASSERT(0);
             } else {
                 // count = 0; no work received; do something else if required.

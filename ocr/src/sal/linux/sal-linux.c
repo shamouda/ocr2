@@ -36,7 +36,6 @@ void sig_handler(u32 sigNum) {
     }
 
     if(sigNum == SIGUSR2 && globalPD->runtimePause == true){
-        //TODO: Support this with new querying methodology?
         PRINTF("\nQuery Not Supported via signalling\n");
         //salQuery(1, OCR_QUERY_WORKPILE_EDTS, NULL_GUID, &sigRes, &sigSize, 0);
         return;

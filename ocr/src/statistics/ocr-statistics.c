@@ -2,6 +2,7 @@
  * @brief OCR implementation of statistics gathering
  **/
 
+// BUG #225: Statistics need to be implemented. This is an old version
 /*
  * This file is subject to the license agreement located in the file LICENSE
  * and cannot be distributed without it. This notice cannot be
@@ -48,7 +49,7 @@ void ocrStatsAsyncMessage(ocrStatsProcess_t *src, ocrStatsProcess_t *dst,
         // We grabbed the lock
         DPRINTF(DEBUG_LVL_VERB, "Message 0x%lx: grabbing processing lock for 0x%lx\n",
                 (u64)msg, dst->me);
-        u32 count = 5; // TODO: Make configurable
+        u32 count = 5;
         while(count-- > 0) {
             if(!intProcessMessage(dst))
                 break;
@@ -89,7 +90,7 @@ void ocrStatsSyncMessage(ocrStatsProcess_t *src, ocrStatsProcess_t *dst,
             // We grabbed the lock
             DPRINTF(DEBUG_LVL_VERB, "Message 0x%lx: grabbing processing lock for 0x%lx\n",
                     (u64)msg, dst->me);
-            s32 count = 5; // TODO: Make configurable
+            s32 count = 5;
             // Process at least count and at least until we get to our message
             // EXTREMELY RARE PROBLEM of count running over for REALLY deep queues
             while(count-- > 0 || msg->state != 2) {
@@ -102,7 +103,7 @@ void ocrStatsSyncMessage(ocrStatsProcess_t *src, ocrStatsProcess_t *dst,
 
             break; // Break out of while(1)
         } else {
-            // Backoff (TODO, need HW support (abstraction though))
+            // Backoff
         }
     }
 

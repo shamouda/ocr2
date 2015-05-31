@@ -76,8 +76,7 @@ struct _ocrPolicyDomain_t;
  *     - DB1 gets removed/freed on All1           DB1  <-> All1  (STATS_DB_DESTROY)
  *     - EDT1 accesses (r/w or r/o) DB1           EDT1 <-> DB1 (local) (STATS_DB_ACCESS)
  *         This is a local ticker that is synched on acquire/release/free since we do not (cannot)
- *         model overlapping accesses to the same DB. TODO: For now, just the same DB ticker and
- *         need to be thread safe. Overlap information is irrelevant though.
+ *         model overlapping accesses to the same DB.
  *     - Worker Work starts on comp-target CTarg  Work <-> CTarg (STATS_WORKER_START)
  *     - Worker Work stops on comp-target CTarg   Work <-> CTarg (STATS_WORKER_STOP)
  *     - Allocator All starts on mem-target MTarg All  <-> MTarg (STATS_ALLOCATOR_START)
@@ -130,7 +129,7 @@ typedef enum {
 
     STATS_EDT_CREATE = 0x8,  /**< The EDT was first created */
     STATS_EDT_DESTROY = 0x10, /**< The EDT was destroyed (rare) */
-    STATS_EDT_READY = 0x20,   /**< The EDT became ready to run (last dep satisfied) TODO: SEE IF USEFUL. NOT IMPLEMENTED*/
+    STATS_EDT_READY = 0x20,   /**< The EDT became ready to run (last dep satisfied) // BUG #225 NOT IMPLEMENTED*/
     STATS_EDT_START = 0x40,   /**< The EDT started execution */
     STATS_EDT_END = 0x80,    /**< The EDT ended execution */
 
@@ -139,8 +138,8 @@ typedef enum {
     STATS_DB_DESTROY = 0x200,  /**< The DB was destroyed (will be by last user after a free) */
     STATS_DB_ACQ = 0x400,      /**< The DB was acquired */
     STATS_DB_REL = 0x800,      /**< The DB was released */
-    STATS_DB_MOVE = 0x1000,    /**< The DB was moved TODO: NOT IMPLEMENTED */
-    STATS_DB_ACCESS = 0x2000,  /**< The DB was accessed (read or write) TODO: ADD IN PROFILING CALLBACKS */
+    STATS_DB_MOVE = 0x1000,    /**< The DB was moved BUG #225: NOT IMPLEMENTED */
+    STATS_DB_ACCESS = 0x2000,  /**< The DB was accessed (read or write) BUG #225: ADD IN PROFILING CALLBACKS */
 
     /* Event related events */
     STATS_EVT_CREATE = 0x4000,  /**< The Event was created */
@@ -363,7 +362,7 @@ typedef struct _ocrStatsFcts_t {
     ocrStatsFilter_t* (*getFilter)(struct _ocrStats_t *self, struct _ocrStats_t *requester,
                                    enum _ocrStatsFilterType_t type);
 
-    // TODO: Check what this does
+    // BUG #225: Check what this does
     void (*dumpFilter)(struct _ocrStats_t* self, ocrStatsFilter_t *filter, u64 tick,
                        ocrStatsEvt_t type, ocrGuid_t src, ocrGuid_t dest);
 } ocrStatsFcts_t;

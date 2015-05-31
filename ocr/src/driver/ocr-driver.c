@@ -612,7 +612,7 @@ void bringUpRuntime(ocrConfig_t *ocrConfig) {
                                                   RL_ASYNC | RL_BRING_UP | RL_NODE_MASTER),
                   ==, 0);
 
-    // REC TODO: This part may need to be specialized a bit. Basically,
+    // BUG #583: This part may need to be specialized a bit. Basically,
     // we need this capable thread to determine which PDs it is responsible
     // for bringing to PD_OK. On TG, this will only be the one PD (each core brings
     // its own PD to a start) whereas on TG-emul, it is all PDs. This goes back

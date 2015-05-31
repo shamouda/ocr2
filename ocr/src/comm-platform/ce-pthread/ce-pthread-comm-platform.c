@@ -130,9 +130,8 @@ u8 cePthreadCommSendMessage(ocrCommPlatform_t *self, ocrLocation_t target, ocrPo
     ASSERT(target != self->pd->myLocation);
     msg->seqId = self->fcts.getSeqIdAtNeighbor(self, target, msg->seqId);
 
-    //FIXME: This is currently a hack to know if target is a CE or XE.
-    //This needs to be replaced by a location query in future.
-    //Bug #135
+    // BUG #135: This is currently a hack to know if target is a CE or XE.
+    // This needs to be replaced by a location query in future.
     ocrCommChannel_t * channel = NULL;
     bool ceTarget = false;
     for (i = 0; i < self->pd->neighborCount; i++) {

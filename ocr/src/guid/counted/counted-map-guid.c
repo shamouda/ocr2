@@ -204,7 +204,7 @@ u8 countedMapCreateGuid(ocrGuidProvider_t* self, ocrFatGuid_t *fguid, u64 size, 
 #define PD_TYPE PD_MSG_MEM_ALLOC
     msg.type = PD_MSG_MEM_ALLOC | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
     PD_MSG_FIELD_I(size) = size; // allocate 'size' payload as metadata
-    PD_MSG_FIELD_I(properties) = 0; // TODO:  What flags should be defined?  Where are symbolic constants for them defined?
+    PD_MSG_FIELD_I(properties) = 0;
     PD_MSG_FIELD_I(type) = GUID_MEMTYPE;
 
     RESULT_PROPAGATE(policy->fcts.processMessage (policy, &msg, true));

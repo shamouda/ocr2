@@ -14,7 +14,8 @@
 #include "ocr-sysboot.h"
 #include "ocr-workpile.h"
 #include "scheduler/ce/ce-scheduler.h"
-// TODO: This relies on data in ce-worker (its ID to do the mapping)
+
+// BUG #619: This relies on data in ce-worker (its ID to do the mapping)
 // This is non-portable (CE scheduler does not work with non
 // CE worker) but works for now
 #include "worker/ce/ce-worker.h" // NON PORTABLE FOR NOW
@@ -188,9 +189,9 @@ u8 ceSchedulerSwitchRunlevel(ocrScheduler_t *self, ocrPolicyDomain_t *PD, ocrRun
 }
 
 u8 ceSchedulerTake (ocrScheduler_t *self, u32 *count, ocrFatGuid_t *edts) {
-    // Source must be a worker guid and we rely on indices to map
+    // BUG #619: Source must be a worker guid and we rely on indices to map
     // workers to workpiles (one-to-one)
-    // TODO: This is a non-portable assumption but will do for now.
+    // This is a non-portable assumption but will do for now.
     ocrWorker_t *worker = NULL;
     ocrWorkerCe_t *ceWorker = NULL;
     getCurrentEnv(NULL, &worker, NULL, NULL);
@@ -203,7 +204,7 @@ u8 ceSchedulerTake (ocrScheduler_t *self, u32 *count, ocrFatGuid_t *edts) {
     u64 workerId = ceWorker->id;
     // First try to pop
     ocrWorkpile_t * wpToPop = popMappingOneToOne(self, workerId);
-    // TODO: Add cost again
+    // BUG #619: Add cost again
     ocrFatGuid_t popped = wpToPop->fcts.pop(wpToPop, POP_WORKPOPTYPE, NULL);
     // In this implementation we expect the caller to have
     // allocated memory for us since we can return at most one
@@ -220,9 +221,9 @@ u8 ceSchedulerTake (ocrScheduler_t *self, u32 *count, ocrFatGuid_t *edts) {
 }
 
 u8 ceSchedulerGive (ocrScheduler_t* base, u32* count, ocrFatGuid_t* edts) {
-    // Source must be a worker guid and we rely on indices to map
+    // BUG #619: Source must be a worker guid and we rely on indices to map
     // workers to workpiles (one-to-one)
-    // TODO: This is a non-portable assumption but will do for now.
+    // This is a non-portable assumption but will do for now.
     ocrWorker_t *worker = NULL;
     ocrWorkerCe_t *ceWorker = NULL;
     getCurrentEnv(NULL, &worker, NULL, NULL);

@@ -40,8 +40,6 @@ int memcpy(void * dst, void * src, u64 len) {
 
 
 // Ugly globals, but similar globals exist in pthread as well
-// FIXME: These globals need to be moved out into their own registers
-
 ocrPolicyDomain_t *myPD = NULL;
 ocrWorker_t *myWorker = NULL;
 

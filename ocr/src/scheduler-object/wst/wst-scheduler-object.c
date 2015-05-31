@@ -202,7 +202,7 @@ u8 wstSchedulerObjectSwitchRunlevel(ocrSchedulerObjectRoot_t *self, ocrPolicyDom
         ASSERT(0);
     }
     return toReturn;
-    /* TODO-RL: There was this code on STOP, not sure if we still need it
+    /* BUG #583: There was this code on STOP, not sure if we still need it
        ocrSchedulerObject_t *schedObj = (ocrSchedulerObject_t*)self;
        ocrSchedulerObjectFactory_t *fact = self->scheduler->pd->schedulerObjectFactories[schedObj->fctId];
        ASSERT(wstSchedulerObjectCount(fact, schedObj, 0) == 0);

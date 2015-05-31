@@ -99,7 +99,7 @@ u8 ptrGetGuid(ocrGuidProvider_t* self, ocrGuid_t* guid, u64 val, ocrGuidKind kin
     msg.type = PD_MSG_MEM_ALLOC | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
     PD_MSG_FIELD_I(size) = sizeof(ocrGuidImpl_t);
     PD_MSG_FIELD_I(type) = GUID_MEMTYPE;
-    PD_MSG_FIELD_I(properties) = 0; // TODO:  What flags should be defined?  Where are symbolic constants for them defined?
+    PD_MSG_FIELD_I(properties) = 0;
 
     RESULT_PROPAGATE(policy->fcts.processMessage (policy, &msg, true));
 
@@ -127,14 +127,14 @@ u8 ptrCreateGuid(ocrGuidProvider_t* self, ocrFatGuid_t *fguid, u64 size, ocrGuid
 #define PD_TYPE PD_MSG_MEM_ALLOC
     msg.type = PD_MSG_MEM_ALLOC | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
     PD_MSG_FIELD_I(size) = sizeof(ocrGuidImpl_t) + size;
-    PD_MSG_FIELD_I(properties) = 0; // TODO:  What flags should be defined?  Where are symbolic constants for them defined?
+    PD_MSG_FIELD_I(properties) = 0;
     PD_MSG_FIELD_I(type) = GUID_MEMTYPE;
 
     RESULT_PROPAGATE(policy->fcts.processMessage (policy, &msg, true));
 
     ocrGuidImpl_t * guidInst = (ocrGuidImpl_t *)PD_MSG_FIELD_O(ptr);
 #ifdef HAL_FSIM_CE
-    if((u64)PD_MSG_FIELD_O(ptr) < CE_MSR_BASE) // FIXME: do this check properly, trac #222
+    if((u64)PD_MSG_FIELD_O(ptr) < CE_MSR_BASE) // BUG #222: do this check properly
         guidInst = (ocrGuidImpl_t *) DR_CE_BASE(CHIP_FROM_ID(policy->myLocation),
                                                 UNIT_FROM_ID(policy->myLocation),
                                                 BLOCK_FROM_ID(policy->myLocation))

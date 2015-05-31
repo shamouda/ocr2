@@ -39,7 +39,7 @@
 #include <stdio.h>
 #include <pthread.h>
 
-// BUG #591: FIXME
+// BUG #591: Make this more platform independent
 extern pthread_key_t _profilerThreadData;
 
 /* _profiler functions */

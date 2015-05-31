@@ -575,7 +575,7 @@ static void quickInit(poolHdr_t *pool, u64 size)
         DPRINTF(DEBUG_LVL_INFO, "init'ed pool %p, avail %ld bytes , sizeof(poolHdr_t) = %ld\n", pool, size, sizeof(poolHdr_t));
         pool->inited = 1;
 #ifdef ENABLE_VALGRIND
-        VALGRIND_CREATE_MEMPOOL(p, 0, 1);  // TODO: destory.
+        VALGRIND_CREATE_MEMPOOL(p, 0, 1);  // BUG #600: Mempool needs to be destroyed
         VALGRIND_MAKE_MEM_NOACCESS(p, size+sizeof(poolHdr_t));
 #endif
     } else {
@@ -859,11 +859,13 @@ void quickDestruct(ocrAllocator_t *self) {
     ASSERT(self->memoryCount == 1);
     self->memories[0]->fcts.destruct(self->memories[0]);
     /*
-    // TODO: Should we do this? It is the clean thing to do but may
-    // cause mismatch between way it was created and freed
-    runtimeChunkFree((u64)self->memories, NULL);
-    DPRINTF(DEBUG_LVL_WARN, "quickDestruct free %p\n", (u64)self->memories );
+      BUG #288
+      Should we do this? It is the clean thing to do but may
+      cause mismatch between way it was created and freed
     */
+    //runtimeChunkFree((u64)self->memories, PERSISTENT_CHUNK);
+    //DPRINTF(DEBUG_LVL_WARN, "quickDestruct free %p\n", (u64)self->memories );
+
     runtimeChunkFree((u64)self, NULL);
     DPRINTF(DEBUG_LVL_INFO, "Leaving quickDesctruct on allocator 0x%lx (free)\n", (u64) self);
 }
@@ -1020,8 +1022,6 @@ ocrAllocator_t * newAllocatorQuick(ocrAllocatorFactory_t * factory, ocrParamList
         runtimeChunkAlloc(sizeof(ocrAllocatorQuick_t), PERSISTENT_CHUNK);
     DPRINTF(DEBUG_LVL_VERB, "newAllocator called. (This is x86 only ? ? ) alloc %p\n", result);
     ocrAllocator_t * base = (ocrAllocator_t *) result;
-    //TODO-RL don't know what that is but it does not compile
-    // SET_MODULE_STATE(QUICK-ALLOCATOR, base, NEW);
     factory->initialize(factory, base, perInstance);
     return (ocrAllocator_t *) result;
 }

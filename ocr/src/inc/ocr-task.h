@@ -105,7 +105,7 @@ typedef struct _ocrTaskTemplate_t {
 #endif
     u32 paramc;             /**< Number of input parameters */
     u32 depc;               /**< Number of dependences */
-    // TODO: This does not really support things like
+    // BUG #616: This does not really support things like
     // moving code around and/or different ISAs. Is this
     // going to be a problem...
     ocrEdt_t executePtr;    /**< Function pointer to execute */
