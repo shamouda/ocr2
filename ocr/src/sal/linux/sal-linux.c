@@ -97,11 +97,9 @@ ocrGuid_t salQuery(ocrQueryType_t query, ocrGuid_t guid, void **result, u32 *siz
             break;
 
         case OCR_QUERY_EVENTS:
-            //TODO: Call Query Event Function
             break;
 
         case OCR_QUERY_DATABLOCKS:
-            //TODO: Query Datablock Function
             break;
 
         case OCR_QUERY_ALL_EDTS:

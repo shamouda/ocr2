@@ -127,8 +127,6 @@ s32 read_values(dictionary *dict, char *sec, char *field, s32 *values_array) {
     return count;
 }
 
-// TODO: expand to parse comma separated values & ranges iterating the below thru strtok with ,
-// TODO: eventually, extend this to expressions
 s32 read_range(dictionary *dict, char *sec, char *field, s32 *low, s32 *high) {
     char key[MAX_KEY_SZ];
     s32 value;
@@ -149,7 +147,10 @@ s32 read_range(dictionary *dict, char *sec, char *field, s32 *low, s32 *high) {
     return count;
 }
 
-/*  This function, when called with the section name & field, gives the first token, followed by subsequent calls that give other ones */
+/*  This function, when called with the section name & field,
+ *  gives the first token, followed by subsequent calls that
+ *  give other ones */
+
 s32 read_next_csv_value(dictionary *dict, char *key) {
     static char *parsestr = NULL; // This gives the current string that's parsed
     static char *currentfield = NULL;
@@ -202,7 +203,8 @@ char* populate_type(ocrParamList_t **type_param, type_enum index, dictionary *di
     snprintf(key, MAX_KEY_SZ, "%s:%s", secname, "name");
     INI_GET_STR (key, typestr, "");
 
-    // TODO: populate type-specific fields as-needed; see compplatform_type for an example
+    // To extend, populate type-specific fields here as-needed;
+    // see compplatform_type for an example
     switch (index) {
     case guid_type:
         ALLOC_PARAM_LIST(*type_param, paramListGuidProviderFact_t);
@@ -576,7 +578,9 @@ void *create_factory (type_enum index, char *factory_name, ocrParamList_t *param
     return new_factory;
 }
 
-s32 populate_inst(ocrParamList_t **inst_param, void **instance, s32 *type_counts, char ***factory_names, void ***all_factories, void ***all_instances, type_enum index, dictionary *dict, char *secname) {
+s32 populate_inst(ocrParamList_t **inst_param, void **instance, s32 *type_counts,
+                  char ***factory_names, void ***all_factories, void ***all_instances,
+                  type_enum index, dictionary *dict, char *secname) {
     s32 i, low, high, j;
     char *inststr;
     char key[MAX_KEY_SZ];
@@ -589,9 +593,12 @@ s32 populate_inst(ocrParamList_t **inst_param, void **instance, s32 *type_counts
     INI_GET_STR (key, inststr, "");
 
     for (i = 0; i < type_counts[index]; i++) {
-        if (factory_names[index][i] && (0 == strncmp(factory_names[index][i], inststr, 1+strlen(factory_names[index][i])))) break;
+        if (factory_names[index][i] &&
+            (0 == strncmp(factory_names[index][i], inststr, 1+strlen(factory_names[index][i]))))
+            break;
     }
-    if (factory_names[index][i] == NULL || strncmp(factory_names[index][i], inststr, 1+strlen(factory_names[index][i]))) {
+    if (factory_names[index][i] == NULL ||
+        strncmp(factory_names[index][i], inststr, 1+strlen(factory_names[index][i]))) {
         DPRINTF(DEBUG_LVL_WARN, "Unknown type %s while reading key %s\n", inststr, key);
         return 0;
     }
@@ -723,9 +730,7 @@ s32 populate_inst(ocrParamList_t **inst_param, void **instance, s32 *type_counts
         for (j = low; j<=high; j++) {
             ALLOC_PARAM_LIST(inst_param[j], paramListCommPlatformInst_t);
             snprintf(key, MAX_KEY_SZ, "%s:%s", secname, "location");
-            //INI_GET_LONG (key, value, -1); TODO: Decide if this is needed
-            //value |= j;  // Or the id into value for location.
-            //((paramListCommPlatformInst_t *)inst_param[j])->location = (ocrLocation_t)value;
+            // Currently location field is auto-populated. To be deprecated.
             instance[j] = (void *)((ocrCommPlatformFactory_t *)factory)->instantiate(factory, inst_param[j]);
             if (instance[j])
                 DPRINTF(DEBUG_LVL_INFO, "Created commplatform of type %s, index %d\n", inststr, j);
@@ -819,50 +824,47 @@ s32 populate_inst(ocrParamList_t **inst_param, void **instance, s32 *type_counts
                     INI_GET_STR (workertypekey, workerstr, "");
                     TO_ENUM (workertype, workerstr, ocrWorkerType_t, ocrWorkerType_types, MAX_WORKERTYPE-1);
                     workertype += 1;  // because workertype is 1-indexed, not 0-indexed
-                    if (workertype == MAX_WORKERTYPE) workertype = SLAVE_WORKERTYPE; // TODO: is this a reasonable default?
+                    if (workertype == MAX_WORKERTYPE) workertype = SLAVE_WORKERTYPE; // reasonable default
                     ALLOC_PARAM_LIST(inst_param[j], paramListWorkerHcInst_t);
                     ((paramListWorkerHcInst_t *)inst_param[j])->workerType = workertype;
-                    ((paramListWorkerInst_t *)inst_param[j])->workerId = j; // using "id" for now; TODO: decide if a separate key is needed
+                    ((paramListWorkerInst_t *)inst_param[j])->workerId = j; // using "id" for now, not a separate key
                 }
                 break;
 #endif
 #ifdef ENABLE_WORKER_CE
-            case workerCe_id: {
-                char *workerstr;
-                char workertypekey[MAX_KEY_SZ];
-                ocrWorkerType_t workertype = MAX_WORKERTYPE;
+                case workerCe_id: {
+                    char *workerstr;
+                    char workertypekey[MAX_KEY_SZ];
+                    ocrWorkerType_t workertype = MAX_WORKERTYPE;
 
-                snprintf(workertypekey, MAX_KEY_SZ, "%s:%s", secname, "workertype");
-                INI_GET_STR (workertypekey, workerstr, "");
-                TO_ENUM (workertype, workerstr, ocrWorkerType_t, ocrWorkerType_types, MAX_WORKERTYPE-1);
-                workertype += 1;  // because workertype is 1-indexed, not 0-indexed
-                if (workertype == MAX_WORKERTYPE) workertype = SLAVE_WORKERTYPE; // TODO: is this a reasonable default?
-                ALLOC_PARAM_LIST(inst_param[j], paramListWorkerCeInst_t);
-                ((paramListWorkerCeInst_t *)inst_param[j])->workerType = workertype;
-                ((paramListWorkerInst_t *)inst_param[j])->workerId = j; // using "id" for now; TODO: decide if a separate key is needed
-            }
-            break;
+                    snprintf(workertypekey, MAX_KEY_SZ, "%s:%s", secname, "workertype");
+                    INI_GET_STR (workertypekey, workerstr, "");
+                    TO_ENUM (workertype, workerstr, ocrWorkerType_t, ocrWorkerType_types, MAX_WORKERTYPE-1);
+                    workertype += 1;  // because workertype is 1-indexed, not 0-indexed
+                    if (workertype == MAX_WORKERTYPE) workertype = SLAVE_WORKERTYPE; // reasonable default
+                    ALLOC_PARAM_LIST(inst_param[j], paramListWorkerCeInst_t);
+                    ((paramListWorkerCeInst_t *)inst_param[j])->workerType = workertype;
+                }
+                break;
 #endif
 #ifdef ENABLE_WORKER_XE
-            case workerXe_id: {
-                char *workerstr;
-                char workertypekey[MAX_KEY_SZ];
-                ocrWorkerType_t workertype = MAX_WORKERTYPE;
+                case workerXe_id: {
+                    char *workerstr;
+                    char workertypekey[MAX_KEY_SZ];
+                    ocrWorkerType_t workertype = MAX_WORKERTYPE;
 
-                snprintf(workertypekey, MAX_KEY_SZ, "%s:%s", secname, "workertype");
-                INI_GET_STR (workertypekey, workerstr, "");
-                TO_ENUM (workertype, workerstr, ocrWorkerType_t, ocrWorkerType_types, MAX_WORKERTYPE-1);
-                workertype += 1;  // because workertype is 1-indexed, not 0-indexed
-                if (workertype == MAX_WORKERTYPE) workertype = SLAVE_WORKERTYPE; // TODO: is this a reasonable default?
-                ALLOC_PARAM_LIST(inst_param[j], paramListWorkerXeInst_t);
-                ((paramListWorkerInst_t *)inst_param[j])->workerId = j; // using "id" for now; TODO: decide if a separate key is needed
-            }
-            break;
-#endif
-            default:
-                ASSERT (0); // Unimplemented worker type.
-                //ALLOC_PARAM_LIST(inst_param[j], paramListWorkerInst_t);
+                    snprintf(workertypekey, MAX_KEY_SZ, "%s:%s", secname, "workertype");
+                    INI_GET_STR (workertypekey, workerstr, "");
+                    TO_ENUM (workertype, workerstr, ocrWorkerType_t, ocrWorkerType_types, MAX_WORKERTYPE-1);
+                    workertype += 1;  // because workertype is 1-indexed, not 0-indexed
+                    if (workertype == MAX_WORKERTYPE) workertype = SLAVE_WORKERTYPE; // reasonable default
+                    ALLOC_PARAM_LIST(inst_param[j], paramListWorkerXeInst_t);
+                }
                 break;
+#endif
+                default:
+                    ASSERT (0); // Unimplemented worker type.
+                    break;
             }
 
             instance[j] = (void *)((ocrWorkerFactory_t *)factory)->instantiate(factory, inst_param[j]);
@@ -905,8 +907,7 @@ s32 populate_inst(ocrParamList_t **inst_param, void **instance, s32 *type_counts
         for (j = low; j<=high; j++) {
             policyDomainType_t mytype = policyDomainMax_id;
 #ifdef OCR_ENABLE_STATISTICS
-            // HUGE HUGE HUGE HUGE HUGE HACK. This needs to be parsed
-            // but for now just passing some default one
+            // Bug #225
             ocrStatsFactory_t *sf = newStatsFactory(statisticsDefault_id, NULL);
 #endif
 
@@ -947,10 +948,9 @@ s32 populate_inst(ocrParamList_t **inst_param, void **instance, s32 *type_counts
                 break;
             }
 
-            // TODO: Redo the below to mirror rank config changes
             snprintf(key, MAX_KEY_SZ, "%s:%s", secname, "location");
             if(INI_IS_RANGE(key)) {
-                ((paramListPolicyDomainInst_t*)inst_param[j])->location =  j-1;  // FIXME: HACKHACKHACK
+                ((paramListPolicyDomainInst_t*)inst_param[j])->location =  j-1;
             } else {
                 INI_GET_INT (key, value, -1);
                 ((paramListPolicyDomainInst_t*)inst_param[j])->location = value;
@@ -1157,7 +1157,7 @@ void add_dependence (type_enum fromtype, type_enum totype, char *refstr,
         case policydomain_type: {
             ocrPolicyDomain_t* t = (ocrPolicyDomain_t*)toinstance;
             f->parentLocation = (u64) t->myLocation;
-            f->parentPD = t; // FIXME: PD2Location
+            f->parentPD = t;
             break;
         }
         default:
@@ -1186,7 +1186,7 @@ s32 build_deps (dictionary *dict, s32 A, s32 B, char *refstr, void ***all_instan
                 // Parse corresponding dependences from secname
                 depcount = read_values(dict, iniparser_getsecname(dict, i), refstr, values_array);
                 // Connect A with B
-                // Using a rough heuristic for now: if |from| == |to| then 1:1, else all:all TODO: What else makes sense here?
+                // Using a rough heuristic for now: if |from| == |to| then 1:1, else all:all
                 if (depcount == high-low+1) {
                     k = values_array[j-low];
                     add_dependence(A, B, refstr, all_instances[A][j], inst_params[A][j], all_instances[B][k], inst_params[B][k], 0, 1);
@@ -1210,8 +1210,6 @@ s32 build_deps_types (s32 A, s32 B, char *refstr, void **pdinst, int pdcount, in
             add_dependence(A, B, refstr, pdinst[i], NULL, all_factories[B][j], NULL, j, type_count);
         }
     }
-
-    // FIXME: The above is highly simplified, needs review/change
 
     return 0;
 }

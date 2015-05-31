@@ -62,7 +62,7 @@ ocrStaticAssert(OCR_HINT_COUNT_EDT_HC < OCR_RUNTIME_HINT_PROP_BITS);
 u8 destructTaskTemplateHc(ocrTaskTemplate_t *self) {
 #ifdef OCR_ENABLE_STATISTICS
     {
-        // TODO: FIXME
+        // Bug #225
         ocrPolicyDomain_t *pd = getCurrentPD();
         ocrGuid_t edtGuid = getCurrentEDT();
 
@@ -129,7 +129,7 @@ ocrTaskTemplate_t * newTaskTemplateHc(ocrTaskTemplateFactory_t* factory, ocrEdt_
 
 #ifdef OCR_ENABLE_STATISTICS
     {
-        // TODO: FIXME
+        // Bug #225
         ocrGuid_t edtGuid = getCurrentEDT();
         statsTEMP_CREATE(pd, edtGuid, NULL, base->guid, base);
     }
@@ -338,7 +338,7 @@ static u8 initTaskHcInternal(ocrTaskHc_t *task, ocrPolicyDomain_t * pd,
 }
 
 /**
- * @brief sorted an array of regNode_t according to their GUID
+ * @brief sort an array of regNode_t according to their GUID
  * Warning. 'notifyDbReleaseTaskHc' relies on this sort to be stable !
  */
  static void sortRegNode(regNode_t * array, u32 length) {
@@ -504,14 +504,15 @@ u8 destructTaskHc(ocrTask_t* base) {
     DO_DEBUG_TYPE(TASK, DEBUG_LVL_INFO)
     PRINTF("EDT(INFO) [PD:0x0 W:0x0 EDT:0x0] Destroy 0x%lx\n", base->guid);
     END_DEBUG
-    // FIXME: The above hack was added because the below causes a coredump. [Trac #219]
+    // Bug #219
+    // The above hack was added because the below causes a coredump.
     //DPRINTF(DEBUG_LVL_INFO, "Destroy 0x%lx\n", base->guid);
     ocrPolicyDomain_t *pd = NULL;
     PD_MSG_STACK(msg);
     getCurrentEnv(&pd, NULL, NULL, &msg);
 #ifdef OCR_ENABLE_STATISTICS
     {
-        // TODO: FIXME
+        // Bug #225
         // An EDT is destroyed just when it finishes running so
         // the source is basically itself
         statsEDT_DESTROY(pd, base->guid, base, base->guid, base);
@@ -646,7 +647,7 @@ u8 newTaskHc(ocrTaskFactory_t* factory, ocrFatGuid_t * edtGuid, ocrFatGuid_t edt
 #undef PD_TYPE
 
 #ifdef OCR_ENABLE_STATISTICS
-    // TODO FIXME
+    // Bug #225
     {
         ocrGuid_t edtGuid = getCurrentEDT();
         if(edtGuid) {
@@ -931,8 +932,6 @@ u8 notifyDbReleaseTaskHc(ocrTask_t *base, ocrFatGuid_t db) {
             if(db.guid == derived->unkDbs[count]) {
                 DPRINTF(DEBUG_LVL_VVERB, "Dynamic Releasing DB @ 0x%lx (GUID 0x%lx) from EDT 0x%lx, match in unkDbs list for count %lu\n",
                        db.guid, base->guid, count);
-                // printf("Dynamic Releasing DB (GUID 0x%lx) from EDT 0x%lx, match in unkDbs list for count %lu\n",
-                //        db.guid, base->guid, count);
                 derived->unkDbs[count] = derived->unkDbs[maxCount - 1];
                 --(derived->countUnkDbs);
                 return 0;
@@ -979,7 +978,7 @@ u8 taskExecute(ocrTask_t* base) {
     getCurrentEnv(&pd, &curWorker, NULL, NULL);
 
 #ifdef OCR_ENABLE_STATISTICS
-    // TODO: FIXME
+    // Bug #225
     ocrPolicyCtx_t *ctx = getCurrentWorkerContext();
     ocrWorker_t *curWorker = NULL;
 
@@ -1049,7 +1048,7 @@ u8 taskExecute(ocrTask_t* base) {
                 PD_MSG_FIELD_I(edt.guid) = base->guid;
                 PD_MSG_FIELD_I(edt.metaDataPtr) = base;
                 PD_MSG_FIELD_I(ptr) = NULL;
-                PD_MSG_FIELD_I(size) = 0; // TODO check that's set properly for release by hc-dist-policy.c
+                PD_MSG_FIELD_I(size) = 0;
                 PD_MSG_FIELD_I(properties) = 0;
                 // Ignore failures at this point
                 pd->fcts.processMessage(pd, &msg, true);
@@ -1106,7 +1105,7 @@ u8 taskExecute(ocrTask_t* base) {
             // the finish latch if needed
             PD_MSG_FIELD_IO(properties) = DB_MODE_CONST;
             // Ignore failure for now
-            // FIXME: Probably need to be a bit more selective
+            // Bug #615
             pd->fcts.processMessage(pd, &msg, false);
     #undef PD_MSG
     #undef PD_TYPE
@@ -1127,7 +1126,7 @@ u8 taskExecute(ocrTask_t* base) {
             // the finish latch if needed
             PD_MSG_FIELD_I(properties) = 0;
             // Ignore failure for now
-            // FIXME: Probably need to be a bit more selective
+            // Bug #615
             pd->fcts.processMessage(pd, &msg, false);
     #undef PD_MSG
     #undef PD_TYPE

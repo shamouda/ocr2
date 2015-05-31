@@ -1348,8 +1348,6 @@ typedef struct _ocrPolicyDomainFactory_t {
      * @param costFunction        The cost function used by this policy domain
      */
 
-    // TODO: Check with Bala on this. We may not need to pass anything
-    // except the physical location of itself and its parent
     ocrPolicyDomain_t * (*instantiate) (struct _ocrPolicyDomainFactory_t *factory,
 #ifdef OCR_ENABLE_STATISTICS
                                         ocrStats_t *statsObject,

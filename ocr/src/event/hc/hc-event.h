@@ -40,9 +40,7 @@ typedef struct ocrEventHc_t {
     ocrRuntimeHint_t hint;
 } ocrEventHc_t;
 
-// STICKY or IDEM events need a lock
-// NOTE: This is a sucky implementation for
-// now but works
+// STICKY or IDEM events need a lock - can be improved upon
 typedef struct _ocrEventHcPersist_t {
     ocrEventHc_t base;
     ocrGuid_t data;
