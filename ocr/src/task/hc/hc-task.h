@@ -54,7 +54,7 @@ typedef struct {
     volatile u32 frontierSlot; /**< Slot of the execution frontier
                                   This excludes once events */
     volatile u32 slotSatisfiedCount; /**< Number of slots satisfied */
-    volatile u32 lock; /**< TODO: We can probably do with just atomics on frontierSlot and slotSatisfiedCount */
+    volatile u32 lock;
     ocrEdtDep_t * resolvedDeps; /**< List of satisfied dependences */
     u64 doNotReleaseSlots[OCR_MAX_MULTI_SLOT];
     ocrRuntimeHint_t hint;

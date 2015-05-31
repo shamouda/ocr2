@@ -453,9 +453,6 @@ static u8 scheduleTask(ocrTask_t *self) {
  * Note: static function only meant to factorize code.
  */
 static u8 taskAllDepvSatisfied(ocrTask_t *self) {
-    //TODO DBX It feels the responsibility of fetching DB-related things should
-    //be in the scheduler, however it is difficult to interact with the task
-    //inners from there.
     DPRINTF(DEBUG_LVL_INFO, "All dependences satisfied for task 0x%lx\n", self->guid);
     // Now check if there's anything to do before scheduling
     // In this implementation we want to acquire locks for DBs in EW mode
@@ -827,8 +824,8 @@ u8 registerSignalerTaskHc(ocrTask_t * base, ocrFatGuid_t signalerGuid, u32 slot,
     ASSERT(signalerGuid.guid != NULL_GUID); // This should have been caught earlier on
     hal_lock32(&(self->lock));
     node->guid = signalerGuid.guid;
-    //DIST-TODO this is the reason why we need to introduce new kinds of guid
-    //because we don't have support for cloning metadata around yet
+    //BUG #536 metadata cloning: Had to introduce new kinds of guids because we don't
+    //         have support for cloning metadata around yet
     if(signalerKind & OCR_GUID_EVENT) {
         if((signalerKind == OCR_GUID_EVENT_ONCE) ||
                 (signalerKind == OCR_GUID_EVENT_LATCH)) {

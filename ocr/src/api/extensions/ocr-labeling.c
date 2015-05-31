@@ -58,7 +58,7 @@ u8 ocrGuidMapCreate(ocrGuid_t *mapGuid, u32 numParams,
     msg.type = PD_MSG_GUID_RESERVE | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
     PD_MSG_FIELD_I(numberGuids) = numberGuid;
     PD_MSG_FIELD_I(guidKind) = (ocrGuidKind)kind;
-    // TODO: There is a leak if this fails
+    //BUG #527: memory reclaim: There is a leak if this fails
     returnCode = pd->fcts.processMessage(pd, &msg, true);
     if(!((returnCode == 0) && ((returnCode = PD_MSG_FIELD_O(returnDetail)) == 0))) {
         return returnCode;
@@ -107,7 +107,7 @@ u8 ocrGuidRangeCreate(ocrGuid_t *mapGuid,
     msg.type = PD_MSG_GUID_RESERVE | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
     PD_MSG_FIELD_I(numberGuids) = numberGuid;
     PD_MSG_FIELD_I(guidKind) = (ocrGuidKind)kind;
-    // TODO: There is a leak if this fails
+    //BUG #527: memory reclaim: There is a leak if this fails
     returnCode = pd->fcts.processMessage(pd, &msg, true);
     if(!((returnCode == 0) && ((returnCode = PD_MSG_FIELD_O(returnDetail)) == 0))) {
         return returnCode;

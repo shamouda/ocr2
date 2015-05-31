@@ -391,7 +391,7 @@ typedef struct _ocrPolicyMsg_t {
         struct {
             ocrFatGuid_t guid;            /**< In/Out: GUID of the created
                                            * memory segment (usually a DB) */
-            // TODO: Bug #273. See if these need to stay In/Out or if it can move back to in
+            //BUG #273 See if these need to stay In/Out or if it can move back to in
             u32 properties;               /**< In: Properties for creation */
             u64 size;                     /**< In: Size of the created DB */
             union {
@@ -424,7 +424,7 @@ typedef struct _ocrPolicyMsg_t {
         struct {
             // These four parameters should move to IN but they are here
             // due to the implementation of the lockable DB
-            // This is reported in bug #273
+            //BUG #273: This is reported in bug #273
             ocrFatGuid_t guid;         /**< In: GUID of the DB to acquire */
             ocrFatGuid_t edt;          /**< In: EDT doing the acquire */
             u32 edtSlot;               /**< In: EDT's slot if applicable else EDT_SLOT_NONE */
@@ -441,7 +441,7 @@ typedef struct _ocrPolicyMsg_t {
         } PD_MSG_STRUCT_NAME(PD_MSG_DB_ACQUIRE);
 
         struct {
-            // This field should also be just IN. See bug #273
+            //BUG #273 This field should also be just IN
             ocrFatGuid_t guid;         /**< In: GUID of the DB to release */
             union {
                 struct {
@@ -771,7 +771,7 @@ typedef struct _ocrPolicyMsg_t {
         } PD_MSG_STRUCT_NAME(PD_MSG_COMM_GIVE);
 
         struct {
-            // TODO: Bug #273. THis is also being used at In/Out
+            //BUG #273 THis is also being used at In/Out
             u32 properties;      /**< In: Properties. Lower 3 bits are access modes */
             union {
                 struct {
@@ -1004,7 +1004,7 @@ typedef struct _ocrPolicyMsg_t {
         } PD_MSG_STRUCT_NAME(PD_MSG_MGT_UNREGISTER);
 
         struct {
-            // TODO: Bug #273
+            //BUG #273
             u32 properties; /**< In: first eight bits is type of monitoree */
             union {
                 struct {

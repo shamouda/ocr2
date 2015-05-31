@@ -133,14 +133,14 @@ static u64 extractLocIdFromGuid(ocrGuid_t guid) {
 }
 
 static ocrLocation_t locIdtoLocation(u64 locId) {
-    //TODO: We assume there will be a mapping between a location
-    //      and an 'id' stored in the guid. For now identity.
+    //BUG #605 Locations spec: We assume there will be a mapping
+    //between a location and an 'id' stored in the guid. For now identity.
     return (ocrLocation_t) (locId);
 }
 
 static u64 locationToLocId(ocrLocation_t location) {
-    //TODO: We assume there will be a mapping between a location
-    //      and an 'id' stored in the guid. For now identity.
+    //BUG #605 Locations spec: We assume there will be a mapping
+    //between a location and an 'id' stored in the guid. For now identity.
     u64 locId = (u64) ((int)location);
     // Make sure we're not overflowing location size
     ASSERT((locId < (1<<GUID_LOCID_SIZE)) && "GUID location ID overflows");

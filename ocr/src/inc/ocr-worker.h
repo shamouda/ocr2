@@ -102,7 +102,7 @@ typedef struct _ocrWorkerFcts_t {
 typedef struct _ocrWorker_t {
     ocrFatGuid_t fguid;
     struct _ocrPolicyDomain_t *pd;
-    ocrLocation_t location;  //!!! TO BE DEPRECATED !!!
+    ocrLocation_t location;  //BUG #605 Locations spec: need this ?
     ocrWorkerType_t type;
     u8 amBlessed; // TODO: Maybe merge in type?
     u64 seqId;

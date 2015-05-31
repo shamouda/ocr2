@@ -38,7 +38,7 @@ typedef union {
         volatile u64 internalUsers : 15;
         volatile u64 freeRequested: 1;
         volatile u64 modeLock : 2;
-        volatile u64 _padding : 1; //TODO DBX Purpose of this ??
+        volatile u64 _padding : 1;
     };
     u64 data;
 } ocrDataBlockLockableAttr_t;

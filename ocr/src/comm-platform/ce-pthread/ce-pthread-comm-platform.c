@@ -333,7 +333,7 @@ u64 cePthreadGetSeqIdAtNeighbor(ocrCommPlatform_t *self, ocrLocation_t neighborL
 }
 
 u8 cePthreadDestructMessage(ocrCommPlatform_t *self, ocrPolicyMsg_t *msg) {
-    // TODO
+    //BUG #527: memory reclaim: destruct message
     return 0;
 }
 

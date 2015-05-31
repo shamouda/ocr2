@@ -181,7 +181,7 @@ u8 satisfyEventHcOnce(ocrEvent_t *base, ocrFatGuid_t db, u32 slot) {
         u8 res = pd->fcts.processMessage(pd, &msg, true);
         ASSERT(!res); // Possible corruption of waitersDb
         waiters = (regNode_t*)PD_MSG_FIELD_O(ptr);
-        // Todo: Related to bug #273. We should not get an updated deguidification...
+        //BUG #273: related to 273: we should not get an updated deguidification...
         event->waitersDb = PD_MSG_FIELD_IO(guid); //Get updated deguidifcation if needed
         ASSERT(waiters); // Indicates a corruption
 #undef PD_TYPE
@@ -241,7 +241,7 @@ u8 satisfyEventHcPersist(ocrEvent_t *base, ocrFatGuid_t db, u32 slot) {
            (event->data == UNINITIALIZED_GUID)); // Sticky events can be satisfied once
 
     if(event->data != UNINITIALIZED_GUID) {
-        return 1; // TODO: Put some error code here.
+        return 1; //BUG #603 error codes: Put some error code here.
     } else {
         DPRINTF(DEBUG_LVL_INFO, "Satisfy %s: 0x%lx with 0x%lx\n", eventTypeToString(base),
                 base->guid, db.guid);
@@ -285,7 +285,7 @@ u8 satisfyEventHcPersist(ocrEvent_t *base, ocrFatGuid_t db, u32 slot) {
         u8 res = pd->fcts.processMessage(pd, &msg, true);
         ASSERT(!res); // Possible corruption of waitersDb
         waiters = (regNode_t*)PD_MSG_FIELD_O(ptr);
-        // TODO: bug #273
+        //BUG #273
         event->base.waitersDb = PD_MSG_FIELD_IO(guid);
         ASSERT(waiters); // Check for corruption
         // Before we satisfy, we "cache" some of the information we need
@@ -336,7 +336,6 @@ u8 satisfyEventHcPersist(ocrEvent_t *base, ocrFatGuid_t db, u32 slot) {
         RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, true));
 #undef PD_MSG
 #undef PD_TYPE
-        //TODO early release of the DB here ?
     }
     // The event sticks around until the user destroys it
     return 0;
@@ -390,7 +389,7 @@ u8 satisfyEventHcLatch(ocrEvent_t *base, ocrFatGuid_t db, u32 slot) {
         ASSERT(!res); // Possible corruption of waitersDb
 
         waiters = (regNode_t*)PD_MSG_FIELD_O(ptr);
-        // TODO: See bug #273
+        //BUG #273
         event->base.waitersDb = PD_MSG_FIELD_IO(guid);
         ASSERT(waiters); // Check for corruption
 #undef PD_TYPE
@@ -483,7 +482,7 @@ u8 registerWaiterEventHc(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot, bool i
     u8 res = pd->fcts.processMessage(pd, &msg, true);
     ASSERT(!res); // Possible corruption of waitersDb
     waiters = (regNode_t*)PD_MSG_FIELD_O(ptr);
-    // TODO: See bug #273
+    //BUG #273
     event->waitersDb = PD_MSG_FIELD_IO(guid);
     ASSERT(waiters); // Check for corruption
 #undef PD_TYPE
@@ -622,7 +621,7 @@ u8 registerWaiterEventHcPersist(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot,
         PD_MSG_FIELD_I(slot) = slot;
         PD_MSG_FIELD_I(properties) = 0;
         if((toReturn = pd->fcts.processMessage(pd, &msg, false))) {
-            return toReturn; //TODO error status
+            return toReturn; //BUG #603 error codes
         }
 #undef PD_MSG
 #undef PD_TYPE
@@ -645,11 +644,11 @@ u8 registerWaiterEventHcPersist(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot,
         ASSERT(false); // debug
         ASSERT(toReturn != OCR_EBUSY);
         hal_unlock32(&(event->base.waitersLock));
-        return toReturn; //TODO error status
+        return toReturn; //BUG #603 error codes
     }
 
     waiters = (regNode_t*)PD_MSG_FIELD_O(ptr);
-    // TODO: See bug #273
+    //BUG #273
     event->base.waitersDb = PD_MSG_FIELD_IO(guid);
     ASSERT(waiters);
 #undef PD_TYPE
@@ -669,7 +668,7 @@ u8 registerWaiterEventHcPersist(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot,
         if((toReturn = pd->fcts.processMessage(pd, &msg, true))) {
             ASSERT(false); // debug
             hal_unlock32(&(event->base.waitersLock));
-            return toReturn; //TODO error status
+            return toReturn; //BUG #603 error codes
         }
 
         waitersNew = (regNode_t*)PD_MSG_FIELD_O(ptr);
@@ -701,7 +700,7 @@ u8 registerWaiterEventHcPersist(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot,
         if((toReturn = pd->fcts.processMessage(pd, &msg, false))) {
             ASSERT(false); // debug
             hal_unlock32(&(event->base.waitersLock));
-            return toReturn; //TODO error status
+            return toReturn; //BUG #603 error codes
         }
 #undef PD_TYPE
         event->base.waitersDb = newGuid;
@@ -756,7 +755,7 @@ u8 unregisterWaiterEventHc(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot, bool
     ASSERT(!res); // Possible corruption of waitersDb
 
     waiters = (regNode_t*)PD_MSG_FIELD_O(ptr);
-    // TODO: Bug #273
+    //BUG #273
     event->waitersDb = PD_MSG_FIELD_IO(guid);
     ASSERT(waiters);
 #undef PD_TYPE
@@ -826,7 +825,7 @@ u8 unregisterWaiterEventHcPersist(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slo
         hal_unlock32(&(event->base.waitersLock));
         return toReturn;
     }
-    // TODO: Guid reading (bug #273)
+    //BUG #273: Guid reading
     waiters = (regNode_t*)PD_MSG_FIELD_O(ptr);
     event->base.waitersDb = PD_MSG_FIELD_IO(guid);
     ASSERT(waiters);
@@ -1004,7 +1003,7 @@ u8 newEventHc(ocrEventFactory_t * factory, ocrFatGuid_t *guid,
     }
 
     /* Signalers not used at this point
-    // TODO: FIXME when reuse of message function implemented
+    //BUG #604 comm/msg API: when reuse of message function implemented
     // We probably need to just call something to reset a bit
     msg.type = PD_MSG_DB_CREATE | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
     PD_MSG_FIELD_IO(guid) = event->signalersDb;
