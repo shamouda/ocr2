@@ -167,6 +167,7 @@ u8 ceCommSwitchRunlevel(ocrCommPlatform_t *self, ocrPolicyDomain_t *PD, ocrRunle
                 // Wait till XE is in the barrier
                 do {
                     tmp = rmd_ld64((u64)rq);
+                    hal_fence();
                 } while(tmp != 0xfeedf00d);
                 ASSERT(tmp == 0xfeedf00d);
                 // Exit the XE out of the barrier
@@ -179,6 +180,7 @@ u8 ceCommSwitchRunlevel(ocrCommPlatform_t *self, ocrPolicyDomain_t *PD, ocrRunle
         {
             for(i=0; i< OUTSTANDING_CE_MSGS; i++)
                 msgAddresses[i] = 0xdead;
+            hal_fence();
 
             recvBuf.type = 0xdead;
         }

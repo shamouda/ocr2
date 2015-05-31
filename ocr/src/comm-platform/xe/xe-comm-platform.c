@@ -115,7 +115,8 @@ void xeInitBarrier(void)
 
     lq[0] = 0xfeedf00d;
     // While local stage non-Full, keep looping. (FIXME: sleep?)
-    while(lq[0] != 2);
+    while(lq[0] != 2)
+        hal_fence();
     lq[0] = 0;
 }
 
