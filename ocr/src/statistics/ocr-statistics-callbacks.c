@@ -8,7 +8,7 @@
  * removed or modified.
  */
 
-
+// BUG #225: Implement statistics; this is an older version
 #ifdef OCR_ENABLE_STATISTICS
 
 #include "debug.h"
@@ -248,7 +248,6 @@ void statsDB_CREATE(ocrPolicyDomain_t *pd, ocrGuid_t edtGuid, ocrTask_t *task,
 
     statsParamDb_t params = { .offset = 0, .size = db->size, .isWrite = 1 };
 
-    // TODO: Check if this is the most useful way to message things...
     ocrStatsMessage_t *mess = stats->fctPtrs->createMessage(stats, STATS_DB_CREATE, edtGuid, allocatorGuid,
                               (ocrStatsParam_t*)&params);
     ocrStatsSyncMessage(task->statProcess, allocator->statProcess, mess);
@@ -283,7 +282,6 @@ void statsDB_DESTROY(ocrPolicyDomain_t *pd, ocrGuid_t edtGuid, ocrTask_t *task,
     ASSERT(db->allocator == allocatorGuid);
 
     statsParamDb_t params = { .offset = 0, .size = db->size, .isWrite = 1 };
-    // TODO: Check if this is the most useful way to message things...
     ocrStatsMessage_t *mess = stats->fctPtrs->createMessage(stats, STATS_DB_DESTROY, edtGuid, allocatorGuid,
                               (ocrStatsParam_t*)&params);
     ocrStatsSyncMessage(task->statProcess, allocator->statProcess, mess);

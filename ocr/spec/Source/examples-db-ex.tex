@@ -1,0 +1,171 @@
+The {\tt Exclusive-Write (EW)} mode allows for an easy implementation of mutual exclusion of EDTs execution. When an EDT depend on one or several DBs in {\tt EW} mode, the runtime guarantees it is the only EDT throught the system to currently writing to those DBs.
+Hence, the {\tt EW} mode is useful when one wants to guarantee there's no race condition writing to a Data-Block or when ordering among EDTs do not matter for as long as the execution is in mutual exclusion. The following examples shows how two EDTs may share access to a DB in {\tt RW} mode, while one EDT requires {\tt EW} access. In this situation the programmer cannot assume in which order the EDTs are executed. It might be that EDT1 and EDT2 are executed simultaneously or independently, while EDT3 happens either before, after or in between the others.
+
+%%%%
+
+\subsection{Code example}
+\begin{ocrsnip}
+/* Example usage of EW (Exclusive-Write)
+ * datablock access mode in OCR
+ *
+ * Implements the following dependence graph:
+ *
+ *       mainEdt
+ *       [ DB ]
+ *      / |     \
+ * (RW)/  |(RW)  \(EW)
+ *    /   |       \
+ * EDT1  EDT2    EDT3
+ *    \   |      /
+ *     \  |     /
+ *      \ |    /
+ *       [ DB ]
+ *     shutdownEdt
+ *
+ */
+
+#include "ocr.h"
+
+#define NB_ELEM_DB 20
+
+ocrGuid_t shutdownEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
+    // The fourth slot (3 as it is 0-indexed) was the DB.
+    u64 * data = (u64 *) depv[3].ptr;
+    u32 i = 0;
+    while (i < NB_ELEM_DB) {
+        PRINTF("%d ",data[i]);
+        i++;
+    }
+    PRINTF("\n");
+    // Destroying the DB implicitely releases it.
+    ocrDbDestroy(depv[3].guid);
+    // Instruct the runtime the application is done executing
+    ocrShutdown();
+    return NULL_GUID;
+}
+
+ocrGuid_t writerEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
+    // An EDT has access to the parameters and dependences it has been created with.
+    // ocrEdtDep_t allow to access both the '.guid' of the dependence and the '.ptr'
+    // Note that when an EDT has an event as a dependence and this event is satisfied
+    // with a DB GUID, the .guid field contains the DB GUID, not the event GUID.
+    u64 * data = (u64 *) depv[0].ptr;
+    u64 lb = paramv[0];
+    u64 ub = paramv[1];
+    u64 value = paramv[2];
+    u32 i = lb;
+    while (i < ub) {
+        data[i] += value;
+        i++;
+    }
+    // The GUID the output event of this EDT is satisfied with
+    return NULL_GUID;
+}
+
+ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
+    void * dbPtr;
+    ocrGuid_t dbGuid;
+    u32 nbElem = NB_ELEM_DB;
+    // Create a DataBlock (DB). Note that the currently executing EDT
+    // acquires the DB in Read-Write (RW) mode
+    ocrDbCreate(&dbGuid, &dbPtr, sizeof(u64) * NB_ELEM_DB, 0, NULL_GUID, NO_ALLOC);
+    u64 i = 0;
+    int * data = (int *) dbPtr;
+    while (i < nbElem) {
+        data[i] = 0;
+        i++;
+    }
+    // Indicate to the runtime the current EDT is not using the DB anymore
+    ocrDbRelease(dbGuid);
+
+    // Create the sink EDT template. The sink EDT is responsible for
+    // shutting down the application.
+    // It has 4 dependences: EDT1, EDT2, EDT3 and the DB
+    ocrGuid_t shutdownEdtTemplateGuid;
+    ocrEdtTemplateCreate(&shutdownEdtTemplateGuid, shutdownEdt, 0, 4);
+    ocrGuid_t shutdownGuid;
+    // Create the shutdown EDT indicating this instance of the shutdown EDT template
+    // has the same number of parameters and dependences the template declares.
+    ocrEdtCreate(&shutdownGuid, shutdownEdtTemplateGuid, 0, NULL, EDT_PARAM_DEF, NULL,
+                 EDT_PROP_NONE, NULL_GUID, NULL);
+    // EDT is created, but it does not have its four dependences set up yet.
+    // Set the third dependence of EDT shutdown to be the DB
+    ocrAddDependence(dbGuid, shutdownGuid, 3, DB_MODE_CONST);
+
+    // Writer EDTs have 3 parameters and 2 dependences
+    ocrGuid_t writeEdtTemplateGuid;
+    ocrEdtTemplateCreate(&writeEdtTemplateGuid, writerEdt, 3, 2);
+
+    // Create the event that enable EDT1, EDT2, EDT3 to run
+    // It is a once event automatically destroyed when satisfy
+    // has been called on it. Because of that we need to make
+    // sure that all its dependences are set up before satisfied
+    // is called.
+    ocrGuid_t eventStartGuid;
+    ocrEventCreate(&eventStartGuid, OCR_EVENT_ONCE_T, false);
+
+    // RW '1' from 0 to N/2 (potentially concurrent with writer 1, but different range)
+    ocrGuid_t oeWriter1Guid;
+    ocrGuid_t writer1Guid;
+    // parameters composed of lower bound, upper bound, value to write.
+    // parameters are passed by copy to the EDT, so it's ok to use the stack here.
+    u64 writerParamv1[3] = {0, NB_ELEM_DB/2, 1};
+    // Create the EDT1. Note the output event parameter 'oeWriter1Guid'.
+    // The output event is satisfied automatically by the runtime when EDT1
+    // is done executing. This event is by default a ONCE event. The user must
+    // make sure dependences on that event are set up before the EDT is scheduled.
+    // This is the main reason why we have a start event. It allows to create all the
+    // EDT before-hand and set up all the dependences before any scheduling occurs.
+    ocrEdtCreate(&writer1Guid, writeEdtTemplateGuid, EDT_PARAM_DEF, writerParamv1, EDT_PARAM_DEF, NULL,
+                 EDT_PROP_NONE, NULL_GUID, &oeWriter1Guid);
+    // Set up the sink EDT dependence slot 0 (2 dependences added so far)
+    ocrAddDependence(oeWriter1Guid, shutdownGuid, 0, false);
+    // EDT1 depends on the DB in RW mode on its slot '0'
+    ocrAddDependence(dbGuid, writer1Guid, 0, DB_MODE_RW);
+    // EDT1 depends on the start event on its slot '1'
+    ocrAddDependence(eventStartGuid, writer1Guid, 1, DB_MODE_CONST);
+
+    // RW '2' from N/2 to N (potentially concurrent with writer 0, but different range)
+    ocrGuid_t oeWriter2Guid;
+    ocrGuid_t writer2Guid;
+    u64 writerParamv2[3] = {NB_ELEM_DB/2, NB_ELEM_DB, 2};
+    ocrEdtCreate(&writer2Guid, writeEdtTemplateGuid, EDT_PARAM_DEF, writerParamv2, EDT_PARAM_DEF, NULL,
+                 EDT_PROP_NONE, NULL_GUID, &oeWriter2Guid);
+    // Set up the sink EDT dependence slot 1 (3 dependences added so far)
+    ocrAddDependence(oeWriter2Guid, shutdownGuid, 1, false);
+    ocrAddDependence(dbGuid, writer2Guid, 0, DB_MODE_RW);
+    ocrAddDependence(eventStartGuid, writer2Guid, 1, DB_MODE_CONST);
+
+    // EW '3' from N/4 to 3N/4
+    ocrGuid_t oeWriter3Guid;
+    ocrGuid_t writer3Guid;
+    u64 writerParamv3[3] = {NB_ELEM_DB/4, (NB_ELEM_DB/4)*3, 3};
+    ocrEdtCreate(&writer3Guid, writeEdtTemplateGuid, EDT_PARAM_DEF, writerParamv3, EDT_PARAM_DEF, NULL,
+                 EDT_PROP_NONE, NULL_GUID, &oeWriter3Guid);
+    // Set up the sink EDT dependence slot 2.
+    // At this point the shutdown EDT has all its dependences
+    // and will be eligible for scheduling when they are satisfied
+    ocrAddDependence(oeWriter3Guid, shutdownGuid, 2, false);
+    // EDT3 request the DB in Exclusive-Write (EW) mode. This is essentially
+    // introducing an implicit ordering dependence between all other EDTs
+    // that are also acquiring this DB. The actual EDTs execution ordering
+    // is schedule dependent.
+    ocrAddDependence(dbGuid, writer3Guid, 0, DB_MODE_EW);
+    ocrAddDependence(eventStartGuid, writer3Guid, 1, DB_MODE_CONST);
+
+    // At this point all writers EDTs have their DB dependence satisfied and
+    // are only missing the start event to be satisfied.
+    // Doing so enable EDT1, EDT2, EDT3 to be eligible for scheduling.
+    // Because there's no control dependence among the writer EDT, the
+    // runtime is free to schedule them in any order, potentially in parallel.
+    // In this particular example, EDT1 and EDT2 can execute in parallel because
+    // they both access the DB in RW mode which allow for concurrent writers.
+    // EDT3 will be executed in mutual exclusion with EDT1 and EDT2 at any point in time
+    // since it requires EW access.
+    ocrEventSatisfy(eventStartGuid, NULL_GUID);
+
+    return NULL_GUID;
+}
+\end{ocrsnip}
+%%%
+\subsubsection{Details}

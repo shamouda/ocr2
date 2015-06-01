@@ -61,7 +61,7 @@ u8 sendMessageSimpleCommApi(ocrCommApi_t *self, ocrLocation_t target, ocrPolicyM
         //are already persistant because of the asynchrony delegation allows. The comm-worker
         //may occasionally invoke send for its own messages. In that case persist is not set.
         u64 baseSize = 0, marshalledSize = 0;
-        // TODO Do we marshall ptr here or do we wait for the comm-platform to decide what to do ?
+        //BUG #604 Do we marshall ptr here or do we wait for the comm-platform to decide what to do ?
         // Currently avoids an extra copy because we know simple-comm fwd to mpi-comm
         ocrPolicyMsgGetMsgSize(message, &baseSize, &marshalledSize, MARSHALL_DBPTR | MARSHALL_NSADDR);
         u64 fullMsgSize = baseSize + marshalledSize;
@@ -106,7 +106,7 @@ u8 sendMessageSimpleCommApi(ocrCommApi_t *self, ocrLocation_t target, ocrPolicyM
  *
  */
 u8 pollMessageSimpleCommApi(ocrCommApi_t *self, ocrMsgHandle_t **handle) {
-    //DIST-TODO one-way ack: cannot poll to check completion of one-way messages
+    //BUG #130 Is there a use case to poll for a one-way to complete ?
     //This implementation does not support one-way with ack
     //However it's a little hard to detect here. A handle message
     //pointer may have been de-allocated and it's the only place
@@ -205,7 +205,7 @@ u8 simpleCommApiSwitchRunlevel(ocrCommApi_t *self, ocrPolicyDomain_t *PD, ocrRun
             commApiSimple->handleMap = newHashtableModulo(self->pd, HANDLE_MAP_BUCKETS);
         }
         if ((properties & RL_TEAR_DOWN) && RL_IS_LAST_PHASE_DOWN(PD, RL_GUID_OK, phase)) {
-            //TODO would like to make sure this is empty, otherwise it probably
+            //BUG #527: memory reclaim: would like to make sure this is empty, otherwise it probably
             //means there are pending communication so we shouldn't be in tear down.
             ocrCommApiSimple_t * commApiSimple = (ocrCommApiSimple_t *) self;
             destructHashtable(commApiSimple->handleMap, NULL);

@@ -104,7 +104,7 @@ u8 xePthreadCommWaitMessage(ocrCommPlatform_t *self, ocrPolicyMsg_t **msg,
 }
 
 u8 xePthreadDestructMessage(ocrCommPlatform_t *self, ocrPolicyMsg_t *msg) {
-    // TODO
+    //BUG #527: memory reclaim: destruct message
     return 0;
 }
 

@@ -18,7 +18,7 @@
 #include "mpi-comm-platform.h"
 #include <mpi.h>
 
-//TODO replace this with some INT_MAX from sal header
+//BUG #609 system header: replace this with some INT_MAX from sal header
 #include "limits.h"
 
 #define DEBUG_TYPE COMM_PLATFORM
@@ -75,12 +75,12 @@ typedef struct {
 } mpiCommHandle_t;
 
 static ocrLocation_t mpiRankToLocation(int mpiRank) {
-    //TODO-LOC: identity integer cast for now
+    //BUG #605 Locations spec: identity integer cast for now
     return (ocrLocation_t) mpiRank;
 }
 
 static int locationToMpiRank(ocrLocation_t location) {
-    //TODO-LOC: identity integer cast for now
+    //BUG #605 Locations spec: identity integer cast for now
     return (int) location;
 }
 
@@ -146,7 +146,7 @@ u8 MPICommSendMessage(ocrCommPlatform_t * self,
     ocrPolicyMsgGetMsgSize(message, &baseSize, &marshalledSize, MARSHALL_DBPTR | MARSHALL_NSADDR);
     u64 fullMsgSize = baseSize + marshalledSize;
 
-    //DIST-TODO: multi-comm-worker: msgId incr only works if a single comm-worker per rank,
+    //BUG #602 multi-comm-worker: msgId incr only works if a single comm-worker per rank,
     //do we want OCR to provide PD, system level counters ?
     // Always generate an identifier for a new communication to give back to upper-layer
     u64 mpiId = mpiComm->msgId++;
@@ -203,7 +203,7 @@ u8 MPICommSendMessage(ocrCommPlatform_t * self,
                                     MARSHALL_APPEND | MARSHALL_DBPTR | MARSHALL_NSADDR);
         } else {
             ASSERT(marshallMode == MARSHALL_FULL_COPY);
-            //TODO These are only relevant in certain contexts
+            //BUG #604 Communication API extensions
             // They are needed in a comm-platform such as mpi or gasnet
             // but it feels off that the calling context already set those
             // because it shouldn't know beforehand if the communication is
@@ -243,7 +243,7 @@ u8 MPICommSendMessage(ocrCommPlatform_t * self,
         DPRINTF(DEBUG_LVL_VERB,"[MPI %d] posting irecv for msgId %lu\n", mpiRankToLocation(self->pd->myLocation), respTag);
         int res = MPI_Irecv(respMsg, respCount, datatype, targetRank, respTag, comm, status);
         if (res != MPI_SUCCESS) {
-            //DIST-TODO define error for comm-api
+            //BUG #603 define error for comm-api
             ASSERT(false);
             return res;
         }
@@ -279,7 +279,7 @@ u8 MPICommSendMessage(ocrCommPlatform_t * self,
         mpiComm->outgoing->pushFront(mpiComm->outgoing, handle);
         *id = mpiId;
     } else {
-        //DIST-TODO define error for comm-api
+        //BUG #603 define error for comm-api
         ASSERT(false);
     }
 
@@ -324,13 +324,14 @@ u8 probeIncoming(ocrCommPlatform_t *self, int src, int tag, ocrPolicyMsg_t ** ms
         ASSERT((baseSize+marshalledSize) == count);
         // The unmarshalling is just fixing up fields to point to the correct
         // payload address trailing after the base message.
-        // TODO: I'm thinking we can further customize un/marshalling for MPI. Because we use
+        //BUG #604 Communication API extensions
+        //1)     I'm thinking we can further customize un/marshalling for MPI. Because we use
         //       mpi tags, we actually don't need to send the header part of response message.
         //       We can directly recv the message at msg + header, update the msg header
         //       to be a response + flip src/dst.
-        // TODO: See if we can improve unmarshalling by keeping around pointers for the various
+        //2)     See if we can improve unmarshalling by keeping around pointers for the various
         //       payload to be unmarshalled
-        // TODO: We also need to deguidify all the fatGuids that are 'local' and decide
+        //3)     We also need to deguidify all the fatGuids that are 'local' and decide
         //       where it is appropriate to do it.
         //       - REC: I think the right place would be in the user code (ie: not the comm layer)
         ocrPolicyMsgUnMarshallMsg((u8*)*msg, NULL, *msg,
@@ -424,7 +425,7 @@ u8 MPICommPollMessageInternal(ocrCommPlatform_t *self, ocrPolicyMsg_t **msg,
                     locationToMpiRank(self->pd->myLocation), receivedMsg->type, (int) receivedMsg->msgId);
             // if request : msg may be reused for the response
             // if response: upper-layer must process and deallocate
-            //DIST-TODO there's no convenient way to let upper-layers know if msg can be reused
+            //BUG #604 Communication API extensions: There's no convenient way to let upper-layers know if msg can be reused
             *msg = receivedMsg;
             // We need to unmarshall the message here
             // Check the size for sanity (I think it should be OK but not sure in this case)
@@ -501,7 +502,7 @@ u8 MPICommSwitchRunlevel(ocrCommPlatform_t *self, ocrPolicyDomain_t *PD, ocrRunl
         if ((properties & RL_BRING_UP) && RL_IS_FIRST_PHASE_UP(self->pd, RL_PD_OK, phase)) {
             //Initialize base
             self->pd = PD;
-            //TODO-LOC: both commPlatform and worker have a location, are the supposed to be the same ?
+            //BUG #605 Locations spec: commPlatform and worker have a location, are the supposed to be the same ?
             int rank=0;
             MPI_Comm_rank(MPI_COMM_WORLD, &rank);
             DPRINTF(DEBUG_LVL_VERB,"[MPI %d] comm-platform starts\n", rank);
@@ -514,7 +515,7 @@ u8 MPICommSwitchRunlevel(ocrCommPlatform_t *self, ocrPolicyDomain_t *PD, ocrRunl
     case RL_GUID_OK:
         ASSERT(self->pd == PD);
         if((properties & RL_BRING_UP) && RL_IS_LAST_PHASE_UP(self->pd, RL_GUID_OK, phase)) {
-            //DIST-TODO: multi-comm-worker: multi-initialization if multiple comm-worker
+            //BUG #602 multi-comm-worker: multi-initialization if multiple comm-worker
             //Initialize mpi comm internal queues
             mpiComm->msgId = 1;
             mpiComm->incoming = newLinkedList(PD);
@@ -524,7 +525,7 @@ u8 MPICommSwitchRunlevel(ocrCommPlatform_t *self, ocrPolicyDomain_t *PD, ocrRunl
 
             // Default max size is customizable through setMaxExpectedMessageSize()
 #if STRATEGY_PRE_POST_RECV
-            //DIST-TODO STRATEGY_PRE_POST_RECV doesn't support arbitrary message size
+            //Limitation: STRATEGY_PRE_POST_RECV doesn't support arbitrary message size
             mpiComm->maxMsgSize = sizeof(ocrPolicyMsg_t)*2;
 #endif
 #if STRATEGY_PROBE_RECV
@@ -532,7 +533,7 @@ u8 MPICommSwitchRunlevel(ocrCommPlatform_t *self, ocrPolicyDomain_t *PD, ocrRunl
             ASSERT(mpiComm->maxMsgSize == 0);
 #endif
             // Generate the list of known neighbors (All-to-all)
-            //DIST-TODO neighbors: neighbor information should come from discovery or topology description
+            //BUG #606 Neighbor registration: neighbor information should come from discovery or topology description
             int nbRanks;
             MPI_Comm_size(MPI_COMM_WORLD, &nbRanks);
             PD->neighborCount = nbRanks - 1;
@@ -602,7 +603,7 @@ ocrCommPlatform_t* newCommPlatformMPI(ocrCommPlatformFactory_t *factory,
                                        ocrParamList_t *perInstance) {
     ocrCommPlatformMPI_t * commPlatformMPI = (ocrCommPlatformMPI_t*)
     runtimeChunkAlloc(sizeof(ocrCommPlatformMPI_t), PERSISTENT_CHUNK);
-    //TODO-LOC: what is a comm-platform location ? is it the same as the PD ?
+    //BUG #605 Locations spec: what is a comm-platform location ? is it the same as the PD ?
     commPlatformMPI->base.location = ((paramListCommPlatformInst_t *)perInstance)->location;
     commPlatformMPI->base.fcts = factory->platformFcts;
     factory->initialize(factory, (ocrCommPlatform_t *) commPlatformMPI, perInstance);

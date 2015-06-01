@@ -177,7 +177,7 @@ typedef struct _ocrGuidProviderFcts_t {
     /**
      * @brief Resolve the location of a GUID
      *
-     * TODO: any property regarding location ?
+     * BUG #605 Locations spec: any property regarding location ?
      *  - Is it where guid has been created ?
      *  - Is it where the value is ?
      *  - Can we get different location across calls if associated value is replicated ?

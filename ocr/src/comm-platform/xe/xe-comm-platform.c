@@ -67,7 +67,7 @@
 //
 // (e) xeCommWaitMessage() -- blocking receive
 //
-//     While local stage E, keep looping. (FIXME: sleep?)
+//     While local stage E, keep looping. (BUG #515: allow XEs to sleep)
 //     Once it is F, return content.
 //
 // (f) xeCommDestructMessage() -- callback to notify received message was consumed
@@ -114,8 +114,10 @@ void xeInitBarrier(void)
     volatile u64 * lq = 0x0;
 
     lq[0] = 0xfeedf00d;
-    // While local stage non-Full, keep looping. (FIXME: sleep?)
-    while(lq[0] != 2);
+    // While local stage non-Full, keep looping.
+    // BUG #515: Allow XEs to sleep
+    while(lq[0] != 2)
+        hal_fence();
     lq[0] = 0;
 }
 
@@ -265,7 +267,8 @@ u8 xeCommWaitMessage(ocrCommPlatform_t *self,  ocrPolicyMsg_t **msg,
     // Local stage is at well-known 0x0
     volatile u64 * lq = 0x0;
 
-    // While local stage non-Full, keep looping. (FIXME: sleep?)
+    // While local stage non-Full, keep looping.
+    // BUG #515: Sleep
     while(lq[0] != 2);
 
     // Once it is F, return content.

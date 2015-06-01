@@ -4,6 +4,8 @@
  * removed or modified.
  */
 
+// BUG #225: Implement statistics. This is an older version
+
 #ifdef OCR_ENABLE_STATISTICS
 #include "debug.h"
 #include "ocr-policy-domain.h"
@@ -128,7 +130,6 @@ void intStatsProcessRegisterFilter(ocrStatsProcess_t *self, u64 bitMask,
             else
                 countAlloc = 1;
             ocrStatsFilter_t **newAlloc = (ocrStatsFilter_t**)malloc(sizeof(ocrStatsFilter_t*)*countAlloc);
-            // TODO: This memcpy needs to be replaced. The malloc above as well...
             memcpy(newAlloc, (*filterVar)[bitSet], countPresent*sizeof(ocrStatsFilter_t*));
             if(countAlloc != 1)
                 free((*filterVar)[bitSet]);
@@ -151,7 +152,6 @@ void intStatsProcessRegisterFilter(ocrStatsProcess_t *self, u64 bitMask,
         else
             countAlloc = 1;
         ocrStatsFilter_t **newAlloc = (ocrStatsFilter_t**)malloc(sizeof(ocrStatsFilter_t*)*countAlloc);
-        // TODO: This memcpy needs to be replaced. The malloc above as well...
         memcpy(newAlloc, (*filterVar)[0], countPresent*sizeof(ocrStatsFilter_t*));
         if(countAlloc != 1)
             free((*filterVar)[0]);

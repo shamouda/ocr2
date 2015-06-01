@@ -35,7 +35,7 @@ u8 ocrAffinityCount(ocrAffinityKind kind, u64 * count) {
     }
 
     if (kind == AFFINITY_PD) {
-        //TODO this is assuming each PD knows about every other PDs
+        //BUG #606/#VV4 Neighbors/affinities: this is assuming each PD knows about every other PDs
         //Need to revisit that when we have a better idea of what affinities are
         *count = (pd->neighborCount + 1);
     } else if ((kind == AFFINITY_PD_MASTER) || (kind == AFFINITY_CURRENT) || (kind == AFFINITY_GUID)) {
@@ -81,7 +81,7 @@ u8 ocrAffinityQuery(ocrGuid_t guid, u64 * count, ocrGuid_t * affinities) {
 }
 
 
-//TODO This call returns affinities with identical mapping across PDs.
+//BUG #606/#VV4 Neighbors/affinities:  This call returns affinities with identical mapping across PDs.
 u8 ocrAffinityGet(ocrAffinityKind kind, u64 * count, ocrGuid_t * affinities) {
     ocrPolicyDomain_t * pd = NULL;
     getCurrentEnv(&pd, NULL, NULL, NULL);
@@ -101,7 +101,7 @@ u8 ocrAffinityGet(ocrAffinityKind kind, u64 * count, ocrGuid_t * affinities) {
             i++;
         }
     } else if (kind == AFFINITY_PD_MASTER) {
-        //TODO This should likely come from the INI file
+        //BUG #610 Master PD: This should likely come from the INI file
         affinities[0] = placer->pdLocAffinities[0];
     } else if (kind == AFFINITY_CURRENT) {
         affinities[0] = placer->pdLocAffinities[placer->current];

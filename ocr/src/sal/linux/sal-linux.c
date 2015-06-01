@@ -36,7 +36,6 @@ void sig_handler(u32 sigNum) {
     }
 
     if(sigNum == SIGUSR2 && globalPD->runtimePause == true){
-        //TODO: Support this with new querying methodology?
         PRINTF("\nQuery Not Supported via signalling\n");
         //salQuery(1, OCR_QUERY_WORKPILE_EDTS, NULL_GUID, &sigRes, &sigSize, 0);
         return;
@@ -97,11 +96,9 @@ ocrGuid_t salQuery(ocrQueryType_t query, ocrGuid_t guid, void **result, u32 *siz
             break;
 
         case OCR_QUERY_EVENTS:
-            //TODO: Call Query Event Function
             break;
 
         case OCR_QUERY_DATABLOCKS:
-            //TODO: Query Datablock Function
             break;
 
         case OCR_QUERY_ALL_EDTS:

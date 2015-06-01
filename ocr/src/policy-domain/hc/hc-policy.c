@@ -109,9 +109,6 @@ void hcWorkerCallback(ocrPolicyDomain_t *self, u64 val) {
                 // will drop out of its computation (at some point) and take over
                 DPRINTF(DEBUG_LVL_VVERB, "PD_MASTER thread will pick up for switch to RL_COMPUTE_OK\n");
             } else {
-                PRINTF("Re-entering switchRunlevel with RL %u; phase %u; prop 0x%x\n",
-                        rself->rlSwitch.runlevel, rself->rlSwitch.nextPhase, rself->rlSwitch.properties);
-
                 DPRINTF(DEBUG_LVL_VVERB, "Re-entering switchRunlevel with RL %u; phase %u; prop 0x%x\n",
                         rself->rlSwitch.runlevel, rself->rlSwitch.nextPhase, rself->rlSwitch.properties);
                 RESULT_ASSERT(self->fcts.switchRunlevel(self, rself->rlSwitch.runlevel, rself->rlSwitch.properties), ==, 0);
@@ -1680,7 +1677,6 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             }
         }
 #ifdef OCR_ENABLE_STATISTICS
-        // BUG #225: Fixme
         statsDEP_ADD(pd, getCurrentEDT(), NULL, signalerGuid, waiterGuid, NULL, slot);
 #endif
 #undef PD_MSG
@@ -1726,7 +1722,6 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             ASSERT(0); // No other things we can register signalers on
         }
 #ifdef OCR_ENABLE_STATISTICS
-        // BUG #225: Fixme
         statsDEP_ADD(pd, getCurrentEDT(), NULL, signalerGuid, waiterGuid, NULL, slot);
 #endif
 #undef PD_MSG
@@ -1765,7 +1760,6 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
                 db, waiter, PD_MSG_FIELD_I(slot), isAddDep);
         }
 #ifdef OCR_ENABLE_STATISTICS
-        // BUG #225: Fixme
         statsDEP_ADD(pd, getCurrentEDT(), NULL, signalerGuid, waiterGuid, NULL, slot);
 #endif
 #undef PD_MSG
@@ -1807,7 +1801,6 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             }
         }
 #ifdef OCR_ENABLE_STATISTICS
-        // BUG #225: Fixme
         statsDEP_ADD(pd, getCurrentEDT(), NULL, signalerGuid, waiterGuid, NULL, slot);
 #endif
 #undef PD_MSG

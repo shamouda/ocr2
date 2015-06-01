@@ -172,9 +172,6 @@ u8 mallocQueryTag(ocrMemPlatform_t *self, u64 *start, u64* end,
 ocrMemPlatform_t* newMemPlatformMalloc(ocrMemPlatformFactory_t * factory,
                                        ocrParamList_t *perInstance) {
 
-    // TODO: This will be replaced by the runtime/GUID meta-data allocator
-    // For now, we cheat and use good-old malloc which is kind of counter productive with
-    // all the trouble we are going through to *not* use malloc...
     ocrMemPlatform_t *result = (ocrMemPlatform_t*)
                                runtimeChunkAlloc(sizeof(ocrMemPlatformMalloc_t), PERSISTENT_CHUNK);
     factory->initialize(factory, result, perInstance);

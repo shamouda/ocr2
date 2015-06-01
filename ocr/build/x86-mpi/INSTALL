@@ -1,13 +1,80 @@
 
-* Specify the MPI distribution to use
+About installing and running distributed OCR built on top of MPI
 
-By default, the makefile will just use the first 'mpicc'
-found in the environment's PATH variable.
 
-The distribution to be used can be set through the
-MPI_ROOT and MPI_LIB environment variables.
+**
+** Compiling OCR with MPI support
+**
 
-- MPI_ROOT: Defines the path where the MPI distribution is installed.
+To build distributed OCR with MPI as a communication layer:
 
-- MPI_LIB: Defines the name of the MPI library to link with, default is
-"mpi". This may vary from one MPI distribution to another.
+    cd ocr/build/x86-mpi
+    make
+    make install
+
+
+The OCR build system looks for and uses any MPI compiler found
+in the environment's PATH variable.
+
+If you wish to use a specific MPI implementation the following
+environment variables can be defined:
+
+    MPI_ROOT                Path to the MPI installation
+    MPI_LIB                 Name of the MPI library to link (default is "mpi").
+
+
+**
+** Running and debugging OCR programs with MPI support
+**
+
+The 'ocrrun' command uses environment variables to determine how to spawn MPI processes.
+
+Optional environment variables:
+    OCR_NUM_NODES           Number of MPI processes to spawn
+    OCR_NODEFILE            Specifies a host file to spawn processes to
+
+Note that if both variables are set, the number of nodes specified must
+equal the number of hosts defined in the node file and vice versa.
+
+For debugging, one can set the following environment variables:
+
+    OCRRUN_GDB              Starts mpi launcher through gdb (only tested with intel-mpi)
+    OCRRUN_VALGRIND         Launch user program through valgrind.
+
+Valgrind note: To take advantage of valgrind, OCR must have been
+built with valgrind support enabled. This can be done by editing
+ocr/build/common.mk and uncommenting the following line:
+
+    # CFLAGS += -I/usr/include -DENABLE_VALGRIND
+
+
+**
+** Running OCR tests with MPI support
+**
+
+The script 'ocrTests' is the driver to compile and run non-regression tests.
+
+To run distributed OCR non-regression tests:
+
+    cd ocr/tests
+    ./ocrTests -unstablefile unstable.x86-mpi-lockableDB
+
+The driver relies on 'OCR_NUM_NODES' and 'OCR_NODEFILE' to
+determine how to create programs. Make sure a node file is
+set to do distributed run across machines.
+
+One common caveat is to forget that 'OCRRUN_GDB' is set in
+the environment, effectively making the first test 'hang'
+on the gdb prompt waiting for user input.
+
+
+**
+** Running OCR applications with MPI support
+**
+
+OCR provides a makefile skeleton 'Makefile.x86-mpi' to build and
+run your applications that does most of the heavy lifting.
+
+You can adapt any of the Makefile.x86-mpi under apps/ to you own
+application by changing few lines.
+

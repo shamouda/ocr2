@@ -261,7 +261,7 @@ static void simpleInit(pool_t *pool, u64 size)
         DPRINTF(DEBUG_LVL_INFO, "init'ed pool %p, avail %ld bytes , sizeof(pool_t) = %ld\n", pool, size, sizeof(pool_t));
         pool->inited = 1;
 #ifdef ENABLE_VALGRIND
-        VALGRIND_CREATE_MEMPOOL(p, 0, 1);  // TODO: destory.
+        VALGRIND_CREATE_MEMPOOL(p, 0, 1);  // BUG #600: Mempool needs to be destroyed
         VALGRIND_MAKE_MEM_NOACCESS(p, size+sizeof(pool_t));
 #endif
     } else {

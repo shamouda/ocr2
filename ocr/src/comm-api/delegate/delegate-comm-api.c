@@ -110,7 +110,7 @@ ocrMsgHandle_t * createMsgHandlerDelegate(ocrCommApi_t *self, ocrPolicyMsg_t * m
 }
 
 /**
- * @brief delegate a message send operation to the scheduler
+ * @brief delegate a message send operation to the scheduler.
  */
 u8 delegateCommSendMessage(ocrCommApi_t *self, ocrLocation_t target,
                             ocrPolicyMsg_t *message,
@@ -118,7 +118,7 @@ u8 delegateCommSendMessage(ocrCommApi_t *self, ocrLocation_t target,
     ocrPolicyDomain_t * pd = self->pd;
     // Message source/destination is corrupted
     ASSERT((pd->myLocation == message->srcLocation) && (target == message->destLocation));
-    ASSERT(pd->myLocation != target); //DIST-TODO not tested sending a message to self
+    ASSERT(pd->myLocation != target); // Do not support sending to 'itself' (current PD).
 
     // If the message is not persistent and the marshall mode is set, we do the specified
     // copy. Otherwise it is just the mode the buffer has been copied in the first place.
@@ -128,15 +128,12 @@ u8 delegateCommSendMessage(ocrCommApi_t *self, ocrLocation_t target,
         // Need to make a copy of the message. Recall that send is returning
         // as soon as the handle is handed over to the scheduler.
         ocrMarshallMode_t marshallMode = (ocrMarshallMode_t) GET_PROP_U8_MARSHALL(properties);
-
         if (marshallMode == 0) {
             marshallMode = MARSHALL_DUPLICATE; // impl choice
         }
-
         // NOTE: here we could support _APPEND or _ADDL although we would still
         //       have to create a new message anyway because of PERSIST_MSG_PROP
         ASSERT((marshallMode & MARSHALL_DUPLICATE) || (marshallMode & MARSHALL_FULL_COPY));
-
         u64 baseSize = 0, marshalledSize = 0;
         ocrPolicyMsgGetMsgSize(message, &baseSize, &marshalledSize, marshallMode);
         u64 fullSize = baseSize + marshalledSize;
@@ -177,10 +174,11 @@ u8 delegateCommSendMessage(ocrCommApi_t *self, ocrLocation_t target,
 
 /**
  * @brief poll message is a no-op in this delegate implementation
+ *
  * Depending on the calling context, the handle can either be:
- *  - handle == NULL
- *  - *handle == NULL
- *  - *handle != NULL
+ *  - handle == NULL  (Impl specific, likely poll for "progress" to be made)
+ *  - *handle == NULL (Poll any and return message)
+ *  - *handle != NULL (Poll for a specific handle completion)
  */
 u8 delegateCommPollMessage(ocrCommApi_t *self, ocrMsgHandle_t **handle) {
     ocrPolicyDomain_t * pd = self->pd;
@@ -197,7 +195,6 @@ u8 delegateCommPollMessage(ocrCommApi_t *self, ocrMsgHandle_t **handle) {
     PD_MSG_FIELD_IO(type) = OCR_GUID_COMM;
     PD_MSG_FIELD_IO(guidCount) = 1;
     PD_MSG_FIELD_I(properties) = 0;
-
     RESULT_PROPAGATE(pd->fcts.processMessage(pd, &takeMsg, true));
 #undef PD_MSG
 #undef PD_TYPE
@@ -206,7 +203,6 @@ u8 delegateCommPollMessage(ocrCommApi_t *self, ocrMsgHandle_t **handle) {
         if (handle != NULL) {
             #ifdef OCR_ASSERT
             // was polling for a specific handle, check if that's what we got
-            //DIST-TODO design: comparing polled expected handle and what we get: Is it the handle that's important here or the message id ?
             if (*handle != NULL)
                 ASSERT(*handle == ((ocrMsgHandle_t*)delHandle));
             #endif
@@ -220,14 +216,15 @@ u8 delegateCommPollMessage(ocrCommApi_t *self, ocrMsgHandle_t **handle) {
 
 /**
  * @brief Wait for a reply for the last message that has been sent out.
+ *
  * Depending on the calling context, the handle can either be:
- *  - handle == NULL
- *  - *handle == NULL
- *  - *handle != NULL
+ *  - handle == NULL  (Impl specific, likely wait for "progress" to be made)
+ *  - *handle == NULL (Wait any and return message)
+ *  - *handle != NULL (Wait for a specific handle completion)
  */
 u8 delegateCommWaitMessage(ocrCommApi_t *self, ocrMsgHandle_t **handle) {
     u8 ret = POLL_NO_MESSAGE;
-    //DIST-TODO one-way ack: is there a use case for waiting a one-way to complete ?
+    //BUG #130 Is there a use case to wait for a one-way to complete ?
     while(ret == POLL_NO_MESSAGE) {
         // Try to poll a little
         u64 i = 0;
@@ -243,7 +240,7 @@ u8 delegateCommWaitMessage(ocrCommApi_t *self, ocrMsgHandle_t **handle) {
         #define PD_MSG (&msg)
         #define PD_TYPE PD_MSG_MGT_MONITOR_PROGRESS
             msg.type = PD_MSG_MGT_MONITOR_PROGRESS | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
-            //TODO not sure if the caller should register a progress function or if the
+            //BUG #131 helper-mode: not sure if the caller should register a progress function or if the
             //scheduler should know what to do for each type of monitor progress
             PD_MSG_FIELD_IO(properties) = (0 | MONITOR_PROGRESS_COMM);
             PD_MSG_FIELD_I(monitoree) = &handle;
@@ -294,7 +291,6 @@ ocrCommApiFactory_t *newCommApiFactoryDelegate(ocrParamList_t *perType) {
                                                delegateCommPollMessage);
     base->apiFcts.waitMessage = FUNC_ADDR(u8 (*)(ocrCommApi_t*, ocrMsgHandle_t**),
                                                delegateCommWaitMessage);
-
     return base;
 }
 

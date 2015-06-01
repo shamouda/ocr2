@@ -1,0 +1,45 @@
+% Ideas for putting examples here:
+%   - We should figure out what APIs or model characteristics we want
+%   to demonstrate in each example (and put it here so we know)
+%   - Each code snippet should show that feature and allow for the
+%   entire example to be constructed from that snippet and any
+%   previous snippets (i.e.: we don't have to put the whole program
+%   every time but it should be ``obvious'' how to build it)
+
+%%%%%
+
+\chapter{OCR  Examples}
+\label{chap:OCR Examples}
+\label{chap:Appendix A}
+
+
+This chapter demonstrates the use of OCR through a series of
+examples. The examples are ordered from the most basic to the most
+complicated and frequently make use of previous examples. They are
+meant to guide the reader in understanding the fundamental concepts of
+the OCR programming model and API.
+
+\section{OCR's ``Hello World!''}
+% In this example:
+%   - APIs: ocrMain, ocrShutdown, PRINTF, getArgc, getArgv
+%   - Functionality: program entry point, argument passing, shutdown
+%   - Concepts: None
+\input{Source/examples-hello.tex}
+%%%%%
+\section{Expressing a Fork-Join pattern}
+\input{Source/examples-fork-join.tex}
+%%%%%
+\section{Expressing unstructured parallelism}
+\input{Source/examples-task-dep.tex}
+%%%%%
+\section{Using a Finish EDT}
+\input{Source/examples-finish.tex}
+%%%%%
+\section{Accessing a DataBlock with ``Read-Write'' Mode}
+\input{Source/examples-db-itw.tex}
+%%%%%
+\section{Accessing a DataBlock with ``Exclusive-Write'' Mode}
+\input{Source/examples-db-ex.tex}
+%%%%%
+\section{Acquiring contents of a DataBlock as a dependence input}
+\input{Source/examples-db-acquire.tex}
