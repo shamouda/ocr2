@@ -29,15 +29,8 @@ denoted by a globally unique ID (GUID).
 OCR is designed to be portable and scalable, hence, the OCR Platform
 places minimal constraints on the physical hardware.
 
-%
-%  Library mode is an extension so we do not have to settle on the name just yet.
-%
-%  this whole run-alone vs library-mode concept is broken.  I need
-% to come up with the right way to describe this.
-%OCR programs can either run alone or be encompassed in other programs
-%in a library manner. In the following description, ``OCR program'' refers
-%to either the entire OCR program if it is running alone or the OCR
-%portion of the program if running library mode.
+
+% TODO: Expand on "library mode" vs. "run alone"
 
 The OCR program logically starts as a single EDT called \code{mainEDT()}.
 In other words, the programmer does not provide a \code{main()} function.
@@ -53,11 +46,7 @@ This rather simple model can handle a wide range of
 design patterns including branch and bound, data flow, and divide and
 conquer.
 %
-%Vivek wanted to add a long discussion of how you can use to represent
-% SPMD algorithms as well. Once again, given the short time to address this,
-% I opted to leave it out. This is a specification not a programmers reference guide. But
-% he raised many good points that we need to develop and document somewhere
-%
+% TODO: Expression of SPMD algorithms in OCR
 
 To understand the execution model of OCR, consider the discrete states and
 transitions of an executing EDT as defined in figure~\ref{fig:EDTexec}. An
@@ -91,19 +80,8 @@ will then schedule the EDT for execution and the EDT
 \emph{Starts}\index{EDT state, start} to execute and
 becomes a \emph{Running}\index{EDT state, running} EDT.
 
-% Vincent writes:
-%
-%   I think the graph misses direct transitions from certain states to
-%  destroyed. Basically when calling ocrEdtDestroy in “available” state
-%  and eventually, in “resolved” state. The user respectively knows not
-%   all dependences will be added and not all dependences will be satisfied
-%  ever. It’s a limited way for the user to “cancel” an edt. If we do that then
-%  we need to define when the “reference count” for an EDT is set to 1 so
-%  that subsequent ocrEdtDestroy will have to wait for the edt to complete
-%  execution. Future specification/apis could also introduce cancellation
-%  arrows from other state.
-%
-%    .... we need to think about his comments and update the following figure accordingly
+% TODO: Add extra transitions in the graph from certain states to destroyed state,
+% for when the user cancels the EDT
 
 \begin{figure*}
 \centering
@@ -173,19 +151,9 @@ through the events that link OCR objects, which are explicit to the
 runtime.
 \end{itemize}
 
-
-%  Vincent writes (pertaining to the following paragraph) ...
-%
-% "Typically, the EDT that terminates the program is the last EDT in the
-%  program DAG, and the programmer has assured that all other EDTs in the
-%  DAG have completed execution before the function to terminate the program is called.”
-%  => That goes back to my comment on page 12 (the figure with teh execution states of an EDT).
-%   I think it depends how you define “completed execution” or for which EDT state one
-% should assume the EDT “has to necessarily complete" at some point. For instance, I don’t
-%   see a correctness issue calling shutdown while some edts are available/resolved but will
-%  never transition to their next state because the programer ensures it. Am I presuming too
-%   much because I know the implementation or does the spec defined as it is allowed me that
-%  and we’re ok with it ?
+% TODO: Add clarity to the following paragraph on when a programmer
+% calls ocrShutdown to terminate even when a few other EDTs haven't
+% completed execution, how much is being presumed.
 
 A computation is complete when an EDT terminates the program
 (e.g.\ with a call to \code{ocrShutdown()}). Typically, the EDT that
@@ -193,50 +161,9 @@ terminates the program is the last EDT in the program DAG, and the
 programmer has assured that all other EDTs in the DAG have completed
 execution before the function to terminate the program is called.
 
-%The \code{mainEDT()} function has the function prototype:
-%  TGM: rob writes ... It is too late to change this now, but it is very unfortunate that types
-%  u32 and u64 (which are not defined!) are used for different types of OCR variables.
-%  If it becomes necessary to change the type of an OCR variable (which Sanjay, Zoran
-%  and I discovered would have been very nice to accommodate hints), all other variables
-%  using the same type will also change. In the final spec, i.e. the one to be written
-%  after the apps workshop, and which will also do away with the Event object, I propose
-%   that we use different opaque data types for all OCR variables.
-%\begin{ocrsnip}
-%#include <ocr.h>
-%
-%ocrGuid_t mainEdt(
-%             u32 paramc,           // number of parameters for mainEDT
-%             u64* paramv,          // array of parameters for mainEDT
-%             u32 depc,             // number of dependences for mainEDT
-%             ocrEdtDep_t depv[] )  // array of parameters for mainEDT
-%{
-%    // Put the code for the mainEDT here
-%    ocrShutdown();         // shut down OCR once all resources have been released
-%    return NULL_GUID;
-%}
-%\end{ocrsnip}
-%The details behind the parameters and dependences are described in
-%Chapter~\ref{chap:OCRAPI}.
 Since the OCR runtime creates the \code{main()}
 function, the programmer does not need to manage the low level
 details of initializing and cleanly shutting down OCR.
-%This approach,
-%however, does not work if the programmer wishes to use OCR inside a
-%larger body of software perhaps as part of a library that must
-%inter-operate with other runtimes. Hence, the OCR specification
-%defines a set of functions to support this ``library mode'' of
-%launching an OCR program.
-%
-%In non-library mode (using just \code{mainEdt}), the arguments
-%(\code{argc} and \code{argv}) are still communicated through the use
-%of the first data block passed into \code{mainEdt}. The programmer can
-%use the functions \code{getArgc} and \code{getArgv} to gain access to
-%these values. These functions are defined in Chapter~\ref{chap:OCRAPI}.
-
-% Links can imply control dependences or, when a data block is
-% associated with an event, they imply data flow between OCR objects.
-% In either case, the events constrain the order of execution of EDTs
-% typically executing the program as a data flow program.
 
 With both data and tasks conceptually decoupled from their realization
 on a computer system, OCR has the flexibility to relocate tasks and data

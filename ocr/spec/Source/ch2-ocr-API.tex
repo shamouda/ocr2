@@ -32,10 +32,6 @@ reference all OCR objects;
 \item \hypertarget{type_ocrEdtDep_t}{\code{ocrEdtDep\_t}}: Type of dependences as
 passed into the EDTs; it contains both the GUID and the pointer to any data block
 passed as a dependence.
-% REC: Move to extension; this is part of the ``library mode''
-%  Is this exposed as part of the API?  Or does this belong in one of the appendices?
-%\item \code{ocrConfig\_t Struct}:  Reference
-%Data-structure containing the configuration parameters for the runtime.
 \end{itemize}
 %%
 \paragraph*{Other constants}
@@ -386,8 +382,6 @@ The following macros and enums are used with OCR data blocks.
 \item \code{DB\_PROP\_NONE} which specifies no special properties on the data block
 \item \code{DB\_PROP\_NO\_ACQUIRE} which specifies that the data block should
   not be acquired on creation
-% REC: Removed SINGLE_ASSIGNMENT; only used in distributed and not part of the
-% described modes/functionality
 \end{itemize}
 
 %% This is a repeat of sec:datablocks. Keeping for now commented.

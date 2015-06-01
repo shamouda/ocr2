@@ -23,7 +23,7 @@ providing information the OCR runtime can use to optimize program execution:
 \begin{itemize}
 \item \emph{EDT Template} An OCR object used to manage the resources
 required to create an EDT.
-% REC: This is not yet fully defined and speced out. Removing for now
+% TODO: Required a better definition below
 %\item \emph{Affinity container} An OCR object used to influence the
 %placement of EDTs in an executing program.
 \end{itemize}
@@ -42,10 +42,8 @@ acquired it have also released it.\footnote{As
 an optimization, the runtime may choose to reuse the same physical
 object for different logical objects~\cite{USBCSS12,SbKS12}. Similarly
 GUIDs may be reused for objects that have non-overlaping live ranges.}.
-%
-%  Vivek suggest we call this "Dead" instead of "destroyed".  He provided new text in his feedback to
-% address this. I would have put his text here, but I can't cut and paste from his document. But
-% if we all agree, we should look at his feedback document and add this later.
+% TODO: Incorporate Vivek's feedback on replacing "destroyed" with "dead" and
+% accompanying reasoning.
 \end{enumerate}
 Furthermore, data blocks have two additional states:
 \begin{enumerate}
@@ -240,16 +238,6 @@ explicitly destroyed with a call to \code{ocrEventDestroy()}. It is
 satisfied once and subsequent attempts to satisfy (i.e.\ trigger) the
 event result in an error code being returned when trying to satisfy
 the event.
-%
-%  Vivek writes:  Need to state the meaning of an error in OCR. Does it result in program
-% termination, or some sort of error code (since there is no support for exceptions in C),
-% or is it simply undefined?
-%
-%  TGM responds ... yes, I am in violent agreement with Vivek. I just don't know
-% how to do this right now in fits in with the overall design of OCR. This should be
-% a major discussion point following the apps workshop
-% REC: I added a small note saying it is an error code
-%
 \item \emph{Latch event}\index{Event, Latch}: The latch event has two
 pre-slots and triggers when the conditions defined by the latch
 trigger rule are met. The event is automatically destroyed once it
