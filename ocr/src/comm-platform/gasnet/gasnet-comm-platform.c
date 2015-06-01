@@ -60,8 +60,7 @@ static inline ocrLocation_t GasnetRankToLocation(int rank) {
  */
 static void gasnetMessageIncoming(ocrCommPlatformGasnet_t *platform , ocrPolicyMsg_t *msg, uint64_t size,
        gasnet_handlerarg_t seg_addr_hi, gasnet_handlerarg_t seg_addr_lo,
-       gasnet_handlerarg_t seg_size)
-{
+       gasnet_handlerarg_t seg_size) {
     ocrCommPlatform_t * self = (ocrCommPlatform_t*) platform;
 
     // -------------------------------------------------------------
@@ -228,8 +227,8 @@ static u8 GasnetCommSendMessage(ocrCommPlatform_t * self,
     ocrPolicyMsgGetMsgSize(message, &baseSize, &marshalledSize, MARSHALL_DBPTR | MARSHALL_NSADDR);
     u64 fullMsgSize = baseSize + marshalledSize;
 
-    //DIST-TODO: multi-comm-worker: msgId incr only works if a single comm-worker per rank,
-    //do we want OCR to provide PD, system level counters ?
+    //BUG #602 multi-comm-worker: msgId incr only works if a single comm-worker per rank,
+    // Do we want OCR to provide PD, system level counters ?
     // Always generate an identifier for a new communication to give back to upper-layer
     u64 gasnetId = gasnetComm->msgId++;
 
@@ -264,7 +263,7 @@ static u8 GasnetCommSendMessage(ocrCommPlatform_t * self,
                                     MARSHALL_APPEND | MARSHALL_DBPTR | MARSHALL_NSADDR);
         } else {
             ASSERT(marshallMode == MARSHALL_FULL_COPY);
-            //TODO These are only relevant in certain contexts
+            //BUG #604 Communication API extensions
             // They are needed in a comm-platform such as mpi or gasnet
             // but it feels off that the calling context already set those
             // because it shouldn't know beforehand if the communication is

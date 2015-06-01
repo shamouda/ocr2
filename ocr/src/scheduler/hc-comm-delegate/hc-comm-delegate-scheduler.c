@@ -226,9 +226,9 @@ u8 hcCommSchedulerTakeComm(ocrScheduler_t *self, u32* count, ocrFatGuid_t * fatH
  */
 u8 hcCommSchedulerGiveComm(ocrScheduler_t *self, u32* count, ocrFatGuid_t* fatHandlers, u32 properties) {
     ocrSchedulerHcCommDelegate_t * commSched = (ocrSchedulerHcCommDelegate_t *) self;
-    ocrWorker_t *worker = NULL; //BUG #204: sep-concern: Do we need a way to register worker types somehow ?
+    ocrWorker_t *worker = NULL;
     getCurrentEnv(NULL, &worker, NULL, NULL);
-    //DIST-TODO sep-concern: Do we need a way to register worker types somehow ?
+    //BUG #204 sep-concern: Do we need a way to register worker types somehow ?
     if (((ocrWorkerHc_t *) worker)->hcType == HC_WORKER_COMM) {
         u32 i=0;
         while (i < *count) {

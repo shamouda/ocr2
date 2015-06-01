@@ -4,8 +4,8 @@
  * removed or modified.
  */
 
-// TODO:  The prescription needs to be derived from the affinity, and needs to default to something sensible.
-// TODO:  All this prescription logic needs to be moved out of the PD, into an abstract allocator level.  See and resolve TRAC #145.
+// BUG #145:  The prescription needs to be derived from the affinity, and needs to default to something sensible.
+// All this prescription logic needs to be moved out of the PD, into an abstract allocator level.
 #define PRESCRIPTION 0xFEDCBA9876544321LL   // L1 remnant, L2 slice, L2 remnant, L3 slice (twice), L3 remnant, remaining levels each slice-then-remnant.
 #define PRESCRIPTION_HINT_MASK 0x1
 #define PRESCRIPTION_HINT_NUMBITS 1
@@ -149,9 +149,8 @@ u8 cePdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
         }
     }
 #else
-    //FIXME: This is a hack to get the shutdown reportees.
-    //This should be replaced by a registration protocol for children to parents.
-    //Trac bug: #134
+    // BUG #134: This is a hack to get the shutdown reportees.
+    // This should be replaced by a registration protocol for children to parents.
     if (policy->myLocation == policy->parentLocation) {
         cePolicy->shutdownMax = cePolicy->xeCount + policy->neighborCount;
     } else {
@@ -332,7 +331,7 @@ static u8 getEngineIndex(ocrPolicyDomain_t *self, ocrLocation_t location) {
         self->myLocation + // Absolute location of the CE doing the allocation.
         derived->xeCount;  // Offset so that first XE is 0, last is xeCount-1, and CE is xeCount.
 #if defined(HAL_FSIM_CE)
-    // FIXME: Temporary override to avoid a bug. Trac #270
+    // BUG #270: Temporary override to avoid a bug.
     if(location == self->myLocation) blockRelativeEngineIndex = derived->xeCount; else blockRelativeEngineIndex = location & 0xF;
 #endif
     ASSERT(blockRelativeEngineIndex >= 0);
@@ -600,13 +599,13 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         START_PROFILE(pd_ce_DbCreate);
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_DB_CREATE
-        // TODO: Add properties whether DB needs to be acquired or not
+        // BUG #584: Add properties whether DB needs to be acquired or not
         // This would impact where we do the PD_MSG_MEM_ALLOC for example
         // For now we deal with both USER and RT dbs the same way
         ASSERT((PD_MSG_FIELD_I(dbType) == USER_DBTYPE) || (PD_MSG_FIELD_I(dbType) == RUNTIME_DBTYPE));
         DPRINTF(DEBUG_LVL_VVERB, "DB_CREATE request from 0x%lx for size %lu\n",
                 msg->srcLocation, PD_MSG_FIELD_IO(size));
-// TODO:  The prescription needs to be derived from the affinity, and needs to default to something sensible.
+// BUG #145: The prescription needs to be derived from the affinity, and needs to default to something sensible.
         u64 engineIndex = getEngineIndex(self, msg->srcLocation);
         ocrFatGuid_t edtFatGuid = {.guid = PD_MSG_FIELD_I(edt.guid), .metaDataPtr = PD_MSG_FIELD_I(edt.metaDataPtr)};
         u64 reqSize = PD_MSG_FIELD_IO(size);
@@ -618,7 +617,7 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         if(PD_MSG_FIELD_O(returnDetail) == 0) {
             ocrDataBlock_t *db= PD_MSG_FIELD_IO(guid.metaDataPtr);
             ASSERT(db);
-            // TODO: Check if properties want DB acquired
+            // BUG #584: Check if properties want DB acquired
             ASSERT(db->fctId == self->dbFactories[0]->factoryId);
             PD_MSG_FIELD_O(returnDetail) = self->dbFactories[0]->fcts.acquire(
                 db, &(PD_MSG_FIELD_O(ptr)), edtFatGuid, EDT_SLOT_NONE,
@@ -953,7 +952,6 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         } else {
             PD_MSG_FIELD_O(returnDetail) = WMETA_GUIDPROP | RMETA_GUIDPROP;
         }
-        // TODO print more useful stuff
         DPRINTF(DEBUG_LVL_VVERB, "GUID_INFO response\n");
         returnCode = ceProcessResponse(self, msg, 0);
 #undef PD_MSG
@@ -1029,7 +1027,7 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             static s32 throttlecount = 1;
             static u32 i = 0;
 u32 k;
-            // FIXME: very basic self-throttling mechanism bug #268
+            // BUG #268: very basic self-throttling mechanism
             if ((PD_MSG_FIELD_IO(guidCount) == 0) &&
                 (cePolicy->shutdownMode == false) &&
                 (--throttlecount <= 0)) {
@@ -1207,7 +1205,6 @@ ASSERT(ceMsg.destLocation != self->parentLocation); // Parent's not dead
         }
 
 #ifdef OCR_ENABLE_STATISTICS
-        // TODO: Fixme
         statsDEP_ADD(pd, getCurrentEDT(), NULL, signalerGuid, waiterGuid, NULL, slot);
 #endif
         returnCode = ceProcessResponse(self, msg, 0);
@@ -1250,7 +1247,6 @@ ASSERT(ceMsg.destLocation != self->parentLocation); // Parent's not dead
             ASSERT(0); // No other things we can register signalers on
         }
 #ifdef OCR_ENABLE_STATISTICS
-        // TODO: Fixme
         statsDEP_ADD(pd, getCurrentEDT(), NULL, signalerGuid, waiterGuid, NULL, slot);
 #endif
         returnCode = ceProcessResponse(self, msg, 0);
@@ -1284,7 +1280,6 @@ ASSERT(ceMsg.destLocation != self->parentLocation); // Parent's not dead
         self->eventFactories[0]->fcts[evt->kind].registerWaiter(
             evt, waiter, PD_MSG_FIELD_I(slot), false);
 #ifdef OCR_ENABLE_STATISTICS
-        // TODO: Fixme
         statsDEP_ADD(pd, getCurrentEDT(), NULL, signalerGuid, waiterGuid, NULL, slot);
 #endif
         returnCode = ceProcessResponse(self, msg, 0);
@@ -1322,7 +1317,6 @@ ASSERT(ceMsg.destLocation != self->parentLocation); // Parent's not dead
             }
         }
 #ifdef OCR_ENABLE_STATISTICS
-        // TODO: Fixme
         statsDEP_ADD(pd, getCurrentEDT(), NULL, signalerGuid, waiterGuid, NULL, slot);
 #endif
         returnCode = ceProcessResponse(self, msg, 0);
@@ -1414,7 +1408,6 @@ u8 cePdWaitMessage(ocrPolicyDomain_t *self,  ocrMsgHandle_t **handle) {
 void* cePdMalloc(ocrPolicyDomain_t *self, u64 size) {
     void* result;
     u64 engineIndex = getEngineIndex(self, self->myLocation);
-//TODO: Unlike other datablock allocation contexts, cePdMalloc is not going to get hints, so this part can be stripped/simplified. Maybe use an order value directly hard-coded in this function.
     u64 prescription = PRESCRIPTION;
     u64 allocatorHints;  // Allocator hint
     u64 levelIndex; // "Level" of the memory hierarchy, taken from the "prescription" to pick from the allocators array the allocator to try.

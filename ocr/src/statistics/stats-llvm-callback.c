@@ -4,6 +4,7 @@
  * removed or modified.
  */
 
+// BUG #225: Implement statistics. THis is an old version.
 #ifdef OCR_ENABLE_STATISTICS
 #ifdef OCR_ENABLE_PROFILING_STATISTICS
 
@@ -27,8 +28,8 @@ __thread u64 _threadInstructionCount = 0ULL;
 __thread u64 _threadFPInstructionCount = 0ULL;
 __thread u8 _threadInstrumentOn = 0;
 
-#define MAXEDTS        65536    // TODO: Turn this into a dynamic list
-#define ELS_EDT_INDEX  1    // FIXME: Move this someplace global to avoid conflicts
+#define MAXEDTS        65536
+#define ELS_EDT_INDEX  1
 #define MOREDB         8
 
 edtTable_t *edtList[MAXEDTS];
@@ -70,7 +71,7 @@ static edtTable_t* ocrStatsAccessInsertEDT(ocrTask_t *task) {
     edtList[numEdts++] = addedEDT;
     leave_cs();
 
-    ASSERT(numEdts<MAXEDTS);  // FIXME: to be made dynamic
+    ASSERT(numEdts<MAXEDTS);
 
     return addedEDT;
 }

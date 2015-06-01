@@ -124,14 +124,14 @@ static u64 extractLocIdFromGuid(ocrGuid_t guid) {
 }
 
 static ocrLocation_t locIdtoLocation(u64 locId) {
-    //TODO: We assume there will be a mapping between a location
-    //      and an 'id' stored in the guid. For now identity.
+    //BUG #605 Locations spec: We assume there will be a mapping
+    //between a location and an 'id' stored in the guid. For now identity.
     return (ocrLocation_t) (locId);
 }
 
 static u64 locationToLocId(ocrLocation_t location) {
-    //TODO: We assume there will be a mapping between a location
-    //      and an 'id' stored in the guid. For now identity.
+    //BUG #605 Locations spec: We assume there will be a mapping
+    //between a location and an 'id' stored in the guid. For now identity.
     u64 locId = (u64) ((int)location);
     // Make sure we're not overflowing location size
     ASSERT((locId < (1<<GUID_LOCID_SIZE)) && "GUID location ID overflows");
@@ -200,11 +200,11 @@ u8 labeledGuidCreateGuid(ocrGuidProvider_t* self, ocrFatGuid_t *fguid, u64 size,
         // We need to use the GUID provided; make sure it is non null and reserved
         ASSERT((fguid->guid != NULL_GUID) && IS_RESERVED_GUID(fguid->guid));
 
-        // TODO: We need to fix this: ie: return a code saying we can't do the reservation
+        // We need to fix this: ie: return a code saying we can't do the reservation
         // Ideally, we would either forward to the responsible party or return something
         // so the PD knows what to do. This is going to take a lot more infrastructure
         // change so we'll punt for now
-        // Related to #535 and #536
+        // Related to BUG #535 and to BUG #536
         ASSERT(extractLocIdFromGuid(fguid->guid) == locationToLocId(self->pd->myLocation));
 
         // Other sanity check
@@ -218,7 +218,7 @@ u8 labeledGuidCreateGuid(ocrGuidProvider_t* self, ocrFatGuid_t *fguid, u64 size,
 #define PD_TYPE PD_MSG_MEM_ALLOC
     msg.type = PD_MSG_MEM_ALLOC | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
     PD_MSG_FIELD_I(size) = size; // allocate 'size' payload as metadata
-    PD_MSG_FIELD_I(properties) = 0; // TODO:  What flags should be defined?  Where are symbolic constants for them defined?
+    PD_MSG_FIELD_I(properties) = 0;
     PD_MSG_FIELD_I(type) = GUID_MEMTYPE;
 
     RESULT_PROPAGATE(policy->fcts.processMessage (policy, &msg, true));

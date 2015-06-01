@@ -67,7 +67,7 @@
 //
 // (e) ceCommWaitMessage() -- blocking receive
 //
-//     While local stage E, keep looping. (FIXME: rate-limit w/ timer?)
+//     While local stage E, keep looping. BUG #618: Should we add a rate limit
 //     Once it is F, return content.
 //
 // (f) ceCommDestructMessage() -- callback to notify received message was consumed
@@ -79,8 +79,8 @@
 #define OUTSTANDING_CE_MSGS 4
 u64 msgAddresses[OUTSTANDING_CE_MSGS] = {0xbadf00d, 0xbadf00d, 0xbadf00d, 0xbadf00d};
 ocrPolicyMsg_t sendBuf, recvBuf; // Currently size of 1 msg each.
-// TODO: The above need to be placed in the CE's scratchpad, but once QMAs are ready, should
-// be no problem. trac #232
+// BUG #232: The above need to be placed in the CE's scratchpad, but once QMAs are ready, should
+// be no problem.
 
 void ceCommsInit(ocrCommPlatform_t * commPlatform, ocrPolicyDomain_t * PD);
 u8 ceCommDestructMessage(ocrCommPlatform_t *self, ocrPolicyMsg_t *msg);
@@ -167,6 +167,7 @@ u8 ceCommSwitchRunlevel(ocrCommPlatform_t *self, ocrPolicyDomain_t *PD, ocrRunle
                 // Wait till XE is in the barrier
                 do {
                     tmp = rmd_ld64((u64)rq);
+                    hal_fence();
                 } while(tmp != 0xfeedf00d);
                 ASSERT(tmp == 0xfeedf00d);
                 // Exit the XE out of the barrier
@@ -179,6 +180,7 @@ u8 ceCommSwitchRunlevel(ocrCommPlatform_t *self, ocrPolicyDomain_t *PD, ocrRunle
         {
             for(i=0; i< OUTSTANDING_CE_MSGS; i++)
                 msgAddresses[i] = 0xdead;
+            hal_fence();
 
             recvBuf.type = 0xdead;
         }
@@ -205,7 +207,7 @@ void ceCommsInit(ocrCommPlatform_t * commPlatform, ocrPolicyDomain_t * PD) {
     initializePolicyMessage(&recvBuf, sizeof(ocrPolicyMsg_t));
     initializePolicyMessage(&sendBuf, sizeof(ocrPolicyMsg_t));
 
-    // FIXME: HACK!!! HACK!!! HACK!!!
+    // BUG #618 and BUG #557
     // Because currently PD->Start() never returns, the CE cannot
     // Start() before booting its XEs. So, it boots the XEs and
     // Start()s only then. Which leads to a race between XEs Send()ing
@@ -233,7 +235,7 @@ void ceCommsInit(ocrCommPlatform_t * commPlatform, ocrPolicyDomain_t * PD) {
     if ((PD->myLocation & ID_BLOCK_MASK) == 0)
         PD->parentLocation = (PD->myLocation & ~(ID_UNIT_MASK|ID_BLOCK_MASK|ID_AGENT_MASK))
                              | ID_AGENT_CE;
-    // TODO: Generalize this to cover higher levels of hierarchy too. trac #231
+    // BUG #231: Generalize this to cover higher levels of hierarchy too.
 
     // Remember our PD in case we need to call through it later
     cp->pdPtr = PD;
@@ -307,7 +309,7 @@ u8 ceCommSendMessageToCE(ocrCommPlatform_t *self, ocrLocation_t target,
             }
         }
     } while(retval && ((k<100)));
-    // TODO: This value is arbitrary.
+    // BUG #618: This value is arbitrary.
     // What is a reasonable number of tries before giving up?
 
     if(retval) {
@@ -331,20 +333,20 @@ u8 ceCommSendMessage(ocrCommPlatform_t *self, ocrLocation_t target,
 
     ocrCommPlatformCe_t * cp = (ocrCommPlatformCe_t *)self;
     // If target is not in the same block, use a different function
-    // FIXME: do the same for chip/unit/board as well, or better yet, a new macro
+    // BUG #618: do the same for chip/unit/board as well, or better yet, a new macro
     if((self->location & ~ID_AGENT_MASK) != (target & ~ID_AGENT_MASK)) {
         message->seqId = self->fcts.getSeqIdAtNeighbor(self, target, 0);
         return ceCommSendMessageToCE(self, target, message, id, properties, mask);
     } else {
         message->seqId = 0; //For XE's the neighbor ID of the CE is always 0.
-        // TODO: compute all-but-agent & compare between us & target
+        // BUG #618: compute all-but-agent & compare between us & target
         // Target XE's stage (note this is in remote XE memory!)
         u64 * rq = cp->rq[((u64)target) & ID_AGENT_MASK];
 
         // - Check remote stage Empty/Busy/Full is Empty.
         {
             u64 tmp = rmd_ld64((u64)rq);
-            if(tmp) return 1; // Temporary workaround till bug #134 is fixed
+            if(tmp) return 1; // BUG #134: Temporary workaround for now
             ASSERT(tmp == 0);
         }
 
@@ -490,8 +492,6 @@ u8 ceCommWaitMessage(ocrCommPlatform_t *self,  ocrPolicyMsg_t **msg,
            (cp->lq[i])[0] != 2; i = (i+1) % MAX_NUM_XE) {
         // Halt the CPU, instead of burning rubber
         // An alarm would wake us, so no delay will result
-        // TODO: REC: Loop around at least once if we get
-        // an alarm to check all slots.
         // Note that a timer alarm wakes us up periodically
         if(i==j) {
              // Before going to sleep, check for CE messages
@@ -552,8 +552,8 @@ u8 ceCommDestructMessage(ocrCommPlatform_t *self, ocrPolicyMsg_t *msg) {
 
     ocrCommPlatformCe_t * cp = (ocrCommPlatformCe_t *)self;
 
-    if(msg->type == 0xdead) return 0; // FIXME: This is needed to ignore shutdown
-                                 // messages. To go away once #134 is fixed
+    if(msg->type == 0xdead) return 0; // BUG #134: This is needed to ignore shutdown
+                                      // messages. To go away once #134 is fixed
     if(msg->type & PD_CE_CE_MESSAGE) {
         if (msg->destLocation == self->location)
             return ceCommDestructCEMessage(self, msg);

@@ -363,7 +363,7 @@ void dumpStructs(void *pd, const char* output_binary, u64 start_address) {
         totu64++;
 
         // Fix up all the pointers
-        // (FIXME: potential low-likelihood bug due to address collision; need to be improved upon)
+        // (Bug #596: potential low-likelihood bug due to address collision; need to be improved upon)
         for(i = 0; i<(persistent_pointer/sizeof(u64)); i++) {
             if((ptrs[i] > (u64)ptrs) && (ptrs[i] < (u64)(ptrs+persistent_pointer))) {
                 ptrs[i] -= (u64)ptrs;
@@ -430,7 +430,7 @@ void platformSpecificInit(ocrConfig_t * ocrConfig) {
 }
 
 /**
- * @brief Calls platformn specific finalizer code.
+ * @brief Calls platform specific finalizer code.
  *
  * Allows to call platform specific finalizer code
  * that may be invoked independently of any OCR
@@ -536,15 +536,7 @@ void bringUpRuntime(ocrConfig_t *ocrConfig) {
             }
         }
     }
-#if 0
-    // Special case: register compPlatformFactory's functions
-    ocrCompPlatformFactory_t *compPlatformFactory;
-    compPlatformFactory = (ocrCompPlatformFactory_t *) all_factories[compplatform_type][0];
-    if (type_counts[compplatform_type] != 1) {
-        DPRINTF(DEBUG_LVL_WARN, "Only the first type of CompPlatform is used. If you don't want this behavior, please reorder!\n");
-    }
-    if(compPlatformFactory->setEnvFuncs != NULL) compPlatformFactory->setEnvFuncs(compPlatformFactory);
-#endif
+
     // BUILD DEPENDENCES
     DPRINTF(DEBUG_LVL_INFO, "========= Build dependences ==========\n");
 
@@ -620,7 +612,7 @@ void bringUpRuntime(ocrConfig_t *ocrConfig) {
                                                   RL_ASYNC | RL_BRING_UP | RL_NODE_MASTER),
                   ==, 0);
 
-    // REC TODO: This part may need to be specialized a bit. Basically,
+    // BUG #583: This part may need to be specialized a bit. Basically,
     // we need this capable thread to determine which PDs it is responsible
     // for bringing to PD_OK. On TG, this will only be the one PD (each core brings
     // its own PD to a start) whereas on TG-emul, it is all PDs. This goes back
@@ -682,14 +674,14 @@ void freeUpRuntime (bool doTeardown) {
     if(doTeardown) {
         ocrPolicyDomain_t *pd = NULL;
         getCurrentEnv(&pd, NULL, NULL, NULL);
-            // When we need to do the tear-down, we need to continue from RL_GUID_OK all the way down to CONFIG_PARSE
-        // TODO: Need to ensure that only NODE_MASTER comes out of here. Other PD_MASTER need to stay in their PDs
+        // When we need to do the tear-down, we need to continue from RL_GUID_OK all the way down to CONFIG_PARSE
+        // Bug #597 Need to ensure that only NODE_MASTER comes out of here. Other PD_MASTER need to stay in their PDs
         RESULT_ASSERT(pd->fcts.switchRunlevel(pd, RL_GUID_OK, RL_REQUEST | RL_ASYNC | RL_TEAR_DOWN | RL_NODE_MASTER),
                       ==, 0);
         RESULT_ASSERT(pd->fcts.switchRunlevel(pd, RL_MEMORY_OK, RL_REQUEST | RL_ASYNC | RL_TEAR_DOWN | RL_NODE_MASTER),
                       ==, 0);
 
-        // NOTE: TODO: The switch of other PD's runlevels needs to happen with ocrPdMessages_t
+        // Bug #597 The switch of other PD's runlevels needs to happen with ocrPdMessages_t
         RESULT_ASSERT(pd->fcts.switchRunlevel(pd, RL_PD_OK, RL_REQUEST | RL_ASYNC | RL_TEAR_DOWN | RL_NODE_MASTER),
                       ==, 0);
         // Here everyone is down except NODE_MASTER

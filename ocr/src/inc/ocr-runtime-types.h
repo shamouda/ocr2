@@ -32,7 +32,7 @@ typedef enum _ocrRunlevels_t {
 
 typedef u8 phase_t;
 
-// TODO: Do we need to explicitly expand this
+// BUG #583: Do we need to explicitly expand this
 // to the subcomponents (platform/target for example)
 typedef enum _ocrRLPhaseComponents_t {
     RL_PHASE_COMMAPI,
@@ -292,9 +292,9 @@ typedef enum { // Coded on 8 bits maximum
     MAX_MONITOR_PROGRESS   = 0x3
 } ocrMonitorProgress_t;
 
-// REC: FIXME
+// BUG #605
 // This is a placeholder for something that identifies a memory,
-// a compute node and a policy domain.  Whatever else this becomes in the future, it
+// a compute node and a policy domain. Whatever else this becomes in the future, it
 // includes the "engine index" in the low order eight bits.  Irrelevant for other
 // platforms, this is needed by TG where it provides the block-based index for which
 // processor or memory is identified:  0 == CE, 1-8 == XE; additional bits allow for

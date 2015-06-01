@@ -155,7 +155,7 @@ static u8 lockableAcquireInternal(ocrDataBlock_t *self, void** ptr, ocrFatGuid_t
         return OCR_EACCES;
     }
 
-    //TODO DBX this is temporary until we get a real OB mode implemented
+    //BUG #607 DB RO mode: Implement DB read-only mode (former non-coherent read)
     if(properties & DB_PROP_RT_OBLIVIOUS) {
         *ptr = self->ptr;
         return 0;
@@ -255,7 +255,7 @@ static u8 lockableAcquireInternal(ocrDataBlock_t *self, void** ptr, ocrFatGuid_t
  **/
 static void processAcquireCallback(ocrDataBlock_t *self, dbWaiter_t * waiter, ocrDbAccessMode_t waiterMode, u32 properties, ocrPolicyMsg_t * msg) {
     getCurrentEnv(NULL, NULL, NULL, msg);
-    // The In/Out nature of certain parameters (bug #273) is exposed here
+    //BUG #273: The In/Out nature of certain parameters is exposed here
 #define PD_MSG (msg)
 #define PD_TYPE PD_MSG_DB_ACQUIRE
     msg->type = PD_MSG_DB_ACQUIRE | PD_MSG_RESPONSE;

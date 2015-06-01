@@ -102,9 +102,9 @@ typedef struct _ocrWorkerFcts_t {
 typedef struct _ocrWorker_t {
     ocrFatGuid_t fguid;
     struct _ocrPolicyDomain_t *pd;
-    ocrLocation_t location;  //!!! TO BE DEPRECATED !!!
+    ocrLocation_t location;  //BUG #605 Locations spec: need this ?
     ocrWorkerType_t type;
-    u8 amBlessed; // TODO: Maybe merge in type?
+    u8 amBlessed; // BUG #583: Clean-up runlevels; maybe merge in type?
     u64 seqId;
     // Workers are capable modules so
     // part of their runlevel processing happens asynchronously
@@ -112,7 +112,7 @@ typedef struct _ocrWorker_t {
     // what is needed to do this
     // The state encodes the RL (top 4 bits) and the phase (bottom 4 bits)
     volatile u8 curState, desiredState;
-    // TODO: Do we need something with RL properties?
+    // BUG #583: Clean up runlevels; Do we need something with RL properties?
     void (*callback)(struct _ocrPolicyDomain_t*, u64);
     u64 callbackArg;
 

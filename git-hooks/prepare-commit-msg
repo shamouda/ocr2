@@ -1,0 +1,27 @@
+#!/bin/sh
+#
+
+# A GIT hook that looks for BUG #XXX and proposes to the user
+# the addition of those bugs in the commit message
+
+if git-rev-parse --verify HEAD >/dev/null 2>&1 ; then
+    against=HEAD
+else
+    # Initial commit: diff against an empty tree object
+    against=4b825dc642cb6eb9a060e54bf8d69288fbee4904
+fi
+
+# Redirect output to stderr.
+exec 1>&2
+
+fileToEdit=$1
+msgType=$2
+
+# Don't do anything for squash or messages coming in with -m
+if [ "$msgType" = "squash" -o "$msgType" = "message" ]; then
+    exit 0
+fi
+
+git diff-index --diff-filter=AM -U0 --cached $against | $GIT_DIR/hooks/findBugs.py | cat - $fileToEdit > ${fileToEdit}.new
+mv ${fileToEdit}.new $fileToEdit
+

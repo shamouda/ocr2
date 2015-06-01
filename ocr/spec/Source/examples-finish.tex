@@ -1,0 +1,221 @@
+%%%%
+\subsection{Code example}
+
+The following code demonstrates the use of Finish EDTs by performing a Fast Fourier
+Transform on a sparse array of length 256 bytes. For the sake of simplicity, the
+array contents and sizes are hardcoded, however, the code can be used as a starting
+point for adding more functionality.
+
+\begin{ocrsnip}
+
+
+/* Example usage of Finish EDT in FFT.
+ *
+ * Implements the following dependence graph:
+ *
+ * MainEdt
+ *    |
+ *
+ * FinishEdt
+ * {
+ *       DFT
+ *      /   \
+ * FFT-odd FFT-even
+ *      \   /
+ *     Twiddle
+ * }
+ *    |
+ * Shutdown
+ *
+ */
+
+#include ``ocr.h''
+#include ``math.h''
+
+#define N          256
+#define BLOCK_SIZE 16
+
+// The below function performs a twiddle operation on an array x_in
+// and places the results in X_real & X_imag. The other arguments
+// size and step refer to the size of the array x_in and the offset therein
+void ditfft2(double *X_real, double *X_imag, double *x_in, u32 size, u32 step) {
+    if(size == 1) {
+        X_real[0] = x_in[0];
+        X_imag[0] = 0;
+    } else {
+        ditfft2(X_real, X_imag, x_in, size/2, 2 * step);
+        ditfft2(X_real+size/2, X_imag+size/2, x_in+step, size/2, 2 * step);
+        u32 k;
+        for(k=0;k<size/2;k++) {
+            double t_real = X_real[k];
+            double t_imag = X_imag[k];
+            double twiddle_real = cos(-2 * M_PI * k / size);
+            double twiddle_imag = sin(-2 * M_PI * k / size);
+            double xr = X_real[k+size/2];
+            double xi = X_imag[k+size/2];
+
+            // (a+bi)(c+di) = (ac - bd) + (bc + ad)i
+            X_real[k] = t_real +
+                (twiddle_real*xr - twiddle_imag*xi);
+            X_imag[k] = t_imag +
+
+                (twiddle_imag*xr + twiddle_real*xi);
+            X_real[k+size/2] = t_real -
+                (twiddle_real*xr - twiddle_imag*xi);
+            X_imag[k+size/2] = t_imag -
+                (twiddle_imag*xr + twiddle_real*xi);
+        }
+    }
+}
+
+// The below function splits the given array into odd & even portions and
+// calls itself recursively via child EDTs that operate on each of the portions,
+// till the array operated upon is of size BLOCK_SIZE, a pre-defined
+// parameter. It then trivially computes the FFT of this array, then spawns
+// twiddle EDTs to combine the results of the children.
+ocrGuid_t fftComputeEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) { (@ \label{line:HW_ComputeEdt} @)
+    ocrGuid_t computeGuid = paramv[0];
+    ocrGuid_t twiddleGuid = paramv[1];
+    double *data = (double*)depv[0].ptr;
+    ocrGuid_t dataGuid = depv[0].guid;
+    u64 size = paramv[2];
+    u64 step = paramv[3];
+    u64 offset = paramv[4];
+    u64 step_offset = paramv[5];
+    u64 blockSize = paramv[6];
+    double *x_in = (double*)data;
+    double *X_real = (double*)(data+offset + size*step);
+    double *X_imag = (double*)(data+offset + 2*size*step);
+
+    if(size <= blockSize) {
+        ditfft2(X_real, X_imag, x_in+step_offset, size, step);
+    } else {
+        // DFT even side
+        u64 childParamv[7] = { computeGuid, twiddleGuid, size/2, 2 * step,
+                               0 + offset, step_offset, blockSize };
+        u64 childParamv2[7] = { computeGuid, twiddleGuid, size/2, 2 * step,
+                                size/2 + offset, step_offset + step, blockSize };
+
+        ocrGuid_t edtGuid, edtGuid2, twiddleEdtGuid, finishEventGuid, finishEventGuid2;
+
+        ocrEdtCreate(&edtGuid, computeGuid, EDT_PARAM_DEF, childParamv,
+                     EDT_PARAM_DEF, NULL, EDT_PROP_FINISH, NULL_GUID,
+                     &finishEventGuid); (@ \label{line:HW_FinishEdt1} @)
+        ocrEdtCreate(&edtGuid2, computeGuid, EDT_PARAM_DEF, childParamv2,
+                     EDT_PARAM_DEF, NULL, EDT_PROP_FINISH, NULL_GUID,
+                     &finishEventGuid2); (@ \label{line:HW_FinishEdt2} @)
+
+        ocrGuid_t twiddleDependencies[3] = { dataGuid, finishEventGuid, finishEventGuid2 };
+        ocrEdtCreate(&twiddleEdtGuid, twiddleGuid, EDT_PARAM_DEF, paramv, 3,
+                     twiddleDependencies, EDT_PROP_FINISH, NULL_GUID, NULL); (@ \label{line:HW_FinishEdt3} @)
+
+        ocrAddDependence(dataGuid, edtGuid, 0, DB_MODE_RW);
+        ocrAddDependence(dataGuid, edtGuid2, 0, DB_MODE_RW);
+    }
+
+    return NULL_GUID;
+}
+
+// The below function performs the twiddle operation
+ocrGuid_t fftTwiddleEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) { (@ \label{line:HW_TwiddleEdt} @)
+    double *data = (double*)depv[0].ptr;
+    u64 size = paramv[2];
+    u64 step = paramv[3];
+    u64 offset = paramv[4];
+    double *x_in = (double*)data+offset;
+    double *X_real = (double*)(data+offset + size*step);
+    double *X_imag = (double*)(data+offset + 2*size*step);
+
+    ditfft2(X_real, X_imag, x_in, size, step);
+
+    return NULL_GUID;
+}
+
+ocrGuid_t endEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) { (@ \label{line:HW_EndEdt} @)
+    ocrGuid_t dataGuid = paramv[0];
+
+    ocrDbDestroy(dataGuid);
+    ocrShutdown();
+    return NULL_GUID;
+}
+
+ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
+
+    ocrGuid_t computeTempGuid, twiddleTempGuid, endTempGuid;
+    ocrEdtTemplateCreate(&computeTempGuid, &fftComputeEdt, 7, 1);
+    ocrEdtTemplateCreate(&twiddleTempGuid, &fftTwiddleEdt, 7, 3);
+    ocrEdtTemplateCreate(&endTempGuid, &endEdt, 1, 1);
+    u32 i;
+    double *x;
+
+    ocrGuid_t dataGuid;
+    ocrDbCreate(&dataGuid, (void **) &x, sizeof(double) * N * 3, DB_PROP_NONE, NULL_GUID, NO_ALLOC); (@ \label{line:HW_DBCreate} @)
+
+    // Cook up some arbitrary data
+    for(i=0;i<N;i++) {
+        x[i] = 0;
+    }
+    x[0] = 1;
+
+    u64 edtParamv[7] = { computeTempGuid, twiddleTempGuid, N, 1, 0, 0, BLOCK_SIZE };
+    ocrGuid_t edtGuid, eventGuid, endGuid;
+
+    // Launch compute EDT
+    ocrEdtCreate(&edtGuid, computeTempGuid, EDT_PARAM_DEF, edtParamv,
+                 EDT_PARAM_DEF, NULL, EDT_PROP_FINISH, NULL_GUID,
+                 &eventGuid); (@ \label{line:HW_FinishEdt4} @)
+
+    // Launch finish EDT
+    ocrEdtCreate(&endGuid, endTempGuid, EDT_PARAM_DEF, &dataGuid,
+                 EDT_PARAM_DEF, NULL, EDT_PROP_FINISH, NULL_GUID,
+                 NULL); (@ \label{line:HW_FinishEdt5} @)
+
+    ocrAddDependence(dataGuid, edtGuid, 0, DB_MODE_RW); (@ \label{line:HW_DBDep} @)
+    ocrAddDependence(eventGuid, endGuid, 0, DB_MODE_RW); (@ \label{line:HW_EventDep} @)
+
+    return NULL_GUID;
+}
+\end{ocrsnip}
+%%%
+\subsubsection{Details}
+
+The above code contains a total of 5 functions - a \texttt{mainEdt()} required of all
+OCR programs, a \texttt{ditfft2()} that acts as the core of the recursive FFT
+computation, calling itself on smaller sizes of the array provided to it, and three
+other EDTs that are managed by OCR. They include - \texttt{fftComputeEdt()} in
+Line~\ref{line:HW_ComputeEdt} that breaks down the FFT operation on an array into
+two FFT operations on the two halves of the array (by spawning two other EDTs of
+the same template), as well as an instance of \texttt{fftTwiddleEdt()} shown in
+Line~\ref{line:HW_TwiddleEdt} that combines the
+results from the two spawned EDTs by applying the FFT ``twiddle'' operation on the
+real and imaginary portions of the array. The \texttt{fftComputeEdt()} function stops
+spawning EDTs once the size of the array it operates on drops below a pre-defined
+\texttt{BLOCK\_SIZE} value. This sets up a recursive cascade of EDTs operating on gradually
+smaller data sizes till the \texttt{BLOCK\_SIZE} value is reached, at which point the FFT value
+is directly computed, followed by a series of twiddle operations on gradualy larger
+data sizes till the entire array has undergone the operation. When this is available,
+a final EDT termed \texttt{endEdt()} in Line~\ref{line:HW_EndEdt} is called to
+optionally output the value of the
+computed FFT, and terminate the program by calling \texttt{ocrShutdown()}. All the
+FFT operations are performed on a single datablock created in Line~\ref{line:HW_DBCreate}.
+This shortcut is taken for the sake of didactic simplicity. While this is
+programmatically correct, a user who desires reducing contention on the single array
+may want to break down the datablock into smaller units for each of the EDTs to operate
+upon.
+
+For this program to execute correctly, it is apparent that each of the
+\texttt{fftTwiddleEdt} instances can not start until all its previous instances have
+completed execution. Further, for the sake of program simplicity, an instance of
+\texttt{fftComputeEdt}-\texttt{fftTwiddleEdt} pair cannot return until the EDTs that
+they spawn have completed execution. The above dependences are enforced using the
+concept of \emph{Finish EDTs}. As stated before, a Finish EDT does not return until
+all the EDTs spawned by it have completed execution. This simplifies programming,
+and does not consume computing resources since a Finish EDT that is not running, is
+removed from any computing resources it has used. In this program, no instance of
+\texttt{fftComputeEdt} or \texttt{fftTwiddleEdt} returns before the corresponding
+EDTs that operates on smaller data sizes have returned, as illustrated in
+Lines~\ref{line:HW_FinishEdt1},\ref{line:HW_FinishEdt2} and \ref{line:HW_FinishEdt3}.
+Finally, the single \texttt{endEdt()} instance in Line~\ref{line:HW_FinishEdt4} is called
+only after all the EDTs spawned by the parent \texttt{fftComputeEdt()}
+in Line~\ref{line:HW_FinishEdt5}, return.
+

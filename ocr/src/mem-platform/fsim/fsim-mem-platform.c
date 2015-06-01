@@ -211,9 +211,6 @@ u8 fsimQueryTag(ocrMemPlatform_t *self, u64 *start, u64* end,
 ocrMemPlatform_t* newMemPlatformFsim(ocrMemPlatformFactory_t * factory,
                                      ocrParamList_t *perInstance) {
 
-    // TODO: This will be replaced by the runtime/GUID meta-data allocator
-    // For now, we cheat and use good-old fsimRuntimeChunkAlloc which is kind of counter productive with
-    // all the trouble we are going through to *not* use fsimRuntimeChunkAlloc...
     ocrMemPlatform_t *result = (ocrMemPlatform_t*)
                                runtimeChunkAlloc(sizeof(ocrMemPlatformFsim_t), PERSISTENT_CHUNK);
     factory->initialize(factory, result, perInstance);
@@ -226,7 +223,6 @@ void initializeMemPlatformFsim(ocrMemPlatformFactory_t * factory,
 
     initializeMemPlatformOcr(factory, result, perInstance);
     ocrMemPlatformFsim_t *rself = (ocrMemPlatformFsim_t*)result;
-    // TODO: If this is the base, it should go in the base param list
     result->startAddr = ((paramListMemPlatformFsim_t *)perInstance)->start;
     INIT_LOCK(&(rself->lock));
 }

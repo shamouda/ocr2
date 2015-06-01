@@ -1,0 +1,235 @@
+%
+% This is an included file. See the master file for more information.
+%
+
+% TODO:  The original Release Consistency model had the "memory coherence" assumption which stated that all
+% processors see writes to the same location in the same order, which is likely too strong a
+%condition for OCR. For a weaker memory model, see Location Consistency (Gao & Sarkar, IEEE ToC 2000).
+%
+\section{Memory Model}
+\index{Memory Model}
+\label{sec:MemoryModel}
+A memory model defines the values that can be legally observed in
+memory when multiple units of execution (e.g.\ processes or threads)
+access a shared memory system. The memory model provides programmers
+with the tools they need to understand the state of memory, but it
+also places restrictions on what a compiler writer can do (e.g.\ which
+aggressive optimizations are allowed) and restrictions on what a
+hardware designer is allowed to do (e.g.\ the behavior of write
+buffers).
+%%%%
+\subsection{Definitions}
+To construct a memory model for OCR, we need to present a few
+definitions. The operations inside an EDT execute in a non-blocking
+manner. The order of such operations are defined by the
+\emph{sequenced-before}\index{Sequenced-before} relation defined by
+the host C programming language.
+
+When multiple EDTs are running, they execute asynchronously. Usually,
+a programmer can make few assumptions about the relative orders of
+operations in two different EDTs. At certain points in the execution
+of EDTs, however, the OCR program may need to define ordering
+constraints. These constraints define
+\emph{synchronized-with}\index{Synchronized-with} relations.
+
+The ``transitive closure'' of sequenced-before operations inside each
+of two EDTs combined with the synchronized-with relations between two
+EDTs defines a \emph{happens-before}\index{Happens-before}
+relationship. For example:
+\begin{itemize}
+\item if \code{A} is sequenced-before \code{B} in EDT1
+\item if \code{C} is sequenced-before \code{D} in EDT2
+\item and \code{B} is synchronized-with \code{C} in EDT2
+\item then \code{A} happens-before \code{D}.
+\end{itemize}
+These basic concepts are enough to define the memory model for OCR.
+
+%%%%
+\subsection{OCR memory model}
+OCR provides a relatively simple memory model. Before an EDT can read
+or write a data block, it must first \emph{acquire}\index{Acquire} the data
+block. This is not an exclusive relationship by which we mean it is
+possible (depending on the mode of the data block in question) for
+multiple EDTs to acquire the same data block at the same
+time. When an EDT has finished with a data block and it is ready
+to expose any modifications to the data block to other EDTs, it
+must \emph{release}\index{Release} that data block.
+
+\begin{quote}
+Any function in the OCR runtime that releases a data block must ensure
+that all loads and stores to the data block occur before the data
+block is released. Furthermore, the OCR runtime must ensure that the
+release completes before returning from the release function call.
+\end{quote}
+
+The only way to establish a synchronized-with relation is through the
+behavior of events. If the pre-slot of EDT2 is connected to the post-slot
+of EDT1, then EDT2 waits for event associated with the post-slot of EDT1 to
+trigger. Therefore, the satisfy event from EDT1 synchronizes-with the
+triggering of the pre-slot of EDT2. We can establish a happens-before
+relationship between all operations in EDT1 and any operation in EDT2
+if we define the following rule for OCR.
+
+\begin{quote}
+The OCR runtime must ensure that an EDT completes the release of all
+of its data blocks before it marks its post-event as satisfied.
+\end{quote}
+
+An EDT can use data blocks to satisfy events in the body of the task
+in addition to the event associated with its post-slot. We can reason
+about the behavior of the memory model and establish happens-before
+relationships if we define the following rule.
+
+%Vincent's feedback....
+%
+%"If an EDT uses a Data Block to satisfy an event, all writes to that data block from the EDT must complete
+%before the event is triggered.” => I think we already discussed that but I believe you should wait for all the
+%db releases that are sequenced-before the satisfy.
+%1) This is in case of a db storing guids. db1 has data the edt has written to,  db2 has the guid of db1. %Satisfying ev1 with db2, potentially enables edt2, which spawns edt3 that depends on db1’s guid read from
+%db2. With the current rule, db1 may or may not have been released when edt3 acquires it.
+%
+%db1[0]=1
+%db2[0]=db1Guid
+%ocrDbRelease(db1)
+%ocrDbRelease(db2)
+%ocrEventSatisfy(ev1,db2)
+%
+% TGM responds:
+% I submit that since ocrDbRelease(db1) is sequenced before ocrDbRelease(db2) the rules in the memory
+%model forces the releases to occur in that order and therefore the model already covers your case.     Can
+%you tell me what I'm missing ... because I agree with you completely that the model must force the releases
+%to occur in that order prior to the satisfy ... I just think the
+%normal sequenced before relations cover this.
+%
+% REC adds:
+% I think what is missing (from the statement below) is something to
+% say that all blocks that may potentially be acquired need to be
+% released (in Vincent's example, db1). I tried to capture that but am
+% not happy with my word smitthing.
+%
+
+\begin{quote}
+Wrties to data blocks that may be acquired by EDTs that could be made
+transitively ready by an event satisfaction must have completed and
+the data block must have been released prior to satisfying the event.
+\end{quote}
+
+Without this rule we cannot assume a release operation followed by
+satisfying an event defines a sequenced-before relationship that can
+be used to establish a happens-before relation.
+
+The core idea in the OCR memory model is that happens-before
+relationships are defined in terms of events (the only synchronization
+operation in OCR) and the release of OCR objects (such as data
+blocks). This is an instance of a \emph{Release
+Consistency}\index{Release Consistency} memory model which has the
+advantage of being relatively straightforward to apply to OCR
+programs.
+
+The safest course for a programmer is to write programs that can be
+defined strictly in terms of the release consistency rules. OCR,
+however, lets a programmer write programs in which two or more EDTs can
+write to a single data block at the same time (or more precisely, the
+two EDTs can issue writes in an unordered manner). This may result in a
+data race\index{Data race} in that the value that is ultimately stored
+in memory depends on how a system chooses to schedule operations from
+the two EDTs.
+
+Most modern parallel programming languages state that a program that
+has a data race\footnote{A \emph{data race} occurs when loads and
+stores by two units of execution operate on overlapping memory regions
+without a synchronized-with relation to order them} is an illegal
+program and the results produced by such a program are undefined.
+These programming models then define a complex set of synchronization
+constructs and atomic variables so a programmer has the tools needed
+to write race-free programs. OCR, however, does not provide any
+synchronization constructs beyond the behavior of events. This is not
+an oversight. Rather, this restricted synchronization model helps OCR
+to better scale on a wider range of parallel computers.
+
+OCR, therefore, allows a programmer to write legal programs that may
+potentially contain data races. OCR deals with this situation by
+adding two more rules. In both of these rules, we say that address
+range $A$ and $B$ are non-overlapping if and only if the set $A_1$ of
+8-byte\footnote{The reference to ``8-byte'' words assumes the processing elements
+utilize a 64-bit architecture. For other cases, all references to an 8-byte
+word in this specification must be adjusted to match the architecture of the processing elements.}
+aligned 8-byte words fully covering $A$ and the set $B_1$ of
+8-byte aligned 8-byte words fully covering $B$ do not overlap. For
+example, addresses
+$0x0$ and $0x7$ overlap (assuming byte level addressing) whereas
+$0x0$ and $0x8$ do not.
+The first rule deals with the situation of multiple
+EDTs writing to a data block with non-overlapping address ranges.
+\begin{quote}
+If two EDTs write to a single data block without a well defined order,
+if the address ranges of the writes do not overlap, the correct result
+of each write operation must appear in memory.
+\end{quote}
+
+This behavior may seem obvious making it trivial for a system to
+support. However, when addresses are distinct but happen to share the
+same cache lines or when aggressive optimization of writes occur
+through write buffers, an implementation could mask the updates from
+one of the EDTs if this rule were not defined in the OCR
+specification.
+
+The last rule addresses the case of overlapping address ranges. Assume that
+a system writes values to memory at an atomicity of N-bytes. This defines
+the fundamental store-atomicity for the system\index{Store-atomicity}.
+\begin{quote}
+If two EDTs write to a single data block without a well defined order,
+if the address ranges of the writes overlap, the results written to
+memory must correspond to one of the legal interleavings of statements
+from the two EDTs at an N-byte aligned granularity. Overlapping writes
+to non-aligned or smaller than N-byte granularity are not defined.
+\end{quote}
+For systems that do not provide store-atomicity at any level, N would be 0
+and the above rule states that unordered writes to overlapping address
+ranges are undefined.
+This rule is the well known \emph{sequential consistency}\index{Sequential
+consistency} rule. It states that the actual result appearing in
+memory may be nondeterministic, but it will be well defined and it
+will correspond to values from one EDT or the other.
+
+Release consistency remains the safest and best approach to use in
+writing OCR programs. It is conceivable that some of the more
+difficult rules may be relaxed in future versions of OCR (especially
+the sequential consistency rule), but the relaxed consistency model
+will almost assuredly always be supported by OCR.
+
+Any memory in OCR that can be accessed by multiple EDTs resides in data blocks.  As
+discussed in Section~\ref{sec:datablocks} there
+are four access modes for the data blocks in OCR. The modes and how they
+interact with the OCR memory model are listed as follows.
+\begin{itemize}
+
+\item \emph{Read-Write} (default mode)\index{Data block, read-write}:
+  The EDT may read and write to the data block. Multiple EDTs may
+  write to the same data block at the same time with values
+  constrained according to the rules in the OCR memory model.
+
+\item \emph{Exclusive write}\index{Data block, exclusive write}: The
+  EDT requires that it is the only EDT that can commit write
+  operations to a data block at a given time. Writes must follow a
+  sequential total order; i.e.\ when more than one EDT is writing
+  to a data block in exclusive write mode, all the writes from one EDT
+  must complete before a subsequent EDT can acquire and then write to
+  the data block. This serializes the execution of
+  EDTs that acquire a same data block in exclusive write mode.
+
+\item \emph{Read only}\index{Data block, read only}: The EDT
+  will only read from the data block. OCR does
+  not restrict the ability of other EDTs to write to the data block. The
+  visibility of those writes are undefined; i.e.\ an implementation may
+  choose whether or not to make writes by other EDTs visible.
+
+\item \emph{Constant}\index{Data Block,constant}: The EDT will
+  only read from the data block and the OCR runtime will ensure
+  that once the data block is acquired, writes from other EDTs
+  will not be visible.
+
+\end{itemize}
+
+
+% This is the end of ch1-memory.tex of the OCR specification.

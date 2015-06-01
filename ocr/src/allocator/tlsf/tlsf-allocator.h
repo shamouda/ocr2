@@ -33,7 +33,7 @@ typedef struct _ocrAllocatorTlsf_t {
                             // of the allocator.  This value is zero when slicing is not used, as is the case with the lowest
                             // level memory pool(s).
     volatile u64 sliceSize; // How many bytes each slice will accomodate.  NOTE:  This count INCLUDES the pool overhead space.
-                            // To keep things simple, sliceSize must be a minimum of 256 bytes.  (TODO: perhaps change this)
+                            // To keep things simple, sliceSize must be a minimum of 256 bytes.
     volatile u64 poolAddr;  // Address of the 8-byte-aligned net pool storage space.
     u64 poolSize;           // Net size of usable, aligned pool space.  Includes pool header; it is net of unaligned bytes trimmed
                             // from the beginning and end of the available storage span.

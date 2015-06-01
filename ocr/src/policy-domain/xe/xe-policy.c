@@ -228,8 +228,7 @@ static u8 xeProcessCeRequest(ocrPolicyDomain_t *self, ocrPolicyMsg_t **msg) {
             ASSERT((handle->response->type & PD_MSG_TYPE_ONLY) == type);
             if(handle->response != *msg) {
                 // We need to copy things back into *msg
-                // TODO: FIXME when issue #68 is fully implemented by checking
-                // sizes
+                // BUG #68: This should go away when that issue is fully implemented
                 // We use the marshalling function to "copy" this message
                 u64 baseSize = 0, marshalledSize = 0;
                 ocrPolicyMsgGetMsgSize(handle->response, &baseSize, &marshalledSize, 0);
@@ -380,9 +379,8 @@ u8 xePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             // because otherwise something will complain
             returnCode = 0;
         } else {
-            //FIXME: We never exercise this code path.
-            //Keeping it for now until we fix the shutdown protocol
-            //Bug #134
+            // BUG #134: We never exercise this code path.
+            // Keeping it for now until we fix the shutdown protocol
             ASSERT(0);
             DPRINTF(DEBUG_LVL_INFO, "SHUTDOWN(slave) from 0x%lx\n",
                     msg->srcLocation);
@@ -420,14 +418,13 @@ u8 xePdSendMessage(ocrPolicyDomain_t* self, ocrLocation_t target, ocrPolicyMsg_t
     switch (returnCode) {
     case OCR_ECANCELED:
         // Our outgoing message was cancelled and shutdown is assumed
-        // TODO: later this will be expanded to include failures
+        // BUG #134: later this will be expanded to include failures
         // We destruct the handle for the first message in case it was partially used
         if(*handle)
             (*handle)->destruct(*handle);
-        //FIXME: OCR_ECANCELED shouldn't be inferred generally as shutdown
+        //BUG #134: OCR_ECANCELED shouldn't be inferred generally as shutdown
         //but rather handled on a per message basis. Once we have a proper
         //shutdown protocol this should go away.
-        //Bug #134
         // We do not do a shutdown if we already have a shutdown initiated
         if(returnCode==OCR_ECANCELED && !rself->shutdownInitiated)
             ocrShutdown();
@@ -471,7 +468,7 @@ void* xePdMalloc(ocrPolicyDomain_t *self, u64 size) {
     PD_MSG_FIELD_I(size) = size;
     ASSERT(self->workerCount == 1);              // Assert this XE has exactly one worker.
     u8 msgResult = xeProcessCeRequest(self, &pmsg);
-    ASSERT (msgResult == 0);   // TODO: Are there error cases I need to handle?  How?
+    ASSERT (msgResult == 0);
     ptr = PD_MSG_FIELD_O(ptr);
 #undef PD_TYPE
 #undef PD_MSG
@@ -488,7 +485,6 @@ void xePdFree(ocrPolicyDomain_t *self, void* addr) {
     msg.type = PD_MSG_MEM_UNALLOC | PD_MSG_REQUEST;
     PD_MSG_FIELD_I(ptr) = addr;
     PD_MSG_FIELD_I(type) = DB_MEMTYPE;
-    // TODO: Things are missing. Brian's new way to free things should fix this!
     PD_MSG_FIELD_I(properties) = 0;
     u8 msgResult = xeProcessCeRequest(self, &pmsg);
     ASSERT(msgResult == 0);

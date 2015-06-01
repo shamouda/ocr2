@@ -55,7 +55,7 @@ typedef struct _ocrParamList_t {
 /******************************************************/
 /*  ABORT / EXIT OCR                                  */
 /******************************************************/
-// TODO: These need to move. SAL or HAL?
+// BUG #609: These need to move. SAL or HAL?
 void ocr_abort();
 
 void ocr_exit();
@@ -107,6 +107,7 @@ u32 fls64(u64 val);
  * with an associated bit vector keeping track of
  * available slots (to reuse them)
  * @todo Extend to have a different number than 64 entries
+ * BUG #617
  */
 typedef struct _ocrGuidTracker_t {
     u64 slotsStatus; /**< Bit vector. A 0 indicates the slot is *used* (1 = available slot) */

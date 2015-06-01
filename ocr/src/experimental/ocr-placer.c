@@ -38,7 +38,7 @@ ocrGuid_t locationToAffinity(ocrLocationPlacer_t * placer, ocrLocation_t locatio
 }
 
 //Fetch remote affinity guid information
-//TODO nasty copy from hc-dist-policy.c until we don't have proper remote guid metdata resolve impl in PD
+//BUG #536 metadata cloning: copy-paste from hc-dist-policy.c until we have MD cloning
 static u8 resolveRemoteMetaData(ocrPolicyDomain_t * self, ocrFatGuid_t * fGuid, u64 metaDataSize) {
     ocrGuid_t remoteGuid = fGuid->guid;
     u64 val;
@@ -62,7 +62,7 @@ static u8 resolveRemoteMetaData(ocrPolicyDomain_t * self, ocrFatGuid_t * fGuid, 
         ASSERT(PD_MSG_FIELD_IO(guid.guid) == remoteGuid);
         ASSERT(PD_MSG_FIELD_O(size) == metaDataSize);
         hal_memCopy(metaDataPtr, PD_MSG_FIELD_IO(guid.metaDataPtr), metaDataSize, false);
-        //DIST-TODO Potentially multiple concurrent registerGuid on the same template
+        //BUG #536 metadata cloning: Potentially multiple concurrent registerGuid on the same template
         self->guidProviders[0]->fcts.registerGuid(self->guidProviders[0], remoteGuid, (u64) metaDataPtr);
         val = (u64) metaDataPtr;
         DPRINTF(DEBUG_LVL_VVERB,"Data @ 0x%lx registered for GUID 0x%lx for %ld\n",
@@ -184,7 +184,7 @@ u8 suggestLocationPlacement(ocrPolicyDomain_t *pd, ocrLocation_t curLoc, ocrLoca
                 if (PD_MSG_FIELD_I(affinity.guid) != NULL_GUID) {
                     msg->destLocation = affinityToLocation(PD_MSG_FIELD_I(affinity.guid));
                 }
-                //TODO when we do place DBs make sure we only place USER DBs
+                // When we do place DBs make sure we only place USER DBs
                 // doPlace = ((PD_MSG_FIELD_I(dbType) == USER_DBTYPE) &&
                 //             (PD_MSG_FIELD_I(affinity.guid) == NULL_GUID));
 #undef PD_MSG

@@ -22,7 +22,6 @@
 #include "ocr-worker.h"
 
 #include "experimental/ocr-placer.h"
-#include "experimental/ocr-tuning.h"
 
 /****************************************************/
 /* PARAMETER LISTS                                  */
@@ -220,7 +219,7 @@ typedef struct _paramListPolicyDomainInst_t {
 #define PD_MSG_SAL_READ         0x00002100
 /**< Write operation */
 #define PD_MSG_SAL_WRITE        0x00003100
-// TODO: Possibly add open, close, seek
+// BUG #611: Potentially provide more operations to support newlib/legacy
 /**< Abort/exit the runtime */
 #define PD_MSG_SAL_TERMINATE    0x00004100
 
@@ -299,8 +298,8 @@ typedef struct _paramListPolicyDomainInst_t {
 #define PD_MSG_FIELD_O(field) _PD_MSG_FIELD_FULL_QUAL(PD_MSG, PD_TYPE, inOrOut.out, field)
 #define PD_MSG_INOUT_STRUCT(ptr) _PD_MSG_INOUT_STRUCT(ptr, PD_TYPE)
 
-// TODO: Check if this works with packing and what not. In particular it assumes that
-// all union members start at the start of the union.
+// Assumes that all union members start at the start of the union.
+// Works for now but may have issues with packing
 #define _PD_MSG_SIZE_ALL_SUB(type)                              \
     ((u64)(&(((struct _ocrPolicyMsg_t*)0)->args)) +             \
      sizeof(((struct _ocrPolicyMsg_t*)0)->args._data_##type))
@@ -391,7 +390,7 @@ typedef struct _ocrPolicyMsg_t {
         struct {
             ocrFatGuid_t guid;            /**< In/Out: GUID of the created
                                            * memory segment (usually a DB) */
-            // TODO: Bug #273. See if these need to stay In/Out or if it can move back to in
+            //BUG #273 See if these need to stay In/Out or if it can move back to in
             u32 properties;               /**< In: Properties for creation */
             u64 size;                     /**< In: Size of the created DB */
             union {
@@ -424,7 +423,7 @@ typedef struct _ocrPolicyMsg_t {
         struct {
             // These four parameters should move to IN but they are here
             // due to the implementation of the lockable DB
-            // This is reported in bug #273
+            //BUG #273: This is reported in bug #273
             ocrFatGuid_t guid;         /**< In: GUID of the DB to acquire */
             ocrFatGuid_t edt;          /**< In: EDT doing the acquire */
             u32 edtSlot;               /**< In: EDT's slot if applicable else EDT_SLOT_NONE */
@@ -441,7 +440,7 @@ typedef struct _ocrPolicyMsg_t {
         } PD_MSG_STRUCT_NAME(PD_MSG_DB_ACQUIRE);
 
         struct {
-            // This field should also be just IN. See bug #273
+            //BUG #273 This field should also be just IN
             ocrFatGuid_t guid;         /**< In: GUID of the DB to release */
             union {
                 struct {
@@ -726,7 +725,7 @@ typedef struct _ocrPolicyMsg_t {
                                  * by the callee */
             u64 extra;           /**< In/Out: Additional information on the take (for eg: function
                                   * pointer to use to execute the returned EDTs
-                                  * TODO: Could this be moved to OUT ? */
+                                  * BUG #586: Could this be moved to OUT ? */
             ocrGuidKind type;    /**< In/Out Kind of GUIDs requested */
             u32 guidCount;       /**< In/Out: Number of GUID(s) in guids.
                                   * In: If guids[0].guid, number of GUIDs requested in
@@ -736,13 +735,13 @@ typedef struct _ocrPolicyMsg_t {
                                   */
             union {
                 struct {
-                    u32 properties;      /**< In: properties for the take; TODO: define some for extra */
+                    u32 properties;      /**< In: properties for the take; */
                 } in;
                 struct {
                     u32 returnDetail;    /**< Out: Success or error code */
                 } out;
             } inOrOut __attribute__ (( aligned(8) ));
-            // TODO: Add something about cost/choice heuristic
+            // BUG #586: Take into account cost/choice heuristic
         } PD_MSG_STRUCT_NAME(PD_MSG_COMM_TAKE);
 
         struct {
@@ -767,11 +766,11 @@ typedef struct _ocrPolicyMsg_t {
                     u32 returnDetail;    /**< Out: Success or error code */
                 } out;
             } inOrOut __attribute__ (( aligned(8) ));
-            // TODO: Do we need something about cost/choice heuristic here
+            // BUG #586: Take into account cost/choice heuristic
         } PD_MSG_STRUCT_NAME(PD_MSG_COMM_GIVE);
 
         struct {
-            // TODO: Bug #273. THis is also being used at In/Out
+            //BUG #273 THis is also being used at In/Out
             u32 properties;      /**< In: Properties. Lower 3 bits are access modes */
             union {
                 struct {
@@ -981,7 +980,7 @@ typedef struct _ocrPolicyMsg_t {
             union {
                 struct {
                     ocrLocation_t loc;      /**< In: Location registering */
-                    // TODO: Add things having to do with cost and relationship
+                    // BUG #586: Add cost/relationship maybe?
                     u32 properties;         /**< In */
                 } in;
                 struct {
@@ -1004,7 +1003,7 @@ typedef struct _ocrPolicyMsg_t {
         } PD_MSG_STRUCT_NAME(PD_MSG_MGT_UNREGISTER);
 
         struct {
-            // TODO: Bug #273
+            //BUG #273
             u32 properties; /**< In: first eight bits is type of monitoree */
             union {
                 struct {
@@ -1221,10 +1220,11 @@ typedef struct _ocrPolicyDomainFcts_t {
  */
 typedef struct _ocrPolicyDomain_t {
 
-// CAUTION:  FIXME:  Any changes to this struct may cause problems in the symbolic constants inside
-// ss/common/include/rmd-bin-files.h.  To minimize problems, put factory first.  (The factory in turn
-// contains the pointers to the Begin and Start functions, which are the relevant data for needing
-// careful placement.  See also xe-policy.h for a third magicly placed value, packedArgsLocation).
+// Any changes to this struct may cause problems in the symbolic constants inside
+// rmd-bin-files.h (build/tg-xe or build/tg-ce). To minimize problems, put factory first.
+// (The factory in turn contains the pointers to the switchRunlevel functions, which is the relevant
+// data for needing careful placement.
+// See also xe-policy.h for a third magicly placed value, packedArgsLocation).
 
     ocrPolicyDomainFcts_t fcts;                 /**< Function pointers */
 
@@ -1288,10 +1288,11 @@ typedef struct _ocrPolicyDomain_t {
      * @todo The entire structure is only useful in the RL_CONFIG_PARSE
      * phase but part of it needs to be kept around for the shutdown
      * part. Is there a better way
+     * BUG #583
      */
     s8 phasesPerRunlevel[RL_MAX][RL_PHASE_MAX];
 
-    // TODO: What to do about this?
+    // BUG #612: Clean up scheduler interface
     ocrCost_t *costFunction; /**< Cost function used to determine
                               * what to schedule/steal/take/etc.
                               * Currently a placeholder for future
@@ -1302,7 +1303,7 @@ typedef struct _ocrPolicyDomain_t {
     u32 neighborCount;                          /**< Number of neighboring policy domains */
     u8 shutdownCode;
 
-    //FIXME: Temporary solution until we get location services. [Bug #135].
+    // BUG #135 and BUG #605: Location support
     struct _ocrPolicyDomain_t **neighborPDs;
     struct _ocrPolicyDomain_t *parentPD;
 
@@ -1348,8 +1349,6 @@ typedef struct _ocrPolicyDomainFactory_t {
      * @param costFunction        The cost function used by this policy domain
      */
 
-    // TODO: Check with Bala on this. We may not need to pass anything
-    // except the physical location of itself and its parent
     ocrPolicyDomain_t * (*instantiate) (struct _ocrPolicyDomainFactory_t *factory,
 #ifdef OCR_ENABLE_STATISTICS
                                         ocrStats_t *statsObject,

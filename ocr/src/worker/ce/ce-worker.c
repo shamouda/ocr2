@@ -146,8 +146,8 @@ bool ceIsRunningWorker(ocrWorker_t * base) {
 }
 
 void cePrintLocation(ocrWorker_t *base, char* location) {
-    // TODO This should be made more platform agnostic. When we have a better
-    // notion of location
+    // BUG #605: Make the notion of location more robust. This should be made
+    // more platform agnostic
 #ifdef HAL_FSIM_CE
     SNPRINTF(location, 32, "CE %d Block %d Unit %d", AGENT_FROM_ID(base->location),
              BLOCK_FROM_ID(base->location), UNIT_FROM_ID(base->location));

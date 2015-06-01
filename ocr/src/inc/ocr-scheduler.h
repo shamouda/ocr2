@@ -110,11 +110,6 @@ typedef struct _ocrSchedulerFcts_t {
     u8 (*switchRunlevel)(struct _ocrScheduler_t* self, struct _ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
                          phase_t phase, u32 properties, void (*callback)(struct _ocrPolicyDomain_t*, u64), u64 val);
 
-    // TODO: Check this call
-    // u8 (*yield)(struct _ocrScheduler_t *self, ocrGuid_t workerGuid,
-    //                    ocrGuid_t yieldingEdtGuid, ocrGuid_t eventToYieldForGuid,
-    //                    ocrGuid_t * returnGuid, struct _ocrPolicyCtx_t *context);
-
     /**
      * @brief Requests EDTs from this scheduler
      *
@@ -188,7 +183,7 @@ typedef struct _ocrSchedulerFcts_t {
 
     /**
      * @brief Ask the scheduler to monitor the progress of an operation
-     * TODO needs more work.
+     * BUG #131 helper-mode:
      * @param self[in]          Pointer to this scheduler
      * @param type[in]          The type of the operation
      * @param monitoree[in]     The data-structure associated with the operation

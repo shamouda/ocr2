@@ -88,7 +88,6 @@ typedef struct _ocrWorkpileFcts_t {
  *  This class provides the interface for the underlying implementation to conform.
  *  As we want to support work stealing, we current have pop, push and steal interfaces
  */
-//TODO We may be influenced by how STL resolves this issue as in push_back, push_front, pop_back, pop_front
 typedef struct _ocrWorkpile_t {
     ocrFatGuid_t fguid;
     struct _ocrPolicyDomain_t *pd;

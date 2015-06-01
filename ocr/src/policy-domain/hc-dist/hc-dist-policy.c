@@ -473,7 +473,8 @@ static void * acquireLocalDb(ocrPolicyDomain_t * pd, ocrGuid_t dbGuid, ocrDbAcce
     getCurrentEnv(NULL, NULL, &curTask, &msg);
     u32 properties = mode | DB_PROP_RT_ACQUIRE;
     if (mode == DB_MODE_RO) {
-        //BUG #587 DBX temporary to avoid interfering with the DB lock protocol
+        //BUG #607 DB RO mode: This is only used by the runtime for write-backs
+        //         and not interfere with lockable datablocks locking protocol.
         properties |= DB_PROP_RT_OBLIVIOUS;
     }
 #define PD_MSG (&msg)
@@ -496,7 +497,7 @@ static void * acquireLocalDb(ocrPolicyDomain_t * pd, ocrGuid_t dbGuid, ocrDbAcce
 #undef PD_TYPE
 }
 
-// Might be resurrected when we finish NCR DB mode implementation
+// Might be resurrected when we finish RO DB mode implementation
 // static void releaseLocalDb(ocrPolicyDomain_t * pd, ocrGuid_t dbGuid, u64 size) {
 //     ocrTask_t *curTask = NULL;
 //     PD_MSG_STACK(msg);
@@ -535,7 +536,7 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
         // for a clone the cloning should actually be of an edt template
     }
 
-    //BUG #587 msg setup: how to double check that: msg->srcLocation has been filled by getCurrentEnv(..., &msg) ?
+    //BUG #604 msg setup: how to double check that: msg->srcLocation has been filled by getCurrentEnv(..., &msg) ?
 
     // Determine message's recipient and properties:
     // If destination is not set, check if it is a message with an affinity.
@@ -550,7 +551,7 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
     // and need to get back to it
     ocrPolicyMsg_t * originalMsg = msg;
 
-    //BUG 588: affinity: would help to have a NO_LOC default value
+    //BUG #605: Locations/affinity: would help to have a NO_LOC default value
     //The current assumption is that a locally generated message will have
     //src and dest set to the 'current' location. If the message has an affinity
     //hint, it is then used to potentially decide on a different destination.
@@ -1205,11 +1206,11 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
                 // Acquire local DB on behalf of remote release to do the writeback.
                 // Do it in OB mode so as to make sure the acquire goes through
                 // We perform the write-back and then fall-through for the actual db release.
-                //BUG #587 DBX DB_MODE_NCR is not implemented, we're converting the call to a special
+                //BUG #607 DB RO mode: Not implemented, we're converting the call to a special
                 void * localData = acquireLocalDb(self, PD_MSG_FIELD_IO(guid.guid), DB_MODE_RO);
                 ASSERT(localData != NULL);
                 hal_memCopy(localData, data, size, false);
-                // BUG #587 DBX We do not release here because we've been using this special mode to do the write back
+                //BUG #607 DB RO mode: We do not release here because we've been using this special mode to do the write back
                 // releaseLocalDb(self, PD_MSG_FIELD_IO(guid.guid), size);
             } // else fall-through and do the regular release
         }
@@ -1742,7 +1743,6 @@ u8 hcDistPdSendMessage(ocrPolicyDomain_t* self, ocrLocation_t target, ocrPolicyM
     ASSERT(((s32)target) > -1);
     ASSERT(message->srcLocation == self->myLocation);
     ASSERT(message->destLocation != self->myLocation);
-
     u32 id = worker->seqId;
     u8 ret = self->commApis[id]->fcts.sendMessage(self->commApis[id], target, message, handle, properties);
     return ret;

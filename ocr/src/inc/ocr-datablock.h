@@ -208,7 +208,7 @@ typedef struct _ocrDataBlock_t {
 
 // Runtime DB properties (upper 16 bits of a u32)
 #define DB_PROP_RT_ACQUIRE     0x10000 // DB acquired by runtime
-#define DB_PROP_RT_OBLIVIOUS   0x20000 // TODO DBX Runtime acquires local DB, write and do not release
+#define DB_PROP_RT_OBLIVIOUS   0x20000 //BUG #607 DB RO mode: (Flag is for runtime use)
 
 #define DB_FLAG_RT_FETCH       0x100000
 #define DB_FLAG_RT_WRITE_BACK  0x200000

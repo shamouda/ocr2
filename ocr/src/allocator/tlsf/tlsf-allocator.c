@@ -181,11 +181,6 @@
 //     tlsfFinish: All agents count down the useCount1.  Non-anchor agents are then done.  The anchor has to
 //     wait for that counter to reach zero, and then it calls finish on the mem-target.
 //
-//     tlsfDestruct:  TODO!
-//
-//     The wait operations are presently implemented as while loop spins.  This might be really rotten
-//     on FSIM, wasting lots of simulation time; and on real hardware it would waste power.  Therefore,
-//     this is a FIXME!  Team advice solicited:  how should this be done?
 //
 
 #include "ocr-config.h"
@@ -1166,11 +1161,6 @@ static u32 tlsfInit(poolHdr_t * pPool, u64 size) {
     return 0;
 }
 
-//static u32 tlsfResize(u64 pgStart, u64 newsize) {
-//    return -1;
-//    // TODO: Not implemented yet
-//}
-
 void tlsf_walk_heap(poolHdr_t * pPool/*, tlsf_walkerAction action, void* extra*/);
 static blkPayload_t * tlsfMalloc(poolHdr_t * pPool, u64 size)
 {
@@ -1295,9 +1285,7 @@ static blkPayload_t * tlsfRealloc(poolHdr_t * pPool, blkPayload_t * pOldBlkPaylo
     defined(ENABLE_ALLOCATOR_INIT_NEW_DB_PAYLOAD) | \
     defined(ENABLE_ALLOCATOR_TRASH_FREED_DB_PAYLOAD) | \
     defined(ENABLE_ALLOCATOR_LEAK_FREED_DATABLOCKS)
-    // TODO:  At such time as this function is enabled for usage, deal with setting/checking checksums
-    // and with the other ENABLE_ALLOCATOR... flags.  E.g., if the LEAK and the TRASH flags are set, it
-    // would probably be appropriat to always do the realloc as a copy operation, and trash the old block
+    // BUG #598: Deal with this when we use realloc more
     static int warningGiven = 0;
     if (warningGiven == 0) {
         DPRINTF(DEBUG_LVL_WARN, "tlsfRealloc:  allocator checksuming, leaking, and/or payload [re]initing not implemented.\n");
@@ -1369,7 +1357,8 @@ static blkPayload_t * tlsfRealloc(poolHdr_t * pPool, blkPayload_t * pOldBlkPaylo
 }
 
 static ocrAllocator_t * getAnchorCE (ocrAllocator_t * self) {
-// TODO:  given the address of this agent's ocrAllocator_t, this function returns the address of the
+// BUG #599
+// Given the address of this agent's ocrAllocator_t, this function returns the address of the
 // same struct in the "anchor" agent.  ("Anchor" means the "zeroeth" agent of as far out the hierarchy
 // as required.  E.g., for an L4 (shared by all blocks on a chip), the anchor is the CE of Block 0,
 // Unit 0, Chip 0, current Board, current Rack, current Chassis, ....
@@ -1417,37 +1406,6 @@ static ocrAllocator_t * getAnchorCE (ocrAllocator_t * self) {
 #endif
     return anchorCE;
 }
-
-// =======
-// void tlsfDestruct(ocrAllocator_t *self) {
-//         //TODO-RL pretty much all other module depend on this
-//         //being the last thing destroyed.
-//         CHECK_AND_SET_MODULE_STATE(TLSF-ALLOCATOR, self, FINISH);
-//         int i;
-//         ocrAllocatorTlsf_t *rself = (ocrAllocatorTlsf_t*)self;
-//         RESULT_ASSERT(rself->base.memories[0]->fcts.tag(
-//             rself->base.memories[0], rself->poolStorageAddr, rself->poolStorageSize + rself->poolStorageAddr,
-//             USER_FREE_TAG), ==, 0);
-//         u64 poolAddr = rself->poolAddr - (((u64) rself->sliceCount)*((u64) rself->sliceSize));
-//         for (i = 0; i < rself->sliceCount; i++) {
-//     #ifdef ENABLE_VALGRIND
-//             VALGRIND_DESTROY_MEMPOOL(poolAddr);
-//             VALGRIND_MAKE_MEM_DEFINED(poolAddr, rself->sliceSize);
-//     #endif
-//             poolAddr += rself->sliceSize;
-//         }
-
-//     #ifdef ENABLE_VALGRIND
-//         VALGRIND_DESTROY_MEMPOOL(poolAddr);
-//         VALGRIND_MAKE_MEM_DEFINED(poolAddr, rself->poolSize);
-//     #endif
-
-//     if(self->memoryCount) {
-//         self->memories[0]->fcts.destruct(self->memories[0]);
-//         // TODO: Should we do this? It is the clean thing to do but may
-//         // cause mismatch between way it was created and freed
-//         runtimeChunkFree((u64)self->memories, NULL);
-// >>>>>>> Runlevel experimentations (WIP)
 
 void tlsfDestruct(ocrAllocator_t *self) {
     DPRINTF(DEBUG_LVL_INFO, "Entered tlsfDesctruct on allocator 0x%lx\n", (u64) self);
@@ -1601,7 +1559,7 @@ u8 tlsfSwitchRunlevel(ocrAllocator_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t
             // tear-down
             if(rself->initAttributed == (u64)rself && RL_IS_LAST_PHASE_DOWN(PD, RL_MEMORY_OK, phase)) {
 #ifdef OCR_ENABLE_STATISTICS
-                //TODO:  Should this be done by non-anchor agents too?
+                // BUG #225: Statistics framework; should this be done by non-anchor agents as well?
                 statsALLOCATOR_STOP(self->pd, self->guid, self, self->memories[0]->guid, self->memories[0]);
 #endif
                 RESULT_ASSERT(rself->base.memories[0]->fcts.tag(

@@ -50,7 +50,7 @@ typedef struct _tagNode_t {
 
 typedef struct _tagHead_t {
     u32 headIdx; /**< Index of the first element of tag-list in the tag array (0 == invalid) */
-    // TODO: See if useful to introduce finer-grain locking. Bug #499
+    // BUG #499: See if useful to introduce finer-grain locking
     //volatile u32 lock; /**< Local lock on the tag-list */
 } tagHead_t;
 
@@ -66,9 +66,9 @@ typedef struct _rangeTracker_t {
     tagNode_t *tags; /**< Tags in this range */
     tagHead_t heads[MAX_TAG]; /**< Heads to the linked-lists stored in tags */
 
-    // TODO: For the lock, would be better to move to a reader-writer lock
+    // BUG #499: For the lock, would be better to move to a reader-writer lock
     volatile u32 lock; /**< Lock protecting range */
-    volatile u32 lockChunkAndTag;    // TODO move this to ocrMemPlatformFsim_t. Bug #497
+    volatile u32 lockChunkAndTag;    // BUG #497: move this to ocrMemPlatformFsim_t
 } rangeTracker_t;
 
 

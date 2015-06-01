@@ -125,26 +125,6 @@ extern void (*bootUpAbort)();
  */
 extern void (*bootUpPrint)(const char* str, u64 length);
 
-/**
- * @brief Function called to temporarily set the answer of getCurrentPD and
- * to something sane when the workers have not
- * yet been brought up
- *
- * This order of boot-up is as follows:
- *     - Bring up the factories needed to build a policy domain
- *     - Bring up a GUID provider
- *     - Build a policy domain (the root one)
- *     - Call setBootPD
- *     - Bring up all other instances and do any mapping needed
- *     - Call setIdentifyingFunctions on the comp platform factory to reset
- *       the getCurrentPD etc properly
- *
- * @param domain    Domain to use as the boot PD
- * @return nothing
- */
-// TODO: This may no longer be needed
-//extern void (*setBootPD)(struct _ocrPolicyDomain_t* domain);
-
 #ifdef ENABLE_BUILDER_ONLY
 extern void* (*getFuncAddr)(const char* funcName);
 

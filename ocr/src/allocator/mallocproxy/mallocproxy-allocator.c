@@ -189,15 +189,13 @@ void * mallocProxyReallocate(
     defined(ENABLE_ALLOCATOR_INIT_NEW_DB_PAYLOAD) | \
     defined(ENABLE_ALLOCATOR_TRASH_FREED_DB_PAYLOAD) | \
     defined(ENABLE_ALLOCATOR_LEAK_FREED_DATABLOCKS)
-    // TODO:  At such time as this function is enabled for usage, deal with setting/checking checksums
-    // and with the other ENABLE_ALLOCATOR... flags.  E.g., if the LEAK and the TRASH flags are set, it
-    // would probably be appropriat to always do the realloc as a copy operation, and trash the old block
+    // BUG #598: Re-enable this if we start using reallocate more
     static int warningGiven = 0;
     if (warningGiven == 0) {
         DPRINTF(DEBUG_LVL_WARN, "mallocProxyRealloc:  allocator checksuming, leaking, and/or payload [re]initing not implemented.\n");
         warningGiven = 1;
     }
-    #endif
+#endif
     DPRINTF(DEBUG_LVL_VERB, "mallocProxyRealloc called to resize 0x%lx\n to %ld/0x%lx\n",
         (u64) origClientPayloadAddr, (u64) size, (u64) size);
     size =
