@@ -1,0 +1,36 @@
+% This is an included file. See the master file for more information.
+%
+
+\chapter{The OCR API }
+\label{chap:OCRAPI}
+
+This chapter describes the syntax and behavior of the OCR API functions, and is divided
+into the following sections:
+\begin{itemize}
+\item The core types, macros and error codes used in OCR.
+(\specref{sec:OCRtypesmacros})
+
+\item A description of OCR main entry point: \code{mainEdt}.
+(\specref{sec:mainEDT})
+
+\item Supporting functions.
+(\specref{sec:supportFuncs})
+
+\item Functions to create, destroy, and otherwise manage the contents of OCR data blocks.
+(\specref{sec:OCRDataBlockManagement})
+
+\item Functions to manage events in OCR.
+(\specref{sec:OCREventManagement})
+
+\item Functions to create and destroy tasks in OCR.
+(\specref{sec:OCRTaskManagement})
+
+\item Functions to manage dependences between OCR objects.
+(\specref{sec:OCRDependenceManagement})
+\end{itemize}
+
+Types, constants, function prototypes and anything else required to use the
+OCR API are made available through the \code{ocr.h} include file. You do not
+need to include any other files unless using extended or experimental
+features (described in the appendices).
+% This is the end of ch2-intro.tex of the OCR specification.

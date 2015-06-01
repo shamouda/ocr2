@@ -1,0 +1,123 @@
+% This is an included file. See the master file for more information.
+%
+
+\chapter{Introduction}
+\label{chap:introduction}
+Extreme scale computers (such as proposed Exascale computers) contain
+so many components that the aggregate mean-time-between-failure (MTBF)
+is small
+compared to the runtime of an application. Programming models (and
+supporting compilers and runtime systems) must therefore support a
+variety of features unique to these machines:
+\begin{itemize}
+\item The ability for a programmer to
+express O(billion) concurrency in an application program.
+
+\item The ability of a computation to make progress towards a useful
+result even as components within the system fail.
+
+\item The ability of a computation to dynamically adapt to a high
+degree of variability in the performance and energy consumption of
+system components to support efficient execution.
+
+\item The ability to either hide overheads behind useful computation
+or have overheads small enough to allow applications to exhibit strong
+scaling across the entire exascale system.
+
+\end{itemize}
+
+There are a number of active research projects to develop runtime systems
+for extreme scale computers. This specification describes one of
+these research runtime systems: the \emph{Open Community Runtime} or \emph{OCR}.
+
+The fundamental idea behind OCR is to consider a computation as a
+dynamically generated directed acyclic graph (DAG) \index{DAG}~\cite{
+TaSa11,Tasirlar11,Zuckerman:2011:UCP:2000417.2000424} of tasks
+operating on relocatable blocks of data (which we call data blocks in
+OCR). Task execution is managed by events.
+When the data blocks and events a task depends upon are satisfied, the
+preconditions for the execution of the task~\cite{SSWS13} are met and the
+task will, at some later point, run on the system. OCR tasks are
+\emph{non-blocking}\index{Non-blocking}. This means that once all
+preconditions of a task have been met, the task will eventually run to completion
+regardless of the behavior of any other tasks or events.
+
+Representing a computation in terms of an event-driven DAG of tasks
+decouples the work of a computation
+from the ``Units of execution'' that carry out the computation. The work
+of a computation is virtualized giving OCR the flexibility to relocate tasks and data
+to respond to failures in the system~\cite{Vrvilo14}, achieve a better balance of load
+among the processing elements of the computer, or to optimize memory
+and energy consumption~\cite{GZCS10,Guo10,CTBCCGYS13,SbBS14}.
+
+Representing the data in terms of data-blocks similarly
+decouples the data in a computation from the computer's memory subsystem.
+This supports transparent placement and dynamic migration of data
+across hardware resources.
+
+OCR is a low level runtime system designed to map onto a wide range of scalable
+computer systems.
+It provides the capabilities needed to support a wide range of programming models
+including data-flow (when events are associated with data blocks),
+fork-join (when events enable the execution of post-join
+continuations), bulk-synchronous processing (when event trees can be
+used to build scalable barriers and collective operations), and
+combinations thereof. While some programmers will choose to program directly
+at the level of the OCR API, we expect most will use higher level
+programming environments that map onto OCR; hence why we describe OCR as a
+runtime system rather than an application level programming environment.
+
+\section{Scope}
+\label{sec:Scope}
+
+OCR is a vehicle to support research on programming models and
+runtime systems for extreme scale
+computers~\cite{ExascaleSoftwareStudy2009,SaHS10}. This specification
+defines the state of OCR at a fixed point in its development. There
+are several limitations in OCR that will be addressed as it continues to
+mature.
+
+OCR is a runtime system and collection of low level Application
+Programming Interfaces (APIs). While some programmers will directly
+work with the APIs defined by OCR, the most common use of OCR will be
+to support higher level programming models. Therefore, OCR lacks high
+level constructs familiar to traditional parallel programmers such as
+\code{reductions} and \code{parallel for}\footnote{Reductions can be
+supported in OCR using an accumulator/reducer
+approach~\cite{Frigo:2009:ROC:1583991.1584017,SCZS13} and
+\code{parallel for} can be supported in OCR
+using a fork-join decomposition similar to the cilk\_for construct.}.
+
+All parallelism must be specified explicitly in OCR; OCR does not
+extract the concurrency in a program on behalf of a programmer. The
+OCR execution model is a low level model; abstract enough to support
+relocation of tasks and data to support resiliency or to minimize the
+energy consumed by a computation, but low level enough to cleanly map
+onto the hardware of extreme scale computers.
+
+OCR is designed to handle dynamic task driven algorithms expressed in
+terms of a directed acyclic graph (DAG). In an OCR DAG, each node is
+visited only once. This makes irregular problems based on dynamic
+graphs easier to express. However, it means that OCR may be less
+effective for regular problems that benefit from static load balancing
+or for problems that depend on iteration over regular control
+structures.
+
+OCR is defined in terms of a C library. Programs written in any
+language that includes an interface to C should be able to work with
+OCR.
+
+OCR tasks are expressed as event driven tasks (EDTs).
+The overheads associated with OCR API calls depend on the underlying
+system software and hardware. On current systems, the overhead of
+creating and scheduling an event driven task can be fairly high.
+On system with hardware support for task queues, the
+overheads can be significantly lower. An OCR programmer should experiment with their
+implementation of OCR to understand the overheads associated with managing EDTs and
+assure that the work per EDT is great enough to offset OCR overheads.
+
+OCR is currently a research runtime system, developed as an
+open-source community project. It does not as yet have the level of
+investment needed to develop a production system that can be used for
+serious application deployment.
+% This is the end of ch1-intro.tex of the OCR specification.

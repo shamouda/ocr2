@@ -1,0 +1,38 @@
+This example illustrates the most basic OCR program: a single function
+that prints the message ``Hello World!'' on the screen and exits.
+%%%%
+\subsection{Code example}
+The following code will print the string ``Hello World!'' to the
+standard output and exit. Note that this program is fully functional
+(ie: there is no need for a \texttt{main} function).
+
+\begin{ocrsnip}
+#include <ocr.h> (@ \label{line:HW_include} @)
+
+ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) { (@ \label{line:HW_mainEdt} @)
+    PRINTF('Hello World!\n'); (@ \label{line:HW_printf}@)
+    ocrShutdown(); (@ \label{line:HW_shutdown}@)
+    return NULL_GUID;
+}
+\end{ocrsnip}
+%%%
+\subsubsection{Details}
+The \texttt{ocr.h} file included on Line~\ref{line:HW_include}
+contains all of the main OCR APIs. Other more experimental or extended
+APIs are also located in the \texttt{extensions/} folder of the
+include directory.
+
+EDT's signature is shown on Line~\ref{line:HW_mainEdt}. A special EDT,
+named \texttt{mainEdt} is called by the runtime if the programmer does not
+provide a \texttt{main} function\footnote{Note that if the programmer
+  \emph{does} provide a \texttt{main} function, it is the
+  responsability of the programmer to properly initialize the runtime,
+  call the first EDT to execute and properly shutdown the runtime. This
+  method is detailed in TODO and is not recommended as it is not
+  platform portable.}.
+
+The \texttt{ocrShutdown} function called on
+Line~\ref{line:HW_shutdown} should be called once and only once by all
+OCR programs to indicate that the program has terminated. The runtime
+will then shutdown and any non-executed EDTs at that time are not
+guaranteed to execute.

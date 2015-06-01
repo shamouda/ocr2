@@ -1,0 +1,11 @@
+*.aux
+*.bbl
+*.blg
+*.brf
+*.idx
+*.ilg
+*.ind
+*.log
+*.out
+*.toc
+auto/

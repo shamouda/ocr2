@@ -1,0 +1,114 @@
+This example illustrates the creation of a fork-join pattern in OCR.
+
+%%%%
+\subsection{Code example}
+\begin{ocrsnip}
+/* Example of a "fork-join" pattern in OCR
+ *
+ * Implements the following dependence graph:
+ *
+ *   mainEdt
+ *   /    \
+ * fun1   fun2
+ *   \    /
+ * shutdownEdt
+ *
+ */
+
+#include "ocr.h"  (@ \label{line:FJ_include} @)
+
+ocrGuid_t fun1(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
+    int* k;
+    ocrGuid_t db_guid;
+    ocrDbCreate(&db_guid,(void **) &k, sizeof(int), 0, NULL_GUID, NO_ALLOC); (@ \label{line:FJ_db1}@)
+    k[0]=1; (@ \label{line:FJ_k1}@)
+    PRINTF("Hello from fun1, sending k = %lu\n",*k);
+    return db_guid; (@ \label{line:FJ_retDB1}@)
+}
+
+ocrGuid_t fun2(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
+    int* k;
+    ocrGuid_t db_guid;
+    ocrDbCreate(&db_guid,(void **) &k, sizeof(int), 0, NULL_GUID, NO_ALLOC); (@ \label{line:FJ_db2}@)
+    k[0]=2; (@ \label{line:FJ_k2}@)
+    PRINTF("Hello from fun2, sending k = %lu\n",*k);
+    return db_guid; (@ \label{line:FJ_retDB2}@)
+}
+
+ocrGuid_t shutdownEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) { (@ \label{line:FJ_shutdown}@)
+    PRINTF("Hello from shutdownEdt\n");
+    int* data1 = (int*) depv[0].ptr;
+    int* data2 = (int*) depv[1].ptr;
+    PRINTF("Received data1 = %lu, data2 = %lu\n", *data1, *data2);
+    ocrDbDestroy(depv[0].guid);
+    ocrDbDestroy(depv[1].guid);
+    ocrShutdown();
+    return NULL_GUID;
+}
+
+ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) { (@ \label{line:FJ_mainEdt} @)
+    PRINTF("Starting mainEdt\n");
+    ocrGuid_t edt1_template, edt2_template, edt3_template;
+    ocrGuid_t edt1, edt2, edt3, outputEvent1, outputEvent2;
+
+    //Create templates for the EDTs
+    ocrEdtTemplateCreate(&edt1_template, fun1, 0, 1); (@ \label{line:FJ_edtTemplt1} @)
+    ocrEdtTemplateCreate(&edt2_template, fun2, 0, 1); (@ \label{line:FJ_edtTemplt2} @)
+    ocrEdtTemplateCreate(&edt3_template, shutdownEdt, 0, 2);  (@ \label{line:FJ_edtTemplt3} @)
+
+    //Create the EDTs
+    ocrEdtCreate(&edt1, edt1_template, EDT_PARAM_DEF, NULL, EDT_PARAM_DEF, NULL, EDT_PROP_NONE, NULL_GUID, &outputEvent1); (@ \label{line:FJ_edt1} @)
+    ocrEdtCreate(&edt2, edt2_template, EDT_PARAM_DEF, NULL, EDT_PARAM_DEF, NULL, EDT_PROP_NONE, NULL_GUID, &outputEvent2); (@ \label{line:FJ_edt2} @)
+    ocrEdtCreate(&edt3, edt3_template, EDT_PARAM_DEF, NULL, 2, NULL, EDT_PROP_NONE, NULL_GUID, NULL); (@ \label{line:FJ_edt3} @)
+
+    //Setup dependences for the shutdown EDT
+    ocrAddDependence(outputEvent1, edt3, 0, DB_MODE_CONST); (@ \label{line:FJ_edt3Dep1} @)
+    ocrAddDependence(outputEvent2, edt3, 1, DB_MODE_CONST); (@ \label{line:FJ_edt3Dep2} @)
+
+    //Start execution of the parallel EDTs
+    ocrAddDependence(NULL_GUID, edt1, 0, DB_DEFAULT_MODE); (@ \label{line:FJ_edt1start} @)
+    ocrAddDependence(NULL_GUID, edt2, 0, DB_DEFAULT_MODE); (@ \label{line:FJ_edt2start} @)
+    return NULL_GUID;
+}
+\end{ocrsnip}
+%%%
+\subsubsection{Details}
+
+%%%%
+The \texttt{ocr.h} file included on Line~\ref{line:FJ_include}
+contains all of the main OCR APIs. The \texttt{mainEdt} is
+shown on Line~\ref{line:FJ_mainEdt}. It is called by the runtime
+as a \texttt{main} function is not provided
+(more details in \texttt{hello.c}).
+
+The \texttt{mainEdt} creates three templates (Lines~\ref{line:FJ_edtTemplt1}, ~\ref{line:FJ_edtTemplt2}
+and ~\ref{line:FJ_edtTemplt3}), respectively for three different EDTs
+(Lines~\ref{line:FJ_edt1}, ~\ref{line:FJ_edt2} and ~\ref{line:FJ_edt3}).
+An EDT is created as an instance of an EDT template.
+This template stores metadata about EDT,
+optionally defines the number of dependences and parameters used when
+creating an instance of an EDT, and is a container for the function
+that will be executed by an EDT. This function is called the EDT function.
+For the EDTs, \texttt{edt1}, \texttt{edt2} and \texttt{edt3}, the EDT functions
+are, \texttt{fun1}, \texttt{fun2} and \texttt{shutdownEdt}, respectively.
+The last parameter to \texttt{ocrEdtTemplateCreate} is the total number of
+data blocks on which the EDTs depends. The signature of EDT creation API,
+\texttt{ocrEdtCreate}, is shown in Lines~\ref{line:FJ_edt1}, ~\ref{line:FJ_edt2}
+and ~\ref{line:FJ_edt3}. When \texttt{edt1} and \texttt{edt2} will complete,
+they will satisfy the output events \texttt{outputEvent1} and \texttt{outputEvent2} repectively.
+This is not required for \texttt{edt3}. However, \texttt{edt3} should execute only
+when the events \texttt{outputEvent1} and \texttt{outputEvent2} are satisfied.
+This is done by setting up dependencies on \texttt{edt3} by using the API \texttt{ocrAddDependence},
+as shown in Lines~\ref{line:FJ_edt3Dep1} and ~\ref{line:FJ_edt3Dep2}.
+This spawns \texttt{edt3} but it will not execute until both the events
+are satisfied. Finally, the EDTs \texttt{edt1} and \texttt{edt2} are
+spawned in Lines~\ref{line:FJ_edt1start} and ~\ref{line:FJ_edt2start} respectively.
+As they do not have any dependencies, they execute the associated EDT functions
+in parallel. These functions (\texttt{fun1} and \texttt{fun2}) creates
+data-blocks using the API \texttt{ocrDbCreate} (Lines~\ref{line:FJ_db1} and ~\ref{line:FJ_db2}).
+The data is written to the data-blocks and the GUID is returned (Lines~\ref{line:FJ_retDB1}
+and ~\ref{line:FJ_retDB2}). This will satisfy the events on which the \texttt{edt3}
+is waiting. The EDT function \texttt{shutdownEdt} executes
+and calls \texttt{ocrShutdown} after reading and destroying the two data-blocks.
+
+%%%%

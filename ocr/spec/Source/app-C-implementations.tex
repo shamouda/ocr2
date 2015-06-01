@@ -1,0 +1,19 @@
+% This is an included file. See the master file for more information.
+%
+
+\chapter{Implementation Notes}
+\label{chap:ImplementationNotes}
+\label{chap:Appendix C}
+This appendix contains details on the ways in which the various OCR
+reference implementations differ from the specification. This section
+will keep evolving as the implementations become more compliant.
+%%%%
+\section{General notes}
+This section describes the limitations common to all OCR
+implementations.
+%
+\paragraph*{Data block access modes}
+The data block access modes are only supported using the {\code
+  lockableDB} implementation of data blocks. The {\code regularDB}
+implementation ignores the modes. Furthermore, the read-only mode has
+not been fully tested.

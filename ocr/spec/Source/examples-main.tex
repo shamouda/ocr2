@@ -1,0 +1,31 @@
+This chapter demonstrates the use of OCR through a series of
+examples. The examples are ordered from the most basic to the most
+complicated and frequently make use of previous examples. They are
+meant to guide the reader in understanding the fundamental concepts of
+the OCR programming model and API.
+
+%%%%%
+\section{OCR's ``Hello World!''}
+% In this example:
+%   - APIs: ocrMain, ocrShutdown, PRINTF, getArgc, getArgv
+%   - Functionality: program entry point, argument passing, shutdown
+%   - Concepts: None
+\input{examples-hello.tex}
+%%%%%
+\section{Expressing a Fork-Join pattern}
+\input{examples-fork-join.tex}
+%%%%%
+\section{Expressing unstructured parallelism}
+\input{examples-task-dep.tex}
+%%%%%
+\section{Using a Finish EDT}
+\input{examples-finish.tex}
+%%%%%
+\section{Accessing a DataBlock with ``Read-Write'' Mode}
+\input{examples-db-itw.tex}
+%%%%%
+\section{Accessing a DataBlock with ``Exclusive-Write'' Mode}
+\input{examples-db-ex.tex}
+%%%%%
+\section{Acquiring contents of a DataBlock as a dependence input}
+\input{examples-db-acquire.tex}
