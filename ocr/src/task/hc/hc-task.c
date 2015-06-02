@@ -214,11 +214,14 @@ ocrTaskTemplateFactory_t * newTaskTemplateFactoryHc(ocrParamList_t* perType, u32
 
 // satisfies the incr slot of a finish latch event
 static u8 finishLatchCheckin(ocrPolicyDomain_t *pd, ocrPolicyMsg_t *msg,
-                             ocrFatGuid_t sourceEvent, ocrFatGuid_t latchEvent) {
+                             ocrFatGuid_t edtCheckin, ocrFatGuid_t sourceEvent, ocrFatGuid_t latchEvent) {
 #define PD_MSG (msg)
 #define PD_TYPE PD_MSG_DEP_SATISFY
+    //BUG #207 This is a long shot but if the latchEvent is not local (which it shouldn't)
+    //then this could be in-flight and child EDT incr/decr is seen before completion,
+    //leading to the finish scope being considered completed.
     msg->type = PD_MSG_DEP_SATISFY | PD_MSG_REQUEST;
-    PD_MSG_FIELD_I(satisfierGuid) = sourceEvent;
+    PD_MSG_FIELD_I(satisfierGuid) = edtCheckin;
     PD_MSG_FIELD_I(guid) = latchEvent;
     PD_MSG_FIELD_I(payload.guid) = NULL_GUID;
     PD_MSG_FIELD_I(payload.metaDataPtr) = NULL;
@@ -273,8 +276,6 @@ static u8 registerOnFrontier(ocrTaskHc_t *self, ocrPolicyDomain_t *pd,
 static u8 initTaskHcInternal(ocrTaskHc_t *task, ocrPolicyDomain_t * pd,
                              ocrTask_t *curTask, ocrFatGuid_t outputEvent,
                              ocrFatGuid_t parentLatch, u32 properties) {
-
-
     task->frontierSlot = 0;
     task->slotSatisfiedCount = 0;
     task->lock = 0;
@@ -295,6 +296,9 @@ static u8 initTaskHcInternal(ocrTaskHc_t *task, ocrPolicyDomain_t * pd,
     if (hasProperty(properties, EDT_PROP_FINISH)) {
         PD_MSG_STACK(msg);
         getCurrentEnv(NULL, NULL, NULL, &msg);
+        ocrFatGuid_t edtCheckin;
+        edtCheckin.guid = task->base.guid;
+        edtCheckin.metaDataPtr = task;
 #define PD_MSG (&msg)
 #define PD_TYPE PD_MSG_EVT_CREATE
         msg.type = PD_MSG_EVT_CREATE | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
@@ -315,25 +319,28 @@ static u8 initTaskHcInternal(ocrTaskHc_t *task, ocrPolicyDomain_t * pd,
             DPRINTF(DEBUG_LVL_INFO, "Checkin 0x%lx on parent flatch 0x%lx\n", task->base.guid, parentLatch.guid);
             // Check in current finish latch
             getCurrentEnv(NULL, NULL, NULL, &msg);
-            RESULT_PROPAGATE(finishLatchCheckin(pd, &msg, latchFGuid, parentLatch));
+            RESULT_PROPAGATE(finishLatchCheckin(pd, &msg, edtCheckin, latchFGuid, parentLatch));
         }
 
-        DPRINTF(DEBUG_LVL_INFO, "Checkin 0x%lx on self flatch 0x%lx\n", task->base.guid, latchFGuid.guid);
         // Check in the new finish scope
         // This will also link outputEvent to latchFGuid
         getCurrentEnv(NULL, NULL, NULL, &msg);
-        RESULT_PROPAGATE(finishLatchCheckin(pd, &msg, outputEvent, latchFGuid));
+        DPRINTF(DEBUG_LVL_INFO, "Checkin 0x%lx on self flatch 0x%lx\n", task->base.guid, latchFGuid.guid);
+        RESULT_PROPAGATE(finishLatchCheckin(pd, &msg, edtCheckin, outputEvent, latchFGuid));
         // Set edt's ELS to the new latch
         task->base.finishLatch = latchFGuid.guid;
     } else {
         // If the currently executing edt is in a finish scope,
         // but is not a finish-edt itself, just register to the scope
         if(parentLatch.guid != NULL_GUID) {
-            DPRINTF(DEBUG_LVL_INFO, "Checkin 0x%lx on current flatch 0x%lx\n", task->base.guid, parentLatch.guid);
-            // Check in current finish latch
             PD_MSG_STACK(msg);
             getCurrentEnv(NULL, NULL, NULL, &msg);
-            RESULT_PROPAGATE(finishLatchCheckin(pd, &msg, outputEvent, parentLatch));
+            DPRINTF(DEBUG_LVL_INFO, "Checkin 0x%lx on current flatch 0x%lx\n", task->base.guid, parentLatch.guid);
+            // Check in current finish latch
+            ocrFatGuid_t edtCheckin;
+            edtCheckin.guid = task->base.guid;
+            edtCheckin.metaDataPtr = task;
+            RESULT_PROPAGATE(finishLatchCheckin(pd, &msg, edtCheckin, outputEvent, parentLatch));
         }
     }
     return 0;
@@ -523,15 +530,83 @@ static u8 taskAllDepvSatisfied(ocrTask_t *self) {
 #define SLOT_SATISFIED_DB               ((u32) -3)
 
 u8 destructTaskHc(ocrTask_t* base) {
-    DO_DEBUG_TYPE(TASK, DEBUG_LVL_INFO)
-    PRINTF("EDT(INFO) [PD:0x0 W:0x0 EDT:0x0] Destroy 0x%lx\n", base->guid);
-    END_DEBUG
-    // Bug #219
-    // The above hack was added because the below causes a coredump.
-    //DPRINTF(DEBUG_LVL_INFO, "Destroy 0x%lx\n", base->guid);
+    DPRINTF(DEBUG_LVL_INFO, "Destroy EDT 0x%lx in state 0x%x outputEvent=0x%lx finishLatch=0x%lx parentLatch=0x%lx\n",
+            base->guid, base->state, base->outputEvent, base->finishLatch, base->parentLatch);
     ocrPolicyDomain_t *pd = NULL;
-    PD_MSG_STACK(msg);
-    getCurrentEnv(&pd, NULL, NULL, &msg);
+    // If we are above ALLDEPS_EDTSTATE it's hard to determine exactly
+    // what the task might be doing. For now just have a simple policy
+    // that we'll let the task run to completion
+    if (base->state < ALLDEPS_EDTSTATE) {
+        ocrTask_t * curEdt = NULL;
+        getCurrentEnv(&pd, NULL, &curEdt, NULL);
+        // Clean up output-event
+        if (base->outputEvent != NULL_GUID) {
+            PD_MSG_STACK(msg);
+            getCurrentEnv(NULL, NULL, NULL, &msg);
+#define PD_MSG (&msg)
+#define PD_TYPE PD_MSG_EVT_DESTROY
+            msg.type = PD_MSG_EVT_DESTROY | PD_MSG_REQUEST;
+            PD_MSG_FIELD_I(guid.guid) = base->outputEvent;
+            PD_MSG_FIELD_I(guid.metaDataPtr) = NULL;
+            PD_MSG_FIELD_I(currentEdt.guid) = curEdt ? curEdt->guid : NULL_GUID;
+            PD_MSG_FIELD_I(currentEdt.metaDataPtr) = curEdt;
+            PD_MSG_FIELD_I(properties) = 0;
+            u8 returnCode = pd->fcts.processMessage(pd, &msg, false);
+            ASSERT(returnCode == 0);
+#undef PD_MSG
+#undef PD_TYPE
+        }
+
+        // If this is a finish EDT and it hasn't ran yet just destroy
+        if (base->finishLatch != NULL_GUID) {
+            PD_MSG_STACK(msg);
+            getCurrentEnv(NULL, NULL, NULL, &msg);
+#define PD_MSG (&msg)
+#define PD_TYPE PD_MSG_EVT_DESTROY
+            msg.type = PD_MSG_EVT_DESTROY | PD_MSG_REQUEST;
+            PD_MSG_FIELD_I(guid.guid) = base->finishLatch;
+            PD_MSG_FIELD_I(guid.metaDataPtr) = NULL;
+            PD_MSG_FIELD_I(currentEdt.guid) = curEdt ? curEdt->guid : NULL_GUID;
+            PD_MSG_FIELD_I(currentEdt.metaDataPtr) = curEdt;
+            PD_MSG_FIELD_I(properties) = 0;
+            u8 returnCode = pd->fcts.processMessage(pd, &msg, false);
+            ASSERT(returnCode == 0);
+#undef PD_MSG
+#undef PD_TYPE
+        }
+
+        // Need to decrement the parent latch since the EDT didn't run
+        if (base->parentLatch != NULL_GUID) {
+            PD_MSG_STACK(msg);
+            getCurrentEnv(NULL, NULL, NULL, &msg);
+#define PD_MSG (&msg)
+#define PD_TYPE PD_MSG_DEP_SATISFY
+            //TODO ABA issue here if not REQ_RESP ?
+            msg.type = PD_MSG_DEP_SATISFY | PD_MSG_REQUEST;
+            // PD_MSG_FIELD_I(satisfierGuid) = {(curEdt ? curEdt->guid : NULL_GUID), curEdt};
+            PD_MSG_FIELD_I(satisfierGuid.guid) = (curEdt ? curEdt->guid : NULL_GUID);
+            PD_MSG_FIELD_I(satisfierGuid.metaDataPtr) = curEdt;
+            PD_MSG_FIELD_I(guid.guid) = base->parentLatch;
+            PD_MSG_FIELD_I(guid.metaDataPtr) = NULL;
+            PD_MSG_FIELD_I(payload.guid) = NULL_GUID;
+            PD_MSG_FIELD_I(payload.metaDataPtr) = NULL;
+            PD_MSG_FIELD_I(currentEdt.guid) = curEdt ? curEdt->guid : NULL_GUID;
+            PD_MSG_FIELD_I(currentEdt.metaDataPtr) = curEdt;
+            PD_MSG_FIELD_I(slot) = OCR_EVENT_LATCH_DECR_SLOT;
+            PD_MSG_FIELD_I(properties) = 0;
+            u8 returnCode = pd->fcts.processMessage(pd, &msg, false);
+            ASSERT(returnCode == 0);
+#undef PD_MSG
+#undef PD_TYPE
+        }
+    } else {
+        if (base->state != REAPING_EDTSTATE) {
+            DPRINTF(DEBUG_LVL_WARN, "Destroy EDT 0x%lx is potentially racing with the EDT prelude or execution\n", base->guid);
+        }
+        ASSERT((base->state == REAPING_EDTSTATE) && "EDT destruction is racing with EDT execution");
+        return OCR_EPERM;
+    }
+
 #ifdef OCR_ENABLE_STATISTICS
     {
         // Bug #225
@@ -540,10 +615,12 @@ u8 destructTaskHc(ocrTask_t* base) {
         statsEDT_DESTROY(pd, base->guid, base, base->guid, base);
     }
 #endif /* OCR_ENABLE_STATISTICS */
+    // Destroy the EDT GUID and metadata
+    PD_MSG_STACK(msg);
+    getCurrentEnv(&pd, NULL, NULL, &msg);
 #define PD_MSG (&msg)
 #define PD_TYPE PD_MSG_GUID_DESTROY
     msg.type = PD_MSG_GUID_DESTROY | PD_MSG_REQUEST;
-    // These next two statements may be not required. Just to be safe
     PD_MSG_FIELD_I(guid.guid) = base->guid;
     PD_MSG_FIELD_I(guid.metaDataPtr) = base;
     PD_MSG_FIELD_I(properties) = 1; // Free metadata
@@ -995,6 +1072,7 @@ u8 notifyDbReleaseTaskHc(ocrTask_t *base, ocrFatGuid_t db) {
 
 u8 taskExecute(ocrTask_t* base) {
     DPRINTF(DEBUG_LVL_INFO, "Execute 0x%lx paramc:%d depc:%d\n", base->guid, base->paramc, base->depc);
+    base->state = RUNNING_EDTSTATE;
     ocrTaskHc_t* derived = (ocrTaskHc_t*)base;
     // In this implementation each time a signaler has been satisfied, its guid
     // has been replaced by the db guid it has been satisfied with.
@@ -1162,7 +1240,10 @@ u8 taskExecute(ocrTask_t* base) {
     #undef PD_MSG
     #undef PD_TYPE
         }
+        // Because the output event is non-persistent it is deallocated automatically
+        base->outputEvent = NULL_GUID;
     }
+    base->state = REAPING_EDTSTATE;
     return 0;
 }
 
