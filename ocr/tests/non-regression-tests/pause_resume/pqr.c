@@ -33,7 +33,7 @@ ocrGuid_t pqrTaskA(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]){
     }
 
     //Call query
-    ocrGuid_t dbGuid = ocrQuery(OCR_QUERY_WORKPILE_EDTS, NULL_GUID, &result, &dbSize, 0);
+    ocrGuid_t dbGuid = ocrQuery(OCR_QUERY_READY_EDTS, NULL_GUID, &result, &dbSize, 0);
 
     //Get query contents from datablock.
     //This query type returns a datablock in *result containing an
@@ -72,7 +72,7 @@ ocrGuid_t pqrTaskB(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]){
     }
 
     //Call query
-    ocrGuid_t dbGuid = ocrQuery(OCR_QUERY_WORKPILE_EDTS, NULL_GUID, &result, &dbSize, 0);
+    ocrGuid_t dbGuid = ocrQuery(OCR_QUERY_READY_EDTS, NULL_GUID, &result, &dbSize, 0);
 
     //Get query contents from result datablock
     ocrGuid_t *resultEdts = (ocrGuid_t *) result;
@@ -145,13 +145,11 @@ ocrGuid_t mainEdt( u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]){
 
     ocrAddDependence(NULL_GUID, spawnerEdt, 0, DB_DEFAULT_MODE);
 
-    ocrShutdown();
     return NULL_GUID;
 
 }
 
-#endif /*ENABLE_EXTENSION_PAUSE*/
-
+#else
 ocrGuid_t mainEdt( u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]){
     //Temporary placeholder until pause/query/resume is supported
     //on distributed x86 implementations.
@@ -159,4 +157,5 @@ ocrGuid_t mainEdt( u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]){
     return NULL_GUID;
 }
 
+#endif /*ENABLE_EXTENSION_PAUSE*/
 
