@@ -19,8 +19,7 @@
 #include "ce-comm-platform.h"
 
 #include "mmio-table.h"
-#include "rmd-arch.h"
-#include "rmd-map.h"
+#include "xstg-map.h"
 #include "rmd-msg-queue.h"
 #include "rmd-mmio.h"
 
@@ -88,6 +87,7 @@ u8 ceCommDestructCEMessage(ocrCommPlatform_t *self, ocrPolicyMsg_t *msg);
 u8 ceCommCheckSeqIdRecv(ocrCommPlatform_t *self, ocrPolicyMsg_t *msg);
 
 u64 parentOf(u64 location) {
+#if 0
     // XE's parent is its CE
     if ((location & ID_AGENT_CE) != ID_AGENT_CE)
         return ((location & ~ID_AGENT_MASK ) | ID_AGENT_CE);
@@ -95,6 +95,7 @@ u64 parentOf(u64 location) {
         return (location & ~ID_BLOCK_MASK);
     else if (UNIT_FROM_ID(location)) // Non-zero unit has zero unit & zero block as parent
         return (location & ~ID_UNIT_MASK);
+#endif
     return location;
 }
 
@@ -142,12 +143,14 @@ u8 ceCommSwitchRunlevel(ocrCommPlatform_t *self, ocrPolicyDomain_t *PD, ocrRunle
             for(i = 0; i<PD->neighborCount; i++) {
                 u64 target = PD->neighbors[i] & 0xFFFFFFFF;
                 if(PD->myLocation == parentOf(target)) {
+#if 0
                     u64 *rmbox = (u64 *) (DR_CE_BASE(CHIP_FROM_ID(target),
                                       UNIT_FROM_ID(target), BLOCK_FROM_ID(target))
                                       + (u64)(msgAddresses));
                     while((*(volatile u64 *)(&rmbox[3])) != 0xfeedf00d) hal_pause();
                     ASSERT(rmbox[3] == 0xfeedf00d);
                     *(volatile u64 *)&rmbox[3] = 0;
+#endif
                 }
             }
 
@@ -224,7 +227,7 @@ void ceCommsInit(ocrCommPlatform_t * commPlatform, ocrPolicyDomain_t * PD) {
     // Zero-out our stage for receiving messages
     //for(i=MSG_QUEUE_OFFT; i<(MAX_NUM_XE * MSG_QUEUE_SIZE); i += sizeof(u64))
     //    *(volatile u64 *)i = 0;
-
+#if 0
     // Fill-in location tuples: ours and our parent's (the CE in FSIM)
     PD->myLocation = (ocrLocation_t)rmd_ld64(CE_MSR_BASE + CORE_LOCATION * sizeof(u64));
     commPlatform->location = PD->myLocation;
@@ -252,6 +255,7 @@ void ceCommsInit(ocrCommPlatform_t * commPlatform, ocrPolicyDomain_t * PD) {
 
     // Statically check stage area is big enough for 1 policy message + F/E word
     COMPILE_TIME_ASSERT(MSG_QUEUE_SIZE >= (sizeof(u64) + sizeof(ocrPolicyMsg_t)));
+#endif
 }
 
 u8 ceCommSendMessageToCE(ocrCommPlatform_t *self, ocrLocation_t target,
@@ -265,7 +269,7 @@ u8 ceCommSendMessageToCE(ocrCommPlatform_t *self, ocrLocation_t target,
     if(msgId==0xace00000000)
         msgId |= (self->location & 0xFF)<<16; // Embed the src location onto msgId
     ASSERT(self->location != target);
-
+#if 0
     if(sendBuf.type) {
         // Check if remote target is already dead
         u64 *rmbox = (u64 *) (DR_CE_BASE(CHIP_FROM_ID(sendBuf.destLocation),
@@ -321,6 +325,7 @@ u8 ceCommSendMessageToCE(ocrCommPlatform_t *self, ocrLocation_t target,
         return 1;                        // otherwise, retry send
     }
     DPRINTF(DEBUG_LVL_VVERB, "Sent msg %lx type %lx; (%lx->%lx)\n", message->msgId, message->type, self->location, target);
+#endif
     return 0;
 }
 
@@ -574,12 +579,13 @@ u8 ceCommDestructMessage(ocrCommPlatform_t *self, ocrPolicyMsg_t *msg) {
 
     // Advance queue for next time
     cp->pollq = (cp->pollq + 1) % MAX_NUM_XE;
-
+#if 0
     {
         // Clear the XE pipeline clock gate while preserving other bits.
         u64 state = rmd_ld64(XE_MSR_BASE(n) + (FUB_CLOCK_CTL * sizeof(u64)));
         rmd_st64_async( XE_MSR_BASE(n) + (FUB_CLOCK_CTL * sizeof(u64)), state & ~0x10000000ULL );
     }
+#endif
 
     return 0;
 }

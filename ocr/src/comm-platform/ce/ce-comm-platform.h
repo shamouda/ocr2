@@ -18,7 +18,7 @@
 #include "ocr-types.h"
 #include "utils/ocr-utils.h"
 
-#include "rmd-arch.h"
+#include "xstg-arch.h"
 
 typedef struct {
     ocrCommPlatformFactory_t base;

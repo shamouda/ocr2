@@ -18,9 +18,9 @@
 #include "xe-comm-platform.h"
 
 #include "xe-abi.h"
-#include "mmio-table.h"
-#include "rmd-arch.h"
-#include "rmd-map.h"
+//#include "mmio-table.h"
+#include "xstg-arch.h"
+#include "xstg-map.h"
 #include "rmd-msg-queue.h"
 
 #define DEBUG_TYPE COMM_PLATFORM
@@ -82,8 +82,8 @@ void xeCommDestruct (ocrCommPlatform_t * base) {
 void xeCommBegin(ocrCommPlatform_t * commPlatform, ocrPolicyDomain_t * PD) {
 
     ASSERT(commPlatform != NULL && PD != NULL);
-
-#ifndef ENABLE_BUILDER_ONLY
+#if 0
+//#ifndef ENABLE_BUILDER_ONLY
     u64 i;
     ocrCommPlatformXe_t * cp = (ocrCommPlatformXe_t *)commPlatform;
 
@@ -167,7 +167,7 @@ u8 xeCommSendMessage(ocrCommPlatform_t *self, ocrLocation_t target,
 
 #ifndef ENABLE_BUILDER_ONLY
     // Statically check stage area is big enough for 1 policy message
-    COMPILE_TIME_ASSERT(sizeof(ocrPolicyMsg_t) < (MSG_QUEUE_SIZE + sizeof(u64)));
+//    COMPILE_TIME_ASSERT(sizeof(ocrPolicyMsg_t) < (MSG_QUEUE_SIZE + sizeof(u64)));
 
     ASSERT(self != NULL);
     ASSERT(message != NULL && message->bufferSize != 0);
