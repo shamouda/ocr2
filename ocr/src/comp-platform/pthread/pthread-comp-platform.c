@@ -68,17 +68,13 @@ static void * pthreadRoutineWrapper(void * arg) {
     // Wrapper routine to allow initialization of local storage
     // before entering the worker routine.
     perThreadStorage_t *data = (perThreadStorage_t*)malloc(sizeof(perThreadStorage_t));
-    // This should be superfluous (done in hc-worker in hcRunWorker
-    /*
-    data->pd = pthreadCompPlatform->base.pd;
-    data->worker = pthreadCompPlatform->base.worker;
-    */
     RESULT_ASSERT(pthread_setspecific(selfKey, data), ==, 0);
 
 #ifdef OCR_RUNTIME_PROFILER
     _profilerData *d = (_profilerData*)malloc(sizeof(_profilerData));
     char buffer[50];
-    snprintf(buffer, 50, "profiler_%lx-%lx", data->pd->myLocation, (u64)arg);
+    snprintf(buffer, 50, "profiler_%lx-%lx",
+                 ((ocrPolicyDomain_t *)(pthreadCompPlatform->base.pd))->myLocation, (u64)arg);
     d->output = fopen(buffer, "w");
     ASSERT(d->output);
     RESULT_ASSERT(pthread_setspecific(_profilerThreadData, d), ==, 0);
