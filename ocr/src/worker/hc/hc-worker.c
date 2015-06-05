@@ -17,7 +17,6 @@
 #include "ocr-worker.h"
 #include "worker/hc/hc-worker.h"
 #include "policy-domain/hc/hc-policy.h"
-#include "workpile/hc/hc-workpile.h"
 
 #include "experimental/ocr-placer.h"
 #include "extensions/ocr-affinity.h"
@@ -436,56 +435,6 @@ void initializeWorkerHc(ocrWorkerFactory_t * factory, ocrWorker_t* self, ocrPara
     ocrWorkerHc_t * workerHc = (ocrWorkerHc_t*) self;
     workerHc->hcType = HC_WORKER_COMP;
     workerHc->legacySecondStart = false;
-}
-
-//return guid of next EDT on specified worker's workpile
-ocrGuid_t hcDumpNextEdt(ocrWorker_t *worker, u32 *size){
-    ocrPolicyDomain_t *pd = worker->pd;
-    ocrWorkpileHc_t *workpile = (ocrWorkpileHc_t *)pd->schedulers[0]->workpiles[worker->seqId];
-    ocrTask_t *curTask = NULL;
-
-    u32 head = (workpile->deque->head%INIT_DEQUE_CAPACITY);
-    u32 tail = (workpile->deque->tail%INIT_DEQUE_CAPACITY);
-    u32 workpileSize = tail-head;
-
-    if(workpileSize > 0){
-
-        PD_MSG_STACK(msg);
-        getCurrentEnv(NULL, NULL, NULL, &msg);
-        ocrFatGuid_t fguid;
-        fguid.guid = (ocrGuid_t)workpile->deque->data[tail-1];
-        fguid.metaDataPtr = NULL;
-
-    #define PD_MSG (&msg)
-    #define PD_TYPE PD_MSG_GUID_INFO
-        msg.type = PD_MSG_GUID_INFO | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
-        PD_MSG_FIELD_IO(guid.guid) = fguid.guid;
-        PD_MSG_FIELD_IO(guid.metaDataPtr) = fguid.metaDataPtr;
-        PD_MSG_FIELD_I(properties) = RMETA_GUIDPROP | KIND_GUIDPROP;
-        RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, true));
-        ocrGuidKind msgKind = PD_MSG_FIELD_O(kind);
-        curTask = (ocrTask_t *)PD_MSG_FIELD_IO(guid.metaDataPtr);
-    #undef PD_MSG
-    #undef PD_TYPE
-
-        if(msgKind != OCR_GUID_EDT){
-            PRINTF("\nNon-EDT guid type return from GUID_INFO message - Kind: %d\n", msgKind);
-            return NULL_GUID;
-
-        }else if(curTask != NULL){
-            //One queried task per worker (next EDT guid)
-            *size = 1;
-
-            return curTask->guid;
-        }
-
-    }else{
-        //One queried task per worker (next EDT guid)
-        *size = 1;
-
-        return NULL_GUID;
-    }
-    return NULL_GUID;
 }
 
 /******************************************************/

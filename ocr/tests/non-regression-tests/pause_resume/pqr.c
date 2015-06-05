@@ -33,7 +33,7 @@ ocrGuid_t pqrTaskA(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]){
     }
 
     //Call query
-    ocrGuid_t dbGuid = ocrQuery(OCR_QUERY_WORKPILE_EDTS, NULL_GUID, &result, &dbSize, 0);
+    ocrGuid_t dbGuid = ocrQuery(OCR_QUERY_NEXT_EDTS, NULL_GUID, &result, &dbSize, 0);
 
     //Get query contents from datablock.
     //This query type returns a datablock in *result containing an
@@ -72,7 +72,7 @@ ocrGuid_t pqrTaskB(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]){
     }
 
     //Call query
-    ocrGuid_t dbGuid = ocrQuery(OCR_QUERY_WORKPILE_EDTS, NULL_GUID, &result, &dbSize, 0);
+    ocrGuid_t dbGuid = ocrQuery(OCR_QUERY_NEXT_EDTS, NULL_GUID, &result, &dbSize, 0);
 
     //Get query contents from result datablock
     ocrGuid_t *resultEdts = (ocrGuid_t *) result;

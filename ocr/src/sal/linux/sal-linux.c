@@ -1,12 +1,15 @@
+/*
+ * This file is subject to the license agreement located in the file LICENSE
+ * and cannot be distributed without it. This notice cannot be
+ * removed or modified.
+ */
+
+
 #include "ocr-config.h"
 #ifdef ENABLE_POLICY_DOMAIN_HC
 
-#include "ocr-hal.h"
-#include "ocr-types.h"
 #include <signal.h>
-#include "policy-domain/hc/hc-policy.h"
-#include "comp-platform/pthread/pthread-comp-platform.h"
-#include "ocr-policy-domain.h"
+#include "utils/pqr-utils.h"
 
 /* NOTE: Below is an optional interface allowing users to
  *       send SIGUSR1 and SIGUSR2 to control pause/query/resume
@@ -90,7 +93,7 @@ ocrGuid_t salQuery(ocrQueryType_t query, ocrGuid_t guid, void **result, u32 *siz
         return NULL_GUID;
 
     switch(query){
-        case OCR_QUERY_WORKPILE_EDTS:
+        case OCR_QUERY_NEXT_EDTS:
             dataDb = hcQueryNextEdts(self, result, size);
             *size = (*size)*sizeof(ocrGuid_t);
             break;
@@ -98,7 +101,9 @@ ocrGuid_t salQuery(ocrQueryType_t query, ocrGuid_t guid, void **result, u32 *siz
         case OCR_QUERY_EVENTS:
             break;
 
-        case OCR_QUERY_DATABLOCKS:
+        case OCR_QUERY_PREV_DATABLOCK:
+            dataDb = hcQueryPreviousDatablock(self, result, size);
+            *size = (*size)*(sizeof(ocrGuid_t));
             break;
 
         case OCR_QUERY_ALL_EDTS:

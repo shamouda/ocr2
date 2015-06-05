@@ -45,8 +45,6 @@ typedef struct {
     u8 legacySecondStart;
 } ocrWorkerHc_t;
 
-ocrGuid_t hcDumpNextEdt(ocrWorker_t *worker, u32 *wrkrSize);
-
 ocrWorkerFactory_t* newOcrWorkerFactoryHc(ocrParamList_t *perType);
 
 #endif /* ENABLE_WORKER_HC */

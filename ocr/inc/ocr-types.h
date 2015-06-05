@@ -353,9 +353,9 @@ typedef struct {
  *
  */
 typedef enum {
-    OCR_QUERY_WORKPILE_EDTS,
+    OCR_QUERY_NEXT_EDTS,
     OCR_QUERY_EVENTS,
-    OCR_QUERY_DATABLOCKS,
+    OCR_QUERY_PREV_DATABLOCK,
     OCR_QUERY_ALL_EDTS,
 } ocrQueryType_t;
 
