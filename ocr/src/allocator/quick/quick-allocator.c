@@ -141,7 +141,7 @@
 #include "allocator/allocator-all.h"
 #include "ocr-mem-platform.h"
 #ifdef HAL_FSIM_CE
-#include "rmd-map.h"
+#include "xstg-map.h"
 #endif
 #endif
 

@@ -18,7 +18,7 @@
 #include "worker/ce/ce-worker.h"
 
 #ifdef HAL_FSIM_CE
-#include "rmd-map.h"
+#include "xstg-map.h"
 #endif
 
 #ifdef OCR_ENABLE_STATISTICS
@@ -150,7 +150,7 @@ void cePrintLocation(ocrWorker_t *base, char* location) {
     // more platform agnostic
 #ifdef HAL_FSIM_CE
     SNPRINTF(location, 32, "CE %d Block %d Unit %d", AGENT_FROM_ID(base->location),
-             BLOCK_FROM_ID(base->location), UNIT_FROM_ID(base->location));
+             BLOCK_FROM_ID(base->location), CLUSTER_FROM_ID(base->location));
 #else
     SNPRINTF(location, 32, "CE");
 #endif

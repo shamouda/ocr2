@@ -31,7 +31,7 @@
  */
 
 #define hal_fence()                                     \
-    do { __asm__ __volatile__("fence 0xF\n\t"); } while(0)
+    do { __asm__ __volatile__("fence 0xF, B\n\t"); } while(0)
 
 
 /**
@@ -51,14 +51,13 @@
  * source and destination
  */
 #define hal_memCopy(destination, source, size, isBackground)            \
-    do { __asm__ __volatile__("dma.copyregion %0, %1, %2\n\t"           \
+    do { __asm__ __volatile__("dma.copy %0, %1, %2, 0, 8\n\t"           \
                               :                                         \
                               : "r" ((void *)(destination)),            \
                                 "r" ((void *)(source)),                 \
                                 "r" (size));                            \
-        if (!isBackground) __asm__ __volatile__("fence 0xF\n\t");       \
+        if (!isBackground) __asm__ __volatile__("fence 0xF, B\n\t");       \
     } while(0)
-
 
 /**
  * @brief Memory move from source to destination. As if overlapping portions
@@ -106,10 +105,9 @@
 #define hal_swap64(atomic, newValue)                                    \
     ({                                                                  \
         u64 __tmp;                                                      \
-        __asm__ __volatile__("xchg64.any %0, %1, %2\n\t"                \
+        __asm__ __volatile__("xchg %0, %1, 64\n\t"                \
                              : "=r" (__tmp)                             \
                              : "r" (atomic),                            \
-                               "r" (0),                                 \
                                "0" (newValue));                         \
         __tmp;                                                          \
     })
@@ -131,7 +129,7 @@
 #define hal_cmpswap64(atomic, cmpValue, newValue)                       \
     ({                                                                  \
         u64 __tmp;                                                      \
-        __asm__ __volatile__("cmpxchg64.any %0, %1, %2\n\t"             \
+        __asm__ __volatile__("cmpxchg %0, %1, %2, 64\n\t"             \
                              : "=r" (__tmp)                             \
                              : "r" (atomic),                            \
                                "r" (cmpValue),                          \
@@ -190,10 +188,9 @@
 #define hal_swap32(atomic, newValue)                                    \
     ({                                                                  \
         u32 __tmp;                                                      \
-        __asm__ __volatile__("xchg32.any %0, %1, %2\n\t"                \
+        __asm__ __volatile__("xchg %0, %1, 32\n\t"                \
                              : "=r" (__tmp)                             \
                              : "r" (atomic),                            \
-                               "r" (0),                                 \
                                "0" (newValue));                         \
         __tmp;                                                          \
     })
@@ -215,7 +212,7 @@
 #define hal_cmpswap32(atomic, cmpValue, newValue)                       \
     ({                                                                  \
         u32 __tmp;                                                      \
-        __asm__ __volatile__("cmpxchg32.any %0, %1, %2\n\t"             \
+        __asm__ __volatile__("cmpxchg %0, %1, %2, 32\n\t"             \
                              : "=r" (__tmp)                             \
                              : "r" (atomic),                            \
                                "r" (cmpValue),                          \
@@ -307,7 +304,7 @@
  * This will exit the runtime more cleanly than abort
  */
 #define hal_exit(arg)                           \
-    __asm__ __volatile__("alarm %0\n\t" : : "L" (XE_TERMINATE))
+    __asm__ __volatile__("alarm %0\n\t" : : "L" (XE_TERMINATE_ALARM))
 
 /**
  * @brief Pause execution

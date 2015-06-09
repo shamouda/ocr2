@@ -66,11 +66,11 @@ CFLAGS += -DINIT_DEQUE_CAPACITY=2048
 # x86 only
 #
 # Enable profiler
- CFLAGS += -DOCR_RUNTIME_PROFILER -DPROFILE_KHZ=3400000
+# CFLAGS += -DOCR_RUNTIME_PROFILER -DPROFILE_KHZ=3400000
 #
 # (optional) Maximum number of scope
 # nesting for runtime profiler
- CFLAGS += -DMAX_PROFILER_LEVEL=512
+# CFLAGS += -DMAX_PROFILER_LEVEL=512
 
 # Enables the collection of EDT R/W statistics
 # x86 only
@@ -264,8 +264,9 @@ endif
 # Build targets
 #
 
+# -O2 changed to -O0 due to a bug in LLVM  - see #626
 .PHONY: static
-static: CFLAGS_STATIC += -O2
+static: CFLAGS_STATIC += -O0
 static: supports-static info-static $(OCRSTATIC)
 
 .PHONY: shared

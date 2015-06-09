@@ -30,7 +30,7 @@
 #include "allocator/allocator-all.h"
 
 #ifdef HAL_FSIM_CE
-#include "rmd-map.h"
+#include "xstg-map.h"
 #endif
 
 #define DEBUG_TYPE POLICY
@@ -107,11 +107,14 @@ u8 cePdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
     // However, if I'm block 0 CE, my neighbors also include unit 0 block 0 CE
     // unless I'm unit 0 block 0 CE
 
+#define MAX_NUM_BLOCK 8
+#define MAX_NUM_UNIT 4
+
     u32 ncount = 0;
 
     if(policy->neighborCount) {
         for (i = 0; i < MAX_NUM_BLOCK; i++) {
-            u32 myUnit = ((policy->myLocation & ID_UNIT_MASK) >> ID_UNIT_SHIFT);
+            u32 myUnit = ((policy->myLocation & ID_CLUSTER_MASK) >> ID_CLUSTER_SHIFT);
             if(policy->myLocation != MAKE_CORE_ID(0, 0, 0, myUnit, i, ID_AGENT_CE))
                 policy->neighbors[ncount++] = MAKE_CORE_ID(0, 0, 0, myUnit, i, ID_AGENT_CE);
             if(ncount >= policy->neighborCount) break;
@@ -138,7 +141,7 @@ u8 cePdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
     if((policy->myLocation & ID_BLOCK_MASK) == 0) {
         cePolicy->shutdownMax += policy->neighborCount;
         // Block 0 of unit 0 collects block 0's of other units
-        if(policy->myLocation & ID_UNIT_MASK) {
+        if(policy->myLocation & ID_CLUSTER_MASK) {
             u32 otherblocks = 0;
             u32 j;
             for(j = 0; j<policy->neighborCount; j++)

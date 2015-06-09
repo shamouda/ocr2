@@ -21,7 +21,6 @@
 //#include "mmio-table.h"
 #include "xstg-arch.h"
 #include "xstg-map.h"
-#include "rmd-msg-queue.h"
 
 #define DEBUG_TYPE COMM_PLATFORM
 
@@ -82,7 +81,7 @@ void xeCommDestruct (ocrCommPlatform_t * base) {
 void xeCommBegin(ocrCommPlatform_t * commPlatform, ocrPolicyDomain_t * PD) {
 
     ASSERT(commPlatform != NULL && PD != NULL);
-#if 0
+#if 0 // FIXME
 //#ifndef ENABLE_BUILDER_ONLY
     u64 i;
     ocrCommPlatformXe_t * cp = (ocrCommPlatformXe_t *)commPlatform;
@@ -211,7 +210,7 @@ u8 xeCommSendMessage(ocrCommPlatform_t *self, ocrLocation_t target,
     }
 
     // - Alarm remote to tell the CE it has something (in case it is halted)
-    __asm__ __volatile__("alarm %0\n\t" : : "L" (XE_MSG_QUEUE));
+    __asm__ __volatile__("alarm %0\n\t" : : "L" (XE_MSG_READY));
 
 #endif
 

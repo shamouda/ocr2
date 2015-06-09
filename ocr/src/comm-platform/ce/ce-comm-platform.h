@@ -19,6 +19,9 @@
 #include "utils/ocr-utils.h"
 
 #include "xstg-arch.h"
+#define MAX_NUM_XE 8
+#define MSG_QUEUE_OFFT  (0x0)
+#define MSG_QUEUE_SIZE  (0x100)
 
 typedef struct {
     ocrCommPlatformFactory_t base;

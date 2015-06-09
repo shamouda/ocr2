@@ -20,7 +20,6 @@
 
 #include "mmio-table.h"
 #include "xstg-map.h"
-#include "rmd-msg-queue.h"
 #include "rmd-mmio.h"
 
 #define DEBUG_TYPE COMM_PLATFORM
@@ -87,7 +86,7 @@ u8 ceCommDestructCEMessage(ocrCommPlatform_t *self, ocrPolicyMsg_t *msg);
 u8 ceCommCheckSeqIdRecv(ocrCommPlatform_t *self, ocrPolicyMsg_t *msg);
 
 u64 parentOf(u64 location) {
-#if 0
+#if 0  // FIXME
     // XE's parent is its CE
     if ((location & ID_AGENT_CE) != ID_AGENT_CE)
         return ((location & ~ID_AGENT_MASK ) | ID_AGENT_CE);
@@ -143,7 +142,7 @@ u8 ceCommSwitchRunlevel(ocrCommPlatform_t *self, ocrPolicyDomain_t *PD, ocrRunle
             for(i = 0; i<PD->neighborCount; i++) {
                 u64 target = PD->neighbors[i] & 0xFFFFFFFF;
                 if(PD->myLocation == parentOf(target)) {
-#if 0
+#if 0 // FIXME
                     u64 *rmbox = (u64 *) (DR_CE_BASE(CHIP_FROM_ID(target),
                                       UNIT_FROM_ID(target), BLOCK_FROM_ID(target))
                                       + (u64)(msgAddresses));
@@ -227,7 +226,7 @@ void ceCommsInit(ocrCommPlatform_t * commPlatform, ocrPolicyDomain_t * PD) {
     // Zero-out our stage for receiving messages
     //for(i=MSG_QUEUE_OFFT; i<(MAX_NUM_XE * MSG_QUEUE_SIZE); i += sizeof(u64))
     //    *(volatile u64 *)i = 0;
-#if 0
+#if 0 // FIXME
     // Fill-in location tuples: ours and our parent's (the CE in FSIM)
     PD->myLocation = (ocrLocation_t)rmd_ld64(CE_MSR_BASE + CORE_LOCATION * sizeof(u64));
     commPlatform->location = PD->myLocation;
@@ -269,7 +268,7 @@ u8 ceCommSendMessageToCE(ocrCommPlatform_t *self, ocrLocation_t target,
     if(msgId==0xace00000000)
         msgId |= (self->location & 0xFF)<<16; // Embed the src location onto msgId
     ASSERT(self->location != target);
-#if 0
+#if 0 // FIXME
     if(sendBuf.type) {
         // Check if remote target is already dead
         u64 *rmbox = (u64 *) (DR_CE_BASE(CHIP_FROM_ID(sendBuf.destLocation),
@@ -579,7 +578,7 @@ u8 ceCommDestructMessage(ocrCommPlatform_t *self, ocrPolicyMsg_t *msg) {
 
     // Advance queue for next time
     cp->pollq = (cp->pollq + 1) % MAX_NUM_XE;
-#if 0
+#if 0 // FIXME
     {
         // Clear the XE pipeline clock gate while preserving other bits.
         u64 state = rmd_ld64(XE_MSR_BASE(n) + (FUB_CLOCK_CTL * sizeof(u64)));

@@ -22,11 +22,11 @@ extern void salResume(u32 flag);
 #define sal_assert(x, fn, ln) if(!(x)) {                            \
         __asm__ __volatile__ __attribute__ (( noreturn )) (         \
             "alarm %2\n\t"                                          \
-            : : "{r2}" (ln), "{r3}" (fn), "L" (XE_ASSERT));         \
+            : : "{r2}" (ln), "{r3}" (fn), "L" (XE_ASSERT_ERROR));         \
     }
 
 #define sal_print(msg, len) __asm__ __volatile__(                   \
         "alarm %2\n\t"                                              \
-        : : "{r2}" (msg), "{r3}" (len), "L" (XE_CONOUT))
+        : : "{r2}" (msg), "{r3}" (len), "L" (XE_CONOUT_ALARM))
 
 #endif /* __OCR_SAL_FSIM_XE_H__ */

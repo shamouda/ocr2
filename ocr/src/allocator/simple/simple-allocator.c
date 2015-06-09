@@ -59,7 +59,7 @@
 #include "allocator/allocator-all.h"
 #include "ocr-mem-platform.h"
 #ifdef HAL_FSIM_CE
-#include "rmd-map.h"
+#include "xstg-map.h"
 #endif
 
 #define ALIGNMENT 8LL
@@ -164,6 +164,7 @@
 // EDTs are scheduled to other blocks and the address is passed to free() on that other block.
 void *addrGlobalizeOnTG(void *result, ocrPolicyDomain_t *self)
 {
+#if 0 // FIXME
 #if defined(HAL_FSIM_CE)
     // ideally we'd like to use the size of each memory as the end of each area.
     // canonicalize addresses for L3 SPAD (USM -- unit shared mem)
@@ -197,6 +198,7 @@ void *addrGlobalizeOnTG(void *result, ocrPolicyDomain_t *self)
         //DPRINTF(DEBUG_LVL_WARN, "check:%p , self:%p, myloc:0x%lx\n", check, self, self->myLocation);
         ASSERT(check==self->myLocation);
     }
+#endif
 #endif
     return result;
 }

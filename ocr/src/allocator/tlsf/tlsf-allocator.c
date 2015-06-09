@@ -196,7 +196,7 @@
 #include "tlsf-allocator.h"
 #include "allocator/allocator-all.h"
 #ifdef HAL_FSIM_CE
-#include "rmd-map.h"
+#include "xstg-map.h"
 #endif
 
 #define DEBUG_TYPE ALLOCATOR
@@ -1389,16 +1389,16 @@ static ocrAllocator_t * getAnchorCE (ocrAllocator_t * self) {
         anchorCE = (ocrAllocator_t *) (self);
         break;
     case 3:    // Unit level   (i.e. unit-shared memory, or unit's private slice of a higher-level memory.
-        anchorCE = (ocrAllocator_t *) (((u64) self) | (UR_CE_BASE(0)));
+        anchorCE = (ocrAllocator_t *) (((u64) self) | (CR_AGENT_BASE(0, ID_AGENT_CE)));
         break;
     case 4:    // Chip level   (i.e. chip-shared memory, or chip's private slice of a higher-level memory.
-        anchorCE = (ocrAllocator_t *) (((u64) self) | (CR_CE_BASE(0,0)));
+        anchorCE = (ocrAllocator_t *) (((u64) self) | (SR_AGENT_BASE(0,0, ID_AGENT_CE)));
         break;
     case 5:    // Board level  (i.e. board-shared memory, or board's private slice of a higher-level memory.
-        anchorCE = (ocrAllocator_t *) (((u64) self) | (DR_CE_BASE(0,0,0)));
+        anchorCE = (ocrAllocator_t *) (((u64) self) | (UR_AGENT_BASE(0,0,0,ID_AGENT_CE)));
         break;
     case 6:    // Rack level   (i.e. rack-shared memory
-        anchorCE = (ocrAllocator_t *) (((u64) self) | (RR_CE_BASE(0,0,0,0)));
+        anchorCE = (ocrAllocator_t *) (((u64) self) | (RR_AGENT_BASE(0,0,0,0,ID_AGENT_CE)));
         break;
     default:
         ASSERT(0);
