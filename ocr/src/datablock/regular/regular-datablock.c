@@ -296,6 +296,7 @@ ocrRuntimeHint_t* getRuntimeHintDbRegular(ocrDataBlock_t* self) {
 /******************************************************/
 
 void destructRegularFactory(ocrDataBlockFactory_t *factory) {
+    runtimeChunkFree((u64)factory->hintPropMap, PERSISTENT_CHUNK);
     runtimeChunkFree((u64)factory, PERSISTENT_CHUNK);
 }
 

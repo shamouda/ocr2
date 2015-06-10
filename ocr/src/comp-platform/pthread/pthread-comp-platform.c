@@ -39,14 +39,6 @@ typedef struct {
  */
 pthread_key_t selfKey;
 
-/**
- * The keyInit boolean allows threads to know if they can lookup the TLS key or not.
- * BUG #583: may disappear once we clearly define runlevels trac #80
- */
-// BUG #583: RL: We should be able to check the PD's RL instead
-// REC: I was wondering about that and it looked like
-//static bool keyInit = false;
-
 #ifdef OCR_RUNTIME_PROFILER
 pthread_key_t _profilerThreadData;
 #endif
@@ -103,8 +95,6 @@ static void initializeKey() {
     data->pd = NULL;
     data->worker = NULL;
     RESULT_ASSERT(pthread_setspecific(selfKey, data), ==, 0);
-
-    //keyInit = true;
 }
 
 void pthreadDestruct (ocrCompPlatform_t * base) {
@@ -267,24 +257,21 @@ void destructCompPlatformFactoryPthread(ocrCompPlatformFactory_t *factory) {
 void getCurrentEnv(ocrPolicyDomain_t** pd, ocrWorker_t** worker,
                    ocrTask_t **task, ocrPolicyMsg_t* msg) {
     START_PROFILE(cp_getCurrentEnv);
-//    if(keyInit) {
-        perThreadStorage_t *vals = pthread_getspecific(selfKey);
-        if(vals == NULL)
-            return;
-        if(pd)
-            *pd = vals->pd;
-        if(worker)
-            *worker = vals->worker;
-        if(task && vals->worker)
-            *task = vals->worker->curTask;
-        if(msg) {
-            //By default set src and dest location to current location.
-            msg->srcLocation = vals->pd->myLocation;
-            msg->destLocation = msg->srcLocation;
-            //msg->seqId = vals->worker->seqId;
-            msg->usefulSize = 0; // Convention to say that the size is not yet set
-        }
-        //}
+    perThreadStorage_t *vals = pthread_getspecific(selfKey);
+    if(vals == NULL)
+        return;
+    if(pd)
+        *pd = vals->pd;
+    if(worker)
+        *worker = vals->worker;
+    if(task && vals->worker)
+        *task = vals->worker->curTask;
+    if(msg) {
+        //By default set src and dest location to current location.
+        msg->srcLocation = vals->pd->myLocation;
+        msg->destLocation = msg->srcLocation;
+        msg->usefulSize = 0; // Convention to say that the size is not yet set
+    }
     RETURN_PROFILE();
 }
 

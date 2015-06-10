@@ -91,7 +91,7 @@ u8 countedMapSwitchRunlevel(ocrGuidProvider_t *self, ocrPolicyDomain_t *PD, ocrR
 #else
             deallocFct entryDeallocator = NULL;
 #endif
-            destructHashtable(((ocrGuidProviderCountedMap_t *) self)->guidImplTable, entryDeallocator);
+            destructHashtableBucketLocked(((ocrGuidProviderCountedMap_t *) self)->guidImplTable, entryDeallocator);
         }
         break;
     case RL_GUID_OK:

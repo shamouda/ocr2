@@ -399,7 +399,6 @@ u8 hcPdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
 
                 destroyLocationPlacer(policy);
 
-                // We need to deguidify ourself here
                 PD_MSG_STACK(msg);
                 getCurrentEnv(NULL, NULL, NULL, &msg);
 #define PD_MSG (&msg)
@@ -576,32 +575,26 @@ void hcPolicyDomainDestruct(ocrPolicyDomain_t * policy) {
     // Destroying instances
     u64 i = 0;
     u64 maxCount = 0;
-
     //BUG #583: should transform all these to stop RL_DEALLOCATE
 
     // Note: As soon as worker '0' is stopped; its thread is
     // free to fall-through and continue shutting down the
     // policy domain
 
-    /*
     maxCount = policy->workerCount;
     for(i = 0; i < maxCount; i++) {
-        policy->workers[i]->fcts.stop(policy->workers[i], RL_DEALLOCATE, RL_ACTION_ENTER);
+        policy->workers[i]->fcts.destruct(policy->workers[i]);
     }
 
     maxCount = policy->commApiCount;
     for(i = 0; i < maxCount; i++) {
-        policy->commApis[i]->fcts.stop(policy->commApis[i], RL_DEALLOCATE, RL_ACTION_ENTER);
+        policy->commApis[i]->fcts.destruct(policy->commApis[i]);
     }
-    */
 
     maxCount = policy->schedulerCount;
     for(i = 0; i < maxCount; ++i) {
         policy->schedulers[i]->fcts.destruct(policy->schedulers[i]);
     }
-
-    //BUG #583 Need a scheme to deallocate neighbors
-    //ASSERT(policy->neighbors == NULL);
 
     // Destruct factories
 
@@ -2157,7 +2150,6 @@ void initializePolicyDomainHc(ocrPolicyDomainFactory_t * factory, ocrPolicyDomai
     initializePolicyDomainOcr(factory, self, perInstance);
 
     ocrPolicyDomainHc_t* derived = (ocrPolicyDomainHc_t*) self;
-    derived->rank = ((paramListPolicyDomainHcInst_t*)perInstance)->rank;
     derived->rlSwitch.legacySecondStart = false;
 }
 

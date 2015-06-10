@@ -570,6 +570,8 @@ u8 MPICommSwitchRunlevel(ocrCommPlatform_t *self, ocrPolicyDomain_t *PD, ocrRunl
             mpiComm->outgoing->destruct(mpiComm->outgoing);
             mpiComm->incomingIt->destruct(mpiComm->incomingIt);
             mpiComm->outgoingIt->destruct(mpiComm->outgoingIt);
+            PD->fcts.pdFree(PD, PD->neighbors);
+            PD->neighbors = NULL;
         }
         break;
     case RL_COMPUTE_OK:

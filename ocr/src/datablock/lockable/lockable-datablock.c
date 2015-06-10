@@ -625,6 +625,7 @@ ocrRuntimeHint_t* getRuntimeHintDbLockable(ocrDataBlock_t* self) {
 /******************************************************/
 
 void destructLockableFactory(ocrDataBlockFactory_t *factory) {
+    runtimeChunkFree((u64)factory->hintPropMap, PERSISTENT_CHUNK);
     runtimeChunkFree((u64)factory, PERSISTENT_CHUNK);
 }
 
