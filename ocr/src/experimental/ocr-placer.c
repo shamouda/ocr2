@@ -122,14 +122,13 @@ void destroyLocationPlacer(ocrPolicyDomain_t *pd) {
     u64 i=0;
     PD_MSG_STACK(msg);
     getCurrentEnv(NULL, NULL, NULL, &msg);
-
     for(i=0; i < pd->neighborCount; i++) {
 #define PD_MSG (&msg)
 #define PD_TYPE PD_MSG_GUID_DESTROY
       msg.type = PD_MSG_GUID_DESTROY | PD_MSG_REQUEST;
       PD_MSG_FIELD_I(guid.guid) = placer->pdLocAffinities[pd->neighbors[i]];
       PD_MSG_FIELD_I(guid.metaDataPtr) = NULL;
-      PD_MSG_FIELD_I(properties) = 0; // Free metadata
+      PD_MSG_FIELD_I(properties) = 1; // Free metadata
       pd->fcts.processMessage(pd, &msg, false);
 #undef PD_MSG
 #undef PD_TYPE
@@ -140,7 +139,7 @@ void destroyLocationPlacer(ocrPolicyDomain_t *pd) {
       msg.type = PD_MSG_GUID_DESTROY | PD_MSG_REQUEST;
       PD_MSG_FIELD_I(guid.guid) = placer->pdLocAffinities[placer->current];
       PD_MSG_FIELD_I(guid.metaDataPtr) = NULL;
-      PD_MSG_FIELD_I(properties) = 0; // Free metadata
+      PD_MSG_FIELD_I(properties) = 1; // Free metadata
       pd->fcts.processMessage(pd, &msg, false);
 #undef PD_MSG
 #undef PD_TYPE

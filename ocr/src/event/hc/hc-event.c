@@ -1040,8 +1040,9 @@ u8 newEventHc(ocrEventFactory_t * factory, ocrFatGuid_t *guid,
     return returnValue;
 }
 
-void destructEventFactoryHc(ocrEventFactory_t * base) {
-    runtimeChunkFree((u64)base, PERSISTENT_CHUNK);
+void destructEventFactoryHc(ocrEventFactory_t * factory) {
+    runtimeChunkFree((u64)factory->hintPropMap, PERSISTENT_CHUNK);
+    runtimeChunkFree((u64)factory, PERSISTENT_CHUNK);
 }
 
 ocrEventFactory_t * newEventFactoryHc(ocrParamList_t *perType, u32 factoryId) {

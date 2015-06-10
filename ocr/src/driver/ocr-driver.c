@@ -670,10 +670,10 @@ void bringUpRuntime(ocrConfig_t *ocrConfig) {
 
 void freeUpRuntime (bool doTeardown) {
     u32 i, j;
-
+    ocrPolicyDomain_t *pd = NULL;
+    getCurrentEnv(&pd, NULL, NULL, NULL);
+    ocrPolicyDomain_t *otherPolicyDomains = NULL;
     if(doTeardown) {
-        ocrPolicyDomain_t *pd = NULL;
-        getCurrentEnv(&pd, NULL, NULL, NULL);
         // When we need to do the tear-down, we need to continue from RL_GUID_OK all the way down to CONFIG_PARSE
         // Bug #597 Need to ensure that only NODE_MASTER comes out of here. Other PD_MASTER need to stay in their PDs
         RESULT_ASSERT(pd->fcts.switchRunlevel(pd, RL_GUID_OK, RL_REQUEST | RL_ASYNC | RL_TEAR_DOWN | RL_NODE_MASTER),
@@ -685,7 +685,6 @@ void freeUpRuntime (bool doTeardown) {
         RESULT_ASSERT(pd->fcts.switchRunlevel(pd, RL_PD_OK, RL_REQUEST | RL_ASYNC | RL_TEAR_DOWN | RL_NODE_MASTER),
                       ==, 0);
         // Here everyone is down except NODE_MASTER
-        ocrPolicyDomain_t *otherPolicyDomains = NULL;
         for(i = 1; i < inst_counts[policydomain_type]; ++i) {
             otherPolicyDomains = (ocrPolicyDomain_t*)all_instances[policydomain_type][i];
             RESULT_ASSERT(otherPolicyDomains->fcts.switchRunlevel(otherPolicyDomains, RL_NETWORK_OK,
@@ -702,6 +701,13 @@ void freeUpRuntime (bool doTeardown) {
         RESULT_ASSERT(pd->fcts.switchRunlevel(pd, RL_CONFIG_PARSE, RL_REQUEST | RL_ASYNC | RL_TEAR_DOWN | RL_NODE_MASTER),
                       ==, 0);
     }
+
+    for(i = 1; i < inst_counts[policydomain_type]; ++i) {
+        otherPolicyDomains = (ocrPolicyDomain_t*)all_instances[policydomain_type][i];
+        otherPolicyDomains->fcts.destruct(otherPolicyDomains);
+    }
+
+    pd->fcts.destruct(pd);
 
     for (i = 0; i < total_types; i++) {
         for (j = 0; j < type_counts[i]; j++) {

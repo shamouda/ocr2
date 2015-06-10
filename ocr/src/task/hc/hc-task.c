@@ -182,8 +182,9 @@ ocrRuntimeHint_t* getRuntimeHintTaskTemplateHc(ocrTaskTemplate_t* self) {
     return &(derived->hint);
 }
 
-void destructTaskTemplateFactoryHc(ocrTaskTemplateFactory_t* base) {
-    runtimeChunkFree((u64)base, PERSISTENT_CHUNK);
+void destructTaskTemplateFactoryHc(ocrTaskTemplateFactory_t* factory) {
+    runtimeChunkFree((u64)factory->hintPropMap, PERSISTENT_CHUNK);
+    runtimeChunkFree((u64)factory, PERSISTENT_CHUNK);
 }
 
 ocrTaskTemplateFactory_t * newTaskTemplateFactoryHc(ocrParamList_t* perType, u32 factoryId) {
@@ -1149,8 +1150,9 @@ ocrRuntimeHint_t* getRuntimeHintTaskHc(ocrTask_t* self) {
     return &(derived->hint);
 }
 
-void destructTaskFactoryHc(ocrTaskFactory_t* base) {
-    runtimeChunkFree((u64)base, PERSISTENT_CHUNK);
+void destructTaskFactoryHc(ocrTaskFactory_t* factory) {
+    runtimeChunkFree((u64)factory->hintPropMap, PERSISTENT_CHUNK);
+    runtimeChunkFree((u64)factory, PERSISTENT_CHUNK);
 }
 
 ocrTaskFactory_t * newTaskFactoryHc(ocrParamList_t* perInstance, u32 factoryId) {

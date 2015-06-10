@@ -1732,6 +1732,14 @@ u8 hcDistPdSwitchRunlevel(ocrPolicyDomain_t *self, ocrRunlevel_t runlevel, u32 p
                 // we request phases directly from here through the coalesced number of phases at slot 0.
                 RL_ENSURE_PHASE_DOWN(self, RL_USER_OK, 0, 3);
             }
+        } else {
+            ASSERT(properties & RL_TEAR_DOWN);
+            if (runlevel == RL_GUID_OK) {
+                // The template map should be empty. Do not check, because this
+                // data-structure should go away with #536 GUID metadata
+                destructHashtable(dself->proxyTplMap, NULL);
+            }
+
         }
         return res;
     }
