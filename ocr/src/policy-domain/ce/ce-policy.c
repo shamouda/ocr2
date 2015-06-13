@@ -1106,16 +1106,14 @@ ASSERT(ceMsg.destLocation != self->parentLocation); // Parent's not dead
         break;
     }
 
-    case PD_MSG_COMM_GIVE: {
-        START_PROFILE(pd_ce_Give);
+    case PD_MSG_SCHED_NOTIFY: {
+        START_PROFILE(pd_ce_Sched_Notify);
 #define PD_MSG msg
-#define PD_TYPE PD_MSG_COMM_GIVE
-        ASSERT(PD_MSG_FIELD_I(type) == OCR_GUID_EDT);
-        DPRINTF(DEBUG_LVL_VVERB, "COMM_GIVE req/resp from 0x%lx with GUID 0x%lx\n",
-                msg->srcLocation, (PD_MSG_FIELD_IO(guids))->guid);
-        PD_MSG_FIELD_O(returnDetail) = self->schedulers[0]->fcts.giveEdt(
-            self->schedulers[0], &(PD_MSG_FIELD_IO(guidCount)),
-            PD_MSG_FIELD_IO(guids));
+#define PD_TYPE PD_MSG_SCHED_NOTIFY
+        ocrSchedulerOpNotifyArgs_t *notifyArgs = &PD_MSG_FIELD_IO(schedArgs);
+        PD_MSG_FIELD_O(returnDetail) =
+            self->schedulers[0]->fcts.op[OCR_SCHEDULER_OP_NOTIFY].invoke(
+                self->schedulers[0], (ocrSchedulerOpArgs_t*)notifyArgs, NULL);
         returnCode = ceProcessResponse(self, msg, 0);
 #undef PD_MSG
 #undef PD_TYPE

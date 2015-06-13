@@ -165,13 +165,22 @@ typedef struct _paramListPolicyDomainInst_t {
 /**< AND with this and if result non-null, GUID distribution related
  * operation (taking/giving EDTs, DBs, events, etc)
  */
-#define PD_MSG_COMM_OP          0x040
+#define PD_MSG_SCHED_OP          0x040
+/**< Find tasks for the worker to execute */
+#define PD_MSG_SCHED_GET_WORK        0x00001040
+/**< Notify a scheduler of a new guid or event */
+#define PD_MSG_SCHED_NOTIFY      0x00002040
+/**< Transaction of a scheduler object between schedulers */
+#define PD_MSG_SCHED_TRANSACT    0x00003040
+/**< Negotiations between schedulers to setup transactions */
+#define PD_MSG_SCHED_ANALYZE     0x00004040
+
 /**< Request for a GUID (ie: the caller wants the callee
  * to give it the GUID(s) requested (pull model) */
-#define PD_MSG_COMM_TAKE        0x00001040
+#define PD_MSG_COMM_TAKE        0x00005040
 /**< Request for a GUID to be put (ie: the caller wants the
  * callee to accept the GUID(s) given (push model) */
-#define PD_MSG_COMM_GIVE        0x00002040
+#define PD_MSG_COMM_GIVE        0x00006040
 
 /**< AND with this and if result non-null, dependence related
  * operation
@@ -769,6 +778,61 @@ typedef struct _ocrPolicyMsg_t {
             // BUG #586: Take into account cost/choice heuristic
         } PD_MSG_STRUCT_NAME(PD_MSG_COMM_GIVE);
 
+        /* WORKER to SCHEDULER: Scheduling tasks for the worker to execute. These are typically
+         *                      messages where the worker blocks for response.
+         */
+        struct {
+            ocrSchedulerOpWorkArgs_t schedArgs;            /**< In/Out: Arguments for worker tasks */
+            union {
+                struct {
+                    u32 properties;                         /**< In: properties for the op */
+                } in;
+                struct {
+                    u32 factoryId;                          /**< Out: Task factory of EDTs returned */
+                    u32 returnDetail;                       /**< Out: Success or error code */
+                } out;
+            } inOrOut __attribute__ (( aligned(8) ));
+        } PD_MSG_STRUCT_NAME(PD_MSG_SCHED_GET_WORK);
+
+        /* Operation to notify scheduler about a new guid or event (typically used by other runtime modules)  */
+        struct {
+            ocrSchedulerOpNotifyArgs_t schedArgs;          /**< In/Out: Arguments for the scheduler notify operation */
+            union {
+                struct {
+                    u32 properties;                         /**< In: properties for the op */
+                } in;
+                struct {
+                    u32 returnDetail;                       /**< Out: Success or error code */
+                } out;
+            } inOrOut __attribute__ (( aligned(8) ));
+        } PD_MSG_STRUCT_NAME(PD_MSG_SCHED_NOTIFY);
+
+        /* Operation where schedulers transact a scheduler object (scheduler-scheduler operation) */
+        struct {
+            ocrSchedulerOpTransactArgs_t schedArgs;        /**< In/Out: Arguments for the scheduler transact operation */
+            union {
+                struct {
+                    u32 properties;                         /**< In: properties for the op */
+                } in;
+                struct {
+                    u32 returnDetail;                       /**< Out: Success or error code */
+                } out;
+            } inOrOut __attribute__ (( aligned(8) ));
+        } PD_MSG_STRUCT_NAME(PD_MSG_SCHED_TRANSACT);
+
+        /* Operation where schedulers analyze (no scheduler objects are transferred) and help setup transactions */
+        struct {
+            ocrSchedulerOpAnalyzeArgs_t schedArgs;       /**< In/Out: Arguments for the scheduler analyze operation */
+            union {
+                struct {
+                    u32 properties;                         /**< In: properties for the op */
+                } in;
+                struct {
+                    u32 returnDetail;                       /**< Out: Success or error code */
+                } out;
+            } inOrOut __attribute__ (( aligned(8) ));
+        } PD_MSG_STRUCT_NAME(PD_MSG_SCHED_ANALYZE);
+
         struct {
             //BUG #273 THis is also being used at In/Out
             u32 properties;      /**< In: Properties. Lower 3 bits are access modes */
@@ -979,7 +1043,6 @@ typedef struct _ocrPolicyMsg_t {
         struct {
             union {
                 struct {
-                    ocrLocation_t loc;      /**< In: Location registering */
                     // BUG #586: Add cost/relationship maybe?
                     u32 properties;         /**< In */
                 } in;

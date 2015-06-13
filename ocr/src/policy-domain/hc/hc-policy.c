@@ -34,8 +34,6 @@
 
 #define DEBUG_TYPE POLICY
 
-//#define SCHED_1_0 1
-
 static u8 helperSwitchInert(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, phase_t phase, u32 properties) {
     u64 i = 0;
     u64 maxCount = 0;
@@ -1425,59 +1423,20 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         break;
     }
 
-    case PD_MSG_COMM_TAKE: {
-        START_PROFILE(pd_hc_Take);
+    case PD_MSG_SCHED_GET_WORK: {
+        START_PROFILE(pd_hc_Sched_Work);
 #define PD_MSG msg
-#define PD_TYPE PD_MSG_COMM_TAKE
-#ifdef SCHED_1_0
-        ASSERT(PD_MSG_FIELD_IO(type) == OCR_GUID_EDT);
-        ASSERT(PD_MSG_FIELD_IO(guidCount) == 1);
-        //This is temporary until we get proper seqId support
-        ocrWorker_t *worker;
-        getCurrentEnv(NULL, &worker, NULL, NULL);
+#define PD_TYPE PD_MSG_SCHED_GET_WORK
+        ocrSchedulerOpWorkArgs_t *taskArgs = &PD_MSG_FIELD_IO(schedArgs);
+        PD_MSG_FIELD_O(returnDetail) =
+            self->schedulers[0]->fcts.op[OCR_SCHEDULER_OP_GET_WORK].invoke(
+                self->schedulers[0], (ocrSchedulerOpArgs_t*)taskArgs, NULL);
 
-        ocrSchedulerObject_t el;
-        el.guid = NULL_GUID;
-        el.kind = OCR_SCHEDULER_OBJECT_EDT;
-        el.fctId = 0;
-
-        ocrSchedulerOpArgs_t opArgs;
-        opArgs.loc = msg->srcLocation;
-        opArgs.contextId = worker->seqId;
-        opArgs.el = &el;
-        opArgs.takeKind = OCR_SCHEDULER_OBJECT_EDT;
-        opArgs.takeCount = PD_MSG_FIELD_IO(guidCount);
-
-        PD_MSG_FIELD_O(returnDetail) = self->schedulers[0]->fcts.op[OCR_SCHEDULER_OP_TAKE].invoke(self->schedulers[0], &opArgs, NULL);
-        PD_MSG_FIELD_IO(guidCount) = el.guid == NULL_GUID ? 0 : 1;
-        if (PD_MSG_FIELD_IO(guidCount) > 0) {
-            PD_MSG_FIELD_IO(guids)[0].guid = el.guid;
-            localDeguidify(self, &(PD_MSG_FIELD_IO(guids)[0]));
-            PD_MSG_FIELD_IO(extra) = (u64)(self->taskFactories[0]->fcts.execute);
+        if (taskArgs->kind == OCR_SCHED_WORK_EDT_USER) {
+            PD_MSG_FIELD_O(factoryId) = 0; //taskHc_id;
+            ocrFatGuid_t *fguid = &(taskArgs->OCR_SCHED_ARG_FIELD(OCR_SCHED_WORK_EDT_USER).edt);
+            localDeguidify(self, fguid);
         }
-#else
-        if (PD_MSG_FIELD_IO(type) == OCR_GUID_EDT) {
-            PD_MSG_FIELD_O(returnDetail) = self->schedulers[0]->fcts.takeEdt(
-                self->schedulers[0], &(PD_MSG_FIELD_IO(guidCount)),
-                PD_MSG_FIELD_IO(guids));
-            ASSERT(PD_MSG_FIELD_O(returnDetail) == 0);
-            if (PD_MSG_FIELD_O(returnDetail) == 0) {
-                // For now, we return the execute function for EDTs
-                PD_MSG_FIELD_IO(extra) = (u64)(self->taskFactories[0]->fcts.execute);
-                // We also consider that the task to be executed is local so we
-                // return it's fully deguidified value (BUG #586: this may need revising)
-                u64 i = 0, maxCount = PD_MSG_FIELD_IO(guidCount);
-                for( ; i < maxCount; ++i) {
-                    localDeguidify(self, &(PD_MSG_FIELD_IO(guids)[i]));
-                }
-            }
-        } else {
-            ASSERT(PD_MSG_FIELD_IO(type) == OCR_GUID_COMM);
-            PD_MSG_FIELD_O(returnDetail) = self->schedulers[0]->fcts.takeComm(
-                self->schedulers[0], &(PD_MSG_FIELD_IO(guidCount)),
-                PD_MSG_FIELD_IO(guids), PD_MSG_FIELD_I(properties));
-        }
-#endif
 #undef PD_MSG
 #undef PD_TYPE
         msg->type &= ~PD_MSG_REQUEST;
@@ -1486,48 +1445,14 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         break;
     }
 
-    case PD_MSG_COMM_GIVE: {
-        START_PROFILE(pd_hc_Give);
+    case PD_MSG_SCHED_NOTIFY: {
+        START_PROFILE(pd_hc_Sched_Notify);
 #define PD_MSG msg
-#define PD_TYPE PD_MSG_COMM_GIVE
-#ifdef SCHED_1_0
-        ASSERT(PD_MSG_FIELD_I(type) == OCR_GUID_EDT);
-        ASSERT(PD_MSG_FIELD_IO(guidCount) == 1);
-        //This is temporary until we get proper seqId support
-        ocrWorker_t *worker;
-        getCurrentEnv(NULL, &worker, NULL, NULL);
-
-        ocrSchedulerObject_t el;
-        el.guid = PD_MSG_FIELD_IO(guids)[0].guid;
-        el.kind = OCR_SCHEDULER_OBJECT_EDT;
-        el.fctId = 0;
-
-        ocrSchedulerOpArgs_t opArgs;
-        opArgs.loc = msg->srcLocation;
-        opArgs.contextId = worker->seqId;
-        opArgs.el = &el;
-        opArgs.takeKind = 0;
-        opArgs.takeCount = 0;
-
-        ocrRuntimeHint_t *rHints = NULL;
-#ifdef ENABLE_HINTS
-        rHints = (ocrRuntimeHint_t*)(*(PD_MSG_FIELD_IO(hints)));
-#endif
-
-        PD_MSG_FIELD_O(returnDetail) = self->schedulers[0]->fcts.op[OCR_SCHEDULER_OP_GIVE].invoke(self->schedulers[0], &opArgs, rHints);
-
-#else
-        if (PD_MSG_FIELD_I(type) == OCR_GUID_EDT) {
-            PD_MSG_FIELD_O(returnDetail) = self->schedulers[0]->fcts.giveEdt(
-                self->schedulers[0], &(PD_MSG_FIELD_IO(guidCount)),
-                PD_MSG_FIELD_IO(guids));
-        } else {
-            ASSERT(PD_MSG_FIELD_I(type) == OCR_GUID_COMM);
-            PD_MSG_FIELD_O(returnDetail) = self->schedulers[0]->fcts.giveComm(
-                self->schedulers[0], &(PD_MSG_FIELD_IO(guidCount)),
-                PD_MSG_FIELD_IO(guids), PD_MSG_FIELD_I(properties));
-        }
-#endif
+#define PD_TYPE PD_MSG_SCHED_NOTIFY
+        ocrSchedulerOpNotifyArgs_t *notifyArgs = &PD_MSG_FIELD_IO(schedArgs);
+        PD_MSG_FIELD_O(returnDetail) =
+            self->schedulers[0]->fcts.op[OCR_SCHEDULER_OP_NOTIFY].invoke(
+                self->schedulers[0], (ocrSchedulerOpArgs_t*)notifyArgs, NULL);
 #undef PD_MSG
 #undef PD_TYPE
         msg->type &= ~PD_MSG_REQUEST;
@@ -1894,9 +1819,9 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         START_PROFILE(pd_hc_Register);
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_MGT_REGISTER
-        u64 contextId = ((u64)PD_MSG_FIELD_I(loc));
+        u64 contextId = 0;
         PD_MSG_FIELD_O(returnDetail) = self->schedulers[0]->fcts.registerContext(
-                self->schedulers[0], contextId, msg->srcLocation);
+                self->schedulers[0], msg->srcLocation, &contextId);
         PD_MSG_FIELD_O(seqId) = contextId;
 #undef PD_MSG
 #undef PD_TYPE

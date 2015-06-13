@@ -57,8 +57,10 @@ typedef struct _ocrCostTable_t {
 /****************************************************/
 
 typedef enum {
-    OCR_SCHEDULER_HEURISTIC_OP_GIVE,
-    OCR_SCHEDULER_HEURISTIC_OP_TAKE,
+    OCR_SCHEDULER_HEURISTIC_OP_GET_WORK,
+    OCR_SCHEDULER_HEURISTIC_OP_NOTIFY,
+    OCR_SCHEDULER_HEURISTIC_OP_TRANSACT,
+    OCR_SCHEDULER_HEURISTIC_OP_ANALYZE,
     NUM_SCHEDULER_HEURISTIC_OPS,
 } ocrSchedulerHeuristicOp_t;
 

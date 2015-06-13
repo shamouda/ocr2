@@ -424,24 +424,19 @@ static u8 scheduleTask(ocrTask_t *self) {
     DPRINTF(DEBUG_LVL_INFO, "Schedule 0x%lx\n", self->guid);
     self->state = ALLACQ_EDTSTATE;
     ocrPolicyDomain_t *pd = NULL;
+    ocrWorker_t *worker = NULL;
     PD_MSG_STACK(msg);
-    getCurrentEnv(&pd, NULL, NULL, &msg);
+    getCurrentEnv(&pd, &worker, NULL, &msg);
 
-    ocrFatGuid_t toGive = {.guid = self->guid, .metaDataPtr = self};
 #define PD_MSG (&msg)
-#define PD_TYPE PD_MSG_COMM_GIVE
-    msg.type = PD_MSG_COMM_GIVE | PD_MSG_REQUEST;
-    PD_MSG_FIELD_IO(guids) = &toGive;
-    PD_MSG_FIELD_IO(guidCount) = 1;
-    PD_MSG_FIELD_I(properties) = 0;
-    PD_MSG_FIELD_I(type) = OCR_GUID_EDT;
-#ifdef ENABLE_HINTS
-    u64 *hints[1]; //declare static hint array
-    ocrTaskHc_t *derived = (ocrTaskHc_t*)self;
-    hints[0] = (u64*)(&(derived->hint));
-    PD_MSG_FIELD_IO(hints) = hints;
-#endif
+#define PD_TYPE PD_MSG_SCHED_NOTIFY
+    msg.type = PD_MSG_SCHED_NOTIFY | PD_MSG_REQUEST;
+    PD_MSG_FIELD_IO(schedArgs).base.seqId = worker->seqId;
+    PD_MSG_FIELD_IO(schedArgs).kind = OCR_SCHED_NOTIFY_EDT_READY;
+    PD_MSG_FIELD_IO(schedArgs).OCR_SCHED_ARG_FIELD(OCR_SCHED_NOTIFY_EDT_READY).guid.guid = self->guid;
+    PD_MSG_FIELD_IO(schedArgs).OCR_SCHED_ARG_FIELD(OCR_SCHED_NOTIFY_EDT_READY).guid.metaDataPtr = self;
     RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, false));
+    ASSERT(PD_MSG_FIELD_O(returnDetail) == 0);
 #undef PD_MSG
 #undef PD_TYPE
     return 0;

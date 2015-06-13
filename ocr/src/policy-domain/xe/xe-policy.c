@@ -261,7 +261,8 @@ u8 xePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
     case PD_MSG_EDTTEMP_CREATE: case PD_MSG_EDTTEMP_DESTROY:
     case PD_MSG_EVT_CREATE: case PD_MSG_EVT_DESTROY: case PD_MSG_EVT_GET:
     case PD_MSG_GUID_CREATE: case PD_MSG_GUID_INFO: case PD_MSG_GUID_DESTROY:
-    case PD_MSG_COMM_TAKE:
+    case PD_MSG_COMM_TAKE: //This is enabled until we move TAKE heuristic in CE policy domain to inside scheduler
+    case PD_MSG_SCHED_NOTIFY:
     case PD_MSG_DEP_ADD: case PD_MSG_DEP_REGSIGNALER: case PD_MSG_DEP_REGWAITER:
     case PD_MSG_DEP_SATISFY: {
         START_PROFILE(pd_xe_OffloadtoCE);
@@ -306,7 +307,6 @@ u8 xePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
     }
 
     // Messages are not handled at all
-    case PD_MSG_COMM_GIVE: // Give should only be triggered from the CE
     case PD_MSG_WORK_EXECUTE: case PD_MSG_DEP_UNREGSIGNALER:
     case PD_MSG_DEP_UNREGWAITER: case PD_MSG_SAL_PRINT:
     case PD_MSG_SAL_READ: case PD_MSG_SAL_WRITE:
@@ -323,6 +323,29 @@ u8 xePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
     }
 
     // Messages handled locally
+    case PD_MSG_SCHED_GET_WORK: {
+        START_PROFILE(pd_xe_SchedWork);
+        DPRINTF(DEBUG_LVL_VVERB, "Offloading message of type 0x%x to CE\n",
+                msg->type & PD_MSG_TYPE_ONLY);
+        returnCode = xeProcessCeRequest(self, &msg);
+        if(((msg->type & PD_MSG_TYPE_ONLY) == PD_MSG_SCHED_GET_WORK) && (returnCode == 0)) {
+#define PD_MSG msg
+#define PD_TYPE PD_MSG_SCHED_GET_WORK
+            ASSERT(PD_MSG_FIELD_IO(schedArgs).kind == OCR_SCHED_WORK_EDT_USER);
+            ocrFatGuid_t *fguid = &PD_MSG_FIELD_IO(schedArgs).OCR_SCHED_ARG_FIELD(OCR_SCHED_WORK_EDT_USER).edt;
+            if (fguid->guid != NULL_GUID) {
+                DPRINTF(DEBUG_LVL_VVERB, "Received EDT with GUID 0x%lx\n", fguid->guid);
+                localDeguidify(self, fguid);
+                DPRINTF(DEBUG_LVL_VVERB, "Received EDT (0x%lx; 0x%lx)\n",
+                        (u64)self->myLocation, fguid->guid, fguid->metaDataPtr);
+                PD_MSG_FIELD_O(factoryId) = 0;
+            }
+#undef PD_MSG
+#undef PD_TYPE
+        }
+        EXIT_PROFILE;
+        break;
+    }
     case PD_MSG_DEP_DYNADD: {
         START_PROFILE(pd_xe_DepDynAdd);
         ocrTask_t *curTask = NULL;

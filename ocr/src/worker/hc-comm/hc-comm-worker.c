@@ -77,7 +77,7 @@ ocrGuid_t processRequestEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[
     return NULL_GUID;
 }
 
-static u8 takeFromSchedulerAndSend(ocrPolicyDomain_t * pd) {
+static u8 takeFromSchedulerAndSend(ocrWorker_t * worker, ocrPolicyDomain_t * pd) {
     // When the communication-worker is not stopping only a single iteration is
     // executed. Otherwise it is executed until the scheduler's 'take' do not
     // return any more work.
@@ -86,26 +86,25 @@ static u8 takeFromSchedulerAndSend(ocrPolicyDomain_t * pd) {
     u8 ret = 0;
     getCurrentEnv(NULL, NULL, NULL, &msgCommTake);
     ocrFatGuid_t handlerGuid = {.guid = NULL_GUID, .metaDataPtr = NULL};
-    //IMPL: MSG_COMM_TAKE implementation must be consistent across PD, Scheduler and Worker.
+    //IMPL: MSG_SCHED_GET_WORK implementation must be consistent across PD, Scheduler and Worker.
     // We expect the PD to fill-in the guids pointer with an ocrMsgHandle_t pointer
     // to be processed by the communication worker or NULL.
     //PERF: could request 'n' for internal comm load balancing (outgoing vs pending vs incoming).
-    #define PD_MSG (&msgCommTake)
-    #define PD_TYPE PD_MSG_COMM_TAKE
-    msgCommTake.type = PD_MSG_COMM_TAKE | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
-    PD_MSG_FIELD_IO(guids) = &handlerGuid;
-    PD_MSG_FIELD_IO(extra) = 0; /*unused*/
-    PD_MSG_FIELD_IO(type) = OCR_GUID_COMM;
-    PD_MSG_FIELD_IO(guidCount) = 1;
-    PD_MSG_FIELD_I(properties) = 0;
+#define PD_MSG (&msgCommTake)
+#define PD_TYPE PD_MSG_SCHED_GET_WORK
+    msgCommTake.type = PD_MSG_SCHED_GET_WORK | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
+    PD_MSG_FIELD_IO(schedArgs).base.seqId = worker->seqId;
+    PD_MSG_FIELD_IO(schedArgs).kind = OCR_SCHED_WORK_COMM;
+    PD_MSG_FIELD_IO(schedArgs).OCR_SCHED_ARG_FIELD(OCR_SCHED_WORK_COMM).guids = &handlerGuid;
+    PD_MSG_FIELD_IO(schedArgs).OCR_SCHED_ARG_FIELD(OCR_SCHED_WORK_COMM).guidCount = 1;
     ret = pd->fcts.processMessage(pd, &msgCommTake, true);
-    if (!ret && (PD_MSG_FIELD_IO(guidCount) != 0)) {
-        ASSERT(PD_MSG_FIELD_IO(guidCount) == 1); //LIMITATION: single guid returned by comm take
-        ocrFatGuid_t handlerGuid = PD_MSG_FIELD_IO(guids[0]);
+    if (!ret && (PD_MSG_FIELD_IO(schedArgs).OCR_SCHED_ARG_FIELD(OCR_SCHED_WORK_COMM).guidCount != 0)) {
+        ASSERT(PD_MSG_FIELD_IO(schedArgs).OCR_SCHED_ARG_FIELD(OCR_SCHED_WORK_COMM).guidCount == 1); //LIMITATION: single guid returned by comm take
+        ocrFatGuid_t handlerGuid = PD_MSG_FIELD_IO(schedArgs).OCR_SCHED_ARG_FIELD(OCR_SCHED_WORK_COMM).guids[0];
         ASSERT(handlerGuid.metaDataPtr != NULL);
         outgoingHandle = (ocrMsgHandle_t *) handlerGuid.metaDataPtr;
-    #undef PD_MSG
-    #undef PD_TYPE
+#undef PD_MSG
+#undef PD_TYPE
         if (outgoingHandle != NULL) {
             // This code handles the pd's outgoing messages. They can be requests or responses.
             DPRINTF(DEBUG_LVL_VVERB,"hc-comm-worker: outgoing handle comm take successful handle=%p, msg=%p type=0x%x\n",
@@ -203,7 +202,7 @@ static void workerLoopHcCommInternal(ocrWorker_t * worker, ocrPolicyDomain_t *pd
     // - Poll to receive an incoming communication
     u8 ret;
     do {
-        ret = takeFromSchedulerAndSend(pd);
+        ret = takeFromSchedulerAndSend(worker, pd);
     } while (flushOutgoingComm && (ret == POLL_MORE_MESSAGE));
 
     do {
@@ -225,14 +224,12 @@ static void workerLoopHcCommInternal(ocrWorker_t * worker, ocrPolicyDomain_t *pd
                 PD_MSG_STACK(giveMsg);
                 getCurrentEnv(NULL, NULL, NULL, &giveMsg);
             #define PD_MSG (&giveMsg)
-            #define PD_TYPE PD_MSG_COMM_GIVE
-                giveMsg.type = PD_MSG_COMM_GIVE | PD_MSG_REQUEST;
-                PD_MSG_FIELD_IO(guids) = &fatGuid;
-                PD_MSG_FIELD_IO(guidCount) = 1;
-                PD_MSG_FIELD_I(properties) = 0;
-                PD_MSG_FIELD_I(type) = OCR_GUID_COMM;
-                ret = pd->fcts.processMessage(pd, &giveMsg, false);
-                ASSERT(ret == 0);
+            #define PD_TYPE PD_MSG_SCHED_NOTIFY
+                giveMsg.type = PD_MSG_SCHED_NOTIFY | PD_MSG_REQUEST;
+                PD_MSG_FIELD_IO(schedArgs).base.seqId = worker->seqId;
+                PD_MSG_FIELD_IO(schedArgs).kind = OCR_SCHED_NOTIFY_COMM_READY;
+                PD_MSG_FIELD_IO(schedArgs).OCR_SCHED_ARG_FIELD(OCR_SCHED_NOTIFY_COMM_READY).guid = fatGuid;
+                ASSERT(pd->fcts.processMessage(pd, &giveMsg, false) == 0);
             #undef PD_MSG
             #undef PD_TYPE
                 //For now, assumes all the responses are for workers that are
@@ -274,6 +271,20 @@ static void workerLoopHcComm(ocrWorker_t * worker) {
     u8 continueLoop = true;
     // At this stage, we are in the USER_OK runlevel
     ASSERT(worker->curState == GET_STATE(RL_USER_OK, (RL_GET_PHASE_COUNT_DOWN(worker->pd, RL_USER_OK))));
+
+    //Register this worker with the and get a context id
+    ocrPolicyDomain_t *pd = worker->pd;
+    PD_MSG_STACK(msg);
+    msg.srcLocation = pd->myLocation;
+    msg.destLocation = pd->myLocation;
+#define PD_MSG (&msg)
+#define PD_TYPE PD_MSG_MGT_REGISTER
+    msg.type = PD_MSG_MGT_REGISTER | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
+    PD_MSG_FIELD_I(properties) = 0;
+    pd->fcts.processMessage(pd, &msg, true);
+    ASSERT(worker->seqId == PD_MSG_FIELD_O(seqId));
+#undef PD_MSG
+#undef PD_TYPE
 
     if (worker->amBlessed) {
         ocrGuid_t affinityMasterPD;
@@ -534,23 +545,6 @@ u8 hcCommWorkerSwitchRunlevel(ocrWorker_t *self, ocrPolicyDomain_t *PD, ocrRunle
 
 // NOTE: This is exactly the same as the runWorkerHc beside the call to the different work loop
 void* runWorkerHcComm(ocrWorker_t * worker) {
-    // BUG #583: This probably needs to go away and be set directly
-    // by the PD during one of the RLs
-    //Register this worker and get a context id
-    ocrPolicyDomain_t *pd = worker->pd;
-    PD_MSG_STACK(msg);
-    msg.srcLocation = pd->myLocation;
-    msg.destLocation = pd->myLocation;
-#define PD_MSG (&msg)
-#define PD_TYPE PD_MSG_MGT_REGISTER
-    msg.type = PD_MSG_MGT_REGISTER | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
-    PD_MSG_FIELD_I(loc) = (ocrLocation_t) ((ocrWorkerHc_t *) worker)->id;
-    PD_MSG_FIELD_I(properties) = 0;
-    pd->fcts.processMessage(pd, &msg, true);
-    worker->seqId = PD_MSG_FIELD_O(seqId);
-#undef PD_MSG
-#undef PD_TYPE
-
     // At this point, we should have a callback to inform the PD
     // that we have successfully achieved the RL_COMPUTE_OK RL
     ASSERT(worker->callback != NULL);

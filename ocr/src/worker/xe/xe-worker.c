@@ -48,6 +48,42 @@ static void workerLoop(ocrWorker_t * worker) {
     PD_MSG_STACK(msg);
     getCurrentEnv(NULL, NULL, NULL, &msg);
     while(worker->fcts.isRunning(worker)) {
+#if 0 //This is disabled until we move TAKE heuristic in CE policy domain to inside scheduler
+#define PD_MSG (&msg)
+#define PD_TYPE PD_MSG_SCHED_GET_WORK
+        msg.type = PD_MSG_SCHED_GET_WORK | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
+        PD_MSG_FIELD_IO(schedArgs).base.seqId = worker->seqId;
+        PD_MSG_FIELD_IO(schedArgs).kind = OCR_SCHED_WORK_EDT_USER;
+        PD_MSG_FIELD_IO(schedArgs).OCR_SCHED_ARG_FIELD(OCR_SCHED_WORK_EDT_USER).edt.guid = NULL_GUID;
+        PD_MSG_FIELD_IO(schedArgs).OCR_SCHED_ARG_FIELD(OCR_SCHED_WORK_EDT_USER).edt.metaDataPtr = NULL;
+        if(pd->fcts.processMessage(pd, &msg, true) == 0) {
+            // We got a response
+            ocrFatGuid_t taskGuid = PD_MSG_FIELD_IO(schedArgs).OCR_SCHED_ARG_FIELD(OCR_SCHED_WORK_EDT_USER).edt;
+            if(taskGuid.guid != NULL_GUID) {
+                // Task sanity checks
+                ASSERT(taskGuid.metaDataPtr != NULL);
+                worker->curTask = (ocrTask_t*)taskGuid.metaDataPtr;
+                u32 factoryId = PD_MSG_FIELD_O(factoryId);
+                pd->taskFactories[factoryId]->fcts.execute(worker->curTask);
+#undef PD_TYPE
+#define PD_TYPE PD_MSG_SCHED_NOTIFY
+                getCurrentEnv(NULL, NULL, NULL, &msg);
+                msg.type = PD_MSG_SCHED_NOTIFY | PD_MSG_REQUEST;
+                PD_MSG_FIELD_IO(schedArgs).kind = OCR_SCHED_NOTIFY_EDT_DONE;
+                PD_MSG_FIELD_IO(schedArgs).OCR_SCHED_ARG_FIELD(OCR_SCHED_NOTIFY_EDT_DONE).guid.guid = taskGuid.guid;
+                PD_MSG_FIELD_IO(schedArgs).OCR_SCHED_ARG_FIELD(OCR_SCHED_NOTIFY_EDT_DONE).guid.metaDataPtr = taskGuid.metaDataPtr;
+                ASSERT(pd->fcts.processMessage(pd, &msg, false) == 0);
+
+                // Important for this to be the last
+                worker->curTask = NULL;
+            }
+        } else {
+            ASSERT(0); //Handle error code
+        }
+#undef PD_MSG
+#undef PD_TYPE
+
+#else
         ocrFatGuid_t taskGuid = {.guid = NULL_GUID, .metaDataPtr = NULL};
         u32 count = 1;
 #define PD_MSG (&msg)
@@ -86,6 +122,7 @@ static void workerLoop(ocrWorker_t * worker) {
                 // count = 0; no work received; do something else if required.
             }
         }
+#endif
     } /* End of while loop */
 }
 

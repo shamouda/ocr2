@@ -249,6 +249,73 @@ u8 ceSchedulerGiveComm(ocrScheduler_t *self, u32* count, ocrFatGuid_t* handlers,
     return OCR_ENOSYS;
 }
 
+///////////////////////////////
+//      Scheduler 1.0        //
+///////////////////////////////
+
+u8 ceSchedulerRegisterContext(ocrScheduler_t *self, ocrLocation_t loc, u64 *seqId) {
+    return OCR_ENOTSUP;
+}
+
+u8 ceSchedulerGetWorkInvoke(ocrScheduler_t *self, ocrSchedulerOpArgs_t *opArgs, ocrRuntimeHint_t *hints) {
+    ocrSchedulerOpWorkArgs_t *taskArgs = (ocrSchedulerOpWorkArgs_t*)opArgs;
+    switch(taskArgs->kind) {
+    case OCR_SCHED_WORK_EDT_USER:
+        {
+            u32 count = 1;
+            return self->fcts.takeEdt(self, &count, &taskArgs->OCR_SCHED_ARG_FIELD(OCR_SCHED_WORK_EDT_USER).edt);
+        }
+    default:
+        ASSERT(0);
+        break;
+    }
+    return OCR_ENOTSUP;
+}
+
+u8 ceSchedulerNotifyInvoke(ocrScheduler_t *self, ocrSchedulerOpArgs_t *opArgs, ocrRuntimeHint_t *hints) {
+    ocrSchedulerOpNotifyArgs_t *notifyArgs = (ocrSchedulerOpNotifyArgs_t*)opArgs;
+    switch(notifyArgs->kind) {
+    case OCR_SCHED_NOTIFY_EDT_READY:
+        {
+            u32 count = 1;
+            return self->fcts.giveEdt(self, &count, &notifyArgs->OCR_SCHED_ARG_FIELD(OCR_SCHED_NOTIFY_EDT_READY).guid);
+        }
+    case OCR_SCHED_NOTIFY_EDT_DONE: {
+            // Destroy the work
+            ocrPolicyDomain_t *pd;
+            PD_MSG_STACK(msg);
+            getCurrentEnv(&pd, NULL, NULL, &msg);
+#define PD_MSG (&msg)
+#define PD_TYPE PD_MSG_WORK_DESTROY
+            getCurrentEnv(NULL, NULL, NULL, &msg);
+            msg.type = PD_MSG_WORK_DESTROY | PD_MSG_REQUEST;
+            PD_MSG_FIELD_I(guid) = notifyArgs->OCR_SCHED_ARG_FIELD(OCR_SCHED_NOTIFY_EDT_DONE).guid;
+            PD_MSG_FIELD_I(currentEdt) = notifyArgs->OCR_SCHED_ARG_FIELD(OCR_SCHED_NOTIFY_EDT_DONE).guid;
+            PD_MSG_FIELD_I(properties) = 0;
+            ASSERT(pd->fcts.processMessage(pd, &msg, false) == 0);
+#undef PD_MSG
+#undef PD_TYPE
+        }
+        break;
+    default:
+        ASSERT(0);
+        return OCR_ENOTSUP;
+    }
+    return 0;
+}
+
+u8 ceSchedulerTransactInvoke(ocrScheduler_t *self, ocrSchedulerOpArgs_t *opArgs, ocrRuntimeHint_t *hints) {
+    return OCR_ENOTSUP;
+}
+
+u8 ceSchedulerAnalyzeInvoke(ocrScheduler_t *self, ocrSchedulerOpArgs_t *opArgs, ocrRuntimeHint_t *hints) {
+    return OCR_ENOTSUP;
+}
+
+u8 ceSchedulerUpdate(ocrScheduler_t *self, ocrSchedulerOpArgs_t *opArgs) {
+    return OCR_ENOTSUP;
+}
+
 ocrScheduler_t* newSchedulerCe(ocrSchedulerFactory_t * factory, ocrParamList_t *perInstance) {
     ocrScheduler_t* base = (ocrScheduler_t*) runtimeChunkAlloc(
                                sizeof(ocrSchedulerCe_t), PERSISTENT_CHUNK);
@@ -280,6 +347,13 @@ ocrSchedulerFactory_t * newOcrSchedulerFactoryCe(ocrParamList_t *perType) {
     base->schedulerFcts.takeComm = FUNC_ADDR(u8 (*)(ocrScheduler_t*, u32*, ocrFatGuid_t*, u32), ceSchedulerTakeComm);
     base->schedulerFcts.giveComm = FUNC_ADDR(u8 (*)(ocrScheduler_t*, u32*, ocrFatGuid_t*, u32), ceSchedulerGiveComm);
 
+    //Scheduler 1.0
+    base->schedulerFcts.registerContext = FUNC_ADDR(u8 (*)(ocrScheduler_t*, ocrLocation_t, u64*), ceSchedulerRegisterContext);
+    base->schedulerFcts.update = FUNC_ADDR(u8 (*)(ocrScheduler_t*, ocrSchedulerOpArgs_t*), ceSchedulerUpdate);
+    base->schedulerFcts.op[OCR_SCHEDULER_OP_GET_WORK].invoke = FUNC_ADDR(u8 (*)(ocrScheduler_t*, ocrSchedulerOpArgs_t*, ocrRuntimeHint_t*), ceSchedulerGetWorkInvoke);
+    base->schedulerFcts.op[OCR_SCHEDULER_OP_NOTIFY].invoke = FUNC_ADDR(u8 (*)(ocrScheduler_t*, ocrSchedulerOpArgs_t*, ocrRuntimeHint_t*), ceSchedulerNotifyInvoke);
+    base->schedulerFcts.op[OCR_SCHEDULER_OP_TRANSACT].invoke = FUNC_ADDR(u8 (*)(ocrScheduler_t*, ocrSchedulerOpArgs_t*, ocrRuntimeHint_t*), ceSchedulerTransactInvoke);
+    base->schedulerFcts.op[OCR_SCHEDULER_OP_ANALYZE].invoke = FUNC_ADDR(u8 (*)(ocrScheduler_t*, ocrSchedulerOpArgs_t*, ocrRuntimeHint_t*), ceSchedulerAnalyzeInvoke);
     return base;
 }
 

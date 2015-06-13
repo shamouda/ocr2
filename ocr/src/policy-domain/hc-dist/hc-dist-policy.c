@@ -1241,7 +1241,8 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
 #undef PD_TYPE
         break;
     }
-    case PD_MSG_COMM_TAKE: {
+    case PD_MSG_SCHED_GET_WORK:
+    {
         // fall-through and do regular take
         break;
     }
@@ -1270,7 +1271,7 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
     case PD_MSG_EVT_CREATE:
     case PD_MSG_EVT_GET:
     case PD_MSG_GUID_CREATE:
-    case PD_MSG_COMM_GIVE:
+    case PD_MSG_SCHED_NOTIFY:
     case PD_MSG_SAL_OP:
     case PD_MSG_SAL_PRINT:
     case PD_MSG_SAL_READ:

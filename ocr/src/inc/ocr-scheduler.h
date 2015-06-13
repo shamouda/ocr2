@@ -18,6 +18,9 @@
 
 struct _ocrPolicyDomain_t;
 
+#define OCR_SCHED_ARG_NAME(name) _arg_##name
+#define OCR_SCHED_ARG_FIELD(type) data.OCR_SCHED_ARG_NAME(type)
+
 /****************************************************/
 /* PARAMETER LISTS                                  */
 /****************************************************/
@@ -36,27 +39,132 @@ typedef struct _paramListSchedulerInst_t {
 /****************************************************/
 
 typedef enum {
-    OCR_SCHEDULER_OP_GIVE = 0,              /* Operation where a component is given to this scheduler */
-    OCR_SCHEDULER_OP_TAKE,                  /* Operation where a request is made to take a component from this scheduler */
-    OCR_SCHEDULER_OP_DONE,                  /* Operation to notify scheduler that a previous "taken" component is done processing */
-    OCR_SCHEDULER_OP_DONE_TAKE,             /* Operation to notify a previous component is "done" with a request for a new take */
+    OCR_SCHEDULER_OP_GET_WORK,                      /**< Operation to find task(s) for the worker to execute (worker-scheduler operation)
+                                                     **  The call from the worker is blocking and this call does not return without a response.
+                                                     **/
+
+    OCR_SCHEDULER_OP_NOTIFY,                        /**< Operation to notify scheduler about a new guid or event (typically used by other runtime modules)
+                                                     **  This op is used in a one-way notification message and does not expect a response.
+                                                     **/
+
+    OCR_SCHEDULER_OP_TRANSACT,                      /**< Operation where schedulers transact a scheduler object (scheduler-scheduler operation)
+                                                     **  This op is used with a property flags called request, transact and done to establish a
+                                                     **  handshaking protocol. Some schedulers may directly use a transact without a request when
+                                                     **  they have an implicit agreement between themselves.
+                                                     **/
+
+    OCR_SCHEDULER_OP_ANALYZE,                       /** Operation where schedulers analyze state (no scheduler objects are transferred) and help setup transactions
+                                                     ** Schedulers collectively participate in negotiations to decide who gets to execute what and when.
+                                                     ** All transaction are typically setup once analysis is done.
+                                                     **/
     NUM_SCHEDULER_OPS,
 } ocrSchedulerOp_t;
 
 typedef struct _ocrSchedulerOpArgs_t {
-    ocrLocation_t loc;                      /* Location of client PD requesting scheduler invokation */
-    u64 contextId;                          /* Sequential ID of 'loc' to allow for fast array index  */
-    struct _ocrSchedulerObject_t *el;       /* schedulerObject used in this operation:
-                                             * For GIVE:      IN: el is the schedulerObject to "give"
-                                             * For TAKE:      IN: el is either NULL or is the allocation of the schedulerObject to "take"
-                                             *                OUT: schedulerObject taken
-                                             * For DONE:      IN: el is schedulerObject which is "done"
-                                             * For DONE_TAKE: IN: el is schedulerObject which is "done"
-                                             *                OUT: schedulerObject taken
-                                             */
-    ocrSchedulerObjectKind takeKind;        /* If a TAKE operation: kind of element to take */
-    u32 takeCount;                          /* If a TAKE operation: number of elements requested */
+    u64 seqId;                                      /* Sequential ID of client calling into the scheduler */
 } ocrSchedulerOpArgs_t;
+
+/* Scheduler worker task related arguments */
+typedef enum {
+    OCR_SCHED_WORK_EDT_USER,
+    OCR_SCHED_WORK_COMM,
+} ocrSchedWorkKind;
+
+typedef union _ocrSchedWorkData_t {
+    struct {
+        ocrFatGuid_t edt;                           // For user EDTs, count is always 1
+    } OCR_SCHED_ARG_NAME(OCR_SCHED_WORK_EDT_USER);
+    struct {
+        ocrFatGuid_t *guids;
+        u32 guidCount;
+    } OCR_SCHED_ARG_NAME(OCR_SCHED_WORK_COMM);
+} ocrSchedWorkData_t;
+
+typedef struct _ocrSchedulerOpWorkArgs_t {
+    ocrSchedulerOpArgs_t base;
+    ocrSchedWorkKind kind;                          /* Kind of worker task */
+    ocrSchedWorkData_t data;                        /* Worker task related data */
+} ocrSchedulerOpWorkArgs_t;
+
+/* Scheduler notify related arguments */
+typedef enum {
+    OCR_SCHED_NOTIFY_DB_CREATE,                     /* Notify scheduler that a DB is created */
+    OCR_SCHED_NOTIFY_DB_DONE,                       /* Notify scheduler that a DB's use is done */
+    OCR_SCHED_NOTIFY_EDT_SATISFIED,                 /* Notify scheduler that an EDT is fully satisfied */
+    OCR_SCHED_NOTIFY_EDT_READY,                     /* Notify scheduler that an EDT is ready to execute */
+    OCR_SCHED_NOTIFY_EDT_DONE,                      /* Notify scheduler that an EDT is done executing */
+    OCR_SCHED_NOTIFY_COMM_READY,                    /* Notify scheduler that a communication task is ready to execute */
+} ocrSchedNotifyKind;
+
+typedef union _ocrSchedNotifyData_t {
+    struct {
+        ocrFatGuid_t guid;                          /* Scheduler is notified about this db guid */
+    } OCR_SCHED_ARG_NAME(OCR_SCHED_NOTIFY_DB_CREATE);
+    struct {
+        ocrFatGuid_t guid;                          /* Scheduler is notified about this db guid */
+    } OCR_SCHED_ARG_NAME(OCR_SCHED_NOTIFY_DB_DONE);
+    struct {
+        ocrFatGuid_t guid;                          /* Scheduler is notified about this edt guid */
+    } OCR_SCHED_ARG_NAME(OCR_SCHED_NOTIFY_EDT_SATISFIED);
+    struct {
+        ocrFatGuid_t guid;                          /* Scheduler is notified about this edt guid */
+    } OCR_SCHED_ARG_NAME(OCR_SCHED_NOTIFY_EDT_READY);
+    struct {
+        ocrFatGuid_t guid;                          /* Scheduler is notified about this edt guid */
+    } OCR_SCHED_ARG_NAME(OCR_SCHED_NOTIFY_EDT_DONE);
+    struct {
+        ocrFatGuid_t guid;                          /* Scheduler is notified about this communication guid */
+    } OCR_SCHED_ARG_NAME(OCR_SCHED_NOTIFY_COMM_READY);
+} ocrSchedNotifyData_t;
+
+typedef struct _ocrSchedulerOpNotifyArgs_t {
+    ocrSchedulerOpArgs_t base;
+    ocrSchedNotifyKind kind;                        /* Kind of notify */
+    ocrSchedNotifyData_t data;                      /* Notify op related data */
+} ocrSchedulerOpNotifyArgs_t;
+
+/* Scheduler transaction related arguments */
+typedef enum {
+    OCR_TRANSACT_PROP_REQUEST   =0x1,
+    OCR_TRANSACT_PROP_TRANSFER  =0x2,
+    OCR_TRANSACT_PROP_DONE      =0x4,
+} ocrSchedulerTransactProp;
+
+typedef struct _ocrSchedulerOpTransactArgs_t {
+    ocrSchedulerOpArgs_t base;
+    ocrSchedulerTransactProp properties;            /* Transact properties */
+    struct _ocrSchedulerObject_t *elObj;            /* scheduler object element that is used in transaction */
+    struct _ocrSchedulerObject_t *dstObj;           /* destination scheduler object */
+    struct _ocrSchedulerObject_t *srcObj;           /* source scheduler object */
+} ocrSchedulerOpTransactArgs_t;
+
+/* Scheduler negotiation related arguments */
+typedef enum {
+    OCR_SCHED_ANALYZE_CLOCK_CYCLE,
+} ocrSchedAnalyzeKind;
+
+typedef union _ocrSchedAnalyzeData_t {
+    struct {
+        u64 cycle;                                  /* Scheduler cycle */
+        ocrDbAccessMode_t mode;                     /* DB access mode */
+    } OCR_SCHED_ARG_NAME(OCR_SCHED_ANALYZE_CLOCK_CYCLE);
+} ocrSchedAnalyzeData_t;
+
+typedef enum {
+    OCR_SCHED_ANALYZE_REQUEST,
+    OCR_SCHED_ANALYZE_RESPONSE,
+    OCR_SCHED_ANALYZE_UPDATE,
+    OCR_SCHED_ANALYZE_ACKNOWLEDGE,
+} ocrSchedulerAnalyzeProp;
+
+typedef struct _ocrSchedulerOpAnalyzeArgs_t {
+    ocrSchedulerOpArgs_t base;
+    ocrSchedAnalyzeKind kind;
+    ocrSchedAnalyzeData_t data;                     /* Analyze op related data */
+    ocrSchedulerAnalyzeProp properties;             /* Analyze properties */
+    struct _ocrSchedulerObject_t *dstObj;           /* destination scheduler object */
+    struct _ocrSchedulerObject_t *srcObj;           /* source scheduler object */
+} ocrSchedulerOpAnalyzeArgs_t;
 
 /****************************************************/
 /* OCR SCHEDULER                                    */
@@ -71,14 +179,12 @@ typedef struct _ocrSchedulerOpFcts_t {
     /**
      * @brief Invokes the scheduler for a specific operation
      *
-     * This call can be used to create EDTs/DBs/Events.
-     * E.g: The data block create API can reason about
-     * allocation based on scheduler information and
-     * cost heuristics.
+     * The scheduler responds to this call in reactive manner
+     * performing the specified operation.
      *
      * @param self[in]           Pointer to this scheduler
      * @param opArgs[in]         Info about specific scheduling task
-     * @param hints[in]          Hints for the create.
+     * @param hints[in]          Hints for the op
      *
      * @return 0 on success and a non-zero value on failure
      */
@@ -196,22 +302,22 @@ typedef struct _ocrSchedulerFcts_t {
     ////////////////////////////////////////////////////////////////////////////////////////////////////
 
     /**
-     * @brief Register the contextId with the scheduler
+     * @brief Register a client with the scheduler
      *
      * The scheduler keeps track of all agents that
-     * it communicate with as contexts. It registers those
+     * it will communicate with. It registers those
      * contexts with each scheduler heuristic.
      *
      * @param self[in]           Pointer to this scheduler heuristic
-     * @param contextId[in]      Context ID known to policy domain
      * @param loc[in]            Absolute location for this context ID
+     * @param seqId[out]         Sequential ID of client as determined by the scheduler
      *
      * @return 0 on success and a non-zero value on failure
      */
-    u8 (*registerContext)(struct _ocrScheduler_t *self, u64 contextId, ocrLocation_t loc);
+    u8 (*registerContext)(struct _ocrScheduler_t *self, ocrLocation_t loc, u64 *seqId);
 
     /**
-     * @brief Scheduler updates itself
+     * @brief Perform updates on the scheduler
      *
      * This works as a proactive monitoring hook
      *
@@ -222,7 +328,12 @@ typedef struct _ocrSchedulerFcts_t {
      */
     u8 (*update)(struct _ocrScheduler_t *self, ocrSchedulerOpArgs_t *opArgs);
 
-    //Array of functions for scheduler ops
+    /**
+     * @brief Array of functions for scheduler ops
+     *
+     * These functions are used by scheduler related
+     * policy messages.
+     */
     ocrSchedulerOpFcts_t op[NUM_SCHEDULER_OPS];
 } ocrSchedulerFcts_t;
 
