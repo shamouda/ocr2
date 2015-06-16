@@ -260,6 +260,7 @@ u8 hcWorkerSwitchRunlevel(ocrWorker_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_
             ASSERT(callback != NULL);
             self->curState = GET_STATE(RL_MEMORY_OK, 0); // Technically last phase of memory OK but doesn't really matter
             self->desiredState = GET_STATE(RL_COMPUTE_OK, phase);
+            self->location = (u64) self; // Currently used only by visualizer, value is not important as long as it's unique
 
             // See if we are blessed
             self->amBlessed = (properties & RL_BLESSED) != 0;
