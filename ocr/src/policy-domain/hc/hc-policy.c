@@ -1128,6 +1128,7 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
                 if(depv[i].guid != UNINITIALIZED_GUID) {
                     // We only add dependences that are not UNINITIALIZED_GUID
                     PD_MSG_STACK(msgAddDep);
+                    getCurrentEnv(NULL, NULL, NULL, &msgAddDep);
                 #undef PD_MSG
                 #undef PD_TYPE
                     //NOTE: Could systematically call DEP_ADD but it's faster to disambiguate
