@@ -17,22 +17,11 @@
 
 #include "pthread-comp-platform.h"
 
-#include <stdlib.h> // For malloc for TLS
-
 #include "utils/profiler/profiler.h"
 
 #define DEBUG_TYPE COMP_PLATFORM
 
 extern void bindThread(u32 mask);
-
-/**
- * @brief Structure stored on a per-thread basis to keep track of
- * "who we are"
- */
-typedef struct {
-    ocrPolicyDomain_t *pd;
-    ocrWorker_t *worker;
-} perThreadStorage_t;
 
 /**
  * The key we use to be able to find which compPlatform we are on
@@ -49,58 +38,51 @@ static void * pthreadRoutineExecute(ocrWorker_t * worker) {
     return worker->fcts.run(worker);
 }
 
-static void * pthreadRoutineWrapper(void * arg) {
-    // Only called on slave workers (never master)
-    ocrCompPlatformPthread_t * pthreadCompPlatform = (ocrCompPlatformPthread_t *) arg;
+static void pthreadRoutineInitializer(ocrCompPlatformPthread_t * pthreadCompPlatform) {
     s32 cpuBind = pthreadCompPlatform->binding;
     if(cpuBind != -1) {
         DPRINTF(DEBUG_LVL_INFO, "Binding comp-platform to cpu_id %d\n", cpuBind);
         bindThread(cpuBind);
     }
-    // Wrapper routine to allow initialization of local storage
-    // before entering the worker routine.
-    perThreadStorage_t *data = (perThreadStorage_t*)malloc(sizeof(perThreadStorage_t));
-    RESULT_ASSERT(pthread_setspecific(selfKey, data), ==, 0);
-
 #ifdef OCR_RUNTIME_PROFILER
-    _profilerData *d = (_profilerData*)malloc(sizeof(_profilerData));
-    char buffer[50];
-    snprintf(buffer, 50, "profiler_%lx-%lx",
-                 ((ocrPolicyDomain_t *)(pthreadCompPlatform->base.pd))->myLocation, (u64)arg);
-    d->output = fopen(buffer, "w");
-    ASSERT(d->output);
-    RESULT_ASSERT(pthread_setspecific(_profilerThreadData, d), ==, 0);
+    {
+        _profilerData *d = (_profilerData*) runtimeChunkAlloc(sizeof(_profilerData), PERSISTENT_CHUNK);
+        char buffer[50];
+        snprintf(buffer, 50, "profiler_%lx-%lx",
+                     ((ocrPolicyDomain_t *)(pthreadCompPlatform->base.pd))->myLocation, (u64)pthreadCompPlatform);
+        d->output = fopen(buffer, "w");
+        ASSERT(d->output);
+        RESULT_ASSERT(pthread_setspecific(_profilerThreadData, d), ==, 0);
+    }
 #endif
-
-    return pthreadRoutineExecute(pthreadCompPlatform->base.worker);
 }
 
-static void destroyKey(void* arg) {
-    runtimeChunkFree((u64)arg, PERSISTENT_CHUNK);
+/*
+ * Wrapper routine to allow initialization of local storage
+ * before entering the worker routine.
+ */
+static void * pthreadRoutineWrapper(void * arg) {
+    // Only called on slave workers (never master)
+    ocrCompPlatformPthread_t * pthreadCompPlatform = (ocrCompPlatformPthread_t *) arg;
+    pthreadRoutineInitializer(pthreadCompPlatform);
+    // Real initialization happens in workers's run routine
+    RESULT_ASSERT(pthread_setspecific(selfKey, &(pthreadCompPlatform->tls)), ==, 0);
+    return pthreadRoutineExecute(pthreadCompPlatform->base.worker);
 }
 
 /**
  * Called once by the master thread before others pthread are started.
  */
 static void initializeKey() {
-    RESULT_ASSERT(pthread_key_create(&selfKey, &destroyKey), ==, 0);
+    RESULT_ASSERT(pthread_key_create(&selfKey, NULL), ==, 0);
 #ifdef OCR_RUNTIME_PROFILER
     RESULT_ASSERT(pthread_key_create(&_profilerThreadData, &_profilerDataDestroy), ==, 0);
 #endif
-
-    ocrPolicyDomain_t *pd = NULL;
-    getCurrentEnv(&pd, NULL, NULL, NULL);
-    // We are going to set our own key (we are the master thread)
-    perThreadStorage_t *data = (perThreadStorage_t*)malloc(sizeof(perThreadStorage_t));
-    data->pd = NULL;
-    data->worker = NULL;
-    RESULT_ASSERT(pthread_setspecific(selfKey, data), ==, 0);
 }
 
 void pthreadDestruct (ocrCompPlatform_t * base) {
     runtimeChunkFree((u64)base, PERSISTENT_CHUNK);
 }
-
 
 u8 pthreadSwitchRunlevel(ocrCompPlatform_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
                          phase_t phase, u32 properties, void (*callback)(ocrPolicyDomain_t*, u64), u64 val) {
@@ -131,9 +113,17 @@ u8 pthreadSwitchRunlevel(ocrCompPlatform_t *self, ocrPolicyDomain_t *PD, ocrRunl
         if(properties & RL_BRING_UP) {
             self->pd = PD;
             if(properties & RL_PD_MASTER) {
-                // We need to make sure we have the current environment set
-                // at least partially as the PD may be used
-                self->fcts.setCurrentEnv(self, self->pd, NULL);
+                // This code is called by the master thread as many times there are platforms.
+                // This is a little fragile but since platforms are called in order, we can
+                // set the TLS on the first platform assuming it's going to be the one for master
+                perThreadStorage_t *tls = pthread_getspecific(selfKey);
+                if (tls == NULL) {
+                    // We need to make sure we have the current environment set
+                    // at least partially as the PD may be used
+                    // We are going to set our own key (we are the master thread)
+                    RESULT_ASSERT(pthread_setspecific(selfKey, &pthreadCompPlatform->tls), ==, 0);
+                    self->fcts.setCurrentEnv(self, self->pd, NULL);
+                }
             }
         }
         break;
@@ -143,27 +133,11 @@ u8 pthreadSwitchRunlevel(ocrCompPlatform_t *self, ocrPolicyDomain_t *PD, ocrRunl
         break;
     case RL_COMPUTE_OK:
         if((properties & RL_BRING_UP) && RL_IS_FIRST_PHASE_UP(PD, RL_COMPUTE_OK, phase)) {
+            ocrCompPlatformPthread_t * pthreadCompPlatform = (ocrCompPlatformPthread_t *)self;
             if(properties & RL_PD_MASTER) {
-                // We do not need to create another thread
-                // Only do the binding
-                s32 cpuBind = pthreadCompPlatform->binding;
-                if(cpuBind != -1) {
-                    DPRINTF(DEBUG_LVL_INFO, "Binding comp-platform to cpu_id %d\n", cpuBind);
-                    bindThread(cpuBind);
-                }
-#ifdef OCR_RUNTIME_PROFILER
-                {
-                    _profilerData *d = (_profilerData*)malloc(sizeof(_profilerData));
-                    char buffer[50];
-                    snprintf(buffer, 50, "profiler_%lx-%lx", PD->myLocation, 0UL);
-                    d->output = fopen(buffer, "w");
-                    ASSERT(d->output);
-                    RESULT_ASSERT(pthread_setspecific(_profilerThreadData, d), ==, 0);
-                }
-#endif
+                pthreadRoutineInitializer(pthreadCompPlatform);
             } else {
                 // We need to create another capable module
-                ocrCompPlatformPthread_t * pthreadCompPlatform = (ocrCompPlatformPthread_t *)self;
                 pthread_attr_t attr;
                 toReturn |= pthread_attr_init(&attr);
                 //Note this call may fail if the system doesn't like the stack size asked for.
@@ -181,6 +155,11 @@ u8 pthreadSwitchRunlevel(ocrCompPlatform_t *self, ocrPolicyDomain_t *PD, ocrRunl
                 // We do not join with ourself
                 toReturn |= pthread_join(pthreadCompPlatform->osThread, NULL);
             }
+#ifdef OCR_RUNTIME_PROFILER
+            {
+                //BUG #527 missing OCR_RUNTIME_PROFILER deallocation
+            }
+#endif
         }
         break;
     case RL_USER_OK:
@@ -190,19 +169,6 @@ u8 pthreadSwitchRunlevel(ocrCompPlatform_t *self, ocrPolicyDomain_t *PD, ocrRunl
     }
     return toReturn;
 }
-
-#if 0
-    // Not sure if I need to do this anymore for master thread
-    if(pthreadCompPlatform->isMaster) {
-        // Destroy keys for the master thread
-        void* _t = pthread_getspecific(selfKey);
-        destroyKey(_t);
-#ifdef OCR_RUNTIME_PROFILER
-        _t = pthread_getspecific(_profilerThreadData);
-        _profilerDataDestroy(_t);
-#endif
-    }
-#endif
 
 u8 pthreadGetThrottle(ocrCompPlatform_t *self, u64* value) {
     return 1;
@@ -216,9 +182,9 @@ u8 pthreadSetCurrentEnv(ocrCompPlatform_t *self, ocrPolicyDomain_t *pd,
                         ocrWorker_t *worker) {
 
     ASSERT(pd->fguid.guid == self->pd->fguid.guid);
-    perThreadStorage_t *vals = pthread_getspecific(selfKey);
-    vals->pd = pd;
-    vals->worker = worker;
+    perThreadStorage_t *tls = pthread_getspecific(selfKey);
+    tls->pd = pd;
+    tls->worker = worker;
     return 0;
 }
 
@@ -244,6 +210,8 @@ void initializeCompPlatformPthread(ocrCompPlatformFactory_t * factory, ocrCompPl
     compPlatformPthread->base.fcts = factory->platformFcts;
     compPlatformPthread->binding = (params != NULL) ? params->binding : -1;
     compPlatformPthread->stackSize = ((params != NULL) && (params->stackSize > 0)) ? params->stackSize : 8388608;
+    ((ocrCompPlatformPthread_t*)compPlatformPthread)->tls.pd = NULL;
+    ((ocrCompPlatformPthread_t*)compPlatformPthread)->tls.worker = NULL;
 }
 
 /******************************************************/
@@ -257,18 +225,21 @@ void destructCompPlatformFactoryPthread(ocrCompPlatformFactory_t *factory) {
 void getCurrentEnv(ocrPolicyDomain_t** pd, ocrWorker_t** worker,
                    ocrTask_t **task, ocrPolicyMsg_t* msg) {
     START_PROFILE(cp_getCurrentEnv);
-    perThreadStorage_t *vals = pthread_getspecific(selfKey);
-    if(vals == NULL)
-        return;
+    perThreadStorage_t *tls = pthread_getspecific(selfKey);
+    if(tls == NULL) {
+        // TLS may be NULL when we start the runtime but are using the logging facility.
+        RETURN_PROFILE();
+    }
     if(pd)
-        *pd = vals->pd;
+        *pd = tls->pd;
     if(worker)
-        *worker = vals->worker;
-    if(task && vals->worker)
-        *task = vals->worker->curTask;
+        *worker = tls->worker;
+    if(task && tls->worker)
+        *task = tls->worker->curTask;
     if(msg) {
+        ASSERT(tls->pd != NULL);
         //By default set src and dest location to current location.
-        msg->srcLocation = vals->pd->myLocation;
+        msg->srcLocation = tls->pd->myLocation;
         msg->destLocation = msg->srcLocation;
         msg->usefulSize = 0; // Convention to say that the size is not yet set
     }
