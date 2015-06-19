@@ -17,7 +17,7 @@ if [[ $# -lt 1 ]]; then
     exit 1
 fi
 
-REPORT_FILES=$1
+REPORT_FILES=$@
 
 #Extract a filename for the report: careful with regexp here, use echo
 REPORT_FILENAME=`echo ${REPORT_FILES} | tr -s ' ' | cut -d' ' -f 1-1`

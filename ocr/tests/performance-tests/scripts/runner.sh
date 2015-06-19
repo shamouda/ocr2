@@ -33,7 +33,7 @@ REPORT_OPT="no"
 REPORT_ARG=""
 SWEEPFILE_OPT="no"
 SWEEPFILE_ARG=""
-TARGET_ARG="X86"
+TARGET_ARG="x86"
 NOCLEAN_OPT="no"
 
 OCR_MAKEFILE="Makefile"
@@ -88,7 +88,7 @@ while [[ $# -gt 0 ]]; do
         echo "       -nbrun  integer    : Number of runs per program"
         echo "       -runlog name       : Naming for run logs"
         echo "       -report name       : Naming for run reports"
-        echo "       -target name       : Target to run on (X86|MPI)"
+        echo "       -target name       : Target to run on (x86|mpi)"
         echo "       -noclean           : Do not cleanup temporary files"
         echo "Environment variables:"
         echo "       - CUSTOM_BOUNDS: defines to use when compiling the program"
@@ -142,18 +142,18 @@ function deleteFiles() {
 function defaultConfigTarget() {
     local target=$1
     case "$target" in
-        X86)
+        x86)
             export CFGARG_GUID=${CFGARG_GUID-"PTR"}
             export CFGARG_PLATFORM=${CFGARG_PLATFORM-"X86"}
-            export CFGARG_TARGET=${CFGARG_TARGET-"X86"}
+            export CFGARG_TARGET=${CFGARG_TARGET-"x86"}
             export CFGARG_BINDING=${CFGARG_BINDING-"seq"}
             export CFGARG_ALLOC=${CFGARG_ALLOC-"32"}
             export CFGARG_ALLOCTYPE=${CFGARG_ALLOCTYPE-"mallocproxy"}
         ;;
-        MPI)
+        mpi)
             export CFGARG_GUID=${CFGARG_GUID-"COUNTED_MAP"}
             export CFGARG_PLATFORM=${CFGARG_PLATFORM-"X86"}
-            export CFGARG_TARGET=${CFGARG_TARGET-"MPI"}
+            export CFGARG_TARGET=${CFGARG_TARGET-"mpi"}
             export CFGARG_BINDING=${CFGARG_BINDING-"seq"}
             export CFGARG_ALLOC=${CFGARG_ALLOC-"32"}
             export CFGARG_ALLOCTYPE=${CFGARG_ALLOCTYPE-"mallocproxy"}
@@ -270,14 +270,22 @@ if [[ "$SWEEPFILE_OPT" = "yes" ]]; then
     # use sweep file
     echo "${SCRIPT_NAME} Loading sweep configuration: $SWEEPFILE_ARG"
     let count=0
-    while read -r defines
+    # Used the following approach to read the sweepfile but it
+    # seems that invoking mpirun somehow breaks the loop and only
+    # the first line is read.
+    # while read -r defines
+    # done < "${SWEEPFILE_ARG}"
+    readarray defineArray < "${SWEEPFILE_ARG}"
+    for defines in "${defineArray[@]}"
     do
+        tmp="$defines"
+        defines=`echo $tmp | tr '\n' ' '`
         echo "${0%%.c} Executing sweep configuration: $defines"
         runlogFilename=${RUNLOG_ARG}-sweep${count}
         reportFilename=${REPORT_ARG}-sweep${count}
         runTest $PROG_ARG $NBRUN_ARG $runlogFilename $reportFilename "${defines}"
         let count=${count}+1
-    done < "${SWEEPFILE_ARG}"
+    done
 elif [[ -n "$CUSTOM_BOUNDS" ]]; then
     # use provided defines
     echo "${SCRIPT_NAME} Use CUSTOM_BOUNDS: ${CUSTOM_BOUNDS}"

@@ -41,6 +41,8 @@ SWEEPFILE_OPT="no"
 SWEEPFILE_ARG=""
 DEFSFILE_OPT="no"
 DEFSFILE_ARG=""
+TARGET_OPT="no"
+TARGET_ARG="x86"
 PROGRAMS=""
 
 SWEEP_FOLDER="configSweep"
@@ -60,6 +62,11 @@ while [[ $# -gt 0 ]]; do
     if [[ "$1" = "-sweep" ]]; then
         shift
         SWEEP_OPT="yes"
+    elif [[ "$1" = "-target" && $# -ge 2 ]]; then
+        shift
+        TARGET_OPT="yes"
+        TARGET_ARG=("$@")
+        shift
     elif [[ "$1" = "-sweepfile" && $# -ge 2 ]]; then
         shift
         SWEEPFILE_OPT="yes"
@@ -97,6 +104,13 @@ done
 if [[ -z "$PROGRAMS" ]]; then
     #No programs specified, scan the ocr/ folder
     PROGRAMS=`find ${TEST_FOLDER} -name "*.c"`
+    ACC=""
+    for prog in `echo $PROGRAMS`; do
+        CUR=${prog##ocr/}
+        CUR=${CUR%%.c}
+        ACC="${ACC} ${CUR}"
+    done
+    PROGRAMS="${ACC}"
 fi
 
 function matchDefaultSweepFile() {
@@ -173,7 +187,7 @@ function run() {
 
         runlogFilename=${RUNLOG_FILENAME_BASE}-${prog}
         reportFilename=${REPORT_FILENAME_BASE}-${prog}
-        ${SCRIPT_ROOT}/runner.sh -nbrun ${NB_RUN} -logdir ${LOGDIR} -runlog ${runlogFilename} -report ${reportFilename} ${runnerArgs} ${prog}
+        ${SCRIPT_ROOT}/runner.sh -nbrun ${NB_RUN} -target ${TARGET_ARG} -logdir ${LOGDIR} -runlog ${runlogFilename} -report ${reportFilename} ${runnerArgs} ${prog}
     done
 }
 

@@ -255,11 +255,11 @@ def GenerateConfig(filehandle, guid, platform, target, threads, binding, alloc, 
     elif target=='MPI':
         # catch default value errors for distributed
         if dbtype != 'Lockable':
-            print 'MPI target only supports Lockable datablocks'
+            print 'error: MPI target only supports Lockable datablocks'
             raise
         if guid != 'COUNTED_MAP':
-            print 'MPI target only supports counted-map guid provider'
-            print guid, ' ', target
+            print 'error: MPI target only supports counted-map guid provider'
+            raise
         pdtype="HCDist"
         GeneratePd(filehandle, pdtype, dbtype, threads)
         #Intentionally use "HC" here
@@ -270,10 +270,10 @@ def GenerateConfig(filehandle, guid, platform, target, threads, binding, alloc, 
     elif target=='GASNET':
         # catch default value errors for distributed
         if dbtype != 'Lockable':
-            print 'GASNet target only supports Lockable datablocks'
+            print 'error: GASNet target only supports Lockable datablocks'
             raise
         if guid != 'COUNTED_MAP':
-            print 'GASNet target only supports counted-map guid provider'
+            print 'error: GASNet target only supports counted-map guid provider'
             raise
         pdtype="HCDist"
         GeneratePd(filehandle, pdtype, dbtype, threads)

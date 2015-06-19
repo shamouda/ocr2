@@ -17,8 +17,7 @@ if [[ $# -lt 1 ]]; then
     exit 1
 fi
 
-REPORT_FILES=$1
-
+REPORT_FILES=$@
 
 #
 # Setting up temporary files
