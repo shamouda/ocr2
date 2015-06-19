@@ -46,10 +46,10 @@ u8 ocrLegacyFinalize(ocrGuid_t legacyContext, bool runUntilShutdown) {
     // Bug #492: legacyContext is ignored
     ocrPolicyDomain_t *pd = NULL;
     u8 returnCode;
+    getCurrentEnv(&pd, NULL, NULL, NULL);
     if(runUntilShutdown) {
         // Here, we are in COMPUTE_OK. We just need to transition to USER_OK
         // which will start mainEdt
-        getCurrentEnv(&pd, NULL, NULL, NULL);
         // Here we should enter the worker loop in non-legacy mode so that
         // the worker goes into its work loop. Do NOT set RL_LEGACY here
         // but the runtime figures out it's the second call to BRING_UP.
