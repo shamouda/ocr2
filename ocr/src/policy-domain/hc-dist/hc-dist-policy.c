@@ -1210,6 +1210,17 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
             DPRINTF(DEBUG_LVL_VVERB,"DB_RELEASE outgoing request send for DB GUID "GUIDSx"\n", GUIDFS(PD_MSG_FIELD_IO(guid.guid)));
             // Outgoing release request
             ProxyDb_t * proxyDb = getProxyDb(self, PD_MSG_FIELD_IO(guid.guid), false);
+            if (proxyDb == NULL) {
+                // This is VERY likely an error in the user-code where the DB is released twice by the same EDT.
+                DPRINTF(DEBUG_LVL_WARN,"Detected multiple release for DB 0x%lx by EDT 0x%lx\n", PD_MSG_FIELD_IO(guid.guid), PD_MSG_FIELD_I(edt.guid));
+                msg->type &= ~PD_MSG_REQUEST;
+                msg->type &= ~PD_MSG_REQ_RESPONSE;
+                msg->type |= PD_MSG_RESPONSE;
+                msg->srcLocation = curLoc;
+                msg->destLocation = curLoc;
+                PD_MSG_FIELD_O(returnDetail) = 0;
+                PROCESS_MESSAGE_RETURN_NOW(self, OCR_EACCES);
+            }
             hal_lock32(&(proxyDb->lock)); // lock the db
             switch(proxyDb->state) {
                 case PROXY_DB_RUN:
