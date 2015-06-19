@@ -499,7 +499,7 @@ u8 MPICommSwitchRunlevel(ocrCommPlatform_t *self, ocrPolicyDomain_t *PD, ocrRunl
         // Nothing
         break;
     case RL_PD_OK:
-        if ((properties & RL_BRING_UP) && RL_IS_FIRST_PHASE_UP(self->pd, RL_PD_OK, phase)) {
+        if ((properties & RL_BRING_UP) && RL_IS_FIRST_PHASE_UP(PD, RL_PD_OK, phase)) {
             //Initialize base
             self->pd = PD;
             //BUG #605 Locations spec: commPlatform and worker have a location, are the supposed to be the same ?
