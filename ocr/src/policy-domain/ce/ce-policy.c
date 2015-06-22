@@ -539,7 +539,7 @@ static u8 ceProcessResponse(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u32 pr
             msg->type &= ~PD_MSG_REQUEST;
             msg->type |=  PD_MSG_RESPONSE;
 #if defined(HAL_FSIM_CE)
-            if((msg->destLocation & ID_AGENT_CE) == ID_AGENT_CE) {
+            if((msg->destLocation & ID_AGENT_MASK) == ID_AGENT_CE) {
                 // This is a CE->CE message
                 PD_MSG_STACK(toSend);
                 u64 baseSize = 0, marshalledSize = 0;
