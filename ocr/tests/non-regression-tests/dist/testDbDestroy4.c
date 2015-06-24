@@ -9,80 +9,43 @@
 #include "extensions/ocr-affinity.h"
 
 /**
- * DESC: Create EDT that destroys a DB it did not acquired concurrent with RT release in other EDT
+ * DESC: Create EDT that destroys a DB passed as dependence without explicit release
  */
 
 #define TYPE_ELEM_DB int
 #define NB_ELEM_DB 20
 
 ocrGuid_t readerEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
-    ocrGuid_t dbGuid = depv[0].guid;
-    ocrGuid_t evGuid = ((ocrGuid_t*) depv[1].ptr)[0];
-    PRINTF("readerEdt: executing, depends on DB guid 0x%lx \n", dbGuid);
-    int v = 1;
-    int i = 0;
-    int * data = (int *) depv[0].ptr;
-    while (i < NB_ELEM_DB) {
-        ASSERT(data[i] == v++);
-        i++;
-    }
-    PRINTF("readerEdt: satisfy event 0x%lx \n", evGuid);
-    // Don't explicitely release dbGuid, so the runtime issued
-    // release is concurrent with the dbDestroy in the other EDT
-    ocrEventSatisfy(evGuid, dbGuid);
-    return NULL_GUID;
-}
-
-ocrGuid_t destroyEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
-    ocrGuid_t dbGuid = depv[0].guid;
-    PRINTF("destroyEdt: destroying  dbGuid 0x%lx\n", dbGuid);
+    ocrGuid_t dbGuid = (ocrGuid_t) depv[0].guid;
+    PRINTF("[remote] readerEdt: executing, depends on DB guid 0x%lx \n", dbGuid);
     ocrDbDestroy(dbGuid);
     ocrShutdown();
     return NULL_GUID;
 }
 
 ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
-    // Create DB array to store the event guid
-    ocrGuid_t * evPtrArray;
-    ocrGuid_t evGuidArray;
-    ocrDbCreate(&evGuidArray, (void **)&evPtrArray, sizeof(ocrGuid_t), 0, NULL_GUID, NO_ALLOC);
-
-    // Create a DB that contains user data
-    ocrGuid_t dbGuid;
+    // Create a DB
     void * dbPtr;
+    ocrGuid_t dbGuid;
+    u64 nbElem = NB_ELEM_DB;
     ocrDbCreate(&dbGuid, &dbPtr, sizeof(TYPE_ELEM_DB) * NB_ELEM_DB, 0, NULL_GUID, NO_ALLOC);
     int v = 1;
     int i = 0;
     int * data = (int *) dbPtr;
-    while (i < NB_ELEM_DB) {
+    while (i < nbElem) {
         data[i] = v++;
         i++;
     }
+    // Intentionally not releasing the DB
+    PRINTF("[local] mainEdt: local DB guid is 0x%lx, dbPtr=%p\n", dbGuid, dbPtr);
 
-    // Create event used by readerEdt to satisfy destroyEdt
-    ocrGuid_t eventGuid;
-    ocrEventCreate(&eventGuid, OCR_EVENT_STICKY_T, true);
-    evPtrArray[0] = eventGuid;
-    ocrDbRelease(evGuidArray);
-
-    PRINTF("mainEdt: local DB guid is 0x%lx, dbPtr=%p\n", dbGuid, dbPtr);
-    ocrGuid_t destroyEdtTemplateGuid;
-    ocrEdtTemplateCreate(&destroyEdtTemplateGuid, destroyEdt, 0, 1);
+    // create local edt that depends on the remote edt, the db is automatically cloned
     ocrGuid_t readerEdtTemplateGuid;
-    ocrEdtTemplateCreate(&readerEdtTemplateGuid, readerEdt, 0, 2);
+    ocrEdtTemplateCreate(&readerEdtTemplateGuid, readerEdt, 0, 1);
 
-    // Setup destroy EDT depending on the event to be satisfied by readerEdt
-    ocrGuid_t destroyEdtGuid;
-    ocrEdtCreate(&destroyEdtGuid, destroyEdtTemplateGuid, 0, NULL, 1, NULL,
-                 EDT_PROP_NONE, NULL_GUID, NULL);
-    ocrAddDependence(eventGuid, destroyEdtGuid, 0, DB_MODE_CONST);
-
-    // Setup reader EDT, takes the array of guid as depv
     ocrGuid_t readerEdtGuid;
-    ocrEdtCreate(&readerEdtGuid, readerEdtTemplateGuid, 0, NULL, 2, NULL,
+    ocrEdtCreate(&readerEdtGuid, readerEdtTemplateGuid, 0, NULL, 1, NULL,
                  EDT_PROP_NONE, NULL_GUID, NULL);
     ocrAddDependence(dbGuid, readerEdtGuid, 0, DB_MODE_CONST);
-    ocrAddDependence(evGuidArray, readerEdtGuid, 1, DB_MODE_CONST);
-
     return NULL_GUID;
 }

@@ -170,7 +170,9 @@ u8 regularDestruct(ocrDataBlock_t *self) {
     return 0;
 }
 
-u8 regularFree(ocrDataBlock_t *self, ocrFatGuid_t edt, bool isInternal) {
+u8 regularFree(ocrDataBlock_t *self, ocrFatGuid_t edt, u32 properties) {
+    bool isInternal = ((properties & DB_PROP_RT_ACQUIRE) != 0);
+    bool reqRelease = !(properties & DB_PROP_NO_RELEASE);
     ocrDataBlockRegular_t *rself = (ocrDataBlockRegular_t*)self;
 
     DPRINTF(DEBUG_LVL_VERB, "Requesting a free for DB @ 0x%lx (GUID: 0x%lx)\n",
@@ -193,7 +195,11 @@ u8 regularFree(ocrDataBlock_t *self, ocrFatGuid_t edt, bool isInternal) {
         return regularDestruct(self);
     } else {
         hal_unlock32(&(rself->lock));
-        regularRelease(self, edt, isInternal);
+        // The datablock may not have been acquired by the current EDT hence
+        // we do not need to account for a release.
+        if (reqRelease) {
+            regularRelease(self, edt, isInternal);
+        }
     }
     // End critical section
 
@@ -311,7 +317,7 @@ ocrDataBlockFactory_t *newDataBlockFactoryRegular(ocrParamList_t *perType, u32 f
     base->fcts.destruct = FUNC_ADDR(u8 (*)(ocrDataBlock_t*), regularDestruct);
     base->fcts.acquire = FUNC_ADDR(u8 (*)(ocrDataBlock_t*, void**, ocrFatGuid_t, u32, ocrDbAccessMode_t, bool, u32), regularAcquire);
     base->fcts.release = FUNC_ADDR(u8 (*)(ocrDataBlock_t*, ocrFatGuid_t, bool), regularRelease);
-    base->fcts.free = FUNC_ADDR(u8 (*)(ocrDataBlock_t*, ocrFatGuid_t, bool), regularFree);
+    base->fcts.free = FUNC_ADDR(u8 (*)(ocrDataBlock_t*, ocrFatGuid_t, u32), regularFree);
     base->fcts.registerWaiter = FUNC_ADDR(u8 (*)(ocrDataBlock_t*, ocrFatGuid_t,
                                                  u32, bool), regularRegisterWaiter);
     base->fcts.unregisterWaiter = FUNC_ADDR(u8 (*)(ocrDataBlock_t*, ocrFatGuid_t,

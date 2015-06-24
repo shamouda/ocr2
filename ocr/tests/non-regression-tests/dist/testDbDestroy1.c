@@ -9,7 +9,7 @@
 #include "extensions/ocr-affinity.h"
 
 /**
- * DESC: Create consumer EDT that releases then destroys a DB passed as dependence
+ * DESC: Create EDT that releases then destroys a DB passed as dependence
  */
 
 #define TYPE_ELEM_DB int
