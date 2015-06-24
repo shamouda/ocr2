@@ -143,7 +143,7 @@ u8 ocrLegacyBlockProgress(ocrGuid_t handle, ocrGuid_t* guid, void** result, u64*
         }
         eventToYieldFor = (ocrEvent_t *)PD_MSG_FIELD_IO(guid.metaDataPtr);
 
-        if(PD_MSG_FIELD_IO(guid.guid) == NULL_GUID) {
+        if(PD_MSG_FIELD_IO(guid.metaDataPtr) == NULL_GUID) {
             if(properties == LEGACY_PROP_NONE) {
                 return OCR_EINVAL;
             } else if(properties == LEGACY_PROP_WAIT_FOR_CREATE) {
