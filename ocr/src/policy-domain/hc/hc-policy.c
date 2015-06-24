@@ -1024,7 +1024,7 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         ASSERT(db->fctId == self->dbFactories[0]->factoryId);
         ASSERT(!(msg->type & PD_MSG_REQ_RESPONSE));
         PD_MSG_FIELD_O(returnDetail) = self->dbFactories[0]->fcts.free(
-            db, PD_MSG_FIELD_I(edt), !!(PD_MSG_FIELD_I(properties) & DB_PROP_RT_ACQUIRE));
+            db, PD_MSG_FIELD_I(edt), PD_MSG_FIELD_I(properties));
         if(PD_MSG_FIELD_O(returnDetail)!=0)
             DPRINTF(DEBUG_LVL_WARN, "DB Free failed for guid %lx\n", PD_MSG_FIELD_I(guid));
 #undef PD_MSG
@@ -1770,20 +1770,17 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         getCurrentEnv(NULL, NULL, &curTask, NULL);
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_DEP_DYNREMOVE
-        // Check to make sure that the EDT is only doing this to
-        // itself
+        // Check to make sure that the EDT is only doing this to itself
         // Also, this should only happen when there is an actual EDT
-        if((curTask==NULL) || (curTask->guid != PD_MSG_FIELD_I(edt.guid)))
+        if ((curTask==NULL) || (curTask->guid != PD_MSG_FIELD_I(edt.guid)))
             DPRINTF(DEBUG_LVL_WARN, "Attempting to notify a missing/different EDT, GUID=%lx\n", PD_MSG_FIELD_I(edt.guid));
-        ASSERT(curTask &&
-               curTask->guid == PD_MSG_FIELD_I(edt.guid));
-
+        ASSERT(curTask && curTask->guid == PD_MSG_FIELD_I(edt.guid));
         ASSERT(curTask->fctId == self->taskFactories[0]->factoryId);
         PD_MSG_FIELD_O(returnDetail) = self->taskFactories[0]->fcts.notifyDbRelease(curTask, PD_MSG_FIELD_I(db));
 #undef PD_MSG
 #undef PD_TYPE
         msg->type &= ~PD_MSG_REQUEST;
-        // msg->type |= PD_MSG_RESPONSE;
+        msg->type |= PD_MSG_RESPONSE;
         EXIT_PROFILE;
         break;
     }

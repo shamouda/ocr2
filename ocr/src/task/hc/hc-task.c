@@ -955,7 +955,7 @@ u8 notifyDbReleaseTaskHc(ocrTask_t *base, ocrFatGuid_t db) {
         }
     }
     // not found means it's an error or it has already been released
-    return 0;
+    return OCR_ENOENT;
 }
 
 u8 taskExecute(ocrTask_t* base) {

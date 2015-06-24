@@ -108,10 +108,10 @@ typedef struct _ocrDataBlockFcts_t {
      * @param self          Pointer to this data-block
      * @param edt           EDT seeking to free the data-block
      *                      Must be fully resolved
-     * @param isInternal    Mode of the release (see release()) if required
+     * @param properties    Properties of the free (runtime free, require release, etc..)
      * @return 0 on success and an error code on failure (see ocr-db.h)
      */
-    u8 (*free)(struct _ocrDataBlock_t *self, ocrFatGuid_t edt, bool isInternal);
+    u8 (*free)(struct _ocrDataBlock_t *self, ocrFatGuid_t edt, u32 properties);
 
     /**
      * @brief Register a "waiter" (aka a dependence) on the data-block
@@ -209,6 +209,7 @@ typedef struct _ocrDataBlock_t {
 // Runtime DB properties (upper 16 bits of a u32)
 #define DB_PROP_RT_ACQUIRE     0x10000 // DB acquired by runtime
 #define DB_PROP_RT_OBLIVIOUS   0x20000 //BUG #607 DB RO mode: (Flag is for runtime use)
+#define DB_PROP_NO_RELEASE     0x40000 // Indicate a release is not required
 
 #define DB_FLAG_RT_FETCH       0x100000
 #define DB_FLAG_RT_WRITE_BACK  0x200000
