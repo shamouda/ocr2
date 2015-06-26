@@ -23,7 +23,7 @@ OBJDIR := $(OCR_BUILD)/objs
 #
 # Default machine configuration
 #
-DEFAULT_CONFIG ?= mach-hc-4w.cfg
+DEFAULT_CONFIG ?= mach-common-4w.cfg
 
 ####################################################
 # User Configurable settings

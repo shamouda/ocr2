@@ -21,34 +21,8 @@
 /******************************************************/
 
 ocrSchedulerObject_t* wstSchedulerObjectCreate(ocrSchedulerObjectFactory_t *fact, ocrParamList_t *params) {
-    u32 i;
-    ocrSchedulerObject_t *el = NULL;
-    paramListSchedulerObject_t *schedObjParams = (paramListSchedulerObject_t*)params;
-    ASSERT(schedObjParams->kind != OCR_SCHEDULER_OBJECT_ROOT_WST);
-    ocrPolicyDomain_t *pd = fact->pd;
-    switch(schedObjParams->kind) {
-    case OCR_SCHEDULER_OBJECT_EDT:
-    case OCR_SCHEDULER_OBJECT_DB:
-        {   //schedulerObject->guid is used to store singleton guid
-            el = (ocrSchedulerObject_t*)pd->fcts.pdMalloc(pd, sizeof(ocrSchedulerObject_t));
-            el->guid = NULL_GUID;
-            el->kind = schedObjParams->kind;
-            el->fctId = fact->factoryId;
-            el->loc = INVALID_LOCATION;
-            el->mapping = OCR_SCHEDULER_OBJECT_MAPPING_UNDEFINED;
-        }
-        break;
-    default:
-        {
-            ocrSchedulerObjectFactory_t **factories = pd->schedulerObjectFactories;
-            for (i = 0; (i < pd->schedulerObjectFactoryCount) && (el == NULL); i++) {
-                ocrSchedulerObjectFactory_t *factory = factories[i];
-                el = factory->fcts.create(factory, params);
-            }
-        }
-        break;
-    }
-    return el;
+    ASSERT(0); //Dynamic creation of wst object is not supported
+    return NULL;
 }
 
 u8 wstSchedulerObjectDestruct(ocrSchedulerObjectFactory_t *fact, ocrSchedulerObject_t *self) {
@@ -105,7 +79,7 @@ u8 wstSetLocationForSchedulerObject(ocrSchedulerObjectFactory_t *fact, ocrSchedu
 
 ocrSchedulerObject_t* newSchedulerObjectRootWst(ocrSchedulerObjectFactory_t *factory, ocrParamList_t *perInstance) {
     ocrSchedulerObject_t *schedObj = (ocrSchedulerObject_t*)runtimeChunkAlloc(sizeof(ocrSchedulerObjectRootWst_t), PERSISTENT_CHUNK);
-    schedObj->guid = NULL_GUID;
+    schedObj->guid = NULL_GUID; //Root objects are always static
     schedObj->kind = OCR_SCHEDULER_OBJECT_ROOT_WST;
     schedObj->fctId = factory->factoryId;
     schedObj->loc = INVALID_LOCATION;
@@ -170,7 +144,7 @@ u8 wstSchedulerObjectSwitchRunlevel(ocrSchedulerObjectRoot_t *self, ocrPolicyDom
                 //Instantiate the deque schedulerObjects
                 paramListSchedulerObjectDeq_t params;
                 params.base.kind = OCR_SCHEDULER_OBJECT_DEQUE;
-                params.base.count = 1;
+                params.base.guidRequired = 0;
                 params.type = WORK_STEALING_DEQUE;
                 ocrSchedulerObjectFactory_t *dequeFactory = PD->schedulerObjectFactories[schedulerObjectDeq_id];
                 for (i = 0; i < wstRootSchedObj->numDeques; i++) {

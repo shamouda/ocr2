@@ -100,8 +100,8 @@ typedef struct _paramListSchedulerObjectFact_t {
 
 typedef struct _paramListSchedulerObject_t {
     ocrParamList_t base;
-    ocrSchedulerObjectKind kind;
-    u32 count;
+    ocrSchedulerObjectKind kind;    // Kind of scheduler object
+    bool guidRequired;              // If object will stay local in the PD, then guid is not required
 } paramListSchedulerObject_t;
 
 /****************************************************/

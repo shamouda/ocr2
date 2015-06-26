@@ -80,7 +80,9 @@
 #define ENABLE_POLICY_DOMAIN_HC
 
 // Scheduler
-#define ENABLE_SCHEDULER_HC
+// (We should probably create multiple config files)
+//#define ENABLE_SCHEDULER_HC
+#define ENABLE_SCHEDULER_COMMON
 
 // Sysboot layer to use
 #define ENABLE_SYSBOOT_LINUX
