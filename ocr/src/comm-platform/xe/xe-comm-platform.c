@@ -140,9 +140,9 @@ u8 xeCommSwitchRunlevel(ocrCommPlatform_t *self, ocrPolicyDomain_t *PD, ocrRunle
         // and check compatibility on phase 1
         break;
     case RL_NETWORK_OK:
+        xeCommBegin(self, PD);
         break;
     case RL_PD_OK:
-        xeCommBegin(self, PD);
         // Barrier - wait for CE's go signal
         xeInitBarrier();
         break;

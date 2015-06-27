@@ -42,72 +42,88 @@ u8 xePdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
 #endif
     // The PD should have been brought up by now and everything instantiated
 
+    u8 toReturn = 0;
     u64 i = 0;
     u64 maxCount = 0;
 
-    ((ocrPolicyDomainXe_t*)policy)->shutdownInitiated = 0;
-
-
-    maxCount = policy->guidProviderCount;
-    for(i = 0; i < maxCount; ++i) {
-        policy->guidProviders[i]->fcts.switchRunlevel(policy->guidProviders[i], policy, RL_PD_OK,
+    switch(runlevel) {
+        case RL_CONFIG_PARSE:
+            ((ocrPolicyDomainXe_t*)policy)->shutdownInitiated = 0;
+        case RL_NETWORK_OK:
+            maxCount = policy->commApiCount;
+            for(i = 0; i < maxCount; i++) {
+                policy->commApis[i]->fcts.switchRunlevel(policy->commApis[i], policy, RL_NETWORK_OK,
                                                  0, RL_REQUEST | RL_BRING_UP | RL_BARRIER, NULL, 0);
-    }
-
-    maxCount = policy->schedulerCount;
-    for(i = 0; i < maxCount; ++i) {
-        policy->schedulers[i]->fcts.switchRunlevel(policy->schedulers[i], policy, RL_PD_OK,
+            }
+            break;
+        case RL_PD_OK:
+            maxCount = policy->guidProviderCount;
+            for(i = 0; i < maxCount; ++i) {
+                policy->guidProviders[i]->fcts.switchRunlevel(policy->guidProviders[i], policy, RL_PD_OK,
                                                  0, RL_REQUEST | RL_BRING_UP | RL_BARRIER, NULL, 0);
-        policy->schedulers[i]->fcts.switchRunlevel(policy->schedulers[i], policy, RL_MEMORY_OK,
+            }
+            maxCount = policy->schedulerCount;
+            for(i = 0; i < maxCount; ++i) {
+                policy->schedulers[i]->fcts.switchRunlevel(policy->schedulers[i], policy, RL_PD_OK,
                                                  0, RL_REQUEST | RL_BRING_UP | RL_BARRIER, NULL, 0);
-    }
-
-    maxCount = policy->commApiCount;
-    for(i = 0; i < maxCount; i++) {
-        policy->commApis[i]->fcts.switchRunlevel(policy->commApis[i], policy, RL_PD_OK,
+            }
+            maxCount = policy->commApiCount;
+            for(i = 0; i < maxCount; i++) {
+                policy->commApis[i]->fcts.switchRunlevel(policy->commApis[i], policy, RL_PD_OK,
                                                  0, RL_REQUEST | RL_BRING_UP | RL_BARRIER, NULL, 0);
-    }
-    // REC: Moved all workers to start here.
-    // Note: it's important to first logically start all workers.
-    // Once they are all up, start the runtime.
-    // Workers should start the underlying target and platforms
-    maxCount = policy->workerCount;
-    for(i = 0; i < maxCount; i++) {
-        policy->workers[i]->fcts.switchRunlevel(policy->workers[i], policy, RL_PD_OK,
+            }
+            maxCount = policy->workerCount;
+            for(i = 0; i < maxCount; i++) {
+                policy->workers[i]->fcts.switchRunlevel(policy->workers[i], policy, RL_PD_OK,
                                                  0, RL_REQUEST | RL_BRING_UP | RL_BARRIER, NULL, 0);
-    }
-
-    maxCount = policy->allocatorCount;
-    for(i = 0; i < maxCount; ++i) {
-        policy->allocators[i]->fcts.switchRunlevel(policy->allocators[i], policy, RL_MEMORY_OK,
+            }
+            break;
+        case RL_MEMORY_OK:
+            maxCount = policy->schedulerCount;
+            for(i = 0; i < maxCount; ++i) {
+                policy->schedulers[i]->fcts.switchRunlevel(policy->schedulers[i], policy, RL_MEMORY_OK,
                                                  0, RL_REQUEST | RL_BRING_UP | RL_BARRIER, NULL, 0);
-    }
-
-    maxCount = policy->schedulerCount;
-    for(i = 0; i < maxCount; ++i) {
-        policy->schedulers[i]->fcts.switchRunlevel(policy->schedulers[i], policy, RL_COMPUTE_OK,
+            }
+            maxCount = policy->allocatorCount;
+            for(i = 0; i < maxCount; ++i) {
+                policy->allocators[i]->fcts.switchRunlevel(policy->allocators[i], policy, RL_MEMORY_OK,
                                                  0, RL_REQUEST | RL_BRING_UP | RL_BARRIER, NULL, 0);
-    }
-
-    maxCount = policy->commApiCount;
-    for(i = 0; i < maxCount; i++) {
-        policy->commApis[i]->fcts.switchRunlevel(policy->commApis[i], policy, RL_MEMORY_OK,
+            }
+            maxCount = policy->commApiCount;
+            for(i = 0; i < maxCount; i++) {
+                policy->commApis[i]->fcts.switchRunlevel(policy->commApis[i], policy, RL_MEMORY_OK,
                                                  0, RL_REQUEST | RL_BRING_UP | RL_BARRIER, NULL, 0);
-    }
-    policy->placer = NULL;
-    guidify(policy, (u64)policy, &(policy->fguid), OCR_GUID_POLICY);
-
-    // REC: Moved all workers to start here.
-    // Note: it's important to first logically start all workers.
-    // Once they are all up, start the runtime.
-    // Workers should start the underlying target and platforms
-    maxCount = policy->workerCount;
-    for(i = 0; i < maxCount; i++) {
-        policy->workers[i]->fcts.switchRunlevel(policy->workers[i], policy, RL_COMPUTE_OK,
+            }
+            break;
+        case RL_GUID_OK:
+            policy->placer = NULL;
+            guidify(policy, (u64)policy, &(policy->fguid), OCR_GUID_POLICY);
+            break;
+        case RL_COMPUTE_OK:
+            maxCount = policy->schedulerCount;
+            for(i = 0; i < maxCount; ++i) {
+                policy->schedulers[i]->fcts.switchRunlevel(policy->schedulers[i], policy, RL_COMPUTE_OK,
                                                  0, RL_REQUEST | RL_BRING_UP | RL_BARRIER, NULL, 0);
+            }
+            maxCount = policy->workerCount;
+            for(i = 0; i < maxCount; i++) {
+                policy->workers[i]->fcts.switchRunlevel(policy->workers[i], policy, RL_COMPUTE_OK,
+                                                 0, RL_REQUEST | RL_BRING_UP | RL_BARRIER, NULL, 0);
+            }
+            break;
+        case RL_USER_OK:
+            break;
+        default:
+            // Unknown runlevel
+            ASSERT(0);
+            break;
     }
 
 #if defined(SAL_FSIM_XE) // If running on FSim XE
+    // Since driver is not initiating run level changes
+    if(runlevel != RL_USER_OK)
+        xePdSwitchRunlevel(policy, runlevel+1, properties);
+
     PRINTF("XE shutting down\n");
     hal_exit(0);
 #endif

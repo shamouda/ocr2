@@ -37,70 +37,7 @@
 
 extern void ocrShutdown(void);
 
-// Function to cause run-level switches in this PD
-u8 cePdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 properties) {
-    u32 i = 0;
-    u32 maxCount = 0;
-
-    u8 toReturn = 0;
-
-    switch (runlevel) {
-        case RL_COMPUTE_OK:
-            maxCount = policy->commApiCount;
-            for(i = 0; i < maxCount; i++)
-                policy->commApis[i]->fcts.switchRunlevel(policy->commApis[i], policy, RL_COMPUTE_OK,
-                                                 0, RL_REQUEST | RL_BRING_UP | RL_BARRIER, NULL, 0);
-            return 0;
-            break;
-        case RL_USER_OK:
-            maxCount = policy->commApiCount;
-            for(i = 0; i < maxCount; i++)
-                policy->commApis[i]->fcts.switchRunlevel(policy->commApis[i], policy, RL_USER_OK,
-                                                 0, RL_REQUEST | RL_BRING_UP | RL_BARRIER, NULL, 0);
-            return 0;
-            break;
-        default:
-            break;
-    }
-
-    maxCount = policy->commApiCount;
-    for(i = 0; i < maxCount; i++) {
-        policy->commApis[i]->fcts.switchRunlevel(policy->commApis[i], policy, RL_NETWORK_OK,
-                                                 0, RL_REQUEST | RL_BRING_UP | RL_BARRIER, NULL, 0);
-    }
-
-    maxCount = policy->guidProviderCount;
-    for(i = 0; i < maxCount; ++i) {
-        policy->guidProviders[i]->fcts.switchRunlevel(policy->guidProviders[i], policy, RL_PD_OK,
-                                                 0, RL_REQUEST | RL_BRING_UP | RL_BARRIER, NULL, 0);
-    }
-
-    maxCount = policy->allocatorCount;
-    for(i = 0; i < maxCount; ++i) {
-        policy->allocators[i]->fcts.switchRunlevel(policy->allocators[i], policy, RL_PD_OK,
-                                                 0, RL_REQUEST | RL_BRING_UP | RL_BARRIER, NULL, 0);
-        policy->allocators[i]->fcts.switchRunlevel(policy->allocators[i], policy, RL_MEMORY_OK,
-                                                 0, RL_REQUEST | RL_BRING_UP | RL_BARRIER, NULL, 0);
-    }
-
-    maxCount = policy->schedulerCount;
-    for(i = 0; i < maxCount; ++i) {
-        policy->schedulers[i]->fcts.switchRunlevel(policy->schedulers[i], policy, RL_PD_OK,
-                                                 0, RL_REQUEST | RL_BRING_UP | RL_BARRIER, NULL, 0);
-    }
-
-    policy->placer = NULL;
-
-    // REC: Moved all workers to start here.
-    // Note: it's important to first logically start all workers.
-    // Once they are all up, start the runtime.
-    // Workers should start the underlying target and platforms
-    maxCount = policy->workerCount;
-    for(i = 0; i < maxCount; i++) {
-        policy->workers[i]->fcts.switchRunlevel(policy->workers[i], policy, RL_PD_OK,
-                                                 0, RL_REQUEST | RL_BRING_UP | RL_BARRIER, NULL, 0);
-    }
-
+static void performNeighborDiscovery(ocrPolicyDomain_t *policy) {
 #ifdef HAL_FSIM_CE
     // Neighbor discovery
     // In the general case, all other CEs in my unit are my neighbors
@@ -111,6 +48,7 @@ u8 cePdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
 #define MAX_NUM_BLOCK 8
 #define MAX_NUM_CLUSTER 4
 
+    u32 i = 0;
     u32 ncount = 0;
 
     if(policy->neighborCount) {
@@ -131,111 +69,178 @@ u8 cePdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
         }
     }
     policy->neighborCount = ncount;
-
 #endif
+}
 
-    ocrPolicyDomainCe_t * cePolicy = (ocrPolicyDomainCe_t*)policy;
+// Function to cause run-level switches in this PD
+u8 cePdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 properties) {
+    u32 i = 0;
+    u32 maxCount = 0;
+
+    u8 toReturn = 0;
+
+    switch (runlevel) {
+        case RL_CONFIG_PARSE:
+            break;
+        case RL_NETWORK_OK:
+            maxCount = policy->commApiCount;
+            for(i = 0; i < maxCount; i++) {
+                policy->commApis[i]->fcts.switchRunlevel(policy->commApis[i], policy, RL_NETWORK_OK,
+                                                 0, RL_REQUEST | RL_BRING_UP | RL_BARRIER, NULL, 0);
+            }
+            break;
+        case RL_PD_OK:
+            maxCount = policy->guidProviderCount;
+            for(i = 0; i < maxCount; ++i) {
+                policy->guidProviders[i]->fcts.switchRunlevel(policy->guidProviders[i], policy, RL_PD_OK,
+                                                 0, RL_REQUEST | RL_BRING_UP | RL_BARRIER, NULL, 0);
+            }
+            maxCount = policy->allocatorCount;
+            for(i = 0; i < maxCount; ++i) {
+                policy->allocators[i]->fcts.switchRunlevel(policy->allocators[i], policy, RL_PD_OK,
+                                                 0, RL_REQUEST | RL_BRING_UP | RL_BARRIER, NULL, 0);
+            }
+            maxCount = policy->schedulerCount;
+            for(i = 0; i < maxCount; ++i) {
+                policy->schedulers[i]->fcts.switchRunlevel(policy->schedulers[i], policy, RL_PD_OK,
+                                                 0, RL_REQUEST | RL_BRING_UP | RL_BARRIER, NULL, 0);
+            }
+            maxCount = policy->workerCount;
+            for(i = 0; i < maxCount; i++) {
+                policy->workers[i]->fcts.switchRunlevel(policy->workers[i], policy, RL_PD_OK,
+                                                 0, RL_REQUEST | RL_BRING_UP | RL_BARRIER, NULL, 0);
+            }
+
+            policy->placer = NULL;
+            performNeighborDiscovery(policy);
+            ocrPolicyDomainCe_t * cePolicy = (ocrPolicyDomainCe_t*)policy;
 
 #ifdef HAL_FSIM_CE
-    cePolicy->shutdownMax = cePolicy->xeCount; // All CE's collect their XE's shutdowns
-    // Block 0 also collects other blocks in its unit
-    if((policy->myLocation & ID_BLOCK_MASK) == 0) {
-        cePolicy->shutdownMax += policy->neighborCount;
-        // Block 0 of unit 0 collects block 0's of other units
-        if(policy->myLocation & ID_CLUSTER_MASK) {
-            u32 otherblocks = 0;
-            u32 j;
-            for(j = 0; j<policy->neighborCount; j++)
-                if((policy->neighbors[j] & ID_BLOCK_MASK) == 0)
-                    otherblocks++;
-            cePolicy->shutdownMax -= otherblocks;
-            // Subtract those neighbors which are not block 0, unit 0
-        }
-    }
+            cePolicy->shutdownMax = cePolicy->xeCount; // All CE's collect their XE's shutdowns
+            // Block 0 also collects other blocks in its unit
+            if((policy->myLocation & ID_BLOCK_MASK) == 0) {
+                cePolicy->shutdownMax += policy->neighborCount;
+                // Block 0 of unit 0 collects block 0's of other units
+                if(policy->myLocation & ID_UNIT_MASK) {
+                    u32 otherblocks = 0;
+                    u32 j;
+                    for(j = 0; j<policy->neighborCount; j++)
+                        if((policy->neighbors[j] & ID_BLOCK_MASK) == 0)
+                            otherblocks++;
+                    cePolicy->shutdownMax -= otherblocks;
+                    // Subtract those neighbors which are not block 0, unit 0
+                }
+            }
 #else
-    // BUG #134: This is a hack to get the shutdown reportees.
-    // This should be replaced by a registration protocol for children to parents.
-    if (policy->myLocation == policy->parentLocation) {
-        cePolicy->shutdownMax = cePolicy->xeCount + policy->neighborCount;
-    } else {
-        cePolicy->shutdownMax = cePolicy->xeCount;
-    }
+            // BUG #134: This is a hack to get the shutdown reportees.
+            // This should be replaced by a registration protocol for children to parents.
+            if (policy->myLocation == policy->parentLocation) {
+                cePolicy->shutdownMax = cePolicy->xeCount + policy->neighborCount;
+            } else {
+                cePolicy->shutdownMax = cePolicy->xeCount;
+            }
 #endif
 
-    // The PD should have been brought up by now and everything instantiated
-    // This is a bit ugly but I can't find a cleaner solution:
-    //   - we need to associate the environment with the
-    //   currently running worker/PD so that we can use getCurrentEnv
-    u64 low, high, level, engineIdx;
+            // The PD should have been brought up by now and everything instantiated
+            // This is a bit ugly but I can't find a cleaner solution:
+            //   - we need to associate the environment with the
+            //   currently running worker/PD so that we can use getCurrentEnv
+            u64 low, high, level, engineIdx;
 
-    maxCount = policy->allocatorCount;
-    low = 0;
-    for(i = 0; i < maxCount; ++i) {
-        level = policy->allocators[low]->memories[0]->level;
-        high = i+1;
-        if (high == maxCount || policy->allocators[high]->memories[0]->level != level) {
-            // One or more allocators for some level were provided in the config file.  Their indices in
-            // the array of allocators span from low(inclusive) to high (exclusive).  From this information,
-            // initialize the allocatorIndexLookup table for that level, for all agents.
-            if (high - low == 1) {
-                // All agents in the block use the same allocator (usage conjecture: on TG,
-                // this is used for all but L1.)
-                for (engineIdx = 0; engineIdx <= cePolicy->xeCount; engineIdx++) {
-                    policy->allocatorIndexLookup[engineIdx*NUM_MEM_LEVELS_SUPPORTED+level] = low;
+            maxCount = policy->allocatorCount;
+            low = 0;
+            for(i = 0; i < maxCount; ++i) {
+                level = policy->allocators[low]->memories[0]->level;
+                high = i+1;
+                if (high == maxCount || policy->allocators[high]->memories[0]->level != level) {
+                    // One or more allocators for some level were provided in the config file.  Their indices in
+                    // the array of allocators span from low(inclusive) to high (exclusive).  From this information,
+                    // initialize the allocatorIndexLookup table for that level, for all agents.
+                    if (high - low == 1) {
+                        // All agents in the block use the same allocator (usage conjecture: on TG,
+                        // this is used for all but L1.)
+                        for (engineIdx = 0; engineIdx <= cePolicy->xeCount; engineIdx++) {
+                            policy->allocatorIndexLookup[engineIdx*NUM_MEM_LEVELS_SUPPORTED+level] = low;
+                        }
+                    } else if (high - low == 2) {
+                        // All agents except the last in the block (i.e. the XEs) use the same allocator.
+                        // The last (i.e. the CE) uses a different allocator.  (usage conjecture: on TG,
+                        // this is might be used to experiment with XEs sharing a common SPAD that is
+                        // different than what the CE uses.  This is presently just for academic interst.)
+                        for (engineIdx = 0; engineIdx < cePolicy->xeCount; engineIdx++) {
+                            policy->allocatorIndexLookup[engineIdx*NUM_MEM_LEVELS_SUPPORTED+level] = low;
+                        }
+                        policy->allocatorIndexLookup[engineIdx*NUM_MEM_LEVELS_SUPPORTED+level] = low+1;
+                    } else if (high - low == cePolicy->xeCount+1) {
+                        // All agents in the block use different allocators (usage conjecture: on TG,
+                        // this is used for L1.)
+                        for (engineIdx = 0; engineIdx <= cePolicy->xeCount; engineIdx++) {
+                            policy->allocatorIndexLookup[engineIdx*NUM_MEM_LEVELS_SUPPORTED+level] = low+engineIdx;
+                        }
+                    } else {
+                        DPRINTF(DEBUG_LVL_WARN, "Unable to spread allocator[%ld:%ld] (level %ld) across %ld XEs plus the CE\n",
+                                                (u64) low, (u64) high-1, (u64) level, (u64) cePolicy->xeCount);
+                        ASSERT (0);
+                    }
+                    low = high;
                 }
-            } else if (high - low == 2) {
-                // All agents except the last in the block (i.e. the XEs) use the same allocator.
-                // The last (i.e. the CE) uses a different allocator.  (usage conjecture: on TG,
-                // this is might be used to experiment with XEs sharing a common SPAD that is
-                // different than what the CE uses.  This is presently just for academic interst.)
-                for (engineIdx = 0; engineIdx < cePolicy->xeCount; engineIdx++) {
-                    policy->allocatorIndexLookup[engineIdx*NUM_MEM_LEVELS_SUPPORTED+level] = low;
-                }
-                policy->allocatorIndexLookup[engineIdx*NUM_MEM_LEVELS_SUPPORTED+level] = low+1;
-            } else if (high - low == cePolicy->xeCount+1) {
-                // All agents in the block use different allocators (usage conjecture: on TG,
-                // this is used for L1.)
-                for (engineIdx = 0; engineIdx <= cePolicy->xeCount; engineIdx++) {
-                    policy->allocatorIndexLookup[engineIdx*NUM_MEM_LEVELS_SUPPORTED+level] = low+engineIdx;
-                }
-            } else {
-                DPRINTF(DEBUG_LVL_WARN, "I don't know how to spread allocator[%ld:%ld] (level %ld) across %ld XEs plus the CE\n", (u64) low, (u64) high-1, (u64) level, (u64) cePolicy->xeCount);
-                ASSERT (0);
             }
-            low = high;
-        }
+            maxCount = policy->commApiCount;
+            for(i = 0; i < maxCount; i++) {
+                policy->commApis[i]->fcts.switchRunlevel(policy->commApis[i], policy, RL_PD_OK,
+                                                 0, RL_REQUEST | RL_BRING_UP | RL_BARRIER, NULL, 0);
+            }
+            break;
+
+        case RL_MEMORY_OK:
+            maxCount = policy->allocatorCount;
+            for(i = 0; i < maxCount; ++i)
+                policy->allocators[i]->fcts.switchRunlevel(policy->allocators[i], policy, RL_MEMORY_OK,
+                                                 0, RL_REQUEST | RL_BRING_UP | RL_BARRIER, NULL, 0);
+            maxCount = policy->schedulerCount;
+            for(i = 0; i < maxCount; ++i)
+                policy->schedulers[i]->fcts.switchRunlevel(policy->schedulers[i], policy, RL_MEMORY_OK,
+                                                 0, RL_REQUEST | RL_BRING_UP | RL_BARRIER, NULL, 0);
+            break;
+
+        case RL_GUID_OK:
+            break;
+
+        case RL_COMPUTE_OK:
+            guidify(policy, (u64)policy, &(policy->fguid), OCR_GUID_POLICY);
+            maxCount = policy->commApiCount;
+            for(i = 0; i < maxCount; i++)
+                policy->commApis[i]->fcts.switchRunlevel(policy->commApis[i], policy, RL_COMPUTE_OK,
+                                                 0, RL_REQUEST | RL_BRING_UP | RL_BARRIER, NULL, 0);
+            maxCount = policy->allocatorCount;
+            for(i = 0; i < maxCount; ++i)
+                policy->allocators[i]->fcts.switchRunlevel(policy->allocators[i], policy, RL_COMPUTE_OK,
+                                                 0, RL_REQUEST | RL_BRING_UP | RL_BARRIER, NULL, 0);
+            maxCount = policy->schedulerCount;
+            for(i = 0; i < maxCount; i++)
+                policy->schedulers[i]->fcts.switchRunlevel(policy->schedulers[i], policy, RL_COMPUTE_OK,
+                                                 0, RL_REQUEST | RL_BRING_UP | RL_BARRIER, NULL, 0);
+            maxCount = policy->workerCount;
+            for(i = 0; i < maxCount; i++)
+                policy->workers[i]->fcts.switchRunlevel(policy->workers[i], policy, RL_COMPUTE_OK,
+                                                 0, RL_REQUEST | RL_BRING_UP | RL_BARRIER, NULL, 0);
+            break;
+        case RL_USER_OK:
+            maxCount = policy->commApiCount;
+            for(i = 0; i < maxCount; i++)
+                policy->commApis[i]->fcts.switchRunlevel(policy->commApis[i], policy, RL_USER_OK,
+                                                 0, RL_REQUEST | RL_BRING_UP | RL_BARRIER, NULL, 0);
+            return 0;
+            break;
+        default:
+            break;
     }
 
-    maxCount = policy->allocatorCount;
-    for(i = 0; i < maxCount; ++i) {
-        policy->allocators[i]->fcts.switchRunlevel(policy->allocators[i], policy, RL_COMPUTE_OK,
-                                                 0, RL_REQUEST | RL_BRING_UP | RL_BARRIER, NULL, 0);
-    }
-    guidify(policy, (u64)policy, &(policy->fguid), OCR_GUID_POLICY);
 
-    maxCount = policy->schedulerCount;
-    for(i = 0; i < maxCount; ++i) {
-        policy->schedulers[i]->fcts.switchRunlevel(policy->schedulers[i], policy, RL_MEMORY_OK,
-                                                 0, RL_REQUEST | RL_BRING_UP | RL_BARRIER, NULL, 0);
-        policy->schedulers[i]->fcts.switchRunlevel(policy->schedulers[i], policy, RL_COMPUTE_OK,
-                                                 0, RL_REQUEST | RL_BRING_UP | RL_BARRIER, NULL, 0);
-    }
-
-    maxCount = policy->commApiCount;
-    for(i = 0; i < maxCount; i++) {
-        policy->commApis[i]->fcts.switchRunlevel(policy->commApis[i], policy, RL_PD_OK,
-                                                 0, RL_REQUEST | RL_BRING_UP | RL_BARRIER, NULL, 0);
-    }
-
-    // REC: Moved all workers to start here.
-    // Note: it's important to first logically start all workers.
-    // Once they are all up, start the runtime.
-    // Workers should start the underlying target and platforms
-    maxCount = policy->workerCount;
-    for(i = 0; i < maxCount; i++) {
-        policy->workers[i]->fcts.switchRunlevel(policy->workers[i], policy, RL_COMPUTE_OK,
-                                                 0, RL_REQUEST | RL_BRING_UP | RL_BARRIER, NULL, 0);
-    }
+#ifdef SAL_FSIM_CE
+    if (runlevel < RL_COMPUTE_OK)
+        cePdSwitchRunlevel(policy, runlevel+1, properties);
+#endif
     return toReturn;
 }
 

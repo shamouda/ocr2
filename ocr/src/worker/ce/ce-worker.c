@@ -45,7 +45,6 @@ static void workerLoop(ocrWorker_t * worker) {
     ocrPolicyDomain_t *pd = worker->pd;
 
     DPRINTF(DEBUG_LVL_VERB, "Starting scheduler routine of CE worker %ld\n", getWorkerId(worker));
-    pd->fcts.switchRunlevel(pd, RL_COMPUTE_OK, 0);
     while(worker->fcts.isRunning(worker)) {
         ocrMsgHandle_t *handle = NULL;
         RESULT_ASSERT(pd->fcts.waitMessage(pd, &handle), ==, 0);
