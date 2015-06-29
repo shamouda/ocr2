@@ -356,6 +356,9 @@ u8 hcSchedulerNotifyInvoke(ocrScheduler_t *self, ocrSchedulerOpArgs_t *opArgs, o
             u32 count = 1;
             return self->fcts.giveComm(self, &count, &notifyArgs->OCR_SCHED_ARG_FIELD(OCR_SCHED_NOTIFY_COMM_READY).guid, 0);
         }
+    // Notifies ignored by this scheduler
+    case OCR_SCHED_NOTIFY_DB_CREATE:
+        break;
     default:
         ASSERT(0);
         return OCR_ENOTSUP;

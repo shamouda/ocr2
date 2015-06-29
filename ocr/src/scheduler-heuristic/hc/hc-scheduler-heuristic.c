@@ -231,6 +231,9 @@ u8 hcSchedulerHeuristicNotifyInvoke(ocrSchedulerHeuristic_t *self, ocrSchedulerH
 #undef PD_TYPE
         }
         break;
+    // Notifies ignored by this heuristic
+    case OCR_SCHED_NOTIFY_DB_CREATE:
+        break;
     default:
         ASSERT(0);
         return OCR_ENOTSUP;

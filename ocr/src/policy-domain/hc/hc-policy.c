@@ -708,6 +708,25 @@ static u8 hcAllocateDb(ocrPolicyDomain_t *self, ocrFatGuid_t *guid, void** ptr, 
         *ptr = result;
         (*guid).guid = block->guid;
         (*guid).metaDataPtr = block;
+
+        // Notify scheduler of DB CREATE
+        if (result != NULL && block != NULL) {
+            ocrWorker_t *worker = NULL;
+            PD_MSG_STACK(msg);
+            getCurrentEnv(NULL, &worker, NULL, &msg);
+
+#define PD_MSG (&msg)
+#define PD_TYPE PD_MSG_SCHED_NOTIFY
+            msg.type = PD_MSG_SCHED_NOTIFY | PD_MSG_REQUEST;
+            PD_MSG_FIELD_IO(schedArgs).base.seqId = worker->seqId;
+            PD_MSG_FIELD_IO(schedArgs).kind = OCR_SCHED_NOTIFY_DB_CREATE;
+            PD_MSG_FIELD_IO(schedArgs).OCR_SCHED_ARG_FIELD(OCR_SCHED_NOTIFY_DB_CREATE).guid.guid = block->guid;
+            PD_MSG_FIELD_IO(schedArgs).OCR_SCHED_ARG_FIELD(OCR_SCHED_NOTIFY_DB_CREATE).guid.metaDataPtr = block;
+            RESULT_PROPAGATE(self->fcts.processMessage(self, &msg, false));
+            ASSERT(PD_MSG_FIELD_O(returnDetail) == 0);
+#undef PD_MSG
+#undef PD_TYPE
+        }
         return 0;
     } else {
         DPRINTF(DEBUG_LVL_WARN, "hcAllocateDb returning NULL for size %ld\n", (u64) size);
