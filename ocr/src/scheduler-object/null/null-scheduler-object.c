@@ -100,7 +100,8 @@ void nullSchedulerObjectRootDestruct(ocrSchedulerObjectRoot_t *self) {
 
 ocrSchedulerObject_t* newSchedulerObjectRootNull(ocrSchedulerObjectFactory_t *factory, ocrParamList_t *perInstance) {
     ocrSchedulerObject_t *schedObj = (ocrSchedulerObject_t*)runtimeChunkAlloc(sizeof(ocrSchedulerObjectRootNull_t), PERSISTENT_CHUNK);
-    schedObj->guid = NULL_GUID;
+    schedObj->guid.guid = NULL_GUID;
+    schedObj->guid.metaDataPtr = NULL;
     schedObj->kind = OCR_SCHEDULER_OBJECT_UNDEFINED;
     schedObj->fctId = factory->factoryId;
     schedObj->loc = INVALID_LOCATION;

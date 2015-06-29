@@ -27,7 +27,8 @@ ocrSchedulerObject_t* deqSchedulerObjectCreate(ocrSchedulerObjectFactory_t *fact
     paramListSchedulerObjectDeq_t *paramDeq = (paramListSchedulerObjectDeq_t*)params;
     ocrPolicyDomain_t *pd = fact->pd;
     ocrSchedulerObject_t* schedObj = (ocrSchedulerObject_t*)pd->fcts.pdMalloc(pd, sizeof(ocrSchedulerObjectDeq_t));
-    schedObj->guid = NULL_GUID;
+    schedObj->guid.guid = NULL_GUID;
+    schedObj->guid.metaDataPtr = NULL;
     schedObj->kind = OCR_SCHEDULER_OBJECT_DEQUE;
     schedObj->fctId = fact->factoryId;
     schedObj->loc = INVALID_LOCATION;
@@ -50,7 +51,7 @@ u8 deqSchedulerObjectInsert(ocrSchedulerObjectFactory_t *fact, ocrSchedulerObjec
     ocrSchedulerObjectDeq_t *schedObj = (ocrSchedulerObjectDeq_t*)self;
     ASSERT(IS_SCHEDULER_OBJECT_SINGLETON_KIND(element->kind));
     deque_t * deq = schedObj->deque;
-    deq->pushAtTail(deq, (void *)(element->guid), 0);
+    deq->pushAtTail(deq, (void *)(element->guid.guid), 0);
     return 0;
 }
 
@@ -86,11 +87,11 @@ u8 deqSchedulerObjectRemove(ocrSchedulerObjectFactory_t *fact, ocrSchedulerObjec
             break;
 
         if (IS_SCHEDULER_OBJECT_SINGLETON_KIND(dst->kind)) {
-            ASSERT(dst->guid == NULL_GUID && count == 1);
-            dst->guid = retGuid;
+            ASSERT(dst->guid.guid == NULL_GUID && count == 1);
+            dst->guid.guid = retGuid;
         } else {
             ocrSchedulerObject_t taken;
-            taken.guid = retGuid;
+            taken.guid.guid = retGuid;
             taken.kind = kind;
             ocrSchedulerObjectFactory_t *dstFactory = fact->pd->schedulerObjectFactories[dst->fctId];
             dstFactory->fcts.insert(dstFactory, dst, &taken, 0);

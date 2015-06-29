@@ -79,7 +79,8 @@ u8 wstSetLocationForSchedulerObject(ocrSchedulerObjectFactory_t *fact, ocrSchedu
 
 ocrSchedulerObject_t* newSchedulerObjectRootWst(ocrSchedulerObjectFactory_t *factory, ocrParamList_t *perInstance) {
     ocrSchedulerObject_t *schedObj = (ocrSchedulerObject_t*)runtimeChunkAlloc(sizeof(ocrSchedulerObjectRootWst_t), PERSISTENT_CHUNK);
-    schedObj->guid = NULL_GUID; //Root objects are always static
+    schedObj->guid.guid = NULL_GUID; //Root objects are always static
+    schedObj->guid.metaDataPtr = NULL;
     schedObj->kind = OCR_SCHEDULER_OBJECT_ROOT_WST;
     schedObj->fctId = factory->factoryId;
     schedObj->loc = INVALID_LOCATION;
