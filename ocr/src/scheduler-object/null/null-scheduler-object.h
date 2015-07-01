@@ -22,9 +22,9 @@ typedef struct _paramListSchedulerObjectNull_t {
     paramListSchedulerObject_t base;
 } paramListSchedulerObjectNull_t;
 
-typedef struct _ocrSchedulerObjectRootNull_t {
-    ocrSchedulerObjectRoot_t base;
-} ocrSchedulerObjectRootNull_t;
+typedef struct _ocrSchedulerObjectNull_t {
+    ocrSchedulerObject_t base;
+} ocrSchedulerObjectNull_t;
 
 /****************************************************/
 /* OCR NULL SCHEDULER_OBJECT FACTORY                        */

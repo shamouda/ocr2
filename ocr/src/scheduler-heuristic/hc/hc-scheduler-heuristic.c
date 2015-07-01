@@ -73,7 +73,7 @@ u8 hcSchedulerHeuristicSwitchRunlevel(ocrSchedulerHeuristic_t *self, ocrPolicyDo
             u32 i;
             ocrScheduler_t *scheduler = self->scheduler;
             ASSERT(scheduler);
-            ASSERT(self->scheduler->rootObj->base.kind == OCR_SCHEDULER_OBJECT_ROOT_WST);
+            ASSERT(SCHEDULER_OBJECT_KIND(self->scheduler->rootObj->kind) == OCR_SCHEDULER_OBJECT_WST);
             ASSERT(scheduler->pd != NULL);
             ASSERT(scheduler->contextCount > 0);
             ocrPolicyDomain_t *pd = scheduler->pd;
@@ -121,7 +121,7 @@ ocrSchedulerHeuristicContext_t* hcSchedulerHeuristicGetContext(ocrSchedulerHeuri
 u8 hcSchedulerHeuristicRegisterContext(ocrSchedulerHeuristic_t *self, u64 contextId, ocrLocation_t loc) {
     ocrSchedulerHeuristicContext_t *context = self->contexts[contextId];
     ocrSchedulerHeuristicContextHc_t *hcContext = (ocrSchedulerHeuristicContextHc_t*)context;
-    ocrSchedulerObjectRootWst_t *wstSchedObj = (ocrSchedulerObjectRootWst_t*)self->scheduler->rootObj;
+    ocrSchedulerObjectWst_t *wstSchedObj = (ocrSchedulerObjectWst_t*)self->scheduler->rootObj;
     ASSERT(contextId < wstSchedObj->numDeques);
 
     //Reserve a deque for this context
@@ -153,16 +153,15 @@ static u8 hcSchedulerHeuristicWorkEdtUserInvoke(ocrSchedulerHeuristic_t *self, o
     //If pop fails, then try to steal from other deques
     if (edtObj.guid.guid == NULL_GUID) {
         //First try to steal from the last deque that was visited (probably had a successful steal)
-        ocrSchedulerObjectRoot_t *rootObj = self->scheduler->rootObj;
-        ocrSchedulerObjectRootWst_t *wstSchedObj = (ocrSchedulerObjectRootWst_t*)rootObj;
+        ocrSchedulerObject_t *rootObj = self->scheduler->rootObj;
+        ocrSchedulerObjectWst_t *wstSchedObj = (ocrSchedulerObjectWst_t*)rootObj;
         ocrSchedulerObject_t *stealSchedulerObject = wstSchedObj->deques[hcContext->stealSchedulerObjectIndex];
         ASSERT(stealSchedulerObject->fctId == schedObj->fctId);
         retVal = fact->fcts.remove(fact, stealSchedulerObject, OCR_SCHEDULER_OBJECT_EDT, 1, &edtObj, NULL, SCHEDULER_OBJECT_REMOVE_DEQ_STEAL); //try cached deque first
 
         //If cached steal failed, then restart steal loop from starting index
-        ocrSchedulerObject_t *sSchedObj = (ocrSchedulerObject_t*)rootObj;
-        ocrSchedulerObjectFactory_t *sFact = self->scheduler->pd->schedulerObjectFactories[sSchedObj->fctId];
-        while (edtObj.guid.guid == NULL_GUID && sFact->fcts.count(sFact, (ocrSchedulerObject_t*)wstSchedObj, (SCHEDULER_OBJECT_COUNT_EDT | SCHEDULER_OBJECT_COUNT_RECURSIVE) ) != 0) {
+        ocrSchedulerObjectFactory_t *sFact = self->scheduler->pd->schedulerObjectFactories[rootObj->fctId];
+        while (edtObj.guid.guid == NULL_GUID && sFact->fcts.count(sFact, rootObj, (SCHEDULER_OBJECT_COUNT_EDT | SCHEDULER_OBJECT_COUNT_RECURSIVE) ) != 0) {
             u32 i;
             for (i = 1; edtObj.guid.guid == NULL_GUID && i < wstSchedObj->numDeques; i++) {
                 hcContext->stealSchedulerObjectIndex = (context->id + i) % wstSchedObj->numDeques;

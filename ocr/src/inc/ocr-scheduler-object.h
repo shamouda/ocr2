@@ -15,7 +15,6 @@
 #include "utils/ocr-utils.h"
 
 struct _ocrSchedulerObjectFactory_t;
-struct _ocrSchedulerObjectRoot_t;
 struct _ocrScheduler_t;
 
 /****************************************************/
@@ -73,21 +72,25 @@ typedef enum {
     //    These schedulerObjects can hold other schedulerObjects, both singleton and aggregate.
     //    These have associated schedulerObject factories and support ocrSchedulerObjectFcts_t.
     OCR_SCHEDULER_OBJECT_AGGREGATE         =0x02,
-    OCR_SCHEDULER_OBJECT_DEQUE             =0x12,
-    OCR_SCHEDULER_OBJECT_ARRAY             =0x22, // BUG #613: No implementation of this yet
 
     //root schedulerObjects:
     //    These are derived aggregate schedulerObjects that act as the single top-level
     //    schedulerObject for each scheduler. There is one ROOT schedulerObject per scheduler.
     //    They are persistent for the lifetime of the scheduler.
-    OCR_SCHEDULER_OBJECT_ROOT              =0x03,
-    OCR_SCHEDULER_OBJECT_ROOT_WST          =0x13,
+    OCR_SCHEDULER_OBJECT_ROOT              =0x04,
+
+    //list of aggregate kinds
+    OCR_SCHEDULER_OBJECT_WST               =0x30,
+    OCR_SCHEDULER_OBJECT_DEQUE             =0x40,
+    OCR_SCHEDULER_OBJECT_ARRAY             =0x50, // BUG #613: No implementation of this yet
+
 } ocrSchedulerObjectKind;
 
-#define SCHEDULER_OBJECT_KIND_TYPE(kind)           (kind & 0xF)
-#define IS_SCHEDULER_OBJECT_SINGLETON_KIND(kind)   (SCHEDULER_OBJECT_KIND_TYPE(kind) == OCR_SCHEDULER_OBJECT_SINGLETON)
-#define IS_SCHEDULER_OBJECT_AGGREGATE_KIND(kind)   (SCHEDULER_OBJECT_KIND_TYPE(kind) == OCR_SCHEDULER_OBJECT_AGGREGATE)
-#define IS_SCHEDULER_OBJECT_ROOT_KIND(kind)        (SCHEDULER_OBJECT_KIND_TYPE(kind) == OCR_SCHEDULER_OBJECT_ROOT)
+#define SCHEDULER_OBJECT_TYPE(kind)                (kind & 0xF)
+#define SCHEDULER_OBJECT_KIND(kind)                (kind & ~0xF)
+#define IS_SCHEDULER_OBJECT_TYPE_SINGLETON(kind)   (SCHEDULER_OBJECT_TYPE(kind) & OCR_SCHEDULER_OBJECT_SINGLETON)
+#define IS_SCHEDULER_OBJECT_TYPE_AGGREGATE(kind)   (SCHEDULER_OBJECT_TYPE(kind) & OCR_SCHEDULER_OBJECT_AGGREGATE)
+#define IS_SCHEDULER_OBJECT_TYPE_ROOT(kind)        (SCHEDULER_OBJECT_TYPE(kind) & OCR_SCHEDULER_OBJECT_ROOT)
 
 /****************************************************/
 /* PARAMETER LISTS                                  */
@@ -186,7 +189,7 @@ typedef struct _ocrSchedulerObjectFcts_t {
      *
      *  @return 0 on success and a non-zero value on failure
      */
-    u8 (*destruct)(struct _ocrSchedulerObjectFactory_t *fact, ocrSchedulerObject_t *self);
+    u8 (*destroy)(struct _ocrSchedulerObjectFactory_t *fact, ocrSchedulerObject_t *self);
 
     /** @brief Insert an element into this(self) schedulerObject
      *
@@ -307,7 +310,7 @@ typedef struct _ocrSchedulerObjectFactory_t {
      */
     void (*destruct)(struct _ocrSchedulerObjectFactory_t * factory);
 
-    /*! \brief Instantiates a SchedulerObject and returns its corresponding pointer
+    /*! \brief Instantiates a SchedulerObject from the factory and returns its corresponding pointer
      *         If it does not recognize the kind, then it returns NULL.
      */
     ocrSchedulerObject_t* (*instantiate)(struct _ocrSchedulerObjectFactory_t * factory, ocrParamList_t *perInstance);
@@ -319,8 +322,9 @@ typedef struct _ocrSchedulerObjectFactory_t {
 } ocrSchedulerObjectFactory_t;
 
 /****************************************************/
-/* OCR SCHEDULER OBJECT ROOT                        */
+/* OCR SCHEDULER OBJECT ROOT FACTORY                */
 /****************************************************/
+
 /*
  * A "schedulerObject root" is a special kind of schedulerObject
  * that encapsulates all the schedulerObjects maintained by
@@ -351,30 +355,20 @@ typedef struct _ocrSchedulerObjectRootFcts_t {
      * that the call to switch runlevel was well formed and will be processed
      * at some point
      */
-    u8 (*switchRunlevel)(struct _ocrSchedulerObjectRoot_t* self, struct _ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
+    u8 (*switchRunlevel)(ocrSchedulerObject_t *self, struct _ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
                          phase_t phase, u32 properties, void (*callback)(struct _ocrPolicyDomain_t*, u64), u64 val);
 
-    void (*destruct)(struct _ocrSchedulerObjectRoot_t *self);
+    void (*destruct)(ocrSchedulerObject_t *self);
 
     /*! \brief Creates an action set of with "count" number of actions
      */
-    ocrSchedulerObjectActionSet_t* (*newActionSet)(struct _ocrSchedulerObjectRoot_t *self, u32 count);
+    ocrSchedulerObjectActionSet_t* (*newActionSet)(ocrSchedulerObject_t *self, struct _ocrPolicyDomain_t *PD, u32 count);
 
     /*! \brief Destroys an action set
      */
-    void (*destroyActionSet)(struct _ocrSchedulerObjectRoot_t *self, ocrSchedulerObjectActionSet_t *actionSet);
+    void (*destroyActionSet)(ocrSchedulerObject_t *self, struct _ocrPolicyDomain_t *PD, ocrSchedulerObjectActionSet_t *actionSet);
 
 } ocrSchedulerObjectRootFcts_t;
-
-typedef struct _ocrSchedulerObjectRoot_t {
-    ocrSchedulerObject_t base;
-    struct _ocrScheduler_t *scheduler;    /**< Scheduler of this schedulerObject root */
-    ocrSchedulerObjectRootFcts_t fcts;       /**< root specific functions */
-} ocrSchedulerObjectRoot_t;
-
-/****************************************************/
-/* OCR SCHEDULER OBJECT ROOT FACTORY                */
-/****************************************************/
 
 /*! \brief Abstract factory class to create OCR schedulerObject root
  *

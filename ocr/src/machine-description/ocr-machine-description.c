@@ -1050,7 +1050,7 @@ void add_dependence (type_enum fromtype, type_enum totype, char *refstr,
         case schedulerObject_type: {
             if (toinstance != NULL) {
                 ASSERT(f->rootObj == NULL); //scheduler can have only one schedulerObject root
-                f->rootObj = (ocrSchedulerObjectRoot_t *)toinstance;
+                f->rootObj = (ocrSchedulerObject_t *)toinstance;
             }
             break;
         }

@@ -38,7 +38,7 @@ ocrSchedulerObject_t* deqSchedulerObjectCreate(ocrSchedulerObjectFactory_t *fact
     return schedObj;
 }
 
-u8 deqSchedulerObjectDestruct(ocrSchedulerObjectFactory_t *fact, ocrSchedulerObject_t *self) {
+u8 deqSchedulerObjectDestroy(ocrSchedulerObjectFactory_t *fact, ocrSchedulerObject_t *self) {
     ASSERT(self->kind == OCR_SCHEDULER_OBJECT_DEQUE);
     ocrPolicyDomain_t *pd = fact->pd;
     ocrSchedulerObjectDeq_t* deqSchedObj = (ocrSchedulerObjectDeq_t*)self;
@@ -49,7 +49,7 @@ u8 deqSchedulerObjectDestruct(ocrSchedulerObjectFactory_t *fact, ocrSchedulerObj
 
 u8 deqSchedulerObjectInsert(ocrSchedulerObjectFactory_t *fact, ocrSchedulerObject_t *self, ocrSchedulerObject_t *element, u32 properties) {
     ocrSchedulerObjectDeq_t *schedObj = (ocrSchedulerObjectDeq_t*)self;
-    ASSERT(IS_SCHEDULER_OBJECT_SINGLETON_KIND(element->kind));
+    ASSERT(IS_SCHEDULER_OBJECT_TYPE_SINGLETON(element->kind));
     deque_t * deq = schedObj->deque;
     deq->pushAtTail(deq, (void *)(element->guid.guid), 0);
     return 0;
@@ -58,7 +58,7 @@ u8 deqSchedulerObjectInsert(ocrSchedulerObjectFactory_t *fact, ocrSchedulerObjec
 u8 deqSchedulerObjectRemove(ocrSchedulerObjectFactory_t *fact, ocrSchedulerObject_t *self, ocrSchedulerObjectKind kind, u32 count, ocrSchedulerObject_t *dst, ocrSchedulerObject_t *element, u32 properties) {
     u32 i;
     ocrSchedulerObjectDeq_t *schedObj = (ocrSchedulerObjectDeq_t*)self;
-    ASSERT(IS_SCHEDULER_OBJECT_SINGLETON_KIND(kind));
+    ASSERT(IS_SCHEDULER_OBJECT_TYPE_SINGLETON(kind));
     deque_t * deq = schedObj->deque;
 
     for (i = 0; i < count; i++) {
@@ -86,7 +86,7 @@ u8 deqSchedulerObjectRemove(ocrSchedulerObjectFactory_t *fact, ocrSchedulerObjec
         if (retGuid == NULL_GUID)
             break;
 
-        if (IS_SCHEDULER_OBJECT_SINGLETON_KIND(dst->kind)) {
+        if (IS_SCHEDULER_OBJECT_TYPE_SINGLETON(dst->kind)) {
             ASSERT(dst->guid.guid == NULL_GUID && count == 1);
             dst->guid.guid = retGuid;
         } else {
@@ -143,7 +143,7 @@ ocrSchedulerObjectFactory_t * newOcrSchedulerObjectAggregateFactoryDeq(ocrParamL
     schedObjFact->destruct = &destructSchedulerObjectFactoryDeq;
 
     schedObjFact->fcts.create = FUNC_ADDR(ocrSchedulerObject_t* (*)(ocrSchedulerObjectFactory_t*, ocrParamList_t*), deqSchedulerObjectCreate);
-    schedObjFact->fcts.destruct = FUNC_ADDR(u8 (*)(ocrSchedulerObjectFactory_t*, ocrSchedulerObject_t*), deqSchedulerObjectDestruct);
+    schedObjFact->fcts.destroy = FUNC_ADDR(u8 (*)(ocrSchedulerObjectFactory_t*, ocrSchedulerObject_t*), deqSchedulerObjectDestroy);
     schedObjFact->fcts.insert = FUNC_ADDR(u8 (*)(ocrSchedulerObjectFactory_t*, ocrSchedulerObject_t*, ocrSchedulerObject_t*, u32), deqSchedulerObjectInsert);
     schedObjFact->fcts.remove = FUNC_ADDR(u8 (*)(ocrSchedulerObjectFactory_t*, ocrSchedulerObject_t*, ocrSchedulerObjectKind, u32, ocrSchedulerObject_t*, ocrSchedulerObject_t*, u32), deqSchedulerObjectRemove);
     schedObjFact->fcts.count = FUNC_ADDR(u64 (*)(ocrSchedulerObjectFactory_t*, ocrSchedulerObject_t*, u32), deqSchedulerObjectCount);
@@ -155,7 +155,7 @@ ocrSchedulerObjectFactory_t * newOcrSchedulerObjectAggregateFactoryDeq(ocrParamL
 
 ocrSchedulerObjectFactory_t * newOcrSchedulerObjectFactoryDeq(ocrParamList_t *perType, u32 factoryId) {
     paramListSchedulerObjectFact_t *paramFact = (paramListSchedulerObjectFact_t*)perType;
-    switch(SCHEDULER_OBJECT_KIND_TYPE(paramFact->kind)) {
+    switch(SCHEDULER_OBJECT_TYPE(paramFact->kind)) {
     case OCR_SCHEDULER_OBJECT_AGGREGATE:
         return newOcrSchedulerObjectAggregateFactoryDeq(perType, factoryId);
     default:

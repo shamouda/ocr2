@@ -22,15 +22,19 @@ typedef struct _paramListSchedulerObjectWst_t {
     paramListSchedulerObject_t base;
 } paramListSchedulerObjectWst_t;
 
-typedef struct _ocrSchedulerObjectRootWst_t {
-    ocrSchedulerObjectRoot_t base;
+typedef struct _ocrSchedulerObjectWst_t {
+    ocrSchedulerObject_t base;
     ocrSchedulerObject_t **deques;    /* Array of deques */
-    u32 numDeques;              /* Number of deques */
-} ocrSchedulerObjectRootWst_t;
+    u32 numDeques;                    /* Number of deques */
+} ocrSchedulerObjectWst_t;
 
 /****************************************************/
 /* OCR WST SCHEDULER_OBJECT FACTORY                        */
 /****************************************************/
+
+typedef struct _ocrSchedulerObjectFactoryWst_t {
+    ocrSchedulerObjectFactory_t base;
+} ocrSchedulerObjectFactoryWst_t;
 
 typedef struct _ocrSchedulerObjectRootFactoryWst_t {
     ocrSchedulerObjectRootFactory_t base;

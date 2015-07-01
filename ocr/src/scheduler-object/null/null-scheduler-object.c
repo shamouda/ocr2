@@ -16,7 +16,7 @@
 #include "scheduler-object/null/null-scheduler-object.h"
 
 /******************************************************/
-/* OCR-NULL SCHEDULER_OBJECT FUNCTIONS                        */
+/* OCR-NULL SCHEDULER_OBJECT FUNCTIONS                */
 /******************************************************/
 
 ocrSchedulerObject_t* nullSchedulerObjectCreate(ocrSchedulerObjectFactory_t *fact, ocrParamList_t *params) {
@@ -24,7 +24,7 @@ ocrSchedulerObject_t* nullSchedulerObjectCreate(ocrSchedulerObjectFactory_t *fac
     return NULL;
 }
 
-u8 nullSchedulerObjectDestruct(ocrSchedulerObjectFactory_t *fact, ocrSchedulerObject_t *self) {
+u8 nullSchedulerObjectDestroy(ocrSchedulerObjectFactory_t *fact, ocrSchedulerObject_t *self) {
     return OCR_ENOTSUP;
 }
 
@@ -51,10 +51,10 @@ u8 nullSetLocationForSchedulerObject(ocrSchedulerObjectFactory_t *fact, ocrSched
 }
 
 /******************************************************/
-/* NULL SCHEDULER_OBJECT ROOT FUNCTIONS                      */
+/* NULL SCHEDULER_OBJECT ROOT FUNCTIONS               */
 /******************************************************/
 
-u8 nullSchedulerObjectRootSwitchRunlevel(ocrSchedulerObjectRoot_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
+u8 nullSchedulerObjectSwitchRunlevel(ocrSchedulerObject_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
                                          phase_t phase, u32 properties, void (*callback)(ocrPolicyDomain_t*, u64), u64 val) {
 
     u8 toReturn = 0;
@@ -89,26 +89,32 @@ u8 nullSchedulerObjectRootSwitchRunlevel(ocrSchedulerObjectRoot_t *self, ocrPoli
     return toReturn;
 }
 
-void nullSchedulerObjectRootDestruct(ocrSchedulerObjectRoot_t *self) {
+void nullSchedulerObjectDestruct(ocrSchedulerObject_t *self) {
     runtimeChunkFree((u64)self, PERSISTENT_CHUNK);
     return;
 }
 
+ocrSchedulerObjectActionSet_t* nullSchedulerObjectNewActionSet(ocrSchedulerObject_t *self, ocrPolicyDomain_t *PD, u32 count) {
+    ASSERT(0);
+    return NULL;
+}
+
+void nullSchedulerObjectDestroyActionSet(ocrSchedulerObject_t *self, ocrPolicyDomain_t *PD, ocrSchedulerObjectActionSet_t *actionSet) {
+    ASSERT(0);
+    return;
+}
+
 /******************************************************/
-/* OCR-NULL SCHEDULER_OBJECT FACTORY FUNCTIONS                */
+/* OCR-NULL SCHEDULER_OBJECT FACTORY FUNCTIONS        */
 /******************************************************/
 
 ocrSchedulerObject_t* newSchedulerObjectRootNull(ocrSchedulerObjectFactory_t *factory, ocrParamList_t *perInstance) {
-    ocrSchedulerObject_t *schedObj = (ocrSchedulerObject_t*)runtimeChunkAlloc(sizeof(ocrSchedulerObjectRootNull_t), PERSISTENT_CHUNK);
+    ocrSchedulerObject_t *schedObj = (ocrSchedulerObject_t*)runtimeChunkAlloc(sizeof(ocrSchedulerObjectNull_t), PERSISTENT_CHUNK);
     schedObj->guid.guid = NULL_GUID;
     schedObj->guid.metaDataPtr = NULL;
     schedObj->kind = OCR_SCHEDULER_OBJECT_UNDEFINED;
     schedObj->fctId = factory->factoryId;
     schedObj->loc = INVALID_LOCATION;
-    ocrSchedulerObjectRoot_t *rootSchedObj = (ocrSchedulerObjectRoot_t*)schedObj;
-    ocrSchedulerObjectRootFactory_t *rootFact = (ocrSchedulerObjectRootFactory_t*)factory;
-    rootSchedObj->scheduler = NULL;
-    rootSchedObj->fcts = rootFact->fcts;
     return schedObj;
 }
 
@@ -128,7 +134,7 @@ ocrSchedulerObjectFactory_t * newOcrSchedulerObjectFactoryNull(ocrParamList_t *p
     schedObjFact->destruct = &destructSchedulerObjectRootFactoryNull;
 
     schedObjFact->fcts.create = FUNC_ADDR(ocrSchedulerObject_t* (*)(ocrSchedulerObjectFactory_t*, ocrParamList_t*), nullSchedulerObjectCreate);
-    schedObjFact->fcts.destruct = FUNC_ADDR(u8 (*)(ocrSchedulerObjectFactory_t*, ocrSchedulerObject_t*), nullSchedulerObjectDestruct);
+    schedObjFact->fcts.destroy = FUNC_ADDR(u8 (*)(ocrSchedulerObjectFactory_t*, ocrSchedulerObject_t*), nullSchedulerObjectDestroy);
     schedObjFact->fcts.insert = FUNC_ADDR(u8 (*)(ocrSchedulerObjectFactory_t*, ocrSchedulerObject_t*, ocrSchedulerObject_t*, u32), nullSchedulerObjectInsert);
     schedObjFact->fcts.remove = FUNC_ADDR(u8 (*)(ocrSchedulerObjectFactory_t*, ocrSchedulerObject_t*, ocrSchedulerObjectKind, u32, ocrSchedulerObject_t*, ocrSchedulerObject_t*, u32), nullSchedulerObjectRemove);
     schedObjFact->fcts.count = FUNC_ADDR(u64 (*)(ocrSchedulerObjectFactory_t*, ocrSchedulerObject_t*, u32), nullSchedulerObjectCount);
@@ -136,9 +142,11 @@ ocrSchedulerObjectFactory_t * newOcrSchedulerObjectFactoryNull(ocrParamList_t *p
     schedObjFact->fcts.getSchedulerObjectForLocation = FUNC_ADDR(ocrSchedulerObject_t* (*)(ocrSchedulerObjectFactory_t*, ocrSchedulerObject_t*, ocrLocation_t, ocrSchedulerObjectMappingKind, u32), nullGetSchedulerObjectForLocation);
 
     ocrSchedulerObjectRootFactory_t* rootFactory = (ocrSchedulerObjectRootFactory_t*)schedObjFact;
-    rootFactory->fcts.switchRunlevel = FUNC_ADDR(u8 (*)(ocrSchedulerObjectRoot_t*, ocrPolicyDomain_t*, ocrRunlevel_t,
-                                                        phase_t, u32, void (*)(ocrPolicyDomain_t*, u64), u64), nullSchedulerObjectRootSwitchRunlevel);
-    rootFactory->fcts.destruct = FUNC_ADDR(void (*)(ocrSchedulerObjectRoot_t*), nullSchedulerObjectRootDestruct);
+    rootFactory->fcts.switchRunlevel = FUNC_ADDR(u8 (*)(ocrSchedulerObject_t*, ocrPolicyDomain_t*, ocrRunlevel_t,
+                                                        phase_t, u32, void (*)(ocrPolicyDomain_t*, u64), u64), nullSchedulerObjectSwitchRunlevel);
+    rootFactory->fcts.destruct = FUNC_ADDR(void (*)(ocrSchedulerObject_t*), nullSchedulerObjectDestruct);
+    rootFactory->fcts.newActionSet = FUNC_ADDR(ocrSchedulerObjectActionSet_t* (*)(ocrSchedulerObject_t*, ocrPolicyDomain_t*, u32), nullSchedulerObjectNewActionSet);
+    rootFactory->fcts.destroyActionSet = FUNC_ADDR(void (*)(ocrSchedulerObject_t*, ocrPolicyDomain_t*, ocrSchedulerObjectActionSet_t*), nullSchedulerObjectDestroyActionSet);
 
     return schedObjFact;
 }

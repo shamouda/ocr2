@@ -354,7 +354,7 @@ typedef struct _ocrScheduler_t {
     // SchedulerObject Root:
     // Top level schedulerObject that encapsulates all schedulerObjects.
     // SchedulerObject factories are maintained in the policy domain.
-    struct _ocrSchedulerObjectRoot_t *rootObj;
+    struct _ocrSchedulerObject_t *rootObj;
 
     // Scheduler Heuristics
     struct _ocrSchedulerHeuristic_t **schedulerHeuristics;
