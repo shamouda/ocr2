@@ -1017,6 +1017,11 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
                         proxyDb->mode = (PD_MSG_FIELD_IO(properties) & DB_ACCESS_MODE_MASK);
                         proxyDb->size = PD_MSG_FIELD_O(size);
                         proxyDb->flags = PD_MSG_FIELD_IO(properties);
+                        // XXX Keep single-assignment DBs forever...
+                        bool isSS = (PD_MSG_FIELD_IO(properties) & DB_PROP_SINGLE_ASSIGNMENT);
+                        if (isSS) {
+                            proxyDb->nbUsers++; // add extra proxy user (so this never gets deleted)
+                        }
                         // Deserialize the data pointer from the message
                         // The message ptr is set to the message payload but we need
                         // to make a copy since the message will be deallocated later on.
