@@ -302,6 +302,7 @@ typedef struct {
     u64 size;
     void * volatile ptr;
     u32 flags;
+    u32 singleAssignment;
 } ProxyDb_t;
 
 /**
@@ -319,6 +320,7 @@ static ProxyDb_t * createProxyDb(ocrPolicyDomain_t * pd) {
     proxyDb->size = 0;
     proxyDb->ptr = NULL;
     proxyDb->flags = 0;
+    proxyDb->singleAssignment = 0;
     return proxyDb;
 }
 
@@ -1018,8 +1020,8 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
                         proxyDb->size = PD_MSG_FIELD_O(size);
                         proxyDb->flags = PD_MSG_FIELD_IO(properties);
                         // XXX Keep single-assignment DBs forever...
-                        bool isSS = (PD_MSG_FIELD_IO(properties) & DB_PROP_SINGLE_ASSIGNMENT);
-                        if (isSS) {
+                        proxyDb->singleAssignment = (PD_MSG_FIELD_IO(properties) & DB_PROP_SINGLE_ASSIGNMENT);
+                        if (proxyDb->singleAssignment) {
                             proxyDb->nbUsers++; // add extra proxy user (so this never gets deleted)
                         }
                         // Deserialize the data pointer from the message
