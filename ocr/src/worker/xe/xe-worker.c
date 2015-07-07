@@ -18,7 +18,7 @@
 #include "worker/xe/xe-worker.h"
 
 #ifdef HAL_FSIM_XE
-#include "rmd-map.h"
+#include "xstg-map.h"
 #endif
 
 #ifdef OCR_ENABLE_STATISTICS

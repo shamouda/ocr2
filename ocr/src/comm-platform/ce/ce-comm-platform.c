@@ -19,10 +19,10 @@
 #include "ce-comm-platform.h"
 
 #include "mmio-table.h"
-#include "rmd-arch.h"
-#include "rmd-map.h"
-#include "rmd-msg-queue.h"
-#include "rmd-mmio.h"
+#include "xstg-arch.h"
+#include "xstg-map.h"
+#include "xstg-msg-queue.h"
+#include "tg-mmio.h"
 
 #define DEBUG_TYPE COMM_PLATFORM
 
@@ -93,8 +93,8 @@ u64 parentOf(u64 location) {
         return ((location & ~ID_AGENT_MASK ) | ID_AGENT_CE);
     else if (BLOCK_FROM_ID(location)) // Non-zero block has zero block as parent
         return (location & ~ID_BLOCK_MASK);
-    else if (UNIT_FROM_ID(location)) // Non-zero unit has zero unit & zero block as parent
-        return (location & ~ID_UNIT_MASK);
+    else if (CLUSTER_FROM_ID(location)) // Non-zero cluster has zero cluster & zero block as parent
+        return (location & ~ID_CLUSTER_MASK);
     return location;
 }
 
@@ -142,8 +142,8 @@ u8 ceCommSwitchRunlevel(ocrCommPlatform_t *self, ocrPolicyDomain_t *PD, ocrRunle
             for(i = 0; i<PD->neighborCount; i++) {
                 u64 target = PD->neighbors[i] & 0xFFFFFFFF;
                 if(PD->myLocation == parentOf(target)) {
-                    u64 *rmbox = (u64 *) (DR_CE_BASE(CHIP_FROM_ID(target),
-                                      UNIT_FROM_ID(target), BLOCK_FROM_ID(target))
+                    u64 *rmbox = (u64 *) (UR_AGENT_BASE(SOCKET_FROM_ID(target),
+                                          CLUSTER_FROM_ID(target), BLOCK_FROM_ID(target), ID_AGENT_CE)
                                       + (u64)(msgAddresses));
                     while((*(volatile u64 *)(&rmbox[3])) != 0xfeedf00d) hal_pause();
                     ASSERT(rmbox[3] == 0xfeedf00d);
@@ -166,12 +166,12 @@ u8 ceCommSwitchRunlevel(ocrCommPlatform_t *self, ocrPolicyDomain_t *PD, ocrRunle
                 (((ocrCommPlatformCe_t *)self)->lq[j])[1] = 0;
                 // Wait till XE is in the barrier
                 do {
-                    tmp = rmd_ld64((u64)rq);
+                    tmp = *rq;
                     hal_fence();
                 } while(tmp != 0xfeedf00d);
                 ASSERT(tmp == 0xfeedf00d);
                 // Exit the XE out of the barrier
-                tmp = rmd_mmio_xchg64((u64)rq, (u64)2);
+                tmp = tg_xchg64(rq, 2);
                 ASSERT(tmp == 0xfeedf00d);
             }
         }
@@ -226,14 +226,14 @@ void ceCommsInit(ocrCommPlatform_t * commPlatform, ocrPolicyDomain_t * PD) {
     //    *(volatile u64 *)i = 0;
 
     // Fill-in location tuples: ours and our parent's (the CE in FSIM)
-    PD->myLocation = (ocrLocation_t)rmd_ld64(CE_MSR_BASE + CORE_LOCATION * sizeof(u64));
+    PD->myLocation = (ocrLocation_t)*(u64 *)(AR_MSR_BASE + CORE_LOCATION_NUM * sizeof(u64));
     commPlatform->location = PD->myLocation;
     hal_fence();
-    // My parent is my unit's block 0 CE
-    PD->parentLocation = (PD->myLocation & ~(ID_BLOCK_MASK|ID_AGENT_MASK)) | ID_AGENT_CE; // My parent is my unit's block 0 CE
-    // If I'm a block 0 CE, my parent is unit 0 block 0 CE
+    // My parent is my cluster's block 0 CE
+    PD->parentLocation = (PD->myLocation & ~(ID_BLOCK_MASK|ID_AGENT_MASK)) | ID_AGENT_CE; // My parent is my cluster's block 0 CE
+    // If I'm a block 0 CE, my parent is cluster 0 block 0 CE
     if ((PD->myLocation & ID_BLOCK_MASK) == 0)
-        PD->parentLocation = (PD->myLocation & ~(ID_UNIT_MASK|ID_BLOCK_MASK|ID_AGENT_MASK))
+        PD->parentLocation = (PD->myLocation & ~(ID_CLUSTER_MASK|ID_BLOCK_MASK|ID_AGENT_MASK))
                              | ID_AGENT_CE;
     // BUG #231: Generalize this to cover higher levels of hierarchy too.
 
@@ -243,7 +243,7 @@ void ceCommsInit(ocrCommPlatform_t * commPlatform, ocrPolicyDomain_t * PD) {
     // Pre-compute pointer to our block's XEs' remote stages (where we send to)
     // Pre-compute pointer to our block's XEs' local stages (where they send to us)
     for(i=0; i<MAX_NUM_XE ; i++) {
-        cp->rq[i] = (u64 *)(BR_XE_BASE(i) + MSG_QUEUE_OFFT);
+        cp->rq[i] = (u64 *)(BR_AGENT_BASE(ID_AGENT_XE(i)) + MSG_QUEUE_OFFT);
         cp->lq[i] = (u64 *)((u64)MSG_QUEUE_OFFT + i * MSG_QUEUE_SIZE);
     }
 
@@ -268,8 +268,8 @@ u8 ceCommSendMessageToCE(ocrCommPlatform_t *self, ocrLocation_t target,
 
     if(sendBuf.type) {
         // Check if remote target is already dead
-        u64 *rmbox = (u64 *) (DR_CE_BASE(CHIP_FROM_ID(sendBuf.destLocation),
-                              UNIT_FROM_ID(sendBuf.destLocation), BLOCK_FROM_ID(sendBuf.destLocation))
+        u64 *rmbox = (u64 *) (UR_AGENT_BASE(SOCKET_FROM_ID(sendBuf.destLocation),
+                                            CLUSTER_FROM_ID(sendBuf.destLocation), BLOCK_FROM_ID(sendBuf.destLocation), ID_AGENT_CE)
                               + (u64)(msgAddresses));
         if(rmbox[0] == 0xdead) sendBuf.type = 0;
         return 1;
@@ -288,12 +288,12 @@ u8 ceCommSendMessageToCE(ocrCommPlatform_t *self, ocrLocation_t target,
     message->type |= PD_CE_CE_MESSAGE;
     ocrPolicyMsgMarshallMsg(message, baseSize, (u8 *)&sendBuf, MARSHALL_FULL_COPY);
 
-    msgAbsAddr = DR_CE_BASE(CHIP_FROM_ID(self->location),
-                            UNIT_FROM_ID(self->location), BLOCK_FROM_ID(self->location))
+    msgAbsAddr = UR_AGENT_BASE(SOCKET_FROM_ID(self->location),
+                               CLUSTER_FROM_ID(self->location), BLOCK_FROM_ID(self->location), ID_AGENT_CE)
                             + (u64)(&sendBuf);
 
-    u64 *rmbox = (u64 *) (DR_CE_BASE(CHIP_FROM_ID(target),
-                          UNIT_FROM_ID(target), BLOCK_FROM_ID(target))
+    u64 *rmbox = (u64 *) (UR_AGENT_BASE(SOCKET_FROM_ID(target),
+                                        CLUSTER_FROM_ID(target), BLOCK_FROM_ID(target), ID_AGENT_CE)
                           + (u64)(msgAddresses));
     u32 k = 0;
     do {
@@ -333,7 +333,7 @@ u8 ceCommSendMessage(ocrCommPlatform_t *self, ocrLocation_t target,
 
     ocrCommPlatformCe_t * cp = (ocrCommPlatformCe_t *)self;
     // If target is not in the same block, use a different function
-    // BUG #618: do the same for chip/unit/board as well, or better yet, a new macro
+    // BUG #618: do the same for socket/cluster/board as well, or better yet, a new macro
     if((self->location & ~ID_AGENT_MASK) != (target & ~ID_AGENT_MASK)) {
         message->seqId = self->fcts.getSeqIdAtNeighbor(self, target, 0);
         return ceCommSendMessageToCE(self, target, message, id, properties, mask);
@@ -345,7 +345,7 @@ u8 ceCommSendMessage(ocrCommPlatform_t *self, ocrLocation_t target,
 
         // - Check remote stage Empty/Busy/Full is Empty.
         {
-            u64 tmp = rmd_ld64((u64)rq);
+            u64 tmp = *rq;
             if(tmp) return 1; // BUG #134: Temporary workaround for now
             ASSERT(tmp == 0);
         }
@@ -369,13 +369,13 @@ u8 ceCommSendMessage(ocrCommPlatform_t *self, ocrLocation_t target,
         // - DMA to remote stage, with fence
         DPRINTF(DEBUG_LVL_VVERB, "DMA-ing out message to 0x%lx of size %d\n",
                 (u64)&rq[1], message->usefulSize);
-        rmd_mmio_dma_copyregion_async((u64)message, (u64)&rq[1], message->usefulSize);
+        tg_dma_copyregion_async(&rq[1], message, message->usefulSize);
 
         // - Fence DMA
-        rmd_fence_fbm();
+        tg_fence_fbm();
         // - Atomically test & set remote stage to Full. Error if already non-Empty.
         {
-            u64 tmp = rmd_mmio_xchg64((u64)rq, (u64)2);
+            u64 tmp = tg_xchg64(rq, 2);
             ASSERT(tmp == 0);
         }
 #endif
@@ -577,8 +577,9 @@ u8 ceCommDestructMessage(ocrCommPlatform_t *self, ocrPolicyMsg_t *msg) {
 
     {
         // Clear the XE pipeline clock gate while preserving other bits.
-        u64 state = rmd_ld64(XE_MSR_BASE(n) + (FUB_CLOCK_CTL * sizeof(u64)));
-        rmd_st64_async( XE_MSR_BASE(n) + (FUB_CLOCK_CTL * sizeof(u64)), state & ~0x10000000ULL );
+#warning FIXME-OCRTG: THIS WAS FUB_CLOCK_CTL AND IS NOW MSR_6 -- MAKE SURE WE DO THE RIGHT THING STILL...
+        u64 state = *(u64 *)(BR_MSR_BASE(ID_AGENT_XE(n)) + (MSR_6 * sizeof(u64)));
+        *(u64 *)(BR_MSR_BASE(ID_AGENT_XE(n)) + (MSR_6 * sizeof(u64))) = state & ~0x10000000ULL;
     }
 
     return 0;

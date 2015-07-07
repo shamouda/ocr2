@@ -19,8 +19,8 @@
 
 #include "xe-abi.h"
 #include "mmio-table.h"
-#include "rmd-arch.h"
-#include "rmd-map.h"
+#include "xstg-arch.h"
+#include "xstg-map.h"
 #include "rmd-msg-queue.h"
 
 #define DEBUG_TYPE COMM_PLATFORM

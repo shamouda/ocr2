@@ -30,7 +30,7 @@
 #include "allocator/allocator-all.h"
 
 #ifdef HAL_FSIM_CE
-#include "rmd-map.h"
+#include "xstg-map.h"
 #endif
 
 #define DEBUG_TYPE POLICY
@@ -107,19 +107,23 @@ u8 cePdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
     // However, if I'm block 0 CE, my neighbors also include unit 0 block 0 CE
     // unless I'm unit 0 block 0 CE
 
+#warning FIXME-OCRTG: ADJUST FOR THE NEW TG HIERARCHY?
+#define MAX_NUM_BLOCK 8
+#define MAX_NUM_CLUSTER 4
+
     u32 ncount = 0;
 
     if(policy->neighborCount) {
         for (i = 0; i < MAX_NUM_BLOCK; i++) {
-            u32 myUnit = ((policy->myLocation & ID_UNIT_MASK) >> ID_UNIT_SHIFT);
-            if(policy->myLocation != MAKE_CORE_ID(0, 0, 0, myUnit, i, ID_AGENT_CE))
-                policy->neighbors[ncount++] = MAKE_CORE_ID(0, 0, 0, myUnit, i, ID_AGENT_CE);
+            u32 myCluster = ((policy->myLocation & ID_CLUSTER_MASK) >> ID_CLUSTER_SHIFT);
+            if(policy->myLocation != MAKE_CORE_ID(0, 0, 0, myCluster, i, ID_AGENT_CE))
+                policy->neighbors[ncount++] = MAKE_CORE_ID(0, 0, 0, myCluster, i, ID_AGENT_CE);
             if(ncount >= policy->neighborCount) break;
         }
 
         // Block 0 of any unit also has block 0 of other units as neighbors
         if((policy->myLocation & ID_BLOCK_MASK) == 0) {
-            for (i = 0; i < MAX_NUM_UNIT; i++) {
+            for (i = 0; i < MAX_NUM_CLUSTER; i++) {
                 if(policy->myLocation != MAKE_CORE_ID(0, 0, 0, i, 0, ID_AGENT_CE))
                     policy->neighbors[ncount++] = MAKE_CORE_ID(0, 0, 0, i, 0, ID_AGENT_CE);
                 if(ncount >= policy->neighborCount) break;
@@ -138,7 +142,7 @@ u8 cePdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
     if((policy->myLocation & ID_BLOCK_MASK) == 0) {
         cePolicy->shutdownMax += policy->neighborCount;
         // Block 0 of unit 0 collects block 0's of other units
-        if(policy->myLocation & ID_UNIT_MASK) {
+        if(policy->myLocation & ID_CLUSTER_MASK) {
             u32 otherblocks = 0;
             u32 j;
             for(j = 0; j<policy->neighborCount; j++)
