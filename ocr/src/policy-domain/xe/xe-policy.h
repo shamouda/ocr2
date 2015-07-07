@@ -35,19 +35,18 @@ typedef struct {
 typedef struct {
     ocrPolicyDomain_t base;
     void *packedArgsLocation;  // Keep this here.  If moved around, might make mismatch in
-                               // .../ss/rmdkrnl/inc/rmd-bin-file.h, "magic" number XE_PDARGS_OFFSET.
+                               // .../tg/tgkrnl/inc/tg-bin-file.h, "magic" number XE_PDARGS_OFFSET.
     pdXeResumeSwitchRL_t rlSwitch; // Structure to keep track of runlevel switches
 } ocrPolicyDomainXe_t;
 
 ocrPolicyDomainFactory_t *newPolicyDomainFactoryXe(ocrParamList_t *perType);
 
 #ifdef ENABLE_SYSBOOT_FSIM
-#include "rmd-bin-files.h"
-
+#include "tg-bin-files.h"
 COMPILE_ASSERT(offsetof(ocrPolicyDomain_t, fcts) + offsetof(ocrPolicyDomainFcts_t, switchRunlevel) == PD_SWITCH_RL_OFFSET);
-               // If this fails, go to ss/common/include/rmd-bin-files.h and change PD_SWITCH_RL_OFFSET
+               // If this fails, go to ss/common/include/tg-bin-files.h and change PD_SWITCH_RL_OFFSET
 COMPILE_ASSERT(offsetof(ocrPolicyDomainXe_t, packedArgsLocation) == XE_PDARGS_OFFSET);
-               // If this fails, go to ss/common/include/rmd-bin-files.h and change XE_PDARGS_OFFSET
+               // If this fails, go to ss/common/include/tg-bin-files.h and change XE_PDARGS_OFFSET
 #endif
 
 

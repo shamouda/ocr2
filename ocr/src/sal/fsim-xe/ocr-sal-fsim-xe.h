@@ -14,7 +14,7 @@
  * @brief Function to drive the runlevel changes on boot-up as well
  * as the runlevel changes on tear-down
  *
- * This function will be called by rmdkrnl to start the PD for the CE
+ * This function will be called by tgkrnl to start the PD for the XE
  *
  * @param[in] pd    Pointer to the policy domain to start
  */
@@ -32,11 +32,11 @@ extern void salResume(u32 flag);
 #define sal_assert(x, fn, ln) do { if(!(x)) {                       \
         __asm__ __volatile__ __attribute__ (( noreturn )) (         \
             "alarm %2\n\t"                                          \
-            : : "{r2}" (ln), "{r3}" (fn), "L" (XE_ASSERT));         \
+            : : "{r2}" (ln), "{r3}" (fn), "L" (XE_ASSERT_ERROR));   \
         } } while(0)
 
 #define sal_print(msg, len) __asm__ __volatile__(                   \
         "alarm %2\n\t"                                              \
-        : : "{r2}" (msg), "{r3}" (len), "L" (XE_CONOUT))
+        : : "{r2}" (msg), "{r3}" (len), "L" (XE_CONOUT_ALARM))
 
 #endif /* __OCR_SAL_FSIM_XE_H__ */

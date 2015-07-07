@@ -15,7 +15,6 @@
 #include "ocr-workpile.h"
 #include "policy-domain/ce/ce-policy.h"
 #include "scheduler/ce/ce-scheduler.h"
-#include "rmd-map.h"
 
 // BUG #619: This relies on data in ce-worker (its ID to do the mapping)
 // This is non-portable (CE scheduler does not work with non

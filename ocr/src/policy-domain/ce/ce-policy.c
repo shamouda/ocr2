@@ -38,10 +38,16 @@
 #include "allocator/allocator-all.h"
 #include "extensions/ocr-hints.h"
 
-#include "rmd-map.h"
-#include "mmio-table.h"
+#ifdef HAL_FSIM_CE
+#include "xstg-map.h"
+#endif
 
 #define DEBUG_TYPE POLICY
+
+#warning FIXME-OCRTG: ADJUST FOR THE NEW TG HIERARCHY?
+// FIXME: Check that the below numbers are valid
+#define MAX_NUM_BLOCK 8
+#define MAX_NUM_CLUSTER 4
 
 extern void ocrShutdown(void);
 
@@ -51,11 +57,11 @@ extern void ocrShutdown(void);
 static void doRLInform(ocrPolicyDomain_t *policy) {
     // We only inform our children CEs and our parent
     u32 i;
-    u32 myUnit = UNIT_FROM_ID(policy->myLocation);
+    u32 myCluster = CLUSTER_FROM_ID(policy->myLocation);
     u32 myBlock = BLOCK_FROM_ID(policy->myLocation);
-    // amGrandMaster is true if Unit0, Block0
-    bool amGrandMaster = (myUnit == 0) && (myBlock == 0);
-    bool amUnitMaster = myBlock == 0;
+    // amGrandMaster is true if Cluster0, Block0
+    bool amGrandMaster = (myCluster == 0) && (myBlock == 0);
+    bool amClusterMaster = myBlock == 0;
     ocrPolicyDomainCe_t *rself = (ocrPolicyDomainCe_t*)policy;
 
     DPRINTF(DEBUG_LVL_VERB, "Location 0x%lx: Informing children\n", policy->myLocation);
@@ -74,29 +80,29 @@ static void doRLInform(ocrPolicyDomain_t *policy) {
 #undef PD_TYPE
 
     if(policy->neighborCount) {
-        // This will be > 0 if there are more than one unit
-        s32 unitCount = (s32)policy->neighborCount - (MAX_NUM_BLOCK-1) + 1 ; // We exclude ourself in the neighborCount and add one for the unit count
-        if(unitCount > 0 && amGrandMaster) {
-            // I need to inform the other units
-            // unitCount does not include unit0 so we start at 1
-            for(i = 1; i < unitCount; ++i) {
+        // This will be > 0 if there are more than one cluster
+        s32 clusterCount = (s32)policy->neighborCount - (MAX_NUM_BLOCK-1) + 1 ; // We exclude ourself in the neighborCount and add one for the cluster count
+        if(clusterCount > 0 && amGrandMaster) {
+            // I need to inform the other clusters
+            // clusterCount does not include cluster0 so we start at 1
+            for(i = 1; i < clusterCount; ++i) {
                 getCurrentEnv(NULL, NULL, NULL, &msg);
                 msg.destLocation = MAKE_CORE_ID(0, 0, 0, i, 0, ID_AGENT_CE);
-                DPRINTF(DEBUG_LVL_VVERB, "Location 0x%lx: Informing unit CE 0x%lx\n",
+                DPRINTF(DEBUG_LVL_VVERB, "Location 0x%lx: Informing cluster CE 0x%lx\n",
                         policy->myLocation, msg.destLocation);
                 RESULT_ASSERT(policy->fcts.sendMessage(policy, msg.destLocation,
                                                        &msg, NULL, 0), ==, 0);
             }
         }
-        if(amUnitMaster) {
-            // I need to inform the other blocks in my unit
+        if(amClusterMaster) {
+            // I need to inform the other blocks in my cluster
             u32 blockCount = MAX_NUM_BLOCK;
-            // If only one unit, cap the number of blocks
-            if(unitCount <= 0) blockCount = policy->neighborCount + 1;
+            // If only one cluster, cap the number of blocks
+            if(clusterCount <= 0) blockCount = policy->neighborCount + 1;
             // Start at one to skip ourself
             for(i = 1; i < blockCount; ++i) {
                 getCurrentEnv(NULL, NULL, NULL, &msg);
-                msg.destLocation = MAKE_CORE_ID(0, 0, 0, myUnit, i, ID_AGENT_CE);
+                msg.destLocation = MAKE_CORE_ID(0, 0, 0, myCluster, i, ID_AGENT_CE);
                 DPRINTF(DEBUG_LVL_VVERB, "Location 0x%lx: Informing block CE 0x%lx\n",
                         policy->myLocation, msg.destLocation);
                 RESULT_ASSERT(policy->fcts.sendMessage(policy, msg.destLocation,
@@ -193,11 +199,11 @@ static void doRLRelease(ocrPolicyDomain_t *policy) {
     // not cause a deadlock because the children we are sending to
     // are blocked anyways.
     u32 i;
-    u32 myUnit = UNIT_FROM_ID(policy->myLocation);
+    u32 myCluster = CLUSTER_FROM_ID(policy->myLocation);
     u32 myBlock = BLOCK_FROM_ID(policy->myLocation);
-    // amGrandMaster is true if Unit0, Block0
-    bool amGrandMaster = (myUnit == 0) && (myBlock == 0);
-    bool amUnitMaster = myBlock == 0;
+    // amGrandMaster is true if Cluster0, Block0
+    bool amGrandMaster = (myCluster == 0) && (myBlock == 0);
+    bool amClusterMaster = myBlock == 0;
     ocrPolicyDomainCe_t *rself = (ocrPolicyDomainCe_t*)policy;
 
     DPRINTF(DEBUG_LVL_VERB, "Location 0x%lx: Releasing children\n", policy->myLocation);
@@ -210,15 +216,15 @@ static void doRLRelease(ocrPolicyDomain_t *policy) {
         (rself->rlSwitch.properties & (RL_BRING_UP | RL_TEAR_DOWN));
 
     if(policy->neighborCount) {
-        // This will be > 0 if there are more than one unit
-        s32 unitCount = (s32)policy->neighborCount - (MAX_NUM_BLOCK-1) + 1 ; // We exclude ourself in the neighborCount and add one for the unit count
-        if(unitCount > 0 && amGrandMaster) {
-            // I need to inform the other units
-            // unitCount does not include unit0 so we start at 1
-            for(i = 1; i < unitCount; ++i) {
+        // This will be > 0 if there are more than one cluster
+        s32 clusterCount = (s32)policy->neighborCount - (MAX_NUM_BLOCK-1) + 1 ; // We exclude ourself in the neighborCount and add one for the cluster count
+        if(clusterCount > 0 && amGrandMaster) {
+            // I need to inform the other clusters
+            // clusterCount does not include cluster0 so we start at 1
+            for(i = 1; i < clusterCount; ++i) {
                 getCurrentEnv(NULL, NULL, NULL, &msg);
                 msg.destLocation = MAKE_CORE_ID(0, 0, 0, i, 0, ID_AGENT_CE);
-                DPRINTF(DEBUG_LVL_VVERB, "Location 0x%lx: Releasing unit CE 0x%lx\n",
+                DPRINTF(DEBUG_LVL_VVERB, "Location 0x%lx: Releasing cluster CE 0x%lx\n",
                         policy->myLocation, msg.destLocation);
                 // Send message until success but avoid the poll that is
                 // present in sendMessage
@@ -227,15 +233,15 @@ static void doRLRelease(ocrPolicyDomain_t *policy) {
                     ;
             }
         }
-        if(amUnitMaster) {
-            // I need to inform the other blocks in my unit
+        if(amClusterMaster) {
+            // I need to inform the other blocks in my cluster
             u32 blockCount = MAX_NUM_BLOCK;
-            // If only one unit, cap the number of blocks
-            if(unitCount <= 0) blockCount = policy->neighborCount + 1;
+            // If only one cluster, cap the number of blocks
+            if(clusterCount <= 0) blockCount = policy->neighborCount + 1;
             // Start at one to skip ourself
             for(i = 1; i < blockCount; ++i) {
                 getCurrentEnv(NULL, NULL, NULL, &msg);
-                msg.destLocation = MAKE_CORE_ID(0, 0, 0, myUnit, i, ID_AGENT_CE);
+                msg.destLocation = MAKE_CORE_ID(0, 0, 0, myCluster, i, ID_AGENT_CE);
                 DPRINTF(DEBUG_LVL_VVERB, "Location 0x%lx: Releasing block CE 0x%lx\n",
                         policy->myLocation, msg.destLocation);
                 while(policy->fcts.sendMessage(policy, msg.destLocation,
@@ -247,7 +253,7 @@ static void doRLRelease(ocrPolicyDomain_t *policy) {
     // Finally, release the XEs
     for(i=0; i < rself->xeCount; ++i) {
         getCurrentEnv(NULL, NULL, NULL, &msg);
-        msg.destLocation = MAKE_CORE_ID(0, 0, 0, myUnit, myBlock, (ID_AGENT_XE0 + i));
+        msg.destLocation = MAKE_CORE_ID(0, 0, 0, myCluster, myBlock, (ID_AGENT_XE0 + i));
         DPRINTF(DEBUG_LVL_VVERB, "Location 0x%lx: Releasing XE 0x%lx\n",
                 policy->myLocation, msg.destLocation);
         while(policy->fcts.sendMessage(policy, msg.destLocation,
@@ -261,27 +267,27 @@ static void doRLRelease(ocrPolicyDomain_t *policy) {
 
 // Returns true if location is a child of policy
 static bool isChildLocation(ocrPolicyDomain_t *policy, ocrLocation_t location) {
-    u32 myUnit = UNIT_FROM_ID(policy->myLocation);
+    u32 myCluster = CLUSTER_FROM_ID(policy->myLocation);
     u32 myBlock = BLOCK_FROM_ID(policy->myLocation);
-    // amGrandMaster is true if Unit0, Block0
-    bool amGrandMaster = (myUnit == 0) && (myBlock == 0);
-    bool amUnitMaster = myBlock == 0;
+    // amGrandMaster is true if Cluster0, Block0
+    bool amGrandMaster = (myCluster == 0) && (myBlock == 0);
+    bool amClusterMaster = myBlock == 0;
 
     if(location == policy->myLocation) return false;
 
     // Check if one of our XEs
-    if(BLOCK_FROM_ID(location) == myBlock && UNIT_FROM_ID(location) == myUnit
+    if(BLOCK_FROM_ID(location) == myBlock && CLUSTER_FROM_ID(location) == myCluster
        && AGENT_FROM_ID(location) < ID_AGENT_CE) {
         return true;
     }
 
-    // If we are the unit master, another CE of the same unit is our child
-    if(amUnitMaster && (UNIT_FROM_ID(location) == myUnit) &&
+    // If we are the cluster master, another CE of the same cluster is our child
+    if(amClusterMaster && (CLUSTER_FROM_ID(location) == myCluster) &&
        AGENT_FROM_ID(location) == ID_AGENT_CE) {
         return true;
     }
 
-    // If we are the grand master, block 0 of other units is our child
+    // If we are the grand master, block 0 of other clusters is our child
     if(amGrandMaster && (BLOCK_FROM_ID(location) == 0) && AGENT_FROM_ID(location) == ID_AGENT_CE) {
         return true;
     }
@@ -324,22 +330,24 @@ static void performNeighborDiscovery(ocrPolicyDomain_t *policy) {
     // Fill-in location tuples: ours and our parent's (the CE in FSIM)
 #ifdef HAL_FSIM_CE
     // On FSim, read the MSR
-    policy->myLocation = (ocrLocation_t)rmd_ld64(CE_MSR_BASE + CORE_LOCATION * sizeof(u64));
+    // Bug #820: This was a MMIO gate
+    policy->myLocation = *((ocrLocation_t*)(AR_MSR_BASE + CORE_LOCATION_NUM * sizeof(u64)));
 #endif // On TG-x86, it is set in the driver code
-    // My parent is my unit's block 0 CE
+    // My parent is my cluster's block 0 CE
     policy->parentLocation = (policy->myLocation & ~(ID_BLOCK_MASK|ID_AGENT_MASK)) | ID_AGENT_CE;
 
-    // If I'm a block 0 CE, my parent is unit 0 block 0 CE
+    // If I'm a block 0 CE, my parent is cluster 0 block 0 CE
     if((policy->myLocation & ID_BLOCK_MASK) == 0)
-        policy->parentLocation = (policy->myLocation & ~(ID_UNIT_MASK|ID_BLOCK_MASK|ID_AGENT_MASK))
+        policy->parentLocation = (policy->myLocation & ~(ID_CLUSTER_MASK|ID_BLOCK_MASK|ID_AGENT_MASK))
             | ID_AGENT_CE;
     // BUG #231: Generalize this to cover higher levels of hierarchy too.
 
     // Now that I know who I am, I figure out who my neighbors are
     // Neighbor discovery
-    // In the general case, all other CEs in my unit are my neighbors
-    // However, if I'm block 0 CE, my neighbors also include unit 0 block 0 CE
-    // unless I'm unit 0 block 0 CE
+    // In the general case, all other CEs in my cluster are my neighbors
+    // However, if I'm block 0 CE, my neighbors also include cluster 0 block 0 CE
+    // unless I'm cluster 0 block 0 CE
+    // TODO: Extend this to Sockets & beyond
 
     u32 i = 0;
     u32 ncount = 0;
@@ -351,21 +359,21 @@ static void performNeighborDiscovery(ocrPolicyDomain_t *policy) {
 
     if(policy->neighborCount) {
         for (i = 0; i < MAX_NUM_BLOCK; i++) {
-            u32 myUnit = UNIT_FROM_ID(policy->myLocation);
-            if(policy->myLocation != MAKE_CORE_ID(0, 0, 0, myUnit, i, ID_AGENT_CE)) {
-                policy->neighbors[ncount++] = MAKE_CORE_ID(0, 0, 0, myUnit, i, ID_AGENT_CE);
-                DPRINTF(DEBUG_LVL_VERB, "For unit %u and block %u, got agent ID 0x%x and setting to %u (@ 0x%lx)\n",
-                        myUnit, i, policy->neighbors[ncount-1], ncount-1, &(policy->neighbors[ncount-1]));
+            u32 myCluster = ((policy->myLocation & ID_CLUSTER_MASK) >> ID_CLUSTER_SHIFT);
+            if(policy->myLocation != MAKE_CORE_ID(0, 0, 0, myCluster, i, ID_AGENT_CE)) {
+                policy->neighbors[ncount++] = MAKE_CORE_ID(0, 0, 0, myCluster, i, ID_AGENT_CE);
+                DPRINTF(DEBUG_LVL_VERB, "For cluster %u and block %u, got agent ID 0x%x and setting to %u (@ 0x%lx)\n",
+                        myCluster, i, policy->neighbors[ncount-1], ncount-1, &(policy->neighbors[ncount-1]));
             }
             if(ncount >= policy->neighborCount) break;
         }
 
-        // Block 0 of any unit also has block 0 of other units as neighbors
+        // Block 0 of any cluster also has block 0 of other clusters as neighbors
         if((ncount < policy->neighborCount) && (BLOCK_FROM_ID(policy->myLocation) == 0)) {
-            for (i = 0; i < MAX_NUM_UNIT; i++) {
+            for (i = 0; i < MAX_NUM_CLUSTER; i++) {
                 if(policy->myLocation != MAKE_CORE_ID(0, 0, 0, i, 0, ID_AGENT_CE)) {
                     policy->neighbors[ncount++] = MAKE_CORE_ID(0, 0, 0, i, 0, ID_AGENT_CE);
-                    DPRINTF(DEBUG_LVL_VERB, "For unit %u, got unit agent ID 0x%x and setting to %u (@ 0x%lx)\n",
+                    DPRINTF(DEBUG_LVL_VERB, "For cluster %u, got cluster agent ID 0x%x and setting to %u (@ 0x%lx)\n",
                             i, policy->neighbors[ncount-1], ncount-1, &(policy->neighbors[ncount-1]));
                 }
                 if(ncount >= policy->neighborCount) break;
@@ -377,7 +385,7 @@ static void performNeighborDiscovery(ocrPolicyDomain_t *policy) {
 
 static void findNeighborsPd(ocrPolicyDomain_t *policy) {
 #ifndef HAL_FSIM_CE
-    u32 myUnit = UNIT_FROM_ID(policy->myLocation);
+    u32 myCLuster = CLUSTER_FROM_ID(policy->myLocation);
     u32 myBlock = BLOCK_FROM_ID(policy->myLocation);
 
     // Fill out the neighborPDs structure which is needed
@@ -399,8 +407,8 @@ static void findNeighborsPd(ocrPolicyDomain_t *policy) {
     // (all CEs and XEs). We extract from there just the ones that are of interest to us (our XEs
     // and the CEs we are supposed to communicate with)
     for(i=0; i < rself->xeCount; ++i) {
-        ocrLocation_t curNeighbor = MAKE_CORE_ID(0, 0, 0, myUnit, myBlock, (ID_AGENT_XE0 + i));
-        policy->neighborPDs[i] = neighborsAll[myUnit*MAX_NUM_BLOCK + myBlock*(MAX_NUM_XE + MAX_NUM_CE) + i];
+        ocrLocation_t curNeighbor = MAKE_CORE_ID(0, 0, 0, myCluster, myBlock, (ID_AGENT_XE0 + i));
+        policy->neighborPDs[i] = neighborsAll[myCluster*MAX_NUM_BLOCK + myBlock*(MAX_NUM_XE + MAX_NUM_CE) + i];
         ASSERT(curNeighbor == policy->neighborPDs[i]->myLocation);
         DPRINTF(DEBUG_LVL_VERB, "PD 0x%lx (loc: 0x%lx) found XE neighbor %u at 0x%lx (loc: 0x%lx)\n",
                 policy, policy->myLocation, i, policy->neighborPDs[i],
@@ -408,7 +416,7 @@ static void findNeighborsPd(ocrPolicyDomain_t *policy) {
     }
     for(i = rself->xeCount; i < policy->neighborCount + rself->xeCount; ++i) {
         ocrLocation_t curNeighbor = policy->neighbors[i - rself->xeCount];
-        policy->neighborPDs[i] = neighborsAll[UNIT_FROM_ID(curNeighbor)*MAX_NUM_BLOCK +
+        policy->neighborPDs[i] = neighborsAll[CLUSTER_FROM_ID(curNeighbor)*MAX_NUM_BLOCK +
                                               BLOCK_FROM_ID(curNeighbor)*(MAX_NUM_XE + MAX_NUM_CE) +
                                               AGENT_FROM_ID(curNeighbor)];
         ASSERT(curNeighbor == policy->neighborPDs[i]->myLocation);
@@ -566,14 +574,14 @@ u8 cePdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
             if((properties & RL_BRING_UP) && RL_IS_FIRST_PHASE_UP(policy, RL_PD_OK, curPhase)) {
                 // The XEs are our children (always)
                 rself->rlSwitch.checkedInCount = rself->xeCount;
-                // Block 0 also collects other blocks in its unit
+                // Block 0 also collects other blocks in its cluster
                 if(BLOCK_FROM_ID(policy->myLocation) == 0) {
-                    // Neighbors include all blocks in my unit and if I am
-                    // block 0, I also have all other block 0s in other units
+                    // Neighbors include all blocks in my cluster and if I am
+                    // block 0, I also have all other block 0s in other clusters
                     rself->rlSwitch.checkedInCount += policy->neighborCount;
-                    if(UNIT_FROM_ID(policy->myLocation)) {
-                        // If I am not unit 0, my children do *not* include
-                        // block0 of other units
+                    if(CLUSTER_FROM_ID(policy->myLocation)) {
+                        // If I am not cluster 0, my children do *not* include
+                        // block0 of other clusters
                         u32 otherblocks = 0;
                         u32 j;
                         for(j = 0; j<policy->neighborCount; ++j)
@@ -1624,23 +1632,23 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             // since we do not create labeled GUIDs ourself
             ocrLocation_t jumpTarget = msg->origSrcLocation;
             ASSERT(jumpTarget != self->myLocation);
-            if(UNIT_FROM_ID(jumpTarget) == UNIT_FROM_ID(self->myLocation)) {
+            if(CLUSTER_FROM_ID(jumpTarget) == CLUSTER_FROM_ID(self->myLocation)) {
                 // We check if we are in the same block
                 if(BLOCK_FROM_ID(jumpTarget) == BLOCK_FROM_ID(self->myLocation)) {
                     DPRINTF(DEBUG_LVL_VVERB, "Responding with GUID response to my XE 0x%lx\n",
                             jumpTarget);
                 } else {
                     // Forward to the proper block
-                    jumpTarget = MAKE_CORE_ID(0, 0, 0, UNIT_FROM_ID(jumpTarget), BLOCK_FROM_ID(jumpTarget), ID_AGENT_CE);
+                    jumpTarget = MAKE_CORE_ID(0, 0, 0, CLUSTER_FROM_ID(jumpTarget), BLOCK_FROM_ID(jumpTarget), ID_AGENT_CE);
                     msg->srcLocation = self->myLocation;
                     msg->destLocation = jumpTarget;
                 }
             } else {
-                // We need to forward to the proper unit
+                // We need to forward to the proper cluster
                 if(BLOCK_FROM_ID(self->myLocation) == 0) {
-                    jumpTarget = MAKE_CORE_ID(0, 0, 0, UNIT_FROM_ID(jumpTarget), 0, ID_AGENT_CE);
+                    jumpTarget = MAKE_CORE_ID(0, 0, 0, CLUSTER_FROM_ID(jumpTarget), 0, ID_AGENT_CE);
                 } else {
-                    jumpTarget = MAKE_CORE_ID(0, 0, 0, UNIT_FROM_ID(self->myLocation), 0, ID_AGENT_CE);
+                    jumpTarget = MAKE_CORE_ID(0, 0, 0, CLUSTER_FROM_ID(self->myLocation), 0, ID_AGENT_CE);
                 }
             }
             DPRINTF(DEBUG_LVL_VVERB, "Forwarding response to 0x%lx\n", jumpTarget);
@@ -1673,20 +1681,20 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
                         returnCode = ceProcessResponse(self, msg, 0);
                     } else {
                         // Find who to offload-to:
-                        //   - If in same unit, offload to that (we have a direct connection
-                        //   - If in different unit, we first go to our "head" block (block 0 for
-                        //   our unit), then we jump to the target unit (block 0 of that unit), before
+                        //   - If in same cluster, offload to that (we have a direct connection
+                        //   - If in different cluster, we first go to our "head" block (block 0 for
+                        //   our cluster), then we jump to the target cluster (block 0 of that cluster), before
                         //   jumpting to the target block (3 hops maximum)
                         ocrLocation_t jumpTarget;
-                        if(UNIT_FROM_ID(guidLocation) == UNIT_FROM_ID(self->myLocation)) {
+                        if(CLUSTER_FROM_ID(guidLocation) == CLUSTER_FROM_ID(self->myLocation)) {
                             jumpTarget = guidLocation;
                         } else {3
                             if(BLOCK_FROM_ID(self->myLocation) == 0) {
-                                // We are the head block for this unit
-                                jumpTarget = MAKE_CORE_ID(0, 0, 0, UNIT_FROM_ID(guidLocation), 0, ID_AGENT_CE);
+                                // We are the head block for this cluster
+                                jumpTarget = MAKE_CORE_ID(0, 0, 0, CLUSTER_FROM_ID(guidLocation), 0, ID_AGENT_CE);
                             } else {
                                 // Jump to our head block
-                                jumpTarget = MAKE_CORE_ID(0, 0, 0, UNIT_FROM_ID(self->myLocation), 0, ID_AGENT_CE);
+                                jumpTarget = MAKE_CORE_ID(0, 0, 0, CLUSTER_FROM_ID(self->myLocation), 0, ID_AGENT_CE);
                             }
                         }
                         // Offload to the other CE
@@ -1764,14 +1772,14 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
                     DPRINTF(DEBUG_LVL_VVERB, "Cannot create labeled GUID for 0x%lx, asking 0x%lx\n",
                         PD_MSG_FIELD_IO(guid.guid), guidLocation);
 #ifndef HAL_FSIM_CE
-                    ocrPolicyDomain_t *otherPd = rself->allPDs[UNIT_FROM_ID(guidLocation)*MAX_NUM_BLOCK +
+                    ocrPolicyDomain_t *otherPd = rself->allPDs[CLUSTER_FROM_ID(guidLocation)*MAX_NUM_BLOCK +
                                                                BLOCK_FROM_ID(guidLocation)*(MAX_NUM_XE+MAX_NUM_CE) +
                                                                AGENT_FROM_ID(guidLocation)];
 #else
                     // Self is always relative to ourself (the CE). All PDs are at the same location
                     // relatively to the CE itself
                     ocrPolicyDomain_t *otherPd = (ocrPolicyDomain_t*)(
-                        CR_CE_BASE(UNIT_FROM_ID(guidLocation), BLOCK_FROM_ID(guidLocation)) + (u64)(self));
+                        SR_L1_BASE(CLUSTER_FROM_ID(guidLocation), BLOCK_FROM_ID(guidLocation), ID_AGENT_CE) + (u64)(self));
 #endif
                     // Note that this a HACK for now because we do not have asynchronous runtime
                     // execution (Bug #695). There is a risk that getCurrentEnv is called in this
@@ -1832,12 +1840,12 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             DPRINTF(DEBUG_LVL_VVERB, "Cannot resolve GUID_INFO, asking 0x%lx\n",
                     guidLocation);
 #ifndef HAL_FSIM_CE
-            ocrPolicyDomain_t *otherPd = rself->allPDs[UNIT_FROM_ID(guidLocation)*MAX_NUM_BLOCK +
+            ocrPolicyDomain_t *otherPd = rself->allPDs[CLUSTER_FROM_ID(guidLocation)*MAX_NUM_BLOCK +
                                                        BLOCK_FROM_ID(guidLocation)*(MAX_NUM_XE+MAX_NUM_CE) +
                                                        AGENT_FROM_ID(guidLocation)];
 #else
             ocrPolicyDomain_t *otherPd = (ocrPolicyDomain_t*)(
-                CR_CE_BASE(UNIT_FROM_ID(guidLocation), BLOCK_FROM_ID(guidLocation)) + (u64)(self));
+                SR_L1_BASE(CLUSTER_FROM_ID(guidLocation), BLOCK_FROM_ID(guidLocation), ID_AGENT_CE) + (u64)(self));
 #endif
             ASSERT(otherPd->myLocation == guidLocation);
             RESULT_ASSERT(otherPd->guidProviders[0]->fcts.getVal(otherPd->guidProviders[0], PD_MSG_FIELD_IO(guid.guid),
@@ -1943,12 +1951,12 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
                 DPRINTF(DEBUG_LVL_VVERB, "Cannot process local GUID_DESTROY, asking 0x%lx\n",
                         guidLocation);
 #ifndef HAL_FSIM_CE
-                ocrPolicyDomain_t *otherPd = rself->allPDs[UNIT_FROM_ID(guidLocation)*MAX_NUM_BLOCK +
+                ocrPolicyDomain_t *otherPd = rself->allPDs[CLUSTER_FROM_ID(guidLocation)*MAX_NUM_BLOCK +
                                                            BLOCK_FROM_ID(guidLocation)*(MAX_NUM_XE+MAX_NUM_CE) +
                                                            AGENT_FROM_ID(guidLocation)];
 #else
                 ocrPolicyDomain_t *otherPd = (ocrPolicyDomain_t*)(
-                    CR_CE_BASE(UNIT_FROM_ID(guidLocation), BLOCK_FROM_ID(guidLocation)) + (u64)(self));
+                    SR_L1_BASE(CLUSTER_FROM_ID(guidLocation), BLOCK_FROM_ID(guidLocation), ID_AGENT_CE) + (u64)(self));
 #endif
                 ASSERT(otherPd->myLocation == guidLocation);
                 RESULT_ASSERT(otherPd->guidProviders[0]->fcts.releaseGuid(otherPd->guidProviders[0],
@@ -1960,20 +1968,20 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
                 // and a GUID_INFO (which uses a faster path).
                 // We are not allowed to deguidify this so we need to offload it
                 // Find who to offload-to:
-                //   - If in same unit, offload to that (we have a direct connection
-                //   - If in different unit, we first go to our "head" block (block 0 for
-                //   our unit), then we jump to the target unit (block 0 of that unit), before
+                //   - If in same cluster, offload to that (we have a direct connection
+                //   - If in different cluster, we first go to our "head" block (block 0 for
+                //   our cluster), then we jump to the target cluster (block 0 of that cluster), before
                 //   jumpting to the target block (3 hops maximum)
                 ocrLocation_t jumpTarget;
-                if(UNIT_FROM_ID(guidLocation) == UNIT_FROM_ID(self->myLocation)) {
+                if(CLUSTER_FROM_ID(guidLocation) == CLUSTER_FROM_ID(self->myLocation)) {
                     jumpTarget = guidLocation;
                 } else {
                     if(BLOCK_FROM_ID(self->myLocation) == 0) {
-                        // We are the head block for this unit
-                        jumpTarget = MAKE_CORE_ID(0, 0, 0, UNIT_FROM_ID(guidLocation), 0, ID_AGENT_CE);
+                        // We are the head block for this cluster
+                        jumpTarget = MAKE_CORE_ID(0, 0, 0, CLUSTER_FROM_ID(guidLocation), 0, ID_AGENT_CE);
                     } else {
                         // Jump to our head block
-                        jumpTarget = MAKE_CORE_ID(0, 0, 0, UNIT_FROM_ID(self->myLocation), 0, ID_AGENT_CE);
+                        jumpTarget = MAKE_CORE_ID(0, 0, 0, CLUSTER_FROM_ID(self->myLocation), 0, ID_AGENT_CE);
                     }
                 }
                 DPRINTF(DEBUG_LVL_VVERB, "GUID_DESTROY for GUID 0x%lx will be offloaded to 0x%lx (owned by 0x%lx)\n",
