@@ -22,7 +22,7 @@
 #include "xe-pthread-comm-platform.h"
 #include "../ce-pthread/ce-pthread-comm-platform.h"
 
-#include "rmd-map.h"
+#include "xstg-map.h"
 
 #define DEBUG_TYPE COMM_PLATFORM
 

@@ -14,16 +14,11 @@
 #include "ocr-policy-domain.h"
 #include "ocr-sysboot.h"
 
-#include "comm-platform/ce/ce-comm-platform.h"
 #include "policy-domain/ce/ce-policy.h"
 
 #include "utils/ocr-utils.h"
 
-#include "mmio-table.h"
-#include "rmd-arch.h"
-#include "rmd-map.h"
-#include "rmd-msg-queue.h"
-#include "rmd-mmio.h"
+#include "ce-comm-platform.h"
 
 #define DEBUG_TYPE COMM_PLATFORM
 
@@ -98,8 +93,8 @@ ocrPolicyMsg_t sendBuffs[OUTSTANDING_CE_SEND]; // Have a bit more send buffers b
 // be no problem.
 
 static u8 ceCommSendMessageToCE(ocrCommPlatform_t *self, ocrLocation_t target,
-                         ocrPolicyMsg_t *message, u64 *id,
-                         u32 properties, u32 mask) {
+                                ocrPolicyMsg_t *message, u64 *id,
+                                u32 properties, u32 mask) {
 
     u32 i;
     u64 retval, msgAbsAddr;
@@ -140,11 +135,12 @@ static u8 ceCommSendMessageToCE(ocrCommPlatform_t *self, ocrLocation_t target,
 
     // Figure out where our remote boxes our (where we are sending to)
     // This relies on the fact that all CEs have the same layout
-    rmbox = (u64 *) (DR_CE_BASE(CHIP_FROM_ID(target), UNIT_FROM_ID(target), BLOCK_FROM_ID(target))
+    rmbox = (u64 *) (UR_L1_BASE(SOCKET_FROM_ID(target), CLUSTER_FROM_ID(target), BLOCK_FROM_ID(target), AGENT_FROM_ID(target))
                      + (u64)(msgAddresses));
 
     // Calculate our absolute sendBuf address
-    msgAbsAddr = DR_CE_BASE(CHIP_FROM_ID(self->location), UNIT_FROM_ID(self->location), BLOCK_FROM_ID(self->location))
+    msgAbsAddr = UR_L1_BASE(SOCKET_FROM_ID(self->location), CLUSTER_FROM_ID(self->location), BLOCK_FROM_ID(self->location),
+                            AGENT_FROM_ID(self->location))
         + (u64)(sendBuf);
 
     // We now check to see if the message requires a response, if so, we will reserve
@@ -261,6 +257,17 @@ static u8 ceCommCheckCEMessage(ocrCommPlatform_t *self, ocrPolicyMsg_t **msg) {
     return POLL_NO_MESSAGE;
 }
 
+u64 parentOf(u64 location) {
+    // XE's parent is its CE
+    if ((location & ID_AGENT_MASK) != ID_AGENT_CE)
+        return ((location & ~ID_AGENT_MASK ) | ID_AGENT_CE);
+    else if (BLOCK_FROM_ID(location)) // Non-zero block has zero block as parent
+        return (location & ~ID_BLOCK_MASK);
+    else if (CLUSTER_FROM_ID(location)) // Non-zero cluster has zero cluster & zero block as parent
+        return (location & ~ID_CLUSTER_MASK);
+    return location;
+}
+
 void ceCommDestruct (ocrCommPlatform_t * base) {
 
     runtimeChunkFree((u64)base, NULL);
@@ -303,9 +310,10 @@ u8 ceCommSwitchRunlevel(ocrCommPlatform_t *self, ocrPolicyDomain_t *PD, ocrRunle
 
             // Pre-compute pointer to our block's XEs' remote stages (where we send to)
             // Pre-compute pointer to our block's XEs' local stages (where they send to us)
+            COMPILE_TIME_ASSERT(ID_AGENT_XE0 == 1); // This loop assumes this. Fix if this changes
             for(i=0; i< ((ocrPolicyDomainCe_t*)PD)->xeCount; ++i) {
-                cp->rq[i] = (u64 *)(BR_XE_BASE(i) + MSG_QUEUE_OFFT);
-                cp->lq[i] = (u64 *)((u64)MSG_QUEUE_OFFT + i * MSG_QUEUE_SIZE);
+                cp->rq[i] = (u64 *)(BR_L1_BASE(i+1) + MSG_QUEUE_OFFT);
+                cp->lq[i] = (u64 *)(AR_L1_BASE + (u64)MSG_QUEUE_OFFT + i * MSG_QUEUE_SIZE);
                 *(cp->rq[i]) = 0; // Only initialize the remote one; XEs initialize local ones
             }
 
@@ -343,8 +351,6 @@ u8 ceCommSwitchRunlevel(ocrCommPlatform_t *self, ocrPolicyDomain_t *PD, ocrRunle
     return toReturn;
 }
 
-
-
 u8 ceCommSendMessage(ocrCommPlatform_t *self, ocrLocation_t target,
                      ocrPolicyMsg_t *message, u64 *id,
                      u32 properties, u32 mask) {
@@ -355,17 +361,18 @@ u8 ceCommSendMessage(ocrCommPlatform_t *self, ocrLocation_t target,
     ocrCommPlatformCe_t * cp = (ocrCommPlatformCe_t *)self;
 
     // If target is not in the same block, use a different function
-    // BUG #618: do the same for chip/unit/board as well, or better yet, a new macro
+    // BUG #618: do the same for socket/cluster/board as well, or better yet, a new macro
     if((self->location & ~ID_AGENT_MASK) != (target & ~ID_AGENT_MASK)) {
         return ceCommSendMessageToCE(self, target, message, id, properties, mask);
     } else {
         // BUG #618: compute all-but-agent & compare between us & target
         // Target XE's stage (note this is in remote XE memory!)
-        volatile u64 * rq = cp->rq[((u64)target) & ID_AGENT_MASK];
+        volatile u64 * rq = cp->rq[(((u64)target) & ID_AGENT_MASK) - ID_AGENT_XE0];
 
         // - Check remote stage Empty/Busy/Full is Empty.
         {
-            volatile u64 tmp = rmd_ld64((u64)rq);
+            // Bug #820: This was an MMIO gate
+            volatile u64 tmp = *((u64*)rq);
             if(tmp) {
                 DPRINTF(DEBUG_LVL_VERB, "Sending to 0x%x failed (busy) because 0x%lx reads %d\n",
                         target, rq, tmp);
@@ -393,14 +400,14 @@ u8 ceCommSendMessage(ocrCommPlatform_t *self, ocrLocation_t target,
         // - DMA to remote stage, with fence
         DPRINTF(DEBUG_LVL_VVERB, "DMA-ing out message to 0x%lx of size %d\n",
                 (u64)&rq[1], message->usefulSize);
-        rmd_mmio_dma_copyregion_async((u64)message, (u64)&rq[1], message->usefulSize);
+        hal_memCopy(&(rq[1]), message, message->usefulSize, true);
         DPRINTF(DEBUG_LVL_VVERB, "DMA done (async)\n");
         // - Fence DMA
-        rmd_fence_fbm();
+        hal_fence();
         DPRINTF(DEBUG_LVL_VVERB, "Past fence\n");
         // - Atomically test & set remote stage to Full. Error if already non-Empty.
         {
-            u64 tmp = rmd_mmio_xchg64((u64)rq, (u64)2);
+            u64 tmp = hal_swap64(rq, 2);
             ASSERT(tmp == 0);
         }
         DPRINTF(DEBUG_LVL_VVERB, "DMA done and set 0x%lx to 2 (full)\n", &(rq[0]));
@@ -413,7 +420,7 @@ static u8 extractXEMessage(ocrCommPlatformCe_t *cp, ocrPolicyMsg_t **msg, u32 qu
     // We have a message
     *msg = (ocrPolicyMsg_t *)&((cp->lq[queueIdx])[1]);
     DPRINTF(DEBUG_LVL_VERB, "Found message from XE 0x%x @ 0x%lx of type 0x%x\n",
-            queueIdx, *msg, (*msg)->type);
+            queueIdx + ID_AGENT_XE0, *msg, (*msg)->type);
     // We fixup pointers
     u64 baseSize = 0, marshalledSize = 0;
     ocrPolicyMsgGetMsgSize(*msg, &baseSize, &marshalledSize, 0);
@@ -521,7 +528,7 @@ u8 ceCommDestructMessage(ocrCommPlatform_t *self, ocrPolicyMsg_t *msg) {
                 // We should have been reading it
                 ASSERT(cp->lq[i][0] == 3);
                 cp->lq[i][0] = 0;
-                DPRINTF(DEBUG_LVL_VVERB, "Ungating XE %u\n", i);
+                DPRINTF(DEBUG_LVL_VVERB, "Ungating XE %u\n", i + ID_AGENT_XE0);
                 {
                     // Clear the XE pipeline clock gate while preserving other bits.
                     // Before unclockgating the XE, we make sure it is clock-gated to avoid
@@ -531,13 +538,16 @@ u8 ceCommDestructMessage(ocrCommPlatform_t *self, ocrPolicyMsg_t *msg) {
                     u64 state = 0;
                     u64 loopcount = 0;
                     do {
-                        state = rmd_ld64(XE_MSR_BASE(i) + (FUB_CLOCK_CTL * sizeof(u64)));
+                        // Bug #820: This was a MMIO LD call and should be replaced by one when they become available
+                        state = *((u64*)(BR_MSR_BASE((i+ID_AGENT_XE0)) + (MSR_6 * sizeof(u64))));
                         if(++loopcount > 1000000) {
                             loopcount = 0;
                             DPRINTF(DEBUG_LVL_WARN, "Stuck on unclockgating %u\n", i);
                         }
                     } while(!(state & 0x10000000ULL));
-                    rmd_st64_async( XE_MSR_BASE(i) + (FUB_CLOCK_CTL * sizeof(u64)), state & ~0x10000000ULL );
+#warning FIXME-OCRTG: THIS WAS FUB_CLOCK_CTL AND IS NOW MSR_6 -- MAKE SURE WE DO THE RIGHT THING STILL...
+                    // Bug #820: Further, this was a MMIO operation
+                    *((u64*)(BR_MSR_BASE((i+ID_AGENT_XE0)) + (MSR_6 * sizeof(u64)))) =  state & ~0x10000000ULL;
                 }
                 return 0;
             }
@@ -608,4 +618,3 @@ ocrCommPlatformFactory_t *newCommPlatformFactoryCe(ocrParamList_t *perType) {
     return base;
 }
 #endif /* ENABLE_COMM_PLATFORM_CE */
-

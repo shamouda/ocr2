@@ -17,13 +17,14 @@ endif
 # Tool-chain to be used for the build
 #
 
-TG_INSTALL ?= ../../../../intel/ss/install
+TG_INSTALL ?= ../../../../tg/tg/install
 
 DEFAULT_CONFIG = ce-default.cfg
 
 
 CC      := gcc
-CFLAGS  := -fno-builtin -fno-stack-protector -Wno-unused-local-typedefs -I $(TG_INSTALL)/include
+CFLAGS  := -m64 -mcmodel=large -fno-builtin -fno-stack-protector -Wno-unused-local-typedefs \
+		-I${TG_INSTALL}/include
 
 RM      := rm
 RMFLAGS := -rf
