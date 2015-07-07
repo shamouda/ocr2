@@ -299,6 +299,7 @@ u8 probeIncoming(ocrCommPlatform_t *self, int src, int tag, ocrPolicyMsg_t ** ms
     if (available) {
         ASSERT(msg != NULL);
         ASSERT((bufferSize == 0) ? ((tag == RECV_ANY_ID) && (*msg == NULL)) : 1);
+        src = status.MPI_SOURCE; // Using MPI_ANY_SOURCE for the receive might get a different message
         // Look at the size of incoming message
         MPI_Datatype datatype = MPI_BYTE;
         int count;
