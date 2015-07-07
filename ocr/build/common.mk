@@ -33,7 +33,7 @@ DEFAULT_CONFIG ?= jenkins-common-8w-lockableDB.cfg
 # CFLAGS += -DELS_USER_SIZE=0
 
 # Static size for deques used to contain EDTs
-CFLAGS += -DINIT_DEQUE_CAPACITY=2048
+CFLAGS += -DINIT_DEQUE_CAPACITY=32768
 
 # Maximum number of characters handled by a single PRINTF
 # CFLAGS += -DPRINTF_MAX=1024
