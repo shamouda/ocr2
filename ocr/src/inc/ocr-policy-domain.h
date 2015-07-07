@@ -1283,7 +1283,7 @@ typedef struct _ocrPolicyDomainFcts_t {
 typedef struct _ocrPolicyDomain_t {
 
 // Any changes to this struct may cause problems in the symbolic constants inside
-// rmd-bin-files.h (build/tg-xe or build/tg-ce). To minimize problems, put factory first.
+// tg-bin-files.h (build/tg-xe or build/tg-ce). To minimize problems, put factory first.
 // (The factory in turn contains the pointers to the switchRunlevel functions, which is the relevant
 // data for needing careful placement.
 // See also xe-policy.h for a third magicly placed value, packedArgsLocation).

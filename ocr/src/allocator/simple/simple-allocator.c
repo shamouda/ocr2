@@ -59,7 +59,7 @@
 #include "allocator/allocator-all.h"
 #include "ocr-mem-platform.h"
 #if defined(HAL_FSIM_CE) || defined(HAL_FSIM_XE)
-#include "rmd-map.h"
+#include "xstg-map.h"
 #endif
 
 #define ALIGNMENT 8LL
@@ -164,9 +164,11 @@
 // EDTs are scheduled to other blocks and the address is passed to free() on that other block.
 void *addrGlobalizeOnTG(void *result, ocrPolicyDomain_t *self)
 {
+#if 1
+#warning FIXME-OCRTG: CONVERT TO SELFREF_TO_CANONICAL() MACRO FROM SAMKIT
+#else
 #if defined(HAL_FSIM_CE) || defined(HAL_FSIM_XE)
-    //void *orig = result;
-
+    // void *orig = result;
     // ideally we'd like to use the size of each memory as the end of each area.
     // canonicalize addresses for L3 SPAD (USM -- unit shared mem)
     if((u64)result <= UR_BSM_BASE(0, 0) /* as Bala suggested */ && (u64)result >= UR_USM_BASE) {
@@ -254,6 +256,7 @@ void *addrGlobalizeOnTG(void *result, ocrPolicyDomain_t *self)
 
 //    if (orig == result)
 //        DPRINTF(DEBUG_LVL_WARN, "globalize skipped : %p , id:%ld , 0x%lx < x < 0x%lx\n", result, id, BR_XE_BASE(id) , XE_MSR_BASE(id) );
+#endif
 #endif
     return result;
 }

@@ -33,6 +33,9 @@
 #include "scheduler-object/wst/wst-scheduler-object.h"
 #include "policy-domain/ce/ce-policy.h"
 
+#include "mmio-table.h"
+#include "xstg-arch.h"
+
 //Temporary until we get introspection support
 #include "task/hc/hc-task.h"
 
@@ -47,9 +50,9 @@ static bool isChildCe(ocrLocation_t myLocation, ocrLocation_t loc) {
     if (AGENT_FROM_ID(loc) != ID_AGENT_CE)
         return false;
     if ((myLocation & ID_BLOCK_MASK) == 0) {                              //If I am the block0 CE, ...
-        if ((myLocation & ID_UNIT_MASK) == 0) {                           //If I am the unit0,block0 CE
+        if ((myLocation & ID_CLUSTER_MASK) == 0) {                        //If I am the cluster0,block0 CE
             return true;                                                  //then, everyone is my child
-        } else if ((myLocation & ID_UNIT_MASK) == (loc & ID_UNIT_MASK)) { //else if, context is a CE in my unit
+        } else if ((myLocation & ID_CLUSTER_MASK) == (loc & ID_CLUSTER_MASK)) { //else if, context is a CE in my cluster
             return true;                                                  //then, this non-block0 CE is my child
         }
     }
@@ -103,7 +106,7 @@ u8 ceSchedulerHeuristicSwitchRunlevel(ocrSchedulerHeuristic_t *self, ocrPolicyDo
         // Memory is up at this point. We can initialize ourself
         if((properties & RL_BRING_UP) && RL_IS_FIRST_PHASE_UP(PD, RL_MEMORY_OK, phase)) {
             u32 i;
-            u32 myUnit = UNIT_FROM_ID(PD->myLocation);
+            u32 myCluster = CLUSTER_FROM_ID(PD->myLocation);
             u32 myBlock = BLOCK_FROM_ID(PD->myLocation);
             u32 xeCount = ((ocrPolicyDomainCe_t*)PD)->xeCount;
             self->contexts = (ocrSchedulerHeuristicContext_t **)PD->fcts.pdMalloc(PD, self->contextCount * sizeof(ocrSchedulerHeuristicContext_t*));
@@ -121,7 +124,7 @@ u8 ceSchedulerHeuristicSwitchRunlevel(ocrSchedulerHeuristic_t *self, ocrPolicyDo
                 ceContext->inWorkRequestPending = false;
                 ceContext->outWorkRequestPending = false;
                 if (i < xeCount) {
-                    context->location = MAKE_CORE_ID(0, 0, 0, myUnit, myBlock, (ID_AGENT_XE0 + i));
+                    context->location = MAKE_CORE_ID(0, 0, 0, myCluster, myBlock, (ID_AGENT_XE0 + i));
                     ceContext->canAcceptWorkRequest = false;
                     ceContext->isChild = true;
                 } else {
@@ -349,12 +352,12 @@ static u8 ceSchedulerHeuristicNotifyEdtReadyInvoke(ocrSchedulerHeuristic_t *self
             ocrLocation_t myLoc = pd->myLocation;
             ocrLocation_t dbLoc = dbMemAffinity;
             ocrLocation_t affinityLoc = dbLoc;
-            u64 dbLocUnt = UNIT_FROM_ID(dbLoc);
+            u64 dbLocCluster = CLUSTER_FROM_ID(dbLoc);
             u64 dbLocBlk = BLOCK_FROM_ID(dbLoc);
-            if (dbLocUnt != UNIT_FROM_ID(myLoc)) {
-                affinityLoc = MAKE_CORE_ID(0, 0, 0, dbLocUnt, 0, ID_AGENT_CE); //Map it to block 0 for dbLocUnt
+            if (dbLocCluster != CLUSTER_FROM_ID(myLoc)) {
+                affinityLoc = MAKE_CORE_ID(0, 0, 0, dbLocCluster, 0, ID_AGENT_CE); //Map it to block 0 for dbLocCluster
             } else if (dbLocBlk != BLOCK_FROM_ID(myLoc)) {
-                affinityLoc = MAKE_CORE_ID(0, 0, 0, dbLocUnt, dbLocBlk, ID_AGENT_CE); //Map it to dbLocBlk of current unit
+                affinityLoc = MAKE_CORE_ID(0, 0, 0, dbLocCluster, dbLocBlk, ID_AGENT_CE); //Map it to dbLocBlk of current unit
             }
             u32 i;
             bool found = false;

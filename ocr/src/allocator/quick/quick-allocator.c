@@ -140,9 +140,6 @@
 #include "quick-allocator.h"
 #include "allocator/allocator-all.h"
 #include "ocr-mem-platform.h"
-#ifdef HAL_FSIM_CE
-#include "rmd-map.h"
-#endif
 #endif
 
 #define DEBUG_TYPE ALLOCATOR

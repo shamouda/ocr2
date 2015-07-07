@@ -17,11 +17,10 @@
 
 #include "xe-comm-platform.h"
 
-#include "xe-abi.h"
 #include "mmio-table.h"
-#include "rmd-arch.h"
-#include "rmd-map.h"
-#include "rmd-msg-queue.h"
+#include "xstg-arch.h"
+#include "xstg-map.h"
+#include "xstg-msg-queue.h"
 
 #define DEBUG_TYPE COMM_PLATFORM
 
@@ -87,7 +86,7 @@ void xeCommBegin(ocrCommPlatform_t * commPlatform, ocrPolicyDomain_t * PD) {
     u64 i;
     ocrCommPlatformXe_t * cp = (ocrCommPlatformXe_t *)commPlatform;
 
-    u64 myid = *(u64 *)(XE_MSR_OFFT + CORE_LOCATION * sizeof(u64));
+    u64 myid = *(u64 *)(AR_MSR_BASE + CORE_LOCATION_NUM * sizeof(u64));
 
     // Zero-out our stage for receiving messages
     for(i=MSG_QUEUE_OFFT; i<MSG_QUEUE_SIZE; i += sizeof(u64))
@@ -105,7 +104,7 @@ void xeCommBegin(ocrCommPlatform_t * commPlatform, ocrPolicyDomain_t * PD) {
     cp->N = (PD->myLocation & ID_AGENT_MASK);
 
     // Pre-compute pointer to our stage at the CE
-    cp->rq = (u64 *)(BR_CE_BASE + MSG_QUEUE_OFFT + cp->N * MSG_QUEUE_SIZE);
+    cp->rq = (u64 *)(BR_L1_BASE(ID_AGENT_CE) + MSG_QUEUE_OFFT + cp->N * MSG_QUEUE_SIZE);
 #endif
 }
 
@@ -211,7 +210,7 @@ u8 xeCommSendMessage(ocrCommPlatform_t *self, ocrLocation_t target,
     }
 
     // - Alarm remote to tell the CE it has something (in case it is halted)
-    __asm__ __volatile__("alarm %0\n\t" : : "L" (XE_MSG_QUEUE));
+    __asm__ __volatile__("alarm %0\n\t" : : "L" (XE_MSG_READY));
 
 #endif
 
