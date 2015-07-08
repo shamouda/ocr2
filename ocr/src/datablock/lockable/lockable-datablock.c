@@ -155,11 +155,13 @@ static u8 lockableAcquireInternal(ocrDataBlock_t *self, void** ptr, ocrFatGuid_t
         return OCR_EACCES;
     }
 
-    //BUG #607 DB RO mode: Implement DB read-only mode (former non-coherent read)
+    // Allows the runtime to directly access the data pointer.
     if(properties & DB_PROP_RT_OBLIVIOUS) {
         *ptr = self->ptr;
         return 0;
     }
+
+    // mode == DB_MODE_RO just fall through
 
     if (mode == DB_MODE_CONST) {
         if (rself->attributes.modeLock) {
