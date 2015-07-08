@@ -377,11 +377,10 @@ static void relProxyDb(ocrPolicyDomain_t * pd, ProxyDb_t * proxyDb) {
  * This call helps to determine when an acquire is susceptible to use the proxy DB
  * or if it is not and must handled at a later time.
  *
- * This implementation allows RO over RO and ITW over ITW.
+ * This implementation allows all reuse (RO/CONST/RW) but EW
  */
 static bool isAcquireEligibleForProxy(ocrDbAccessMode_t proxyDbMode, ocrDbAccessMode_t acquireMode) {
-    return (((proxyDbMode == DB_MODE_CONST) && (acquireMode == DB_MODE_CONST)) ||
-     ((proxyDbMode == DB_MODE_RW) && (acquireMode == DB_MODE_RW)));
+    return ((proxyDbMode != DB_MODE_EW) && (acquireMode == proxyDbMode));
 }
 
 /**
@@ -415,7 +414,7 @@ static void enqueueAcquireMessageInProxy(ocrPolicyDomain_t * pd, ProxyDb_t * pro
  * Warning: The caller must own the proxy DB internal's lock.
  */
 static Queue_t * dequeueCompatibleAcquireMessageInProxy(ocrPolicyDomain_t * pd, Queue_t * candidateQueue, ocrDbAccessMode_t acquireMode) {
-    if ((candidateQueue != NULL) && ((acquireMode == DB_MODE_CONST) || (acquireMode == DB_MODE_RW))) {
+    if ((candidateQueue != NULL) && (acquireMode != DB_MODE_EW)) {
         u32 idx = 0;
         Queue_t * eligibleQueue = NULL;
         // Iterate the candidate queue
@@ -467,16 +466,10 @@ void getTemplateParamcDepc(ocrPolicyDomain_t * self, ocrFatGuid_t * fatGuid, u32
     if(*depc == EDT_PARAM_DEF) *depc = edtTemplate->depc;
 }
 
-static void * acquireLocalDb(ocrPolicyDomain_t * pd, ocrGuid_t dbGuid, ocrDbAccessMode_t mode) {
+static void * acquireLocalDbOblivious(ocrPolicyDomain_t * pd, ocrGuid_t dbGuid) {
     ocrTask_t *curTask = NULL;
     PD_MSG_STACK(msg);
     getCurrentEnv(NULL, NULL, &curTask, &msg);
-    u32 properties = mode | DB_PROP_RT_ACQUIRE;
-    if (mode == DB_MODE_RO) {
-        //BUG #607 DB RO mode: This is only used by the runtime for write-backs
-        //         and not interfere with lockable datablocks locking protocol.
-        properties |= DB_PROP_RT_OBLIVIOUS;
-    }
 #define PD_MSG (&msg)
 #define PD_TYPE PD_MSG_DB_ACQUIRE
     msg.type = PD_MSG_DB_ACQUIRE | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
@@ -485,9 +478,7 @@ static void * acquireLocalDb(ocrPolicyDomain_t * pd, ocrGuid_t dbGuid, ocrDbAcce
     PD_MSG_FIELD_IO(edt.guid) = curTask->guid;
     PD_MSG_FIELD_IO(edt.metaDataPtr) = curTask;
     PD_MSG_FIELD_IO(edtSlot) = EDT_SLOT_NONE;
-    PD_MSG_FIELD_IO(properties) = properties; // Runtime acquire
-    // This call may fail if the policy domain goes down
-    // while we are starting to execute
+    PD_MSG_FIELD_IO(properties) = DB_PROP_RT_OBLIVIOUS; // Runtime acquire
     if(pd->fcts.processMessage(pd, &msg, true)) {
         ASSERT(false); // debug
         return NULL;
@@ -496,26 +487,6 @@ static void * acquireLocalDb(ocrPolicyDomain_t * pd, ocrGuid_t dbGuid, ocrDbAcce
 #undef PD_MSG
 #undef PD_TYPE
 }
-
-// Might be resurrected when we finish RO DB mode implementation
-// static void releaseLocalDb(ocrPolicyDomain_t * pd, ocrGuid_t dbGuid, u64 size) {
-//     ocrTask_t *curTask = NULL;
-//     PD_MSG_STACK(msg);
-//     getCurrentEnv(NULL, NULL, &curTask, &msg);
-// #define PD_MSG (&msg)
-// #define PD_TYPE PD_MSG_DB_RELEASE
-//     msg.type = PD_MSG_DB_RELEASE | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
-//     PD_MSG_FIELD_IO(guid.guid) = dbGuid;
-//     PD_MSG_FIELD_IO(guid.metaDataPtr) = NULL;
-//     PD_MSG_FIELD_I(edt.guid) = curTask->guid;
-//     PD_MSG_FIELD_I(edt.metaDataPtr) = curTask;
-//     PD_MSG_FIELD_I(size) = size;
-//     PD_MSG_FIELD_I(properties) = DB_PROP_RT_ACQUIRE; // Runtime release
-//     // Ignore failures at this point
-//     pd->fcts.processMessage(pd, &msg, true);
-// #undef PD_MSG
-// #undef PD_TYPE
-// }
 
 /*
  * Handle messages requiring remote communications, delegate locals to shared memory implementation.
@@ -1119,7 +1090,7 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
 #define PD_TYPE PD_MSG_DB_RELEASE
         RETRIEVE_LOCATION_FROM_GUID_MSG(self, msg->destLocation, IO)
         if ((msg->srcLocation == curLoc) && (msg->destLocation != curLoc)) {
-            DPRINTF(DEBUG_LVL_VVERB,"DB_RELEASE_WARN outgoing request send for DB GUID 0x%lx\n", PD_MSG_FIELD_IO(guid.guid));
+            DPRINTF(DEBUG_LVL_VVERB,"DB_RELEASE outgoing request send for DB GUID 0x%lx\n", PD_MSG_FIELD_IO(guid.guid));
             // Outgoing release request
             ProxyDb_t * proxyDb = getProxyDb(self, PD_MSG_FIELD_IO(guid.guid), false);
             hal_lock32(&(proxyDb->lock)); // lock the db
@@ -1128,7 +1099,7 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
                     if (proxyDb->nbUsers == 1) {
                         // Last checked-in user of the proxy DB in this PD
                         proxyDb->state = PROXY_DB_RELINQUISH;
-                        DPRINTF(DEBUG_LVL_VVERB,"DB_RELEASE_WARN outgoing request send for DB GUID 0x%lx with WB=%d\n",
+                        DPRINTF(DEBUG_LVL_VVERB,"DB_RELEASE outgoing request send for DB GUID 0x%lx with WB=%d\n",
                             PD_MSG_FIELD_IO(guid.guid), !!(proxyDb->flags & DB_FLAG_RT_WRITE_BACK));
                         if (proxyDb->flags & DB_FLAG_RT_WRITE_BACK) {
                             // Serialize the cached DB ptr for write back
@@ -1150,7 +1121,7 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
                         // Fall-through and send the release request
                         // The count is decremented when the release response is received
                     } else {
-                        DPRINTF(DEBUG_LVL_VVERB,"DB_RELEASE_WARN outgoing request send for DB GUID 0x%lx intercepted for local proxy DB\n",
+                        DPRINTF(DEBUG_LVL_VVERB,"DB_RELEASE outgoing request send for DB GUID 0x%lx intercepted for local proxy DB\n",
                             PD_MSG_FIELD_IO(guid.guid), !!(proxyDb->flags & DB_FLAG_RT_WRITE_BACK));
                         // The proxy DB is still in use locally, no need to notify the original DB.
                         proxyDb->nbUsers--;
@@ -1195,7 +1166,7 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
             self->guidProviders[0]->fcts.getVal(self->guidProviders[0], PD_MSG_FIELD_IO(guid.guid), &val, NULL);
             ASSERT(val != 0);
             PD_MSG_FIELD_IO(guid.metaDataPtr) = (void *) val;
-            DPRINTF(DEBUG_LVL_VVERB,"DB_RELEASE_WARN incoming request received for DB GUID 0x%lx WB=%d\n",
+            DPRINTF(DEBUG_LVL_VVERB,"DB_RELEASE incoming request received for DB GUID 0x%lx WB=%d\n",
                     PD_MSG_FIELD_IO(guid.guid), !!(PD_MSG_FIELD_I(properties) & DB_FLAG_RT_WRITE_BACK));
             //BUG #587 db: We may want to double check this writeback (first one) is legal wrt single assignment
             if (PD_MSG_FIELD_I(properties) & DB_FLAG_RT_WRITE_BACK) {
@@ -1203,19 +1174,16 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
                 //WARN: MUST read from the RELEASE size u64 field instead of the msg size (u32)
                 u64 size = PD_MSG_FIELD_I(size);
                 void * data = PD_MSG_FIELD_I(ptr);
-                // Acquire local DB on behalf of remote release to do the writeback.
-                // Do it in OB mode so as to make sure the acquire goes through
-                // We perform the write-back and then fall-through for the actual db release.
-                //BUG #607 DB RO mode: Not implemented, we're converting the call to a special
-                void * localData = acquireLocalDb(self, PD_MSG_FIELD_IO(guid.guid), DB_MODE_RO);
+                // Acquire local DB with oblivious property on behalf of remote release to do the writeback.
+                void * localData = acquireLocalDbOblivious(self, PD_MSG_FIELD_IO(guid.guid));
                 ASSERT(localData != NULL);
                 hal_memCopy(localData, data, size, false);
-                //BUG #607 DB RO mode: We do not release here because we've been using this special mode to do the write back
-                // releaseLocalDb(self, PD_MSG_FIELD_IO(guid.guid), size);
+                //BUG #607 DB RO mode: We do not release here because we've been using this
+                // special mode to do the write back. the release happens in the fall-through
             } // else fall-through and do the regular release
         }
         if ((msg->srcLocation == curLoc) && (msg->destLocation == curLoc)) {
-            DPRINTF(DEBUG_LVL_VVERB,"DB_RELEASE_WARN local processing: DB GUID 0x%lx\n", PD_MSG_FIELD_IO(guid.guid));
+            DPRINTF(DEBUG_LVL_VVERB,"DB_RELEASE local processing: DB GUID 0x%lx\n", PD_MSG_FIELD_IO(guid.guid));
         }
 #undef PD_MSG
 #undef PD_TYPE
@@ -1358,7 +1326,7 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
                 proxyDb->refCount = 0; // ref hasn't been shared yet so '0' is fine.
                 proxyDb->mode = (PD_MSG_FIELD_IO(properties) & DB_ACCESS_MODE_MASK); //BUG #273
                 if (proxyDb->mode == 0) {
-                    printf("WARNING: DB create mode not found !!!, default to ITW\n");
+                    DPRINTF(DEBUG_LVL_WARN,"DB create mode not found !!!, default to RW\n");
                     proxyDb->mode = DB_MODE_RW;
                 }
                 //BUG #273: The easy patch is to make 'size' an IO, otherwise we need to make sure
@@ -1400,7 +1368,7 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
                         hal_lock32(&((ocrPolicyDomainHcDist_t *) self)->lockDbLookup);
                         // Here nobody else can acquire a reference on the proxy
                         if (proxyDb->refCount == 1) {
-                            DPRINTF(DEBUG_LVL_VVERB,"DB_RELEASE_WARN response received for DB GUID 0x%lx, destroy proxy\n", dbGuid);
+                            DPRINTF(DEBUG_LVL_VVERB,"DB_RELEASE response received for DB GUID 0x%lx, destroy proxy\n", dbGuid);
                             // Nullify the entry for the proxy DB in the GUID provider
                             self->guidProviders[0]->fcts.registerGuid(self->guidProviders[0], dbGuid, (u64) 0);
                             // Nobody else can get a reference on the proxy's lock now
@@ -1423,7 +1391,7 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
                             resetProxyDb(proxyDb);
                             // Allow others to use the proxy
                             hal_unlock32(&(proxyDb->lock));
-                            DPRINTF(DEBUG_LVL_VVERB,"DB_RELEASE_WARN response received for DB GUID 0x%lx, proxy is referenced\n", dbGuid);
+                            DPRINTF(DEBUG_LVL_VVERB,"DB_RELEASE response received for DB GUID 0x%lx, proxy is referenced\n", dbGuid);
                             relProxyDb(self, proxyDb);
                         }
                     } else {
@@ -1431,7 +1399,7 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
                         // Resetting the state to created means the popped acquire or any concurrent
                         // acquire to the currently executing call will try to fetch the DB.
                         resetProxyDb(proxyDb);
-                        DPRINTF(DEBUG_LVL_VVERB,"DB_RELEASE_WARN response received for DB GUID 0x%lx, processing queued acquire\n", dbGuid);
+                        DPRINTF(DEBUG_LVL_VVERB,"DB_RELEASE response received for DB GUID 0x%lx, processing queued acquire\n", dbGuid);
                         // DBs are not supposed to be resizable hence, do NOT reset
                         // size and ptr so they can be reused in the subsequent fetch.
                         // NOTE: There's a size check when an acquire fetch completes and we reuse the proxy.
