@@ -38,6 +38,8 @@ args = parser.parse_args()
 guid = args.guid
 platform = args.platform
 target = args.target.upper()
+if target == 'GASNET':
+    target = 'GASNet'
 threads = args.threads
 binding = args.binding
 alloc = args.alloc
@@ -253,7 +255,7 @@ def GenerateConfig(filehandle, guid, platform, target, threads, binding, alloc, 
         GeneratePd(filehandle, "XE", dbtype, threads)
         GenerateCommon(filehandle, "HC", dbtype)
         GenerateMem(filehandle, alloc, 1, alloctype)
-    elif (target=='MPI') or (target=='GASNET'):
+    elif (target=='MPI') or (target=='GASNet'):
         # catch default value errors for distributed
         if dbtype != 'Lockable':
             print 'error: target ', target, ' only supports Lockable datablocks; received ', dbtype
