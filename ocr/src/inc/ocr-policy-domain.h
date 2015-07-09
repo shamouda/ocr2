@@ -1007,17 +1007,6 @@ typedef struct _ocrPolicyMsg_t {
         struct {
             union {
                 struct {
-                    u32 properties;    /**< In */
-                } in;
-                struct {
-                    u32 returnDetail;  /**< Out: Success or error code */
-                } out;
-            } inOrOut __attribute__ (( aligned(8) ));
-        } PD_MSG_STRUCT_NAME(PD_MSG_MGT_FINISH);
-
-        struct {
-            union {
-                struct {
                     ocrRunlevel_t runlevel; /**< In: Runlevel involved */
                     u32 properties;         /**< Properties: OR of the following flags
                                                One of:
