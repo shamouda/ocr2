@@ -311,6 +311,8 @@ typedef enum {
     OCR_HINT_EDT_PROP_START,                /* This is NOT a hint. Its use is reserved for the runtime */
     OCR_HINT_EDT_PRIORITY,                  /* [u64] : Global priority number of EDT. Higher value is greater priority. */
     OCR_HINT_EDT_SLOT_MAX_ACCESS,           /* [u64] : EDT slot number that contains the DB which is accessed most by the EDT. */
+    OCR_HINT_EDT_AFFINITY,                  /* [u64] : Used internally by the runtime for spatial locality of EDTs */
+    OCR_HINT_EDT_PHASE,                     /* [u64] : Used internally by the runtime for temporal locality of EDTs */
     OCR_HINT_EDT_PROP_END,                  /* This is NOT a hint. Its use is reserved for the runtime */
 
     //DB Hint Properties                    (OCR_HINT_DB_T)

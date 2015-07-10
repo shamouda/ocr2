@@ -17,29 +17,80 @@
 #include "scheduler-object/scheduler-object-all.h"
 
 /******************************************************/
-/* OCR-WST SCHEDULER_OBJECT FUNCTIONS                        */
+/* OCR-WST SCHEDULER_OBJECT FUNCTIONS                 */
 /******************************************************/
 
+static void wstSchedulerObjectInit(ocrSchedulerObject_t *self, ocrPolicyDomain_t *PD) {
+    u32 i;
+    ocrScheduler_t *scheduler = PD->schedulers[0];
+    ASSERT(scheduler);
+
+    ocrSchedulerObjectWst_t *wstSchedObj = (ocrSchedulerObjectWst_t*)self;
+    wstSchedObj->numDeques = scheduler->contextCount;
+    wstSchedObj->deques = (ocrSchedulerObject_t**)PD->fcts.pdMalloc(
+        PD, wstSchedObj->numDeques * sizeof(ocrSchedulerObject_t*));
+#ifdef ENABLE_SCHEDULER_OBJECT_DEQ
+    //Instantiate the deque schedulerObjects
+    paramListSchedulerObjectDeq_t params;
+    params.base.kind = OCR_SCHEDULER_OBJECT_DEQUE | OCR_SCHEDULER_OBJECT_AGGREGATE;
+    params.base.guidRequired = 0;
+    params.type = WORK_STEALING_DEQUE;
+    ocrSchedulerObjectFactory_t *dequeFactory = PD->schedulerObjectFactories[schedulerObjectDeq_id];
+    for (i = 0; i < wstSchedObj->numDeques; i++) {
+        wstSchedObj->deques[i] = dequeFactory->fcts.create(dequeFactory, (ocrParamList_t*)(&params));
+        dequeFactory->fcts.setLocationForSchedulerObject(dequeFactory, wstSchedObj->deques[i], i, OCR_SCHEDULER_OBJECT_MAPPING_PINNED);
+    }
+#else
+    ASSERT(0);
+#endif
+}
+
+static void wstSchedulerObjectFinish(ocrSchedulerObject_t *self, ocrPolicyDomain_t *PD) {
+    u32 i;
+    ocrSchedulerObjectWst_t *wstSchedObj = (ocrSchedulerObjectWst_t*)self;
+    for (i = 0; i < wstSchedObj->numDeques; i++) {
+        ocrSchedulerObject_t *deque = wstSchedObj->deques[i];
+        ocrSchedulerObjectFactory_t *dequeFactory = PD->schedulerObjectFactories[deque->fctId];
+        dequeFactory->fcts.destroy(dequeFactory, wstSchedObj->deques[i]);
+    }
+    PD->fcts.pdFree(PD, wstSchedObj->deques);
+}
+
 ocrSchedulerObject_t* wstSchedulerObjectCreate(ocrSchedulerObjectFactory_t *fact, ocrParamList_t *params) {
-    ASSERT(0); //Dynamic creation of wst object is not supported
-    return NULL;
+    paramListSchedulerObject_t *paramSchedObj = (paramListSchedulerObject_t*)params;
+    ASSERT(SCHEDULER_OBJECT_KIND(paramSchedObj->kind) == OCR_SCHEDULER_OBJECT_WST);
+    ASSERT(!paramSchedObj->guidRequired);
+    ocrPolicyDomain_t *pd = fact->pd;
+    ocrSchedulerObject_t* schedObj = (ocrSchedulerObject_t*)pd->fcts.pdMalloc(pd, sizeof(ocrSchedulerObjectWst_t));
+    schedObj->guid.guid = NULL_GUID;
+    schedObj->guid.metaDataPtr = NULL;
+    schedObj->kind = paramSchedObj->kind;
+    schedObj->fctId = fact->factoryId;
+    schedObj->loc = INVALID_LOCATION;
+    schedObj->mapping = OCR_SCHEDULER_OBJECT_MAPPING_UNDEFINED;
+    wstSchedulerObjectInit(schedObj, pd);
+    return schedObj;
 }
 
 u8 wstSchedulerObjectDestroy(ocrSchedulerObjectFactory_t *fact, ocrSchedulerObject_t *self) {
-    ASSERT(IS_SCHEDULER_OBJECT_TYPE_SINGLETON(self->kind));
+    ASSERT(SCHEDULER_OBJECT_KIND(self->kind) == OCR_SCHEDULER_OBJECT_WST);
     ocrPolicyDomain_t *pd = fact->pd;
+    wstSchedulerObjectFinish(self, pd);
     pd->fcts.pdFree(pd, self);
     return 0;
 }
 
 u8 wstSchedulerObjectInsert(ocrSchedulerObjectFactory_t *fact, ocrSchedulerObject_t *self, ocrSchedulerObject_t *element, u32 properties) {
-    ASSERT(IS_SCHEDULER_OBJECT_TYPE_SINGLETON(self->kind)); //Using the schedulerObject root to invoke singleton function which do not have factories
-    ASSERT(self->kind == element->kind);
-    self->guid = element->guid;
-    return 0;
+    ASSERT(0);
+    return OCR_ENOTSUP;
 }
 
 u8 wstSchedulerObjectRemove(ocrSchedulerObjectFactory_t *fact, ocrSchedulerObject_t *self, ocrSchedulerObjectKind kind, u32 count, ocrSchedulerObject_t *dst, ocrSchedulerObject_t *element, u32 properties) {
+    ASSERT(0);
+    return OCR_ENOTSUP;
+}
+
+u8 wstSchedulerObjectIterate(ocrSchedulerObjectFactory_t *fact, ocrSchedulerObject_t *self, ocrSchedulerObjectIterator_t *iterator, u32 properties) {
     ASSERT(0);
     return OCR_ENOTSUP;
 }
@@ -74,7 +125,7 @@ u8 wstSetLocationForSchedulerObject(ocrSchedulerObjectFactory_t *fact, ocrSchedu
 }
 
 /******************************************************/
-/* WST SCHEDULER_OBJECT ROOT FUNCTIONS                      */
+/* WST SCHEDULER_OBJECT ROOT FUNCTIONS                */
 /******************************************************/
 
 ocrSchedulerObject_t* newSchedulerObjectWst(ocrSchedulerObjectFactory_t *factory, ocrParamList_t *perInstance) {
@@ -132,39 +183,12 @@ u8 wstSchedulerObjectSwitchRunlevel(ocrSchedulerObject_t *self, ocrPolicyDomain_
         // Memory is up
         if(properties & RL_BRING_UP) {
             if(RL_IS_FIRST_PHASE_UP(PD, RL_GUID_OK, phase)) {
-                u32 i;
-                ocrScheduler_t *scheduler = PD->schedulers[0];
-                ASSERT(scheduler);
-
-                ocrSchedulerObjectWst_t *wstSchedObj = (ocrSchedulerObjectWst_t*)self;
-                wstSchedObj->numDeques = scheduler->contextCount;
-                wstSchedObj->deques = (ocrSchedulerObject_t**)PD->fcts.pdMalloc(
-                    PD, wstSchedObj->numDeques * sizeof(ocrSchedulerObject_t*));
-#ifdef ENABLE_SCHEDULER_OBJECT_DEQ
-                //Instantiate the deque schedulerObjects
-                paramListSchedulerObjectDeq_t params;
-                params.base.kind = OCR_SCHEDULER_OBJECT_DEQUE;
-                params.base.guidRequired = 0;
-                params.type = WORK_STEALING_DEQUE;
-                ocrSchedulerObjectFactory_t *dequeFactory = PD->schedulerObjectFactories[schedulerObjectDeq_id];
-                for (i = 0; i < wstSchedObj->numDeques; i++) {
-                    wstSchedObj->deques[i] = dequeFactory->fcts.create(dequeFactory, (ocrParamList_t*)(&params));
-                }
-#else
-                ASSERT(0);
-#endif
+                wstSchedulerObjectInit(self, PD);
             }
         } else {
             // Tear down
             if(RL_IS_LAST_PHASE_DOWN(PD, RL_GUID_OK, phase)) {
-                u32 i;
-                ocrSchedulerObjectWst_t *wstSchedObj = (ocrSchedulerObjectWst_t*)self;
-                for (i = 0; i < wstSchedObj->numDeques; i++) {
-                    ocrSchedulerObject_t *deque = wstSchedObj->deques[i];
-                    ocrSchedulerObjectFactory_t *dequeFactory = PD->schedulerObjectFactories[deque->fctId];
-                    dequeFactory->fcts.destroy(dequeFactory, wstSchedObj->deques[i]);
-                }
-                PD->fcts.pdFree(PD, wstSchedObj->deques);
+                wstSchedulerObjectFinish(self, PD);
             }
         }
         break;
@@ -227,6 +251,7 @@ ocrSchedulerObjectFactory_t * newOcrSchedulerObjectFactoryWst(ocrParamList_t *pe
     schedObjFact->fcts.destroy = FUNC_ADDR(u8 (*)(ocrSchedulerObjectFactory_t*, ocrSchedulerObject_t*), wstSchedulerObjectDestroy);
     schedObjFact->fcts.insert = FUNC_ADDR(u8 (*)(ocrSchedulerObjectFactory_t*, ocrSchedulerObject_t*, ocrSchedulerObject_t*, u32), wstSchedulerObjectInsert);
     schedObjFact->fcts.remove = FUNC_ADDR(u8 (*)(ocrSchedulerObjectFactory_t*, ocrSchedulerObject_t*, ocrSchedulerObjectKind, u32, ocrSchedulerObject_t*, ocrSchedulerObject_t*, u32), wstSchedulerObjectRemove);
+    schedObjFact->fcts.iterate = FUNC_ADDR(u8 (*)(ocrSchedulerObjectFactory_t*, ocrSchedulerObject_t*, ocrSchedulerObjectIterator_t*, u32), wstSchedulerObjectIterate);
     schedObjFact->fcts.count = FUNC_ADDR(u64 (*)(ocrSchedulerObjectFactory_t*, ocrSchedulerObject_t*, u32), wstSchedulerObjectCount);
     schedObjFact->fcts.setLocationForSchedulerObject = FUNC_ADDR(u8 (*)(ocrSchedulerObjectFactory_t*, ocrSchedulerObject_t*, ocrLocation_t, ocrSchedulerObjectMappingKind), wstSetLocationForSchedulerObject);
     schedObjFact->fcts.getSchedulerObjectForLocation = FUNC_ADDR(ocrSchedulerObject_t* (*)(ocrSchedulerObjectFactory_t*, ocrSchedulerObject_t*, ocrLocation_t, ocrSchedulerObjectMappingKind, u32), wstGetSchedulerObjectForLocation);

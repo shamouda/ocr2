@@ -256,8 +256,17 @@ char* populate_type(ocrParamList_t **type_param, type_enum index, dictionary *di
     case policydomain_type:
         ALLOC_PARAM_LIST(*type_param, paramListPolicyDomainFact_t);
         break;
-    case taskfactory_type:
-        ALLOC_PARAM_LIST(*type_param, paramListTaskFact_t);
+    case taskfactory_type: {
+            ALLOC_PARAM_LIST(*type_param, paramListTaskFact_t);
+            ((paramListTaskFact_t*)(*type_param))->usesSchedulerObject = 0;
+            if (key_exists(dict, secname, "schedobj")) {
+                char *valuestr = NULL;
+                snprintf(key, MAX_KEY_SZ, "%s:%s", secname, "schedobj");
+                INI_GET_STR (key, valuestr, "");
+                ASSERT(strcmp(valuestr, "1") == 0);
+                ((paramListTaskFact_t*)(*type_param))->usesSchedulerObject = 1;
+            }
+        }
         break;
     case tasktemplatefactory_type:
         ALLOC_PARAM_LIST(*type_param, paramListTaskTemplateFact_t);
@@ -875,7 +884,10 @@ s32 populate_inst(ocrParamList_t **inst_param, void **instance, s32 *type_counts
             switch (mytype) {
 #if defined(ENABLE_SCHEDULER_HC) || defined(ENABLE_SCHEDULER_HC_COMM_DELEGATE)
             case schedulerHc_id:
-            case schedulerHcCommDelegate_id: {
+#if defined(ENABLE_SCHEDULER_HC_COMM_DELEGATE)
+            case schedulerHcCommDelegate_id:
+#endif
+            {
                 ALLOC_PARAM_LIST(inst_param[j], paramListSchedulerHcInst_t);
                 snprintf(key, MAX_KEY_SZ, "%s:%s", secname, "workeridfirst");
                 INI_GET_INT (key, value, -1);

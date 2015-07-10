@@ -51,7 +51,7 @@ typedef struct {
 /**
  * OCR object hint mask format:
  * 52 bits ( 0 - 51) : Bit mask for hint properties
- *  6 bits (52 - 57) : Size of the hint array used in the metadata
+ *  6 bits (52 - 57) : Number of hints that are set
  *  3 bits (58 - 60) : Factory Id of the hint type
  *  3 bits (61 - 63) : Hint type
  **/

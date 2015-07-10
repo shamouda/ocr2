@@ -45,7 +45,8 @@ extern struct _dbWeightStruct gDbWeights[] __attribute__((weak));
 u64 ocrHintPropTaskHc[] = {
 #ifdef ENABLE_HINTS
     OCR_HINT_EDT_PRIORITY,
-    OCR_HINT_EDT_SLOT_MAX_ACCESS
+    OCR_HINT_EDT_AFFINITY,
+    OCR_HINT_EDT_PHASE
 #endif
 };
 
@@ -444,6 +445,28 @@ static u8 scheduleTask(ocrTask_t *self) {
 }
 
 /**
+ * @brief Give the fully satisfied task to the scheduler
+ */
+static u8 scheduleSatisfiedTask(ocrTask_t *self) {
+    ocrPolicyDomain_t *pd = NULL;
+    ocrWorker_t *worker = NULL;
+    PD_MSG_STACK(msg);
+    getCurrentEnv(&pd, &worker, NULL, &msg);
+
+#define PD_MSG (&msg)
+#define PD_TYPE PD_MSG_SCHED_NOTIFY
+    msg.type = PD_MSG_SCHED_NOTIFY | PD_MSG_REQUEST;
+    PD_MSG_FIELD_IO(schedArgs).base.seqId = worker->seqId;
+    PD_MSG_FIELD_IO(schedArgs).kind = OCR_SCHED_NOTIFY_EDT_SATISFIED;
+    PD_MSG_FIELD_IO(schedArgs).OCR_SCHED_ARG_FIELD(OCR_SCHED_NOTIFY_EDT_SATISFIED).guid.guid = self->guid;
+    PD_MSG_FIELD_IO(schedArgs).OCR_SCHED_ARG_FIELD(OCR_SCHED_NOTIFY_EDT_SATISFIED).guid.metaDataPtr = self;
+    RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, false));
+    return PD_MSG_FIELD_O(returnDetail);
+#undef PD_MSG
+#undef PD_TYPE
+}
+
+/**
  * @brief Dependences of the tasks have been satisfied
  * Warning: The caller must ensure all dependencies have been satisfied
  * Note: static function only meant to factorize code.
@@ -476,7 +499,10 @@ static u8 taskAllDepvSatisfied(ocrTask_t *self) {
         rself->frontierSlot = 0;
     }
 
-    if (!iterateDbFrontier(self)) {
+    if (scheduleSatisfiedTask(self) != 0 && !iterateDbFrontier(self)) {
+        //TODO: Keeping this here for 0.9 compatibility but
+        //iterateDbFrontier and related code will eventually
+        //move to the scheduler.
         scheduleTask(self);
     }
     return 0;
@@ -568,6 +594,7 @@ u8 newTaskHc(ocrTaskFactory_t* factory, ocrFatGuid_t * edtGuid, ocrFatGuid_t edt
     }
 
     u32 hintc = hasProperty(properties, EDT_PROP_NO_HINT) ? 0 : OCR_HINT_COUNT_EDT_HC;
+    u32 schedc = factory->usesSchedulerObject;
 
     PD_MSG_STACK(msg);
     // Create the task itself by getting a GUID
@@ -578,7 +605,7 @@ u8 newTaskHc(ocrTaskFactory_t* factory, ocrFatGuid_t * edtGuid, ocrFatGuid_t edt
     PD_MSG_FIELD_IO(guid.guid) = NULL_GUID;
     PD_MSG_FIELD_IO(guid.metaDataPtr) = NULL;
     // We allocate everything in the meta-data to keep things simple
-    PD_MSG_FIELD_I(size) = sizeof(ocrTaskHc_t) + paramc*sizeof(u64) + depc*sizeof(regNode_t) + hintc*sizeof(u64);
+    PD_MSG_FIELD_I(size) = sizeof(ocrTaskHc_t) + paramc*sizeof(u64) + depc*sizeof(regNode_t) + hintc*sizeof(u64) + schedc*sizeof(u64);
     PD_MSG_FIELD_I(kind) = OCR_GUID_EDT;
     PD_MSG_FIELD_I(properties) = 0;
     RESULT_PROPAGATE2(pd->fcts.processMessage(pd, &msg, true), 1);
@@ -605,6 +632,7 @@ u8 newTaskHc(ocrTaskFactory_t* factory, ocrFatGuid_t * edtGuid, ocrFatGuid_t edt
     base->state = CREATED_EDTSTATE;
     base->paramc = paramc;
     base->depc = depc;
+    base->flags = 0;
     base->fctId = factory->factoryId;
     for(i = 0; i < paramc; ++i) {
         base->paramv[i] = paramv[i];
@@ -622,8 +650,15 @@ u8 newTaskHc(ocrTaskFactory_t* factory, ocrFatGuid_t * edtGuid, ocrFatGuid_t edt
         edt->hint.hintMask = 0;
         edt->hint.hintVal = NULL;
     } else {
+        base->flags |= OCR_TASK_FLAG_USES_HINTS;
         OCR_RUNTIME_HINT_MASK_INIT(edt->hint.hintMask, OCR_HINT_EDT_T, factory->factoryId);
         edt->hint.hintVal = (u64*)((u64)base + sizeof(ocrTaskHc_t) + paramc*sizeof(u64) + depc*sizeof(regNode_t));
+    }
+
+    if (schedc != 0) {
+        base->flags |= OCR_TASK_FLAG_USES_SCHEDULER_OBJECT;
+        u64* schedObjPtr = (u64*)HC_TASK_SCHED_OBJ_PTR(edt);
+        *schedObjPtr = 0;
     }
 
     // Set up HC specific stuff
@@ -1176,6 +1211,9 @@ ocrTaskFactory_t * newTaskFactoryHc(ocrParamList_t* perInstance, u32 factoryId) 
     //Setup hint framework
     base->hintPropMap = (u64*)runtimeChunkAlloc(sizeof(u64)*(OCR_HINT_EDT_PROP_END - OCR_HINT_EDT_PROP_START - 1), PERSISTENT_CHUNK);
     OCR_HINT_SETUP(base->hintPropMap, ocrHintPropTaskHc, OCR_HINT_COUNT_EDT_HC, OCR_HINT_EDT_PROP_START, OCR_HINT_EDT_PROP_END);
+
+    paramListTaskFact_t *paramTaskFact = (paramListTaskFact_t*)perInstance;
+    base->usesSchedulerObject = paramTaskFact->usesSchedulerObject;
     return base;
 }
 #endif /* ENABLE_TASK_HC */

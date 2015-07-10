@@ -346,11 +346,12 @@ u8 hcSchedulerGetWorkInvoke(ocrScheduler_t *self, ocrSchedulerOpArgs_t *opArgs, 
     case OCR_SCHED_WORK_COMM: {
             return self->fcts.takeComm(self, &taskArgs->OCR_SCHED_ARG_FIELD(OCR_SCHED_WORK_COMM).guidCount, taskArgs->OCR_SCHED_ARG_FIELD(OCR_SCHED_WORK_COMM).guids, 0);
         }
+    // Unknown ops
     default:
         ASSERT(0);
-        break;
+        return OCR_ENOTSUP;
     }
-    return OCR_ENOTSUP;
+    return 0;
 }
 
 u8 hcSchedulerNotifyInvoke(ocrScheduler_t *self, ocrSchedulerOpArgs_t *opArgs, ocrRuntimeHint_t *hints) {
@@ -382,8 +383,10 @@ u8 hcSchedulerNotifyInvoke(ocrScheduler_t *self, ocrSchedulerOpArgs_t *opArgs, o
             return self->fcts.giveComm(self, &count, &notifyArgs->OCR_SCHED_ARG_FIELD(OCR_SCHED_NOTIFY_COMM_READY).guid, 0);
         }
     // Notifies ignored by this scheduler
+    case OCR_SCHED_NOTIFY_EDT_SATISFIED:
     case OCR_SCHED_NOTIFY_DB_CREATE:
-        break;
+        return OCR_ENOP;
+    // Unknown ops
     default:
         ASSERT(0);
         return OCR_ENOTSUP;

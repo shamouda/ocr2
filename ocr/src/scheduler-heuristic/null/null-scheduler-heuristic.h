@@ -40,7 +40,7 @@ typedef struct _ocrSchedulerHeuristicFactoryNull_t {
     ocrSchedulerHeuristicFactory_t base;
 } ocrSchedulerHeuristicFactoryNull_t;
 
-ocrSchedulerHeuristicFactory_t * newOcrSchedulerHeuristicFactoryNull(ocrParamList_t *perType);
+ocrSchedulerHeuristicFactory_t * newOcrSchedulerHeuristicFactoryNull(ocrParamList_t *perType, u32 factoryId);
 
 #endif /* ENABLE_SCHEDULER_HEURISTIC_NULL */
 #endif /* __NULL_SCHEDULER_HEURISTIC_H__ */

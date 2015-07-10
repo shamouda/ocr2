@@ -228,13 +228,13 @@ u8 commonSchedulerNotifyInvoke(ocrScheduler_t *self, ocrSchedulerOpArgs_t *opArg
 }
 
 u8 commonSchedulerTransactInvoke(ocrScheduler_t *self, ocrSchedulerOpArgs_t *opArgs, ocrRuntimeHint_t *hints) {
-    ocrSchedulerHeuristic_t *schedulerHeuristic = self->schedulerHeuristics[0];
+    ocrSchedulerHeuristic_t *schedulerHeuristic = self->schedulerHeuristics[opArgs->heuristicId];
     ocrSchedulerHeuristicContext_t *context = schedulerHeuristic->fcts.getContext(schedulerHeuristic, opArgs->seqId);
     return schedulerHeuristic->fcts.op[OCR_SCHEDULER_HEURISTIC_OP_TRANSACT].invoke(schedulerHeuristic, context, opArgs, hints);
 }
 
 u8 commonSchedulerAnalyzeInvoke(ocrScheduler_t *self, ocrSchedulerOpArgs_t *opArgs, ocrRuntimeHint_t *hints) {
-    ocrSchedulerHeuristic_t *schedulerHeuristic = self->schedulerHeuristics[0];
+    ocrSchedulerHeuristic_t *schedulerHeuristic = self->schedulerHeuristics[opArgs->heuristicId];
     ocrSchedulerHeuristicContext_t *context = schedulerHeuristic->fcts.getContext(schedulerHeuristic, opArgs->seqId);
     return schedulerHeuristic->fcts.op[OCR_SCHEDULER_HEURISTIC_OP_ANALYZE].invoke(schedulerHeuristic, context, opArgs, hints);
 }
