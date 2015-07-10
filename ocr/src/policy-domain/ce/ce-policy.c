@@ -40,11 +40,13 @@ extern void ocrShutdown(void);
 static void performNeighborDiscovery(ocrPolicyDomain_t *policy) {
 #ifdef HAL_FSIM_CE
     // Neighbor discovery
-    // In the general case, all other CEs in my unit are my neighbors
-    // However, if I'm block 0 CE, my neighbors also include unit 0 block 0 CE
-    // unless I'm unit 0 block 0 CE
+    // In the general case, all other CEs in my cluster are my neighbors
+    // However, if I'm block 0 CE, my neighbors also include cluster 0 block 0 CE
+    // unless I'm cluster 0 block 0 CE
+    // TODO: Extend this to Sockets & beyond
 
 #warning FIXME-OCRTG: ADJUST FOR THE NEW TG HIERARCHY?
+// FIXME: Check that the below numbers are valid
 #define MAX_NUM_BLOCK 8
 #define MAX_NUM_CLUSTER 4
 
