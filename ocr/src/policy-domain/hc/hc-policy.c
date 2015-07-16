@@ -1520,6 +1520,8 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             #define PD_TYPE PD_MSG_DEP_ADD
                 PD_MSG_FIELD_O(returnDetail) = returnDetail;
                 RESULT_PROPAGATE(returnCode);
+            #undef PD_MSG
+            #undef PD_TYPE
             }
         } else {
             if(!(srcKind & OCR_GUID_EVENT)) {
@@ -1527,48 +1529,30 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
                                         "expected Event\n", srcKind);
             }
             ASSERT(srcKind & OCR_GUID_EVENT);
+            // We are handling the following dependences (event, event|edt) and do
+            // things differently depending on the type of events:
+            // (non-persistent event, edt)  => REG_SIGNALER (event on edt), then REG_WAITER (edt on event)
+            // (persistent event, edt)      => REG_SIGNALER (event on edt, edt does late registration)
+            // ((any) event, (any) event)   => REG_WAITER
+            //
+            // Are we revealing too much of the underlying implementation here ?
+            //
             bool srcIsNonPersistent = ((srcKind == OCR_GUID_EVENT_ONCE) ||
                                         (srcKind == OCR_GUID_EVENT_LATCH));
             // 'Push' registration when source is non-persistent and/or destination is another event.
-            // NOTE: This code could be made more generic if we could query the src/dst metadata
-            //       to determine the correct mode to use.
-            bool isPushMode = (srcIsNonPersistent || (dstKind & OCR_GUID_EVENT));
-            bool needSignalerReg = 0;
-            if (isPushMode) {
-                //OK if srcKind is at current location
-                PD_MSG_STACK(registerMsg);
-                getCurrentEnv(NULL, NULL, NULL, &registerMsg);
-            #undef PD_MSG
-            #undef PD_TYPE
-            #define PD_MSG (&registerMsg)
-            #define PD_TYPE PD_MSG_DEP_REGWAITER
-                // Registration with non-persistent events is two-way
-                // to enforce message ordering constraints.
-                registerMsg.type = PD_MSG_DEP_REGWAITER | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
-                // Registers destGuid (waiter) onto sourceGuid
-                PD_MSG_FIELD_I(waiter) = dest;
-                PD_MSG_FIELD_I(dest) = src;
-                PD_MSG_FIELD_I(slot) = slot;
-                PD_MSG_FIELD_I(properties) = true; // Specify context is add-dependence
-                u8 returnCode = self->fcts.processMessage(self, &registerMsg, true);
-                u8 returnDetail = (returnCode == 0) ? PD_MSG_FIELD_O(returnDetail) : returnCode;
-                // We should be looking at the returnDetail to determine if we need to call
-                // the signaler too. However, the current implementation requires to do the
-                // signaler registration anyway to be able to record the mode.
-                needSignalerReg = 1;
-            #undef PD_MSG
-            #undef PD_TYPE
-            #define PD_MSG msg
-            #define PD_TYPE PD_MSG_DEP_ADD
-                PD_MSG_FIELD_O(returnDetail) = returnDetail;
-                RESULT_PROPAGATE(returnCode);
-            #undef PD_MSG
-            #undef PD_TYPE
-            }
-            if(!isPushMode || needSignalerReg) {
-                ASSERT_BLOCK_BEGIN(((dstKind == OCR_GUID_EDT) || (dstKind & OCR_GUID_EVENT)))
-                DPRINTF(DEBUG_LVL_WARN, "Attempting to add a dependence to a GUID of type 0x%x, "
-                                        "but expected EDT or Event\n", dstKind);
+            bool needPushMode = (srcIsNonPersistent || (dstKind & OCR_GUID_EVENT));
+            // The registration is always necessary when the destination is an EDT.
+            // It allows to record the mode of the dependence as well as the type of
+            // event the EDT should be expecting.
+            bool needPullMode = !!(dstKind & OCR_GUID_EDT);
+            // NOTE: Important to do the signaler registration before the waiter one
+            // when the dependence is of the form (non-persistent event, edt)
+            // Otherwise there's a race between the once event being destroyed and
+            // the edt processing the registerSignaler call (which may read into the
+            // destroyed event metadata).
+            if(needPullMode) {
+                ASSERT_BLOCK_BEGIN(dstKind & OCR_GUID_EDT);
+                DPRINTF(DEBUG_LVL_WARN, "Runtime error expect REGSIGNALER dest to be an EDT GUID\n");
                 ASSERT_BLOCK_END
                 PD_MSG_STACK(registerMsg);
                 getCurrentEnv(NULL, NULL, NULL, &registerMsg);
@@ -1581,6 +1565,32 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
                 PD_MSG_FIELD_I(dest) = dest;
                 PD_MSG_FIELD_I(slot) = slot;
                 PD_MSG_FIELD_I(mode) = mode;
+                PD_MSG_FIELD_I(properties) = true; // Specify context is add-dependence
+                u8 returnCode = self->fcts.processMessage(self, &registerMsg, true);
+                u8 returnDetail = (returnCode == 0) ? PD_MSG_FIELD_O(returnDetail) : returnCode;
+            #undef PD_MSG
+            #undef PD_TYPE
+            #define PD_MSG msg
+            #define PD_TYPE PD_MSG_DEP_ADD
+                PD_MSG_FIELD_O(returnDetail) = returnDetail;
+                RESULT_PROPAGATE(returnCode);
+            #undef PD_MSG
+            #undef PD_TYPE
+            }
+
+            if (needPushMode) {
+                //OK if srcKind is at current location
+                PD_MSG_STACK(registerMsg);
+                getCurrentEnv(NULL, NULL, NULL, &registerMsg);
+            #define PD_MSG (&registerMsg)
+            #define PD_TYPE PD_MSG_DEP_REGWAITER
+                // Registration with non-persistent events is two-way
+                // to enforce message ordering constraints.
+                registerMsg.type = PD_MSG_DEP_REGWAITER | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
+                // Registers destGuid (waiter) onto sourceGuid
+                PD_MSG_FIELD_I(waiter) = dest;
+                PD_MSG_FIELD_I(dest) = src;
+                PD_MSG_FIELD_I(slot) = slot;
                 PD_MSG_FIELD_I(properties) = true; // Specify context is add-dependence
                 u8 returnCode = self->fcts.processMessage(self, &registerMsg, true);
                 u8 returnDetail = (returnCode == 0) ? PD_MSG_FIELD_O(returnDetail) : returnCode;

@@ -1178,27 +1178,20 @@ ASSERT(ceMsg.destLocation != self->parentLocation); // Parent's not dead
 #define PD_TYPE PD_MSG_DEP_ADD
             }
         } else {
-            if(srcKind & OCR_GUID_EVENT) {
-                ocrEvent_t *evt = (ocrEvent_t*)(src.metaDataPtr);
-                ASSERT(evt->fctId == self->eventFactories[0]->factoryId);
-                self->eventFactories[0]->fcts[evt->kind].registerWaiter(
-                    evt, dest, PD_MSG_FIELD_I(slot), true);
-            } else {
-                // Some sanity check
-                ASSERT(srcKind == OCR_GUID_EDT);
-            }
-            if(dstKind == OCR_GUID_EDT) {
+            // Is it ok not to use messages here ?
+            if (dstKind == OCR_GUID_EDT) {
                 ocrTask_t *task = (ocrTask_t*)(dest.metaDataPtr);
                 ASSERT(task->fctId == self->taskFactories[0]->factoryId);
                 self->taskFactories[0]->fcts.registerSignaler(task, src, PD_MSG_FIELD_I(slot),
                     PD_MSG_FIELD_IO(properties) & DB_ACCESS_MODE_MASK, true);
-            } else if(dstKind & OCR_GUID_EVENT) {
-                ocrEvent_t *evt = (ocrEvent_t*)(dest.metaDataPtr);
+            }
+            bool srcIsNonPersistent = ((srcKind == OCR_GUID_EVENT_ONCE) ||
+                                        (srcKind == OCR_GUID_EVENT_LATCH));
+            if (srcIsNonPersistent || (dstKind & OCR_GUID_EVENT)) {
+                ocrEvent_t *evt = (ocrEvent_t*)(src.metaDataPtr);
                 ASSERT(evt->fctId == self->eventFactories[0]->factoryId);
-                self->eventFactories[0]->fcts[evt->kind].registerSignaler(
-                    evt, src, PD_MSG_FIELD_I(slot), PD_MSG_FIELD_IO(properties) & DB_ACCESS_MODE_MASK, true);
-            } else {
-                ASSERT(0); // Cannot have other types of destinations
+                self->eventFactories[0]->fcts[evt->kind].registerWaiter(
+                    evt, dest, PD_MSG_FIELD_I(slot), true);
             }
         }
 

@@ -589,6 +589,7 @@ u8 registerWaiterEventHcPersist(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot,
     RESULT_ASSERT(guidKind(pd, waiter, &waiterKind), ==, 0);
 
     if(isDepAdd && waiterKind == OCR_GUID_EDT) {
+        ASSERT(false && "Should never happen anymore");
         // If we're adding a dependence and the waiter is an EDT we
         // skip this part. The event is registered on the EDT and
         // the EDT will register on the event only when its dependence
