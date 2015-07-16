@@ -58,7 +58,7 @@
 #include "simple-allocator.h"
 #include "allocator/allocator-all.h"
 #include "ocr-mem-platform.h"
-#ifdef HAL_FSIM_CE
+#if defined(HAL_FSIM_CE) || defined(HAL_FSIM_XE)
 #include "rmd-map.h"
 #endif
 
@@ -164,7 +164,9 @@
 // EDTs are scheduled to other blocks and the address is passed to free() on that other block.
 void *addrGlobalizeOnTG(void *result, ocrPolicyDomain_t *self)
 {
-#if defined(HAL_FSIM_CE)
+#if defined(HAL_FSIM_CE) || defined(HAL_FSIM_XE)
+    //void *orig = result;
+
     // ideally we'd like to use the size of each memory as the end of each area.
     // canonicalize addresses for L3 SPAD (USM -- unit shared mem)
     if((u64)result <= UR_BSM_BASE(0, 0) /* as Bala suggested */ && (u64)result >= UR_USM_BASE) {
@@ -183,6 +185,42 @@ void *addrGlobalizeOnTG(void *result, ocrPolicyDomain_t *self)
         //DPRINTF(DEBUG_LVL_INFO, "BSM conv: %p -> %p\n", result, newresult );
         result = newresult;
     }
+
+    u64 id = AGENT_FROM_ID(self->myLocation);
+
+    if((u64)result <= NOM_L1_SIZE_KB*1024) {
+        result = (void *)DR_XE_BASE(CHIP_FROM_ID(self->myLocation),
+                                    UNIT_FROM_ID(self->myLocation),
+                                    BLOCK_FROM_ID(self->myLocation),
+                                    id) +
+                                    (u64)(result - 0);
+        u64 check = MAKE_CORE_ID(0,
+                                 0,
+                                 ((((u64)result >> MAP_CHIP_SHIFT) & ((1ULL<<MAP_CHIP_LEN) - 1)) - 1),
+                                 ((((u64)result >> MAP_UNIT_SHIFT) & ((1ULL<<MAP_UNIT_LEN) - 1)) - 2),
+                                 ((((u64)result >> MAP_BLOCK_SHIFT) & ((1ULL<<MAP_BLOCK_LEN) - 1)) - 2),
+                                 id);
+        //DPRINTF(DEBUG_LVL_WARN, "check:%p , self:%p, myloc:0x%lx\n", check, self, self->myLocation);
+        ASSERT(check==self->myLocation);
+        //DPRINTF(DEBUG_LVL_WARN, "globalize success : %p-> %p , id:%ld\n", orig, result, id);
+    }
+
+    if((u64)result <= XE_MSR_BASE(id) && (u64)result >= BR_XE_BASE(id)) {
+        result = (void *)DR_XE_BASE(CHIP_FROM_ID(self->myLocation),
+                                    UNIT_FROM_ID(self->myLocation),
+                                    BLOCK_FROM_ID(self->myLocation),
+                                    id) +
+                                    (u64)(result - BR_XE_BASE(id));
+        u64 check = MAKE_CORE_ID(0,
+                                 0,
+                                 ((((u64)result >> MAP_CHIP_SHIFT) & ((1ULL<<MAP_CHIP_LEN) - 1)) - 1),
+                                 ((((u64)result >> MAP_UNIT_SHIFT) & ((1ULL<<MAP_UNIT_LEN) - 1)) - 2),
+                                 ((((u64)result >> MAP_BLOCK_SHIFT) & ((1ULL<<MAP_BLOCK_LEN) - 1)) - 2),
+                                 id);
+        //DPRINTF(DEBUG_LVL_WARN, "check:%p , self:%p, myloc:0x%lx\n", check, self, self->myLocation);
+        ASSERT(check==self->myLocation);
+        //DPRINTF(DEBUG_LVL_WARN, "globalize success : %p-> %p , id:%ld , 0x%lx < x < 0x%lx\n", orig, result, id, BR_XE_BASE(id) , XE_MSR_BASE(id) );
+    }
     if((u64)result <= CE_MSR_BASE && (u64)result >= BR_CE_BASE) {
         result = (void *)DR_CE_BASE(CHIP_FROM_ID(self->myLocation),
                                     UNIT_FROM_ID(self->myLocation),
@@ -197,6 +235,9 @@ void *addrGlobalizeOnTG(void *result, ocrPolicyDomain_t *self)
         //DPRINTF(DEBUG_LVL_WARN, "check:%p , self:%p, myloc:0x%lx\n", check, self, self->myLocation);
         ASSERT(check==self->myLocation);
     }
+
+//    if (orig == result)
+//        DPRINTF(DEBUG_LVL_WARN, "globalize skipped : %p , id:%ld , 0x%lx < x < 0x%lx\n", result, id, BR_XE_BASE(id) , XE_MSR_BASE(id) );
 #endif
     return result;
 }
@@ -733,13 +774,11 @@ ocrAllocator_t * newAllocatorSimple(ocrAllocatorFactory_t * factory, ocrParamLis
 
     ocrAllocatorSimple_t *result = (ocrAllocatorSimple_t*)
         runtimeChunkAlloc(sizeof(ocrAllocatorSimple_t), PERSISTENT_CHUNK);
-    DPRINTF(DEBUG_LVL_VERB, "newAllocator called. (This is x86 only ? ? ) alloc %p\n", result);
     ocrAllocator_t * base = (ocrAllocator_t *) result;
     factory->initialize(factory, base, perInstance);
     return (ocrAllocator_t *) result;
 }
 void initializeAllocatorSimple(ocrAllocatorFactory_t * factory, ocrAllocator_t * self, ocrParamList_t * perInstance) {
-    DPRINTF(DEBUG_LVL_VERB, "Simple: initialize (This is x86 only ? ? ) called\n");
     initializeAllocatorOcr(factory, self, perInstance);
 
     ocrAllocatorSimple_t *derived = (ocrAllocatorSimple_t *)self;

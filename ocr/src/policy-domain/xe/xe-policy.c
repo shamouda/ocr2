@@ -13,6 +13,7 @@
 #include "ocr-policy-domain.h"
 #include "ocr-sysboot.h"
 #include "ocr-runtime-types.h"
+#include "allocator/allocator-all.h"
 
 #ifdef OCR_ENABLE_STATISTICS
 #include "ocr-statistics.h"
@@ -27,7 +28,6 @@
 #include "utils/profiler/profiler.h"
 
 #define DEBUG_TYPE POLICY
-
 
 extern void ocrShutdown(void);
 
@@ -79,6 +79,8 @@ u8 xePdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
 
     maxCount = policy->allocatorCount;
     for(i = 0; i < maxCount; ++i) {
+        policy->allocators[i]->fcts.switchRunlevel(policy->allocators[i], policy, RL_PD_OK,
+                                                 0, RL_REQUEST | RL_BRING_UP | RL_BARRIER, NULL, 0);
         policy->allocators[i]->fcts.switchRunlevel(policy->allocators[i], policy, RL_MEMORY_OK,
                                                  0, RL_REQUEST | RL_BRING_UP | RL_BARRIER, NULL, 0);
     }
@@ -197,6 +199,51 @@ static void localDeguidify(ocrPolicyDomain_t *self, ocrFatGuid_t *guid) {
     }
 }
 
+
+
+static u8 xeAllocateDb(ocrPolicyDomain_t *self, ocrFatGuid_t *guid, void** ptr, u64 size,
+                       u32 properties, u64 engineIndex,
+                       ocrFatGuid_t affinity, ocrInDbAllocator_t allocator,
+                       u64 prescription) {
+    // This function allocates a data block for the requestor, who is either this computing agent or a
+    // different one that sent us a message.  After getting that data block, it "guidifies" the results
+    // which, by the way, ultimately causes xeMemAlloc (just below) to run.
+    //
+    // Currently, the "affinity" and "allocator" arguments are ignored, and I expect that these will
+    // eventually be eliminated here and instead, above this level, processed into the "prescription"
+    // variable, which has been added to this argument list.  The prescription indicates an order in
+    // which to attempt to allocate the block to a pool.
+    u64 idx = 0;
+    void* result;
+    s8 allocatorIndex = 0;
+    u64 allocatorHints = 0;
+    result = self->allocators[allocatorIndex]->fcts.allocate(self->allocators[allocatorIndex], size, allocatorHints);
+    // DPRINTF(DEBUG_LVL_WARN, "xeAllocateDb successfully returning %p\n", result);
+
+    if (result) {
+        ocrDataBlock_t *block = self->dbFactories[0]->instantiate(
+            self->dbFactories[0], self->allocators[idx]->fguid, self->fguid,
+            size, result, properties, NULL);
+        *ptr = result;
+        (*guid).guid = block->guid;
+        (*guid).metaDataPtr = block;
+        return 0;
+    } else {
+        DPRINTF(DEBUG_LVL_VERB, "xeAllocateDb returning NULL for size %ld\n", (u64) size);
+        return OCR_ENOMEM;
+    }
+}
+
+static u8 xeProcessResponse(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u32 properties) {
+    if (msg->srcLocation == self->myLocation) {
+        msg->type &= ~PD_MSG_REQUEST;
+        msg->type |=  PD_MSG_RESPONSE;
+    } else {
+        ASSERT(0);
+    }
+    return 0;
+}
+
 static u8 xeProcessCeRequest(ocrPolicyDomain_t *self, ocrPolicyMsg_t **msg) {
     u8 returnCode = 0;
     u32 type = ((*msg)->type & PD_MSG_TYPE_ONLY);
@@ -253,8 +300,58 @@ u8 xePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
     DPRINTF(DEBUG_LVL_VVERB, "Going to process message of type 0x%lx\n",
             (msg->type & PD_MSG_TYPE_ONLY));
     switch(msg->type & PD_MSG_TYPE_ONLY) {
+
+    // try direct DB alloc, if fails, fallback to CE
+    case PD_MSG_DB_CREATE: {
+        START_PROFILE(pd_xe_DbCreate);
+#define PD_MSG msg
+#define PD_TYPE PD_MSG_DB_CREATE
+        // BUG #584: Add properties whether DB needs to be acquired or not
+        // This would impact where we do the PD_MSG_MEM_ALLOC for example
+        // For now we deal with both USER and RT dbs the same way
+        ASSERT((PD_MSG_FIELD_I(dbType) == USER_DBTYPE) || (PD_MSG_FIELD_I(dbType) == RUNTIME_DBTYPE));
+        DPRINTF(DEBUG_LVL_VVERB, "DB_CREATE request from 0x%lx for size %lu\n",
+                msg->srcLocation, PD_MSG_FIELD_IO(size));
+// BUG #145: The prescription needs to be derived from the affinity, and needs to default to something sensible.
+        u64 engineIndex = self->myLocation & 0xF;
+        // getEngineIndex(self, msg->srcLocation);
+        ocrFatGuid_t edtFatGuid = {.guid = PD_MSG_FIELD_I(edt.guid), .metaDataPtr = PD_MSG_FIELD_I(edt.metaDataPtr)};
+        u64 reqSize = PD_MSG_FIELD_IO(size);
+
+        u8 ret = xeAllocateDb(
+            self, &(PD_MSG_FIELD_IO(guid)), &(PD_MSG_FIELD_O(ptr)), reqSize,
+            PD_MSG_FIELD_IO(properties), engineIndex,
+            PD_MSG_FIELD_I(affinity), PD_MSG_FIELD_I(allocator), 0 /*PRESCRIPTION*/);
+        if (ret == 0) {
+            PD_MSG_FIELD_O(returnDetail) = ret;
+            if(PD_MSG_FIELD_O(returnDetail) == 0) {
+                ocrDataBlock_t *db= PD_MSG_FIELD_IO(guid.metaDataPtr);
+                ASSERT(db);
+                // BUG #584: Check if properties want DB acquired
+                ASSERT(db->fctId == self->dbFactories[0]->factoryId);
+                PD_MSG_FIELD_O(returnDetail) = self->dbFactories[0]->fcts.acquire(
+                    db, &(PD_MSG_FIELD_O(ptr)), edtFatGuid, EDT_SLOT_NONE,
+                    DB_MODE_RW, !!(PD_MSG_FIELD_IO(properties) & DB_PROP_RT_ACQUIRE), (u32)DB_MODE_RW);
+            } else {
+                // Cannot acquire
+                PD_MSG_FIELD_O(ptr) = NULL;
+            }
+            DPRINTF(DEBUG_LVL_VVERB, "DB_CREATE response for size %lu: GUID: 0x%lx; PTR: 0x%lx)\n",
+                    reqSize, PD_MSG_FIELD_IO(guid.guid), PD_MSG_FIELD_O(ptr));
+            returnCode = xeProcessResponse(self, msg, 0);
+#undef PD_MSG
+#undef PD_TYPE
+            EXIT_PROFILE;
+            break;
+        }
+        EXIT_PROFILE;
+        // fallbacks to CE
+        //DPRINTF(DEBUG_LVL_WARN, "xeAllocateDb failed, fallback to CE\n");
+    }
+
+
     // First type of messages: things that we offload completely to the CE
-    case PD_MSG_DB_CREATE: case PD_MSG_DB_DESTROY:
+    case PD_MSG_DB_DESTROY:
     case PD_MSG_DB_ACQUIRE: case PD_MSG_DB_RELEASE: case PD_MSG_DB_FREE:
     case PD_MSG_MEM_ALLOC: case PD_MSG_MEM_UNALLOC:
     case PD_MSG_WORK_CREATE: case PD_MSG_WORK_DESTROY:
@@ -480,6 +577,18 @@ u8 xePdWaitMessage(ocrPolicyDomain_t *self,  ocrMsgHandle_t **handle) {
 
 void* xePdMalloc(ocrPolicyDomain_t *self, u64 size) {
     START_PROFILE(pd_xe_pdMalloc);
+
+    void* result;
+    s8 allocatorIndex = 0;
+    u64 allocatorHints = 0;
+    result = self->allocators[allocatorIndex]->fcts.allocate(self->allocators[allocatorIndex], size, allocatorHints);
+    if (result) {
+        RETURN_PROFILE(result);
+    }
+    DPRINTF(DEBUG_LVL_INFO, "xePdMalloc falls back to MSG_MEM_ALLOC for size %ld\n", (u64) size);
+    // fallback to messaging
+
+    // send allocation mesg to CE
     void *ptr;
     PD_MSG_STACK(msg);
     ocrPolicyMsg_t* pmsg = &msg;
@@ -500,6 +609,13 @@ void* xePdMalloc(ocrPolicyDomain_t *self, u64 size) {
 
 void xePdFree(ocrPolicyDomain_t *self, void* addr) {
     START_PROFILE(pd_xe_pdFree);
+
+    // Sometimes XE frees blocks that CE or other XE allocated.
+    // XE can free directly even if it was allocated by CE. OK.
+    allocatorFreeFunction(addr);
+    RETURN_PROFILE();
+#if 0    // old code for messaging. Will be removed later.
+    // send deallocation mesg to CE
     PD_MSG_STACK(msg);
     ocrPolicyMsg_t *pmsg = &msg;
     getCurrentEnv(NULL, NULL, NULL, &msg);
@@ -514,6 +630,7 @@ void xePdFree(ocrPolicyDomain_t *self, void* addr) {
 #undef PD_MSG
 #undef PD_TYPE
     RETURN_PROFILE();
+#endif
 }
 
 ocrPolicyDomain_t * newPolicyDomainXe(ocrPolicyDomainFactory_t * factory,
