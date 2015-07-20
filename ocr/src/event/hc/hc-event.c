@@ -932,7 +932,7 @@ u8 newEventHc(ocrEventFactory_t * factory, ocrFatGuid_t *guid,
             kind = OCR_GUID_NONE; // To keep clang happy
             ASSERT(false && "Unknown type of event");
     }
-
+    ocrGuid_t resultGuid = NULL_GUID;
 #define PD_MSG (&msg)
 #define PD_TYPE PD_MSG_GUID_CREATE
     msg.type = PD_MSG_GUID_CREATE | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
@@ -952,7 +952,7 @@ u8 newEventHc(ocrEventFactory_t * factory, ocrFatGuid_t *guid,
     }
 
     // Set-up base structures
-    base->guid = PD_MSG_FIELD_IO(guid.guid);
+    resultGuid = PD_MSG_FIELD_IO(guid.guid);
     base->kind = eventType;
     base->fctId = factory->factoryId;
 #undef PD_MSG
@@ -1037,11 +1037,16 @@ u8 newEventHc(ocrEventFactory_t * factory, ocrFatGuid_t *guid,
 #undef PD_MSG
 #undef PD_TYPE
 
+    // Do this at the very end; it indicates that the object of the GUID is actually
+    // valid
+    base->guid = resultGuid;
+
     DPRINTF(DEBUG_LVL_INFO, "Create %s: 0x%lx\n", eventTypeToString(base), base->guid);
 #ifdef OCR_ENABLE_STATISTICS
     statsEVT_CREATE(getCurrentPD(), getCurrentEDT(), NULL, base->guid, base);
 #endif
     if(returnValue == 0) {
+
         guid->guid = base->guid;
         guid->metaDataPtr = base;
     }
