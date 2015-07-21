@@ -9,7 +9,7 @@
 #include "extensions/ocr-affinity.h"
 
 /**
- * DESC: Create EDT that destroys a DB it did not acquired
+ * DESC: Create EDT that destroys a DB (no prior release in caller)
  */
 
 #define TYPE_ELEM_DB int

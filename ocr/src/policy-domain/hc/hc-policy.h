@@ -32,7 +32,6 @@ typedef struct {
 
 typedef struct {
     ocrPolicyDomain_t base;
-    u32 rank;           // For MPI use
     volatile u32 pausingWorker; //Worker responsible for pause
     volatile bool runtimePause; //flag to indicate pause
     volatile u32 pauseCounter; //number of paused workers
@@ -42,7 +41,7 @@ typedef struct {
 
 typedef struct {
     paramListPolicyDomainInst_t base;
-    u32 rank;
+    u32 rank; // set through the CFG file, not used for now
 } paramListPolicyDomainHcInst_t;
 
 ocrGuid_t hcQueryNextEdts(ocrPolicyDomainHc_t *rself, void **result, u32 *size);

@@ -24,6 +24,14 @@
 
 #include <pthread.h>
 
+/**
+ * @brief Structure stored on a per-thread basis to keep track of
+ * "who we are"
+ */
+typedef struct {
+    ocrPolicyDomain_t *pd;
+    ocrWorker_t *worker;
+} perThreadStorage_t;
 
 typedef struct {
     ocrCompPlatformFactory_t base;
@@ -33,9 +41,9 @@ typedef struct {
 typedef struct {
     ocrCompPlatform_t base;
     pthread_t osThread;
+    perThreadStorage_t tls;
     u64 stackSize;
     s32 binding;
-    bool isMaster;
 } ocrCompPlatformPthread_t;
 
 typedef struct {

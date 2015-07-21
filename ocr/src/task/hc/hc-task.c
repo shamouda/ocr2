@@ -182,8 +182,9 @@ ocrRuntimeHint_t* getRuntimeHintTaskTemplateHc(ocrTaskTemplate_t* self) {
     return &(derived->hint);
 }
 
-void destructTaskTemplateFactoryHc(ocrTaskTemplateFactory_t* base) {
-    runtimeChunkFree((u64)base, PERSISTENT_CHUNK);
+void destructTaskTemplateFactoryHc(ocrTaskTemplateFactory_t* factory) {
+    runtimeChunkFree((u64)factory->hintPropMap, PERSISTENT_CHUNK);
+    runtimeChunkFree((u64)factory, PERSISTENT_CHUNK);
 }
 
 ocrTaskTemplateFactory_t * newTaskTemplateFactoryHc(ocrParamList_t* perType, u32 factoryId) {
@@ -424,24 +425,19 @@ static u8 scheduleTask(ocrTask_t *self) {
     DPRINTF(DEBUG_LVL_INFO, "Schedule 0x%lx\n", self->guid);
     self->state = ALLACQ_EDTSTATE;
     ocrPolicyDomain_t *pd = NULL;
+    ocrWorker_t *worker = NULL;
     PD_MSG_STACK(msg);
-    getCurrentEnv(&pd, NULL, NULL, &msg);
+    getCurrentEnv(&pd, &worker, NULL, &msg);
 
-    ocrFatGuid_t toGive = {.guid = self->guid, .metaDataPtr = self};
 #define PD_MSG (&msg)
-#define PD_TYPE PD_MSG_COMM_GIVE
-    msg.type = PD_MSG_COMM_GIVE | PD_MSG_REQUEST;
-    PD_MSG_FIELD_IO(guids) = &toGive;
-    PD_MSG_FIELD_IO(guidCount) = 1;
-    PD_MSG_FIELD_I(properties) = 0;
-    PD_MSG_FIELD_I(type) = OCR_GUID_EDT;
-#ifdef ENABLE_HINTS
-    u64 *hints[1]; //declare static hint array
-    ocrTaskHc_t *derived = (ocrTaskHc_t*)self;
-    hints[0] = (u64*)(&(derived->hint));
-    PD_MSG_FIELD_IO(hints) = hints;
-#endif
+#define PD_TYPE PD_MSG_SCHED_NOTIFY
+    msg.type = PD_MSG_SCHED_NOTIFY | PD_MSG_REQUEST;
+    PD_MSG_FIELD_IO(schedArgs).base.seqId = worker->seqId;
+    PD_MSG_FIELD_IO(schedArgs).kind = OCR_SCHED_NOTIFY_EDT_READY;
+    PD_MSG_FIELD_IO(schedArgs).OCR_SCHED_ARG_FIELD(OCR_SCHED_NOTIFY_EDT_READY).guid.guid = self->guid;
+    PD_MSG_FIELD_IO(schedArgs).OCR_SCHED_ARG_FIELD(OCR_SCHED_NOTIFY_EDT_READY).guid.metaDataPtr = self;
     RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, false));
+    ASSERT(PD_MSG_FIELD_O(returnDetail) == 0);
 #undef PD_MSG
 #undef PD_TYPE
     return 0;
@@ -959,7 +955,7 @@ u8 notifyDbReleaseTaskHc(ocrTask_t *base, ocrFatGuid_t db) {
         }
     }
     // not found means it's an error or it has already been released
-    return 0;
+    return OCR_ENOENT;
 }
 
 u8 taskExecute(ocrTask_t* base) {
@@ -1154,8 +1150,9 @@ ocrRuntimeHint_t* getRuntimeHintTaskHc(ocrTask_t* self) {
     return &(derived->hint);
 }
 
-void destructTaskFactoryHc(ocrTaskFactory_t* base) {
-    runtimeChunkFree((u64)base, PERSISTENT_CHUNK);
+void destructTaskFactoryHc(ocrTaskFactory_t* factory) {
+    runtimeChunkFree((u64)factory->hintPropMap, PERSISTENT_CHUNK);
+    runtimeChunkFree((u64)factory, PERSISTENT_CHUNK);
 }
 
 ocrTaskFactory_t * newTaskFactoryHc(ocrParamList_t* perInstance, u32 factoryId) {

@@ -37,7 +37,6 @@
 /* OCR-HC WORKER                                      */
 /******************************************************/
 
-
 static void hcWorkShift(ocrWorker_t * worker) {
     ocrPolicyDomain_t * pd;
     PD_MSG_STACK(msg);
@@ -46,27 +45,23 @@ static void hcWorkShift(ocrWorker_t * worker) {
     ocrPolicyDomainHc_t *self = (ocrPolicyDomainHc_t *)pd;
     ocrWorkerHc_t *hcWorker = (ocrWorkerHc_t *) worker;
 
-
-    ocrFatGuid_t taskGuid = {.guid = NULL_GUID, .metaDataPtr = NULL};
-    u32 count = 1;
 #define PD_MSG (&msg)
-#define PD_TYPE PD_MSG_COMM_TAKE
-    msg.type = PD_MSG_COMM_TAKE | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
-    PD_MSG_FIELD_IO(guids) = &taskGuid;
-    PD_MSG_FIELD_IO(guidCount) = count;
-    PD_MSG_FIELD_I(properties) = 0;
-    PD_MSG_FIELD_IO(type) = OCR_GUID_EDT;
-    // BUG #586: In the future, potentially take more than one)
+#define PD_TYPE PD_MSG_SCHED_GET_WORK
+    msg.type = PD_MSG_SCHED_GET_WORK | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
+    PD_MSG_FIELD_IO(schedArgs).base.seqId = worker->seqId;
+    PD_MSG_FIELD_IO(schedArgs).kind = OCR_SCHED_WORK_EDT_USER;
+    PD_MSG_FIELD_IO(schedArgs).OCR_SCHED_ARG_FIELD(OCR_SCHED_WORK_EDT_USER).edt.guid = NULL_GUID;
+    PD_MSG_FIELD_IO(schedArgs).OCR_SCHED_ARG_FIELD(OCR_SCHED_WORK_EDT_USER).edt.metaDataPtr = NULL;
     if(pd->fcts.processMessage(pd, &msg, true) == 0) {
         // We got a response
-        count = PD_MSG_FIELD_IO(guidCount);
-        if(count == 1) {
-            // Stolen task sanity checks
-            ASSERT(taskGuid.guid != NULL_GUID && taskGuid.metaDataPtr != NULL);
+        ocrFatGuid_t taskGuid = PD_MSG_FIELD_IO(schedArgs).OCR_SCHED_ARG_FIELD(OCR_SCHED_WORK_EDT_USER).edt;
+        if(taskGuid.guid != NULL_GUID) {
+            // Task sanity checks
+            ASSERT(taskGuid.metaDataPtr != NULL);
             worker->curTask = (ocrTask_t*)taskGuid.metaDataPtr;
             DPRINTF(DEBUG_LVL_VERB, "Worker shifting to execute EDT GUID 0x%lx\n", taskGuid.guid);
-            u8 (*executeFunc)(ocrTask_t *) = (u8 (*)(ocrTask_t*))PD_MSG_FIELD_IO(extra); // Execute is stored in extra
-            executeFunc(worker->curTask);
+            u32 factoryId = PD_MSG_FIELD_O(factoryId);
+            pd->taskFactories[factoryId]->fcts.execute(worker->curTask);
 
             //Store state at worker level to report most recent state on pause.
             hcWorker->templateGuid = worker->curTask->templateGuid;
@@ -77,22 +72,22 @@ static void hcWorkShift(ocrWorker_t * worker) {
 #endif
 
 #undef PD_TYPE
-            // Destroy the work
-#define PD_TYPE PD_MSG_WORK_DESTROY
+#define PD_TYPE PD_MSG_SCHED_NOTIFY
             getCurrentEnv(NULL, NULL, NULL, &msg);
-            msg.type = PD_MSG_WORK_DESTROY | PD_MSG_REQUEST;
-            PD_MSG_FIELD_I(guid) = taskGuid;
-            PD_MSG_FIELD_I(currentEdt) = taskGuid;
-            PD_MSG_FIELD_I(properties) = 0;
-            // Ignore failures, we may be shutting down
-            pd->fcts.processMessage(pd, &msg, false);
-#undef PD_MSG
-#undef PD_TYPE
-            // Important for this to be the last
+            msg.type = PD_MSG_SCHED_NOTIFY | PD_MSG_REQUEST;
+            PD_MSG_FIELD_IO(schedArgs).kind = OCR_SCHED_NOTIFY_EDT_DONE;
+            PD_MSG_FIELD_IO(schedArgs).OCR_SCHED_ARG_FIELD(OCR_SCHED_NOTIFY_EDT_DONE).guid.guid = taskGuid.guid;
+            PD_MSG_FIELD_IO(schedArgs).OCR_SCHED_ARG_FIELD(OCR_SCHED_NOTIFY_EDT_DONE).guid.metaDataPtr = taskGuid.metaDataPtr;
+            ASSERT(pd->fcts.processMessage(pd, &msg, false) == 0);
 
+            // Important for this to be the last
             worker->curTask = NULL;
         }
+    } else {
+        ASSERT(0); //Handle error code
     }
+#undef PD_MSG
+#undef PD_TYPE
 
     if(self->runtimePause == true) {
         hal_xadd32((u32*)&self->pauseCounter, 1);
@@ -102,13 +97,27 @@ static void hcWorkShift(ocrWorker_t * worker) {
         }
         hal_xadd32((u32*)&self->pauseCounter, -1);
     }
-
 }
 
 static void workerLoop(ocrWorker_t * worker) {
     u8 continueLoop = true;
     // At this stage, we are in the USER_OK runlevel
     ASSERT(worker->curState == GET_STATE(RL_USER_OK, (RL_GET_PHASE_COUNT_DOWN(worker->pd, RL_USER_OK))));
+
+    //Register this worker with the scheduler and get a context id
+    ocrPolicyDomain_t *pd = worker->pd;
+    PD_MSG_STACK(msg);
+    msg.srcLocation = pd->myLocation;
+    msg.destLocation = pd->myLocation;
+#define PD_MSG (&msg)
+#define PD_TYPE PD_MSG_MGT_REGISTER
+    msg.type = PD_MSG_MGT_REGISTER | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
+    // The original 'id' value is read from the CFG file
+    PD_MSG_FIELD_I(properties) = 0;
+    pd->fcts.processMessage(pd, &msg, true);
+    ASSERT(worker->seqId == PD_MSG_FIELD_O(seqId));
+#undef PD_MSG
+#undef PD_TYPE
 
     if (worker->amBlessed) {
         ocrGuid_t affinityMasterPD;
@@ -260,6 +269,7 @@ u8 hcWorkerSwitchRunlevel(ocrWorker_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_
             ASSERT(callback != NULL);
             self->curState = GET_STATE(RL_MEMORY_OK, 0); // Technically last phase of memory OK but doesn't really matter
             self->desiredState = GET_STATE(RL_COMPUTE_OK, phase);
+            self->location = (u64) self; // Currently used only by visualizer, value is not important as long as it's unique
 
             // See if we are blessed
             self->amBlessed = (properties & RL_BLESSED) != 0;
@@ -371,24 +381,6 @@ u8 hcWorkerSwitchRunlevel(ocrWorker_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_
 }
 
 void* hcRunWorker(ocrWorker_t * worker) {
-    // BUG #583: This probably needs to go away and be set directly
-    // by the PD during one of the RLs
-    //Register this worker and get a context id
-    ocrPolicyDomain_t *pd = worker->pd;
-    PD_MSG_STACK(msg);
-    msg.srcLocation = pd->myLocation;
-    msg.destLocation = pd->myLocation;
-#define PD_MSG (&msg)
-#define PD_TYPE PD_MSG_MGT_REGISTER
-    msg.type = PD_MSG_MGT_REGISTER | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
-    // The original 'id' value is read from the CFG file
-    PD_MSG_FIELD_I(loc) = (ocrLocation_t) worker->seqId;
-    PD_MSG_FIELD_I(properties) = 0;
-    pd->fcts.processMessage(pd, &msg, true);
-    worker->seqId = PD_MSG_FIELD_O(seqId);
-#undef PD_MSG
-#undef PD_TYPE
-
     // At this point, we should have a callback to inform the PD
     // that we have successfully achieved the RL_COMPUTE_OK RL
     ASSERT(worker->callback != NULL);

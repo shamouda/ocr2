@@ -74,10 +74,10 @@ u8 hcCommSchedulerSwitchRunlevel(ocrScheduler_t *self, ocrPolicyDomain_t *PD, oc
             // deallocate all pdMalloc-ed structures
             u64 i;
             for(i = 0; i < commSched->outboxesCount; ++i) {
-                PD->fcts.pdFree(PD, commSched->outboxes[i]);
+                commSched->outboxes[i]->destruct(PD, commSched->outboxes[i]);
             }
             for(i = 0; i < commSched->inboxesCount; ++i) {
-                PD->fcts.pdFree(PD, commSched->inboxes[i]);
+                commSched->inboxes[i]->destruct(PD, commSched->inboxes[i]);
             }
             PD->fcts.pdFree(PD, commSched->outboxes);
             PD->fcts.pdFree(PD, commSched->inboxes);

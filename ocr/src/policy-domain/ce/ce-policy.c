@@ -539,7 +539,7 @@ static u8 ceProcessResponse(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u32 pr
             msg->type &= ~PD_MSG_REQUEST;
             msg->type |=  PD_MSG_RESPONSE;
 #if defined(HAL_FSIM_CE)
-            if((msg->destLocation & ID_AGENT_CE) == ID_AGENT_CE) {
+            if((msg->destLocation & ID_AGENT_MASK) == ID_AGENT_CE) {
                 // This is a CE->CE message
                 PD_MSG_STACK(toSend);
                 u64 baseSize = 0, marshalledSize = 0;
@@ -1106,16 +1106,14 @@ ASSERT(ceMsg.destLocation != self->parentLocation); // Parent's not dead
         break;
     }
 
-    case PD_MSG_COMM_GIVE: {
-        START_PROFILE(pd_ce_Give);
+    case PD_MSG_SCHED_NOTIFY: {
+        START_PROFILE(pd_ce_Sched_Notify);
 #define PD_MSG msg
-#define PD_TYPE PD_MSG_COMM_GIVE
-        ASSERT(PD_MSG_FIELD_I(type) == OCR_GUID_EDT);
-        DPRINTF(DEBUG_LVL_VVERB, "COMM_GIVE req/resp from 0x%lx with GUID 0x%lx\n",
-                msg->srcLocation, (PD_MSG_FIELD_IO(guids))->guid);
-        PD_MSG_FIELD_O(returnDetail) = self->schedulers[0]->fcts.giveEdt(
-            self->schedulers[0], &(PD_MSG_FIELD_IO(guidCount)),
-            PD_MSG_FIELD_IO(guids));
+#define PD_TYPE PD_MSG_SCHED_NOTIFY
+        ocrSchedulerOpNotifyArgs_t *notifyArgs = &PD_MSG_FIELD_IO(schedArgs);
+        PD_MSG_FIELD_O(returnDetail) =
+            self->schedulers[0]->fcts.op[OCR_SCHEDULER_OP_NOTIFY].invoke(
+                self->schedulers[0], (ocrSchedulerOpArgs_t*)notifyArgs, NULL);
         returnCode = ceProcessResponse(self, msg, 0);
 #undef PD_MSG
 #undef PD_TYPE
@@ -1180,27 +1178,20 @@ ASSERT(ceMsg.destLocation != self->parentLocation); // Parent's not dead
 #define PD_TYPE PD_MSG_DEP_ADD
             }
         } else {
-            if(srcKind & OCR_GUID_EVENT) {
-                ocrEvent_t *evt = (ocrEvent_t*)(src.metaDataPtr);
-                ASSERT(evt->fctId == self->eventFactories[0]->factoryId);
-                self->eventFactories[0]->fcts[evt->kind].registerWaiter(
-                    evt, dest, PD_MSG_FIELD_I(slot), true);
-            } else {
-                // Some sanity check
-                ASSERT(srcKind == OCR_GUID_EDT);
-            }
-            if(dstKind == OCR_GUID_EDT) {
+            // Is it ok not to use messages here ?
+            if (dstKind == OCR_GUID_EDT) {
                 ocrTask_t *task = (ocrTask_t*)(dest.metaDataPtr);
                 ASSERT(task->fctId == self->taskFactories[0]->factoryId);
                 self->taskFactories[0]->fcts.registerSignaler(task, src, PD_MSG_FIELD_I(slot),
                     PD_MSG_FIELD_IO(properties) & DB_ACCESS_MODE_MASK, true);
-            } else if(dstKind & OCR_GUID_EVENT) {
-                ocrEvent_t *evt = (ocrEvent_t*)(dest.metaDataPtr);
+            }
+            bool srcIsNonPersistent = ((srcKind == OCR_GUID_EVENT_ONCE) ||
+                                        (srcKind == OCR_GUID_EVENT_LATCH));
+            if (srcIsNonPersistent || (dstKind & OCR_GUID_EVENT)) {
+                ocrEvent_t *evt = (ocrEvent_t*)(src.metaDataPtr);
                 ASSERT(evt->fctId == self->eventFactories[0]->factoryId);
-                self->eventFactories[0]->fcts[evt->kind].registerSignaler(
-                    evt, src, PD_MSG_FIELD_I(slot), PD_MSG_FIELD_IO(properties) & DB_ACCESS_MODE_MASK, true);
-            } else {
-                ASSERT(0); // Cannot have other types of destinations
+                self->eventFactories[0]->fcts[evt->kind].registerWaiter(
+                    evt, dest, PD_MSG_FIELD_I(slot), true);
             }
         }
 

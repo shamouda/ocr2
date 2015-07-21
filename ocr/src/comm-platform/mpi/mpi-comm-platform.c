@@ -299,6 +299,7 @@ u8 probeIncoming(ocrCommPlatform_t *self, int src, int tag, ocrPolicyMsg_t ** ms
     if (available) {
         ASSERT(msg != NULL);
         ASSERT((bufferSize == 0) ? ((tag == RECV_ANY_ID) && (*msg == NULL)) : 1);
+        src = status.MPI_SOURCE; // Using MPI_ANY_SOURCE for the receive might get a different message
         // Look at the size of incoming message
         MPI_Datatype datatype = MPI_BYTE;
         int count;
@@ -499,7 +500,7 @@ u8 MPICommSwitchRunlevel(ocrCommPlatform_t *self, ocrPolicyDomain_t *PD, ocrRunl
         // Nothing
         break;
     case RL_PD_OK:
-        if ((properties & RL_BRING_UP) && RL_IS_FIRST_PHASE_UP(self->pd, RL_PD_OK, phase)) {
+        if ((properties & RL_BRING_UP) && RL_IS_FIRST_PHASE_UP(PD, RL_PD_OK, phase)) {
             //Initialize base
             self->pd = PD;
             //BUG #605 Locations spec: commPlatform and worker have a location, are the supposed to be the same ?
@@ -570,6 +571,8 @@ u8 MPICommSwitchRunlevel(ocrCommPlatform_t *self, ocrPolicyDomain_t *PD, ocrRunl
             mpiComm->outgoing->destruct(mpiComm->outgoing);
             mpiComm->incomingIt->destruct(mpiComm->incomingIt);
             mpiComm->outgoingIt->destruct(mpiComm->outgoingIt);
+            PD->fcts.pdFree(PD, PD->neighbors);
+            PD->neighbors = NULL;
         }
         break;
     case RL_COMPUTE_OK:

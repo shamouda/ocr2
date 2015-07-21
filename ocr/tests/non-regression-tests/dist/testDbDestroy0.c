@@ -9,7 +9,7 @@
 #include "extensions/ocr-affinity.h"
 
 /**
- * DESC: Create consumer EDT that destroys a DB passed as dependence
+ * DESC: Create EDT that destroys a DB passed as dependence without explicit release
  */
 
 #define TYPE_ELEM_DB int
@@ -19,7 +19,7 @@ ocrGuid_t readerEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrGuid_t dbGuid = (ocrGuid_t) depv[0].guid;
     PRINTF("[remote] readerEdt: executing, depends on DB guid 0x%lx \n", dbGuid);
     ocrDbDestroy(dbGuid);
-    ocrShutdown();
+    ocrShutdown(); // This prevents the db from being properly released
     return NULL_GUID;
 }
 

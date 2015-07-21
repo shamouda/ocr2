@@ -9,7 +9,7 @@ fi
 APPS_MAKEFILE=${APPS_MAKEFILE:-${WORKLOAD_SRC}/Makefile}
 
 echo "Building kernel '$1' for architecture '$2'"
-RUN_JENKINS=build make -f ${APPS_MAKEFILE}.$2 all install
+RUN_JENKINS=buildApp make -f ${APPS_MAKEFILE}.$2 all install
 RETURN_CODE=$?
 
 if [ $RETURN_CODE -eq 0 ]; then

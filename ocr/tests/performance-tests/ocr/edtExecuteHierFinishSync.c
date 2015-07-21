@@ -89,7 +89,8 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     timestamp_t * dbPtr;
     ocrGuid_t dbGuid;
     ocrDbCreate(&dbGuid, (void **)&dbPtr, (sizeof(timestamp_t)*2), 0, NULL_GUID, NO_ALLOC);
-    ocrAddDependence(dbGuid, terminateEdtGuid, 1, DB_MODE_CONST);
+    ocrDbRelease(dbGuid);
+    ocrAddDependence(dbGuid, terminateEdtGuid, 1, DB_MODE_RW);
 
     ocrGuid_t oEvtGuid;
     ocrGuid_t finishEdtTemplateGuid;
@@ -99,7 +100,6 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
                  0, NULL, 1, NULL_GUID,  EDT_PROP_FINISH, NULL_GUID, &oEvtGuid);
 
     ocrAddDependence(oEvtGuid, terminateEdtGuid, 0, DB_MODE_CONST);
-    ocrAddDependence(dbGuid, finishEdtGuid, 0, DB_MODE_CONST);
-
+    ocrAddDependence(dbGuid, finishEdtGuid, 0, DB_MODE_RW);
     return NULL_GUID;
 }

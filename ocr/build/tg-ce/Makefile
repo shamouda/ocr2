@@ -58,4 +58,5 @@ all: static
 .PHONY: debug
 debug: debug-static
 
+
 include ../common.mk

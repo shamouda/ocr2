@@ -425,6 +425,25 @@ BASE_EXES         := $(firstword $(dir $(INSTALL_EXES)))
 INSTALLED_CONFIGS := $(addprefix $(OCR_INSTALL)/config/, $(MACHINE_CONFIGS))
 INSTALLED_INCS    := $(addprefix $(OCR_INSTALL)/include/, $(INC_FILES))
 
+# Special include files for tg-ce and tg-xe
+# This is a bit ugly but putting this directly in the TG makefiles
+# means changing a lot of things. This is required for Jenkins
+# as the build directory is no longer available when the app
+# is building but RMDKRNL still needs rmd-bin-files.h
+ifeq ($(OCR_TYPE), tg-xe)
+INSTALLED_INCS    += $(OCR_INSTALL)/include/rmd-bin-files.h
+$(OCR_INSTALL)/include/rmd-bin-files.h: $(OCR_BUILD)/rmd-bin-files.h
+	@$(RM) -f $(OCR_INSTALL)/include/rmd-bin-files.h
+	@$(CP) $(OCR_BUILD)/rmd-bin-files.h $(OCR_INSTALL)/include/
+endif
+
+ifeq ($(OCR_TYPE), tg-ce)
+INSTALLED_INCS    += $(OCR_INSTALL)/include/rmd-bin-files.h
+$(OCR_INSTALL)/include/rmd-bin-files.h: $(OCR_BUILD)/rmd-bin-files.h
+	@$(RM) -f $(OCR_INSTALL)/include/rmd-bin-files.h
+	@$(CP) $(OCR_BUILD)/rmd-bin-files.h $(OCR_INSTALL)/include/
+endif
+
 $(OCR_INSTALL)/lib/%: $(BASE_LIBS)% | $(OCR_INSTALL)/lib
 	@$(RM) -f $@
 	@$(CP) $< $@

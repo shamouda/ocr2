@@ -119,9 +119,9 @@ ocrGuid_t driverEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
                      1, &i, 2, NULL_GUID, EDT_PROP_NONE, NULL_GUID, &eventGuid);
 
         // Add timer dependence
+        ocrAddDependence(eventGuid, edtWrapupGuid, i, DB_MODE_RW);
         ocrAddDependence(dbTimerGuid, edtGuid, 0, DB_MODE_RW);
         ocrAddDependence(depv[1].guid, edtGuid, 1, DB_MODE_RW);
-        ocrAddDependence(eventGuid, edtWrapupGuid, i, DB_MODE_RW);
     }
     ocrEdtTemplateDestroy(edtCodeTemplateGuid);
     ocrEdtTemplateDestroy(finishTemplateGuid);
