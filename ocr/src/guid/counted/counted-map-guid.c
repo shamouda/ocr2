@@ -70,7 +70,7 @@ u8 countedMapSwitchRunlevel(ocrGuidProvider_t *self, ocrPolicyDomain_t *PD, ocrR
         // Nothing
         break;
     case RL_PD_OK:
-        if ((properties & RL_BRING_UP) && RL_IS_FIRST_PHASE_UP(self->pd, RL_PD_OK, phase)) {
+        if ((properties & RL_BRING_UP) && RL_IS_FIRST_PHASE_UP(PD, RL_PD_OK, phase)) {
             self->pd = PD;
         }
         break;
@@ -91,7 +91,7 @@ u8 countedMapSwitchRunlevel(ocrGuidProvider_t *self, ocrPolicyDomain_t *PD, ocrR
 #else
             deallocFct entryDeallocator = NULL;
 #endif
-            destructHashtable(((ocrGuidProviderCountedMap_t *) self)->guidImplTable, entryDeallocator);
+            destructHashtableBucketLocked(((ocrGuidProviderCountedMap_t *) self)->guidImplTable, entryDeallocator);
         }
         break;
     case RL_GUID_OK:

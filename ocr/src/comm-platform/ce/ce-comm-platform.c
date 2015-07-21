@@ -89,7 +89,7 @@ u8 ceCommCheckSeqIdRecv(ocrCommPlatform_t *self, ocrPolicyMsg_t *msg);
 
 u64 parentOf(u64 location) {
     // XE's parent is its CE
-    if ((location & ID_AGENT_CE) != ID_AGENT_CE)
+    if ((location & ID_AGENT_MASK) != ID_AGENT_CE)
         return ((location & ~ID_AGENT_MASK ) | ID_AGENT_CE);
     else if (BLOCK_FROM_ID(location)) // Non-zero block has zero block as parent
         return (location & ~ID_BLOCK_MASK);

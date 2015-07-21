@@ -37,7 +37,10 @@ u8 ocrEventCreate(ocrGuid_t *guid, ocrEventTypes_t eventType, u16 properties) {
     returnCode = pd->fcts.processMessage(pd, &msg, true);
     if(returnCode == 0) {
         returnCode = PD_MSG_FIELD_O(returnDetail);
-        *guid = (returnCode == 0) ? PD_MSG_FIELD_IO(guid.guid) : NULL_GUID;
+        // Leave the GUID unchanged if the error is OCR_EGUIDEXISTS
+        if(returnCode != OCR_EGUIDEXISTS) {
+            *guid = (returnCode == 0) ? PD_MSG_FIELD_IO(guid.guid) : NULL_GUID;
+        }
     } else {
         *guid = NULL_GUID;
     }

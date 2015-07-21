@@ -312,7 +312,7 @@ Generate a multi report plot:
     ./scripts/plotCoreScalingMultiRun.sh myReport1 myReport2
 
 Generate a daily trend report plot:
-    ./scripts/plotCoreScalingSingleRun.sh myReportMon myReportTue myReportWed
+    ./scripts/plotCoreScalingTrendRun.sh myReportMon myReportTue myReportWed
 
 
 ******************************

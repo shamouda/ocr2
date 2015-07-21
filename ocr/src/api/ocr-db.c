@@ -100,45 +100,52 @@ u8 ocrDbDestroy(ocrGuid_t db) {
     ocrPolicyDomain_t *policy = NULL;
     ocrTask_t *task = NULL;
     getCurrentEnv(&policy, NULL, &task, &msg);
-
-#define PD_MSG (&msg)
-#define PD_TYPE PD_MSG_DB_FREE
-    msg.type = PD_MSG_DB_FREE | PD_MSG_REQUEST;
-    PD_MSG_FIELD_I(guid.guid) = db;
-    PD_MSG_FIELD_I(guid.metaDataPtr) = NULL;
-    PD_MSG_FIELD_I(edt.guid) = task?task->guid:NULL_GUID;
-    PD_MSG_FIELD_I(edt.metaDataPtr) = task;
-    PD_MSG_FIELD_I(properties) = 0;
-    u8 returnCode = policy->fcts.processMessage(policy, &msg, false);
-#undef PD_MSG
-#undef PD_TYPE
-
-    if(task && (returnCode == 0)) {
-        // Here we inform the task that we destroyed (and therefore released) a DB
+    u8 returnCode = OCR_ECANCELED;
+    bool dynRemoved = false;
+    if(task) {
+        // Here we inform the task that we are going to destroy the DB
+        // We check the returnDetail of the operation to find out if the task
+        // was using the datablock or not.
         // This is most likely ALWAYS a local message but let's leave the
         // API as it is for now. It is possible that the EDTs move at some point so
         // just to be safe
 #define PD_MSG (&msg)
 #define PD_TYPE PD_MSG_DEP_DYNREMOVE
         getCurrentEnv(NULL, NULL, NULL, &msg);
-        msg.type = PD_MSG_DEP_DYNREMOVE | PD_MSG_REQUEST;
+        msg.type = PD_MSG_DEP_DYNREMOVE | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
         PD_MSG_FIELD_I(edt.guid) = task->guid;
         PD_MSG_FIELD_I(edt.metaDataPtr) = task;
         PD_MSG_FIELD_I(db.guid) = db;
         PD_MSG_FIELD_I(db.metaDataPtr) = NULL;
         PD_MSG_FIELD_I(properties) = 0;
-        returnCode = policy->fcts.processMessage(policy, &msg, false);
+        returnCode = policy->fcts.processMessage(policy, &msg, true);
         if(returnCode != 0) {
-            DPRINTF(DEBUG_LVL_WARN, "Destroying DB  -> %u; Issue unregistering DB datablock\n", returnCode);
+            DPRINTF(DEBUG_LVL_WARN, "Destroying DB (GUID: 0x%lx) -> %u; Issue unregistering the datablock\n", db, returnCode);
         }
+        dynRemoved = (PD_MSG_FIELD_O(returnDetail)==0);
 #undef PD_MSG
 #undef PD_TYPE
     } else {
-        if (returnCode == 0) {
-            DPRINTF(DEBUG_LVL_WARN, "Destroying DB (GUID: 0x%lx) from outside an EDT ... auto-release will fail\n",
-                    db);
-        }
+        DPRINTF(DEBUG_LVL_WARN, "Destroying DB (GUID: 0x%lx) from outside an EDT ... auto-release will fail\n", db);
     }
+    if (returnCode == 0) {
+#define PD_MSG (&msg)
+#define PD_TYPE PD_MSG_DB_FREE
+        msg.type = PD_MSG_DB_FREE | PD_MSG_REQUEST;
+        PD_MSG_FIELD_I(guid.guid) = db;
+        PD_MSG_FIELD_I(guid.metaDataPtr) = NULL;
+        PD_MSG_FIELD_I(edt.guid) = task?task->guid:NULL_GUID;
+        PD_MSG_FIELD_I(edt.metaDataPtr) = task;
+        // Tell whether or not the task was using the DB. This is useful
+        // to know if the DB actually needs to be released or not.
+        PD_MSG_FIELD_I(properties) = dynRemoved ? 0 : DB_PROP_NO_RELEASE;
+        returnCode = policy->fcts.processMessage(policy, &msg, false);
+#undef PD_MSG
+#undef PD_TYPE
+    } else {
+        DPRINTF(DEBUG_LVL_WARN, "Destroying DB (GUID: 0x%lx) Issue destroying the datablock\n", db);
+    }
+
     DPRINTF_COND_LVL(returnCode, DEBUG_LVL_WARN, DEBUG_LVL_INFO,
                      "EXIT ocrDbDestroy(guid=0x%lx) -> %u\n", db, returnCode);
     RETURN_PROFILE(returnCode);
@@ -178,13 +185,13 @@ u8 ocrDbRelease(ocrGuid_t db) {
 #define PD_MSG (&msg)
 #define PD_TYPE PD_MSG_DEP_DYNREMOVE
         getCurrentEnv(NULL, NULL, NULL, &msg);
-        msg.type = PD_MSG_DEP_DYNREMOVE | PD_MSG_REQUEST;
+        msg.type = PD_MSG_DEP_DYNREMOVE | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
         PD_MSG_FIELD_I(edt.guid) = task->guid;
         PD_MSG_FIELD_I(edt.metaDataPtr) = task;
         PD_MSG_FIELD_I(db.guid) = db;
         PD_MSG_FIELD_I(db.metaDataPtr) = NULL;
         PD_MSG_FIELD_I(properties) = 0;
-        returnCode = policy->fcts.processMessage(policy, &msg, false);
+        returnCode = policy->fcts.processMessage(policy, &msg, true);
         if (returnCode != 0) {
             DPRINTF(DEBUG_LVL_WARN, "Releasing DB  -> %u; Issue unregistering DB datablock\n", returnCode);
         }

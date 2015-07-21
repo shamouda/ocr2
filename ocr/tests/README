@@ -13,7 +13,7 @@ on.
 The following runs all the tests with the exclusion of all test-cases
 mentioned in the 'unstable.x86-mpi-lockableDB' file
 
-    ./ocrTest -unstablefile unstable.x86-mpi-lockableDB
+    ./ocrTests -unstablefile unstable.x86-mpi-lockableDB
 
 The current naming convention is for unstable file is:
 

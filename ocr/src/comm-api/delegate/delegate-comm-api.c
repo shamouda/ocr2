@@ -154,14 +154,14 @@ u8 delegateCommSendMessage(ocrCommApi_t *self, ocrLocation_t target,
     ocrFatGuid_t fatGuid;
     fatGuid.metaDataPtr = handlerDelegate;
     PD_MSG_STACK(giveMsg);
-    getCurrentEnv(NULL, NULL, NULL, &giveMsg);
+    ocrWorker_t *worker = NULL;
+    getCurrentEnv(NULL, &worker, NULL, &giveMsg);
 #define PD_MSG (&giveMsg)
-#define PD_TYPE PD_MSG_COMM_GIVE
-    giveMsg.type = PD_MSG_COMM_GIVE | PD_MSG_REQUEST;
-    PD_MSG_FIELD_IO(guids) = &fatGuid;
-    PD_MSG_FIELD_IO(guidCount) = 1;
-    PD_MSG_FIELD_I(type) = OCR_GUID_COMM;
-    PD_MSG_FIELD_I(properties) = 0;
+#define PD_TYPE PD_MSG_SCHED_NOTIFY
+    giveMsg.type = PD_MSG_SCHED_NOTIFY | PD_MSG_REQUEST;
+    PD_MSG_FIELD_IO(schedArgs).base.seqId = worker->seqId;
+    PD_MSG_FIELD_IO(schedArgs).kind = OCR_SCHED_NOTIFY_COMM_READY;
+    PD_MSG_FIELD_IO(schedArgs).OCR_SCHED_ARG_FIELD(OCR_SCHED_NOTIFY_COMM_READY).guid = fatGuid;
     RESULT_PROPAGATE(pd->fcts.processMessage(pd, &giveMsg, false));
 #undef PD_MSG
 #undef PD_TYPE
@@ -186,15 +186,15 @@ u8 delegateCommPollMessage(ocrCommApi_t *self, ocrMsgHandle_t **handle) {
     ocrFatGuid_t fatGuid;
     fatGuid.metaDataPtr = handle;
     PD_MSG_STACK(takeMsg);
-    getCurrentEnv(NULL, NULL, NULL, &takeMsg);
+    ocrWorker_t *worker = NULL;
+    getCurrentEnv(NULL, &worker, NULL, &takeMsg);
 #define PD_MSG (&takeMsg)
-#define PD_TYPE PD_MSG_COMM_TAKE
-    takeMsg.type = PD_MSG_COMM_TAKE | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
-    PD_MSG_FIELD_IO(guids) = &fatGuid;
-    PD_MSG_FIELD_IO(extra) = 0ULL; // Initialize
-    PD_MSG_FIELD_IO(type) = OCR_GUID_COMM;
-    PD_MSG_FIELD_IO(guidCount) = 1;
-    PD_MSG_FIELD_I(properties) = 0;
+#define PD_TYPE PD_MSG_SCHED_GET_WORK
+    takeMsg.type = PD_MSG_SCHED_GET_WORK | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
+    PD_MSG_FIELD_IO(schedArgs).base.seqId = worker->seqId;
+    PD_MSG_FIELD_IO(schedArgs).kind = OCR_SCHED_WORK_COMM;
+    PD_MSG_FIELD_IO(schedArgs).OCR_SCHED_ARG_FIELD(OCR_SCHED_WORK_COMM).guids = &fatGuid;
+    PD_MSG_FIELD_IO(schedArgs).OCR_SCHED_ARG_FIELD(OCR_SCHED_WORK_COMM).guidCount = 1;
     RESULT_PROPAGATE(pd->fcts.processMessage(pd, &takeMsg, true));
 #undef PD_MSG
 #undef PD_TYPE

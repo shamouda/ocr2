@@ -70,7 +70,7 @@ u8 labeledGuidSwitchRunlevel(ocrGuidProvider_t *self, ocrPolicyDomain_t *PD, ocr
         // Nothing
         break;
     case RL_PD_OK:
-        if ((properties & RL_BRING_UP) && RL_IS_FIRST_PHASE_UP(self->pd, RL_PD_OK, phase)) {
+        if ((properties & RL_BRING_UP) && RL_IS_FIRST_PHASE_UP(PD, RL_PD_OK, phase)) {
             self->pd = PD;
         }
         break;
@@ -228,7 +228,7 @@ u8 labeledGuidCreateGuid(ocrGuidProvider_t* self, ocrFatGuid_t *fguid, u64 size,
     fguid->metaDataPtr = ptr;
 #undef PD_TYPE
     if(properties & GUID_PROP_IS_LABELED) {
-        if((properties & GUID_PROP_CHECK)) {
+        if((properties & GUID_PROP_CHECK) == GUID_PROP_CHECK) {
             // We need to actually check things
             DPRINTF(DEBUG_LVL_VERB, "LabeledGUID: try insert into hash table 0x%lx -> 0x%lx\n", fguid->guid, ptr);
             void *value = hashtableConcBucketLockedTryPut(
@@ -251,7 +251,7 @@ u8 labeledGuidCreateGuid(ocrGuidProvider_t* self, ocrFatGuid_t *fguid, u64 size,
 #undef PD_TYPE
                 return OCR_EGUIDEXISTS;
             }
-        } else if(properties & GUID_PROP_BLOCK) {
+        } else if((properties & GUID_PROP_BLOCK) == GUID_PROP_BLOCK) {
             void* value = NULL;
             DPRINTF(DEBUG_LVL_VERB, "LabeledGUID: force insert into hash table 0x%lx -> 0x%lx\n", fguid->guid, ptr);
             do {

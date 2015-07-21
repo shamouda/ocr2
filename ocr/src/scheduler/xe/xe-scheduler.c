@@ -43,6 +43,34 @@ u8 xeSchedulerGiveComm(ocrScheduler_t *self, u32* count, ocrFatGuid_t* handlers,
     return OCR_ENOSYS;
 }
 
+///////////////////////////////
+//      Scheduler 1.0        //
+///////////////////////////////
+
+u8 xeSchedulerRegisterContext(ocrScheduler_t *self, ocrLocation_t loc, u64 *seqId) {
+    return OCR_ENOTSUP;
+}
+
+u8 xeSchedulerGetWorkInvoke(ocrScheduler_t *self, ocrSchedulerOpArgs_t *opArgs, ocrRuntimeHint_t *hints) {
+    return OCR_ENOTSUP;
+}
+
+u8 xeSchedulerNotifyInvoke(ocrScheduler_t *self, ocrSchedulerOpArgs_t *opArgs, ocrRuntimeHint_t *hints) {
+    return OCR_ENOTSUP;
+}
+
+u8 xeSchedulerTransactInvoke(ocrScheduler_t *self, ocrSchedulerOpArgs_t *opArgs, ocrRuntimeHint_t *hints) {
+    return OCR_ENOTSUP;
+}
+
+u8 xeSchedulerAnalyzeInvoke(ocrScheduler_t *self, ocrSchedulerOpArgs_t *opArgs, ocrRuntimeHint_t *hints) {
+    return OCR_ENOTSUP;
+}
+
+u8 xeSchedulerUpdate(ocrScheduler_t *self, ocrSchedulerOpArgs_t *opArgs) {
+    return OCR_ENOTSUP;
+}
+
 ocrScheduler_t* newSchedulerXe(ocrSchedulerFactory_t * factory, ocrParamList_t *perInstance) {
     ocrScheduler_t* derived = (ocrScheduler_t*) runtimeChunkAlloc(
                                   sizeof(ocrSchedulerXe_t), PERSISTENT_CHUNK);
@@ -73,6 +101,14 @@ ocrSchedulerFactory_t * newOcrSchedulerFactoryXe(ocrParamList_t *perType) {
     base->schedulerFcts.giveEdt = FUNC_ADDR(u8 (*)(ocrScheduler_t*, u32*, ocrFatGuid_t*), xeSchedulerGive);
     base->schedulerFcts.takeComm = FUNC_ADDR(u8 (*)(ocrScheduler_t*, u32*, ocrFatGuid_t*, u32), xeSchedulerTakeComm);
     base->schedulerFcts.giveComm = FUNC_ADDR(u8 (*)(ocrScheduler_t*, u32*, ocrFatGuid_t*, u32), xeSchedulerGiveComm);
+
+    //Scheduler 1.0
+    base->schedulerFcts.registerContext = FUNC_ADDR(u8 (*)(ocrScheduler_t*, ocrLocation_t, u64*), xeSchedulerRegisterContext);
+    base->schedulerFcts.update = FUNC_ADDR(u8 (*)(ocrScheduler_t*, ocrSchedulerOpArgs_t*), xeSchedulerUpdate);
+    base->schedulerFcts.op[OCR_SCHEDULER_OP_GET_WORK].invoke = FUNC_ADDR(u8 (*)(ocrScheduler_t*, ocrSchedulerOpArgs_t*, ocrRuntimeHint_t*), xeSchedulerGetWorkInvoke);
+    base->schedulerFcts.op[OCR_SCHEDULER_OP_NOTIFY].invoke = FUNC_ADDR(u8 (*)(ocrScheduler_t*, ocrSchedulerOpArgs_t*, ocrRuntimeHint_t*), xeSchedulerNotifyInvoke);
+    base->schedulerFcts.op[OCR_SCHEDULER_OP_TRANSACT].invoke = FUNC_ADDR(u8 (*)(ocrScheduler_t*, ocrSchedulerOpArgs_t*, ocrRuntimeHint_t*), xeSchedulerTransactInvoke);
+    base->schedulerFcts.op[OCR_SCHEDULER_OP_ANALYZE].invoke = FUNC_ADDR(u8 (*)(ocrScheduler_t*, ocrSchedulerOpArgs_t*, ocrRuntimeHint_t*), xeSchedulerAnalyzeInvoke);
     return base;
 }
 

@@ -120,10 +120,12 @@ ocrGuid_t driverEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
 #endif
 
 #else /* No CLEAN_UP_ITERATION */
-        nextIterEvt = NULL_GUID;
+        ocrEventCreate(&nextIterEvt, OCR_EVENT_STICKY_T, false);
         ocrGuid_t consEdtGuid;
+        ocrGuid_t doneOnceConsEdtGuid;
         ocrEdtCreate(&consEdtGuid, consEdtTemplateGuid,
-                     0, NULL, FAN_OUT, NULL, EDT_PROP_NONE, NULL_GUID, NULL);
+                     0, NULL, FAN_OUT, NULL, EDT_PROP_NONE, NULL_GUID, &doneOnceConsEdtGuid);
+        ocrAddDependence(doneOnceConsEdtGuid, nextIterEvt, 0, DB_MODE_CONST);
         int i = 0;
         while (i < FAN_OUT) {
 #if TIME_CONSUMER_CREATE

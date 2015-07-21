@@ -34,8 +34,6 @@
 
 #define DEBUG_TYPE POLICY
 
-//#define SCHED_1_0 1
-
 static u8 helperSwitchInert(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, phase_t phase, u32 properties) {
     u64 i = 0;
     u64 maxCount = 0;
@@ -401,7 +399,6 @@ u8 hcPdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
 
                 destroyLocationPlacer(policy);
 
-                // We need to deguidify ourself here
                 PD_MSG_STACK(msg);
                 getCurrentEnv(NULL, NULL, NULL, &msg);
 #define PD_MSG (&msg)
@@ -578,32 +575,26 @@ void hcPolicyDomainDestruct(ocrPolicyDomain_t * policy) {
     // Destroying instances
     u64 i = 0;
     u64 maxCount = 0;
-
     //BUG #583: should transform all these to stop RL_DEALLOCATE
 
     // Note: As soon as worker '0' is stopped; its thread is
     // free to fall-through and continue shutting down the
     // policy domain
 
-    /*
     maxCount = policy->workerCount;
     for(i = 0; i < maxCount; i++) {
-        policy->workers[i]->fcts.stop(policy->workers[i], RL_DEALLOCATE, RL_ACTION_ENTER);
+        policy->workers[i]->fcts.destruct(policy->workers[i]);
     }
 
     maxCount = policy->commApiCount;
     for(i = 0; i < maxCount; i++) {
-        policy->commApis[i]->fcts.stop(policy->commApis[i], RL_DEALLOCATE, RL_ACTION_ENTER);
+        policy->commApis[i]->fcts.destruct(policy->commApis[i]);
     }
-    */
 
     maxCount = policy->schedulerCount;
     for(i = 0; i < maxCount; ++i) {
         policy->schedulers[i]->fcts.destruct(policy->schedulers[i]);
     }
-
-    //BUG #583 Need a scheme to deallocate neighbors
-    //ASSERT(policy->neighbors == NULL);
 
     // Destruct factories
 
@@ -1012,7 +1003,6 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         localDeguidify(self, &(PD_MSG_FIELD_I(edt)));
         ocrDataBlock_t *db = (ocrDataBlock_t*)(PD_MSG_FIELD_IO(guid.metaDataPtr));
         ASSERT(db->fctId == self->dbFactories[0]->factoryId);
-        //BUG #585: db: release is a blocking two-way message to make sure it executed at destination
         PD_MSG_FIELD_O(returnDetail) = self->dbFactories[0]->fcts.release(
             db, PD_MSG_FIELD_I(edt), !!(PD_MSG_FIELD_I(properties) & DB_PROP_RT_ACQUIRE));
 #undef PD_MSG
@@ -1034,7 +1024,7 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         ASSERT(db->fctId == self->dbFactories[0]->factoryId);
         ASSERT(!(msg->type & PD_MSG_REQ_RESPONSE));
         PD_MSG_FIELD_O(returnDetail) = self->dbFactories[0]->fcts.free(
-            db, PD_MSG_FIELD_I(edt), !!(PD_MSG_FIELD_I(properties) & DB_PROP_RT_ACQUIRE));
+            db, PD_MSG_FIELD_I(edt), PD_MSG_FIELD_I(properties));
         if(PD_MSG_FIELD_O(returnDetail)!=0)
             DPRINTF(DEBUG_LVL_WARN, "DB Free failed for guid %lx\n", PD_MSG_FIELD_I(guid));
 #undef PD_MSG
@@ -1128,6 +1118,7 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
                 if(depv[i].guid != UNINITIALIZED_GUID) {
                     // We only add dependences that are not UNINITIALIZED_GUID
                     PD_MSG_STACK(msgAddDep);
+                    getCurrentEnv(NULL, NULL, NULL, &msgAddDep);
                 #undef PD_MSG
                 #undef PD_TYPE
                     //NOTE: Could systematically call DEP_ADD but it's faster to disambiguate
@@ -1425,59 +1416,20 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         break;
     }
 
-    case PD_MSG_COMM_TAKE: {
-        START_PROFILE(pd_hc_Take);
+    case PD_MSG_SCHED_GET_WORK: {
+        START_PROFILE(pd_hc_Sched_Work);
 #define PD_MSG msg
-#define PD_TYPE PD_MSG_COMM_TAKE
-#ifdef SCHED_1_0
-        ASSERT(PD_MSG_FIELD_IO(type) == OCR_GUID_EDT);
-        ASSERT(PD_MSG_FIELD_IO(guidCount) == 1);
-        //This is temporary until we get proper seqId support
-        ocrWorker_t *worker;
-        getCurrentEnv(NULL, &worker, NULL, NULL);
+#define PD_TYPE PD_MSG_SCHED_GET_WORK
+        ocrSchedulerOpWorkArgs_t *taskArgs = &PD_MSG_FIELD_IO(schedArgs);
+        PD_MSG_FIELD_O(returnDetail) =
+            self->schedulers[0]->fcts.op[OCR_SCHEDULER_OP_GET_WORK].invoke(
+                self->schedulers[0], (ocrSchedulerOpArgs_t*)taskArgs, NULL);
 
-        ocrSchedulerObject_t el;
-        el.guid = NULL_GUID;
-        el.kind = OCR_SCHEDULER_OBJECT_EDT;
-        el.fctId = 0;
-
-        ocrSchedulerOpArgs_t opArgs;
-        opArgs.loc = msg->srcLocation;
-        opArgs.contextId = worker->seqId;
-        opArgs.el = &el;
-        opArgs.takeKind = OCR_SCHEDULER_OBJECT_EDT;
-        opArgs.takeCount = PD_MSG_FIELD_IO(guidCount);
-
-        PD_MSG_FIELD_O(returnDetail) = self->schedulers[0]->fcts.op[OCR_SCHEDULER_OP_TAKE].invoke(self->schedulers[0], &opArgs, NULL);
-        PD_MSG_FIELD_IO(guidCount) = el.guid == NULL_GUID ? 0 : 1;
-        if (PD_MSG_FIELD_IO(guidCount) > 0) {
-            PD_MSG_FIELD_IO(guids)[0].guid = el.guid;
-            localDeguidify(self, &(PD_MSG_FIELD_IO(guids)[0]));
-            PD_MSG_FIELD_IO(extra) = (u64)(self->taskFactories[0]->fcts.execute);
+        if (taskArgs->kind == OCR_SCHED_WORK_EDT_USER) {
+            PD_MSG_FIELD_O(factoryId) = 0; //taskHc_id;
+            ocrFatGuid_t *fguid = &(taskArgs->OCR_SCHED_ARG_FIELD(OCR_SCHED_WORK_EDT_USER).edt);
+            localDeguidify(self, fguid);
         }
-#else
-        if (PD_MSG_FIELD_IO(type) == OCR_GUID_EDT) {
-            PD_MSG_FIELD_O(returnDetail) = self->schedulers[0]->fcts.takeEdt(
-                self->schedulers[0], &(PD_MSG_FIELD_IO(guidCount)),
-                PD_MSG_FIELD_IO(guids));
-            ASSERT(PD_MSG_FIELD_O(returnDetail) == 0);
-            if (PD_MSG_FIELD_O(returnDetail) == 0) {
-                // For now, we return the execute function for EDTs
-                PD_MSG_FIELD_IO(extra) = (u64)(self->taskFactories[0]->fcts.execute);
-                // We also consider that the task to be executed is local so we
-                // return it's fully deguidified value (BUG #586: this may need revising)
-                u64 i = 0, maxCount = PD_MSG_FIELD_IO(guidCount);
-                for( ; i < maxCount; ++i) {
-                    localDeguidify(self, &(PD_MSG_FIELD_IO(guids)[i]));
-                }
-            }
-        } else {
-            ASSERT(PD_MSG_FIELD_IO(type) == OCR_GUID_COMM);
-            PD_MSG_FIELD_O(returnDetail) = self->schedulers[0]->fcts.takeComm(
-                self->schedulers[0], &(PD_MSG_FIELD_IO(guidCount)),
-                PD_MSG_FIELD_IO(guids), PD_MSG_FIELD_I(properties));
-        }
-#endif
 #undef PD_MSG
 #undef PD_TYPE
         msg->type &= ~PD_MSG_REQUEST;
@@ -1486,48 +1438,14 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         break;
     }
 
-    case PD_MSG_COMM_GIVE: {
-        START_PROFILE(pd_hc_Give);
+    case PD_MSG_SCHED_NOTIFY: {
+        START_PROFILE(pd_hc_Sched_Notify);
 #define PD_MSG msg
-#define PD_TYPE PD_MSG_COMM_GIVE
-#ifdef SCHED_1_0
-        ASSERT(PD_MSG_FIELD_I(type) == OCR_GUID_EDT);
-        ASSERT(PD_MSG_FIELD_IO(guidCount) == 1);
-        //This is temporary until we get proper seqId support
-        ocrWorker_t *worker;
-        getCurrentEnv(NULL, &worker, NULL, NULL);
-
-        ocrSchedulerObject_t el;
-        el.guid = PD_MSG_FIELD_IO(guids)[0].guid;
-        el.kind = OCR_SCHEDULER_OBJECT_EDT;
-        el.fctId = 0;
-
-        ocrSchedulerOpArgs_t opArgs;
-        opArgs.loc = msg->srcLocation;
-        opArgs.contextId = worker->seqId;
-        opArgs.el = &el;
-        opArgs.takeKind = 0;
-        opArgs.takeCount = 0;
-
-        ocrRuntimeHint_t *rHints = NULL;
-#ifdef ENABLE_HINTS
-        rHints = (ocrRuntimeHint_t*)(*(PD_MSG_FIELD_IO(hints)));
-#endif
-
-        PD_MSG_FIELD_O(returnDetail) = self->schedulers[0]->fcts.op[OCR_SCHEDULER_OP_GIVE].invoke(self->schedulers[0], &opArgs, rHints);
-
-#else
-        if (PD_MSG_FIELD_I(type) == OCR_GUID_EDT) {
-            PD_MSG_FIELD_O(returnDetail) = self->schedulers[0]->fcts.giveEdt(
-                self->schedulers[0], &(PD_MSG_FIELD_IO(guidCount)),
-                PD_MSG_FIELD_IO(guids));
-        } else {
-            ASSERT(PD_MSG_FIELD_I(type) == OCR_GUID_COMM);
-            PD_MSG_FIELD_O(returnDetail) = self->schedulers[0]->fcts.giveComm(
-                self->schedulers[0], &(PD_MSG_FIELD_IO(guidCount)),
-                PD_MSG_FIELD_IO(guids), PD_MSG_FIELD_I(properties));
-        }
-#endif
+#define PD_TYPE PD_MSG_SCHED_NOTIFY
+        ocrSchedulerOpNotifyArgs_t *notifyArgs = &PD_MSG_FIELD_IO(schedArgs);
+        PD_MSG_FIELD_O(returnDetail) =
+            self->schedulers[0]->fcts.op[OCR_SCHEDULER_OP_NOTIFY].invoke(
+                self->schedulers[0], (ocrSchedulerOpArgs_t*)notifyArgs, NULL);
 #undef PD_MSG
 #undef PD_TYPE
         msg->type &= ~PD_MSG_REQUEST;
@@ -1602,6 +1520,8 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             #define PD_TYPE PD_MSG_DEP_ADD
                 PD_MSG_FIELD_O(returnDetail) = returnDetail;
                 RESULT_PROPAGATE(returnCode);
+            #undef PD_MSG
+            #undef PD_TYPE
             }
         } else {
             if(!(srcKind & OCR_GUID_EVENT)) {
@@ -1609,48 +1529,30 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
                                         "expected Event\n", srcKind);
             }
             ASSERT(srcKind & OCR_GUID_EVENT);
+            // We are handling the following dependences (event, event|edt) and do
+            // things differently depending on the type of events:
+            // (non-persistent event, edt)  => REG_SIGNALER (event on edt), then REG_WAITER (edt on event)
+            // (persistent event, edt)      => REG_SIGNALER (event on edt, edt does late registration)
+            // ((any) event, (any) event)   => REG_WAITER
+            //
+            // Are we revealing too much of the underlying implementation here ?
+            //
             bool srcIsNonPersistent = ((srcKind == OCR_GUID_EVENT_ONCE) ||
                                         (srcKind == OCR_GUID_EVENT_LATCH));
             // 'Push' registration when source is non-persistent and/or destination is another event.
-            // NOTE: This code could be made more generic if we could query the src/dst metadata
-            //       to determine the correct mode to use.
-            bool isPushMode = (srcIsNonPersistent || (dstKind & OCR_GUID_EVENT));
-            bool needSignalerReg = 0;
-            if (isPushMode) {
-                //OK if srcKind is at current location
-                PD_MSG_STACK(registerMsg);
-                getCurrentEnv(NULL, NULL, NULL, &registerMsg);
-            #undef PD_MSG
-            #undef PD_TYPE
-            #define PD_MSG (&registerMsg)
-            #define PD_TYPE PD_MSG_DEP_REGWAITER
-                // Registration with non-persistent events is two-way
-                // to enforce message ordering constraints.
-                registerMsg.type = PD_MSG_DEP_REGWAITER | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
-                // Registers destGuid (waiter) onto sourceGuid
-                PD_MSG_FIELD_I(waiter) = dest;
-                PD_MSG_FIELD_I(dest) = src;
-                PD_MSG_FIELD_I(slot) = slot;
-                PD_MSG_FIELD_I(properties) = true; // Specify context is add-dependence
-                u8 returnCode = self->fcts.processMessage(self, &registerMsg, true);
-                u8 returnDetail = (returnCode == 0) ? PD_MSG_FIELD_O(returnDetail) : returnCode;
-                // We should be looking at the returnDetail to determine if we need to call
-                // the signaler too. However, the current implementation requires to do the
-                // signaler registration anyway to be able to record the mode.
-                needSignalerReg = 1;
-            #undef PD_MSG
-            #undef PD_TYPE
-            #define PD_MSG msg
-            #define PD_TYPE PD_MSG_DEP_ADD
-                PD_MSG_FIELD_O(returnDetail) = returnDetail;
-                RESULT_PROPAGATE(returnCode);
-            #undef PD_MSG
-            #undef PD_TYPE
-            }
-            if(!isPushMode || needSignalerReg) {
-                ASSERT_BLOCK_BEGIN(((dstKind == OCR_GUID_EDT) || (dstKind & OCR_GUID_EVENT)))
-                DPRINTF(DEBUG_LVL_WARN, "Attempting to add a dependence to a GUID of type 0x%x, "
-                                        "but expected EDT or Event\n", dstKind);
+            bool needPushMode = (srcIsNonPersistent || (dstKind & OCR_GUID_EVENT));
+            // The registration is always necessary when the destination is an EDT.
+            // It allows to record the mode of the dependence as well as the type of
+            // event the EDT should be expecting.
+            bool needPullMode = !!(dstKind & OCR_GUID_EDT);
+            // NOTE: Important to do the signaler registration before the waiter one
+            // when the dependence is of the form (non-persistent event, edt)
+            // Otherwise there's a race between the once event being destroyed and
+            // the edt processing the registerSignaler call (which may read into the
+            // destroyed event metadata).
+            if(needPullMode) {
+                ASSERT_BLOCK_BEGIN(dstKind & OCR_GUID_EDT);
+                DPRINTF(DEBUG_LVL_WARN, "Runtime error expect REGSIGNALER dest to be an EDT GUID\n");
                 ASSERT_BLOCK_END
                 PD_MSG_STACK(registerMsg);
                 getCurrentEnv(NULL, NULL, NULL, &registerMsg);
@@ -1663,6 +1565,32 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
                 PD_MSG_FIELD_I(dest) = dest;
                 PD_MSG_FIELD_I(slot) = slot;
                 PD_MSG_FIELD_I(mode) = mode;
+                PD_MSG_FIELD_I(properties) = true; // Specify context is add-dependence
+                u8 returnCode = self->fcts.processMessage(self, &registerMsg, true);
+                u8 returnDetail = (returnCode == 0) ? PD_MSG_FIELD_O(returnDetail) : returnCode;
+            #undef PD_MSG
+            #undef PD_TYPE
+            #define PD_MSG msg
+            #define PD_TYPE PD_MSG_DEP_ADD
+                PD_MSG_FIELD_O(returnDetail) = returnDetail;
+                RESULT_PROPAGATE(returnCode);
+            #undef PD_MSG
+            #undef PD_TYPE
+            }
+
+            if (needPushMode) {
+                //OK if srcKind is at current location
+                PD_MSG_STACK(registerMsg);
+                getCurrentEnv(NULL, NULL, NULL, &registerMsg);
+            #define PD_MSG (&registerMsg)
+            #define PD_TYPE PD_MSG_DEP_REGWAITER
+                // Registration with non-persistent events is two-way
+                // to enforce message ordering constraints.
+                registerMsg.type = PD_MSG_DEP_REGWAITER | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
+                // Registers destGuid (waiter) onto sourceGuid
+                PD_MSG_FIELD_I(waiter) = dest;
+                PD_MSG_FIELD_I(dest) = src;
+                PD_MSG_FIELD_I(slot) = slot;
                 PD_MSG_FIELD_I(properties) = true; // Specify context is add-dependence
                 u8 returnCode = self->fcts.processMessage(self, &registerMsg, true);
                 u8 returnDetail = (returnCode == 0) ? PD_MSG_FIELD_O(returnDetail) : returnCode;
@@ -1852,20 +1780,17 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         getCurrentEnv(NULL, NULL, &curTask, NULL);
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_DEP_DYNREMOVE
-        // Check to make sure that the EDT is only doing this to
-        // itself
+        // Check to make sure that the EDT is only doing this to itself
         // Also, this should only happen when there is an actual EDT
-        if((curTask==NULL) || (curTask->guid != PD_MSG_FIELD_I(edt.guid)))
+        if ((curTask==NULL) || (curTask->guid != PD_MSG_FIELD_I(edt.guid)))
             DPRINTF(DEBUG_LVL_WARN, "Attempting to notify a missing/different EDT, GUID=%lx\n", PD_MSG_FIELD_I(edt.guid));
-        ASSERT(curTask &&
-               curTask->guid == PD_MSG_FIELD_I(edt.guid));
-
+        ASSERT(curTask && curTask->guid == PD_MSG_FIELD_I(edt.guid));
         ASSERT(curTask->fctId == self->taskFactories[0]->factoryId);
         PD_MSG_FIELD_O(returnDetail) = self->taskFactories[0]->fcts.notifyDbRelease(curTask, PD_MSG_FIELD_I(db));
 #undef PD_MSG
 #undef PD_TYPE
         msg->type &= ~PD_MSG_REQUEST;
-        // msg->type |= PD_MSG_RESPONSE;
+        msg->type |= PD_MSG_RESPONSE;
         EXIT_PROFILE;
         break;
     }
@@ -1894,9 +1819,9 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         START_PROFILE(pd_hc_Register);
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_MGT_REGISTER
-        u64 contextId = ((u64)PD_MSG_FIELD_I(loc));
+        u64 contextId = 0;
         PD_MSG_FIELD_O(returnDetail) = self->schedulers[0]->fcts.registerContext(
-                self->schedulers[0], contextId, msg->srcLocation);
+                self->schedulers[0], msg->srcLocation, &contextId);
         PD_MSG_FIELD_O(seqId) = contextId;
 #undef PD_MSG
 #undef PD_TYPE
@@ -2232,7 +2157,6 @@ void initializePolicyDomainHc(ocrPolicyDomainFactory_t * factory, ocrPolicyDomai
     initializePolicyDomainOcr(factory, self, perInstance);
 
     ocrPolicyDomainHc_t* derived = (ocrPolicyDomainHc_t*) self;
-    derived->rank = ((paramListPolicyDomainHcInst_t*)perInstance)->rank;
     derived->rlSwitch.legacySecondStart = false;
 }
 
