@@ -31,7 +31,7 @@
 
 // Change here if you want a different initial number
 // of waiters and signalers
-#define INIT_WAITER_COUNT 1
+#define INIT_WAITER_COUNT 4
 #define INIT_SIGNALER_COUNT 0
 
 #define DEBUG_TYPE EVENT
@@ -102,7 +102,7 @@ u8 destructEventHc(ocrEvent_t *base) {
     PD_MSG_FIELD_I(guid) = event->waitersDb;
     PD_MSG_FIELD_I(edt.guid) = curTask ? curTask->guid : NULL_GUID;
     PD_MSG_FIELD_I(edt.metaDataPtr) = curTask;
-    PD_MSG_FIELD_I(properties) = DB_PROP_RT_ACQUIRE;
+    PD_MSG_FIELD_I(properties) = DB_PROP_RT_ACQUIRE | DB_PROP_NO_RELEASE;
     RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, false));
 
     /* Signalers not used
