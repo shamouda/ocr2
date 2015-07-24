@@ -625,10 +625,7 @@ s32 populate_inst(ocrParamList_t **inst_param, void **instance, s32 *type_counts
             switch (mytype) {
 #ifdef ENABLE_MEM_PLATFORM_FSIM
             case memPlatformFsim_id: {
-                extern u64 end_marker;
                 ALLOC_PARAM_LIST(inst_param[j], paramListMemPlatformFsim_t);
-                ((paramListMemPlatformFsim_t *)inst_param[j])->start = end_marker;
-                ((paramListMemPlatformInst_t *)inst_param[j])->size = end_marker;
                 break;
             }
 #endif
@@ -643,9 +640,8 @@ s32 populate_inst(ocrParamList_t **inst_param, void **instance, s32 *type_counts
 #ifdef ENABLE_MEM_PLATFORM_FSIM
             // Adjust the start and size according to size of ELF binary
             // BUG #594
-            ((paramListMemPlatformInst_t *)inst_param[j])->size -= ((paramListMemPlatformFsim_t*)inst_param[j])->start;
             snprintf(key, MAX_KEY_SZ, "%s:%s", secname, "start");
-            ((paramListMemPlatformFsim_t*)inst_param[j])->start += (u64)iniparser_getlonglong(dict, key, 0);
+            ((paramListMemPlatformFsim_t*)inst_param[j])->start = (u64)iniparser_getlonglong(dict, key, 0);
 #endif
 
             instance[j] = (void *)((ocrMemPlatformFactory_t *)factory)->instantiate(factory, inst_param[j]);
