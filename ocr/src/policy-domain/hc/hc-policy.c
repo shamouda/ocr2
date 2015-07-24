@@ -1375,9 +1375,6 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
 #ifdef OCR_ENABLE_STATISTICS
                 ASSERT(false && "no statistics support in distributed edt templates");
 #endif
-#ifdef OCR_ENABLE_EDT_NAMING
-                ASSERT(false && "no serialization of edt template string");
-#endif
                 PD_MSG_FIELD_O(size) = sizeof(ocrTaskTemplateHc_t) + (sizeof(u64) * OCR_HINT_COUNT_EDT_HC);
                 PD_MSG_FIELD_O(returnDetail) = 0;
                 break;
