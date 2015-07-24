@@ -6,7 +6,8 @@
 
 // BUG #145:  The prescription needs to be derived from the affinity, and needs to default to something sensible.
 // All this prescription logic needs to be moved out of the PD, into an abstract allocator level.
-#define PRESCRIPTION 0xFEDCBA9876544321LL   // L1 remnant, L2 slice, L2 remnant, L3 slice (twice), L3 remnant, remaining levels each slice-then-remnant.
+//#define PRESCRIPTION 0xFEDCBA9876544321LL   // L1 remnant, L2 slice, L2 remnant, L3 slice (twice), L3 remnant, remaining levels each slice-then-remnant.
+#define PRESCRIPTION 0xECA86420LL   // L1,L2,...
 #define PRESCRIPTION_HINT_MASK 0x1
 #define PRESCRIPTION_HINT_NUMBITS 1
 #define PRESCRIPTION_LEVEL_MASK 0x7
@@ -348,6 +349,7 @@ static void* allocateDatablock (ocrPolicyDomain_t *self,
                                 u64                size,
                                 u64                engineIndex,
                                 u64                prescription,
+                                u64                preferredLevel,
                                 u64               *allocatorIndexReturn) {
     void* result;
     u64 allocatorHints;  // Allocator hint
@@ -363,13 +365,17 @@ static void* allocateDatablock (ocrPolicyDomain_t *self,
         prescription >>= PRESCRIPTION_HINT_NUMBITS;
         levelIndex = prescription & PRESCRIPTION_LEVEL_MASK;
         prescription >>= PRESCRIPTION_LEVEL_NUMBITS;
+        if (levelIndex < preferredLevel) {       // don't try if less than preferredLevel
+            DPRINTF(DEBUG_LVL_VVERB, "allocateDatablock skips level %ld\n", levelIndex);
+            continue;
+        }
         allocatorIndex = self->allocatorIndexLookup[engineIndex*NUM_MEM_LEVELS_SUPPORTED+levelIndex]; // Lookup index of allocator to use for requesting engine (aka agent) at prescribed memory hierarchy level.
         if ((allocatorIndex < 0) ||
             (allocatorIndex >= self->allocatorCount) ||
             (self->allocators[allocatorIndex] == NULL)) continue;  // Skip this allocator if it doesn't exist.
         result = self->allocators[allocatorIndex]->fcts.allocate(self->allocators[allocatorIndex], size, allocatorHints);
         if (result) {
-            DPRINTF (DEBUG_LVL_VVERB, "Success allocationg %5ld-byte block to allocator %ld (level %ld) for engine %ld (%2ld) -- 0x%lx\n",
+            DPRINTF (DEBUG_LVL_VVERB, "Success allocation %5ld-byte block to allocator %ld (level %ld) for engine %ld (%2ld) -- 0x%lx\n",
             (u64) size, (u64) allocatorIndex, (u64) levelIndex, (u64) engineIndex, (u64) self->myLocation, (u64) (((u64*) result)[-1]));
             *allocatorIndexReturn = allocatorIndex;
             return result;
@@ -391,8 +397,22 @@ static u8 ceAllocateDb(ocrPolicyDomain_t *self, ocrFatGuid_t *guid, void** ptr, 
     // eventually be eliminated here and instead, above this level, processed into the "prescription"
     // variable, which has been added to this argument list.  The prescription indicates an order in
     // which to attempt to allocate the block to a pool.
+
     u64 idx;
-    void* result = allocateDatablock (self, size, engineIndex, prescription, &idx);
+    void* result;
+    int preferredLevel = 0;
+    if ((u64)affinity.guid > 0 && (u64)affinity.guid <= NUM_MEM_LEVELS_SUPPORTED) {
+        preferredLevel = (u64)affinity.guid;
+        DPRINTF(DEBUG_LVL_WARN, "ceAllocateDb affinity.guid %llx  .metaDataPtr %p\n", affinity.guid, affinity.metaDataPtr);
+        DPRINTF(DEBUG_LVL_WARN, "ceAllocateDb preferred %ld\n", preferredLevel);
+        result = allocateDatablock (self, size, engineIndex, prescription, preferredLevel, &idx);
+        if (!result) {
+            DPRINTF(DEBUG_LVL_WARN, "ceAllocateDb ignores preferredLevel hint to be successful in alloc%ld\n", preferredLevel);
+            result = allocateDatablock (self, size, engineIndex, prescription, 0, &idx);
+        }
+    } else {
+        result = allocateDatablock (self, size, engineIndex, prescription, 0, &idx);
+    }
 
     if (result) {
         ocrDataBlock_t *block = self->dbFactories[0]->instantiate(
@@ -418,7 +438,7 @@ static u8 ceMemAlloc(ocrPolicyDomain_t *self, ocrFatGuid_t* allocator, u64 size,
     void* result;
     u64 idx;
     ASSERT (memType == GUID_MEMTYPE || memType == DB_MEMTYPE);
-    result = allocateDatablock (self, size, engineIndex, prescription, &idx);
+    result = allocateDatablock (self, size, engineIndex, prescription, 0, &idx);
 
     if (result) {
         *ptr = result;

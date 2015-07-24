@@ -200,6 +200,7 @@ static void localDeguidify(ocrPolicyDomain_t *self, ocrFatGuid_t *guid) {
 }
 
 
+#define NUM_MEM_LEVELS_SUPPORTED 8
 
 static u8 xeAllocateDb(ocrPolicyDomain_t *self, ocrFatGuid_t *guid, void** ptr, u64 size,
                        u32 properties, u64 engineIndex,
@@ -214,6 +215,18 @@ static u8 xeAllocateDb(ocrPolicyDomain_t *self, ocrFatGuid_t *guid, void** ptr, 
     // variable, which has been added to this argument list.  The prescription indicates an order in
     // which to attempt to allocate the block to a pool.
     u64 idx = 0;
+//    void* result = allocateDatablock (self, size, engineIndex, prescription, &idx);
+
+    int preferredLevel = 0;
+    if ((u64)affinity.guid > 0 && (u64)affinity.guid <= NUM_MEM_LEVELS_SUPPORTED) {
+        preferredLevel = (u64)affinity.guid;
+//        DPRINTF(DEBUG_LVL_WARN, "xeAllocateDb affinity.guid %llx  .metaDataPtr %p\n", affinity.guid, affinity.metaDataPtr);
+//        DPRINTF(DEBUG_LVL_WARN, "xeAllocateDb preferred %ld\n", preferredLevel);
+        if (preferredLevel >= 2) {
+            return OCR_ENOMEM;
+        }
+    }
+
     void* result;
     s8 allocatorIndex = 0;
     u64 allocatorHints = 0;
