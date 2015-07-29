@@ -23,7 +23,7 @@ OBJDIR := $(OCR_BUILD)/objs
 #
 # Default machine configuration
 #
-DEFAULT_CONFIG ?= mach-common-4w.cfg
+DEFAULT_CONFIG ?= jenkins-common-8w-lockableDB.cfg
 
 ####################################################
 # User Configurable settings
