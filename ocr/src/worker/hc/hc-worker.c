@@ -363,7 +363,20 @@ u8 hcWorkerSwitchRunlevel(ocrWorker_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_
                         ((ocrWorkerHc_t*) self)->legacySecondStart = true;
                     }
 
-                    if (!(properties & RL_LEGACY)) {
+                    if (properties & RL_LEGACY) {
+                        PD_MSG_STACK(msg);
+                        msg.srcLocation = PD->myLocation;
+                        msg.destLocation = PD->myLocation;
+                    #define PD_MSG (&msg)
+                    #define PD_TYPE PD_MSG_MGT_REGISTER
+                        msg.type = PD_MSG_MGT_REGISTER | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
+                        // The original 'id' value is read from the CFG file
+                        PD_MSG_FIELD_I(properties) = 0;
+                        PD->fcts.processMessage(PD, &msg, true);
+                        ASSERT(self->seqId == PD_MSG_FIELD_O(seqId));
+                    #undef PD_MSG
+                    #undef PD_TYPE
+                    } else {
                         workerLoop(self);
                     }
                 }

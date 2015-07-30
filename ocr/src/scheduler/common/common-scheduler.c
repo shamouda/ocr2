@@ -157,8 +157,13 @@ u8 commonSchedulerGiveComm(ocrScheduler_t *self, u32* count, ocrFatGuid_t* handl
 }
 
 u8 commonSchedulerMonitorProgress(ocrScheduler_t *self, ocrMonitorProgress_t type, void * monitoree) {
-    ASSERT(0); //old scheduler interfaces not supported
-    return OCR_ENOTSUP;
+#ifdef ENABLE_SCHEDULER_BLOCKING_SUPPORT
+    // Current implementation assumes the worker is blocked.
+    ocrWorker_t * worker;
+    getCurrentEnv(NULL, &worker, NULL, NULL);
+    handleWorkerNotProgressing(worker);
+#endif
+    return 0;
 }
 
 ///////////////////////////////

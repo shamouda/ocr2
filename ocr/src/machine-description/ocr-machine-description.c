@@ -882,11 +882,11 @@ s32 populate_inst(ocrParamList_t **inst_param, void **instance, s32 *type_counts
             schedulerType_t mytype = -1;
             TO_ENUM (mytype, inststr, schedulerType_t, scheduler_types, schedulerMax_id);
             switch (mytype) {
-#if defined(ENABLE_SCHEDULER_HC) || defined(ENABLE_SCHEDULER_HC_COMM_DELEGATE)
-            case schedulerHc_id:
-#if defined(ENABLE_SCHEDULER_HC_COMM_DELEGATE)
+#ifdef ENABLE_SCHEDULER_HC_COMM_DELEGATE
             case schedulerHcCommDelegate_id:
 #endif
+#if defined(ENABLE_SCHEDULER_HC) || defined(ENABLE_SCHEDULER_HC_COMM_DELEGATE)
+            case schedulerHc_id:
             {
                 ALLOC_PARAM_LIST(inst_param[j], paramListSchedulerHcInst_t);
                 snprintf(key, MAX_KEY_SZ, "%s:%s", secname, "workeridfirst");
