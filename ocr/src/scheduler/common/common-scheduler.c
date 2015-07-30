@@ -12,7 +12,6 @@
 #include "ocr-policy-domain.h"
 #include "ocr-runtime-types.h"
 #include "ocr-sysboot.h"
-#include "ocr-workpile.h"
 #include "scheduler/common/common-scheduler.h"
 
 /******************************************************/
@@ -21,21 +20,10 @@
 
 void commonSchedulerDestruct(ocrScheduler_t * self) {
     u64 i;
-    // Destruct the workpiles
-    u64 count = self->workpileCount;
-    for(i = 0; i < count; ++i) {
-        self->workpiles[i]->fcts.destruct(self->workpiles[i]);
-    }
 
     // Destruct the root scheduler object
-    for(i = 0; i < self->pd->schedulerObjectFactoryCount; ++i) {
-        ocrSchedulerObjectFactory_t *fact = self->pd->schedulerObjectFactories[i];
-        if (IS_SCHEDULER_OBJECT_TYPE_ROOT(fact->kind)) {
-            ocrSchedulerObjectRootFactory_t *rootFact = (ocrSchedulerObjectRootFactory_t*)fact;
-            rootFact->fcts.destruct(self->rootObj);
-            break;
-        }
-    }
+    ocrSchedulerObjectRootFactory_t *rootFact = (ocrSchedulerObjectRootFactory_t*)self->pd->schedulerObjectFactories[self->rootObj->fctId];
+    rootFact->fcts.destruct(self->rootObj);
 
     //scheduler heuristics
     u64 schedulerHeuristicCount = self->schedulerHeuristicCount;
@@ -43,7 +31,6 @@ void commonSchedulerDestruct(ocrScheduler_t * self) {
         self->schedulerHeuristics[i]->fcts.destruct(self->schedulerHeuristics[i]);
     }
 
-    runtimeChunkFree((u64)(self->workpiles), PERSISTENT_CHUNK);
     runtimeChunkFree((u64)(self->schedulerHeuristics), PERSISTENT_CHUNK);
     runtimeChunkFree((u64)self, PERSISTENT_CHUNK);
 }
@@ -71,20 +58,8 @@ u8 commonSchedulerSwitchRunlevel(ocrScheduler_t *self, ocrPolicyDomain_t *PD, oc
 
     if(properties & RL_BRING_UP) {
         // Take care of all other sub-objects
-        for(i = 0; i < self->workpileCount; ++i) {
-            toReturn |= self->workpiles[i]->fcts.switchRunlevel(
-                self->workpiles[i], PD, runlevel, phase, properties, NULL, 0);
-        }
-
-        for(i = 0; i < PD->schedulerObjectFactoryCount; ++i) {
-            ocrSchedulerObjectFactory_t *fact = PD->schedulerObjectFactories[i];
-            if (IS_SCHEDULER_OBJECT_TYPE_ROOT(fact->kind)) {
-                ocrSchedulerObjectRootFactory_t *rootFact = (ocrSchedulerObjectRootFactory_t*)fact;
-                toReturn |= rootFact->fcts.switchRunlevel(self->rootObj, PD, runlevel, phase,
-                                                          properties, NULL, 0);
-                break;
-            }
-        }
+        ocrSchedulerObjectRootFactory_t *rootFact = (ocrSchedulerObjectRootFactory_t*)PD->schedulerObjectFactories[self->rootObj->fctId];
+        toReturn |= rootFact->fcts.switchRunlevel(self->rootObj, PD, runlevel, phase, properties, NULL, 0);
 
         for(i = 0; i < self->schedulerHeuristicCount; ++i) {
             toReturn |= self->schedulerHeuristics[i]->fcts.switchRunlevel(
@@ -150,19 +125,8 @@ u8 commonSchedulerSwitchRunlevel(ocrScheduler_t *self, ocrPolicyDomain_t *PD, oc
 
     if(properties & RL_TEAR_DOWN) {
         // Take care of all other sub-objects
-        for(i = 0; i < self->workpileCount; ++i) {
-            toReturn |= self->workpiles[i]->fcts.switchRunlevel(
-                self->workpiles[i], PD, runlevel, phase, properties, NULL, 0);
-        }
-        for(i = 0; i < PD->schedulerObjectFactoryCount; ++i) {
-            ocrSchedulerObjectFactory_t *fact = PD->schedulerObjectFactories[i];
-            if (IS_SCHEDULER_OBJECT_TYPE_ROOT(fact->kind)) {
-                ocrSchedulerObjectRootFactory_t *rootFact = (ocrSchedulerObjectRootFactory_t*)fact;
-                toReturn |= rootFact->fcts.switchRunlevel(self->rootObj, PD, runlevel, phase,
-                                                          properties, NULL, 0);
-                break;
-            }
-        }
+        ocrSchedulerObjectRootFactory_t *rootFact = (ocrSchedulerObjectRootFactory_t*)PD->schedulerObjectFactories[self->rootObj->fctId];
+        toReturn |= rootFact->fcts.switchRunlevel(self->rootObj, PD, runlevel, phase, properties, NULL, 0);
 
         for(i = 0; i < self->schedulerHeuristicCount; ++i) {
             toReturn |= self->schedulerHeuristics[i]->fcts.switchRunlevel(
