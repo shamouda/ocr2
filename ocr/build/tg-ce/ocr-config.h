@@ -38,10 +38,11 @@
 #define ENABLE_COMP_TARGET_PASSTHROUGH
 
 // Scheduler Objects
-#define ENABLE_SCHEDULER_OBJECT_NULL
+#define ENABLE_SCHEDULER_OBJECT_WST
+#define ENABLE_SCHEDULER_OBJECT_DEQ
 
 // Scheduler Heuristic
-#define ENABLE_SCHEDULER_HEURISTIC_NULL
+#define ENABLE_SCHEDULER_HEURISTIC_CE
 
 // Datablock
 #define ENABLE_DATABLOCK_REGULAR
@@ -54,6 +55,9 @@
 
 // GUID provider
 #define ENABLE_GUID_PTR
+
+// Hints
+#define ENABLE_HINTS
 
 // HAL layer to use
 #define HAL_FSIM_CE

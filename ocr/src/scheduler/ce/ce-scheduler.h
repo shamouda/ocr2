@@ -32,6 +32,7 @@ typedef struct {
 typedef struct {
     ocrScheduler_t scheduler;
     ceWorkpileIterator_t * stealIterators;
+    u32 contextCounter;
 } ocrSchedulerCe_t;
 
 typedef struct _paramListSchedulerCeInst_t {

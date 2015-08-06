@@ -108,7 +108,7 @@ void hcSchedulerHeuristicDestruct(ocrSchedulerHeuristic_t * self) {
     runtimeChunkFree((u64)self, PERSISTENT_CHUNK);
 }
 
-u8 hcSchedulerHeuristicUpdate(ocrSchedulerHeuristic_t *self, ocrSchedulerObject_t *schedulerObject, u32 properties) {
+u8 hcSchedulerHeuristicUpdate(ocrSchedulerHeuristic_t *self, u32 properties) {
     return OCR_ENOTSUP;
 }
 

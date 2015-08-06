@@ -26,7 +26,8 @@ typedef struct _paramListSchedulerObjectDeq_t {
 
 typedef struct _ocrSchedulerObjectDeq_t {
     ocrSchedulerObject_t base;
-    deque_t *deque;           /* the deque */
+    deque_t *deque;             // the deque
+    ocrDequeType_t dequeType;   // type of deque
 } ocrSchedulerObjectDeq_t;
 
 /****************************************************/

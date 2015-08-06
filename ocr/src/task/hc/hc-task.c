@@ -45,6 +45,7 @@ extern struct _dbWeightStruct gDbWeights[] __attribute__((weak));
 u64 ocrHintPropTaskHc[] = {
 #ifdef ENABLE_HINTS
     OCR_HINT_EDT_PRIORITY,
+    OCR_HINT_EDT_SLOT_MAX_ACCESS,
     OCR_HINT_EDT_AFFINITY,
     OCR_HINT_EDT_PHASE
 #endif
@@ -728,8 +729,10 @@ u8 newTaskHc(ocrTaskFactory_t* factory, ocrFatGuid_t * edtGuid, ocrFatGuid_t edt
         edt->hint.hintVal = NULL;
     } else {
         base->flags |= OCR_TASK_FLAG_USES_HINTS;
-        OCR_RUNTIME_HINT_MASK_INIT(edt->hint.hintMask, OCR_HINT_EDT_T, factory->factoryId);
+        ocrTaskTemplateHc_t *derived = (ocrTaskTemplateHc_t*)(edtTemplate.metaDataPtr);
+        edt->hint.hintMask = derived->hint.hintMask;
         edt->hint.hintVal = (u64*)((u64)base + sizeof(ocrTaskHc_t) + paramc*sizeof(u64) + depc*sizeof(regNode_t));
+        for (i = 0; i < hintc; i++) edt->hint.hintVal[i] = derived->hint.hintVal[i]; //copy the hints from the template
     }
 
     if (schedc != 0) {

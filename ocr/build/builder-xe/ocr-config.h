@@ -57,6 +57,9 @@
 // GUID provider
 #define ENABLE_GUID_PTR
 
+// Hints
+#define ENABLE_HINTS
+
 // HAL layer to use
 #define HAL_X86_64
 

@@ -21,7 +21,7 @@
 
 #ifdef ENABLE_HINTS
 /**< The number of hint properties supported by this implementation */
-#define OCR_HINT_COUNT_EDT_HC   3
+#define OCR_HINT_COUNT_EDT_HC   4
 #else
 #define OCR_HINT_COUNT_EDT_HC   0
 #endif

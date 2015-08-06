@@ -58,7 +58,7 @@ u8 sharedSwitchRunlevel(ocrMemTarget_t *self, ocrPolicyDomain_t *PD, ocrRunlevel
     ASSERT(self->memoryCount == 1);
     if(properties & RL_BRING_UP) {
         toReturn |= self->memories[0]->fcts.switchRunlevel(
-            self->memories[0], PD, runlevel, phase, properties, NULL, 0);
+            self->memories[0], PD, runlevel, phase, properties, NULL, self->level);
     }
     switch(runlevel) {
     case RL_CONFIG_PARSE:
