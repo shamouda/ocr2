@@ -178,6 +178,21 @@ typedef struct _ocrSchedulerOpAnalyzeArgs_t {
 } ocrSchedulerOpAnalyzeArgs_t;
 
 /****************************************************/
+/* OCR SCHEDULER PROPERTIES                         */
+/****************************************************/
+
+#define OCR_SCHEDULER_GET_WORK_PROP_NONE                0x0
+#define OCR_SCHEDULER_GET_WORK_PROP_REQUEST             0x1
+#define OCR_SCHEDULER_GET_WORK_PROP_REQUEST_PENDING     0x2
+#define OCR_SCHEDULER_GET_WORK_PROP_RESPONSE_WORK_SEND  0x3
+#define OCR_SCHEDULER_GET_WORK_PROP_RESPONSE_WORK_RECV  0x4
+#define OCR_SCHEDULER_GET_WORK_PROP_RESPONSE_SHUTDOWN   0x5
+
+#define OCR_SCHEDULER_UPDATE_PROP_NONE                  0x0
+#define OCR_SCHEDULER_UPDATE_PROP_IDLE                  0x1
+#define OCR_SCHEDULER_UPDATE_PROP_SHUTDOWN              0x2
+
+/****************************************************/
 /* OCR SCHEDULER                                    */
 /****************************************************/
 
@@ -333,11 +348,11 @@ typedef struct _ocrSchedulerFcts_t {
      * This works as a proactive monitoring hook
      *
      * @param self[in]          Pointer to this scheduler
-     * @param opArgs[in]        Info about scheduler update
+     * @param properties[in]    Properties of this update
      *
      * @return 0 on success and a non-zero value on failure
      */
-    u8 (*update)(struct _ocrScheduler_t *self, ocrSchedulerOpArgs_t *opArgs);
+    u8 (*update)(struct _ocrScheduler_t *self, u32 properties);
 
     /**
      * @brief Array of functions for scheduler ops

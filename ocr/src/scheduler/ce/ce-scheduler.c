@@ -13,7 +13,9 @@
 #include "ocr-runtime-types.h"
 #include "ocr-sysboot.h"
 #include "ocr-workpile.h"
+#include "policy-domain/ce/ce-policy.h"
 #include "scheduler/ce/ce-scheduler.h"
+#include "rmd-map.h"
 
 // BUG #619: This relies on data in ce-worker (its ID to do the mapping)
 // This is non-portable (CE scheduler does not work with non
@@ -21,6 +23,11 @@
 #include "worker/ce/ce-worker.h" // NON PORTABLE FOR NOW
 
 #define DEBUG_TYPE SCHEDULER
+
+#define SCHED10 1
+#if !SCHED10
+#pragma message "Scheduler framework is v0.9"
+#endif
 
 /******************************************************/
 /* Support structures                                 */
@@ -135,7 +142,7 @@ u8 ceSchedulerSwitchRunlevel(ocrScheduler_t *self, ocrPolicyDomain_t *PD, ocrRun
     case RL_PD_OK:
         if(properties & RL_BRING_UP) {
             self->pd = PD;
-            self->contextCount = self->pd->workerCount;
+            self->contextCount = ((ocrPolicyDomainCe_t*)PD)->xeCount + PD->neighborCount;
         }
         break;
     case RL_MEMORY_OK:
@@ -167,6 +174,22 @@ u8 ceSchedulerSwitchRunlevel(ocrScheduler_t *self, ocrPolicyDomain_t *PD, ocrRun
             if(RL_IS_FIRST_PHASE_UP(PD, RL_COMPUTE_OK, phase)) {
                 // We get a GUID for ourself
                 guidify(self->pd, (u64)self, &(self->fguid), OCR_GUID_ALLOCATOR);
+                //Register all XEs and neighbors
+                u32 i;
+                u64 contextId;
+                u32 myUnit = UNIT_FROM_ID(PD->myLocation);
+                u32 myBlock = BLOCK_FROM_ID(PD->myLocation);
+                u32 xeCount = ((ocrPolicyDomainCe_t*)PD)->xeCount;
+                for(i=0; i< xeCount; ++i) {
+                    ocrLocation_t loc = MAKE_CORE_ID(0, 0, 0, myUnit, myBlock, (ID_AGENT_XE0 + i));
+                    ASSERT(self->fcts.registerContext(self, loc, &contextId) == 0);
+                    ASSERT(contextId == i);
+                }
+                for(i = 0; i<PD->neighborCount; i++) {
+                    ocrLocation_t loc = PD->neighbors[i];
+                    ASSERT(self->fcts.registerContext(self, loc, &contextId) == 0);
+                    ASSERT(contextId == (i + xeCount));
+                }
             }
         } else {
             // Tear-down
@@ -259,8 +282,30 @@ u8 ceSchedulerGiveComm(ocrScheduler_t *self, u32* count, ocrFatGuid_t* handlers,
 //      Scheduler 1.0        //
 ///////////////////////////////
 
+static u32 getSeqId(ocrScheduler_t *self, ocrLocation_t loc) {
+    u32 i;
+    ocrPolicyDomain_t *PD = self->pd;
+    u32 xeCount = ((ocrPolicyDomainCe_t*)PD)->xeCount;
+    u64 agentId = AGENT_FROM_ID(loc);
+    if ((agentId >= ID_AGENT_XE0) && (agentId <= ID_AGENT_XE7))
+        return (agentId - ID_AGENT_XE0);
+    for (i = 0; i < PD->neighborCount; i++) {
+        if (PD->neighbors[i] == loc)
+            return (i + xeCount);
+    }
+    return 0;
+}
+
 u8 ceSchedulerRegisterContext(ocrScheduler_t *self, ocrLocation_t loc, u64 *seqId) {
-    return OCR_ENOTSUP;
+    u32 i;
+    ocrSchedulerCe_t *policy = (ocrSchedulerCe_t*)self;
+    u32 contextId = (policy->contextCounter)++;
+    ASSERT(contextId == getSeqId(self, loc));
+    for (i = 0; i < self->schedulerHeuristicCount; i++) {
+        self->schedulerHeuristics[i]->fcts.registerContext(self->schedulerHeuristics[i], contextId, loc);
+    }
+    *seqId = contextId;
+    return 0;
 }
 
 u8 ceSchedulerGetWorkInvoke(ocrScheduler_t *self, ocrSchedulerOpArgs_t *opArgs, ocrRuntimeHint_t *hints) {
@@ -268,9 +313,16 @@ u8 ceSchedulerGetWorkInvoke(ocrScheduler_t *self, ocrSchedulerOpArgs_t *opArgs, 
     switch(taskArgs->kind) {
     case OCR_SCHED_WORK_EDT_USER:
         {
+#if SCHED10
+            ocrSchedulerHeuristic_t *schedulerHeuristic = self->schedulerHeuristics[0];
+            ocrSchedulerHeuristicContext_t *context = schedulerHeuristic->fcts.getContext(schedulerHeuristic, getSeqId(self, opArgs->seqId));
+            return schedulerHeuristic->fcts.op[OCR_SCHEDULER_HEURISTIC_OP_GET_WORK].invoke(schedulerHeuristic, context, opArgs, hints);
+#else
             u32 count = 1;
             return self->fcts.takeEdt(self, &count, &taskArgs->OCR_SCHED_ARG_FIELD(OCR_SCHED_WORK_EDT_USER).edt);
+#endif
         }
+        break;
     default:
         ASSERT(0);
         break;
@@ -283,10 +335,21 @@ u8 ceSchedulerNotifyInvoke(ocrScheduler_t *self, ocrSchedulerOpArgs_t *opArgs, o
     switch(notifyArgs->kind) {
     case OCR_SCHED_NOTIFY_EDT_READY:
         {
+#if SCHED10
+            ocrSchedulerHeuristic_t *schedulerHeuristic = self->schedulerHeuristics[0];
+            ocrSchedulerHeuristicContext_t *context = schedulerHeuristic->fcts.getContext(schedulerHeuristic, getSeqId(self, opArgs->seqId));
+            return schedulerHeuristic->fcts.op[OCR_SCHEDULER_HEURISTIC_OP_NOTIFY].invoke(schedulerHeuristic, context, opArgs, hints);
+#else
             u32 count = 1;
             return self->fcts.giveEdt(self, &count, &notifyArgs->OCR_SCHED_ARG_FIELD(OCR_SCHED_NOTIFY_EDT_READY).guid);
+#endif
         }
     case OCR_SCHED_NOTIFY_EDT_DONE: {
+#if SCHED10
+            ocrSchedulerHeuristic_t *schedulerHeuristic = self->schedulerHeuristics[0];
+            ocrSchedulerHeuristicContext_t *context = schedulerHeuristic->fcts.getContext(schedulerHeuristic, getSeqId(self, opArgs->seqId));
+            return schedulerHeuristic->fcts.op[OCR_SCHEDULER_HEURISTIC_OP_NOTIFY].invoke(schedulerHeuristic, context, opArgs, hints);
+#else
             // Destroy the work
             ocrPolicyDomain_t *pd;
             PD_MSG_STACK(msg);
@@ -301,6 +364,7 @@ u8 ceSchedulerNotifyInvoke(ocrScheduler_t *self, ocrSchedulerOpArgs_t *opArgs, o
             ASSERT(pd->fcts.processMessage(pd, &msg, false) == 0);
 #undef PD_MSG
 #undef PD_TYPE
+#endif
         }
         break;
     // Notifies ignored by this scheduler
@@ -321,14 +385,36 @@ u8 ceSchedulerAnalyzeInvoke(ocrScheduler_t *self, ocrSchedulerOpArgs_t *opArgs, 
     return OCR_ENOTSUP;
 }
 
-u8 ceSchedulerUpdate(ocrScheduler_t *self, ocrSchedulerOpArgs_t *opArgs) {
-    return OCR_ENOTSUP;
+u8 ceSchedulerUpdate(ocrScheduler_t *self, u32 properties) {
+    u32 i;
+    switch(properties) {
+    case OCR_SCHEDULER_UPDATE_PROP_IDLE: {
+            for (i = 0; i < self->schedulerHeuristicCount; i++) {
+                ocrSchedulerHeuristic_t *schedulerHeuristic = self->schedulerHeuristics[i];
+                schedulerHeuristic->fcts.update(schedulerHeuristic, OCR_SCHEDULER_HEURISTIC_UPDATE_PROP_IDLE);
+            }
+        }
+        break;
+    case OCR_SCHEDULER_UPDATE_PROP_SHUTDOWN: {
+            for (i = 0; i < self->schedulerHeuristicCount; i++) {
+                ocrSchedulerHeuristic_t *schedulerHeuristic = self->schedulerHeuristics[i];
+                schedulerHeuristic->fcts.update(schedulerHeuristic, OCR_SCHEDULER_HEURISTIC_UPDATE_PROP_SHUTDOWN);
+            }
+        }
+        break;
+    default:
+        ASSERT(0);
+        return OCR_ENOTSUP;
+    }
+    return 0;
 }
 
 ocrScheduler_t* newSchedulerCe(ocrSchedulerFactory_t * factory, ocrParamList_t *perInstance) {
     ocrScheduler_t* base = (ocrScheduler_t*) runtimeChunkAlloc(
                                sizeof(ocrSchedulerCe_t), PERSISTENT_CHUNK);
     factory->initialize(factory, base, perInstance);
+    ocrSchedulerCe_t *derived = (ocrSchedulerCe_t*)base;
+    derived->contextCounter = 0;
     return base;
 }
 
@@ -358,7 +444,7 @@ ocrSchedulerFactory_t * newOcrSchedulerFactoryCe(ocrParamList_t *perType) {
 
     //Scheduler 1.0
     base->schedulerFcts.registerContext = FUNC_ADDR(u8 (*)(ocrScheduler_t*, ocrLocation_t, u64*), ceSchedulerRegisterContext);
-    base->schedulerFcts.update = FUNC_ADDR(u8 (*)(ocrScheduler_t*, ocrSchedulerOpArgs_t*), ceSchedulerUpdate);
+    base->schedulerFcts.update = FUNC_ADDR(u8 (*)(ocrScheduler_t*, u32), ceSchedulerUpdate);
     base->schedulerFcts.op[OCR_SCHEDULER_OP_GET_WORK].invoke = FUNC_ADDR(u8 (*)(ocrScheduler_t*, ocrSchedulerOpArgs_t*, ocrRuntimeHint_t*), ceSchedulerGetWorkInvoke);
     base->schedulerFcts.op[OCR_SCHEDULER_OP_NOTIFY].invoke = FUNC_ADDR(u8 (*)(ocrScheduler_t*, ocrSchedulerOpArgs_t*, ocrRuntimeHint_t*), ceSchedulerNotifyInvoke);
     base->schedulerFcts.op[OCR_SCHEDULER_OP_TRANSACT].invoke = FUNC_ADDR(u8 (*)(ocrScheduler_t*, ocrSchedulerOpArgs_t*, ocrRuntimeHint_t*), ceSchedulerTransactInvoke);

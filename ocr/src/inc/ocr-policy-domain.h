@@ -167,20 +167,22 @@ typedef struct _paramListPolicyDomainInst_t {
  */
 #define PD_MSG_SCHED_OP          0x040
 /**< Find tasks for the worker to execute */
-#define PD_MSG_SCHED_GET_WORK        0x00001040
+#define PD_MSG_SCHED_GET_WORK    0x00001040
 /**< Notify a scheduler of a new guid or event */
 #define PD_MSG_SCHED_NOTIFY      0x00002040
 /**< Transaction of a scheduler object between schedulers */
 #define PD_MSG_SCHED_TRANSACT    0x00003040
 /**< Negotiations between schedulers to setup transactions */
 #define PD_MSG_SCHED_ANALYZE     0x00004040
+/**< Update scheduler state */
+#define PD_MSG_SCHED_UPDATE      0x00005040
 
 /**< Request for a GUID (ie: the caller wants the callee
  * to give it the GUID(s) requested (pull model) */
-#define PD_MSG_COMM_TAKE        0x00005040
+#define PD_MSG_COMM_TAKE        0x00006040
 /**< Request for a GUID to be put (ie: the caller wants the
  * callee to accept the GUID(s) given (push model) */
-#define PD_MSG_COMM_GIVE        0x00006040
+#define PD_MSG_COMM_GIVE        0x00007040
 
 /**< AND with this and if result non-null, dependence related
  * operation
@@ -833,6 +835,18 @@ typedef struct _ocrPolicyMsg_t {
             } inOrOut __attribute__ (( aligned(8) ));
         } PD_MSG_STRUCT_NAME(PD_MSG_SCHED_ANALYZE);
 
+        /* Operation to update scheduler state at certain times during the runtime  */
+        struct {
+            union {
+                struct {
+                    u32 properties;                         /**< In: properties for the op */
+                } in;
+                struct {
+                    u32 returnDetail;                       /**< Out: Success or error code */
+                } out;
+            } inOrOut __attribute__ (( aligned(8) ));
+        } PD_MSG_STRUCT_NAME(PD_MSG_SCHED_UPDATE);
+
         struct {
             //BUG #273 THis is also being used at In/Out
             u32 properties;      /**< In: Properties. Lower 3 bits are access modes */
@@ -1032,8 +1046,8 @@ typedef struct _ocrPolicyMsg_t {
         struct {
             union {
                 struct {
-                    // BUG #586: Add cost/relationship maybe?
-                    u32 properties;         /**< In */
+                    ocrLocation_t loc;      /**< In Location being registered */
+                    u32 properties;         /**< In Properties for the registration */
                 } in;
                 struct {
                     u32 seqId;              /**< Out: Seq Id at dest policy domain */
@@ -1359,6 +1373,7 @@ typedef struct _ocrPolicyDomain_t {
     struct _ocrPolicyDomain_t **neighborPDs;
     struct _ocrPolicyDomain_t *parentPD;
 
+    //TODO that looks TG related, should move to implementation
     s8 * allocatorIndexLookup;                  /**< Allocator indices for each block agent, over each of 8 memory levels */
 #ifdef OCR_ENABLE_STATISTICS
     ocrStats_t *statsObject;                    /**< Statistics object */

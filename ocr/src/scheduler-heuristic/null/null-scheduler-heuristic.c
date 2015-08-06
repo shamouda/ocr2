@@ -70,7 +70,7 @@ void nullSchedulerHeuristicDestruct(ocrSchedulerHeuristic_t * self) {
     runtimeChunkFree((u64)self, PERSISTENT_CHUNK);
 }
 
-u8 nullSchedulerHeuristicUpdate(ocrSchedulerHeuristic_t *self, ocrSchedulerObject_t *schedulerObject, u32 properties) {
+u8 nullSchedulerHeuristicUpdate(ocrSchedulerHeuristic_t *self, u32 properties) {
     return OCR_ENOTSUP;
 }
 

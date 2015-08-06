@@ -13,6 +13,7 @@
 #include "ocr-scheduler-heuristic.h"
 #include "scheduler-heuristic/hc/hc-scheduler-heuristic.h"
 #include "scheduler-heuristic/pc/pc-scheduler-heuristic.h"
+#include "scheduler-heuristic/ce/ce-scheduler-heuristic.h"
 #include "scheduler-heuristic/null/null-scheduler-heuristic.h"
 
 typedef enum _schedulerHeuristicType_t {
@@ -21,6 +22,9 @@ typedef enum _schedulerHeuristicType_t {
 #endif
 #ifdef ENABLE_SCHEDULER_HEURISTIC_PC
     schedulerHeuristicPc_id,
+#endif
+#ifdef ENABLE_SCHEDULER_HEURISTIC_CE
+    schedulerHeuristicCe_id,
 #endif
 #ifdef ENABLE_SCHEDULER_HEURISTIC_NULL
     schedulerHeuristicNull_id,

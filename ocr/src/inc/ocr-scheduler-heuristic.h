@@ -65,6 +65,14 @@ typedef enum {
 } ocrSchedulerHeuristicOp_t;
 
 /****************************************************/
+/* OCR SCHEDULER HEURISTIC PROPERTIES               */
+/****************************************************/
+
+#define OCR_SCHEDULER_HEURISTIC_UPDATE_PROP_NONE        0x0
+#define OCR_SCHEDULER_HEURISTIC_UPDATE_PROP_IDLE        0x1
+#define OCR_SCHEDULER_HEURISTIC_UPDATE_PROP_SHUTDOWN    0x2
+
+/****************************************************/
 /* OCR SCHEDULER HEURISTIC CONTEXT                  */
 /****************************************************/
 
@@ -80,6 +88,7 @@ typedef struct _ocrSchedulerHeuristicContext_t {
                                              ID that is unique to a location (see registerNeighbor() in ocr-scheduler.h)
                                              In other words, for a single location, all scheduler-heuristics will index that location
                                              with the same ID */
+    ocrLocation_t location;             /**< Location that this context is maintained for */
     ocrSchedulerObjectActionSet_t *actionSet; /**< Actions returned by the scheduler heuristic */
     ocrCost_t *cost;                    /**< TBD: (Placeholder) Cost values returned by the scheduler heuristic to the scheduler */
     u32 properties;                     /**< Properties for the schedulerObject context */

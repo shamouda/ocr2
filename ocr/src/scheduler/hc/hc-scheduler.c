@@ -402,7 +402,7 @@ u8 hcSchedulerAnalyzeInvoke(ocrScheduler_t *self, ocrSchedulerOpArgs_t *opArgs, 
     return OCR_ENOTSUP;
 }
 
-u8 hcSchedulerUpdate(ocrScheduler_t *self, ocrSchedulerOpArgs_t *opArgs) {
+u8 hcSchedulerUpdate(ocrScheduler_t *self, u32 properties) {
     return OCR_ENOTSUP;
 }
 
@@ -441,7 +441,7 @@ ocrSchedulerFactory_t * newOcrSchedulerFactoryHc(ocrParamList_t *perType) {
 
     //Scheduler 1.0
     base->schedulerFcts.registerContext = FUNC_ADDR(u8 (*)(ocrScheduler_t*, ocrLocation_t, u64*), hcSchedulerRegisterContext);
-    base->schedulerFcts.update = FUNC_ADDR(u8 (*)(ocrScheduler_t*, ocrSchedulerOpArgs_t*), hcSchedulerUpdate);
+    base->schedulerFcts.update = FUNC_ADDR(u8 (*)(ocrScheduler_t*, u32), hcSchedulerUpdate);
     base->schedulerFcts.op[OCR_SCHEDULER_OP_GET_WORK].invoke = FUNC_ADDR(u8 (*)(ocrScheduler_t*, ocrSchedulerOpArgs_t*, ocrRuntimeHint_t*), hcSchedulerGetWorkInvoke);
     base->schedulerFcts.op[OCR_SCHEDULER_OP_NOTIFY].invoke = FUNC_ADDR(u8 (*)(ocrScheduler_t*, ocrSchedulerOpArgs_t*, ocrRuntimeHint_t*), hcSchedulerNotifyInvoke);
     base->schedulerFcts.op[OCR_SCHEDULER_OP_TRANSACT].invoke = FUNC_ADDR(u8 (*)(ocrScheduler_t*, ocrSchedulerOpArgs_t*, ocrRuntimeHint_t*), hcSchedulerTransactInvoke);

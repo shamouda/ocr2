@@ -16,6 +16,7 @@
 #define __OCR_HAL_X86_64_H__
 
 #include "ocr-types.h"
+#include "ocr-runtime-types.h"
 #include <string.h>
 #include <stdlib.h>
 #define _GNU_SOURCE
@@ -239,6 +240,28 @@
  * and may be deprecated in the future
  */
 #define hal_pause() sched_yield()
+
+/**
+ * @brief Put the XE core to sleep
+ *
+ * Does nothing on x86 platform
+ */
+#define hal_sleep(id) do {                    \
+    } while(0)
+
+/**
+ * @brief Wake the XE core from sleep
+ *
+ * Does nothing on x86 platform
+ */
+#define hal_wake(id) do {                     \
+    } while(0)
+
+/****************************************************/
+/* SYSTEM DISCOVERY                                 */
+/****************************************************/
+
+
 
 // Abstraction to do a load operation from any level of the memory hierarchy
 #define GET8(temp, addr)   ((temp) = *((u8*)(addr)))
