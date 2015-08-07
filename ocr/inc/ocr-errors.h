@@ -47,6 +47,7 @@
 #define OCR_EGUIDEXISTS     100     /**< The object referred to by the given GUID already exists */
 #define OCR_EACQ            101     /**< Data block is already acquired */
 #define OCR_EPEND           102     /**< Operation is pending */
+#define OCR_ENOP            103     /**< Operation was a no-op */
 #define OCR_ECANCELED       125     /**< Operation canceled */
 /**
  * @}

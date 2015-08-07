@@ -74,7 +74,15 @@ void hcSchedulerDestruct(ocrScheduler_t * self) {
         self->workpiles[i]->fcts.destruct(self->workpiles[i]);
     }
 
-    self->rootObj->fcts.destruct(self->rootObj);
+    // Destruct the root scheduler object
+    for(i = 0; i < self->pd->schedulerObjectFactoryCount; ++i) {
+        ocrSchedulerObjectFactory_t *fact = self->pd->schedulerObjectFactories[i];
+        if (IS_SCHEDULER_OBJECT_TYPE_ROOT(fact->kind)) {
+            ocrSchedulerObjectRootFactory_t *rootFact = (ocrSchedulerObjectRootFactory_t*)fact;
+            rootFact->fcts.destruct(self->rootObj);
+            break;
+        }
+    }
 
     //scheduler heuristics
     u64 schedulerHeuristicCount = self->schedulerHeuristicCount;
@@ -103,7 +111,6 @@ u8 hcSchedulerSwitchRunlevel(ocrScheduler_t *self, ocrPolicyDomain_t *PD, ocrRun
     u64 i;
     if(runlevel == RL_CONFIG_PARSE && (properties & RL_BRING_UP) && RL_IS_FIRST_PHASE_UP(PD, RL_CONFIG_PARSE, phase)) {
         // First transition, setup some backpointers
-        self->rootObj->scheduler = self;
         for(i = 0; i < self->schedulerHeuristicCount; ++i) {
             self->schedulerHeuristics[i]->scheduler = self;
         }
@@ -115,8 +122,17 @@ u8 hcSchedulerSwitchRunlevel(ocrScheduler_t *self, ocrPolicyDomain_t *PD, ocrRun
             toReturn |= self->workpiles[i]->fcts.switchRunlevel(
                 self->workpiles[i], PD, runlevel, phase, properties, NULL, 0);
         }
-        toReturn |= self->rootObj->fcts.switchRunlevel(self->rootObj, PD, runlevel, phase,
-                                                       properties, NULL, 0);
+
+        for(i = 0; i < PD->schedulerObjectFactoryCount; ++i) {
+            ocrSchedulerObjectFactory_t *fact = PD->schedulerObjectFactories[i];
+            if (IS_SCHEDULER_OBJECT_TYPE_ROOT(fact->kind)) {
+                ocrSchedulerObjectRootFactory_t *rootFact = (ocrSchedulerObjectRootFactory_t*)fact;
+                toReturn |= rootFact->fcts.switchRunlevel(self->rootObj, PD, runlevel, phase,
+                                                          properties, NULL, 0);
+                break;
+            }
+        }
+
         for(i = 0; i < self->schedulerHeuristicCount; ++i) {
             toReturn |= self->schedulerHeuristics[i]->fcts.switchRunlevel(
                 self->schedulerHeuristics[i], PD, runlevel, phase, properties, NULL, 0);
@@ -200,8 +216,17 @@ u8 hcSchedulerSwitchRunlevel(ocrScheduler_t *self, ocrPolicyDomain_t *PD, ocrRun
             toReturn |= self->workpiles[i]->fcts.switchRunlevel(
                 self->workpiles[i], PD, runlevel, phase, properties, NULL, 0);
         }
-        toReturn |= self->rootObj->fcts.switchRunlevel(self->rootObj, PD, runlevel, phase,
-                                                       properties, NULL, 0);
+
+        for(i = 0; i < PD->schedulerObjectFactoryCount; ++i) {
+            ocrSchedulerObjectFactory_t *fact = PD->schedulerObjectFactories[i];
+            if (IS_SCHEDULER_OBJECT_TYPE_ROOT(fact->kind)) {
+                ocrSchedulerObjectRootFactory_t *rootFact = (ocrSchedulerObjectRootFactory_t*)fact;
+                toReturn |= rootFact->fcts.switchRunlevel(self->rootObj, PD, runlevel, phase,
+                                                          properties, NULL, 0);
+                break;
+            }
+        }
+
         for(i = 0; i < self->schedulerHeuristicCount; ++i) {
             toReturn |= self->schedulerHeuristics[i]->fcts.switchRunlevel(
                 self->schedulerHeuristics[i], PD, runlevel, phase, properties, NULL, 0);
@@ -321,11 +346,12 @@ u8 hcSchedulerGetWorkInvoke(ocrScheduler_t *self, ocrSchedulerOpArgs_t *opArgs, 
     case OCR_SCHED_WORK_COMM: {
             return self->fcts.takeComm(self, &taskArgs->OCR_SCHED_ARG_FIELD(OCR_SCHED_WORK_COMM).guidCount, taskArgs->OCR_SCHED_ARG_FIELD(OCR_SCHED_WORK_COMM).guids, 0);
         }
+    // Unknown ops
     default:
         ASSERT(0);
-        break;
+        return OCR_ENOTSUP;
     }
-    return OCR_ENOTSUP;
+    return 0;
 }
 
 u8 hcSchedulerNotifyInvoke(ocrScheduler_t *self, ocrSchedulerOpArgs_t *opArgs, ocrRuntimeHint_t *hints) {
@@ -356,6 +382,11 @@ u8 hcSchedulerNotifyInvoke(ocrScheduler_t *self, ocrSchedulerOpArgs_t *opArgs, o
             u32 count = 1;
             return self->fcts.giveComm(self, &count, &notifyArgs->OCR_SCHED_ARG_FIELD(OCR_SCHED_NOTIFY_COMM_READY).guid, 0);
         }
+    // Notifies ignored by this scheduler
+    case OCR_SCHED_NOTIFY_EDT_SATISFIED:
+    case OCR_SCHED_NOTIFY_DB_CREATE:
+        return OCR_ENOP;
+    // Unknown ops
     default:
         ASSERT(0);
         return OCR_ENOTSUP;

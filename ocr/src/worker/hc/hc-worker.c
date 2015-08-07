@@ -139,6 +139,22 @@ static void workerLoop(ocrWorker_t * worker) {
                     DB_PROP_IGNORE_WARN, affinityMasterPD, NO_ALLOC);
         // copy packed args to DB
         hal_memCopy(dbPtr, packedUserArgv, totalLength, 0);
+        PD_MSG_STACK(msg);
+        getCurrentEnv(NULL, NULL, NULL, &msg);
+#define PD_MSG (&msg)
+#define PD_TYPE PD_MSG_DB_RELEASE
+        msg.type = PD_MSG_DB_RELEASE | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
+        PD_MSG_FIELD_IO(guid.guid) = dbGuid;
+        PD_MSG_FIELD_IO(guid.metaDataPtr) = NULL;
+        PD_MSG_FIELD_I(edt.guid) = NULL_GUID;
+        PD_MSG_FIELD_I(edt.metaDataPtr) = NULL;
+        PD_MSG_FIELD_I(ptr) = NULL;
+        PD_MSG_FIELD_I(size) = 0;
+        PD_MSG_FIELD_I(properties) = 0;
+        RESULT_ASSERT(pd->fcts.processMessage(pd, &msg, true), ==, 0);
+#undef PD_MSG
+#undef PD_TYPE
+
         // Prepare the mainEdt for scheduling
         ocrGuid_t edtTemplateGuid = NULL_GUID, edtGuid = NULL_GUID;
         ocrEdtTemplateCreate(&edtTemplateGuid, mainEdt, 0, 1);

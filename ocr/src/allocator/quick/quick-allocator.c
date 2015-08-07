@@ -211,6 +211,9 @@ typedef void blkPayload_t; // Strongly type-check the ptr-to-void that comprises
 // Thus, the minimum block size internally below
 #define MINIMUM_SIZE            (2*sizeof(u64) + ALLOC_OVERHEAD)
 
+// known value is placed at the end of heap as a guard
+#define KNOWN_VALUE_AS_GUARD    0xfeed0000deadbeef
+
 
 
 // VALGRIND SUPPORT
@@ -319,10 +322,15 @@ typedef struct {
 } secondLevel_t;
 
 typedef struct {
+    u64 guard;          // some known value as a guard
     u64 *glebeStart;
     u64 *glebeEnd;
     u32 lock;
     u32 inited;
+    // counters
+    u32 count_used;     // count bytes allocated.
+    u32 count_malloc;   // count successful malloc calls.
+    u32 count_free;     // count successful deallocation calls
     // tlsf-specific parts
     u32 flCount;        // Number of first-level buckets.  This is invariant after constructor runs.
     u64 flAvailOrNot;   // bitmap that indicates the presence (1) or absence (0) of free blocks in blocks[i][*]
@@ -379,6 +387,13 @@ static u64 quickInitAnnex(poolHdr_t * pPool, u64 size) {
 
     return poolHeaderSize;
 }
+
+/*
+static void quickPrintCounters(poolHdr_t *pool)
+{
+    DPRINTF(DEBUG_LVL_WARN, "%d bytes in use, malloc %d times, free %d times\n", pool->count_used, pool->count_malloc, pool->count_free);
+}
+*/
 
 /* Two-level function to determine indices. This is pretty much
  * taken straight from the specs
@@ -537,10 +552,17 @@ static void quickInit(poolHdr_t *pool, u64 size)
     ASSERT((sizeof(poolHdr_t) & ALIGNMENT_MASK) == 0);
     ASSERT((size & ALIGNMENT_MASK) == 0);
 
+    // spinlock value must be 0 or 1. If not, it means it's not properly zero'ed before, or corrupted.
+    ASSERT(pool->lock == 0 || pool->lock == 1);
+
     // pool->lock and pool->inited is already 0 at startup (on x86, it's done at mallocBegin())
     hal_lock32(&(pool->lock));
     if (!(pool->inited)) {
         quickTest((u64)pool, size);
+        // reserve 8 bytes for a guard
+        size -= sizeof(u64);
+
+        // init annex area
         u64 offsetToGlebe = quickInitAnnex(pool, size);
         u64 *q = (u64 *)(p + offsetToGlebe);
         ASSERT(((u64)q & ALIGNMENT_MASK) == 0);
@@ -555,6 +577,14 @@ static void quickInit(poolHdr_t *pool, u64 size)
         pool->glebeEnd = (u64 *)(p+size+offsetToGlebe);
         DPRINTF(DEBUG_LVL_VERB, "end of annex:%p , glebeStart:%p\n", &pool->sl[pool->flCount], pool->glebeStart);
         ASSERT( (u64)(&pool->sl[pool->flCount]) <= (u64)(pool->glebeStart));
+
+        // place a guard value at both ends
+        pool->guard = KNOWN_VALUE_AS_GUARD;
+        *pool->glebeEnd = KNOWN_VALUE_AS_GUARD;
+
+        pool->count_used = 0;
+        pool->count_malloc = 0;
+        pool->count_free = 0;
 
         u32 i,j;
         for(i=0;i<pool->flCount;i++) {
@@ -671,6 +701,18 @@ static void quickDeleteFree(poolHdr_t *pool,u64 *p, u32 skipLock)
     VALGRIND_POOL_CLOSE(pool);
 }
 
+// check if the known values are there intact.
+static inline void checkGuard(poolHdr_t *pool)
+{
+    ASSERT_BLOCK_BEGIN( *pool->glebeEnd == KNOWN_VALUE_AS_GUARD )  // always true
+    DPRINTF(DEBUG_LVL_WARN, "quickMalloc : heap corruption! known value not found at the end of the pool. (might be stack overflow if it's L1SPAD)\n");
+    ASSERT_BLOCK_END
+    ASSERT_BLOCK_BEGIN( pool->guard == KNOWN_VALUE_AS_GUARD )  // always true
+    DPRINTF(DEBUG_LVL_WARN, "quickMalloc : heap corruption! known value not found at the beginning of the pool.\n");
+    ASSERT_BLOCK_END
+}
+
+
 static blkPayload_t *quickMalloc(poolHdr_t *pool,u64 size, struct _ocrPolicyDomain_t *pd)
 {
     u64 size_orig = size;
@@ -686,6 +728,7 @@ static blkPayload_t *quickMalloc(poolHdr_t *pool,u64 size, struct _ocrPolicyDoma
 #ifndef FINE_LOCKING
     hal_lock32(&(pool->lock));
 #endif
+    checkGuard(pool);
     u64 *freelist = getFreeListMalloc(pool, size);
     u64 *p = freelist;
     VALGRIND_POOL_CLOSE(pool);
@@ -722,6 +765,13 @@ static blkPayload_t *quickMalloc(poolHdr_t *pool,u64 size, struct _ocrPolicyDoma
     ASSERT_BLOCK_BEGIN((*(u8 *)(&INFO2(p)) & POOL_HEADER_TYPE_MASK) == allocatorQuick_id)
     DPRINTF(DEBUG_LVL_WARN, "QuickAlloc : id != allocatorQuick_id \n");
     ASSERT_BLOCK_END
+
+    pool->count_used += size;       // count bytes using internal block size to match to free()
+    pool->count_malloc++;           // count successful malloc calls.
+
+//    DPRINTF(DEBUG_LVL_WARN, "QuickAlloc : malloc : called\n");
+//    quickPrintCounters(pool);
+
     VALGRIND_CHUNK_CLOSE(p);
 #ifndef FINE_LOCKING
     VALGRIND_POOL_OPEN(pool);
@@ -730,7 +780,7 @@ static blkPayload_t *quickMalloc(poolHdr_t *pool,u64 size, struct _ocrPolicyDoma
 #endif
 #ifdef ENABLE_VALGRIND
     VALGRIND_MEMPOOL_ALLOC(pool, ret, size_orig);
-VALGRIND_MAKE_MEM_DEFINED(ret, size_orig);
+    VALGRIND_MAKE_MEM_DEFINED(ret, size_orig);
 //    DPRINTF(DEBUG_LVL_WARN, "mempool_alloc, pool %p, ret %p, size %8ld\n", pool, ret, size_orig);
 #endif
     return ret;
@@ -757,6 +807,7 @@ static void quickFree(blkPayload_t *p)
 #ifndef FINE_LOCKING
     hal_lock32(&(pool->lock));
 #endif
+    checkGuard(pool);
     VALGRIND_POOL_CLOSE(pool);
 
     ASSERT((*(u8 *)(&INFO2(q)) & POOL_HEADER_TYPE_MASK) == allocatorQuick_id);
@@ -778,9 +829,7 @@ static void quickFree(blkPayload_t *p)
     DPRINTF(DEBUG_LVL_WARN, "QuickAlloc : two sizes doesn't match. p=%p\n", p);
     ASSERT_BLOCK_END
 
-#ifdef ENABLE_VALGRIND
-//    u64 size_orig = size;
-#endif
+    u64 size_orig = size;
 
     //DPRINTF(DEBUG_LVL_VERB, "before free : pool = %p, addr=%p\n", pool, INFO2(q));
     //quickPrint(pool);
@@ -841,6 +890,12 @@ static void quickFree(blkPayload_t *p)
         VALGRIND_CHUNK_CLOSE(q);
     }
     quickInsertFree(pool, &HEAD(q), size);
+
+    pool->count_used -= size_orig;  // count bytes using user-provided size
+    pool->count_free++;             // count successful deallocation calls
+
+//    DPRINTF(DEBUG_LVL_WARN, "QuickAlloc : free: called\n");
+//    quickPrintCounters(pool);
 #ifndef FINE_LOCKING
     VALGRIND_POOL_OPEN(pool);
     hal_unlock32(&(pool->lock));
@@ -910,12 +965,16 @@ u8 quickSwitchRunlevel(ocrAllocator_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_
             ocrAllocatorQuick_t * rself = (ocrAllocatorQuick_t *) self;
 
             u64 poolAddr = 0;
-            DPRINTF(DEBUG_LVL_INFO, "quickBegin : poolsize 0x%llx, level %d\n",  rself->poolSize, self->memories[0]->level);
+            DPRINTF(DEBUG_LVL_INFO, "quickBegin : poolsize 0x%llx, level %d, startAddr 0x%lx\n",  rself->poolSize, self->memories[0]->level, self->memories[0]->memories[0]->startAddr);
+
+            // if this RESULT_ASSERT fails, it usually means not-enough-free-memory.
+            // For example, for L1, increased executable size easily shrinks free area.
+            // Try shrink heap size in config file, or adjust layout (smaller stack area?)
             RESULT_ASSERT(self->memories[0]->fcts.chunkAndTag(
                 self->memories[0], &poolAddr, rself->poolSize,
                 USER_FREE_TAG, USER_USED_TAG), ==, 0);
             rself->poolAddr = poolAddr;
-            DPRINTF(DEBUG_LVL_INFO, "quickBegin : %p\n", poolAddr);
+            DPRINTF(DEBUG_LVL_INFO, "quickBegin : poolAddr %p\n", poolAddr);
 
             // Adjust alignment if required
             u64 fiddlyBits = ((u64) rself->poolAddr) & (ALIGNMENT - 1LL);
@@ -933,6 +992,7 @@ u8 quickSwitchRunlevel(ocrAllocator_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_
                 (u64) rself, (u64) self,
                 (u64) (rself->poolAddr), (u64) (rself->poolSize), (u64)(rself->poolSize), (u64) (rself->poolStorageOffset));
 
+            // at this moment, this is for only x86
             ASSERT(self->memories[0]->memories[0]->startAddr /* startAddr of the memory that memplatform allocated. (for x86, at mallocBegin()) */
                       + MEM_PLATFORM_ZEROED_AREA_SIZE >= /* Add the size of zero-ed area (for x86, at mallocBegin()), then this should be greater than */
                      rself->poolAddr + sizeof(poolHdr_t) /* the end of poolHdr_t, so this ensures zero'ed rangeTracker,pad,poolHdr_t */ );
@@ -1020,13 +1080,11 @@ ocrAllocator_t * newAllocatorQuick(ocrAllocatorFactory_t * factory, ocrParamList
 
     ocrAllocatorQuick_t *result = (ocrAllocatorQuick_t*)
         runtimeChunkAlloc(sizeof(ocrAllocatorQuick_t), PERSISTENT_CHUNK);
-    DPRINTF(DEBUG_LVL_VERB, "newAllocator called. (This is x86 only ? ? ) alloc %p\n", result);
     ocrAllocator_t * base = (ocrAllocator_t *) result;
     factory->initialize(factory, base, perInstance);
     return (ocrAllocator_t *) result;
 }
 void initializeAllocatorQuick(ocrAllocatorFactory_t * factory, ocrAllocator_t * self, ocrParamList_t * perInstance) {
-    DPRINTF(DEBUG_LVL_VERB, "Quick: initialize (This is x86 only ? ? ) called\n");
     initializeAllocatorOcr(factory, self, perInstance);
 
     ocrAllocatorQuick_t *derived = (ocrAllocatorQuick_t *)self;
@@ -1047,8 +1105,6 @@ ocrAllocatorFactory_t * newAllocatorFactoryQuick(ocrParamList_t *perType) {
     ocrAllocatorFactory_t* base = (ocrAllocatorFactory_t*)
         runtimeChunkAlloc(sizeof(ocrAllocatorFactoryQuick_t), NONPERSISTENT_CHUNK);
     ASSERT(base);
-    DPRINTF(DEBUG_LVL_VERB,
-        "newAllocatorFactoryQuick called, (This is x86 only?) alloc %p (Q: who free this?)\n", base);
     base->instantiate = &newAllocatorQuick;
     base->initialize = &initializeAllocatorQuick;
     base->destruct = &destructAllocatorFactoryQuick;

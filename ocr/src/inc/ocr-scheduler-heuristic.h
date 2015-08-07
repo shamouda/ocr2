@@ -240,6 +240,7 @@ typedef struct _ocrSchedulerHeuristic_t {
     u64 contextCount;                               /*< Total number of contexts maintained by this scheduler heuristic */
     ocrCostTable_t *costTable;                      /*< TBD: Placeholder for a cost table */
     ocrSchedulerHeuristicFcts_t fcts;                       /*< Functions called by the scheduler */
+    u32 factoryId;
 } ocrSchedulerHeuristic_t;
 
 /****************************************************/
@@ -250,6 +251,7 @@ typedef struct _ocrSchedulerHeuristicFactory_t {
     ocrSchedulerHeuristic_t* (*instantiate) (struct _ocrSchedulerHeuristicFactory_t * factory, ocrParamList_t *perInstance);
     void (*destruct)(struct _ocrSchedulerHeuristicFactory_t * factory);
     ocrSchedulerHeuristicFcts_t fcts;
+    u32 factoryId;
 } ocrSchedulerHeuristicFactory_t;
 
 void initializeSchedulerHeuristicOcr(ocrSchedulerHeuristicFactory_t * factory, ocrSchedulerHeuristic_t * self, ocrParamList_t *perInstance);

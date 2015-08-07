@@ -8,11 +8,15 @@
 #include "debug.h"
 
 const char * schedulerHeuristic_types[] = {
+#ifdef ENABLE_SCHEDULER_HEURISTIC_HC
     "HC",
-    "HC_COMM",
-    "XE",
-    "CE",
+#endif
+#ifdef ENABLE_SCHEDULER_HEURISTIC_PC
+    "PC",
+#endif
+#ifdef ENABLE_SCHEDULER_HEURISTIC_NULL
     "NULL",
+#endif
     NULL
 };
 
@@ -20,28 +24,15 @@ ocrSchedulerHeuristicFactory_t * newSchedulerHeuristicFactory(schedulerHeuristic
     switch(type) {
 #ifdef ENABLE_SCHEDULER_HEURISTIC_HC
     case schedulerHeuristicHc_id:
-    {
-#ifdef ENABLE_SCHEDULER_OBJECT_WST
-        return newOcrSchedulerHeuristicFactoryHc(perType);
+        return newOcrSchedulerHeuristicFactoryHc(perType, type);
 #endif
-        break;
-    }
-#endif
-#ifdef ENABLE_SCHEDULER_HEURISTIC_HC_COMM
-    case schedulerHeuristicHcComm_id:
-        return newOcrSchedulerHeuristicFactoryHcComm(perType);
-#endif
-#ifdef ENABLE_SCHEDULER_HEURISTIC_CE
-    case schedulerHeuristicCe_id:
-        return newOcrSchedulerHeuristicFactoryCe(perType);
-#endif
-#ifdef ENABLE_SCHEDULER_HEURISTIC_XE
-    case schedulerHeuristicXe_id:
-        return newOcrSchedulerHeuristicFactoryXe(perType);
+#ifdef ENABLE_SCHEDULER_HEURISTIC_PC
+    case schedulerHeuristicPc_id:
+        return newOcrSchedulerHeuristicFactoryPc(perType, type);
 #endif
 #ifdef ENABLE_SCHEDULER_HEURISTIC_NULL
     case schedulerHeuristicNull_id:
-        return newOcrSchedulerHeuristicFactoryNull(perType);
+        return newOcrSchedulerHeuristicFactoryNull(perType, type);
 #endif
     default:
         break;
@@ -58,4 +49,5 @@ void initializeSchedulerHeuristicOcr(ocrSchedulerHeuristicFactory_t * factory, o
     self->contextCount = 0;
     self->costTable = NULL;
     self->fcts = factory->fcts;
+    self->factoryId = factory->factoryId;
 }

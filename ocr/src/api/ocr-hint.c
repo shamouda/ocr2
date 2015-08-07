@@ -48,6 +48,8 @@ u8 ocrHintInit(ocrHint_t *hint, ocrHintType_t hintType) {
         {
             OCR_HINT_FIELD(hint, OCR_HINT_EDT_PRIORITY) = 0;
             OCR_HINT_FIELD(hint, OCR_HINT_EDT_SLOT_MAX_ACCESS) = ((u64)-1);
+            OCR_HINT_FIELD(hint, OCR_HINT_EDT_AFFINITY) = ((u64)-1);
+            OCR_HINT_FIELD(hint, OCR_HINT_EDT_PHASE) = ((u64)-1);
         }
         break;
     case OCR_HINT_DB_T:
@@ -75,6 +77,8 @@ u8 ocrUnsetHintValue(ocrHint_t *hint, ocrHintProp_t hintProp) {
 
 u8 ocrGetHintValue(ocrHint_t *hint, ocrHintProp_t hintProp, u64 *value) {
     OCR_HINT_CHECK(hint, hintProp);
+    if ((hint->propMask & OCR_HINT_BIT_MASK(hint, hintProp)) == 0)
+        return OCR_ENOENT;
     *value = OCR_HINT_FIELD(hint, hintProp);
     return 0;
 }

@@ -16,7 +16,7 @@
 #include "utils/deque.h"
 
 /****************************************************/
-/* OCR DEQ SCHEDULER_OBJECT                                */
+/* OCR DEQ SCHEDULER_OBJECT                         */
 /****************************************************/
 
 typedef struct _paramListSchedulerObjectDeq_t {
@@ -30,7 +30,7 @@ typedef struct _ocrSchedulerObjectDeq_t {
 } ocrSchedulerObjectDeq_t;
 
 /****************************************************/
-/* OCR DEQ SCHEDULER_OBJECT FACTORY                        */
+/* OCR DEQ SCHEDULER_OBJECT FACTORY                 */
 /****************************************************/
 
 typedef struct _ocrSchedulerObjectFactoryDeq_t {

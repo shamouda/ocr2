@@ -11,16 +11,28 @@
 #include "utils/ocr-utils.h"
 
 #include "ocr-scheduler.h"
+#include "scheduler/common/common-scheduler.h"
 #include "scheduler/hc/hc-scheduler.h"
 #include "scheduler/hc-comm-delegate/hc-comm-delegate-scheduler.h"
 #include "scheduler/ce/ce-scheduler.h"
 #include "scheduler/xe/xe-scheduler.h"
 
 typedef enum _schedulerType_t {
+#ifdef ENABLE_SCHEDULER_COMMON
+    schedulerCommon_id,
+#endif
+#ifdef ENABLE_SCHEDULER_HC
     schedulerHc_id,
+#endif
+#ifdef ENABLE_SCHEDULER_HC_COMM_DELEGATE
     schedulerHcCommDelegate_id,
+#endif
+#ifdef ENABLE_SCHEDULER_XE
     schedulerXe_id,
+#endif
+#ifdef ENABLE_SCHEDULER_CE
     schedulerCe_id,
+#endif
     schedulerMax_id
 } schedulerType_t;
 

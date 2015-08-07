@@ -15,7 +15,6 @@
 #include "utils/ocr-utils.h"
 
 struct _ocrSchedulerObjectFactory_t;
-struct _ocrSchedulerObjectRoot_t;
 struct _ocrScheduler_t;
 
 /****************************************************/
@@ -31,20 +30,76 @@ struct _ocrScheduler_t;
 #define OCR_SCHEDULER_OBJECT_PROP_TYPE                     0x00F
 #define OCR_SCHEDULER_OBJECT_PROP_INSERT                   0x001
 #define OCR_SCHEDULER_OBJECT_PROP_REMOVE                   0x002
-#define OCR_SCHEDULER_OBJECT_PROP_COUNT                    0x003
-#define OCR_SCHEDULER_OBJECT_PROP_MAPPING                  0x004
+#define OCR_SCHEDULER_OBJECT_PROP_ITERATE                  0x003
+#define OCR_SCHEDULER_OBJECT_PROP_COUNT                    0x004
+#define OCR_SCHEDULER_OBJECT_PROP_MAPPING                  0x005
 
-#define SCHEDULER_OBJECT_REMOVE_DEQ                        0x012
+// Insert
+// specialized properties for lists
+// #define SCHEDULER_OBJECT_INSERT_LIST                    0x011
+#define SCHEDULER_OBJECT_INSERT_LIST_FRONT                 0x111
+#define SCHEDULER_OBJECT_INSERT_LIST_BACK                  0x211
+#define SCHEDULER_OBJECT_INSERT_LIST_BEFORE                0x311
+#define SCHEDULER_OBJECT_INSERT_LIST_AFTER                 0x411
+
+// specialized properties for map
+// #define SCHEDULER_OBJECT_INSERT_MAP                     0x021
+#define SCHEDULER_OBJECT_INSERT_MAP_PUT                    0x121
+#define SCHEDULER_OBJECT_INSERT_MAP_TRY_PUT                0x221
+#define SCHEDULER_OBJECT_INSERT_MAP_CONC_PUT               0x321
+#define SCHEDULER_OBJECT_INSERT_MAP_CONC_TRY_PUT           0x421
+
+// specialized properties for dbnode
+// #define SCHEDULER_OBJECT_INSERT_DBNODE                  0x031
+#define SCHEDULER_OBJECT_INSERT_DBNODE_PHASE               0x131
+
+// Remove
+// specialized properties for deq
+// #define SCHEDULER_OBJECT_REMOVE_DEQ                     0x012
 #define SCHEDULER_OBJECT_REMOVE_DEQ_POP                    0x112
-#define SCHEDULER_OBJECT_REMOVE_DEQ_STEAL                  0x213
+#define SCHEDULER_OBJECT_REMOVE_DEQ_STEAL                  0x212
 
-#define SCHEDULER_OBJECT_COUNT_NONEMPTY                    0x013
-#define SCHEDULER_OBJECT_COUNT_RECURSIVE                   0x023
-#define SCHEDULER_OBJECT_COUNT_EDT                         0x043
-#define SCHEDULER_OBJECT_COUNT_DB                          0x083
-#define SCHEDULER_OBJECT_COUNT_ARRAY                       0x103
+// specialized properties for lists
+// #define SCHEDULER_OBJECT_REMOVE_LIST                    0x022
+#define SCHEDULER_OBJECT_REMOVE_LIST_FRONT                 0x122
+#define SCHEDULER_OBJECT_REMOVE_LIST_BACK                  0x222
+#define SCHEDULER_OBJECT_REMOVE_LIST_CURRENT               0x322
+#define SCHEDULER_OBJECT_REMOVE_LIST_BEFORE                0x422
+#define SCHEDULER_OBJECT_REMOVE_LIST_AFTER                 0x522
 
-#define SCHEDULER_OBJECT_CREATE_IF_ABSENT                  0x014
+// specialized properties for map
+// #define SCHEDULER_OBJECT_REMOVE_MAP                     0x032
+#define SCHEDULER_OBJECT_REMOVE_MAP_NON_CONC               0x132
+#define SCHEDULER_OBJECT_REMOVE_MAP_CONC                   0x232
+
+// Iterate
+// Common iterator properties
+#define SCHEDULER_OBJECT_ITERATE_BEGIN                     0x103
+#define SCHEDULER_OBJECT_ITERATE_END                       0x203
+#define SCHEDULER_OBJECT_ITERATE_CURRENT                   0x303
+#define SCHEDULER_OBJECT_ITERATE_NEXT                      0x403
+#define SCHEDULER_OBJECT_ITERATE_PREV                      0x503
+
+// specialized properties for lists
+// #define SCHEDULER_OBJECT_ITERATE_LIST                   0x013
+#define SCHEDULER_OBJECT_ITERATE_LIST_HEAD_PEEK            0x613
+#define SCHEDULER_OBJECT_ITERATE_LIST_TAIL_PEEK            0x713
+
+// specialized properties for map
+// #define SCHEDULER_OBJECT_ITERATE_MAP                    0x023
+#define SCHEDULER_OBJECT_ITERATE_MAP_GET_NON_CONC          0x123
+#define SCHEDULER_OBJECT_ITERATE_MAP_GET_CONC              0x223
+
+// Count
+#define SCHEDULER_OBJECT_COUNT_NONEMPTY                    0x014
+#define SCHEDULER_OBJECT_COUNT_RECURSIVE                   0x024
+#define SCHEDULER_OBJECT_COUNT_EDT                         0x044
+#define SCHEDULER_OBJECT_COUNT_DB                          0x084
+#define SCHEDULER_OBJECT_COUNT_ARRAY                       0x104
+
+//Mapping
+#define SCHEDULER_OBJECT_CREATE_IF_ABSENT                  0x015
+#define SCHEDULER_OBJECT_MAPPING_WST                       0x105
 
 typedef enum {
     OCR_SCHEDULER_OBJECT_MAPPING_POTENTIAL,    /* schedulerObjects are potentially mapped to certain locations or policy domains but not placed yet. Potential mappings can change. */
@@ -54,40 +109,63 @@ typedef enum {
 } ocrSchedulerObjectMappingKind;
 
 /*! \brief OCR schedulerObject kinds
- *   This table should be extended whenever a new kind
- *   of schedulerObject is implemented.
+ *   This table should be extended whenever a new kind of schedulerObject is implemented.
+ *   LS 4 Bits (0-3)   : Scheduler object attributes (regular, root, iterator, etc.)
+ *   Next 4 Bits (4-7) : Scheduler object type
+ *   MS Bits + (4-7)   : Scheduler object kind
  */
 typedef enum {
-    OCR_SCHEDULER_OBJECT_UNDEFINED         =0x00,
+    OCR_SCHEDULER_OBJECT_UNDEFINED         =0x000,
 
     //singleton schedulerObjects:
     //    These are the basic elements that are part of aggregate schedulerObjects.
     //    They do not have their own schedulerObject factories and hence they do not
     //    support the functions in ocrSchedulerObjectFcts_t.
     //    They are managed as part of aggregate schedulerObjects.
-    OCR_SCHEDULER_OBJECT_SINGLETON         =0x01,
-    OCR_SCHEDULER_OBJECT_EDT               =0x11,
-    OCR_SCHEDULER_OBJECT_DB                =0x21,
+    OCR_SCHEDULER_OBJECT_SINGLETON         =0x010,
+    OCR_SCHEDULER_OBJECT_EDT               =0x110,
+    OCR_SCHEDULER_OBJECT_DB                =0x210,
 
     //aggregate schedulerObjects:
     //    These schedulerObjects can hold other schedulerObjects, both singleton and aggregate.
     //    These have associated schedulerObject factories and support ocrSchedulerObjectFcts_t.
-    OCR_SCHEDULER_OBJECT_AGGREGATE         =0x02,
-    OCR_SCHEDULER_OBJECT_DEQUE             =0x12,
-    OCR_SCHEDULER_OBJECT_ARRAY             =0x22, // BUG #613: No implementation of this yet
+    OCR_SCHEDULER_OBJECT_AGGREGATE         =0x020,
+    OCR_SCHEDULER_OBJECT_DEQUE             =0x320,
+    OCR_SCHEDULER_OBJECT_WST               =0x420,
+    OCR_SCHEDULER_OBJECT_ARRAY             =0x520, // BUG #613: No implementation of this yet
+    OCR_SCHEDULER_OBJECT_LIST              =0x620,
+    OCR_SCHEDULER_OBJECT_MAP               =0x720,
+    OCR_SCHEDULER_OBJECT_DBNODE            =0x820, //Scheduler object to manage the scheduling of DBs
+    OCR_SCHEDULER_OBJECT_DOMAIN            =0x920, //Scheduler object that manages a policy domain
 
     //root schedulerObjects:
-    //    These are derived aggregate schedulerObjects that act as the single top-level
+    //    These are special aggregate schedulerObjects that act as the single top-level
     //    schedulerObject for each scheduler. There is one ROOT schedulerObject per scheduler.
     //    They are persistent for the lifetime of the scheduler.
-    OCR_SCHEDULER_OBJECT_ROOT              =0x03,
-    OCR_SCHEDULER_OBJECT_ROOT_WST          =0x13,
+    OCR_SCHEDULER_OBJECT_ROOT              =0x021,
+    OCR_SCHEDULER_OBJECT_WST_ROOT          =(OCR_SCHEDULER_OBJECT_WST    | OCR_SCHEDULER_OBJECT_ROOT),
+    OCR_SCHEDULER_OBJECT_DOMAIN_ROOT       =(OCR_SCHEDULER_OBJECT_DOMAIN | OCR_SCHEDULER_OBJECT_ROOT),
+
+    //iterator schedulerObjects:
+    //    These are special schedulerObjects that can be used to iterate over
+    //    other aggregate objects.
+    OCR_SCHEDULER_OBJECT_ITERATOR          =0x022,
+    OCR_SCHEDULER_OBJECT_LIST_ITERATOR     =(OCR_SCHEDULER_OBJECT_LIST | OCR_SCHEDULER_OBJECT_ITERATOR),
+    OCR_SCHEDULER_OBJECT_MAP_ITERATOR      =(OCR_SCHEDULER_OBJECT_MAP  | OCR_SCHEDULER_OBJECT_ITERATOR),
+
+    //void* schedulerObjects:
+    //    This type of scheduler object is used to pass void* data from/to another scheduler object
+    //    It is the caller/callee's agreement how to handle the pointer.
+    //    The pointer is passed through the ocrFatGuid_t metaDataPtr.
+    OCR_SCHEDULER_OBJECT_VOID_PTR          =0x030,
+
 } ocrSchedulerObjectKind;
 
-#define SCHEDULER_OBJECT_KIND_TYPE(kind)           (kind & 0xF)
-#define IS_SCHEDULER_OBJECT_SINGLETON_KIND(kind)   (SCHEDULER_OBJECT_KIND_TYPE(kind) == OCR_SCHEDULER_OBJECT_SINGLETON)
-#define IS_SCHEDULER_OBJECT_AGGREGATE_KIND(kind)   (SCHEDULER_OBJECT_KIND_TYPE(kind) == OCR_SCHEDULER_OBJECT_AGGREGATE)
-#define IS_SCHEDULER_OBJECT_ROOT_KIND(kind)        (SCHEDULER_OBJECT_KIND_TYPE(kind) == OCR_SCHEDULER_OBJECT_ROOT)
+#define SCHEDULER_OBJECT_KIND(kind)                (kind & ~0xF)
+#define IS_SCHEDULER_OBJECT_TYPE_SINGLETON(kind)   ((kind & 0xF0) == OCR_SCHEDULER_OBJECT_SINGLETON)
+#define IS_SCHEDULER_OBJECT_TYPE_AGGREGATE(kind)   ((kind & 0xF0) == OCR_SCHEDULER_OBJECT_AGGREGATE)
+#define IS_SCHEDULER_OBJECT_TYPE_ROOT(kind)        ((kind & 0xFF) == OCR_SCHEDULER_OBJECT_ROOT)
+#define IS_SCHEDULER_OBJECT_TYPE_ITERATOR(kind)    ((kind & 0xFF) == OCR_SCHEDULER_OBJECT_ITERATOR)
 
 /****************************************************/
 /* PARAMETER LISTS                                  */
@@ -100,8 +178,8 @@ typedef struct _paramListSchedulerObjectFact_t {
 
 typedef struct _paramListSchedulerObject_t {
     ocrParamList_t base;
-    ocrSchedulerObjectKind kind;
-    u32 count;
+    ocrSchedulerObjectKind kind;    // Kind of scheduler object
+    bool guidRequired;              // If object will stay local in the PD, then guid is not required
 } paramListSchedulerObject_t;
 
 /****************************************************/
@@ -111,9 +189,10 @@ typedef struct _paramListSchedulerObject_t {
 /*! \brief OCR schedulerObject data structures.
  */
 typedef struct _ocrSchedulerObject_t {
-    ocrGuid_t guid;                         /**< GUID for this schedulerObject
-                                                 For singleton schedulerObjects this field is
-                                                 used to carry the element guid */
+    ocrFatGuid_t guid;                      /**< GUID for this schedulerObject
+                                                 The metadata ptr points to the allocation of the scheduler object.
+                                                 For singleton schedulerObjects this field is used to carry the
+                                                 element guid and its metadata ptr */
     ocrSchedulerObjectKind kind;            /**< Kind of schedulerObject */
     u32 fctId;                              /**< ID determining factory; Not used for singleton schedulerObjects. */
     ocrLocation_t loc;                      /**< Current location mapping for this schedulerObject.
@@ -121,6 +200,27 @@ typedef struct _ocrSchedulerObject_t {
                                                  during the lifetime of the schedulerObject. */
     ocrSchedulerObjectMappingKind mapping;  /**< Mapping kind */
 } ocrSchedulerObject_t;
+
+/****************************************************/
+/* OCR SCHEDULER OBJECT ITERATOR                    */
+/****************************************************/
+
+#define ITERATOR_ARG_NAME(name) _arg_##name
+#define ITERATOR_ARG_FIELD(type) data.ITERATOR_ARG_NAME(type)
+
+/*! \brief OCR schedulerObject Iterator data structure
+ */
+typedef struct _ocrSchedulerObjectIterator_t {
+    ocrSchedulerObject_t base;              /**< Scheduler object base */
+    union {
+        struct {
+            void *el;                       /**< List node data element */
+        } ITERATOR_ARG_NAME(OCR_SCHEDULER_OBJECT_LIST);
+        struct {
+            void *key, *value;              /**< Hash map key and value */
+        } ITERATOR_ARG_NAME(OCR_SCHEDULER_OBJECT_MAP);
+    } data;
+} ocrSchedulerObjectIterator_t;
 
 /****************************************************/
 /* OCR SCHEDULER OBJECT ACTIONS                     */
@@ -185,7 +285,7 @@ typedef struct _ocrSchedulerObjectFcts_t {
      *
      *  @return 0 on success and a non-zero value on failure
      */
-    u8 (*destruct)(struct _ocrSchedulerObjectFactory_t *fact, ocrSchedulerObject_t *self);
+    u8 (*destroy)(struct _ocrSchedulerObjectFactory_t *fact, ocrSchedulerObject_t *self);
 
     /** @brief Insert an element into this(self) schedulerObject
      *
@@ -213,6 +313,17 @@ typedef struct _ocrSchedulerObjectFcts_t {
      *  @return 0 on success and a non-zero value on failure
      */
     u8 (*remove)(struct _ocrSchedulerObjectFactory_t *fact, ocrSchedulerObject_t *self, ocrSchedulerObjectKind kind, u32 count, ocrSchedulerObject_t *dst, ocrSchedulerObject_t *elToRemove, u32 properties);
+
+    /** @brief Iterate over the scheduler object
+     *
+     *  @param[in] fact         Pointer to this schedulerObject factory
+     *  @param[in] self         Scheduler object to iterate over
+     *  @param[in] iterator     Iterator object
+     *  @param[in] properties   Properties of the operation
+     *
+     *  @return 0 on success and a non-zero value on failure
+     */
+    u8 (*iterate)(struct _ocrSchedulerObjectFactory_t *fact, ocrSchedulerObject_t *self, ocrSchedulerObjectIterator_t *iterator, u32 properties);
 
     /** @brief Get the number of elements
      *
@@ -306,7 +417,7 @@ typedef struct _ocrSchedulerObjectFactory_t {
      */
     void (*destruct)(struct _ocrSchedulerObjectFactory_t * factory);
 
-    /*! \brief Instantiates a SchedulerObject and returns its corresponding pointer
+    /*! \brief Instantiates a SchedulerObject from the factory and returns its corresponding pointer
      *         If it does not recognize the kind, then it returns NULL.
      */
     ocrSchedulerObject_t* (*instantiate)(struct _ocrSchedulerObjectFactory_t * factory, ocrParamList_t *perInstance);
@@ -318,8 +429,9 @@ typedef struct _ocrSchedulerObjectFactory_t {
 } ocrSchedulerObjectFactory_t;
 
 /****************************************************/
-/* OCR SCHEDULER OBJECT ROOT                        */
+/* OCR SCHEDULER OBJECT ROOT FACTORY                */
 /****************************************************/
+
 /*
  * A "schedulerObject root" is a special kind of schedulerObject
  * that encapsulates all the schedulerObjects maintained by
@@ -350,30 +462,20 @@ typedef struct _ocrSchedulerObjectRootFcts_t {
      * that the call to switch runlevel was well formed and will be processed
      * at some point
      */
-    u8 (*switchRunlevel)(struct _ocrSchedulerObjectRoot_t* self, struct _ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
+    u8 (*switchRunlevel)(ocrSchedulerObject_t *self, struct _ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
                          phase_t phase, u32 properties, void (*callback)(struct _ocrPolicyDomain_t*, u64), u64 val);
 
-    void (*destruct)(struct _ocrSchedulerObjectRoot_t *self);
+    void (*destruct)(ocrSchedulerObject_t *self);
 
     /*! \brief Creates an action set of with "count" number of actions
      */
-    ocrSchedulerObjectActionSet_t* (*newActionSet)(struct _ocrSchedulerObjectRoot_t *self, u32 count);
+    ocrSchedulerObjectActionSet_t* (*newActionSet)(ocrSchedulerObject_t *self, struct _ocrPolicyDomain_t *PD, u32 count);
 
     /*! \brief Destroys an action set
      */
-    void (*destroyActionSet)(struct _ocrSchedulerObjectRoot_t *self, ocrSchedulerObjectActionSet_t *actionSet);
+    void (*destroyActionSet)(ocrSchedulerObject_t *self, struct _ocrPolicyDomain_t *PD, ocrSchedulerObjectActionSet_t *actionSet);
 
 } ocrSchedulerObjectRootFcts_t;
-
-typedef struct _ocrSchedulerObjectRoot_t {
-    ocrSchedulerObject_t base;
-    struct _ocrScheduler_t *scheduler;    /**< Scheduler of this schedulerObject root */
-    ocrSchedulerObjectRootFcts_t fcts;       /**< root specific functions */
-} ocrSchedulerObjectRoot_t;
-
-/****************************************************/
-/* OCR SCHEDULER OBJECT ROOT FACTORY                */
-/****************************************************/
 
 /*! \brief Abstract factory class to create OCR schedulerObject root
  *

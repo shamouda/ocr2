@@ -16,14 +16,13 @@
 #include "ocr-scheduler-object.h"
 
 /****************************************************/
-/* HC SCHEDULER_HEURISTIC                                   */
+/* HC SCHEDULER_HEURISTIC                           */
 /****************************************************/
 
 // Cached information about context
 typedef struct _ocrSchedulerHeuristicContextHc_t {
     ocrSchedulerHeuristicContext_t base;
     ocrSchedulerObject_t *mySchedulerObject;    // The deque owned by a specific worker (context)
-    u64 mySchedulerObjectIndex;           // The index of the owned deque in the workstealing array of deques
     u64 stealSchedulerObjectIndex;        // Cached index of the deque lasted visited during steal attempts
 #if 0 // Example fields for simulation mode
     ocrSchedulerObjectActionSet_t singleActionSet;
@@ -37,7 +36,7 @@ typedef struct _ocrSchedulerHeuristicHc_t {
 } ocrSchedulerHeuristicHc_t;
 
 /****************************************************/
-/* HC SCHEDULER_HEURISTIC FACTORY                           */
+/* HC SCHEDULER_HEURISTIC FACTORY                   */
 /****************************************************/
 
 typedef struct _paramListSchedulerHeuristicHc_t {
@@ -48,7 +47,7 @@ typedef struct _ocrSchedulerHeuristicFactoryHc_t {
     ocrSchedulerHeuristicFactory_t base;
 } ocrSchedulerHeuristicFactoryHc_t;
 
-ocrSchedulerHeuristicFactory_t * newOcrSchedulerHeuristicFactoryHc(ocrParamList_t *perType);
+ocrSchedulerHeuristicFactory_t * newOcrSchedulerHeuristicFactoryHc(ocrParamList_t *perType, u32 factoryId);
 
 #endif /* ENABLE_SCHEDULER_HEURISTIC_HC */
 #endif /* __HC_SCHEDULER_HEURISTIC_H__ */

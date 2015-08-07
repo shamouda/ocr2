@@ -21,7 +21,7 @@
 
 #ifdef ENABLE_HINTS
 /**< The number of hint properties supported by this implementation */
-#define OCR_HINT_COUNT_EDT_HC   2
+#define OCR_HINT_COUNT_EDT_HC   3
 #else
 #define OCR_HINT_COUNT_EDT_HC   0
 #endif
@@ -60,8 +60,20 @@ typedef struct {
     ocrRuntimeHint_t hint;
 } ocrTaskHc_t;
 
-#define HC_TASK_PARAMV_PTR(edt) ((u64*)(((u64)edt) + sizeof(ocrTaskHc_t)))
-#define HC_TASK_DEPV_PTR(edt)   ((regNode_t*)(((u64)edt) + sizeof(ocrTaskHc_t) + (((ocrTask_t *) edt)->paramc)*sizeof(u64)))
+#define HC_TASK_PARAMV_PTR(edt)     ((u64*)(((u64)edt) + sizeof(ocrTaskHc_t)))
+#define HC_TASK_DEPV_PTR(edt)       ((regNode_t*)(((u64)edt) + sizeof(ocrTaskHc_t) + (((ocrTask_t *) edt)->paramc)*sizeof(u64)))
+#define HC_TASK_DEPV_END(edt)       ((u64)HC_TASK_DEPV_PTR(edt) + (((ocrTask_t *) edt)->depc) * sizeof(regNode_t))
+#define HC_TASK_HINT_PTR(edt)       ((((ocrTask_t*)edt)->flags & OCR_TASK_FLAG_USES_HINTS) ? (u64*)HC_TASK_DEPV_END(edt) : NULL)
+#define HC_TASK_HINT_END(edt)       ((u64)((((ocrTask_t*)edt)->flags & OCR_TASK_FLAG_USES_HINTS) ? HC_TASK_DEPV_END(edt) + OCR_HINT_COUNT_EDT_HC * sizeof(u64) : HC_TASK_DEPV_END(edt)))
+#define HC_TASK_SCHED_OBJ_PTR(edt)  ((((ocrTask_t*)edt)->flags & OCR_TASK_FLAG_USES_SCHEDULER_OBJECT) ? (u64*)HC_TASK_HINT_END(edt) : NULL)
+#define HC_TASK_SCHED_OBJ_END(edt)  ((u64)((((ocrTask_t*)edt)->flags & OCR_TASK_FLAG_USES_SCHEDULER_OBJECT) ? HC_TASK_HINT_END(edt) + sizeof(u64) : HC_TASK_HINT_END(edt)))
+
+#define HC_TASK_SIZE(edt)                                                                                           \
+    (sizeof(ocrTaskHc_t) +                                                                                          \
+    (((ocrTask_t *) edt)->paramc) * sizeof(u64) +                                                                   \
+    (((ocrTask_t *) edt)->depc) * sizeof(regNode_t) +                                                               \
+    (((((ocrTask_t *) edt)->flags & OCR_TASK_FLAG_USES_HINTS) != 0) ? OCR_HINT_COUNT_EDT_HC * sizeof(u64) : 0) +    \
+    (((((ocrTask_t *) edt)->flags & OCR_TASK_FLAG_USES_SCHEDULER_OBJECT) != 0) ? sizeof(u64) : 0));
 
 typedef struct {
     ocrTaskFactory_t baseFactory;
