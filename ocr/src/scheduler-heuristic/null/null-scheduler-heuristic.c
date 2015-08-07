@@ -131,9 +131,10 @@ void destructSchedulerHeuristicFactoryNull(ocrSchedulerHeuristicFactory_t * fact
     runtimeChunkFree((u64)factory, NONPERSISTENT_CHUNK);
 }
 
-ocrSchedulerHeuristicFactory_t * newOcrSchedulerHeuristicFactoryNull(ocrParamList_t *perType) {
+ocrSchedulerHeuristicFactory_t * newOcrSchedulerHeuristicFactoryNull(ocrParamList_t *perType, u32 factoryId) {
     ocrSchedulerHeuristicFactory_t* base = (ocrSchedulerHeuristicFactory_t*) runtimeChunkAlloc(
                                       sizeof(ocrSchedulerHeuristicFactoryNull_t), NONPERSISTENT_CHUNK);
+    base->factoryId = factoryId;
     base->instantiate = &newSchedulerHeuristicNull;
     base->destruct = &destructSchedulerHeuristicFactoryNull;
     base->fcts.switchRunlevel = FUNC_ADDR(u8 (*)(ocrSchedulerHeuristic_t*, ocrPolicyDomain_t*, ocrRunlevel_t,

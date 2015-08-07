@@ -62,12 +62,13 @@ typedef enum {
 
 typedef struct _ocrSchedulerOpArgs_t {
     u64 seqId;                                      /* Sequential ID of client calling into the scheduler */
+    u32 heuristicId;                                /* Scheduler heuristic to invoke */
 } ocrSchedulerOpArgs_t;
 
 /* Scheduler worker task related arguments */
 typedef enum {
-    OCR_SCHED_WORK_EDT_USER,
-    OCR_SCHED_WORK_COMM,
+    OCR_SCHED_WORK_EDT_USER,                        /* User-created EDT */
+    OCR_SCHED_WORK_COMM,                            /* Runtime created communication task */
 } ocrSchedWorkKind;
 
 typedef union _ocrSchedWorkData_t {
@@ -99,6 +100,7 @@ typedef enum {
 typedef union _ocrSchedNotifyData_t {
     struct {
         ocrFatGuid_t guid;                          /* Scheduler is notified about this db guid */
+        ocrDataBlockType_t dbType;                  /* Type of datablock being created */
     } OCR_SCHED_ARG_NAME(OCR_SCHED_NOTIFY_DB_CREATE);
     struct {
         ocrFatGuid_t guid;                          /* Scheduler is notified about this db guid */
@@ -140,21 +142,30 @@ typedef struct _ocrSchedulerOpTransactArgs_t {
 
 /* Scheduler negotiation related arguments */
 typedef enum {
-    OCR_SCHED_ANALYZE_CLOCK_CYCLE,
+    OCR_SCHED_ANALYZE_PHASE,
 } ocrSchedAnalyzeKind;
 
 typedef union _ocrSchedAnalyzeData_t {
-    struct {
-        u64 cycle;                                  /* Scheduler cycle */
-        ocrDbAccessMode_t mode;                     /* DB access mode */
-    } OCR_SCHED_ARG_NAME(OCR_SCHED_ANALYZE_CLOCK_CYCLE);
+    union {
+        struct {
+            u32 depc;
+            ocrEdtDep_t *depv;
+            ocrRuntimeHint_t *hint;
+        } req;
+        struct {
+            u64 scheduledPhase;                     /* Scheduler phase when task will be scheduled */
+            u64 scheduledLocation;                  /* Scheduler location where task will be scheduled */
+            ocrGuid_t affinity;                     /* Affinity to specific DB/group etc */
+        } resp;
+    } OCR_SCHED_ARG_NAME(OCR_SCHED_ANALYZE_PHASE);
 } ocrSchedAnalyzeData_t;
 
 typedef enum {
-    OCR_SCHED_ANALYZE_REQUEST,
-    OCR_SCHED_ANALYZE_RESPONSE,
-    OCR_SCHED_ANALYZE_UPDATE,
-    OCR_SCHED_ANALYZE_ACKNOWLEDGE,
+    OCR_SCHED_ANALYZE_REQUEST,                      /* Property for requesting data from another scheduler (get) */
+    OCR_SCHED_ANALYZE_RESPONSE,                     /* Property for responding to a request from another scheduler (get response) */
+    OCR_SCHED_ANALYZE_UPDATE,                       /* Property for updating the data in another scheduler (set) */
+    OCR_SCHED_ANALYZE_ACK,                          /* Property to acknowledge successful update of data (positive set response) */
+    OCR_SCHED_ANALYZE_NACK,                         /* Property to acknowledge unsuccessful update of data (negative set response) */
 } ocrSchedulerAnalyzeProp;
 
 typedef struct _ocrSchedulerOpAnalyzeArgs_t {
@@ -354,7 +365,7 @@ typedef struct _ocrScheduler_t {
     // SchedulerObject Root:
     // Top level schedulerObject that encapsulates all schedulerObjects.
     // SchedulerObject factories are maintained in the policy domain.
-    struct _ocrSchedulerObjectRoot_t *rootObj;
+    struct _ocrSchedulerObject_t *rootObj;
 
     // Scheduler Heuristics
     struct _ocrSchedulerHeuristic_t **schedulerHeuristics;

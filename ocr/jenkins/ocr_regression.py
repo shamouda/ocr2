@@ -21,7 +21,7 @@ job_ocr_regression_x86_pthread_x86 = {
     'name': 'ocr-regression-x86',
     'depends': ('ocr-build-x86',),
     'jobtype': 'ocr-regression',
-    'run-args': 'x86 jenkins-hc-8w-regularDB.cfg regularDB',
+    'run-args': 'x86 jenkins-common-8w-regularDB.cfg regularDB',
     'sandbox': ('inherit0',)
 }
 
@@ -29,7 +29,7 @@ job_ocr_regression_x86_pthread_x86_lockableDB = {
     'name': 'ocr-regression-x86-lockableDB',
     'depends': ('ocr-build-x86',),
     'jobtype': 'ocr-regression',
-    'run-args': 'x86 jenkins-hc-8w-lockableDB.cfg lockableDB',
+    'run-args': 'x86 jenkins-common-8w-lockableDB.cfg lockableDB',
     'sandbox': ('inherit0',)
 }
 

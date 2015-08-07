@@ -97,7 +97,6 @@ u8 ceSchedulerSwitchRunlevel(ocrScheduler_t *self, ocrPolicyDomain_t *PD, ocrRun
     u64 i;
     if(runlevel == RL_PD_OK && (properties & RL_BRING_UP) && phase == 0) {
         // First transition, setup some backpointers
-        self->rootObj->scheduler = self;
         for(i = 0; i < self->schedulerHeuristicCount; ++i) {
             self->schedulerHeuristics[i]->scheduler = self;
         }
@@ -108,8 +107,15 @@ u8 ceSchedulerSwitchRunlevel(ocrScheduler_t *self, ocrPolicyDomain_t *PD, ocrRun
         toReturn |= self->workpiles[i]->fcts.switchRunlevel(
             self->workpiles[i], PD, runlevel, phase, properties, NULL, 0);
     }
-    toReturn |= self->rootObj->fcts.switchRunlevel(self->rootObj, PD, runlevel, phase,
-                                                  properties, NULL, 0);
+    for(i = 0; i < PD->schedulerObjectFactoryCount; ++i) {
+        ocrSchedulerObjectFactory_t *fact = PD->schedulerObjectFactories[i];
+        if (IS_SCHEDULER_OBJECT_TYPE_ROOT(fact->kind)) {
+            ocrSchedulerObjectRootFactory_t *rootFact = (ocrSchedulerObjectRootFactory_t*)fact;
+            toReturn |= rootFact->fcts.switchRunlevel(self->rootObj, PD, runlevel, phase,
+                                                      properties, NULL, 0);
+            break;
+        }
+    }
     for(i = 0; i < self->schedulerHeuristicCount; ++i) {
         toReturn |= self->schedulerHeuristics[i]->fcts.switchRunlevel(
             self->schedulerHeuristics[i], PD, runlevel, phase, properties, NULL, 0);
@@ -297,6 +303,9 @@ u8 ceSchedulerNotifyInvoke(ocrScheduler_t *self, ocrSchedulerOpArgs_t *opArgs, o
 #undef PD_TYPE
         }
         break;
+    // Notifies ignored by this scheduler
+    case OCR_SCHED_NOTIFY_EDT_SATISFIED:
+        return OCR_ENOP;
     default:
         ASSERT(0);
         return OCR_ENOTSUP;

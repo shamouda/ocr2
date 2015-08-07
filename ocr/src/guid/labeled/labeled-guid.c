@@ -227,6 +227,8 @@ u8 labeledGuidCreateGuid(ocrGuidProvider_t* self, ocrFatGuid_t *fguid, u64 size,
     // Update the fat GUID's metaDataPtr
     fguid->metaDataPtr = ptr;
 #undef PD_TYPE
+    (*(ocrGuid_t*)ptr) = NULL_GUID; // The first field is always the GUID, either directly as ocrGuid_t or a ocrFatGuid_t
+                                    // This is used to determine if a GUID metadata is "ready". See bug #627
     if(properties & GUID_PROP_IS_LABELED) {
         if((properties & GUID_PROP_CHECK) == GUID_PROP_CHECK) {
             // We need to actually check things
@@ -235,7 +237,8 @@ u8 labeledGuidCreateGuid(ocrGuidProvider_t* self, ocrFatGuid_t *fguid, u64 size,
                 ((ocrGuidProviderLabeled_t*)self)->guidImplTable,
                 (void*)(fguid->guid), ptr);
             if(value != ptr) {
-                DPRINTF(DEBUG_LVL_VVERB, "LabeledGUID: FAILED to insert\n");
+                DPRINTF(DEBUG_LVL_VVERB, "LabeledGUID: FAILED to insert (got 0x%lx instead of 0x%lx)\n",
+                        value, ptr);
                 // Fail; already exists
                 fguid->metaDataPtr = value; // Do we need to return this?
                 // We now need to free the memory we allocated
@@ -249,6 +252,10 @@ u8 labeledGuidCreateGuid(ocrGuidProvider_t* self, ocrFatGuid_t *fguid, u64 size,
                 PD_MSG_FIELD_I(properties) = 0;
                 RESULT_PROPAGATE(policy->fcts.processMessage(policy, &msg, true));
 #undef PD_TYPE
+                // Bug #627: We do not return OCR_EGUIDEXISTS until the GUID is valid. We test this
+                // by looking at the first field of ptr and waiting for it to be the GUID value (meaning the
+                // object has been initialized
+                while(*(ocrGuid_t*)value != fguid->guid) ;
                 return OCR_EGUIDEXISTS;
             }
         } else if((properties & GUID_PROP_BLOCK) == GUID_PROP_BLOCK) {

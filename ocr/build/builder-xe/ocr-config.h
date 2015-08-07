@@ -20,7 +20,8 @@
 #define ENABLE_BUILDER_ONLY
 
 // Allocator
-#define ENABLE_ALLOCATOR_NULL
+#define ENABLE_ALLOCATOR_SIMPLE
+#define ENABLE_ALLOCATOR_QUICK
 
 
 // CommApi

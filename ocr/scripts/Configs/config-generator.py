@@ -249,7 +249,7 @@ def GenerateConfig(filehandle, guid, platform, target, threads, binding, alloc, 
         GenerateCommon(filehandle, "HC", dbtype)
         GenerateMem(filehandle, alloc, 1, alloctype)
         GenerateComm(filehandle, "null", "HC", threads)
-        GenerateComp(filehandle, "HC", threads, binding, "HC")
+        GenerateComp(filehandle, "HC", threads, binding, "COMMON")
     elif target=='FSIM':
         GeneratePd(filehandle, "CE", dbtype, 1)
         GeneratePd(filehandle, "XE", dbtype, threads)

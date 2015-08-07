@@ -690,7 +690,7 @@ static void* allocateDatablock (ocrPolicyDomain_t *self,
 
 static u8 hcAllocateDb(ocrPolicyDomain_t *self, ocrFatGuid_t *guid, void** ptr, u64 size,
                        u32 properties, ocrFatGuid_t affinity, ocrInDbAllocator_t allocator,
-                       u64 prescription) {
+                       u64 prescription, ocrDataBlockType_t dbType) {
     // This function allocates a data block for the requestor, who is either this computing agent or a
     // different one that sent us a message.  After getting that data block, it "guidifies" the results
     // which, by the way, ultimately causes hcMemAlloc (just below) to run.
@@ -708,6 +708,26 @@ static u8 hcAllocateDb(ocrPolicyDomain_t *self, ocrFatGuid_t *guid, void** ptr, 
         *ptr = result;
         (*guid).guid = block->guid;
         (*guid).metaDataPtr = block;
+
+        // Notify scheduler of DB CREATE
+        if (result != NULL && block != NULL) {
+            ocrWorker_t *worker = NULL;
+            PD_MSG_STACK(msg);
+            getCurrentEnv(NULL, &worker, NULL, &msg);
+
+#define PD_MSG (&msg)
+#define PD_TYPE PD_MSG_SCHED_NOTIFY
+            msg.type = PD_MSG_SCHED_NOTIFY | PD_MSG_REQUEST;
+            PD_MSG_FIELD_IO(schedArgs).base.seqId = worker->seqId;
+            PD_MSG_FIELD_IO(schedArgs).kind = OCR_SCHED_NOTIFY_DB_CREATE;
+            PD_MSG_FIELD_IO(schedArgs).OCR_SCHED_ARG_FIELD(OCR_SCHED_NOTIFY_DB_CREATE).guid.guid = block->guid;
+            PD_MSG_FIELD_IO(schedArgs).OCR_SCHED_ARG_FIELD(OCR_SCHED_NOTIFY_DB_CREATE).guid.metaDataPtr = block;
+            PD_MSG_FIELD_IO(schedArgs).OCR_SCHED_ARG_FIELD(OCR_SCHED_NOTIFY_DB_CREATE).dbType = dbType;
+            RESULT_PROPAGATE(self->fcts.processMessage(self, &msg, false));
+            ASSERT(PD_MSG_FIELD_O(returnDetail) != OCR_ENOTSUP);
+#undef PD_MSG
+#undef PD_TYPE
+        }
         return 0;
     } else {
         DPRINTF(DEBUG_LVL_WARN, "hcAllocateDb returning NULL for size %ld\n", (u64) size);
@@ -909,7 +929,7 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
                                   PD_MSG_FIELD_IO(properties),
                                   PD_MSG_FIELD_I(affinity),
                                   PD_MSG_FIELD_I(allocator),
-                                  PRESCRIPTION);
+                                  PRESCRIPTION, PD_MSG_FIELD_I(dbType));
         if(PD_MSG_FIELD_O(returnDetail) == 0) {
             ocrDataBlock_t *db = PD_MSG_FIELD_IO(guid.metaDataPtr);
             if(db==NULL)
@@ -1446,6 +1466,22 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         PD_MSG_FIELD_O(returnDetail) =
             self->schedulers[0]->fcts.op[OCR_SCHEDULER_OP_NOTIFY].invoke(
                 self->schedulers[0], (ocrSchedulerOpArgs_t*)notifyArgs, NULL);
+#undef PD_MSG
+#undef PD_TYPE
+        msg->type &= ~PD_MSG_REQUEST;
+        msg->type |= PD_MSG_RESPONSE;
+        EXIT_PROFILE;
+        break;
+    }
+
+    case PD_MSG_SCHED_ANALYZE: {
+        START_PROFILE(pd_hc_Sched_Notify);
+#define PD_MSG msg
+#define PD_TYPE PD_MSG_SCHED_ANALYZE
+        ocrSchedulerOpAnalyzeArgs_t *analyzeArgs = &PD_MSG_FIELD_IO(schedArgs);
+        PD_MSG_FIELD_O(returnDetail) =
+            self->schedulers[0]->fcts.op[OCR_SCHEDULER_OP_ANALYZE].invoke(
+                self->schedulers[0], (ocrSchedulerOpArgs_t*)analyzeArgs, NULL);
 #undef PD_MSG
 #undef PD_TYPE
         msg->type &= ~PD_MSG_REQUEST;

@@ -36,6 +36,7 @@ struct _ocrTaskTemplate_t;
 /****************************************************/
 typedef struct _paramListTaskFact_t {
     ocrParamList_t base;
+    u8 usesSchedulerObject;
 } paramListTaskFact_t;
 
 typedef struct _paramListTaskTemplateFact_t {
@@ -338,8 +339,12 @@ typedef struct _ocrTask_t {
     ocrGuid_t els[ELS_SIZE];/**< EDT local storage */
     ocrEdtState_t state;    /**< State of the EDT */
     u32 paramc, depc;       /**< Number of parameters and dependences */
+    u32 flags;              /**< Bit flags for the task */
     u32 fctId;
 } ocrTask_t;
+
+#define OCR_TASK_FLAG_USES_HINTS            0x1
+#define OCR_TASK_FLAG_USES_SCHEDULER_OBJECT 0x2
 
 /****************************************************/
 /* OCR TASK FACTORY                                 */
@@ -371,9 +376,11 @@ typedef struct _ocrTaskFactory_t {
      */
     void (*destruct)(struct _ocrTaskFactory_t * factory);
 
-    u32 factoryId;
-    ocrTaskFcts_t fcts;
-    u64 *hintPropMap; /**< Mapping hint properties to implementation specific packed array */
+    ocrTaskFcts_t fcts;         /**< Function pointers created instances should use */
+    u32 factoryId;              /**< Corresponds to fctId in task */
+    u64 *hintPropMap;           /**< Mapping hint properties to implementation specific packed array */
+    u8 usesSchedulerObject;     /**< This flag indicates if the datablock can have
+                                     a scheduler object associated with it */
 } ocrTaskFactory_t;
 
 #endif /* __OCR_TASK_H__ */

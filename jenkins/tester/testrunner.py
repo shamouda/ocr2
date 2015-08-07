@@ -490,7 +490,7 @@ def main(argv=None):
             raise Usage(err)
         # Need to parse deftimeout first
         for o, a in opts:
-            if o in ('--deftimeout'):
+            if o in ('--deftimeout',):
                 defaultTimeout = int(a)
                 break
         myLog.debug("Default timeout set to %d seconds" % (defaultTimeout))
@@ -533,7 +533,7 @@ def main(argv=None):
                     directories with at least one failure in them will be maintained.
     --deftimeout    Default timeout for jobs without timeouts. Defaults to 300 seconds
 """)
-            elif o in ('--full-help'):
+            elif o in ('--full-help',):
                 raise Usage(\
 """
     Each job type must specify the following arguments:
@@ -720,22 +720,22 @@ def main(argv=None):
                 testKeywords.append(a)
             elif o in ("-o", "--output"):
                 resultFileName = a
-            elif o in ("--hier-results"):
+            elif o in ("--hier-results",):
                 doHierarchicalResults = True
-            elif o in ("--no-clean"):
+            elif o in ("--no-clean",):
                 if a == 'all':
                     keepDirs = KEEP_ALL
                 elif a == 'failure':
                     keepDirs = KEEP_FAILURE
                 else:
                     raise Usage("Value %s is not valid for '--no-clean'" % (a))
-            elif o in ("--local-only"):
+            elif o in ("--local-only",):
                 runRemoteJobs = False
-            elif o in ("--local-max"):
+            elif o in ("--local-max",):
                 maxLocalJobs = int(a)
                 if maxLocalJobs < 1:
                     maxLocalJobs = 1
-            elif o in ("--deftimeout"):
+            elif o in ("--deftimeout",):
                 # Ignore, we already parsed this
                 pass
             else:

@@ -256,8 +256,17 @@ char* populate_type(ocrParamList_t **type_param, type_enum index, dictionary *di
     case policydomain_type:
         ALLOC_PARAM_LIST(*type_param, paramListPolicyDomainFact_t);
         break;
-    case taskfactory_type:
-        ALLOC_PARAM_LIST(*type_param, paramListTaskFact_t);
+    case taskfactory_type: {
+            ALLOC_PARAM_LIST(*type_param, paramListTaskFact_t);
+            ((paramListTaskFact_t*)(*type_param))->usesSchedulerObject = 0;
+            if (key_exists(dict, secname, "schedobj")) {
+                char *valuestr = NULL;
+                snprintf(key, MAX_KEY_SZ, "%s:%s", secname, "schedobj");
+                INI_GET_STR (key, valuestr, "");
+                ASSERT(strcmp(valuestr, "1") == 0);
+                ((paramListTaskFact_t*)(*type_param))->usesSchedulerObject = 1;
+            }
+        }
         break;
     case tasktemplatefactory_type:
         ALLOC_PARAM_LIST(*type_param, paramListTaskTemplateFact_t);
@@ -625,10 +634,7 @@ s32 populate_inst(ocrParamList_t **inst_param, void **instance, s32 *type_counts
             switch (mytype) {
 #ifdef ENABLE_MEM_PLATFORM_FSIM
             case memPlatformFsim_id: {
-                extern u64 end_marker;
                 ALLOC_PARAM_LIST(inst_param[j], paramListMemPlatformFsim_t);
-                ((paramListMemPlatformFsim_t *)inst_param[j])->start = end_marker;
-                ((paramListMemPlatformInst_t *)inst_param[j])->size = end_marker;
                 break;
             }
 #endif
@@ -643,9 +649,8 @@ s32 populate_inst(ocrParamList_t **inst_param, void **instance, s32 *type_counts
 #ifdef ENABLE_MEM_PLATFORM_FSIM
             // Adjust the start and size according to size of ELF binary
             // BUG #594
-            ((paramListMemPlatformInst_t *)inst_param[j])->size -= ((paramListMemPlatformFsim_t*)inst_param[j])->start;
             snprintf(key, MAX_KEY_SZ, "%s:%s", secname, "start");
-            ((paramListMemPlatformFsim_t*)inst_param[j])->start += (u64)iniparser_getlonglong(dict, key, 0);
+            ((paramListMemPlatformFsim_t*)inst_param[j])->start = (u64)iniparser_getlonglong(dict, key, 0);
 #endif
 
             instance[j] = (void *)((ocrMemPlatformFactory_t *)factory)->instantiate(factory, inst_param[j]);
@@ -879,7 +884,10 @@ s32 populate_inst(ocrParamList_t **inst_param, void **instance, s32 *type_counts
             switch (mytype) {
 #if defined(ENABLE_SCHEDULER_HC) || defined(ENABLE_SCHEDULER_HC_COMM_DELEGATE)
             case schedulerHc_id:
-            case schedulerHcCommDelegate_id: {
+#if defined(ENABLE_SCHEDULER_HC_COMM_DELEGATE)
+            case schedulerHcCommDelegate_id:
+#endif
+            {
                 ALLOC_PARAM_LIST(inst_param[j], paramListSchedulerHcInst_t);
                 snprintf(key, MAX_KEY_SZ, "%s:%s", secname, "workeridfirst");
                 INI_GET_INT (key, value, -1);
@@ -1050,7 +1058,7 @@ void add_dependence (type_enum fromtype, type_enum totype, char *refstr,
         case schedulerObject_type: {
             if (toinstance != NULL) {
                 ASSERT(f->rootObj == NULL); //scheduler can have only one schedulerObject root
-                f->rootObj = (ocrSchedulerObjectRoot_t *)toinstance;
+                f->rootObj = (ocrSchedulerObject_t *)toinstance;
             }
             break;
         }

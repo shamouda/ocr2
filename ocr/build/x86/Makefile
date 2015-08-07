@@ -14,7 +14,7 @@ $(error OCR_TYPE is set to ${OCR_TYPE} but expected x86)
 endif
 endif
 
-DEFAULT_CONFIG=mach-hc-4w.cfg
+DEFAULT_CONFIG=jenkins-common-8w-lockableDB.cfg
 
 #
 # Tool-chain to be used for the build
