@@ -1,3 +1,5 @@
 wst                 - scheduler object for work-stealing domains or places
 deq                 - scheduler object that implements a double ended queue
+bin-heap            - scheduler object that implements a binary max heap
+pr-wsh              - scheduler object for priority work-sharing domains or places
 null                - null implementation (temporary)

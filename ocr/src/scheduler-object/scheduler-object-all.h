@@ -29,6 +29,12 @@
 #ifdef ENABLE_SCHEDULER_OBJECT_MAP
 #include "scheduler-object/map/map-scheduler-object.h"
 #endif
+#ifdef ENABLE_SCHEDULER_OBJECT_BIN_HEAP
+#include "scheduler-object/bin-heap/bin-heap-scheduler-object.h"
+#endif
+#ifdef ENABLE_SCHEDULER_OBJECT_PR_WSH
+#include "scheduler-object/pr-wsh/pr-wsh-scheduler-object.h"
+#endif
 #ifdef ENABLE_SCHEDULER_OBJECT_NULL
 #include "scheduler-object/null/null-scheduler-object.h"
 #endif
@@ -51,6 +57,12 @@ typedef enum _schedulerObjectType_t {
 #endif
 #ifdef ENABLE_SCHEDULER_OBJECT_MAP
     schedulerObjectMap_id,
+#endif
+#ifdef ENABLE_SCHEDULER_OBJECT_BIN_HEAP
+    schedulerObjectBinHeap_id,
+#endif
+#ifdef ENABLE_SCHEDULER_OBJECT_PR_WSH
+    schedulerObjectPrWsh_id,
 #endif
 #ifdef ENABLE_SCHEDULER_OBJECT_NULL
     schedulerObjectNull_id,

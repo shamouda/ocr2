@@ -100,6 +100,7 @@ struct _ocrScheduler_t;
 //Mapping
 #define SCHEDULER_OBJECT_CREATE_IF_ABSENT                  0x015
 #define SCHEDULER_OBJECT_MAPPING_WST                       0x105
+#define SCHEDULER_OBJECT_MAPPING_PR_WSH                    0x205
 
 typedef enum {
     OCR_SCHEDULER_OBJECT_MAPPING_POTENTIAL,    /* schedulerObjects are potentially mapped to certain locations or policy domains but not placed yet. Potential mappings can change. */
@@ -137,6 +138,8 @@ typedef enum {
     OCR_SCHEDULER_OBJECT_MAP               =0x720,
     OCR_SCHEDULER_OBJECT_DBNODE            =0x820, //Scheduler object to manage the scheduling of DBs
     OCR_SCHEDULER_OBJECT_DOMAIN            =0x920, //Scheduler object that manages a policy domain
+    OCR_SCHEDULER_OBJECT_BIN_HEAP          =0xA20,
+    OCR_SCHEDULER_OBJECT_PR_WSH            =0xB20,
 
     //root schedulerObjects:
     //    These are special aggregate schedulerObjects that act as the single top-level
@@ -144,6 +147,7 @@ typedef enum {
     //    They are persistent for the lifetime of the scheduler.
     OCR_SCHEDULER_OBJECT_ROOT              =0x021,
     OCR_SCHEDULER_OBJECT_WST_ROOT          =(OCR_SCHEDULER_OBJECT_WST    | OCR_SCHEDULER_OBJECT_ROOT),
+    OCR_SCHEDULER_OBJECT_PR_WSH_ROOT       =(OCR_SCHEDULER_OBJECT_PR_WSH | OCR_SCHEDULER_OBJECT_ROOT),
     OCR_SCHEDULER_OBJECT_DOMAIN_ROOT       =(OCR_SCHEDULER_OBJECT_DOMAIN | OCR_SCHEDULER_OBJECT_ROOT),
 
     //iterator schedulerObjects:
