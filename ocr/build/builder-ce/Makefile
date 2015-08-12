@@ -17,10 +17,11 @@ endif
 # Tool-chain to be used for the build
 #
 
-TG_INSTALL ?= ../../../../intel/ss/install
+TG_COMMON ?= ../../../../intel/ss/common
+TG_TGKRNL ?= ../../../../intel/ss/tgkrnl
 
 CC      := gcc
-CFLAGS  := -fno-builtin -fno-stack-protector -Wno-unused-local-typedefs -I ${TG_INSTALL}/include
+CFLAGS  := -fno-builtin -fno-stack-protector -Wno-unused-local-typedefs -I ${TG_COMMON}/include -I ${TG_TGKRNL}/inc
 
 RM      := rm
 RMFLAGS := -rf
