@@ -188,7 +188,7 @@ void *addrGlobalizeOnTG(void *result, ocrPolicyDomain_t *self)
 
     u64 id = AGENT_FROM_ID(self->myLocation);
 
-    if((u64)result <= NOM_L1_SIZE_KB*1024) {
+    if((u64)result <= NOM_L1_SIZE_KB*1024 && id < ID_AGENT_CE) {
         result = (void *)DR_XE_BASE(CHIP_FROM_ID(self->myLocation),
                                     UNIT_FROM_ID(self->myLocation),
                                     BLOCK_FROM_ID(self->myLocation),
@@ -221,6 +221,22 @@ void *addrGlobalizeOnTG(void *result, ocrPolicyDomain_t *self)
         ASSERT(check==self->myLocation);
         //DPRINTF(DEBUG_LVL_WARN, "globalize success : %p-> %p , id:%ld , 0x%lx < x < 0x%lx\n", orig, result, id, BR_XE_BASE(id) , XE_MSR_BASE(id) );
     }
+
+    if((u64)result <= 638 * 1024 && id == ID_AGENT_CE) {
+        result = (void *)DR_CE_BASE(CHIP_FROM_ID(self->myLocation),
+                                    UNIT_FROM_ID(self->myLocation),
+                                    BLOCK_FROM_ID(self->myLocation)) +
+                                    (u64)(result - 0);
+        u64 check = MAKE_CORE_ID(0,
+                                 0,
+                                 ((((u64)result >> MAP_CHIP_SHIFT) & ((1ULL<<MAP_CHIP_LEN) - 1)) - 1),
+                                 ((((u64)result >> MAP_UNIT_SHIFT) & ((1ULL<<MAP_UNIT_LEN) - 1)) - 2),
+                                 ((((u64)result >> MAP_BLOCK_SHIFT) & ((1ULL<<MAP_BLOCK_LEN) - 1)) - 2),
+                                 ID_AGENT_CE);
+        //DPRINTF(DEBUG_LVL_WARN, "check:%p , self:%p, myloc:0x%lx\n", check, self, self->myLocation);
+        ASSERT(check==self->myLocation);
+    }
+
     if((u64)result <= CE_MSR_BASE && (u64)result >= BR_CE_BASE) {
         result = (void *)DR_CE_BASE(CHIP_FROM_ID(self->myLocation),
                                     UNIT_FROM_ID(self->myLocation),
@@ -232,7 +248,7 @@ void *addrGlobalizeOnTG(void *result, ocrPolicyDomain_t *self)
                                  ((((u64)result >> MAP_UNIT_SHIFT) & ((1ULL<<MAP_UNIT_LEN) - 1)) - 2),
                                  ((((u64)result >> MAP_BLOCK_SHIFT) & ((1ULL<<MAP_BLOCK_LEN) - 1)) - 2),
                                  ID_AGENT_CE);
-        //DPRINTF(DEBUG_LVL_WARN, "check:%p , self:%p, myloc:0x%lx\n", check, self, self->myLocation);
+        //DPRINTF(DEBUG_LVL_WARN, "check:%p , self:%p, myloc:0x%lx, [%lx,%lx]\n", check, self, self->myLocation, CE_MSR_BASE, BR_CE_BASE);
         ASSERT(check==self->myLocation);
     }
 

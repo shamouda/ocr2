@@ -214,6 +214,46 @@ typedef void blkPayload_t; // Strongly type-check the ptr-to-void that comprises
 // known value is placed at the end of heap as a guard
 #define KNOWN_VALUE_AS_GUARD    0xfeed0000deadbeef
 
+#if defined(HAL_FSIM_CE) || defined(HAL_FSIM_XE)
+#define PER_THREAD_CACHE
+// TG
+#define CACHE_POOL(ID)          (cache_pool)
+#define _CACHE_POOL(ID)         (_cache_pool)
+#else
+// x86
+#define MAX_THREAD              16
+#define CACHE_POOL(ID)          (cache_pool[ID])
+#define _CACHE_POOL(ID)         (_cache_pool[ID])
+#endif
+
+#ifdef PER_THREAD_CACHE
+#define SLAB_MARK               ( 0xfeed )        // arbitrary number
+#define SLAB_SHIFT              ( 4UL )           // differences between bins
+#define SLAB_MASK               (( 1UL << SLAB_SHIFT ) - 1UL )
+#define SIZE_TO_SLABS(size)     ( ((size)+SLAB_MASK) >> SLAB_SHIFT )
+#define SLAB_MAX_SIZE(index)    (  (index) << SLAB_SHIFT )
+#define SLAB_OVERHEAD           ( sizeof(u64)*3 )
+#define MAX_SLABS               ( 32 )
+#define MAX_SIZE_FOR_SLABS      SLAB_MAX_SIZE(MAX_SLABS-1)
+#define MAX_OBJ_PER_SLAB        ( 63 )
+
+// Each thread has pointers to an array of objects it allocates from the central heap.
+// When the allocation requests come, it first checks this per-thread lists for free object before it goes to the central heap.
+struct per_thread_cache {
+    void *slabs[MAX_SLABS];
+    u32 lock;
+} _CACHE_POOL(MAX_THREAD);
+
+struct slab_header {
+    struct slab_header *next, *prev;
+    struct per_thread_cache *per_thread;
+    u64 bitmap;
+    u32 mark;
+    u32 size;
+};
+
+struct per_thread_cache *CACHE_POOL(MAX_THREAD);
+#endif
 
 
 // VALGRIND SUPPORT
@@ -552,6 +592,17 @@ static void quickInit(poolHdr_t *pool, u64 size)
     ASSERT((sizeof(poolHdr_t) & ALIGNMENT_MASK) == 0);
     ASSERT((size & ALIGNMENT_MASK) == 0);
 
+#ifdef PER_THREAD_CACHE
+        ASSERT((sizeof(struct slab_header) & ALIGNMENT_MASK) == 0);
+#if defined(HAL_FSIM_CE) || defined(HAL_FSIM_XE)
+        cache_pool = &_cache_pool;
+#else
+        for(i=0;i<MAX_THREAD;i++) {
+            cache_pool[i] = &_cache_pool[i];
+        }
+#endif
+#endif
+
     // spinlock value must be 0 or 1. If not, it means it's not properly zero'ed before, or corrupted.
     ASSERT(pool->lock == 0 || pool->lock == 1);
 
@@ -713,13 +764,14 @@ static inline void checkGuard(poolHdr_t *pool)
 }
 
 
-static blkPayload_t *quickMalloc(poolHdr_t *pool,u64 size, struct _ocrPolicyDomain_t *pd)
+static blkPayload_t *quickMallocInternal(poolHdr_t *pool,u64 size, struct _ocrPolicyDomain_t *pd)
 {
     u64 size_orig = size;
-    DPRINTF(DEBUG_LVL_VERB, "before malloc size %ld:\n", size_orig);
+//    DPRINTF(DEBUG_LVL_VERB, "before malloc size %ld:\n", size_orig);
+
     // This guarantees that the block will be able to embed NEXT/PREV
     // in case that it's freed in the future.
-    size = (size + ALIGNMENT_MASK)&(~ALIGNMENT_MASK);   // ceiling
+    size = (size_orig + ALIGNMENT_MASK)&(~ALIGNMENT_MASK);   // ceiling
     size += ALLOC_OVERHEAD;     // internal size
     if (size < MINIMUM_SIZE)    // should be bigger than minimum size
         size = MINIMUM_SIZE;
@@ -786,7 +838,7 @@ static blkPayload_t *quickMalloc(poolHdr_t *pool,u64 size, struct _ocrPolicyDoma
     return ret;
 }
 
-static void quickFree(blkPayload_t *p)
+static void quickFreeInternal(blkPayload_t *p)
 {
     if (p == NULL)
         return;
@@ -906,6 +958,142 @@ static void quickFree(blkPayload_t *p)
 //    DPRINTF(DEBUG_LVL_WARN,"mempool_free,  pool %p , p  %p, size %8ld\n", pool, p, size_orig - ALLOC_OVERHEAD);
 #endif
 }
+
+
+#ifdef PER_THREAD_CACHE
+static struct slab_header *quickNewSlab(poolHdr_t *pool,s32 slabMaxSize, struct _ocrPolicyDomain_t *pd, struct per_thread_cache *per_thread)
+{
+        // goes to the central heap to allocate slab
+        void *slab = quickMallocInternal(pool, sizeof(struct slab_header)+(SLAB_OVERHEAD+slabMaxSize)*MAX_OBJ_PER_SLAB, pd );
+        if (slab == NULL) {
+            DPRINTF(DEBUG_LVL_VERB, "Slab alloc failed (slabMaxSize %d)\n", slabMaxSize);
+            return NULL;
+        }
+        struct slab_header *head = slab;
+        head->per_thread = addrGlobalizeOnTG((void *)per_thread, pd);
+        head->next = head->prev = head;
+        head->bitmap = (1UL << MAX_OBJ_PER_SLAB)-1UL;
+        head->mark = SLAB_MARK;
+        head->size = slabMaxSize;
+        return head;
+}
+
+static blkPayload_t *quickMalloc(poolHdr_t *pool,u64 size, struct _ocrPolicyDomain_t *pd)
+{
+    if (size > MAX_SIZE_FOR_SLABS) // for big objects, go to the central heap
+        return quickMallocInternal(pool, size, pd);
+    s64 myid = (s64)pd;
+    //ASSERT(myid >=0 && myid < MAX_THREAD);
+    s32 slabsIndex = SIZE_TO_SLABS(size);
+    s32 slabMaxSize = SLAB_MAX_SIZE(slabsIndex);
+    hal_lock32(&CACHE_POOL(myid)->lock);
+    struct slab_header *slabs = CACHE_POOL(myid)->slabs[slabsIndex];
+    if (slabs == NULL /* initial alloc? */ || slabs->bitmap == 0 /* full? */) {
+        struct slab_header *slab = quickNewSlab(pool, slabMaxSize, pd, CACHE_POOL(myid));
+        if (slab == NULL) {
+            hal_unlock32(&CACHE_POOL(myid)->lock);
+            return quickMallocInternal(pool, size, pd);
+        }
+        if (slabs) {  // list manupulation
+            slab->next = slabs;
+            slab->prev = slabs->prev;
+            slabs->prev->next = slab;
+            slabs->prev = slab;
+        }
+        CACHE_POOL(myid)->slabs[slabsIndex] = slabs = slab;
+    }
+    ASSERT(slabs->bitmap);
+    s32 pos = myffs(slabs->bitmap);
+    ASSERT(pos >= 0 && pos < MAX_OBJ_PER_SLAB);
+    u64 *p = (u64 *)((u64)slabs + sizeof(struct slab_header)+(SLAB_OVERHEAD+slabMaxSize)*pos);
+    HEAD(p) = (s64)slabs - (s64)p;   // for cached objects, put negative offset in header.
+
+    // for only TG
+    void *ret = HEAD_TO_USER(p);
+    INFO2(p) = (u64)ret; // already globalized addr
+    ASSERT((*(u8 *)(&INFO2(p)) & POOL_HEADER_TYPE_MASK) == 0);
+    *(u8 *)(&INFO2(p)) |= allocatorQuick_id;
+
+    //__sync_fetch_and_xor(&slabs->bitmap , 1UL << pos);
+    slabs->bitmap ^= 1UL << pos;
+    ASSERT_BLOCK_BEGIN((slabs->bitmap & (1UL << pos)) == 0)
+    ASSERT_BLOCK_END
+
+    if (slabs->bitmap == 0) {  // if slab is full, point to next (partially-full) slab
+        CACHE_POOL(myid)->slabs[slabsIndex] = slabs->next;     // next slab
+    }
+    hal_unlock32(&CACHE_POOL(myid)->lock);
+    return ret;
+}
+
+static void quickFree(blkPayload_t *p)
+{
+    if (p == NULL)
+        return;
+    u64 *q = USER_TO_HEAD(p);
+    u64 size = GET_SIZE(HEAD(q));
+
+    if (size < 0xf00000000000) {   // in case of cached object, size is negative (offset to slab header)
+        quickFreeInternal(p);
+        return;
+    }
+
+    struct slab_header *head = (struct slab_header *)((s64)(q) + (s64)HEAD(q));
+    ASSERT(head->mark == SLAB_MARK);
+    s64 offset = (s64)q - (s64)head - sizeof(struct slab_header);
+    s64 pos = offset / (head->size+SLAB_OVERHEAD);
+    ASSERT(pos >= 0 && pos < MAX_OBJ_PER_SLAB);
+    //printf("%lx , %ld, pos %d\n", HEAD(q), HEAD(q), pos);
+    //printf("offset %ld , size %d \n", offset, head->size+SLAB_OVERHEAD);
+    ASSERT((offset % (head->size+SLAB_OVERHEAD)) == 0);
+
+    // local if (addrGlobalizeOnTG(CACHE_POOL(X)) == head->per_thread)
+    s32 slabsIndex = SIZE_TO_SLABS(head->size);
+    hal_lock32(&head->per_thread->lock);
+    struct slab_header *slabs = head->per_thread->slabs[slabsIndex];
+
+//    __sync_fetch_and_xor(&head->bitmap , 1UL << pos);
+    head->bitmap ^= 1UL << pos;
+    ASSERT_BLOCK_BEGIN((head->bitmap & (1UL << pos)) != 0)
+    ASSERT_BLOCK_END
+
+    if (slabs == head ) {  // so we will have at least one slab always
+        hal_unlock32(&head->per_thread->lock);
+        return;
+    }
+
+    if (head->bitmap == ((1UL << MAX_OBJ_PER_SLAB)-1UL) /* empty slab? */) {
+        head->next->prev = head->prev;
+        head->prev->next = head->next;
+        hal_unlock32(&head->per_thread->lock);
+        quickFreeInternal(head);
+        return;
+    }
+    // if prev slab is full, we move current slab to header to roughly sort
+    // this list. The first part is partially used slabs, then full slabs follows.
+    if (head->prev->bitmap == 0UL /* full (previous) slab? */) {
+        head->next->prev = head->prev;
+        head->prev->next = head->next;
+
+        head->next = slabs;
+        head->prev = slabs->prev;
+        slabs->prev->next = head;
+        slabs->prev = head;
+
+        head->per_thread->slabs[slabsIndex] = head;
+    }
+    hal_unlock32(&head->per_thread->lock);
+}
+#else
+static inline blkPayload_t *quickMalloc(poolHdr_t *pool,u64 size, struct _ocrPolicyDomain_t *pd)
+{
+    return quickMallocInternal(pool, size, pd);
+}
+static inline void quickFree(blkPayload_t *p)
+{
+    return quickFreeInternal(p);
+}
+#endif
 // end of simple alloc core part
 
 #ifndef ENABLE_ALLOCATOR_QUICK_STANDALONE
