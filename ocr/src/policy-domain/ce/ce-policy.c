@@ -123,7 +123,7 @@ u8 cePdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
             if((policy->myLocation & ID_BLOCK_MASK) == 0) {
                 cePolicy->shutdownMax += policy->neighborCount;
                 // Block 0 of unit 0 collects block 0's of other units
-                if(policy->myLocation & ID_UNIT_MASK) {
+                if(policy->myLocation & ID_CLUSTER_MASK) {
                     u32 otherblocks = 0;
                     u32 j;
                     for(j = 0; j<policy->neighborCount; j++)
