@@ -58,13 +58,43 @@ ocrPolicyDomainFactory_t * newPolicyDomainFactory(policyDomainType_t type, ocrPa
 
 void initializePolicyDomainOcr(ocrPolicyDomainFactory_t * factory, ocrPolicyDomain_t * self, ocrParamList_t *perInstance) {
     self->fcts = factory->policyDomainFcts;
-
-    self->myLocation = ((paramListPolicyDomainInst_t*)perInstance)->location;
-
-    self->schedulers = NULL;
-    self->allocators = NULL;
+    self->fguid.guid = NULL_GUID;
+    self->fguid.metaDataPtr = NULL;
+    self->commApiCount = 0;
+    self->guidProviderCount = 0;
+    self->allocatorCount = 0;
+    self->schedulerCount = 0;
+    self->workerCount = 0;
+    self->taskFactoryCount = 0;
+    self->taskTemplateFactoryCount = 0;
+    self->dbFactoryCount = 0;
+    self->eventFactoryCount = 0;
+    self->schedulerObjectFactoryCount = 0;
     self->commApis = NULL;
+    self->guidProviders = NULL;
+    self->allocators = NULL;
+    self->schedulers = NULL;
+    self->workers = NULL;
+    self->taskFactories = NULL;
+    self->taskTemplateFactories = NULL;
+    self->dbFactories = NULL;
+    self->eventFactories = NULL;
+    self->schedulerObjectFactories = NULL;
+    self->placer = NULL;
+    u32 i = 0, j = 0;
+    for(i = 0; i < RL_MAX; ++i) {
+        for(j = 0; j < RL_PHASE_MAX; ++j) {
+            self->phasesPerRunlevel[i][j] = 0;
+        }
+    }
+    self->costFunction = NULL;
+    self->myLocation = ((paramListPolicyDomainInst_t*)perInstance)->location;
+    self->parentLocation = 0;
+    self->neighbors = NULL;
+    self->neighborCount = 0;
     self->shutdownCode = 0;
+    self->neighborPDs = NULL;
+    self->parentPD = NULL;
 }
 
 u64 ocrPolicyMsgGetMsgBaseSize(ocrPolicyMsg_t *msg, bool isIn) {
