@@ -34,9 +34,13 @@
 /******************************************************/
 
 void mallocDestruct(ocrMemPlatform_t *self) {
-    runtimeChunkFree((u64)self, PERSISTENT_CHUNK);
+    // BUG #673: Deal with objects owned by multiple PDs
+    //runtimeChunkFree((u64)self, PERSISTENT_CHUNK);
 }
 
+// BUG #673: This mem-platform may be shared by multiple threads (for example
+// one SPAD shared by 2 CEs. We therefore do the malloc/free and what not extremely early
+// on so that only the NODE_MASTER does it in a race free manner.
 u8 mallocSwitchRunlevel(ocrMemPlatform_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
                         phase_t phase, u32 properties, void (*callback)(ocrPolicyDomain_t*, u64), u64 val) {
 
@@ -56,16 +60,10 @@ u8 mallocSwitchRunlevel(ocrMemPlatform_t *self, ocrPolicyDomain_t *PD, ocrRunlev
         // and check compatibility on phase 1
         break;
     case RL_NETWORK_OK:
-        break;
-    case RL_PD_OK:
-        if(properties & RL_BRING_UP) {
-            // We can now set our PD (before this, we couldn't because
-            // "our" PD might not have been started
-            self->pd = PD;
-        }
-        break;
-    case RL_MEMORY_OK:
-        if((properties & RL_BRING_UP) && RL_IS_FIRST_PHASE_UP(PD, RL_MEMORY_OK, phase)) {
+        // This should ideally be in MEMORY_OK
+        if((properties & RL_BRING_UP) && RL_IS_FIRST_PHASE_UP(PD, RL_NETWORK_OK, phase)) {
+            if(self->startAddr != 0)
+                break; // We break out early since we are already initialized
             // This is where we need to update the memory
             // using the sysboot functions
             self->startAddr = (u64)malloc(self->size);
@@ -82,13 +80,35 @@ u8 mallocSwitchRunlevel(ocrMemPlatform_t *self, ocrPolicyDomain_t *PD, ocrRunlev
             ocrMemPlatformMalloc_t *rself = (ocrMemPlatformMalloc_t*)self;
             rself->pRangeTracker = initializeRange(
                 16, self->startAddr, self->endAddr, USER_FREE_TAG);
-        } else if((properties & RL_TEAR_DOWN) && RL_IS_LAST_PHASE_DOWN(PD, RL_MEMORY_OK, phase)) {
+        } else if((properties & RL_TEAR_DOWN) && RL_IS_LAST_PHASE_DOWN(PD, RL_NETWORK_OK, phase)) {
             ocrMemPlatformMalloc_t *rself = (ocrMemPlatformMalloc_t*)self;
-            if(rself->pRangeTracker)    // in case of mallocproxy, pRangeTracker==0
-                destroyRange(rself->pRangeTracker);
-            // Here we can free the memory we allocated
-            free((void*)(self->startAddr));
+            LOCK(&(rself->pRangeTracker->lockChunkAndTag));
+            rself->pRangeTracker->count--;           // decrease count
+
+            if(self->startAddr == 0) {
+                UNLOCK(&(rself->pRangeTracker->lockChunkAndTag));
+                break; // Someone already freed things up
+            }
+
+            if (rself->pRangeTracker->count == 0) {  // if I'm the last one
+                if(rself->pRangeTracker)    // in case of mallocproxy, pRangeTracker==0
+                    destroyRange(rself->pRangeTracker);
+                // Here we can free the memory we allocated
+                free((void*)(self->startAddr));
+            }
+            self->startAddr = 0ULL;
+            UNLOCK(&(rself->pRangeTracker->lockChunkAndTag));
         }
+        break;
+    case RL_PD_OK:
+        if(properties & RL_BRING_UP) {
+            // We can now set our PD (before this, we couldn't because
+            // "our" PD might not have been started
+            self->pd = PD;
+        }
+        break;
+    case RL_MEMORY_OK:
+        // Should ideally do what's in NETWORK_OK
         break;
     case RL_GUID_OK:
         break;
@@ -128,20 +148,45 @@ u8 mallocChunkAndTag(ocrMemPlatform_t *self, u64 *startAddr, u64 size,
     u64 iterate = 0;
     u64 startRange, endRange;
     u8 result;
-    LOCK(&(rself->lock));
+    LOCK(&(rself->pRangeTracker->lockChunkAndTag));
+    // first check if there's existing one. (query part)
+    do {
+        result = getRegionWithTag(rself->pRangeTracker, newTag, &startRange,
+                                  &endRange, &iterate);
+        if(result == 0 && endRange - startRange >= size) {
+            *startAddr = startRange;
+//            printf("ChunkAndTag returning (existing) start of 0x%llx for size %lld (0x%llx) Tag %d\n",
+//                    *startAddr, size, size, newTag);
+            // exit.
+            UNLOCK(&(rself->pRangeTracker->lockChunkAndTag));
+            return result;
+        }
+    } while(result == 0);
+
+
+
+    // now do chunkAndTag (allocation part)
+    iterate = 0;
     do {
         result = getRegionWithTag(rself->pRangeTracker, oldTag, &startRange,
                                   &endRange, &iterate);
         if(result == 0 && endRange - startRange >= size) {
             // This is a fit, we do not look for "best" fit for now
             *startAddr = startRange;
+//            printf("ChunkAndTag returning start of 0x%llx for size %lld (0x%llx) and newTag %d\n",
+//                    *startAddr, size, size, newTag);
             RESULT_ASSERT(splitRange(rself->pRangeTracker,
                                      startRange, size, newTag, 0), ==, 0);
             break;
+        } else {
+            if(result == 0) {
+//                printf("ChunkAndTag, found [0x%llx; 0x%llx[ but too small for size %lld (0xllx)\n",
+//                        startRange, endRange, size, size);
+            }
         }
     } while(result == 0);
 
-    UNLOCK(&(rself->lock));
+    UNLOCK(&(rself->pRangeTracker->lockChunkAndTag));
     return result;
 }
 
