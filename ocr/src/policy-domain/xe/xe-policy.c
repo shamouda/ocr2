@@ -24,12 +24,129 @@
 #ifdef ENABLE_SYSBOOT_FSIM
 #include "rmd-bin-files.h"
 #endif
+#include "rmd-map.h"
+#include "mmio-table.h"
 
 #include "utils/profiler/profiler.h"
 
 #define DEBUG_TYPE POLICY
 
-extern void ocrShutdown(void);
+#define RL_BARRIER_STATE_INVALID          0x0  // Barrier should never happen (used for checking)
+#define RL_BARRIER_STATE_UNINIT           0x1  // Barrier has not been started (but children may be reporting)
+#define RL_BARRIER_STATE_PARENT_NOTIFIED  0x4  // Parent has been notified
+#define RL_BARRIER_STATE_PARENT_RESPONSE  0x8  // Parent has responded thereby releasing us
+                                               // and children
+
+// Barrier helper function (for RL switches)
+// Wait for children to check in and inform parent
+// Blocks until parent response
+static void doRLBarrier(ocrPolicyDomain_t *policy) {
+    ocrPolicyDomainXe_t *rself = (ocrPolicyDomainXe_t*)policy;
+    ocrMsgHandle_t handle;
+    ocrMsgHandle_t * pHandle = &handle;
+
+    DPRINTF(DEBUG_LVL_VERB, "Location 0x%lx: Notifying parent 0x%lx of reaching barrier %d\n",
+            policy->myLocation, policy->parentLocation, rself->rlSwitch.barrierRL);
+    // We first notify our parent
+    rself->rlSwitch.barrierState = RL_BARRIER_STATE_PARENT_NOTIFIED;
+    PD_MSG_STACK(msg);
+    getCurrentEnv(NULL, NULL, NULL, &msg);
+#define PD_MSG (&msg)
+#define PD_TYPE PD_MSG_MGT_RL_NOTIFY
+    msg.type = PD_MSG_MGT_RL_NOTIFY | PD_MSG_REQUEST;
+    PD_MSG_FIELD_I(runlevel) = rself->rlSwitch.barrierRL;
+    PD_MSG_FIELD_I(properties) = RL_RESPONSE | RL_BARRIER | RL_FROM_MSG |
+        (rself->rlSwitch.properties & (RL_BRING_UP | RL_TEAR_DOWN));
+    RESULT_ASSERT(policy->fcts.sendMessage(
+                      policy, policy->parentLocation, &msg,
+                      NULL, TWOWAY_MSG_PROP | PERSIST_MSG_PROP), ==, 0);
+#undef PD_MSG
+#undef PD_TYPE
+
+    DPRINTF(DEBUG_LVL_VERB, "Location 0x%lx: waiting for parent release\n", policy->myLocation);
+    // Now we wait for our parent to notify us
+    while(rself->rlSwitch.barrierState != RL_BARRIER_STATE_PARENT_RESPONSE) {
+        policy->commApis[0]->fcts.initHandle(policy->commApis[0], pHandle);
+        RESULT_ASSERT(policy->fcts.waitMessage(policy, &pHandle), ==, 0);
+        ASSERT(pHandle && pHandle == &handle);
+        ocrPolicyMsg_t *msg = pHandle->response;
+        RESULT_ASSERT(policy->fcts.processMessage(policy, msg, true), ==, 0);
+        pHandle->destruct(pHandle);
+    }
+    DPRINTF(DEBUG_LVL_VERB, "Location 0x%lx: released by parent\n", policy->myLocation);
+}
+
+static void performNeighborDiscovery(ocrPolicyDomain_t *policy) {
+    // Fill-in location tuples: ours and our parent's (the CE in FSIM)
+#ifdef HAL_FSIM_XE
+    policy->myLocation = (ocrLocation_t)(*(u64*)(XE_MSR_OFFT + CORE_LOCATION * sizeof(u64)));
+#else
+    // Figure out myLocation based on its current value which is just an index (based on xeCount = 8)
+    // See ce-policy.c for more explanations
+    // TODO: This assumes xeCount = 8!!
+    u32 myUnit = (policy->myLocation) / ((8+1)*MAX_NUM_BLOCK);
+    u32 myBlock = (policy->myLocation - myUnit*((8+1)*MAX_NUM_BLOCK)) / (8 + 1);
+    u32 agentCount = policy->myLocation - myUnit*((8+1)*MAX_NUM_BLOCK) - myBlock*(8+1);
+    policy->myLocation = MAKE_CORE_ID(0, 0, 0, myUnit, myBlock, (ID_AGENT_XE0 + agentCount));
+#endif
+    policy->parentLocation = (policy->myLocation & ~ID_AGENT_MASK) | ID_AGENT_CE;
+}
+
+static void findNeighborsPd(ocrPolicyDomain_t *policy) {
+#ifndef HAL_FSIM_XE
+    // Fill out the parentPD information which is needed
+    // by the communication layer on TG-x86. See comment in ce-policy.c
+    // for how this works
+    ocrPolicyDomain_t** neighborsAll = policy->neighborPDs; // Initially set in the driver
+    policy->neighborPDs = NULL; // We don't need it afterwards so cleaning up
+
+    policy->parentPD = NULL;
+    ocrPolicyDomain_t **candidate = neighborsAll;
+    while(*candidate != NULL) {
+        if((*candidate)->myLocation == policy->parentLocation) {
+            policy->parentPD = *candidate;
+            break;
+        }
+        candidate += 1; // Go to the next PD in neighborsAll
+    }
+    // We should have found our parent
+    ASSERT(policy->parentPD != NULL);
+    DPRINTF(DEBUG_LVL_VERB, "PD 0x%lx (loc: 0x%lx) found parent at 0x%lx (loc: 0x%lx)\n",
+            policy, policy->myLocation, policy->parentPD, policy->parentPD->myLocation);
+
+#endif
+}
+
+static u8 helperSwitchInert(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, phase_t phase, u32 properties) {
+    u64 i = 0;
+    u64 maxCount = 0;
+    u8 toReturn = 0;
+    maxCount = policy->commApiCount;
+    for(i = 0; i < maxCount; ++i) {
+        toReturn |= policy->commApis[i]->fcts.switchRunlevel(
+            policy->commApis[i], policy, runlevel, phase, properties, NULL, 0);
+    }
+
+    maxCount = policy->guidProviderCount;
+    for(i = 0; i < maxCount; ++i) {
+        toReturn |= policy->guidProviders[i]->fcts.switchRunlevel(
+            policy->guidProviders[i], policy, runlevel, phase, properties, NULL, 0);
+    }
+
+    maxCount = policy->allocatorCount;
+    for(i = 0; i < maxCount; ++i) {
+        toReturn |= policy->allocators[i]->fcts.switchRunlevel(
+            policy->allocators[i], policy, runlevel, phase, properties, NULL, 0);
+    }
+
+    maxCount = policy->schedulerCount;
+    for(i = 0; i < maxCount; ++i) {
+        toReturn |= policy->schedulers[i]->fcts.switchRunlevel(
+            policy->schedulers[i], policy, runlevel, phase, properties, NULL, 0);
+    }
+
+    return toReturn;
+}
 
 // Function to cause run-level switches in this PD
 u8 xePdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 properties) {
@@ -40,79 +157,362 @@ u8 xePdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
         ASSERT (0);
     }
 #endif
-    // The PD should have been brought up by now and everything instantiated
 
-    u64 i = 0;
-    u64 maxCount = 0;
+#define GET_PHASE(counter) curPhase = (properties & RL_BRING_UP)?counter:(phaseCount - counter - 1)
 
-    ((ocrPolicyDomainXe_t*)policy)->shutdownInitiated = 0;
+    u32 maxCount = 0;
+    s32 i=0, j=0, k=0, phaseCount=0, curPhase = 0;
+
+    u8 toReturn = 0;
+
+    u32 origProperties = properties;
+    u32 masterWorkerProperties = 0;
+
+    ocrPolicyDomainXe_t* rself = (ocrPolicyDomainXe_t*)policy;
+    // Check properties
+    u32 amNodeMaster = (properties & RL_NODE_MASTER) == RL_NODE_MASTER;
+    u32 amPDMaster = properties & RL_PD_MASTER;
+
+    properties &= ~RL_FROM_MSG; // Strip this out from the rest; only valuable for the PD
+    masterWorkerProperties = properties;
+    properties &= ~RL_NODE_MASTER;
 
 
-    maxCount = policy->guidProviderCount;
-    for(i = 0; i < maxCount; ++i) {
-        policy->guidProviders[i]->fcts.switchRunlevel(policy->guidProviders[i], policy, RL_PD_OK,
-                                                 0, RL_REQUEST | RL_BRING_UP | RL_BARRIER, NULL, 0);
+
+    switch(runlevel) {
+    case RL_CONFIG_PARSE:
+    {
+        // Are we bringing the machine up
+        if(properties & RL_BRING_UP) {
+            for(i = 0; i < RL_MAX; ++i) {
+                for(j = 0; j < RL_PHASE_MAX; ++j) {
+                     // Everything has at least one phase on both up and down
+                    policy->phasesPerRunlevel[i][j] = (1<<4) + 1;
+                }
+            }
+
+            phaseCount = 2;
+            // For RL_CONFIG_PARSE, we set it to 2 on bring up
+            policy->phasesPerRunlevel[RL_CONFIG_PARSE][0] = (1<<4) + 2;
+            ASSERT(policy->workerCount == 1); // We only handle one worker per PD
+
+            // See comment in ce-policy.c for why this is here
+            performNeighborDiscovery(policy);
+        } else {
+            // Tear down
+            phaseCount = policy->phasesPerRunlevel[RL_CONFIG_PARSE][0] >> 4;
+        }
+        // Both cases
+        maxCount = policy->workerCount;
+        for(i = 0; i < phaseCount; ++i) {
+            if(toReturn) break;
+            GET_PHASE(i);
+            toReturn |= helperSwitchInert(policy, runlevel, curPhase, masterWorkerProperties);
+            for(j = 0; j < maxCount; ++j) {
+                if(toReturn) break;
+                toReturn |= policy->workers[j]->fcts.switchRunlevel(
+                    policy->workers[j], policy, runlevel, curPhase,
+                    j==0?masterWorkerProperties:properties, NULL, 0);
+            }
+            if(!(toReturn) && i == 0 && (properties & RL_BRING_UP)) {
+                // After the first phase, we update the counts
+                // Coalesce the phasesPerRunLevel by taking the maximum
+                for(k = 0; k < RL_MAX; ++k) {
+                    u32 finalCount = policy->phasesPerRunlevel[k][0];
+                    for(j = 1; j < RL_PHASE_MAX; ++j) {
+                        // Deal with UP phase count
+                        u32 newCount = 0;
+                        newCount = (policy->phasesPerRunlevel[k][j] & 0xF) > (finalCount & 0xF)?
+                            (policy->phasesPerRunlevel[k][j] & 0xF):(finalCount & 0xF);
+                        // And now the DOWN phase count
+                        newCount |= ((policy->phasesPerRunlevel[k][j] >> 4) > (finalCount >> 4)?
+                                     (policy->phasesPerRunlevel[k][j] >> 4):(finalCount >> 4)) << 4;
+                        finalCount = newCount;
+                    }
+                    policy->phasesPerRunlevel[k][0] = finalCount;
+                }
+            }
+        }
+        if(toReturn) {
+            DPRINTF(DEBUG_LVL_WARN, "RL_CONFIG_PARSE(%d) phase %d failed: %d\n", properties, curPhase, toReturn);
+        }
+
+        break;
     }
-
-    maxCount = policy->schedulerCount;
-    for(i = 0; i < maxCount; ++i) {
-        policy->schedulers[i]->fcts.switchRunlevel(policy->schedulers[i], policy, RL_PD_OK,
-                                                 0, RL_REQUEST | RL_BRING_UP | RL_BARRIER, NULL, 0);
-        policy->schedulers[i]->fcts.switchRunlevel(policy->schedulers[i], policy, RL_MEMORY_OK,
-                                                 0, RL_REQUEST | RL_BRING_UP | RL_BARRIER, NULL, 0);
+    case RL_NETWORK_OK:
+    {
+        if(properties & RL_BRING_UP) {
+            findNeighborsPd(policy);
+        }
+        // We just pass the information down here
+        phaseCount = ((policy->phasesPerRunlevel[RL_NETWORK_OK][0]) >> ((properties&RL_TEAR_DOWN)?4:0)) & 0xF;
+        maxCount = policy->workerCount;
+        for(i = 0; i < phaseCount; ++i) {
+            if(toReturn) break;
+            GET_PHASE(i);
+            toReturn |= helperSwitchInert(policy, runlevel, curPhase, masterWorkerProperties);
+            for(j = 0; j < maxCount; ++j) {
+                if(toReturn) break;
+                toReturn |= policy->workers[j]->fcts.switchRunlevel(
+                    policy->workers[j], policy, runlevel, curPhase, j==0?masterWorkerProperties:properties, NULL, 0);
+            }
+        }
+        if(toReturn) {
+            DPRINTF(DEBUG_LVL_WARN, "RL_NETWORK_OK(%d) phase %d failed: %d\n", properties, curPhase, toReturn);
+        }
+        break;
     }
+    case RL_PD_OK:
+    {
+        // Just pass it down. We don't do much in the XEs
+        phaseCount = ((policy->phasesPerRunlevel[RL_PD_OK][0]) >> ((properties&RL_TEAR_DOWN)?4:0)) & 0xF;
 
-    maxCount = policy->commApiCount;
-    for(i = 0; i < maxCount; i++) {
-        policy->commApis[i]->fcts.switchRunlevel(policy->commApis[i], policy, RL_PD_OK,
-                                                 0, RL_REQUEST | RL_BRING_UP | RL_BARRIER, NULL, 0);
-    }
-    // REC: Moved all workers to start here.
-    // Note: it's important to first logically start all workers.
-    // Once they are all up, start the runtime.
-    // Workers should start the underlying target and platforms
-    maxCount = policy->workerCount;
-    for(i = 0; i < maxCount; i++) {
-        policy->workers[i]->fcts.switchRunlevel(policy->workers[i], policy, RL_PD_OK,
-                                                 0, RL_REQUEST | RL_BRING_UP | RL_BARRIER, NULL, 0);
-    }
+        maxCount = policy->workerCount;
+        for(i = 0; i < phaseCount; ++i) {
+            if(toReturn) break;
+            GET_PHASE(i);
+            toReturn |= helperSwitchInert(policy, runlevel, curPhase, masterWorkerProperties);
+            for(j = 0; j < maxCount; ++j) {
+                if(toReturn) break;
+                toReturn |= policy->workers[j]->fcts.switchRunlevel(
+                    policy->workers[j], policy, runlevel, curPhase, j==0?masterWorkerProperties:properties, NULL, 0);
+            }
+        }
 
-    maxCount = policy->allocatorCount;
-    for(i = 0; i < maxCount; ++i) {
-        policy->allocators[i]->fcts.switchRunlevel(policy->allocators[i], policy, RL_PD_OK,
-                                                 0, RL_REQUEST | RL_BRING_UP | RL_BARRIER, NULL, 0);
-        policy->allocators[i]->fcts.switchRunlevel(policy->allocators[i], policy, RL_MEMORY_OK,
-                                                 0, RL_REQUEST | RL_BRING_UP | RL_BARRIER, NULL, 0);
+        if(toReturn) {
+            DPRINTF(DEBUG_LVL_WARN, "RL_PD_OK(%d) phase %d failed: %d\n", properties, curPhase, toReturn);
+        }
+        break;
     }
+    case RL_MEMORY_OK:
+    {
+        // In this runlevel, in the current implementation, each thread is the
+        // PD master after PD_OK so we just check here
+        ASSERT(amPDMaster);
+        phaseCount = ((policy->phasesPerRunlevel[RL_MEMORY_OK][0]) >> ((properties&RL_TEAR_DOWN)?4:0)) & 0xF;
 
-    maxCount = policy->schedulerCount;
-    for(i = 0; i < maxCount; ++i) {
-        policy->schedulers[i]->fcts.switchRunlevel(policy->schedulers[i], policy, RL_COMPUTE_OK,
-                                                 0, RL_REQUEST | RL_BRING_UP | RL_BARRIER, NULL, 0);
+        // We just pass things down
+        maxCount = policy->workerCount;
+        for(i = 0; i < phaseCount; ++i) {
+            if(toReturn) break;
+            GET_PHASE(i);
+            toReturn |= helperSwitchInert(policy, runlevel, curPhase, masterWorkerProperties);
+            for(j = 0; j < maxCount; ++j) {
+                if(toReturn) break;
+                toReturn |= policy->workers[j]->fcts.switchRunlevel(
+                    policy->workers[j], policy, runlevel, curPhase, j==0?masterWorkerProperties:properties, NULL, 0);
+            }
+        }
+        if(toReturn) {
+            DPRINTF(DEBUG_LVL_WARN, "RL_MEMORY_OK(%d) phase %d failed: %d\n", properties, curPhase, toReturn);
+        }
+        break;
     }
+    case RL_GUID_OK:
+    {
+        // TG has multiple PDs (one per CE/XE). We therefore proceed as follows:
+        //     - do local transition
+        //     - send a response to our parent (our CE; unasked, the CE is waiting for it)
+        //     - wait for release from parent
+        // NOTE: This protocol is simple and assumes that all PDs behave appropriately (ie:
+        // all send their report to their parent without prodding)
 
-    maxCount = policy->commApiCount;
-    for(i = 0; i < maxCount; i++) {
-        policy->commApis[i]->fcts.switchRunlevel(policy->commApis[i], policy, RL_MEMORY_OK,
-                                                 0, RL_REQUEST | RL_BRING_UP | RL_BARRIER, NULL, 0);
+        if(properties & RL_BRING_UP) {
+            // This step includes a barrier
+            ASSERT(properties & RL_BARRIER);
+            phaseCount = RL_GET_PHASE_COUNT_UP(policy, RL_GUID_OK);
+            maxCount = policy->workerCount;
+
+            for(i = 0; i < phaseCount; ++i) {
+                if(toReturn) break;
+                toReturn |= helperSwitchInert(policy, runlevel, i, masterWorkerProperties);
+                for(j = 0; j < maxCount; ++j) {
+                    if(toReturn) break;
+                    toReturn |= policy->workers[j]->fcts.switchRunlevel(
+                        policy->workers[j], policy, runlevel, i,
+                        j==0?masterWorkerProperties:properties, NULL, 0);
+                }
+            }
+            if(toReturn == 0) {
+                // At this stage, we need to wait for the barrier. We set it up
+                rself->rlSwitch.properties = origProperties;
+                ASSERT(rself->rlSwitch.barrierRL == RL_GUID_OK);
+                ASSERT(rself->rlSwitch.barrierState == RL_BARRIER_STATE_UNINIT);
+                // Do the barrier
+                doRLBarrier(policy);
+                // Setup the next one, in this case, it's the teardown barrier
+                rself->rlSwitch.barrierRL = RL_USER_OK;
+                rself->rlSwitch.barrierState = RL_BARRIER_STATE_UNINIT;
+                rself->rlSwitch.properties = RL_TEAR_DOWN | RL_BARRIER;
+            }
+        } else {
+            phaseCount = RL_GET_PHASE_COUNT_DOWN(policy, RL_GUID_OK);
+            maxCount = policy->workerCount;
+            for(i = phaseCount; i >= 0; --i) {
+                if(toReturn) break;
+                toReturn |= helperSwitchInert(policy, runlevel, i, masterWorkerProperties);
+                for(j = 0; j < maxCount; ++j) {
+                    if(toReturn) break;
+                    toReturn |= policy->workers[j]->fcts.switchRunlevel(
+                        policy->workers[j], policy, runlevel, i, j==0?masterWorkerProperties:properties, NULL, 0);
+                }
+            }
+        }
+
+        if(toReturn) {
+            DPRINTF(DEBUG_LVL_WARN, "RL_GUID_OK(%d) phase %d failed: %d\n", properties, i-1, toReturn);
+        }
+        break;
     }
-    policy->placer = NULL;
-    guidify(policy, (u64)policy, &(policy->fguid), OCR_GUID_POLICY);
+    case RL_COMPUTE_OK:
+    {
+        if(properties & RL_BRING_UP) {
+            phaseCount = RL_GET_PHASE_COUNT_UP(policy, RL_COMPUTE_OK);
+            for(i = 0; i < phaseCount; ++i) {
+                if(toReturn) break;
+                if(RL_IS_FIRST_PHASE_UP(policy, RL_COMPUTE_OK, i)) {
+                    guidify(policy, (u64)policy, &(policy->fguid), OCR_GUID_POLICY);
+                    policy->placer = NULL; // No placer for TG
+                }
+                toReturn |= helperSwitchInert(policy, runlevel, i, masterWorkerProperties);
 
-    // REC: Moved all workers to start here.
-    // Note: it's important to first logically start all workers.
-    // Once they are all up, start the runtime.
-    // Workers should start the underlying target and platforms
-    maxCount = policy->workerCount;
-    for(i = 0; i < maxCount; i++) {
-        policy->workers[i]->fcts.switchRunlevel(policy->workers[i], policy, RL_COMPUTE_OK,
-                                                 0, RL_REQUEST | RL_BRING_UP | RL_BARRIER, NULL, 0);
+                maxCount = policy->workerCount;
+                for(j = 1; j < maxCount; ++j) {
+                    if(toReturn) break;
+                    toReturn |= policy->workers[j]->fcts.switchRunlevel(
+                        policy->workers[j], policy, runlevel, i, properties, NULL, 0);
+                }
+                if(!toReturn) {
+                    toReturn |= policy->workers[0]->fcts.switchRunlevel(
+                        policy->workers[0], policy, runlevel, i, masterWorkerProperties, NULL, 0);
+                }
+            }
+        } else {
+            // Tear down
+            phaseCount = RL_GET_PHASE_COUNT_DOWN(policy, RL_COMPUTE_OK);
+            maxCount = policy->workerCount;
+            for(i = phaseCount; i >= 0; --i) {
+                if(toReturn) break;
+                if(RL_IS_LAST_PHASE_DOWN(policy, RL_COMPUTE_OK, i)) {
+                    // We need to deguidify ourself here
+                    PD_MSG_STACK(msg);
+                    getCurrentEnv(NULL, NULL, NULL, &msg);
+#define PD_MSG (&msg)
+#define PD_TYPE PD_MSG_GUID_DESTROY
+                    msg.type = PD_MSG_GUID_DESTROY | PD_MSG_REQUEST;
+                    PD_MSG_FIELD_I(guid) = policy->fguid;
+                    PD_MSG_FIELD_I(properties) = 0;
+                    toReturn |= policy->fcts.processMessage(policy, &msg, false);
+                    policy->fguid.guid = NULL_GUID;
+#undef PD_MSG
+#undef PD_TYPE
+                }
+                toReturn |= helperSwitchInert(policy, runlevel, i, masterWorkerProperties);
+
+                maxCount = policy->workerCount;
+                for(j = 1; j < maxCount; ++j) {
+                    if(toReturn) break;
+                    toReturn |= policy->workers[j]->fcts.switchRunlevel(
+                        policy->workers[j], policy, runlevel, i, properties,
+                            NULL, 0);
+                }
+                if(!toReturn) {
+                    toReturn |= policy->workers[0]->fcts.switchRunlevel(
+                        policy->workers[0], policy, runlevel, i, masterWorkerProperties, NULL, 0);
+                }
+            }
+            if(toReturn == 0) {
+                // At this stage, we need to wait for the barrier. We set it up
+                rself->rlSwitch.properties = origProperties;
+                ASSERT(rself->rlSwitch.barrierRL == RL_COMPUTE_OK);
+                ASSERT(rself->rlSwitch.barrierState == RL_BARRIER_STATE_UNINIT);
+                // Do the barrier
+                doRLBarrier(policy);
+                // There is no next barrier on teardown so we clear things
+                rself->rlSwitch.barrierRL = 0;
+                rself->rlSwitch.barrierState = RL_BARRIER_STATE_INVALID;
+            }
+        }
+        if(toReturn) {
+            DPRINTF(DEBUG_LVL_WARN, "RL_COMPUTE_OK(%d) phase %d failed: %d\n", properties, i-1, toReturn);
+        }
+        break;
     }
+    case RL_USER_OK:
+    {
+        if(properties & RL_BRING_UP) {
+            phaseCount = RL_GET_PHASE_COUNT_UP(policy, RL_USER_OK);
+            maxCount = policy->workerCount;
+            for(i = 0; i < phaseCount; ++i) {
+                if(toReturn) break;
+                toReturn |= helperSwitchInert(policy, runlevel, i, masterWorkerProperties);
+                for(j = 1; j < maxCount; ++j) {
+                    if(toReturn) break;
+                    toReturn |= policy->workers[j]->fcts.switchRunlevel(
+                        policy->workers[j], policy, runlevel, i, properties, NULL, 0);
+                }
+                // We always start the capable worker last (ya ya, there is only one right now but
+                // leaving the logic
+                if(toReturn) break;
+                toReturn |= policy->workers[0]->fcts.switchRunlevel(
+                    policy->workers[0], policy, runlevel, i, masterWorkerProperties, NULL, 0);
+            }
 
-#if defined(SAL_FSIM_XE) // If running on FSim XE
-    PRINTF("XE shutting down\n");
-    hal_exit(0);
-#endif
+            if(toReturn) {
+                DPRINTF(DEBUG_LVL_WARN, "RL_USER_OK(%d) phase %d failed: %d\n", properties, i-1, toReturn);
+            }
+
+            // When I get here, it means that I dropped out of the RL_USER_OK level
+            DPRINTF(DEBUG_LVL_INFO, "PD_MASTER worker dropped out\n");
+
+            // First wait on the barrier at the end of RL_USER_OK
+            if(toReturn == 0) {
+                doRLBarrier(policy);
+                // Setup the next one, in this case, the second teardown barrier
+                rself->rlSwitch.barrierRL = RL_COMPUTE_OK;
+                rself->rlSwitch.barrierState = RL_BARRIER_STATE_UNINIT;
+            }
+
+            // Continue our bring-down (we need to get to get down past COMPUTE_OK)
+            policy->fcts.switchRunlevel(policy, RL_COMPUTE_OK, RL_REQUEST | RL_TEAR_DOWN | RL_BARRIER |
+                                        ((amPDMaster)?RL_PD_MASTER:0) | ((amNodeMaster)?RL_NODE_MASTER:0));
+            // At this point, we can drop out and the driver code will take over taking us down the
+            // other runlevels.
+        } else {
+            ASSERT(rself->rlSwitch.barrierRL == RL_USER_OK);
+            ASSERT(rself->rlSwitch.barrierState == RL_BARRIER_STATE_UNINIT);
+            ASSERT(rself->rlSwitch.properties & RL_TEAR_DOWN);
+
+            // Do our own teardown
+            phaseCount = RL_GET_PHASE_COUNT_DOWN(policy, RL_USER_OK);
+            maxCount = policy->workerCount;
+            for(i = phaseCount; i >= 0; --i) {
+                if(toReturn) break;
+                toReturn |= helperSwitchInert(policy, runlevel, i, masterWorkerProperties);
+
+
+                for(j = 1; j < maxCount; ++j) {
+                    if(toReturn) break;
+                    toReturn |= policy->workers[j]->fcts.switchRunlevel(
+                        policy->workers[j], policy, runlevel, i, properties, NULL, 0);
+                }
+                if(toReturn) break;
+                // Worker 0 is considered the capable one by convention
+                toReturn |= policy->workers[0]->fcts.switchRunlevel(
+                    policy->workers[0], policy, runlevel, i, masterWorkerProperties,
+                    NULL, 0);
+            }
+        }
+        if(toReturn) {
+            DPRINTF(DEBUG_LVL_WARN, "RL_USER_OK(%d) phase %d failed: %d\n", properties, i-1, toReturn);
+        }
+        break;
+    }
+    default:
+        // Unknown runlevel
+        ASSERT(0);
+        break;
+    }
 
     return 0;
 }
@@ -146,27 +546,6 @@ void xePolicyDomainDestruct(ocrPolicyDomain_t * policy) {
         policy->allocators[i]->fcts.destruct(policy->allocators[i]);
     }
 
-
-    // Destruct factories
-    maxCount = policy->taskFactoryCount;
-    for(i = 0; i < maxCount; ++i) {
-        policy->taskFactories[i]->destruct(policy->taskFactories[i]);
-    }
-
-    maxCount = policy->taskTemplateFactoryCount;
-    for(i = 0; i < maxCount; ++i) {
-        policy->taskTemplateFactories[i]->destruct(policy->taskTemplateFactories[i]);
-    }
-
-    maxCount = policy->dbFactoryCount;
-    for(i = 0; i < maxCount; ++i) {
-        policy->dbFactories[i]->destruct(policy->dbFactories[i]);
-    }
-
-    maxCount = policy->eventFactoryCount;
-    for(i = 0; i < maxCount; ++i) {
-        policy->eventFactories[i]->destruct(policy->eventFactories[i]);
-    }
 
     //Anticipate those to be null-impl for some time
     ASSERT(policy->costFunction == NULL);
@@ -260,43 +639,51 @@ static u8 xeProcessResponse(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u32 pr
 static u8 xeProcessCeRequest(ocrPolicyDomain_t *self, ocrPolicyMsg_t **msg) {
     u8 returnCode = 0;
     u32 type = ((*msg)->type & PD_MSG_TYPE_ONLY);
-    ocrPolicyDomainXe_t *rself = (ocrPolicyDomainXe_t*)self;
     ASSERT((*msg)->type & PD_MSG_REQUEST);
     if ((*msg)->type & PD_MSG_REQ_RESPONSE) {
-        ocrMsgHandle_t *handle = NULL;
+        // For blocking messages, we are going to use a persistent buffer
+        // and wait for the response
+        ocrMsgHandle_t handle;
+        ocrMsgHandle_t *pHandle = &handle;
         returnCode = self->fcts.sendMessage(self, self->parentLocation, (*msg),
-                                            &handle, (TWOWAY_MSG_PROP | PERSIST_MSG_PROP));
+                                            &pHandle, (TWOWAY_MSG_PROP | PERSIST_MSG_PROP));
         if (returnCode == 0) {
-            ASSERT(handle && handle->msg);
-            ASSERT(handle->msg == *msg); // This is what we passed in
-            RESULT_ASSERT(self->fcts.waitMessage(self, &handle), ==, 0);
-            ASSERT(handle->response);
+            ASSERT(pHandle && pHandle->msg && pHandle == &handle);
+            ASSERT(pHandle->msg == *msg); // This is what we passed in
+            RESULT_ASSERT(self->fcts.waitMessage(self, &pHandle), ==, 0);
+            ASSERT(pHandle->response);
+            DPRINTF(DEBUG_LVL_VVERB, "XE got response from CE @ 0x%lx of type 0x%x\n",
+                    pHandle->response, pHandle->response->type);
             // Check if the message was a proper response and came from the right place
-            //ASSERT(handle->response->srcLocation == self->parentLocation);
-            ASSERT(handle->response->destLocation == self->myLocation);
-            if((handle->response->type & PD_MSG_TYPE_ONLY) != type) {
-                // Special case: shutdown in progress, cancel this message
-                // The handle is destroyed by the caller for this case
-                if(!rself->shutdownInitiated)
-                    ocrShutdown();
-                else {
-                    // We destroy the handle here (which frees the buffer)
-                    handle->destruct(handle);
-                }
+            ASSERT(pHandle->response->srcLocation == self->parentLocation);
+            ASSERT(pHandle->response->destLocation == self->myLocation);
+
+            // Check for shutdown message
+            if(type != (pHandle->response->type & PD_MSG_TYPE_ONLY)) {
+                // This is currently just the shutdown message
+                ASSERT((pHandle->response->type & PD_MSG_TYPE_ONLY) == PD_MSG_MGT_RL_NOTIFY);
+                DPRINTF(DEBUG_LVL_VERB, "XE got a shutdown response; processing as new message\n");
+                // We process this as a new message
+                self->fcts.processMessage(self, pHandle->response, false);
+                pHandle->destruct(pHandle);
                 return OCR_ECANCELED;
             }
-            ASSERT((handle->response->type & PD_MSG_TYPE_ONLY) == type);
-            if(handle->response != *msg) {
+
+            // Fall-through case is if we actually received a non-shutdown response
+            ASSERT((pHandle->response->type & PD_MSG_TYPE_ONLY) == type);
+            if(pHandle->response != *msg) {
                 // We need to copy things back into *msg
                 // BUG #68: This should go away when that issue is fully implemented
                 // We use the marshalling function to "copy" this message
+                DPRINTF(DEBUG_LVL_VVERB, "Copying response from 0x%lx to 0x%lx\n",
+                        pHandle->response, *msg);
                 u64 baseSize = 0, marshalledSize = 0;
-                ocrPolicyMsgGetMsgSize(handle->response, &baseSize, &marshalledSize, 0);
+                ocrPolicyMsgGetMsgSize(pHandle->response, &baseSize, &marshalledSize, 0);
                 // For now, it must fit in a single message
                 ASSERT(baseSize + marshalledSize <= sizeof(ocrPolicyMsg_t));
-                ocrPolicyMsgMarshallMsg(handle->response, baseSize, (u8*)*msg, MARSHALL_DUPLICATE);
+                ocrPolicyMsgMarshallMsg(pHandle->response, baseSize, (u8*)*msg, MARSHALL_DUPLICATE);
             }
-            handle->destruct(handle);
+            pHandle->destruct(pHandle);
         }
     } else {
         returnCode = self->fcts.sendMessage(self, self->parentLocation, (*msg), NULL, 0);
@@ -308,7 +695,6 @@ u8 xePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
 
     u8 returnCode = 0;
 
-    ASSERT((msg->type & PD_MSG_REQUEST) && (!(msg->type & PD_MSG_RESPONSE)));
 
     DPRINTF(DEBUG_LVL_VVERB, "Going to process message of type 0x%lx\n",
             (msg->type & PD_MSG_TYPE_ONLY));
@@ -500,37 +886,53 @@ u8 xePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         break;
     }
     case PD_MSG_MGT_RL_NOTIFY: {
-        START_PROFILE(pd_xe_Shutdown);
+        START_PROFILE(pd_xe_mgt_notify);
         ocrPolicyDomainXe_t *rself = (ocrPolicyDomainXe_t*)self;
-        rself->shutdownInitiated = 1;
-        // Shutdown here
-        if(msg->srcLocation == self->myLocation) {
-            DPRINTF(DEBUG_LVL_INFO, "SHUTDOWN initiation from 0x%lx %lx\n",
-                    msg->srcLocation, msg->destLocation);
-            returnCode = xeProcessCeRequest(self, &msg);
-            self->workers[0]->fcts.switchRunlevel(self->workers[0], self, RL_USER_OK,
-                                                  0, RL_REQUEST, NULL, 0);
-            // HACK: We force the return code to be 0 here
-            // because otherwise something will complain
-            returnCode = 0;
+#define PD_MSG msg
+#define PD_TYPE PD_MSG_MGT_RL_NOTIFY
+        DPRINTF(DEBUG_LVL_VERB, "Received RL_NOTIFY from 0x%lx with properties 0x%x\n",
+                msg->srcLocation, PD_MSG_FIELD_I(properties));
+        if(PD_MSG_FIELD_I(properties) & RL_FROM_MSG) {
+            // This is a message that can only come from the CE
+            // It is either a request to shutdown (answer given to
+            // another query) or a response that we can proceed past
+            // a barrier
+            ASSERT(msg->srcLocation == self->parentLocation);
+            if(PD_MSG_FIELD_I(properties) & RL_RELEASE) {
+                // This is a release from the CE
+                // Check that we match on the runlevel
+                DPRINTF(DEBUG_LVL_VVERB, "Release from CE\n");
+                ASSERT(PD_MSG_FIELD_I(runlevel) == rself->rlSwitch.barrierRL);
+                ASSERT(rself->rlSwitch.barrierState == RL_BARRIER_STATE_PARENT_NOTIFIED);
+                rself->rlSwitch.barrierState = RL_BARRIER_STATE_PARENT_RESPONSE;
+            } else {
+                // This is a request for a change of runlevel
+                ASSERT(PD_MSG_FIELD_I(runlevel) == rself->rlSwitch.barrierRL);
+                if(rself->rlSwitch.barrierState == RL_BARRIER_STATE_UNINIT) {
+                    DPRINTF(DEBUG_LVL_VVERB, "Request to switch to RL %u\n", rself->rlSwitch.barrierRL);
+                    RESULT_ASSERT(self->fcts.switchRunlevel(
+                                      self, PD_MSG_FIELD_I(runlevel),
+                                      PD_MSG_FIELD_I(properties) | rself->rlSwitch.pdStatus), ==, 0);
+                } else {
+                    // We already know about the shutdown so we just ignore this
+                    DPRINTF(DEBUG_LVL_INFO, "IGNORE 0: runlevel: %u, properties: %u, rlSwitch.barrierRL: rlSwitch.barrierState: %u\n",
+                            PD_MSG_FIELD_I(runlevel), PD_MSG_FIELD_I(properties), rself->rlSwitch.barrierRL,
+                            rself->rlSwitch.barrierState);
+                }
+            }
         } else {
-            // BUG #134: We never exercise this code path.
-            // Keeping it for now until we fix the shutdown protocol
-            ASSERT(0);
-            DPRINTF(DEBUG_LVL_INFO, "SHUTDOWN(slave) from 0x%lx\n",
-                    msg->srcLocation);
-            // Send the message back saying that
-            // we did the shutdown
-            msg->destLocation = msg->srcLocation;
-            msg->srcLocation = self->myLocation;
-            msg->type &= ~PD_MSG_REQUEST;
-            msg->type |= PD_MSG_RESPONSE;
-            RESULT_ASSERT(self->fcts.sendMessage(self, msg->destLocation, msg, NULL, 0),
-                          ==, 0);
-            returnCode = 0;
+            // This is a local shutdown request. We need to start shutting down
+            DPRINTF(DEBUG_LVL_VVERB, "Initial, user-initiated, shutdown notification\n");
+            RESULT_ASSERT(self->fcts.switchRunlevel(
+                              self, RL_USER_OK, RL_TEAR_DOWN | RL_BARRIER |
+                              RL_REQUEST | RL_PD_MASTER), ==, 0);
+            // After this, we will drop out in switchRunlevel and proceed with
+            // shutdown
         }
         EXIT_PROFILE;
         break;
+#undef PD_MSG
+#undef PD_TYPE
     }
     default: {
         DPRINTF(DEBUG_LVL_WARN, "Unknown message type 0x%x\n", (u32)(msg->type & PD_MSG_TYPE_ONLY));
@@ -543,43 +945,23 @@ u8 xePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
 
 u8 xePdSendMessage(ocrPolicyDomain_t* self, ocrLocation_t target, ocrPolicyMsg_t *message,
                    ocrMsgHandle_t **handle, u32 properties) {
-    ocrPolicyDomainXe_t *rself = (ocrPolicyDomainXe_t*)self;
-    ASSERT(target == self->parentLocation);
-    // Set the header of this message
-    message->srcLocation  = self->myLocation;
-    message->destLocation = self->parentLocation;
-    u8 returnCode = self->commApis[0]->fcts.sendMessage(self->commApis[0], target, message, handle, properties);
-    if (returnCode == 0) return 0;
-    switch (returnCode) {
-    case OCR_ECANCELED:
-        // Our outgoing message was cancelled and shutdown is assumed
-        // BUG #134: later this will be expanded to include failures
-        // We destruct the handle for the first message in case it was partially used
-        if(*handle)
-            (*handle)->destruct(*handle);
-        //BUG #134: OCR_ECANCELED shouldn't be inferred generally as shutdown
-        //but rather handled on a per message basis. Once we have a proper
-        //shutdown protocol this should go away.
-        // We do not do a shutdown if we already have a shutdown initiated
-        if(returnCode==OCR_ECANCELED && !rself->shutdownInitiated)
-            ocrShutdown();
-        break;
-    case OCR_EBUSY:
-        if(*handle)
-            (*handle)->destruct(*handle);
-        ocrMsgHandle_t *tempHandle = NULL;
-        RESULT_ASSERT(self->fcts.waitMessage(self, &tempHandle), ==, 0);
-        ASSERT(tempHandle && tempHandle->response);
-        ocrPolicyMsg_t * newMsg = tempHandle->response;
-        ASSERT(newMsg->srcLocation == self->parentLocation);
-        ASSERT(newMsg->destLocation == self->myLocation);
-        RESULT_ASSERT(self->fcts.processMessage(self, newMsg, true), ==, 0);
-        tempHandle->destruct(tempHandle);
-        break;
-    default:
-        ASSERT(0);
+
+    ocrMsgHandle_t thandle;
+    ocrMsgHandle_t *pthandle = &thandle;
+    ASSERT(target == self->parentLocation); // We should only be sending to our parent
+    // Update the message fields
+    message->destLocation = target;
+    message->srcLocation = self->myLocation;
+    while(self->commApis[0]->fcts.sendMessage(self->commApis[0], target, message,
+                                              handle, properties) != 0) {
+        self->commApis[0]->fcts.initHandle(self->commApis[0], pthandle);
+        u8 status = self->fcts.pollMessage(self, &pthandle);
+        if(status == 0 || status == POLL_MORE_MESSAGE) {
+            RESULT_ASSERT(self->fcts.processMessage(self, pthandle->response, true), ==, 0);
+            pthandle->destruct(pthandle);
+        }
     }
-    return returnCode;
+    return 0;
 }
 
 u8 xePdPollMessage(ocrPolicyDomain_t *self, ocrMsgHandle_t **handle) {
@@ -615,8 +997,11 @@ void* xePdMalloc(ocrPolicyDomain_t *self, u64 size) {
     PD_MSG_FIELD_I(size) = size;
     ASSERT(self->workerCount == 1);              // Assert this XE has exactly one worker.
     u8 msgResult = xeProcessCeRequest(self, &pmsg);
-    ASSERT (msgResult == 0);
-    ptr = PD_MSG_FIELD_O(ptr);
+    if(msgResult == 0) {
+        ptr = PD_MSG_FIELD_O(ptr);
+    } else {
+        ptr = NULL;
+    }
 #undef PD_TYPE
 #undef PD_MSG
     RETURN_PROFILE(ptr);
@@ -640,8 +1025,7 @@ void xePdFree(ocrPolicyDomain_t *self, void* addr) {
     PD_MSG_FIELD_I(ptr) = addr;
     PD_MSG_FIELD_I(type) = DB_MEMTYPE;
     PD_MSG_FIELD_I(properties) = 0;
-    u8 msgResult = xeProcessCeRequest(self, &pmsg);
-    ASSERT(msgResult == 0);
+    xeProcessCeRequest(self, &pmsg);
 #undef PD_MSG
 #undef PD_TYPE
     RETURN_PROFILE();
@@ -653,18 +1037,14 @@ ocrPolicyDomain_t * newPolicyDomainXe(ocrPolicyDomainFactory_t * factory,
                                       ocrStats_t *statsObject,
 #endif
                                       ocrCost_t *costFunction, ocrParamList_t *perInstance) {
-
     ocrPolicyDomainXe_t * derived = (ocrPolicyDomainXe_t *) runtimeChunkAlloc(sizeof(ocrPolicyDomainXe_t), PERSISTENT_CHUNK);
     ocrPolicyDomain_t * base = (ocrPolicyDomain_t *) derived;
-
     ASSERT(base);
 #ifdef OCR_ENABLE_STATISTICS
     factory->initialize(factory, base, statsObject, costFunction, perInstance);
 #else
     factory->initialize(factory, base, costFunction, perInstance);
 #endif
-    derived->packedArgsLocation = NULL;
-
     return base;
 }
 
@@ -678,6 +1058,11 @@ void initializePolicyDomainXe(ocrPolicyDomainFactory_t * factory, ocrPolicyDomai
 #endif
 
     initializePolicyDomainOcr(factory, self, perInstance);
+    ocrPolicyDomainXe_t * derived = (ocrPolicyDomainXe_t *) self;
+    derived->packedArgsLocation = NULL;
+    derived->rlSwitch.barrierRL = RL_GUID_OK;
+    derived->rlSwitch.barrierState = RL_BARRIER_STATE_UNINIT;
+    derived->rlSwitch.pdStatus = 0;
 }
 
 static void destructPolicyDomainFactoryXe(ocrPolicyDomainFactory_t * factory) {

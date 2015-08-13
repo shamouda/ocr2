@@ -18,10 +18,10 @@
 #include "xe-comm-platform.h"
 
 #include "xe-abi.h"
-#include "mmio-table.h"
 #include "rmd-arch.h"
 #include "rmd-map.h"
 #include "rmd-msg-queue.h"
+#include "mmio-table.h"
 
 #define DEBUG_TYPE COMM_PLATFORM
 
@@ -79,50 +79,8 @@ void xeCommDestruct (ocrCommPlatform_t * base) {
     runtimeChunkFree((u64)base, NULL);
 }
 
-void xeCommBegin(ocrCommPlatform_t * commPlatform, ocrPolicyDomain_t * PD) {
-
-    ASSERT(commPlatform != NULL && PD != NULL);
-
-#ifndef ENABLE_BUILDER_ONLY
-    u64 i;
-    ocrCommPlatformXe_t * cp = (ocrCommPlatformXe_t *)commPlatform;
-
-    u64 myid = *(u64 *)(XE_MSR_OFFT + CORE_LOCATION * sizeof(u64));
-
-    // Zero-out our stage for receiving messages
-    for(i=MSG_QUEUE_OFFT; i<MSG_QUEUE_SIZE; i += sizeof(u64))
-        *(volatile u64 *)i = 0;
-
-    // Fill-in location tuples: ours and our parent's (the CE in FSIM)
-    PD->myLocation = (ocrLocation_t)myid;
-    hal_fence();
-    PD->parentLocation = (PD->myLocation & ~ID_AGENT_MASK) | ID_AGENT_CE;
-
-    // Remember our PD in case we need to call through it later
-    cp->pdPtr = PD;
-
-    // Remember which XE number we are
-    cp->N = (PD->myLocation & ID_AGENT_MASK);
-
-    // Pre-compute pointer to our stage at the CE
-    cp->rq = (u64 *)(BR_CE_BASE + MSG_QUEUE_OFFT + cp->N * MSG_QUEUE_SIZE);
-#endif
-}
-
-void xeInitBarrier(void)
-{
-    volatile u64 * lq = 0x0;
-
-    lq[0] = 0xfeedf00d;
-    // While local stage non-Full, keep looping.
-    // BUG #515: Allow XEs to sleep
-    while(lq[0] != 2)
-        hal_fence();
-    lq[0] = 0;
-}
-
 u8 xeCommSwitchRunlevel(ocrCommPlatform_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
-                      phase_t phase, u32 properties, void (*callback)(ocrPolicyDomain_t*, u64), u64 val) {
+                        phase_t phase, u32 properties, void (*callback)(ocrPolicyDomain_t*, u64), u64 val) {
 
     u8 toReturn = 0;
 
@@ -140,11 +98,30 @@ u8 xeCommSwitchRunlevel(ocrCommPlatform_t *self, ocrPolicyDomain_t *PD, ocrRunle
         // and check compatibility on phase 1
         break;
     case RL_NETWORK_OK:
+        if((properties & RL_BRING_UP) && (RL_IS_FIRST_PHASE_UP(PD, RL_NETWORK_OK, phase))) {
+#ifndef ENABLE_BUILDER_ONLY
+            u64 i;
+            ocrCommPlatformXe_t * cp = (ocrCommPlatformXe_t *)self;
+
+
+            // Zero-out our stage for receiving messages
+            for(i=MSG_QUEUE_OFFT; i<MSG_QUEUE_SIZE; i += sizeof(u64))
+                *(volatile u64 *)i = 0;
+
+            // Remember which XE number we are
+            cp->N = (PD->myLocation & ID_AGENT_MASK);
+
+            // Pre-compute pointer to our stage at the CE
+            cp->rq = (u64 *)(BR_CE_BASE + MSG_QUEUE_OFFT + cp->N * MSG_QUEUE_SIZE);
+            // Initialize it to 0
+            *(cp->rq) = 0;
+#endif
+        }
         break;
     case RL_PD_OK:
-        xeCommBegin(self, PD);
-        // Barrier - wait for CE's go signal
-        xeInitBarrier();
+        if(properties & RL_BRING_UP) {
+            self->pd = PD;
+        }
         break;
     case RL_MEMORY_OK:
         break;
@@ -175,9 +152,9 @@ u8 xeCommSendMessage(ocrCommPlatform_t *self, ocrLocation_t target,
     ocrCommPlatformXe_t * cp = (ocrCommPlatformXe_t *)self;
 
     // For now, XEs only sent to their CE; make sure!
-    if(target != cp->pdPtr->parentLocation)
-        DPRINTF(DEBUG_LVL_WARN, "XE trying to send to %lx not parent %lx\n", target, cp->pdPtr->parentLocation);
-    ASSERT(target == cp->pdPtr->parentLocation);
+    if(target != self->pd->parentLocation)
+        DPRINTF(DEBUG_LVL_WARN, "XE trying to send to %lx not parent %lx\n", target, self->pd->parentLocation);
+    ASSERT(target == self->pd->parentLocation);
 
     // - Atomically test & set remote stage to Busy. Error if already non-Empty.
     {
@@ -200,8 +177,8 @@ u8 xeCommSendMessage(ocrCommPlatform_t *self, ocrLocation_t target,
                                 message->type, message->usefulSize, MSG_QUEUE_SIZE-sizeof(u64));
     ASSERT(message->usefulSize <= MSG_QUEUE_SIZE - sizeof(u64))
     // - DMA to remote stage, with fence
-    DPRINTF(DEBUG_LVL_VVERB, "DMA-ing out message to 0x%lx of size %d\n",
-            &(cp->rq)[1], message->usefulSize);
+    DPRINTF(DEBUG_LVL_VVERB, "DMA-ing out message to 0x%lx of type 0x%x and size 0x%lx\n",
+            &(cp->rq)[1], message->type, message->usefulSize);
     hal_memCopy(&(cp->rq)[1], message, message->usefulSize, 0);
 
     // - Atomically test & set remote stage to Full. Error otherwise (Empty/Busy.)
@@ -225,12 +202,13 @@ u8 xeCommPollMessage(ocrCommPlatform_t *self, ocrPolicyMsg_t **msg,
     ASSERT(msg != NULL);
 
     // Local stage is at well-known 0x0
-    u64 * lq = 0x0;
+    volatile u64 * lq = 0x0;
 
     // Check local stage's Empty/Busy/Full word. If non-Full, return; else, return content.
-    if(lq[0] != 2) return 0;
+    if(lq[0] != 2) {
+        return POLL_NO_MESSAGE;
+    }
 
-#if 1
     // Provide a ptr to the local stage's contents
     *msg = (ocrPolicyMsg_t *)&lq[1];
     if((*msg)->bufferSize > MSG_QUEUE_SIZE - sizeof(u64))
@@ -247,20 +225,13 @@ u8 xeCommPollMessage(ocrCommPlatform_t *self, ocrPolicyMsg_t **msg,
     }
     ocrPolicyMsgUnMarshallMsg((u8*)*msg, NULL, *msg, MARSHALL_APPEND);
 
-#else
-    // NOTE: For now we copy it into the buffer provided by the caller
-    //       eventually when QMA arrives we'll move to a posted-buffer
-    //       scheme and eliminate the copies.
-    hal_memCopy(*msg, &lq[1], sizeof(ocrPolicyMsg_t), 0);
-    hal_fence();
-#endif
-
     return 0;
 }
 
 u8 xeCommWaitMessage(ocrCommPlatform_t *self,  ocrPolicyMsg_t **msg,
                      u32 properties, u32 *mask) {
 
+    DPRINTF(DEBUG_LVL_VERB, "Waiting for message\n");
     ASSERT(self != NULL);
     ASSERT(msg != NULL);
 
@@ -269,11 +240,11 @@ u8 xeCommWaitMessage(ocrCommPlatform_t *self,  ocrPolicyMsg_t **msg,
 
     // While local stage non-Full, keep looping.
     // BUG #515: Sleep
-    while(lq[0] != 2);
+    while(lq[0] != 2)
+        ;
 
     // Once it is F, return content.
 
-#if 1
     // Provide a ptr to the local stage's contents
     *msg = (ocrPolicyMsg_t *)&lq[1];
     // We fixup pointers
@@ -289,13 +260,7 @@ u8 xeCommWaitMessage(ocrCommPlatform_t *self,  ocrPolicyMsg_t **msg,
         ASSERT(0);
     }
     ocrPolicyMsgUnMarshallMsg((u8*)*msg, NULL, *msg, MARSHALL_APPEND);
-#else
-    // NOTE: For now we copy it into the buffer provided by the caller
-    //       eventually when QMA arrives we'll move to a posted-buffer
-    //       scheme and eliminate the copies.
-    hal_memCopy(*msg, &lq[1], sizeof(ocrPolicyMsg_t), 0);
-    hal_fence();
-#endif
+    DPRINTF(DEBUG_LVL_VERB, "Found full message @ 0x%lx of type 0x%x\n", *msg, (*msg)->type);
 
     return 0;
 }
@@ -312,7 +277,7 @@ u8 xeCommDestructMessage(ocrCommPlatform_t *self, ocrPolicyMsg_t *msg) {
     DPRINTF(DEBUG_LVL_VERB, "Resetting incomming message buffer\n");
 #ifndef ENABLE_BUILDER_ONLY
     // Local stage is at well-known 0x0
-    u64 * lq = 0x0;
+    volatile u64 * lq = 0x0;
     // - Atomically test & set local stage to Empty. Error if prev not Full.
     {
         u64 old = hal_swap64(lq, 0);

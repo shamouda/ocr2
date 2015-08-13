@@ -21,11 +21,22 @@ typedef struct {
     ocrPolicyDomainFactory_t base;
 } ocrPolicyDomainFactoryXe_t;
 
+// This structure currently assumes only one worker per PD because
+// it is only designed to gather information about PDs (ie: not
+// asynchronous workers in the same PD)
+typedef struct {
+    ocrRunlevel_t barrierRL;   // RL on which we are performing a barrier. Mostly here for
+                               // sanity check
+    u32 properties;            // Properties for the switch of RL
+    u32 pdStatus;              // Either RL_PD_MASTER, RL_NODE_MASTER or 0
+    volatile u8 barrierState;  // State of the barrier (see RL_BARRIER_STATE_* in xe-policy.c)
+} pdXeResumeSwitchRL_t;
+
 typedef struct {
     ocrPolicyDomain_t base;
     void *packedArgsLocation;  // Keep this here.  If moved around, might make mismatch in
                                // .../ss/rmdkrnl/inc/rmd-bin-file.h, "magic" number XE_PDARGS_OFFSET.
-    u8 shutdownInitiated;      // Non-zero if the XE knows about the shutdown
+    pdXeResumeSwitchRL_t rlSwitch; // Structure to keep track of runlevel switches
 } ocrPolicyDomainXe_t;
 
 ocrPolicyDomainFactory_t *newPolicyDomainFactoryXe(ocrParamList_t *perType);

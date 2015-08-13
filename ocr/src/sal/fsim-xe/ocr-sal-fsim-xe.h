@@ -10,6 +10,16 @@
 #include "ocr-hal.h"
 #include "xe-abi.h"
 
+/**
+ * @brief Function to drive the runlevel changes on boot-up as well
+ * as the runlevel changes on tear-down
+ *
+ * This function will be called by rmdkrnl to start the PD for the CE
+ *
+ * @param[in] pd    Pointer to the policy domain to start
+ */
+void salPdDriver(void* pd);
+
 extern u32 salPause(bool isBlocking);
 
 extern ocrGuid_t salQuery(ocrQueryType_t query, ocrGuid_t guid, void **result, u32 *size, u8 flags);

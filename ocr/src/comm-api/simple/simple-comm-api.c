@@ -51,6 +51,11 @@ static ocrPolicyMsg_t * allocateNewMessage(ocrCommApi_t * self, u32 size) {
     return message;
 }
 
+u8 simpleCommApiInitHandle(ocrCommApi_t *self, ocrMsgHandle_t *handle) {
+    ASSERT(0);
+    return OCR_ENOTSUP;
+}
+
 u8 sendMessageSimpleCommApi(ocrCommApi_t *self, ocrLocation_t target, ocrPolicyMsg_t *message,
                         ocrMsgHandle_t **handle, u32 properties) {
     ocrCommApiSimple_t * commApiSimple = (ocrCommApiSimple_t *) self;
@@ -263,6 +268,7 @@ ocrCommApiFactory_t *newCommApiFactorySimple(ocrParamList_t *perType) {
     base->apiFcts.destruct = FUNC_ADDR(void (*)(ocrCommApi_t*), simpleCommApiDestruct);
     base->apiFcts.switchRunlevel = FUNC_ADDR(u8 (*)(ocrCommApi_t*, ocrPolicyDomain_t*, ocrRunlevel_t,
                                                       phase_t, u32, void (*)(ocrPolicyDomain_t*, u64), u64), simpleCommApiSwitchRunlevel);
+    base->apiFcts.initHandle = FUNC_ADDR(u8 (*)(ocrCommApi_t*, ocrMsgHandle_t*), simpleCommApiInitHandle);
     base->apiFcts.sendMessage = FUNC_ADDR(u8 (*)(ocrCommApi_t*, ocrLocation_t, ocrPolicyMsg_t *, ocrMsgHandle_t**, u32),
                                           sendMessageSimpleCommApi);
     base->apiFcts.pollMessage = FUNC_ADDR(u8 (*)(ocrCommApi_t*, ocrMsgHandle_t**),

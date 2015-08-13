@@ -302,6 +302,7 @@ char *args_binary;
 
 extern int extract_functions(const char *);
 extern void free_functions(void);
+extern void *getAddress(const char *fname);
 extern char *persistent_chunk;
 extern u64 persistent_pointer;
 extern u64 args_pointer;
@@ -310,11 +311,13 @@ extern u64 dram_offset;
 /* Format of this file:
  *
  * +--------------------------+
- * | header size (incl) (u64) | = (5)*sizeof(u64)
+ * | header size (incl) (u64) | = (6)*sizeof(u64)
  * +--------------------------+
  * |  abs. location  (u64)    | = CeMemSize - 4K
  * +--------------------------+
  * |  abs.address of PD (u64) | = abs.location + PD offset
+ * +--------------------------+
+ * |ptr to salPdDriver() (u64)| = pointer to salPdDriver
  * +--------------------------+
  * |  size (of structs) (u64) | = persistent_pointer
  * +--------------------------+
@@ -337,7 +340,7 @@ void dumpStructs(void *pd, const char* output_binary, u64 start_address) {
 
         // Write the header
         // Header size
-        value = 5*sizeof(u64);
+        value = 6*sizeof(u64);
         fwrite(&value, sizeof(u64), 1, fp);
         DPRINTF(DEBUG_LVL_VERB, "Wrote header size: 0x%llx\n", value);
         totu64++;
@@ -351,6 +354,11 @@ void dumpStructs(void *pd, const char* output_binary, u64 start_address) {
         offset = (u64)pd - (u64)&persistent_chunk + (u64)start_address;
         fwrite(&offset, sizeof(u64), 1, fp);
         DPRINTF(DEBUG_LVL_VERB, "Wrote PD address: 0x%llx\n", offset);
+        totu64++;
+
+        value = (u64)getAddress("salPdDriver");
+        fwrite(&value, sizeof(u64), 1, fp);
+        DPRINTF(DEBUG_LVL_VERB, "Wrote salPdDriver address: 0x%llx\n", value);
         totu64++;
 
         // Size of all structs
@@ -526,7 +534,8 @@ void bringUpRuntime(ocrConfig_t *ocrConfig) {
                 if(inst_counts[j] && inst_params[j] == NULL) {
                     DPRINTF(DEBUG_LVL_INFO, "Create %d instances of %s\n", inst_counts[j], inst_str[j]);
                     inst_params[j] = (ocrParamList_t **)runtimeChunkAlloc(inst_counts[j] * sizeof(ocrParamList_t *), NONPERSISTENT_CHUNK);
-                    all_instances[j] = (void **)runtimeChunkAlloc(inst_counts[j] * sizeof(void *), NONPERSISTENT_CHUNK);
+                    all_instances[j] = (void **)runtimeChunkAlloc((inst_counts[j]+1) * sizeof(void *), NONPERSISTENT_CHUNK); // We create an "end of instances" marker
+                    all_instances[j][inst_counts[j]] = NULL;
                     count = 0;
                 }
                 populate_inst(inst_params[j], all_instances[j], type_counts, factory_names, all_factories, all_instances, j, dict, secname);
@@ -547,38 +556,53 @@ void bringUpRuntime(ocrConfig_t *ocrConfig) {
                          inst_counts[deps[i].from], type_counts[deps[i].to], all_factories, type_params);
     }
 
-    // SETUP NEIGHBORS
-    for (i = 0; i < nsec; i++) {
-        char *secname = iniparser_getsecname(dict, i);
-        if (strncasecmp("PolicyDomainInst", secname, strlen("PolicyDomainInst"))==0) {
-          if (key_exists(dict, secname, "neighbors")) {
-            int neighbors_low, neighbors_high, neighbors_count;
-            neighbors_count = read_range(dict, secname, "neighbors", &neighbors_low, &neighbors_high);
-            if (neighbors_count > 0) {
-                int low, high, count;
-                count = read_range(dict, secname, "id", &low, &high);
-                ASSERT(count == 1 && low == high);
-                ocrPolicyDomain_t *pd = (ocrPolicyDomain_t*)all_instances[policydomain_type][low];
-                ASSERT(neighbors_count == pd->neighborCount);
-                pd->neighbors = (ocrLocation_t*)runtimeChunkAlloc(sizeof(ocrLocation_t) * neighbors_count, PERSISTENT_CHUNK);
-#ifndef ENABLE_BUILDER_ONLY
-                pd->neighborPDs = (ocrPolicyDomain_t**)runtimeChunkAlloc(sizeof(ocrPolicyDomain_t*) * neighbors_count, NONPERSISTENT_CHUNK);
-                int idx = 0;
-                DPRINTF(DEBUG_LVL_VERB, "PD%lu neighbors (%d): ", (u64)pd->myLocation, neighbors_count);
-                for (j = neighbors_low; j <= neighbors_high; j++) {
-                    if (j != low) {
-                        ocrPolicyDomain_t *neighborPd = (ocrPolicyDomain_t*)all_instances[policydomain_type][j];
-                        pd->neighborPDs[idx] = neighborPd;
-                        pd->neighbors[idx++] = neighborPd->myLocation;
-                        DPRINTF(DEBUG_LVL_VERB, "%lu ", (u64)neighborPd->myLocation);
-                    }
-                }
-                DPRINTF(DEBUG_LVL_VERB, "\n");
-#endif
-            }
-          }
-        }
+#ifdef ENABLE_BUILDER_ONLY
+    // If we are doing the builder, we set this up here because we can't do runtimeChunkAlloc in ce-policy.c like
+    // we do for everything but TG
+    for(i=0; i < inst_counts[policydomain_type]; ++i) {
+        ocrPolicyDomain_t *policy = (ocrPolicyDomain_t*)all_instances[policydomain_type][i];
+        policy->neighbors = (ocrLocation_t*)runtimeChunkAlloc(policy->neighborCount*sizeof(ocrLocation_t), PERSISTENT_CHUNK);
     }
+#else
+    // We point each PD to all other PDs if needed for neighbor discovery.
+    // Note that at this point neighborsPDs points to *everyone*. If needed, when the
+    // PD starts, it will update its copy of neighborsPDs to match exactly what it needs
+    for(i=0; i < inst_counts[policydomain_type]; ++i) {
+        ((ocrPolicyDomain_t*)all_instances[policydomain_type][i])->neighborPDs = (ocrPolicyDomain_t**)all_instances[policydomain_type];
+    }
+#endif
+
+ //     for (i = 0; i < nsec; i++) {
+ //         char *secname = iniparser_getsecname(dict, i);
+ //         if (strncasecmp("PolicyDomainInst", secname, strlen("PolicyDomainInst"))==0) {
+ //           if (key_exists(dict, secname, "neighbors")) {
+ //             int neighbors_low, neighbors_high, neighbors_count;
+ //             neighbors_count = read_range(dict, secname, "neighbors", &neighbors_low, &neighbors_high);
+ //             if (neighbors_count > 0) {
+ //                 int low, high, count;
+ //                 count = read_range(dict, secname, "id", &low, &high);
+ //                 ASSERT(count == 1 && low == high);
+ //                 ocrPolicyDomain_t *pd = (ocrPolicyDomain_t*)all_instances[policydomain_type][low];
+ //                 ASSERT(neighbors_count == pd->neighborCount);
+ //                 pd->neighbors = (ocrLocation_t*)runtimeChunkAlloc(sizeof(ocrLocation_t) * neighbors_count, PERSISTENT_CHUNK);
+ // #ifndef ENABLE_BUILDER_ONLY
+ //                 pd->neighborPDs = (ocrPolicyDomain_t**)runtimeChunkAlloc(sizeof(ocrPolicyDomain_t*) * neighbors_count, NONPERSISTENT_CHUNK);
+ //                 int idx = 0;
+ //                 DPRINTF(DEBUG_LVL_VERB, "PD%lu neighbors (%d): ", (u64)pd->myLocation, neighbors_count);
+ //                 for (j = neighbors_low; j <= neighbors_high; j++) {
+ //                     if (j != low) {
+ //                         ocrPolicyDomain_t *neighborPd = (ocrPolicyDomain_t*)all_instances[policydomain_type][j];
+ //                         pd->neighborPDs[idx] = neighborPd;
+ //                         pd->neighbors[idx++] = neighborPd->myLocation;
+ //                         DPRINTF(DEBUG_LVL_VERB, "%lu ", (u64)neighborPd->myLocation);
+ //                     }
+ //                 }
+ //                 DPRINTF(DEBUG_LVL_VERB, "\n");
+ // #endif
+ //             }
+ //           }
+ //         }
+ //     }
 
     // START EXECUTION
     DPRINTF(DEBUG_LVL_INFO, "========= Start execution ==========\n");
@@ -599,10 +623,11 @@ void bringUpRuntime(ocrConfig_t *ocrConfig) {
     // to the first runlevel (CONFIG_PARSE). This will, in particular, enable all
     // modules within a PD to become aware of each other's runaction requirements
     // Transition all PDs to CONFIG_PARSE
+
     for(i = 1; i < inst_counts[policydomain_type]; ++i) {
         otherPolicyDomains = (ocrPolicyDomain_t*)all_instances[policydomain_type][i];
         RESULT_ASSERT(otherPolicyDomains->fcts.switchRunlevel(otherPolicyDomains, RL_CONFIG_PARSE,
-                                                              RL_REQUEST | RL_ASYNC | RL_BRING_UP),
+                                                              RL_REQUEST | RL_ASYNC | RL_BRING_UP | RL_PD_MASTER),
                       ==, 0);
     }
     RESULT_ASSERT(rootPolicy->fcts.switchRunlevel(rootPolicy, RL_CONFIG_PARSE, RL_REQUEST |
@@ -621,7 +646,7 @@ void bringUpRuntime(ocrConfig_t *ocrConfig) {
     for(i = 1; i < inst_counts[policydomain_type]; ++i) {
         otherPolicyDomains = (ocrPolicyDomain_t*)all_instances[policydomain_type][i];
         RESULT_ASSERT(otherPolicyDomains->fcts.switchRunlevel(otherPolicyDomains, RL_NETWORK_OK,
-                                                              RL_REQUEST | RL_ASYNC | RL_BRING_UP),
+                                                              RL_REQUEST | RL_ASYNC | RL_BRING_UP | RL_PD_MASTER),
                       ==, 0);
     }
     RESULT_ASSERT(rootPolicy->fcts.switchRunlevel(rootPolicy, RL_NETWORK_OK,
@@ -635,7 +660,7 @@ void bringUpRuntime(ocrConfig_t *ocrConfig) {
     for(i = 1; i < inst_counts[policydomain_type]; ++i) {
         otherPolicyDomains = (ocrPolicyDomain_t*)all_instances[policydomain_type][i];
         RESULT_ASSERT(otherPolicyDomains->fcts.switchRunlevel(otherPolicyDomains, RL_PD_OK,
-                                                              RL_REQUEST | RL_ASYNC | RL_BRING_UP),
+                                                              RL_REQUEST | RL_ASYNC | RL_BRING_UP | RL_PD_MASTER),
                       ==, 0);
     }
     RESULT_ASSERT(rootPolicy->fcts.switchRunlevel(rootPolicy, RL_PD_OK,
@@ -685,7 +710,7 @@ void freeUpRuntime (bool doTeardown) {
         for(i = 1; i < inst_counts[policydomain_type]; ++i) {
             otherPolicyDomains = (ocrPolicyDomain_t*)all_instances[policydomain_type][i];
             RESULT_ASSERT(otherPolicyDomains->fcts.switchRunlevel(otherPolicyDomains, RL_NETWORK_OK,
-                                                                  RL_REQUEST | RL_ASYNC | RL_TEAR_DOWN), ==, 0);
+                                                                  RL_REQUEST | RL_ASYNC | RL_TEAR_DOWN | RL_PD_MASTER), ==, 0);
         }
         RESULT_ASSERT(pd->fcts.switchRunlevel(pd, RL_NETWORK_OK, RL_REQUEST | RL_ASYNC | RL_TEAR_DOWN | RL_NODE_MASTER),
                       ==, 0);
@@ -693,7 +718,7 @@ void freeUpRuntime (bool doTeardown) {
         for(i = 1; i < inst_counts[policydomain_type]; ++i) {
             otherPolicyDomains = (ocrPolicyDomain_t*)all_instances[policydomain_type][i];
             RESULT_ASSERT(otherPolicyDomains->fcts.switchRunlevel(otherPolicyDomains, RL_CONFIG_PARSE,
-                                                                  RL_REQUEST | RL_ASYNC | RL_TEAR_DOWN), ==, 0);
+                                                                  RL_REQUEST | RL_ASYNC | RL_TEAR_DOWN | RL_PD_MASTER), ==, 0);
         }
         RESULT_ASSERT(pd->fcts.switchRunlevel(pd, RL_CONFIG_PARSE, RL_REQUEST | RL_ASYNC | RL_TEAR_DOWN | RL_NODE_MASTER),
                       ==, 0);

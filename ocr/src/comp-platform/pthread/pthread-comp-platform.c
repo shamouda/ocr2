@@ -23,6 +23,8 @@
 
 extern void bindThread(u32 mask);
 
+//TODO: I did a number of changes/cleanup here in another patchset. I'll try to push that soon
+
 /**
  * The key we use to be able to find which compPlatform we are on
  */
@@ -67,7 +69,58 @@ static void * pthreadRoutineWrapper(void * arg) {
     pthreadRoutineInitializer(pthreadCompPlatform);
     // Real initialization happens in workers's run routine
     RESULT_ASSERT(pthread_setspecific(selfKey, &(pthreadCompPlatform->tls)), ==, 0);
-    return pthreadRoutineExecute(pthreadCompPlatform->base.worker);
+
+    // Depending on whether we are a node master or a PD master or just a worker
+    // we do different things
+    switch(pthreadCompPlatform->threadStatus) {
+    case 0:
+        // regular worker
+        return pthreadRoutineExecute(pthreadCompPlatform->base.worker);
+    case RL_PD_MASTER:
+    {
+        // Since we do not start the worker right away, we need to at least
+        // partially initialize the environment
+        pthreadCompPlatform->base.fcts.setCurrentEnv(
+            (ocrCompPlatform_t*)pthreadCompPlatform,
+            ((ocrCompPlatform_t*)pthreadCompPlatform)->pd, NULL);
+
+        // We need to continue the startup sequence
+        ocrPolicyDomain_t *policy = pthreadCompPlatform->base.pd;
+        RESULT_ASSERT(policy->fcts.switchRunlevel(
+                          policy, RL_MEMORY_OK, RL_REQUEST |
+                          RL_ASYNC | RL_BRING_UP | RL_PD_MASTER), ==, 0);
+        RESULT_ASSERT(policy->fcts.switchRunlevel(
+                          policy, RL_GUID_OK, RL_REQUEST | RL_BARRIER |
+                          RL_BRING_UP | RL_PD_MASTER), ==, 0);
+        RESULT_ASSERT(policy->fcts.switchRunlevel(
+                          policy, RL_COMPUTE_OK, RL_REQUEST | RL_ASYNC |
+                          RL_BRING_UP | RL_PD_MASTER), ==, 0);
+        RESULT_ASSERT(policy->fcts.switchRunlevel(
+                          policy, RL_USER_OK, RL_REQUEST | RL_ASYNC |
+                          RL_BRING_UP | RL_PD_MASTER), ==, 0);
+        // At this point, we actually start doing work
+        // When we come back down here, we need to continue the transition
+        // (RL_GUID_OK and RL_PD_OK). After that, we return and the NODE_MASTER will
+        // continue to transition us
+        RESULT_ASSERT(policy->fcts.switchRunlevel(
+                          policy, RL_GUID_OK, RL_REQUEST | RL_BARRIER |
+                          RL_TEAR_DOWN | RL_PD_MASTER), ==, 0);
+        RESULT_ASSERT(policy->fcts.switchRunlevel(
+                          policy, RL_PD_OK, RL_REQUEST | RL_ASYNC |
+                          RL_TEAR_DOWN | RL_PD_MASTER), ==, 0);
+        break;
+    }
+    case RL_NODE_MASTER:
+    {
+        // This should never happen. The NODE master thread should always
+        // exist and never enter pthreadRoutineWrapper
+        ASSERT(0);
+        break;
+    }
+    default:
+        ;
+    }
+    return NULL;
 }
 
 /**
@@ -104,7 +157,14 @@ u8 pthreadSwitchRunlevel(ocrCompPlatform_t *self, ocrPolicyDomain_t *PD, ocrRunl
         // On bring-up: Update PD->phasesPerRunlevel on phase 0
         // and check compatibility on phase 1
         if((properties & RL_BRING_UP) && RL_IS_FIRST_PHASE_UP(PD, RL_CONFIG_PARSE, phase)) {
-            ASSERT(self->worker != NULL);
+            if((properties & RL_NODE_MASTER) == RL_NODE_MASTER) {
+                DPRINTF(DEBUG_LVL_VVERB, "I am RL_NODE_MASTER\n");
+                pthreadCompPlatform->threadStatus = RL_NODE_MASTER;
+            } else if(properties & RL_PD_MASTER) {
+                pthreadCompPlatform->threadStatus = RL_PD_MASTER;
+            } else {
+                pthreadCompPlatform->threadStatus = 0;
+            }
         }
         if((properties & RL_TEAR_DOWN) && RL_IS_LAST_PHASE_DOWN(PD, RL_CONFIG_PARSE, phase)) {
             perThreadStorage_t *tls = pthread_getspecific(selfKey);
@@ -118,21 +178,44 @@ u8 pthreadSwitchRunlevel(ocrCompPlatform_t *self, ocrPolicyDomain_t *PD, ocrRunl
 
         break;
     case RL_NETWORK_OK:
+        // This is run only by NODE_MASTER and we need to join with all the other PD_MASTERs
+        // created in the PD_OK stage
+        if((properties & RL_TEAR_DOWN) && (RL_IS_FIRST_PHASE_DOWN(PD, RL_NETWORK_OK, phase))) {
+            if(pthreadCompPlatform->threadStatus == RL_PD_MASTER) {
+                // We don't join with ourself
+                toReturn |= pthread_join(pthreadCompPlatform->osThread, NULL);
+            }
+        }
         break;
     case RL_PD_OK:
         if(properties & RL_BRING_UP) {
             self->pd = PD;
-            if(properties & RL_PD_MASTER) {
-                // This code is called by the master thread as many times there are platforms.
-                // This is a little fragile but since platforms are called in order, we can
-                // set the TLS on the first platform assuming it's going to be the one for master
+            if(((properties & RL_NODE_MASTER) == RL_NODE_MASTER) &&
+               RL_IS_FIRST_PHASE_UP(PD, RL_PD_OK, phase)) {
+                // This means that we are the node master and therefore do not
+                // need to start another thread. Instead, we set the current environment
+                // for ourself
                 perThreadStorage_t *tls = pthread_getspecific(selfKey);
-                if (tls == NULL) {
-                    // We need to make sure we have the current environment set
-                    // at least partially as the PD may be used
-                    // We are going to set our own key (we are the master thread)
-                    RESULT_ASSERT(pthread_setspecific(selfKey, &pthreadCompPlatform->tls), ==, 0);
-                    self->fcts.setCurrentEnv(self, self->pd, NULL);
+                ASSERT(tls == NULL); // The key has not been setup yet
+                RESULT_ASSERT(pthread_setspecific(selfKey, &pthreadCompPlatform->tls), ==, 0);
+                self->fcts.setCurrentEnv(self, self->pd, NULL);
+            } else if(properties & RL_PD_MASTER) {
+                // Excludes NODE_MASTER since that is caught in the first part of this if statement
+                // We need to bring up the PD_MASTER thread for the other PDs and
+                // they will then continue the switch. Note that we create the thread
+                // only on the last phase
+                if(RL_IS_LAST_PHASE_UP(PD, RL_PD_OK, phase)) {
+                    DPRINTF(DEBUG_LVL_INFO, "Creating PD_MASTER thread\n");
+                    pthread_attr_t attr;
+                    toReturn |= pthread_attr_init(&attr);
+                    if(!toReturn) {
+                        toReturn |= pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+                        toReturn |= pthread_attr_setstacksize(&attr, pthreadCompPlatform->stackSize);
+                    }
+                    if(!toReturn) {
+                        toReturn |= pthread_create(&(pthreadCompPlatform->osThread), &attr,
+                                                   &pthreadRoutineWrapper, pthreadCompPlatform);
+                    }
                 }
             }
         }
@@ -145,14 +228,17 @@ u8 pthreadSwitchRunlevel(ocrCompPlatform_t *self, ocrPolicyDomain_t *PD, ocrRunl
         if((properties & RL_BRING_UP) && RL_IS_FIRST_PHASE_UP(PD, RL_COMPUTE_OK, phase)) {
             ocrCompPlatformPthread_t * pthreadCompPlatform = (ocrCompPlatformPthread_t *)self;
             if(properties & RL_PD_MASTER) {
+                // For both PD_MASTER and NODE_MASTER
                 pthreadRoutineInitializer(pthreadCompPlatform);
             } else {
                 // We need to create another capable module
                 pthread_attr_t attr;
                 toReturn |= pthread_attr_init(&attr);
                 //Note this call may fail if the system doesn't like the stack size asked for.
-                if(!toReturn)
+                if(!toReturn) {
+                    toReturn |= pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
                     toReturn |= pthread_attr_setstacksize(&attr, pthreadCompPlatform->stackSize);
+                }
                 if(!toReturn) {
                     toReturn |= pthread_create(&(pthreadCompPlatform->osThread),
                                                &attr, &pthreadRoutineWrapper,
@@ -162,7 +248,7 @@ u8 pthreadSwitchRunlevel(ocrCompPlatform_t *self, ocrPolicyDomain_t *PD, ocrRunl
         } else if((properties & RL_TEAR_DOWN) && RL_IS_LAST_PHASE_DOWN(PD, RL_COMPUTE_OK, phase)) {
             // At this point, this is run only by the master thread
             if(!(properties & RL_PD_MASTER)) {
-                // We do not join with ourself
+                // We do not join with ourself; covers both PD_MASTER and NODE_MASTER
                 toReturn |= pthread_join(pthreadCompPlatform->osThread, NULL);
             }
 #ifdef OCR_RUNTIME_PROFILER

@@ -64,6 +64,7 @@ ocrSchedulerHeuristic_t* newSchedulerHeuristicCe(ocrSchedulerHeuristicFactory_t 
     derived->inPendingCount = 0;
     derived->pendingXeCount = 0;
     derived->outWorkVictimsAvailable = 0;
+    derived->shutdownMode = false;
     return self;
 }
 
@@ -116,7 +117,8 @@ u8 ceSchedulerHeuristicSwitchRunlevel(ocrSchedulerHeuristic_t *self, ocrPolicyDo
                 context->cost = NULL;
                 context->properties = 0;
                 ocrSchedulerHeuristicContextCe_t *ceContext = (ocrSchedulerHeuristicContextCe_t*)context;
-                ceContext->stealSchedulerObjectIndex = ((u64)-1);
+                ceContext->msgId = 0;
+                ceContext->stealSchedulerObjectIndex = ((u32)-1);
                 ceContext->mySchedulerObject = NULL;
                 ceContext->inWorkRequestPending = false;
                 ceContext->outWorkRequestPending = false;
@@ -255,16 +257,12 @@ static u8 ceWorkStealingGet(ocrSchedulerHeuristic_t *self, ocrSchedulerHeuristic
 }
 
 static u8 ceSchedulerHeuristicWorkEdtUserInvoke(ocrSchedulerHeuristic_t *self, ocrSchedulerHeuristicContext_t *context, ocrSchedulerOpArgs_t *opArgs, ocrRuntimeHint_t *hints) {
-    ocrPolicyDomain_t *pd = self->scheduler->pd;
-    ocrPolicyDomainCe_t * cePolicy = (ocrPolicyDomainCe_t *)pd;
-    if (cePolicy->shutdownMode) {
-        return 0;
-    }
+    ocrSchedulerHeuristicCe_t *derived = (ocrSchedulerHeuristicCe_t*)self;
+    ASSERT(!derived->shutdownMode);
     ocrSchedulerOpWorkArgs_t *taskArgs = (ocrSchedulerOpWorkArgs_t*)opArgs;
     ocrFatGuid_t *fguid = &(taskArgs->OCR_SCHED_ARG_FIELD(OCR_SCHED_WORK_EDT_USER).edt);
     u8 retVal = ceWorkStealingGet(self, context, fguid);
     if (retVal) {
-        ocrSchedulerHeuristicCe_t *derived = (ocrSchedulerHeuristicCe_t*)self;
         ocrSchedulerHeuristicContextCe_t *ceContext = (ocrSchedulerHeuristicContextCe_t*)context;
         ASSERT(ceContext->inWorkRequestPending == false);
         DPRINTF(DEBUG_LVL_VVERB, "TAKE_WORK_INVOKE from %lx (pending)\n", context->location);
@@ -276,6 +274,9 @@ static u8 ceSchedulerHeuristicWorkEdtUserInvoke(ocrSchedulerHeuristic_t *self, o
             derived->pendingXeCount++;
         }
         ceContext->inWorkRequestPending = true;
+        ASSERT(ceContext->msgId == 0 && hints != NULL);
+        ocrPolicyMsg_t *message = (ocrPolicyMsg_t*)hints;
+        ceContext->msgId = message->msgId; //HACK: Store the msgId for future response
         derived->inPendingCount++;
     } else {
         DPRINTF(DEBUG_LVL_VVERB, "TAKE_WORK_INVOKE from %lx (found)\n", context->location);
@@ -315,6 +316,8 @@ static u8 handleEmptyResponse(ocrSchedulerHeuristic_t *self, ocrSchedulerHeurist
 }
 
 static u8 ceSchedulerHeuristicNotifyEdtReadyInvoke(ocrSchedulerHeuristic_t *self, ocrSchedulerHeuristicContext_t *context, ocrSchedulerOpArgs_t *opArgs, ocrRuntimeHint_t *hints) {
+    ocrSchedulerHeuristicCe_t *derived = (ocrSchedulerHeuristicCe_t*)self;
+    ASSERT(!derived->shutdownMode);
     DPRINTF(DEBUG_LVL_VVERB, "GIVE WORK INVOKE from %lx\n", opArgs->location);
     ocrSchedulerOpNotifyArgs_t *notifyArgs = (ocrSchedulerOpNotifyArgs_t*)opArgs;
     ocrPolicyDomain_t *pd = self->scheduler->pd;
@@ -378,7 +381,6 @@ static u8 ceSchedulerHeuristicNotifyEdtReadyInvoke(ocrSchedulerHeuristic_t *self
     edtObj.kind = OCR_SCHEDULER_OBJECT_EDT;
     ocrSchedulerObjectFactory_t *fact = pd->schedulerObjectFactories[insertSchedObj->fctId];
     ASSERT(fact->fcts.insert(fact, insertSchedObj, &edtObj, 0) == 0);
-    ocrSchedulerHeuristicCe_t *derived = (ocrSchedulerHeuristicCe_t*)self;
     derived->workCount++;
     if (AGENT_FROM_ID(context->location) == ID_AGENT_CE) {
         ocrSchedulerHeuristicContextCe_t *ceContext = (ocrSchedulerHeuristicContextCe_t*)context;
@@ -505,7 +507,7 @@ static u8 respondWorkRequest(ocrSchedulerHeuristic_t *self, ocrSchedulerHeuristi
     ocrSchedulerHeuristicCe_t *derived = (ocrSchedulerHeuristicCe_t*)self;
     ocrSchedulerHeuristicContextCe_t *ceContext = (ocrSchedulerHeuristicContextCe_t*)context;
     ASSERT(ceContext->inWorkRequestPending);
-    ASSERT(fguid && fguid->guid != NULL_GUID);
+    ASSERT(fguid);
     u8 returnCode = 0;
     bool ceMessage = false;
 
@@ -519,6 +521,8 @@ static u8 respondWorkRequest(ocrSchedulerHeuristic_t *self, ocrSchedulerHeuristi
         ceMessage = true;
     }
     ceContext->inWorkRequestPending = false;
+    u64 msgId = ceContext->msgId;
+    ceContext->msgId = 0;
     derived->inPendingCount--;
 
     //TODO: For now pretend we are an XE until
@@ -531,6 +535,7 @@ static u8 respondWorkRequest(ocrSchedulerHeuristic_t *self, ocrSchedulerHeuristi
 #define PD_MSG (&msg)
 #define PD_TYPE PD_MSG_SCHED_GET_WORK
     msg.type = PD_MSG_SCHED_GET_WORK | PD_MSG_RESPONSE | PD_MSG_REQ_RESPONSE;
+    msg.msgId = msgId; //HACK: Use the msgId from the original request
     PD_MSG_FIELD_IO(schedArgs).kind = OCR_SCHED_WORK_EDT_USER;
     PD_MSG_FIELD_IO(schedArgs).OCR_SCHED_ARG_FIELD(OCR_SCHED_WORK_EDT_USER).edt = *fguid;
     PD_MSG_FIELD_I(properties) = 0;
@@ -584,6 +589,7 @@ static u8 respondShutdown(ocrSchedulerHeuristic_t *self, ocrSchedulerHeuristicCo
 #define PD_MSG (&msg)
 #define PD_TYPE PD_MSG_MGT_RL_NOTIFY
     msg.type = PD_MSG_MGT_RL_NOTIFY | PD_MSG_RESPONSE | PD_MSG_REQ_RESPONSE;
+    msg.msgId = ceContext->msgId; //HACK: Use the msgId from the original request
     if (ceMessage) {
         if (isBlocking) {
             do {
@@ -608,6 +614,7 @@ static u8 respondShutdown(ocrSchedulerHeuristic_t *self, ocrSchedulerHeuristicCo
     if (returnCode == 0 || returnCode == 2) {
         if (ceContext->inWorkRequestPending) derived->inPendingCount--;
         ceContext->inWorkRequestPending = false;
+        ceContext->msgId = 0;
         ceContext->isChild = false;
     }
     DPRINTF(DEBUG_LVL_VVERB, "SCHEDULER SHUTDOWN RESPONSE SUCCESS (%u) to %lx\n", returnCode, context->location);
@@ -630,6 +637,9 @@ u8 ceSchedulerHeuristicUpdate(ocrSchedulerHeuristic_t *self, u32 properties) {
     u32 i;
     switch(properties) {
     case OCR_SCHEDULER_HEURISTIC_UPDATE_PROP_IDLE: {
+            if (derived->shutdownMode)
+                break; //We are shutting down, no more processing
+
             DPRINTF(DEBUG_LVL_VVERB, "IDLE [work: %lu pending: (%u, %u) victims: %u]\n", derived->workCount, derived->inPendingCount, derived->pendingXeCount, derived->outWorkVictimsAvailable);
             //High-level logic:
             //First check if any remote agent (XE or CE) is waiting for a response from this CE.
@@ -701,12 +711,20 @@ u8 ceSchedulerHeuristicUpdate(ocrSchedulerHeuristic_t *self, u32 properties) {
         }
         break;
     case OCR_SCHEDULER_HEURISTIC_UPDATE_PROP_SHUTDOWN: {
+            ASSERT(!derived->shutdownMode);
+            derived->shutdownMode = true;
+
+            ocrFatGuid_t fguid;
+            fguid.guid = NULL_GUID;
+            fguid.metaDataPtr = NULL;
+
             //First, ensure shutdown response is sent to all pending children...
             for (i = 0; i < self->contextCount; i++) {
                 ocrSchedulerHeuristicContext_t *context = self->contexts[i];
                 ocrSchedulerHeuristicContextCe_t *ceContext = (ocrSchedulerHeuristicContextCe_t*)context;
                 if ((ceContext->inWorkRequestPending) && (ceContext->isChild)) {
-                    respondShutdown(self, context, true);
+                    //respondShutdown(self, context, true);
+                    respondWorkRequest(self, context, &fguid);
                 }
             }
 
@@ -715,11 +733,12 @@ u8 ceSchedulerHeuristicUpdate(ocrSchedulerHeuristic_t *self, u32 properties) {
                 ocrSchedulerHeuristicContext_t *context = self->contexts[i];
                 ocrSchedulerHeuristicContextCe_t *ceContext = (ocrSchedulerHeuristicContextCe_t*)context;
                 if (ceContext->inWorkRequestPending) {
-                    respondShutdown(self, context, false);
+                    //respondShutdown(self, context, false);
+                    respondWorkRequest(self, context, &fguid);
                 }
             }
 
-#if 1
+#if 0
             //Finally try to shutdown to non-pending CE children as well
             for (i = 0; i < self->contextCount; i++) {
                 ocrSchedulerHeuristicContext_t *context = self->contexts[i];

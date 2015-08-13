@@ -251,7 +251,7 @@ u8 ocrPolicyMsgGetMsgSize(ocrPolicyMsg_t *msg, u64 *baseSize,
     *marshalledSize = (*marshalledSize + MAX_ALIGN - 1)&(~(MAX_ALIGN-1));
 
     DPRINTF(DEBUG_LVL_VVERB, "Msg 0x%lx of type 0x%x: baseSize %ld; addlSize %ld\n",
-            msg, msg->type & PD_MSG_TYPE_ONLY, *baseSize, *marshalledSize);
+            msg, msg->type, *baseSize, *marshalledSize);
 #undef PD_MSG
     return 0;
 }

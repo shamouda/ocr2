@@ -151,29 +151,65 @@ u8 xeWorkerSwitchRunlevel(ocrWorker_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_
 
     // Call the runlevel change on the underlying platform
     switch (runlevel) {
-        case RL_PD_OK:
+    case RL_CONFIG_PARSE:
+        break;
+    case RL_NETWORK_OK:
+        break;
+    case RL_PD_OK:
+        if(properties & RL_BRING_UP) {
             // Set the worker properly the first time
             ASSERT(self->computeCount == 1);
             self->computes[0]->worker = self;
             self->pd = PD;
-            break;
-        case RL_COMPUTE_OK:
             self->location = PD->myLocation;
-            self->pd = PD;
-            ((ocrWorkerXe_t *) self)->running = true;
+        }
+        break;
+    case RL_MEMORY_OK:
+        break;
+    case RL_GUID_OK:
+        break;
+    case RL_COMPUTE_OK:
+        if((properties & RL_BRING_UP) && RL_IS_FIRST_PHASE_UP(PD, RL_COMPUTE_OK, phase)) {
+            // Guidify ourself
+            guidify(self->pd, (u64)self, &(self->fguid), OCR_GUID_WORKER);
+            if(properties & RL_PD_MASTER) {
+                // Set who we are
+                self->computes[0]->fcts.setCurrentEnv(self->computes[0], self->pd, self);
+            }
+        }
+        if((properties & RL_TEAR_DOWN) && RL_IS_LAST_PHASE_DOWN(PD, RL_COMPUTE_OK, phase)) {
+            // Destroy GUID
+            PD_MSG_STACK(msg);
+            getCurrentEnv(NULL, NULL, NULL, &msg);
+#define PD_MSG (&msg)
+#define PD_TYPE PD_MSG_GUID_DESTROY
+            msg.type = PD_MSG_GUID_DESTROY | PD_MSG_REQUEST;
+            PD_MSG_FIELD_I(guid) = self->fguid;
+            PD_MSG_FIELD_I(properties) = 0;
+            toReturn |= self->pd->fcts.processMessage(self->pd, &msg, false);
+            self->fguid.guid = NULL_GUID;
+#undef PD_MSG
+#undef PD_TYPE
+        }
+        break;
+    case RL_USER_OK:
+        if((properties & RL_BRING_UP) && RL_IS_LAST_PHASE_UP(PD, RL_USER_OK, phase)) {
+            self->curState = GET_STATE(RL_USER_OK, 0); // We don't use the phase here
             DPRINTF(DEBUG_LVL_INFO, "XE %lx Started\n", self->location);
-            break;
-        case RL_USER_OK:
-            ((ocrWorkerXe_t *) self)->running = false;
+            if(properties & RL_PD_MASTER) {
+                self->fcts.run(self);
+            }
+        } else if((properties & RL_TEAR_DOWN) && RL_IS_FIRST_PHASE_DOWN(PD, RL_USER_OK, phase)) {
+            self->curState = GET_STATE(RL_COMPUTE_OK, 0); // We don't use the phase here
             DPRINTF(DEBUG_LVL_INFO, "XE %lx Stopped\n", self->location);
-            break;
-        default:
-            break;
+        }
+        break;
+    default:
+        ASSERT(0);
     }
 
     toReturn |= self->computes[0]->fcts.switchRunlevel(self->computes[0], PD, runlevel, phase, properties,
-                                                           callback, val);
-
+                                                       callback, val);
     return toReturn;
 }
 
@@ -190,20 +226,22 @@ void initializeWorkerXe(ocrWorkerFactory_t * factory, ocrWorker_t* base, ocrPara
     initializeWorkerOcr(factory, base, perInstance);
     base->type = SLAVE_WORKERTYPE;
 
-
     ocrWorkerXe_t* workerXe = (ocrWorkerXe_t*) base;
     workerXe->id = ((paramListWorkerInst_t*)perInstance)->workerId;
-    workerXe->running = false;
 }
 
 void* xeRunWorker(ocrWorker_t * worker) {
     // Need to pass down a data-structure
     ocrPolicyDomain_t *pd = worker->pd;
 
+    //TODO: we need to double check the runlevel-based thread-comp-platform
+    //and make sure the TLS is setup properly wrt to tg-x86 initialization
     u32 i;
     for(i = 0; i < worker->computeCount; i++)
         worker->computes[i]->fcts.setCurrentEnv(worker->computes[i], pd, worker);
 
+    // TODO: For x86 workers there's some notification/synchronization with the PD
+    // to callback from RL_COMPUTE_OK, busy-wait, then get transition to RL_USER_OK
     if (pd->myLocation == 0) { //Blessed worker
 
         // This is all part of the mainEdt setup
@@ -252,6 +290,7 @@ void* xeRunWorker(ocrWorker_t * worker) {
         ocrEdtTemplateCreate(&edtTemplateGuid, mainEdt, 0, 1);
         ocrEdtCreate(&edtGuid, edtTemplateGuid, EDT_PARAM_DEF, /* paramv=*/ NULL,
                      EDT_PARAM_DEF, /* depv=*/&dbGuid, EDT_PROP_NONE, NULL_GUID, NULL);
+        DPRINTF(DEBUG_LVL_INFO, "Launched mainEDT from worker %ld\n", getWorkerId(worker));
     }
 
     DPRINTF(DEBUG_LVL_INFO, "Starting scheduler routine of worker %ld\n", getWorkerId(worker));
@@ -265,8 +304,7 @@ void* xeWorkShift(ocrWorker_t* worker) {
 }
 
 bool xeIsRunningWorker(ocrWorker_t * base) {
-    ocrWorkerXe_t * xeWorker = (ocrWorkerXe_t *) base;
-    return xeWorker->running;
+    return GET_STATE_RL(base->curState) == RL_USER_OK;
 }
 
 void xePrintLocation(ocrWorker_t *base, char* location) {

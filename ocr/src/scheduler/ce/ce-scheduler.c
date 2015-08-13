@@ -146,7 +146,10 @@ u8 ceSchedulerSwitchRunlevel(ocrScheduler_t *self, ocrPolicyDomain_t *PD, ocrRun
         }
         break;
     case RL_MEMORY_OK:
-        if((properties & RL_BRING_UP) && RL_IS_LAST_PHASE_UP(PD, RL_MEMORY_OK, phase)) {
+        break;
+    case RL_GUID_OK:
+        // We have memory, allocate all our structures
+        if((properties & RL_BRING_UP) && RL_IS_FIRST_PHASE_UP(PD, RL_GUID_OK, phase)) {
             // allocate steal iterator cache. Use pdMalloc since this is something
             // local to the policy domain and that will never be shared
             ceWorkpileIterator_t * stealIteratorsCache = self->pd->fcts.pdMalloc(
@@ -162,12 +165,10 @@ u8 ceSchedulerSwitchRunlevel(ocrScheduler_t *self, ocrPolicyDomain_t *PD, ocrRun
             derived->stealIterators = stealIteratorsCache;
         }
 
-        if((properties & RL_TEAR_DOWN) && RL_IS_FIRST_PHASE_DOWN(PD, RL_MEMORY_OK, phase)) {
+        if((properties & RL_TEAR_DOWN) && RL_IS_LAST_PHASE_DOWN(PD, RL_GUID_OK, phase)) {
             ocrSchedulerCe_t *derived = (ocrSchedulerCe_t*)self;
             self->pd->fcts.pdFree(self->pd, derived->stealIterators);
         }
-        break;
-    case RL_GUID_OK:
         break;
     case RL_COMPUTE_OK:
         if(properties & RL_BRING_UP) {

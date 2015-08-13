@@ -26,10 +26,9 @@ typedef struct {
 
 typedef struct {
     ocrCommPlatform_t base;
-    ocrPolicyDomain_t * pdPtr;  // Our PD
     u64 * rq[MAX_NUM_XE];       // Remote stages for this block's XEs
     u64 * lq[MAX_NUM_XE];       // Local stages for this block's XEs
-    u64 pollq;                  // Round-robing queue to poll next
+    u64 pollq;                  // Round-robin queue to poll next
 } ocrCommPlatformCe_t;
 
 typedef struct {

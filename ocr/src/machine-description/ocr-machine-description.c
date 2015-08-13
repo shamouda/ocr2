@@ -992,7 +992,12 @@ s32 populate_inst(ocrParamList_t **inst_param, void **instance, s32 *type_counts
 
             snprintf(key, MAX_KEY_SZ, "%s:%s", secname, "location");
             if(INI_IS_RANGE(key)) {
-                ((paramListPolicyDomainInst_t*)inst_param[j])->location =  j-1;
+                s32 sublo, subhi;
+                read_range(dict, secname, "location", &sublo, &subhi);
+                // Make sure there is the same number of instances so we can
+                // match them 1 to 1
+                ASSERT(subhi - sublo == high - low);
+                ((paramListPolicyDomainInst_t*)inst_param[j])->location = sublo + j - low;
             } else {
                 INI_GET_INT (key, value, -1);
                 ((paramListPolicyDomainInst_t*)inst_param[j])->location = value;

@@ -13,16 +13,18 @@ ifneq (${OCR_TYPE}, tg-x86)
 $(error OCR_TYPE is set to ${OCR_TYPE} but expected tg-x86)
 endif
 endif
-$(error tg-x86 support is not available for OCR v1.0)
 
-#DEFAULT_CONFIG=mach-1block.cfg
-DEFAULT_CONFIG=mach-2block.cfg
+DEFAULT_CONFIG=mach-1block.cfg
+#DEFAULT_CONFIG=mach-2block.cfg
 #
 # Tool-chain to be used for the build
 #
 
+ TG_INSTALL ?= ../../../../intel/ss/install
+
 CC      := gcc
-CFLAGS  := -fno-stack-protector
+# TG_INSTALL/include is for rm-map.h
+CFLAGS  := -fno-stack-protector -I $(TG_INSTALL)/include
 
 RM      := rm
 RMFLAGS := -rf

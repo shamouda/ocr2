@@ -19,8 +19,6 @@
 /******************************************************/
 
 void ceWorkpileDestruct ( ocrWorkpile_t * base ) {
-    ocrWorkpileCe_t* derived = (ocrWorkpileCe_t*) base;
-    derived->deque->destruct(base->pd, derived->deque);
     runtimeChunkFree((u64)base, NULL);
 }
 
@@ -49,12 +47,17 @@ u8 ceWorkpileSwitchRunlevel(ocrWorkpile_t *self, ocrPolicyDomain_t *PD, ocrRunle
         if(properties & RL_BRING_UP)
             self->pd = PD;
         break;
-    case RL_MEMORY_OK: {
-            ocrWorkpileCe_t* derived = (ocrWorkpileCe_t*)self;
-            derived->deque = newDeque(self->pd, (void *) NULL_GUID, WORK_STEALING_DEQUE);
-        }
+    case RL_MEMORY_OK:
         break;
     case RL_GUID_OK:
+        // We have memory, we can now allocate a deque
+        if((properties & RL_BRING_UP) && RL_IS_FIRST_PHASE_UP(PD, RL_GUID_OK, phase)) {
+            ocrWorkpileCe_t* derived = (ocrWorkpileCe_t*)self;
+            derived->deque = newDeque(self->pd, (void *) NULL_GUID, WORK_STEALING_DEQUE);
+        } else if((properties & RL_TEAR_DOWN) && RL_IS_LAST_PHASE_DOWN(PD, RL_GUID_OK, phase)) {
+            ocrWorkpileCe_t* derived = (ocrWorkpileCe_t*)self;
+            derived->deque->destruct(PD, derived->deque);
+        }
         break;
     case RL_COMPUTE_OK:
         if(properties & RL_BRING_UP) {

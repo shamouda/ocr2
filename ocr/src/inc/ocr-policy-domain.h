@@ -288,8 +288,11 @@ typedef struct _paramListPolicyDomainInst_t {
 /**< Defines if the message requires a return message */
 #define PD_MSG_REQ_RESPONSE     0x04000000
 
-/**< Defines if the message is marked a CE-CE message */
-#define PD_CE_CE_MESSAGE        0x10000000
+/**< Defines a message that is a request
+ * but actually a response to another query (ie:
+ * the receiver was expecting something else but
+ * we changed the response (shutdown for example) */
+#define PD_MSG_RESPONSE_OVERRIDE 0x10000000
 
 #define PD_MSG_ARG_NAME_SUB(ID) _data_##ID
 #define PD_MSG_STRUCT_NAME(ID) PD_MSG_ARG_NAME_SUB(ID)
@@ -1365,7 +1368,7 @@ typedef struct _ocrPolicyDomain_t {
     u32 neighborCount;                          /**< Number of neighboring policy domains */
     u8 shutdownCode;
 
-    // BUG #135 and BUG #605: Location support
+    // BUG #605: Location support
     struct _ocrPolicyDomain_t **neighborPDs;
     struct _ocrPolicyDomain_t *parentPD;
 

@@ -9,6 +9,7 @@
 
 #include "debug.h"
 
+#include "ocr-errors.h"
 #include "ocr-sysboot.h"
 #include "utils/ocr-utils.h"
 #include "ocr-comm-platform.h"
@@ -106,6 +107,11 @@ ocrMsgHandle_t * createMsgHandlerDelegate(ocrCommApi_t *self, ocrPolicyMsg_t * m
     handle->commApi = self;
     handle->properties = properties;
     return handle;
+}
+
+u8 delegateCommInitHandle(ocrCommApi_t *self, ocrMsgHandle_t *handle) {
+    ASSERT(0);
+    return OCR_ENOTSUP;
 }
 
 /**
@@ -280,6 +286,7 @@ ocrCommApiFactory_t *newCommApiFactoryDelegate(ocrParamList_t *perType) {
     base->apiFcts.destruct = FUNC_ADDR(void (*)(ocrCommApi_t*), delegateCommDestruct);
     base->apiFcts.switchRunlevel = FUNC_ADDR(u8 (*)(ocrCommApi_t*, ocrPolicyDomain_t*, ocrRunlevel_t,
                                                     phase_t, u32, void (*)(ocrPolicyDomain_t*,u64), u64), delegateCommSwitchRunlevel);
+    base->apiFcts.initHandle = FUNC_ADDR(u8 (*)(ocrCommApi_t*, ocrMsgHandle_t*), delegateCommInitHandle);
     base->apiFcts.sendMessage = FUNC_ADDR(u8 (*)(ocrCommApi_t*, ocrLocation_t,
                                                       ocrPolicyMsg_t *, ocrMsgHandle_t **, u32), delegateCommSendMessage);
     base->apiFcts.pollMessage = FUNC_ADDR(u8 (*)(ocrCommApi_t*, ocrMsgHandle_t**),

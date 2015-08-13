@@ -27,8 +27,6 @@ typedef struct {
     // The HC implementation relies on integer ids to
     // map workers, schedulers and workpiles together
     u64 id;
-    // Flag the worker checksto now if he's running
-    volatile bool running;
 } ocrWorkerXe_t;
 
 ocrWorkerFactory_t* newOcrWorkerFactoryXe(ocrParamList_t *perType);

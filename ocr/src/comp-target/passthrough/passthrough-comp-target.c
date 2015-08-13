@@ -51,7 +51,6 @@ u8 ptSwitchRunlevel(ocrCompTarget_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t 
     if(runlevel == RL_CONFIG_PARSE && (properties & RL_BRING_UP) && RL_IS_FIRST_PHASE_UP(PD, RL_CONFIG_PARSE, phase)) {
         // Set the worker properly the first time
         ASSERT(self->platformCount == 1);
-        self->platforms[0]->worker = self->worker;
     }
     if(properties & RL_BRING_UP) {
         toReturn |= self->platforms[0]->fcts.switchRunlevel(self->platforms[0], PD, runlevel, phase, properties,
