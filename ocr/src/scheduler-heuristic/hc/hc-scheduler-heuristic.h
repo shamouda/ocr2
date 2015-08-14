@@ -23,6 +23,7 @@
 typedef struct _ocrSchedulerHeuristicContextHc_t {
     ocrSchedulerHeuristicContext_t base;
     ocrSchedulerObject_t *mySchedulerObject;    // The deque owned by a specific worker (context)
+    ocrSchedulerObject_t *mySchedulerObject2;    // The deque owned by a specific worker (context)
     u64 stealSchedulerObjectIndex;        // Cached index of the deque lasted visited during steal attempts
 #if 0 // Example fields for simulation mode
     ocrSchedulerObjectActionSet_t singleActionSet;
