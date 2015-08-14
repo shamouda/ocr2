@@ -50,6 +50,7 @@ u8 ocrHintInit(ocrHint_t *hint, ocrHintType_t hintType) {
             OCR_HINT_FIELD(hint, OCR_HINT_EDT_SLOT_MAX_ACCESS) = ((u64)-1);
             OCR_HINT_FIELD(hint, OCR_HINT_EDT_AFFINITY) = ((u64)-1);
             OCR_HINT_FIELD(hint, OCR_HINT_EDT_PHASE) = ((u64)-1);
+            OCR_HINT_FIELD(hint, OCR_HINT_EDT_IS_STOKER) = 0;
         }
         break;
     case OCR_HINT_DB_T:

@@ -46,7 +46,8 @@ u64 ocrHintPropTaskHc[] = {
 #ifdef ENABLE_HINTS
     OCR_HINT_EDT_PRIORITY,
     OCR_HINT_EDT_AFFINITY,
-    OCR_HINT_EDT_PHASE
+    OCR_HINT_EDT_PHASE,
+    OCR_HINT_EDT_IS_STOKER
 #endif
 };
 
