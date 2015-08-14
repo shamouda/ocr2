@@ -76,8 +76,11 @@
 //
 
 // Ugly globals below, but would go away once FSim has QMA support trac #232
-#define OUTSTANDING_CE_MSGS 8
-u64 msgAddresses[OUTSTANDING_CE_MSGS] = {0xbadf00d, 0xbadf00d, 0xbadf00d, 0xbadf00d};
+#define OUTSTANDING_CE_MSGS 16
+u64 msgAddresses[OUTSTANDING_CE_MSGS] = {0xbadf00d, 0xbadf00d, 0xbadf00d, 0xbadf00d,
+                                         0xbadf00d, 0xbadf00d, 0xbadf00d, 0xbadf00d,
+                                         0xbadf00d, 0xbadf00d, 0xbadf00d, 0xbadf00d,
+                                         0xbadf00d, 0xbadf00d, 0xbadf00d, 0xbadf00d};
 ocrPolicyMsg_t sendBuf, recvBuf; // Currently size of 1 msg each.
 // BUG #232: The above need to be placed in the CE's scratchpad, but once QMAs are ready, should
 // be no problem.
