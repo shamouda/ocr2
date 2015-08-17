@@ -21,6 +21,11 @@ statements:
 \item \hypertarget{type_s32}{\code{typedef int32\_t s32}} 32-bit signed integer;
 \item \hypertarget{type_s8}{\code{typedef int8\_t s8}} 8-bit signed integer;
 \item \hypertarget{type_bool}{\code{typedef u8 bool}} 8-bit boolean.
+\item \hypertarget{type_ocrEdtDep_t}{\code{ocrEdtDep\_t}}: Type of
+  dependences as passed into the EDTs. It contains at least two fields
+  that can be used by the programmer: \code{guid} which contains the
+  GUID of the data block passed in and \code{ptr} which contains a
+  pointer to the aforementioned data block.
 \end{itemize}
 %%
 \paragraph*{OCR opaque types}
@@ -28,10 +33,8 @@ In addition to these low level types, OCR defines a number of opaque data types
 to manage OCR objects and to interact with the OCR environment:
 \begin{itemize}
 \item \hypertarget{type_ocrGuid_t}{\code{ocrGuid\_t}}: Opaque handle used to
-reference all OCR objects;
-\item \hypertarget{type_ocrEdtDep_t}{\code{ocrEdtDep\_t}}: Type of dependences as
-passed into the EDTs; it contains both the GUID and the pointer to any data block
-passed as a dependence.
+reference all OCR objects. An \code{ocrGuid\_t} is truly opaque and
+the user cannot assume that it is of a given size;
 \end{itemize}
 %%
 \paragraph*{Other constants}
@@ -42,7 +45,9 @@ inside \code{ocr.h}:
 \item \code{\#define TRUE 1};
 \item \code{\#define false 0};
 \item \code{\#define FALSE 0};
-\item \code{\#define NULL\_GUID}: A NULL ocrGuid\_t;
+\item \code{\#define NULL\_GUID}: A NULL ocrGuid\_t. This value cannot
+  be assumed to be equal to zero. In other words, a programmer should
+  explicitly test for equality to NULL\_GUID.
 \item \code{\#define UNINITIALIZED\_GUID}: An Unitialized GUID (ie: never set);
 \item \code{\#define ERROR\_GUID}: An invalid GUID.
 \end{itemize}
@@ -53,6 +58,11 @@ internally to limit OCR's dependence on standard libraries. Most functions in th
 OCR API will return a status code where 0 signifies successful completion. A non-zero
 return code will be one of the following error codes. These codes are found
 in the \code{ocr-errors.h} include file and described in Table~\ref{tab:errorcodes}.
+Since OCR aims to be as asynchronous as possible, it is not always
+possible or advisable to return an error code as soon as called
+function returns. A compliant implementation may therefore not detect
+all possible errors. Future revisions of this specification will
+provide a more robust mechanism for more accurately checking for error conditions.
 \tablefirsthead{%
 \hline
 \textsf{\textbf{Error code}} & \textsf{\textbf{Generic Interpretation}}\\
