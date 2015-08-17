@@ -3,19 +3,15 @@
  * and cannot be distributed without it. This notice cannot be
  * removed or modified.
  */
-
-
-
-
 #include "ocr.h"
 
 // Only tested when OCR library interface is available
-#ifdef OCR_LEGACY_ITF
+#ifdef ENABLE_EXTENSION_LEGACY
 
 #include "extensions/ocr-legacy.h"
 
 /**
- * DESC: Simplest OCR-library, init, shutdown, finalize
+ * DESC: init, shutdown, finalize
  */
 
 int main(int argc, const char * argv[]) {

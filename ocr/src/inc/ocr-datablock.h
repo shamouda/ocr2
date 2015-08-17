@@ -204,7 +204,7 @@ typedef struct _ocrDataBlock_t {
 } ocrDataBlock_t;
 
 // User DB properties
-#define DB_ACCESS_MODE_MASK 0xF /**< Bits encodinf the access modes (see inc/ocr-types.h) */
+#define DB_ACCESS_MODE_MASK 0xF /**< Bits encoding the access modes (see inc/ocr-types.h) */
 
 // Runtime DB properties (upper 16 bits of a u32)
 #define DB_PROP_RT_ACQUIRE     0x10000 // DB acquired by runtime

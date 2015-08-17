@@ -136,7 +136,7 @@ ocrFatGuid_t getEventHc(ocrEvent_t *base) {
     case OCR_EVENT_STICKY_T:
     case OCR_EVENT_IDEM_T: {
         ocrEventHcPersist_t *event = (ocrEventHcPersist_t*)base;
-        res.guid = (event->data == UNINITIALIZED_GUID)?ERROR_GUID:event->data;
+        res.guid = (event->data == UNINITIALIZED_GUID) ? ERROR_GUID : event->data;
         break;
     }
     default:

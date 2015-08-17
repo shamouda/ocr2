@@ -4,12 +4,7 @@
  * removed or modified.
  */
 
-
-
-
-
 #include "ocr.h"
-
 /**
  * DESC: Test addDependence(db, edt, slot); which should trigger the edt.
  */

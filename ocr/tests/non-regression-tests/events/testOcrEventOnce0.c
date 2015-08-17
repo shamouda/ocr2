@@ -4,12 +4,7 @@
  * removed or modified.
  */
 
-
-
-
-
 #include "ocr.h"
-
 /**
  * DESC: Satisfy a 'once' event
  */
@@ -25,7 +20,7 @@ ocrGuid_t taskForEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
 
 ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrGuid_t e0;
-    ocrEventCreate(&e0, OCR_EVENT_ONCE_T, true);
+    ocrEventCreate(&e0, OCR_EVENT_ONCE_T, EVT_PROP_TAKES_ARG);
 
     // Creates the EDT
     ocrGuid_t edtGuid;

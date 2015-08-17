@@ -128,7 +128,8 @@ u8 ocrDbDestroy(ocrGuid_t db) {
     } else {
         DPRINTF(DEBUG_LVL_WARN, "Destroying DB (GUID: 0x%lx) from outside an EDT ... auto-release will fail\n", db);
     }
-    if (returnCode == 0) {
+    // !task is to allow the legacy interface to destroy a datablock outside of an EDT
+    if ((!task) || (returnCode == 0)) {
 #define PD_MSG (&msg)
 #define PD_TYPE PD_MSG_DB_FREE
         msg.type = PD_MSG_DB_FREE | PD_MSG_REQUEST;

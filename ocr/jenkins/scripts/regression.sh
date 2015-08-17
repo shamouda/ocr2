@@ -19,8 +19,15 @@ else
     DB_IMPL=$3;
 
     cd ${JJOB_PRIVATE_HOME}/xstack/ocr/tests/
+    TEST_OPTIONS=""
 
-    ./ocrTests -unstablefile unstable.${ARCH}-${DB_IMPL}
+    if [[ "${ARCH}" == "x86" ]]; then
+        # Also tests legacy and rt-api supports
+        # These MUST be built by default for OCR x86
+        TEST_OPTIONS="-ext_rtapi -ext_legacy"
+    fi
+
+    ./ocrTests ${TEST_OPTIONS} -unstablefile unstable.${ARCH}-${DB_IMPL}
     RES=$?
 
     #Conditionally execute to preserve logs if previous run failed.

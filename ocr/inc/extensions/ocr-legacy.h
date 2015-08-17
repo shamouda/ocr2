@@ -103,7 +103,7 @@ u8 ocrLegacyFinalize(ocrGuid_t legacyContext, bool runUntilShutdown);
  * This call will *NOT* trigger ocrLegacyFinalize(). This call is non-blocking and
  * is frequently used with ocrLegacyBlockProgress().
  *
- * @param[out] handle             Handle to use in ocrBlockProgress().
+ * @param[out] handle             Handle to use in ocrLegacyBlockProgress().
  *                                This is a persistent event which the user needs
  *                                to destroy using ocrEventDestroy() after it
  *                                has been waited on
