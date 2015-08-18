@@ -277,6 +277,13 @@ ocrGuid_t __attribute__ ((weak)) mainEdt(u32 paramc, u64* paramv, u32 depc, ocrE
     return NULL_GUID;
 }
 
+ocrGuid_t __attribute__ ((weak)) main2Edt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
+    // This is just to make the linker happy and shouldn't be executed
+    printf("error: no main2Edt defined.\n");
+    ASSERT(false);
+    return NULL_GUID;
+}
+
 void **all_factories[sizeof(type_str)/sizeof(const char *)];
 void **all_instances[sizeof(inst_str)/sizeof(const char *)];
 int total_types = sizeof(type_str)/sizeof(const char *);
@@ -825,8 +832,12 @@ int __attribute__ ((weak)) main(int argc, const char* argv[]) {
 
     ocrParseArgs(argc, argv, &ocrConfig);
 
-    // Register pointer to the mainEdt
-    mainEdtSet(mainEdt);
+    // Register pointer to ithe mainEdt
+    ocrEdt_t mainEdtArray[2];
+
+    mainEdtArray[0] = mainEdt;
+    mainEdtArray[1] = main2Edt;
+    mainEdtSet(mainEdtArray);
 
     // Pack and save user args for the mainEdt
     void * packedUserArgv = packUserArguments(ocrConfig.userArgc, ocrConfig.userArgv);

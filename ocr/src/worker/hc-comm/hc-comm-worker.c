@@ -296,7 +296,7 @@ static void workerLoopHcComm(ocrWorker_t * worker) {
         // This is all part of the mainEdt setup
         // and should be executed by the "blessed" worker.
         void * packedUserArgv = userArgsGet();
-        ocrEdt_t mainEdt = mainEdtGet();
+        ocrEdt_t* mainEdt = mainEdtGet();
         u64 totalLength = ((u64*) packedUserArgv)[0]; // already exclude this first arg
         // strip off the 'totalLength first argument'
         packedUserArgv = (void *) (((u64)packedUserArgv) + sizeof(u64)); // skip first totalLength argument

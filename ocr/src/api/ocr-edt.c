@@ -326,6 +326,89 @@ u8 ocrEdtCreate(ocrGuid_t* edtGuidPtr, ocrGuid_t templateGuid,
 #undef PD_TYPE
 }
 
+
+#ifdef ENABLE_INTROSPECTION_HOOKS
+
+double mysecond()
+{
+        struct timeval tp;
+        struct timezone tzp;
+        int i;
+
+        i = gettimeofday(&tp,&tzp);
+        return ( (double) tp.tv_sec + (double) tp.tv_usec * 1.e-6 );
+}
+
+double getSimulationTimestepExpectedTime(){
+    return simulation_time;
+}
+
+double getAnalyticsTimestepExpectedTime(){
+    return analytics_time;
+}
+
+void increaseAllocation();
+void decreaseAllocation();
+
+
+void increaseAllocation(){
+#ifdef PARTITIONING_ENABLED
+    thread_boundary++;
+#endif
+
+#ifdef PRIORITY_ENABLED
+    priority++;
+#endif
+
+}
+
+void decreaseAllocation(){
+#ifdef PARTITIOING_ENABLED
+    thread_boundary--;
+#endif
+
+#ifdef PRIORITY_ENABLED
+    priority--;
+#endif
+}
+
+u8 reportStartOfTimestep(u64 app_tag, u64 timestep_count){
+    start_time[app_tag-1] = mysecond();
+    return 0;
+}
+
+u8 reportEndOfTimestep(u64 app_tag, u64 timestep_count){
+    end_time[app_tag-1] = mysecond();
+    if(app_tag==1) {//simulation
+        double timestepTime = end_time[app_tag-1] - start_time[app_tag-1];
+        if(timestepTime > getSimulationTimestepExpectedTime()*0.1) //timestep takes longer
+            simulation_time += (simulation_time*0.1);
+        else if{ //falls within range
+            // do nothing
+        }else{//lesser than, decrease allocation
+            decreaseAllocation();
+        }
+
+            //printf("\nSimulation has slowed down taking %11.6f seconds to complete", timestepTime);
+    }
+    else if(app_tag==2) {//analytics
+        double timestepTime = end_time[app_tag-1] - start_time[app_tag-1];
+        if(timestepTime > getAnalyticsTimestepExpectedTime()){
+            analytics_time += (analytics*0.1);
+            if(analytics_time <= getAnalyticsTimestepExpectedTime())
+              decreaseAllocation();
+            //printf("\nAnalytics has slowed down taking %11.6f seconds to complete", timestepTime);
+        }else{
+          if(analytics_time>getAnalyticsTimestepExpectedTime())
+            increaseAllocation();
+        }
+    }
+    return 0;
+}
+
+#endif
+
+
 u8 ocrEdtDestroy(ocrGuid_t edtGuid) {
     START_PROFILE(api_EdtDestroy);
     DPRINTF(DEBUG_LVL_INFO, "ENTER ocrEdtDestory(guid=0x%lx)\n", edtGuid);

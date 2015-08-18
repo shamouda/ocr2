@@ -30,11 +30,11 @@ void * x86UserArgsGet() {
     return packedUserArgs;
 }
 
-void x86MainEdtSet(ocrEdt_t mainEdtFct) {
+void x86MainEdtSet(ocrEdt_t* mainEdtFct) {
     mainEdt = mainEdtFct;
 }
 
-ocrEdt_t x86MainEdtGet() {
+ocrEdt_t* x86MainEdtGet() {
     return mainEdt;
 }
 
@@ -65,8 +65,8 @@ void x86BootUpPrint(const char* str, u64 length) {
 
 void (*userArgsSet)(void *) = &x86UserArgsSet;
 void * (*userArgsGet)() = &x86UserArgsGet;
-void (*mainEdtSet)(ocrEdt_t) = &x86MainEdtSet;
-ocrEdt_t (*mainEdtGet)() = &x86MainEdtGet;
+void (*mainEdtSet)(ocrEdt_t*) = &x86MainEdtSet;
+ocrEdt_t* (*mainEdtGet)() = &x86MainEdtGet;
 u64 (*runtimeChunkAlloc)(u64, u64*) = &x86RuntimeChunkAlloc;
 void (*runtimeChunkFree)(u64, u64*) = &x86RuntimeChunkFree;
 void (*runtimeUpdateMemTarget)(ocrMemTarget_t *, u64) = &x86RuntimeUpdateMemTarget;

@@ -136,6 +136,8 @@ u8 pthreadSwitchRunlevel(ocrCompPlatform_t *self, ocrPolicyDomain_t *PD, ocrRunl
             ocrCompPlatformPthread_t * pthreadCompPlatform = (ocrCompPlatformPthread_t *)self;
             if(properties & RL_PD_MASTER) {
                 pthreadRoutineInitializer(pthreadCompPlatform);
+                s32 cpuBind = 0;
+                bindThread(cpuBind);
             } else {
                 // We need to create another capable module
                 pthread_attr_t attr;
@@ -148,6 +150,10 @@ u8 pthreadSwitchRunlevel(ocrCompPlatform_t *self, ocrPolicyDomain_t *PD, ocrRunl
                                                &attr, &pthreadRoutineWrapper,
                                                pthreadCompPlatform);
                 }
+                s32 cpuBind = self->worker->seqId;
+                if(cpuBind > 5)
+                    cpuBind += 6;
+                bindThread(cpuBind);
             }
         } else if((properties & RL_TEAR_DOWN) && RL_IS_LAST_PHASE_DOWN(PD, RL_COMPUTE_OK, phase)) {
             // At this point, this is run only by the master thread

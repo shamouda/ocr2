@@ -19,6 +19,12 @@ typedef enum _schedulerHeuristicType_t {
 #ifdef ENABLE_SCHEDULER_HEURISTIC_HC
     schedulerHeuristicHc_id,
 #endif
+#ifdef ENABLE_SCHEDULER_HEURISTIC_HT
+        schedulerHeuristicHt_id,
+#endif
+#ifdef ENABLE_SCHEDULER_HEURISTIC_HIERARCHICAL
+        schedulerHeuristicHierarchical_id,
+#endif
 #ifdef ENABLE_SCHEDULER_HEURISTIC_PC
     schedulerHeuristicPc_id,
 #endif

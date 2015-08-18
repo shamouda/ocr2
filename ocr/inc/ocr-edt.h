@@ -23,6 +23,15 @@ extern "C" {
    @{
 **/
 
+/** 
+ * @brief application specific introspection hooks
+ *
+ */  
+u8 reportStartOfTimestep(u64 app_tag, u64 timestep_count);
+
+u8 reportEndOfTimestep(u64 app_tag, u64 timestep_count);
+
+
 /**
  * @brief Creates an event
  *

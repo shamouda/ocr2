@@ -54,14 +54,14 @@ extern void * (*userArgsGet)();
  *
  * @return NULL or the pointer to packed argument.
  */
-extern void (*mainEdtSet)(ocrEdt_t mainEdt);
+extern void (*mainEdtSet)(ocrEdt_t* mainEdt);
 
 /**
  * @brief Retrieves the address to the mainEdt.
  *
  * @return NULL or the pointer to the mainEdt.
  */
-extern ocrEdt_t (*mainEdtGet)();
+extern ocrEdt_t* (*mainEdtGet)();
 
 /**
  * @brief "Allocates" a chunk of memory for the runtime of size 'size'

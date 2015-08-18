@@ -91,8 +91,8 @@ void* fsimUserArgsGet(void) {
 
 void (*userArgsSet)(void *) = &fsimUserArgsSet;
 void * (*userArgsGet)() = &fsimUserArgsGet;
-void (*mainEdtSet)(ocrEdt_t) = &fsimMainEdtSet;
-ocrEdt_t (*mainEdtGet)() = NULL;
+void (*mainEdtSet)(ocrEdt_t*) = &fsimMainEdtSet;
+ocrEdt_t* (*mainEdtGet)() = NULL;
 
 void* (*getFuncAddr)(const char*) = &myGetFuncAddr;
 

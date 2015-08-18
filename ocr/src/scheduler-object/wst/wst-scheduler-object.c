@@ -26,7 +26,7 @@ static void wstSchedulerObjectInit(ocrSchedulerObject_t *self, ocrPolicyDomain_t
     ASSERT(scheduler);
 
     ocrSchedulerObjectWst_t *wstSchedObj = (ocrSchedulerObjectWst_t*)self;
-    wstSchedObj->numDeques = scheduler->contextCount;
+    wstSchedObj->numDeques = scheduler->contextCount * 2;
     wstSchedObj->deques = (ocrSchedulerObject_t**)PD->fcts.pdMalloc(
         PD, wstSchedObj->numDeques * sizeof(ocrSchedulerObject_t*));
 #ifdef ENABLE_SCHEDULER_OBJECT_DEQ

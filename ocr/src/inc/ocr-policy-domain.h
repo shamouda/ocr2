@@ -36,6 +36,10 @@ typedef struct _paramListPolicyDomainInst_t {
     ocrLocation_t location;
 } paramListPolicyDomainInst_t;
 
+#ifdef ENABLE_INTROSPECTION_HOOKS
+    double analytics_time;
+    double simulation_time;
+#endif
 
 /******************************************************/
 /* RL macros                                          */

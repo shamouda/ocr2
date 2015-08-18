@@ -22,6 +22,7 @@ extern "C" {
 #include "ocr-std.h"
 #include "extensions/ocr-hints.h"
 
+u64 instances;
 /**
  * @defgroup OCRGeneral Support calls for OCR
  * @brief Describes general support functions for OCR

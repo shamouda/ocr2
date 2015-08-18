@@ -34,6 +34,13 @@ typedef struct _paramListWorkerInst_t {
     u64 workerId;
 } paramListWorkerInst_t;
 
+typedef enum {
+    WORKER_COMPUTE_INTENSIVE = 0,
+    WORKER_MEMORY_INTENSIVE = 1,
+    WORKER_EMPTY = 2
+} ocrWorkerKind;
+
+
 /******************************************************/
 /* OCR WORKER                                         */
 /******************************************************/
@@ -106,6 +113,7 @@ typedef struct _ocrWorker_t {
     ocrWorkerType_t type;
     u8 amBlessed; // BUG #583: Clean-up runlevels; maybe merge in type?
     u64 seqId;
+    ocrWorkerKind kind;
     // Workers are capable modules so
     // part of their runlevel processing happens asynchronously
     // This provides a convenient location to save

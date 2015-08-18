@@ -129,7 +129,7 @@ static void workerLoop(ocrWorker_t * worker) {
         // This is all part of the mainEdt setup
         // and should be executed by the "blessed" worker.
         void * packedUserArgv = userArgsGet();
-        ocrEdt_t mainEdt = mainEdtGet();
+        ocrEdt_t* mainEdt = mainEdtGet();
         u64 totalLength = ((u64*) packedUserArgv)[0]; // already exclude this first arg
         // strip off the 'totalLength first argument'
         packedUserArgv = (void *) (((u64)packedUserArgv) + sizeof(u64)); // skip first totalLength argument
@@ -157,12 +157,21 @@ static void workerLoop(ocrWorker_t * worker) {
 
         // Prepare the mainEdt for scheduling
         ocrGuid_t edtTemplateGuid = NULL_GUID, edtGuid = NULL_GUID;
-        ocrEdtTemplateCreate(&edtTemplateGuid, mainEdt, 0, 1);
+        ocrEdtTemplateCreate(&edtTemplateGuid, mainEdt[0], 0, 1);
         ocrEdtCreate(&edtGuid, edtTemplateGuid, EDT_PARAM_DEF, /* paramv = */ NULL,
                      /* depc = */ EDT_PARAM_DEF, /* depv = */ &dbGuid,
                      EDT_PROP_NONE, affinityMasterPD, NULL);
+
+        ocrGuid_t edtTemplateGuid_2 = NULL_GUID, edtGuid_2 = NULL_GUID;
+        ocrEdtTemplateCreate(&edtTemplateGuid_2, mainEdt[1], 0, 1);
+        ocrEdtCreate(&edtGuid_2, edtTemplateGuid_2, EDT_PARAM_DEF, /* paramv = */ NULL,
+                     /* depc = */ EDT_PARAM_DEF, /* depv = */ &dbGuid,
+                     EDT_PROP_NONE, affinityMasterPD, NULL);
+
+
         // Once mainEdt is created, its template is no longer needed
         ocrEdtTemplateDestroy(edtTemplateGuid);
+       // ocrEdtTemplateDestroy(edtTemplateGuid_2);
     }
 
     // Actual loop

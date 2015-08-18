@@ -153,7 +153,7 @@ u8 hcSchedulerSwitchRunlevel(ocrScheduler_t *self, ocrPolicyDomain_t *PD, ocrRun
     case RL_PD_OK:
         if(properties & RL_BRING_UP) {
             self->pd = PD;
-            self->contextCount = self->pd->workerCount;
+            self->contextCount = self->pd->workerCount*2;
         }
         break;
     case RL_MEMORY_OK:

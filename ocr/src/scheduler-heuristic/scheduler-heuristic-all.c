@@ -11,6 +11,12 @@ const char * schedulerHeuristic_types[] = {
 #ifdef ENABLE_SCHEDULER_HEURISTIC_HC
     "HC",
 #endif
+#ifdef ENABLE_SCHEDULER_HEURISTIC_HIERARCHICAL
+        "HIERARCHICAL",
+#endif
+#ifdef ENABLE_SCHEDULER_HEURISTIC_HT
+    "HT",
+#endif
 #ifdef ENABLE_SCHEDULER_HEURISTIC_PC
     "PC",
 #endif
@@ -25,6 +31,14 @@ ocrSchedulerHeuristicFactory_t * newSchedulerHeuristicFactory(schedulerHeuristic
 #ifdef ENABLE_SCHEDULER_HEURISTIC_HC
     case schedulerHeuristicHc_id:
         return newOcrSchedulerHeuristicFactoryHc(perType, type);
+#endif
+#ifdef ENABLE_SCHEDULER_HEURISTIC_HT
+            case schedulerHeuristicHt_id:
+                    return newOcrSchedulerHeuristicFactoryHt(perType, type);
+#endif
+#ifdef ENABLE_SCHEDULER_HEURISTIC_HIERARCHICAL
+    case schedulerHeuristicHierarchical_id:
+        return newOcrSchedulerHeuristicFactoryHierarchical(perType, type);
 #endif
 #ifdef ENABLE_SCHEDULER_HEURISTIC_PC
     case schedulerHeuristicPc_id:
