@@ -53,7 +53,7 @@ u8 binHeapSchedulerObjectInsert(ocrSchedulerObjectFactory_t *fact, ocrSchedulerO
     ASSERT(IS_SCHEDULER_OBJECT_TYPE_SINGLETON(element->kind));
     binHeap_t * heap = schedObj->binHeap;
     ocrGuid_t edtGuid = element->guid.guid;
-    s64 priority;
+    s64 priority = 0;
     { // read EDT hint
         ASSERT(element->kind == OCR_SCHEDULER_OBJECT_EDT);
         ocrHint_t edtHints;
