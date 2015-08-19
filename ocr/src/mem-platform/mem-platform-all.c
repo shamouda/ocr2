@@ -8,8 +8,12 @@
 #include "debug.h"
 
 const char * memplatform_types[] = {
+#ifdef ENABLE_MEM_PLATFORM_MALLOC
     "malloc",
+#endif
+#ifdef ENABLE_MEM_PLATFORM_FSIM
     "fsim",
+#endif
     NULL
 };
 

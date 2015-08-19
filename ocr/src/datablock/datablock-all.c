@@ -8,9 +8,12 @@
 #include "debug.h"
 
 const char * dataBlock_types [] = {
+#ifdef ENABLE_DATABLOCK_REGULAR
     "Regular",
+#endif
+#ifdef ENABLE_DATABLOCK_LOCKABLE
     "Lockable",
-    "Placed",
+#endif
     NULL
 };
 
@@ -25,11 +28,6 @@ ocrDataBlockFactory_t* newDataBlockFactory(dataBlockType_t type, ocrParamList_t 
     case dataBlockLockable_id:
         return newDataBlockFactoryLockable(typeArg, (u32)type);
         break;
-#endif
-#ifdef ENABLE_DATABLOCK_PLACED
-    case dataBlockPlaced_id:
-//        return newDataBlockFactoryPlaced(typeArg, (u32)type);
-//        break;
 #endif
     default:
         ASSERT(0);

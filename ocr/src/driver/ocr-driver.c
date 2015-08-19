@@ -196,6 +196,8 @@ void ocrParseArgs(s32 argc, const char* argv[], ocrConfig_t * ocrConfig) {
     ocrConfig->userArgv = (char **) argv;
 }
 
+extern u32 type_max[];
+
 const char *type_str[] = {
     "GuidType",
     "MemPlatformType",
@@ -473,13 +475,8 @@ void bringUpRuntime(ocrConfig_t *ocrConfig) {
     DPRINTF(DEBUG_LVL_INFO, "========= Create factories ==========\n");
 
     nsec = iniparser_getnsec(dict);
-    for (i = 0; i < nsec; i++) {
-        char * secname = iniparser_getsecname(dict, i);
-        for (j = 0; j < total_types; j++) {
-            if (strncasecmp(type_str[j], secname, strlen(type_str[j]))==0) {
-                type_counts[j]++;
-            }
-        }
+    for (j = 0; j < total_types; j++) {
+        type_counts[j] =  type_max[j];
     }
 
     for (i = 0; i < nsec; i++) {
@@ -712,9 +709,12 @@ void freeUpRuntime (bool doTeardown) {
     for (i = 0; i < total_types; i++) {
         for (j = 0; j < type_counts[i]; j++) {
             if(i<=policydomain_type)
-                runtimeChunkFree((u64)all_factories[i][j], NONPERSISTENT_CHUNK);
-            runtimeChunkFree((u64)type_params[i][j], NONPERSISTENT_CHUNK);
-            runtimeChunkFree((u64)factory_names[i][j], NONPERSISTENT_CHUNK);
+                if(all_factories[i][j])
+                    runtimeChunkFree((u64)all_factories[i][j], NONPERSISTENT_CHUNK);
+            if(type_params[i][j])
+                runtimeChunkFree((u64)type_params[i][j], NONPERSISTENT_CHUNK);
+            if(factory_names[i][j])
+                runtimeChunkFree((u64)factory_names[i][j], NONPERSISTENT_CHUNK);
         }
         runtimeChunkFree((u64)all_factories[i], NONPERSISTENT_CHUNK);
         runtimeChunkFree((u64)type_params[i], NONPERSISTENT_CHUNK);

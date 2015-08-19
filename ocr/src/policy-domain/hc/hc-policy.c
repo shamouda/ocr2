@@ -599,25 +599,31 @@ void hcPolicyDomainDestruct(ocrPolicyDomain_t * policy) {
     }
 
     // Destruct factories
+    // Not all factories might have been used in the config file,
+    // so only destroy them if they were instantiated.
 
     maxCount = policy->taskFactoryCount;
     for(i = 0; i < maxCount; ++i) {
-        policy->taskFactories[i]->destruct(policy->taskFactories[i]);
+        if(policy->taskFactories[i])
+            policy->taskFactories[i]->destruct(policy->taskFactories[i]);
     }
 
     maxCount = policy->eventFactoryCount;
     for(i = 0; i < maxCount; ++i) {
-        policy->eventFactories[i]->destruct(policy->eventFactories[i]);
+        if(policy->eventFactories[i])
+            policy->eventFactories[i]->destruct(policy->eventFactories[i]);
     }
 
     maxCount = policy->taskTemplateFactoryCount;
     for(i = 0; i < maxCount; ++i) {
-        policy->taskTemplateFactories[i]->destruct(policy->taskTemplateFactories[i]);
+        if(policy->taskTemplateFactories[i])
+            policy->taskTemplateFactories[i]->destruct(policy->taskTemplateFactories[i]);
     }
 
     maxCount = policy->dbFactoryCount;
     for(i = 0; i < maxCount; ++i) {
-        policy->dbFactories[i]->destruct(policy->dbFactories[i]);
+        if(policy->dbFactories[i])
+            policy->dbFactories[i]->destruct(policy->dbFactories[i]);
     }
 
     //Anticipate those to be null-impl for some time

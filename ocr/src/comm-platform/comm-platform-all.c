@@ -10,13 +10,27 @@
 #include "comm-platform/comm-platform-all.h"
 
 const char * commplatform_types[] = {
+#ifdef ENABLE_COMM_PLATFORM_NULL
     "None",
+#endif
+#ifdef ENABLE_COMM_PLATFORM_CE
     "CE",
+#endif
+#ifdef ENABLE_COMM_PLATFORM_XE
     "XE",
+#endif
+#ifdef ENABLE_COMM_PLATFORM_CE_PTHREAD
     "CePthread",
+#endif
+#ifdef ENABLE_COMM_PLATFORM_XE_PTHREAD
     "XePthread",
+#endif
+#ifdef ENABLE_COMM_PLATFORM_MPI
     "MPI",
+#endif
+#ifdef ENABLE_COMM_PLATFORM_GASNET
     "GASNet",
+#endif
     NULL
 };
 

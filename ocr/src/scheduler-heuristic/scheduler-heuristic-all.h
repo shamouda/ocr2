@@ -11,10 +11,18 @@
 #include "utils/ocr-utils.h"
 
 #include "ocr-scheduler-heuristic.h"
+#ifdef ENABLE_SCHEDULER_HEURISTIC_HC
 #include "scheduler-heuristic/hc/hc-scheduler-heuristic.h"
+#endif
+#ifdef ENABLE_SCHEDULER_HEURISTIC_PC
 #include "scheduler-heuristic/pc/pc-scheduler-heuristic.h"
+#endif
+#ifdef ENABLE_SCHEDULER_HEURISTIC_CE
 #include "scheduler-heuristic/ce/ce-scheduler-heuristic.h"
+#endif
+#ifdef ENABLE_SCHEDULER_HEURISTIC_NULL
 #include "scheduler-heuristic/null/null-scheduler-heuristic.h"
+#endif
 
 typedef enum _schedulerHeuristicType_t {
 #ifdef ENABLE_SCHEDULER_HEURISTIC_HC

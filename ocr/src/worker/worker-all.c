@@ -8,10 +8,18 @@
 #include "debug.h"
 
 const char * worker_types[] = {
+#ifdef ENABLE_WORKER_HC
    "HC",
+#endif
+#ifdef ENABLE_WORKER_HC_COMM
    "HC_COMM",
+#endif
+#ifdef ENABLE_WORKER_XE
    "XE",
+#endif
+#ifdef ENABLE_WORKER_CE
    "CE",
+#endif
    NULL
 };
 

@@ -173,7 +173,8 @@ u8 wstSchedulerObjectSwitchRunlevel(ocrSchedulerObject_t *self, ocrPolicyDomain_
             // The scheduler calls this before switching itself. Do we want
             // to invert this?
             for(i = 0; i < PD->schedulerObjectFactoryCount; ++i) {
-                PD->schedulerObjectFactories[i]->pd = PD;
+                if(PD->schedulerObjectFactories[i])
+                    PD->schedulerObjectFactories[i]->pd = PD;
             }
         }
         break;

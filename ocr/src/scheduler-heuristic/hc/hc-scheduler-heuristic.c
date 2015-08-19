@@ -29,6 +29,18 @@ ocrSchedulerHeuristic_t* newSchedulerHeuristicHc(ocrSchedulerHeuristicFactory_t 
     return self;
 }
 
+static void initializeContextHc(ocrSchedulerHeuristicContext_t *context, u64 contextId) {
+    context->id = contextId;
+    context->actionSet = NULL;
+    context->cost = NULL;
+    context->properties = 0;
+
+    ocrSchedulerHeuristicContextHc_t *hcContext = (ocrSchedulerHeuristicContextHc_t*)context;
+    hcContext->stealSchedulerObjectIndex = ((u64)-1);
+    hcContext->mySchedulerObject = NULL;
+    return;
+}
+
 u8 hcSchedulerHeuristicSwitchRunlevel(ocrSchedulerHeuristic_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
                                       phase_t phase, u32 properties, void (*callback)(ocrPolicyDomain_t*, u64), u64 val) {
 
@@ -65,6 +77,7 @@ u8 hcSchedulerHeuristicSwitchRunlevel(ocrSchedulerHeuristic_t *self, ocrPolicyDo
             ocrSchedulerHeuristicContextHc_t *contextAlloc = (ocrSchedulerHeuristicContextHc_t *)PD->fcts.pdMalloc(PD, self->contextCount * sizeof(ocrSchedulerHeuristicContextHc_t));
             for (i = 0; i < self->contextCount; i++) {
                 ocrSchedulerHeuristicContext_t *context = (ocrSchedulerHeuristicContext_t *)&(contextAlloc[i]);
+                initializeContextHc(context, i);
                 self->contexts[i] = context;
                 context->id = i;
                 context->location = PD->myLocation;
