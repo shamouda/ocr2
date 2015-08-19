@@ -31,9 +31,7 @@
 // only -- hence this placement.
 //
 int memcpy(void * dst, void * src, u64 len) {
-    __asm__ __volatile__("dma.copyregion %1, %0, %2\n\t"
-                         "fence 0xF\n\t"
-                         : : "r" (dst), "r" (src), "r" (len));
+    hal_memCopy(dst, src, len, 0);
     return len;
 }
 #endif

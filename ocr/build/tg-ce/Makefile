@@ -24,7 +24,7 @@ DEFAULT_CONFIG = ce-multialloc-default.cfg
 
 
 CC      := gcc
-CFLAGS  := -fno-builtin -fno-stack-protector -Wno-unused-local-typedefs \
+CFLAGS  := -m64 -mcmodel=large -fno-builtin -fno-stack-protector -Wno-unused-local-typedefs \
 		-I ../../../../intel/ss/common/include -I ../../../../intel/ss/tgkrnl/inc
 
 RM      := rm

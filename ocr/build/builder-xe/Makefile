@@ -20,7 +20,7 @@ endif
 TG_INSTALL ?= ../../../../intel/ss/install
 
 CC      := gcc
-CFLAGS  := -fno-builtin -fno-stack-protector -I ${TG_INSTALL}/include
+CFLAGS  := -fno-builtin -fno-stack-protector -I ${TG_INSTALL}/../common/include
 
 RM      := rm
 RMFLAGS := -rf
