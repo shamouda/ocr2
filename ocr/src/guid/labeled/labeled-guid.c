@@ -255,7 +255,7 @@ u8 labeledGuidCreateGuid(ocrGuidProvider_t* self, ocrFatGuid_t *fguid, u64 size,
                 // Bug #627: We do not return OCR_EGUIDEXISTS until the GUID is valid. We test this
                 // by looking at the first field of ptr and waiting for it to be the GUID value (meaning the
                 // object has been initialized
-                while(*(ocrGuid_t*)value != fguid->guid) ;
+                while(*(volatile ocrGuid_t*)value != fguid->guid) ;
                 return OCR_EGUIDEXISTS;
             }
         } else if((properties & GUID_PROP_BLOCK) == GUID_PROP_BLOCK) {
