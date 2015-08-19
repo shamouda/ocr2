@@ -215,17 +215,13 @@ static u8 hcSchedulerHeuristicNotifyEdtReadyInvoke(ocrSchedulerHeuristic_t *self
 
     ocrSchedulerObject_t *schedObj;
     { // read EDT stoker hint
-        u64 isStoker;
+        u64 isStoker = 0;
         ocrHint_t edtHints;
         ocrHintInit(&edtHints, OCR_HINT_EDT_T);
         ocrGetHint(edtObj.guid.guid, &edtHints);
         ocrGetHintValue(&edtHints, OCR_HINT_EDT_IS_STOKER, &isStoker);
-        //printf("\nEdt tag = %llu", edt_tag);
-        isStoker = edtHints.propMask && isStoker;
-        // FIXME - why are the hints being stupid?
         schedObj = isStoker == 1 ?
             hcContext->mySchedulerObject2 : hcContext->mySchedulerObject;
-        // if (isStoker) PRINTF("STOKER! %lu %lx\n", isStoker, edtHints.propMask);
     }
     ASSERT(schedObj);
 
