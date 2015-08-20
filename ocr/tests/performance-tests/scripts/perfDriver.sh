@@ -28,10 +28,11 @@ export CORE_SCALING=${CORE_SCALING-"2 4 8 16"}
 export OCR_NUM_NODES=${OCR_NUM_NODES-"1"}
 
 # Default runlog and report naming
-export LOGDIR=${LOGDIR-$PWD}
+export LOG_DIR=${LOG_DIR-${PWD}}
 export RUNLOG_FILENAME_BASE=${RUNLOG_FILENAME_BASE-"runlog"}
 export REPORT_FILENAME_BASE=${REPORT_FILENAME_BASE-"report"}
 
+echo "LOG_DIR=${LOG_DIR}"
 #
 # Option Parsing and Checking
 #
@@ -187,7 +188,7 @@ function run() {
 
         runlogFilename=${RUNLOG_FILENAME_BASE}-${prog}
         reportFilename=${REPORT_FILENAME_BASE}-${prog}
-        ${SCRIPT_ROOT}/runner.sh -nbrun ${NB_RUN} -target ${TARGET_ARG} -logdir ${LOGDIR} -runlog ${runlogFilename} -report ${reportFilename} ${runnerArgs} ${prog}
+        ${SCRIPT_ROOT}/runner.sh -nbrun ${NB_RUN} -target ${TARGET_ARG} -logdir ${LOG_DIR} -runlog ${runlogFilename} -report ${reportFilename} ${runnerArgs} ${prog}
     done
 }
 

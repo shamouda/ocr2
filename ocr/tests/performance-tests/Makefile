@@ -33,6 +33,10 @@ CC=gcc
 $(warning CC not set, defaulting to ${CC})
 endif
 
+ifndef BIN_GEN_DIR
+BIN_GEN_DIR=build
+endif
+
 INCS=-I./inc
 CFLAGS=-O3 -g -Wp,-w $(INCS) -c
 OCR_FLAGS=-L${OCR_INSTALL}/lib -I${OCR_INSTALL}/include -locr -lpthread -lm ${OCR_LDFLAGS}
@@ -46,26 +50,26 @@ all: build
 .PHONY: run
 
 C_FILES=$(wildcard ocr/*.c)
-OUT_FILES=$(subst ocr,build,$(C_FILES))
+OUT_FILES=$(subst ocr,$(BIN_GEN_DIR),$(C_FILES))
 BIN_FILES=$(patsubst %.c,%,$(OUT_FILES))
 
 RUN_FILES=$(subst ocr,run,$(C_FILES))
 RUNBIN_FILES=$(patsubst %.c,%,$(RUN_FILES))
 
-benchmark: $(PROG) build/$(TYPE).o
-	$(CC) -o $(EXECUTABLE) $(PROG) $(INCS) $(C_DEFINES) build/$(TYPE).o $(OCR_FLAGS)
+benchmark: $(PROG) $(BIN_GEN_DIR)/$(TYPE).o
+	$(CC) -o $(EXECUTABLE) $(PROG) $(INCS) $(C_DEFINES) $(BIN_GEN_DIR)/$(TYPE).o $(OCR_FLAGS)
 
 run: $(EXECUTABLE)
-	LD_LIBRARY_PATH=$(OCR_INSTALL)/lib $(OCR_INSTALL)/bin/ocrrun ./$(EXECUTABLE) $(OCR_RUN_FLAGS)
+	LD_LIBRARY_PATH=$(OCR_INSTALL)/lib $(OCR_INSTALL)/bin/ocrrun $(EXECUTABLE) $(OCR_RUN_FLAGS)
 
-build/$(TYPE).o: $(DEPS)
+$(BIN_GEN_DIR)/$(TYPE).o: $(DEPS)
 	echo "Build $(CC) $(INCS) -g -c $< -o $@"
 	$(CC) $(INCS) -g -c $< -o $@
 
 build: $(BIN_FILES)
 VPATH=ocr/
-build/%: %.c build/$(TYPE).o
-	$(CC) -o $@ $< $(INCS) $(C_DEFINES) build/$(TYPE).o $(OCR_FLAGS)
+$(BIN_GEN_DIR)/%: %.c $(BIN_GEN_DIR)/$(TYPE).o
+	$(CC) -o $@ $< $(INCS) $(C_DEFINES) $(BIN_GEN_DIR)/$(TYPE).o $(OCR_FLAGS)
 
 clean:
 	-rm -Rf build/*

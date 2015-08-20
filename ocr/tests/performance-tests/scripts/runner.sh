@@ -109,10 +109,12 @@ fi
 
 if [[ -z "$LOGDIR_ARG" ]]; then
     LOGDIR="."
+else
+    LOGDIR=${LOGDIR_ARG}
 fi
 
 if [[ ! -e ${LOGDIR_ARG} ]]; then
-    echo "${SCRIPT_NAME} create log dir ${LOGDIR_ARG}"
+    echo "${SCRIPT_NAME} create log dir ${LOGDIR}"
     mkdir -p ${LOGDIR}
 fi
 
@@ -212,14 +214,21 @@ function scalingTest {
             exit 1
         fi
 
+        if [[ -z "${BIN_GEN_DIR}" ]]; then
+            BIN_GEN_DIR=build
+        fi
+        if [[ ! -d ${BIN_GEN_DIR} ]]; then
+            mkdir -p ${BIN_GEN_DIR}
+        fi
+
         # Compile the program with provided defines
         echo "Compiling for OCR ${prog} ${runInfo}"
-        echo "${progDefines} ${runInfo} make -f ${OCR_MAKEFILE} benchmark build/${prog} PROG=ocr/${prog}.c"
-        eval ${progDefines} ${runInfo} make -f ${OCR_MAKEFILE} benchmark build/${prog} PROG=ocr/${prog}.c
+        echo "${progDefines} ${runInfo} make -f ${OCR_MAKEFILE} benchmark ${BIN_GEN_DIR}/${prog} PROG=ocr/${prog}.c"
+        eval ${progDefines} ${runInfo} BUILD_GEN_DIR=${BIN_GEN_DIR} make -f ${OCR_MAKEFILE} benchmark ${BIN_GEN_DIR}/${prog} PROG=ocr/${prog}.c
 
         # Run the program with the appropriate OCR cfg file
         echo "Run with OCR ${prog} ${runInfo}"
-        make -f ${OCR_MAKEFILE} OCR_CONFIG=${CFGARG_OUTPUT} run build/${prog}
+        make -f ${OCR_MAKEFILE} OCR_CONFIG=${CFGARG_OUTPUT} run ${BIN_GEN_DIR}/${prog}
         RES=$?
 
         if [[ $RES -ne 0 ]]; then
