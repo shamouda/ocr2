@@ -46,8 +46,9 @@ u8 ocrEventCreate(ocrGuid_t *guid, ocrEventTypes_t eventType, u16 properties) {
     }
 #undef PD_MSG
 #undef PD_TYPE
+
     DPRINTF_COND_LVL(((returnCode != 0) && (returnCode != OCR_EGUIDEXISTS)), DEBUG_LVL_WARN, DEBUG_LVL_INFO,
-                     "EXIT ocrEventCreate -> %u; GUID: 0x%lx\n", returnCode, *guid);
+                     "EXIT ocrEventCreate -> %u; GUID: 0x%lx\n", returnCode, *guid, true, OCR_TRACE_TYPE_EVENT, OCR_ACTION_CREATE);
     RETURN_PROFILE(returnCode);
 }
 
@@ -189,11 +190,16 @@ u8 ocrEdtCreate(ocrGuid_t* edtGuidPtr, ocrGuid_t templateGuid,
                 u16 properties, ocrGuid_t affinity, ocrGuid_t *outputEvent) {
     ocrGuid_t edtGuid = (edtGuidPtr != NULL) ? *edtGuidPtr : NULL_GUID;
     START_PROFILE(api_EdtCreate);
+
+
     DPRINTF(DEBUG_LVL_INFO,
             "ENTER ocrEdtCreate(*guid=0x%lx, template=0x%lx, paramc=%d, paramv=0x%lx"
             ", depc=%d, depv=0x%lx, prop=%u, aff=0x%lx, outEvt=0x%lx)\n",
             edtGuid, templateGuid, (s32)paramc, paramv, (s32)depc, depv,
-            (u32)properties, affinity, outputEvent);
+            (u32)properties, affinity, outputEvent,
+            true, OCR_TRACE_TYPE_EDT, OCR_ACTION_CREATE);
+
+
     PD_MSG_STACK(msg);
     ocrPolicyDomain_t * pd = NULL;
     u8 returnCode = 0;

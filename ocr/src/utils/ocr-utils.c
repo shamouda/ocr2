@@ -168,7 +168,6 @@ u64 ocrStrlen(const char* str) {
     return res;
 }
 
-
 /* This is not currently used. What to do with it?
 void ocrPlaceTrackerAllocate ( ocrPlaceTracker_t** toFill ) {
     *toFill = (ocrPlaceTracker_t*) malloc(sizeof(ocrPlaceTracker_t));

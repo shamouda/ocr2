@@ -129,7 +129,9 @@ u8 destructEventHc(ocrEvent_t *base) {
     ocrTask_t *curTask = NULL;
     getCurrentEnv(&pd, NULL, &curTask, &msg);
 
-    DPRINTF(DEBUG_LVL_INFO, "Destroy %s: 0x%lx\n", eventTypeToString(base), base->guid);
+
+    DPRINTF(DEBUG_LVL_INFO, "Destroy %s: 0x%lx\n", eventTypeToString(base), base->guid,
+            false, OCR_TRACE_TYPE_EVENT, OCR_ACTION_DESTROY);
 
 #ifdef OCR_ENABLE_STATISTICS
     statsEVT_DESTROY(pd, getCurrentEDT(), NULL, base->guid, base);

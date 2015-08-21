@@ -943,8 +943,21 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
                                   PRESCRIPTION, PD_MSG_FIELD_I(dbType));
         if(PD_MSG_FIELD_O(returnDetail) == 0) {
             ocrDataBlock_t *db = PD_MSG_FIELD_IO(guid.metaDataPtr);
-            if(db==NULL)
+            if(db==NULL){
                 DPRINTF(DEBUG_LVL_WARN, "DB Create failed for size %lx\n", PD_MSG_FIELD_IO(size));
+            }else{
+
+                bool srcFlag;
+                if(PD_MSG_FIELD_I(dbType) == USER_DBTYPE)
+                    srcFlag = true;
+                else
+                    srcFlag = false;
+                DPRINTF(DEBUG_LVL_VERB, "Creating a datablock of size %lu @ 0x%lx (GUID: 0x%lx)\n",
+                        db->size, db->ptr, db->guid,
+                        srcFlag, OCR_TRACE_TYPE_DATABLOCK, OCR_ACTION_CREATE, db->size);
+
+
+            }
             ASSERT(db);
             // BUG #584: Check if properties want DB acquired
             ASSERT(db->fctId == self->dbFactories[0]->factoryId);
@@ -1058,6 +1071,12 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             db, PD_MSG_FIELD_I(edt), PD_MSG_FIELD_I(properties));
         if(PD_MSG_FIELD_O(returnDetail)!=0)
             DPRINTF(DEBUG_LVL_WARN, "DB Free failed for guid %lx\n", PD_MSG_FIELD_I(guid));
+        else{
+            DPRINTF(DEBUG_LVL_INFO,
+                    "DB guid: %lx Destroyed\n", PD_MSG_FIELD_I(guid).guid,
+                    false, OCR_TRACE_TYPE_DATABLOCK, OCR_ACTION_DESTROY);
+
+        }
 #undef PD_MSG
 #undef PD_TYPE
         msg->type &= ~PD_MSG_REQUEST;
@@ -1292,6 +1311,7 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
 #undef PD_TYPE
         msg->type &= (~PD_MSG_REQUEST);
         EXIT_PROFILE;
+
         break;
     }
 
@@ -1623,6 +1643,11 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
                 PD_MSG_FIELD_I(properties) = true; // Specify context is add-dependence
                 u8 returnCode = self->fcts.processMessage(self, &registerMsg, true);
                 u8 returnDetail = (returnCode == 0) ? PD_MSG_FIELD_O(returnDetail) : returnCode;
+
+                DPRINTF(DEBUG_LVL_INFO,
+                        "Dependence added (src: 0x%lx, dest: 0x%lx) -> %u\n", src.guid, dest.guid, returnCode,
+                        false, OCR_TRACE_TYPE_EDT, OCR_ACTION_ADD_DEP, src.guid);
+
             #undef PD_MSG
             #undef PD_TYPE
             #define PD_MSG msg
@@ -1649,6 +1674,11 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
                 PD_MSG_FIELD_I(properties) = true; // Specify context is add-dependence
                 u8 returnCode = self->fcts.processMessage(self, &registerMsg, true);
                 u8 returnDetail = (returnCode == 0) ? PD_MSG_FIELD_O(returnDetail) : returnCode;
+
+                DPRINTF(DEBUG_LVL_INFO,
+                        "Dependence added (src: 0x%lx, dest: 0x%lx) -> %u\n", src.guid, dest.guid, returnCode,
+                        false, OCR_TRACE_TYPE_EVENT, OCR_ACTION_ADD_DEP, src.guid);
+
             #undef PD_MSG
             #undef PD_TYPE
             #define PD_MSG msg
@@ -1707,6 +1737,12 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
 #ifdef OCR_ENABLE_STATISTICS
         statsDEP_ADD(pd, getCurrentEDT(), NULL, signalerGuid, waiterGuid, NULL, slot);
 #endif
+
+        DPRINTF(DEBUG_LVL_INFO,
+                "Dependence added (src: 0x%lx, dest: 0x%lx) -> %u\n", signaler.guid, dest.guid, returnCode,
+                false, OCR_TRACE_TYPE_EDT, OCR_ACTION_ADD_DEP, signaler.guid);
+
+
 #undef PD_MSG
 #undef PD_TYPE
         msg->type &= ~PD_MSG_REQUEST;
