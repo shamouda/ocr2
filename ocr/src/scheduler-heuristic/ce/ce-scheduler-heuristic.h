@@ -29,15 +29,15 @@ typedef struct _ocrSchedulerHeuristicContextCe_t {
     bool inWorkRequestPending;                  // Work request coming in from remote location (remote loc is out of work)
     bool outWorkRequestPending;                 // Work request sent out to this context's remote location (current loc is out of work)
     bool canAcceptWorkRequest;                  // Identifies a context that can accept a work request from current CE
+    bool isChild;                               // Identifies if a context will report to this CE for shutdown protocol
 } ocrSchedulerHeuristicContextCe_t;
 
 typedef struct _ocrSchedulerHeuristicCe_t {
     ocrSchedulerHeuristic_t base;
     u64 workCount;
-    u32 inPendingCount;
-    u32 pendingXeCount;                         // Number of XE's currently active (not sleeping)
-    u32 workRequestStartIndex;                  // Context id of the location to which last out work request was sent
-    u32 outWorkVictimsAvailable;                // The remaining number of requests that can be made
+    u32 inPendingCount;                         // Number of pending agents (XEs + CEs)
+    u32 pendingXeCount;                         // Number of pending XEs (sleeping)
+    u32 outWorkVictimsAvailable;                // The remaining number of work requests that can be made
 } ocrSchedulerHeuristicCe_t;
 
 /****************************************************/

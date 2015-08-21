@@ -77,10 +77,10 @@
 
 // Ugly globals below, but would go away once FSim has QMA support trac #232
 #define OUTSTANDING_CE_MSGS 16
-u64 msgAddresses[OUTSTANDING_CE_MSGS] = {0xbadf00d, 0xbadf00d, 0xbadf00d, 0xbadf00d,
-                                         0xbadf00d, 0xbadf00d, 0xbadf00d, 0xbadf00d,
-                                         0xbadf00d, 0xbadf00d, 0xbadf00d, 0xbadf00d,
-                                         0xbadf00d, 0xbadf00d, 0xbadf00d, 0xbadf00d};
+//u64 msgAddresses[OUTSTANDING_CE_MSGS] = {0xbadf00d, 0xbadf00d, 0xbadf00d, 0xbadf00d};
+//u64 msgAddresses[OUTSTANDING_CE_MSGS] = {0xbadf00d, 0xbadf00d, 0xbadf00d, 0xbadf00d, 0xbadf00d, 0xbadf00d, 0xbadf00d, 0xbadf00d};
+u64 msgAddresses[OUTSTANDING_CE_MSGS] = {0xbadf00d, 0xbadf00d, 0xbadf00d, 0xbadf00d, 0xbadf00d, 0xbadf00d, 0xbadf00d, 0xbadf00d,
+                                         0xbadf00d, 0xbadf00d, 0xbadf00d, 0xbadf00d, 0xbadf00d, 0xbadf00d, 0xbadf00d, 0xbadf00d};
 ocrPolicyMsg_t sendBuf, recvBuf; // Currently size of 1 msg each.
 // BUG #232: The above need to be placed in the CE's scratchpad, but once QMAs are ready, should
 // be no problem.
@@ -324,7 +324,7 @@ u8 ceCommSendMessageToCE(ocrCommPlatform_t *self, ocrLocation_t target,
         if(rmbox[0] == 0xdead) return 2; // Shutdown in progress - no retry
         return 1;                        // otherwise, retry send
     }
-    DPRINTF(DEBUG_LVL_VVERB, "Sent msg %lx type %lx; (%lx->%lx)\n", message->msgId, message->type, self->location, target);
+    DPRINTF(DEBUG_LVL_VVERB, "Sent msg %lx type %lx; (%lx->%lx) to box %lx : %u\n", message->msgId, message->type, self->location, target, i);
     return 0;
 }
 
@@ -402,7 +402,12 @@ u8 ceCommCheckCEMessage(ocrCommPlatform_t *self, ocrPolicyMsg_t **msg) {
             ocrPolicyMsgUnMarshallMsg((u8*)msgAddresses[j], NULL, &recvBuf, MARSHALL_FULL_COPY);
             ceCommDestructCEMessage(self, (ocrPolicyMsg_t*)msgAddresses[j]);
             *msg = &recvBuf;
-
+            /*u32 k;
+            for (k = j+1; k < OUTSTANDING_CE_MSGS; k++) {
+                ocrPolicyMsg_t *msgPtr = (ocrPolicyMsg_t*)(msgAddresses[k]);
+                PRINTF("{%u: [%lx] %lx } ", k, msgPtr->srcLocation, msgAddresses[k]);
+            }
+            PRINTF("\n");*/
             return 0;
         }
     *msg = NULL;

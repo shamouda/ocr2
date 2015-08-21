@@ -609,6 +609,7 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
     case PD_MSG_GUID_RESERVE:
     case PD_MSG_GUID_UNRESERVE:
     case PD_MSG_SAL_TERMINATE:
+    case PD_MSG_MGT_REGISTER:
     case PD_MSG_MGT_UNREGISTER:
     case PD_MSG_MGT_MONITOR_PROGRESS:
     {
@@ -1142,93 +1143,31 @@ ASSERT(ceMsg.destLocation != self->parentLocation); // Parent's not dead
         START_PROFILE(pd_ce_Sched_Get_Work);
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_SCHED_GET_WORK
-        switch(PD_MSG_FIELD_I(properties)) {
-        case OCR_SCHEDULER_GET_WORK_PROP_NONE:
-            {
-                ocrPolicyDomainCe_t * cePolicy = (ocrPolicyDomainCe_t *)self;
-                if (cePolicy->shutdownMode == false) {
-                    ocrSchedulerOpWorkArgs_t *workArgs = &PD_MSG_FIELD_IO(schedArgs);
-                    workArgs->base.seqId = msg->srcLocation;
-                    PD_MSG_FIELD_O(returnDetail) = self->schedulers[0]->fcts.op[OCR_SCHEDULER_OP_GET_WORK].invoke(
-                                 self->schedulers[0], (ocrSchedulerOpArgs_t*)workArgs, (ocrRuntimeHint_t*)msg);
-                } else {
-                    PD_MSG_FIELD_O(returnDetail) = OCR_SCHEDULER_GET_WORK_PROP_RESPONSE_SHUTDOWN;
-                }
-            }
-            break;
-        case OCR_SCHEDULER_GET_WORK_PROP_REQUEST:
-            {
-                PD_MSG_FIELD_O(returnDetail) = OCR_SCHEDULER_GET_WORK_PROP_REQUEST;
-            }
-            break;
-        case OCR_SCHEDULER_GET_WORK_PROP_RESPONSE_WORK_SEND:
-            {
-                PD_MSG_FIELD_O(returnDetail) = OCR_SCHEDULER_GET_WORK_PROP_RESPONSE_WORK_SEND;
-            }
-            break;
-        case OCR_SCHEDULER_GET_WORK_PROP_RESPONSE_WORK_RECV:
-            {
-                ocrSchedulerOpWorkArgs_t *workArgs = &PD_MSG_FIELD_IO(schedArgs);
-                ocrFatGuid_t fguid = workArgs->OCR_SCHED_ARG_FIELD(OCR_SCHED_WORK_EDT_USER).edt;
-                workArgs->OCR_SCHED_ARG_FIELD(OCR_SCHED_WORK_EDT_USER).edt.guid = NULL_GUID;
-                workArgs->OCR_SCHED_ARG_FIELD(OCR_SCHED_WORK_EDT_USER).edt.metaDataPtr = NULL;
-                if (fguid.guid != NULL_GUID) localDeguidify(self, &fguid);
-                ocrSchedulerOpNotifyArgs_t notifyArgs;
-                notifyArgs.base.seqId = msg->srcLocation;
-                notifyArgs.kind = OCR_SCHED_NOTIFY_EDT_READY;
-                notifyArgs.OCR_SCHED_ARG_FIELD(OCR_SCHED_NOTIFY_EDT_READY).guid = fguid;
-                returnCode = self->schedulers[0]->fcts.op[OCR_SCHEDULER_OP_NOTIFY].invoke(
-                        self->schedulers[0], (ocrSchedulerOpArgs_t*)(&notifyArgs), NULL);
-                PD_MSG_FIELD_O(returnDetail) = OCR_SCHEDULER_GET_WORK_PROP_RESPONSE_WORK_RECV;
-            }
-            break;
-        case OCR_SCHEDULER_GET_WORK_PROP_RESPONSE_SHUTDOWN:
-            {
-                PD_MSG_FIELD_O(returnDetail) = OCR_SCHEDULER_GET_WORK_PROP_RESPONSE_SHUTDOWN;
-            }
-            break;
-        default:
-            ASSERT(0);
-            break;
-        }
+        if (msg->type & PD_MSG_REQUEST) {
+            u8 retVal = 0;
+            ocrSchedulerOpWorkArgs_t *workArgs = &PD_MSG_FIELD_IO(schedArgs);
+            workArgs->base.seqId = msg->srcLocation;
+            retVal = self->schedulers[0]->fcts.op[OCR_SCHEDULER_OP_GET_WORK].invoke(
+                         self->schedulers[0], (ocrSchedulerOpArgs_t*)workArgs, (ocrRuntimeHint_t*)msg);
 
-        switch(PD_MSG_FIELD_O(returnDetail)) {
-        case OCR_SCHEDULER_GET_WORK_PROP_RESPONSE_SHUTDOWN:
-            {
-                PD_MSG_FIELD_I(properties) = OCR_SCHEDULER_GET_WORK_PROP_RESPONSE_SHUTDOWN;
-                PD_MSG_FIELD_O(returnDetail) = OCR_SCHEDULER_GET_WORK_PROP_RESPONSE_SHUTDOWN;
+            if (retVal == 0) {
+                PD_MSG_FIELD_O(returnDetail) = 0;
                 returnCode = ceProcessResponse(self, msg, 0);
             }
-            break;
-        case OCR_SCHEDULER_GET_WORK_PROP_REQUEST:
-            {
-                PD_MSG_FIELD_I(properties) = OCR_SCHEDULER_GET_WORK_PROP_NONE;
-                PD_MSG_FIELD_O(returnDetail) = OCR_SCHEDULER_GET_WORK_PROP_NONE;
-                returnCode = self->fcts.sendMessage(self, msg->destLocation, msg, NULL, 0);
-            }
-            break;
-        case OCR_SCHEDULER_GET_WORK_PROP_RESPONSE_WORK_SEND:
-            {
-                PD_MSG_FIELD_I(properties) = OCR_SCHEDULER_GET_WORK_PROP_RESPONSE_WORK_RECV;
-                PD_MSG_FIELD_O(returnDetail) = OCR_SCHEDULER_GET_WORK_PROP_RESPONSE_WORK_RECV;
-                returnCode = ceProcessResponse(self, msg, 0);
-            }
-            break;
-        case OCR_SCHEDULER_GET_WORK_PROP_RESPONSE_WORK_RECV:
-            {
-                ASSERT(returnCode == 0);
-                PD_MSG_FIELD_O(returnDetail) = 0;
-            }
-            break;
-        case OCR_SCHEDULER_GET_WORK_PROP_REQUEST_PENDING:
-            {
-                ASSERT(returnCode == 0);
-                PD_MSG_FIELD_O(returnDetail) = 0;
-            }
-            break;
-        default:
-            ASSERT(0);
-            break;
+        } else {
+            ASSERT(msg->type & PD_MSG_RESPONSE);
+            ocrSchedulerOpWorkArgs_t *workArgs = &PD_MSG_FIELD_IO(schedArgs);
+            ocrFatGuid_t fguid = workArgs->OCR_SCHED_ARG_FIELD(OCR_SCHED_WORK_EDT_USER).edt;
+            workArgs->OCR_SCHED_ARG_FIELD(OCR_SCHED_WORK_EDT_USER).edt.guid = NULL_GUID;
+            workArgs->OCR_SCHED_ARG_FIELD(OCR_SCHED_WORK_EDT_USER).edt.metaDataPtr = NULL;
+            ASSERT(fguid.guid != NULL_GUID);
+            localDeguidify(self, &fguid);
+            ocrSchedulerOpNotifyArgs_t notifyArgs;
+            notifyArgs.base.seqId = msg->srcLocation;
+            notifyArgs.kind = OCR_SCHED_NOTIFY_EDT_READY;
+            notifyArgs.OCR_SCHED_ARG_FIELD(OCR_SCHED_NOTIFY_EDT_READY).guid = fguid;
+            returnCode = self->schedulers[0]->fcts.op[OCR_SCHEDULER_OP_NOTIFY].invoke(
+                    self->schedulers[0], (ocrSchedulerOpArgs_t*)(&notifyArgs), NULL);
         }
 #undef PD_MSG
 #undef PD_TYPE
@@ -1565,8 +1504,6 @@ ASSERT(ceMsg.destLocation != self->parentLocation); // Parent's not dead
         //u32 neighborCount = self->neighborCount;
         ocrPolicyDomainCe_t * cePolicy = (ocrPolicyDomainCe_t *)self;
         if (cePolicy->shutdownMode == false) {
-            // Inform scheduler of shutdown to release all pending messages
-            // Can this be done better with runlevels?
             cePolicy->shutdownMode = true;
         }
         hal_fence();
@@ -1600,21 +1537,6 @@ ASSERT(ceMsg.destLocation != self->parentLocation); // Parent's not dead
             cePolicy->shutdownCount++;
             ocrShutdown();
         }
-#undef PD_MSG
-#undef PD_TYPE
-        EXIT_PROFILE;
-        break;
-    }
-
-    case PD_MSG_MGT_REGISTER: {
-        START_PROFILE(pd_ce_Register);
-#define PD_MSG msg
-#define PD_TYPE PD_MSG_MGT_REGISTER
-        u64 contextId = 0;
-        PD_MSG_FIELD_O(returnDetail) = self->schedulers[0]->fcts.registerContext(
-                self->schedulers[0], PD_MSG_FIELD_I(loc), &contextId);
-        PD_MSG_FIELD_O(seqId) = contextId;
-        returnCode = ceProcessResponse(self, msg, 0);
 #undef PD_MSG
 #undef PD_TYPE
         EXIT_PROFILE;

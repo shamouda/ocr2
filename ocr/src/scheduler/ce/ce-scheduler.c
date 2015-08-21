@@ -174,6 +174,7 @@ u8 ceSchedulerSwitchRunlevel(ocrScheduler_t *self, ocrPolicyDomain_t *PD, ocrRun
             if(RL_IS_FIRST_PHASE_UP(PD, RL_COMPUTE_OK, phase)) {
                 // We get a GUID for ourself
                 guidify(self->pd, (u64)self, &(self->fguid), OCR_GUID_ALLOCATOR);
+#if SCHED10
                 //Register all XEs and neighbors
                 u32 i;
                 u64 contextId;
@@ -190,6 +191,7 @@ u8 ceSchedulerSwitchRunlevel(ocrScheduler_t *self, ocrPolicyDomain_t *PD, ocrRun
                     ASSERT(self->fcts.registerContext(self, loc, &contextId) == 0);
                     ASSERT(contextId == (i + xeCount));
                 }
+#endif
             }
         } else {
             // Tear-down
@@ -297,6 +299,7 @@ static u32 getSeqId(ocrScheduler_t *self, ocrLocation_t loc) {
 }
 
 u8 ceSchedulerRegisterContext(ocrScheduler_t *self, ocrLocation_t loc, u64 *seqId) {
+#if SCHED10
     u32 i;
     ocrSchedulerCe_t *policy = (ocrSchedulerCe_t*)self;
     u32 contextId = (policy->contextCounter)++;
@@ -305,6 +308,7 @@ u8 ceSchedulerRegisterContext(ocrScheduler_t *self, ocrLocation_t loc, u64 *seqI
         self->schedulerHeuristics[i]->fcts.registerContext(self->schedulerHeuristics[i], contextId, loc);
     }
     *seqId = contextId;
+#endif
     return 0;
 }
 
@@ -386,6 +390,7 @@ u8 ceSchedulerAnalyzeInvoke(ocrScheduler_t *self, ocrSchedulerOpArgs_t *opArgs, 
 }
 
 u8 ceSchedulerUpdate(ocrScheduler_t *self, u32 properties) {
+#if SCHED10
     u32 i;
     switch(properties) {
     case OCR_SCHEDULER_UPDATE_PROP_IDLE: {
@@ -406,6 +411,7 @@ u8 ceSchedulerUpdate(ocrScheduler_t *self, u32 properties) {
         ASSERT(0);
         return OCR_ENOTSUP;
     }
+#endif
     return 0;
 }
 

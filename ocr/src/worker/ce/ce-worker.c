@@ -51,6 +51,11 @@ static void workerLoop(ocrWorker_t * worker) {
     DPRINTF(DEBUG_LVL_VERB, "Starting scheduler routine of CE worker %ld\n", getWorkerId(worker));
     pd->fcts.switchRunlevel(pd, RL_COMPUTE_OK, 0);
     while(worker->fcts.isRunning(worker)) {
+        if (cePolicy->shutdownMode) {
+            DPRINTF(DEBUG_LVL_VVERB, "UPDATE SHUTDOWN\n");
+        } else {
+            DPRINTF(DEBUG_LVL_VVERB, "UPDATE IDLE\n");
+        }
 #define PD_MSG (&msg)
 #define PD_TYPE PD_MSG_SCHED_UPDATE
         msg.type = PD_MSG_SCHED_UPDATE | PD_MSG_REQUEST;
@@ -60,10 +65,12 @@ static void workerLoop(ocrWorker_t * worker) {
 #undef PD_MSG
 #undef PD_TYPE
 
+        DPRINTF(DEBUG_LVL_VVERB, "WAIT\n");
         ocrMsgHandle_t *handle = NULL;
         RESULT_ASSERT(pd->fcts.waitMessage(pd, &handle), ==, 0);
         ASSERT(handle);
         ocrPolicyMsg_t *msg = handle->response;
+        DPRINTF(DEBUG_LVL_VVERB, "PROCESSING: %lx from %lx\n", (msg->type & PD_MSG_TYPE_ONLY), msg->srcLocation);
         RESULT_ASSERT(pd->fcts.processMessage(pd, msg, true), ==, 0);
         handle->destruct(handle);
     } /* End of while loop */
