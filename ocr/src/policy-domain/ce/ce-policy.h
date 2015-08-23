@@ -53,6 +53,7 @@ typedef struct {
     pdCeResumeSwitchRL_t rlSwitch;  // Structure used to coordinate
     u32 nextVictimNeighbor;         // Which CE to steal from next (idx in neighbors)
     s32 nextVictimThrottle;         // BUG #268: Too basic of a throttling scheme
+    ocrPolicyDomain_t **allPDs;     // BUG #694: GUIDs across PDs
 } ocrPolicyDomainCe_t;
 
 typedef struct {

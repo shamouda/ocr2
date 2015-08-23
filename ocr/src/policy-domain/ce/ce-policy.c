@@ -325,24 +325,7 @@ static void performNeighborDiscovery(ocrPolicyDomain_t *policy) {
 #ifdef HAL_FSIM_CE
     // On FSim, read the MSR
     policy->myLocation = (ocrLocation_t)rmd_ld64(CE_MSR_BASE + CORE_LOCATION * sizeof(u64));
-#else
-    ocrPolicyDomainCe_t *rself = (ocrPolicyDomainCe_t*)policy;
-    // We figure out myLocation based on its current value which is just an index (based on xeCount = 8)
-    // Assumptions:
-    //    - same number of XEs per block
-    //    - if multiple units, all have MAX_NUM_BLOCK blocks in them
-    // 0-7: XEs of block 0
-    // 8: CE of block 0
-    // 9-16: XEs of block 1
-    // 17: CE of block 1
-    // 17-25: XEs of block 2
-    // 26: CE of block 2
-    // ...
-    u32 myUnit = (policy->myLocation) / ((rself->xeCount+1)*MAX_NUM_BLOCK);
-    u32 myBlock = (policy->myLocation - myUnit*((rself->xeCount+1)*MAX_NUM_BLOCK)) / (rself->xeCount + 1);
-
-    policy->myLocation = MAKE_CORE_ID(0, 0, 0, myUnit, myBlock, ID_AGENT_CE);
-#endif
+#endif // On TG-x86, it is set in the driver code
     // My parent is my unit's block 0 CE
     policy->parentLocation = (policy->myLocation & ~(ID_BLOCK_MASK|ID_AGENT_MASK)) | ID_AGENT_CE;
 
@@ -407,45 +390,31 @@ static void findNeighborsPd(ocrPolicyDomain_t *policy) {
     u32 i;
     ocrPolicyDomain_t** neighborsAll = policy->neighborPDs; // Initially set in the driver
     ocrPolicyDomainCe_t *rself = (ocrPolicyDomainCe_t*)policy;
+    rself->allPDs = neighborsAll; // Bug #694: Keep track of this for remote GUID resolution
     policy->neighborPDs = (ocrPolicyDomain_t**)runtimeChunkAlloc(
         (policy->neighborCount + rself->xeCount)*sizeof(ocrPolicyDomain_t*), PERSISTENT_CHUNK);
     policy->parentPD = NULL;
 
-    // Ugly again...
+    // neighborsAll is properly sorted and contains all possible neighbors for the entire machine
+    // (all CEs and XEs). We extract from there just the ones that are of interest to us (our XEs
+    // and the CEs we are supposed to communicate with)
     for(i=0; i < rself->xeCount; ++i) {
-        ocrLocation_t curNeighbor = MAKE_CORE_ID(0, 0, 0, myUnit, myBlock, (ID_AGENT_XE0 +i));
-        ocrPolicyDomain_t **candidate = neighborsAll;
-        policy->neighborPDs[i] = NULL;
-        while(*candidate != NULL) {
-            if((*candidate)->myLocation == curNeighbor) {
-                policy->neighborPDs[i] = *candidate;
-                break;
-            }
-            candidate += 1;
-        }
-        ASSERT(policy->neighborPDs[i] != NULL);
+        ocrLocation_t curNeighbor = MAKE_CORE_ID(0, 0, 0, myUnit, myBlock, (ID_AGENT_XE0 + i));
+        policy->neighborPDs[i] = neighborsAll[myUnit*MAX_NUM_BLOCK + myBlock*(MAX_NUM_XE + MAX_NUM_CE) + i];
+        ASSERT(curNeighbor == policy->neighborPDs[i]->myLocation);
         DPRINTF(DEBUG_LVL_VERB, "PD 0x%lx (loc: 0x%lx) found XE neighbor %u at 0x%lx (loc: 0x%lx)\n",
                 policy, policy->myLocation, i, policy->neighborPDs[i],
                 policy->neighborPDs[i]->myLocation);
     }
-    // Ugly loop but setup code and how many neighbors are there going to be
-    // for now...
     for(i = rself->xeCount; i < policy->neighborCount + rself->xeCount; ++i) {
         ocrLocation_t curNeighbor = policy->neighbors[i - rself->xeCount];
-        ocrPolicyDomain_t **candidate = neighborsAll;
-        policy->neighborPDs[i] = NULL;
-        while(*candidate != NULL) {
-            if((*candidate)->myLocation == curNeighbor) {
-                policy->neighborPDs[i] = *candidate;
-                if(curNeighbor == policy->parentLocation) {
-                    policy->parentPD = *candidate;
-                }
-                break;
-            }
-            candidate += 1; // Go to the next PD in neighborsAll
+        policy->neighborPDs[i] = neighborsAll[UNIT_FROM_ID(curNeighbor)*MAX_NUM_BLOCK +
+                                              BLOCK_FROM_ID(curNeighbor)*(MAX_NUM_XE + MAX_NUM_CE) +
+                                              AGENT_FROM_ID(curNeighbor)];
+        ASSERT(curNeighbor == policy->neighborPDs[i]->myLocation);
+        if(curNeighbor == policy->parentLocation) {
+            policy->parentPD = policy->neighborPDs[i];
         }
-        // Make sure we found our neighbor
-        ASSERT(policy->neighborPDs[i] != NULL);
         DPRINTF(DEBUG_LVL_VERB, "PD 0x%lx (loc: 0x%lx) found neighbor %u at 0x%lx (loc: 0x%lx)\n",
                 policy, policy->myLocation, i, policy->neighborPDs[i], policy->neighborPDs[i]->myLocation);
     }
@@ -981,13 +950,32 @@ void cePolicyDomainDestruct(ocrPolicyDomain_t * policy) {
     runtimeChunkFree((u64)policy, NULL);
 }
 
-static void localDeguidify(ocrPolicyDomain_t *self, ocrFatGuid_t *guid) {
+static void localDeguidify(ocrPolicyDomain_t *self, ocrFatGuid_t *guid, ocrGuidKind *kind) {
     ASSERT(self->guidProviderCount == 1);
+    // Bug #694: All this logic should be moved into the GUID provider
     if(guid->guid != NULL_GUID && guid->guid != UNINITIALIZED_GUID) {
         if(guid->metaDataPtr == NULL) {
-            self->guidProviders[0]->fcts.getVal(self->guidProviders[0], guid->guid,
-                                                (u64*)(&(guid->metaDataPtr)), NULL);
+            PD_MSG_STACK(ceMsg);
+            getCurrentEnv(NULL, NULL, NULL, &ceMsg);
+#define PD_MSG (&ceMsg)
+#define PD_TYPE PD_MSG_GUID_INFO
+            ceMsg.type = PD_MSG_GUID_INFO | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
+            PD_MSG_FIELD_IO(guid) = *guid;
+            PD_MSG_FIELD_I(properties) = 0; // I really only need the resolved GUID
+            RESULT_ASSERT(self->fcts.processMessage(self, &ceMsg, true), ==, 0);
+            guid->metaDataPtr = PD_MSG_FIELD_IO(guid.metaDataPtr);
+#undef PD_TYPE
+#undef PD_MSG
         }
+        if(kind != NULL) {
+            // We use a cheaper call that should be able to extract a kind
+            // directly from the GUID. This implies that the kind is
+            // encoded in the GUID which is the case for now
+            self->guidProviders[0]->fcts.getKind(self->guidProviders[0], guid->guid, kind);
+        }
+    } else {
+        if(kind != NULL)
+            *kind = OCR_GUID_NONE;
     }
 }
 
@@ -1291,8 +1279,6 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
     case PD_MSG_DEP_UNREGWAITER: case PD_MSG_DEP_DYNADD:
     case PD_MSG_DEP_DYNREMOVE:
     case PD_MSG_GUID_METADATA_CLONE:
-    case PD_MSG_GUID_RESERVE:
-    case PD_MSG_GUID_UNRESERVE:
     case PD_MSG_SAL_TERMINATE:
     case PD_MSG_MGT_REGISTER:
     case PD_MSG_MGT_UNREGISTER:
@@ -1359,8 +1345,8 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_DB_ACQUIRE
         if (msg->type & PD_MSG_REQUEST) {
-            localDeguidify(self, &(PD_MSG_FIELD_IO(guid)));
-            localDeguidify(self, &(PD_MSG_FIELD_IO(edt)));
+            localDeguidify(self, &(PD_MSG_FIELD_IO(guid)), NULL);
+            localDeguidify(self, &(PD_MSG_FIELD_IO(edt)), NULL);
             ocrDataBlock_t *db = (ocrDataBlock_t*)(PD_MSG_FIELD_IO(guid.metaDataPtr));
             DPRINTF(DEBUG_LVL_VERB, "Processing DB_ACQUIRE request for GUID 0x%lx\n",
                     PD_MSG_FIELD_IO(guid.guid));
@@ -1386,7 +1372,9 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             ocrFatGuid_t edtFGuid = PD_MSG_FIELD_IO(edt);
             ocrFatGuid_t dbFGuid = PD_MSG_FIELD_IO(guid);
             u32 edtSlot = PD_MSG_FIELD_IO(edtSlot);
-            localDeguidify(self, &edtFGuid);
+            DPRINTF(DEBUG_LVL_VERB, "Processing DB_ACQUIRE response for GUID 0x%lx; resolving dependence %u for EDT 0x%lx\n",
+                    dbFGuid.guid, edtSlot, edtFGuid);
+            localDeguidify(self, &edtFGuid, NULL);
             // At this point the edt MUST be local as well as the db data pointer.
             ocrTask_t* task = (ocrTask_t*) edtFGuid.metaDataPtr;
             PD_MSG_FIELD_O(returnDetail) = self->taskFactories[0]->fcts.dependenceResolved(task, dbFGuid.guid, PD_MSG_FIELD_O(ptr), edtSlot);
@@ -1402,8 +1390,8 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         // Call the appropriate release function
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_DB_RELEASE
-        localDeguidify(self, &(PD_MSG_FIELD_IO(guid)));
-        localDeguidify(self, &(PD_MSG_FIELD_I(edt)));
+        localDeguidify(self, &(PD_MSG_FIELD_IO(guid)), NULL);
+        localDeguidify(self, &(PD_MSG_FIELD_I(edt)), NULL);
         ocrDataBlock_t *db = (ocrDataBlock_t*)(PD_MSG_FIELD_IO(guid.metaDataPtr));
         ASSERT(db->fctId == self->dbFactories[0]->factoryId);
         //ASSERT(!(msg->type & PD_MSG_REQ_RESPONSE));
@@ -1423,8 +1411,8 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         // Call the appropriate free function
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_DB_FREE
-        localDeguidify(self, &(PD_MSG_FIELD_I(guid)));
-        localDeguidify(self, &(PD_MSG_FIELD_I(edt)));
+        localDeguidify(self, &(PD_MSG_FIELD_I(guid)), NULL);
+        localDeguidify(self, &(PD_MSG_FIELD_I(edt)), NULL);
         ocrDataBlock_t *db = (ocrDataBlock_t*)(PD_MSG_FIELD_I(guid.metaDataPtr));
         DPRINTF(DEBUG_LVL_VERB, "Processing DB_FREE req/resp for GUID 0x%lx\n",
                 PD_MSG_FIELD_I(guid.guid));
@@ -1481,10 +1469,10 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         START_PROFILE(pd_ce_WorkCreate);
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_WORK_CREATE
-        localDeguidify(self, &(PD_MSG_FIELD_I(templateGuid)));
-        localDeguidify(self, &(PD_MSG_FIELD_I(affinity)));
-        localDeguidify(self, &(PD_MSG_FIELD_I(currentEdt)));
-        localDeguidify(self, &(PD_MSG_FIELD_I(parentLatch)));
+        localDeguidify(self, &(PD_MSG_FIELD_I(templateGuid)), NULL);
+        localDeguidify(self, &(PD_MSG_FIELD_I(affinity)), NULL);
+        localDeguidify(self, &(PD_MSG_FIELD_I(currentEdt)), NULL);
+        localDeguidify(self, &(PD_MSG_FIELD_I(parentLatch)), NULL);
         ocrFatGuid_t *outputEvent = NULL;
         if(PD_MSG_FIELD_IO(outputEvent.guid) == UNINITIALIZED_GUID) {
             outputEvent = &(PD_MSG_FIELD_IO(outputEvent));
@@ -1509,7 +1497,7 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         START_PROFILE(pd_hc_WorkDestroy);
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_WORK_DESTROY
-        localDeguidify(self, &(PD_MSG_FIELD_I(guid)));
+        localDeguidify(self, &(PD_MSG_FIELD_I(guid)), NULL);
         ocrTask_t *task = (ocrTask_t*)PD_MSG_FIELD_I(guid.metaDataPtr);
         ASSERT(task);
         DPRINTF(DEBUG_LVL_VERB, "WORK_DESTROY req/resp for GUID 0x%lx\n",
@@ -1549,7 +1537,7 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         START_PROFILE(pd_ce_EdtTempDestroy);
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_EDTTEMP_DESTROY
-        localDeguidify(self, &(PD_MSG_FIELD_I(guid)));
+        localDeguidify(self, &(PD_MSG_FIELD_I(guid)), NULL);
         ocrTaskTemplate_t *tTemplate = (ocrTaskTemplate_t*)(PD_MSG_FIELD_I(guid.metaDataPtr));
         DPRINTF(DEBUG_LVL_VERB, "Processing EDTTEMP_DESTROY req/resp for GUID 0x%lx\n",
                 PD_MSG_FIELD_I(guid.guid));
@@ -1585,7 +1573,7 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         START_PROFILE(pd_ce_EvtDestroy);
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_EVT_DESTROY
-        localDeguidify(self, &(PD_MSG_FIELD_I(guid)));
+        localDeguidify(self, &(PD_MSG_FIELD_I(guid)), NULL);
         ocrEvent_t *evt = (ocrEvent_t*)PD_MSG_FIELD_I(guid.metaDataPtr);
         DPRINTF(DEBUG_LVL_VERB, "Processing EVT_DESTROY req/resp for GUID 0x%lx\n",
                 PD_MSG_FIELD_I(guid.guid));
@@ -1602,7 +1590,7 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         START_PROFILE(pd_ce_EvtGet);
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_EVT_GET
-        localDeguidify(self, &(PD_MSG_FIELD_I(guid)));
+        localDeguidify(self, &(PD_MSG_FIELD_I(guid)), NULL);
         ocrEvent_t *evt = (ocrEvent_t*)PD_MSG_FIELD_I(guid.metaDataPtr);
         DPRINTF(DEBUG_LVL_VERB, "Processing EVT_GET request for GUID 0x%lx\n",
                 PD_MSG_FIELD_I(guid.guid));
@@ -1621,26 +1609,203 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         START_PROFILE(pd_ce_GuidCreate);
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_GUID_CREATE
+
+
+        // The following code is kept around to show how something a bit
+        // more asynchronous would look like but we need a LOT more
+        // support in the runtime
+        // Bug #695
+        /*
+        if(msg->type & PD_MSG_RESPONSE) {
+            DPRINTF(DEBUG_LVL_VVERB, "GUID_CREATE response from 0x%lx destined for 0x%lx\n",
+                    msg->srcLocation, msg->origSrcLocation);
+            // This is a response to a request we already sent on behalf of
+            // someone else (either another CE or an XE). It should never be for us
+            // since we do not create labeled GUIDs ourself
+            ocrLocation_t jumpTarget = msg->origSrcLocation;
+            ASSERT(jumpTarget != self->myLocation);
+            if(UNIT_FROM_ID(jumpTarget) == UNIT_FROM_ID(self->myLocation)) {
+                // We check if we are in the same block
+                if(BLOCK_FROM_ID(jumpTarget) == BLOCK_FROM_ID(self->myLocation)) {
+                    DPRINTF(DEBUG_LVL_VVERB, "Responding with GUID response to my XE 0x%lx\n",
+                            jumpTarget);
+                } else {
+                    // Forward to the proper block
+                    jumpTarget = MAKE_CORE_ID(0, 0, 0, UNIT_FROM_ID(jumpTarget), BLOCK_FROM_ID(jumpTarget), ID_AGENT_CE);
+                    msg->srcLocation = self->myLocation;
+                    msg->destLocation = jumpTarget;
+                }
+            } else {
+                // We need to forward to the proper unit
+                if(BLOCK_FROM_ID(self->myLocation) == 0) {
+                    jumpTarget = MAKE_CORE_ID(0, 0, 0, UNIT_FROM_ID(jumpTarget), 0, ID_AGENT_CE);
+                } else {
+                    jumpTarget = MAKE_CORE_ID(0, 0, 0, UNIT_FROM_ID(self->myLocation), 0, ID_AGENT_CE);
+                }
+            }
+            DPRINTF(DEBUG_LVL_VVERB, "Forwarding response to 0x%lx\n", jumpTarget);
+            msg->srcLocation = self->myLocation;
+            msg->destLocation = jumpTarget;
+            RESULT_ASSERT(self->fcts.sendMessage(self, msg->destLocation, msg,
+                                                 NULL, 0), ==, 0);
+        } else {
+            // This is a request
+            ASSERT(msg->type & PD_MSG_REQUEST);
+            if(PD_MSG_FIELD_I(size) != 0) {
+                // Here we need to create a metadata area as well
+                DPRINTF(DEBUG_LVL_VVERB, "GUID_CREATE(new) request from 0x%lx\n",
+                        msg->srcLocation);
+                if((PD_MSG_FIELD_I(properties)) & GUID_PROP_IS_LABELED) {
+                    // In this case, we need to offload this to the CE that can actually
+                    // process this.
+                    ocrLocation_t guidLocation;
+                    self->guidProviders[0]->fcts.getLocation(self->guidProviders[0],
+                                                             PD_MSG_FIELD_IO(guid.guid),
+                                                             &guidLocation);
+                    if(guidLocation == self->myLocation) {
+                        // We are all good, we can process this just fine
+                        DPRINTF(DEBUG_LVL_VVERB, "GUID_CREATE(new), labeled, processed locally\n");
+                        PD_MSG_FIELD_O(returnDetail) = self->guidProviders[0]->fcts.createGuid(
+                            self->guidProviders[0], &(PD_MSG_FIELD_IO(guid)), PD_MSG_FIELD_I(size),
+                            PD_MSG_FIELD_I(kind), PD_MSG_FIELD_I(properties));
+                        DPRINTF(DEBUG_LVL_VVERB, "GUID_CREATE response: GUID: 0x%lx\n",
+                                PD_MSG_FIELD_IO(guid.guid));
+                        returnCode = ceProcessResponse(self, msg, 0);
+                    } else {
+                        // Find who to offload-to:
+                        //   - If in same unit, offload to that (we have a direct connection
+                        //   - If in different unit, we first go to our "head" block (block 0 for
+                        //   our unit), then we jump to the target unit (block 0 of that unit), before
+                        //   jumpting to the target block (3 hops maximum)
+                        ocrLocation_t jumpTarget;
+                        if(UNIT_FROM_ID(guidLocation) == UNIT_FROM_ID(self->myLocation)) {
+                            jumpTarget = guidLocation;
+                        } else {3
+                            if(BLOCK_FROM_ID(self->myLocation) == 0) {
+                                // We are the head block for this unit
+                                jumpTarget = MAKE_CORE_ID(0, 0, 0, UNIT_FROM_ID(guidLocation), 0, ID_AGENT_CE);
+                            } else {
+                                // Jump to our head block
+                                jumpTarget = MAKE_CORE_ID(0, 0, 0, UNIT_FROM_ID(self->myLocation), 0, ID_AGENT_CE);
+                            }
+                        }
+                        // Offload to the other CE
+                        DPRINTF(DEBUG_LVL_VVERB, "GUID_CREATE(new), labeled, offloading to 0x%x; belongs to 0x%x\n",
+                                jumpTarget, guidLocation);
+                        if(msg->origSrcLocation == UNDEFINED_LOCATION) {
+                            msg->origSrcLocation = msg->srcLocation;
+                        }
+                        PD_MSG_STACK(ceMsg);
+                        getCurrentEnv(NULL, NULL, NULL, &ceMsg);
+                        u64 baseSize = 0, marshalledSize = 0;
+                        ocrPolicyMsgGetMsgSize(msg, &baseSize, &marshalledSize, 0);
+                        // For now, it must fit in a single message
+                        ASSERT(baseSize + marshalledSize <= sizeof(ocrPolicyMsg_t));
+                        ocrPolicyMsgMarshallMsg(msg, baseSize, (u8*)&ceMsg, MARSHALL_DUPLICATE);
+#undef PD_MSG
+#define PD_MSG (&ceMsg)
+                        ceMsg.destLocation = jumpTarget;
+                        ceMsg.type = PD_MSG_GUID_CREATE | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
+                        RESULT_ASSERT(self->fcts.sendMessage(
+                                          self, ceMsg.destLocation, &ceMsg, NULL, 0),
+                                      ==, 0);
+#undef PD_MSG
+#define PD_MSG msg
+                    }
+                } else {
+                    DPRINTF(DEBUG_LVL_VVERB, "GUID_CREATE(new), non-labeled, processed locally\n");
+                    PD_MSG_FIELD_O(returnDetail) = self->guidProviders[0]->fcts.createGuid(
+                        self->guidProviders[0], &(PD_MSG_FIELD_IO(guid)), PD_MSG_FIELD_I(size),
+                        PD_MSG_FIELD_I(kind), PD_MSG_FIELD_I(properties));
+                    DPRINTF(DEBUG_LVL_VVERB, "GUID_CREATE response: GUID: 0x%lx\n",
+                            PD_MSG_FIELD_IO(guid.guid));
+                    returnCode = ceProcessResponse(self, msg, 0);
+                }
+            } else {
+                // Here we just need to associate a GUID
+                ocrGuid_t temp;
+                DPRINTF(DEBUG_LVL_VVERB, "GUID_CREATE(exist) request from 0x%lx\n",
+                        msg->srcLocation);
+                PD_MSG_FIELD_O(returnDetail) = self->guidProviders[0]->fcts.getGuid(
+                    self->guidProviders[0], &temp, (u64)PD_MSG_FIELD_IO(guid.metaDataPtr),
+                    PD_MSG_FIELD_I(kind));
+                PD_MSG_FIELD_IO(guid.guid) = temp;
+                DPRINTF(DEBUG_LVL_VVERB, "GUID_CREATE response: GUID: 0x%lx\n",
+                        PD_MSG_FIELD_IO(guid.guid));
+                returnCode = ceProcessResponse(self, msg, 0);
+            }
+        }
+        */
+        // Currently, only requests for GUID_CREATE
+        DPRINTF(DEBUG_LVL_VERB, "Processing GUID_CREATE request\n");
+        ASSERT(msg->type & PD_MSG_REQUEST);
         if(PD_MSG_FIELD_I(size) != 0) {
             // Here we need to create a metadata area as well
-            DPRINTF(DEBUG_LVL_VVERB, "GUID_CREATE(new) request from 0x%lx\n",
-                    msg->srcLocation);
-            PD_MSG_FIELD_O(returnDetail) = self->guidProviders[0]->fcts.createGuid(
-                self->guidProviders[0], &(PD_MSG_FIELD_IO(guid)), PD_MSG_FIELD_I(size),
-                PD_MSG_FIELD_I(kind), PD_MSG_FIELD_I(properties));
+            DPRINTF(DEBUG_LVL_VVERB, "GUID_CREATE(new) request for size %u\n",
+                    PD_MSG_FIELD_I(size));
+            if((PD_MSG_FIELD_I(properties)) & GUID_PROP_IS_LABELED) {
+                // We need to create this using the proper CE guid provider
+                ocrLocation_t guidLocation;
+                self->guidProviders[0]->fcts.getLocation(self->guidProviders[0],
+                                                         PD_MSG_FIELD_IO(guid.guid),
+                                                         &guidLocation);
+                if(guidLocation == self->myLocation || guidLocation == INVALID_LOCATION) {
+                    // We are all good, we can process this just fine. INVALID_LOCATION means
+                    // everyone can do this operation
+                    DPRINTF(DEBUG_LVL_VVERB, "GUID_CREATE (new), labeled, processed locally\n");
+                    PD_MSG_FIELD_O(returnDetail) = self->guidProviders[0]->fcts.createGuid(
+                        self->guidProviders[0], &(PD_MSG_FIELD_IO(guid)), PD_MSG_FIELD_I(size),
+                        PD_MSG_FIELD_I(kind), PD_MSG_FIELD_I(properties));
+                    DPRINTF(DEBUG_LVL_VVERB, "GUID_CREATE (new, local) response: GUID: 0x%lx\n",
+                            PD_MSG_FIELD_IO(guid.guid));
+                    returnCode = ceProcessResponse(self, msg, 0);
+                } else {
+                    // Go and ask the other CE's provider
+                    DPRINTF(DEBUG_LVL_VVERB, "Cannot create labeled GUID for 0x%lx, asking 0x%lx\n",
+                        PD_MSG_FIELD_IO(guid.guid), guidLocation);
+#ifndef HAL_FSIM_CE
+                    ocrPolicyDomain_t *otherPd = rself->allPDs[UNIT_FROM_ID(guidLocation)*MAX_NUM_BLOCK +
+                                                               BLOCK_FROM_ID(guidLocation)*(MAX_NUM_XE+MAX_NUM_CE) +
+                                                               AGENT_FROM_ID(guidLocation)];
+#else
+                    // Self is always relative to ourself (the CE). All PDs are at the same location
+                    // relatively to the CE itself
+                    ocrPolicyDomain_t *otherPd = (ocrPolicyDomain_t*)(
+                        CR_CE_BASE(UNIT_FROM_ID(guidLocation), BLOCK_FROM_ID(guidLocation)) + (u64)(self));
+#endif
+                    // Note that this a HACK for now because we do not have asynchronous runtime
+                    // execution (Bug #695). There is a risk that getCurrentEnv is called in this
+                    // chain which may screw things up. So far it seems OK :).
+                    ASSERT(otherPd->myLocation == guidLocation);
+                    PD_MSG_FIELD_O(returnDetail) = otherPd->guidProviders[0]->fcts.createGuid(
+                        otherPd->guidProviders[0], &(PD_MSG_FIELD_IO(guid)), PD_MSG_FIELD_I(size),
+                        PD_MSG_FIELD_I(kind), PD_MSG_FIELD_I(properties));
+                    DPRINTF(DEBUG_LVL_VVERB, "GUID_CREATE (new, remote) response: GUID: 0x%lx\n",
+                            PD_MSG_FIELD_IO(guid.guid));
+                    returnCode = ceProcessResponse(self, msg, 0);
+                }
+            } else {
+                DPRINTF(DEBUG_LVL_VVERB, "GUID_CREATE (new), non-labeled, processed locally\n");
+                PD_MSG_FIELD_O(returnDetail) = self->guidProviders[0]->fcts.createGuid(
+                    self->guidProviders[0], &(PD_MSG_FIELD_IO(guid)), PD_MSG_FIELD_I(size),
+                    PD_MSG_FIELD_I(kind), PD_MSG_FIELD_I(properties));
+                DPRINTF(DEBUG_LVL_VVERB, "GUID_CREATE (new) response: GUID: 0x%lx\n",
+                        PD_MSG_FIELD_IO(guid.guid));
+                returnCode = ceProcessResponse(self, msg, 0);
+            }
         } else {
-            // Here we just need to associate a GUID
+            // Here we just need to associate a GUID. This should never be labeled
+            ASSERT(!(PD_MSG_FIELD_I(properties) & GUID_PROP_IS_LABELED));
             ocrGuid_t temp;
-            DPRINTF(DEBUG_LVL_VVERB, "GUID_CREATE(exist) request from 0x%lx\n",
-                    msg->srcLocation);
+            DPRINTF(DEBUG_LVL_VVERB, "GUID_CREATE (exist) for value 0x%lx\n", PD_MSG_FIELD_IO(guid.metaDataPtr));
             PD_MSG_FIELD_O(returnDetail) = self->guidProviders[0]->fcts.getGuid(
                 self->guidProviders[0], &temp, (u64)PD_MSG_FIELD_IO(guid.metaDataPtr),
                 PD_MSG_FIELD_I(kind));
             PD_MSG_FIELD_IO(guid.guid) = temp;
+            DPRINTF(DEBUG_LVL_VVERB, "GUID_CREATE (exist) response: GUID: 0x%lx\n",
+                    PD_MSG_FIELD_IO(guid.guid));
+            returnCode = ceProcessResponse(self, msg, 0);
         }
-        DPRINTF(DEBUG_LVL_VVERB, "GUID_CREATE response: GUID: 0x%lx\n",
-                PD_MSG_FIELD_IO(guid.guid));
-        returnCode = ceProcessResponse(self, msg, 0);
 #undef PD_MSG
 #undef PD_TYPE
         EXIT_PROFILE;
@@ -1651,24 +1816,69 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         START_PROFILE(pd_ce_GuidInfo);
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_GUID_INFO
-        localDeguidify(self, &(PD_MSG_FIELD_IO(guid)));
-        DPRINTF(DEBUG_LVL_VVERB, "GUID_INFO request from 0x%lx for GUID 0x%lx\n",
-                msg->srcLocation, PD_MSG_FIELD_IO(guid.guid));
-        if(PD_MSG_FIELD_I(properties) & KIND_GUIDPROP) {
-            PD_MSG_FIELD_O(returnDetail) = self->guidProviders[0]->fcts.getKind(
-                self->guidProviders[0], PD_MSG_FIELD_IO(guid.guid), &(PD_MSG_FIELD_O(kind)));
-            if(PD_MSG_FIELD_O(returnDetail) == 0)
-                PD_MSG_FIELD_O(returnDetail) = KIND_GUIDPROP | WMETA_GUIDPROP | RMETA_GUIDPROP;
-        } else if (PD_MSG_FIELD_I(properties) & LOCATION_GUIDPROP) {
-            PD_MSG_FIELD_O(returnDetail) = self->guidProviders[0]->fcts.getLocation(
-                self->guidProviders[0], PD_MSG_FIELD_IO(guid.guid), &(PD_MSG_FIELD_O(location)));
-            if(PD_MSG_FIELD_O(returnDetail) == 0) {
-                PD_MSG_FIELD_O(returnDetail) = LOCATION_GUIDPROP | WMETA_GUIDPROP | RMETA_GUIDPROP;
+        // We need to resolve the GUID
+        DPRINTF(DEBUG_LVL_VERB, "Processing GUID_INFO request for GUID 0x%lx\n", PD_MSG_FIELD_IO(guid.guid));
+        if(self->guidProviders[0]->fcts.getVal(self->guidProviders[0], PD_MSG_FIELD_IO(guid.guid),
+                                               (u64*)(&(PD_MSG_FIELD_IO(guid.metaDataPtr))), NULL)) {
+            // If we get here, it means our GUID provider has no clue about
+            // this GUID so we probably have to go fetch it from somewhere else
+            ocrLocation_t guidLocation;
+            self->guidProviders[0]->fcts.getLocation(self->guidProviders[0], PD_MSG_FIELD_IO(guid.guid),
+                                                     &guidLocation);
+            // If we get an error, we should really not know about this GUID
+            ASSERT(guidLocation != INVALID_LOCATION && guidLocation != self->myLocation);
+
+            // Go and ask the other CE's provider
+            DPRINTF(DEBUG_LVL_VVERB, "Cannot resolve GUID_INFO, asking 0x%lx\n",
+                    guidLocation);
+#ifndef HAL_FSIM_CE
+            ocrPolicyDomain_t *otherPd = rself->allPDs[UNIT_FROM_ID(guidLocation)*MAX_NUM_BLOCK +
+                                                       BLOCK_FROM_ID(guidLocation)*(MAX_NUM_XE+MAX_NUM_CE) +
+                                                       AGENT_FROM_ID(guidLocation)];
+#else
+            ocrPolicyDomain_t *otherPd = (ocrPolicyDomain_t*)(
+                CR_CE_BASE(UNIT_FROM_ID(guidLocation), BLOCK_FROM_ID(guidLocation)) + (u64)(self));
+#endif
+            ASSERT(otherPd->myLocation == guidLocation);
+            RESULT_ASSERT(otherPd->guidProviders[0]->fcts.getVal(otherPd->guidProviders[0], PD_MSG_FIELD_IO(guid.guid),
+                                                                 (u64*)(&(PD_MSG_FIELD_IO(guid.metaDataPtr))), NULL), ==, 0);
+
+            if(PD_MSG_FIELD_I(properties) & KIND_GUIDPROP) {
+                PD_MSG_FIELD_O(returnDetail) = otherPd->guidProviders[0]->fcts.getKind(
+                    otherPd->guidProviders[0], PD_MSG_FIELD_IO(guid.guid), &(PD_MSG_FIELD_O(kind)));
+                if(PD_MSG_FIELD_O(returnDetail) == 0)
+                    PD_MSG_FIELD_O(returnDetail) = KIND_GUIDPROP | WMETA_GUIDPROP | RMETA_GUIDPROP;
+            } else if (PD_MSG_FIELD_I(properties) & LOCATION_GUIDPROP) {
+                PD_MSG_FIELD_O(returnDetail) = otherPd->guidProviders[0]->fcts.getLocation(
+                    otherPd->guidProviders[0], PD_MSG_FIELD_IO(guid.guid), &(PD_MSG_FIELD_O(location)));
+                if(PD_MSG_FIELD_O(returnDetail) == 0) {
+                    PD_MSG_FIELD_O(returnDetail) = LOCATION_GUIDPROP | WMETA_GUIDPROP | RMETA_GUIDPROP;
+                }
+            } else {
+                PD_MSG_FIELD_O(returnDetail) = WMETA_GUIDPROP | RMETA_GUIDPROP;
             }
+
+            // The results are *not* cached because we don't know how to "un-cache" them and with
+            // labeled GUIDs, it is legal to reuse GUIDs.
         } else {
-            PD_MSG_FIELD_O(returnDetail) = WMETA_GUIDPROP | RMETA_GUIDPROP;
+            DPRINTF(DEBUG_LVL_VVERB, "GUID is locally known\n");
+            if(PD_MSG_FIELD_I(properties) & KIND_GUIDPROP) {
+                PD_MSG_FIELD_O(returnDetail) = self->guidProviders[0]->fcts.getKind(
+                    self->guidProviders[0], PD_MSG_FIELD_IO(guid.guid), &(PD_MSG_FIELD_O(kind)));
+                if(PD_MSG_FIELD_O(returnDetail) == 0)
+                    PD_MSG_FIELD_O(returnDetail) = KIND_GUIDPROP | WMETA_GUIDPROP | RMETA_GUIDPROP;
+            } else if (PD_MSG_FIELD_I(properties) & LOCATION_GUIDPROP) {
+                PD_MSG_FIELD_O(returnDetail) = self->guidProviders[0]->fcts.getLocation(
+                    self->guidProviders[0], PD_MSG_FIELD_IO(guid.guid), &(PD_MSG_FIELD_O(location)));
+                if(PD_MSG_FIELD_O(returnDetail) == 0) {
+                    PD_MSG_FIELD_O(returnDetail) = LOCATION_GUIDPROP | WMETA_GUIDPROP | RMETA_GUIDPROP;
+                }
+            } else {
+                PD_MSG_FIELD_O(returnDetail) = WMETA_GUIDPROP | RMETA_GUIDPROP;
+            }
         }
-        DPRINTF(DEBUG_LVL_VVERB, "GUID_INFO response\n");
+        DPRINTF(DEBUG_LVL_VERB, "GUID_INFO response: GUID: 0x%lx, PTR: 0x%lx\n",
+                PD_MSG_FIELD_IO(guid.guid), PD_MSG_FIELD_IO(guid.metaDataPtr));
         returnCode = ceProcessResponse(self, msg, 0);
 #undef PD_MSG
 #undef PD_TYPE
@@ -1676,13 +1886,42 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         break;
     }
 
+    case PD_MSG_GUID_RESERVE:
+    {
+#define PD_MSG msg
+#define PD_TYPE PD_MSG_GUID_RESERVE
+        DPRINTF(DEBUG_LVL_VERB, "Processing GUID_RESERVE request for %u GUIDs of type %u\n",
+                PD_MSG_FIELD_I(numberGuids), PD_MSG_FIELD_I(guidKind));
+        PD_MSG_FIELD_O(returnDetail) = self->guidProviders[0]->fcts.guidReserve(
+            self->guidProviders[0], &(PD_MSG_FIELD_O(startGuid)), &(PD_MSG_FIELD_O(skipGuid)),
+            PD_MSG_FIELD_I(numberGuids), PD_MSG_FIELD_I(guidKind));
+        DPRINTF(DEBUG_LVL_VERB, "GUID_RESERVE response: start 0x%lx\n",
+                PD_MSG_FIELD_O(startGuid));
+#undef PD_MSG
+#undef PD_TYPE
+        returnCode = ceProcessResponse(self, msg, 0);
+        break;
+    }
+
+    case PD_MSG_GUID_UNRESERVE:
+    {
+#define PD_MSG msg
+#define PD_TYPE PD_MSG_GUID_UNRESERVE
+        DPRINTF(DEBUG_LVL_VERB, "Processing GUID_UNRESERVE req/resp for start 0x%lx\n",
+                PD_MSG_FIELD_I(startGuid));
+        PD_MSG_FIELD_O(returnDetail) = self->guidProviders[0]->fcts.guidUnreserve(
+            self->guidProviders[0], PD_MSG_FIELD_I(startGuid), PD_MSG_FIELD_I(skipGuid),
+            PD_MSG_FIELD_I(numberGuids));
+#undef PD_MSG
+#undef PD_TYPE
+        returnCode = ceProcessResponse(self, msg, 0);
+        break;
+    }
     case PD_MSG_GUID_DESTROY: {
         START_PROFILE(pd_ce_GuidDestroy);
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_GUID_DESTROY
-        localDeguidify(self, &(PD_MSG_FIELD_I(guid)));
-        DPRINTF(DEBUG_LVL_VVERB, "GUID_DESTROY req/resp from 0x%lx for GUID 0x%lx\n",
-                msg->srcLocation, PD_MSG_FIELD_I(guid.guid));
+        ocrLocation_t guidLocation;
         if(PD_MSG_FIELD_I(guid.guid) == NULL_GUID || PD_MSG_FIELD_I(guid.guid) == UNINITIALIZED_GUID
            || PD_MSG_FIELD_I(guid.guid) == ERROR_GUID) {
             // This can happen in very rare cases when the shutdown is noticed before the
@@ -1690,8 +1929,73 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             DPRINTF(DEBUG_LVL_INFO, "Trying to destroy NULL_GUID, ignoring\n");
             PD_MSG_FIELD_O(returnDetail) = 0;
         } else {
-            PD_MSG_FIELD_O(returnDetail) = self->guidProviders[0]->fcts.releaseGuid(
-                self->guidProviders[0], PD_MSG_FIELD_I(guid), PD_MSG_FIELD_I(properties) & 1);
+            DPRINTF(DEBUG_LVL_VERB, "Processing GUID_DESTROY for GUID 0x%lx\n", PD_MSG_FIELD_I(guid.guid));
+
+            self->guidProviders[0]->fcts.getLocation(self->guidProviders[0], PD_MSG_FIELD_I(guid.guid),
+                                                 &guidLocation);
+            if(guidLocation == INVALID_LOCATION || guidLocation == self->myLocation) {
+                DPRINTF(DEBUG_LVL_VVERB, "GUID_DESTROY for GUID 0x%lx can be dealt with locally\n",
+                        PD_MSG_FIELD_I(guid.guid));
+
+                PD_MSG_FIELD_O(returnDetail) = self->guidProviders[0]->fcts.releaseGuid(
+                    self->guidProviders[0], PD_MSG_FIELD_I(guid), PD_MSG_FIELD_I(properties) & 1);
+            } else {
+                DPRINTF(DEBUG_LVL_VVERB, "Cannot process local GUID_DESTROY, asking 0x%lx\n",
+                        guidLocation);
+#ifndef HAL_FSIM_CE
+                ocrPolicyDomain_t *otherPd = rself->allPDs[UNIT_FROM_ID(guidLocation)*MAX_NUM_BLOCK +
+                                                           BLOCK_FROM_ID(guidLocation)*(MAX_NUM_XE+MAX_NUM_CE) +
+                                                           AGENT_FROM_ID(guidLocation)];
+#else
+                ocrPolicyDomain_t *otherPd = (ocrPolicyDomain_t*)(
+                    CR_CE_BASE(UNIT_FROM_ID(guidLocation), BLOCK_FROM_ID(guidLocation)) + (u64)(self));
+#endif
+                ASSERT(otherPd->myLocation == guidLocation);
+                RESULT_ASSERT(otherPd->guidProviders[0]->fcts.releaseGuid(otherPd->guidProviders[0],
+                                                                          PD_MSG_FIELD_I(guid),
+                                                                          PD_MSG_FIELD_I(properties) & 1), ==, 0);
+                /*
+                // Same as for GUID info. Keeping here as example of what can be done
+                // Remove for now because of a possible race condition between a destroy
+                // and a GUID_INFO (which uses a faster path).
+                // We are not allowed to deguidify this so we need to offload it
+                // Find who to offload-to:
+                //   - If in same unit, offload to that (we have a direct connection
+                //   - If in different unit, we first go to our "head" block (block 0 for
+                //   our unit), then we jump to the target unit (block 0 of that unit), before
+                //   jumpting to the target block (3 hops maximum)
+                ocrLocation_t jumpTarget;
+                if(UNIT_FROM_ID(guidLocation) == UNIT_FROM_ID(self->myLocation)) {
+                    jumpTarget = guidLocation;
+                } else {
+                    if(BLOCK_FROM_ID(self->myLocation) == 0) {
+                        // We are the head block for this unit
+                        jumpTarget = MAKE_CORE_ID(0, 0, 0, UNIT_FROM_ID(guidLocation), 0, ID_AGENT_CE);
+                    } else {
+                        // Jump to our head block
+                        jumpTarget = MAKE_CORE_ID(0, 0, 0, UNIT_FROM_ID(self->myLocation), 0, ID_AGENT_CE);
+                    }
+                }
+                DPRINTF(DEBUG_LVL_VVERB, "GUID_DESTROY for GUID 0x%lx will be offloaded to 0x%lx (owned by 0x%lx)\n",
+                        PD_MSG_FIELD_I(guid.guid), jumpTarget, guidLocation);
+                PD_MSG_STACK(ceMsg);
+                getCurrentEnv(NULL, NULL, NULL, &ceMsg);
+                u64 baseSize = 0, marshalledSize = 0;
+                ocrPolicyMsgGetMsgSize(msg, &baseSize, &marshalledSize, 0);
+                // For now, it must fit in a single message
+                ASSERT(baseSize + marshalledSize <= sizeof(ocrPolicyMsg_t));
+                ocrPolicyMsgMarshallMsg(msg, baseSize, (u8*)&ceMsg, MARSHALL_DUPLICATE);
+#undef PD_MSG
+#define PD_MSG (&ceMsg)
+                ceMsg.destLocation = jumpTarget;
+                ceMsg.type = PD_MSG_GUID_DESTROY | PD_MSG_REQUEST;
+                RESULT_ASSERT(self->fcts.sendMessage(
+                                  self, ceMsg.destLocation, &ceMsg, NULL, 0),
+                              ==, 0);
+#undef PD_MSG
+#define PD_MSG msg
+                */
+            }
         }
         returnCode = ceProcessResponse(self, msg, 0);
 #undef PD_MSG
@@ -1800,13 +2104,8 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             // Respond to the requester
             // If my own scheduler had extra work, we respond with work
             // If not, then we respond with no work (but we've already put out work requests by now)
-            if(PD_MSG_FIELD_IO(guidCount)) {
-                if(PD_MSG_FIELD_IO(guids[0]).metaDataPtr == NULL)
-                    localDeguidify(self, &(PD_MSG_FIELD_IO(guids[0])));
-            }
-            DPRINTF(DEBUG_LVL_VERB, "Response for COMM_TAKE: GUID 0x%lx (metadata: 0x%lx) count: %u\n",
-                    PD_MSG_FIELD_IO(guids[0].guid), PD_MSG_FIELD_IO(guids[0].metaDataPtr),
-                    PD_MSG_FIELD_IO(guidCount));
+            DPRINTF(DEBUG_LVL_VERB, "Response for COMM_TAKE: GUID 0x%lx count: %u\n",
+                    PD_MSG_FIELD_IO(guids[0].guid), PD_MSG_FIELD_IO(guidCount));
             returnCode = ceProcessResponse(self, msg, 0);
         } else { // A TAKE response has to be from another CE responding to my own request
             DPRINTF(DEBUG_LVL_VERB, "Processing COMM_TAKE response from another CE with %u EDTs\n",
@@ -1866,7 +2165,7 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             workArgs->OCR_SCHED_ARG_FIELD(OCR_SCHED_WORK_EDT_USER).edt.guid = NULL_GUID;
             workArgs->OCR_SCHED_ARG_FIELD(OCR_SCHED_WORK_EDT_USER).edt.metaDataPtr = NULL;
             if (fguid.guid != NULL_GUID) {
-                localDeguidify(self, &fguid);
+                localDeguidify(self, &fguid, NULL);
                 ocrSchedulerOpNotifyArgs_t notifyArgs;
                 notifyArgs.base.location = msg->srcLocation;
                 notifyArgs.kind = OCR_SCHED_NOTIFY_EDT_READY;
@@ -1922,12 +2221,8 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
                 msg->srcLocation, PD_MSG_FIELD_I(source.guid), PD_MSG_FIELD_I(dest.guid));
         // We first get information about the source and destination
         ocrGuidKind srcKind, dstKind;
-        self->guidProviders[0]->fcts.getVal(
-            self->guidProviders[0], PD_MSG_FIELD_I(source.guid),
-            (u64*)(&(PD_MSG_FIELD_I(source.metaDataPtr))), &srcKind);
-        self->guidProviders[0]->fcts.getVal(
-            self->guidProviders[0], PD_MSG_FIELD_I(dest.guid),
-            (u64*)(&(PD_MSG_FIELD_I(dest.metaDataPtr))), &dstKind);
+        localDeguidify(self, &(PD_MSG_FIELD_I(source)), &srcKind);
+        localDeguidify(self, &(PD_MSG_FIELD_I(dest)), &dstKind);
 
         ocrFatGuid_t src = PD_MSG_FIELD_I(source);
         ocrFatGuid_t dest = PD_MSG_FIELD_I(dest);
@@ -2012,12 +2307,8 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         DPRINTF(DEBUG_LVL_VERB, "Processing DEP_REGSIGNALER req/resp on 0x%lx: signaler 0x%lx, slot is %u\n",
                 PD_MSG_FIELD_I(dest.guid),  PD_MSG_FIELD_I(signaler.guid), PD_MSG_FIELD_I(slot));
         ocrGuidKind signalerKind, dstKind;
-        self->guidProviders[0]->fcts.getVal(
-            self->guidProviders[0], PD_MSG_FIELD_I(signaler.guid),
-            (u64*)(&(PD_MSG_FIELD_I(signaler.metaDataPtr))), &signalerKind);
-        self->guidProviders[0]->fcts.getVal(
-            self->guidProviders[0], PD_MSG_FIELD_I(dest.guid),
-            (u64*)(&(PD_MSG_FIELD_I(dest.metaDataPtr))), &dstKind);
+        localDeguidify(self, &(PD_MSG_FIELD_I(signaler)), &signalerKind);
+        localDeguidify(self, &(PD_MSG_FIELD_I(dest)), &dstKind);
 
         ocrFatGuid_t signaler = PD_MSG_FIELD_I(signaler);
         ocrFatGuid_t dest = PD_MSG_FIELD_I(dest);
@@ -2054,12 +2345,8 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         DPRINTF(DEBUG_LVL_VERB, "Processing DEP_REGWAITER req/resp on 0x%lx; waiter is 0x%lx, slot is %u\n",
                 PD_MSG_FIELD_I(dest.guid), PD_MSG_FIELD_I(waiter.guid), PD_MSG_FIELD_I(slot));
         ocrGuidKind waiterKind, dstKind;
-        self->guidProviders[0]->fcts.getVal(
-            self->guidProviders[0], PD_MSG_FIELD_I(waiter.guid),
-            (u64*)(&(PD_MSG_FIELD_I(waiter.metaDataPtr))), &waiterKind);
-        self->guidProviders[0]->fcts.getVal(
-            self->guidProviders[0], PD_MSG_FIELD_I(dest.guid),
-            (u64*)(&(PD_MSG_FIELD_I(dest.metaDataPtr))), &dstKind);
+        localDeguidify(self, &(PD_MSG_FIELD_I(waiter)), &waiterKind);
+        localDeguidify(self, &(PD_MSG_FIELD_I(dest)), &dstKind);
 
         ocrFatGuid_t waiter = PD_MSG_FIELD_I(waiter);
         ocrFatGuid_t dest = PD_MSG_FIELD_I(dest);
@@ -2086,9 +2373,7 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         DPRINTF(DEBUG_LVL_VERB, "Processing DEP_SATISFY req/resp for event/edt 0x%lx with db 0x%lx for slot %u\n",
                 PD_MSG_FIELD_I(guid.guid), PD_MSG_FIELD_I(payload.guid), PD_MSG_FIELD_I(slot));
         ocrGuidKind dstKind;
-        self->guidProviders[0]->fcts.getVal(
-            self->guidProviders[0], PD_MSG_FIELD_I(guid.guid),
-            (u64*)(&(PD_MSG_FIELD_I(guid.metaDataPtr))), &dstKind);
+        localDeguidify(self, &(PD_MSG_FIELD_I(guid)), &dstKind);
 
         ocrFatGuid_t dst = PD_MSG_FIELD_I(guid);
         if(dstKind & OCR_GUID_EVENT) {
@@ -2122,10 +2407,8 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         START_PROFILE(pd_ce_HintSet);
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_HINT_SET
-        localDeguidify(self, &(PD_MSG_FIELD_I(guid)));
-        ocrFatGuid_t fatGuid = PD_MSG_FIELD_I(guid);
         ocrGuidKind kind = OCR_GUID_NONE;
-        guidKind(self, fatGuid, &kind);
+        localDeguidify(self, &(PD_MSG_FIELD_I(guid)), &kind);
         switch(PD_MSG_FIELD_I(hint.type)) {
         case OCR_HINT_EDT_T:
             {
@@ -2170,10 +2453,8 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         START_PROFILE(pd_hc_HintGet);
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_HINT_GET
-        localDeguidify(self, &(PD_MSG_FIELD_I(guid)));
-        ocrFatGuid_t fatGuid = PD_MSG_FIELD_I(guid);
         ocrGuidKind kind = OCR_GUID_NONE;
-        guidKind(self, fatGuid, &kind);
+        localDeguidify(self, &(PD_MSG_FIELD_I(guid)), &kind);
         switch(PD_MSG_FIELD_IO(hint.type)) {
         case OCR_HINT_EDT_T:
             {
@@ -2404,6 +2685,37 @@ u8 cePdSendMessage(ocrPolicyDomain_t* self, ocrLocation_t target, ocrPolicyMsg_t
     u8 status;
     u8 sendMultiple = (properties == 0);
     properties = properties & ~0x1;
+
+    // For responses to XEs about work, we deguidify here because the XEs can't
+    // always deguidify (so we make their life easy
+    if(AGENT_FROM_ID(target) != ID_AGENT_CE) {
+        u32 type = message->type & PD_MSG_TYPE_ONLY;
+#define PD_MSG message
+        switch(type) {
+        case PD_MSG_COMM_TAKE:
+        {
+#define PD_TYPE PD_MSG_COMM_TAKE
+            u32 i = 0;
+            for(i = 0; i < PD_MSG_FIELD_IO(guidCount); ++i) {
+                localDeguidify(self, &(PD_MSG_FIELD_IO(guids[i])), NULL);
+            }
+#undef PD_TYPE
+            break;
+        }
+        case PD_MSG_SCHED_GET_WORK:
+        {
+#define PD_TYPE PD_MSG_SCHED_GET_WORK
+            if(PD_MSG_FIELD_IO(schedArgs.kind) == OCR_SCHED_WORK_EDT_USER) {
+                localDeguidify(self, &(PD_MSG_FIELD_IO(schedArgs.OCR_SCHED_ARG_FIELD(OCR_SCHED_WORK_EDT_USER).edt)), NULL);
+            }
+#undef PD_TYPE
+            break;
+        }
+        default:
+            ;
+        }
+#undef PD_MSG
+    }
     status = self->commApis[0]->fcts.sendMessage(self->commApis[0], target, message,
                                                  handle, properties);
     while(sendMultiple && status != 0) {

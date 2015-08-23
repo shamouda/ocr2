@@ -132,7 +132,7 @@ static ocrLocation_t locIdtoLocation(u64 locId) {
 static u64 locationToLocId(ocrLocation_t location) {
     //BUG #605 Locations spec: We assume there will be a mapping
     //between a location and an 'id' stored in the guid. For now identity.
-    u64 locId = (u64) ((int)location);
+    u64 locId = (u64)(location);
     // Make sure we're not overflowing location size
     ASSERT((locId < (1<<GUID_LOCID_SIZE)) && "GUID location ID overflows");
     return locId;
@@ -294,6 +294,7 @@ u8 labeledGuidGetVal(ocrGuidProvider_t* self, ocrGuid_t guid, u64* val, ocrGuidK
         if(kind) {
             *kind = OCR_GUID_NONE;
         }
+        return OCR_EPERM;
     } else {
         // Bug #627: We do not return until the GUID is valid. We test this
         // by looking at the first field of ptr and waiting for it to be the GUID value (meaning the
@@ -338,6 +339,8 @@ u8 labeledGuidRegisterGuid(ocrGuidProvider_t* self, ocrGuid_t guid, u64 val) {
 }
 
 u8 labeledGuidReleaseGuid(ocrGuidProvider_t *self, ocrFatGuid_t fatGuid, bool releaseVal) {
+    // We can only destroy GUIDs that we created
+    ASSERT(extractLocIdFromGuid(fatGuid.guid) == locationToLocId(self->pd->myLocation));
     DPRINTF(DEBUG_LVL_VERB, "LabeledGUID: release GUID 0x%lx\n", fatGuid.guid);
     ocrGuid_t guid = fatGuid.guid;
     // If there's metaData associated with guid we need to deallocate memory

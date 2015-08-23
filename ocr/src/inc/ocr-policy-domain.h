@@ -348,7 +348,9 @@ struct _ocrPolicyDomain_t;
  * Use this macro to allocate a ocrPolicyMsg_t on the stack and properly set-up
  * its buffer size
  */
-#define PD_MSG_STACK(name) ocrPolicyMsg_t name; name.usefulSize = 0; name.bufferSize = sizeof(ocrPolicyMsg_t);
+#define PD_MSG_STACK(name) ocrPolicyMsg_t name; \
+    name.usefulSize = 0; name.bufferSize = sizeof(ocrPolicyMsg_t); \
+    name.srcLocation = name.destLocation = INVALID_LOCATION;
 
 /**
  * @brief Structure describing a "message" that is used to communicate between
@@ -368,17 +370,20 @@ struct _ocrPolicyDomain_t;
  * the marshalling and unmarshalling functions in policy-domain-all.c
  */
 typedef struct _ocrPolicyMsg_t {
-    u64 msgId;                  /**< Implementation specific ID identifying
-                                 * this message (if required) */
-    u64 bufferSize;             /**< Total size of the buffer containing this message */
-    u64 usefulSize;             /**< Size to transfer (useful payload). This size may be
-                                 * modified by the marshalling code (for example, it will
-                                 * be updated if elements are marshalled inside this buffer).
-                                 * Always less than or equal to bufferSize */
-    ocrLocation_t srcLocation;  /**< Source of the message
-                                 * (location making the request) */
-    ocrLocation_t destLocation; /**< Destination of the message
-                                 * (location processing the request) */
+    u64 msgId;                      /**< Implementation specific ID identifying
+                                     * this message (if required) */
+    u64 bufferSize;                 /**< Total size of the buffer containing this message */
+    u64 usefulSize;                 /**< Size to transfer (useful payload). This size may be
+                                     * modified by the marshalling code (for example, it will
+                                     * be updated if elements are marshalled inside this buffer).
+                                     * Always less than or equal to bufferSize */
+    /*ocrLocation_t origSrcLocation;*/  /**< Original source of the message (in case
+                                         * it gets forwarded around). This is currently not used
+                                         * but there is example code in the CE PD for this */
+    ocrLocation_t srcLocation;      /**< Source of the message
+                                     * (location making the request) */
+    ocrLocation_t destLocation;     /**< Destination of the message
+                                     * (location processing the request) */
     u32 type;                   /**< Type of the message. Also includes if this
                                  * is a request or a response */
 

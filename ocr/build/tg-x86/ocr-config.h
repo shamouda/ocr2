@@ -19,6 +19,9 @@
 // that does not contribute to building the policy domain
 //#define ENABLE_BUILDER_ONLY
 
+// Bug #694 Better handling of GUID metadata across PDs
+#define TG_X86_TARGET
+
 // Bug #556
 #define EDT_DEPV_DELAYED
 
@@ -64,6 +67,7 @@
 #define ENABLE_EXTERNAL_INIPARSER
 
 // GUID provider
+#define ENABLE_GUID_LABELED
 #define ENABLE_GUID_PTR
 
 // HAL layer to use
@@ -109,6 +113,7 @@
 // Extensions
 #define ENABLE_EXTENSION_AFFINITY
 #define ENABLE_EXTENSION_LEGACY
+#define ENABLE_EXTENSION_LABELING
 
 // Build pause/resume support
 #define ENABLE_EXTENSION_PAUSE

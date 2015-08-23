@@ -107,7 +107,8 @@ u8 ptrGetGuid(ocrGuidProvider_t* self, ocrGuid_t* guid, u64 val, ocrGuidKind kin
 
     guidInst->guid = (ocrGuid_t)val;
     guidInst->kind = kind;
-    guidInst->location = self->pd->myLocation;
+    // Bug #694: Better handling of cross PDs and cross address-spaces GUID providers
+    guidInst->location = UNDEFINED_LOCATION; //self->pd->myLocation;
     *guid = (ocrGuid_t) guidInst;
 #undef PD_MSG
 #undef PD_TYPE

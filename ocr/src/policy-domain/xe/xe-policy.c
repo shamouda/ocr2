@@ -81,15 +81,7 @@ static void performNeighborDiscovery(ocrPolicyDomain_t *policy) {
     // Fill-in location tuples: ours and our parent's (the CE in FSIM)
 #ifdef HAL_FSIM_XE
     policy->myLocation = (ocrLocation_t)(*(u64*)(XE_MSR_OFFT + CORE_LOCATION * sizeof(u64)));
-#else
-    // Figure out myLocation based on its current value which is just an index (based on xeCount = 8)
-    // See ce-policy.c for more explanations
-    // TODO: This assumes xeCount = 8!!
-    u32 myUnit = (policy->myLocation) / ((8+1)*MAX_NUM_BLOCK);
-    u32 myBlock = (policy->myLocation - myUnit*((8+1)*MAX_NUM_BLOCK)) / (8 + 1);
-    u32 agentCount = policy->myLocation - myUnit*((8+1)*MAX_NUM_BLOCK) - myBlock*(8+1);
-    policy->myLocation = MAKE_CORE_ID(0, 0, 0, myUnit, myBlock, (ID_AGENT_XE0 + agentCount));
-#endif
+#endif // For TG-x86, set in the driver code
     policy->parentLocation = (policy->myLocation & ~ID_AGENT_MASK) | ID_AGENT_CE;
 }
 
@@ -101,17 +93,10 @@ static void findNeighborsPd(ocrPolicyDomain_t *policy) {
     ocrPolicyDomain_t** neighborsAll = policy->neighborPDs; // Initially set in the driver
     policy->neighborPDs = NULL; // We don't need it afterwards so cleaning up
 
-    policy->parentPD = NULL;
-    ocrPolicyDomain_t **candidate = neighborsAll;
-    while(*candidate != NULL) {
-        if((*candidate)->myLocation == policy->parentLocation) {
-            policy->parentPD = *candidate;
-            break;
-        }
-        candidate += 1; // Go to the next PD in neighborsAll
-    }
-    // We should have found our parent
-    ASSERT(policy->parentPD != NULL);
+    policy->parentPD = neighborsAll[UNIT_FROM_ID(policy->parentLocation)*MAX_NUM_BLOCK +
+                                    BLOCK_FROM_ID(policy->parentLocation)*(MAX_NUM_XE+MAX_NUM_CE) +
+                                    ID_AGENT_CE];
+    ASSERT(policy->parentPD->myLocation == policy->parentLocation);
     DPRINTF(DEBUG_LVL_VERB, "PD 0x%lx (loc: 0x%lx) found parent at 0x%lx (loc: 0x%lx)\n",
             policy, policy->myLocation, policy->parentPD, policy->parentPD->myLocation);
 
@@ -570,12 +555,15 @@ void xePolicyDomainDestruct(ocrPolicyDomain_t * policy) {
 }
 
 static void localDeguidify(ocrPolicyDomain_t *self, ocrFatGuid_t *guid) {
-    ASSERT(self->guidProviderCount == 1);
-    if(guid->guid != NULL_GUID && guid->guid != UNINITIALIZED_GUID) {
-        if(guid->metaDataPtr == NULL) {
-            self->guidProviders[0]->fcts.getVal(self->guidProviders[0], guid->guid,
-                                                (u64*)(&(guid->metaDataPtr)), NULL);
-        }
+    if((guid->guid != NULL_GUID) && (guid->guid != UNINITIALIZED_GUID)) {
+        // The XE cannot deguidify since it does not really have a GUID
+        // provider and relies on the CE for that. It used to be OK
+        // when we used the PTR GUID provider since deguidification was
+        // just reading a memory location but that was a bad assumption.
+        // There are only two places where localDeguidify is called (when
+        // tasks come back in) so if this fails, it means the CE is not
+        // deguidifying the tasks prior to sending them back to the XE
+        ASSERT(guid->metaDataPtr != NULL);
     }
 }
 
@@ -759,18 +747,37 @@ u8 xePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
     case PD_MSG_EVT_CREATE: case PD_MSG_EVT_DESTROY: case PD_MSG_EVT_GET:
     case PD_MSG_GUID_CREATE: case PD_MSG_GUID_INFO: case PD_MSG_GUID_DESTROY:
     case PD_MSG_COMM_TAKE: //This is enabled until we move TAKE heuristic in CE policy domain to inside scheduler
+    case PD_MSG_SCHED_GET_WORK:
     case PD_MSG_SCHED_NOTIFY:
     case PD_MSG_DEP_ADD: case PD_MSG_DEP_REGSIGNALER: case PD_MSG_DEP_REGWAITER:
     case PD_MSG_HINT_SET: case PD_MSG_HINT_GET:
-    case PD_MSG_DEP_SATISFY: {
+    case PD_MSG_DEP_SATISFY:
+    case PD_MSG_GUID_RESERVE: case PD_MSG_GUID_UNRESERVE: {
         START_PROFILE(pd_xe_OffloadtoCE);
+
         if((msg->type & PD_MSG_TYPE_ONLY) == PD_MSG_WORK_CREATE) {
             START_PROFILE(pd_xe_resolveTemp);
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_WORK_CREATE
             if((s32)(PD_MSG_FIELD_IO(paramc)) < 0) {
-                localDeguidify(self, &(PD_MSG_FIELD_I(templateGuid)));
-                ocrTaskTemplate_t *template = PD_MSG_FIELD_I(templateGuid).metaDataPtr;
+                // We need to resolve the template with a GUID_INFO call to the CE
+                PD_MSG_STACK(tMsg);
+                getCurrentEnv(NULL, NULL, NULL, &tMsg);
+                ocrFatGuid_t tGuid = PD_MSG_FIELD_I(templateGuid);
+#undef PD_MSG
+#undef PD_TYPE
+#define PD_MSG (&tMsg)
+#define PD_TYPE PD_MSG_GUID_INFO
+                tMsg.type = PD_MSG_GUID_INFO | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
+                tMsg.destLocation = self->parentLocation;
+                PD_MSG_FIELD_IO(guid) = tGuid;
+                PD_MSG_FIELD_I(properties) = 0;
+                RESULT_ASSERT(self->fcts.processMessage(self, &tMsg, true), ==, 0);
+                ocrTaskTemplate_t *template = (ocrTaskTemplate_t*)PD_MSG_FIELD_IO(guid.metaDataPtr);
+#undef PD_MSG
+#undef PD_TYPE
+#define PD_MSG msg
+#define PD_TYPE PD_MSG_WORK_CREATE
                 PD_MSG_FIELD_IO(paramc) = template->paramc;
             }
 #undef PD_MSG
@@ -791,14 +798,27 @@ u8 xePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
                         PD_MSG_FIELD_IO(guids[0].guid), &(PD_MSG_FIELD_IO(guids[0].guid)));
                 localDeguidify(self, (PD_MSG_FIELD_IO(guids)));
                 DPRINTF(DEBUG_LVL_VVERB, "Received EDT (0x%lx; 0x%lx)\n",
-                        (u64)self->myLocation, (PD_MSG_FIELD_IO(guids))->guid,
-                        (PD_MSG_FIELD_IO(guids))->metaDataPtr);
+                        (PD_MSG_FIELD_IO(guids))->guid, (PD_MSG_FIELD_IO(guids))->metaDataPtr);
                 // For now, we return the execute function for EDTs
                 PD_MSG_FIELD_IO(extra) = (u64)(self->taskFactories[0]->fcts.execute);
             }
 #undef PD_MSG
 #undef PD_TYPE
             EXIT_PROFILE;
+        } else if(((msg->type & PD_MSG_TYPE_ONLY) == PD_MSG_SCHED_GET_WORK) && (returnCode == 0)) {
+#define PD_MSG msg
+#define PD_TYPE PD_MSG_SCHED_GET_WORK
+            ASSERT(PD_MSG_FIELD_IO(schedArgs).kind == OCR_SCHED_WORK_EDT_USER);
+            ocrFatGuid_t *fguid = &PD_MSG_FIELD_IO(schedArgs).OCR_SCHED_ARG_FIELD(OCR_SCHED_WORK_EDT_USER).edt;
+            if (fguid->guid != NULL_GUID) {
+                DPRINTF(DEBUG_LVL_VVERB, "Received EDT with GUID 0x%lx\n", fguid->guid);
+                localDeguidify(self, fguid);
+                DPRINTF(DEBUG_LVL_VVERB, "Received EDT (0x%lx; 0x%lx)\n",
+                        fguid->guid, fguid->metaDataPtr);
+                PD_MSG_FIELD_O(factoryId) = 0;
+            }
+#undef PD_MSG
+#undef PD_TYPE
         }
         EXIT_PROFILE;
         break;
@@ -810,8 +830,7 @@ u8 xePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
     case PD_MSG_SAL_READ: case PD_MSG_SAL_WRITE:
     case PD_MSG_MGT_REGISTER: case PD_MSG_MGT_UNREGISTER:
     case PD_MSG_SAL_TERMINATE:
-    case PD_MSG_GUID_METADATA_CLONE: case PD_MSG_GUID_RESERVE:
-    case PD_MSG_GUID_UNRESERVE: case PD_MSG_MGT_MONITOR_PROGRESS:
+    case PD_MSG_GUID_METADATA_CLONE: case PD_MSG_MGT_MONITOR_PROGRESS:
     {
         DPRINTF(DEBUG_LVL_WARN, "XE PD does not handle call of type 0x%x\n",
                 (u32)(msg->type & PD_MSG_TYPE_ONLY));
@@ -820,30 +839,6 @@ u8 xePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         break;
     }
 
-    // Messages tried locally first before sending out to CE
-    case PD_MSG_SCHED_GET_WORK: {
-        START_PROFILE(pd_xe_SchedWork);
-        DPRINTF(DEBUG_LVL_VVERB, "Offloading message of type 0x%x to CE\n",
-                msg->type & PD_MSG_TYPE_ONLY);
-        returnCode = xeProcessCeRequest(self, &msg);
-        if(((msg->type & PD_MSG_TYPE_ONLY) == PD_MSG_SCHED_GET_WORK) && (returnCode == 0)) {
-#define PD_MSG msg
-#define PD_TYPE PD_MSG_SCHED_GET_WORK
-            ASSERT(PD_MSG_FIELD_IO(schedArgs).kind == OCR_SCHED_WORK_EDT_USER);
-            ocrFatGuid_t *fguid = &PD_MSG_FIELD_IO(schedArgs).OCR_SCHED_ARG_FIELD(OCR_SCHED_WORK_EDT_USER).edt;
-            if (fguid->guid != NULL_GUID) {
-                DPRINTF(DEBUG_LVL_VVERB, "Received EDT with GUID 0x%lx\n", fguid->guid);
-                localDeguidify(self, fguid);
-                DPRINTF(DEBUG_LVL_VVERB, "Received EDT (0x%lx; 0x%lx)\n",
-                        (u64)self->myLocation, fguid->guid, fguid->metaDataPtr);
-                PD_MSG_FIELD_O(factoryId) = 0;
-            }
-#undef PD_MSG
-#undef PD_TYPE
-        }
-        EXIT_PROFILE;
-        break;
-    }
     // Messages handled locally
     case PD_MSG_DEP_DYNADD: {
         START_PROFILE(pd_xe_DepDynAdd);

@@ -30,6 +30,11 @@
 #include <gasnet.h>
 #endif
 
+// For TG specific location functions
+#ifdef TG_X86_TARGET
+#include "rmd-map.h"
+#endif
+
 #define DEBUG_TYPE INIPARSING
 
 /* Configuration parsing options */
@@ -571,6 +576,56 @@ void bringUpRuntime(ocrConfig_t *ocrConfig) {
         ((ocrPolicyDomain_t*)all_instances[policydomain_type][i])->neighborPDs = (ocrPolicyDomain_t**)all_instances[policydomain_type];
     }
 #endif
+#ifdef TG_X86_TARGET
+    // Bug #694 Really fugly!!
+    // In TG-x86, we are going to create an array to contain all the policy domains so that we
+    // can deguidify things that are "owned" by other PDs.
+    // WARNING: This code assumes that if you have more than 1 block, you have MAX_NUM_XE and MAX_NUM_CE
+    // and that if you have more than one unit, each unit has MAX_NUM_BLOCK. This is similar to the restriction
+    // made by the neighbor discovery but adds the restriction on the number of XE/CE
+
+    // Since we already have all_instances, we can just reuse that but we will re-order things
+    // so that it is indiceable using unit*MAX_NUM_BLOCK + block*(MAX_NUM_XE+MAX_NUM_CE) + agent
+    for(i=0; i < inst_counts[policydomain_type]; ++i) {
+        // We figure out myLocation based on its current value which is just an index (based on xeCount = 8)
+        // Assumptions:
+        //    - same number of XEs per block
+        //    - if multiple units, all have MAX_NUM_BLOCK blocks in them
+        // 0-7: XEs of block 0
+        // 8: CE of block 0
+        // 9-16: XEs of block 1
+        // 17: CE of block 1
+        // 17-25: XEs of block 2
+        // 26: CE of block 2
+        // ...
+        ocrPolicyDomain_t *policy = (ocrPolicyDomain_t*)(all_instances[policydomain_type][i]);
+        u32 myUnit = (policy->myLocation) / ((MAX_NUM_XE + MAX_NUM_CE)*MAX_NUM_BLOCK);
+        u32 myBlock = (policy->myLocation - myUnit*((MAX_NUM_XE + MAX_NUM_CE)*MAX_NUM_BLOCK)) / (MAX_NUM_XE + MAX_NUM_CE);
+        policy->myLocation = MAKE_CORE_ID(0, 0, 0, myUnit, myBlock, (policy->myLocation - myUnit*MAX_NUM_BLOCK - myBlock*(MAX_NUM_XE+MAX_NUM_CE)));
+    }
+
+    ocrPolicyDomain_t* tpd = (ocrPolicyDomain_t*)(all_instances[policydomain_type][0]);
+    ASSERT(inst_counts[policydomain_type] > 0);
+    i = 0;
+    while(true) {
+        u32 tpdIdx = UNIT_FROM_ID(tpd->myLocation)*MAX_NUM_BLOCK +
+            BLOCK_FROM_ID(tpd->myLocation)*(MAX_NUM_XE+MAX_NUM_CE) +
+            AGENT_FROM_ID(tpd->myLocation);
+        if(tpdIdx != i) {
+            // We move this one to the proper location and continue to
+            // do so until we have the proper domain at i
+            ocrPolicyDomain_t *tt = (ocrPolicyDomain_t*)(all_instances[policydomain_type][tpdIdx]);
+            all_instances[policydomain_type][tpdIdx] = (void*)tpd;
+            tpd = tt;
+        } else {
+            all_instances[policydomain_type][i] = (void*)tpd;
+            if(++i < inst_counts[policydomain_type])
+                tpd = (ocrPolicyDomain_t*)(all_instances[policydomain_type][i]);
+            else
+                break;
+        }
+    }
+#endif
 
  //     for (i = 0; i < nsec; i++) {
  //         char *secname = iniparser_getsecname(dict, i);
@@ -617,14 +672,19 @@ void bringUpRuntime(ocrConfig_t *ocrConfig) {
     }
 #else
     ocrPolicyDomain_t *rootPolicy;
-    rootPolicy = (ocrPolicyDomain_t *) all_instances[policydomain_type][0];
+    u32 rootPolicyID = 0;
+#ifdef TG_X86_TARGET
+    rootPolicyID = 8;
+#endif
+    rootPolicy = (ocrPolicyDomain_t *)all_instances[policydomain_type][rootPolicyID]; // This is Unit 0, Block 0 CE
     ocrPolicyDomain_t *otherPolicyDomains = NULL;
     // Runlevel switch. Everything is initialized at this point and so we switch
     // to the first runlevel (CONFIG_PARSE). This will, in particular, enable all
     // modules within a PD to become aware of each other's runaction requirements
     // Transition all PDs to CONFIG_PARSE
 
-    for(i = 1; i < inst_counts[policydomain_type]; ++i) {
+    for(i = 0; i < inst_counts[policydomain_type]; ++i) {
+        if(i == rootPolicyID) continue;
         otherPolicyDomains = (ocrPolicyDomain_t*)all_instances[policydomain_type][i];
         RESULT_ASSERT(otherPolicyDomains->fcts.switchRunlevel(otherPolicyDomains, RL_CONFIG_PARSE,
                                                               RL_REQUEST | RL_ASYNC | RL_BRING_UP | RL_PD_MASTER),
@@ -643,7 +703,8 @@ void bringUpRuntime(ocrConfig_t *ocrConfig) {
 
     // Transition all PDs to NETWORK_OK
     // At this stage, everything is inert so all operations are synchronous
-    for(i = 1; i < inst_counts[policydomain_type]; ++i) {
+    for(i = 0; i < inst_counts[policydomain_type]; ++i) {
+        if(i == rootPolicyID) continue;
         otherPolicyDomains = (ocrPolicyDomain_t*)all_instances[policydomain_type][i];
         RESULT_ASSERT(otherPolicyDomains->fcts.switchRunlevel(otherPolicyDomains, RL_NETWORK_OK,
                                                               RL_REQUEST | RL_ASYNC | RL_BRING_UP | RL_PD_MASTER),
@@ -657,7 +718,8 @@ void bringUpRuntime(ocrConfig_t *ocrConfig) {
     // This creates a capable module for each PD. The worker/thread executing
     // this code is the capable thread in the rootPolicy. We then continue executing
     // with just rootPolicy
-    for(i = 1; i < inst_counts[policydomain_type]; ++i) {
+    for(i = 0; i < inst_counts[policydomain_type]; ++i) {
+        if(i == rootPolicyID) continue;
         otherPolicyDomains = (ocrPolicyDomain_t*)all_instances[policydomain_type][i];
         RESULT_ASSERT(otherPolicyDomains->fcts.switchRunlevel(otherPolicyDomains, RL_PD_OK,
                                                               RL_REQUEST | RL_ASYNC | RL_BRING_UP | RL_PD_MASTER),
@@ -695,6 +757,10 @@ void freeUpRuntime (bool doTeardown, u8 *returnCode) {
     ocrPolicyDomain_t *pd = NULL;
     getCurrentEnv(&pd, NULL, NULL, NULL);
     ocrPolicyDomain_t *otherPolicyDomains = NULL;
+    u32 rootPolicyID = 0;
+#ifdef TG_X86_TARGET
+    rootPolicyID = 8;
+#endif
     if(doTeardown) {
         // When we need to do the tear-down, we need to continue from RL_GUID_OK all the way down to CONFIG_PARSE
         // Bug #597 Need to ensure that only NODE_MASTER comes out of here. Other PD_MASTER need to stay in their PDs
@@ -708,7 +774,8 @@ void freeUpRuntime (bool doTeardown, u8 *returnCode) {
                       ==, 0);
 
         // Here everyone is down except NODE_MASTER
-        for(i = 1; i < inst_counts[policydomain_type]; ++i) {
+        for(i = 0; i < inst_counts[policydomain_type]; ++i) {
+            if(i == rootPolicyID) continue;
             otherPolicyDomains = (ocrPolicyDomain_t*)all_instances[policydomain_type][i];
             RESULT_ASSERT(otherPolicyDomains->fcts.switchRunlevel(otherPolicyDomains, RL_NETWORK_OK,
                                                                   RL_REQUEST | RL_ASYNC | RL_TEAR_DOWN | RL_PD_MASTER), ==, 0);
@@ -716,7 +783,8 @@ void freeUpRuntime (bool doTeardown, u8 *returnCode) {
         RESULT_ASSERT(pd->fcts.switchRunlevel(pd, RL_NETWORK_OK, RL_REQUEST | RL_ASYNC | RL_TEAR_DOWN | RL_NODE_MASTER),
                       ==, 0);
 
-        for(i = 1; i < inst_counts[policydomain_type]; ++i) {
+        for(i = 0; i < inst_counts[policydomain_type]; ++i) {
+            if(i == rootPolicyID) continue;
             otherPolicyDomains = (ocrPolicyDomain_t*)all_instances[policydomain_type][i];
             RESULT_ASSERT(otherPolicyDomains->fcts.switchRunlevel(otherPolicyDomains, RL_CONFIG_PARSE,
                                                                   RL_REQUEST | RL_ASYNC | RL_TEAR_DOWN | RL_PD_MASTER), ==, 0);
@@ -728,7 +796,8 @@ void freeUpRuntime (bool doTeardown, u8 *returnCode) {
     // Read the return code
     *returnCode = pd->shutdownCode;
 
-    for(i = 1; i < inst_counts[policydomain_type]; ++i) {
+    for(i = 0; i < inst_counts[policydomain_type]; ++i) {
+        if(i == rootPolicyID) continue;
         otherPolicyDomains = (ocrPolicyDomain_t*)all_instances[policydomain_type][i];
         otherPolicyDomains->fcts.destruct(otherPolicyDomains);
     }

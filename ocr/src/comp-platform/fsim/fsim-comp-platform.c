@@ -146,6 +146,7 @@ void getCurrentEnv(ocrPolicyDomain_t** pd, ocrWorker_t** worker,
         *task = myWorker->curTask;
     if(msg) {
         msg->srcLocation = myPD->myLocation;
+        msg->destLocation = msg->srcLocation;
         msg->usefulSize = 0;
     }
 }
