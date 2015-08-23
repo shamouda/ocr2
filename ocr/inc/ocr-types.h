@@ -110,7 +110,7 @@ typedef enum {
  * - Non-coherent read (NCR): This mode is exactly the same as RO
  *   except that the runtime does not guarantee that the data block will
  *   not change.
- * - Intent to write (ITW) (default mode): The EDT is stating that it may
+ * - Read-write (RW) (default mode): The EDT is stating that it may
  *   or may not write to the data block. The user is responsible for
  *   synchronizing between EDTs that could potentially write to the same
  *   data block concurrently.
@@ -126,11 +126,6 @@ typedef enum {
     DB_MODE_EW   = 0x4,   /**< Exclusive write mode */
     DB_MODE_RO   = 0x8    /**< Read-only mode */
 } ocrDbAccessMode_t; // Warning: only 5 bits starting at bit 1 (leave bit 0 as 0)
-
-// Legacy name of the mode
-// This will be deprecated and removed
-// BUG #575
-#define DB_MODE_ITW ((ocrDbAccessMode_t)DB_MODE_RW)
 
 #define DB_DEFAULT_MODE ((ocrDbAccessMode_t)DB_MODE_RW) /**< Default access mode */
 
