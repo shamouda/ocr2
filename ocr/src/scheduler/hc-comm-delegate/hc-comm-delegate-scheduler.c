@@ -108,7 +108,7 @@ u8 hcCommSchedulerTakeComm(ocrScheduler_t *self, u32* count, ocrFatGuid_t * fatH
     ocrSchedulerHcCommDelegate_t * commSched = (ocrSchedulerHcCommDelegate_t *) self;
     ocrWorker_t *worker = NULL; //BUG #204: sep-concern: Do we need a way to register worker types somehow ?
     getCurrentEnv(NULL, &worker, NULL, NULL);
-    u64 wid = worker->seqId;
+    u64 wid = worker->id;
 
     if (((ocrWorkerHc_t *) worker)->hcType == HC_WORKER_COMM) {
         // Steal from other worker's outbox
@@ -245,8 +245,8 @@ u8 hcCommSchedulerGiveComm(ocrScheduler_t *self, u32* count, ocrFatGuid_t* fatHa
                 ASSERT(message->type & PD_MSG_RESPONSE);
                 // Push to the comm worker outbox
                 DPRINTF(DEBUG_LVL_VVERB,"[%d] hc-comm-delegate-scheduler:: Comm-worker pushes outgoing to own outbox %d\n",
-                    (int) self->pd->myLocation, worker->seqId);
-                deque_t * outbox = commSched->outboxes[worker->seqId];
+                    (int) self->pd->myLocation, worker->id);
+                deque_t * outbox = commSched->outboxes[worker->id];
                 outbox->pushAtTail(outbox, handle, 0);
             } else {
         #endif
@@ -269,7 +269,7 @@ u8 hcCommSchedulerGiveComm(ocrScheduler_t *self, u32* count, ocrFatGuid_t* fatHa
             // Set delegate handle's box id.
             delegateMsgHandle_t* delHandle = (delegateMsgHandle_t *) fatHandlers[i].metaDataPtr;
             //BUG #587: boxId is defined in del-handle however only the scheduler is using it
-            delHandle->boxId = worker->seqId;
+            delHandle->boxId = worker->id;
             DPRINTF(DEBUG_LVL_VVERB,"[%d] hc-comm-delegate-scheduler:: Comp-worker pushes at tail of box %d\n",
                 (int) self->pd->myLocation, delHandle->boxId);
             ASSERT((delHandle->boxId >= 0) && (delHandle->boxId < self->pd->workerCount));

@@ -10,7 +10,6 @@
 #include "debug.h"
 
 #include "ocr-sysboot.h"
-#include "ocr-worker.h"
 #include "utils/ocr-utils.h"
 #include "ocr-comm-platform.h"
 #include "comm-api/delegate/delegate-comm-api.h"
@@ -154,12 +153,10 @@ u8 delegateCommSendMessage(ocrCommApi_t *self, ocrLocation_t target,
     ocrFatGuid_t fatGuid;
     fatGuid.metaDataPtr = handlerDelegate;
     PD_MSG_STACK(giveMsg);
-    ocrWorker_t *worker = NULL;
-    getCurrentEnv(NULL, &worker, NULL, &giveMsg);
+    getCurrentEnv(NULL, NULL, NULL, &giveMsg);
 #define PD_MSG (&giveMsg)
 #define PD_TYPE PD_MSG_SCHED_NOTIFY
     giveMsg.type = PD_MSG_SCHED_NOTIFY | PD_MSG_REQUEST;
-    PD_MSG_FIELD_IO(schedArgs).base.seqId = worker->seqId;
     PD_MSG_FIELD_IO(schedArgs).kind = OCR_SCHED_NOTIFY_COMM_READY;
     PD_MSG_FIELD_IO(schedArgs).OCR_SCHED_ARG_FIELD(OCR_SCHED_NOTIFY_COMM_READY).guid = fatGuid;
     RESULT_PROPAGATE(pd->fcts.processMessage(pd, &giveMsg, false));
@@ -186,12 +183,10 @@ u8 delegateCommPollMessage(ocrCommApi_t *self, ocrMsgHandle_t **handle) {
     ocrFatGuid_t fatGuid;
     fatGuid.metaDataPtr = handle;
     PD_MSG_STACK(takeMsg);
-    ocrWorker_t *worker = NULL;
-    getCurrentEnv(NULL, &worker, NULL, &takeMsg);
+    getCurrentEnv(NULL, NULL, NULL, &takeMsg);
 #define PD_MSG (&takeMsg)
 #define PD_TYPE PD_MSG_SCHED_GET_WORK
     takeMsg.type = PD_MSG_SCHED_GET_WORK | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
-    PD_MSG_FIELD_IO(schedArgs).base.seqId = worker->seqId;
     PD_MSG_FIELD_IO(schedArgs).kind = OCR_SCHED_WORK_COMM;
     PD_MSG_FIELD_IO(schedArgs).OCR_SCHED_ARG_FIELD(OCR_SCHED_WORK_COMM).guids = &fatGuid;
     PD_MSG_FIELD_IO(schedArgs).OCR_SCHED_ARG_FIELD(OCR_SCHED_WORK_COMM).guidCount = 1;

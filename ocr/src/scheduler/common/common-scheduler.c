@@ -53,8 +53,20 @@ u8 commonSchedulerSwitchRunlevel(ocrScheduler_t *self, ocrPolicyDomain_t *PD, oc
     u64 i;
     if(runlevel == RL_CONFIG_PARSE && (properties & RL_BRING_UP) && RL_IS_FIRST_PHASE_UP(PD, RL_CONFIG_PARSE, phase)) {
         // First transition, setup some backpointers
+        bool masterFound = false;
         for(i = 0; i < self->schedulerHeuristicCount; ++i) {
-            self->schedulerHeuristics[i]->scheduler = self;
+            ocrSchedulerHeuristic_t *heuristic = self->schedulerHeuristics[i];
+            heuristic->scheduler = self;
+            if (heuristic->isMaster) {
+                self->masterHeuristicId = i;
+                ASSERT(!masterFound);
+                masterFound = true;
+            }
+        }
+        if (!masterFound) {
+            //If master is not specified, choose the first heuristic to be master
+            self->masterHeuristicId = 0;
+            self->schedulerHeuristics[0]->isMaster = true;
         }
     }
 
@@ -62,7 +74,7 @@ u8 commonSchedulerSwitchRunlevel(ocrScheduler_t *self, ocrPolicyDomain_t *PD, oc
         // Take care of all other sub-objects
         ocrSchedulerObjectRootFactory_t *rootFact = (ocrSchedulerObjectRootFactory_t*)PD->schedulerObjectFactories[self->rootObj->fctId];
         toReturn |= rootFact->fcts.switchRunlevel(self->rootObj, PD, runlevel, phase, properties, NULL, 0);
-
+        // Do not re-order: Scheduler object root should be brought up before heuristics
         for(i = 0; i < self->schedulerHeuristicCount; ++i) {
             toReturn |= self->schedulerHeuristics[i]->fcts.switchRunlevel(
                 self->schedulerHeuristics[i], PD, runlevel, phase, properties, NULL, 0);
@@ -83,7 +95,6 @@ u8 commonSchedulerSwitchRunlevel(ocrScheduler_t *self, ocrPolicyDomain_t *PD, oc
     case RL_PD_OK:
         if(properties & RL_BRING_UP) {
             self->pd = PD;
-            self->contextCount = self->pd->workerCount;
         }
         break;
     case RL_MEMORY_OK:
@@ -173,46 +184,45 @@ u8 commonSchedulerMonitorProgress(ocrScheduler_t *self, ocrMonitorProgress_t typ
 //      Scheduler 1.0        //
 ///////////////////////////////
 
-u8 commonSchedulerRegisterContext(ocrScheduler_t *self, ocrLocation_t loc, u64 *seqId) {
-    u32 i;
-    ocrPolicyDomain_t * pd = NULL;
-    ocrWorker_t *worker = NULL;
-    getCurrentEnv(&pd, &worker, NULL, NULL);
-    ASSERT(pd->myLocation == loc);
-    u64 contextId = worker->seqId;
-    for (i = 0; i < self->schedulerHeuristicCount; i++) {
-        self->schedulerHeuristics[i]->fcts.registerContext(self->schedulerHeuristics[i], contextId, loc);
-    }
-    *seqId = contextId;
-    return 0;
-}
-
 u8 commonSchedulerGetWorkInvoke(ocrScheduler_t *self, ocrSchedulerOpArgs_t *opArgs, ocrRuntimeHint_t *hints) {
-    ocrSchedulerHeuristic_t *schedulerHeuristic = self->schedulerHeuristics[0];
-    ocrSchedulerHeuristicContext_t *context = schedulerHeuristic->fcts.getContext(schedulerHeuristic, opArgs->seqId);
-    return schedulerHeuristic->fcts.op[OCR_SCHEDULER_HEURISTIC_OP_GET_WORK].invoke(schedulerHeuristic, context, opArgs, hints);
+    ocrSchedulerHeuristic_t *schedulerHeuristic = self->schedulerHeuristics[self->masterHeuristicId];
+    return schedulerHeuristic->fcts.op[OCR_SCHEDULER_HEURISTIC_OP_GET_WORK].invoke(schedulerHeuristic, opArgs, hints);
 }
 
 u8 commonSchedulerNotifyInvoke(ocrScheduler_t *self, ocrSchedulerOpArgs_t *opArgs, ocrRuntimeHint_t *hints) {
-    ocrSchedulerHeuristic_t *schedulerHeuristic = self->schedulerHeuristics[0];
-    ocrSchedulerHeuristicContext_t *context = schedulerHeuristic->fcts.getContext(schedulerHeuristic, opArgs->seqId);
-    return schedulerHeuristic->fcts.op[OCR_SCHEDULER_HEURISTIC_OP_NOTIFY].invoke(schedulerHeuristic, context, opArgs, hints);
+    ocrSchedulerHeuristic_t *schedulerHeuristic = self->schedulerHeuristics[self->masterHeuristicId];
+    return schedulerHeuristic->fcts.op[OCR_SCHEDULER_HEURISTIC_OP_NOTIFY].invoke(schedulerHeuristic, opArgs, hints);
 }
 
 u8 commonSchedulerTransactInvoke(ocrScheduler_t *self, ocrSchedulerOpArgs_t *opArgs, ocrRuntimeHint_t *hints) {
-    ocrSchedulerHeuristic_t *schedulerHeuristic = self->schedulerHeuristics[opArgs->heuristicId];
-    ocrSchedulerHeuristicContext_t *context = schedulerHeuristic->fcts.getContext(schedulerHeuristic, opArgs->seqId);
-    return schedulerHeuristic->fcts.op[OCR_SCHEDULER_HEURISTIC_OP_TRANSACT].invoke(schedulerHeuristic, context, opArgs, hints);
+    u32 heuristicId = self->masterHeuristicId;
+    u32 i;
+    for(i = 0; i < self->schedulerHeuristicCount; ++i) {
+        if (self->schedulerHeuristics[i]->factoryId == opArgs->heuristicId) {
+            heuristicId = i;
+            break;
+        }
+    }
+    ocrSchedulerHeuristic_t *schedulerHeuristic = self->schedulerHeuristics[heuristicId];
+    return schedulerHeuristic->fcts.op[OCR_SCHEDULER_HEURISTIC_OP_TRANSACT].invoke(schedulerHeuristic, opArgs, hints);
 }
 
 u8 commonSchedulerAnalyzeInvoke(ocrScheduler_t *self, ocrSchedulerOpArgs_t *opArgs, ocrRuntimeHint_t *hints) {
-    ocrSchedulerHeuristic_t *schedulerHeuristic = self->schedulerHeuristics[opArgs->heuristicId];
-    ocrSchedulerHeuristicContext_t *context = schedulerHeuristic->fcts.getContext(schedulerHeuristic, opArgs->seqId);
-    return schedulerHeuristic->fcts.op[OCR_SCHEDULER_HEURISTIC_OP_ANALYZE].invoke(schedulerHeuristic, context, opArgs, hints);
+    u32 heuristicId = self->masterHeuristicId;
+    u32 i;
+    for(i = 0; i < self->schedulerHeuristicCount; ++i) {
+        if (self->schedulerHeuristics[i]->factoryId == opArgs->heuristicId) {
+            heuristicId = i;
+            break;
+        }
+    }
+    ocrSchedulerHeuristic_t *schedulerHeuristic = self->schedulerHeuristics[heuristicId];
+    return schedulerHeuristic->fcts.op[OCR_SCHEDULER_HEURISTIC_OP_ANALYZE].invoke(schedulerHeuristic, opArgs, hints);
 }
 
 u8 commonSchedulerUpdate(ocrScheduler_t *self, u32 properties) {
-    return OCR_ENOTSUP;
+    ocrSchedulerHeuristic_t *schedulerHeuristic = self->schedulerHeuristics[self->masterHeuristicId];
+    return schedulerHeuristic->fcts.update(schedulerHeuristic, properties);
 }
 
 ocrScheduler_t* newSchedulerCommon(ocrSchedulerFactory_t * factory, ocrParamList_t *perInstance) {
@@ -246,7 +256,6 @@ ocrSchedulerFactory_t * newOcrSchedulerFactoryCommon(ocrParamList_t *perType) {
     base->schedulerFcts.monitorProgress = FUNC_ADDR(u8 (*)(ocrScheduler_t*, ocrMonitorProgress_t, void*), commonSchedulerMonitorProgress);
 
     //Scheduler 1.0
-    base->schedulerFcts.registerContext = FUNC_ADDR(u8 (*)(ocrScheduler_t*, ocrLocation_t, u64*), commonSchedulerRegisterContext);
     base->schedulerFcts.update = FUNC_ADDR(u8 (*)(ocrScheduler_t*, u32), commonSchedulerUpdate);
     base->schedulerFcts.op[OCR_SCHEDULER_OP_GET_WORK].invoke = FUNC_ADDR(u8 (*)(ocrScheduler_t*, ocrSchedulerOpArgs_t*, ocrRuntimeHint_t*), commonSchedulerGetWorkInvoke);
     base->schedulerFcts.op[OCR_SCHEDULER_OP_NOTIFY].invoke = FUNC_ADDR(u8 (*)(ocrScheduler_t*, ocrSchedulerOpArgs_t*, ocrRuntimeHint_t*), commonSchedulerNotifyInvoke);

@@ -68,7 +68,6 @@
 
 // Policy domain
 #define ENABLE_POLICY_DOMAIN_XE
-#define ENABLE_MSG_SEQID
 
 // Scheduler
 #define ENABLE_SCHEDULER_XE

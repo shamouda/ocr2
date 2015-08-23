@@ -49,6 +49,7 @@ ocrSchedulerHeuristicFactory_t * newSchedulerHeuristicFactory(schedulerHeuristic
 }
 
 void initializeSchedulerHeuristicOcr(ocrSchedulerHeuristicFactory_t * factory, ocrSchedulerHeuristic_t * self, ocrParamList_t *perInstance) {
+    paramListSchedulerHeuristic_t *params = (paramListSchedulerHeuristic_t*)perInstance;
     self->fguid.guid = UNINITIALIZED_GUID;
     self->fguid.metaDataPtr = self;
     self->scheduler = NULL;
@@ -56,5 +57,6 @@ void initializeSchedulerHeuristicOcr(ocrSchedulerHeuristicFactory_t * factory, o
     self->contextCount = 0;
     self->costTable = NULL;
     self->fcts = factory->fcts;
+    self->isMaster = params->isMaster;
     self->factoryId = factory->factoryId;
 }

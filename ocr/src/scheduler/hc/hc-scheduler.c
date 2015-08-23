@@ -153,7 +153,6 @@ u8 hcSchedulerSwitchRunlevel(ocrScheduler_t *self, ocrPolicyDomain_t *PD, ocrRun
     case RL_PD_OK:
         if(properties & RL_BRING_UP) {
             self->pd = PD;
-            self->contextCount = self->pd->workerCount;
         }
         break;
     case RL_MEMORY_OK:
@@ -251,7 +250,7 @@ u8 hcSchedulerTakeEdt (ocrScheduler_t *self, u32 *count, ocrFatGuid_t *edts) {
 
     {
         START_PROFILE(sched_hc_Pop);
-        workerId = worker->seqId;
+        workerId = worker->id;
         // First try to pop
         ocrWorkpile_t * wpToPop = popMappingOneToOne(self, workerId);
         popped = wpToPop->fcts.pop(wpToPop, POP_WORKPOPTYPE, NULL);
@@ -288,7 +287,7 @@ u8 hcSchedulerGiveEdt (ocrScheduler_t* base, u32* count, ocrFatGuid_t* edts) {
     ocrWorker_t *worker = NULL;
     getCurrentEnv(NULL, &worker, NULL, NULL);
     // Source must be a worker guid
-    ocrWorkpile_t * wpToPush = pushMappingOneToOne(base, worker->seqId);
+    ocrWorkpile_t * wpToPush = pushMappingOneToOne(base, worker->id);
     u32 i = 0;
     for ( ; i < *count; ++i ) {
         if (((ocrTask_t *)edts[i].metaDataPtr)->state == ALLACQ_EDTSTATE) {
@@ -321,20 +320,6 @@ u8 hcSchedulerMonitorProgress(ocrScheduler_t *self, ocrMonitorProgress_t type, v
 ///////////////////////////////
 //      Scheduler 1.0        //
 ///////////////////////////////
-
-u8 hcSchedulerRegisterContext(ocrScheduler_t *self, ocrLocation_t loc, u64 *seqId) {
-    u32 i;
-    ocrPolicyDomain_t * pd = NULL;
-    ocrWorker_t *worker = NULL;
-    getCurrentEnv(&pd, &worker, NULL, NULL);
-    ASSERT(pd->myLocation == loc);
-    u64 contextId = worker->seqId;
-    for (i = 0; i < self->schedulerHeuristicCount; i++) {
-        self->schedulerHeuristics[i]->fcts.registerContext(self->schedulerHeuristics[i], contextId, loc);
-    }
-    *seqId = contextId;
-    return 0;
-}
 
 u8 hcSchedulerGetWorkInvoke(ocrScheduler_t *self, ocrSchedulerOpArgs_t *opArgs, ocrRuntimeHint_t *hints) {
     ocrSchedulerOpWorkArgs_t *taskArgs = (ocrSchedulerOpWorkArgs_t*)opArgs;
@@ -440,7 +425,6 @@ ocrSchedulerFactory_t * newOcrSchedulerFactoryHc(ocrParamList_t *perType) {
     base->schedulerFcts.monitorProgress = FUNC_ADDR(u8 (*)(ocrScheduler_t*, ocrMonitorProgress_t, void*), hcSchedulerMonitorProgress);
 
     //Scheduler 1.0
-    base->schedulerFcts.registerContext = FUNC_ADDR(u8 (*)(ocrScheduler_t*, ocrLocation_t, u64*), hcSchedulerRegisterContext);
     base->schedulerFcts.update = FUNC_ADDR(u8 (*)(ocrScheduler_t*, u32), hcSchedulerUpdate);
     base->schedulerFcts.op[OCR_SCHEDULER_OP_GET_WORK].invoke = FUNC_ADDR(u8 (*)(ocrScheduler_t*, ocrSchedulerOpArgs_t*, ocrRuntimeHint_t*), hcSchedulerGetWorkInvoke);
     base->schedulerFcts.op[OCR_SCHEDULER_OP_NOTIFY].invoke = FUNC_ADDR(u8 (*)(ocrScheduler_t*, ocrSchedulerOpArgs_t*, ocrRuntimeHint_t*), hcSchedulerNotifyInvoke);

@@ -74,10 +74,9 @@
 
 // Policy domain
 #define ENABLE_POLICY_DOMAIN_CE
-#define ENABLE_MSG_SEQID
 
 // Scheduler
-#define ENABLE_SCHEDULER_CE
+#define ENABLE_SCHEDULER_COMMON
 
 // Sysboot layer to use
 // None - this is a builder

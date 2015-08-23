@@ -42,6 +42,20 @@
 /* OCR-CE SCHEDULER_HEURISTIC                         */
 /******************************************************/
 
+//Check if loc is another CE that is a child of this CE
+static bool isChildCe(ocrLocation_t myLocation, ocrLocation_t loc) {
+    if (AGENT_FROM_ID(loc) != ID_AGENT_CE)
+        return false;
+    if ((myLocation & ID_BLOCK_MASK) == 0) {                              //If I am the block0 CE, ...
+        if ((myLocation & ID_UNIT_MASK) == 0) {                           //If I am the unit0,block0 CE
+            return true;                                                  //then, everyone is my child
+        } else if ((myLocation & ID_UNIT_MASK) == (loc & ID_UNIT_MASK)) { //else if, context is a CE in my unit
+            return true;                                                  //then, this non-block0 CE is my child
+        }
+    }
+    return false;
+}
+
 ocrSchedulerHeuristic_t* newSchedulerHeuristicCe(ocrSchedulerHeuristicFactory_t * factory, ocrParamList_t *perInstance) {
     ocrSchedulerHeuristic_t* self = (ocrSchedulerHeuristic_t*) runtimeChunkAlloc(sizeof(ocrSchedulerHeuristicCe_t), PERSISTENT_CHUNK);
     initializeSchedulerHeuristicOcr(factory, self, perInstance);
@@ -51,23 +65,6 @@ ocrSchedulerHeuristic_t* newSchedulerHeuristicCe(ocrSchedulerHeuristicFactory_t 
     derived->pendingXeCount = 0;
     derived->outWorkVictimsAvailable = 0;
     return self;
-}
-
-void initializeContext(ocrSchedulerHeuristicContext_t *context, u64 contextId) {
-    context->id = contextId;
-    context->location = INVALID_LOCATION;
-    context->actionSet = NULL;
-    context->cost = NULL;
-    context->properties = 0;
-
-    ocrSchedulerHeuristicContextCe_t *ceContext = (ocrSchedulerHeuristicContextCe_t*)context;
-    ceContext->stealSchedulerObjectIndex = ((u64)-1);
-    ceContext->mySchedulerObject = NULL;
-    ceContext->inWorkRequestPending = false;
-    ceContext->outWorkRequestPending = false;
-    ceContext->canAcceptWorkRequest = false;
-    ceContext->isChild = false;
-    return;
 }
 
 u8 ceSchedulerHeuristicSwitchRunlevel(ocrSchedulerHeuristic_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
@@ -93,41 +90,83 @@ u8 ceSchedulerHeuristicSwitchRunlevel(ocrSchedulerHeuristic_t *self, ocrPolicyDo
     case RL_PD_OK:
         break;
     case RL_MEMORY_OK:
+    {
+        ocrScheduler_t *scheduler = self->scheduler;
+        ASSERT(scheduler);
+        self->contextCount = ((ocrPolicyDomainCe_t*)PD)->xeCount + PD->neighborCount;
+        ASSERT(self->contextCount > 0);
+        DPRINTF(DEBUG_LVL_VVERB, "ContextCount: %lu\n", self->contextCount);
         break;
+    }
     case RL_GUID_OK:
     {
         // Memory is up at this point. We can initialize ourself
-        if((properties & RL_BRING_UP) && RL_IS_FIRST_PHASE_UP(PD, RL_GUID_OK, phase)) {
+        if((properties & RL_BRING_UP) && RL_IS_FIRST_PHASE_UP(PD, RL_MEMORY_OK, phase)) {
             u32 i;
-            ocrScheduler_t *scheduler = self->scheduler;
-            ASSERT(scheduler);
-            ASSERT(SCHEDULER_OBJECT_KIND(self->scheduler->rootObj->kind) == OCR_SCHEDULER_OBJECT_WST);
-            ASSERT(scheduler->pd != NULL);
-            ASSERT(scheduler->contextCount > 0);
-            ocrPolicyDomain_t *pd = scheduler->pd;
-            ASSERT(pd == PD);
-
-            DPRINTF(DEBUG_LVL_VVERB, "ContextCount: %lu\n", scheduler->contextCount);
-            self->contextCount = scheduler->contextCount;
-            self->contexts = (ocrSchedulerHeuristicContext_t **)pd->fcts.pdMalloc(pd, self->contextCount * sizeof(ocrSchedulerHeuristicContext_t*));
-            ocrSchedulerHeuristicContextCe_t *contextAlloc = (ocrSchedulerHeuristicContextCe_t *)pd->fcts.pdMalloc(pd, self->contextCount * sizeof(ocrSchedulerHeuristicContextCe_t));
+            u32 myUnit = UNIT_FROM_ID(PD->myLocation);
+            u32 myBlock = BLOCK_FROM_ID(PD->myLocation);
+            u32 xeCount = ((ocrPolicyDomainCe_t*)PD)->xeCount;
+            self->contexts = (ocrSchedulerHeuristicContext_t **)PD->fcts.pdMalloc(PD, self->contextCount * sizeof(ocrSchedulerHeuristicContext_t*));
+            ocrSchedulerHeuristicContextCe_t *contextAlloc = (ocrSchedulerHeuristicContextCe_t *)PD->fcts.pdMalloc(PD, self->contextCount * sizeof(ocrSchedulerHeuristicContextCe_t));
             for (i = 0; i < self->contextCount; i++) {
                 ocrSchedulerHeuristicContext_t *context = (ocrSchedulerHeuristicContext_t *)&(contextAlloc[i]);
-                initializeContext(context, i);
                 self->contexts[i] = context;
+                context->id = i;
+                context->actionSet = NULL;
+                context->cost = NULL;
+                context->properties = 0;
+                ocrSchedulerHeuristicContextCe_t *ceContext = (ocrSchedulerHeuristicContextCe_t*)context;
+                ceContext->stealSchedulerObjectIndex = ((u64)-1);
+                ceContext->mySchedulerObject = NULL;
+                ceContext->inWorkRequestPending = false;
+                ceContext->outWorkRequestPending = false;
+                if (i < xeCount) {
+                    context->location = MAKE_CORE_ID(0, 0, 0, myUnit, myBlock, (ID_AGENT_XE0 + i));
+                    ceContext->canAcceptWorkRequest = false;
+                    ceContext->isChild = true;
+                } else {
+                    context->location = PD->neighbors[i - xeCount];
+                    ceContext->canAcceptWorkRequest = true;
+                    if (isChildCe(PD->myLocation, context->location)) {
+                        ceContext->isChild = true;
+                    } else {
+                        ceContext->isChild = false;
+                    }
+                }
+                if (ceContext->isChild) {
+                    DPRINTF(DEBUG_LVL_VVERB, "Created context %d for location: %lx (CHILD)\n", i, context->location);
+                } else {
+                    DPRINTF(DEBUG_LVL_VVERB, "Created context %d for location: %lx\n", i, context->location);
+                }
             }
-
             ocrSchedulerHeuristicCe_t *derived = (ocrSchedulerHeuristicCe_t*)self;
-            derived->outWorkVictimsAvailable = pd->neighborCount;
+            derived->outWorkVictimsAvailable = PD->neighborCount;
         }
-        if((properties & RL_TEAR_DOWN) && RL_IS_LAST_PHASE_DOWN(PD, RL_GUID_OK, phase)) {
+        if((properties & RL_TEAR_DOWN) && RL_IS_LAST_PHASE_DOWN(PD, RL_MEMORY_OK, phase)) {
             PD->fcts.pdFree(PD, self->contexts[0]);
             PD->fcts.pdFree(PD, self->contexts);
         }
         break;
     }
     case RL_COMPUTE_OK:
+    {
+        if((properties & RL_BRING_UP) && RL_IS_FIRST_PHASE_UP(PD, RL_COMPUTE_OK, phase)) {
+            u32 i;
+            ocrSchedulerObject_t *rootObj = self->scheduler->rootObj;
+            ocrSchedulerObjectFactory_t *rootFact = PD->schedulerObjectFactories[rootObj->fctId];
+            DPRINTF(DEBUG_LVL_VVERB, "Root scheduler object %lx (fact: %d)\n", rootObj, rootObj->fctId);
+            for (i = 0; i < self->contextCount; i++) {
+                ocrSchedulerHeuristicContext_t *context = (ocrSchedulerHeuristicContext_t*)self->contexts[i];
+                ocrSchedulerHeuristicContextCe_t *ceContext = (ocrSchedulerHeuristicContextCe_t*)context;
+                ceContext->mySchedulerObject = rootFact->fcts.getSchedulerObjectForLocation(rootFact, rootObj,
+                                                    context->location, OCR_SCHEDULER_OBJECT_MAPPING_PINNED, 0);
+                ASSERT(ceContext->mySchedulerObject && ceContext->mySchedulerObject != rootObj);
+                ceContext->stealSchedulerObjectIndex = (i + 1) % self->contextCount;
+                DPRINTF(DEBUG_LVL_VVERB, "Scheduler object %lx (fact: %d) for location: %lx\n", ceContext->mySchedulerObject, ceContext->mySchedulerObject->fctId, context->location);
+            }
+        }
         break;
+    }
     case RL_USER_OK:
         break;
     default:
@@ -141,53 +180,20 @@ void ceSchedulerHeuristicDestruct(ocrSchedulerHeuristic_t * self) {
     runtimeChunkFree((u64)self, PERSISTENT_CHUNK);
 }
 
-ocrSchedulerHeuristicContext_t* ceSchedulerHeuristicGetContext(ocrSchedulerHeuristic_t *self, u64 contextId) {
-    return self->contexts[contextId];
-}
-
-bool isChildCe(ocrLocation_t myLocation, ocrLocation_t loc) {
-    if (AGENT_FROM_ID(loc) != ID_AGENT_CE)
-        return false;
-    if ((myLocation & ID_BLOCK_MASK) == 0) {                              //If I am the block0 CE, ...
-        if ((myLocation & ID_UNIT_MASK) == 0) {                           //If I am the unit0,block0 CE
-            return true;                                                  //then, everyone is my child
-        } else if ((myLocation & ID_UNIT_MASK) == (loc & ID_UNIT_MASK)) { //else if, context is a CE in my unit
-            return true;                                                  //then, this non-block0 CE is my child
-        }
-    }
-    return false;
-}
-
-/* Setup the context for this contextId */
-u8 ceSchedulerHeuristicRegisterContext(ocrSchedulerHeuristic_t *self, u64 contextId, ocrLocation_t loc) {
+ocrSchedulerHeuristicContext_t* ceSchedulerHeuristicGetContext(ocrSchedulerHeuristic_t *self, ocrLocation_t loc) {
+    u32 i;
     ocrPolicyDomain_t *pd = self->scheduler->pd;
-    ocrSchedulerHeuristicContext_t *context = self->contexts[contextId];
-    ASSERT(context->location == INVALID_LOCATION && loc != INVALID_LOCATION);
-    context->location = loc;
-
-    //Reserve a deque for this context
-    ocrSchedulerHeuristicContextCe_t *ceContext = (ocrSchedulerHeuristicContextCe_t*)context;
-    ocrSchedulerObjectWst_t *wstSchedObj = (ocrSchedulerObjectWst_t*)self->scheduler->rootObj;
-    ASSERT(contextId < wstSchedObj->numDeques);
-    ceContext->mySchedulerObject = wstSchedObj->deques[contextId];
-    ASSERT(ceContext->mySchedulerObject);
-    ceContext->stealSchedulerObjectIndex = (contextId + 1) % wstSchedObj->numDeques;
-
-    //Set deque's mapping to this context
-    ocrSchedulerObjectFactory_t *fact = pd->schedulerObjectFactories[ceContext->mySchedulerObject->fctId];
-    fact->fcts.setLocationForSchedulerObject(fact, ceContext->mySchedulerObject, contextId, OCR_SCHEDULER_OBJECT_MAPPING_PINNED);
-
-    if (AGENT_FROM_ID(loc) == ID_AGENT_CE) {
-        ceContext->canAcceptWorkRequest = true;
-        if (isChildCe(pd->myLocation, loc)) {
-            ceContext->isChild = true;
-        }
-        DPRINTF(DEBUG_LVL_VVERB, "[CE %lx] Registering CE location: %lx (isChild: %u)\n", pd->myLocation, loc, (u32)ceContext->isChild);
-    } else {
-        ceContext->isChild = true;                                                //XE is always a child
-        DPRINTF(DEBUG_LVL_VVERB, "[CE %lx] Registering XE location: %lx\n", pd->myLocation, loc);
+    if (pd->myLocation == loc)
+        return self->contexts[0];
+    u32 xeCount = ((ocrPolicyDomainCe_t*)pd)->xeCount;
+    u64 agentId = AGENT_FROM_ID(loc);
+    if ((agentId >= ID_AGENT_XE0) && (agentId <= ID_AGENT_XE7))
+        return self->contexts[agentId - ID_AGENT_XE0];
+    for (i = 0; i < pd->neighborCount; i++) {
+        if (pd->neighbors[i] == loc)
+            return self->contexts[i + xeCount];
     }
-    return 0;
+    return NULL;
 }
 
 /* Find EDT for the worker to execute - This uses random workstealing to find work if no work is found owned deque */
@@ -278,7 +284,9 @@ static u8 ceSchedulerHeuristicWorkEdtUserInvoke(ocrSchedulerHeuristic_t *self, o
     return retVal;
 }
 
-u8 ceSchedulerHeuristicGetWorkInvoke(ocrSchedulerHeuristic_t *self, ocrSchedulerHeuristicContext_t *context, ocrSchedulerOpArgs_t *opArgs, ocrRuntimeHint_t *hints) {
+u8 ceSchedulerHeuristicGetWorkInvoke(ocrSchedulerHeuristic_t *self, ocrSchedulerOpArgs_t *opArgs, ocrRuntimeHint_t *hints) {
+    ocrSchedulerHeuristicContext_t *context = self->fcts.getContext(self, opArgs->location);
+    ASSERT(context);
     ocrSchedulerOpWorkArgs_t *taskArgs = (ocrSchedulerOpWorkArgs_t*)opArgs;
     switch(taskArgs->kind) {
     case OCR_SCHED_WORK_EDT_USER:
@@ -307,7 +315,7 @@ static u8 handleEmptyResponse(ocrSchedulerHeuristic_t *self, ocrSchedulerHeurist
 }
 
 static u8 ceSchedulerHeuristicNotifyEdtReadyInvoke(ocrSchedulerHeuristic_t *self, ocrSchedulerHeuristicContext_t *context, ocrSchedulerOpArgs_t *opArgs, ocrRuntimeHint_t *hints) {
-    DPRINTF(DEBUG_LVL_VVERB, "GIVE_WORK_INVOKE from %lx\n", context->location);
+    DPRINTF(DEBUG_LVL_VVERB, "GIVE WORK INVOKE from %lx\n", opArgs->location);
     ocrSchedulerOpNotifyArgs_t *notifyArgs = (ocrSchedulerOpNotifyArgs_t*)opArgs;
     ocrPolicyDomain_t *pd = self->scheduler->pd;
     ocrFatGuid_t fguid = notifyArgs->OCR_SCHED_ARG_FIELD(OCR_SCHED_NOTIFY_EDT_READY).guid;
@@ -378,11 +386,13 @@ static u8 ceSchedulerHeuristicNotifyEdtReadyInvoke(ocrSchedulerHeuristic_t *self
         ceContext->outWorkRequestPending = false;
         derived->outWorkVictimsAvailable++;
     }
-    DPRINTF(DEBUG_LVL_VVERB, "GIVE_WORK_INVOKE DONE from %lx\n", context->location);
+    DPRINTF(DEBUG_LVL_VVERB, "GIVEN WORK to context %lx\n", insertContext->location);
     return 0;
 }
 
-u8 ceSchedulerHeuristicNotifyInvoke(ocrSchedulerHeuristic_t *self, ocrSchedulerHeuristicContext_t *context, ocrSchedulerOpArgs_t *opArgs, ocrRuntimeHint_t *hints) {
+u8 ceSchedulerHeuristicNotifyInvoke(ocrSchedulerHeuristic_t *self, ocrSchedulerOpArgs_t *opArgs, ocrRuntimeHint_t *hints) {
+    ocrSchedulerHeuristicContext_t *context = self->fcts.getContext(self, opArgs->location);
+    ASSERT(context);
     ocrSchedulerOpNotifyArgs_t *notifyArgs = (ocrSchedulerOpNotifyArgs_t*)opArgs;
     switch(notifyArgs->kind) {
     case OCR_SCHED_NOTIFY_EDT_READY:
@@ -405,6 +415,8 @@ u8 ceSchedulerHeuristicNotifyInvoke(ocrSchedulerHeuristic_t *self, ocrSchedulerH
 #undef PD_TYPE
         }
         break;
+    case OCR_SCHED_NOTIFY_EDT_SATISFIED:
+        return OCR_ENOP;
     // Notifies ignored by this heuristic
     case OCR_SCHED_NOTIFY_DB_CREATE:
         break;
@@ -420,7 +432,7 @@ u8 ceSchedulerHeuristicNotifySimulate(ocrSchedulerHeuristic_t *self, ocrSchedule
     return OCR_ENOTSUP;
 }
 
-u8 ceSchedulerHeuristicTransactInvoke(ocrSchedulerHeuristic_t *self, ocrSchedulerHeuristicContext_t *context, ocrSchedulerOpArgs_t *opArgs, ocrRuntimeHint_t *hints) {
+u8 ceSchedulerHeuristicTransactInvoke(ocrSchedulerHeuristic_t *self, ocrSchedulerOpArgs_t *opArgs, ocrRuntimeHint_t *hints) {
     ASSERT(0);
     return OCR_ENOTSUP;
 }
@@ -430,7 +442,7 @@ u8 ceSchedulerHeuristicTransactSimulate(ocrSchedulerHeuristic_t *self, ocrSchedu
     return OCR_ENOTSUP;
 }
 
-u8 ceSchedulerHeuristicAnalyzeInvoke(ocrSchedulerHeuristic_t *self, ocrSchedulerHeuristicContext_t *context, ocrSchedulerOpArgs_t *opArgs, ocrRuntimeHint_t *hints) {
+u8 ceSchedulerHeuristicAnalyzeInvoke(ocrSchedulerHeuristic_t *self, ocrSchedulerOpArgs_t *opArgs, ocrRuntimeHint_t *hints) {
     ASSERT(0);
     return OCR_ENOTSUP;
 }
@@ -519,7 +531,6 @@ static u8 respondWorkRequest(ocrSchedulerHeuristic_t *self, ocrSchedulerHeuristi
 #define PD_MSG (&msg)
 #define PD_TYPE PD_MSG_SCHED_GET_WORK
     msg.type = PD_MSG_SCHED_GET_WORK | PD_MSG_RESPONSE | PD_MSG_REQ_RESPONSE;
-    PD_MSG_FIELD_IO(schedArgs).base.seqId = 0;
     PD_MSG_FIELD_IO(schedArgs).kind = OCR_SCHED_WORK_EDT_USER;
     PD_MSG_FIELD_IO(schedArgs).OCR_SCHED_ARG_FIELD(OCR_SCHED_WORK_EDT_USER).edt = *fguid;
     PD_MSG_FIELD_I(properties) = 0;
@@ -746,19 +757,18 @@ ocrSchedulerHeuristicFactory_t * newOcrSchedulerHeuristicFactoryCe(ocrParamList_
     base->fcts.destruct = FUNC_ADDR(void (*)(ocrSchedulerHeuristic_t*), ceSchedulerHeuristicDestruct);
 
     base->fcts.update = FUNC_ADDR(u8 (*)(ocrSchedulerHeuristic_t*, u32), ceSchedulerHeuristicUpdate);
-    base->fcts.getContext = FUNC_ADDR(ocrSchedulerHeuristicContext_t* (*)(ocrSchedulerHeuristic_t*, u64), ceSchedulerHeuristicGetContext);
-    base->fcts.registerContext = FUNC_ADDR(u8 (*)(ocrSchedulerHeuristic_t*, u64, ocrLocation_t), ceSchedulerHeuristicRegisterContext);
+    base->fcts.getContext = FUNC_ADDR(ocrSchedulerHeuristicContext_t* (*)(ocrSchedulerHeuristic_t*, ocrLocation_t), ceSchedulerHeuristicGetContext);
 
-    base->fcts.op[OCR_SCHEDULER_HEURISTIC_OP_GET_WORK].invoke = FUNC_ADDR(u8 (*)(ocrSchedulerHeuristic_t*, ocrSchedulerHeuristicContext_t*, ocrSchedulerOpArgs_t*, ocrRuntimeHint_t*), ceSchedulerHeuristicGetWorkInvoke);
+    base->fcts.op[OCR_SCHEDULER_HEURISTIC_OP_GET_WORK].invoke = FUNC_ADDR(u8 (*)(ocrSchedulerHeuristic_t*, ocrSchedulerOpArgs_t*, ocrRuntimeHint_t*), ceSchedulerHeuristicGetWorkInvoke);
     base->fcts.op[OCR_SCHEDULER_HEURISTIC_OP_GET_WORK].simulate = FUNC_ADDR(u8 (*)(ocrSchedulerHeuristic_t*, ocrSchedulerHeuristicContext_t*, ocrSchedulerOpArgs_t*, ocrRuntimeHint_t*), ceSchedulerHeuristicGetWorkSimulate);
 
-    base->fcts.op[OCR_SCHEDULER_HEURISTIC_OP_NOTIFY].invoke = FUNC_ADDR(u8 (*)(ocrSchedulerHeuristic_t*, ocrSchedulerHeuristicContext_t*, ocrSchedulerOpArgs_t*, ocrRuntimeHint_t*), ceSchedulerHeuristicNotifyInvoke);
+    base->fcts.op[OCR_SCHEDULER_HEURISTIC_OP_NOTIFY].invoke = FUNC_ADDR(u8 (*)(ocrSchedulerHeuristic_t*, ocrSchedulerOpArgs_t*, ocrRuntimeHint_t*), ceSchedulerHeuristicNotifyInvoke);
     base->fcts.op[OCR_SCHEDULER_HEURISTIC_OP_NOTIFY].simulate = FUNC_ADDR(u8 (*)(ocrSchedulerHeuristic_t*, ocrSchedulerHeuristicContext_t*, ocrSchedulerOpArgs_t*, ocrRuntimeHint_t*), ceSchedulerHeuristicNotifySimulate);
 
-    base->fcts.op[OCR_SCHEDULER_HEURISTIC_OP_TRANSACT].invoke = FUNC_ADDR(u8 (*)(ocrSchedulerHeuristic_t*, ocrSchedulerHeuristicContext_t*, ocrSchedulerOpArgs_t*, ocrRuntimeHint_t*), ceSchedulerHeuristicTransactInvoke);
+    base->fcts.op[OCR_SCHEDULER_HEURISTIC_OP_TRANSACT].invoke = FUNC_ADDR(u8 (*)(ocrSchedulerHeuristic_t*, ocrSchedulerOpArgs_t*, ocrRuntimeHint_t*), ceSchedulerHeuristicTransactInvoke);
     base->fcts.op[OCR_SCHEDULER_HEURISTIC_OP_TRANSACT].simulate = FUNC_ADDR(u8 (*)(ocrSchedulerHeuristic_t*, ocrSchedulerHeuristicContext_t*, ocrSchedulerOpArgs_t*, ocrRuntimeHint_t*), ceSchedulerHeuristicTransactSimulate);
 
-    base->fcts.op[OCR_SCHEDULER_HEURISTIC_OP_ANALYZE].invoke = FUNC_ADDR(u8 (*)(ocrSchedulerHeuristic_t*, ocrSchedulerHeuristicContext_t*, ocrSchedulerOpArgs_t*, ocrRuntimeHint_t*), ceSchedulerHeuristicAnalyzeInvoke);
+    base->fcts.op[OCR_SCHEDULER_HEURISTIC_OP_ANALYZE].invoke = FUNC_ADDR(u8 (*)(ocrSchedulerHeuristic_t*, ocrSchedulerOpArgs_t*, ocrRuntimeHint_t*), ceSchedulerHeuristicAnalyzeInvoke);
     base->fcts.op[OCR_SCHEDULER_HEURISTIC_OP_ANALYZE].simulate = FUNC_ADDR(u8 (*)(ocrSchedulerHeuristic_t*, ocrSchedulerHeuristicContext_t*, ocrSchedulerOpArgs_t*, ocrRuntimeHint_t*), ceSchedulerHeuristicAnalyzeSimulate);
 
     return base;

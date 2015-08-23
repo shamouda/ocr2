@@ -1078,7 +1078,6 @@ u32 k;
                         getCurrentEnv(NULL, NULL, NULL, &ceMsg);
                         ocrFatGuid_t fguid[CE_TAKE_CHUNK_SIZE] = {{0}};
                         ceMsg.destLocation = self->neighbors[i];
-                        ceMsg.seqId = i;
                         ceMsg.type = PD_MSG_COMM_TAKE | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE | PD_CE_CE_MESSAGE;
                         PD_MSG_FIELD_IO(guids) = &(fguid[0]);
                         PD_MSG_FIELD_IO(guidCount) = CE_TAKE_CHUNK_SIZE;
@@ -1146,7 +1145,7 @@ ASSERT(ceMsg.destLocation != self->parentLocation); // Parent's not dead
         if (msg->type & PD_MSG_REQUEST) {
             u8 retVal = 0;
             ocrSchedulerOpWorkArgs_t *workArgs = &PD_MSG_FIELD_IO(schedArgs);
-            workArgs->base.seqId = msg->srcLocation;
+            workArgs->base.location = msg->srcLocation;
             retVal = self->schedulers[0]->fcts.op[OCR_SCHEDULER_OP_GET_WORK].invoke(
                          self->schedulers[0], (ocrSchedulerOpArgs_t*)workArgs, (ocrRuntimeHint_t*)msg);
 
@@ -1163,7 +1162,7 @@ ASSERT(ceMsg.destLocation != self->parentLocation); // Parent's not dead
             ASSERT(fguid.guid != NULL_GUID);
             localDeguidify(self, &fguid);
             ocrSchedulerOpNotifyArgs_t notifyArgs;
-            notifyArgs.base.seqId = msg->srcLocation;
+            notifyArgs.base.location = msg->srcLocation;
             notifyArgs.kind = OCR_SCHED_NOTIFY_EDT_READY;
             notifyArgs.OCR_SCHED_ARG_FIELD(OCR_SCHED_NOTIFY_EDT_READY).guid = fguid;
             returnCode = self->schedulers[0]->fcts.op[OCR_SCHEDULER_OP_NOTIFY].invoke(
@@ -1180,7 +1179,7 @@ ASSERT(ceMsg.destLocation != self->parentLocation); // Parent's not dead
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_SCHED_NOTIFY
         ocrSchedulerOpNotifyArgs_t *notifyArgs = &PD_MSG_FIELD_IO(schedArgs);
-        notifyArgs->base.seqId = msg->srcLocation;
+        notifyArgs->base.location = msg->srcLocation;
         PD_MSG_FIELD_O(returnDetail) =
             self->schedulers[0]->fcts.op[OCR_SCHEDULER_OP_NOTIFY].invoke(
                 self->schedulers[0], (ocrSchedulerOpArgs_t*)notifyArgs, NULL);

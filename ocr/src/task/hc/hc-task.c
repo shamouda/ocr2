@@ -434,14 +434,12 @@ static u8 scheduleTask(ocrTask_t *self) {
     DPRINTF(DEBUG_LVL_INFO, "Schedule 0x%lx\n", self->guid);
     self->state = ALLACQ_EDTSTATE;
     ocrPolicyDomain_t *pd = NULL;
-    ocrWorker_t *worker = NULL;
     PD_MSG_STACK(msg);
-    getCurrentEnv(&pd, &worker, NULL, &msg);
+    getCurrentEnv(&pd, NULL, NULL, &msg);
 
 #define PD_MSG (&msg)
 #define PD_TYPE PD_MSG_SCHED_NOTIFY
     msg.type = PD_MSG_SCHED_NOTIFY | PD_MSG_REQUEST;
-    PD_MSG_FIELD_IO(schedArgs).base.seqId = worker->seqId;
     PD_MSG_FIELD_IO(schedArgs).kind = OCR_SCHED_NOTIFY_EDT_READY;
     PD_MSG_FIELD_IO(schedArgs).OCR_SCHED_ARG_FIELD(OCR_SCHED_NOTIFY_EDT_READY).guid.guid = self->guid;
     PD_MSG_FIELD_IO(schedArgs).OCR_SCHED_ARG_FIELD(OCR_SCHED_NOTIFY_EDT_READY).guid.metaDataPtr = self;
@@ -457,14 +455,12 @@ static u8 scheduleTask(ocrTask_t *self) {
  */
 static u8 scheduleSatisfiedTask(ocrTask_t *self) {
     ocrPolicyDomain_t *pd = NULL;
-    ocrWorker_t *worker = NULL;
     PD_MSG_STACK(msg);
-    getCurrentEnv(&pd, &worker, NULL, &msg);
+    getCurrentEnv(&pd, NULL, NULL, &msg);
 
 #define PD_MSG (&msg)
 #define PD_TYPE PD_MSG_SCHED_NOTIFY
     msg.type = PD_MSG_SCHED_NOTIFY | PD_MSG_REQUEST;
-    PD_MSG_FIELD_IO(schedArgs).base.seqId = worker->seqId;
     PD_MSG_FIELD_IO(schedArgs).kind = OCR_SCHED_NOTIFY_EDT_SATISFIED;
     PD_MSG_FIELD_IO(schedArgs).OCR_SCHED_ARG_FIELD(OCR_SCHED_NOTIFY_EDT_SATISFIED).guid.guid = self->guid;
     PD_MSG_FIELD_IO(schedArgs).OCR_SCHED_ARG_FIELD(OCR_SCHED_NOTIFY_EDT_SATISFIED).guid.metaDataPtr = self;

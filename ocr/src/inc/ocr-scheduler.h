@@ -61,7 +61,7 @@ typedef enum {
 } ocrSchedulerOp_t;
 
 typedef struct _ocrSchedulerOpArgs_t {
-    u64 seqId;                                      /* Sequential ID of client calling into the scheduler */
+    ocrLocation_t location;                         /* Location of the calling context */
     u32 heuristicId;                                /* Scheduler heuristic to invoke */
 } ocrSchedulerOpArgs_t;
 
@@ -321,24 +321,9 @@ typedef struct _ocrSchedulerFcts_t {
     ////////////////////////////////////////////////////////////////////////////////////////////////////
 
     /**
-     * @brief Register a client with the scheduler
+     * @brief Proactively update the scheduler state
      *
-     * The scheduler keeps track of all agents that
-     * it will communicate with. It registers those
-     * contexts with each scheduler heuristic.
-     *
-     * @param self[in]           Pointer to this scheduler heuristic
-     * @param loc[in]            Absolute location for this context ID
-     * @param seqId[out]         Sequential ID of client as determined by the scheduler
-     *
-     * @return 0 on success and a non-zero value on failure
-     */
-    u8 (*registerContext)(struct _ocrScheduler_t *self, ocrLocation_t loc, u64 *seqId);
-
-    /**
-     * @brief Perform updates on the scheduler
-     *
-     * This works as a proactive monitoring hook
+     * This works as a proactive hook for external modules
      *
      * @param self[in]          Pointer to this scheduler
      * @param properties[in]    Properties of this update
@@ -365,7 +350,6 @@ struct _ocrWorkpile_t;
 typedef struct _ocrScheduler_t {
     ocrFatGuid_t fguid;
     struct _ocrPolicyDomain_t *pd;
-    u64 contextCount;                           /**< The number of contexts handled by the scheduler */
 
     struct _ocrWorkpile_t **workpiles;
     u64 workpileCount;
@@ -377,7 +361,8 @@ typedef struct _ocrScheduler_t {
 
     // Scheduler Heuristics
     struct _ocrSchedulerHeuristic_t **schedulerHeuristics;
-    u64 schedulerHeuristicCount;
+    u32 schedulerHeuristicCount;
+    u32 masterHeuristicId;
 
     ocrSchedulerFcts_t fcts;
 } ocrScheduler_t;

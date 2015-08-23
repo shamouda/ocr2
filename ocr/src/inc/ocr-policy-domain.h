@@ -376,9 +376,6 @@ typedef struct _ocrPolicyMsg_t {
                                  * (location making the request) */
     ocrLocation_t destLocation; /**< Destination of the message
                                  * (location processing the request) */
-#ifdef ENABLE_MSG_SEQID
-    u64 seqId;                  /**< The index of srcLocation at dstLocation */
-#endif
     u32 type;                   /**< Type of the message. Also includes if this
                                  * is a request or a response */
 
@@ -1050,7 +1047,6 @@ typedef struct _ocrPolicyMsg_t {
                     u32 properties;         /**< In Properties for the registration */
                 } in;
                 struct {
-                    u32 seqId;              /**< Out: Seq Id at dest policy domain */
                     u32 returnDetail;       /**< Out: Success or error code */
                 } out;
             } inOrOut __attribute__ (( aligned(8) ));

@@ -807,6 +807,14 @@ s32 populate_inst(ocrParamList_t **inst_param, void **instance, s32 *type_counts
     case schedulerHeuristic_type:
         for (j = low; j<=high; j++) {
             ALLOC_PARAM_LIST(inst_param[j], paramListSchedulerHeuristic_t);
+            ((paramListSchedulerHeuristic_t*)inst_param[j])->isMaster = false;
+            if (key_exists(dict, secname, "kind")) {
+                char *valuestr = NULL;
+                snprintf(key, MAX_KEY_SZ, "%s:%s", secname, "kind");
+                INI_GET_STR (key, valuestr, "");
+                ASSERT(strcmp(valuestr, "master") == 0);
+                ((paramListSchedulerHeuristic_t*)inst_param[j])->isMaster = true;
+            }
             instance[j] = (void *)((ocrSchedulerHeuristicFactory_t *)factory)->instantiate(factory, inst_param[j]);
             if (instance[j])
                 DPRINTF(DEBUG_LVL_INFO, "Created schedulerHeuristic of type %s, index %d\n", inststr, j);
