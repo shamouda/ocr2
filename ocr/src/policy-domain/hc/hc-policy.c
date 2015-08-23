@@ -1418,9 +1418,9 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
     case PD_MSG_GUID_UNRESERVE:
     {
 #define PD_MSG msg
-#define PD_TYPE PD_MSG_GUID_RESERVE
+#define PD_TYPE PD_MSG_GUID_UNRESERVE
         PD_MSG_FIELD_O(returnDetail) = self->guidProviders[0]->fcts.guidUnreserve(
-            self->guidProviders[0], PD_MSG_FIELD_O(startGuid), PD_MSG_FIELD_O(skipGuid),
+            self->guidProviders[0], PD_MSG_FIELD_I(startGuid), PD_MSG_FIELD_I(skipGuid),
             PD_MSG_FIELD_I(numberGuids));
 #undef PD_MSG
 #undef PD_TYPE

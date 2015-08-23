@@ -1246,11 +1246,12 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
 
     ocrPolicyDomainCe_t *rself = (ocrPolicyDomainCe_t*)self;
 
-    DPRINTF(DEBUG_LVL_VERB, "Going to processs message of type 0x%x\n",
-            msg->type & PD_MSG_TYPE_ONLY);
+    DPRINTF(DEBUG_LVL_INFO, "Processing message 0x%lx of type 0x%x from 0x%lx\n",
+            msg, msg->type & PD_MSG_TYPE_ONLY, msg->srcLocation);
 
     if(msg->srcLocation != self->myLocation && rself->rlSwitch.informOtherPDs &&
        ((msg->type & PD_MSG_TYPE_ONLY) != PD_MSG_MGT_RL_NOTIFY)) {
+        DPRINTF(DEBUG_LVL_VERB, "Shutdown in progress..\n");
         if(msg->type & PD_MSG_RESPONSE) {
             // Process as usual
         } else if(msg->type & PD_MSG_REQ_RESPONSE) {
@@ -1277,7 +1278,7 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             RESULT_ASSERT(self->fcts.sendMessage(self, msg->destLocation, msg, NULL, 0), ==, 0);
             return returnCode;
         } else {
-            DPRINTF(DEBUG_LVL_VVERB, "Message from 0x%lx being processed because no response required (after shutdown)\n",
+            DPRINTF(DEBUG_LVL_VVERB, "Message being processed because no response required (after shutdown)\n",
                     msg->srcLocation);
         }
     }
@@ -1311,8 +1312,8 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         // This would impact where we do the PD_MSG_MEM_ALLOC for example
         // For now we deal with both USER and RT dbs the same way
         ASSERT((PD_MSG_FIELD_I(dbType) == USER_DBTYPE) || (PD_MSG_FIELD_I(dbType) == RUNTIME_DBTYPE));
-        DPRINTF(DEBUG_LVL_VVERB, "DB_CREATE request from 0x%lx for size %lu\n",
-                msg->srcLocation, PD_MSG_FIELD_IO(size));
+        DPRINTF(DEBUG_LVL_VERB, "Processing DB_CREATE for size %lu\n",
+                PD_MSG_FIELD_IO(size));
         // BUG #145: The prescription needs to be derived from the affinity, and needs to default to something sensible.
         u64 engineIndex = getEngineIndex(self, msg->srcLocation);
         ocrFatGuid_t edtFatGuid = {.guid = PD_MSG_FIELD_I(edt.guid), .metaDataPtr = PD_MSG_FIELD_I(edt.metaDataPtr)};
@@ -1343,7 +1344,7 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             // Cannot acquire
             PD_MSG_FIELD_O(ptr) = NULL;
         }
-        DPRINTF(DEBUG_LVL_VVERB, "DB_CREATE response for size %lu: GUID: 0x%lx; PTR: 0x%lx)\n",
+        DPRINTF(DEBUG_LVL_VERB, "DB_CREATE response for size %lu: GUID: 0x%lx; PTR: 0x%lx)\n",
                 reqSize, PD_MSG_FIELD_IO(guid.guid), PD_MSG_FIELD_O(ptr));
         returnCode = ceProcessResponse(self, msg, 0);
 #undef PD_MSG
@@ -1361,8 +1362,8 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             localDeguidify(self, &(PD_MSG_FIELD_IO(guid)));
             localDeguidify(self, &(PD_MSG_FIELD_IO(edt)));
             ocrDataBlock_t *db = (ocrDataBlock_t*)(PD_MSG_FIELD_IO(guid.metaDataPtr));
-            DPRINTF(DEBUG_LVL_VVERB, "DB_ACQUIRE request from 0x%lx for GUID 0x%lx\n",
-                    msg->srcLocation, PD_MSG_FIELD_IO(guid.guid));
+            DPRINTF(DEBUG_LVL_VERB, "Processing DB_ACQUIRE request for GUID 0x%lx\n",
+                    PD_MSG_FIELD_IO(guid.guid));
             ASSERT(db->fctId == self->dbFactories[0]->factoryId);
             //ASSERT(!(msg->type & PD_MSG_REQ_RESPONSE));
             PD_MSG_FIELD_O(returnDetail) = self->dbFactories[0]->fcts.acquire(
@@ -1374,7 +1375,7 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             // NOTE: at this point the DB may not have been acquired.
             // In that case PD_MSG_FIELD_O(returnDetail) == OCR_EBUSY
             // The XE checks for this return code.
-            DPRINTF(DEBUG_LVL_VVERB, "DB_ACQUIRE response for GUID 0x%lx: PTR: 0x%lx\n",
+            DPRINTF(DEBUG_LVL_VERB, "DB_ACQUIRE response for GUID 0x%lx: PTR: 0x%lx\n",
                     PD_MSG_FIELD_IO(guid.guid), PD_MSG_FIELD_O(ptr));
             returnCode = ceProcessResponse(self, msg, 0);
         } else {
@@ -1406,8 +1407,8 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         ocrDataBlock_t *db = (ocrDataBlock_t*)(PD_MSG_FIELD_IO(guid.metaDataPtr));
         ASSERT(db->fctId == self->dbFactories[0]->factoryId);
         //ASSERT(!(msg->type & PD_MSG_REQ_RESPONSE));
-        DPRINTF(DEBUG_LVL_VVERB, "DB_RELEASE req/resp from 0x%lx for GUID 0x%lx\n",
-                msg->srcLocation, PD_MSG_FIELD_IO(guid.guid));
+        DPRINTF(DEBUG_LVL_VERB, "Processing DB_RELEASE req/resp for GUID 0x%lx\n",
+                PD_MSG_FIELD_IO(guid.guid));
         PD_MSG_FIELD_O(returnDetail) =
             self->dbFactories[0]->fcts.release(db, PD_MSG_FIELD_I(edt), !!(PD_MSG_FIELD_I(properties) & DB_PROP_RT_ACQUIRE));
         returnCode = ceProcessResponse(self, msg, 0);
@@ -1425,8 +1426,8 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         localDeguidify(self, &(PD_MSG_FIELD_I(guid)));
         localDeguidify(self, &(PD_MSG_FIELD_I(edt)));
         ocrDataBlock_t *db = (ocrDataBlock_t*)(PD_MSG_FIELD_I(guid.metaDataPtr));
-        DPRINTF(DEBUG_LVL_VVERB, "DB_FREE req/resp from 0x%lx for GUID 0x%lx\n",
-                msg->srcLocation, PD_MSG_FIELD_I(guid.guid));
+        DPRINTF(DEBUG_LVL_VERB, "Processing DB_FREE req/resp for GUID 0x%lx\n",
+                PD_MSG_FIELD_I(guid.guid));
         ASSERT(db->fctId == self->dbFactories[0]->factoryId);
         ASSERT(!(msg->type & PD_MSG_REQ_RESPONSE));
         PD_MSG_FIELD_O(returnDetail) =
@@ -1443,14 +1444,14 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         u64 engineIndex = getEngineIndex(self, msg->srcLocation);
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_MEM_ALLOC
-        DPRINTF(DEBUG_LVL_VVERB, "MEM_ALLOC request from 0x%lx for size %lu\n",
-                msg->srcLocation, PD_MSG_FIELD_I(size));
+        DPRINTF(DEBUG_LVL_VERB, "Processing MEM_ALLOC request for size %lu\n",
+                PD_MSG_FIELD_I(size));
         PD_MSG_FIELD_O(returnDetail) = ceMemAlloc(
             self, &(PD_MSG_FIELD_O(allocator)), PD_MSG_FIELD_I(size),
             engineIndex, PD_MSG_FIELD_I(type), &(PD_MSG_FIELD_O(ptr)),
             PRESCRIPTION);
         PD_MSG_FIELD_O(allocatingPD) = self->fguid;
-        DPRINTF(DEBUG_LVL_VVERB, "MEM_ALLOC response: PTR: 0x%lx\n",
+        DPRINTF(DEBUG_LVL_VERB, "MEM_ALLOC response: PTR: 0x%lx\n",
                 PD_MSG_FIELD_O(ptr));
         returnCode = ceProcessResponse(self, msg, 0);
 #undef PD_MSG
@@ -1465,8 +1466,8 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
 #define PD_TYPE PD_MSG_MEM_UNALLOC
         // REC: Do we really care about the allocator returned and what not?
         ocrFatGuid_t allocGuid = {.guid = PD_MSG_FIELD_I(allocator.guid), .metaDataPtr = PD_MSG_FIELD_I(allocator.metaDataPtr) };
-        DPRINTF(DEBUG_LVL_VVERB, "MEM_UNALLOC req/resp from 0x%lx for PTR 0x%lx\n",
-                msg->srcLocation, PD_MSG_FIELD_I(ptr));
+        DPRINTF(DEBUG_LVL_VERB, "Processing MEM_UNALLOC req/resp for PTR 0x%lx\n",
+                PD_MSG_FIELD_I(ptr));
         PD_MSG_FIELD_O(returnDetail) = ceMemUnalloc(
             self, &allocGuid, PD_MSG_FIELD_I(ptr), PD_MSG_FIELD_I(type));
         returnCode = ceProcessResponse(self, msg, 0);
@@ -1489,14 +1490,13 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             outputEvent = &(PD_MSG_FIELD_IO(outputEvent));
         }
         ASSERT((PD_MSG_FIELD_I(workType) == EDT_USER_WORKTYPE) || (PD_MSG_FIELD_I(workType) == EDT_RT_WORKTYPE));
-        DPRINTF(DEBUG_LVL_VVERB, "WORK_CREATE request from 0x%lx\n",
-                msg->srcLocation);
+        DPRINTF(DEBUG_LVL_VERB, "Processing WORK_CREATE request\n");
         PD_MSG_FIELD_O(returnDetail) = ceCreateEdt(
             self, &(PD_MSG_FIELD_IO(guid)), PD_MSG_FIELD_I(templateGuid),
             &PD_MSG_FIELD_IO(paramc), PD_MSG_FIELD_I(paramv), &PD_MSG_FIELD_IO(depc),
             PD_MSG_FIELD_I(properties), PD_MSG_FIELD_I(affinity), outputEvent,
             (ocrTask_t*)(PD_MSG_FIELD_I(currentEdt).metaDataPtr), PD_MSG_FIELD_I(parentLatch));
-        DPRINTF(DEBUG_LVL_VVERB, "WORK_CREATE response: GUID: 0x%lx\n",
+        DPRINTF(DEBUG_LVL_VERB, "WORK_CREATE response: GUID: 0x%lx\n",
                 PD_MSG_FIELD_IO(guid.guid));
         returnCode = ceProcessResponse(self, msg, 0);
 #undef PD_MSG
@@ -1512,8 +1512,8 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         localDeguidify(self, &(PD_MSG_FIELD_I(guid)));
         ocrTask_t *task = (ocrTask_t*)PD_MSG_FIELD_I(guid.metaDataPtr);
         ASSERT(task);
-        DPRINTF(DEBUG_LVL_VVERB, "WORK_DESTROY req/resp from 0x%lx for GUID 0x%lx\n",
-                msg->srcLocation, PD_MSG_FIELD_I(guid.guid));
+        DPRINTF(DEBUG_LVL_VERB, "WORK_DESTROY req/resp for GUID 0x%lx\n",
+                PD_MSG_FIELD_I(guid.guid));
         ASSERT(task->fctId == self->taskFactories[0]->factoryId);
         PD_MSG_FIELD_O(returnDetail) = self->taskFactories[0]->fcts.destruct(task);
         returnCode = ceProcessResponse(self, msg, 0);
@@ -1527,8 +1527,7 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         START_PROFILE(pd_ce_EdtTempCreate);
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_EDTTEMP_CREATE
-        DPRINTF(DEBUG_LVL_VVERB, "EDTTEMP_CREATE request from 0x%lx\n",
-                msg->srcLocation);
+        DPRINTF(DEBUG_LVL_VERB, "Processing EDTTEMP_CREATE request\n");
 #ifdef OCR_ENABLE_EDT_NAMING
         const char* edtName = PD_MSG_FIELD_I(funcName);
 #else
@@ -1537,7 +1536,7 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         PD_MSG_FIELD_O(returnDetail) = ceCreateEdtTemplate(
             self, &(PD_MSG_FIELD_IO(guid)), PD_MSG_FIELD_I(funcPtr), PD_MSG_FIELD_I(paramc),
             PD_MSG_FIELD_I(depc), edtName);
-        DPRINTF(DEBUG_LVL_VVERB, "EDTTEMP_CREATE response: GUID: 0x%lx\n",
+        DPRINTF(DEBUG_LVL_VERB, "EDTTEMP_CREATE response: GUID: 0x%lx\n",
                 PD_MSG_FIELD_IO(guid.guid));
         returnCode = ceProcessResponse(self, msg, 0);
 #undef PD_MSG
@@ -1552,8 +1551,8 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
 #define PD_TYPE PD_MSG_EDTTEMP_DESTROY
         localDeguidify(self, &(PD_MSG_FIELD_I(guid)));
         ocrTaskTemplate_t *tTemplate = (ocrTaskTemplate_t*)(PD_MSG_FIELD_I(guid.metaDataPtr));
-        DPRINTF(DEBUG_LVL_VVERB, "EDTTEMP_DESTROY req/resp from 0x%lx for GUID 0x%lx\n",
-                msg->srcLocation, PD_MSG_FIELD_I(guid.guid));
+        DPRINTF(DEBUG_LVL_VERB, "Processing EDTTEMP_DESTROY req/resp for GUID 0x%lx\n",
+                PD_MSG_FIELD_I(guid.guid));
         ASSERT(tTemplate->fctId == self->taskTemplateFactories[0]->factoryId);
         PD_MSG_FIELD_O(returnDetail) = self->taskTemplateFactories[0]->fcts.destruct(tTemplate);
         returnCode = ceProcessResponse(self, msg, 0);
@@ -1568,12 +1567,12 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_EVT_CREATE
         ocrEventTypes_t type = PD_MSG_FIELD_I(type);
-        DPRINTF(DEBUG_LVL_VVERB, "EVT_CREATE request from 0x%lx of type %u\n",
-                msg->srcLocation, type);
+        DPRINTF(DEBUG_LVL_VERB, "Processing EVT_CREATE request of type %u\n",
+                type);
 
         PD_MSG_FIELD_O(returnDetail) = ceCreateEvent(self, &(PD_MSG_FIELD_IO(guid)),
                                                      type, PD_MSG_FIELD_I(properties));
-        DPRINTF(DEBUG_LVL_VVERB, "EVT_CREATE response for type %u: GUID: 0x%lx\n",
+        DPRINTF(DEBUG_LVL_VERB, "EVT_CREATE response for type %u: GUID: 0x%lx\n",
                 type, PD_MSG_FIELD_IO(guid.guid));
         returnCode = ceProcessResponse(self, msg, 0);
 #undef PD_MSG
@@ -1588,8 +1587,8 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
 #define PD_TYPE PD_MSG_EVT_DESTROY
         localDeguidify(self, &(PD_MSG_FIELD_I(guid)));
         ocrEvent_t *evt = (ocrEvent_t*)PD_MSG_FIELD_I(guid.metaDataPtr);
-        DPRINTF(DEBUG_LVL_VVERB, "EVT_DESTROY req/resp from 0x%lx for GUID 0x%lx\n",
-                msg->srcLocation, PD_MSG_FIELD_I(guid.guid));
+        DPRINTF(DEBUG_LVL_VERB, "Processing EVT_DESTROY req/resp for GUID 0x%lx\n",
+                PD_MSG_FIELD_I(guid.guid));
         ASSERT(evt->fctId == self->eventFactories[0]->factoryId);
         PD_MSG_FIELD_O(returnDetail) = self->eventFactories[0]->fcts[evt->kind].destruct(evt);
         returnCode = ceProcessResponse(self, msg, 0);
@@ -1605,11 +1604,11 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
 #define PD_TYPE PD_MSG_EVT_GET
         localDeguidify(self, &(PD_MSG_FIELD_I(guid)));
         ocrEvent_t *evt = (ocrEvent_t*)PD_MSG_FIELD_I(guid.metaDataPtr);
-        DPRINTF(DEBUG_LVL_VVERB, "EVT_GET request from 0x%lx for GUID 0x%lx\n",
-                msg->srcLocation, PD_MSG_FIELD_I(guid.guid));
+        DPRINTF(DEBUG_LVL_VERB, "Processing EVT_GET request for GUID 0x%lx\n",
+                PD_MSG_FIELD_I(guid.guid));
         ASSERT(evt->fctId == self->eventFactories[0]->factoryId);
         PD_MSG_FIELD_O(data) = self->eventFactories[0]->fcts[evt->kind].get(evt);
-        DPRINTF(DEBUG_LVL_VVERB, "EVT_GET response for GUID 0x%lx: GUID: 0x%lx\n",
+        DPRINTF(DEBUG_LVL_VERB, "EVT_GET response for GUID 0x%lx: db-GUID: 0x%lx\n",
                 evt->guid, PD_MSG_FIELD_O(data.guid));
         returnCode = ceProcessResponse(self, msg, 0);
 #undef PD_MSG
@@ -1732,9 +1731,8 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         ASSERT(PD_MSG_FIELD_IO(type) == OCR_GUID_EDT);
         // A TAKE request can come from either a CE or XE
         if (msg->type & PD_MSG_REQUEST) {
-            DPRINTF(DEBUG_LVL_VVERB, "COMM_TAKE request from 0x%lx for %u EDTs with incoming array @ 0x%lx\n",
-                    msg->srcLocation, PD_MSG_FIELD_IO(guidCount),
-                    PD_MSG_FIELD_IO(guids));
+            DPRINTF(DEBUG_LVL_VERB, "Processing COMM_TAKE request for %u EDTs with incoming array @ 0x%lx\n",
+                    PD_MSG_FIELD_IO(guidCount), PD_MSG_FIELD_IO(guids));
 
             // If we get a request but the CE/XE doing the requesting hasn't requested
             // any specific guids, PD_MSG_FIELD_IO(guids) will be NULL so we set something up
@@ -1747,7 +1745,7 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             PD_MSG_FIELD_O(returnDetail) = self->schedulers[0]->fcts.takeEdt(
                 self->schedulers[0], &(PD_MSG_FIELD_IO(guidCount)), PD_MSG_FIELD_IO(guids));
 
-            DPRINTF(DEBUG_LVL_VERB, "After local takeEdt, have returnDetail %u, guidCount %u\n",
+            DPRINTF(DEBUG_LVL_VVERB, "After local takeEdt, have returnDetail %u, guidCount %u\n",
                     (u32)(PD_MSG_FIELD_O(returnDetail)), PD_MSG_FIELD_IO(guidCount));
             //If my scheduler does not have work, (i.e guidCount == 0)
             //then we need to start looking for work on other CE's.
@@ -1778,7 +1776,7 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
                     // requests in the meantime (if it can't send right away) and that
                     // may generate more takes
                     cePolicy->ceCommTakeActive[cePolicy->nextVictimNeighbor] = 1;
-                    DPRINTF(DEBUG_LVL_VERB, "Sending steal to 0x%lx\n", self->neighbors[cePolicy->nextVictimNeighbor]);
+                    DPRINTF(DEBUG_LVL_VVERB, "Sending steal to 0x%lx\n", self->neighbors[cePolicy->nextVictimNeighbor]);
                     if(self->fcts.sendMessage(self, ceMsg.destLocation, &ceMsg, NULL, 1) != 0) {
                         // We couldn't send the steal message but it doesn't matter (we'll just
                         // get the work later). We don't insist for now. This will work better
@@ -1806,25 +1804,27 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
                 if(PD_MSG_FIELD_IO(guids[0]).metaDataPtr == NULL)
                     localDeguidify(self, &(PD_MSG_FIELD_IO(guids[0])));
             }
-            DPRINTF(DEBUG_LVL_VERB, "Returning GUID 0x%lx (metadata: 0x%lx) count: %u\n",
+            DPRINTF(DEBUG_LVL_VERB, "Response for COMM_TAKE: GUID 0x%lx (metadata: 0x%lx) count: %u\n",
                     PD_MSG_FIELD_IO(guids[0].guid), PD_MSG_FIELD_IO(guids[0].metaDataPtr),
                     PD_MSG_FIELD_IO(guidCount));
             returnCode = ceProcessResponse(self, msg, 0);
         } else { // A TAKE response has to be from another CE responding to my own request
+            DPRINTF(DEBUG_LVL_VERB, "Processing COMM_TAKE response from another CE with %u EDTs\n",
+                    PD_MSG_FIELD_IO(guidCount));
             ASSERT(msg->type & PD_MSG_RESPONSE);
             u32 i, j;
             ocrPolicyDomainCe_t * cePolicy = (ocrPolicyDomainCe_t*)self;
             for (i = 0; i < self->neighborCount; i++) {
                 if (msg->srcLocation == self->neighbors[i]) {
                     cePolicy->ceCommTakeActive[i] = 0;
-                    if (PD_MSG_FIELD_IO(guidCount) > 0) {
+                    if(PD_MSG_FIELD_IO(guidCount) > 0) {
                         //If my work request was responded with work,
                         //then we store it in our own scheduler
                         ASSERT(PD_MSG_FIELD_IO(type) == OCR_GUID_EDT);
                         ocrFatGuid_t *fEdtGuids = PD_MSG_FIELD_IO(guids);
 
-                        DPRINTF(DEBUG_LVL_INFO, "Received %lu Edt(s) from 0x%lx: ",
-                                PD_MSG_FIELD_IO(guidCount), (u64)msg->srcLocation);
+                        DPRINTF(DEBUG_LVL_VVERB, "Received %u EDTs: ",
+                                PD_MSG_FIELD_IO(guidCount));
                         for (j = 0; j < PD_MSG_FIELD_IO(guidCount); j++) {
                             DPRINTF(DEBUG_LVL_INFO, "(guid:0x%lx metadata: %p) ", fEdtGuids[j].guid, fEdtGuids[j].metaDataPtr);
                         }
@@ -1884,6 +1884,7 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
     }
 
     case PD_MSG_SCHED_NOTIFY: {
+        DPRINTF(DEBUG_LVL_VERB, "Processing req/resp SCHED_NOTIFY\n");
         START_PROFILE(pd_ce_Sched_Notify);
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_SCHED_NOTIFY
@@ -1917,7 +1918,7 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         START_PROFILE(pd_ce_DepAdd);
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_DEP_ADD
-        DPRINTF(DEBUG_LVL_VVERB, "DEP_ADD req/resp from 0x%lx for 0x%lx -> 0x%lx\n",
+        DPRINTF(DEBUG_LVL_VERB, "Processing DEP_ADD req/resp for 0x%lx -> 0x%lx\n",
                 msg->srcLocation, PD_MSG_FIELD_I(source.guid), PD_MSG_FIELD_I(dest.guid));
         // We first get information about the source and destination
         ocrGuidKind srcKind, dstKind;
@@ -1932,6 +1933,7 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         ocrFatGuid_t dest = PD_MSG_FIELD_I(dest);
         ocrDbAccessMode_t mode = (PD_MSG_FIELD_IO(properties) & DB_ACCESS_MODE_MASK);
         if (srcKind == NULL_GUID) {
+            DPRINTF(DEBUG_LVL_VVERB, "Src is NULL, transforming to satisfy\n");
             //NOTE: Handle 'NULL_GUID' case here to be safe although
             //we've already caught it in ocrAddDependence for performance
             // This is equivalent to an immediate satisfy
@@ -1939,6 +1941,7 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
                 self, src, dest, PD_MSG_FIELD_I(slot));
         } else if (srcKind == OCR_GUID_DB) {
             if(dstKind & OCR_GUID_EVENT) {
+                DPRINTF(DEBUG_LVL_VVERB, "DB -> EVT: converting to satisfy\n");
                 // This is equivalent to an immediate satisfy
                 PD_MSG_FIELD_O(returnDetail) = convertDepAddToSatisfy(
                     self, src, dest, PD_MSG_FIELD_I(slot));
@@ -1946,6 +1949,7 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
                 // NOTE: We could use convertDepAddToSatisfy since adding a DB dependence
                 // is equivalent to satisfy. However, we want to go through the register
                 // function to make sure the access mode is recorded.
+                DPRINTF(DEBUG_LVL_VVERB, "DB -> EDT\n");
                 ASSERT(dstKind == OCR_GUID_EDT);
                 PD_MSG_STACK(registerMsg);
                 getCurrentEnv(NULL, NULL, NULL, &registerMsg);
@@ -1971,7 +1975,9 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             }
         } else {
             // Is it ok not to use messages here ?
+
             if (dstKind == OCR_GUID_EDT) {
+                DPRINTF(DEBUG_LVL_VVERB, "EVT -> EDT; registering the event as a signaler of the EDT\n");
                 ocrTask_t *task = (ocrTask_t*)(dest.metaDataPtr);
                 ASSERT(task->fctId == self->taskFactories[0]->factoryId);
                 self->taskFactories[0]->fcts.registerSignaler(task, src, PD_MSG_FIELD_I(slot),
@@ -1980,6 +1986,7 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             bool srcIsNonPersistent = ((srcKind == OCR_GUID_EVENT_ONCE) ||
                                         (srcKind == OCR_GUID_EVENT_LATCH));
             if (srcIsNonPersistent || (dstKind & OCR_GUID_EVENT)) {
+                DPRINTF(DEBUG_LVL_VVERB, "Non persistent source or destination event, registering destination as waiter on event\n");
                 ocrEvent_t *evt = (ocrEvent_t*)(src.metaDataPtr);
                 ASSERT(evt->fctId == self->eventFactories[0]->factoryId);
                 self->eventFactories[0]->fcts[evt->kind].registerWaiter(
@@ -2002,8 +2009,8 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_DEP_REGSIGNALER
         // We first get information about the signaler and destination
-        DPRINTF(DEBUG_LVL_VVERB, "DEP_REGSIGNALER req/resp from 0x%lx for 0x%lx -> 0x%lx\n",
-                msg->srcLocation, PD_MSG_FIELD_I(signaler.guid), PD_MSG_FIELD_I(dest.guid));
+        DPRINTF(DEBUG_LVL_VERB, "Processing DEP_REGSIGNALER req/resp on 0x%lx: signaler 0x%lx, slot is %u\n",
+                PD_MSG_FIELD_I(dest.guid),  PD_MSG_FIELD_I(signaler.guid), PD_MSG_FIELD_I(slot));
         ocrGuidKind signalerKind, dstKind;
         self->guidProviders[0]->fcts.getVal(
             self->guidProviders[0], PD_MSG_FIELD_I(signaler.guid),
@@ -2044,8 +2051,8 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_DEP_REGWAITER
         // We first get information about the signaler and destination
-        DPRINTF(DEBUG_LVL_VVERB, "DEP_REGWAITER req/resp from 0x%lx for 0x%lx -> 0x%lx\n",
-                msg->srcLocation, PD_MSG_FIELD_I(dest.guid), PD_MSG_FIELD_I(waiter.guid));
+        DPRINTF(DEBUG_LVL_VERB, "Processing DEP_REGWAITER req/resp on 0x%lx; waiter is 0x%lx, slot is %u\n",
+                PD_MSG_FIELD_I(dest.guid), PD_MSG_FIELD_I(waiter.guid), PD_MSG_FIELD_I(slot));
         ocrGuidKind waiterKind, dstKind;
         self->guidProviders[0]->fcts.getVal(
             self->guidProviders[0], PD_MSG_FIELD_I(waiter.guid),
@@ -2076,8 +2083,8 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         START_PROFILE(pd_ce_DepSatisfy);
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_DEP_SATISFY
-        DPRINTF(DEBUG_LVL_VVERB, "DEP_SATISFY from 0x%lx for GUID 0x%lx with 0x%lx\n",
-                msg->srcLocation, PD_MSG_FIELD_I(guid.guid), PD_MSG_FIELD_I(payload.guid));
+        DPRINTF(DEBUG_LVL_VERB, "Processing DEP_SATISFY req/resp for event/edt 0x%lx with db 0x%lx for slot %u\n",
+                PD_MSG_FIELD_I(guid.guid), PD_MSG_FIELD_I(payload.guid), PD_MSG_FIELD_I(slot));
         ocrGuidKind dstKind;
         self->guidProviders[0]->fcts.getVal(
             self->guidProviders[0], PD_MSG_FIELD_I(guid.guid),
@@ -2085,12 +2092,14 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
 
         ocrFatGuid_t dst = PD_MSG_FIELD_I(guid);
         if(dstKind & OCR_GUID_EVENT) {
+            DPRINTF(DEBUG_LVL_VVERB, "Destination is an event\n");
             ocrEvent_t *evt = (ocrEvent_t*)(dst.metaDataPtr);
             ASSERT(evt->fctId == self->eventFactories[0]->factoryId);
             self->eventFactories[0]->fcts[evt->kind].satisfy(
                 evt, PD_MSG_FIELD_I(payload), PD_MSG_FIELD_I(slot));
         } else {
             if(dstKind == OCR_GUID_EDT) {
+                DPRINTF(DEBUG_LVL_VVERB, "Destination is an EDT\n");
                 ocrTask_t *edt = (ocrTask_t*)(dst.metaDataPtr);
                 ASSERT(edt->fctId == self->taskFactories[0]->factoryId);
                 self->taskFactories[0]->fcts.satisfy(
@@ -2220,14 +2229,14 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             // of our children or our parent
             if(msg->srcLocation == self->parentLocation) {
                 if(PD_MSG_FIELD_I(properties) & RL_RELEASE) {
-                    DPRINTF(DEBUG_LVL_VVERB, "RL_NOTIFY from parent releasing me\n");
+                    DPRINTF(DEBUG_LVL_VERB, "RL_NOTIFY from parent releasing me\n");
                     // This is a relase from the CE
                     // Check that we match on the runlevel
                     ASSERT(PD_MSG_FIELD_I(runlevel) == cePolicy->rlSwitch.barrierRL);
                     ASSERT(cePolicy->rlSwitch.barrierState == RL_BARRIER_STATE_PARENT_NOTIFIED);
                     cePolicy->rlSwitch.barrierState = RL_BARRIER_STATE_PARENT_RESPONSE;
                 } else {
-                    DPRINTF(DEBUG_LVL_VVERB, "RL_NOTIFY from parent requesting change to RL %u\n",
+                    DPRINTF(DEBUG_LVL_VERB, "RL_NOTIFY from parent requesting change to RL %u\n",
                             PD_MSG_FIELD_I(runlevel));
                     // This is a request for a change of runlevel
                     // (as an answer to some other message we sent)
@@ -2257,7 +2266,8 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
                 //     initial shutdown message
                 if(cePolicy->rlSwitch.barrierState == RL_BARRIER_STATE_UNINIT &&
                    (PD_MSG_FIELD_I(runlevel) == RL_USER_OK) && (PD_MSG_FIELD_I(properties) & RL_TEAR_DOWN)) {
-                    DPRINTF(DEBUG_LVL_VVERB, "RL_NOTIFY: initial shutdown notification\n");
+                    DPRINTF(DEBUG_LVL_VERB, "RL_NOTIFY: initial shutdown notification with code %u\n",
+                            PD_MSG_FIELD_I(errorCode));
                     ASSERT(cePolicy->rlSwitch.barrierRL == RL_USER_OK);
                     ASSERT(cePolicy->rlSwitch.checkedIn == 0); // No other XE or child CE should have notified us
                     if(!(PD_MSG_FIELD_I(properties) & RL_RESPONSE)) {
@@ -2297,7 +2307,8 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
                 // the shutdown
                 if(cePolicy->rlSwitch.barrierState == RL_BARRIER_STATE_UNINIT &&
                    (PD_MSG_FIELD_I(runlevel) == RL_USER_OK) && (PD_MSG_FIELD_I(properties) & RL_TEAR_DOWN)) {
-                    DPRINTF(DEBUG_LVL_VVERB, "RL_NOTIFY: initial shutdown notification\n");
+                    DPRINTF(DEBUG_LVL_VERB, "RL_NOTIFY: initial shutdown notification from non-child with code %u\n",
+                            PD_MSG_FIELD_I(errorCode));
                     self->shutdownCode = PD_MSG_FIELD_I(errorCode);
                     ASSERT(cePolicy->rlSwitch.barrierRL == RL_USER_OK);
                     ASSERT(cePolicy->rlSwitch.checkedIn == 0); // No other XE or child CE should have notified us
@@ -2380,6 +2391,7 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
                 msg->type & PD_MSG_TYPE_ONLY);
         ASSERT(0);
     }
+    DPRINTF(DEBUG_LVL_INFO, "Done processing message 0x%lx\n", msg);
     return returnCode;
 }
 
