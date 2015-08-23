@@ -54,10 +54,11 @@ extern u32 PRINTF(const char * fmt, ...);
  * This function should be called using the #ASSERT macro
  *
  * @param[in] val       If non-zero, will cause the assertion failure
+ * @param[in] str       Stringified condition so we can output it again
  * @param[in] file      File in which the assertion failure occured
  * @param[in] line      Line at which the assertion failure occured
  */
-extern void _ocrAssert(bool val, const char* file, u32 line);
+extern void _ocrAssert(bool val, const char* str, const char* file, u32 line);
 
 #ifdef OCR_ASSERT
 /**
@@ -65,7 +66,7 @@ extern void _ocrAssert(bool val, const char* file, u32 line);
  *
  * @param[in] a  Condition for the assert
  */
-#define ASSERT(a) do { _ocrAssert((bool)((a) != 0), __FILE__, __LINE__); } while(0);
+#define ASSERT(a) do { _ocrAssert((bool)((a) != 0), #a, __FILE__, __LINE__); } while(0);
 #else
 /**
  * @brief ASSERT macro to replace the assert functionality

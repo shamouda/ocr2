@@ -19,10 +19,10 @@ extern void salResume(u32 flag);
 
 #define sal_exit(x)   hal_exit(x)
 
-#define sal_assert(x, fn, ln)   if(!(x)) {                                \
-        PRINTF("ASSERT FAILURE: CE at line %d in '%s'\n", (int)(ln), fn); \
-        hal_abort();                                                      \
-    }
+#define sal_assert(x, fn, ln)   do { if(!(x)) {                         \
+            PRINTF("ASSERT FAILURE: CE at line %d in '%s'\n", (int)(ln), fn); \
+            hal_abort();                                                \
+        } } while(0)
 
 #define sal_print(msg, len) __asm__ __volatile__("int $0xFF\n\t" : : "a" (msg))
 

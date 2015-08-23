@@ -19,11 +19,11 @@ extern void salResume(u32 flag);
 
 #define sal_exit(x) hal_exit(x)
 
-#define sal_assert(x, fn, ln) if(!(x)) {                            \
+#define sal_assert(x, fn, ln) do { if(!(x)) {                       \
         __asm__ __volatile__ __attribute__ (( noreturn )) (         \
             "alarm %2\n\t"                                          \
             : : "{r2}" (ln), "{r3}" (fn), "L" (XE_ASSERT));         \
-    }
+        } } while(0)
 
 #define sal_print(msg, len) __asm__ __volatile__(                   \
         "alarm %2\n\t"                                              \
