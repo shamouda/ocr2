@@ -13,9 +13,11 @@
 #include "ocr-runtime-types.h"
 #include "ocr-sysboot.h"
 #include "scheduler/common/common-scheduler.h"
+// BUG #793 Probably need to make this not HC-specific
+#include "scheduler/hc/scheduler-blocking-support.h"
 
 /******************************************************/
-/* OCR-COMMON SCHEDULER                                   */
+/* OCR-COMMON SCHEDULER                               */
 /******************************************************/
 
 void commonSchedulerDestruct(ocrScheduler_t * self) {
@@ -97,7 +99,7 @@ u8 commonSchedulerSwitchRunlevel(ocrScheduler_t *self, ocrPolicyDomain_t *PD, oc
         if(properties & RL_BRING_UP) {
             if(RL_IS_FIRST_PHASE_UP(PD, RL_COMPUTE_OK, phase)) {
                 // We get a GUID for ourself
-                guidify(self->pd, (u64)self, &(self->fguid), OCR_GUID_ALLOCATOR);
+                guidify(self->pd, (u64)self, &(self->fguid), OCR_GUID_SCHEDULER);
             }
         } else {
             // Tear-down
@@ -156,6 +158,7 @@ u8 commonSchedulerGiveComm(ocrScheduler_t *self, u32* count, ocrFatGuid_t* handl
     return OCR_ENOTSUP;
 }
 
+// BUG #793 deprecate this api in favor of update
 u8 commonSchedulerMonitorProgress(ocrScheduler_t *self, ocrMonitorProgress_t type, void * monitoree) {
 #ifdef ENABLE_SCHEDULER_BLOCKING_SUPPORT
     // Current implementation assumes the worker is blocked.
