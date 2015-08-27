@@ -17,7 +17,7 @@ endif
 # Tool-chain to be used for the build
 #
 
-TG_INSTALL ?= ../../../../intel/ss/install
+TG_INSTALL ?= ../../../../intel/tg/install
 
 #DEFAULT_CONFIG = ce-default.cfg      #Switch to this configuration file to go back to a single 256K memory allocator.
 DEFAULT_CONFIG = ce-multialloc-default.cfg
@@ -25,7 +25,7 @@ DEFAULT_CONFIG = ce-multialloc-default.cfg
 
 CC      := gcc
 CFLAGS  := -m64 -mcmodel=large -fno-builtin -fno-stack-protector -Wno-unused-local-typedefs \
-		-I ../../../../intel/ss/common/include -I ../../../../intel/ss/tgkrnl/inc
+		-I ${TG_INSTALL}/../common/include -I ${TG_INSTALL}/../tgkrnl/inc
 
 RM      := rm
 RMFLAGS := -rf

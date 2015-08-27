@@ -19,7 +19,7 @@ endif
 
 DEFAULT_CONFIG = xe-default.cfg
 
-TG_INSTALL ?= ../../../../intel/ss/install
+TG_INSTALL ?= ../../../../intel/tg/install
 
 PREFIX  := $(TG_INSTALL)/bin/xstg-linux-elf-
 CC      := $(PREFIX)clang

@@ -17,8 +17,8 @@ endif
 # Tool-chain to be used for the build
 #
 
-TG_COMMON ?= ../../../../intel/ss/common
-TG_TGKRNL ?= ../../../../intel/ss/tgkrnl
+TG_COMMON ?= ../../../../intel/tg/common
+TG_TGKRNL ?= ../../../../intel/tg/tgkrnl
 
 CC      := gcc
 CFLAGS  := -fno-builtin -fno-stack-protector -Wno-unused-local-typedefs -I ${TG_COMMON}/include -I ${TG_TGKRNL}/inc
