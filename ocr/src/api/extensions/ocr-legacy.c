@@ -19,7 +19,7 @@
 
 #define DEBUG_TYPE API
 
-extern void freeUpRuntime(bool);
+extern void freeUpRuntime(bool, u8*);
 extern void bringUpRuntime(ocrConfig_t *ocrConfig);
 
 void ocrLegacyInit(ocrGuid_t *legacyContext, ocrConfig_t * ocrConfig) {
@@ -45,7 +45,7 @@ void ocrLegacyInit(ocrGuid_t *legacyContext, ocrConfig_t * ocrConfig) {
 u8 ocrLegacyFinalize(ocrGuid_t legacyContext, bool runUntilShutdown) {
     // Bug #492: legacyContext is ignored
     ocrPolicyDomain_t *pd = NULL;
-    u8 returnCode;
+    u8 returnCode, otherReturnCode;
     getCurrentEnv(&pd, NULL, NULL, NULL);
     if(runUntilShutdown) {
         // Here, we are in COMPUTE_OK. We just need to transition to USER_OK
@@ -60,7 +60,7 @@ u8 ocrLegacyFinalize(ocrGuid_t legacyContext, bool runUntilShutdown) {
             ==, 0);
         DPRINTF(DEBUG_LVL_INFO, "ocrLegacyFinalize switchRunlevel RL_USER_OK | RL_BRING_UP returned\n");
         returnCode = pd->shutdownCode;
-        freeUpRuntime(true);
+        freeUpRuntime(true, &otherReturnCode);
     } else {
         // This mode just tears down the runtime (does not wait for an ocrShutdown() call)
         // This is useful in a program that calls OCR from time to time:
@@ -68,7 +68,7 @@ u8 ocrLegacyFinalize(ocrGuid_t legacyContext, bool runUntilShutdown) {
         //  calls to ocrLegacySpawnOCR() and ocrLegacyBlockProgress
         // ocrLegacyFinalize()
         returnCode = pd->shutdownCode;
-        freeUpRuntime(false);
+        freeUpRuntime(false, &otherReturnCode);
     }
     return returnCode;
 }

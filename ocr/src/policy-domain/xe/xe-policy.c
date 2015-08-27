@@ -57,6 +57,7 @@ static void doRLBarrier(ocrPolicyDomain_t *policy) {
     PD_MSG_FIELD_I(runlevel) = rself->rlSwitch.barrierRL;
     PD_MSG_FIELD_I(properties) = RL_RESPONSE | RL_BARRIER | RL_FROM_MSG |
         (rself->rlSwitch.properties & (RL_BRING_UP | RL_TEAR_DOWN));
+    PD_MSG_FIELD_I(errorCode) = policy->shutdownCode; // Always safe to do
     RESULT_ASSERT(policy->fcts.sendMessage(
                       policy, policy->parentLocation, &msg,
                       NULL, TWOWAY_MSG_PROP | PERSIST_MSG_PROP), ==, 0);
@@ -907,6 +908,11 @@ u8 xePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
                 rself->rlSwitch.barrierState = RL_BARRIER_STATE_PARENT_RESPONSE;
             } else {
                 // This is a request for a change of runlevel
+                if(PD_MSG_FIELD_I(runlevel) == RL_USER_OK &&
+                   (PD_MSG_FIELD_I(properties) & RL_TEAR_DOWN)) {
+                    // Record the shutdown code
+                    self->shutdownCode = PD_MSG_FIELD_I(errorCode);
+                }
                 ASSERT(PD_MSG_FIELD_I(runlevel) == rself->rlSwitch.barrierRL);
                 if(rself->rlSwitch.barrierState == RL_BARRIER_STATE_UNINIT) {
                     DPRINTF(DEBUG_LVL_VVERB, "Request to switch to RL %u\n", rself->rlSwitch.barrierRL);
@@ -923,6 +929,8 @@ u8 xePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         } else {
             // This is a local shutdown request. We need to start shutting down
             DPRINTF(DEBUG_LVL_VVERB, "Initial, user-initiated, shutdown notification\n");
+            // Record the shutdown code to be able to pass it along
+            self->shutdownCode = PD_MSG_FIELD_I(errorCode);
             RESULT_ASSERT(self->fcts.switchRunlevel(
                               self, RL_USER_OK, RL_TEAR_DOWN | RL_BARRIER |
                               RL_REQUEST | RL_PD_MASTER), ==, 0);

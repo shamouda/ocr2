@@ -159,6 +159,7 @@ static void doRLBarrier(ocrPolicyDomain_t *policy) {
         PD_MSG_FIELD_I(runlevel) = rself->rlSwitch.barrierRL;
         PD_MSG_FIELD_I(properties) = RL_RESPONSE | RL_ASYNC | RL_FROM_MSG |
             (rself->rlSwitch.properties & (RL_BRING_UP | RL_TEAR_DOWN));
+        PD_MSG_FIELD_I(errorCode) = policy->shutdownCode; // Always OK to do
         RESULT_ASSERT(policy->fcts.sendMessage(policy, policy->parentLocation,
                                                &msg, NULL, 0), ==, 0);
 #undef PD_MSG
@@ -1154,9 +1155,15 @@ static u8 ceCreateEdt(ocrPolicyDomain_t *self, ocrFatGuid_t *guid,
     if(*depc == EDT_PARAM_DEF) {
         *depc = taskTemplate->depc;
     }
-    // If paramc are expected, double check paramv is not NULL
+    // Check paramc/paramv combination validity
     if((*paramc > 0) && (paramv == NULL)) {
-        ASSERT(0);
+        DPRINTF(DEBUG_LVL_WARN,"error: EDT paramc set to %d but paramv is NULL\n", *paramc);
+        ASSERT(false);
+        return OCR_EINVAL;
+    }
+    if((*paramc == 0) && (paramv != NULL)) {
+        DPRINTF(DEBUG_LVL_WARN,"error: EDT paramc set to zero but paramv not NULL\n");
+        ASSERT(false);
         return OCR_EINVAL;
     }
 
@@ -1261,6 +1268,7 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             msg->type = PD_MSG_MGT_RL_NOTIFY | PD_MSG_REQUEST | PD_MSG_RESPONSE_OVERRIDE;
             PD_MSG_FIELD_I(runlevel) = rself->rlSwitch.barrierRL;
             PD_MSG_FIELD_I(properties) = rself->rlSwitch.properties;
+            PD_MSG_FIELD_I(errorCode) = self->shutdownCode; // Always safe to do
 #undef PD_MSG
 #undef PD_TYPE
 
@@ -2225,8 +2233,12 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
                     // (as an answer to some other message we sent)
                     ASSERT(PD_MSG_FIELD_I(runlevel) == cePolicy->rlSwitch.barrierRL);
                     if(cePolicy->rlSwitch.barrierState == RL_BARRIER_STATE_UNINIT) {
-                        //Release pending responses from the scheduler
-                        ASSERT(self->schedulers[0]->fcts.update(self->schedulers[0], OCR_SCHEDULER_UPDATE_PROP_SHUTDOWN) == 0);
+                        if(PD_MSG_FIELD_I(runlevel) == RL_USER_OK &&
+                           (PD_MSG_FIELD_I(properties) & RL_TEAR_DOWN)) {
+                            self->shutdownCode = PD_MSG_FIELD_I(errorCode);
+                            //Release pending responses from the scheduler
+                            ASSERT(self->schedulers[0]->fcts.update(self->schedulers[0], OCR_SCHEDULER_UPDATE_PROP_SHUTDOWN) == 0);
+                        }
                         RESULT_ASSERT(self->fcts.switchRunlevel(
                                           self, PD_MSG_FIELD_I(runlevel),
                                           PD_MSG_FIELD_I(properties) | cePolicy->rlSwitch.pdStatus), ==, 0);
@@ -2259,6 +2271,8 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
                         // XEs or CEs that "respond" to the barrier are fully checked in
                         cePolicy->rlSwitch.checkedIn = 1;
                     }
+                    // Record the shudown code
+                    self->shutdownCode = PD_MSG_FIELD_I(errorCode);
 
                     //Release pending responses from the scheduler
                     ASSERT(self->schedulers[0]->fcts.update(self->schedulers[0], OCR_SCHEDULER_UPDATE_PROP_SHUTDOWN) == 0);
@@ -2284,6 +2298,7 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
                 if(cePolicy->rlSwitch.barrierState == RL_BARRIER_STATE_UNINIT &&
                    (PD_MSG_FIELD_I(runlevel) == RL_USER_OK) && (PD_MSG_FIELD_I(properties) & RL_TEAR_DOWN)) {
                     DPRINTF(DEBUG_LVL_VVERB, "RL_NOTIFY: initial shutdown notification\n");
+                    self->shutdownCode = PD_MSG_FIELD_I(errorCode);
                     ASSERT(cePolicy->rlSwitch.barrierRL == RL_USER_OK);
                     ASSERT(cePolicy->rlSwitch.checkedIn == 0); // No other XE or child CE should have notified us
                     // Not our child so we stay at 0

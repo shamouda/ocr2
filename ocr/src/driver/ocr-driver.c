@@ -690,7 +690,7 @@ void bringUpRuntime(ocrConfig_t *ocrConfig) {
 #endif
 }
 
-void freeUpRuntime (bool doTeardown) {
+void freeUpRuntime (bool doTeardown, u8 *returnCode) {
     u32 i, j;
     ocrPolicyDomain_t *pd = NULL;
     getCurrentEnv(&pd, NULL, NULL, NULL);
@@ -706,6 +706,7 @@ void freeUpRuntime (bool doTeardown) {
         // Bug #597 The switch of other PD's runlevels needs to happen with ocrPdMessages_t
         RESULT_ASSERT(pd->fcts.switchRunlevel(pd, RL_PD_OK, RL_REQUEST | RL_ASYNC | RL_TEAR_DOWN | RL_NODE_MASTER),
                       ==, 0);
+
         // Here everyone is down except NODE_MASTER
         for(i = 1; i < inst_counts[policydomain_type]; ++i) {
             otherPolicyDomains = (ocrPolicyDomain_t*)all_instances[policydomain_type][i];
@@ -723,6 +724,9 @@ void freeUpRuntime (bool doTeardown) {
         RESULT_ASSERT(pd->fcts.switchRunlevel(pd, RL_CONFIG_PARSE, RL_REQUEST | RL_ASYNC | RL_TEAR_DOWN | RL_NODE_MASTER),
                       ==, 0);
     }
+
+    // Read the return code
+    *returnCode = pd->shutdownCode;
 
     for(i = 1; i < inst_counts[policydomain_type]; ++i) {
         otherPolicyDomains = (ocrPolicyDomain_t*)all_instances[policydomain_type][i];
@@ -867,14 +871,14 @@ int __attribute__ ((weak)) main(int argc, const char* argv[]) {
         pd->fcts.switchRunlevel(pd, RL_USER_OK, RL_REQUEST | RL_ASYNC | RL_BRING_UP | RL_NODE_MASTER),
         ==, 0);
 
-    u8 returnCode = pd->shutdownCode;
+    u8 returnCode = 0;
 
-    freeUpRuntime(true);
+    freeUpRuntime(true, &returnCode);
 
     // Warning: Finalizer specific to platforms may call exit
     platformSpecificFinalizer(returnCode);
 
-    return returnCode;
+    return (int)returnCode;
 }
 
 #endif

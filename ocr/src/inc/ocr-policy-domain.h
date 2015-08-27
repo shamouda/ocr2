@@ -1034,7 +1034,7 @@ typedef struct _ocrPolicyMsg_t {
                                                  - RL_BRING_UP
                                                  - RL_TEAR_DOWN
                                             */
-                    u32 errorCode;          /**< In switch from RL_USER, used to capture
+                    u8 errorCode;           /**< In switch from RL_USER, used to capture
                                                error code */
                 } in;
                 struct {
