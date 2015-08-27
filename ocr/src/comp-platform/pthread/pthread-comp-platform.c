@@ -106,6 +106,16 @@ u8 pthreadSwitchRunlevel(ocrCompPlatform_t *self, ocrPolicyDomain_t *PD, ocrRunl
         if((properties & RL_BRING_UP) && RL_IS_FIRST_PHASE_UP(PD, RL_CONFIG_PARSE, phase)) {
             ASSERT(self->worker != NULL);
         }
+        if((properties & RL_TEAR_DOWN) && RL_IS_LAST_PHASE_DOWN(PD, RL_CONFIG_PARSE, phase)) {
+            perThreadStorage_t *tls = pthread_getspecific(selfKey);
+            // This code is called by the master thread once per comp-platform
+            if (tls != NULL) {
+                // This is necessary for legacy mode support so that the next time
+                // we start the runtime we do not reuse the current thread old TLS.
+                pthread_setspecific(selfKey, NULL);
+            }
+        }
+
         break;
     case RL_NETWORK_OK:
         break;

@@ -4,10 +4,6 @@
  * and cannot be distributed without it. This notice cannot be
  * removed or modified.
  */
-
-
-
-
 #include "ocr.h"
 #include "extensions/ocr-affinity.h"
 /**

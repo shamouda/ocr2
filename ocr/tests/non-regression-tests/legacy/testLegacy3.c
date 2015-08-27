@@ -6,28 +6,21 @@
 
 #include "ocr.h"
 
-// Only tested when OCR library interface is available
-#ifdef OCR_LEGACY_ITF
-
-
-
+// Only tested when OCR legacy interface is available
+#ifdef ENABLE_EXTENSION_LEGACY
 
 #include "extensions/ocr-legacy.h"
 
 /**
- * DESC: OCR-library, init, edt-finish, finalize
- * Builds a finish-edt that spawns a number of sub-edt to fill-in an array.
- * Then checks if all the elements of the array have been properly set.
+ * DESC: OCR-legacy, init, edt-finish does shutdown, block, finalize
  */
 
-#define N 2
-
+#define N 100
 
 // This edt is triggered when the output event of the other edt is satisfied by the runtime
 ocrGuid_t terminateEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
-    // TODO shouldn't be doing that... but need more support from output events to get a 'return' value from an edt
-    ASSERT(depv[0].guid != NULL_GUID);
-    u64 * array = (u64*)depv[0].ptr;
+    ASSERT(depv[1].guid != NULL_GUID);
+    u64 * array = (u64*)depv[1].ptr;
     u64 i = 0;
     while (i < N) {
         ASSERT(array[i] == i);
@@ -39,8 +32,8 @@ ocrGuid_t terminateEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
 }
 
 ocrGuid_t updaterEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
-    // Retrieve id
     ASSERT(paramc == 1);
+    // Retrieve id
     u64 id = paramv[0];
     ASSERT ((id>=0) && (id < N));
     u64 * dbPtr = (u64 *) depv[0].ptr;
@@ -49,50 +42,69 @@ ocrGuid_t updaterEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
 }
 
 ocrGuid_t rootEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
-    // Build a data-block to be shared with sub-edts
-    u64 * array;
-    ocrGuid_t dbGuid;
-    ocrDbCreate(&dbGuid,(void **) &array, sizeof(u64)*N, 0, NULL_GUID, NO_ALLOC);
-
+    ocrGuid_t dbGuid = depv[0].guid;
     ocrGuid_t updaterEdtTemplateGuid;
     ocrEdtTemplateCreate(&updaterEdtTemplateGuid, updaterEdt, 1 /*paramc*/, 1/*depc*/);
     u64 i = 0;
     while (i < N) {
         // Pass down the index to write to and the db guid through params
         // (Could also be done through dependences)
-        u32 nparamc = 1;
         u64 nparamv = i;
         // Pass the guid we got fron depv to the updaterEdt through depv
         ocrGuid_t updaterEdtGuid;
         ocrEdtCreate(&updaterEdtGuid, updaterEdtTemplateGuid, EDT_PARAM_DEF, &nparamv, EDT_PARAM_DEF, &dbGuid, 0, NULL_GUID, NULL_GUID);
         i++;
     }
-    return dbGuid;
+    return NULL_GUID;
+}
+
+ocrGuid_t headEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
+    ocrGuid_t terminateEdtGuid;
+    ocrGuid_t terminateEdtTemplateGuid;
+    ocrEdtTemplateCreate(&terminateEdtTemplateGuid, terminateEdt, 0 /*paramc*/, 2 /*depc*/);
+    ocrEdtCreate(&terminateEdtGuid, terminateEdtTemplateGuid, EDT_PARAM_DEF, /*paramv=*/NULL, EDT_PARAM_DEF, /*depv=*/NULL,
+                 0, NULL_GUID, /*outEvent=*/NULL);
+    ocrGuid_t outputEventGuid;
+    ocrGuid_t rootEdtGuid;
+    ocrGuid_t rootEdtTemplateGuid;
+    ocrEdtTemplateCreate(&rootEdtTemplateGuid, rootEdt, 0 /*paramc*/, 1 /*depc*/);
+    ocrEdtCreate(&rootEdtGuid, rootEdtTemplateGuid, EDT_PARAM_DEF, /*paramv=*/NULL, EDT_PARAM_DEF, /*depv=*/NULL,
+                 EDT_PROP_FINISH, NULL_GUID, /*outEvent=*/&outputEventGuid);
+    u64 * array;
+    ocrGuid_t dbGuid;
+    ocrDbCreate(&dbGuid,(void **) &array, sizeof(u64)*N, 0, NULL_GUID, NO_ALLOC);
+    ocrDbRelease(dbGuid);
+
+    // When output-event will be satisfied, the whole task sub-tree
+    // spawned by rootEdt will be done, and shutdownEdt is called.
+    ocrAddDependence(outputEventGuid, terminateEdtGuid, 0, DB_MODE_NULL);
+    ocrAddDependence(dbGuid, terminateEdtGuid, 1, DB_MODE_RO);
+
+    ocrGuid_t stickyEvtGuid;
+    // Create a sticky to block on it and avoid the race that
+    // can occur with once events
+    ocrEventCreate(&stickyEvtGuid, OCR_EVENT_STICKY_T, false);
+    ocrAddDependence(outputEventGuid, stickyEvtGuid, 0, DB_MODE_NULL);
+
+    // Schedule the root EDT
+    ocrAddDependence(dbGuid, rootEdtGuid, 0, DB_MODE_RO);
+
+    // Wait for the output-event to be satisfied before proceeding
+    ocrLegacyBlockProgress(stickyEvtGuid, NULL, NULL, NULL, LEGACY_PROP_NONE);
+
+    return NULL_GUID;
 }
 
 int main(int argc, const char * argv[]) {
     ocrConfig_t ocrConfig;
-    ocrGuid_T legacyCtx;
+    ocrGuid_t legacyCtx;
     ocrParseArgs(argc, argv, &ocrConfig);
     ocrLegacyInit(&legacyCtx, &ocrConfig);
-
-    ocrGuid_t terminateEdtGuid;
-    ocrGuid_t terminateEdtTemplateGuid;
-    ocrEdtTemplateCreate(&terminateEdtTemplateGuid, terminateEdt, 0 /*paramc*/, 1 /*depc*/);
-    ocrEdtCreate(&terminateEdtGuid, terminateEdtTemplateGuid, EDT_PARAM_DEF, /*paramv=*/NULL, EDT_PARAM_DEF, /*depv=*/NULL,
-                 /*properties=*/0, NULL_GUID, /*outEvent=*/NULL);
-
-    ocrGuid_t outputEventGuid;
-    ocrGuid_t rootEdtGuid;
-    ocrGuid_t rootEdtTemplateGuid;
-    ocrEdtTemplateCreate(&rootEdtTemplateGuid, rootEdt, 0 /*paramc*/, 0 /*depc*/);
-    ocrEdtCreate(&rootEdtGuid, rootEdtTemplateGuid, EDT_PARAM_DEF, /*paramv=*/NULL, EDT_PARAM_DEF, /*depv=*/NULL,
-                 /*properties=*/EDT_PROP_FINISH, NULL_GUID, /*outEvent=*/&outputEventGuid);
-    ocrAddDependence(outputEventGuid, terminateEdtGuid, 0, DB_MODE_CONST);
-
-    // Wait for the output-event to be satisfied before proceeding
-    ocrWait(outputEventGuid);
-
+    ocrGuid_t headEdtGuid;
+    ocrGuid_t headEdtTemplateGuid;
+    ocrEdtTemplateCreate(&headEdtTemplateGuid, headEdt, 0, 0);
+    ocrEdtCreate(&headEdtGuid, headEdtTemplateGuid, EDT_PARAM_DEF, NULL, EDT_PARAM_DEF, NULL,
+                 EDT_PROP_NONE, NULL_GUID, NULL);
     ocrLegacyFinalize(legacyCtx, true);
     return 0;
 }

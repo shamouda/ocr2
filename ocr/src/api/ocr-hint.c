@@ -40,7 +40,10 @@ do {                                                                            
     }                                                                           \
 } while(0);
 
+#define HINT_DBG_WARN_MSG "WARNING: Current build of OCR is not configured to use the hints API\n"
+
 u8 ocrHintInit(ocrHint_t *hint, ocrHintType_t hintType) {
+#ifdef ENABLE_HINTS
     hint->type = hintType;
     hint->propMask = 0;
     switch (hintType) {
@@ -60,30 +63,50 @@ u8 ocrHintInit(ocrHint_t *hint, ocrHintType_t hintType) {
         return OCR_EINVAL;
     }
     return 0;
+#else
+    DPRINTF(DEBUG_LVL_WARN, HINT_DBG_WARN_MSG);
+    return OCR_EINVAL;
+#endif
 }
 
 u8 ocrSetHintValue(ocrHint_t *hint, ocrHintProp_t hintProp, u64 value) {
+#ifdef ENABLE_HINTS
     OCR_HINT_CHECK(hint, hintProp);
     hint->propMask |= OCR_HINT_BIT_MASK(hint, hintProp);
     OCR_HINT_FIELD(hint, hintProp) = value;
     return 0;
+#else
+    DPRINTF(DEBUG_LVL_WARN, HINT_DBG_WARN_MSG);
+    return OCR_EINVAL;
+#endif
 }
 
 u8 ocrUnsetHintValue(ocrHint_t *hint, ocrHintProp_t hintProp) {
+#ifdef ENABLE_HINTS
     OCR_HINT_CHECK(hint, hintProp);
     hint->propMask &= ~OCR_HINT_BIT_MASK(hint, hintProp);
     return 0;
+#else
+    DPRINTF(DEBUG_LVL_WARN, HINT_DBG_WARN_MSG);
+    return OCR_EINVAL;
+#endif
 }
 
 u8 ocrGetHintValue(ocrHint_t *hint, ocrHintProp_t hintProp, u64 *value) {
+#ifdef ENABLE_HINTS
     OCR_HINT_CHECK(hint, hintProp);
     if ((hint->propMask & OCR_HINT_BIT_MASK(hint, hintProp)) == 0)
         return OCR_ENOENT;
     *value = OCR_HINT_FIELD(hint, hintProp);
     return 0;
+#else
+    DPRINTF(DEBUG_LVL_WARN, HINT_DBG_WARN_MSG);
+    return OCR_EINVAL;
+#endif
 }
 
 u8 ocrSetHint(ocrGuid_t guid, ocrHint_t *hint) {
+#ifdef ENABLE_HINTS
     if (hint->type == OCR_HINT_UNDEF_T) {
         DPRINTF(DEBUG_LVL_WARN, "EXIT ocrSetHint: Invalid hint type\n");
         return OCR_EINVAL;
@@ -107,9 +130,14 @@ u8 ocrSetHint(ocrGuid_t guid, ocrHint_t *hint) {
     RETURN_PROFILE(returnCode);
 #undef PD_MSG
 #undef PD_TYPE
+#else
+    DPRINTF(DEBUG_LVL_WARN, HINT_DBG_WARN_MSG);
+    return OCR_EINVAL;
+#endif
 }
 
 u8 ocrGetHint(ocrGuid_t guid, ocrHint_t *hint) {
+#ifdef ENABLE_HINTS
     if (hint->type == OCR_HINT_UNDEF_T) {
         DPRINTF(DEBUG_LVL_WARN, "EXIT ocrGetHint: Invalid hint type\n");
         return OCR_EINVAL;
@@ -139,5 +167,9 @@ u8 ocrGetHint(ocrGuid_t guid, ocrHint_t *hint) {
     RETURN_PROFILE(returnCode);
 #undef PD_MSG
 #undef PD_TYPE
+#else
+    DPRINTF(DEBUG_LVL_WARN, HINT_DBG_WARN_MSG);
+    return OCR_EINVAL;
+#endif
 }
 

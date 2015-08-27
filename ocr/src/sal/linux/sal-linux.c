@@ -1,12 +1,17 @@
-#include "ocr-config.h"
-#ifdef ENABLE_POLICY_DOMAIN_HC
+/*
+ * This file is subject to the license agreement located in the file LICENSE
+ * and cannot be distributed without it. This notice cannot be
+ * removed or modified.
+ */
 
-#include "ocr-hal.h"
-#include "ocr-types.h"
+
+#include "ocr-config.h"
+//Temporary condition until x86-mpi uses the new scheduler by default
+//or the x86-mpi pause resume gets merged (keeps Jenkins happy)
+#if defined(ENABLE_POLICY_DOMAIN_HC) && defined(ENABLE_EXTENSION_PAUSE)
+
 #include <signal.h>
-#include "policy-domain/hc/hc-policy.h"
-#include "comp-platform/pthread/pthread-comp-platform.h"
-#include "ocr-policy-domain.h"
+#include "utils/pqr-utils.h"
 
 /* NOTE: Below is an optional interface allowing users to
  *       send SIGUSR1 and SIGUSR2 to control pause/query/resume
@@ -24,24 +29,24 @@ void sig_handler(u32 sigNum) {
     ocrPolicyDomainHc_t *globalPD = (ocrPolicyDomainHc_t *) pd;
 
 
-    if(sigNum == SIGUSR1 && globalPD->runtimePause == false){
+    if(sigNum == SIGUSR1 && globalPD->pqrFlags.runtimePause == false){
         PRINTF("Pausing Runtime\n");
         salPause(true);
         return;
     }
 
-    if(sigNum == SIGUSR1 && globalPD->runtimePause == true){
+    if(sigNum == SIGUSR1 && globalPD->pqrFlags.runtimePause == true){
         PRINTF("Resuming Runtime\n");
         salResume(1);
     }
 
-    if(sigNum == SIGUSR2 && globalPD->runtimePause == true){
+    if(sigNum == SIGUSR2 && globalPD->pqrFlags.runtimePause == true){
         PRINTF("\nQuery Not Supported via signalling\n");
         //salQuery(1, OCR_QUERY_WORKPILE_EDTS, NULL_GUID, &sigRes, &sigSize, 0);
         return;
     }
 
-    if(sigNum == SIGUSR2 && globalPD->runtimePause == false){
+    if(sigNum == SIGUSR2 && globalPD->pqrFlags.runtimePause == false){
         PRINTF("Nothing to do\n");
         return;
     }
@@ -55,24 +60,24 @@ u32 salPause(bool isBlocking){
     getCurrentEnv(&pd, &baseWorker, NULL, NULL);
     ocrPolicyDomainHc_t *self = (ocrPolicyDomainHc_t *) pd;
 
-    while(hal_cmpswap32((u32*)&self->runtimePause, false, true) == true) {
+    while(hal_cmpswap32((u32*)&self->pqrFlags.runtimePause, false, true) == true) {
         // Already paused - try to pause self only if blocked
         if(isBlocking == false)
             return 0;
         // Blocking pause
-        if(self->runtimePause == true) {
-            hal_xadd32((u32*)&self->pauseCounter, 1);
+        if(self->pqrFlags.runtimePause == true) {
+            hal_xadd32((u32*)&self->pqrFlags.pauseCounter, 1);
             //Pause called - stop workers
-            while(self->runtimePause == true) {
+            while(self->pqrFlags.runtimePause == true) {
                 hal_pause();
             }
-            hal_xadd32((u32*)&self->pauseCounter, -1);
+            hal_xadd32((u32*)&self->pqrFlags.pauseCounter, -1);
         }
     }
 
-    hal_xadd32((u32*)&self->pauseCounter, 1);
+    hal_xadd32((u32*)&self->pqrFlags.pauseCounter, 1);
 
-    while(self->pauseCounter < self->base.workerCount){
+    while(self->pqrFlags.pauseCounter < self->base.workerCount){
         hal_pause();
     }
 
@@ -86,11 +91,11 @@ ocrGuid_t salQuery(ocrQueryType_t query, ocrGuid_t guid, void **result, u32 *siz
     ocrPolicyDomainHc_t *self = (ocrPolicyDomainHc_t *) pd;
     ocrGuid_t dataDb = NULL_GUID;
 
-    if(self->runtimePause == false)
+    if(self->pqrFlags.runtimePause == false)
         return NULL_GUID;
 
     switch(query){
-        case OCR_QUERY_WORKPILE_EDTS:
+        case OCR_QUERY_READY_EDTS:
             dataDb = hcQueryNextEdts(self, result, size);
             *size = (*size)*sizeof(ocrGuid_t);
             break;
@@ -98,7 +103,9 @@ ocrGuid_t salQuery(ocrQueryType_t query, ocrGuid_t guid, void **result, u32 *siz
         case OCR_QUERY_EVENTS:
             break;
 
-        case OCR_QUERY_DATABLOCKS:
+        case OCR_QUERY_LAST_SATISFIED_DB:
+            dataDb = hcQueryPreviousDatablock(self, result, size);
+            *size = (*size)*(sizeof(ocrGuid_t));
             break;
 
         case OCR_QUERY_ALL_EDTS:
@@ -118,8 +125,8 @@ void salResume(u32 flag){
     getCurrentEnv(&pd, NULL, NULL, NULL);
     ocrPolicyDomainHc_t *self = (ocrPolicyDomainHc_t *) pd;
 
-    if(hal_cmpswap32((u32*)&self->runtimePause, true, false) == true)
-        hal_xadd32((u32*)&self->pauseCounter, -1);
+    if(hal_cmpswap32((u32*)&self->pqrFlags.runtimePause, true, false) == true)
+        hal_xadd32((u32*)&self->pqrFlags.pauseCounter, -1);
 
     return;
 }

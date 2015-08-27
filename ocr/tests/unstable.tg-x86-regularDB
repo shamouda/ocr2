@@ -6,3 +6,4 @@ testDistDbEwRo3.c
 edtForkBomb.c
 testEdtDestroy0.c
 guidlabel.c
+dbNoAcquire0.c

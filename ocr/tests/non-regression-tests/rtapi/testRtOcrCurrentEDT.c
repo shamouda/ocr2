@@ -4,38 +4,28 @@
  * removed or modified.
  */
 
-
-
-
-
 #include "ocr.h"
 
-// Only tested when ocr-legacy interface is available
-#ifdef OCR_LEGACY_ITF
+/**
+ * DESC: RT-API: Test 'currentEdtUserGet'
+ */
+
+// Only tested when OCR runtime API is available
+#ifdef ENABLE_EXTENSION_RTITF
 
 #include "extensions/ocr-runtime-itf.h"
 
-#define ELS_OFFSET 0
-
-void someUserFunction() {
-    // ocrGuid_t els_data_guid = ocrElsGet(ELS_OFFSET);
-    // void * datum;
-    // ocrDbAcquire(els_data_guid, &datum, 0);
-    // ASSERT(*((int *)datum) == 42);
-    // ocrDbRelease(els_data_guid);
-}
-
 ocrGuid_t taskForEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
-    // ocrGuid_t data = depv[0].guid;
-    // ocrElsSet(ELS_OFFSET, data);
-    // someUserFunction();
-    // This is the last EDT to execute, terminate
+    ocrGuid_t edtGuid = *((ocrGuid_t*)depv[0].ptr);
+    ocrGuid_t currentEdt = currentEdtUserGet();
+    // Compare edtGuid passed down and what's returned by the runtime
+    ASSERT(currentEdt == edtGuid);
     ocrShutdown();
     return NULL_GUID;
 }
 
 ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
-    // Current thread is '0' and goes on with user code.
+    PRINTF("RT API Test\n");
     ocrGuid_t eventGuid;
     ocrEventCreate(&eventGuid, OCR_EVENT_STICKY_T, true);
 
@@ -44,18 +34,18 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrGuid_t taskForEdtTemplateGuid;
     ocrEdtTemplateCreate(&taskForEdtTemplateGuid, taskForEdt, 0 /*paramc*/, 1 /*depc*/);
     ocrEdtCreate(&edtGuid, taskForEdtTemplateGuid, EDT_PARAM_DEF, NULL, EDT_PARAM_DEF, NULL, 0, NULL_GUID, NULL);
-    // Register a dependence between an event and an edt
-    ocrAddDependence(eventGuid, edtGuid, 0);
 
-    int *k;
+    // Build a data-block and pass down the edtGuid
+    ocrGuid_t *k;
     ocrGuid_t dbGuid;
     ocrDbCreate(&dbGuid,(void **) &k,
-                sizeof(int), /*flags=*/DB_PROP_NONE,
+                sizeof(ocrGuid_t), /*flags=*/0,
                 /*location=*/NULL_GUID,
                 NO_ALLOC);
-    *k = 42;
+    *k = edtGuid;
 
-    ocrEventSatisfy(eventGuid, dbGuid);
+    // Pass down the db to the edt
+    ocrAddDependence(dbGuid, edtGuid, 0, DB_MODE_CONST);
 
     return NULL_GUID;
 }
@@ -63,6 +53,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
 #else
 
 ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
+    PRINTF("No RT API\n");
     ocrShutdown();
     return NULL_GUID;
 }

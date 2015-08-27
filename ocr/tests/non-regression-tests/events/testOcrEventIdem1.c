@@ -4,10 +4,6 @@
  * removed or modified.
  */
 
-
-
-
-
 #include "ocr.h"
 
 /**
@@ -26,9 +22,9 @@ ocrGuid_t computeEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
 ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     // Current thread is '0' and goes on with user code.
     ocrGuid_t e0;
-    ocrEventCreate(&e0, OCR_EVENT_IDEM_T, true);
+    ocrEventCreate(&e0, OCR_EVENT_IDEM_T, EVT_PROP_TAKES_ARG);
     ocrGuid_t e1;
-    ocrEventCreate(&e1, OCR_EVENT_IDEM_T, true);
+    ocrEventCreate(&e1, OCR_EVENT_IDEM_T, EVT_PROP_TAKES_ARG);
 
     // Creates the EDT
     ocrGuid_t edtGuid;

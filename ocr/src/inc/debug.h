@@ -243,6 +243,16 @@
 #define DEBUG_LVL_POLICY OCR_DEBUG_LVL
 #endif
 
+#ifdef OCR_DEBUG_SAL
+#define OCR_DEBUG_SAL 1
+#else
+#define OCR_DEBUG_SAL 0
+#endif
+
+#define OCR_DEBUG_SAL_STR "SAL"
+#ifndef DEBUG_LVL_SAL
+#define DEBUG_LVL_SAL OCR_DEBUG_LVL
+#endif
 
 #ifdef OCR_DEBUG_SCHEDULER
 #define OCR_DEBUG_SCHEDULER 1

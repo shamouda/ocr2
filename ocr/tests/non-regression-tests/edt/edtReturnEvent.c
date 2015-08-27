@@ -3,12 +3,7 @@
  * and cannot be distributed without it. This notice cannot be
  * removed or modified.
  */
-
-
-
-
 #include "ocr.h"
-
 /**
  * DESC: Test using a future Event GUID as an EDT return value
  */
@@ -37,7 +32,7 @@ ocrGuid_t producer1(u32 paramc, u64 *paramv, u32 depc, ocrEdtDep_t *depv) {
     // of producer being satisfied and destroyed before we
     // could have returned its guid.
     ocrGuid_t complete_event;
-    ocrEventCreate(&complete_event, OCR_EVENT_STICKY_T, false);
+    ocrEventCreate(&complete_event,OCR_EVENT_ONCE_T, EVT_PROP_NONE);
     ocrEdtCreate(&producer_edt, producer_template, 0, NULL, 1, NULL,
                  EDT_PROP_NONE, NULL_GUID, &producer_done_event);
     ocrAddDependence(producer_done_event, complete_event, 0, DB_MODE_CONST);
@@ -52,7 +47,7 @@ ocrGuid_t mainEdt(u32 paramc, u64 *paramv, u32 depc, ocrEdtDep_t *depv) {
     // The ready_event ensures the producer edt doesn't run before we
     // can add a dependence to its output event
     ocrGuid_t ready_event;
-    ocrEventCreate(&ready_event, OCR_EVENT_STICKY_T, false);
+    ocrEventCreate(&ready_event,OCR_EVENT_ONCE_T, EVT_PROP_NONE);
     ocrEdtTemplateCreate(&producer_template, producer1, 0, 1);
     ocrEdtTemplateCreate(&consumer_template, consumer , 0, 1);
     ocrEdtCreate(&producer_edt, producer_template, 0, NULL, 1, &ready_event,
