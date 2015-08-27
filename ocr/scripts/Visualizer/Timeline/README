@@ -35,7 +35,13 @@ Script Instructions:
  to the /ocr/scripts/Visualizer/Timeline directory
     The command would look like: make -f Makefile.x86 run > ../../scripts/Visualizer/Timeline/<log_ouput_file_name>
 
--Navigate to /ocr/scripts/Visualizer/Timeline, and run: python timeline.py <log_ouput_file_name>
+-Navigate to /ocr/scripts/Visualizer/Timeline, and run: python timeline.py <log_ouput_file_name> <optional flags>
+
+    flag options:
+        -s  :  Display distributed system generated EDTs (off by default)
+        -c  :  Combine subsequent EDTs of equal type (off by default)
+        -f  :  Force All EDTs to display on a single page (off by default)
+
 -The output will be HTML files called timeline[*].html
 
 -Copy html file(s) to local machine, and starting with timeline1.html, open in an internet browser.

@@ -4,12 +4,7 @@
  * removed or modified.
  */
 
-
-
-
-
 #include "ocr.h"
-
 /**
  * DESC: Test EDT creation without any depc/depv
  */

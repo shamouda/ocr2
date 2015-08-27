@@ -4,12 +4,7 @@
  * removed or modified.
  */
 
-
-
-
-
 #include "ocr.h"
-
 /**
  * DESC: Test addDependence(db, event, slot) equivalent to directly satisfy the event
  */

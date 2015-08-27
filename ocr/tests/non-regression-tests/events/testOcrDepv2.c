@@ -4,12 +4,7 @@
  * removed or modified.
  */
 
-
-
-
-
 #include "ocr.h"
-
 /**
  * DESC: Create and EDT and directly give its depv (which are NULL_GUIDS)
  */

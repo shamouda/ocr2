@@ -31,22 +31,22 @@ typedef struct {
 } pdHcResumeSwitchRL_t;
 
 typedef struct {
-    ocrPolicyDomain_t base;
     volatile u32 pausingWorker; //Worker responsible for pause
     volatile bool runtimePause; //flag to indicate pause
     volatile u32 pauseCounter; //number of paused workers
+    volatile ocrGuid_t prevDb; //Previous DB used for sat.
+} hcPqrFlags;
 
+typedef struct {
+    ocrPolicyDomain_t base;
     pdHcResumeSwitchRL_t rlSwitch; // Used for asynchronous RL switch
+    hcPqrFlags pqrFlags;
 } ocrPolicyDomainHc_t;
 
 typedef struct {
     paramListPolicyDomainInst_t base;
     u32 rank; // set through the CFG file, not used for now
 } paramListPolicyDomainHcInst_t;
-
-ocrGuid_t hcQueryNextEdts(ocrPolicyDomainHc_t *rself, void **result, u32 *size);
-
-ocrGuid_t hcQueryAllEdts(ocrPolicyDomainHc_t *rself, void **result, u32 *size);
 
 ocrPolicyDomainFactory_t *newPolicyDomainFactoryHc(ocrParamList_t *perType);
 

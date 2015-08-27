@@ -567,11 +567,13 @@ rangeTracker_t *initializeRange(u32 maxSplits,
 
     LOCK(&(dest->lock));           // pool->lock is already 0 at startup (for x86, it's done at mallocBegin())
     if (dest->startBKHeap) {       // already init'ed? use startBKHeap as a initialization flag
+        ASSERT(dest->count);
         DPRINTF(DEBUG_LVL_INFO, "Initializing a range @ 0x%lx from 0x%lx to 0x%lx -- SKIP\n",
             (u64)dest, minRange, maxRange);
         goto init_range_skip;
     }
 
+    dest->count++;                 // initialization count, assuming zeroed at startup
     dest->minimum = minRange;
     dest->startBKHeap = minRange + sizeof(rangeTracker_t) + sizeof(tagNode_t)*maxSplits; // Start of our book-keeping heap
     dest->maximum = maxRange;

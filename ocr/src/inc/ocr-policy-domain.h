@@ -1479,7 +1479,7 @@ u64 ocrPolicyMsgGetMsgBaseSize(ocrPolicyMsg_t *msg, bool isIn);
  * @brief Marshall everything needed to send the message over to a PD that
  * does not share the same address space
  *
- * This function performs one of three operations depending on the
+ * This function performs one of four operations depending on the
  * mode. You must specify one of:
  *
  *   - MARSHALL_FULL_COPY: Fully copy and marshall msg into buffer. In

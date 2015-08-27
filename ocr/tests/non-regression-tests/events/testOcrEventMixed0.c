@@ -25,9 +25,9 @@ ocrGuid_t taskForEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
 
 ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrGuid_t once0;
-    ocrEventCreate(&once0, OCR_EVENT_ONCE_T, true);
+    ocrEventCreate(&once0, OCR_EVENT_ONCE_T, EVT_PROP_TAKES_ARG);
     ocrGuid_t once1;
-    ocrEventCreate(&once1, OCR_EVENT_ONCE_T, true);
+    ocrEventCreate(&once1, OCR_EVENT_ONCE_T, EVT_PROP_TAKES_ARG);
     ocrGuid_t sticky0;
     ocrEventCreate(&sticky0, OCR_EVENT_STICKY_T, true);
     ocrGuid_t sticky1;

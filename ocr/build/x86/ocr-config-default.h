@@ -74,6 +74,10 @@
 
 // Scheduler
 #define ENABLE_SCHEDULER_COMMON
+#define ENABLE_SCHEDULER_HC
+
+// Support for legacy runtime build on top of OCR
+#define ENABLE_SCHEDULER_BLOCKING_SUPPORT
 
 // Scheduler Heuristic
 #define ENABLE_SCHEDULER_HEURISTIC_HC

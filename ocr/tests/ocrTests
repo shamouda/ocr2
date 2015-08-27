@@ -31,12 +31,12 @@ while [[ $# -gt 0 ]]; do
         shift
         TEST_DIR=("$@")
         shift
-    elif [[ "$1" = "-run-itf-ext" ]]; then
+    elif [[ "$1" = "-ext_rtapi" ]]; then
         shift
-        RUNTIME_ITF_EXT=yes
-    elif [[ "$1" = "-ocrlegacy" ]]; then
+        TEST_EXT_RTAPI=yes
+    elif [[ "$1" = "-ext_legacy" ]]; then
         shift
-        OCR_LEGACY_ITF=yes
+        TEST_EXT_LEGACY=yes
     elif [[ "$1" = "-co" ]]; then
         shift
         STEP_COMPILE_ONLY="yes"
@@ -76,14 +76,19 @@ if [ -z "${CC}" ]; then
 fi
 
 export INCLUDES="-I${OCR_INSTALL}/include"
-export CFLAGS=" -Wall -g -Werror -DOCR_ENABLE_EDT_NAMING -DOCR_ASSERT -DENABLE_EXTENSION_AFFINITY"
 
-if [ -n "${RUNTIME_ITF_EXT}" ]; then
-    CFLAGS="$CFLAGS -DRUNTIME_ITF_EXT=1"
+if [[ ("$OCR_INSTALL" =~ "mpi") || ("$OCR_INSTALL" =~ "gasnet") ]]; then
+    export CFLAGS=" -Wall -g -Werror -DOCR_ENABLE_EDT_NAMING -DOCR_ASSERT -DENABLE_EXTENSION_AFFINITY"
+else
+    export CFLAGS=" -Wall -g -Werror -DOCR_ENABLE_EDT_NAMING -DOCR_ASSERT -DENABLE_EXTENSION_AFFINITY -DENABLE_EXTENSION_PAUSE"
 fi
 
-if [ -n "${OCR_LEGACY_ITF}" ]; then
-    CFLAGS="$CFLAGS -DOCR_LEGACY_ITF=1"
+if [ -n "${TEST_EXT_RTAPI}" ]; then
+    CFLAGS="$CFLAGS -DENABLE_EXTENSION_RTITF"
+fi
+
+if [ -n "${TEST_EXT_LEGACY}" ]; then
+    CFLAGS="$CFLAGS -DENABLE_EXTENSION_LEGACY"
 fi
 
 export LDFLAGS="-L${OCR_INSTALL}/lib -locr -lpthread ${OCR_LDFLAGS}"

@@ -3,19 +3,15 @@
  * and cannot be distributed without it. This notice cannot be
  * removed or modified.
  */
-
-
-
-
 #include "ocr.h"
 
 // Only tested when OCR legacy interface is available
-#ifdef OCR_LEGACY_ITF
+#ifdef ENABLE_EXTENSION_LEGACY
 
 #include "extensions/ocr-legacy.h"
 
 /**
- * DESC: OCR-legacy, init, edt does shutdown, finalize
+ * DESC: init, shutdown done from EDT, finalize
  */
 
 ocrGuid_t rootEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
@@ -34,6 +30,7 @@ int main(int argc, const char * argv[]) {
     ocrEdtTemplateCreate(&rootEdtTemplateGuid, rootEdt, 0 /*paramc*/, 0 /*depc*/);
     ocrEdtCreate(&rootEdtGuid, rootEdtTemplateGuid, EDT_PARAM_DEF, /*paramv=*/NULL, EDT_PARAM_DEF, /*depv=*/NULL,
                  /*properties=*/0, NULL_GUID, /*outEvent=*/NULL);
+    // This should wait for the EDT to finish
     ocrLegacyFinalize(legacyCtx, true);
     return 0;
 }

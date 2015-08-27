@@ -3,10 +3,6 @@
  * and cannot be distributed without it. This notice cannot be
  * removed or modified.
  */
-
-
-
-
 #include "ocr.h"
 #include "extensions/ocr-affinity.h"
 
@@ -46,7 +42,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrGuid_t dbsGuid[COUNT_EDT];
     u64 i = 0;
     while(i < COUNT_EDT) {
-        ocrEventCreate(&eventsGuid[i], OCR_EVENT_STICKY_T, false);
+        ocrEventCreate(&eventsGuid[i],OCR_EVENT_ONCE_T, EVT_PROP_NONE);
         ocrGuid_t * dbPtr;
         ocrDbCreate(&dbsGuid[i], (void **)&dbPtr, sizeof(ocrGuid_t), DB_PROP_SINGLE_ASSIGNMENT, NULL_GUID, NO_ALLOC);
         dbPtr[0] = eventsGuid[i];

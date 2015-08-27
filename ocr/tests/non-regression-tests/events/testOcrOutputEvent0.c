@@ -4,12 +4,7 @@
  * removed or modified.
  */
 
-
-
-
-
 #include "ocr.h"
-
 
 /**
  * DESC: Chain an edt to another edt's output event.

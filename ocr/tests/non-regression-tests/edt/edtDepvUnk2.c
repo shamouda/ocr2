@@ -20,7 +20,7 @@ ocrGuid_t terminateEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
 
 ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrGuid_t e0;
-    ocrEventCreate(&e0, OCR_EVENT_STICKY_T, false);
+    ocrEventCreate(&e0,OCR_EVENT_ONCE_T, EVT_PROP_NONE);
     ocrGuid_t terminateEdtGuid;
     ocrGuid_t terminateEdtTemplateGuid;
     ocrEdtTemplateCreate(&terminateEdtTemplateGuid, terminateEdt, 0 /*paramc*/, EDT_PARAM_UNK /*depc*/);

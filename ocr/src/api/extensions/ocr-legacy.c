@@ -1,5 +1,5 @@
 /*
-* This file is subject to the license agreement located in the file LICENSE
+ * This file is subject to the license agreement located in the file LICENSE
  * and cannot be distributed without it. This notice cannot be
  * removed or modified.
  */
@@ -190,10 +190,17 @@ u8 ocrLegacyBlockProgress(ocrGuid_t handle, ocrGuid_t* guid, void** result, u64*
             if(result != NULL)
                 *result = ((ocrDataBlock_t*)(dbResult.metaDataPtr))->ptr;
         }
-
         ASSERT(dbResult.metaDataPtr != NULL);
-        if(size != NULL)
+        if(size != NULL) {
             *size = ((ocrDataBlock_t*)(dbResult.metaDataPtr))->size;
+        }
+    } else {
+        if(size != NULL) {
+            *size = 0;
+        }
+        if(result != NULL) {
+            *result = NULL;
+        }
     }
 
     if(guid != NULL)

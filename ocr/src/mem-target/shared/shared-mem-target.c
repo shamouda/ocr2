@@ -32,11 +32,14 @@
 void sharedDestruct(ocrMemTarget_t *self) {
     ASSERT(self->memoryCount == 1);
     self->memories[0]->fcts.destruct(self->memories[0]);
+    // BUG #673: Deal with objects that are shared across PDs.
+    /*
     runtimeChunkFree((u64)self->memories, PERSISTENT_CHUNK);
 #ifdef OCR_ENABLE_STATISTICS
     statsMEMTARGET_STOP(self->pd, self->fguid.guid, self->fguid.metaDataPtr);
 #endif
     runtimeChunkFree((u64)self, PERSISTENT_CHUNK);
+    */
 }
 
 u8 sharedSwitchRunlevel(ocrMemTarget_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
@@ -77,6 +80,9 @@ u8 sharedSwitchRunlevel(ocrMemTarget_t *self, ocrPolicyDomain_t *PD, ocrRunlevel
     case RL_GUID_OK:
         break;
     case RL_COMPUTE_OK:
+        // BUG #673: We do not GUIDIFY due to a race if multiple PDs use the same
+        // memory
+        /*
         if((properties & RL_BRING_UP) && RL_IS_FIRST_PHASE_UP(PD, RL_COMPUTE_OK, phase)) {
             guidify(self->pd, (u64)self, &(self->fguid), OCR_GUID_MEMTARGET);
             DPRINTF(DEBUG_LVL_VERB, "SharedStart PD=%p\n", self->pd);
@@ -96,6 +102,7 @@ u8 sharedSwitchRunlevel(ocrMemTarget_t *self, ocrPolicyDomain_t *PD, ocrRunlevel
 #undef PD_TYPE
             self->fguid.guid = NULL_GUID;
         }
+        */
         break;
     case RL_USER_OK:
         break;

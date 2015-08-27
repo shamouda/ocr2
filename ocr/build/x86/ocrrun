@@ -40,6 +40,10 @@ if [ "${OCR_CONFIG}" = "" ]; then
     OCR_CONFIG=${PWD}/default.cfg
 fi
 
+if [[ "${OCRRUN_GDB}" == "yes" ]]; then
+    PROGRAM_BIN="gdb --args ${PROGRAM_BIN}"
+fi
+
 if [[ "${OCRRUN_VALGRIND_OPTS}" != "" ]]; then
     OCRRUN_VALGRIND="yes";
 fi

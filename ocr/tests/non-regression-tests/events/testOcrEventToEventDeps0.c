@@ -4,12 +4,7 @@
  * removed or modified.
  */
 
-
-
-
-
 #include "ocr.h"
-
 /**
  * DESC: Test event to event dependences (chaining two events)
  */

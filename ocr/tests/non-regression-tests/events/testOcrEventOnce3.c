@@ -29,12 +29,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
  */
 
-
-
-
-
 #include "ocr.h"
-
 /**
  * DESC: Add three once event as dependence and satisfy in reverse order
  */
@@ -51,11 +46,11 @@ ocrGuid_t taskForEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
 
 ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrGuid_t e0;
-    ocrEventCreate(&e0, OCR_EVENT_ONCE_T, true);
+    ocrEventCreate(&e0, OCR_EVENT_ONCE_T, EVT_PROP_TAKES_ARG);
     ocrGuid_t e1;
-    ocrEventCreate(&e1, OCR_EVENT_ONCE_T, true);
+    ocrEventCreate(&e1, OCR_EVENT_ONCE_T, EVT_PROP_TAKES_ARG);
     ocrGuid_t e2;
-    ocrEventCreate(&e2, OCR_EVENT_ONCE_T, true);
+    ocrEventCreate(&e2, OCR_EVENT_ONCE_T, EVT_PROP_TAKES_ARG);
 
     // Creates the EDTa
     ocrGuid_t edtGuid;

@@ -1403,6 +1403,11 @@ static ocrAllocator_t * getAnchorCE (ocrAllocator_t * self) {
     default:
         ASSERT(0);
     }
+#else
+    // Need to do this for TG-x86 in particular. This is harder than on TG as we can't rely on the
+    // addresses being the same. It's fairly trivial to get the parentPD (and go from there) but
+    // it's harder to figure out the "right" allocator. Maybe we can look at the memory the
+    // allocator is refering to and see if it is the same as this one.
 #endif
     return anchorCE;
 }

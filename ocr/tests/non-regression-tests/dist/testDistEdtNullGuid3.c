@@ -26,7 +26,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrGuid_t edtAffinity = affinities[affinityCount-1]; //TODO this implies we know current PD is '0'
 
     ocrGuid_t event1Guid;
-    ocrEventCreate(&event1Guid, OCR_EVENT_ONCE_T, false);
+    ocrEventCreate(&event1Guid, OCR_EVENT_ONCE_T, EVT_PROP_NONE);
 
     ocrGuid_t db1Guid;
     u32 * db1Ptr;

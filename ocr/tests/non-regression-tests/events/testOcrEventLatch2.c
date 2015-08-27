@@ -4,12 +4,7 @@
  * removed or modified.
  */
 
-
-
-
-
 #include "ocr.h"
-
 /**
  * DESC: latch-event simulating a finish-edt + check termination of children
  * Does not work yet in distributed because of multiple IW on the DB.

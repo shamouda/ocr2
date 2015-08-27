@@ -6,6 +6,10 @@
 
 #include "ocr.h"
 
+/**
+ * DESC: Pass program argument to shutdown EDT
+ */
+
 ocrGuid_t otherEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrShutdown();
     return NULL_GUID;

@@ -69,6 +69,7 @@ typedef struct _rangeTracker_t {
     // BUG #499: For the lock, would be better to move to a reader-writer lock
     volatile u32 lock; /**< Lock protecting range */
     volatile u32 lockChunkAndTag;    // BUG #497: move this to ocrMemPlatformFsim_t
+    volatile u32 count;  /**< initialization count */
 } rangeTracker_t;
 
 

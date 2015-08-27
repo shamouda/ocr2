@@ -4,12 +4,7 @@
  * removed or modified.
  */
 
-
-
-
-
 #include "ocr.h"
-
 /**
  * DESC: Test addDependence(NULL_GUID, edt, slot); which should trigger the edt.
  */
