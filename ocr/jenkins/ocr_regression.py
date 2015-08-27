@@ -33,21 +33,25 @@ job_ocr_regression_x86_pthread_x86_lockableDB = {
     'sandbox': ('inherit0',)
 }
 
-# job_ocr_regression_x86_pthread_tg_regularDB = {
-#     'name': 'ocr-regression-tg-x86-regularDB',
-#     'depends': ('ocr-build-tg-x86',),
-#     'jobtype': 'ocr-regression',
-#     'run-args': 'tg-x86 jenkins-1block-regularDB.cfg regularDB',
-#     'sandbox': ('inherit0',)
-# }
+job_ocr_regression_x86_pthread_tg_regularDB = {
+    'name': 'ocr-regression-tg-x86-regularDB',
+    'depends': ('ocr-build-tg-x86',),
+    'jobtype': 'ocr-regression',
+    'run-args': 'tg-x86 jenkins-2block-regularDB.cfg regularDB',
+    'timeout': 400,
+    'sandbox': ('inherit0',),
+    'env-vars': { 'TG_INSTALL': '${JJOB_ENVDIR}' }
+}
 
-# job_ocr_regression_x86_pthread_tg_lockableDB = {
-#     'name': 'ocr-regression-tg-x86-lockableDB',
-#     'depends': ('ocr-build-tg-x86',),
-#     'jobtype': 'ocr-regression',
-#     'run-args': 'tg-x86 jenkins-1block-lockableDB.cfg lockableDB',
-#     'sandbox': ('inherit0',)
-# }
+job_ocr_regression_x86_pthread_tg_lockableDB = {
+    'name': 'ocr-regression-tg-x86-lockableDB',
+    'depends': ('ocr-build-tg-x86',),
+    'jobtype': 'ocr-regression',
+    'run-args': 'tg-x86 jenkins-2block-lockableDB.cfg lockableDB',
+    'timeout': 400,
+    'sandbox': ('inherit0',),
+    'env-vars': { 'TG_INSTALL': '${JJOB_ENVDIR}' }
+}
 
 #TODO: not sure how to not hardcode MPI_ROOT here
 job_ocr_regression_x86_pthread_mpi_lockableDB = {

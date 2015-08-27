@@ -45,9 +45,12 @@
 
 // Scheduler Objects
 #define ENABLE_SCHEDULER_OBJECT_NULL
+#define ENABLE_SCHEDULER_OBJECT_WST
+#define ENABLE_SCHEDULER_OBJECT_DEQ
 
 // Scheduler Heuristic
 #define ENABLE_SCHEDULER_HEURISTIC_NULL
+#define ENABLE_SCHEDULER_HEURISTIC_CE
 
 // Datablock
 #define ENABLE_DATABLOCK_REGULAR
@@ -65,6 +68,9 @@
 
 // HAL layer to use
 #define HAL_X86_64
+
+// Hints
+#define ENABLE_HINTS
 
 // Mem-platform
 #define ENABLE_MEM_PLATFORM_MALLOC

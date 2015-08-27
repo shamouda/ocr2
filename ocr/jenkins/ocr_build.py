@@ -98,13 +98,14 @@ job_ocr_build_x86_pthread_gasnet = {
                  'GASNET_TYPE': 'par'}
 }
 
-# job_ocr_build_x86_pthread_tg = {
-#     'name': 'ocr-build-tg-x86',
-#     'depends': ('__alternate ocr-init',),
-#     'jobtype': 'ocr-build',
-#     'run-args': 'tg-x86',
-#     'sandbox': ('inherit0',)
-# }
+job_ocr_build_x86_pthread_tg = {
+    'name': 'ocr-build-tg-x86',
+    'depends': ('__alternate ocr-init',),
+    'jobtype': 'ocr-build',
+    'run-args': 'tg-x86',
+    'sandbox': ('inherit0',),
+    'env-vars': { 'TG_INSTALL': '${JJOB_ENVDIR}' }
+}
 
 job_ocr_build_x86_builder_tg_ce = {
     'name': 'ocr-build-builder-ce',

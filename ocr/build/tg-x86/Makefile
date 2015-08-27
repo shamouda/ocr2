@@ -20,7 +20,7 @@ DEFAULT_CONFIG=mach-1block.cfg
 # Tool-chain to be used for the build
 #
 
- TG_INSTALL ?= ../../../../intel/ss/install
+TG_INSTALL ?= ../../../../intel/ss/install
 
 CC      := gcc
 # TG_INSTALL/include is for rm-map.h
