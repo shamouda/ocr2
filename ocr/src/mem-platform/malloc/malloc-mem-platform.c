@@ -61,8 +61,9 @@ u8 mallocSwitchRunlevel(ocrMemPlatform_t *self, ocrPolicyDomain_t *PD, ocrRunlev
         break;
     case RL_NETWORK_OK:
         // This should ideally be in MEMORY_OK
+        // NOTE: This is serial because only thread is up until PD_OK
         if((properties & RL_BRING_UP) && RL_IS_FIRST_PHASE_UP(PD, RL_NETWORK_OK, phase)) {
-            if(self->startAddr != 0)
+            if(self->startAddr != 0ULL)
                 break; // We break out early since we are already initialized
             // This is where we need to update the memory
             // using the sysboot functions
@@ -81,23 +82,16 @@ u8 mallocSwitchRunlevel(ocrMemPlatform_t *self, ocrPolicyDomain_t *PD, ocrRunlev
             rself->pRangeTracker = initializeRange(
                 16, self->startAddr, self->endAddr, USER_FREE_TAG);
         } else if((properties & RL_TEAR_DOWN) && RL_IS_LAST_PHASE_DOWN(PD, RL_NETWORK_OK, phase)) {
+            // This is also serial because after PD_OK we are down to one thread
             ocrMemPlatformMalloc_t *rself = (ocrMemPlatformMalloc_t*)self;
-            LOCK(&(rself->pRangeTracker->lockChunkAndTag));
-            rself->pRangeTracker->count--;           // decrease count
-
-            if(self->startAddr == 0) {
-                UNLOCK(&(rself->pRangeTracker->lockChunkAndTag));
-                break; // Someone already freed things up
-            }
-
-            if (rself->pRangeTracker->count == 0) {  // if I'm the last one
+            // The first guy through here does this
+            if(self->startAddr != 0ULL) {
                 if(rself->pRangeTracker)    // in case of mallocproxy, pRangeTracker==0
                     destroyRange(rself->pRangeTracker);
                 // Here we can free the memory we allocated
                 free((void*)(self->startAddr));
+                self->startAddr = 0ULL;
             }
-            self->startAddr = 0ULL;
-            UNLOCK(&(rself->pRangeTracker->lockChunkAndTag));
         }
         break;
     case RL_PD_OK:
