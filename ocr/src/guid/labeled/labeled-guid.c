@@ -306,6 +306,7 @@ u8 labeledGuidGetVal(ocrGuidProvider_t* self, ocrGuid_t guid, u64* val, ocrGuidK
             *kind = getKindFromGuid(guid);
         }
     }
+
     return 0;
 }
 

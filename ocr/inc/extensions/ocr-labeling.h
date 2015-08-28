@@ -54,7 +54,7 @@ typedef enum {
  * @param[in] kind                Kind of the GUIDs stored in this map
  * @return 0 on success or a non-zero error code
  */
-u8 ocrGuidMapCreate(ocrGuid_t *mapGuid, u32 numParms, ocrGuid_t (*mapFunc)(
+u8 ocrGuidMapCreate(ocrGuid_t *mapGuid, u32 numParams, ocrGuid_t (*mapFunc)(
                         ocrGuid_t startGuid, u64 skipGuid, s64* params, s64* tuple),
                     s64* params, u64 numberGuid, ocrGuidUserKind kind);
 

@@ -19,6 +19,10 @@
 #include "ocr-statistics.h"
 #endif
 
+#ifdef ENABLE_EXTENSION_LABELING
+#include "experimental/ocr-labeling-runtime.h"
+#endif
+
 #include "utils/profiler/profiler.h"
 
 #include "policy-domain/hc/hc-policy.h"
@@ -1388,6 +1392,14 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
                 PD_MSG_FIELD_O(size) = sizeof(ocrAffinity_t);
                 PD_MSG_FIELD_O(returnDetail) = 0;
                 break;
+#ifdef ENABLE_EXTENSION_LABELING
+            case OCR_GUID_GUIDMAP:
+                localDeguidify(self, &(PD_MSG_FIELD_IO(guid)));
+                ocrGuidMap_t * map = (ocrGuidMap_t *) PD_MSG_FIELD_IO(guid.metaDataPtr);
+                PD_MSG_FIELD_O(size) =  ((sizeof(ocrGuidMap_t) + sizeof(s64) - 1) & ~(sizeof(s64)-1)) + map->numParams*sizeof(s64);
+                PD_MSG_FIELD_O(returnDetail) = 0;
+                break;
+#endif
             default:
                 ASSERT(false && "Unsupported GUID kind cloning");
                 PD_MSG_FIELD_O(returnDetail) = OCR_ENOTSUP;

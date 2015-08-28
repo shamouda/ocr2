@@ -5,8 +5,9 @@
  * Modified for OCR 0.9 by Romain Cledat
  */
 
-#define ENABLE_EXTENSION_LABELING
 #include "ocr.h"
+
+#ifdef ENABLE_EXTENSION_LABELING
 #include "extensions/ocr-labeling.h"
 #include "ocr-std.h"
 
@@ -238,3 +239,12 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     return NULL_GUID;
 }
 
+#else
+
+ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
+    PRINTF("Test disabled - ENABLE_EXTENSION_LABELING not defined\n");
+    ocrShutdown();
+    return NULL_GUID;
+}
+
+#endif

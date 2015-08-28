@@ -17,6 +17,10 @@
 #include "utils/hashtable.h"
 #include "utils/queue.h"
 
+#ifdef ENABLE_EXTENSION_LABELING
+#include "experimental/ocr-labeling-runtime.h"
+#endif
+
 #ifdef OCR_ENABLE_STATISTICS
 #include "ocr-statistics.h"
 #endif
@@ -689,6 +693,21 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
 #undef PD_TYPE
         break;
     }
+    case PD_MSG_EVT_CREATE:
+    {
+#define PD_MSG msg
+#define PD_TYPE PD_MSG_EVT_CREATE
+        if (PD_MSG_FIELD_I(properties) & GUID_PROP_IS_LABELED) {
+            // We need to resolve location because of labeled GUIDs.
+            RETRIEVE_LOCATION_FROM_GUID_MSG(self, msg->destLocation, IO);
+        } else {
+            // for all local messages, fall-through and let local PD to process
+            msg->destLocation = curLoc;
+        }
+#undef PD_MSG
+#undef PD_TYPE
+        break;
+    }
     // Need to determine the destination of the message based
     // on the operation and guids it involves.
     case PD_MSG_WORK_DESTROY:
@@ -755,8 +774,23 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
     {
 #define PD_MSG (msg)
 #define PD_TYPE PD_MSG_GUID_INFO
-        //BUG #536: cloning: What's the meaning of guid info in distributed ?
-        msg->destLocation = curLoc;
+        u64 val;
+        ocrGuidKind kind;
+        self->guidProviders[0]->fcts.getVal(self->guidProviders[0], PD_MSG_FIELD_IO(guid.guid), &val, &kind);
+        if ((val == 0) && (kind == OCR_GUID_GUIDMAP)) {
+            //BUG #536: cloning - piggy back on the mecanism that fetches templates
+            u8 res = resolveRemoteMetaData(self, &PD_MSG_FIELD_IO(guid), msg);
+            if (res == OCR_EPEND) {
+                // We do not handle pending if it an edt spawned locally because
+                // the edt creation is likely invoked from another local EDT.
+                ASSERT(msg->srcLocation != curLoc);
+                // template's metadata not available, message processing will be rescheduled.
+                PROCESS_MESSAGE_RETURN_NOW(self, OCR_EPEND);
+            }
+        } else {
+            //BUG #536: cloning: What's the meaning of guid info in distributed ?
+            msg->destLocation = curLoc;
+        }
 #undef PD_MSG
 #undef PD_TYPE
         break;
@@ -766,7 +800,11 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
 #define PD_MSG (msg)
 #define PD_TYPE PD_MSG_GUID_METADATA_CLONE
         if (msg->type & PD_MSG_REQUEST) {
-            RETRIEVE_LOCATION_FROM_GUID_MSG(self, msg->destLocation, IO);
+
+            // Do not call the macro because it relies on GUID_INFO
+            // and we go into a deadlock when cloning GUID maps
+            // RETRIEVE_LOCATION_FROM_GUID_MSG(self, msg->destLocation, IO);
+            self->guidProviders[0]->fcts.getLocation(self->guidProviders[0], PD_MSG_FIELD_IO(guid.guid), &(msg->destLocation));
             DPRINTF(DEBUG_LVL_VVERB,"METADATA_CLONE: request for guid=0x%lx src=%d dest=%d\n",
                     PD_MSG_FIELD_IO(guid.guid), (u32)msg->srcLocation);
             if ((msg->destLocation != curLoc) && (msg->srcLocation == curLoc)) {
@@ -793,14 +831,34 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
                 void * metaDataPtr = self->fcts.pdMalloc(self, metaDataSize);
                 ASSERT(PD_MSG_FIELD_IO(guid.metaDataPtr) != NULL);
                 ASSERT(PD_MSG_FIELD_O(size) == metaDataSize);
-                // Register the metadata, process the waiter queue and checks out from the proxy.
                 hal_memCopy(metaDataPtr, PD_MSG_FIELD_IO(guid.metaDataPtr), metaDataSize, false);
                 ocrFatGuid_t tplFatGuid;
                 tplFatGuid.guid = PD_MSG_FIELD_IO(guid.guid);
                 tplFatGuid.metaDataPtr = metaDataPtr;
+                // Register the metadata, process the waiter queue and checks out from the proxy.
                 registerRemoteMetaData(self, tplFatGuid);
                 PROCESS_MESSAGE_RETURN_NOW(self, 0);
-            } else {
+            }
+#ifdef ENABLE_EXTENSION_LABELING
+            else if (tkind == OCR_GUID_GUIDMAP) {
+                DPRINTF(DEBUG_LVL_VVERB,"METADATA_CLONE: Incoming response for guidMap=0x%lx)\n", PD_MSG_FIELD_IO(guid.guid));
+                ocrGuidMap_t * mapOrg = (ocrGuidMap_t *) PD_MSG_FIELD_IO(guid.metaDataPtr);
+                u64 metaDataSize = ((sizeof(ocrGuidMap_t) + sizeof(s64) - 1) & ~(sizeof(s64)-1)) + mapOrg->numParams*sizeof(s64);
+                void * metaDataPtr = self->fcts.pdMalloc(self, metaDataSize);
+                ASSERT(PD_MSG_FIELD_IO(guid.metaDataPtr) != NULL);
+                hal_memCopy(metaDataPtr, mapOrg, metaDataSize, false);
+                ocrGuidMap_t * map = (ocrGuidMap_t *) metaDataPtr;
+                if (mapOrg->numParams) { // Fix-up params
+                    map->params = (s64*)((char*)mapOrg + ((sizeof(ocrGuidMap_t) + sizeof(s64) - 1) & ~(sizeof(s64)-1)));
+                }
+                ocrFatGuid_t mapFatGuid;
+                mapFatGuid.guid = PD_MSG_FIELD_IO(guid.guid);
+                mapFatGuid.metaDataPtr = metaDataPtr;
+                registerRemoteMetaData(self, mapFatGuid);
+                PROCESS_MESSAGE_RETURN_NOW(self, 0);
+            }
+#endif
+            else {
                 ASSERT(tkind == OCR_GUID_AFFINITY);
                 DPRINTF(DEBUG_LVL_VVERB,"METADATA_CLONE: Incoming response for affinity 0x%lx)\n", PD_MSG_FIELD_IO(guid.guid));
             }
@@ -1240,7 +1298,6 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
     case PD_MSG_MEM_UNALLOC:
     case PD_MSG_WORK_EXECUTE:
     case PD_MSG_EDTTEMP_CREATE:
-    case PD_MSG_EVT_CREATE:
     case PD_MSG_EVT_GET:
     case PD_MSG_GUID_CREATE:
     case PD_MSG_SCHED_NOTIFY:
@@ -1252,6 +1309,9 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
     case PD_MSG_MGT_OP: //BUG #587 not-supported: PD_MSG_MGT_OP is probably not always local
     case PD_MSG_MGT_REGISTER:
     case PD_MSG_MGT_UNREGISTER:
+    case PD_MSG_GUID_RESERVE:
+    case PD_MSG_GUID_UNRESERVE:
+    // case PD_MSG_EVT_CREATE:
     {
         msg->destLocation = curLoc;
         // for all local messages, fall-through and let local PD to process

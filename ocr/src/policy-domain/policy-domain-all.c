@@ -7,6 +7,10 @@
 #include "policy-domain/policy-domain-all.h"
 #include "debug.h"
 
+#ifdef ENABLE_EXTENSION_LABELING
+#include "experimental/ocr-labeling-runtime.h"
+#endif
+
 #define DEBUG_TYPE POLICY
 
 // Everything in the marshalling code will be
@@ -548,7 +552,6 @@ u8 ocrPolicyMsgMarshallMsg(ocrPolicyMsg_t* msg, u64 baseSize, u8* buffer, u32 mo
     case PD_MSG_GUID_METADATA_CLONE: {
 #define PD_TYPE PD_MSG_GUID_METADATA_CLONE
         if(!isIn) {
-            // First copy things over
             u64 s = PD_MSG_FIELD_O(size);
             if(s) {
                 hal_memCopy(curPtr, PD_MSG_FIELD_IO(guid.metaDataPtr), s, false);
@@ -837,6 +840,19 @@ u8 ocrPolicyMsgUnMarshallMsg(u8* mainBuffer, u8* addlBuffer,
             PD_MSG_FIELD_IO(guid.metaDataPtr) = (void*)((t&1?localAddlPtr:localMainPtr) + (t>>1));
             DPRINTF(DEBUG_LVL_VVERB, "Converted metadata ptr from 0x%lx to 0x%lx\n",
                     t, (u64)PD_MSG_FIELD_IO(guid.metaDataPtr));
+#ifdef ENABLE_EXTENSION_LABELING
+            u64 val;
+            ocrGuidKind kind;
+            ocrPolicyDomain_t * pd;
+            getCurrentEnv(&pd, NULL, NULL, NULL);
+            pd->guidProviders[0]->fcts.getVal(pd->guidProviders[0], PD_MSG_FIELD_IO(guid.guid), &val, &kind);
+            if (kind == OCR_GUID_GUIDMAP) {
+                // Handle unmarshalling formatted as: map data-structure + serialized params array
+                void * orgMdPtr = PD_MSG_FIELD_IO(guid.metaDataPtr);
+                ocrGuidMap_t * orgMap = (ocrGuidMap_t *) orgMdPtr;
+                orgMap->params = (s64*)((char*)orgMap + ((sizeof(ocrGuidMap_t) + sizeof(s64) - 1) & ~(sizeof(s64)-1)));
+            }
+#endif
         }
         break;
 #undef PD_TYPE
