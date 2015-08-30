@@ -2,7 +2,7 @@
 
 if [ $1 == "_params" ]; then
     if [ $2 == "output" ]; then
-        echo "${JJOB_PRIVATE_HOME}/xstack/ocr/tests/tests-log/TESTS-TestSuites.xml"
+        echo "${JJOB_PRIVATE_HOME}/xstack/ocr/tests-${JJOB_ID}/tests-log/TESTS-TestSuites.xml"
         exit 0
     fi
 else
@@ -18,7 +18,10 @@ else
 
     DB_IMPL=$3;
 
-    cd ${JJOB_PRIVATE_HOME}/xstack/ocr/tests/
+    # Make a copy of the tests directory so we can run in parallel
+    # with other regressions
+    cp -r ${JJOB_PRIVATE_HOME}/xstack/ocr/tests ${JJOB_PRIVATE_HOME}/xstack/ocr/tests-${JJOB_ID}
+    cd ${JJOB_PRIVATE_HOME}/xstack/ocr/tests-${JJOB_ID}
     TEST_OPTIONS=""
 
     if [[ "${ARCH}" == "x86" ]]; then

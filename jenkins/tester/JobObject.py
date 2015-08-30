@@ -182,6 +182,7 @@ class JobObject(object):
         """
 
         # Public variables (to avoid getter/setter)
+        self.jobid = -1     # Will be set when the execute method is called
         self.name = inputDict['name']
         self.run_args = inputDict['run-args']
         self.param_args = inputDict.get('param-args', "")
@@ -502,14 +503,13 @@ class JobObject(object):
         self._myLog.error("%s needs to define its own isLocal!!" % (str(self)))
         assert(False)
 
-    def execute(self):
+    def execute(self, jobId):
         """Tries to execute the job. Will return
            the status of the job. If the job was
            successfully launched, it will return RUNNING_LOCAL or
            RUNNING_REMOTE
         """
-        self._myLog.error("%s needs to define its own execute!!" % (str(self)))
-        assert(False)
+        self.jobid = jobId
 
     def poll(self):
         """Checks if the job finished executing.
@@ -891,6 +891,7 @@ class JobObject(object):
         localEnv['JJOB_SHARED_HOME'] = self._dirs['shared'] if self._dirs['shared'] is not None else ""
         localEnv['JJOB_START_HOME'] = localEnv['JJOB_SHARED_HOME'] if self._startInShared else localEnv['JJOB_PRIVATE_HOME']
         localEnv['JJOB_ENVDIR'] = JobObject.envDirectory
+        localEnv['JJOB_ID'] = str(self.jobid)
         for k, v in JobObject.cleanDirectories.iteritems():
             localEnv['JJOB_INITDIR_' + k] = v
         id = 0
@@ -956,8 +957,9 @@ class LocalJobObject(JobObject):
     def isLocal(self):
         return True
 
-    def execute(self):
+    def execute(self, jobId):
         """Executes the job locally"""
+        super(LocalJobObject, self).execute(jobId)
         if self._recomputeStatus:
             self._updateStatus()
         if self._recomputeDirs:
@@ -1096,8 +1098,9 @@ class TorqueJobObject(JobObject):
     def isLocal(self):
         return False
 
-    def execute(self):
+    def execute(self, jobId):
         """Executes the job using Torque"""
+        super(TorqueJobObject, self).execute(jobId)
         if self._recomputeStatus:
             self._updateStatus()
         if self._recomputeDirs:

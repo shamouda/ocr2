@@ -11,7 +11,7 @@ jobtype_ocr_regression = {
     'param-cmd': '${JJOB_PRIVATE_HOME}/xstack/ocr/jenkins/scripts/regression.sh _params',
     'keywords': ('ocr', 'percommit'),
     'timeout': 240,
-    'sandbox': ('local', 'shared', 'copyLocal', 'shareOK'),
+    'sandbox': ('local', 'shared', 'shareOK'),
     'req-repos': ('xstack',)
 }
 
