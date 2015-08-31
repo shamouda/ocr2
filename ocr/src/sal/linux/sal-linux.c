@@ -4,11 +4,41 @@
  * removed or modified.
  */
 
-
 #include "ocr-config.h"
-//Temporary condition until x86-mpi uses the new scheduler by default
-//or the x86-mpi pause resume gets merged (keeps Jenkins happy)
-#if defined(ENABLE_POLICY_DOMAIN_HC) && defined(ENABLE_EXTENSION_PAUSE)
+#if defined(SAL_LINUX) && !defined(ENABLE_COMP_PLATFORM_FSIM)
+
+#include "ocr-types.h"
+#ifdef __MACH__
+
+#include <"mach/mach-time.h">
+static double conversion_factor;
+static int getTimeNs_initialized = 0;
+
+u64 salGetTime(){
+    double timeStamp;
+    if(!getTimeNs_initialized){
+        mach_timebase_info_data_t timebase;
+        mach_timebase_info(&timebase);
+        conversion_factor = (double)timebase.numer / (double)timebase.denom;
+        getTimeNs_initialized = 1;
+    }
+    timeStamp = mach_absolute_time()*conversion_factor;
+    return (u64)timeStamp;
+}
+
+#else
+#include <time.h>
+
+u64 salGetTime(){
+    struct timespec ts;
+    clock_gettime(CLOCK_REALTIME, &ts);
+    return ts.tv_sec * 1000000000UL + ((u64)ts.tv_nsec);
+
+}
+#endif /*__MACH__*/
+
+
+#ifdef ENABLE_EXTENSION_PAUSE
 
 #include <signal.h>
 #include "utils/pqr-utils.h"
@@ -145,4 +175,5 @@ void registerSignalHandler(){
     }
 }
 
-#endif /* ENABLE_COMP_PLATFORM_PTHREAD */
+#endif /* ENABLE_EXTENSION_PAUSE  */
+#endif

@@ -1104,7 +1104,7 @@ u8 taskExecute(ocrTask_t* base) {
     {
 
 #ifdef OCR_ENABLE_VISUALIZER
-        u64 startTime = getTimeNs();
+        u64 startTime = salGetTime();
 #endif
         char location[32];
         curWorker->fcts.printLocation(curWorker, &(location[0]));
@@ -1127,7 +1127,7 @@ u8 taskExecute(ocrTask_t* base) {
 #endif
 
 #ifdef OCR_ENABLE_VISUALIZER
-        u64 endTime = getTimeNs();
+        u64 endTime = salGetTime();
         DPRINTF(DEBUG_LVL_INFO, "Execute 0x%lx FctName: %s Start: %lu End: %lu\n", base->guid, base->name, startTime, endTime);
 #endif
     }
