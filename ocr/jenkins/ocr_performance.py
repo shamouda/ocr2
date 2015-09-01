@@ -37,12 +37,9 @@ job_ocr_performance_x86_pthread_x86 = {
 #Aggregates execution times in csv file
 job_ocr_performance_gatherStats = {
     'name': 'perfGatherStats',
-    #TODO: What's __type here ?
-    # 'depends': ('__type ocr-run-kernel-remote-regression', '__type ocr-run-kernel-remote-scaling',),
     'depends': ('ocr-performance-x86',),
     'jobtype': 'gatherStats-performance',
-    #TODO: What's this folder and the '10' ?
-    #This folder is where the 'ocr-performance' job puts results
+    # This folder is where the 'ocr-performance' job puts results
     'run-args': '${JJOB_SHARED_HOME}/xstack/ocr/tests/performance-tests 10',
     'sandbox': ('shared','inherit0')
 }
