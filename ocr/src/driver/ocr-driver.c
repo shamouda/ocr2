@@ -265,7 +265,7 @@ dep_t deps[] = {
 };
 
 extern char* populate_type(ocrParamList_t **type_param, type_enum index, dictionary *dict, char *secname);
-int populate_inst(ocrParamList_t **inst_param, void **instance, int *type_counts, char ***factory_names, void ***all_factories, void ***all_instances, type_enum index, dictionary *dict, char *secname);
+int populate_inst(ocrParamList_t **inst_param, int inst_param_size, void **instance, int *type_counts, char ***factory_names, void ***all_factories, void ***all_instances, type_enum index, dictionary *dict, char *secname);
 extern int build_deps (dictionary *dict, int A, int B, char *refstr, void ***all_instances, ocrParamList_t ***inst_params);
 extern int build_deps_types (int A, int B, char *refstr, void **pdinst, int pdcount, int type_counts, void ***all_factories, ocrParamList_t ***type_params);
 extern void *create_factory (type_enum index, char *factory_name, ocrParamList_t *paramlist);
@@ -538,7 +538,7 @@ void bringUpRuntime(ocrConfig_t *ocrConfig) {
                     all_instances[j][inst_counts[j]] = NULL;
                     count = 0;
                 }
-                populate_inst(inst_params[j], all_instances[j], type_counts, factory_names, all_factories, all_instances, j, dict, secname);
+                populate_inst(inst_params[j], inst_counts[j], all_instances[j], type_counts, factory_names, all_factories, all_instances, j, dict, secname);
             }
         }
     }

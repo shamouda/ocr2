@@ -608,7 +608,7 @@ void *create_factory (type_enum index, char *factory_name, ocrParamList_t *param
     return new_factory;
 }
 
-s32 populate_inst(ocrParamList_t **inst_param, void **instance, s32 *type_counts,
+s32 populate_inst(ocrParamList_t **inst_param, int inst_param_size, void **instance, s32 *type_counts,
                   char ***factory_names, void ***all_factories, void ***all_instances,
                   type_enum index, dictionary *dict, char *secname) {
     s32 i, low, high, j;
@@ -618,6 +618,11 @@ s32 populate_inst(ocrParamList_t **inst_param, void **instance, s32 *type_counts
     s32 value = 0;
 
     read_range(dict, secname, "id", &low, &high);
+
+    // access to inst_param[high] is out-of-array, i.e. bug
+    // Make sure your config file has no holes in ID space.
+    // a hole in ID space makes this assertion fail
+    ASSERT(high < inst_param_size);
 
     snprintf(key, MAX_KEY_SZ, "%s:%s", secname, "type");
     INI_GET_STR (key, inststr, "");
