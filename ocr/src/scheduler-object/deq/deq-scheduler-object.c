@@ -126,7 +126,7 @@ u64 deqSchedulerObjectCount(ocrSchedulerObjectFactory_t *fact, ocrSchedulerObjec
     ocrSchedulerObjectDeq_t *schedObj = (ocrSchedulerObjectDeq_t*)self;
     deque_t * deq = schedObj->deque;
     if (deq == NULL) return 0;
-    return (deq->tail - deq->head); //this may be racy but ok for approx count
+    return deq->size(deq); //this may be racy but ok for approx count
 }
 
 ocrSchedulerObject_t* deqGetSchedulerObjectForLocation(ocrSchedulerObjectFactory_t *fact, ocrSchedulerObject_t *self, ocrLocation_t loc, ocrSchedulerObjectMappingKind mapping, u32 properties) {

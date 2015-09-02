@@ -37,9 +37,8 @@ ocrGuid_t hcDumpNextEdt(ocrWorker_t *worker, u32 *size){
     wstObj = (ocrSchedulerObjectWst_t *)schedObj;
     deqObj = (ocrSchedulerObjectDeq_t *)wstObj->deques[worker->id];
 
-    u32 head = (deqObj->deque->head%INIT_DEQUE_CAPACITY);
     u32 tail = (deqObj->deque->tail%INIT_DEQUE_CAPACITY);
-    u32 deqSize = tail-head;
+    u32 deqSize = deqObj->deque->size(deqObj->deque);
 
     if(deqSize > 0){
 

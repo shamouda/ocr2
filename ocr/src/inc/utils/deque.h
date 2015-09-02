@@ -51,6 +51,10 @@ typedef struct _ocrDeque_t {
     volatile s32 tail;
     volatile void ** data;
 
+    /** @brief Size of the deque
+     */
+    u32 (*size)(struct _ocrDeque_t *self);
+
     /** @brief Destruct deque
      */
     void (*destruct)(ocrPolicyDomain_t *pd, struct _ocrDeque_t *self);
