@@ -226,9 +226,11 @@ u8 labeledGuidCreateGuid(ocrGuidProvider_t* self, ocrFatGuid_t *fguid, u64 size,
 
     // Update the fat GUID's metaDataPtr
     fguid->metaDataPtr = ptr;
+    ASSERT(ptr);
 #undef PD_TYPE
     (*(ocrGuid_t*)ptr) = NULL_GUID; // The first field is always the GUID, either directly as ocrGuid_t or a ocrFatGuid_t
                                     // This is used to determine if a GUID metadata is "ready". See bug #627
+    hal_fence(); // Make sure the ptr update is visible before we update the hash table
     if(properties & GUID_PROP_IS_LABELED) {
         if((properties & GUID_PROP_CHECK) == GUID_PROP_CHECK) {
             // We need to actually check things
@@ -256,6 +258,7 @@ u8 labeledGuidCreateGuid(ocrGuidProvider_t* self, ocrFatGuid_t *fguid, u64 size,
                 // by looking at the first field of ptr and waiting for it to be the GUID value (meaning the
                 // object has been initialized
                 while(*(volatile ocrGuid_t*)value != fguid->guid) ;
+                hal_fence(); // May be overkill but there is a race that I don't get
                 return OCR_EGUIDEXISTS;
             }
         } else if((properties & GUID_PROP_BLOCK) == GUID_PROP_BLOCK) {
@@ -286,12 +289,19 @@ u8 labeledGuidCreateGuid(ocrGuidProvider_t* self, ocrFatGuid_t *fguid, u64 size,
 u8 labeledGuidGetVal(ocrGuidProvider_t* self, ocrGuid_t guid, u64* val, ocrGuidKind* kind) {
     *val = (u64) hashtableConcBucketLockedGet(((ocrGuidProviderLabeled_t *) self)->guidImplTable, (void *) guid);
     DPRINTF(DEBUG_LVL_VERB, "LabeledGUID: got val for GUID 0x%lx: 0x%lx\n", guid, *val);
-    if(*val == (u64)NULL_GUID) {
+    if(*val == (u64)NULL) {
         // Does not exist in the hashtable
         if(kind) {
             *kind = OCR_GUID_NONE;
         }
     } else {
+        // Bug #627: We do not return until the GUID is valid. We test this
+        // by looking at the first field of ptr and waiting for it to be the GUID value (meaning the
+        // object has been initialized
+        if(IS_RESERVED_GUID(guid)) {
+            while(*((volatile ocrGuid_t*)(*val)) != guid) ;
+            hal_fence(); // May be overkill but there is a race that I don't get
+        }
         if(kind) {
             *kind = getKindFromGuid(guid);
         }
@@ -351,7 +361,7 @@ u8 labeledGuidReleaseGuid(ocrGuidProvider_t *self, ocrFatGuid_t fatGuid, bool re
     }
     // In any case, we need to recycle the guid
     ocrGuidProviderLabeled_t * derived = (ocrGuidProviderLabeled_t *) self;
-    hashtableConcBucketLockedRemove(derived->guidImplTable, (void *)guid, NULL);
+    RESULT_ASSERT(hashtableConcBucketLockedRemove(derived->guidImplTable, (void *)guid, NULL), ==, true);
     return 0;
 }
 
