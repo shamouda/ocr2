@@ -105,6 +105,7 @@ typedef enum {
     OCR_SCHEDULER_OBJECT_MAPPING_POTENTIAL,    /* schedulerObjects are potentially mapped to certain locations or policy domains but not placed yet. Potential mappings can change. */
     OCR_SCHEDULER_OBJECT_MAPPING_MAPPED,       /* mappings are identified and they are currently in the process of being placed at specific locations */
     OCR_SCHEDULER_OBJECT_MAPPING_PINNED,       /* schedulerObjects are already placed at specific locations */
+    OCR_SCHEDULER_OBJECT_MAPPING_WORKER,       /* schedulerObjects are mapped to a specific worker in current PD location */
     OCR_SCHEDULER_OBJECT_MAPPING_UNDEFINED,
 } ocrSchedulerObjectMappingKind;
 

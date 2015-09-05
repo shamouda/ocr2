@@ -1,0 +1,350 @@
+\section{User specified hints}
+OCR allows application developers to provide hints about the application using
+an extension of the standard API. The motivation of the hints API is to enable
+the transfer of knowledge, which is usually lost when expressing an program
+using the standard OCR API. Hints never impact the correctness of a program but
+are instead “extra” information that the runtime can use, for example, to
+improve the allocation of datablocks and scheduling of EDTs. Note that an OCR
+implementation can ignore all hints or selectively choose the ones to respect.
+%%%%
+
+\subsection{OCR hint framework}
+\begin{itemize}
+\item \hypertarget{type_ocrHint_t}{\code{ocrHint\_t}}: Hints in OCR use a special
+type called \code{ocrHint\_t}. A variable of this type can be declared inside an EDT.
+
+\item \hypertarget{type_ocrHintType_t}{\code{ocrHintType\_t}}: The hint variable
+has to be initialized for a specific usage {\em type}. Currently, there are four
+types of hints:
+\begin{itemize}
+\item \code{OCR\_HINT\_EDT\_T} is used to initialize the hint variable to be
+used for EDT specific hints. EDT specific hints can also be used for EDT
+templates. When an EDT is created, it is initialized with the hints that are
+set on the EDT template.
+\item \code{OCR\_HINT\_DB\_T} is used for datablock specific hints.
+\item \code{OCR\_HINT\_EVT\_T} is used for event specific hints.
+\item \code{OCR\_HINT\_GROUP\_T} is used for group specific hints.
+OCR groups are logical entities to which multiple OCR objects can be associated.
+Providing a hint for a group will help the runtime guide the scheduling of these
+OCR objects. Group hints can be applied either to each individual object in the
+group or to the group as a whole.
+\end{itemize}
+
+\item \hypertarget{type_ocrHintProp_t}{\code{ocrHintProp\_t}}: User hints are
+set as hint properties in the hint variable. The runtime defines the hint
+properties that can be set for a specific hint type. Supported properties are
+an ongoing developement. Please refer to ocr-types.h for all the currently
+supported hint properties.
+\end{itemize}
+
+After the variable has been initialized, it can start accepting hint properties.
+The hint variable can then be used to transfer all the set properties to an OCR
+object guid.
+
+It is also possible for the user to read the hints that are set on a specific
+OCR object. The user may then choose to update the values of the properties on
+the guid.
+
+
+\subsection*{Functions}
+\begin{DoxyCompactItemize}
+\item
+  \hyperlink{type_u8}{u8} \hyperlink{func_ocrHintInit}
+            {\code{ocrHintInit}}(\hyperlink{type_ocrHint_t}{ocr\-Hint\-\_\-t} $\ast$hint,
+      \hyperlink{type_ocrHintType_t}{ocrHintType\_t} hintType)
+    \begin{DoxyCompactList}
+      \small\item \emph{Initializes a user hint variable}
+    \end{DoxyCompactList}
+\item
+  \hyperlink{type_u8}{u8} \hyperlink{func_ocrSetHintValue}
+            {\code{ocrSetHintValue}}(\hyperlink{type_ocrHint_t}{ocr\-Hint\-\_\-t} $\ast$hint,
+      \hyperlink{type_ocrHintProp_t}{ocrHintProp\_t} hintProp, \hyperlink{type_s64}{s64} value)
+    \begin{DoxyCompactList}
+      \small\item \emph{Sets the value of a specific hint property}
+    \end{DoxyCompactList}
+\item
+  \hyperlink{type_u8}{u8} \hyperlink{func_ocrUnsetHintValue}
+            {\code{ocrUnsetHintValue}}(\hyperlink{type_ocrHint_t}{ocr\-Hint\-\_\-t} $\ast$hint,
+      \hyperlink{type_ocrHintProp_t}{ocrHintProp\_t} hintProp)
+    \begin{DoxyCompactList}
+      \small\item \emph{Unsets the value of a specific hint property}
+    \end{DoxyCompactList}
+\item
+  \hyperlink{type_u8}{u8} \hyperlink{func_ocrGetHintValue}
+            {\code{ocrGetHintValue}}(\hyperlink{type_ocrHint_t}{ocr\-Hint\-\_\-t} $\ast$hint,
+      \hyperlink{type_ocrHintProp_t}{ocrHintProp\_t} hintProp, \hyperlink{type_s64}{s64} $\ast$value)
+    \begin{DoxyCompactList}
+      \small\item \emph{Gets the value of a specific hint property}
+    \end{DoxyCompactList}
+\item
+  \hyperlink{type_u8}{u8} \hyperlink{func_ocrSetHint}
+            {\code{ocrSetHint}}(\hyperlink{type_ocrGuid_t}{ocr\-Guid\-\_\-t} guid,
+      \hyperlink{type_ocrHint_t}{ocr\-Hint\-\_\-t} $\ast$hint)
+    \begin{DoxyCompactList}
+      \small\item \emph{Sets all hint properties defined in the hint variable to the target guid}
+    \end{DoxyCompactList}
+\item
+  \hyperlink{type_u8}{u8} \hyperlink{func_ocrGetHint}
+            {\code{ocrGetHint}}(\hyperlink{type_ocrGuid_t}{ocr\-Guid\-\_\-t} guid,
+      \hyperlink{type_ocrHint_t}{ocr\-Hint\-\_\-t} $\ast$hint)
+    \begin{DoxyCompactList}
+      \small\item \emph{Gets the existing hint properties from a specific guid}
+    \end{DoxyCompactList}
+\end{DoxyCompactItemize}
+
+%
+%  ocrHintInit
+%
+\hypertarget{func_ocrHintInit}{
+  \index{User specified hints@{User specified hints}!ocr\-Hint\-Init@{ocr\-Hint\-Init}}
+  \subsection[{ocr\-Hint\-Init}]{\setlength{\rightskip}{0pt plus 5cm}{\bf u8} ocr\-Hint\-Init(
+\begin{DoxyParamCaption}
+\item[{{\bf ocr\-Hint\-\_\-t} $\ast$}]{hint, }
+\item[{{\bf ocr\-Hint\-Type\-\_\-t}}]{hintType}
+\end{DoxyParamCaption}
+)}}
+\label{func_ocrHintInit}
+
+Initializes a user hint variable of a specific type. The hint variable has
+to be initialized before any hint properties can be set.
+
+\begin{DoxyParams}[1]{Parameters}
+\mbox{\tt in}  & \code{hint} & The hint variable to be initialized.\\
+\hline
+\mbox{\tt in}  & \code{hintType} & The usage type for the hint variable\\
+\hline
+\end{DoxyParams}
+
+\returns
+A status code:
+\begin{DoxyItemize}
+\item 0: Successful
+\item OCR\_EINVAL: error in initializing hint when hintType is unrecognized
+\end{DoxyItemize}
+
+\descr
+User hint objects in OCR are of type \code{ocrHint\_t}. A user hint object is a
+stack allocated variable that can only exist within the lifetime of an EDT.
+The user has to first call \emph{ocrHintInit} to initialize a local hint variable
+before using it. Subsequent calls to ocrHintInit will reset the variable to
+an empty state, that is where none of the properties are set.
+
+%
+% ocrSetHintValue
+%
+\hypertarget{func_ocrSetHintValue}{
+  \index{User specified hints@{User specified hints}!ocr\-Set\-Hint\-Value@{ocr\-Set\-Hint\-Value}}
+  \subsection[{ocr\-Set\-Hint\-Value}]{\setlength{\rightskip}{0pt plus 5cm}{\bf u8} ocr\-Set\-Hint\-Value(
+\begin{DoxyParamCaption}
+\item[{{\bf ocr\-Hint\-\_\-t} $\ast$}]{hint, }
+\item[{{\bf ocr\-Hint\-Prop\-\_\-t}}]{hintProp, }
+\item[{{\bf s64}}]{value}
+\end{DoxyParamCaption}
+)}}
+\label{func_ocrSetHintValue}
+
+Sets the value of a specific hint property on to a hint variable. Multiple hint
+properties of the same usage type can be set on a single hint variable.
+
+\begin{DoxyParams}[1]{Parameters}
+\mbox{\tt in}  & \code{hint} & The hint variable for which hints are set.\\
+\hline
+\mbox{\tt in}  & \code{hintProp} & The hint property to set\\
+\hline
+\mbox{\tt in}  & \code{value} & The value of the hint property\\
+\hline
+\end{DoxyParams}
+
+\returns
+A status code:
+\begin{DoxyItemize}
+\item 0: Successful
+\item OCR\_EINVAL: If property is invalid for the hint type.
+\end{DoxyItemize}
+
+\descr
+A value for a specific hint property can be set if that property is
+supported for that specific hint type. If a property value is already set,
+then the value is updated.
+
+%
+% ocrUnsetHintValue
+%
+\hypertarget{func_ocrUnsetHintValue}{
+  \index{User specified hints@{User specified hints}!ocr\-Unset\-Hint\-Value@{ocr\-Unset\-Hint\-Value}}
+  \subsection[{ocr\-Unset\-Hint\-Value}]{\setlength{\rightskip}{0pt plus 5cm}{\bf u8} ocr\-Unset\-Hint\-Value(
+\begin{DoxyParamCaption}
+\item[{{\bf ocr\-Hint\-\_\-t} $\ast$}]{hint, }
+\item[{{\bf ocr\-Hint\-Prop\-\_\-t}}]{hintProp}
+\end{DoxyParamCaption}
+)}}
+\label{func_ocrUnsetHintValue}
+
+Unsets the value of a specific hint property in a hint variable.
+
+\begin{DoxyParams}[1]{Parameters}
+\mbox{\tt in}  & \code{hint} & The hint variable for which hints are set.\\
+\hline
+\mbox{\tt in}  & \code{hintProp} & The hint property to unset\\
+\hline
+\end{DoxyParams}
+
+\returns
+A status code:
+\begin{DoxyItemize}
+\item 0: Successful
+\item OCR\_EINVAL: If property is invalid for the hint type.
+\end{DoxyItemize}
+
+\descr
+A value for a specific hint property can be unset if that property is
+supported for that specific hint type and is already set.
+If a property value was not set earlier, then unset is a no-op.
+
+%
+% ocrGetHintValue
+%
+\hypertarget{func_ocrGetHintValue}{
+  \index{User specified hints@{User specified hints}!ocr\-Get\-Hint\-Value@{ocr\-Get\-Hint\-Value}}
+  \subsection[{ocr\-Get\-Hint\-Value}]{\setlength{\rightskip}{0pt plus 5cm}{\bf u8} ocr\-Get\-Hint\-Value(
+\begin{DoxyParamCaption}
+\item[{{\bf ocr\-Hint\-\_\-t} $\ast$}]{hint, }
+\item[{{\bf ocr\-Hint\-Prop\-\_\-t}}]{hintProp, }
+\item[{{\bf s64}}]{value}
+\end{DoxyParamCaption}
+)}}
+\label{func_ocrGetHintValue}
+
+Gets the value of a specific hint property from a hint variable.
+
+\begin{DoxyParams}[1]{Parameters}
+\mbox{\tt in}  & \code{hint} & The hint variable from which to get hints\\
+\hline
+\mbox{\tt in}  & \code{hintProp} & The hint property to get\\
+\hline
+\mbox{\tt out}  & \code{value} & The value of the hint property read from the hint variable\\
+\hline
+\end{DoxyParams}
+
+Gets the value of a specific hint property that was already set on the hint variable.
+
+\returns
+A status code:
+\begin{DoxyItemize}
+\item 0: Successful
+\item OCR\_EINVAL: If property is invalid for the hint type.
+\item OCR\_ENOENT: If property is not set on this hint variable
+\end{DoxyItemize}
+
+\descr
+A value for the hint property can be gotten from a hint object if the property
+is supported and it has already been set.
+
+%
+% ocrSetHint
+%
+\hypertarget{func_ocrSetHint}{
+  \index{User specified hints@{User specified hints}!ocr\-Set\-Hint@{ocr\-Set\-Hint}}
+  \subsection[{ocr\-Set\-Hint}]{\setlength{\rightskip}{0pt plus 5cm}{\bf u8} ocr\-Set\-Hint(
+\begin{DoxyParamCaption}
+\item[{{\bf ocr\-Guid\-\_\-t}}]{guid, }
+\item[{{\bf ocr\-Hint\-\_\-t} $\ast$}]{hint}
+\end{DoxyParamCaption}
+)}}
+\label{func_ocrSetHint}
+
+Sets all the hint properties in the hint variable on to the target OCR object guid.
+The target guid has to be of a compatible type with the hint variable's usage type.
+
+\begin{DoxyParams}[1]{Parameters}
+\mbox{\tt in}  & \code{guid} & The target guid of the hints\\
+\hline
+\mbox{\tt in}  & \code{hint} & The hint variable used to set the hint properties\\
+\hline
+\end{DoxyParams}
+
+\returns
+A status code:
+\begin{DoxyItemize}
+\item 0: Successful
+\item OCR\_EINVAL: If hint type and target guid kind are incompatible
+\item OCR\_EFAULT: Some hints were not set due to insufficient or invalid values of hint properties
+\end{DoxyItemize}
+
+\descr
+If the target guid has some of the hints already set then their values are
+updated. If hints are set on the same guid concurrently, then the final
+values are undefined.
+
+%
+% ocrGetHint
+%
+\hypertarget{func_ocrGetHint}{
+  \index{User specified hints@{User specified hints}!ocr\-Get\-Hint@{ocr\-Get\-Hint}}
+  \subsection[{ocr\-Get\-Hint}]{\setlength{\rightskip}{0pt plus 5cm}{\bf u8} ocr\-Get\-Hint(
+\begin{DoxyParamCaption}
+\item[{{\bf ocr\-Guid\-\_\-t}}]{guid, }
+\item[{{\bf ocr\-Hint\-\_\-t} $\ast$}]{hint}
+\end{DoxyParamCaption}
+)}}
+\label{func_ocrGetHint}
+
+Gets the existing hint properties that have been set on a specific guid.
+
+\begin{DoxyParams}[1]{Parameters}
+\mbox{\tt in}  & \code{guid} & The target guid of the hints\\
+\hline
+\mbox{\tt out}  & \code{hint} & The hint variable that will be populated with the target guid's existing hints\\
+\hline
+\end{DoxyParams}
+
+\returns
+A status code:
+\begin{DoxyItemize}
+\item 0: Successful
+\item OCR\_EINVAL: If hint type and target guid kind are incompatible
+\end{DoxyItemize}
+
+\descr
+The hint variable that is used as the output argument will be updated with hint
+property values from the guid. The type of the hint variable should be
+compatible with the guid kind. If the hint properties that exist on the
+guid are already set on the hint variable then those properties will be
+updated. The hint properties that are present on the guid but not on the
+hint variable will be added to the hint variable. If the hint variable has
+other properties set which do not exist on the guid, those properties will
+be retained in the hint variable.
+
+\subsection{Usage scenarios}
+As an example, we show how hints can be added to an OCR program solving a tiled cholesky factorization problem.
+\begin{ocrsnip}
+//Here we set hints on the EDT template for the various tasks:
+//In this example, we show how to set the default affinity of all EDTs
+//being generated out of these EDT templates will be set to the DB that
+//is passed in to slot 0. That is why we set the value of the hint property
+//OCR_HINT_EDT_SLOT_MAX_ACCESS to be 0
+
+ocrHint_t hintVar;
+ocrHintInit(&hintVar, OCR_HINT_EDT_T);
+if (ocrSetHintValue(&hintVar, OCR_HINT_EDT_SLOT_MAX_ACCESS, 0 /*slot number hint*/) == 0) {
+    ocrSetHint(templateSeq, &hintVar);
+    ocrSetHint(templateTrisolve, &hintVar);
+    ocrSetHint(templateUpdateNonDiag, &hintVar);
+    ocrSetHint(templateUpdate, &hintVar);
+}
+\end{ocrsnip}
+
+%%%
+
+%\subsection{How to add a new hint to the runtime}
+%The OCR hint framework is intended for runtime developers to explore hints that
+%can be useful for creating adaptive runtime algorithms, either through the
+%addition of new hints or by using existing ones.
+
+\subsection{Useful feedback}
+It has been suggested that the hint property value should have a more generic
+type instead of \hyperlink{type_s64}{s64}. One suggestion is to create a union
+type that would allow users to set property value that may not be known to be
+within 64 bits, such as, \hyperlink{type_ocrGuid_t}{ocr\-Guid\-\_\-t}.
+
+

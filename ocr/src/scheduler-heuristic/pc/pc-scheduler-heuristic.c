@@ -121,8 +121,9 @@ u8 pcSchedulerHeuristicUpdate(ocrSchedulerHeuristic_t *self, ocrSchedulerObject_
     return OCR_ENOTSUP;
 }
 
-ocrSchedulerHeuristicContext_t* pcSchedulerHeuristicGetContext(ocrSchedulerHeuristic_t *self, u64 contextId) {
-    return self->contexts[contextId];
+ocrSchedulerHeuristicContext_t* pcSchedulerHeuristicGetContext(ocrSchedulerHeuristic_t *self, ocrLocation_t loc) {
+    ASSERT(0);
+    return NULL;
 }
 
 /* Setup the context for this contextId */
@@ -250,7 +251,6 @@ static u8 pcSchedulerHeuristicNotifyEdtSatisfiedInvoke(ocrSchedulerHeuristic_t *
 #define PD_TYPE PD_MSG_SCHED_ANALYZE
     msg.type = PD_MSG_SCHED_ANALYZE | PD_MSG_REQUEST;
     msg.destLocation = derived->analyzeLocation;
-    PD_MSG_FIELD_IO(schedArgs).base.seqId = context->id;
     PD_MSG_FIELD_IO(schedArgs).base.heuristicId = self->factoryId;
     PD_MSG_FIELD_IO(schedArgs).kind = OCR_SCHED_ANALYZE_PHASE;
     PD_MSG_FIELD_IO(schedArgs).OCR_SCHED_ARG_FIELD(OCR_SCHED_ANALYZE_PHASE).req.depc = task->depc;
@@ -377,7 +377,6 @@ static u8 sendPhaseResponse(ocrSchedulerHeuristic_t *self, ocrSchedulerHeuristic
 #define PD_TYPE PD_MSG_SCHED_ANALYZE
     msg.type = PD_MSG_SCHED_ANALYZE | PD_MSG_REQUEST;
     msg.destLocation = analyzeArgs->srcObj->loc;
-    PD_MSG_FIELD_IO(schedArgs).base.seqId = context->id;
     PD_MSG_FIELD_IO(schedArgs).base.heuristicId = self->factoryId;
     PD_MSG_FIELD_IO(schedArgs).kind = OCR_SCHED_ANALYZE_PHASE;
     PD_MSG_FIELD_IO(schedArgs).OCR_SCHED_ARG_FIELD(OCR_SCHED_ANALYZE_PHASE).resp.scheduledPhase = phase;
@@ -490,7 +489,6 @@ static u8 pcSchedulerHeuristicAnalyzePhaseResponseInvoke(ocrSchedulerHeuristic_t
 #define PD_MSG (&msg)
 #define PD_TYPE PD_MSG_SCHED_NOTIFY
     msg.type = PD_MSG_SCHED_NOTIFY | PD_MSG_REQUEST;
-    PD_MSG_FIELD_IO(schedArgs).base.seqId = context->id;
     PD_MSG_FIELD_IO(schedArgs).kind = OCR_SCHED_NOTIFY_EDT_READY;
     PD_MSG_FIELD_IO(schedArgs).OCR_SCHED_ARG_FIELD(OCR_SCHED_NOTIFY_EDT_READY).guid.guid = task->guid;
     PD_MSG_FIELD_IO(schedArgs).OCR_SCHED_ARG_FIELD(OCR_SCHED_NOTIFY_EDT_READY).guid.metaDataPtr = task;
@@ -552,7 +550,7 @@ ocrSchedulerHeuristicFactory_t * newOcrSchedulerHeuristicFactoryPc(ocrParamList_
     base->fcts.destruct = FUNC_ADDR(void (*)(ocrSchedulerHeuristic_t*), pcSchedulerHeuristicDestruct);
 
     base->fcts.update = FUNC_ADDR(u8 (*)(ocrSchedulerHeuristic_t*, u32), pcSchedulerHeuristicUpdate);
-    base->fcts.getContext = FUNC_ADDR(ocrSchedulerHeuristicContext_t* (*)(ocrSchedulerHeuristic_t*, u64), pcSchedulerHeuristicGetContext);
+    base->fcts.getContext = FUNC_ADDR(ocrSchedulerHeuristicContext_t* (*)(ocrSchedulerHeuristic_t*, ocrLocation_t), pcSchedulerHeuristicGetContext);
     base->fcts.registerContext = FUNC_ADDR(u8 (*)(ocrSchedulerHeuristic_t*, u64, ocrLocation_t), pcSchedulerHeuristicRegisterContext);
 
     base->fcts.op[OCR_SCHEDULER_HEURISTIC_OP_GET_WORK].invoke = FUNC_ADDR(u8 (*)(ocrSchedulerHeuristic_t*, ocrSchedulerHeuristicContext_t*, ocrSchedulerOpArgs_t*, ocrRuntimeHint_t*), pcSchedulerHeuristicGetWorkInvoke);

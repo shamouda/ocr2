@@ -379,13 +379,13 @@ typedef struct {
 
 // FLS: Find last set: position of the MSB set to 1
 #define FLS fls64
-#define myStaticAssert(e) extern char (*myStaticAssert(void))[sizeof(char[1-2*!(e)])]
-myStaticAssert(ALIGNMENT == 8LL);
-myStaticAssert((ALIGNMENT-1) == POOL_HEADER_TYPE_MASK);
-myStaticAssert(SL_COUNT_LOG2 < 5);
-myStaticAssert(FL_MAX_LOG2 <= 64);
 
-myStaticAssert(ZERO_LIST_SIZE == SL_COUNT);
+COMPILE_ASSERT(ALIGNMENT == 8LL);
+COMPILE_ASSERT((ALIGNMENT-1) == POOL_HEADER_TYPE_MASK);
+COMPILE_ASSERT(SL_COUNT_LOG2 < 5);
+COMPILE_ASSERT(FL_MAX_LOG2 <= 64);
+
+COMPILE_ASSERT(ZERO_LIST_SIZE == SL_COUNT);
 
 static u32 myffs(u64 val) {
     return FLS(val & (~val + 1LL));

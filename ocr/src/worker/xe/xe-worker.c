@@ -48,18 +48,20 @@ static void workerLoop(ocrWorker_t * worker) {
     PD_MSG_STACK(msg);
     getCurrentEnv(NULL, NULL, NULL, &msg);
     while(worker->fcts.isRunning(worker)) {
-#if 0 //This is disabled until we move TAKE heuristic in CE policy domain to inside scheduler
+    DPRINTF(DEBUG_LVL_VVERB, "XE %lx REQUESTING WORK\n", pd->myLocation);
+#if 1 //This is disabled until we move TAKE heuristic in CE policy domain to inside scheduler
 #define PD_MSG (&msg)
 #define PD_TYPE PD_MSG_SCHED_GET_WORK
         msg.type = PD_MSG_SCHED_GET_WORK | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
-        PD_MSG_FIELD_IO(schedArgs).base.seqId = worker->seqId;
         PD_MSG_FIELD_IO(schedArgs).kind = OCR_SCHED_WORK_EDT_USER;
         PD_MSG_FIELD_IO(schedArgs).OCR_SCHED_ARG_FIELD(OCR_SCHED_WORK_EDT_USER).edt.guid = NULL_GUID;
         PD_MSG_FIELD_IO(schedArgs).OCR_SCHED_ARG_FIELD(OCR_SCHED_WORK_EDT_USER).edt.metaDataPtr = NULL;
+        PD_MSG_FIELD_I(properties) = 0;
         if(pd->fcts.processMessage(pd, &msg, true) == 0) {
             // We got a response
             ocrFatGuid_t taskGuid = PD_MSG_FIELD_IO(schedArgs).OCR_SCHED_ARG_FIELD(OCR_SCHED_WORK_EDT_USER).edt;
             if(taskGuid.guid != NULL_GUID) {
+                DPRINTF(DEBUG_LVL_VVERB, "XE %lx EXECUTING TASK %lx\n", pd->myLocation, taskGuid.guid);
                 // Task sanity checks
                 ASSERT(taskGuid.metaDataPtr != NULL);
                 worker->curTask = (ocrTask_t*)taskGuid.metaDataPtr;
@@ -76,9 +78,9 @@ static void workerLoop(ocrWorker_t * worker) {
 
                 // Important for this to be the last
                 worker->curTask = NULL;
+            } else {
+                DPRINTF(DEBUG_LVL_VVERB, "XE %lx NULL RESPONSE from CE\n", pd->myLocation);
             }
-        } else {
-            ASSERT(0); //Handle error code
         }
 #undef PD_MSG
 #undef PD_TYPE

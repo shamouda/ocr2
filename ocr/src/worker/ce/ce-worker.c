@@ -16,6 +16,7 @@
 #include "ocr-types.h"
 #include "ocr-worker.h"
 #include "worker/ce/ce-worker.h"
+#include "policy-domain/ce/ce-policy.h"
 
 #ifdef HAL_FSIM_CE
 #include "rmd-map.h"
@@ -43,14 +44,33 @@ static inline u64 getWorkerId(ocrWorker_t * worker) {
  */
 static void workerLoop(ocrWorker_t * worker) {
     ocrPolicyDomain_t *pd = worker->pd;
+    ocrPolicyDomainCe_t * cePolicy = (ocrPolicyDomainCe_t *)pd;
+    PD_MSG_STACK(msg);
+    getCurrentEnv(NULL, NULL, NULL, &msg);
 
     DPRINTF(DEBUG_LVL_VERB, "Starting scheduler routine of CE worker %ld\n", getWorkerId(worker));
     pd->fcts.switchRunlevel(pd, RL_COMPUTE_OK, 0);
     while(worker->fcts.isRunning(worker)) {
+        if (cePolicy->shutdownMode) {
+            DPRINTF(DEBUG_LVL_VVERB, "UPDATE SHUTDOWN\n");
+        } else {
+            DPRINTF(DEBUG_LVL_VVERB, "UPDATE IDLE\n");
+        }
+#define PD_MSG (&msg)
+#define PD_TYPE PD_MSG_SCHED_UPDATE
+        msg.type = PD_MSG_SCHED_UPDATE | PD_MSG_REQUEST;
+        PD_MSG_FIELD_I(properties) = cePolicy->shutdownMode ? OCR_SCHEDULER_UPDATE_PROP_SHUTDOWN : OCR_SCHEDULER_UPDATE_PROP_IDLE;
+        ASSERT(pd->fcts.processMessage(pd, &msg, false) == 0);
+        ASSERT(PD_MSG_FIELD_O(returnDetail) == 0);
+#undef PD_MSG
+#undef PD_TYPE
+
+        DPRINTF(DEBUG_LVL_VVERB, "WAIT\n");
         ocrMsgHandle_t *handle = NULL;
         RESULT_ASSERT(pd->fcts.waitMessage(pd, &handle), ==, 0);
         ASSERT(handle);
         ocrPolicyMsg_t *msg = handle->response;
+        DPRINTF(DEBUG_LVL_VVERB, "PROCESSING: %lx from %lx\n", (msg->type & PD_MSG_TYPE_ONLY), msg->srcLocation);
         RESULT_ASSERT(pd->fcts.processMessage(pd, msg, true), ==, 0);
         handle->destruct(handle);
     } /* End of while loop */

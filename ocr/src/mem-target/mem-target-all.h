@@ -18,14 +18,17 @@
 #include "utils/ocr-utils.h"
 
 typedef enum _memTargetType_t {
+#ifdef ENABLE_MEM_TARGET_SHARED
     memTargetShared_id,
+#endif
     memTargetMax_id
 } memTargetType_t;
 
 extern const char * memtarget_types[];
 
-// Shared memory target
+#ifdef ENABLE_MEM_TARGET_SHARED
 #include "mem-target/shared/shared-mem-target.h"
+#endif
 
 // Add other memory targets using the same pattern as above
 

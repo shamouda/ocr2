@@ -17,16 +17,23 @@
 #include "utils/ocr-utils.h"
 
 typedef enum _memPlatformType_t {
+#ifdef ENABLE_MEM_PLATFORM_MALLOC
     memPlatformMalloc_id,
+#endif
+#ifdef ENABLE_MEM_PLATFORM_FSIM
     memPlatformFsim_id,
+#endif
     memPlatformMax_id
 } memPlatformType_t;
 
 extern const char * memplatform_types[];
 
-// Malloc memory platform
+#ifdef ENABLE_MEM_PLATFORM_MALLOC
 #include "mem-platform/malloc/malloc-mem-platform.h"
+#endif
+#ifdef ENABLE_MEM_PLATFORM_FSIM
 #include "mem-platform/fsim/fsim-mem-platform.h"
+#endif
 
 // Add other memory platforms using the same pattern as above
 

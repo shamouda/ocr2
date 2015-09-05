@@ -47,7 +47,6 @@ static void hcWorkShift(ocrWorker_t * worker) {
 #define PD_MSG (&msg)
 #define PD_TYPE PD_MSG_SCHED_GET_WORK
     msg.type = PD_MSG_SCHED_GET_WORK | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
-    PD_MSG_FIELD_IO(schedArgs).base.seqId = worker->seqId;
     PD_MSG_FIELD_IO(schedArgs).kind = OCR_SCHED_WORK_EDT_USER;
     PD_MSG_FIELD_IO(schedArgs).OCR_SCHED_ARG_FIELD(OCR_SCHED_WORK_EDT_USER).edt.guid = NULL_GUID;
     PD_MSG_FIELD_IO(schedArgs).OCR_SCHED_ARG_FIELD(OCR_SCHED_WORK_EDT_USER).edt.metaDataPtr = NULL;
@@ -102,21 +101,7 @@ static void workerLoop(ocrWorker_t * worker) {
     u8 continueLoop = true;
     // At this stage, we are in the USER_OK runlevel
     ASSERT(worker->curState == GET_STATE(RL_USER_OK, (RL_GET_PHASE_COUNT_DOWN(worker->pd, RL_USER_OK))));
-
-    //Register this worker with the scheduler and get a context id
     ocrPolicyDomain_t *pd = worker->pd;
-    PD_MSG_STACK(msg);
-    msg.srcLocation = pd->myLocation;
-    msg.destLocation = pd->myLocation;
-#define PD_MSG (&msg)
-#define PD_TYPE PD_MSG_MGT_REGISTER
-    msg.type = PD_MSG_MGT_REGISTER | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
-    // The original 'id' value is read from the CFG file
-    PD_MSG_FIELD_I(properties) = 0;
-    pd->fcts.processMessage(pd, &msg, true);
-    ASSERT(worker->seqId == PD_MSG_FIELD_O(seqId));
-#undef PD_MSG
-#undef PD_TYPE
 
     if (worker->amBlessed) {
         ocrGuid_t affinityMasterPD;
@@ -171,7 +156,7 @@ static void workerLoop(ocrWorker_t * worker) {
             worker->fcts.workShift(worker);
             EXIT_PROFILE;
         }
-        DPRINTF(DEBUG_LVL_VERB, "Dropped out of curState(%u,%u) going to desiredState(%u,%u)\n", worker->seqId,
+        DPRINTF(DEBUG_LVL_VERB, "Dropped out of curState(%u,%u) going to desiredState(%u,%u)\n", worker->id,
                                 GET_STATE_RL(worker->curState), GET_STATE_PHASE(worker->curState),
                                 GET_STATE_RL(worker->desiredState), GET_STATE_PHASE(worker->desiredState));
 
@@ -362,21 +347,7 @@ u8 hcWorkerSwitchRunlevel(ocrWorker_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_
                         }
                         ((ocrWorkerHc_t*) self)->legacySecondStart = true;
                     }
-
-                    if (properties & RL_LEGACY) {
-                        PD_MSG_STACK(msg);
-                        msg.srcLocation = PD->myLocation;
-                        msg.destLocation = PD->myLocation;
-                    #define PD_MSG (&msg)
-                    #define PD_TYPE PD_MSG_MGT_REGISTER
-                        msg.type = PD_MSG_MGT_REGISTER | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
-                        // The original 'id' value is read from the CFG file
-                        PD_MSG_FIELD_I(properties) = 0;
-                        PD->fcts.processMessage(PD, &msg, true);
-                        ASSERT(self->seqId == PD_MSG_FIELD_O(seqId));
-                    #undef PD_MSG
-                    #undef PD_TYPE
-                    } else {
+                    if (!(properties & RL_LEGACY)) {
                         workerLoop(self);
                     }
                 }

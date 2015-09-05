@@ -374,6 +374,7 @@ u8 xePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
     case PD_MSG_COMM_TAKE: //This is enabled until we move TAKE heuristic in CE policy domain to inside scheduler
     case PD_MSG_SCHED_NOTIFY:
     case PD_MSG_DEP_ADD: case PD_MSG_DEP_REGSIGNALER: case PD_MSG_DEP_REGWAITER:
+    case PD_MSG_HINT_SET: case PD_MSG_HINT_GET:
     case PD_MSG_DEP_SATISFY: {
         START_PROFILE(pd_xe_OffloadtoCE);
         if((msg->type & PD_MSG_TYPE_ONLY) == PD_MSG_WORK_CREATE) {
@@ -432,7 +433,7 @@ u8 xePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         break;
     }
 
-    // Messages handled locally
+    // Messages tried locally first before sending out to CE
     case PD_MSG_SCHED_GET_WORK: {
         START_PROFILE(pd_xe_SchedWork);
         DPRINTF(DEBUG_LVL_VVERB, "Offloading message of type 0x%x to CE\n",
@@ -456,6 +457,7 @@ u8 xePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         EXIT_PROFILE;
         break;
     }
+    // Messages handled locally
     case PD_MSG_DEP_DYNADD: {
         START_PROFILE(pd_xe_DepDynAdd);
         ocrTask_t *curTask = NULL;

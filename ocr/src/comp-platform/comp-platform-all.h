@@ -13,16 +13,23 @@
 #include "utils/ocr-utils.h"
 
 typedef enum _compPlatformType_t {
+#ifdef ENABLE_COMP_PLATFORM_PTHREAD
     compPlatformPthread_id,
+#endif
+#ifdef ENABLE_COMP_PLATFORM_FSIM
     compPlatformFsim_id,
+#endif
     compPlatformMax_id,
 } compPlatformType_t;
 
 extern const char * compplatform_types[];
 
-// Pthread compute platform
+#ifdef ENABLE_COMP_PLATFORM_PTHREAD
 #include "comp-platform/pthread/pthread-comp-platform.h"
+#endif
+#ifdef ENABLE_COMP_PLATFORM_FSIM
 #include "comp-platform/fsim/fsim-comp-platform.h"
+#endif
 
 // Add other compute platforms using the same pattern as above
 

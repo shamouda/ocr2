@@ -8,7 +8,7 @@ jobtype_ocr_init = {
     'run-cmd': '${JJOB_PRIVATE_HOME}/xstack/ocr/jenkins/scripts/init.sh',
     'param-cmd': '${JJOB_PRIVATE_HOME}/xstack/jenkins/scripts/empty-cmd.sh',
     'keywords': ('ocr', 'percommit'),
-    'timeout': 240,
+    'timeout': 300,
     'sandbox': ('local', 'shared', 'emptyShared', 'shareOK'),
     'req-repos': ('xstack',)
 }

@@ -599,25 +599,31 @@ void hcPolicyDomainDestruct(ocrPolicyDomain_t * policy) {
     }
 
     // Destruct factories
+    // Not all factories might have been used in the config file,
+    // so only destroy them if they were instantiated.
 
     maxCount = policy->taskFactoryCount;
     for(i = 0; i < maxCount; ++i) {
-        policy->taskFactories[i]->destruct(policy->taskFactories[i]);
+        if(policy->taskFactories[i])
+            policy->taskFactories[i]->destruct(policy->taskFactories[i]);
     }
 
     maxCount = policy->eventFactoryCount;
     for(i = 0; i < maxCount; ++i) {
-        policy->eventFactories[i]->destruct(policy->eventFactories[i]);
+        if(policy->eventFactories[i])
+            policy->eventFactories[i]->destruct(policy->eventFactories[i]);
     }
 
     maxCount = policy->taskTemplateFactoryCount;
     for(i = 0; i < maxCount; ++i) {
-        policy->taskTemplateFactories[i]->destruct(policy->taskTemplateFactories[i]);
+        if(policy->taskTemplateFactories[i])
+            policy->taskTemplateFactories[i]->destruct(policy->taskTemplateFactories[i]);
     }
 
     maxCount = policy->dbFactoryCount;
     for(i = 0; i < maxCount; ++i) {
-        policy->dbFactories[i]->destruct(policy->dbFactories[i]);
+        if(policy->dbFactories[i])
+            policy->dbFactories[i]->destruct(policy->dbFactories[i]);
     }
 
     //Anticipate those to be null-impl for some time
@@ -720,7 +726,6 @@ static u8 hcAllocateDb(ocrPolicyDomain_t *self, ocrFatGuid_t *guid, void** ptr, 
 #define PD_MSG (&msg)
 #define PD_TYPE PD_MSG_SCHED_NOTIFY
             msg.type = PD_MSG_SCHED_NOTIFY | PD_MSG_REQUEST;
-            PD_MSG_FIELD_IO(schedArgs).base.seqId = worker->seqId;
             PD_MSG_FIELD_IO(schedArgs).kind = OCR_SCHED_NOTIFY_DB_CREATE;
             PD_MSG_FIELD_IO(schedArgs).OCR_SCHED_ARG_FIELD(OCR_SCHED_NOTIFY_DB_CREATE).guid.guid = block->guid;
             PD_MSG_FIELD_IO(schedArgs).OCR_SCHED_ARG_FIELD(OCR_SCHED_NOTIFY_DB_CREATE).guid.metaDataPtr = block;
@@ -1440,6 +1445,7 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_SCHED_GET_WORK
         ocrSchedulerOpWorkArgs_t *taskArgs = &PD_MSG_FIELD_IO(schedArgs);
+        taskArgs->base.location = msg->srcLocation;
         PD_MSG_FIELD_O(returnDetail) =
             self->schedulers[0]->fcts.op[OCR_SCHEDULER_OP_GET_WORK].invoke(
                 self->schedulers[0], (ocrSchedulerOpArgs_t*)taskArgs, NULL);
@@ -1462,6 +1468,7 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_SCHED_NOTIFY
         ocrSchedulerOpNotifyArgs_t *notifyArgs = &PD_MSG_FIELD_IO(schedArgs);
+        notifyArgs->base.location = msg->srcLocation;
         PD_MSG_FIELD_O(returnDetail) =
             self->schedulers[0]->fcts.op[OCR_SCHEDULER_OP_NOTIFY].invoke(
                 self->schedulers[0], (ocrSchedulerOpArgs_t*)notifyArgs, NULL);
@@ -1478,6 +1485,7 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_SCHED_ANALYZE
         ocrSchedulerOpAnalyzeArgs_t *analyzeArgs = &PD_MSG_FIELD_IO(schedArgs);
+        analyzeArgs->base.location = msg->srcLocation;
         PD_MSG_FIELD_O(returnDetail) =
             self->schedulers[0]->fcts.op[OCR_SCHEDULER_OP_ANALYZE].invoke(
                 self->schedulers[0], (ocrSchedulerOpArgs_t*)analyzeArgs, NULL);
@@ -1854,18 +1862,7 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
     }
 
     case PD_MSG_MGT_REGISTER: {
-        START_PROFILE(pd_hc_Register);
-#define PD_MSG msg
-#define PD_TYPE PD_MSG_MGT_REGISTER
-        u64 contextId = 0;
-        PD_MSG_FIELD_O(returnDetail) = self->schedulers[0]->fcts.registerContext(
-                self->schedulers[0], msg->srcLocation, &contextId);
-        PD_MSG_FIELD_O(seqId) = contextId;
-#undef PD_MSG
-#undef PD_TYPE
-        msg->type &= ~PD_MSG_REQUEST;
-        msg->type |= PD_MSG_RESPONSE;
-        EXIT_PROFILE;
+        ASSERT(0);
         break;
     }
 

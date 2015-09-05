@@ -1720,7 +1720,7 @@ u8 hcDistPdSendMessage(ocrPolicyDomain_t* self, ocrLocation_t target, ocrPolicyM
     ASSERT(((s32)target) > -1);
     ASSERT(message->srcLocation == self->myLocation);
     ASSERT(message->destLocation != self->myLocation);
-    u32 id = worker->seqId;
+    u32 id = worker->id;
     u8 ret = self->commApis[id]->fcts.sendMessage(self->commApis[id], target, message, handle, properties);
     return ret;
 }
@@ -1728,7 +1728,7 @@ u8 hcDistPdSendMessage(ocrPolicyDomain_t* self, ocrLocation_t target, ocrPolicyM
 u8 hcDistPdPollMessage(ocrPolicyDomain_t *self, ocrMsgHandle_t **handle) {
     ocrWorker_t * worker;
     getCurrentEnv(NULL, &worker, NULL, NULL);
-    u32 id = worker->seqId;
+    u32 id = worker->id;
     u8 ret = self->commApis[id]->fcts.pollMessage(self->commApis[id], handle);
     return ret;
 }
@@ -1736,7 +1736,7 @@ u8 hcDistPdPollMessage(ocrPolicyDomain_t *self, ocrMsgHandle_t **handle) {
 u8 hcDistPdWaitMessage(ocrPolicyDomain_t *self,  ocrMsgHandle_t **handle) {
     ocrWorker_t * worker;
     getCurrentEnv(NULL, &worker, NULL, NULL);
-    u32 id = worker->seqId;
+    u32 id = worker->id;
     u8 ret = self->commApis[id]->fcts.waitMessage(self->commApis[id], handle);
     return ret;
 }

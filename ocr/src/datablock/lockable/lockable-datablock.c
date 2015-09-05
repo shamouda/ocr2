@@ -39,6 +39,7 @@
 
 u64 ocrHintPropDbLockable[] = {
 #ifdef ENABLE_HINTS
+    OCR_HINT_DB_MEM_AFFINITY
 #endif
 };
 

@@ -8,10 +8,18 @@
 #include "debug.h"
 
 const char * worker_types[] = {
+#ifdef ENABLE_WORKER_HC
    "HC",
+#endif
+#ifdef ENABLE_WORKER_HC_COMM
    "HC_COMM",
+#endif
+#ifdef ENABLE_WORKER_XE
    "XE",
+#endif
+#ifdef ENABLE_WORKER_CE
    "CE",
+#endif
    NULL
 };
 
@@ -56,6 +64,6 @@ void initializeWorkerOcr(ocrWorkerFactory_t * factory, ocrWorker_t * self, ocrPa
     self->curState = self->desiredState = GET_STATE(RL_CONFIG_PARSE, 0);
     self->callback = NULL;
     self->callbackArg = 0ULL;
-    self->seqId = ((paramListWorkerInst_t *) perInstance)->workerId;
+    self->id = ((paramListWorkerInst_t *) perInstance)->workerId;
 }
 

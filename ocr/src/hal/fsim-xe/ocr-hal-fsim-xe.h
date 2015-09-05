@@ -91,7 +91,7 @@
                 ((char*)_destination)[count] = ((char*)_source)[count]; \
         }                                                               \
     }                                                                   \
-    } while(0);
+    } while(0)
 
 /**
  * @brief Atomic swap (64 bit)
@@ -318,7 +318,23 @@
 #define hal_pause() do {                        \
         u32 _i = 1000;                          \
         while(_i > 0) --_i;                     \
-    } while(0);
+    } while(0)
+
+/**
+ * @brief Put the XE core to sleep
+ *
+ * Currently does nothing
+ */
+#define hal_sleep(id) do {                       \
+    } while(0)
+
+/**
+ * @brief Wake the XE core from sleep
+ *
+ * Currently does nothing
+ */
+#define hal_wake(id) do {                         \
+    } while(0)
 
 // Abstraction to do a load operation from any level of the memory hierarchy
 #define GET8(temp, addr)   ((temp) = *((u8*)(addr)))

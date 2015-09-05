@@ -105,7 +105,7 @@ typedef struct _ocrWorker_t {
     ocrLocation_t location;  //BUG #605 Locations spec: need this ?
     ocrWorkerType_t type;
     u8 amBlessed; // BUG #583: Clean-up runlevels; maybe merge in type?
-    u64 seqId;
+    u64 id; //Worker id as indicated in runtime config
     // Workers are capable modules so
     // part of their runlevel processing happens asynchronously
     // This provides a convenient location to save

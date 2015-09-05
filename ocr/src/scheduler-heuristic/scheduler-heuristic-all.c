@@ -14,6 +14,9 @@ const char * schedulerHeuristic_types[] = {
 #ifdef ENABLE_SCHEDULER_HEURISTIC_PC
     "PC",
 #endif
+#ifdef ENABLE_SCHEDULER_HEURISTIC_CE
+    "CE",
+#endif
 #ifdef ENABLE_SCHEDULER_HEURISTIC_NULL
     "NULL",
 #endif
@@ -30,6 +33,10 @@ ocrSchedulerHeuristicFactory_t * newSchedulerHeuristicFactory(schedulerHeuristic
     case schedulerHeuristicPc_id:
         return newOcrSchedulerHeuristicFactoryPc(perType, type);
 #endif
+#ifdef ENABLE_SCHEDULER_HEURISTIC_CE
+    case schedulerHeuristicCe_id:
+        return newOcrSchedulerHeuristicFactoryCe(perType, type);
+#endif
 #ifdef ENABLE_SCHEDULER_HEURISTIC_NULL
     case schedulerHeuristicNull_id:
         return newOcrSchedulerHeuristicFactoryNull(perType, type);
@@ -42,6 +49,7 @@ ocrSchedulerHeuristicFactory_t * newSchedulerHeuristicFactory(schedulerHeuristic
 }
 
 void initializeSchedulerHeuristicOcr(ocrSchedulerHeuristicFactory_t * factory, ocrSchedulerHeuristic_t * self, ocrParamList_t *perInstance) {
+    paramListSchedulerHeuristic_t *params = (paramListSchedulerHeuristic_t*)perInstance;
     self->fguid.guid = UNINITIALIZED_GUID;
     self->fguid.metaDataPtr = self;
     self->scheduler = NULL;
@@ -49,5 +57,6 @@ void initializeSchedulerHeuristicOcr(ocrSchedulerHeuristicFactory_t * factory, o
     self->contextCount = 0;
     self->costTable = NULL;
     self->fcts = factory->fcts;
+    self->isMaster = params->isMaster;
     self->factoryId = factory->factoryId;
 }

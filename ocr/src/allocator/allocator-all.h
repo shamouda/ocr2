@@ -24,12 +24,15 @@ typedef enum _allocatorType_t {
 #ifdef ENABLE_ALLOCATOR_QUICK
     allocatorQuick_id,
 #endif
+#ifdef ENABLE_ALLOCATOR_TLSF
     allocatorTlsf_id,
-
+#endif
 #ifdef ENABLE_ALLOCATOR_MALLOCPROXY
     allocatorMallocProxy_id,
 #endif
+#ifdef ENABLE_ALLOCATOR_NULL
     allocatorNull_id,
+#endif
     // As other types are added, add switch cases in allocater-all.c
     allocatorMax_id
 } allocatorType_t;
@@ -48,14 +51,22 @@ typedef enum _allocatorType_t {
 
 extern const char * allocator_types[];
 
+#ifdef ENABLE_ALLOCATOR_TLSF
 #include "allocator/tlsf/tlsf-allocator.h"    // TLSF allocator
+#endif
+#ifdef ENABLE_ALLOCATOR_SIMPLE
 #include "allocator/simple/simple-allocator.h"
+#endif
+#ifdef ENABLE_ALLOCATOR_QUICK
 #include "allocator/quick/quick-allocator.h"
+#endif
 #ifdef ENABLE_ALLOCATOR_MALLOCPROXY
 // System malloc allocator with our own wrapper, for platforms other than FSIM, for fall-back testing
 #include "allocator/mallocproxy/mallocproxy-allocator.h"
 #endif
+#ifdef ENABLE_ALLOCATOR_NULL
 #include "allocator/null/null-allocator.h"
+#endif
 
 ocrAllocatorFactory_t *newAllocatorFactory(allocatorType_t type, ocrParamList_t *typeArg);
 void allocatorFreeFunction(void* blockPayloadAddr);

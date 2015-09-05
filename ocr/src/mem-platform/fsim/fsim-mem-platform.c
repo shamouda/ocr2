@@ -68,6 +68,15 @@ u8 fsimSwitchRunlevel(ocrMemPlatform_t *self, ocrPolicyDomain_t *PD, ocrRunlevel
             ASSERT(self->startAddr);
             self->endAddr = self->startAddr + self->size;
 
+#ifdef SAL_FSIM_CE
+            // Needed to workaround a Qemu issue where the Qemu-managed scratchpad isn't zeroed properly Bug #699
+            if(RL_IS_FIRST_PHASE_UP(PD, RL_MEMORY_OK, phase) && (val == 1)) {
+                u32 i;
+                for(i = 0; i<MEM_PLATFORM_ZEROED_AREA_SIZE && i<self->size; i+=8)
+                    *(u64 *)(self->startAddr+i) = 0ULL;
+           }
+#endif
+
             DPRINTF(DEBUG_LVL_VERB, "Initializing memory range %lx to %lx\n", self->startAddr, self->endAddr);
             ocrMemPlatformFsim_t *rself = (ocrMemPlatformFsim_t*)self;
             rself->pRangeTracker = initializeRange(16, self->startAddr,

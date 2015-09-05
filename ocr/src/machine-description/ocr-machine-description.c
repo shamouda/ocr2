@@ -39,6 +39,27 @@
 #include <string.h>
 #include <signal.h>
 
+u32 type_max[] = {
+    guidMax_id,
+    memPlatformMax_id,
+    memTargetMax_id,
+    allocatorMax_id,
+    commApiMax_id,
+    commPlatformMax_id,
+    compPlatformMax_id,
+    compTargetMax_id,
+    workpileMax_id,
+    workerMax_id,
+    schedulerMax_id,
+    schedulerObjectMax_id,
+    schedulerHeuristicMax_id,
+    policyDomainMax_id,
+    taskMax_id,
+    taskTemplateMax_id,
+    dataBlockMax_id,
+    eventMax_id,
+};
+
 #define MAX_INSTANCES 64
 #define MAX_KEY_SZ 64
 #define DEBUG_TYPE INIPARSING
@@ -807,6 +828,14 @@ s32 populate_inst(ocrParamList_t **inst_param, void **instance, s32 *type_counts
     case schedulerHeuristic_type:
         for (j = low; j<=high; j++) {
             ALLOC_PARAM_LIST(inst_param[j], paramListSchedulerHeuristic_t);
+            ((paramListSchedulerHeuristic_t*)inst_param[j])->isMaster = false;
+            if (key_exists(dict, secname, "kind")) {
+                char *valuestr = NULL;
+                snprintf(key, MAX_KEY_SZ, "%s:%s", secname, "kind");
+                INI_GET_STR (key, valuestr, "");
+                ASSERT(strcmp(valuestr, "master") == 0);
+                ((paramListSchedulerHeuristic_t*)inst_param[j])->isMaster = true;
+            }
             instance[j] = (void *)((ocrSchedulerHeuristicFactory_t *)factory)->instantiate(factory, inst_param[j]);
             if (instance[j])
                 DPRINTF(DEBUG_LVL_INFO, "Created schedulerHeuristic of type %s, index %d\n", inststr, j);
@@ -819,8 +848,13 @@ s32 populate_inst(ocrParamList_t **inst_param, void **instance, s32 *type_counts
             TO_ENUM (mytype, inststr, workerType_t, worker_types, workerMax_id);
             switch (mytype) {
 #if defined(ENABLE_WORKER_HC) || defined(ENABLE_WORKER_HC_COMM)
+#if defined(ENABLE_WORKER_HC)
                 case workerHc_id:
-                case workerHcComm_id: {
+#endif
+#if defined(ENABLE_WORKER_HC_COMM)
+                case workerHcComm_id:
+#endif
+                    {
                     char *workerstr;
                     char workertypekey[MAX_KEY_SZ];
                     ocrWorkerType_t workertype = MAX_WORKERTYPE;

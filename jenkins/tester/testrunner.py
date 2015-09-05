@@ -109,6 +109,16 @@ allJobsStatus = dict()
 """
 allUsedPaths = dict()
 
+"""Global to give a sequential ID to each job
+running. This ID is not necessarily consistent across
+runs of testrunner but is guaranteed to be unique
+for one run of testrunner thereby allowing it to be
+used as a distinguishing factor for running jobs (for
+example to create uniquely named directories for each
+job
+"""
+jobId = 0
+
 # Check whether a dictionary has the proper format
 def checkDict(inputDict, typeStr, fieldTypes, mandatoryFields):
     """Checks whether input matches a certain format. This
@@ -220,6 +230,7 @@ def mainLoop():
     global allRemainingJobs, allJobTypes, allRunningJobs, allReadyJobs, allTerminalJobs, allJobsStatus
     global allUsedPaths
     global maxLocalJobs
+    global jobId
 
     localJobCount = 0      # Number of local jobs running
     waitForJobDrain = None # Environment producing job to run
@@ -281,7 +292,8 @@ def mainLoop():
                             break
                         except filelock.FileLockException:
                             myLog.error("Environment producing job still on hold...")
-                    returnedStatus = waitForJobDrain.execute()
+                    returnedStatus = waitForJobDrain.execute(jobId)
+                    jobId = jobId + 1
                     if (returnedStatus > JobObject.BLOCKED_JOB and
                         returnedStatus < JobObject.DONE_OK):
                         myLog.info("Starting %s" % (waitForJobDrain))
@@ -368,7 +380,8 @@ def mainLoop():
                 continue
             myLog.debug("Trying to run %s" % (str(allReadyJobs[i][1])))
             assert(allReadyJobs[i][1].getIsEnvProducer() is False)
-            returnedStatus = allReadyJobs[i][1].execute()
+            returnedStatus = allReadyJobs[i][1].execute(jobId)
+            jobId = jobId + 1
             if returnedStatus > JobObject.BLOCKED_JOB and returnedStatus < JobObject.DONE_OK:
                 myLog.info("Starting %s" % (allReadyJobs[i][1]))
                 allRunningJobs.append(allReadyJobs[i][1])
@@ -649,6 +662,8 @@ def main(argv=None):
 
     Environment variables available to the jobs:
         - JJOB_NAME                   Name of the job running
+        - JJOB_ID                     A unique identifier (for this job). The identifier is an integer
+                                      and will not be consistent across runs of testrunner
         - JJOB_INITDIR_XXXX           Directory containing the initial checkouts. You should not
                                       modify anything in this (this is the "golden" copy for the
                                       tests). This is always local. XXXX corresponds to the all-caps

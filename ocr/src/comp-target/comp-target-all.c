@@ -8,7 +8,9 @@
 #include "debug.h"
 
 const char * comptarget_types[] = {
+#ifdef ENABLE_COMP_TARGET_PASSTHROUGH
     "PASSTHROUGH",
+#endif
     NULL
 };
 
