@@ -24,7 +24,8 @@ cp -r ${JJOB_PRIVATE_HOME}/xstack/ocr/scripts/* ${JJOB_SHARED_HOME}/xstack/ocr/s
 cp -r ${JJOB_PRIVATE_HOME}/xstack/ocr/examples/* ${JJOB_SHARED_HOME}/xstack/ocr/examples/
 rsync -aq -r ${JJOB_PRIVATE_HOME}/xstack/apps/ ${JJOB_SHARED_HOME}/xstack/apps/ --exclude libs
 mkdir -p ${JJOB_SHARED_HOME}/xstack/apps/libs
-rsync -aq -r ${JJOB_PRIVATE_HOME}/xstack/apps/libs/src ${JJOB_SHARED_HOME}/xstack/apps/libs/src --exclude trilinos
+rsync -aq -r ${JJOB_PRIVATE_HOME}/xstack/apps/libs/src ${JJOB_SHARED_HOME}/xstack/apps/libs --exclude trilinos --exclude libcxx --exclude libswtest --exclude libunwind --exclude libcxxabi --exclude ocrscaffold --exclude "ocr-glibc"
+#find ${JJOB_PRIVATE_HOME}/xstack/apps/libs/src -maxdepth 1 -type d -not -name "trilinos" -print0 | xargs -0 cp -r -t ${JJOB_SHARED_HOME}/xstack/apps/libs/src
 cp -rT ${JJOB_PRIVATE_HOME}/xstack/hll/cnc ${JJOB_SHARED_HOME}/xstack/hll/cnc
 
 if [ "x$TG" == "xtg" ]; then
