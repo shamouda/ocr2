@@ -13,14 +13,17 @@
 #include "utils/ocr-utils.h"
 
 typedef enum _compTargetType_t {
+#ifdef ENABLE_COMP_TARGET_PASSTHROUGH
     compTargetPassThrough_id,
+#endif
     compTargetMax_id,
 } compTargetType_t;
 
 extern const char * comptarget_types[];
 
-// Pass-through target (just calls one and only one platform)
+#ifdef ENABLE_COMP_TARGET_PASSTHROUGH
 #include "comp-target/passthrough/passthrough-comp-target.h"
+#endif
 
 // Add other compute targets using the same pattern as above
 

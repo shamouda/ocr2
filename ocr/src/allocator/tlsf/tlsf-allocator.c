@@ -656,26 +656,24 @@ static void markPrevNbrBlockFree(blkHdr_t * pBlk) {
 
 // A whole bunch of internal methods used only in this file.
 
-#define myStaticAssert(e) extern char (*myStaticAssert(void))[sizeof(char[1-2*!(e)])]
-
 #define _NULL 0ULL
 
-myStaticAssert(ALIGNMENT == 8LL);
-myStaticAssert((ALIGNMENT-1) == POOL_HEADER_TYPE_MASK);
-myStaticAssert(SL_COUNT_LOG2 < 5);
-myStaticAssert(FL_MAX_LOG2 <= 64);
+COMPILE_ASSERT(ALIGNMENT == 8LL);
+COMPILE_ASSERT((ALIGNMENT-1) == POOL_HEADER_TYPE_MASK);
+COMPILE_ASSERT(SL_COUNT_LOG2 < 5);
+COMPILE_ASSERT(FL_MAX_LOG2 <= 64);
 
 // Some assertions to make sure things are OK
 #ifdef ENABLE_ALLOCATOR_CHECKSUM
-myStaticAssert(sizeof(blkHdr_t) == 4*sizeof(u64));
+COMPILE_ASSERT(sizeof(blkHdr_t) == 4*sizeof(u64));
 #else
-myStaticAssert(sizeof(blkHdr_t) == 3*sizeof(u64));
+COMPILE_ASSERT(sizeof(blkHdr_t) == 3*sizeof(u64));
 #endif
-myStaticAssert(sizeof(blkHdr_t) % ALIGNMENT == 0);
-myStaticAssert(sizeof(poolHdr_t) % ALIGNMENT == 0);
-myStaticAssert(offsetof(poolHdr_t, nullBlock) % ALIGNMENT == 0);
-myStaticAssert(ZERO_LIST_SIZE == SL_COUNT);
-myStaticAssert(sizeof(char) == 1);
+COMPILE_ASSERT(sizeof(blkHdr_t) % ALIGNMENT == 0);
+COMPILE_ASSERT(sizeof(poolHdr_t) % ALIGNMENT == 0);
+COMPILE_ASSERT(offsetof(poolHdr_t, nullBlock) % ALIGNMENT == 0);
+COMPILE_ASSERT(ZERO_LIST_SIZE == SL_COUNT);
+COMPILE_ASSERT(sizeof(char) == 1);
 
 /* Some contants */
 static const u64 GoffsetFromBlkHdrToPayload = (sizeof(blkHdr_t));

@@ -54,6 +54,9 @@
 // GUID provider
 #define ENABLE_GUID_PTR
 
+// Hints
+#define ENABLE_HINTS
+
 // HAL layer to use
 #define HAL_FSIM_XE
 
@@ -65,7 +68,6 @@
 
 // Policy domain
 #define ENABLE_POLICY_DOMAIN_XE
-#define ENABLE_MSG_SEQID
 
 // Scheduler
 #define ENABLE_SCHEDULER_XE

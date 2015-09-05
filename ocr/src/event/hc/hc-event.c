@@ -1039,6 +1039,7 @@ u8 newEventHc(ocrEventFactory_t * factory, ocrFatGuid_t *guid,
 
     // Do this at the very end; it indicates that the object of the GUID is actually
     // valid
+    hal_fence(); // Make sure sure this really happens last
     base->guid = resultGuid;
 
     DPRINTF(DEBUG_LVL_INFO, "Create %s: 0x%lx\n", eventTypeToString(base), base->guid);

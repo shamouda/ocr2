@@ -20,15 +20,12 @@
 /* OCR-WST SCHEDULER_OBJECT FUNCTIONS                 */
 /******************************************************/
 
-static void wstSchedulerObjectInit(ocrSchedulerObject_t *self, ocrPolicyDomain_t *PD) {
+static void wstSchedulerObjectInit(ocrSchedulerObject_t *self, ocrPolicyDomain_t *PD, u32 numDeques) {
     u32 i;
-    ocrScheduler_t *scheduler = PD->schedulers[0];
-    ASSERT(scheduler);
-
+    ASSERT(numDeques > 0);
     ocrSchedulerObjectWst_t *wstSchedObj = (ocrSchedulerObjectWst_t*)self;
-    wstSchedObj->numDeques = scheduler->contextCount;
-    wstSchedObj->deques = (ocrSchedulerObject_t**)PD->fcts.pdMalloc(
-        PD, wstSchedObj->numDeques * sizeof(ocrSchedulerObject_t*));
+    wstSchedObj->numDeques = numDeques;
+    wstSchedObj->deques = (ocrSchedulerObject_t**)PD->fcts.pdMalloc(PD, numDeques * sizeof(ocrSchedulerObject_t*));
 #ifdef ENABLE_SCHEDULER_OBJECT_DEQ
     //Instantiate the deque schedulerObjects
     paramListSchedulerObjectDeq_t params;
@@ -36,9 +33,8 @@ static void wstSchedulerObjectInit(ocrSchedulerObject_t *self, ocrPolicyDomain_t
     params.base.guidRequired = 0;
     params.type = WORK_STEALING_DEQUE;
     ocrSchedulerObjectFactory_t *dequeFactory = PD->schedulerObjectFactories[schedulerObjectDeq_id];
-    for (i = 0; i < wstSchedObj->numDeques; i++) {
+    for (i = 0; i < numDeques; i++) {
         wstSchedObj->deques[i] = dequeFactory->fcts.create(dequeFactory, (ocrParamList_t*)(&params));
-        dequeFactory->fcts.setLocationForSchedulerObject(dequeFactory, wstSchedObj->deques[i], i, OCR_SCHEDULER_OBJECT_MAPPING_PINNED);
     }
 #else
     ASSERT(0);
@@ -68,7 +64,8 @@ ocrSchedulerObject_t* wstSchedulerObjectCreate(ocrSchedulerObjectFactory_t *fact
     schedObj->fctId = fact->factoryId;
     schedObj->loc = INVALID_LOCATION;
     schedObj->mapping = OCR_SCHEDULER_OBJECT_MAPPING_UNDEFINED;
-    wstSchedulerObjectInit(schedObj, pd);
+    paramListSchedulerObjectWst_t *paramsWst = (paramListSchedulerObjectWst_t*)params;
+    wstSchedulerObjectInit(schedObj, pd, paramsWst->numDeques);
     return schedObj;
 }
 
@@ -139,6 +136,7 @@ ocrSchedulerObject_t* newSchedulerObjectRootWst(ocrSchedulerObjectFactory_t *fac
     schedObj->kind = factory->kind;
     schedObj->fctId = factory->factoryId;
     schedObj->loc = INVALID_LOCATION;
+    schedObj->mapping = OCR_SCHEDULER_OBJECT_MAPPING_UNDEFINED;
 
     ocrSchedulerObjectWst_t* wstSchedObj = (ocrSchedulerObjectWst_t*)schedObj;
     wstSchedObj->numDeques = 0;
@@ -168,31 +166,52 @@ u8 wstSchedulerObjectSwitchRunlevel(ocrSchedulerObject_t *self, ocrPolicyDomain_
     case RL_NETWORK_OK:
         break;
     case RL_PD_OK:
+        break;
+    case RL_MEMORY_OK:
         if((properties & RL_BRING_UP) && RL_IS_FIRST_PHASE_UP(PD, RL_PD_OK, phase)) {
             u32 i;
             // The scheduler calls this before switching itself. Do we want
             // to invert this?
             for(i = 0; i < PD->schedulerObjectFactoryCount; ++i) {
-                PD->schedulerObjectFactories[i]->pd = PD;
+                if(PD->schedulerObjectFactories[i])
+                    PD->schedulerObjectFactories[i]->pd = PD;
             }
         }
-        break;
-    case RL_MEMORY_OK:
         break;
     case RL_GUID_OK:
         // Memory is up
         if(properties & RL_BRING_UP) {
-            if(RL_IS_FIRST_PHASE_UP(PD, RL_GUID_OK, phase)) {
-                wstSchedulerObjectInit(self, PD);
+            if(RL_IS_FIRST_PHASE_UP(PD, RL_MEMORY_OK, phase)) {
+                ocrScheduler_t *scheduler = PD->schedulers[0];
+                ocrSchedulerHeuristic_t *masterSchedulerHeuristic = scheduler->schedulerHeuristics[scheduler->masterHeuristicId];
+                wstSchedulerObjectInit(self, PD, masterSchedulerHeuristic->contextCount);
             }
         } else {
             // Tear down
-            if(RL_IS_LAST_PHASE_DOWN(PD, RL_GUID_OK, phase)) {
+            if(RL_IS_LAST_PHASE_DOWN(PD, RL_MEMORY_OK, phase)) {
                 wstSchedulerObjectFinish(self, PD);
             }
         }
         break;
     case RL_COMPUTE_OK:
+        if(properties & RL_BRING_UP) {
+            if(RL_IS_FIRST_PHASE_UP(PD, RL_GUID_OK, phase)) {
+                u32 i, w;
+                ocrSchedulerObjectWst_t *wstSchedObj = (ocrSchedulerObjectWst_t*)self;
+                ocrScheduler_t *scheduler = PD->schedulers[0];
+                ocrSchedulerHeuristic_t *masterSchedulerHeuristic = scheduler->schedulerHeuristics[scheduler->masterHeuristicId];
+                for (i = 0, w = 0; i < masterSchedulerHeuristic->contextCount; i++) {
+                    ocrSchedulerHeuristicContext_t *context = (ocrSchedulerHeuristicContext_t *)masterSchedulerHeuristic->contexts[i];
+                    ocrSchedulerObject_t *deque = wstSchedObj->deques[i];
+                    ocrSchedulerObjectFactory_t *dequeFactory = PD->schedulerObjectFactories[deque->fctId];
+                    if (context->location == PD->myLocation) {
+                        dequeFactory->fcts.setLocationForSchedulerObject(dequeFactory, deque, w++, OCR_SCHEDULER_OBJECT_MAPPING_WORKER);
+                    } else {
+                        dequeFactory->fcts.setLocationForSchedulerObject(dequeFactory, deque, context->location, OCR_SCHEDULER_OBJECT_MAPPING_PINNED);
+                    }
+                }
+            }
+        }
         break;
     case RL_USER_OK:
         break;

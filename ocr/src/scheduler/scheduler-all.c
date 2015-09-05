@@ -58,7 +58,6 @@ void initializeSchedulerOcr(ocrSchedulerFactory_t * factory, ocrScheduler_t * se
     self->fguid.guid = UNINITIALIZED_GUID;
     self->fguid.metaDataPtr = self;
     self->pd = NULL;
-    self->contextCount = 0;
     self->workpiles = NULL;
     self->workpileCount = 0;
     self->rootObj = NULL;

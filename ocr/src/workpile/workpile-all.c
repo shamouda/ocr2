@@ -8,24 +8,17 @@
 #include "debug.h"
 
 const char * workpile_types[] = {
+#ifdef ENABLE_WORKPILE_HC
     "HC",
+#endif
+#ifdef ENABLE_WORKPILE_CE
     "CE",
+#endif
+#ifdef ENABLE_WORKPILE_XE
     "XE",
-    "FSIM",
+#endif
     NULL
 };
-
-#ifdef ENABLE_WORKPILE_HC
-#include "workpile/hc/hc-workpile.h"
-#endif
-
-#ifdef ENABLE_WORKPILE_CE
-#include "workpile/ce/ce-workpile.h"
-#endif
-
-#ifdef ENABLE_WORKPILE_XE
-#include "workpile/xe/xe-workpile.h"
-#endif
 
 ocrWorkpileFactory_t * newWorkpileFactory(workpileType_t type, ocrParamList_t * perType) {
     switch(type) {
@@ -41,7 +34,6 @@ ocrWorkpileFactory_t * newWorkpileFactory(workpileType_t type, ocrParamList_t * 
     case workpileXe_id:
         return newOcrWorkpileFactoryXe(perType);
 #endif
-    case workpileFsimMessage_id:
     case workpileMax_id:
     default:
         ASSERT(0);

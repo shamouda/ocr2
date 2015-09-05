@@ -20,12 +20,15 @@ const char * allocator_types[] = {
 #ifdef ENABLE_ALLOCATOR_QUICK
     "quick",
 #endif
+#ifdef ENABLE_ALLOCATOR_TLSF
     "tlsf",
-
+#endif
 #ifdef ENABLE_ALLOCATOR_MALLOCPROXY
     "mallocproxy",
 #endif
+#ifdef ENABLE_ALLOCATOR_NULL
     "null",
+#endif
     NULL
 };
 
@@ -43,7 +46,6 @@ ocrAllocatorFactory_t *newAllocatorFactory(allocatorType_t type, ocrParamList_t 
     case allocatorTlsf_id:
         return newAllocatorFactoryTlsf(typeArg);
 #endif
-
 #ifdef ENABLE_ALLOCATOR_MALLOCPROXY
     case allocatorMallocProxy_id:
         return newAllocatorFactoryMallocProxy(typeArg);

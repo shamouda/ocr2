@@ -34,7 +34,13 @@ ocrSchedulerObject_t* deqSchedulerObjectCreate(ocrSchedulerObjectFactory_t *fact
     schedObj->loc = INVALID_LOCATION;
     schedObj->mapping = OCR_SCHEDULER_OBJECT_MAPPING_UNDEFINED;
     ocrSchedulerObjectDeq_t* deqSchedObj = (ocrSchedulerObjectDeq_t*)schedObj;
+    //deqSchedObj->deque = newDeque(pd, NULL, paramDeq->type);
+    deqSchedObj->dequeType = paramDeq->type;
+#ifdef SAL_FSIM_CE //TODO: This needs to be removed when bug #802 is fixed
+    deqSchedObj->deque = NULL;
+#else
     deqSchedObj->deque = newDeque(pd, NULL, paramDeq->type);
+#endif
     return schedObj;
 }
 
@@ -42,7 +48,7 @@ u8 deqSchedulerObjectDestroy(ocrSchedulerObjectFactory_t *fact, ocrSchedulerObje
     ASSERT(SCHEDULER_OBJECT_KIND(self->kind) == OCR_SCHEDULER_OBJECT_DEQUE);
     ocrPolicyDomain_t *pd = fact->pd;
     ocrSchedulerObjectDeq_t* deqSchedObj = (ocrSchedulerObjectDeq_t*)self;
-    deqSchedObj->deque->destruct(pd, deqSchedObj->deque);
+    if (deqSchedObj->deque) deqSchedObj->deque->destruct(pd, deqSchedObj->deque);
     pd->fcts.pdFree(pd, self);
     return 0;
 }
@@ -51,6 +57,11 @@ u8 deqSchedulerObjectInsert(ocrSchedulerObjectFactory_t *fact, ocrSchedulerObjec
     ocrSchedulerObjectDeq_t *schedObj = (ocrSchedulerObjectDeq_t*)self;
     ASSERT(IS_SCHEDULER_OBJECT_TYPE_SINGLETON(element->kind));
     deque_t * deq = schedObj->deque;
+    if (deq == NULL) {
+        ocrPolicyDomain_t *pd = fact->pd;
+        deq = newDeque(pd, NULL, schedObj->dequeType);
+        schedObj->deque = deq;
+    }
     deq->pushAtTail(deq, (void *)(element->guid.guid), 0);
     return 0;
 }
@@ -60,6 +71,7 @@ u8 deqSchedulerObjectRemove(ocrSchedulerObjectFactory_t *fact, ocrSchedulerObjec
     ocrSchedulerObjectDeq_t *schedObj = (ocrSchedulerObjectDeq_t*)self;
     ASSERT(IS_SCHEDULER_OBJECT_TYPE_SINGLETON(kind));
     deque_t * deq = schedObj->deque;
+    if (deq == NULL) return count;
 
     for (i = 0; i < count; i++) {
         ocrGuid_t retGuid = NULL_GUID;
@@ -110,6 +122,7 @@ u8 deqSchedulerObjectIterate(ocrSchedulerObjectFactory_t *fact, ocrSchedulerObje
 u64 deqSchedulerObjectCount(ocrSchedulerObjectFactory_t *fact, ocrSchedulerObject_t *self, u32 properties) {
     ocrSchedulerObjectDeq_t *schedObj = (ocrSchedulerObjectDeq_t*)self;
     deque_t * deq = schedObj->deque;
+    if (deq == NULL) return 0;
     return (deq->tail - deq->head); //this may be racy but ok for approx count
 }
 

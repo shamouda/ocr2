@@ -11,7 +11,7 @@
 #
 
 #
-# For now the test folder is current folder
+# Test folder is current folder
 #
 TEST_DIR=./non-regression-tests
 
@@ -887,6 +887,7 @@ function runTests () {
     local EXT_DIR=
     local TEST_DIR=
     local LOG_DIR=
+    local BIN_GEN_DIR=
     local PATTERN=
     local EXCL_PATTERN=
     local UNSTABLE_EXT=ignored
@@ -904,6 +905,10 @@ function runTests () {
         elif [[ "$1" = "-logdir"  && $# -ge 2 ]]; then
             shift
             LOG_DIR=("$@")
+            shift
+        elif [[ "$1" = "-bingendir"  && $# -ge 2 ]]; then
+            shift
+            BIN_GEN_DIR=("$@")
             shift
         elif [[ "$1" = "-v" ]]; then
             shift
@@ -968,6 +973,7 @@ function runTests () {
 
     if [ -z ${LOG_DIR} ]; then
         LOG_DIR=`pwd`/tests-log
+        echo "Set logdir pampam"
     fi
 
     if [ -d ${LOG_DIR} ]; then
@@ -977,7 +983,7 @@ function runTests () {
 
     if [ ! -d ${LOG_DIR} ]; then
         echo "Creating log dir ${LOG_DIR}"
-        mkdir ${LOG_DIR}
+        mkdir -p ${LOG_DIR}
     fi
 
     if [ -z ${BIN_GEN_DIR} ]; then
@@ -993,7 +999,7 @@ function runTests () {
 
     if [ ! -d ${BIN_GEN_DIR} ]; then
         echo "Creating bin dir ${BIN_GEN_DIR}"
-        mkdir ${BIN_GEN_DIR}
+        mkdir -p ${BIN_GEN_DIR}
     fi
 
     # If no unstable file is provided as argument

@@ -17,21 +17,23 @@
 #include "utils/ocr-utils.h"
 
 typedef enum _dataBlockType_t {
+#ifdef ENABLE_DATABLOCK_REGULAR
     dataBlockRegular_id,
+#endif
+#ifdef ENABLE_DATABLOCK_LOCKABLE
     dataBlockLockable_id,
-    dataBlockPlaced_id,
+#endif
     dataBlockMax_id
 } dataBlockType_t;
 
 extern const char * dataBlock_types[];
 
-// Regular datablock
+#ifdef ENABLE_DATABLOCK_REGULAR
 #include "datablock/regular/regular-datablock.h"
-// Lockable datablock
+#endif
+#ifdef ENABLE_DATABLOCK_LOCKABLE
 #include "datablock/lockable/lockable-datablock.h"
-// Placed datablock (not ported as of now)
-// #include "datablock/placed/placed-datablock.h"
-
+#endif
 
 ocrDataBlockFactory_t* newDataBlockFactory(dataBlockType_t type, ocrParamList_t *typeArg);
 

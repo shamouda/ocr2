@@ -18,6 +18,7 @@
 #include "ocr-types.h"
 #include "rmd-mmio.h"
 
+#include "mmio-table.h"
 
 /****************************************************/
 /* OCR LOW-LEVEL MACROS                             */
@@ -31,7 +32,7 @@
  */
 
 #define hal_fence() \
-    do { __sync_synchronize(); } while(0);
+    do { __sync_synchronize(); } while(0)
 
 /**
  * @brief Memory copy from source to destination
@@ -111,7 +112,7 @@
                 ((char*)_destination)[count] = ((char*)_source)[count]; \
         }                                                               \
     }                                                                   \
-    } while(0);
+    } while(0)
 
 /**
  * @brief Atomic swap (64 bit)
@@ -267,7 +268,7 @@
 #define hal_lock32(lock)                                    \
     do {                                                    \
         while(__sync_lock_test_and_set(lock, 1) != 0) ;     \
-    } while(0);
+    } while(0)
 
 /**
  * @brief Convenience function to implement a simple
@@ -320,7 +321,25 @@
         __asm__ __volatile__("cli");                            \
         /* Works because there is a periodic timer interupt */  \
         __asm__ __volatile__("sti;hlt;");                       \
-    } while(0);
+    } while(0)
+
+/**
+ * @brief Put the XE core to sleep
+ *
+ * This is used by CE to put an XE core in its block to sleep
+ */
+#define hal_sleep(id) do {                                              \
+       *(u64 *)(XE_MSR_BASE(id) + FUB_POWER_CTL*sizeof(u64)) = 0x0ULL;  \
+    } while(0)
+
+/**
+ * @brief Wake the XE core from sleep
+ *
+ * This is used by CE to wake an XE core in its block from sleep
+ */
+#define hal_wake(id) do {                                                    \
+       *(u64 *)(XE_MSR_BASE(id) + FUB_POWER_CTL*sizeof(u64)) = 0x1FFFFFFULL; \
+    } while(0)
 
 // Support for abstract load and store macros
 #define MAP_AGENT_SIZE_LOG2 (21)

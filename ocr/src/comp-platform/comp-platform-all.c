@@ -8,8 +8,12 @@
 #include "debug.h"
 
 const char * compplatform_types[] = {
+#ifdef ENABLE_COMP_PLATFORM_PTHREAD
     "pthread",
+#endif
+#ifdef ENABLE_COMP_PLATFORM_FSIM
     "fsim",
+#endif
     NULL,
 };
 

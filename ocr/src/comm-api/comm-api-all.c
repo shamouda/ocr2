@@ -8,9 +8,15 @@
 #include "debug.h"
 
 const char * commapi_types[] = {
+#ifdef ENABLE_COMM_API_DELEGATE
     "Delegate",
+#endif
+#ifdef ENABLE_COMM_API_HANDLELESS
     "Handleless",
+#endif
+#ifdef ENABLE_COMM_API_SIMPLE
     "Simple",
+#endif
     NULL
 };
 

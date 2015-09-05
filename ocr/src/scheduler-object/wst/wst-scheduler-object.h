@@ -20,6 +20,7 @@
 
 typedef struct _paramListSchedulerObjectWst_t {
     paramListSchedulerObject_t base;
+    u32 numDeques;                    /* Number of deques */
 } paramListSchedulerObjectWst_t;
 
 typedef struct _ocrSchedulerObjectWst_t {

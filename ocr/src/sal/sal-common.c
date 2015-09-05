@@ -2,13 +2,16 @@
 #include "ocr-types.h"
 #include "ocr-sal.h"
 
-void _ocrAssert(bool val, const char* file, u32 line) {
-    sal_assert(val, file, line);
-}
-
 //
 // Common part of the SAL for all architectures
 //
+
+void _ocrAssert(bool val, const char* str, const char* file, u32 line) {
+    if(!val) {
+      PRINTF("ASSERT: %s @ %s:%u\n", str, file, line);
+    }
+    sal_assert(val, file, line);
+}
 
 #define HASH_FLAG  (1 << (sizeof(int) * 8 - 1))
 

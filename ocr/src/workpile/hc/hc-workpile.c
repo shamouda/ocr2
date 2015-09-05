@@ -65,7 +65,7 @@ u8 hcWorkpileSwitchRunlevel(ocrWorkpile_t *self, ocrPolicyDomain_t *PD, ocrRunle
         if(properties & RL_BRING_UP) {
             if(RL_IS_FIRST_PHASE_UP(PD, RL_COMPUTE_OK, phase)) {
                 // We get a GUID for ourself
-                guidify(self->pd, (u64)self, &(self->fguid), OCR_GUID_ALLOCATOR);
+                guidify(self->pd, (u64)self, &(self->fguid), OCR_GUID_WORKPILE);
             }
         } else {
             // Tear-down

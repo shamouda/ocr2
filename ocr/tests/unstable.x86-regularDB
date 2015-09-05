@@ -2,6 +2,7 @@ testDb64Users.c
 testDistDbEw0.c
 testDistDbEw1.c
 testDistDbEw2.c
+testDistDbEw4.c
 testDistDbEwRo2.c
 testDistDbEwRo3.c
 testEdtDestroy0.c

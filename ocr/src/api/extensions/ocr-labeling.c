@@ -233,7 +233,11 @@ u8 ocrGuidFromIndex(ocrGuid_t *outGuid, ocrGuid_t rangeGuid, u64 idx) {
         DPRINTF(DEBUG_LVL_WARN, "ocrGuidFromLabel requires a map created with ocrGuidRangeCreate (not a map)\n");
         return OCR_EINVAL;
     }
-
+    if(idx >= myMap->numGuids) {
+        DPRINTF(DEBUG_LVL_WARN, "Invalid index value in ocrGuidFromIndex. Got %lu, expected 0..%lu\n",
+                idx, myMap->numGuids-1);
+        return OCR_EINVAL;
+    }
     *outGuid = myMap->startGuid + myMap->skipGuid*idx;
     DPRINTF(DEBUG_LVL_VERB, "Returning GUID 0x%lx\n", *outGuid);
     return 0;

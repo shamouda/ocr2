@@ -22,7 +22,7 @@
 
 #ifdef ENABLE_HINTS
 /**< The number of hint properties supported by this implementation */
-#define OCR_HINT_COUNT_DB_LOCKABLE   0
+#define OCR_HINT_COUNT_DB_LOCKABLE   1
 #else
 #define OCR_HINT_COUNT_DB_LOCKABLE   0
 #endif

@@ -18,26 +18,30 @@
 #include "utils/ocr-utils.h"
 
 typedef enum _taskType_t {
+#ifdef ENABLE_TASK_HC
     taskHc_id,
-    taskFsim_id,
+#endif
     taskMax_id
 } taskType_t;
 
 const char * task_types [] = {
+#ifdef ENABLE_TASK_HC
     "HC",
-    "FSIM",
+#endif
     NULL
 };
 
 typedef enum _taskTemplateType_t {
+#ifdef ENABLE_TASKTEMPLATE_HC
     taskTemplateHc_id,
-    taskTemplateFsim_id,
+#endif
     taskTemplateMax_id
 } taskTemplateType_t;
 
 const char * taskTemplate_types [] = {
+#ifdef ENABLE_TASKTEMPLATE_HC
     "HC",
-    "FSIM",
+#endif
     NULL
 };
 

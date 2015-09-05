@@ -612,6 +612,9 @@
     } while(0);
 #endif
 
+// Support for compile time asserts
+#define COMPILE_ASSERT(e) extern char (*COMPILE_ASSERT(void))[sizeof(char[1-2*!(e)])]
+
 // Include this to get the DPRINTF thing to work properly
 #ifndef OCR_POLICY_DOMAIN_H_
 #include "ocr-policy-domain.h"

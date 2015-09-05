@@ -56,6 +56,10 @@ u8 ocrHintInit(ocrHint_t *hint, ocrHintType_t hintType) {
         }
         break;
     case OCR_HINT_DB_T:
+        {
+            OCR_HINT_FIELD(hint, OCR_HINT_DB_MEM_AFFINITY) = 0;
+        }
+        break;
     case OCR_HINT_EVT_T:
     case OCR_HINT_GROUP_T:
         break;

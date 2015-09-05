@@ -131,14 +131,13 @@ static inline void SET_allocatorType (blkHdr_t * pBlk, u8 value) {
     pBlk->allocatorType = value;
 }
 
-#define myStaticAssert(e) extern char (*myStaticAssert(void))[sizeof(char[1-2*!(e)])]
 
-myStaticAssert(ALIGNMENT == 8LL);
-myStaticAssert((ALIGNMENT-1) == POOL_HEADER_TYPE_MASK);
+COMPILE_ASSERT(ALIGNMENT == 8LL);
+COMPILE_ASSERT((ALIGNMENT-1) == POOL_HEADER_TYPE_MASK);
 
 // Some assertions to make sure things are OK
-myStaticAssert(sizeof(blkHdr_t) == 8);
-myStaticAssert(sizeof(char) == 1);
+COMPILE_ASSERT(sizeof(blkHdr_t) == 8);
+COMPILE_ASSERT(sizeof(char) == 1);
 
 /*
  * Allocation helpers (size and alignement constraints)

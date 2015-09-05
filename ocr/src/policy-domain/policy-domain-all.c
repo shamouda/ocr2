@@ -18,10 +18,18 @@
 #define MAX_ALIGN 8
 
 const char * policyDomain_types [] = {
+#ifdef ENABLE_POLICY_DOMAIN_HC
     "HC",
+#endif
+#ifdef ENABLE_POLICY_DOMAIN_HC_DIST
     "HCDist",
+#endif
+#ifdef ENABLE_POLICY_DOMAIN_XE
     "XE",
+#endif
+#ifdef ENABLE_POLICY_DOMAIN_CE
     "CE",
+#endif
     NULL
 };
 

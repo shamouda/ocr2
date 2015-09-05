@@ -27,9 +27,9 @@ named \texttt{mainEdt} is called by the runtime if the programmer does not
 provide a \texttt{main} function\footnote{Note that if the programmer
   \emph{does} provide a \texttt{main} function, it is the
   responsability of the programmer to properly initialize the runtime,
-  call the first EDT to execute and properly shutdown the runtime. This
-  method is detailed in TODO and is not recommended as it is not
-  platform portable.}.
+  call the first EDT to execute and properly shutdown the
+  runtime. Refer to the legacy mode extension and the
+  \texttt{ocr-legacy.h} header file for more detail.}.
 
 The \texttt{ocrShutdown} function called on
 Line~\ref{line:HW_shutdown} should be called once and only once by all

@@ -28,7 +28,7 @@ DB_SZ ?= 4
 # Fan out for non-leaf EDTs in hierarchical tests
 NODE_FANOUT ?= 2
 # Fan out for leaf EDTs in hierarchical tests
-LEAF_FANOUT ?= 100
+LEAF_FANOUT ?= 10
 # Tree depth for hierarchial tests
 TREE_DEPTH ?= 8
 

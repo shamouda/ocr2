@@ -29,6 +29,7 @@
 #include "ocr-comm-platform.h"
 #include "policy-domain/ce/ce-policy.h"
 #include "allocator/allocator-all.h"
+#include "extensions/ocr-hints.h"
 
 #ifdef HAL_FSIM_CE
 #include "rmd-map.h"
@@ -213,6 +214,8 @@ u8 cePdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
     maxCount = policy->schedulerCount;
     for(i = 0; i < maxCount; ++i) {
         policy->schedulers[i]->fcts.switchRunlevel(policy->schedulers[i], policy, RL_MEMORY_OK,
+                                                 0, RL_REQUEST | RL_BRING_UP | RL_BARRIER, NULL, 0);
+        policy->schedulers[i]->fcts.switchRunlevel(policy->schedulers[i], policy, RL_GUID_OK,
                                                  0, RL_REQUEST | RL_BRING_UP | RL_BARRIER, NULL, 0);
         policy->schedulers[i]->fcts.switchRunlevel(policy->schedulers[i], policy, RL_COMPUTE_OK,
                                                  0, RL_REQUEST | RL_BRING_UP | RL_BARRIER, NULL, 0);
@@ -605,7 +608,8 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
     case PD_MSG_GUID_METADATA_CLONE:
     case PD_MSG_GUID_RESERVE:
     case PD_MSG_GUID_UNRESERVE:
-    case PD_MSG_SAL_TERMINATE: case PD_MSG_MGT_REGISTER:
+    case PD_MSG_SAL_TERMINATE:
+    case PD_MSG_MGT_REGISTER:
     case PD_MSG_MGT_UNREGISTER:
     case PD_MSG_MGT_MONITOR_PROGRESS:
     {
@@ -637,6 +641,15 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         if(PD_MSG_FIELD_O(returnDetail) == 0) {
             ocrDataBlock_t *db= PD_MSG_FIELD_IO(guid.metaDataPtr);
             ASSERT(db);
+
+            // Set the affinity hint (TODO: Use sched notify)
+            if (msg->srcLocation != self->myLocation) {
+                ocrHint_t hintVar;
+                ASSERT(ocrHintInit(&hintVar, OCR_HINT_DB_T) == 0);
+                ASSERT(ocrSetHintValue(&hintVar, OCR_HINT_DB_MEM_AFFINITY, (u64)(msg->srcLocation)) == 0);
+                ASSERT(ocrSetHint(db->guid, &hintVar) == 0);
+            }
+
             // BUG #584: Check if properties want DB acquired
             ASSERT(db->fctId == self->dbFactories[0]->factoryId);
             PD_MSG_FIELD_O(returnDetail) = self->dbFactories[0]->fcts.acquire(
@@ -1065,7 +1078,6 @@ u32 k;
                         getCurrentEnv(NULL, NULL, NULL, &ceMsg);
                         ocrFatGuid_t fguid[CE_TAKE_CHUNK_SIZE] = {{0}};
                         ceMsg.destLocation = self->neighbors[i];
-                        ceMsg.seqId = i;
                         ceMsg.type = PD_MSG_COMM_TAKE | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE | PD_CE_CE_MESSAGE;
                         PD_MSG_FIELD_IO(guids) = &(fguid[0]);
                         PD_MSG_FIELD_IO(guidCount) = CE_TAKE_CHUNK_SIZE;
@@ -1126,15 +1138,66 @@ ASSERT(ceMsg.destLocation != self->parentLocation); // Parent's not dead
         break;
     }
 
+    case PD_MSG_SCHED_GET_WORK: {
+        START_PROFILE(pd_ce_Sched_Get_Work);
+#define PD_MSG msg
+#define PD_TYPE PD_MSG_SCHED_GET_WORK
+        if (msg->type & PD_MSG_REQUEST) {
+            u8 retVal = 0;
+            ocrSchedulerOpWorkArgs_t *workArgs = &PD_MSG_FIELD_IO(schedArgs);
+            workArgs->base.location = msg->srcLocation;
+            retVal = self->schedulers[0]->fcts.op[OCR_SCHEDULER_OP_GET_WORK].invoke(
+                         self->schedulers[0], (ocrSchedulerOpArgs_t*)workArgs, (ocrRuntimeHint_t*)msg);
+
+            if (retVal == 0) {
+                PD_MSG_FIELD_O(returnDetail) = 0;
+                returnCode = ceProcessResponse(self, msg, 0);
+            }
+        } else {
+            ASSERT(msg->type & PD_MSG_RESPONSE);
+            ocrSchedulerOpWorkArgs_t *workArgs = &PD_MSG_FIELD_IO(schedArgs);
+            ocrFatGuid_t fguid = workArgs->OCR_SCHED_ARG_FIELD(OCR_SCHED_WORK_EDT_USER).edt;
+            workArgs->OCR_SCHED_ARG_FIELD(OCR_SCHED_WORK_EDT_USER).edt.guid = NULL_GUID;
+            workArgs->OCR_SCHED_ARG_FIELD(OCR_SCHED_WORK_EDT_USER).edt.metaDataPtr = NULL;
+            ASSERT(fguid.guid != NULL_GUID);
+            localDeguidify(self, &fguid);
+            ocrSchedulerOpNotifyArgs_t notifyArgs;
+            notifyArgs.base.location = msg->srcLocation;
+            notifyArgs.kind = OCR_SCHED_NOTIFY_EDT_READY;
+            notifyArgs.OCR_SCHED_ARG_FIELD(OCR_SCHED_NOTIFY_EDT_READY).guid = fguid;
+            returnCode = self->schedulers[0]->fcts.op[OCR_SCHEDULER_OP_NOTIFY].invoke(
+                    self->schedulers[0], (ocrSchedulerOpArgs_t*)(&notifyArgs), NULL);
+        }
+#undef PD_MSG
+#undef PD_TYPE
+        EXIT_PROFILE;
+        break;
+    }
+
     case PD_MSG_SCHED_NOTIFY: {
         START_PROFILE(pd_ce_Sched_Notify);
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_SCHED_NOTIFY
         ocrSchedulerOpNotifyArgs_t *notifyArgs = &PD_MSG_FIELD_IO(schedArgs);
+        notifyArgs->base.location = msg->srcLocation;
         PD_MSG_FIELD_O(returnDetail) =
             self->schedulers[0]->fcts.op[OCR_SCHEDULER_OP_NOTIFY].invoke(
                 self->schedulers[0], (ocrSchedulerOpArgs_t*)notifyArgs, NULL);
         returnCode = ceProcessResponse(self, msg, 0);
+#undef PD_MSG
+#undef PD_TYPE
+        EXIT_PROFILE;
+        break;
+    }
+
+    case PD_MSG_SCHED_UPDATE: {
+        START_PROFILE(pd_ce_Sched_Update);
+#define PD_MSG msg
+#define PD_TYPE PD_MSG_SCHED_UPDATE
+        ASSERT(msg->srcLocation == self->myLocation);
+        PD_MSG_FIELD_O(returnDetail) =
+            self->schedulers[0]->fcts.update(
+                self->schedulers[0], PD_MSG_FIELD_I(properties));
 #undef PD_MSG
 #undef PD_TYPE
         EXIT_PROFILE;
@@ -1337,6 +1400,102 @@ ASSERT(ceMsg.destLocation != self->parentLocation); // Parent's not dead
         break;
     }
 
+    case PD_MSG_HINT_SET: {
+        START_PROFILE(pd_ce_HintSet);
+#define PD_MSG msg
+#define PD_TYPE PD_MSG_HINT_SET
+        localDeguidify(self, &(PD_MSG_FIELD_I(guid)));
+        ocrFatGuid_t fatGuid = PD_MSG_FIELD_I(guid);
+        ocrGuidKind kind = OCR_GUID_NONE;
+        guidKind(self, fatGuid, &kind);
+        switch(PD_MSG_FIELD_I(hint.type)) {
+        case OCR_HINT_EDT_T:
+            {
+                if (kind == OCR_GUID_EDT_TEMPLATE) {
+                    ocrTaskTemplate_t* taskTemplate = (ocrTaskTemplate_t*)(PD_MSG_FIELD_I(guid.metaDataPtr));
+                    PD_MSG_FIELD_O(returnDetail) = self->taskTemplateFactories[0]->fcts.setHint(taskTemplate, &(PD_MSG_FIELD_I(hint)));
+                } else {
+                    ASSERT(kind == OCR_GUID_EDT);
+                    ocrTask_t *task = (ocrTask_t*)(PD_MSG_FIELD_I(guid.metaDataPtr));
+                    PD_MSG_FIELD_O(returnDetail) = self->taskFactories[0]->fcts.setHint(task, &(PD_MSG_FIELD_I(hint)));
+                }
+            }
+            break;
+        case OCR_HINT_DB_T:
+            {
+                ASSERT(kind == OCR_GUID_DB);
+                ocrDataBlock_t *db = (ocrDataBlock_t*)(PD_MSG_FIELD_I(guid.metaDataPtr));
+                PD_MSG_FIELD_O(returnDetail) = self->dbFactories[0]->fcts.setHint(db, &(PD_MSG_FIELD_I(hint)));
+            }
+            break;
+        case OCR_HINT_EVT_T:
+            {
+                ASSERT(kind & OCR_GUID_EVENT);
+                ocrEvent_t *evt = (ocrEvent_t*)(PD_MSG_FIELD_I(guid.metaDataPtr));
+                PD_MSG_FIELD_O(returnDetail) = self->eventFactories[0]->commonFcts.setHint(evt, &(PD_MSG_FIELD_I(hint)));
+            }
+            break;
+        case OCR_HINT_GROUP_T:
+        default:
+            ASSERT(0);
+            PD_MSG_FIELD_O(returnDetail) = OCR_ENOTSUP;
+            break;
+        }
+        returnCode = ceProcessResponse(self, msg, 0);
+#undef PD_MSG
+#undef PD_TYPE
+        EXIT_PROFILE;
+        break;
+    }
+
+    case PD_MSG_HINT_GET: {
+        START_PROFILE(pd_hc_HintGet);
+#define PD_MSG msg
+#define PD_TYPE PD_MSG_HINT_GET
+        localDeguidify(self, &(PD_MSG_FIELD_I(guid)));
+        ocrFatGuid_t fatGuid = PD_MSG_FIELD_I(guid);
+        ocrGuidKind kind = OCR_GUID_NONE;
+        guidKind(self, fatGuid, &kind);
+        switch(PD_MSG_FIELD_IO(hint.type)) {
+        case OCR_HINT_EDT_T:
+            {
+                if (kind == OCR_GUID_EDT_TEMPLATE) {
+                    ocrTaskTemplate_t* taskTemplate = (ocrTaskTemplate_t*)(PD_MSG_FIELD_I(guid.metaDataPtr));
+                    PD_MSG_FIELD_O(returnDetail) = self->taskTemplateFactories[0]->fcts.getHint(taskTemplate, &(PD_MSG_FIELD_IO(hint)));
+                } else {
+                    ASSERT(kind == OCR_GUID_EDT);
+                    ocrTask_t *task = (ocrTask_t*)(PD_MSG_FIELD_I(guid.metaDataPtr));
+                    PD_MSG_FIELD_O(returnDetail) = self->taskFactories[0]->fcts.getHint(task, &(PD_MSG_FIELD_IO(hint)));
+                }
+            }
+            break;
+        case OCR_HINT_DB_T:
+            {
+                ASSERT(kind == OCR_GUID_DB);
+                ocrDataBlock_t *db = (ocrDataBlock_t*)(PD_MSG_FIELD_I(guid.metaDataPtr));
+                PD_MSG_FIELD_O(returnDetail) = self->dbFactories[0]->fcts.getHint(db, &(PD_MSG_FIELD_IO(hint)));
+            }
+            break;
+        case OCR_HINT_EVT_T:
+            {
+                ASSERT(kind & OCR_GUID_EVENT);
+                ocrEvent_t *evt = (ocrEvent_t*)(PD_MSG_FIELD_I(guid.metaDataPtr));
+                PD_MSG_FIELD_O(returnDetail) = self->eventFactories[0]->commonFcts.getHint(evt, &(PD_MSG_FIELD_IO(hint)));
+            }
+            break;
+        case OCR_HINT_GROUP_T:
+        default:
+            ASSERT(0);
+            PD_MSG_FIELD_O(returnDetail) = OCR_ENOTSUP;
+            break;
+        }
+        returnCode = ceProcessResponse(self, msg, 0);
+#undef PD_MSG
+#undef PD_TYPE
+        EXIT_PROFILE;
+        break;
+    }
+
     case PD_MSG_MGT_RL_NOTIFY: {
         START_PROFILE(pd_ce_Shutdown);
 #define PD_MSG msg
@@ -1346,10 +1505,14 @@ ASSERT(ceMsg.destLocation != self->parentLocation); // Parent's not dead
         if (cePolicy->shutdownMode == false) {
             cePolicy->shutdownMode = true;
         }
+        hal_fence();
         if (msg->srcLocation == self->myLocation) {
             msg->destLocation = self->parentLocation;
-            if (self->myLocation != self->parentLocation)
+            if (self->myLocation != self->parentLocation) {
+                DPRINTF(DEBUG_LVL_INFO, "MSG_SHUTDOWN REQ %lx to Parent 0x%lx; shutdown %u/%u\n", msg->msgId,
+                    msg->destLocation, cePolicy->shutdownCount, cePolicy->shutdownMax);
                 while(self->fcts.sendMessage(self, msg->destLocation, msg, NULL, BLOCKING_SEND_MSG_PROP)) hal_pause();
+            }
             self->fcts.switchRunlevel(self, RL_USER_OK, 0);
         } else {
             if (msg->type & PD_MSG_REQUEST) {
@@ -1405,6 +1568,8 @@ ASSERT(ceMsg.destLocation != self->parentLocation); // Parent's not dead
 
 u8 cePdSendMessage(ocrPolicyDomain_t* self, ocrLocation_t target, ocrPolicyMsg_t *message,
                    ocrMsgHandle_t **handle, u32 properties) {
+    message->srcLocation = self->myLocation;
+    message->destLocation = target;
     return self->commApis[0]->fcts.sendMessage(self->commApis[0], target, message, handle, properties);
 }
 

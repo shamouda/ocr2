@@ -76,8 +76,11 @@
 //
 
 // Ugly globals below, but would go away once FSim has QMA support trac #232
-#define OUTSTANDING_CE_MSGS 4
-u64 msgAddresses[OUTSTANDING_CE_MSGS] = {0xbadf00d, 0xbadf00d, 0xbadf00d, 0xbadf00d};
+#define OUTSTANDING_CE_MSGS 16
+u64 msgAddresses[OUTSTANDING_CE_MSGS] = {0xbadf00d, 0xbadf00d, 0xbadf00d, 0xbadf00d,
+                                         0xbadf00d, 0xbadf00d, 0xbadf00d, 0xbadf00d,
+                                         0xbadf00d, 0xbadf00d, 0xbadf00d, 0xbadf00d,
+                                         0xbadf00d, 0xbadf00d, 0xbadf00d, 0xbadf00d};
 ocrPolicyMsg_t sendBuf, recvBuf; // Currently size of 1 msg each.
 // BUG #232: The above need to be placed in the CE's scratchpad, but once QMAs are ready, should
 // be no problem.
@@ -85,7 +88,6 @@ ocrPolicyMsg_t sendBuf, recvBuf; // Currently size of 1 msg each.
 void ceCommsInit(ocrCommPlatform_t * commPlatform, ocrPolicyDomain_t * PD);
 u8 ceCommDestructMessage(ocrCommPlatform_t *self, ocrPolicyMsg_t *msg);
 u8 ceCommDestructCEMessage(ocrCommPlatform_t *self, ocrPolicyMsg_t *msg);
-u8 ceCommCheckSeqIdRecv(ocrCommPlatform_t *self, ocrPolicyMsg_t *msg);
 
 u64 parentOf(u64 location) {
     // XE's parent is its CE
@@ -320,7 +322,7 @@ u8 ceCommSendMessageToCE(ocrCommPlatform_t *self, ocrLocation_t target,
         if(rmbox[0] == 0xdead) return 2; // Shutdown in progress - no retry
         return 1;                        // otherwise, retry send
     }
-    DPRINTF(DEBUG_LVL_VVERB, "Sent msg %lx type %lx; (%lx->%lx)\n", message->msgId, message->type, self->location, target);
+    DPRINTF(DEBUG_LVL_VVERB, "Sent msg %lx type %lx; (%lx->%lx) to box %lx : %u\n", message->msgId, message->type, self->location, target, i);
     return 0;
 }
 
@@ -335,10 +337,8 @@ u8 ceCommSendMessage(ocrCommPlatform_t *self, ocrLocation_t target,
     // If target is not in the same block, use a different function
     // BUG #618: do the same for chip/unit/board as well, or better yet, a new macro
     if((self->location & ~ID_AGENT_MASK) != (target & ~ID_AGENT_MASK)) {
-        message->seqId = self->fcts.getSeqIdAtNeighbor(self, target, 0);
         return ceCommSendMessageToCE(self, target, message, id, properties, mask);
     } else {
-        message->seqId = 0; //For XE's the neighbor ID of the CE is always 0.
         // BUG #618: compute all-but-agent & compare between us & target
         // Target XE's stage (note this is in remote XE memory!)
         u64 * rq = cp->rq[((u64)target) & ID_AGENT_MASK];
@@ -383,12 +383,6 @@ u8 ceCommSendMessage(ocrCommPlatform_t *self, ocrLocation_t target,
     return 0;
 }
 
-u8 ceCommCheckSeqIdRecv(ocrCommPlatform_t *self, ocrPolicyMsg_t *msg) {
-    u64 mask = msg->srcLocation & self->location;
-    msg->seqId = (mask >> fls64(mask)) & 0xF; // Assumption: that there are always <= 0xF neighbors
-    return 0;
-}
-
 u8 ceCommCheckCEMessage(ocrCommPlatform_t *self, ocrPolicyMsg_t **msg) {
     u32 j;
 
@@ -404,10 +398,8 @@ u8 ceCommCheckCEMessage(ocrCommPlatform_t *self, ocrPolicyMsg_t **msg) {
                 ASSERT(0);
             }
             ocrPolicyMsgUnMarshallMsg((u8*)msgAddresses[j], NULL, &recvBuf, MARSHALL_FULL_COPY);
-            ceCommCheckSeqIdRecv(self, (ocrPolicyMsg_t*)msgAddresses[j]);
             ceCommDestructCEMessage(self, (ocrPolicyMsg_t*)msgAddresses[j]);
             *msg = &recvBuf;
-
             return 0;
         }
     *msg = NULL;
@@ -458,7 +450,6 @@ u8 ceCommPollMessage(ocrCommPlatform_t *self, ocrPolicyMsg_t **msg,
             ASSERT(0);
         }
         ocrPolicyMsgUnMarshallMsg((u8*)*msg, NULL, *msg, MARSHALL_APPEND);
-        ceCommCheckSeqIdRecv(self, *msg);
 
         // Advance queue for next check
         cp->pollq = (i + 1) % MAX_NUM_XE;
@@ -514,7 +505,6 @@ u8 ceCommWaitMessage(ocrCommPlatform_t *self,  ocrPolicyMsg_t **msg,
         ASSERT(0);
     }
     ocrPolicyMsgUnMarshallMsg((u8*)*msg, NULL, *msg, MARSHALL_APPEND);
-    ceCommCheckSeqIdRecv(self, *msg);
 #else
     // We have a message
     // NOTE: For now we copy it into the buffer provided by the caller

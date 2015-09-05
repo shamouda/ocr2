@@ -25,39 +25,18 @@ typedef enum _guidType_t {
     guidMax_id
 } guidType_t;
 
-const char * guid_types[] __attribute__ ((weak)) = {
-    "PTR",
-    "COUNTED_MAP",
-    "LABELED",
-    NULL
-};
-
-// Ptr GUID provider
-#include "guid/ptr/ptr-guid.h"
-// Counted GUID provider backed my map
-#include "guid/counted/counted-map-guid.h"
-// Similar to counted GUID but with experimental
-// labeling support
-#include "guid/labeled/labeled-guid.h"
-
-// Add other GUID providers if needed
-static inline ocrGuidProviderFactory_t *newGuidProviderFactory(guidType_t type, ocrParamList_t *typeArg) {
-    switch(type) {
 #ifdef ENABLE_GUID_PTR
-    case guidPtr_id:
-        return newGuidProviderFactoryPtr(typeArg, (u32)type);
+#include "guid/ptr/ptr-guid.h"
 #endif
 #ifdef ENABLE_GUID_COUNTED_MAP
-    case guidCountedMap_id:
-        return newGuidProviderFactoryCountedMap(typeArg, (u32)type);
+#include "guid/counted/counted-map-guid.h"
 #endif
 #ifdef ENABLE_GUID_LABELED
-    case guidLabeled_id:
-        return newGuidProviderFactoryLabeled(typeArg, (u32)type);
+#include "guid/labeled/labeled-guid.h"
 #endif
-    default:
-        ASSERT(0);
-    }
-    return NULL;
-}
+
+extern const char * guid_types[];
+
+ocrGuidProviderFactory_t *newGuidProviderFactory(guidType_t type, ocrParamList_t *typeArg);
+
 #endif /* __GUID_ALL_H__ */

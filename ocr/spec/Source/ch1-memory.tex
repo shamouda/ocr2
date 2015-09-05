@@ -56,10 +56,11 @@ to expose any modifications to the data block to other EDTs, it
 must \emph{release}\index{Release} that data block.
 
 \begin{quote}
-Any function in the OCR runtime that releases a data block must ensure
-that all loads and stores to the data block occur before the data
-block is released. Furthermore, the OCR runtime must ensure that the
-release completes before returning from the release function call.
+When an EDT calls an OCR function that releases a data block, the OCR
+runtime must ensure that all loads and stores to the data block by that
+EDT complete before the data block is released. Furthermore, the OCR
+runtime must ensure that the release completes before returning
+from the release function call.
 \end{quote}
 
 The only way to establish a synchronized-with relation is through the
@@ -109,9 +110,10 @@ relationships if we define the following rule.
 %
 
 \begin{quote}
-Wrties to data blocks that may be acquired by EDTs that could be made
-transitively ready by an event satisfaction must have completed and
-the data block must have been released prior to satisfying the event.
+Before an EDT calls a function to satisfy an event,
+for any data block potentially exposed to other EDTs
+by that event satisfaction, all writes to that data block must complete
+and the data block must be released before the event is satisfied.
 \end{quote}
 
 Without this rule we cannot assume a release operation followed by

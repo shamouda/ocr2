@@ -8,7 +8,9 @@
 #include "debug.h"
 
 const char * memtarget_types[] = {
+#ifdef ENABLE_MEM_TARGET_SHARED
     "shared",
+#endif
     NULL
 };
 
