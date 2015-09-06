@@ -8,6 +8,9 @@
 #include "debug.h"
 
 const char * schedulerObject_types[] = {
+#ifdef ENABLE_SCHEDULER_OBJECT_NULL
+    "NULL",
+#endif
 #ifdef ENABLE_SCHEDULER_OBJECT_DOMAIN
     "DOMAIN",
 #endif
@@ -26,14 +29,15 @@ const char * schedulerObject_types[] = {
 #ifdef ENABLE_SCHEDULER_OBJECT_MAP
     "MAP",
 #endif
-#ifdef ENABLE_SCHEDULER_OBJECT_NULL
-    "NULL",
-#endif
     NULL
 };
 
 ocrSchedulerObjectFactory_t * newSchedulerObjectFactory(schedulerObjectType_t type, ocrParamList_t *perType) {
     switch(type) {
+#ifdef ENABLE_SCHEDULER_OBJECT_NULL
+    case schedulerObjectNull_id:
+        return newOcrSchedulerObjectFactoryNull(perType, (u32)type);
+#endif
 #ifdef ENABLE_SCHEDULER_OBJECT_DOMAIN
     case schedulerObjectDomain_id:
         return newOcrSchedulerObjectFactoryDomain(perType, (u32)type);
@@ -57,10 +61,6 @@ ocrSchedulerObjectFactory_t * newSchedulerObjectFactory(schedulerObjectType_t ty
 #ifdef ENABLE_SCHEDULER_OBJECT_MAP
     case schedulerObjectMap_id:
         return newOcrSchedulerObjectFactoryMap(perType, (u32)type);
-#endif
-#ifdef ENABLE_SCHEDULER_OBJECT_NULL
-    case schedulerObjectNull_id:
-        return newOcrSchedulerObjectFactoryNull(perType, (u32)type);
 #endif
     default:
         ASSERT(0);

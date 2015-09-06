@@ -75,14 +75,8 @@ void hcSchedulerDestruct(ocrScheduler_t * self) {
     }
 
     // Destruct the root scheduler object
-    for(i = 0; i < self->pd->schedulerObjectFactoryCount; ++i) {
-        ocrSchedulerObjectFactory_t *fact = self->pd->schedulerObjectFactories[i];
-        if (IS_SCHEDULER_OBJECT_TYPE_ROOT(fact->kind)) {
-            ocrSchedulerObjectRootFactory_t *rootFact = (ocrSchedulerObjectRootFactory_t*)fact;
-            rootFact->fcts.destruct(self->rootObj);
-            break;
-        }
-    }
+    ocrSchedulerObjectRootFactory_t *rootFact = (ocrSchedulerObjectRootFactory_t*)self->pd->schedulerObjectFactories[self->rootObj->fctId];
+    rootFact->fcts.destruct(self->rootObj);
 
     //scheduler heuristics
     u64 schedulerHeuristicCount = self->schedulerHeuristicCount;
@@ -123,15 +117,8 @@ u8 hcSchedulerSwitchRunlevel(ocrScheduler_t *self, ocrPolicyDomain_t *PD, ocrRun
                 self->workpiles[i], PD, runlevel, phase, properties, NULL, 0);
         }
 
-        for(i = 0; i < PD->schedulerObjectFactoryCount; ++i) {
-            ocrSchedulerObjectFactory_t *fact = PD->schedulerObjectFactories[i];
-            if (IS_SCHEDULER_OBJECT_TYPE_ROOT(fact->kind)) {
-                ocrSchedulerObjectRootFactory_t *rootFact = (ocrSchedulerObjectRootFactory_t*)fact;
-                toReturn |= rootFact->fcts.switchRunlevel(self->rootObj, PD, runlevel, phase,
-                                                          properties, NULL, 0);
-                break;
-            }
-        }
+        ocrSchedulerObjectRootFactory_t *rootFact = (ocrSchedulerObjectRootFactory_t*)PD->schedulerObjectFactories[self->rootObj->fctId];
+        toReturn |= rootFact->fcts.switchRunlevel(self->rootObj, PD, runlevel, phase, properties, NULL, 0);
 
         for(i = 0; i < self->schedulerHeuristicCount; ++i) {
             toReturn |= self->schedulerHeuristics[i]->fcts.switchRunlevel(
@@ -216,15 +203,8 @@ u8 hcSchedulerSwitchRunlevel(ocrScheduler_t *self, ocrPolicyDomain_t *PD, ocrRun
                 self->workpiles[i], PD, runlevel, phase, properties, NULL, 0);
         }
 
-        for(i = 0; i < PD->schedulerObjectFactoryCount; ++i) {
-            ocrSchedulerObjectFactory_t *fact = PD->schedulerObjectFactories[i];
-            if (IS_SCHEDULER_OBJECT_TYPE_ROOT(fact->kind)) {
-                ocrSchedulerObjectRootFactory_t *rootFact = (ocrSchedulerObjectRootFactory_t*)fact;
-                toReturn |= rootFact->fcts.switchRunlevel(self->rootObj, PD, runlevel, phase,
-                                                          properties, NULL, 0);
-                break;
-            }
-        }
+        ocrSchedulerObjectRootFactory_t *rootFact = (ocrSchedulerObjectRootFactory_t*)PD->schedulerObjectFactories[self->rootObj->fctId];
+        toReturn |= rootFact->fcts.switchRunlevel(self->rootObj, PD, runlevel, phase, properties, NULL, 0);
 
         for(i = 0; i < self->schedulerHeuristicCount; ++i) {
             toReturn |= self->schedulerHeuristics[i]->fcts.switchRunlevel(
