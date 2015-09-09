@@ -55,8 +55,17 @@ ${SCRIPT_ROOT}/utils/transpose.sh ${DATA_BUFFER_FILE} > ${DATA_FILE}
 #
 
 cp ${DATA_FILE} ${DATA_BUFFER_FILE}
-NB_REPORTS=`echo ${REPORT_FILES} | wc -w | tr '\t' ' ' | sed -e "s/ //g"`
-seq 1 ${NB_REPORTS} > ${XLABEL_FILE}
+if [[ -n "${PLOT_ARG_XAXIS}" ]]; then
+    rm -f ${XLABEL_FILE}
+    let i=1
+    for str in `echo "${PLOT_ARG_XAXIS}"`; do
+        echo "${str}" >> ${XLABEL_FILE}
+    done
+    # echo ${PLOT_ARG_XAXIS} | tr ' ' '\n' > ${XLABEL_FILE}
+else
+    NB_REPORTS=`echo ${REPORT_FILES} | wc -w | tr '\t' ' ' | sed -e "s/ //g"`
+    seq 1 ${NB_REPORTS} > ${XLABEL_FILE}
+fi
 paste -d ' ' ${XLABEL_FILE} ${DATA_BUFFER_FILE} > ${DATA_FILE}
 
 #
@@ -68,24 +77,25 @@ REPORT_FILENAME=${REPORT_FILENAME##*/}
 OUTPUT_PLOT_NAME=${TMPDIR}/tmp.plt
 
 OUTPUT_IMG_FORMAT=svg
-TITLE="Core Scaling Trend: ${REPORT_FILENAME} (${NB_REPORTS})"
-IMG_NAME="trend-graph-${REPORT_FILENAME}".${OUTPUT_IMG_FORMAT}
-XLABEL="Trend Run"
-YLABEL="Throughput (op\/s)"
+
+PLOT_ARG_TITLE=${PLOT_ARG_TITLE-"Core Scaling Trend: ${REPORT_FILENAME} (${NB_REPORTS})"}
+PLOT_ARG_IMG_NAME=${PLOT_ARG_IMG_NAME-"trend-graph-${REPORT_FILENAME}".${OUTPUT_IMG_FORMAT}}
+PLOT_ARG_XLABEL=${PLOT_ARG_XLABEL-"Trend Run"}
+PLOT_ARG_YLABEL=${PLOT_ARG_YLABEL-"Throughput (op\/s)"}
 
 DATA_COL_IDX=2
-${SCRIPT_ROOT}/plotters/generateMultiCurvePlt.sh ${DATA_FILE} ${WU_FILE} ${XLABEL_FILE} ${IMG_NAME} ${OUTPUT_PLOT_NAME} "${TITLE}" "${XLABEL}" "${YLABEL}" ${DATA_COL_IDX}
+${SCRIPT_ROOT}/plotters/generateMultiCurvePlt.sh ${DATA_FILE} ${WU_FILE} ${XLABEL_FILE} ${PLOT_ARG_IMG_NAME} ${OUTPUT_PLOT_NAME} "${PLOT_ARG_TITLE}" "${PLOT_ARG_XLABEL}" "${PLOT_ARG_YLABEL}" ${DATA_COL_IDX}
 
 gnuplot ${OUTPUT_PLOT_NAME}
 RES=$?
 
 if [[ $RES == 0 ]]; then
-    echo "Plot generated ${IMG_NAME}"
+    echo "Plot generated ${PLOT_ARG_IMG_NAME}"
     rm -Rf ${WU_FILE} 2>/dev/null
     rm -Rf ${DATA_FILE}
     rm -Rf ${DATA_BUFFER_FILE}
     rm -Rf ${XLABEL_FILE}
     rm -Rf ${OUTPUT_PLOT_NAME}
 else
-    echo "An error occured generating the plot ${IMG_NAME}"
+    echo "An error occured generating the plot ${PLOT_ARG_IMG_NAME}"
 fi

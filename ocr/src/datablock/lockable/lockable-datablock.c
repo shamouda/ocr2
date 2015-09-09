@@ -70,7 +70,7 @@ static ocrLocation_t fatGuidToLocation(ocrPolicyDomain_t * pd, ocrFatGuid_t fatG
         return pd->myLocation;
     } else {
         ocrLocation_t edtLoc = -1;
-        u8 res = guidLocation(pd, fatGuid, &edtLoc);
+        u8 res __attribute__((unused)) = guidLocation(pd, fatGuid, &edtLoc);
         // Check that the GUID is valid
         ASSERT(!res);
         return edtLoc;
@@ -86,7 +86,7 @@ static ocrLocation_t guidToLocation(ocrPolicyDomain_t * pd, ocrGuid_t edtGuid) {
         fatGuid.guid = edtGuid;
         fatGuid.metaDataPtr = NULL;
         ocrLocation_t edtLoc = -1;
-        u8 res = guidLocation(pd, fatGuid, &edtLoc);
+        u8 res __attribute__((unused)) = guidLocation(pd, fatGuid, &edtLoc);
         // Check that the GUID is valid
         ASSERT(!res);
         return edtLoc;
@@ -274,7 +274,7 @@ static void processAcquireCallback(ocrDataBlock_t *self, dbWaiter_t * waiter, oc
     PD_MSG_FIELD_O(size) = self->size;
     PD_MSG_FIELD_O(returnDetail) = 0;
     //NOTE: we still have the lock, calling the internal version
-    u8 res = lockableAcquireInternal(self, &PD_MSG_FIELD_O(ptr), PD_MSG_FIELD_IO(edt),
+    u8 res __attribute__((unused)) = lockableAcquireInternal(self, &PD_MSG_FIELD_O(ptr), PD_MSG_FIELD_IO(edt),
                                   PD_MSG_FIELD_IO(edtSlot), waiterMode, waiter->isInternal,
                                   PD_MSG_FIELD_IO(properties));
     // Not much we would be able to recover here
@@ -456,6 +456,7 @@ u8 lockableRelease(ocrDataBlock_t *self, ocrFatGuid_t edt, bool isInternal) {
 }
 
 u8 lockableDestruct(ocrDataBlock_t *self) {
+#ifdef OCR_ASSERT
     ocrDataBlockLockable_t *rself = (ocrDataBlockLockable_t*)self;
     // Any of these wrong would indicate a race between free and DB's consumers
     ASSERT(rself->attributes.numUsers == 0);
@@ -465,6 +466,7 @@ u8 lockableDestruct(ocrDataBlock_t *self) {
     ASSERT(rself->ewWaiterList == NULL);
     ASSERT(rself->itwWaiterList == NULL);
     ASSERT(rself->lock == 0);
+#endif
 
     DPRINTF(DEBUG_LVL_VERB, "Freeing DB (GUID: 0x%lx)\n", self->guid);
     ocrPolicyDomain_t *pd = NULL;

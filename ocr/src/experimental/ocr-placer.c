@@ -53,7 +53,7 @@ static u8 resolveRemoteMetaData(ocrPolicyDomain_t * self, ocrFatGuid_t * fGuid, 
         msgClone.type = PD_MSG_GUID_METADATA_CLONE | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
         PD_MSG_FIELD_IO(guid.guid) = remoteGuid;
         PD_MSG_FIELD_IO(guid.metaDataPtr) = NULL;
-        u8 returnCode = self->fcts.processMessage(self, &msgClone, true);
+        u8 returnCode __attribute__((unused)) = self->fcts.processMessage(self, &msgClone, true);
         ASSERT(returnCode == 0);
         // On return, Need some more post-processing to make a copy of the metadata
         // and set the fatGuid's metadata ptr to point to the copy

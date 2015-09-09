@@ -195,8 +195,7 @@ u8 pthreadSwitchRunlevel(ocrCompPlatform_t *self, ocrPolicyDomain_t *PD, ocrRunl
                 // This means that we are the node master and therefore do not
                 // need to start another thread. Instead, we set the current environment
                 // for ourself
-                perThreadStorage_t *tls = pthread_getspecific(selfKey);
-                ASSERT(tls == NULL); // The key has not been setup yet
+                ASSERT(pthread_getspecific(selfKey) == NULL); // The key has not been setup yet
                 RESULT_ASSERT(pthread_setspecific(selfKey, &pthreadCompPlatform->tls), ==, 0);
                 self->fcts.setCurrentEnv(self, self->pd, NULL);
             } else if(properties & RL_PD_MASTER) {

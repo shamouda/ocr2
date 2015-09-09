@@ -102,7 +102,6 @@ static void workerLoop(ocrWorker_t * worker) {
     // At this stage, we are in the USER_OK runlevel
     ASSERT(worker->curState == GET_STATE(RL_USER_OK, (RL_GET_PHASE_COUNT_DOWN(worker->pd, RL_USER_OK))));
     ocrPolicyDomain_t *pd = worker->pd;
-
     if (worker->amBlessed) {
         ocrGuid_t affinityMasterPD;
         u64 count = 0;
@@ -435,11 +434,13 @@ ocrWorker_t* newWorkerHc(ocrWorkerFactory_t * factory, ocrParamList_t * perInsta
 void initializeWorkerHc(ocrWorkerFactory_t * factory, ocrWorker_t* self, ocrParamList_t * perInstance) {
     initializeWorkerOcr(factory, self, perInstance);
     self->type = ((paramListWorkerHcInst_t*)perInstance)->workerType;
+#ifdef OCR_ASSERT
     u64 workerId = ((paramListWorkerInst_t*)perInstance)->workerId;
     //TODO: try to get away from SYSTEM_WORKERTYPE and remove this check.
     if (self->type !=  SYSTEM_WORKERTYPE)
         ASSERT((workerId && self->type == SLAVE_WORKERTYPE) ||
            (workerId == 0 && self->type == MASTER_WORKERTYPE));
+#endif
     ocrWorkerHc_t * workerHc = (ocrWorkerHc_t*) self;
 
     if(self->type == SYSTEM_WORKERTYPE){

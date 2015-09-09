@@ -24,7 +24,7 @@ static void ocrShutdownInternal(u8 errorCode) {
     PD_MSG_FIELD_I(runlevel) = RL_COMPUTE_OK;
     PD_MSG_FIELD_I(properties) = RL_REQUEST | RL_BARRIER | RL_TEAR_DOWN;
     PD_MSG_FIELD_I(errorCode) = errorCode;
-    u8 returnCode = pd->fcts.processMessage(pd, msgPtr, true);
+    u8 returnCode __attribute__((unused)) = pd->fcts.processMessage(pd, msgPtr, true);
     ASSERT((returnCode == 0));
 #undef PD_MSG
 #undef PD_TYPE

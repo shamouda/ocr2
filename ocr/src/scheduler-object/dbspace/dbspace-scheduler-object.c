@@ -59,9 +59,11 @@ static void dbspaceSchedulerObjectInitialize(ocrSchedulerObjectFactory_t *fact, 
 }
 
 ocrSchedulerObject_t* newSchedulerObjectDbspace(ocrSchedulerObjectFactory_t *factory, ocrParamList_t *perInstance) {
+#ifdef OCR_ASSERT
     paramListSchedulerObject_t *paramSchedObj = (paramListSchedulerObject_t*)perInstance;
     ASSERT(paramSchedObj->config);
     ASSERT(!paramSchedObj->guidRequired);
+#endif
     ocrSchedulerObject_t* schedObj = NULL;
     schedObj = (ocrSchedulerObject_t*)runtimeChunkAlloc(sizeof(ocrSchedulerObjectDbspace_t), PERSISTENT_CHUNK);
     dbspaceSchedulerObjectInitialize(factory, schedObj);
@@ -70,9 +72,11 @@ ocrSchedulerObject_t* newSchedulerObjectDbspace(ocrSchedulerObjectFactory_t *fac
 }
 
 ocrSchedulerObject_t* dbspaceSchedulerObjectCreate(ocrSchedulerObjectFactory_t *factory, ocrParamList_t *perInstance) {
+#ifdef OCR_ASSERT
     paramListSchedulerObject_t *paramSchedObj = (paramListSchedulerObject_t*)perInstance;
     ASSERT(!paramSchedObj->config);
     ASSERT(!paramSchedObj->guidRequired);
+#endif
     ocrPolicyDomain_t *pd = factory->pd;
     ocrSchedulerObject_t* schedObj = (ocrSchedulerObject_t*)pd->fcts.pdMalloc(pd, sizeof(ocrSchedulerObjectDbspace_t));
     dbspaceSchedulerObjectInitialize(factory, schedObj);

@@ -56,15 +56,18 @@ if [ -z $WORKSPACE ]; then # debug
     cp ${JJOB_SHARED_HOME}/../${STATS_FILE} /home/vincentc/jenkins-tests-ubench
 fi
 
+YMIN=0.6
+YMAX=1.4
+
 # Plot these stat files
 if [ -z $WORKSPACE ]; then
     #  Manual execution of framework (i.e. local run and not by jenkins)
     cat ${JJOB_SHARED_HOME}/../${STATS_FILE}
-    python ${APPS_SCRIPT_FOLDER}/plotGraph.py ${JJOB_SHARED_HOME}/../${STATS_FILE} "Performance Trend Line" "Build" "Normalized Execution Time" "${JJOB_SHARED_HOME}/../${PLOT_FILE}"
+    python ${APPS_SCRIPT_FOLDER}/plotGraph.py ${JJOB_SHARED_HOME}/../${STATS_FILE} "Performance Trend Line" "Build" "Normalized Execution Time" ${YMIN} ${YMAX} "${JJOB_SHARED_HOME}/../${PLOT_FILE}"
     cp ${JJOB_SHARED_HOME}/../${PLOT_FILE} /home/vincentc/jenkins-tests-ubench
 else
     cat ${WORKSPACE}/${STATS_FILE}
-    python ${APPS_SCRIPT_FOLDER}/plotGraph.py ${WORKSPACE}/${STATS_FILE} "Performance Trend Line" "Build" "Normalized Execution Time" "${WORKSPACE}/${PLOT_FILE}"
+    python ${APPS_SCRIPT_FOLDER}/plotGraph.py ${WORKSPACE}/${STATS_FILE} "Performance Trend Line" "Build" "Normalized Execution Time" ${YMIN} ${YMAX} "${WORKSPACE}/${PLOT_FILE}"
 fi
 RET_VAL=$?
 if [ $RET_VAL -eq 0 ]; then

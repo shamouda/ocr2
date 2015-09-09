@@ -73,9 +73,11 @@ static void wstSchedulerObjectInitialize(ocrSchedulerObjectFactory_t *fact, ocrS
 }
 
 ocrSchedulerObject_t* newSchedulerObjectWst(ocrSchedulerObjectFactory_t *factory, ocrParamList_t *perInstance) {
+#ifdef OCR_ASSERT
     paramListSchedulerObject_t *paramSchedObj = (paramListSchedulerObject_t*)perInstance;
     ASSERT(paramSchedObj->config);
     ASSERT(!paramSchedObj->guidRequired);
+#endif
     ocrSchedulerObject_t* schedObj = (ocrSchedulerObject_t*)runtimeChunkAlloc(sizeof(ocrSchedulerObjectWst_t), PERSISTENT_CHUNK);
     wstSchedulerObjectInitialize(factory, schedObj);
     schedObj->kind |= OCR_SCHEDULER_OBJECT_ALLOC_CONFIG;
@@ -83,9 +85,11 @@ ocrSchedulerObject_t* newSchedulerObjectWst(ocrSchedulerObjectFactory_t *factory
 }
 
 ocrSchedulerObject_t* wstSchedulerObjectCreate(ocrSchedulerObjectFactory_t *factory, ocrParamList_t *perInstance) {
+#ifdef OCR_ASSERT
     paramListSchedulerObject_t *paramSchedObj = (paramListSchedulerObject_t*)perInstance;
     ASSERT(!paramSchedObj->config);
     ASSERT(!paramSchedObj->guidRequired);
+#endif
     ocrPolicyDomain_t *pd = NULL;
     getCurrentEnv(&pd, NULL, NULL, NULL);
     ocrSchedulerObject_t* schedObj = (ocrSchedulerObject_t*)pd->fcts.pdMalloc(pd, sizeof(ocrSchedulerObjectWst_t));

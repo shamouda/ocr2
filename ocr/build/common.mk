@@ -111,8 +111,17 @@ DEFAULT_CONFIG ?= jenkins-common-8w-lockableDB.cfg
 ####################################################
 
 # Debugging support
-# Enable debug
-CFLAGS += -DOCR_DEBUG
+ifneq (${NO_DEBUG}, yes)
+	# Enable assertions
+	CFLAGS += -DOCR_ASSERT
+	# Enable debug
+	CFLAGS += -DOCR_DEBUG
+
+	OPT_LEVEL=-O2
+else
+	OPT_LEVEL=-O3
+endif
+
 # Define level
 CFLAGS += -DOCR_DEBUG_LVL=DEBUG_LVL_WARN
 # CFLAGS += -DOCR_DEBUG_LVL=DEBUG_LVL_INFO
@@ -282,15 +291,15 @@ endif
 #
 
 .PHONY: static
-static: CFLAGS_STATIC += -O2
+static: CFLAGS_STATIC += $(OPT_LEVEL)
 static: supports-static info-static $(OCRSTATIC)
 
 .PHONY: shared
-shared: CFLAGS_SHARED += -O2
+shared: CFLAGS_SHARED += $(OPT_LEVEL)
 shared: supports-shared info-shared $(OCRSHARED)
 
 .PHONY: exec
-exec: CFLAGS_EXEC += -O2
+exec: CFLAGS_EXEC += $(OPT_LEVEL)
 exec: supports-exec info-exec $(OCREXEC)
 
 .PHONY: debug-static
@@ -500,3 +509,7 @@ uninstall:
 .PHONY:clean
 clean:
 	-$(RM) $(RMFLAGS) $(OBJDIR)/* $(OCRSHARED) $(OCRSTATIC) $(OCREXEC) src/*
+
+.PHONY: squeaky
+squeaky:
+	$(MAKE) -C $(OCR_TYPE) clean uninstall

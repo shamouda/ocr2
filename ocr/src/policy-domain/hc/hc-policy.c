@@ -136,8 +136,9 @@ u8 hcPdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
     ocrPolicyDomainHc_t* rself = (ocrPolicyDomainHc_t*)policy;
     // Check properties
     u32 amNodeMaster = (properties & RL_NODE_MASTER) == RL_NODE_MASTER;
+#ifdef OCR_ASSERT
     u32 amPDMaster = properties & RL_PD_MASTER;
-
+#endif
     u32 fromPDMsg = properties & RL_FROM_MSG;
     properties &= ~RL_FROM_MSG; // Strip this out from the rest; only valuable for the PD
     masterWorkerProperties = properties;
@@ -918,14 +919,16 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
     // - Asynchronous message processing allows for certain type of message
     //   to have a RESPONSE processed.
     ASSERT(((msg->type & PD_MSG_REQUEST) && !(msg->type & PD_MSG_RESPONSE))
-        || ((msg->type & PD_MSG_RESPONSE) && ((msg->type & PD_MSG_TYPE_ONLY) == PD_MSG_DB_ACQUIRE)))
+        || ((msg->type & PD_MSG_RESPONSE) && ((msg->type & PD_MSG_TYPE_ONLY) == PD_MSG_DB_ACQUIRE)));
 
     // The message buffer size should always be greater or equal to the
     // max of the message in and out sizes, otherwise a write on the message
     // as a response overflows.
+#ifdef OCR_ASSERT
     u64 baseSizeIn = ocrPolicyMsgGetMsgBaseSize(msg, true);
     u64 baseSizeOut = ocrPolicyMsgGetMsgBaseSize(msg, false);
     ASSERT(((baseSizeIn < baseSizeOut) && (msg->bufferSize >= baseSizeOut)) || (baseSizeIn >= baseSizeOut));
+#endif
 
     switch(msg->type & PD_MSG_TYPE_ONLY) {
     case PD_MSG_DB_CREATE: {
@@ -949,17 +952,9 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             if(db==NULL){
                 DPRINTF(DEBUG_LVL_WARN, "DB Create failed for size %lx\n", PD_MSG_FIELD_IO(size));
             }else{
-
-                bool srcFlag;
-                if(PD_MSG_FIELD_I(dbType) == USER_DBTYPE)
-                    srcFlag = true;
-                else
-                    srcFlag = false;
                 DPRINTF(DEBUG_LVL_VERB, "Creating a datablock of size %lu @ 0x%lx (GUID: 0x%lx)\n",
                         db->size, db->ptr, db->guid,
-                        srcFlag, OCR_TRACE_TYPE_DATABLOCK, OCR_ACTION_CREATE, db->size);
-
-
+                        /*srcFlag*/ (PD_MSG_FIELD_I(dbType) == USER_DBTYPE), OCR_TRACE_TYPE_DATABLOCK, OCR_ACTION_CREATE, db->size);
             }
             ASSERT(db);
             // BUG #584: Check if properties want DB acquired
@@ -1209,7 +1204,7 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
                     }
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_WORK_CREATE
-                    u8 toReturn = self->fcts.processMessage(self, &msgAddDep, true);
+                    u8 toReturn __attribute__((unused)) = self->fcts.processMessage(self, &msgAddDep, true);
                     ASSERT(!toReturn);
                 }
                 ++i;
@@ -1940,7 +1935,7 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             ASSERT(PD_MSG_FIELD_I(properties) & RL_TEAR_DOWN);
             ASSERT(PD_MSG_FIELD_I(runlevel) & RL_COMPUTE_OK);
             self->shutdownCode = PD_MSG_FIELD_I(errorCode);
-            u8 returnCode = self->fcts.switchRunlevel(
+            u8 returnCode __attribute__((unused)) = self->fcts.switchRunlevel(
                               self, RL_USER_OK, RL_TEAR_DOWN | RL_ASYNC | RL_REQUEST | RL_FROM_MSG);
             ASSERT(returnCode == 0);
         }

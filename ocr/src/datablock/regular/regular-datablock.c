@@ -124,12 +124,14 @@ u8 regularRelease(ocrDataBlock_t *self, ocrFatGuid_t edt,
 
 u8 regularDestruct(ocrDataBlock_t *self) {
     // We don't use a lock here. Maybe we should
+#ifdef OCR_ASSERT
     ocrDataBlockRegular_t *rself = (ocrDataBlockRegular_t*)self;
     // Check that no other EDT has acquired this datablock
     ASSERT(rself->attributes.numUsers == 0);
     ASSERT(rself->attributes.internalUsers == 0);
     ASSERT(rself->attributes.freeRequested == 1);
     ASSERT(rself->lock == 0);
+#endif
 
     DPRINTF(DEBUG_LVL_VERB, "Really freeing DB (GUID: 0x%lx)\n", self->guid);
     ocrPolicyDomain_t *pd = NULL;

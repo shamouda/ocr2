@@ -6,9 +6,13 @@ jobtype_ocr_performance = {
     'name': 'ocr-performance',
     'isLocal': True,
     'run-cmd': '${JJOB_PRIVATE_HOME}/xstack/ocr/jenkins/scripts/performance-ubench.sh',
-    'param-cmd': '${JJOB_PRIVATE_HOME}/xstack/ocr/jenkins/scripts/performance-ubench.sh _params',
+    'param-cmd': '${JJOB_SHARED_HOME}/xstack/apps/jenkins/scripts/remote-param-cmd.sh',
+    # Note: Alternatively, we can call 'performance-ubench.sh' with '_params' to let the
+    # script know the caller is just probing for run parameters. For now rely on the default
+    # 'remote-param-cmd.sh' to avoid duplicating run configurations.
+    # 'param-cmd': '${JJOB_PRIVATE_HOME}/xstack/ocr/jenkins/scripts/performance-ubench.sh _params',
     'keywords': ('ocr', 'performance'),
-    'timeout': 240,
+    'timeout': 600,
     'sandbox': ('local', 'shared', 'shareOK'),
     'req-repos': ('xstack',)
 }
@@ -28,7 +32,7 @@ jobtype_gatherStats_performance = {
 
 job_ocr_performance_x86_pthread_x86 = {
     'name': 'ocr-performance-x86',
-    'depends': ('ocr-build-x86',),
+    'depends': ('ocr-build-x86-perfs',),
     'jobtype': 'ocr-performance',
     'run-args': 'x86 jenkins-common-8w-regularDB.cfg regularDB',
     'sandbox': ('inherit0',)

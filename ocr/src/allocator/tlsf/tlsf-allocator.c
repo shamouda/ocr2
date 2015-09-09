@@ -1228,7 +1228,7 @@ static blkPayload_t * tlsfMalloc(poolHdr_t * pPool, u64 size)
 
 static void tlsfFree(poolHdr_t * pPool, blkPayload_t * pPayload) {
     blkHdr_t * pBlk = mapPayloadAddrToBlockAddr (pPayload);
-    u64 payloadSize = GET_payloadSize(pBlk);
+    u64 payloadSize __attribute__((unused)) = GET_payloadSize(pBlk);
     ASSERT ((payloadSize & (ALIGNMENT-1)) == 0);
 #ifdef ENABLE_ALLOCATOR_LEAK_FREED_DATABLOCKS
 #define detail1 "LEAKED"

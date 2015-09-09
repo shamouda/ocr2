@@ -267,7 +267,7 @@ static u8 commonSatisfyWaiters(ocrPolicyDomain_t *pd, ocrEvent_t *base, ocrFatGu
         } else {
             PD_MSG_FIELD_IO(properties) = DB_MODE_CONST | DB_PROP_RT_ACQUIRE;
         }
-        u8 res = pd->fcts.processMessage(pd, msg, true);
+        u8 res __attribute__((unused)) = pd->fcts.processMessage(pd, msg, true);
         ASSERT(!res);
         regNode_t * waiters = (regNode_t*)PD_MSG_FIELD_O(ptr);
         //BUG #273: related to 273: we should not get an updated deguidification...
@@ -377,7 +377,6 @@ u8 satisfyEventHcPersistIdem(ocrEvent_t *base, ocrFatGuid_t db, u32 slot) {
         event->waitersCount = (u32)-1; // Indicate the event is satisfied
         hal_unlock32(&(event->waitersLock));
     }
-
     return commonSatisfyEventHcPersist(base, db, slot, waitersCount);
 }
 
@@ -724,7 +723,7 @@ u8 unregisterWaiterEventHc(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot, bool
     PD_MSG_FIELD_IO(edtSlot) = EDT_SLOT_NONE;
     PD_MSG_FIELD_IO(properties) = DB_MODE_RW | DB_PROP_RT_ACQUIRE;
     //Should be a local DB
-    u8 res = pd->fcts.processMessage(pd, &msg, true);
+    u8 res __attribute__((unused)) = pd->fcts.processMessage(pd, &msg, true);
     ASSERT(!res); // Possible corruption of waitersDb
 
     waiters = (regNode_t*)PD_MSG_FIELD_O(ptr);

@@ -294,10 +294,9 @@ u8 ocrPolicyMsgMarshallMsg(ocrPolicyMsg_t* msg, u64 baseSize, u8* buffer, u32 mo
     u8 isIn = (msg->type & PD_MSG_REQUEST) != 0ULL;
 
     if(baseSize % MAX_ALIGN != 0) {
-        u64 t = baseSize;
-        baseSize = (baseSize + MAX_ALIGN -1)&(~(MAX_ALIGN-1));
         DPRINTF(DEBUG_LVL_WARN, "Adjusted base size in ocrPolicyMsgMarshallMsg to be %d aligned (from %u to %u)\n",
-                MAX_ALIGN, t, baseSize);
+                MAX_ALIGN, baseSize, (baseSize + MAX_ALIGN -1)&(~(MAX_ALIGN-1)));
+        baseSize = (baseSize + MAX_ALIGN -1)&(~(MAX_ALIGN-1));
     }
 
     ASSERT(((msg->type & (PD_MSG_REQUEST | PD_MSG_RESPONSE)) != (PD_MSG_REQUEST | PD_MSG_RESPONSE)) &&

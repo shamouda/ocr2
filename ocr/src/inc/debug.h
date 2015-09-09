@@ -374,8 +374,7 @@ extern void doTrace(u64 location, u64 wrkr, ocrGuid_t taskGuid, char *str, ...);
 #endif
 
 
-// Imply ASSERTs
-#define OCR_ASSERT
+// Build system must define 'OCR_ASSERT' for assertions to work
 
 #define DO_DEBUG_TYPE(type, level) \
     if(OCR_DEBUG_##type  && level <= DEBUG_LVL_##type) {

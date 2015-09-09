@@ -20,8 +20,10 @@
 /******************************************************/
 
 ocrSchedulerObject_t* newSchedulerObjectNull(ocrSchedulerObjectFactory_t *factory, ocrParamList_t *perInstance) {
+#ifdef OCR_ASSERT
     paramListSchedulerObject_t *params = (paramListSchedulerObject_t*)perInstance;
     ASSERT(params->config);
+#endif
     ocrSchedulerObject_t *schedObj = (ocrSchedulerObject_t*)runtimeChunkAlloc(sizeof(ocrSchedulerObjectNull_t), PERSISTENT_CHUNK);
     schedObj->guid.guid = NULL_GUID;
     schedObj->guid.metaDataPtr = NULL;

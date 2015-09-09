@@ -71,8 +71,7 @@ u8 stSchedulerHeuristicSwitchRunlevel(ocrSchedulerHeuristic_t *self, ocrPolicyDo
         break;
     case RL_PD_OK:
     {
-        ocrScheduler_t *scheduler = self->scheduler;
-        ASSERT(scheduler);
+        ASSERT(self->scheduler);
         self->contextCount = PD->workerCount; //Shared mem heuristic
         ASSERT(self->contextCount > 0);
         break;
@@ -261,7 +260,7 @@ static u8 stSchedulerHeuristicNotifyDbCreateInvoke(ocrSchedulerHeuristic_t *self
 
 static u8 stSchedulerHeuristicNotifyEdtSatisfiedInvoke(ocrSchedulerHeuristic_t *self, ocrSchedulerHeuristicContext_t *context, ocrSchedulerOpArgs_t *opArgs, ocrRuntimeHint_t *hints) {
     ocrSchedulerOpNotifyArgs_t *notifyArgs = (ocrSchedulerOpNotifyArgs_t*)opArgs;
-    ocrTask_t *task = notifyArgs->OCR_SCHED_ARG_FIELD(OCR_SCHED_NOTIFY_EDT_SATISFIED).guid.metaDataPtr;
+    ocrTask_t *task __attribute__((unused)) = notifyArgs->OCR_SCHED_ARG_FIELD(OCR_SCHED_NOTIFY_EDT_SATISFIED).guid.metaDataPtr;
     ASSERT(task);
     //...//Send task deps and associated modes to scheduler node for space/time analysis
     return 0;

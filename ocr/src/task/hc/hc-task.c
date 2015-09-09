@@ -552,7 +552,7 @@ u8 destructTaskHc(ocrTask_t* base) {
             PD_MSG_FIELD_I(currentEdt.guid) = curEdt ? curEdt->guid : NULL_GUID;
             PD_MSG_FIELD_I(currentEdt.metaDataPtr) = curEdt;
             PD_MSG_FIELD_I(properties) = 0;
-            u8 returnCode = pd->fcts.processMessage(pd, &msg, false);
+            u8 returnCode __attribute__((unused)) = pd->fcts.processMessage(pd, &msg, false);
             ASSERT(returnCode == 0);
 #undef PD_MSG
 #undef PD_TYPE
@@ -570,7 +570,7 @@ u8 destructTaskHc(ocrTask_t* base) {
             PD_MSG_FIELD_I(currentEdt.guid) = curEdt ? curEdt->guid : NULL_GUID;
             PD_MSG_FIELD_I(currentEdt.metaDataPtr) = curEdt;
             PD_MSG_FIELD_I(properties) = 0;
-            u8 returnCode = pd->fcts.processMessage(pd, &msg, false);
+            u8 returnCode __attribute__((unused)) = pd->fcts.processMessage(pd, &msg, false);
             ASSERT(returnCode == 0);
 #undef PD_MSG
 #undef PD_TYPE
@@ -595,7 +595,7 @@ u8 destructTaskHc(ocrTask_t* base) {
             PD_MSG_FIELD_I(currentEdt.metaDataPtr) = curEdt;
             PD_MSG_FIELD_I(slot) = OCR_EVENT_LATCH_DECR_SLOT;
             PD_MSG_FIELD_I(properties) = 0;
-            u8 returnCode = pd->fcts.processMessage(pd, &msg, false);
+            u8 returnCode __attribute__((unused)) = pd->fcts.processMessage(pd, &msg, false);
             ASSERT(returnCode == 0);
 #undef PD_MSG
 #undef PD_TYPE

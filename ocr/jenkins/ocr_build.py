@@ -29,6 +29,22 @@ jobtype_ocr_build = {
                  'OCR_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/install'}
 }
 
+# identical to 'ocr-build' but with the 'nightly' keyword
+jobtype_ocr_build_perfs = {
+    'name': 'ocr-build-perfs',
+    'isLocal': True,
+    'run-cmd': '${JJOB_PRIVATE_HOME}/xstack/ocr/jenkins/scripts/build.sh',
+    'param-cmd': '${JJOB_PRIVATE_HOME}/xstack/jenkins/scripts/empty-cmd.sh',
+    'keywords': ('ocr', 'nightly'),
+    'timeout': 240,
+    'sandbox': ('local', 'shared', 'shareOK'),
+    'req-repos': ('xstack',),
+    'env-vars': {'OCR_ROOT': '${JJOB_PRIVATE_HOME}/xstack/ocr',
+                 'OCR_BUILD_ROOT': '${JJOB_PRIVATE_HOME}/xstack/ocr/build',
+                 'OCR_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/install'}
+}
+
+
 jobtype_ocr_build_tg = {
     'name': 'ocr-build-tg',
     'isLocal': True,
@@ -73,6 +89,18 @@ job_ocr_build_x86_pthread_x86 = {
     'jobtype': 'ocr-build',
     'run-args': 'x86',
     'sandbox': ('inherit0',)
+}
+
+# Special runtime configuration to run micro-benchmarks
+job_ocr_build_x86_pthread_x86_perfs = {
+    'name': 'ocr-build-x86-perfs',
+    'depends': ('__alternate ocr-init',),
+    'jobtype': 'ocr-build-perfs',
+    'run-args': 'x86',
+    'sandbox': ('inherit0',),
+    'env-vars': {
+            'NO_DEBUG': 'yes',
+            'CFLAGS_USER': '-DINIT_DEQUE_CAPACITY=2500000 -DELS_USER_SIZE=0',}
 }
 
 #TODO: not sure how to not hardcode MPI_ROOT here

@@ -619,11 +619,10 @@ static void quickTest(u64 start, u64 size)
 
 static void quickFinish(poolHdr_t *pool, u64 size)
 {
-    u8 *p = (u8 *)pool;
     ASSERT((sizeof(poolHdr_t) & ALIGNMENT_MASK) == 0);
     ASSERT((size & ALIGNMENT_MASK) == 0);
 
-    DPRINTF(DEBUG_LVL_VERB, "quickFinish called. size 0x%lx at %p\n", size, p);
+    DPRINTF(DEBUG_LVL_VERB, "quickFinish called. size 0x%lx at %p\n", size, (u8 *)pool);
 
     // spinlock value must be 0 or 1. If not, it means it's not properly zero'ed before, or corrupted.
     ASSERT(pool->lock == 0 || pool->lock == 1);

@@ -12,6 +12,7 @@
 #include "ocr-policy-domain.h"
 #include "ocr-sysboot.h"
 #include "ocr-types.h"
+#include "ocr-errors.h"
 
 #define DEBUG_TYPE GUID
 
@@ -167,12 +168,14 @@ u8 countedMapGuidReserve(ocrGuidProvider_t *self, ocrGuid_t* startGuid, u64* ski
                          u64 numberGuids, ocrGuidKind guidType) {
     // Non supported; use labeled provider
     ASSERT(0);
+    return OCR_ENOTSUP;
 }
 
 u8 countedMapGuidUnreserve(ocrGuidProvider_t *self, ocrGuid_t startGuid, u64 skipGuid,
                            u64 numberGuids) {
     // Non supported; use labeled provider
     ASSERT(0);
+    return OCR_ENOTSUP;
 }
 
 /**

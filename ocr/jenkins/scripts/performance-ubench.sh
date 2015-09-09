@@ -21,11 +21,7 @@ else
     cp -r ${JJOB_PRIVATE_HOME}/xstack/ocr/tests ${JJOB_PRIVATE_HOME}/xstack/ocr/tests-${JJOB_ID}
     cd ${JJOB_PRIVATE_HOME}/xstack/ocr/tests-${JJOB_ID}/performance-tests
 
-    # temporarily hard-coded here
-    export CORE_SCALING=1
-    export OCR_NUM_NODES=1
-    export CUSTOM_BOUNDS="NB_INSTANCES=6000 NB_ITERS=1000"
-    SCRIPT_ROOT=./scripts ./scripts/perfDriver.sh event0StickyCreate
+    ./scripts/drivers/foobar.sh
 
     # Copy results to shared folder
     if [[ ! -d ${JJOB_SHARED_HOME}/xstack/ocr/tests/performance-tests ]]; then
@@ -33,6 +29,10 @@ else
     fi
 
     cp report-* ${JJOB_SHARED_HOME}/xstack/ocr/tests/performance-tests
+
+    for file in `find ${JJOB_PRIVATE_HOME}/xstack -name "core.*"`; do
+        rm $file
+    done
 
     exit $RES
 fi
