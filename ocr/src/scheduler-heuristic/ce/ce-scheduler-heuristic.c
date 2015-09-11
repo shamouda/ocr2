@@ -543,56 +543,6 @@ static u8 respondWorkRequest(ocrSchedulerHeuristic_t *self, ocrSchedulerHeuristi
     return 0;
 }
 
-static u8 respondShutdown(ocrSchedulerHeuristic_t *self, ocrSchedulerHeuristicContext_t *context, bool isBlocking) {
-    DPRINTF(DEBUG_LVL_VVERB, "SCHEDULER SHUTDOWN RESPONSE to %lx\n", context->location);
-    ocrSchedulerHeuristicCe_t *derived = (ocrSchedulerHeuristicCe_t*)self;
-    ocrSchedulerHeuristicContextCe_t *ceContext = (ocrSchedulerHeuristicContextCe_t*)context;
-    u8 returnCode = 0;
-    bool ceMessage = false;
-
-    // If the receiver is an XE, wake it up
-    u64 agentId = AGENT_FROM_ID(context->location);
-    if ((agentId >= ID_AGENT_XE0) && (agentId <= ID_AGENT_XE7)) {
-        hal_wake(agentId);
-        DPRINTF(DEBUG_LVL_INFO, "XE %lx woken up\n", context->location);
-        derived->pendingXeCount--;
-    } else {
-        ceMessage = true;
-    }
-
-    //TODO: For now pretend we are an XE until
-    //we get the transact messages working
-    ocrPolicyDomain_t *pd = self->scheduler->pd;
-    PD_MSG_STACK(msg);
-    getCurrentEnv(NULL, NULL, NULL, &msg);
-    msg.srcLocation = pd->myLocation;
-    msg.destLocation = context->location;
-#define PD_MSG (&msg)
-#define PD_TYPE PD_MSG_MGT_RL_NOTIFY
-    msg.type = PD_MSG_MGT_RL_NOTIFY | PD_MSG_RESPONSE | PD_MSG_REQ_RESPONSE;
-    msg.msgId = ceContext->msgId; //HACK: Use the msgId from the original request
-    if (ceMessage) {
-        if (isBlocking) {
-            returnCode = pd->fcts.sendMessage(pd, msg.destLocation, &msg, NULL, 0);
-            ASSERT(returnCode == 0);
-        } else {
-            returnCode = pd->fcts.sendMessage(pd, msg.destLocation, &msg, NULL, 0);
-        }
-    } else {
-        ASSERT(pd->fcts.sendMessage(pd, msg.destLocation, &msg, NULL, 0) == 0);
-    }
-#undef PD_MSG
-#undef PD_TYPE
-    if (returnCode == 0 || returnCode == 2) {
-        if (ceContext->inWorkRequestPending) derived->inPendingCount--;
-        ceContext->inWorkRequestPending = false;
-        ceContext->msgId = 0;
-        ceContext->isChild = false;
-    }
-    DPRINTF(DEBUG_LVL_VVERB, "SCHEDULER SHUTDOWN RESPONSE SUCCESS (%u) to %lx\n", returnCode, context->location);
-    return 0;
-}
-
 //The scheduler update function is called by the worker/policy-domain proactively
 //for the scheduler to make progress or organize itself. There are two kinds of
 //update properties:

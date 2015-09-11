@@ -982,8 +982,6 @@ static blkPayload_t *quickMalloc(poolHdr_t *pool,u64 size, struct _ocrPolicyDoma
 {
     if (size > MAX_SIZE_FOR_SLABS) // for big objects, go to the central heap
         return quickMallocInternal(pool, size, pd);
-    s64 myid = (s64)pd;
-    //ASSERT(myid >=0 && myid < MAX_THREAD);
     s32 slabsIndex = SIZE_TO_SLABS(size);
     s32 slabMaxSize = SLAB_MAX_SIZE(slabsIndex);
     hal_lock32(&CACHE_POOL(myid)->lock);
