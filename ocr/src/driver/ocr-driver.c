@@ -300,7 +300,7 @@ char *args_binary;
 
 extern int extract_functions(const char *);
 extern void free_functions(void);
-extern char *persistent_chunk;
+extern char persistent_chunk[];
 extern u64 persistent_pointer;
 extern u64 args_pointer;
 extern u64 dram_offset;
