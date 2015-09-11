@@ -474,17 +474,8 @@ static u8 makeWorkRequest(ocrSchedulerHeuristic_t *self, ocrSchedulerHeuristicCo
     PD_MSG_FIELD_I(properties) = 0;
 
     if (isBlocking) {
-        do {
-            returnCode = pd->fcts.sendMessage(pd, msg.destLocation, &msg, NULL, 0);
-            if (returnCode == 1) {
-                PD_MSG_STACK(myMsg);
-                ocrMsgHandle_t myHandle;
-                myHandle.msg = &myMsg;
-                ocrMsgHandle_t *handle = &myHandle;
-                while(!pd->fcts.pollMessage(pd, &handle))
-                    RESULT_ASSERT(pd->fcts.processMessage(pd, handle->response, true), ==, 0);
-            }
-        } while(returnCode == 1);
+        returnCode = pd->fcts.sendMessage(pd, msg.destLocation, &msg, NULL, 0);
+        ASSERT(returnCode == 0);
     } else {
         returnCode = pd->fcts.sendMessage(pd, msg.destLocation, &msg, NULL, 0);
     }
@@ -540,17 +531,7 @@ static u8 respondWorkRequest(ocrSchedulerHeuristic_t *self, ocrSchedulerHeuristi
     PD_MSG_FIELD_IO(schedArgs).OCR_SCHED_ARG_FIELD(OCR_SCHED_WORK_EDT_USER).edt = *fguid;
     PD_MSG_FIELD_I(properties) = 0;
     if (ceMessage) {
-        do {
-            returnCode = pd->fcts.sendMessage(pd, msg.destLocation, &msg, NULL, 0);
-            if (returnCode == 1) {
-                PD_MSG_STACK(myMsg);
-                ocrMsgHandle_t myHandle;
-                myHandle.msg = &myMsg;
-                ocrMsgHandle_t *handle = &myHandle;
-                while(!pd->fcts.pollMessage(pd, &handle))
-                    RESULT_ASSERT(pd->fcts.processMessage(pd, handle->response, true), ==, 0);
-            }
-        } while(returnCode == 1);
+        returnCode = pd->fcts.sendMessage(pd, msg.destLocation, &msg, NULL, 0);
         ASSERT(returnCode == 0);
     } else {
         ASSERT(pd->fcts.sendMessage(pd, msg.destLocation, &msg, NULL, 0) == 0);
@@ -592,17 +573,8 @@ static u8 respondShutdown(ocrSchedulerHeuristic_t *self, ocrSchedulerHeuristicCo
     msg.msgId = ceContext->msgId; //HACK: Use the msgId from the original request
     if (ceMessage) {
         if (isBlocking) {
-            do {
-                returnCode = pd->fcts.sendMessage(pd, msg.destLocation, &msg, NULL, 0);
-                if (returnCode == 1) {
-                    PD_MSG_STACK(myMsg);
-                    ocrMsgHandle_t myHandle;
-                    myHandle.msg = &myMsg;
-                    ocrMsgHandle_t *handle = &myHandle;
-                    while(!pd->fcts.pollMessage(pd, &handle))
-                        RESULT_ASSERT(pd->fcts.processMessage(pd, handle->response, true), ==, 0);
-                }
-            } while(returnCode == 1);
+            returnCode = pd->fcts.sendMessage(pd, msg.destLocation, &msg, NULL, 0);
+            ASSERT(returnCode == 0);
         } else {
             returnCode = pd->fcts.sendMessage(pd, msg.destLocation, &msg, NULL, 0);
         }
