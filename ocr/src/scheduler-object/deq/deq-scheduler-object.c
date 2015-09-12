@@ -25,7 +25,8 @@ ocrSchedulerObject_t* deqSchedulerObjectCreate(ocrSchedulerObjectFactory_t *fact
     ASSERT(SCHEDULER_OBJECT_KIND(paramSchedObj->kind) == OCR_SCHEDULER_OBJECT_DEQUE);
     ASSERT(!paramSchedObj->guidRequired);
     paramListSchedulerObjectDeq_t *paramDeq = (paramListSchedulerObjectDeq_t*)params;
-    ocrPolicyDomain_t *pd = fact->pd;
+    ocrPolicyDomain_t *pd = NULL;
+    getCurrentEnv(&pd, NULL, NULL, NULL);
     ocrSchedulerObject_t* schedObj = (ocrSchedulerObject_t*)pd->fcts.pdMalloc(pd, sizeof(ocrSchedulerObjectDeq_t));
     schedObj->guid.guid = NULL_GUID;
     schedObj->guid.metaDataPtr = NULL;
@@ -46,7 +47,8 @@ ocrSchedulerObject_t* deqSchedulerObjectCreate(ocrSchedulerObjectFactory_t *fact
 
 u8 deqSchedulerObjectDestroy(ocrSchedulerObjectFactory_t *fact, ocrSchedulerObject_t *self) {
     ASSERT(SCHEDULER_OBJECT_KIND(self->kind) == OCR_SCHEDULER_OBJECT_DEQUE);
-    ocrPolicyDomain_t *pd = fact->pd;
+    ocrPolicyDomain_t *pd = NULL;
+    getCurrentEnv(&pd, NULL, NULL, NULL);
     ocrSchedulerObjectDeq_t* deqSchedObj = (ocrSchedulerObjectDeq_t*)self;
     if (deqSchedObj->deque) deqSchedObj->deque->destruct(pd, deqSchedObj->deque);
     pd->fcts.pdFree(pd, self);
@@ -58,7 +60,8 @@ u8 deqSchedulerObjectInsert(ocrSchedulerObjectFactory_t *fact, ocrSchedulerObjec
     ASSERT(IS_SCHEDULER_OBJECT_TYPE_SINGLETON(element->kind));
     deque_t * deq = schedObj->deque;
     if (deq == NULL) {
-        ocrPolicyDomain_t *pd = fact->pd;
+        ocrPolicyDomain_t *pd = NULL;
+        getCurrentEnv(&pd, NULL, NULL, NULL);
         deq = newDeque(pd, NULL, schedObj->dequeType);
         schedObj->deque = deq;
     }
