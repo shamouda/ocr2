@@ -181,6 +181,28 @@ u8 ocrPolicyMsgGetMsgSize(ocrPolicyMsg_t *msg, u64 *baseSize,
         break;
 #undef PD_TYPE
 
+    case PD_MSG_SCHED_TRANSACT:
+#define PD_TYPE PD_MSG_SCHED_TRANSACT
+        {
+            ocrPolicyDomain_t *pd = NULL;
+            getCurrentEnv(&pd, NULL, NULL, NULL);
+            ocrSchedulerObjectFactory_t *fact = (ocrSchedulerObjectFactory_t*)pd->schedulerObjectFactories[PD_MSG_FIELD_IO(schedArgs).schedObj.fctId];
+            fact->fcts.ocrPolicyMsgGetMsgSize(fact, msg, marshalledSize, mode);
+        }
+        break;
+#undef PD_TYPE
+
+    case PD_MSG_SCHED_ANALYZE:
+#define PD_TYPE PD_MSG_SCHED_ANALYZE
+        {
+            ocrPolicyDomain_t *pd = NULL;
+            getCurrentEnv(&pd, NULL, NULL, NULL);
+            ocrSchedulerObjectFactory_t *fact = (ocrSchedulerObjectFactory_t*)pd->schedulerObjectFactories[PD_MSG_FIELD_IO(schedArgs).schedObj.fctId];
+            fact->fcts.ocrPolicyMsgGetMsgSize(fact, msg, marshalledSize, mode);
+        }
+        break;
+#undef PD_TYPE
+
     case PD_MSG_COMM_TAKE:
 #define PD_TYPE PD_MSG_COMM_TAKE
         if(isIn) {
@@ -434,6 +456,28 @@ u8 ocrPolicyMsgMarshallMsg(ocrPolicyMsg_t* msg, u64 baseSize, u8* buffer, u32 mo
             }
         default:
             break;
+        }
+        break;
+#undef PD_TYPE
+
+    case PD_MSG_SCHED_TRANSACT:
+#define PD_TYPE PD_MSG_SCHED_TRANSACT
+        {
+            ocrPolicyDomain_t *pd = NULL;
+            getCurrentEnv(&pd, NULL, NULL, NULL);
+            ocrSchedulerObjectFactory_t *fact = (ocrSchedulerObjectFactory_t*)pd->schedulerObjectFactories[PD_MSG_FIELD_IO(schedArgs).schedObj.fctId];
+            fact->fcts.ocrPolicyMsgMarshallMsg(fact, msg, curPtr, mode);
+        }
+        break;
+#undef PD_TYPE
+
+    case PD_MSG_SCHED_ANALYZE:
+#define PD_TYPE PD_MSG_SCHED_ANALYZE
+        {
+            ocrPolicyDomain_t *pd = NULL;
+            getCurrentEnv(&pd, NULL, NULL, NULL);
+            ocrSchedulerObjectFactory_t *fact = (ocrSchedulerObjectFactory_t*)pd->schedulerObjectFactories[PD_MSG_FIELD_IO(schedArgs).schedObj.fctId];
+            fact->fcts.ocrPolicyMsgMarshallMsg(fact, msg, curPtr, mode);
         }
         break;
 #undef PD_TYPE
@@ -774,6 +818,28 @@ u8 ocrPolicyMsgUnMarshallMsg(u8* mainBuffer, u8* addlBuffer,
             }
         default:
             break;
+        }
+        break;
+#undef PD_TYPE
+
+    case PD_MSG_SCHED_TRANSACT:
+#define PD_TYPE PD_MSG_SCHED_TRANSACT
+        {
+            ocrPolicyDomain_t *pd = NULL;
+            getCurrentEnv(&pd, NULL, NULL, NULL);
+            ocrSchedulerObjectFactory_t *fact = (ocrSchedulerObjectFactory_t*)pd->schedulerObjectFactories[PD_MSG_FIELD_IO(schedArgs).schedObj.fctId];
+            fact->fcts.ocrPolicyMsgUnMarshallMsg(fact, msg, localMainPtr, localAddlPtr, mode);
+        }
+        break;
+#undef PD_TYPE
+
+    case PD_MSG_SCHED_ANALYZE:
+#define PD_TYPE PD_MSG_SCHED_ANALYZE
+        {
+            ocrPolicyDomain_t *pd = NULL;
+            getCurrentEnv(&pd, NULL, NULL, NULL);
+            ocrSchedulerObjectFactory_t *fact = (ocrSchedulerObjectFactory_t*)pd->schedulerObjectFactories[PD_MSG_FIELD_IO(schedArgs).schedObj.fctId];
+            fact->fcts.ocrPolicyMsgUnMarshallMsg(fact, msg, localMainPtr, localAddlPtr, mode);
         }
         break;
 #undef PD_TYPE

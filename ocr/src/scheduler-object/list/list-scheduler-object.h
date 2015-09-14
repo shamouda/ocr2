@@ -32,7 +32,6 @@ typedef struct _ocrSchedulerObjectList_t {
 
 typedef struct _ocrSchedulerObjectListIterator_t {
     ocrSchedulerObjectIterator_t base;
-    arrayList_t *list;                  /* List used by the iterator */
     slistNode_t *current;				/* List node currently pointed to by the iterator */
 } ocrSchedulerObjectListIterator_t;
 

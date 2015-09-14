@@ -15,7 +15,7 @@
 #include "utils/ocr-utils.h"
 
 /****************************************************/
-/* OCR WST SCHEDULER_OBJECT                                */
+/* OCR WST SCHEDULER_OBJECT                         */
 /****************************************************/
 
 typedef struct _paramListSchedulerObjectWst_t {
@@ -30,16 +30,12 @@ typedef struct _ocrSchedulerObjectWst_t {
 } ocrSchedulerObjectWst_t;
 
 /****************************************************/
-/* OCR WST SCHEDULER_OBJECT FACTORY                        */
+/* OCR WST SCHEDULER_OBJECT FACTORY                 */
 /****************************************************/
 
 typedef struct _ocrSchedulerObjectFactoryWst_t {
     ocrSchedulerObjectFactory_t base;
 } ocrSchedulerObjectFactoryWst_t;
-
-typedef struct _ocrSchedulerObjectRootFactoryWst_t {
-    ocrSchedulerObjectRootFactory_t base;
-} ocrSchedulerObjectRootFactoryWst_t;
 
 typedef struct _paramListSchedulerObjectFactWst_t {
     paramListSchedulerObjectFact_t base;

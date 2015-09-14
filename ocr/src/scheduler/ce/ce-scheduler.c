@@ -114,15 +114,9 @@ u8 ceSchedulerSwitchRunlevel(ocrScheduler_t *self, ocrPolicyDomain_t *PD, ocrRun
         toReturn |= self->workpiles[i]->fcts.switchRunlevel(
             self->workpiles[i], PD, runlevel, phase, properties, NULL, 0);
     }
-    for(i = 0; i < PD->schedulerObjectFactoryCount; ++i) {
-        ocrSchedulerObjectFactory_t *fact = PD->schedulerObjectFactories[i];
-        if (IS_SCHEDULER_OBJECT_TYPE_ROOT(fact->kind)) {
-            ocrSchedulerObjectRootFactory_t *rootFact = (ocrSchedulerObjectRootFactory_t*)fact;
-            toReturn |= rootFact->fcts.switchRunlevel(self->rootObj, PD, runlevel, phase,
-                                                      properties, NULL, 0);
-            break;
-        }
-    }
+
+    ocrSchedulerObjectFactory_t *rootFact = (ocrSchedulerObjectFactory_t*)PD->schedulerObjectFactories[self->rootObj->fctId];
+    toReturn |= rootFact->fcts.switchRunlevel(self->rootObj, PD, runlevel, phase, properties, NULL, 0);
     // Do not re-order: Scheduler object root should be brought up before heuristics
     for(i = 0; i < self->schedulerHeuristicCount; ++i) {
         toReturn |= self->schedulerHeuristics[i]->fcts.switchRunlevel(

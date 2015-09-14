@@ -92,15 +92,17 @@ u8 ceSchedulerHeuristicSwitchRunlevel(ocrSchedulerHeuristic_t *self, ocrPolicyDo
         break;
     case RL_MEMORY_OK:
     {
+        DPRINTF(DEBUG_LVL_VVERB, "Runlevel: RL_MEMORY_OK\n");
         ocrScheduler_t *scheduler = self->scheduler;
         ASSERT(scheduler);
         self->contextCount = ((ocrPolicyDomainCe_t*)PD)->xeCount + PD->neighborCount;
         ASSERT(self->contextCount > 0);
-        DPRINTF(DEBUG_LVL_VVERB, "ContextCount: %lu\n", self->contextCount);
+        DPRINTF(DEBUG_LVL_INFO, "ContextCount: %lu (XE: %lu + Neighbors: %lu)\n", self->contextCount, ((ocrPolicyDomainCe_t*)PD)->xeCount, PD->neighborCount);
         break;
     }
     case RL_GUID_OK:
     {
+        DPRINTF(DEBUG_LVL_VVERB, "Runlevel: RL_GUID_OK\n");
         // Memory is up at this point. We can initialize ourself
         if((properties & RL_BRING_UP) && RL_IS_FIRST_PHASE_UP(PD, RL_MEMORY_OK, phase)) {
             u32 i;
@@ -152,6 +154,7 @@ u8 ceSchedulerHeuristicSwitchRunlevel(ocrSchedulerHeuristic_t *self, ocrPolicyDo
     }
     case RL_COMPUTE_OK:
     {
+        DPRINTF(DEBUG_LVL_VVERB, "Runlevel: RL_COMPUTE_OK\n");
         if((properties & RL_BRING_UP) && RL_IS_FIRST_PHASE_UP(PD, RL_COMPUTE_OK, phase)) {
             u32 i;
             ocrSchedulerObject_t *rootObj = self->scheduler->rootObj;
@@ -223,7 +226,7 @@ static u8 ceWorkStealingGet(ocrSchedulerHeuristic_t *self, ocrSchedulerHeuristic
     ocrSchedulerObject_t *schedObj = ceContext->mySchedulerObject;
     ASSERT(schedObj);
     ocrSchedulerObjectFactory_t *fact = self->scheduler->pd->schedulerObjectFactories[schedObj->fctId];
-    u8 retVal = fact->fcts.remove(fact, schedObj, OCR_SCHEDULER_OBJECT_EDT, 1, &edtObj, NULL, SCHEDULER_OBJECT_REMOVE_DEQ_POP);
+    u8 retVal = fact->fcts.remove(fact, schedObj, OCR_SCHEDULER_OBJECT_EDT, 1, &edtObj, NULL, SCHEDULER_OBJECT_REMOVE_TAIL);
 
 #if 1 //Turn off to disable stealing (serialize execution)
     //If pop fails, then try to steal from other deques
@@ -232,7 +235,7 @@ static u8 ceWorkStealingGet(ocrSchedulerHeuristic_t *self, ocrSchedulerHeuristic
         ocrSchedulerObjectWst_t *wstSchedObj = (ocrSchedulerObjectWst_t*)rootObj;
         ocrSchedulerObject_t *stealSchedulerObject = wstSchedObj->deques[ceContext->stealSchedulerObjectIndex];
         ASSERT(stealSchedulerObject->fctId == schedObj->fctId);
-        retVal = fact->fcts.remove(fact, stealSchedulerObject, OCR_SCHEDULER_OBJECT_EDT, 1, &edtObj, NULL, SCHEDULER_OBJECT_REMOVE_DEQ_POP); //try cached deque first
+        retVal = fact->fcts.remove(fact, stealSchedulerObject, OCR_SCHEDULER_OBJECT_EDT, 1, &edtObj, NULL, SCHEDULER_OBJECT_REMOVE_HEAD); //try cached deque first
 
         //If cached steal failed, then restart steal loop from starting index
         u32 i;
@@ -240,7 +243,7 @@ static u8 ceWorkStealingGet(ocrSchedulerHeuristic_t *self, ocrSchedulerHeuristic
             ceContext->stealSchedulerObjectIndex = (context->id + i) % wstSchedObj->numDeques;
             stealSchedulerObject = wstSchedObj->deques[ceContext->stealSchedulerObjectIndex];
             ASSERT(stealSchedulerObject->fctId == schedObj->fctId);
-            retVal = fact->fcts.remove(fact, stealSchedulerObject, OCR_SCHEDULER_OBJECT_EDT, 1, &edtObj, NULL, SCHEDULER_OBJECT_REMOVE_DEQ_POP);
+            retVal = fact->fcts.remove(fact, stealSchedulerObject, OCR_SCHEDULER_OBJECT_EDT, 1, &edtObj, NULL, SCHEDULER_OBJECT_REMOVE_HEAD);
         }
     }
 #endif
@@ -380,7 +383,7 @@ static u8 ceSchedulerHeuristicNotifyEdtReadyInvoke(ocrSchedulerHeuristic_t *self
     edtObj.guid = fguid;
     edtObj.kind = OCR_SCHEDULER_OBJECT_EDT;
     ocrSchedulerObjectFactory_t *fact = pd->schedulerObjectFactories[insertSchedObj->fctId];
-    ASSERT(fact->fcts.insert(fact, insertSchedObj, &edtObj, 0) == 0);
+    ASSERT(fact->fcts.insert(fact, insertSchedObj, &edtObj, NULL, (SCHEDULER_OBJECT_INSERT_AFTER | SCHEDULER_OBJECT_INSERT_POSITION_TAIL)) == 0);
     derived->workCount++;
     if (AGENT_FROM_ID(context->location) == ID_AGENT_CE) {
         ocrSchedulerHeuristicContextCe_t *ceContext = (ocrSchedulerHeuristicContextCe_t*)context;

@@ -135,9 +135,7 @@ typedef enum {
 typedef struct _ocrSchedulerOpTransactArgs_t {
     ocrSchedulerOpArgs_t base;
     ocrSchedulerTransactProp properties;            /* Transact properties */
-    struct _ocrSchedulerObject_t *elObj;            /* scheduler object element that is used in transaction */
-    struct _ocrSchedulerObject_t *dstObj;           /* destination scheduler object */
-    struct _ocrSchedulerObject_t *srcObj;           /* source scheduler object */
+    struct _ocrSchedulerObject_t schedObj;          /* The scheduler object element transacted */
 } ocrSchedulerOpTransactArgs_t;
 
 /* Scheduler negotiation related arguments */
@@ -173,8 +171,7 @@ typedef struct _ocrSchedulerOpAnalyzeArgs_t {
     ocrSchedAnalyzeKind kind;
     ocrSchedAnalyzeData_t data;                     /* Analyze op related data */
     ocrSchedulerAnalyzeProp properties;             /* Analyze properties */
-    struct _ocrSchedulerObject_t *dstObj;           /* destination scheduler object */
-    struct _ocrSchedulerObject_t *srcObj;           /* source scheduler object */
+    struct _ocrSchedulerObject_t schedObj;          /* The scheduler object element analyzed */
 } ocrSchedulerOpAnalyzeArgs_t;
 
 /****************************************************/

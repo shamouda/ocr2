@@ -75,8 +75,8 @@ void hcSchedulerDestruct(ocrScheduler_t * self) {
     }
 
     // Destruct the root scheduler object
-    ocrSchedulerObjectRootFactory_t *rootFact = (ocrSchedulerObjectRootFactory_t*)self->pd->schedulerObjectFactories[self->rootObj->fctId];
-    rootFact->fcts.destruct(self->rootObj);
+    ocrSchedulerObjectFactory_t *rootFact = (ocrSchedulerObjectFactory_t*)self->pd->schedulerObjectFactories[self->rootObj->fctId];
+    rootFact->fcts.destroy(rootFact, self->rootObj);
 
     //scheduler heuristics
     u64 schedulerHeuristicCount = self->schedulerHeuristicCount;
@@ -117,7 +117,7 @@ u8 hcSchedulerSwitchRunlevel(ocrScheduler_t *self, ocrPolicyDomain_t *PD, ocrRun
                 self->workpiles[i], PD, runlevel, phase, properties, NULL, 0);
         }
 
-        ocrSchedulerObjectRootFactory_t *rootFact = (ocrSchedulerObjectRootFactory_t*)PD->schedulerObjectFactories[self->rootObj->fctId];
+        ocrSchedulerObjectFactory_t *rootFact = (ocrSchedulerObjectFactory_t*)PD->schedulerObjectFactories[self->rootObj->fctId];
         toReturn |= rootFact->fcts.switchRunlevel(self->rootObj, PD, runlevel, phase, properties, NULL, 0);
 
         for(i = 0; i < self->schedulerHeuristicCount; ++i) {
@@ -203,7 +203,7 @@ u8 hcSchedulerSwitchRunlevel(ocrScheduler_t *self, ocrPolicyDomain_t *PD, ocrRun
                 self->workpiles[i], PD, runlevel, phase, properties, NULL, 0);
         }
 
-        ocrSchedulerObjectRootFactory_t *rootFact = (ocrSchedulerObjectRootFactory_t*)PD->schedulerObjectFactories[self->rootObj->fctId];
+        ocrSchedulerObjectFactory_t *rootFact = (ocrSchedulerObjectFactory_t*)PD->schedulerObjectFactories[self->rootObj->fctId];
         toReturn |= rootFact->fcts.switchRunlevel(self->rootObj, PD, runlevel, phase, properties, NULL, 0);
 
         for(i = 0; i < self->schedulerHeuristicCount; ++i) {

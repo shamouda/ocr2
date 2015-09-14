@@ -301,17 +301,8 @@ char* populate_type(ocrParamList_t **type_param, type_enum index, dictionary *di
     case commplatform_type:
         ALLOC_PARAM_LIST(*type_param, paramListCommPlatformFact_t);
         break;
-    case schedulerObject_type: {
-            ALLOC_PARAM_LIST(*type_param, paramListSchedulerObjectFact_t);
-            ((paramListSchedulerObjectFact_t*)(*type_param))->kind = OCR_SCHEDULER_OBJECT_AGGREGATE;
-            if (key_exists(dict, secname, "kind")) {
-                char *valuestr = NULL;
-                snprintf(key, MAX_KEY_SZ, "%s:%s", secname, "kind");
-                INI_GET_STR (key, valuestr, "");
-                ASSERT(strcmp(valuestr, "root") == 0);
-                ((paramListSchedulerObjectFact_t*)(*type_param))->kind = OCR_SCHEDULER_OBJECT_ROOT;
-            }
-        }
+    case schedulerObject_type:
+        ALLOC_PARAM_LIST(*type_param, paramListSchedulerObjectFact_t);
         break;
     case schedulerHeuristic_type:
         ALLOC_PARAM_LIST(*type_param, paramListSchedulerHeuristicFact_t);
@@ -818,16 +809,13 @@ s32 populate_inst(ocrParamList_t **inst_param, int inst_param_size, void **insta
         break;
     case schedulerObject_type:
         for (j = low; j<=high; j++) {
-            schedulerObjectType_t mytype = -1;
-            TO_ENUM (mytype, inststr, schedulerObjectType_t, schedulerObject_types, schedulerObjectMax_id);
-            switch (mytype) {
-            default:
-                break;
-            }
             ALLOC_PARAM_LIST(inst_param[j], paramListSchedulerObject_t);
+            ((paramListSchedulerObject_t*)inst_param[j])->config = true;
+            ((paramListSchedulerObject_t*)inst_param[j])->guidRequired = false;
             instance[j] = (void *)((ocrSchedulerObjectFactory_t *)factory)->instantiate(factory, inst_param[j]);
-            if (instance[j])
+            if (instance[j]) {
                 DPRINTF(DEBUG_LVL_INFO, "Created schedulerObject of type %s, index %d\n", inststr, j);
+            }
         }
         break;
     case schedulerHeuristic_type:

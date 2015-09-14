@@ -14,12 +14,6 @@
 #ifdef ENABLE_SCHEDULER_OBJECT_NULL
 #include "scheduler-object/null/null-scheduler-object.h"
 #endif
-#ifdef ENABLE_SCHEDULER_OBJECT_DOMAIN
-#include "scheduler-object/domain/domain-scheduler-object.h"
-#endif
-#ifdef ENABLE_SCHEDULER_OBJECT_DBNODE
-#include "scheduler-object/dbnode/dbnode-scheduler-object.h"
-#endif
 #ifdef ENABLE_SCHEDULER_OBJECT_WST
 #include "scheduler-object/wst/wst-scheduler-object.h"
 #endif
@@ -32,16 +26,19 @@
 #ifdef ENABLE_SCHEDULER_OBJECT_MAP
 #include "scheduler-object/map/map-scheduler-object.h"
 #endif
+#ifdef ENABLE_SCHEDULER_OBJECT_PDSPACE
+#include "scheduler-object/pdspace/pdspace-scheduler-object.h"
+#endif
+#ifdef ENABLE_SCHEDULER_OBJECT_DBSPACE
+#include "scheduler-object/dbspace/dbspace-scheduler-object.h"
+#endif
+#ifdef ENABLE_SCHEDULER_OBJECT_DBTIME
+#include "scheduler-object/dbtime/dbtime-scheduler-object.h"
+#endif
 
 typedef enum _schedulerObjectType_t {
 #ifdef ENABLE_SCHEDULER_OBJECT_NULL
     schedulerObjectNull_id,
-#endif
-#ifdef ENABLE_SCHEDULER_OBJECT_DOMAIN
-    schedulerObjectDomain_id,
-#endif
-#ifdef ENABLE_SCHEDULER_OBJECT_DBNODE
-    schedulerObjectDbNode_id,
 #endif
 #ifdef ENABLE_SCHEDULER_OBJECT_WST
     schedulerObjectWst_id,
@@ -54,6 +51,15 @@ typedef enum _schedulerObjectType_t {
 #endif
 #ifdef ENABLE_SCHEDULER_OBJECT_MAP
     schedulerObjectMap_id,
+#endif
+#ifdef ENABLE_SCHEDULER_OBJECT_PDSPACE
+    schedulerObjectPdspace_id,
+#endif
+#ifdef ENABLE_SCHEDULER_OBJECT_DBSPACE
+    schedulerObjectDbspace_id,
+#endif
+#ifdef ENABLE_SCHEDULER_OBJECT_DBTIME
+    schedulerObjectDbtime_id,
 #endif
     schedulerObjectMax_id
 } schedulerObjectType_t;

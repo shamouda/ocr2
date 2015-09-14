@@ -137,13 +137,13 @@ u8 pcSchedulerHeuristicRegisterContext(ocrSchedulerHeuristic_t *self, u64 contex
     pcContext->stealSchedulerObjectIndex = (contextId + 1) % self->contextCount;
     pcContext->listIterator = NULL;
     ocrSchedulerObjectDomain_t *domainObj = (ocrSchedulerObjectDomain_t*)rootObj;
-    ASSERT(domainObj->dbTable);
-    ocrSchedulerObjectFactory_t *tablFact = self->scheduler->pd->schedulerObjectFactories[domainObj->dbTable->fctId];
+    ASSERT(domainObj->dbMap);
+    ocrSchedulerObjectFactory_t *tablFact = self->scheduler->pd->schedulerObjectFactories[domainObj->dbMap->fctId];
     paramListSchedulerObject_t params;
     params.kind = OCR_SCHEDULER_OBJECT_ITERATOR;
     params.guidRequired = 0;
     pcContext->mapIterator = (ocrSchedulerObjectIterator_t*)tablFact->fcts.create(tablFact, (ocrParamList_t*)&params);
-    ASSERT(tablFact->fcts.iterate(tablFact, domainObj->dbTable, pcContext->mapIterator, SCHEDULER_OBJECT_ITERATE_BEGIN) == 0);
+    ASSERT(tablFact->fcts.iterate(tablFact, domainObj->dbMap, pcContext->mapIterator, SCHEDULER_OBJECT_ITERATE_BEGIN) == 0);
     return 0;
 }
 
@@ -316,11 +316,11 @@ static u8 pcSchedulerHeuristicNotifyDbCreateInvoke(ocrSchedulerHeuristic_t *self
     ocrSchedulerHeuristicContextPc_t *pcContext = (ocrSchedulerHeuristicContextPc_t*)context;
     ocrSchedulerObjectIterator_t *it = pcContext->mapIterator;
     ocrSchedulerObjectDomain_t *domainObj = (ocrSchedulerObjectDomain_t*)self->scheduler->rootObj;
-    ocrSchedulerObjectFactory_t *tablFact = self->scheduler->pd->schedulerObjectFactories[domainObj->dbTable->fctId];
+    ocrSchedulerObjectFactory_t *tablFact = self->scheduler->pd->schedulerObjectFactories[domainObj->dbMap->fctId];
     it->ITERATOR_ARG_FIELD(OCR_SCHEDULER_OBJECT_MAP).key = (void*)db->guid;
     it->ITERATOR_ARG_FIELD(OCR_SCHEDULER_OBJECT_MAP).value = (void*)dbNode;
     DPRINTF(DEBUG_LVL_VERB, "DB node. Key: %lu Value: %lu\n", db->guid, dbNode);
-    ASSERT(tablFact->fcts.insert(tablFact, domainObj->dbTable, (ocrSchedulerObject_t*)it, SCHEDULER_OBJECT_INSERT_MAP_CONC_PUT) == 0);
+    ASSERT(tablFact->fcts.insert(tablFact, domainObj->dbMap, (ocrSchedulerObject_t*)it, SCHEDULER_OBJECT_INSERT_MAP_CONC_PUT) == 0);
     return 0;
 }
 
@@ -401,13 +401,13 @@ static u8 pcSchedulerHeuristicAnalyzePhaseRequestInvoke(ocrSchedulerHeuristic_t 
     ocrSchedulerHeuristicContextPc_t *pcContext = (ocrSchedulerHeuristicContextPc_t*)context;
     ocrSchedulerObjectIterator_t *it = pcContext->mapIterator;
     ocrSchedulerObjectDomain_t *domainObj = (ocrSchedulerObjectDomain_t*)self->scheduler->rootObj;
-    ocrSchedulerObjectFactory_t *tablFact = self->scheduler->pd->schedulerObjectFactories[domainObj->dbTable->fctId];
+    ocrSchedulerObjectFactory_t *tablFact = self->scheduler->pd->schedulerObjectFactories[domainObj->dbMap->fctId];
     for (i = 0; i < depc; i++) {
         ASSERT(depv[i].ptr == NULL);
         if (depv[i].guid != NULL_GUID) {
             it->ITERATOR_ARG_FIELD(OCR_SCHEDULER_OBJECT_MAP).key = (void*)depv[i].guid;
             it->ITERATOR_ARG_FIELD(OCR_SCHEDULER_OBJECT_MAP).value = NULL;
-            ASSERT(tablFact->fcts.iterate(tablFact, domainObj->dbTable, it, SCHEDULER_OBJECT_ITERATE_MAP_GET_NON_CONC) == 0);
+            ASSERT(tablFact->fcts.iterate(tablFact, domainObj->dbMap, it, SCHEDULER_OBJECT_ITERATE_MAP_GET_NON_CONC) == 0);
             ASSERT(it->ITERATOR_ARG_FIELD(OCR_SCHEDULER_OBJECT_MAP).value);
             depv[i].ptr = it->ITERATOR_ARG_FIELD(OCR_SCHEDULER_OBJECT_MAP).value; //Repurpose the data ptr to hold the DB node pointer
         }
@@ -467,13 +467,13 @@ static u8 pcSchedulerHeuristicAnalyzePhaseResponseInvoke(ocrSchedulerHeuristic_t
     ocrSchedulerHeuristicContextPc_t *pcContext = (ocrSchedulerHeuristicContextPc_t*)context;
     ocrSchedulerObjectIterator_t *it = pcContext->mapIterator;
     ocrSchedulerObjectDomain_t *domainObj = (ocrSchedulerObjectDomain_t*)self->scheduler->rootObj;
-    ocrSchedulerObjectFactory_t *tablFact = self->scheduler->pd->schedulerObjectFactories[domainObj->dbTable->fctId];
+    ocrSchedulerObjectFactory_t *tablFact = self->scheduler->pd->schedulerObjectFactories[domainObj->dbMap->fctId];
     for (i = 0; i < depc; i++) {
         ASSERT(depv[i].ptr == NULL);
         if (depv[i].guid != NULL_GUID) {
             it->ITERATOR_ARG_FIELD(OCR_SCHEDULER_OBJECT_MAP).key = (void*)depv[i].guid;
             it->ITERATOR_ARG_FIELD(OCR_SCHEDULER_OBJECT_MAP).value = NULL;
-            ASSERT(tablFact->fcts.iterate(tablFact, domainObj->dbTable, it, SCHEDULER_OBJECT_ITERATE_MAP_GET_NON_CONC) == 0);
+            ASSERT(tablFact->fcts.iterate(tablFact, domainObj->dbMap, it, SCHEDULER_OBJECT_ITERATE_MAP_GET_NON_CONC) == 0);
             ASSERT(it->ITERATOR_ARG_FIELD(OCR_SCHEDULER_OBJECT_MAP).value);
             ocrSchedulerObjectDbNode_t *dbNode = (ocrSchedulerObjectDbNode_t*)it->ITERATOR_ARG_FIELD(OCR_SCHEDULER_OBJECT_MAP).value; //Repurpose the data ptr to hold the DB node pointer
             depv[i].ptr = dbNode->dataPtr;

@@ -8,38 +8,38 @@
 #include "debug.h"
 
 const char * schedulerHeuristic_types[] = {
+#ifdef ENABLE_SCHEDULER_HEURISTIC_NULL
+    "NULL",
+#endif
 #ifdef ENABLE_SCHEDULER_HEURISTIC_HC
     "HC",
 #endif
-#ifdef ENABLE_SCHEDULER_HEURISTIC_PC
-    "PC",
+#ifdef ENABLE_SCHEDULER_HEURISTIC_ST
+    "ST",
 #endif
 #ifdef ENABLE_SCHEDULER_HEURISTIC_CE
     "CE",
-#endif
-#ifdef ENABLE_SCHEDULER_HEURISTIC_NULL
-    "NULL",
 #endif
     NULL
 };
 
 ocrSchedulerHeuristicFactory_t * newSchedulerHeuristicFactory(schedulerHeuristicType_t type, ocrParamList_t *perType) {
     switch(type) {
+#ifdef ENABLE_SCHEDULER_HEURISTIC_NULL
+    case schedulerHeuristicNull_id:
+        return newOcrSchedulerHeuristicFactoryNull(perType, type);
+#endif
 #ifdef ENABLE_SCHEDULER_HEURISTIC_HC
     case schedulerHeuristicHc_id:
         return newOcrSchedulerHeuristicFactoryHc(perType, type);
 #endif
-#ifdef ENABLE_SCHEDULER_HEURISTIC_PC
-    case schedulerHeuristicPc_id:
-        return newOcrSchedulerHeuristicFactoryPc(perType, type);
+#ifdef ENABLE_SCHEDULER_HEURISTIC_ST
+    case schedulerHeuristicSt_id:
+        return newOcrSchedulerHeuristicFactorySt(perType, type);
 #endif
 #ifdef ENABLE_SCHEDULER_HEURISTIC_CE
     case schedulerHeuristicCe_id:
         return newOcrSchedulerHeuristicFactoryCe(perType, type);
-#endif
-#ifdef ENABLE_SCHEDULER_HEURISTIC_NULL
-    case schedulerHeuristicNull_id:
-        return newOcrSchedulerHeuristicFactoryNull(perType, type);
 #endif
     default:
         break;

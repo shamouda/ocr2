@@ -16,6 +16,8 @@
 // BUG #793 Probably need to make this not HC-specific
 #include "scheduler/hc/scheduler-blocking-support.h"
 
+#define DEBUG_TYPE SCHEDULER
+
 /******************************************************/
 /* OCR-COMMON SCHEDULER                               */
 /******************************************************/
@@ -24,8 +26,8 @@ void commonSchedulerDestruct(ocrScheduler_t * self) {
     u64 i;
 
     // Destruct the root scheduler object
-    ocrSchedulerObjectRootFactory_t *rootFact = (ocrSchedulerObjectRootFactory_t*)self->pd->schedulerObjectFactories[self->rootObj->fctId];
-    rootFact->fcts.destruct(self->rootObj);
+    ocrSchedulerObjectFactory_t *rootFact = (ocrSchedulerObjectFactory_t*)self->pd->schedulerObjectFactories[self->rootObj->fctId];
+    rootFact->fcts.destroy(rootFact, self->rootObj);
 
     //scheduler heuristics
     u64 schedulerHeuristicCount = self->schedulerHeuristicCount;
@@ -72,7 +74,7 @@ u8 commonSchedulerSwitchRunlevel(ocrScheduler_t *self, ocrPolicyDomain_t *PD, oc
 
     if(properties & RL_BRING_UP) {
         // Take care of all other sub-objects
-        ocrSchedulerObjectRootFactory_t *rootFact = (ocrSchedulerObjectRootFactory_t*)PD->schedulerObjectFactories[self->rootObj->fctId];
+        ocrSchedulerObjectFactory_t *rootFact = (ocrSchedulerObjectFactory_t*)PD->schedulerObjectFactories[self->rootObj->fctId];
         toReturn |= rootFact->fcts.switchRunlevel(self->rootObj, PD, runlevel, phase, properties, NULL, 0);
         // Do not re-order: Scheduler object root should be brought up before heuristics
         for(i = 0; i < self->schedulerHeuristicCount; ++i) {
@@ -98,6 +100,7 @@ u8 commonSchedulerSwitchRunlevel(ocrScheduler_t *self, ocrPolicyDomain_t *PD, oc
         }
         break;
     case RL_MEMORY_OK:
+        DPRINTF(DEBUG_LVL_VVERB, "Runlevel: RL_MEMORY_OK\n");
         if((properties & RL_BRING_UP) && RL_IS_LAST_PHASE_UP(PD, RL_MEMORY_OK, phase)) {
         }
 
@@ -105,8 +108,10 @@ u8 commonSchedulerSwitchRunlevel(ocrScheduler_t *self, ocrPolicyDomain_t *PD, oc
         }
         break;
     case RL_GUID_OK:
+        DPRINTF(DEBUG_LVL_VVERB, "Runlevel: RL_GUID_OK\n");
         break;
     case RL_COMPUTE_OK:
+        DPRINTF(DEBUG_LVL_VVERB, "Runlevel: RL_COMPUTE_OK\n");
         if(properties & RL_BRING_UP) {
             if(RL_IS_FIRST_PHASE_UP(PD, RL_COMPUTE_OK, phase)) {
                 // We get a GUID for ourself
@@ -138,7 +143,7 @@ u8 commonSchedulerSwitchRunlevel(ocrScheduler_t *self, ocrPolicyDomain_t *PD, oc
 
     if(properties & RL_TEAR_DOWN) {
         // Take care of all other sub-objects
-        ocrSchedulerObjectRootFactory_t *rootFact = (ocrSchedulerObjectRootFactory_t*)PD->schedulerObjectFactories[self->rootObj->fctId];
+        ocrSchedulerObjectFactory_t *rootFact = (ocrSchedulerObjectFactory_t*)PD->schedulerObjectFactories[self->rootObj->fctId];
         toReturn |= rootFact->fcts.switchRunlevel(self->rootObj, PD, runlevel, phase, properties, NULL, 0);
 
         for(i = 0; i < self->schedulerHeuristicCount; ++i) {

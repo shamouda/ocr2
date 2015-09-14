@@ -11,12 +11,6 @@ const char * schedulerObject_types[] = {
 #ifdef ENABLE_SCHEDULER_OBJECT_NULL
     "NULL",
 #endif
-#ifdef ENABLE_SCHEDULER_OBJECT_DOMAIN
-    "DOMAIN",
-#endif
-#ifdef ENABLE_SCHEDULER_OBJECT_DBNODE
-    "DBNODE",
-#endif
 #ifdef ENABLE_SCHEDULER_OBJECT_WST
     "WST",
 #endif
@@ -29,6 +23,15 @@ const char * schedulerObject_types[] = {
 #ifdef ENABLE_SCHEDULER_OBJECT_MAP
     "MAP",
 #endif
+#ifdef ENABLE_SCHEDULER_OBJECT_PDSPACE
+    "PDSPACE",
+#endif
+#ifdef ENABLE_SCHEDULER_OBJECT_DBSPACE
+    "DBSPACE",
+#endif
+#ifdef ENABLE_SCHEDULER_OBJECT_DBTIME
+    "DBTIME",
+#endif
     NULL
 };
 
@@ -37,14 +40,6 @@ ocrSchedulerObjectFactory_t * newSchedulerObjectFactory(schedulerObjectType_t ty
 #ifdef ENABLE_SCHEDULER_OBJECT_NULL
     case schedulerObjectNull_id:
         return newOcrSchedulerObjectFactoryNull(perType, (u32)type);
-#endif
-#ifdef ENABLE_SCHEDULER_OBJECT_DOMAIN
-    case schedulerObjectDomain_id:
-        return newOcrSchedulerObjectFactoryDomain(perType, (u32)type);
-#endif
-#ifdef ENABLE_SCHEDULER_OBJECT_DBNODE
-    case schedulerObjectDbNode_id:
-        return newOcrSchedulerObjectFactoryDbNode(perType, (u32)type);
 #endif
 #ifdef ENABLE_SCHEDULER_OBJECT_WST
     case schedulerObjectWst_id:
@@ -61,6 +56,18 @@ ocrSchedulerObjectFactory_t * newSchedulerObjectFactory(schedulerObjectType_t ty
 #ifdef ENABLE_SCHEDULER_OBJECT_MAP
     case schedulerObjectMap_id:
         return newOcrSchedulerObjectFactoryMap(perType, (u32)type);
+#endif
+#ifdef ENABLE_SCHEDULER_OBJECT_PDSPACE
+    case schedulerObjectPdspace_id:
+        return newOcrSchedulerObjectFactoryPdspace(perType, (u32)type);
+#endif
+#ifdef ENABLE_SCHEDULER_OBJECT_DBSPACE
+    case schedulerObjectDbspace_id:
+        return newOcrSchedulerObjectFactoryDbspace(perType, (u32)type);
+#endif
+#ifdef ENABLE_SCHEDULER_OBJECT_DBTIME
+    case schedulerObjectDbtime_id:
+        return newOcrSchedulerObjectFactoryDbtime(perType, (u32)type);
 #endif
     default:
         ASSERT(0);
