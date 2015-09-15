@@ -48,6 +48,9 @@ ocrGuid_t processRequestEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[
     // Hence there's a race between this code and the code posting the response.
     bool processResponse = !!(msg->type & PD_MSG_RESPONSE); // mainly for debug
     bool syncProcess = !((msg->type & PD_MSG_TYPE_ONLY) == PD_MSG_DB_ACQUIRE);
+    // Here we need to read because on EPEND, by the time we get to check 'res'
+    // the callback my have completed and deallocated the message.
+    u32 msgTypeOnly = (msg->type & PD_MSG_TYPE_ONLY);
 
     // All one-way request can be freed after processing
     bool toBeFreed = !(msg->type & PD_MSG_REQ_RESPONSE);
@@ -56,12 +59,14 @@ ocrGuid_t processRequestEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[
     DPRINTF(DEBUG_LVL_VVERB,"hc-comm-worker: [done] Process incoming EDT @ %p request of type 0x%x\n", msg, msg->type);
     //BUG #587 probably want a return code that tells if the message can be discarded or not
     if (res == OCR_EPEND) {
-        if ((msg->type & PD_MSG_TYPE_ONLY) == PD_MSG_DB_ACQUIRE) {
+        if (msgTypeOnly == PD_MSG_DB_ACQUIRE) {
             // Acquire requests are consumed and can be discarded.
             pd->fcts.pdFree(pd, msg);
         } else {
-            ASSERT((msg->type & PD_MSG_TYPE_ONLY) == PD_MSG_WORK_CREATE);
+            ASSERT(msgTypeOnly == PD_MSG_WORK_CREATE);
             // Do not deallocate: Message has been enqueued for further processing.
+            // Actually, message may have been deallocated in the meanwhile because
+            // the callback has been invoked.
         }
     } else {
         if (toBeFreed) {

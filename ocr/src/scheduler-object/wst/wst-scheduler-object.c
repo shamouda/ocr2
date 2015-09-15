@@ -23,9 +23,11 @@
 static void wstSchedulerObjectInit(ocrSchedulerObject_t *self, ocrPolicyDomain_t *PD, u32 numDeques) {
     u32 i;
     ASSERT(numDeques > 0);
+    ocrPolicyDomain_t *pd = NULL;
+    getCurrentEnv(&pd, NULL, NULL, NULL);
     ocrSchedulerObjectWst_t *wstSchedObj = (ocrSchedulerObjectWst_t*)self;
     wstSchedObj->numDeques = numDeques;
-    wstSchedObj->deques = (ocrSchedulerObject_t**)PD->fcts.pdMalloc(PD, numDeques * sizeof(ocrSchedulerObject_t*));
+    wstSchedObj->deques = (ocrSchedulerObject_t**)pd->fcts.pdMalloc(pd, numDeques * sizeof(ocrSchedulerObject_t*));
 #ifdef ENABLE_SCHEDULER_OBJECT_DEQ
     //Instantiate the deque schedulerObjects
     paramListSchedulerObjectDeq_t params;
@@ -49,14 +51,17 @@ static void wstSchedulerObjectFinish(ocrSchedulerObject_t *self, ocrPolicyDomain
         ocrSchedulerObjectFactory_t *dequeFactory = PD->schedulerObjectFactories[deque->fctId];
         dequeFactory->fcts.destroy(dequeFactory, wstSchedObj->deques[i]);
     }
-    PD->fcts.pdFree(PD, wstSchedObj->deques);
+    ocrPolicyDomain_t *pd = NULL;
+    getCurrentEnv(&pd, NULL, NULL, NULL);
+    pd->fcts.pdFree(pd, wstSchedObj->deques);
 }
 
 ocrSchedulerObject_t* wstSchedulerObjectCreate(ocrSchedulerObjectFactory_t *fact, ocrParamList_t *params) {
     paramListSchedulerObject_t *paramSchedObj = (paramListSchedulerObject_t*)params;
     ASSERT(SCHEDULER_OBJECT_KIND(paramSchedObj->kind) == OCR_SCHEDULER_OBJECT_WST);
     ASSERT(!paramSchedObj->guidRequired);
-    ocrPolicyDomain_t *pd = fact->pd;
+    ocrPolicyDomain_t *pd = NULL;
+    getCurrentEnv(&pd, NULL, NULL, NULL);
     ocrSchedulerObject_t* schedObj = (ocrSchedulerObject_t*)pd->fcts.pdMalloc(pd, sizeof(ocrSchedulerObjectWst_t));
     schedObj->guid.guid = NULL_GUID;
     schedObj->guid.metaDataPtr = NULL;
@@ -71,7 +76,8 @@ ocrSchedulerObject_t* wstSchedulerObjectCreate(ocrSchedulerObjectFactory_t *fact
 
 u8 wstSchedulerObjectDestroy(ocrSchedulerObjectFactory_t *fact, ocrSchedulerObject_t *self) {
     ASSERT(SCHEDULER_OBJECT_KIND(self->kind) == OCR_SCHEDULER_OBJECT_WST);
-    ocrPolicyDomain_t *pd = fact->pd;
+    ocrPolicyDomain_t *pd = NULL;
+    getCurrentEnv(&pd, NULL, NULL, NULL);
     wstSchedulerObjectFinish(self, pd);
     pd->fcts.pdFree(pd, self);
     return 0;

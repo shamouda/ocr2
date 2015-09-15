@@ -82,8 +82,8 @@ job_ocr_build_x86_pthread_mpi = {
     'jobtype': 'ocr-build',
     'run-args': 'x86-mpi',
     'sandbox': ('inherit0',),
-    'env-vars': {'MPI_ROOT': '/opt/intel/tools/impi/5.0.1.035',
-                 'PATH': '${MPI_ROOT}/bin64:'+os.environ['PATH'],}
+    'env-vars': {'MPI_ROOT': '/opt/intel/tools/impi/5.1.1.109/intel64',
+                 'PATH': '${MPI_ROOT}/bin:'+os.environ['PATH'],}
 }
 
 job_ocr_build_x86_pthread_gasnet = {

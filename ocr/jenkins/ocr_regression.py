@@ -56,8 +56,8 @@ job_ocr_regression_x86_pthread_mpi_lockableDB = {
     'jobtype': 'ocr-regression',
     'run-args': 'x86-mpi jenkins-hc-dist-mpi-clone-8w-lockableDB.cfg lockableDB',
     'sandbox': ('inherit0',),
-    'env-vars': {'MPI_ROOT': '/opt/intel/tools/impi/5.0.1.035',
-                 'PATH': '${MPI_ROOT}/bin64:'+os.environ['PATH'],
+    'env-vars': {'MPI_ROOT': '/opt/intel/tools/impi/5.1.1.109/intel64',
+                 'PATH': '${MPI_ROOT}/bin:'+os.environ['PATH'],
                  'LD_LIBRARY_PATH': '${MPI_ROOT}/lib64',}
 }
 
@@ -68,9 +68,9 @@ job_ocr_regression_x86_pthread_gasnet_lockableDB = {
     'jobtype': 'ocr-regression',
     'run-args': 'x86-gasnet jenkins-hc-dist-gasnet-clone-8w-lockableDB.cfg lockableDB',
     'sandbox': ('inherit0',),
-    'env-vars': {'MPI_ROOT': '/opt/intel/tools/impi/5.0.1.035',
+    'env-vars': {'MPI_ROOT': '/opt/intel/tools/impi/5.1.1.109/intel64',
                  'GASNET_ROOT': '/opt/rice/GASNet/1.24.0-impi',
-                 'PATH': '${GASNET_ROOT}/bin:${MPI_ROOT}/bin64:'+os.environ['PATH'],
+                 'PATH': '${GASNET_ROOT}/bin:${MPI_ROOT}/bin:'+os.environ['PATH'],
                  'GASNET_CONDUIT': 'ibv',
                  'GASNET_TYPE': 'par',
                  'GASNET_EXTRA_LIBS': '-L/usr/lib64 -lrt -libverbs',

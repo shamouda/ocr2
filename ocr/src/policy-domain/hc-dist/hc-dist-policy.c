@@ -194,7 +194,6 @@ static u8 resolveRemoteMetaData(ocrPolicyDomain_t * pd, ocrFatGuid_t * tplFatGui
             void * ret = hashtableNonConcTryPut(dself->proxyTplMap, (void *) tplFatGuid->guid, (void *) proxyTpl);
             ASSERT(ret == proxyTpl);
             hal_unlock32(&dself->lockTplLookup);
-
             // GUID is unknown, request a copy of the metadata
             PD_MSG_STACK(msgClone);
             getCurrentEnv(NULL, NULL, NULL, &msgClone);
@@ -255,6 +254,8 @@ static u8 resolveRemoteMetaData(ocrPolicyDomain_t * pd, ocrFatGuid_t * tplFatGui
                 ASSERT(val != 0);
                 tplFatGuid->metaDataPtr = (void *) val;
             }
+            // Warning: At this point we cannot access the msg pointer anymore.
+            // This code becomes concurrent with the callback being invoked, possibly destroying 'msg'.
         }
         // Compete to check out of the proxy
         hal_lock32(&dself->lockTplLookup);
@@ -541,11 +542,14 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_WORK_CREATE
         // First query the guid provider to determine if we know the edtTemplate.
+#ifdef OCR_ASSERT
+        ocrLocation_t srcLocation = msg->srcLocation;
+#endif
         u8 res = resolveRemoteMetaData(self, &PD_MSG_FIELD_I(templateGuid), msg);
         if (res == OCR_EPEND) {
-            // We do not handle pending if it an edt spawned locally because
-            // the edt creation is likely invoked from another local EDT.
-            ASSERT(msg->srcLocation != curLoc);
+            // We do not handle pending if it is an edt spawned locally as there's
+            // context on the call stack we can't just return from.
+            ASSERT(srcLocation != curLoc);
             // template's metadata not available, message processing will be rescheduled.
             PROCESS_MESSAGE_RETURN_NOW(self, OCR_EPEND);
         }
