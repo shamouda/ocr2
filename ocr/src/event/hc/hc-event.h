@@ -22,36 +22,41 @@
 #define OCR_HINT_COUNT_EVT_HC   0
 #endif
 
+// Size for the static waiter array
+#ifndef HCEVT_WAITER_STATIC_COUNT
+#define HCEVT_WAITER_STATIC_COUNT 4
+#endif
+
+// Size for the dynamically allocated waiter array
+#ifndef HCEVT_WAITER_DYNAMIC_COUNT
+#define HCEVT_WAITER_DYNAMIC_COUNT 4
+#endif
+
 typedef struct {
     ocrEventFactory_t base;
 } ocrEventFactoryHc_t;
 
 typedef struct ocrEventHc_t {
     ocrEvent_t base;
+    regNode_t waiters[HCEVT_WAITER_STATIC_COUNT]; /**< hold waiters. If overflows a dynamically
+                                              allocated waiter list is stored in waitersDb */
     ocrFatGuid_t waitersDb; /**< DB containing an array of regNode_t listing the
                              * events/EDTs depending on this event */
-    ocrFatGuid_t signalersDb; /**< DB containing an array of regNode_t listing
-                               * the events/EDTs that will signal this event */
     u32 waitersCount; /**< Number of waiters in waitersDb */
     u32 waitersMax; /**< Maximum number of waiters in waitersDb */
-    u32 signalersCount; /**< Number of signalers in signalersDb */
-    u32 signalersMax; /**< Maximum number of signalers in signalersDb */
     volatile u32 waitersLock;
     ocrRuntimeHint_t hint;
 } ocrEventHc_t;
 
-// STICKY or IDEM events need a lock - can be improved upon
 typedef struct _ocrEventHcPersist_t {
     ocrEventHc_t base;
     ocrGuid_t data;
 } ocrEventHcPersist_t;
 
-
 typedef struct ocrEventHcLatch_t {
     ocrEventHc_t base;
     volatile s32 counter;
 } ocrEventHcLatch_t;
-
 
 ocrEventFactory_t* newEventFactoryHc(ocrParamList_t *perType, u32 factoryId);
 

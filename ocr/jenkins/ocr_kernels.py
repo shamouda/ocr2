@@ -153,7 +153,7 @@ job_ocr_run_kernel_fib_mpi = {
     'jobtype': 'ocr-run-kernel-local',
     'run-args': 'fib x86-mpi',
     'sandbox': ('inherit0',),
-    'env-vars': { 'PATH': '/opt/intel/tools/impi_latest/bin64:${PATH}',
+    'env-vars': { 'PATH': '/opt/intel/tools/impi/5.1.1.109/intel64/bin:${PATH}',
                   'APPS_LIBS_ROOT': '${JJOB_SHARED_HOME}/xstack/apps/libs/x86',
                   'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/examples/fib/install' }
 }
@@ -177,9 +177,9 @@ job_ocr_build_kernel_fib_gasnet = {
                   'WORKLOAD_SRC': '${JJOB_INITDIR_XSTACK}/ocr/examples/fib',
                   'WORKLOAD_BUILD_ROOT': '${JJOB_PRIVATE_HOME}/xstack/ocr/examples/fib/build',
                   'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/examples/fib/install',
-                  'MPI_ROOT': '/opt/intel/tools/impi/5.0.1.035',
+                  'MPI_ROOT': '/opt/intel/tools/impi/5.1.1.109/intel64',
                   'GASNET_ROOT': '/opt/rice/GASNet/1.24.0-impi',
-                  'PATH': '${GASNET_ROOT}/bin:${MPI_ROOT}/bin64:${PATH}',
+                  'PATH': '${GASNET_ROOT}/bin:${MPI_ROOT}/bin:${PATH}',
                   'GASNET_CONDUIT': 'ibv',
                   'GASNET_TYPE': 'par',
                   'GASNET_EXTRA_LIBS': '-L/usr/lib64 -lrt -libverbs',
@@ -193,11 +193,11 @@ job_ocr_run_kernel_fib_gasnet = {
     'jobtype': 'ocr-run-kernel-local',
     'run-args': 'fib x86-gasnet',
     'sandbox': ('inherit0',),
-    'env-vars': { 'PATH': '/opt/intel/tools/impi_latest/bin64:${PATH}',
+    'env-vars': { 'PATH': '/opt/intel/tools/impi/5.1.1.109/intel64/bin:${PATH}',
                   'APPS_LIBS_ROOT': '${JJOB_SHARED_HOME}/xstack/apps/libs/x86',
                   'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/examples/fib/install',
                   'GASNET_ROOT': '/opt/rice/GASNet/1.24.0-impi',
-                  'PATH': '${GASNET_ROOT}/bin:${MPI_ROOT}/bin64:${PATH}',
+                  'PATH': '${GASNET_ROOT}/bin:${MPI_ROOT}/bin:${PATH}',
                   'GASNET_CONDUIT': 'ibv'}
 }
 
@@ -326,7 +326,7 @@ job_ocr_run_kernel_fft_mpi = {
     'jobtype': 'ocr-run-kernel-local',
     'run-args': 'fft x86-mpi',
     'sandbox': ('inherit0',),
-    'env-vars': { 'PATH': '/opt/intel/tools/impi_latest/bin64:${PATH}',
+    'env-vars': { 'PATH': '/opt/intel/tools/impi/5.1.1.109/intel64/bin:${PATH}',
                   'APPS_LIBS_ROOT': '${JJOB_SHARED_HOME}/xstack/apps/libs/x86',
                   'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/examples/fft/install' }
 }
@@ -350,9 +350,9 @@ job_ocr_build_kernel_fft_gasnet = {
                   'WORKLOAD_SRC': '${JJOB_INITDIR_XSTACK}/ocr/examples/fft',
                   'WORKLOAD_BUILD_ROOT': '${JJOB_PRIVATE_HOME}/xstack/ocr/examples/fft/build',
                   'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/examples/fft/install',
-                  'MPI_ROOT': '/opt/intel/tools/impi/5.0.1.035',
+                  'MPI_ROOT': '/opt/intel/tools/impi/5.1.1.109/intel64',
                   'GASNET_ROOT': '/opt/rice/GASNet/1.24.0-impi',
-                  'PATH': '${GASNET_ROOT}/bin:${MPI_ROOT}/bin64:${PATH}',
+                  'PATH': '${GASNET_ROOT}/bin:${MPI_ROOT}/bin:${PATH}',
                   'GASNET_CONDUIT': 'ibv',
                   'GASNET_TYPE': 'par',
                   'GASNET_EXTRA_LIBS': '-L/usr/lib64 -lrt -libverbs',
@@ -366,11 +366,11 @@ job_ocr_run_kernel_fft_gasnet = {
     'jobtype': 'ocr-run-kernel-local',
     'run-args': 'fft x86-gasnet',
     'sandbox': ('inherit0',),
-    'env-vars': { 'PATH': '/opt/intel/tools/impi_latest/bin64:${PATH}',
+    'env-vars': { 'PATH': '/opt/intel/tools/impi/5.1.1.109/intel64/bin:${PATH}',
                   'APPS_LIBS_ROOT': '${JJOB_SHARED_HOME}/xstack/apps/libs/x86',
                   'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/examples/fft/install',
                   'GASNET_ROOT': '/opt/rice/GASNet/1.24.0-impi',
-                  'PATH': '${GASNET_ROOT}/bin:${MPI_ROOT}/bin64:${PATH}',
+                  'PATH': '${GASNET_ROOT}/bin:${MPI_ROOT}/bin:${PATH}',
                   'GASNET_CONDUIT': 'ibv'}
 }
 
@@ -500,7 +500,7 @@ job_ocr_run_kernel_sw_mpi = {
     'jobtype': 'ocr-run-kernel-local',
     'run-args': 'smith-waterman x86-mpi',
     'sandbox': ('inherit0',),
-    'env-vars': { 'PATH': '/opt/intel/tools/impi_latest/bin64:${PATH}',
+    'env-vars': { 'PATH': '/opt/intel/tools/impi/5.1.1.109/intel64/bin:${PATH}',
                   'APPS_LIBS_ROOT': '${JJOB_SHARED_HOME}/xstack/apps/libs/x86',
                   'WORKLOAD_ARGS': '100 100 ${JJOB_SHARED_HOME}/xstack/apps/smithwaterman/datasets/string1-medium-large.txt  ${JJOB_SHARED_HOME}/xstack/apps/smithwaterman/datasets/string2-medium-large.txt ${JJOB_SHARED_HOME}/xstack/apps/smithwaterman/datasets/score-medium-large.txt',
                   'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/examples/smith-waterman/install' }
@@ -526,9 +526,9 @@ job_ocr_build_kernel_sw_gasnet = {
                   'WORKLOAD_SRC': '${JJOB_INITDIR_XSTACK}/ocr/examples/smith-waterman',
                   'WORKLOAD_BUILD_ROOT': '${JJOB_PRIVATE_HOME}/xstack/ocr/examples/smith-waterman/build',
                   'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/examples/smith-waterman/install',
-                  'MPI_ROOT': '/opt/intel/tools/impi/5.0.1.035',
+                  'MPI_ROOT': '/opt/intel/tools/impi/5.1.1.109/intel64',
                   'GASNET_ROOT': '/opt/rice/GASNet/1.24.0-impi',
-                  'PATH': '${GASNET_ROOT}/bin:${MPI_ROOT}/bin64:${PATH}',
+                  'PATH': '${GASNET_ROOT}/bin:${MPI_ROOT}/bin:${PATH}',
                   'GASNET_CONDUIT': 'ibv',
                   'GASNET_TYPE': 'par',
                   'GASNET_EXTRA_LIBS': '-L/usr/lib64 -lrt -libverbs',
@@ -542,12 +542,12 @@ job_ocr_run_kernel_sw_gasnet = {
     'jobtype': 'ocr-run-kernel-local',
     'run-args': 'smith-waterman x86-gasnet',
     'sandbox': ('inherit0',),
-    'env-vars': { 'PATH': '/opt/intel/tools/impi_latest/bin64:${PATH}',
+    'env-vars': { 'PATH': '/opt/intel/tools/impi/5.1.1.109/intel64/bin:${PATH}',
                   'APPS_LIBS_ROOT': '${JJOB_SHARED_HOME}/xstack/apps/libs/x86',
                   'WORKLOAD_ARGS': '100 100 ${JJOB_SHARED_HOME}/xstack/apps/smithwaterman/datasets/string1-medium-large.txt  ${JJOB_SHARED_HOME}/xstack/apps/smithwaterman/datasets/string2-medium-large.txt ${JJOB_SHARED_HOME}/xstack/apps/smithwaterman/datasets/score-medium-large.txt',
                   'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/examples/smith-waterman/install',
                   'GASNET_ROOT': '/opt/rice/GASNet/1.24.0-impi',
-                  'PATH': '${GASNET_ROOT}/bin:${MPI_ROOT}/bin64:${PATH}',
+                  'PATH': '${GASNET_ROOT}/bin:${MPI_ROOT}/bin:${PATH}',
                   'GASNET_CONDUIT': 'ibv'}
 }
 
@@ -677,7 +677,7 @@ job_ocr_run_kernel_cholesky_mpi = {
     'jobtype': 'ocr-run-kernel-local',
     'run-args': 'cholesky x86-mpi',
     'sandbox': ('inherit0',),
-    'env-vars': { 'PATH': '/opt/intel/tools/impi_latest/bin64:${PATH}',
+    'env-vars': { 'PATH': '/opt/intel/tools/impi/5.1.1.109/intel64/bin:${PATH}',
                   'APPS_LIBS_ROOT': '${JJOB_SHARED_HOME}/xstack/apps/libs/x86',
                   'WORKLOAD_ARGS': '--ds 1000 --ts 50 --fi ${JJOB_SHARED_HOME}/xstack/apps/cholesky/datasets/m_1000.in',
                   'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/examples/cholesky/install' }
@@ -702,9 +702,9 @@ job_ocr_build_kernel_cholesky_gasnet = {
                   'WORKLOAD_SRC': '${JJOB_INITDIR_XSTACK}/ocr/examples/cholesky',
                   'WORKLOAD_BUILD_ROOT': '${JJOB_PRIVATE_HOME}/xstack/ocr/examples/cholesky/build',
                   'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/examples/cholesky/install',
-                  'MPI_ROOT': '/opt/intel/tools/impi/5.0.1.035',
+                  'MPI_ROOT': '/opt/intel/tools/impi/5.1.1.109/intel64',
                   'GASNET_ROOT': '/opt/rice/GASNet/1.24.0-impi',
-                  'PATH': '${GASNET_ROOT}/bin:${MPI_ROOT}/bin64:${PATH}',
+                  'PATH': '${GASNET_ROOT}/bin:${MPI_ROOT}/bin:${PATH}',
                   'GASNET_CONDUIT': 'ibv',
                   'GASNET_TYPE': 'par',
                   'GASNET_EXTRA_LIBS': '-L/usr/lib64 -lrt -libverbs',
@@ -718,12 +718,12 @@ job_ocr_run_kernel_cholesky_gasnet = {
     'jobtype': 'ocr-run-kernel-local',
     'run-args': 'cholesky x86-gasnet',
     'sandbox': ('inherit0',),
-    'env-vars': { 'PATH': '/opt/intel/tools/impi_latest/bin64:${PATH}',
+    'env-vars': { 'PATH': '/opt/intel/tools/impi/5.1.1.109/intel64/bin:${PATH}',
                   'APPS_LIBS_ROOT': '${JJOB_SHARED_HOME}/xstack/apps/libs/x86',
                   'WORKLOAD_ARGS': '--ds 1000 --ts 50 --fi ${JJOB_SHARED_HOME}/xstack/apps/cholesky/datasets/m_1000.in',
                   'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/examples/cholesky/install',
                   'GASNET_ROOT': '/opt/rice/GASNet/1.24.0-impi',
-                  'PATH': '${GASNET_ROOT}/bin:${MPI_ROOT}/bin64:${PATH}',
+                  'PATH': '${GASNET_ROOT}/bin:${MPI_ROOT}/bin:${PATH}',
                   'GASNET_CONDUIT': 'ibv'}
 }
 
