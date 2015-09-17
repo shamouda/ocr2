@@ -123,8 +123,11 @@
 //
 //
 // Initialization:
-// In quickInit, it acquires pool->lock and whoever acquires this lock first finds 'inited' zero and perform
-// initializations. Others acquire this lock, but find 'inited' nonzero and skip initialization part.
+// In quickInit, it acquires pool->lock and whoever acquires this lock first finds 'init_count' zero and perform
+// initializations. Others acquire this lock, but find 'init_count' nonzero and skip initialization part.
+// init_count is increased in either case. So, init_count will reach the number of users for that memory.
+// For shutdown, in quickFinish, similarly, init_count is decreased and the last one who decreases it to zero
+// performs shutdown and print out leak report.
 
 #include "ocr-config.h"
 #ifdef ENABLE_ALLOCATOR_QUICK
@@ -214,19 +217,27 @@ typedef void blkPayload_t; // Strongly type-check the ptr-to-void that comprises
 // known value is placed at the end of heap as a guard
 #define KNOWN_VALUE_AS_GUARD    0xfeed0000deadbeef
 
-#if defined(HAL_FSIM_CE) || defined(HAL_FSIM_XE)
-#define PER_THREAD_CACHE
+#define PER_AGENT_CACHE
+
+#ifdef ENABLE_ALLOCATOR_QUICK_STANDALONE
+// standalone mode
+#define PER_AGENT_KEYWORD      __thread
+#define CACHE_POOL(ID)          (&_cache_pool)
+#define _CACHE_POOL(ID)         (_cache_pool)
+#elif defined(HAL_FSIM_CE) || defined(HAL_FSIM_XE)
 // TG
-#define CACHE_POOL(ID)          (cache_pool)
+#define PER_AGENT_KEYWORD
+#define CACHE_POOL(ID)          (&_cache_pool)
 #define _CACHE_POOL(ID)         (_cache_pool)
 #else
 // x86
+#define PER_AGENT_KEYWORD
 #define MAX_THREAD              16
-#define CACHE_POOL(ID)          (cache_pool[ID])
-#define _CACHE_POOL(ID)         (_cache_pool[ID])
+#define CACHE_POOL(ID)          (&_cache_pool)
+#define _CACHE_POOL(ID)         (_cache_pool)
 #endif
 
-#ifdef PER_THREAD_CACHE
+#ifdef PER_AGENT_CACHE
 #define SLAB_MARK               ( 0xfeed )        // arbitrary number
 #define SLAB_SHIFT              ( 4UL )           // differences between bins
 #define SLAB_MASK               (( 1UL << SLAB_SHIFT ) - 1UL )
@@ -237,22 +248,23 @@ typedef void blkPayload_t; // Strongly type-check the ptr-to-void that comprises
 #define MAX_SIZE_FOR_SLABS      SLAB_MAX_SIZE(MAX_SLABS-1)
 #define MAX_OBJ_PER_SLAB        ( 63 )
 
-// Each thread has pointers to an array of objects it allocates from the central heap.
-// When the allocation requests come, it first checks this per-thread lists for free object before it goes to the central heap.
-struct per_thread_cache {
+// Each agent (or thread) has pointers to an array of objects it allocates from the central heap.
+// When the allocation requests come, it first checks this per-agent lists for free object before it goes to the central heap.
+PER_AGENT_KEYWORD
+struct per_agent_cache {
     void *slabs[MAX_SLABS];
+    s32 count_malloc[MAX_SLABS];
+    s32 count_free[MAX_SLABS];
     u32 lock;
 } _CACHE_POOL(MAX_THREAD);
 
 struct slab_header {
     struct slab_header *next, *prev;
-    struct per_thread_cache *per_thread;
+    struct per_agent_cache *per_agent;
     u64 bitmap;
     u32 mark;
     u32 size;
 };
-
-struct per_thread_cache *CACHE_POOL(MAX_THREAD);
 #endif
 
 
@@ -366,7 +378,7 @@ typedef struct {
     u64 *glebeStart;
     u64 *glebeEnd;
     u32 lock;
-    u32 inited;
+    u32 init_count;
     // counters
     u32 count_used;     // count bytes allocated.
     u32 count_malloc;   // count successful malloc calls.
@@ -421,19 +433,38 @@ static u64 quickInitAnnex(poolHdr_t * pPool, u64 size) {
     }
     pPool->flCount = flBucketCount;
     poolHeaderSize = (poolHeaderSize + ALIGNMENT_MASK)&(~ALIGNMENT_MASK);   // ceiling
-    DPRINTF(DEBUG_LVL_INFO,"Allocating a pool at [0x%lx,0x%lx) of %ld(0x%lx) bytes. flCount %d, sizeof(poolHdr_t)=0x%x (glebe: offset 0x%lx, and size is %ld(0x%lx), i.e. net size after pool overhead)\n",
+    DPRINTF(DEBUG_LVL_VERB,"Allocating a pool at [0x%lx,0x%lx) of %ld(0x%lx) bytes. flCount %d, sizeof(poolHdr_t)=0x%x (glebe: offset 0x%lx, and size is %ld(0x%lx), i.e. net size after pool overhead)\n",
         (u64)pPool, (u64)pPool+size, size, size, flBucketCount, sizeof(poolHdr_t), (u64) poolHeaderSize, (u64)sizeRemainingAfterPoolHeader, (u64)sizeRemainingAfterPoolHeader);
     pPool->flAvailOrNot = 0; // Initialize the bitmaps to 0
 
     return poolHeaderSize;
 }
 
-/*
+static void quickPrintCache(void)
+{
+#ifdef PER_AGENT_CACHE
+    s32 i;
+    DPRINTF(DEBUG_LVL_INFO, "==== MEMORY LEAK REPORT (cache %p) ====\n", CACHE_POOL(myid));
+    hal_lock32(&CACHE_POOL(myid)->lock);
+    for(i=0;i<MAX_SLABS;i++) {
+        s32 m = CACHE_POOL(myid)->count_malloc[i];
+        s32 f = CACHE_POOL(myid)->count_free[i];
+        if (m || f)
+            DPRINTF(DEBUG_LVL_INFO, "(%d~%d] : malloc %d free %d\n", SLAB_MAX_SIZE(i-1), SLAB_MAX_SIZE(i), m, f);
+    }
+    hal_unlock32(&CACHE_POOL(myid)->lock);
+    DPRINTF(DEBUG_LVL_INFO, "====== END OF REPORT (cache %p) =======\n", CACHE_POOL(myid));
+#endif
+}
+
 static void quickPrintCounters(poolHdr_t *pool)
 {
-    DPRINTF(DEBUG_LVL_WARN, "%d bytes in use, malloc %d times, free %d times\n", pool->count_used, pool->count_malloc, pool->count_free);
+    if (pool->count_used) {
+        DPRINTF(DEBUG_LVL_INFO, "**** MEMORY LEAK REPORT (pool %p) ****\n", pool);
+        DPRINTF(DEBUG_LVL_INFO, "%d bytes still in use, malloc %d times, free %d times\n", pool->count_used, pool->count_malloc, pool->count_free);
+        DPRINTF(DEBUG_LVL_INFO, "****** END OF REPORT (pool %p) *******\n", pool);
+    }
 }
-*/
 
 /* Two-level function to determine indices. This is pretty much
  * taken straight from the specs
@@ -568,7 +599,7 @@ static void quickTest(u64 start, u64 size)
     // boundary check code for sanity check.
     // This helps early detection of malformed addresses.
     do {
-        DPRINTF(DEBUG_LVL_INFO, "quickTest : pool range [%p - %p)\n", start, start+size);
+        DPRINTF(DEBUG_LVL_VERB, "quickTest : pool range [%p - %p)\n", start, start+size);
 
         u8 *p = (u8 *)((start + size - 128)&(~0x7UL));      // at least 128 bytes
         u8 *q = (u8 *)(start + size);
@@ -583,7 +614,32 @@ static void quickTest(u64 start, u64 size)
             p++; size--;
         }
     } while(0);
-    DPRINTF(DEBUG_LVL_INFO, "quickTest : simple boundary test passed\n");
+    DPRINTF(DEBUG_LVL_VERB, "quickTest : simple boundary test passed\n");
+}
+
+static void quickFinish(poolHdr_t *pool, u64 size)
+{
+    u8 *p = (u8 *)pool;
+    ASSERT((sizeof(poolHdr_t) & ALIGNMENT_MASK) == 0);
+    ASSERT((size & ALIGNMENT_MASK) == 0);
+
+    DPRINTF(DEBUG_LVL_VERB, "quickFinish called. size 0x%lx at %p\n", size, p);
+
+    // spinlock value must be 0 or 1. If not, it means it's not properly zero'ed before, or corrupted.
+    ASSERT(pool->lock == 0 || pool->lock == 1);
+
+#ifdef PER_AGENT_CACHE
+    quickPrintCache();
+#endif
+
+    hal_lock32(&(pool->lock));
+    pool->init_count--;
+    if (!(pool->init_count)) {
+        quickPrintCounters(pool);
+    } else {
+        DPRINTF(DEBUG_LVL_INFO, "shutdown skip for pool %p\n", pool);
+    }
+    hal_unlock32(&(pool->lock));
 }
 
 static void quickInit(poolHdr_t *pool, u64 size)
@@ -592,23 +648,26 @@ static void quickInit(poolHdr_t *pool, u64 size)
     ASSERT((sizeof(poolHdr_t) & ALIGNMENT_MASK) == 0);
     ASSERT((size & ALIGNMENT_MASK) == 0);
 
-#ifdef PER_THREAD_CACHE
-        ASSERT((sizeof(struct slab_header) & ALIGNMENT_MASK) == 0);
-#if defined(HAL_FSIM_CE) || defined(HAL_FSIM_XE)
-        cache_pool = &_cache_pool;
+#ifdef PER_AGENT_CACHE
+    ASSERT((sizeof(struct slab_header) & ALIGNMENT_MASK) == 0);
+#ifdef ENABLE_ALLOCATOR_QUICK_STANDALONE
+#elif defined(HAL_FSIM_CE) || defined(HAL_FSIM_XE)
 #else
-        for(i=0;i<MAX_THREAD;i++) {
-            cache_pool[i] = &_cache_pool[i];
-        }
+/*
+    // x86
+    for(i=0;i<MAX_THREAD;i++) {
+        cache_pool[i] = &_cache_pool[i];
+    }
+*/
 #endif
 #endif
 
     // spinlock value must be 0 or 1. If not, it means it's not properly zero'ed before, or corrupted.
     ASSERT(pool->lock == 0 || pool->lock == 1);
 
-    // pool->lock and pool->inited is already 0 at startup (on x86, it's done at mallocBegin())
+    // pool->lock and pool->init_count is already 0 at startup (on x86, it's done at mallocBegin())
     hal_lock32(&(pool->lock));
-    if (!(pool->inited)) {
+    if (!(pool->init_count)) {
         quickTest((u64)pool, size);
         // reserve 8 bytes for a guard
         size -= sizeof(u64);
@@ -654,7 +713,7 @@ static void quickInit(poolHdr_t *pool, u64 size)
         // Add the glebe, i.e. the big free block
         setFreeList(pool, size, q);
         DPRINTF(DEBUG_LVL_INFO, "init'ed pool %p, avail %ld bytes , sizeof(poolHdr_t) = %ld\n", pool, size, sizeof(poolHdr_t));
-        pool->inited = 1;
+        pool->init_count++;
 #ifdef ENABLE_VALGRIND
         VALGRIND_CREATE_MEMPOOL(p, 0, 1);  // BUG #600: Mempool needs to be destroyed
         VALGRIND_MAKE_MEM_NOACCESS(p, size+sizeof(poolHdr_t));
@@ -943,7 +1002,7 @@ static void quickFreeInternal(blkPayload_t *p)
     }
     quickInsertFree(pool, &HEAD(q), size);
 
-    pool->count_used -= size_orig;  // count bytes using user-provided size
+    pool->count_used -= size_orig;  // count bytes using internal block size
     pool->count_free++;             // count successful deallocation calls
 
 //    DPRINTF(DEBUG_LVL_WARN, "QuickAlloc : free: called\n");
@@ -960,17 +1019,17 @@ static void quickFreeInternal(blkPayload_t *p)
 }
 
 
-#ifdef PER_THREAD_CACHE
-static struct slab_header *quickNewSlab(poolHdr_t *pool,s32 slabMaxSize, struct _ocrPolicyDomain_t *pd, struct per_thread_cache *per_thread)
+#ifdef PER_AGENT_CACHE
+static struct slab_header *quickNewSlab(poolHdr_t *pool,s32 slabMaxSize, struct _ocrPolicyDomain_t *pd, struct per_agent_cache *per_agent)
 {
         // goes to the central heap to allocate slab
         void *slab = quickMallocInternal(pool, sizeof(struct slab_header)+(SLAB_OVERHEAD+slabMaxSize)*MAX_OBJ_PER_SLAB, pd );
         if (slab == NULL) {
-            DPRINTF(DEBUG_LVL_VERB, "Slab alloc failed (slabMaxSize %d)\n", slabMaxSize);
+            DPRINTF(DEBUG_LVL_VERB, "Slab alloc failed (slabMaxSize %d), falling back to central heap\n", slabMaxSize);
             return NULL;
         }
         struct slab_header *head = slab;
-        head->per_thread = addrGlobalizeOnTG((void *)per_thread, pd);
+        head->per_agent = addrGlobalizeOnTG((void *)per_agent, pd);
         head->next = head->prev = head;
         head->bitmap = (1UL << MAX_OBJ_PER_SLAB)-1UL;
         head->mark = SLAB_MARK;
@@ -982,6 +1041,8 @@ static blkPayload_t *quickMalloc(poolHdr_t *pool,u64 size, struct _ocrPolicyDoma
 {
     if (size > MAX_SIZE_FOR_SLABS) // for big objects, go to the central heap
         return quickMallocInternal(pool, size, pd);
+    // s64 myid = (s64)pd;
+    // ASSERT(myid >=0 && myid < MAX_THREAD);
     s32 slabsIndex = SIZE_TO_SLABS(size);
     s32 slabMaxSize = SLAB_MAX_SIZE(slabsIndex);
     hal_lock32(&CACHE_POOL(myid)->lock);
@@ -990,7 +1051,11 @@ static blkPayload_t *quickMalloc(poolHdr_t *pool,u64 size, struct _ocrPolicyDoma
         struct slab_header *slab = quickNewSlab(pool, slabMaxSize, pd, CACHE_POOL(myid));
         if (slab == NULL) {
             hal_unlock32(&CACHE_POOL(myid)->lock);
-            return quickMallocInternal(pool, size, pd);
+            blkPayload_t *ret = quickMallocInternal(pool, size, pd);
+            if (ret == NULL) {
+                DPRINTF(DEBUG_LVL_VERB, "Even fallback didn't work -- too small heap?\n");
+            }
+            return ret;
         }
         if (slabs) {  // list manupulation
             slab->next = slabs;
@@ -1020,6 +1085,7 @@ static blkPayload_t *quickMalloc(poolHdr_t *pool,u64 size, struct _ocrPolicyDoma
     if (slabs->bitmap == 0) {  // if slab is full, point to next (partially-full) slab
         CACHE_POOL(myid)->slabs[slabsIndex] = slabs->next;     // next slab
     }
+    CACHE_POOL(myid)->count_malloc[slabsIndex]++;
     hal_unlock32(&CACHE_POOL(myid)->lock);
     return ret;
 }
@@ -1045,25 +1111,27 @@ static void quickFree(blkPayload_t *p)
     //printf("offset %ld , size %d \n", offset, head->size+SLAB_OVERHEAD);
     ASSERT((offset % (head->size+SLAB_OVERHEAD)) == 0);
 
-    // local if (addrGlobalizeOnTG(CACHE_POOL(X)) == head->per_thread)
+    // local if (addrGlobalizeOnTG(CACHE_POOL(X)) == head->per_agent)
     s32 slabsIndex = SIZE_TO_SLABS(head->size);
-    hal_lock32(&head->per_thread->lock);
-    struct slab_header *slabs = head->per_thread->slabs[slabsIndex];
+    hal_lock32(&head->per_agent->lock);
+    struct slab_header *slabs = head->per_agent->slabs[slabsIndex];
 
 //    __sync_fetch_and_xor(&head->bitmap , 1UL << pos);
     head->bitmap ^= 1UL << pos;
     ASSERT_BLOCK_BEGIN((head->bitmap & (1UL << pos)) != 0)
     ASSERT_BLOCK_END
 
+    (head->per_agent->count_free[slabsIndex])++;
+
     if (slabs == head ) {  // so we will have at least one slab always
-        hal_unlock32(&head->per_thread->lock);
+        hal_unlock32(&head->per_agent->lock);
         return;
     }
 
     if (head->bitmap == ((1UL << MAX_OBJ_PER_SLAB)-1UL) /* empty slab? */) {
         head->next->prev = head->prev;
         head->prev->next = head->next;
-        hal_unlock32(&head->per_thread->lock);
+        hal_unlock32(&head->per_agent->lock);
         quickFreeInternal(head);
         return;
     }
@@ -1078,9 +1146,9 @@ static void quickFree(blkPayload_t *p)
         slabs->prev->next = head;
         slabs->prev = head;
 
-        head->per_thread->slabs[slabsIndex] = head;
+        head->per_agent->slabs[slabsIndex] = head;
     }
-    hal_unlock32(&head->per_thread->lock);
+    hal_unlock32(&head->per_agent->lock);
 }
 #else
 static inline blkPayload_t *quickMalloc(poolHdr_t *pool,u64 size, struct _ocrPolicyDomain_t *pd)
@@ -1096,7 +1164,7 @@ static inline void quickFree(blkPayload_t *p)
 
 #ifndef ENABLE_ALLOCATOR_QUICK_STANDALONE
 void quickDestruct(ocrAllocator_t *self) {
-    DPRINTF(DEBUG_LVL_VERB, "Entered quickDesctruct (This is x86 only?) on allocator 0x%lx\n", (u64) self);
+    DPRINTF(DEBUG_LVL_VERB, "Entered quickDestruct on allocator 0x%lx\n", (u64) self);
     ASSERT(self->memoryCount == 1);
     self->memories[0]->fcts.destruct(self->memories[0]);
     /*
@@ -1108,7 +1176,7 @@ void quickDestruct(ocrAllocator_t *self) {
     //DPRINTF(DEBUG_LVL_WARN, "quickDestruct free %p\n", (u64)self->memories );
 
     runtimeChunkFree((u64)self, NULL);
-    DPRINTF(DEBUG_LVL_INFO, "Leaving quickDesctruct on allocator 0x%lx (free)\n", (u64) self);
+    DPRINTF(DEBUG_LVL_VERB, "Leaving quickDestruct on allocator 0x%lx (free)\n", (u64) self);
 }
 
 
@@ -1151,7 +1219,7 @@ u8 quickSwitchRunlevel(ocrAllocator_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_
             ocrAllocatorQuick_t * rself = (ocrAllocatorQuick_t *) self;
 
             u64 poolAddr = 0;
-            DPRINTF(DEBUG_LVL_INFO, "quickBegin : poolsize 0x%llx, level %d, startAddr 0x%lx\n",  rself->poolSize, self->memories[0]->level, self->memories[0]->memories[0]->startAddr);
+            DPRINTF(DEBUG_LVL_VERB, "quickBegin : poolsize 0x%llx, level %d, startAddr 0x%lx\n",  rself->poolSize, self->memories[0]->level, self->memories[0]->memories[0]->startAddr);
 
             // if this RESULT_ASSERT fails, it usually means not-enough-free-memory.
             // For example, for L1, increased executable size easily shrinks free area.
@@ -1160,7 +1228,7 @@ u8 quickSwitchRunlevel(ocrAllocator_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_
                 self->memories[0], &poolAddr, rself->poolSize,
                 USER_FREE_TAG, USER_USED_TAG), ==, 0);
             rself->poolAddr = poolAddr;
-            DPRINTF(DEBUG_LVL_INFO, "quickBegin : poolAddr %p\n", poolAddr);
+            DPRINTF(DEBUG_LVL_VERB, "quickBegin : poolAddr %p\n", poolAddr);
 
             // Adjust alignment if required
             u64 fiddlyBits = ((u64) rself->poolAddr) & (ALIGNMENT - 1LL);
@@ -1185,10 +1253,10 @@ u8 quickSwitchRunlevel(ocrAllocator_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_
 
             quickInit((poolHdr_t *)addrGlobalizeOnTG((void *)rself->poolAddr, PD), rself->poolSize);
         } else if((properties & RL_TEAR_DOWN) && RL_IS_LAST_PHASE_DOWN(PD, RL_MEMORY_OK, phase)) {
-            DPRINTF(DEBUG_LVL_VERB, "quickFinish called (This is x86 only?)\n");
-
             ocrAllocatorQuick_t * rself = (ocrAllocatorQuick_t *) self;
             ASSERT(self->memoryCount == 1);
+
+            quickFinish((poolHdr_t *)addrGlobalizeOnTG((void *)rself->poolAddr, PD), rself->poolSize);
 
             RESULT_ASSERT(self-> /*rAnchorCE->base.*/ memories[0]->fcts.tag(
                 rself->base.memories[0],
