@@ -200,8 +200,8 @@ u8 xeCommPollMessage(ocrCommPlatform_t *self, ocrPolicyMsg_t **msg,
     ASSERT(self != NULL);
     ASSERT(msg != NULL);
 
-    // Local stage is at well-known 0x0
-    volatile u64 * lq = 0x0;
+    // Local stage is at well-known address
+    u64 * lq = (u64*)AR_L1_BASE + MSG_QUEUE_OFFT;
 
     // Check local stage's Empty/Busy/Full word. If non-Full, return; else, return content.
     if(lq[0] != 2) {

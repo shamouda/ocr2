@@ -29,15 +29,15 @@ xe_count = 0
 def ExtractValues(infilename):
     config = ConfigParser.SafeConfigParser(allow_no_value=True)
     config.readfp(infilename)
-    uc = config.get('ChipGlobal', 'unit_count').strip(' ').split(' ')[0]
-    uc = int(''.join(itertools.takewhile(lambda s: s.isdigit(), uc)))
-    bc = config.get('UnitGlobal', 'block_count').strip(' ').split(' ')[0]
+    cc = config.get('SocketGlobal', 'cluster_count').strip(' ').split(' ')[0]
+    cc = int(''.join(itertools.takewhile(lambda s: s.isdigit(), cc)))
+    bc = config.get('ClusterGlobal', 'block_count').strip(' ').split(' ')[0]
     bc = int(''.join(itertools.takewhile(lambda s: s.isdigit(), bc)))
     xc = config.get('BlockGlobal', 'xe_count').strip(' ').split(' ')[0]
     xc = int(''.join(itertools.takewhile(lambda s: s.isdigit(), xc)))
 
     global neighbors, xe_count
-    neighbors = (bc-1)+(uc-1)
+    neighbors = (bc-1)+(cc-1)
     xe_count = xc
 
 def RewriteConfig(cfg):
