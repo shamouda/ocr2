@@ -21,9 +21,7 @@
 
 #include "policy-domain/xe/xe-policy.h"
 
-#ifdef ENABLE_SYSBOOT_FSIM
 #include "tg-bin-files.h"
-#endif
 
 #include "mmio-table.h"
 #include "xstg-arch.h"

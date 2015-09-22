@@ -4,7 +4,9 @@
 #define PD_SWITCH_RL_OFFSET              (0x08)  // Offset of switchRunlevel in ocrPolicyDomainFcts_t
 #define XE_PDARGS_OFFSET                 (0x168) // sizeof(ocrPolicyDomain_t)
 
-//extern int tg_load_struct_binaries(void);
-//extern int tg_call_policy_domain(void);
-
+// HACK FIXME TG
+#define MAX_NUM_BLOCK 8
+#define MAX_NUM_CLUSTER 4
+#define MAX_NUM_XE 8
+#define MAX_NUM_CE 1
 #endif

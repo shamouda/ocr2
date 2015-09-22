@@ -42,12 +42,9 @@
 #include "xstg-map.h"
 #endif
 
-#define DEBUG_TYPE POLICY
+#include "tg-bin-files.h"
 
-#warning FIXME-OCRTG: ADJUST FOR THE NEW TG HIERARCHY?
-// FIXME: Check that the below numbers are valid
-#define MAX_NUM_BLOCK 8
-#define MAX_NUM_CLUSTER 4
+#define DEBUG_TYPE POLICY
 
 extern void ocrShutdown(void);
 
