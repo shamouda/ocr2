@@ -118,7 +118,9 @@ typedef enum {
     OCR_SCHEDULER_OBJECT_ARRAY                             =0x220, // BUG #613: No implementation of this yet
     OCR_SCHEDULER_OBJECT_LIST                              =0x320,
     OCR_SCHEDULER_OBJECT_MAP                               =0x420,
-    OCR_SCHEDULER_OBJECT_WST                               =0x520,
+    OCR_SCHEDULER_OBJECT_CTQ                             =0x0FF20, // Composite task queue (abstract type)
+    OCR_SCHEDULER_OBJECT_WSH                             =0x1FF20, // Work-sharing task queue (centralized)
+    OCR_SCHEDULER_OBJECT_WST                             =0x2FF20, // Work-stealing task queues
 
     //specialized schedulerObjects:
     //    These schedulerObjects can hold other schedulerObjects, both singleton and aggregate.
@@ -133,6 +135,7 @@ typedef enum {
 
 #define IS_SCHEDULER_OBJECT_TYPE_SINGLETON(kind)   ((kind & 0xF0) == OCR_SCHEDULER_OBJECT_SINGLETON)
 #define IS_SCHEDULER_OBJECT_TYPE_AGGREGATE(kind)   ((kind & 0xF0) == OCR_SCHEDULER_OBJECT_AGGREGATE)
+#define IS_SCHEDULER_OBJECT_TYPE_CTQ(kind)         ((kind & 0xFFF0) == OCR_SCHEDULER_OBJECT_CTQ)
 #define IS_SCHEDULER_OBJECT_TYPE_SPECIALIZED(kind) ((kind & 0xF0) == OCR_SCHEDULER_OBJECT_SPECIALIZED)
 #define IS_SCHEDULER_OBJECT_CONFIG_ALLOCATED(kind) ((kind & 0xF) == OCR_SCHEDULER_OBJECT_ALLOC_CONFIG)
 #define IS_SCHEDULER_OBJECT_PD_ALLOCATED(kind)     ((kind & 0xF)  == OCR_SCHEDULER_OBJECT_ALLOC_PD)

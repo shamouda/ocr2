@@ -132,19 +132,21 @@ s32 read_values(dictionary *dict, char *sec, char *field, s32 *values_array) {
 
     snprintf(key, MAX_KEY_SZ, "%s:%s", sec, field);
     values = iniparser_getstring(dict, key, NULL);
-    do {
-        if(strstr(values, "-")) {
-            sscanf(values, "%d-%d", &low, &high);
-            for(i=count; i<=count+high-low; i++) values_array[i] = low+i-count;
-            count += high-low+1;
-        } else {  // Assume integer
-            sscanf(values, "%d", &low);
-            values_array[count] = low;
-            count++;
-        }
-        while((*(char *)values)!='\0' && (*(char *)values)!=',') values++;
-        if(*(char *)values == ',') values++;
-    } while((*(char *)values)!='\0');
+    if (values) {
+        do {
+            if(strstr(values, "-")) {
+                sscanf(values, "%d-%d", &low, &high);
+                for(i=count; i<=count+high-low; i++) values_array[i] = low+i-count;
+                count += high-low+1;
+            } else {  // Assume integer
+                sscanf(values, "%d", &low);
+                values_array[count] = low;
+                count++;
+            }
+            while((*(char *)values)!='\0' && (*(char *)values)!=',') values++;
+            if(*(char *)values == ',') values++;
+        } while((*(char *)values)!='\0');
+    }
     return count;
 }
 
@@ -815,6 +817,7 @@ s32 populate_inst(ocrParamList_t **inst_param, int inst_param_size, void **insta
             instance[j] = (void *)((ocrSchedulerObjectFactory_t *)factory)->instantiate(factory, inst_param[j]);
             if (instance[j]) {
                 DPRINTF(DEBUG_LVL_INFO, "Created schedulerObject of type %s, index %d\n", inststr, j);
+                PRINTF("!!! Created schedulerObject of type %s, index %d\n", inststr, j);
             }
         }
         break;
@@ -1016,17 +1019,29 @@ void add_dependence (type_enum fromtype, type_enum totype, char *refstr,
                      void *toinstance, ocrParamList_t *toparam,
                      s32 dependence_index, s32 dependence_count) {
     switch(fromtype) {
+    case schedulerObject_type: {
+        ocrSchedulerObject_t *f = frominstance;
+        // TODO - check for Composite Task Queue type
+        if (IS_SCHEDULER_OBJECT_TYPE_CTQ(f->kind)) {
+            ocrSchedulerObjectCtq_t *ctq = frominstance;
+            ocrSchedulerObject_t *t = toinstance;
+            PRINTF("!!! Found a composite type: %X to %X\n", f->kind, t->kind);
+            ctq->subfactory = NULL; // TODO
+            break;
+        }
+        PRINTF("!!! Found a non-composite type: %X\n", f->kind);
+    }
     case guid_type:
     case memplatform_type:
     case commplatform_type:
     case compplatform_type:
     case workpile_type:
-    case schedulerObject_type:
     case schedulerHeuristic_type:
         DPRINTF(DEBUG_LVL_WARN, "Unexpected: this type should have no dependences! (incorrect dependence: %d to %d)\n", fromtype, totype);
         break;
 
     case commapi_type: {
+        // XXX - why do we have all of these explicit casts from void* types?
         ocrCommApi_t *f = (ocrCommApi_t *)frominstance;
         DPRINTF(DEBUG_LVL_INFO, "CommApi %d to %d\n", fromtype, totype);
         f->commPlatform = (ocrCommPlatform_t *)toinstance;
@@ -1089,8 +1104,10 @@ void add_dependence (type_enum fromtype, type_enum totype, char *refstr,
         }
         case schedulerObject_type: {
             if (toinstance != NULL) {
-                ASSERT(f->rootObj == NULL); //scheduler can have only one schedulerObject root
-                f->rootObj = (ocrSchedulerObject_t *)toinstance;
+                if (strcasecmp(refstr, "schedulerObject") == 0) {
+                    ASSERT(f->rootObj == NULL); //scheduler can have only one schedulerObject root
+                    f->rootObj = (ocrSchedulerObject_t *)toinstance;
+                }
             }
             break;
         }

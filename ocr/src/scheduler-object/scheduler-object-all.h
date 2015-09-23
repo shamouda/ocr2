@@ -14,6 +14,9 @@
 #ifdef ENABLE_SCHEDULER_OBJECT_NULL
 #include "scheduler-object/null/null-scheduler-object.h"
 #endif
+#ifdef ENABLE_SCHEDULER_OBJECT_CTQ
+#include "scheduler-object/composite-task-queue/composite-task-queue-scheduler-object.h"
+#endif
 #ifdef ENABLE_SCHEDULER_OBJECT_WST
 #include "scheduler-object/wst/wst-scheduler-object.h"
 #endif
