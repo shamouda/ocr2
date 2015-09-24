@@ -901,6 +901,25 @@ s32 populate_inst(ocrParamList_t **inst_param, void **instance, s32 *type_counts
                 }
                 break;
 #endif
+
+#ifdef ENABLE_WORKER_SYSTEM
+                case workerSystem_id: {
+                    char *workerstr;
+                    char workertypekey[MAX_KEY_SZ];
+                    ocrWorkerType_t workertype = MAX_WORKERTYPE;
+
+                    snprintf(workertypekey, MAX_KEY_SZ, "%s:%s", secname, "workertype");
+                    INI_GET_STR(workertypekey, workerstr, "");
+                    TO_ENUM (workertype, workerstr, ocrWorkerType_t, ocrWorkerType_types, MAX_WORKERTYPE-1);
+                    workertype += 1;  // because workertype is 1-indexed, not 0-indexed
+                    if (workertype == MAX_WORKERTYPE) workertype = SYSTEM_WORKERTYPE;
+                    ALLOC_PARAM_LIST(inst_param[j], paramListWorkerHcInst_t);
+                    ((paramListWorkerHcInst_t *)inst_param[j])->workerType = workertype;
+                    ((paramListWorkerInst_t *)inst_param[j])->workerId = j;
+                }
+                break;
+#endif
+
                 default:
                     ASSERT (0); // Unimplemented worker type.
                     break;

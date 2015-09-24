@@ -1,181 +1,153 @@
 #include "ocr-config.h"
+#ifdef ENABLE_WORKER_SYSTEM
+
 #include <stdarg.h>
 
 #include "ocr-sal.h"
 #include "utils/ocr-utils.h"
-#include "utils/tracer/tracer.h"
 #include "ocr-types.h"
+#include "utils/tracer/tracer.h"
+#include "utils/deque.h"
+#include "worker/hc/hc-worker.h"
 
-//Offset needed for collision avoiding typedef'd values for trace object types
-#define IDX_OFFSET OCR_TRACE_TYPE_EDT
 
-//Strings to identify user/runtime created objects
-const char *evt_type[] = {
-    "RUNTIME",
-    "USER",
-};
-
-//Strings for traced OCR objects
-const char *obj_type[] = {
-    "EDT",
-    "EVENT",
-    "DATABLOCK"
-};
-
-//Strings for traced OCR events
-const char *action_type[] = {
-    "CREATE",
-    "DESTROY",
-    "RUNNABLE",
-    "ADD_DEP",
-    "SATISFY",
-    "EXECUTE",
-    "FINISH",
-};
-
-void doTrace(u64 location, u64 wrkr, ocrGuid_t parent, char *str, ...){
-    //TODO implement timing in sal and replace: for platform independence
-    //(patch currently pending for this in gerrit)
-    u64 timestamp = salGetTime();
-
-    va_list ap;
-    va_start(ap, str);
-
-    //Find number of vairable for non-trace format string.
-    u32 numV = numVarsInString(str);
-    u32 i;
-
-    //Skip over non trace string vairables.
-    //**NOTE: Since this is infrastructure is internally managed, it is assumed that as tracing extends
-    //to further types the program will maintain the use of 64-bit values as trace arguments. Otherwise
-    //grabbing va_args as a void * can cause arguments to be skipped. See Redmine issue #823
-    for(i = 0; i < numV; i++){
-        va_arg(ap, void *);
+static bool isDequeFull(deque_t *deq){
+    if(deq == NULL) return false;
+    s32 head = deq->head;
+    s32 tail = deq->tail;
+    if(tail == (INIT_DEQUE_CAPACITY + head)){
+        return true;
+    }else{
+        return false;
     }
-
-    //TODO: replace u32 with bool when system worker is integrated.  As of now the va_args get parsed
-    //even if no trace information is provided.  Once system worker is in place, this function will
-    //no-op based on a check for whether system worker is configured. See Redmine issue #824
-    bool isUserType = va_arg(ap, u32);
-
-    ocrTraceType_t objType = va_arg(ap, ocrTraceType_t);
-    ocrTraceAction_t actionType = va_arg(ap, ocrTraceAction_t);
-
-    populateTraceObject(isUserType, objType, actionType, location, timestamp, parent, ap);
-
-    va_end(ap);
-
 }
 
-//TODO: Return a Trace object for deque when implemented.
-void populateTraceObject(bool isUserType, ocrTraceType_t objType, ocrTraceAction_t actionType, u64 location,
-                        u64 timestamp, ocrGuid_t parent, va_list ap){
+static bool isSystem(ocrPolicyDomain_t *pd){
+    u32 idx = (pd->workerCount)-1;
+    ocrWorker_t *wrkr = pd->workers[idx];
+    if(wrkr->type == SYSTEM_WORKERTYPE){
+        return true;
+    }else{
+        return false;
+    }
+}
+
+static bool isSupportedTraceType(bool evtType, ocrTraceType_t ttype, ocrTraceAction_t atype){
+    //Hacky sanity check to ensure va_arg got valid trace info if provided.
+    //return true if supported (list will expand as more trace types become needed/supported)
+    return ((ttype >= OCR_TRACE_TYPE_EDT && ttype <= OCR_TRACE_TYPE_DATABLOCK) &&
+            (atype >= OCR_ACTION_CREATE  && atype <= OCR_ACTION_FINISH) &&
+            (evtType == true || evtType == false));
+}
+
+//Create a trace object subject to trace type, and push to HC worker's deque, to be processed by system worker.
+static void populateTraceObject(bool evtType, ocrTraceType_t objType, ocrTraceAction_t actionType,
+                                u64 location, u64 timestamp, ocrGuid_t parent, va_list ap){
+
+
     ocrGuid_t src = NULL_GUID;
     ocrGuid_t dest = NULL_GUID;
     ocrEdt_t func = NULL_GUID;
     u64 size = 0;
 
-    ocrTraceObj_t tr;
-    tr.location = location;
-    tr.time = timestamp;
-    tr.isUserType = isUserType;
+    ocrPolicyDomain_t *pd = NULL;
+    ocrWorker_t *worker;
+    getCurrentEnv(&pd, &worker, NULL, NULL);
+
+    ocrTraceObj_t * tr = pd->fcts.pdMalloc(pd, sizeof(ocrTraceObj_t));
+
+    //Populate fields common to all trace objects.
+    tr->typeSwitch = objType;
+    tr->actionSwitch = actionType;
+    tr->location = location;
+    tr->time = timestamp;
+    tr->eventType = evtType;
 
     //Look at each trace type case by case and populate traceObject fields.
     //Unused trace types currently ommited from switch until needed/supported by runtime.
-    //Unused struct/union fields currently initialized to NULL or 0.
+    //Unused struct/union fields currently initialized to NULL or 0 as placeholders.
     switch(objType){
 
     case OCR_TRACE_TYPE_EDT:
+
         switch(actionType){
 
             case OCR_ACTION_CREATE:
-                tr.type.task.action.taskCreate.parentID = parent;
-                genericPrint(isUserType, objType, actionType, location, timestamp, parent);
+                TRACE_FIELD(TASK, taskCreate, tr, parentID) = parent;
                 break;
 
             case OCR_ACTION_DESTROY:
-                tr.type.task.action.taskDestroy.placeHolder = NULL;
-                genericPrint(isUserType, objType, actionType, location, timestamp, NULL_GUID);
+                TRACE_FIELD(TASK, taskDestroy, tr, placeHolder) = NULL;
                 break;
 
             case OCR_ACTION_RUNNABLE:
-                tr.type.task.action.taskReadyToRun.whyReady = 0;
-                genericPrint(isUserType, objType, actionType, location, timestamp, NULL_GUID);
+                TRACE_FIELD(TASK, taskReadyToRun, tr, whyReady) = 0;
                 break;
 
             case OCR_ACTION_SATISFY:
                 // 1 va_arg needed.
                 src = va_arg(ap, ocrGuid_t);
-                tr.type.task.action.taskDepSatisfy.depID = src;
-                PRINTF("[TRACE] U/R: %s | LOCATION: 0x%lx | TIMESTAMP: %lu | TYPE: EDT | ACTION: DEP_SATISFY | DEP_GUID: 0x%llx\n",
-                        evt_type[isUserType], location, timestamp, src);
+                TRACE_FIELD(TASK, taskDepSatisfy, tr, depID) = src;
                 break;
 
             case OCR_ACTION_ADD_DEP:
+                //1 va_arg needed
                 dest = va_arg(ap, ocrGuid_t);
-                tr.type.task.action.taskDepReady.depID = dest;
-                tr.type.task.action.taskDepReady.parentPermissions = 0;
-                PRINTF("[TRACE] U/R: %s | LOCATION: 0x%lx | TIMESTAMP: %lu | TYPE: EVENT | ACTION: ADD_DEP | DEP_GUID: 0x%lx\n",
-                        evt_type[isUserType], location, timestamp, dest);
+                TRACE_FIELD(TASK, taskDepReady, tr, depID) = dest;
+                TRACE_FIELD(TASK, taskDepReady, tr, parentPermissions) = 0;
                 break;
 
             case OCR_ACTION_EXECUTE:
                 // 1 va_arg needed
                 func = va_arg(ap, ocrEdt_t);
-                tr.type.task.action.taskExeBegin.funcPtr = func;
-                tr.type.task.action.taskExeBegin.whyDelay = 0;
-                PRINTF("[TRACE] U/R: %s | LOCATION: 0x%lx | TIMESTAMP: %lu | TYPE: EDT | ACTION: EXECUTE | FUNC_PTR: 0x%llx\n",
-                        evt_type[isUserType], location, timestamp, func);
+                TRACE_FIELD(TASK, taskExeBegin, tr, funcPtr) = func;
+                TRACE_FIELD(TASK, taskExeBegin, tr, whyDelay) = 0;
                 break;
 
             case OCR_ACTION_FINISH:
-                tr.type.task.action.taskExeEnd.placeHolder = NULL;
-                genericPrint(isUserType, objType, actionType, location, timestamp, NULL_GUID);
+                TRACE_FIELD(TASK, taskExeEnd, tr, placeHolder) = NULL;
                 break;
         }
         break;
 
     case OCR_TRACE_TYPE_EVENT:
+
         switch(actionType){
 
             case OCR_ACTION_CREATE:
-                tr.type.event.action.eventCreate.parentID = parent;
-                genericPrint(isUserType, objType, actionType, location, timestamp, parent);
+                TRACE_FIELD(EVENT, eventCreate, tr, parentID) = parent;
                 break;
 
             case OCR_ACTION_DESTROY:
-                tr.type.event.action.eventDestroy.placeHolder = NULL;
-                genericPrint(isUserType, objType, actionType, location, timestamp, NULL_GUID);
+                TRACE_FIELD(EVENT, eventDestroy, tr, placeHolder) = NULL;
                 break;
 
             case OCR_ACTION_ADD_DEP:
                 // 1 va_arg needed
                 dest = va_arg(ap, ocrGuid_t);
-                tr.type.event.action.eventDepAdd.depID = dest;
-                tr.type.event.action.eventDepAdd.parentID = parent;
-                PRINTF("[TRACE] U/R: %s | LOCATION: 0x%lx | TIMESTAMP: %lu | TYPE: EVENT | ACTION: ADD_DEP | DEP_GUID: 0x%lx\n",
-                        evt_type[isUserType], location, timestamp, dest);
+                TRACE_FIELD(EVENT, eventDepAdd, tr, depID) = dest;
+                TRACE_FIELD(EVENT, eventDepAdd, tr, parentID) = parent;
                 break;
 
             default:
                 break;
         }
+
         break;
 
     case OCR_TRACE_TYPE_DATABLOCK:
+
         switch(actionType){
+
             case OCR_ACTION_CREATE:
                 // 1 va_args needed
                 size = va_arg(ap, u64);
-                tr.type.data.action.dataCreate.parentID = parent;
-                tr.type.data.action.dataCreate.size = size;
-                PRINTF("[TRACE] U/R: %s | LOCATION: 0x%lx | TIMESTAMP: %lu | TYPE: DATABLOCK | ACTION: CREATE | SIZE: %lu | PARENT: 0x%lx\n",
-                        evt_type[isUserType], location, timestamp, size, parent);
+                TRACE_FIELD(DATA, dataCreate, tr, parentID) = parent;
+                TRACE_FIELD(DATA, dataCreate, tr, size) = size;
                 break;
 
             case OCR_ACTION_DESTROY:
-                tr.type.data.action.dataDestroy.placeHolder = NULL;
-                genericPrint(isUserType, objType, actionType, location, timestamp, NULL_GUID);
+                TRACE_FIELD(DATA, dataDestroy, tr, placeHolder) = NULL;
                 break;
 
             default:
@@ -183,28 +155,67 @@ void populateTraceObject(bool isUserType, ocrTraceType_t objType, ocrTraceAction
         }
         break;
     }
+
+    while(isDequeFull(((ocrWorkerHc_t*)worker)->sysDeque)){
+        hal_pause();
+    }
+
+    //Trace object populated. Push to my deque
+    ((ocrWorkerHc_t *)worker)->sysDeque->pushAtTail(((ocrWorkerHc_t *)worker)->sysDeque, tr, 0);
+
 }
 
 //Returns number of va_args expected by format string.
 //TODO: Possible bug if DPRINTF escapes to actually print a '%'.
-//      Currently none do.
-u32 numVarsInString(char *fmt){
+//      Currently none do.  Will devise a more robust method.
+//      See bug #823
+static u32 numVarsInString(char *fmt){
     u32 i;
     for(i = 0; fmt[i]; fmt[i]=='%' ? i++ : *fmt++);
     return i;
 }
 
-//Print TRACE object that only uses args provided by the DPRINTF macro (I.e. no trace ar_args needed)
-static void genericPrint(bool isUserType, ocrTraceType_t trace, ocrTraceAction_t action, u64 location, u64 timestamp, ocrGuid_t parent){
-    if(parent != NULL_GUID){
-        PRINTF("[TRACE] U/R: %s | LOCATION: 0x%lx | TIMESTAMP: %lu | TYPE: %s | ACTION: %s | PARENT: 0x%lx\n",
-                evt_type[isUserType], location, timestamp, obj_type[trace-IDX_OFFSET], action_type[action], parent);
-                //location, timestamp, traceTypeToString(trace), actionTypeToString(action), parent);
-    }else{
 
-        PRINTF("[TRACE] U/R: %s | LOCATION: 0x%lx | TIMESTAMP: %lu | TYPE: %s | ACTION: %s\n",
-                evt_type[isUserType], location, timestamp, obj_type[trace-IDX_OFFSET], action_type[action]);
-                //location, timestamp, traceTypeToString(trace), actionTypeToString(action));
+void doTrace(u64 location, u64 wrkr, ocrGuid_t parent, char *str, ...){
+
+    ocrPolicyDomain_t *pd = NULL;
+    getCurrentEnv(&pd, NULL, NULL, NULL);
+
+    //First check if a system worker is configured.  If not, return and do nothing;
+    if((pd == NULL) || !(isSystem(pd))) return;
+
+    u64 timestamp = salGetTime();
+
+    va_list ap;
+    va_start(ap, str);
+
+    //Find number of variable for non-trace format string.
+    u32 numV = numVarsInString(str);
+    u32 i;
+
+    //Skip over non trace string vairables
+    for(i = 0; i < numV; i++){
+        va_arg(ap, void *);
     }
 
+    bool evtType = va_arg(ap, u32);
+    ocrTraceType_t objType = va_arg(ap, ocrTraceType_t);
+    ocrTraceAction_t actionType = va_arg(ap, ocrTraceAction_t);
+
+    //If no valid additional tracing info found return to normal DPRINTF
+    if(!(isSupportedTraceType(evtType, objType, actionType))){
+        va_end(ap);
+        return;
+    }
+    populateTraceObject(evtType, objType, actionType, location, timestamp, parent, ap);
+    va_end(ap);
+
 }
+
+#else  /*Do a no-op trace function if no System worker enabled*/
+
+#include "utils/tracer/tracer.h"
+void doTrace(u64 location, u64 wrkr, ocrGuid_t taskGuid, char *str, ...){
+    return;
+}
+#endif /* ENABLE_WORKER_SYSTEM */

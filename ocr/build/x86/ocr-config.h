@@ -99,7 +99,7 @@
 
 // Worker
 #define ENABLE_WORKER_HC
-
+#define ENABLE_WORKER_SYSTEM
 // Workpile
 #define ENABLE_WORKPILE_HC
 

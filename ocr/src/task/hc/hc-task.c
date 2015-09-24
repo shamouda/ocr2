@@ -1116,7 +1116,6 @@ u8 taskExecute(ocrTask_t* base) {
 #endif /* OCR_ENABLE_STATISTICS */
 
     ocrGuid_t retGuid = NULL_GUID;
-
     {
 
 #ifdef OCR_ENABLE_VISUALIZER
@@ -1152,7 +1151,6 @@ u8 taskExecute(ocrTask_t* base) {
     // We now say that the worker is done executing the EDT
     statsEDT_END(pd, ctx->sourceObj, curWorker, base->guid, base);
 #endif /* OCR_ENABLE_STATISTICS */
-
     DPRINTF(DEBUG_LVL_INFO, "End_Execution 0x%lx\n", base->guid,
             true, OCR_TRACE_TYPE_EDT, OCR_ACTION_FINISH);
 

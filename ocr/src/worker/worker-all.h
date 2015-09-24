@@ -24,6 +24,9 @@ typedef enum _workerType_t {
 #ifdef ENABLE_WORKER_CE
     workerCe_id,
 #endif
+#ifdef ENABLE_WORKER_SYSTEM
+    workerSystem_id,
+#endif
     workerMax_id
 } workerType_t;
 
@@ -43,6 +46,9 @@ extern const char * ocrWorkerType_types[];
 #endif
 #ifdef ENABLE_WORKER_CE
 #include "worker/ce/ce-worker.h"
+#endif
+#ifdef ENABLE_WORKER_SYSTEM
+#include "worker/system/system-worker.h"
 #endif
 
 ocrWorkerFactory_t * newWorkerFactory(workerType_t type, ocrParamList_t *perType);

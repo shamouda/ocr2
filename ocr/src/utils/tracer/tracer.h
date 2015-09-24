@@ -1,22 +1,33 @@
 #include "ocr-config.h"
-#include "ocr-types.h"
 #include "ocr-runtime-types.h"
+#include "ocr-types.h"
+
+#ifdef ENABLE_WORKER_SYSTEM
+
 #include <stdarg.h>
 
 /*
  * Data structure for trace objects.  Not yet fully populated
- * as not all trace coverage is supported yet.
+ * as not all trace coverage is needed/supported yet.
  *
  */
+#define TRACE_TYPE_NAME(ID) _type_##ID
 
-typedef struct _ocrTraceObj_t {
+
+#define _TRACE_FIELD_FULL(ttype, taction, obj, field) obj->type._type_##ttype.action.taction.field
+#define TRACE_FIELD(type, action, traceObj, field) _TRACE_FIELD_FULL(type, action, (traceObj), field)
+
+typedef struct {
+
+    ocrTraceType_t  typeSwitch;       //TODO: Should (maybe) be accessed through a macro in the future.
+    ocrTraceAction_t actionSwitch;    //
 
     u64 time;               /*Timestamp for event*/
     u64 location;           /*PD where event occured*/
-    bool isUserType;        /* 1 if object was created by user 0 for runtime */
+    bool eventType;         /* TODO make this more descriptive than bool*/
     unsigned char **blob;   /* TODO Carry generic blob*/
 
-    union{ /*args*/
+    union{ /*type*/
 
         struct{ /* Task (EDT) */
             union{
@@ -25,7 +36,7 @@ typedef struct _ocrTraceObj_t {
                 }taskCreate;
 
                 struct{
-                    ocrGuid_t depID;               /*GUIDs of dependant objects */
+                    ocrGuid_t depID;               /*GUIDs of dependent objects */
                     u32 parentPermissions;          /*Parent permissions*/
                 }taskDepReady;
 
@@ -51,7 +62,7 @@ typedef struct _ocrTraceObj_t {
 
             }action;
 
-        }task;
+        } TRACE_TYPE_NAME(TASK);
 
         struct{ /* Data (DB) */
             union{
@@ -83,7 +94,7 @@ typedef struct _ocrTraceObj_t {
 
             }action;
 
-        }data;
+        }TRACE_TYPE_NAME(DATA);
 
         struct{ /* Event (OCR module) */
             union{
@@ -106,7 +117,7 @@ typedef struct _ocrTraceObj_t {
 
             }action;
 
-        }event;
+        } TRACE_TYPE_NAME(EVENT);
 
         struct{ /* Execution Unit (workers) */
             union{
@@ -124,29 +135,32 @@ typedef struct _ocrTraceObj_t {
 
             }action;
 
-        }executionUnit;
+        } TRACE_TYPE_NAME(EXECUTION_UNIT);
 
         struct{ /* User-facing custom marker */
-            struct{
-                void *placeHolder;              /* future TODO Define user facing options*/
-            }userMarkerFlags;
+            union{
+                struct{
+                    void *placeHolder;              /* future TODO Define user facing options*/
+                }userMarkerFlags;
 
-        }userMarker;
+            }action;
+
+        } TRACE_TYPE_NAME(USER_MARKER);
 
 
         struct{ /* Runtime facing custom Marker */
-            struct{
-                void *placeHolder;              /* future TODO define runtime options*/
-            }runtimeMarkerFlags;
+            union{
+                struct{
+                    void *placeHolder;              /* future TODO define runtime options*/
+                }runtimeMarkerFlags;
 
-        }runtimeMarker;
+            }action;
+
+        } TRACE_TYPE_NAME(RUNTIME_MARKER);
 
 
     }type;
+}ocrTraceObj_t;
 
-} ocrTraceObj_t;
-
+#endif /* ENABLE_WORKER_SYSTEM */
 void doTrace(u64 location, u64 wrkr, ocrGuid_t taskGuid, char *str, ...);
-u32 numVarsInString(char *fmt);
-void populateTraceObject(bool isUserType, ocrTraceType_t objType, ocrTraceAction_t actionType, u64 location, u64 timestamp, ocrGuid_t parent, va_list ap);
-static void genericPrint(bool isUserType, ocrTraceType_t trace, ocrTraceAction_t action, u64 location, u64 timestamp, ocrGuid_t parent);
