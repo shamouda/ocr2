@@ -369,7 +369,8 @@ u8 satisfyEventHcPersistIdem(ocrEvent_t *base, ocrFatGuid_t db, u32 slot) {
         hal_unlock32(&(event->waitersLock));
         // Legal for idempotent to ignore subsequent satisfy
         return 1; //BUG #603 error codes: Put some error code here.
-    } else{
+    } else {
+        ((ocrEventHcPersist_t*)event)->data = db.guid;
         waitersCount = event->waitersCount;
         event->waitersCount = (u32)-1; // Indicate the event is satisfied
         hal_unlock32(&(event->waitersLock));
