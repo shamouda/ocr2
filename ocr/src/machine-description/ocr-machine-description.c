@@ -1023,11 +1023,13 @@ void add_dependence (type_enum fromtype, type_enum totype, char *refstr,
         ocrSchedulerObject_t *f = frominstance;
         // TODO - check for Composite Task Queue type
         if (IS_SCHEDULER_OBJECT_TYPE_CTQ(f->kind)) {
-            ocrSchedulerObjectCtq_t *ctq = frominstance;
-            ocrSchedulerObject_t *t = toinstance;
-            PRINTF("!!! Found a composite type: %X to %X\n", f->kind, t->kind);
-            ctq->subfactory = NULL; // TODO
-            break;
+            if (totype == schedulerObjectfactory_type) {
+                ocrSchedulerObjectCtq_t *ctq = frominstance;
+                ocrSchedulerObject_t *t = toinstance;
+                PRINTF("!!! Found a composite type: %X to %X\n", f->kind, t->kind);
+                ctq->subfactory = (ocrSchedulerObjectFactory_t*)toinstance;
+                break;
+            }
         }
         PRINTF("!!! Found a non-composite type: %X\n", f->kind);
     }

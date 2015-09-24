@@ -256,7 +256,7 @@ static dep_t instanceDeps[] = {
     { scheduler_type, workpile_type, "workpile"},
     { scheduler_type, schedulerObject_type, "schedulerObject"},
     { scheduler_type, schedulerHeuristic_type, "schedulerHeuristic"},
-    { schedulerObject_type, schedulerObject_type, "subSchedulerObject"},
+    { schedulerObject_type, schedulerObjectfactory_type, "subObjectType"},
     { policydomain_type, guid_type, "guid"},
     { policydomain_type, allocator_type, "allocator"},
     { policydomain_type, worker_type, "worker"},
