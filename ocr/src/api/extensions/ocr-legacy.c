@@ -129,7 +129,6 @@ u8 ocrLegacyBlockProgress(ocrGuid_t handle, ocrGuid_t* guid, void** result, u64*
 
 #define PD_MSG (&msg)
 #define PD_TYPE PD_MSG_GUID_INFO
-    u64 backoff = 1024;
     do {
         getCurrentEnv(NULL, NULL, NULL, &msg);
         msg.type = PD_MSG_GUID_INFO | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
@@ -147,10 +146,7 @@ u8 ocrLegacyBlockProgress(ocrGuid_t handle, ocrGuid_t* guid, void** result, u64*
             if(properties == LEGACY_PROP_NONE) {
                 return OCR_EINVAL;
             } else if(properties == LEGACY_PROP_WAIT_FOR_CREATE) {
-                // We are going to loop
-                u64 origBackoff = backoff;
-                while(--backoff) hal_pause();
-                backoff = origBackoff << 1;
+                continue; // Tightest loop to see how this goes
             }
         } else {
             break;
