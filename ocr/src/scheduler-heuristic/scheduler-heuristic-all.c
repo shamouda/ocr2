@@ -20,6 +20,9 @@ const char * schedulerHeuristic_types[] = {
 #ifdef ENABLE_SCHEDULER_HEURISTIC_CE
     "CE",
 #endif
+#ifdef ENABLE_SCHEDULER_HEURISTIC_PRIORITY
+    "PRIORITY",
+#endif
     NULL
 };
 
@@ -40,6 +43,10 @@ ocrSchedulerHeuristicFactory_t * newSchedulerHeuristicFactory(schedulerHeuristic
 #ifdef ENABLE_SCHEDULER_HEURISTIC_CE
     case schedulerHeuristicCe_id:
         return newOcrSchedulerHeuristicFactoryCe(perType, type);
+#endif
+#ifdef ENABLE_SCHEDULER_HEURISTIC_PRIORITY
+    case schedulerHeuristicPriority_id:
+        return newOcrSchedulerHeuristicFactoryPriority(perType, type);
 #endif
     default:
         break;
