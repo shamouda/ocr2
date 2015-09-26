@@ -81,7 +81,7 @@ static void printHelp(void) {
 }
 
 static void printVersion(void) {
-    fprintf(stderr, "Open Community Runtime (OCR) %s%s\n", "0.9", "");
+    fprintf(stderr, "Open Community Runtime (OCR) %s\n", OCR_VERSION);
 }
 
 static void setIniFile(ocrConfig_t * ocrConfig, const char * value) {
@@ -473,6 +473,11 @@ void bringUpRuntime(ocrConfig_t *ocrConfig) {
         all_factories[j] = NULL;
         all_instances[j] = NULL;
     }
+
+    // Check the config file version number
+    char *version = (char *) iniparser_getstring(dict, "General:version", NULL);
+    if(version == NULL || (strncmp(version, OCR_VERSION, strlen(OCR_VERSION)) != 0))
+        DPRINTF(DEBUG_LVL_WARN, "Configuration file (%s) doesn't match OCR version %s, use at your own risk\n", version, OCR_VERSION);
 
     // POPULATE TYPES
     DPRINTF(DEBUG_LVL_INFO, "========= Create factories ==========\n");

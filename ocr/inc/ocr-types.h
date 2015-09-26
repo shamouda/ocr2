@@ -14,6 +14,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#define OCR_VERSION "1.0.1"
+
 /**
  * @defgroup OCRTypes Types and constants used in OCR
  *
