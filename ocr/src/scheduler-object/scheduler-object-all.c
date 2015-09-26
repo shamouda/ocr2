@@ -32,6 +32,12 @@ const char * schedulerObject_types[] = {
 #ifdef ENABLE_SCHEDULER_OBJECT_DBTIME
     "DBTIME",
 #endif
+#ifdef ENABLE_SCHEDULER_OBJECT_PR_WSH
+    "PR_WSH",
+#endif
+#ifdef ENABLE_SCHEDULER_OBJECT_BIN_HEAP
+    "BIN_HEAP",
+#endif
     NULL
 };
 
@@ -68,6 +74,14 @@ ocrSchedulerObjectFactory_t * newSchedulerObjectFactory(schedulerObjectType_t ty
 #ifdef ENABLE_SCHEDULER_OBJECT_DBTIME
     case schedulerObjectDbtime_id:
         return newOcrSchedulerObjectFactoryDbtime(perType, (u32)type);
+#endif
+#ifdef ENABLE_SCHEDULER_OBJECT_PR_WSH
+    case schedulerObjectPrWsh_id:
+        return newOcrSchedulerObjectFactoryPrWsh(perType, (u32)type);
+#endif
+#ifdef ENABLE_SCHEDULER_OBJECT_BIN_HEAP
+    case schedulerObjectBinHeap_id:
+        return newOcrSchedulerObjectFactoryBinHeap(perType, (u32)type);
 #endif
     default:
         ASSERT(0);

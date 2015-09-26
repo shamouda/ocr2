@@ -30,6 +30,8 @@ parser.add_argument('--alloctype', dest='alloctype', default='mallocproxy', choi
                    help='type of allocator to use (default: mallocproxy)')
 parser.add_argument('--dbtype', dest='dbtype', default='Lockable', choices=['Lockable', 'Regular'],
                    help='type of datablocks to use (default: Lockable)')
+parser.add_argument('--scheduler', dest='scheduler', default='HC', choices=['HC', 'PRIORITY'],
+                   help='scheduler heuristic (default: HC)')
 parser.add_argument('--output', dest='output', default='default.cfg',
                    help='config output filename (default: default.cfg)')
 parser.add_argument('--remove-destination', dest='rmdest', action='store_true',
@@ -47,6 +49,7 @@ binding = args.binding
 alloc = args.alloc
 alloctype = args.alloctype
 dbtype = args.dbtype
+scheduler = args.scheduler
 outputfilename = args.output
 rmdest = args.rmdest
 sysworker = args.sysworker
@@ -247,10 +250,11 @@ def GenerateComp(output, pdtype, threads, binding, sysworker, schedtype):
         output.write("\tname\t=\t%s\n" % ("NULL"))
         output.write("[SchedulerObjectType1]\n")
         output.write("\tname\t=\t%s\n" % ("WST"))
-        output.write("\tkind\t=\t%s\n" % ("root"))
-        output.write("[SchedulerObjectInst0]\n")
-        output.write("\tid\t=\t0\n")
-        output.write("\ttype\t=\t%s\n" % ("WST"))
+        if scheduler == 'HC':
+            output.write("\tkind\t=\t%s\n" % ("root"))
+            output.write("[SchedulerObjectInst0]\n")
+            output.write("\tid\t=\t0\n")
+            output.write("\ttype\t=\t%s\n" % ("WST"))
         output.write("[SchedulerObjectType2]\n")
         output.write("\tname\t=\t%s\n" % ("DEQ"))
         output.write("[SchedulerObjectType3]\n")
@@ -263,13 +267,23 @@ def GenerateComp(output, pdtype, threads, binding, sysworker, schedtype):
         output.write("\tname\t=\t%s\n" % ("DBSPACE"))
         output.write("[SchedulerObjectType7]\n")
         output.write("\tname\t=\t%s\n" % ("DBTIME"))
+        output.write("[SchedulerObjectType8]\n")
+        output.write("\tname\t=\t%s\n" % ("PR_WSH"))
+        if scheduler == 'PRIORITY':
+            output.write("\tkind\t=\t%s\n" % ("root"))
+            output.write("[SchedulerObjectInst0]\n")
+            output.write("\tid\t=\t0\n")
+            output.write("\ttype\t=\t%s\n" % ("PR_WSH"))
+            output.write("[SchedulerObjectType9]\n")
+            output.write("\tname\t=\t%s\n" % ("BIN_HEAP"))
         output.write("\n#======================================================\n")
         output.write("[SchedulerHeuristicType0]\n\tname\t=\t%s\n" % ("NULL"))
         output.write("[SchedulerHeuristicType1]\n\tname\t=\t%s\n" % ("HC"))
         output.write("[SchedulerHeuristicType2]\n\tname\t=\t%s\n" % ("ST"))
+        output.write("[SchedulerHeuristicType3]\n\tname\t=\t%s\n" % ("PRIORITY"))
         output.write("[SchedulerHeuristicInst0]\n")
         output.write("\tid\t=\t0\n")
-        output.write("\ttype\t=\t%s\n" % ("HC"))
+        output.write("\ttype\t=\t%s\n" % (scheduler))
         output.write("\n#======================================================\n")
     output.write("[SchedulerType0]\n\tname\t=\t%s\n" % (schedtype))
     output.write("[SchedulerInst0]\n")
