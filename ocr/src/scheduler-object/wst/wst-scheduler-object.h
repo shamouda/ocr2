@@ -20,13 +20,15 @@
 
 typedef struct _paramListSchedulerObjectWst_t {
     paramListSchedulerObject_t base;
-    u32 numDeques;                    /* Number of deques */
+    u32 numDeques;                          /* Number of deques */
 } paramListSchedulerObjectWst_t;
 
 typedef struct _ocrSchedulerObjectWst_t {
     ocrSchedulerObject_t base;
-    ocrSchedulerObject_t **deques;    /* Array of deques */
-    u32 numDeques;                    /* Number of deques */
+    ocrSchedulerObject_t **deques;          /* Array of deques */
+    u32 numDeques;                          /* Number of deques */
+    ocrSchedulerObject_t *plist;            /* Common priority list */
+    ocrSchedulerObjectIterator_t *iterator;	/* Priority list iterator */
 } ocrSchedulerObjectWst_t;
 
 /****************************************************/

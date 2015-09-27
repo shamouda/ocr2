@@ -35,6 +35,9 @@
 #ifdef ENABLE_SCHEDULER_OBJECT_DBTIME
 #include "scheduler-object/dbtime/dbtime-scheduler-object.h"
 #endif
+#ifdef ENABLE_SCHEDULER_OBJECT_PLIST
+#include "scheduler-object/plist/plist-scheduler-object.h"
+#endif
 
 typedef enum _schedulerObjectType_t {
 #ifdef ENABLE_SCHEDULER_OBJECT_NULL
@@ -60,6 +63,9 @@ typedef enum _schedulerObjectType_t {
 #endif
 #ifdef ENABLE_SCHEDULER_OBJECT_DBTIME
     schedulerObjectDbtime_id,
+#endif
+#ifdef ENABLE_SCHEDULER_OBJECT_PLIST
+    schedulerObjectPlist_id,
 #endif
     schedulerObjectMax_id
 } schedulerObjectType_t;

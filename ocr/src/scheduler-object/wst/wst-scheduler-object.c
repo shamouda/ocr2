@@ -45,6 +45,19 @@ static void wstSchedulerObjectStart(ocrSchedulerObject_t *self, ocrPolicyDomain_
 #else
     ASSERT(0);
 #endif
+#ifdef ENABLE_SCHEDULER_OBJECT_PLIST
+    paramListSchedulerObjectPlist_t paramPlist;
+    paramPlist.base.config = 0;
+    paramPlist.base.guidRequired = 0;
+    paramPlist.type = OCR_LIST_TYPE_SINGLE;
+    paramPlist.elSize = 0;
+    paramPlist.arrayChunkSize = 64;
+    ocrSchedulerObjectFactory_t *plistFactory = PD->schedulerObjectFactories[schedulerObjectPlist_id];
+    wstSchedObj->plist = plistFactory->fcts.create(plistFactory, (ocrParamList_t*)(&paramPlist));
+    wstSchedObj->iterator = plistFactory->fcts.createIterator(plistFactory, wstSchedObj->plist, 0);
+#else
+    ASSERT(0);
+#endif
 }
 
 static void wstSchedulerObjectFinish(ocrSchedulerObject_t *self, ocrPolicyDomain_t *PD) {

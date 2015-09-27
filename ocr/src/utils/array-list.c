@@ -377,6 +377,18 @@ slistNode_t* newArrayListNodeAfter(arrayList_t *list, slistNode_t *node) {
     return newPriorityArrayListNodeAfter(list, node, 0);
 }
 
+slistNode_t* newArrayListNodePriority(arrayList_t *list, u64 key) {
+    if ((list->head == NULL) || ((list->head != NULL) && (list->head->key >= key)))
+        return newPriorityArrayListNodeBefore(list, list->head, key);
+    slistNode_t *prev = list->head;
+    slistNode_t *node = list->head->next;
+    while(node && node->key < key) {
+        prev = node;
+        node = node->next;
+    }
+    return newPriorityArrayListNodeAfter(list, prev, key);
+}
+
 /*****************************************************************************/
 /* FREE                                                                      */
 /*****************************************************************************/
@@ -465,6 +477,18 @@ void* pushFrontArrayList(arrayList_t *list, void *data) {
 
 void* pushBackArrayList(arrayList_t *list, void *data) {
     slistNode_t *newnode = newArrayListNodeAfter(list, list->tail);
+    if (data) {
+        if (list->elSize) {
+            hal_memCopy(newnode->data, data, list->elSize, 0);
+        } else {
+            newnode->data = data;
+        }
+    }
+    return newnode->data;
+}
+
+void* pushPriorityArrayList(arrayList_t *list, void *data, u64 key) {
+    slistNode_t *newnode = newArrayListNodePriority(list, key);
     if (data) {
         if (list->elSize) {
             hal_memCopy(newnode->data, data, list->elSize, 0);

@@ -68,6 +68,7 @@ void freeArrayListNode(struct _arrayList_t *list, slistNode_t *node);
 //Create a new list node and insert it after/before the given node. Return the new list node.
 slistNode_t* newArrayListNodeAfter(struct _arrayList_t *list, slistNode_t *node);
 slistNode_t* newArrayListNodeBefore(struct _arrayList_t *list, slistNode_t *node);
+slistNode_t* newArrayListNodePriority(struct _arrayList_t *list, u64 key);
 
 //Move a list node (src) to be before or after a given node (dst)
 void moveArrayListNodeAfter(struct _arrayList_t *list, slistNode_t *src, slistNode_t *dst);
@@ -76,6 +77,7 @@ void moveArrayListNodeBefore(struct _arrayList_t *list, slistNode_t *src, slistN
 //Wrappers
 void* pushFrontArrayList(struct _arrayList_t *list, void *data);
 void* pushBackArrayList(struct _arrayList_t *list, void *data);
+void* pushPriorityArrayList(struct _arrayList_t *list, void *data, u64 key);
 void  popFrontArrayList(arrayList_t *list);
 void  popBackArrayList(arrayList_t *list);
 void* peekFrontArrayList(arrayList_t *list);

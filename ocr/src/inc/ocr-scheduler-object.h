@@ -119,6 +119,7 @@ typedef enum {
     OCR_SCHEDULER_OBJECT_LIST                              =0x320,
     OCR_SCHEDULER_OBJECT_MAP                               =0x420,
     OCR_SCHEDULER_OBJECT_WST                               =0x520,
+    OCR_SCHEDULER_OBJECT_PLIST                             =0x620,
 
     //specialized schedulerObjects:
     //    These schedulerObjects can hold other schedulerObjects, both singleton and aggregate.

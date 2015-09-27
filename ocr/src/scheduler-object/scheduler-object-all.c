@@ -32,6 +32,9 @@ const char * schedulerObject_types[] = {
 #ifdef ENABLE_SCHEDULER_OBJECT_DBTIME
     "DBTIME",
 #endif
+#ifdef ENABLE_SCHEDULER_OBJECT_PLIST
+    "PLIST",
+#endif
     NULL
 };
 
@@ -68,6 +71,10 @@ ocrSchedulerObjectFactory_t * newSchedulerObjectFactory(schedulerObjectType_t ty
 #ifdef ENABLE_SCHEDULER_OBJECT_DBTIME
     case schedulerObjectDbtime_id:
         return newOcrSchedulerObjectFactoryDbtime(perType, (u32)type);
+#endif
+#ifdef ENABLE_SCHEDULER_OBJECT_PLIST
+    case schedulerObjectPlist_id:
+        return newOcrSchedulerObjectFactoryPlist(perType, (u32)type);
 #endif
     default:
         ASSERT(0);

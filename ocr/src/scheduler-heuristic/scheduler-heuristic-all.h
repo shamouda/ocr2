@@ -20,6 +20,9 @@
 #ifdef ENABLE_SCHEDULER_HEURISTIC_ST
 #include "scheduler-heuristic/st/st-scheduler-heuristic.h"
 #endif
+#ifdef ENABLE_SCHEDULER_HEURISTIC_PRI
+#include "scheduler-heuristic/pri/pri-scheduler-heuristic.h"
+#endif
 #ifdef ENABLE_SCHEDULER_HEURISTIC_CE
 #include "scheduler-heuristic/ce/ce-scheduler-heuristic.h"
 #endif
@@ -33,6 +36,9 @@ typedef enum _schedulerHeuristicType_t {
 #endif
 #ifdef ENABLE_SCHEDULER_HEURISTIC_ST
     schedulerHeuristicSt_id,
+#endif
+#ifdef ENABLE_SCHEDULER_HEURISTIC_PRI
+    schedulerHeuristicPri_id,
 #endif
 #ifdef ENABLE_SCHEDULER_HEURISTIC_CE
     schedulerHeuristicCe_id,
