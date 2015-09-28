@@ -12,6 +12,14 @@
 
 #include <signal.h>
 #include "utils/pqr-utils.h"
+#include "ocr-hal.h"
+#include "ocr-types.h"
+#include "policy-domain/hc/hc-policy.h"
+#include "comp-platform/pthread/pthread-comp-platform.h"
+#include "ocr-policy-domain.h"
+
+#if !defined(ENABLE_NEWLIB_SCAFFOLD)
+#include <signal.h>
 
 /* NOTE: Below is an optional interface allowing users to
  *       send SIGUSR1 and SIGUSR2 to control pause/query/resume
@@ -144,5 +152,6 @@ void registerSignalHandler(){
         PRINTF("Couldn't catch SIGUSR2...\n");
     }
 }
+#endif
 
 #endif /* ENABLE_COMP_PLATFORM_PTHREAD */

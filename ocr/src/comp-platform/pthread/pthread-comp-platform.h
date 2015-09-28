@@ -22,6 +22,7 @@
 #include "utils/deque.h"
 #endif
 
+#include <xlocale.h>
 #include <pthread.h>
 
 /**
