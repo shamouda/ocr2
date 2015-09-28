@@ -242,7 +242,7 @@ def GenerateComp(output, pdtype, threads, binding, schedtype):
         output.write("[SchedulerHeuristicType3]\n\tname\t=\t%s\n" % ("PRI"))
         output.write("[SchedulerHeuristicInst0]\n")
         output.write("\tid\t=\t0\n")
-        output.write("\ttype\t=\t%s\n" % ("HC"))
+        output.write("\ttype\t=\t%s\n" % ("PRI"))
         output.write("\n#======================================================\n")
     output.write("[SchedulerType0]\n\tname\t=\t%s\n" % (schedtype))
     output.write("[SchedulerInst0]\n")
