@@ -527,8 +527,12 @@ static u8 taskAllDepvSatisfied(ocrTask_t *self) {
 #define SLOT_SATISFIED_DB               ((u32) -3)
 
 u8 destructTaskHc(ocrTask_t* base) {
-    DPRINTF(DEBUG_LVL_INFO, "Destroy EDT 0x%lx in state 0x%x outputEvent=0x%lx finishLatch=0x%lx parentLatch=0x%lx\n",
-            base->guid, base->state, base->outputEvent, base->finishLatch, base->parentLatch);
+
+    DPRINTF(DEBUG_LVL_INFO,
+            "Destroy 0x%lx\n", base->guid,
+            false, OCR_TRACE_TYPE_EDT, OCR_ACTION_DESTROY);
+
+
     ocrPolicyDomain_t *pd = NULL;
     // If we are above ALLDEPS_EDTSTATE it's hard to determine exactly
     // what the task might be doing. For now just have a simple policy
@@ -777,8 +781,11 @@ u8 newTaskHc(ocrTaskFactory_t* factory, ocrFatGuid_t * edtGuid, ocrFatGuid_t edt
 
     // Check to see if the EDT can be run
     if(base->depc == edt->slotSatisfiedCount) {
-        DPRINTF(DEBUG_LVL_VVERB, "Scheduling task 0x%lx due to initial satisfactions\n",
-                base->guid);
+
+        DPRINTF(DEBUG_LVL_INFO,
+                "Scheduling task 0x%lx due to initial satisfactions\n", base->guid,
+                false, OCR_TRACE_TYPE_EDT, OCR_ACTION_RUNNABLE);
+
         RESULT_PROPAGATE2(taskAllDepvSatisfied(base), 1);
     }
     return 0;
@@ -818,8 +825,11 @@ u8 satisfyTaskHc(ocrTask_t * base, ocrFatGuid_t data, u32 slot) {
 
     hal_lock32(&(self->lock));
 
-    DPRINTF(DEBUG_LVL_VERB, "Satisfy on task 0x%lx slot %d with 0x%lx slotSatisfiedCount=%u frontierSlot=%u depc=%u\n",
-        self->base.guid, slot, data.guid, self->slotSatisfiedCount, self->frontierSlot, base->depc);
+
+    DPRINTF(DEBUG_LVL_INFO,
+            "Satisfy on task 0x%lx slot %d with 0x%lx slotSatisfiedCount=%u frontierSlot=%u depc=%u\n",
+            self->base.guid, slot, data.guid, self->slotSatisfiedCount, self->frontierSlot, base->depc,
+            false, OCR_TRACE_TYPE_EDT, OCR_ACTION_SATISFY, data.guid);
 
     // Check to see if not already satisfied
     ASSERT_BLOCK_BEGIN(self->signalers[slot].slot != SLOT_SATISFIED_EVT)
@@ -837,8 +847,11 @@ u8 satisfyTaskHc(ocrTask_t * base, ocrFatGuid_t data, u32 slot) {
         self->signalers[slot].guid = data.guid;
 
     if(self->slotSatisfiedCount == base->depc) {
+
         DPRINTF(DEBUG_LVL_VERB, "Scheduling task 0x%lx, satisfied dependences %d/%d\n",
-                self->base.guid, self->slotSatisfiedCount , base->depc);
+                self->base.guid, self->slotSatisfiedCount , base->depc,
+                false, OCR_TRACE_TYPE_EDT, OCR_ACTION_RUNNABLE);
+
         hal_unlock32(&(self->lock));
         // All dependences have been satisfied, schedule the edt
         RESULT_PROPAGATE(taskAllDepvSatisfied(base));
@@ -1070,8 +1083,10 @@ u8 notifyDbReleaseTaskHc(ocrTask_t *base, ocrFatGuid_t db) {
 }
 
 u8 taskExecute(ocrTask_t* base) {
-    DPRINTF(DEBUG_LVL_INFO, "Execute 0x%lx paramc:%d depc:%d\n", base->guid, base->paramc, base->depc);
     base->state = RUNNING_EDTSTATE;
+    //TODO Execute can be considered user on x86, but need to differentiate processRequestEdts in x86-mpi
+    DPRINTF(DEBUG_LVL_INFO, "Execute 0x%lx paramc:%d depc:%d\n", base->guid, base->paramc, base->depc,
+                            true, OCR_TRACE_TYPE_EDT, OCR_ACTION_EXECUTE, base->funcPtr);
     ocrTaskHc_t* derived = (ocrTaskHc_t*)base;
     // In this implementation each time a signaler has been satisfied, its guid
     // has been replaced by the db guid it has been satisfied with.
@@ -1104,7 +1119,7 @@ u8 taskExecute(ocrTask_t* base) {
     {
 
 #ifdef OCR_ENABLE_VISUALIZER
-        u64 startTime = getTimeNs();
+        u64 startTime = salGetTime();
 #endif
         char location[32];
         curWorker->fcts.printLocation(curWorker, &(location[0]));
@@ -1127,7 +1142,7 @@ u8 taskExecute(ocrTask_t* base) {
 #endif
 
 #ifdef OCR_ENABLE_VISUALIZER
-        u64 endTime = getTimeNs();
+        u64 endTime = salGetTime();
         DPRINTF(DEBUG_LVL_INFO, "Execute 0x%lx FctName: %s Start: %lu End: %lu\n", base->guid, base->name, startTime, endTime);
 #endif
     }
@@ -1136,7 +1151,8 @@ u8 taskExecute(ocrTask_t* base) {
     // We now say that the worker is done executing the EDT
     statsEDT_END(pd, ctx->sourceObj, curWorker, base->guid, base);
 #endif /* OCR_ENABLE_STATISTICS */
-    DPRINTF(DEBUG_LVL_INFO, "End_Execution 0x%lx\n", base->guid);
+    DPRINTF(DEBUG_LVL_INFO, "End_Execution 0x%lx\n", base->guid,
+            true, OCR_TRACE_TYPE_EDT, OCR_ACTION_FINISH);
 
     // edt user code is done, if any deps, release data-blocks
     if(depc != 0) {

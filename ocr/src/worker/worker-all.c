@@ -20,6 +20,9 @@ const char * worker_types[] = {
 #ifdef ENABLE_WORKER_CE
    "CE",
 #endif
+#ifdef ENABLE_WORKER_SYSTEM
+   "SYSTEM",
+#endif
    NULL
 };
 
@@ -27,6 +30,7 @@ const char * ocrWorkerType_types[] = {
     "single",
     "master",
     "slave",
+    "system",
     NULL
 };
 
@@ -47,6 +51,10 @@ ocrWorkerFactory_t * newWorkerFactory(workerType_t type, ocrParamList_t *perType
 #ifdef ENABLE_WORKER_CE
     case workerCe_id:
         return newOcrWorkerFactoryCe(perType);
+#endif
+#ifdef ENABLE_WORKER_SYSTEM
+    case workerSystem_id:
+        return newOcrWorkerFactorySystem(perType);
 #endif
     default:
         ASSERT(0);

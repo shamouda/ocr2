@@ -14,6 +14,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#define OCR_VERSION "1.0.1"
+
 /**
  * @defgroup OCRTypes Types and constants used in OCR
  *
@@ -348,7 +350,6 @@ typedef struct {
  *
  * Note: User facing options for queryable sections
  *       of paused runtime.
- *
  */
 typedef enum {
     OCR_QUERY_READY_EDTS,
@@ -356,6 +357,37 @@ typedef enum {
     OCR_QUERY_LAST_SATISFIED_DB,
     OCR_QUERY_ALL_EDTS,
 } ocrQueryType_t;
+
+
+/**
+ * @brief OCR Trace Object types
+ *
+ * Note: Types of OCR objects used for tracing
+ *       Values selected to avoid collision with
+ *       Variable arg values.
+ */
+typedef enum {
+    OCR_TRACE_TYPE_EDT = 1000,
+    OCR_TRACE_TYPE_EVENT = 1001,
+    OCR_TRACE_TYPE_DATABLOCK = 1002
+} ocrTraceType_t;
+
+
+/**
+ * @brief OCR Trace Object actions
+ *
+ * Note: Types of actions performed by OCR objects
+ *       for tracing
+ */
+typedef enum {
+    OCR_ACTION_CREATE,
+    OCR_ACTION_DESTROY,
+    OCR_ACTION_RUNNABLE,
+    OCR_ACTION_ADD_DEP,
+    OCR_ACTION_SATISFY,
+    OCR_ACTION_EXECUTE,
+    OCR_ACTION_FINISH,
+} ocrTraceAction_t;
 
 /**
  * @}

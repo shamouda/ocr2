@@ -273,8 +273,10 @@ ocrDataBlock_t* newDataBlockRegular(ocrDataBlockFactory_t *factory, ocrFatGuid_t
                    &(result->base));
 #endif /* OCR_ENABLE_STATISTICS */
 
-    DPRINTF(DEBUG_LVL_VERB, "Creating a datablock of size %lu @ 0x%lx (GUID: 0x%lx)\n",
-            size, (u64)result->base.ptr, result->base.guid);
+    DPRINTF(DEBUG_LVL_VERB, "Creating a datablock of size %lu, @ 0x%lx (GUID: 0x%lx)\n",
+            size, (u64)result->base.ptr, result->base.guid,
+            false, OCR_TRACE_TYPE_DATABLOCK, OCR_ACTION_CREATE, size);
+
 
     return (ocrDataBlock_t*)result;
 }

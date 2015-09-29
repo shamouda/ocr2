@@ -37,6 +37,9 @@ while [[ $# -gt 0 ]]; do
     elif [[ "$1" = "-ext_legacy" ]]; then
         shift
         TEST_EXT_LEGACY=yes
+    elif [[ "$1" = "-ext_labeling" ]]; then
+        shift
+        TEST_EXT_LABELING=yes
     elif [[ "$1" = "-co" ]]; then
         shift
         STEP_COMPILE_ONLY="yes"
@@ -89,6 +92,10 @@ fi
 
 if [ -n "${TEST_EXT_LEGACY}" ]; then
     CFLAGS="$CFLAGS -DENABLE_EXTENSION_LEGACY"
+fi
+
+if [ -n "${TEST_EXT_LABELING}" ]; then
+    CFLAGS="$CFLAGS -DENABLE_EXTENSION_LABELING"
 fi
 
 export LDFLAGS="-L${OCR_INSTALL}/lib -locr -lpthread ${OCR_LDFLAGS}"

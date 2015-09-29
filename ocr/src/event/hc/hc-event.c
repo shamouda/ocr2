@@ -129,7 +129,9 @@ u8 destructEventHc(ocrEvent_t *base) {
     ocrTask_t *curTask = NULL;
     getCurrentEnv(&pd, NULL, &curTask, &msg);
 
-    DPRINTF(DEBUG_LVL_INFO, "Destroy %s: 0x%lx\n", eventTypeToString(base), base->guid);
+
+    DPRINTF(DEBUG_LVL_INFO, "Destroy %s: 0x%lx\n", eventTypeToString(base), base->guid,
+            false, OCR_TRACE_TYPE_EVENT, OCR_ACTION_DESTROY);
 
 #ifdef OCR_ENABLE_STATISTICS
     statsEVT_DESTROY(pd, getCurrentEDT(), NULL, base->guid, base);
@@ -369,7 +371,8 @@ u8 satisfyEventHcPersistIdem(ocrEvent_t *base, ocrFatGuid_t db, u32 slot) {
         hal_unlock32(&(event->waitersLock));
         // Legal for idempotent to ignore subsequent satisfy
         return 1; //BUG #603 error codes: Put some error code here.
-    } else{
+    } else {
+        ((ocrEventHcPersist_t*)event)->data = db.guid;
         waitersCount = event->waitersCount;
         event->waitersCount = (u32)-1; // Indicate the event is satisfied
         hal_unlock32(&(event->waitersLock));

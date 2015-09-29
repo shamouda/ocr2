@@ -292,7 +292,7 @@ u8 labeledGuidGetVal(ocrGuidProvider_t* self, ocrGuid_t guid, u64* val, ocrGuidK
     if(*val == (u64)NULL) {
         // Does not exist in the hashtable
         if(kind) {
-            *kind = OCR_GUID_NONE;
+            *kind = getKindFromGuid(guid);
         }
     } else {
         // Bug #627: We do not return until the GUID is valid. We test this
@@ -306,6 +306,7 @@ u8 labeledGuidGetVal(ocrGuidProvider_t* self, ocrGuid_t guid, u64* val, ocrGuidK
             *kind = getKindFromGuid(guid);
         }
     }
+
     return 0;
 }
 
@@ -340,6 +341,16 @@ u8 labeledGuidRegisterGuid(ocrGuidProvider_t* self, ocrGuid_t guid, u64 val) {
 u8 labeledGuidReleaseGuid(ocrGuidProvider_t *self, ocrFatGuid_t fatGuid, bool releaseVal) {
     DPRINTF(DEBUG_LVL_VERB, "LabeledGUID: release GUID 0x%lx\n", fatGuid.guid);
     ocrGuid_t guid = fatGuid.guid;
+    // We *first* remove the GUID from the hashtable otherwise the following race
+    // could occur:
+    //   - free the metadata
+    //   - another thread trying to create the same GUID creates the metadata at the *same* address
+    //   - the other thread tries to insert, this succeeds immediately since it's
+    //     the same value for the pointer (already in the hashtable)
+    //   - this function removes the value from the hashtable
+    //   => the creator thinks all is swell but the data was actually *removed*
+    ocrGuidProviderLabeled_t * derived = (ocrGuidProviderLabeled_t *) self;
+    RESULT_ASSERT(hashtableConcBucketLockedRemove(derived->guidImplTable, (void *)guid, NULL), ==, true);
     // If there's metaData associated with guid we need to deallocate memory
     if(releaseVal && (fatGuid.metaDataPtr != NULL)) {
         PD_MSG_STACK(msg);
@@ -359,9 +370,6 @@ u8 labeledGuidReleaseGuid(ocrGuidProvider_t *self, ocrFatGuid_t fatGuid, bool re
 #undef PD_MSG
 #undef PD_TYPE
     }
-    // In any case, we need to recycle the guid
-    ocrGuidProviderLabeled_t * derived = (ocrGuidProviderLabeled_t *) self;
-    RESULT_ASSERT(hashtableConcBucketLockedRemove(derived->guidImplTable, (void *)guid, NULL), ==, true);
     return 0;
 }
 
