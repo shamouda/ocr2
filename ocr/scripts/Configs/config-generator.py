@@ -275,7 +275,7 @@ def GenerateConfig(filehandle, guid, platform, target, threads, binding, alloc, 
             print 'error: target ', target, ' only supports Lockable datablocks; received ', dbtype
             os.unlink(filehandle.name)
             raise
-        if guid != 'COUNTED_MAP':
+        if guid != 'COUNTED_MAP' and guid != 'LABELED':
             print 'error: target ', target, ' only supports counted-map guid provider; received ', guid
             os.unlink(filehandle.name)
             raise

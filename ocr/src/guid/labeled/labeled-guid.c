@@ -292,7 +292,7 @@ u8 labeledGuidGetVal(ocrGuidProvider_t* self, ocrGuid_t guid, u64* val, ocrGuidK
     if(*val == (u64)NULL) {
         // Does not exist in the hashtable
         if(kind) {
-            *kind = OCR_GUID_NONE;
+            *kind = getKindFromGuid(guid);
         }
     } else {
         // Bug #627: We do not return until the GUID is valid. We test this
