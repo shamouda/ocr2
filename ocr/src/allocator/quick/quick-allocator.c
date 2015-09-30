@@ -181,19 +181,51 @@ typedef void blkPayload_t; // Strongly type-check the ptr-to-void that comprises
 // INFO1 contains a pointer to the pool header which it belongs to. i.e. poolHdr_t
 // INFO2 contains canonical address for other agent/CE can use to free this block. (useful only on TG)
 
-// arbitrary value 0xfeef. This mark helps detect invalid ptr or double free.
-#define MARK                    (0xfeefL << 48)
+//#define FINE_LOCKING     // WIP, disabled at this moment.
+
+// This mark helps detect invalid ptr or double free.
+#define MARK                    (0xfeef0055U)
+#define HEAD(X)                 (((u32 *)(X))[0])
+#ifdef FINE_LOCKING
+#define HEAD_LOCK(X)            (((u32 *)(X))[1])
+#else
+#define HEAD_MARK(X)            (((u32 *)(X))[1])
+#endif
+#ifndef FINE_LOCKING
+struct bmapOp {int dummy;};
+#else
+struct bmapOp {
+    u32 fli[3],sli[3];
+    s32 delta[3],count;
+};
+#endif
+
 // first 64bit == HEAD
-#define HEAD(X)                 ((X)[0])
 // last 64bit == TAIL , and last 32bit == TAIL_SIZE (holds block size)
-#define TAIL_SIZE(X,SIZE)       (*(u32 *)((u8 *)(X)+(SIZE)-sizeof(u32)))
+#define TAIL_SIZE(X,SIZE)       (*(u32 *)((u8 *)(X)+(SIZE)-sizeof(u64)))
+#ifdef FINE_LOCKING
+#define TAIL_LOCK(X,SIZE)       (*(u32 *)((u8 *)(X)+(SIZE)-sizeof(u32)))
+#else
+#define TAIL_MARK(X,SIZE)       (*(u32 *)((u8 *)(X)+(SIZE)-sizeof(u32)))
+#endif
 #define TAIL(X,SIZE)            (*(u64 *)((u8 *)(X)+(SIZE)-sizeof(u64)))
-#define PEER_LEFT(X)            ((X)[-( ((s32 *)(X))[-1] >> 3 )])
+#define PEER_LEFT(X)            ((X)[-( ((s32 *)(X))[-2] >> 3 )])
+#define PEER_LEFT_TAIL_LOCK(X)  (((s32 *)(X))[-1])
 #define PEER_RIGHT(X,SIZE)      (*(u64 *)((u8 *)(X)+(SIZE)))
-#define GET_MARK(X)             ((((1UL << 16)-1) << 48) & (X))
-#define GET_SIZE(X)             ((((1UL << 48)-1-3)    ) & (X))
-#define GET_BIT0(X)             ((                   1) & (X))
-#define GET_BIT1(X)             ((                   2) & (X))
+
+#define MAX_BLOCK_SIZE          (0x80000000)  // To support per-agent cache
+#define FLAG_FREE               (0)
+#define FLAG_INUSE              (1)
+#define FLAG_MERGE              (2) // block locked, and is to be merged
+#define GET_FLAG(X)             (  3UL & (X))
+#define GET_BIT2(X)             (  4UL & (X)) // BIT2: 0 for user , 1 for runtime
+#define GET_SIZE(X)             ( ~7UL & (X))
+#ifdef FINE_LOCKING
+#define GET_MARK(X)             (MARK)        // disable
+#else
+//#define GET_MARK(X)             (TAIL_MARK((X),GET_SIZE(HEAD(X))))
+#define GET_MARK(X)             (HEAD_MARK(X))
+#endif
 
 // Additional INFOs
 #define INFO1(X)                ((X)[1])
@@ -213,7 +245,6 @@ typedef void blkPayload_t; // Strongly type-check the ptr-to-void that comprises
 // Minimum allocatable size from user's perspective is 2*u64 for prev/next for free list
 // Thus, the minimum block size internally below
 #define MINIMUM_SIZE            (2*sizeof(u64) + ALLOC_OVERHEAD)
-
 // known value is placed at the end of heap as a guard
 #define KNOWN_VALUE_AS_GUARD    0xfeed0000deadbeef
 
@@ -267,6 +298,11 @@ struct slab_header {
 };
 #endif
 
+//#define ALIGN_CACHE_LINE       // disabled. needs review
+#ifdef ALIGN_CACHE_LINE
+#define CACHE_LINE_SHIFT        (6)
+#define CACHE_LINE_MASK         ((1UL<<(CACHE_LINE_SHIFT))-1)
+#endif
 
 // VALGRIND SUPPORT
 // ( blocks are sometimes called chunks. i.e. chunk == block )
@@ -291,7 +327,7 @@ struct slab_header {
 #define VALGRIND_CHUNK_OPEN(X)                                                 \
     do {                                                                       \
         VALGRIND_MAKE_MEM_DEFINED(&HEAD(X), 3*sizeof(u64));                    \
-        if (GET_BIT0(HEAD(X)) == 0) {                                          \
+        if (GET_FLAG(HEAD(X)) == FLAG_FREE) {                                  \
             VALGRIND_MAKE_MEM_DEFINED((u64 *)(X)+3 , 2*sizeof(u64));           \
         }                                                                      \
         VALGRIND_MAKE_MEM_DEFINED(&TAIL((X), GET_SIZE(HEAD(X))), sizeof(u64)); \
@@ -308,10 +344,10 @@ struct slab_header {
     }
 #define VALGRIND_CHUNK_CLOSE(X)                                          \
     do {                                                                 \
-        int cond = GET_BIT0(HEAD(X));                                    \
+        int cond = GET_FLAG(HEAD(X));                                    \
         int size = GET_SIZE(HEAD(X));                                    \
         VALGRIND_MAKE_MEM_NOACCESS(&HEAD(X), 3*sizeof(u64));             \
-        if (cond==0)                                                     \
+        if (cond==FLAG_FREE)                                             \
             VALGRIND_MAKE_MEM_NOACCESS((u64 *)(X)+3 , 2*sizeof(u64));    \
             VALGRIND_MAKE_MEM_NOACCESS(&TAIL((X), size ), sizeof(u64));  \
     } while(0)
@@ -330,7 +366,6 @@ struct slab_header {
 #define VALGRIND_CHUNK_CLOSE_COND(X, Y)
 #endif
 
-//#define FINE_LOCKING     // WIP, disabled at this moment.
 
 // start of tlsf core part
 /*
@@ -369,7 +404,7 @@ typedef struct {
     u32 freeList[SL_COUNT];
 #ifdef FINE_LOCKING
     u32 listLock[SL_COUNT];
-    u32 bmapLock;   // lock for slAvailOrNot
+    s32 listCount[SL_COUNT];
 #endif
 } secondLevel_t;
 
@@ -377,7 +412,7 @@ typedef struct {
     u64 guard;          // some known value as a guard
     u64 *glebeStart;
     u64 *glebeEnd;
-    u32 lock;
+    u32 lock;           // used for init only, if FINE_LOCKING
     u32 init_count;
     // counters
     u32 count_used;     // count bytes allocated.
@@ -386,6 +421,9 @@ typedef struct {
     // tlsf-specific parts
     u32 flCount;        // Number of first-level buckets.  This is invariant after constructor runs.
     u64 flAvailOrNot;   // bitmap that indicates the presence (1) or absence (0) of free blocks in blocks[i][*]
+#ifdef FINE_LOCKING
+    u32 bmapLock;
+#endif
     secondLevel_t sl[0];// second level structure in the annex area
 } poolHdr_t;
 
@@ -436,6 +474,9 @@ static u64 quickInitAnnex(poolHdr_t * pPool, u64 size) {
     DPRINTF(DEBUG_LVL_VERB,"Allocating a pool at [0x%lx,0x%lx) of %ld(0x%lx) bytes. flCount %d, sizeof(poolHdr_t)=0x%x (glebe: offset 0x%lx, and size is %ld(0x%lx), i.e. net size after pool overhead)\n",
         (u64)pPool, (u64)pPool+size, size, size, flBucketCount, sizeof(poolHdr_t), (u64) poolHeaderSize, (u64)sizeRemainingAfterPoolHeader, (u64)sizeRemainingAfterPoolHeader);
     pPool->flAvailOrNot = 0; // Initialize the bitmaps to 0
+#ifdef FINE_LOCKING
+    pPool->bmapLock = 0;
+#endif
 
     return poolHeaderSize;
 }
@@ -494,7 +535,7 @@ static void mappingInsert(u64 payloadSizeInBytes, u32* flIndex, u32* slIndex) {
  *  that block was taken from.
  */
 
-static u64 *getFreeListMalloc(poolHdr_t *pPool, u64 size)
+static u64 *getFreeListMalloc(poolHdr_t *pPool, u64 size, u32 *fli, u32 *sli)
 {
     u32 flIndex, slIndex;
     size -= ALLOC_OVERHEAD;     // convert to payload size
@@ -517,16 +558,26 @@ static u64 *getFreeListMalloc(poolHdr_t *pPool, u64 size)
     if (flIndex >= pPool->flCount) {
         return NULL;
     }
-
+#ifdef FINE_LOCKING
+    hal_lock32(&(pPool->bmapLock));
+#endif
     u32 slBitmap = pPool->sl[flIndex].slAvailOrNot & (~0UL << slIndex); // This takes all SL bins bigger or equal to slIndex
     if (slBitmap == 0) {
-        if (flIndex+1 >= pPool->flCount)
+        if (flIndex+1 >= pPool->flCount) {
+#ifdef FINE_LOCKING
+            hal_unlock32(&(pPool->bmapLock));
+#endif
             return NULL;
+        }
 
         // We don't have any non-zero block here so we look at the flAvailOrNot map
         u64 flBitmap = pPool->flAvailOrNot & (~0UL << (flIndex+1)); // all FL bins bigger or equal to flIndex
-        if (flBitmap == 0)
+        if (flBitmap == 0) {
+#ifdef FINE_LOCKING
+            hal_unlock32(&(pPool->bmapLock));
+#endif
             return NULL;
+        }
 
         // Look for the first bit that is a one
         flIndex = myffs(flBitmap);
@@ -536,23 +587,18 @@ static u64 *getFreeListMalloc(poolHdr_t *pPool, u64 size)
         slBitmap = pPool->sl[flIndex].slAvailOrNot;
         ASSERT(slBitmap != 0);
     }
+#ifdef FINE_LOCKING
+    hal_unlock32(&(pPool->bmapLock));
+#endif
     slIndex = myffs(slBitmap);
     ASSERT(slIndex < SL_COUNT);
 
-    ASSERT(pPool->sl[flIndex].freeList[slIndex] != -1);
-    return pPool->glebeStart + pPool->sl[flIndex].freeList[slIndex];
+    *fli = flIndex;
+    *sli = slIndex;
+    return (void *)1;
 }
 
-static u64 *getFreeList(poolHdr_t *pPool, u64 size)
-{
-    u32 flIndex, slIndex;
-    mappingInsert(size - ALLOC_OVERHEAD, &flIndex, &slIndex);
-    if (pPool->sl[flIndex].freeList[slIndex] != -1)
-        return pPool->glebeStart + pPool->sl[flIndex].freeList[slIndex];
-    return NULL;
-}
-
-static void setFreeList(poolHdr_t *pPool, u64 size, u64 *p)
+static void setFreeList(poolHdr_t *pPool, u64 size, u64 *p, u32 flIndex, u32 slIndex)
 {
     u32 v;
     if (p == NULL) {
@@ -562,12 +608,11 @@ static void setFreeList(poolHdr_t *pPool, u64 size, u64 *p)
         ASSERT((u64)p < (u64)pPool->glebeEnd);
         v = p-(pPool->glebeStart);
     }
-    u32 flIndex, slIndex;
-
-    mappingInsert(size - ALLOC_OVERHEAD, &flIndex, &slIndex);
+#ifndef FINE_LOCKING
     u32 old = pPool->sl[flIndex].freeList[slIndex];
+#endif
     pPool->sl[flIndex].freeList[slIndex] = v;
-
+#ifndef FINE_LOCKING
     // adjust bitmap
     u32 oldBitmap = pPool->sl[flIndex].slAvailOrNot;
     ASSERT(slIndex < sizeof(pPool->sl[flIndex].slAvailOrNot)*8);
@@ -588,7 +633,70 @@ static void setFreeList(poolHdr_t *pPool, u64 size, u64 *p)
             pPool->flAvailOrNot &= ~(1UL << flIndex);
         }
     }
+#endif
 }
+#ifdef FINE_LOCKING
+void doBmapOp(poolHdr_t *pool, struct bmapOp *bmap_op)
+{
+    int i;
+    // optimization for common cases.
+    if ( bmap_op->count == 2 && bmap_op->fli[0] == bmap_op->fli[1] && bmap_op->sli[0] == bmap_op->sli[1] ) {
+        ASSERT(bmap_op->delta[0] == -1 && bmap_op->delta[1] == 1);
+        return;
+    }
+
+    // dobmapOp count 3
+    // 13,15, -1
+    // 0,8, -1
+    // 13,15, 1
+    //
+    if ( bmap_op->count == 3 && bmap_op->fli[0] == bmap_op->fli[2] && bmap_op->sli[0] == bmap_op->sli[2] ) {
+        ASSERT(bmap_op->delta[0] == -1 && bmap_op->delta[2] == 1);
+        bmap_op->count = 1;
+        bmap_op->fli[0] = bmap_op->fli[1];
+        bmap_op->sli[0] = bmap_op->sli[1];
+    }
+/*  // some debugging code
+    printf("dobmapOp count %d\n", bmap_op->count);
+    for(i=0;i<bmap_op->count;i++) {
+        printf("%d,%d, %d\n", bmap_op->fli[i], bmap_op->sli[i], bmap_op->delta[i]);
+    }
+*/
+    s32 u,v;
+    u32 flIndex, slIndex;
+    hal_lock32(&(pool->bmapLock));
+    for(i=0;i<bmap_op->count;i++) {
+        flIndex = bmap_op->fli[i];
+        slIndex = bmap_op->sli[i];
+        u = pool->sl[flIndex].listCount[slIndex];
+        v = (pool->sl[flIndex].listCount[slIndex] += bmap_op->delta[i]);
+        ASSERT(bmap_op->delta[i] == 1 || bmap_op->delta[i] == -1);
+
+        // adjust bitmap
+        u32 oldBitmap = pool->sl[flIndex].slAvailOrNot;
+        ASSERT(slIndex < sizeof(pool->sl[flIndex].slAvailOrNot)*8);
+        ASSERT(flIndex < sizeof(pool->flAvailOrNot)*8);
+        if (u == 0 && v == 1) {  // 0 -> 1
+            ASSERT(!(oldBitmap & (1UL << slIndex)));
+            pool->sl[flIndex].slAvailOrNot |= (1UL << slIndex);
+            if (!oldBitmap) {
+                ASSERT(!(pool->flAvailOrNot & (1UL << flIndex)));
+                pool->flAvailOrNot |= (1UL << flIndex);
+            }
+        }
+        if (u == 1 && v == 0) {  // 1 -> 0
+            ASSERT(oldBitmap & (1UL << slIndex));
+            pool->sl[flIndex].slAvailOrNot &= ~(1UL << slIndex);
+            if (!(pool->sl[flIndex].slAvailOrNot)) {
+                ASSERT(pool->flAvailOrNot & (1UL << flIndex));
+                pool->flAvailOrNot &= ~(1UL << flIndex);
+            }
+        }
+    }
+//quickPrint(pool);
+    hal_unlock32(&(pool->bmapLock));
+}
+#endif
 // end of tlsf core part
 
 
@@ -627,9 +735,7 @@ static void quickFinish(poolHdr_t *pool, u64 size)
     // spinlock value must be 0 or 1. If not, it means it's not properly zero'ed before, or corrupted.
     ASSERT(pool->lock == 0 || pool->lock == 1);
 
-#ifdef PER_AGENT_CACHE
     quickPrintCache();
-#endif
 
     hal_lock32(&(pool->lock));
     pool->init_count--;
@@ -675,10 +781,20 @@ static void quickInit(poolHdr_t *pool, u64 size)
         u64 offsetToGlebe = quickInitAnnex(pool, size);
         u64 *q = (u64 *)(p + offsetToGlebe);
         ASSERT(((u64)q & ALIGNMENT_MASK) == 0);
-
+#ifdef ALIGN_CACHE_LINE
+        q = (u64 *)(((u64)q + CACHE_LINE_MASK)&(~CACHE_LINE_MASK));   // ceiling
+#endif
         //marks the glebe as a single free block
         size = size - offsetToGlebe;
-        HEAD(q) = MARK | size;
+        HEAD(q) = size | FLAG_FREE;
+
+#ifdef FINE_LOCKING
+        HEAD_LOCK(q) = 0;
+        TAIL_LOCK(q,size) = 0;
+#else
+        HEAD_MARK(q) = MARK;
+        TAIL_MARK(q,size) = MARK;
+#endif
         NEXT(q) = 0;
         PREV(q) = 0;
         TAIL_SIZE(q,size) = size;
@@ -701,16 +817,25 @@ static void quickInit(poolHdr_t *pool, u64 size)
                 pool->sl[i].slAvailOrNot = 0;    // init bitmap
                 pool->sl[i].freeList[j] = -1;    // empty list
 #ifdef FINE_LOCKING
-                pool->sl[i].listLock[j] = 0;
+                pool->sl[i].listCount[j] = 0;
 #endif
             }
-#ifdef FINE_LOCKING
-            pool->sl[i].bmapLock = 0;
-#endif
         }
 
         // Add the glebe, i.e. the big free block
-        setFreeList(pool, size, q);
+        u32 flIndex, slIndex;
+        mappingInsert(size - ALLOC_OVERHEAD, &flIndex, &slIndex);
+        setFreeList(pool, size, q, flIndex, slIndex);
+
+#ifdef FINE_LOCKING
+        struct bmapOp bmap_op;
+        bmap_op.count = 1;
+        bmap_op.fli[0] = flIndex;
+        bmap_op.sli[0] = slIndex;
+        bmap_op.delta[0] = 1;
+
+        doBmapOp(pool, &bmap_op);
+#endif
         DPRINTF(DEBUG_LVL_INFO, "init'ed pool %p, avail %ld bytes , sizeof(poolHdr_t) = %ld\n", pool, size, sizeof(poolHdr_t));
         pool->init_count++;
 #ifdef ENABLE_VALGRIND
@@ -729,20 +854,19 @@ static void quickInit(poolHdr_t *pool, u64 size)
 #endif
 }
 
-static void quickInsertFree(poolHdr_t *pool,u64 *p, u64 size)
+static void quickInsertFree(poolHdr_t *pool,u64 *p, u64 size, u32 flIndex, u32 slIndex)
 {
-    VALGRIND_CHUNK_OPEN_INIT(p, size);
-    ASSERT((size & ALIGNMENT_MASK) == 0);
-    HEAD(p) = MARK | size;
-    TAIL_SIZE(p, size) = size;
-
     VALGRIND_POOL_OPEN(pool);
-    u64 *q = getFreeList(pool, size);
-    if (q == NULL) {
-        NEXT(p) = p-(pool->glebeStart);
-        PREV(p) = p-(pool->glebeStart);
-        setFreeList(pool, size, p);
-    } else {
+
+#ifdef ALIGN_CACHE_LINE
+    ASSERT(!((u64)p & CACHE_LINE_MASK));
+#endif
+#ifdef FINE_LOCKING
+    hal_lock32(&pool->sl[flIndex].listLock[slIndex]);
+#endif
+    if (pool->sl[flIndex].freeList[slIndex] != -1) {
+        u64 *q = pool->glebeStart + pool->sl[flIndex].freeList[slIndex];
+
         VALGRIND_CHUNK_OPEN(q);
         u64 *r = PREV(q)+(pool->glebeStart);
         VALGRIND_CHUNK_OPEN_COND(q, r);
@@ -752,45 +876,42 @@ static void quickInsertFree(poolHdr_t *pool,u64 *p, u64 size)
         PREV(p) = PREV(q);
         PREV(q) = p-(pool->glebeStart);
         VALGRIND_CHUNK_CLOSE(q);
+    } else {
+        NEXT(p) = p-(pool->glebeStart);
+        PREV(p) = p-(pool->glebeStart);
+        setFreeList(pool, size, p, flIndex, slIndex);
     }
-//    putFreeList(pool, size);
+#ifdef FINE_LOCKING
+    hal_unlock32(&pool->sl[flIndex].listLock[slIndex]);
+#endif
     //quickPrint(pool);
     VALGRIND_POOL_CLOSE(pool);
-    VALGRIND_CHUNK_CLOSE(p);
 }
 
-static void quickSplitFree(poolHdr_t *pool,u64 *p, u64 size)
-{
-    VALGRIND_CHUNK_OPEN_INIT(p, size);
-    u64 remain = GET_SIZE(HEAD(p)) - size;
-    ASSERT( remain < GET_SIZE(HEAD(p)) );
-    ASSERT((size & ALIGNMENT_MASK) == 0);
-    // make sure the remaining block is bigger than minimum size
-    if (remain >= MINIMUM_SIZE) {
-        HEAD(p) = MARK | size | 0x1;    // in-use mark
-        TAIL_SIZE(p, size) = size;
-        VALGRIND_CHUNK_CLOSE(p);
-        u64 *right = &PEER_RIGHT(p, size);
-        quickInsertFree(pool, right, remain);
-    } else {
-        HEAD(p) |= 0x1;         // in-use mark
-        VALGRIND_CHUNK_CLOSE(p);
-    }
-}
-
-static void quickDeleteFree(poolHdr_t *pool,u64 *p, u32 skipLock)
+static void quickDeleteFree1(poolHdr_t *pool,u64 *p, u32 flIndex, u32 slIndex)
 {
     VALGRIND_POOL_OPEN(pool);
     VALGRIND_CHUNK_OPEN(p);
-    ASSERT(GET_BIT0(HEAD(p)) == 0);
+    ASSERT(GET_FLAG(HEAD(p)) == FLAG_FREE);   // cleared in-use bit in list.
+    ASSERT(PREV(p) != -1 && NEXT(p) != -1);
     u64 size = GET_SIZE(HEAD(p));
-    u64 *list = getFreeList(pool, size);
+    u64 *list;
+//    u32 flIndex, slIndex;
+
+    if (pool->sl[flIndex].freeList[slIndex] != -1)
+        list = pool->glebeStart + pool->sl[flIndex].freeList[slIndex];
+    else {
+        DPRINTF(DEBUG_LVL_WARN, "quickMalloc : not-in-list free block in Free1!?!\n");
+        ASSERT(0);
+        list = NULL;
+    }
+
     u64 *next = NEXT(p) + pool->glebeStart;
     u64 *prev = PREV(p) + pool->glebeStart;
 
     if (next == p) {
-        setFreeList(pool, size, NULL);
-//        putFreeList(pool, size);
+        setFreeList(pool, size, NULL, flIndex, slIndex);
+        PREV(p) = NEXT(p) = -1;
         VALGRIND_CHUNK_CLOSE(p);
         VALGRIND_POOL_CLOSE(pool);
         return;
@@ -801,9 +922,69 @@ static void quickDeleteFree(poolHdr_t *pool,u64 *p, u32 skipLock)
     NEXT(prev) = NEXT(p);
     PREV(next) = PREV(p);
     if (p == list) {
-        setFreeList(pool, size, next);
-//        putFreeList(pool, size);
+        setFreeList(pool, size, next, flIndex, slIndex);
     }
+    PREV(p) = NEXT(p) = -1;
+    VALGRIND_CHUNK_CLOSE(p);
+    VALGRIND_CHUNK_CLOSE(next);
+    VALGRIND_CHUNK_CLOSE_COND(next, prev);
+    VALGRIND_POOL_CLOSE(pool);
+}
+
+
+
+static void quickDeleteFree2(poolHdr_t *pool,u64 *p, struct bmapOp *bmap_op)
+{
+    VALGRIND_POOL_OPEN(pool);
+    VALGRIND_CHUNK_OPEN(p);
+
+    u64 size = GET_SIZE(HEAD(p));
+    u64 *list;
+    u32 flIndex, slIndex;
+
+    mappingInsert(size - ALLOC_OVERHEAD, &flIndex, &slIndex);
+#ifdef FINE_LOCKING
+    u32 i = bmap_op->count++;
+    bmap_op->fli[i] = flIndex;
+    bmap_op->sli[i] = slIndex;
+    bmap_op->delta[i] = -1;
+    hal_lock32(&pool->sl[flIndex].listLock[slIndex]);
+#endif
+    ASSERT(GET_FLAG(HEAD(p)) == FLAG_MERGE);
+    ASSERT(PREV(p) != -1 && NEXT(p) != -1);
+    if (pool->sl[flIndex].freeList[slIndex] != -1)
+        list = pool->glebeStart + pool->sl[flIndex].freeList[slIndex];
+    else {
+        DPRINTF(DEBUG_LVL_WARN, "quickMalloc : not-in-list free block!?!\n");
+        ASSERT(0);
+        list = NULL;
+    }
+
+    u64 *next = NEXT(p) + pool->glebeStart;
+    u64 *prev = PREV(p) + pool->glebeStart;
+
+    if (next == p) {
+        setFreeList(pool, size, NULL, flIndex, slIndex);
+#ifdef FINE_LOCKING
+        PREV(p) = NEXT(p) = -1;
+        hal_unlock32(&pool->sl[flIndex].listLock[slIndex]);
+#endif
+        VALGRIND_CHUNK_CLOSE(p);
+        VALGRIND_POOL_CLOSE(pool);
+        return;
+    }
+    VALGRIND_CHUNK_OPEN(next);
+    VALGRIND_CHUNK_OPEN_COND(next, prev);
+
+    NEXT(prev) = NEXT(p);
+    PREV(next) = PREV(p);
+    if (p == list) {
+        setFreeList(pool, size, next, flIndex, slIndex);
+    }
+#ifdef FINE_LOCKING
+    PREV(p) = NEXT(p) = -1;
+    hal_unlock32(&pool->sl[flIndex].listLock[slIndex]);
+#endif
     VALGRIND_CHUNK_CLOSE(p);
     VALGRIND_CHUNK_CLOSE(next);
     VALGRIND_CHUNK_CLOSE_COND(next, prev);
@@ -821,6 +1002,11 @@ static inline void checkGuard(poolHdr_t *pool)
     ASSERT_BLOCK_END
 }
 
+// counters for diagnosis
+u32 count_malloc_retry1;
+u32 count_malloc_retry2;
+u32 count_left_retry;
+u32 count_merge_retry;
 
 static blkPayload_t *quickMallocInternal(poolHdr_t *pool,u64 size, struct _ocrPolicyDomain_t *pd)
 {
@@ -831,16 +1017,25 @@ static blkPayload_t *quickMallocInternal(poolHdr_t *pool,u64 size, struct _ocrPo
     // in case that it's freed in the future.
     size = (size_orig + ALIGNMENT_MASK)&(~ALIGNMENT_MASK);   // ceiling
     size += ALLOC_OVERHEAD;     // internal size
+#ifdef ALIGN_CACHE_LINE
+    size = (size + CACHE_LINE_MASK)&(~CACHE_LINE_MASK);   // ceiling
+#else
     if (size < MINIMUM_SIZE)    // should be bigger than minimum size
         size = MINIMUM_SIZE;
+#endif
 
     VALGRIND_POOL_OPEN(pool);
 #ifndef FINE_LOCKING
     hal_lock32(&(pool->lock));
 #endif
     checkGuard(pool);
-    u64 *freelist = getFreeListMalloc(pool, size);
-    u64 *p = freelist;
+
+    u32 fli, sli;
+    u64 *p;
+#ifdef FINE_LOCKING
+retry:
+#endif
+    p = getFreeListMalloc(pool, size, &fli, &sli);
     VALGRIND_POOL_CLOSE(pool);
 
     //quickPrint(pool);
@@ -855,14 +1050,112 @@ static blkPayload_t *quickMallocInternal(poolHdr_t *pool,u64 size, struct _ocrPo
     }
     // OK, we've found a free list
 
+#ifdef FINE_LOCKING
+    if (pool->sl[fli].freeList[sli] == -1) {
+        hal_xadd32(&count_malloc_retry1, 1);
+        goto retry;
+    }
+    hal_lock32(&pool->sl[fli].listLock[sli]);
+    if (pool->sl[fli].freeList[sli] == -1) {
+//        printf("wrong bitmap.. malloc try again...\n");
+        hal_unlock32(&pool->sl[fli].listLock[sli]);
+        hal_xadd32(&count_malloc_retry2, 1);
+        goto retry;
+    }
+#else
+    ASSERT(pool->sl[fli].freeList[sli] != -1);
+#endif
+    p = pool->glebeStart + pool->sl[fli].freeList[sli];
+
     VALGRIND_CHUNK_OPEN(p);
     ASSERT_BLOCK_BEGIN( GET_SIZE(HEAD(p)) >= size )  // always true on tlsf
     DPRINTF(DEBUG_LVL_WARN, "quickMalloc : BUG! this free list has too small block.\n");
     ASSERT_BLOCK_END
 
     VALGRIND_CHUNK_CLOSE(p);
-    quickDeleteFree(pool, p, 1);
-    quickSplitFree(pool, p, size);
+#ifdef FINE_LOCKING
+    {
+    u32 ret;
+    do {
+        ret = hal_trylock32(&HEAD_LOCK(p));
+        if (ret) {
+            if (GET_FLAG(HEAD(p)) == FLAG_MERGE) {
+                //printf("found FLAG_MERGE.. retry\n");
+                hal_xadd32(&count_merge_retry, 1);
+                hal_unlock32(&pool->sl[fli].listLock[sli]);
+                goto retry;
+            }
+        }
+    } while(ret);
+    }
+
+    struct bmapOp bmap_op;
+    bmap_op.count = 1;
+    bmap_op.fli[0] = fli;
+    bmap_op.sli[0] = sli;
+    bmap_op.delta[0] = -1;
+#endif
+
+    quickDeleteFree1(pool, p, fli, sli);
+#ifdef FINE_LOCKING
+    hal_unlock32(&pool->sl[fli].listLock[sli]);
+#endif
+
+    VALGRIND_CHUNK_OPEN_INIT(p, size);
+    u64 remain = GET_SIZE(HEAD(p)) - size;
+    ASSERT( remain < GET_SIZE(HEAD(p)) );
+    ASSERT((size & ALIGNMENT_MASK) == 0);
+    // make sure the remaining block is bigger than minimum size
+    if (remain >= MINIMUM_SIZE) {  // we need split
+#ifdef FINE_LOCKING
+        hal_lock32(&TAIL_LOCK(p, GET_SIZE(HEAD(p))));
+#endif
+        // we're already holding lock
+        HEAD(p) = size | FLAG_INUSE;    // in-use mark
+        TAIL_SIZE(p, size) = size;
+#ifdef FINE_LOCKING
+        TAIL_LOCK(p, size) = 0;
+#else
+        TAIL_MARK(p, size) = MARK;
+#endif
+        VALGRIND_CHUNK_CLOSE(p);
+
+        u64 *right = &PEER_RIGHT(p, size);
+        u32 flIndex, slIndex;
+        mappingInsert(remain - ALLOC_OVERHEAD, &flIndex, &slIndex);
+
+        VALGRIND_CHUNK_OPEN_INIT(right, remain);
+        ASSERT((remain & ALIGNMENT_MASK) == 0);
+        HEAD(right) = remain | FLAG_FREE;
+        PREV(right) = NEXT(right) = -1;
+#ifdef FINE_LOCKING
+        HEAD_LOCK(right) = 1;  // can this be 0 ?
+#else
+        HEAD_MARK(right) = MARK;
+#endif
+        TAIL_SIZE(right, remain) = remain;
+#ifdef FINE_LOCKING
+        hal_unlock32(&TAIL_LOCK(right, remain));
+#endif
+        // do I need barrier?
+
+        quickInsertFree(pool, right, remain, flIndex, slIndex);
+        VALGRIND_CHUNK_CLOSE(right);
+#ifdef FINE_LOCKING
+        hal_unlock32(&HEAD_LOCK(right));
+        bmap_op.count = 2;
+        bmap_op.fli[1] = flIndex;
+        bmap_op.sli[1] = slIndex;
+        bmap_op.delta[1] = 1;
+#endif
+    } else {
+        HEAD(p) |= FLAG_INUSE;         // in-use mark
+        VALGRIND_CHUNK_CLOSE(p);
+    }
+#ifdef FINE_LOCKING
+    hal_unlock32(&HEAD_LOCK(p));
+    doBmapOp(pool, &bmap_op);
+#endif
 
     void *ret = HEAD_TO_USER(p);
     VALGRIND_CHUNK_OPEN(p);
@@ -903,7 +1196,8 @@ static void quickFreeInternal(blkPayload_t *p)
     u64 *q = USER_TO_HEAD(p);
     VALGRIND_CHUNK_OPEN(q);
     poolHdr_t *pool = (poolHdr_t *)INFO1(q);
-    ASSERT_BLOCK_BEGIN (  GET_MARK(HEAD(q)) == MARK )
+
+    ASSERT_BLOCK_BEGIN ( GET_MARK(q) == MARK )
     DPRINTF(DEBUG_LVL_WARN, "QuickAlloc : free: cannot find mark. Probably wrong address is passed to free()? %p\n", p);
     VALGRIND_CHUNK_CLOSE(q);
 #ifdef ENABLE_VALGRIND
@@ -914,8 +1208,11 @@ static void quickFreeInternal(blkPayload_t *p)
     VALGRIND_POOL_OPEN(pool);
     u64 start = (u64)pool->glebeStart;
     u64 end   = (u64)pool->glebeEnd;
+    struct bmapOp bmap_op;
 #ifndef FINE_LOCKING
     hal_lock32(&(pool->lock));
+#else
+    bmap_op.count = 0;
 #endif
     checkGuard(pool);
     VALGRIND_POOL_CLOSE(pool);
@@ -926,11 +1223,11 @@ static void quickFreeInternal(blkPayload_t *p)
     // Make sure we have the global address to free, even if user passed local address...
     q = USER_TO_HEAD(INFO2(q)); // For TG. no effects on x86
 
-    ASSERT_BLOCK_BEGIN ( GET_MARK(HEAD(q)) == MARK )
+    ASSERT_BLOCK_BEGIN ( GET_MARK(q) == MARK )
     DPRINTF(DEBUG_LVL_WARN, "QuickAlloc : free: mark not found %p\n", p);
     ASSERT_BLOCK_END
 
-    ASSERT_BLOCK_BEGIN ( GET_BIT0(HEAD(q)) )
+    ASSERT_BLOCK_BEGIN ( GET_FLAG(HEAD(q)) == FLAG_INUSE)
     DPRINTF(DEBUG_LVL_WARN, "QuickAlloc : free not-allocated block? double free? p=%p\n", p);
     ASSERT_BLOCK_END
 
@@ -939,8 +1236,20 @@ static void quickFreeInternal(blkPayload_t *p)
     DPRINTF(DEBUG_LVL_WARN, "QuickAlloc : two sizes doesn't match. p=%p\n", p);
     ASSERT_BLOCK_END
 
-    u64 size_orig = size;
+    u32 flIndex, slIndex;
+    int skip_merges = 0;
 
+    mappingInsert(size - ALLOC_OVERHEAD, &flIndex, &slIndex);
+#ifdef FINE_LOCKING
+#if 1
+    // skip merges to add more 1's to bitmaps which will exploits parallelism
+    // read without sync, so it's approximate
+    if ( pool->sl[flIndex].listCount[slIndex] < 16)
+        skip_merges = 1;
+#endif
+#endif
+
+    u64 size_orig = size;
     //DPRINTF(DEBUG_LVL_VERB, "before free : pool = %p, addr=%p\n", pool, INFO2(q));
     //quickPrint(pool);
 
@@ -954,52 +1263,134 @@ static void quickFreeInternal(blkPayload_t *p)
     ASSERT_BLOCK_END
     VALGRIND_CHUNK_CLOSE(q);
 
-    if ((u64)peer_right != end) {
+    if (!skip_merges && (u64)peer_right != end) {
+        //printf("try right..\n");
         VALGRIND_CHUNK_OPEN(peer_right);
 
-        ASSERT_BLOCK_BEGIN (  GET_MARK(HEAD(peer_right)) == MARK )
+#ifdef FINE_LOCKING
+        hal_lock32(&HEAD_LOCK(peer_right));
+        hal_lock32(&HEAD_LOCK(q));
+#endif
+
+        ASSERT_BLOCK_BEGIN (  GET_MARK(q) == MARK )
         DPRINTF(DEBUG_LVL_WARN, "QuickAlloc : right neighbor's mark not found %p\n", p);
         ASSERT_BLOCK_END
 
-        if (!(GET_BIT0(HEAD(peer_right)))) {     // right block is free?
-            size += GET_SIZE(HEAD(peer_right));
+        HEAD(q) = GET_SIZE(HEAD(q)) | FLAG_FREE;   // change flag
+        if (GET_FLAG(HEAD(peer_right)) == FLAG_FREE) {     // right block is free?
+            //printf("merge right..\n");
+            u64 peer_size = GET_SIZE(HEAD(peer_right));
+#ifdef FINE_LOCKING
+            hal_lock32(&TAIL_LOCK(peer_right, peer_size));
+#endif
+            HEAD(peer_right) = peer_size | FLAG_MERGE;
+
             VALGRIND_CHUNK_CLOSE(peer_right);
-            quickDeleteFree(pool, peer_right, 0);
+            quickDeleteFree2(pool, peer_right, &bmap_op);
             VALGRIND_CHUNK_OPEN(peer_right);
-            HEAD(peer_right) = 0;    // erase header (and mark)
+
+            // TAIL_MARK( = 0; erase header??
+            size += peer_size;
+            TAIL_SIZE(peer_right, peer_size) = size;
+            HEAD(peer_right) = 0;    // erase header
+            HEAD(q) = size | FLAG_FREE;         // clear in-use bit
+            // peer_right merged.
+        } else {
+#ifdef FINE_LOCKING
+            hal_unlock32(&HEAD_LOCK(peer_right));
+            hal_lock32(&TAIL_LOCK(q, GET_SIZE(HEAD(q))));
+#endif
         }
         VALGRIND_CHUNK_CLOSE(peer_right);
+    } else {
+#ifdef FINE_LOCKING
+        hal_lock32(&HEAD_LOCK(q));
+        hal_lock32(&TAIL_LOCK(q, GET_SIZE(HEAD(q))));
+#endif
+        HEAD(q) = GET_SIZE(HEAD(q)) | FLAG_FREE;   // clears in-use bit
     }
 
     VALGRIND_CHUNK_OPEN(q);
-    if ((u64)&HEAD(q) != start) {
+    if (!skip_merges && (u64)&HEAD(q) != start) {
+        //printf("try left..\n");
         VALGRIND_CHUNK_OPEN_LEFT(q);
-        u64 *peer_left = &PEER_LEFT(q);
+        u64 *peer_left;
+#ifdef FINE_LOCKING
+left_merge_retry:
+        hal_lock32(&PEER_LEFT_TAIL_LOCK(q));
+#endif
+        peer_left = &PEER_LEFT(q);
         ASSERT(peer_left != q);
 
         VALGRIND_CHUNK_CLOSE(q);
         // just omit chunk_close_left()
         VALGRIND_CHUNK_OPEN(peer_left);
 
-        ASSERT_BLOCK_BEGIN ( GET_MARK(HEAD(peer_left)) == MARK )
+#ifdef FINE_LOCKING
+        {
+        u32 ret;
+        do {
+            ret = hal_trylock32(&HEAD_LOCK(peer_left));
+            if (ret) {
+                hal_unlock32(&PEER_LEFT_TAIL_LOCK(q));
+                hal_xadd32(&count_left_retry, 1);
+                goto left_merge_retry;
+            }
+        } while(ret);
+        hal_unlock32(&PEER_LEFT_TAIL_LOCK(q));
+        }
+#endif
+        ASSERT_BLOCK_BEGIN ( GET_MARK(peer_left) == MARK )
         DPRINTF(DEBUG_LVL_WARN, "QuickAlloc : left neighbor's mark not found %p\n", p);
         ASSERT_BLOCK_END
 
-        if (!(GET_BIT0(HEAD(peer_left)))) {      // left block is free?
-            size += GET_SIZE(HEAD(peer_left));
+        if (GET_FLAG(HEAD(peer_left))==FLAG_FREE) {      // left block is free?
+            //printf("merge left..\n");
+            u64 peer_size = GET_SIZE(HEAD(peer_left));
+            HEAD(peer_left) = peer_size | FLAG_MERGE;
+
+            // erase peer_left's mark?
             VALGRIND_CHUNK_CLOSE(peer_left);
-            quickDeleteFree(pool, peer_left, 0);
+            quickDeleteFree2(pool, peer_left, &bmap_op);
             VALGRIND_CHUNK_OPEN(peer_left);
+
+            u64 new_size = size + peer_size;
+            TAIL_SIZE(q, size) = new_size;
+            size = new_size;
+
             VALGRIND_CHUNK_OPEN(q);
-            HEAD(q) = 0;    // erase header (and mark)
+            HEAD(q) = 0;    // erase header
             VALGRIND_CHUNK_CLOSE(q);
             q = peer_left;
+            HEAD(q) = size | FLAG_FREE;    // clear in-use bit
+        } else {
+#ifdef FINE_LOCKING
+            hal_unlock32(&HEAD_LOCK(peer_left));
+#endif
         }
         VALGRIND_CHUNK_CLOSE(peer_left);
     } else {
         VALGRIND_CHUNK_CLOSE(q);
     }
-    quickInsertFree(pool, &HEAD(q), size);
+#ifdef FINE_LOCKING
+    hal_unlock32(&TAIL_LOCK(q, GET_SIZE(HEAD(q))));
+#endif
+
+    if (!skip_merges)  // if merged, recalculate due to size changes
+        mappingInsert(size - ALLOC_OVERHEAD, &flIndex, &slIndex);
+    quickInsertFree(pool, q, size, flIndex, slIndex);
+#ifdef FINE_LOCKING
+    ASSERT(GET_FLAG(HEAD(q)) == FLAG_FREE);
+    hal_unlock32(&HEAD_LOCK(q));
+#endif
+#ifdef FINE_LOCKING
+    int i = bmap_op.count++;
+    bmap_op.fli[i] = flIndex;
+    bmap_op.sli[i] = slIndex;
+    bmap_op.delta[i] = 1;
+
+    doBmapOp(pool, &bmap_op);
+#endif
 
     pool->count_used -= size_orig;  // count bytes using internal block size
     pool->count_free++;             // count successful deallocation calls
@@ -1095,13 +1486,12 @@ static void quickFree(blkPayload_t *p)
         return;
     u64 *q = USER_TO_HEAD(p);
     u64 size = GET_SIZE(HEAD(q));
-
-    if (size < 0xf00000000000) {   // in case of cached object, size is negative (offset to slab header)
+    if (size < MAX_BLOCK_SIZE) {   // in case of cached object, size is negative (offset to slab header)
         quickFreeInternal(p);
         return;
     }
 
-    struct slab_header *head = (struct slab_header *)((s64)(q) + (s64)HEAD(q));
+    struct slab_header *head = (struct slab_header *)((s64)(q) + (s32)HEAD(q));
     ASSERT(head->mark == SLAB_MARK);
     s64 offset = (s64)q - (s64)head - sizeof(struct slab_header);
     s64 pos = offset / (head->size+SLAB_OVERHEAD);
@@ -1115,7 +1505,7 @@ static void quickFree(blkPayload_t *p)
     hal_lock32(&head->per_agent->lock);
     struct slab_header *slabs = head->per_agent->slabs[slabsIndex];
 
-//    __sync_fetch_and_xor(&head->bitmap , 1UL << pos);
+    //    __sync_fetch_and_xor(&head->bitmap , 1UL << pos);
     head->bitmap ^= 1UL << pos;
     ASSERT_BLOCK_BEGIN((head->bitmap & (1UL << pos)) != 0)
     ASSERT_BLOCK_END
