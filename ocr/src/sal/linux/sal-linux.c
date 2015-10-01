@@ -10,7 +10,7 @@
 #include "ocr-types.h"
 #ifdef __MACH__
 
-#include <"mach/mach-time.h">
+#include <mach/mach_time.h>
 static double conversion_factor;
 static int getTimeNs_initialized = 0;
 
