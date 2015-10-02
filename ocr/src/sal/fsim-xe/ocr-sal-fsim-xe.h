@@ -29,14 +29,20 @@ extern void salResume(u32 flag);
 
 #define sal_exit(x) hal_exit(x)
 
-#define sal_assert(x, fn, ln) do { if(!(x)) {                       \
-        __asm__ __volatile__ __attribute__ (( noreturn )) (         \
-            "alarm %2\n\t"                                          \
-            : : "{r2}" (ln), "{r3}" (fn), "L" (XE_ASSERT_ERROR));   \
+#define sal_assert(x, fn, ln) do { if(!(x)) {                           \
+            __asm__ __volatile__ __attribute__((noreturn)) (            \
+                "lea r507, r507\n\t"                                    \
+                "alarm %2\n\t"                                          \
+                :                                                       \
+                : "{r507}" (fn), "{r506}" (ln), "L" (XE_ASSERT_ERROR)   \
+                : "r507");                                              \
         } } while(0)
 
 #define sal_print(msg, len) __asm__ __volatile__(                   \
+        "lea r506, r506\n\t"                                        \
         "alarm %2\n\t"                                              \
-        : : "{r2}" (msg), "{r3}" (len), "L" (XE_CONOUT_ALARM))
+        :                                                           \
+        : "{r506}" (msg), "{r507}" (len), "L" (XE_CONOUT_ALARM)     \
+        : "r506")
 
 #endif /* __OCR_SAL_FSIM_XE_H__ */
