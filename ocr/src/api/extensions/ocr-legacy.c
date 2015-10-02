@@ -179,17 +179,22 @@ u8 ocrLegacyBlockProgress(ocrGuid_t handle, ocrGuid_t* guid, void** result, u64*
             }
             if(result != NULL)
                 *result = PD_MSG_FIELD_O(ptr);
+            if(size != NULL) {
+                //BUG #162
+                // Because we do not have the metadata cloned, must read the size from the msg
+                *size = PD_MSG_FIELD_O(size);
+            }
             dbResult = PD_MSG_FIELD_IO(guid);
 #undef PD_TYPE
 #undef PD_MSG
         } else {
             if(result != NULL)
                 *result = ((ocrDataBlock_t*)(dbResult.metaDataPtr))->ptr;
+            if(size != NULL) {
+                *size = ((ocrDataBlock_t*)(dbResult.metaDataPtr))->size;
+            }
         }
         ASSERT(dbResult.metaDataPtr != NULL);
-        if(size != NULL) {
-            *size = ((ocrDataBlock_t*)(dbResult.metaDataPtr))->size;
-        }
     } else {
         if(size != NULL) {
             *size = 0;

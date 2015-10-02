@@ -256,6 +256,7 @@ static u8 lockableAcquireInternal(ocrDataBlock_t *self, void** ptr, ocrFatGuid_t
  * @brief Setup a callback response message and acquire on behalf of the waiter
  **/
 static void processAcquireCallback(ocrDataBlock_t *self, dbWaiter_t * waiter, ocrDbAccessMode_t waiterMode, u32 properties, ocrPolicyMsg_t * msg) {
+    ASSERT(waiter->slot != EDT_SLOT_NONE);
     getCurrentEnv(NULL, NULL, NULL, msg);
     //BUG #273: The In/Out nature of certain parameters is exposed here
 #define PD_MSG (msg)
