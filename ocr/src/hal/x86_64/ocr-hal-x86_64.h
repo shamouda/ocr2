@@ -257,6 +257,20 @@
 #define hal_wake(id) do {                     \
     } while(0)
 
+/**
+ * @brief On architectures (like TG) that
+ * have different address "formats", canonicalize it
+ * to the unique form
+ */
+#define hal_globalizeAddr(addr) addr
+
+/**
+ * @brief On architectures (like TG) that have
+ * different address "formats", this returns the
+ * smallest usable address from the global address 'addr'
+ */
+#define hal_localizeAddr(addr) addr
+
 /****************************************************/
 /* SYSTEM DISCOVERY                                 */
 /****************************************************/

@@ -34,7 +34,7 @@
 #include "policy-domain/ce/ce-policy.h"
 
 #include "mmio-table.h"
-#include "xstg-arch.h"
+#include "xstg-map.h"
 
 //Temporary until we get introspection support
 #include "task/hc/hc-task.h"
@@ -49,10 +49,10 @@
 static bool isChildCe(ocrLocation_t myLocation, ocrLocation_t loc) {
     if (AGENT_FROM_ID(loc) != ID_AGENT_CE)
         return false;
-    if ((myLocation & ID_BLOCK_MASK) == 0) {                              //If I am the block0 CE, ...
-        if ((myLocation & ID_CLUSTER_MASK) == 0) {                        //If I am the cluster0,block0 CE
+    if (BLOCK_FROM_ID(myLocation) == 0) {                              //If I am the block0 CE, ...
+        if (CLUSTER_FROM_ID(myLocation) == 0) {                        //If I am the cluster0,block0 CE
             return true;                                                  //then, everyone is my child
-        } else if ((myLocation & ID_CLUSTER_MASK) == (loc & ID_CLUSTER_MASK)) { //else if, context is a CE in my cluster
+        } else if (CLUSTER_FROM_ID(myLocation) == CLUSTER_FROM_ID(loc)) { //else if, context is a CE in my cluster
             return true;                                                  //then, this non-block0 CE is my child
         }
     }

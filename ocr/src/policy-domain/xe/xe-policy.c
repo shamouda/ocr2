@@ -24,7 +24,6 @@
 #include "tg-bin-files.h"
 
 #include "mmio-table.h"
-#include "xstg-arch.h"
 #include "xstg-map.h"
 
 #include "utils/profiler/profiler.h"
@@ -82,7 +81,10 @@ static void performNeighborDiscovery(ocrPolicyDomain_t *policy) {
 #ifdef HAL_FSIM_XE
     policy->myLocation = (ocrLocation_t)(*(u64*)(AR_MSR_BASE + CORE_LOCATION_NUM * sizeof(u64)));
 #endif // For TG-x86, set in the driver code
-    policy->parentLocation = (policy->myLocation & ~ID_AGENT_MASK) | ID_AGENT_CE;
+    policy->parentLocation = MAKE_CORE_ID(RACK_FROM_ID(policy->myLocation), CUBE_FROM_ID(policy->myLocation),
+                                          SOCKET_FROM_ID(policy->myLocation), CLUSTER_FROM_ID(policy->myLocation),
+                                          BLOCK_FROM_ID(policy->myLocation), ID_AGENT_CE);
+    DPRINTF(DEBUG_LVL_INFO, "Got location 0x%lx and parent location 0x%lx\n", policy->myLocation, policy->parentLocation);
 }
 
 static void findNeighborsPd(ocrPolicyDomain_t *policy) {
