@@ -328,6 +328,24 @@
 #define hal_wake(id) do {                         \
     } while(0)
 
+/**
+ * @brief On architectures (like TG) that
+ * have different address "formats", canonicalize it
+ * to the unique form
+ */
+#define hal_globalizeAddr(addr) ({                                      \
+    u64 __dest;                                                         \
+    __asm__ __volatile__("lea %0, %1\n\t" : "=r" (__dest) : "r" (addr) ); \
+    __dest;                                                             \
+        })
+
+/**
+ * @brief On architectures (like TG) that have
+ * different address "formats", this returns the
+ * smallest usable address from the global address 'addr'
+ */
+#define hal_localizeAddr(addr) addr
+
 // Abstraction to do a load operation from any level of the memory hierarchy
 #define GET8(temp, addr)   ((temp) = *((u8*)(addr)))
 #define GET16(temp, addr)  ((temp) = *((u16*)(addr)))

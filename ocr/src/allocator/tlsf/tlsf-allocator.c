@@ -1388,16 +1388,16 @@ static ocrAllocator_t * getAnchorCE (ocrAllocator_t * self) {
         anchorCE = (ocrAllocator_t *) (self);
         break;
     case 3:    // Cluster level   (i.e. cluster-shared memory, or cluster's private slice of a higher-level memory.
-        anchorCE = (ocrAllocator_t *) (((u64) self) | (CR_AGENT_BASE(0, ID_AGENT_CE)));
+        anchorCE = (ocrAllocator_t *) (((u64) self) | (CR_L1_BASE(0, ID_AGENT_CE)));
         break;
     case 4:    // Socket level   (i.e. socket-shared memory, or socket's private slice of a higher-level memory.
-        anchorCE = (ocrAllocator_t *) (((u64) self) | (SR_AGENT_BASE(0,0, ID_AGENT_CE)));
+        anchorCE = (ocrAllocator_t *) (((u64) self) | (SR_L1_BASE(0,0, ID_AGENT_CE)));
         break;
     case 5:    // cUbe level  (i.e. cube-shared memory, or cube's private slice of a higher-level memory.
-        anchorCE = (ocrAllocator_t *) (((u64) self) | (UR_AGENT_BASE(0,0,0, ID_AGENT_CE)));
+        anchorCE = (ocrAllocator_t *) (((u64) self) | (UR_L1_BASE(0,0,0, ID_AGENT_CE)));
         break;
     case 6:    // Rack level   (i.e. rack-shared memory
-        anchorCE = (ocrAllocator_t *) (((u64) self) | (RR_AGENT_BASE(0,0,0,0, ID_AGENT_CE)));
+        anchorCE = (ocrAllocator_t *) (((u64) self) | (RR_L1_BASE(0,0,0,0, ID_AGENT_CE)));
         break;
     default:
         ASSERT(0);

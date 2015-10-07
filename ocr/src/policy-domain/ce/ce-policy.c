@@ -38,9 +38,7 @@
 #include "allocator/allocator-all.h"
 #include "extensions/ocr-hints.h"
 
-#ifdef HAL_FSIM_CE
 #include "xstg-map.h"
-#endif
 
 #include "tg-bin-files.h"
 
@@ -331,12 +329,15 @@ static void performNeighborDiscovery(ocrPolicyDomain_t *policy) {
     policy->myLocation = *((ocrLocation_t*)(AR_MSR_BASE + CORE_LOCATION_NUM * sizeof(u64)));
 #endif // On TG-x86, it is set in the driver code
     // My parent is my cluster's block 0 CE
-    policy->parentLocation = (policy->myLocation & ~(ID_BLOCK_MASK|ID_AGENT_MASK)) | ID_AGENT_CE;
+    policy->parentLocation = MAKE_CORE_ID(RACK_FROM_ID(policy->myLocation), CUBE_FROM_ID(policy->myLocation),
+                                          SOCKET_FROM_ID(policy->myLocation), CLUSTER_FROM_ID(policy->myLocation),
+                                          0, ID_AGENT_CE);
 
     // If I'm a block 0 CE, my parent is cluster 0 block 0 CE
-    if((policy->myLocation & ID_BLOCK_MASK) == 0)
-        policy->parentLocation = (policy->myLocation & ~(ID_CLUSTER_MASK|ID_BLOCK_MASK|ID_AGENT_MASK))
-            | ID_AGENT_CE;
+    if(BLOCK_FROM_ID(policy->myLocation) == 0)
+        policy->parentLocation = MAKE_CORE_ID(RACK_FROM_ID(policy->myLocation), CUBE_FROM_ID(policy->myLocation),
+                                              SOCKET_FROM_ID(policy->myLocation), 0,
+                                              0, ID_AGENT_CE);
     // BUG #231: Generalize this to cover higher levels of hierarchy too.
 
     // Now that I know who I am, I figure out who my neighbors are
@@ -356,7 +357,7 @@ static void performNeighborDiscovery(ocrPolicyDomain_t *policy) {
 
     if(policy->neighborCount) {
         for (i = 0; i < MAX_NUM_BLOCK; i++) {
-            u32 myCluster = ((policy->myLocation & ID_CLUSTER_MASK) >> ID_CLUSTER_SHIFT);
+            u32 myCluster = CLUSTER_FROM_ID(policy->myLocation);
             if(policy->myLocation != MAKE_CORE_ID(0, 0, 0, myCluster, i, ID_AGENT_CE)) {
                 policy->neighbors[ncount++] = MAKE_CORE_ID(0, 0, 0, myCluster, i, ID_AGENT_CE);
                 DPRINTF(DEBUG_LVL_VERB, "For cluster %u and block %u, got agent ID 0x%x and setting to %u (@ 0x%lx)\n",
@@ -378,11 +379,13 @@ static void performNeighborDiscovery(ocrPolicyDomain_t *policy) {
         }
     }
     policy->neighborCount = ncount;
+
+    DPRINTF(DEBUG_LVL_INFO, "Got location 0x%lx and parent location 0x%lx\n", policy->myLocation, policy->parentLocation);
 }
 
 static void findNeighborsPd(ocrPolicyDomain_t *policy) {
 #ifndef HAL_FSIM_CE
-    u32 myCLuster = CLUSTER_FROM_ID(policy->myLocation);
+    u32 myCluster = CLUSTER_FROM_ID(policy->myLocation);
     u32 myBlock = BLOCK_FROM_ID(policy->myLocation);
 
     // Fill out the neighborPDs structure which is needed
@@ -1776,7 +1779,7 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
                     // Self is always relative to ourself (the CE). All PDs are at the same location
                     // relatively to the CE itself
                     ocrPolicyDomain_t *otherPd = (ocrPolicyDomain_t*)(
-                        SR_L1_BASE(CLUSTER_FROM_ID(guidLocation), BLOCK_FROM_ID(guidLocation), ID_AGENT_CE) + (u64)(self));
+                        SR_L1_BASE(CLUSTER_FROM_ID(guidLocation), BLOCK_FROM_ID(guidLocation), ID_AGENT_CE) + ((u64)(self) - AR_L1_BASE));
 #endif
                     // Note that this a HACK for now because we do not have asynchronous runtime
                     // execution (Bug #695). There is a risk that getCurrentEnv is called in this
@@ -1842,7 +1845,7 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
                                                        AGENT_FROM_ID(guidLocation)];
 #else
             ocrPolicyDomain_t *otherPd = (ocrPolicyDomain_t*)(
-                SR_L1_BASE(CLUSTER_FROM_ID(guidLocation), BLOCK_FROM_ID(guidLocation), ID_AGENT_CE) + (u64)(self));
+                SR_L1_BASE(CLUSTER_FROM_ID(guidLocation), BLOCK_FROM_ID(guidLocation), ID_AGENT_CE) + (u64)(self) - AR_L1_BASE);
 #endif
             ASSERT(otherPd->myLocation == guidLocation);
             RESULT_ASSERT(otherPd->guidProviders[0]->fcts.getVal(otherPd->guidProviders[0], PD_MSG_FIELD_IO(guid.guid),
@@ -1953,7 +1956,7 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
                                                            AGENT_FROM_ID(guidLocation)];
 #else
                 ocrPolicyDomain_t *otherPd = (ocrPolicyDomain_t*)(
-                    SR_L1_BASE(CLUSTER_FROM_ID(guidLocation), BLOCK_FROM_ID(guidLocation), ID_AGENT_CE) + (u64)(self));
+                    SR_L1_BASE(CLUSTER_FROM_ID(guidLocation), BLOCK_FROM_ID(guidLocation), ID_AGENT_CE) + (u64)(self) - AR_L1_BASE);
 #endif
                 ASSERT(otherPd->myLocation == guidLocation);
                 RESULT_ASSERT(otherPd->guidProviders[0]->fcts.releaseGuid(otherPd->guidProviders[0],

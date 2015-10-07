@@ -20,6 +20,9 @@
 
 #include "ce-comm-platform.h"
 
+#include "mmio-table.h"
+#include "xstg-map.h"
+
 #define DEBUG_TYPE COMM_PLATFORM
 
 //
@@ -257,17 +260,6 @@ static u8 ceCommCheckCEMessage(ocrCommPlatform_t *self, ocrPolicyMsg_t **msg) {
     return POLL_NO_MESSAGE;
 }
 
-u64 parentOf(u64 location) {
-    // XE's parent is its CE
-    if ((location & ID_AGENT_MASK) != ID_AGENT_CE)
-        return ((location & ~ID_AGENT_MASK ) | ID_AGENT_CE);
-    else if (BLOCK_FROM_ID(location)) // Non-zero block has zero block as parent
-        return (location & ~ID_BLOCK_MASK);
-    else if (CLUSTER_FROM_ID(location)) // Non-zero cluster has zero cluster & zero block as parent
-        return (location & ~ID_CLUSTER_MASK);
-    return location;
-}
-
 void ceCommDestruct (ocrCommPlatform_t * base) {
 
     runtimeChunkFree((u64)base, NULL);
@@ -312,7 +304,7 @@ u8 ceCommSwitchRunlevel(ocrCommPlatform_t *self, ocrPolicyDomain_t *PD, ocrRunle
             // Pre-compute pointer to our block's XEs' local stages (where they send to us)
             COMPILE_TIME_ASSERT(ID_AGENT_XE0 == 1); // This loop assumes this. Fix if this changes
             for(i=0; i< ((ocrPolicyDomainCe_t*)PD)->xeCount; ++i) {
-                cp->rq[i] = (u64 *)(BR_L1_BASE(i+1) + MSG_QUEUE_OFFT);
+                cp->rq[i] = (u64 *)(BR_L1_BASE(i+ID_AGENT_XE0) + MSG_QUEUE_OFFT);
                 cp->lq[i] = (u64 *)(AR_L1_BASE + (u64)MSG_QUEUE_OFFT + i * MSG_QUEUE_SIZE);
                 *(cp->rq[i]) = 0; // Only initialize the remote one; XEs initialize local ones
             }
@@ -362,12 +354,12 @@ u8 ceCommSendMessage(ocrCommPlatform_t *self, ocrLocation_t target,
 
     // If target is not in the same block, use a different function
     // BUG #618: do the same for socket/cluster/board as well, or better yet, a new macro
-    if((self->location & ~ID_AGENT_MASK) != (target & ~ID_AGENT_MASK)) {
+    if(BLOCK_FROM_ID(self->location) != BLOCK_FROM_ID(target)) {
         return ceCommSendMessageToCE(self, target, message, id, properties, mask);
     } else {
         // BUG #618: compute all-but-agent & compare between us & target
         // Target XE's stage (note this is in remote XE memory!)
-        volatile u64 * rq = cp->rq[(((u64)target) & ID_AGENT_MASK) - ID_AGENT_XE0];
+        volatile u64 * rq = cp->rq[(AGENT_FROM_ID((u64)target)) - ID_AGENT_XE0];
 
         // - Check remote stage Empty/Busy/Full is Empty.
         {
@@ -539,15 +531,15 @@ u8 ceCommDestructMessage(ocrCommPlatform_t *self, ocrPolicyMsg_t *msg) {
                     u64 loopcount = 0;
                     do {
                         // Bug #820: This was a MMIO LD call and should be replaced by one when they become available
-                        state = *((u64*)(BR_MSR_BASE((i+ID_AGENT_XE0)) + (MSR_6 * sizeof(u64))));
+
+                        state = *((u64*)(BR_MSR_BASE((i+ID_AGENT_XE0)) + (POWER_GATE_RESET * sizeof(u64))));
                         if(++loopcount > 1000000) {
                             loopcount = 0;
                             DPRINTF(DEBUG_LVL_WARN, "Stuck on unclockgating %u\n", i);
                         }
-                    } while(!(state & 0x10000000ULL));
-#warning FIXME-OCRTG: THIS WAS FUB_CLOCK_CTL AND IS NOW MSR_6 -- MAKE SURE WE DO THE RIGHT THING STILL...
+                    } while(!(state & 0x1ULL));
                     // Bug #820: Further, this was a MMIO operation
-                    *((u64*)(BR_MSR_BASE((i+ID_AGENT_XE0)) + (MSR_6 * sizeof(u64)))) =  state & ~0x10000000ULL;
+                    *((u64*)(BR_MSR_BASE((i+ID_AGENT_XE0)) + (POWER_GATE_RESET * sizeof(u64)))) = 0x1ULL;
                 }
                 return 0;
             }

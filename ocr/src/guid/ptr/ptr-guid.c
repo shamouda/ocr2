@@ -134,15 +134,6 @@ u8 ptrCreateGuid(ocrGuidProvider_t* self, ocrFatGuid_t *fguid, u64 size, ocrGuid
     RESULT_PROPAGATE(policy->fcts.processMessage (policy, &msg, true));
 
     ocrGuidImpl_t * guidInst = (ocrGuidImpl_t *)PD_MSG_FIELD_O(ptr);
-#ifdef HAL_FSIM_CE
-#warning FIXME-OCRTG: REWROTE THE TWIDDLES BELOW FOR NEW HIERARCHY -- ORG AUTHOR SHOULD SANITY CHECK
-    if((u64)PD_MSG_FIELD_O(ptr) < AR_MSR_BASE) // FIXME: Revisit the arithmetic
-        guidInst = (ocrGuidImpl_t *) UR_AGENT_BASE(SOCKET_FROM_ID(policy->myLocation),
-                                                   CLUSTER_FROM_ID(policy->myLocation),
-                                                   BLOCK_FROM_ID(policy->myLocation),
-                                                   ID_AGENT_CE)
-                                     + (u64)(PD_MSG_FIELD_O(ptr) - BR_AGENT_BASE(ID_AGENT_CE));
-#endif
 
     guidInst->guid = (ocrGuid_t)((u64)guidInst + sizeof(ocrGuidImpl_t));
     guidInst->kind = kind;

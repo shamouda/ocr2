@@ -60,7 +60,7 @@
 #define ENABLE_HINTS
 
 // HAL layer to use
-#define HAL_FSIM_CE
+#define HAL_X86_64
 
 // SAL layer to use
 #define SAL_LINUX

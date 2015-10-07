@@ -18,7 +18,6 @@
 #include "xe-comm-platform.h"
 
 #include "mmio-table.h"
-#include "xstg-arch.h"
 #include "xstg-map.h"
 #include "xstg-msg-queue.h"
 
@@ -106,14 +105,16 @@ u8 xeCommSwitchRunlevel(ocrCommPlatform_t *self, ocrPolicyDomain_t *PD, ocrRunle
             // Zero-out our stage for receiving messages
             for(i=AR_L1_BASE + MSG_QUEUE_OFFT; i<AR_L1_BASE + MSG_QUEUE_SIZE; i += sizeof(u64))
                 *(volatile u64 *)i = 0;
+            DPRINTF(DEBUG_LVL_VVERB, "Zeroed out local addresses for incoming buffer @ 0x%lx for size %lu\n", AR_L1_BASE + MSG_QUEUE_OFFT, MSG_QUEUE_SIZE);
 
             // Remember which XE number we are
-            cp->N = (PD->myLocation & ID_AGENT_MASK) - ID_AGENT_XE0;
+            cp->N = AGENT_FROM_ID(PD->myLocation) - ID_AGENT_XE0;
 
             // Pre-compute pointer to our stage at the CE
             cp->rq = (u64 *)(BR_L1_BASE(ID_AGENT_CE) + MSG_QUEUE_OFFT + cp->N * MSG_QUEUE_SIZE);
             // Initialize it to 0
-            *(cp->rq) = 0;
+            *(cp->rq) = 0ULL;
+            DPRINTF(DEBUG_LVL_VVERB, "Initializing receive queue for agent %lu @ CE @ 0x%lx\n", cp->N, (u64)(cp->rq));
 #endif
         }
         break;

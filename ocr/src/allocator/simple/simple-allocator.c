@@ -58,9 +58,6 @@
 #include "simple-allocator.h"
 #include "allocator/allocator-all.h"
 #include "ocr-mem-platform.h"
-#if defined(HAL_FSIM_CE) || defined(HAL_FSIM_XE)
-#include "xstg-map.h"
-#endif
 
 #define ALIGNMENT 8LL
 
@@ -158,109 +155,6 @@
 #define VALGRIND_CHUNK_CLOSE(X)
 #define VALGRIND_CHUNK_CLOSE_COND(X, Y)
 #endif
-
-// This is for only TG. It's no-op for other arch.
-// On TG, this canonicalize the given address. This ensures correct memory deallocations when
-// EDTs are scheduled to other blocks and the address is passed to free() on that other block.
-void *addrGlobalizeOnTG(void *result, ocrPolicyDomain_t *self)
-{
-#if 1
-#warning FIXME-OCRTG: CONVERT TO SELFREF_TO_CANONICAL() MACRO FROM SAMKIT
-#else
-#if defined(HAL_FSIM_CE) || defined(HAL_FSIM_XE)
-    // void *orig = result;
-    // ideally we'd like to use the size of each memory as the end of each area.
-    // canonicalize addresses for L3 SPAD (USM -- unit shared mem)
-    if((u64)result <= UR_BSM_BASE(0, 0) /* as Bala suggested */ && (u64)result >= UR_USM_BASE) {
-        void *newresult = (void *)DR_USM_BASE(CHIP_FROM_ID(self->myLocation),
-                                    UNIT_FROM_ID(self->myLocation))
-                                    + (u64)(result - UR_USM_BASE);
-        //DPRINTF(DEBUG_LVL_INFO, "USM conv: %p -> %p\n", result, newresult );
-        result = newresult;
-    }
-    // Canonicalize addresses for L2 SPAD (BSM -- block shared mem)
-    if((u64)result <= BSM_MSR_BASE(0) && (u64)result >= BR_BSM_BASE(0)) {
-        void *newresult = (void *)DR_BSM_BASE(CHIP_FROM_ID(self->myLocation),
-                                    UNIT_FROM_ID(self->myLocation),
-                                    BLOCK_FROM_ID(self->myLocation), 0)
-                                    + (u64)(result - BR_BSM_BASE(0));
-        //DPRINTF(DEBUG_LVL_INFO, "BSM conv: %p -> %p\n", result, newresult );
-        result = newresult;
-    }
-
-    u64 id = AGENT_FROM_ID(self->myLocation);
-
-    if((u64)result <= NOM_L1_SIZE_KB*1024 && id < ID_AGENT_CE) {
-        result = (void *)DR_XE_BASE(CHIP_FROM_ID(self->myLocation),
-                                    UNIT_FROM_ID(self->myLocation),
-                                    BLOCK_FROM_ID(self->myLocation),
-                                    id) +
-                                    (u64)(result - 0);
-        u64 check = MAKE_CORE_ID(0,
-                                 0,
-                                 ((((u64)result >> MAP_CHIP_SHIFT) & ((1ULL<<MAP_CHIP_LEN) - 1)) - 1),
-                                 ((((u64)result >> MAP_UNIT_SHIFT) & ((1ULL<<MAP_UNIT_LEN) - 1)) - 2),
-                                 ((((u64)result >> MAP_BLOCK_SHIFT) & ((1ULL<<MAP_BLOCK_LEN) - 1)) - 2),
-                                 id);
-        //DPRINTF(DEBUG_LVL_WARN, "check:%p , self:%p, myloc:0x%lx\n", check, self, self->myLocation);
-        ASSERT(check==self->myLocation);
-        //DPRINTF(DEBUG_LVL_WARN, "globalize success : %p-> %p , id:%ld\n", orig, result, id);
-    }
-
-    if((u64)result <= XE_MSR_BASE(id) && (u64)result >= BR_XE_BASE(id)) {
-        result = (void *)DR_XE_BASE(CHIP_FROM_ID(self->myLocation),
-                                    UNIT_FROM_ID(self->myLocation),
-                                    BLOCK_FROM_ID(self->myLocation),
-                                    id) +
-                                    (u64)(result - BR_XE_BASE(id));
-        u64 check = MAKE_CORE_ID(0,
-                                 0,
-                                 ((((u64)result >> MAP_CHIP_SHIFT) & ((1ULL<<MAP_CHIP_LEN) - 1)) - 1),
-                                 ((((u64)result >> MAP_UNIT_SHIFT) & ((1ULL<<MAP_UNIT_LEN) - 1)) - 2),
-                                 ((((u64)result >> MAP_BLOCK_SHIFT) & ((1ULL<<MAP_BLOCK_LEN) - 1)) - 2),
-                                 id);
-        //DPRINTF(DEBUG_LVL_WARN, "check:%p , self:%p, myloc:0x%lx\n", check, self, self->myLocation);
-        ASSERT(check==self->myLocation);
-        //DPRINTF(DEBUG_LVL_WARN, "globalize success : %p-> %p , id:%ld , 0x%lx < x < 0x%lx\n", orig, result, id, BR_XE_BASE(id) , XE_MSR_BASE(id) );
-    }
-
-    if((u64)result <= 638 * 1024 && id == ID_AGENT_CE) {
-        result = (void *)DR_CE_BASE(CHIP_FROM_ID(self->myLocation),
-                                    UNIT_FROM_ID(self->myLocation),
-                                    BLOCK_FROM_ID(self->myLocation)) +
-                                    (u64)(result - 0);
-        u64 check = MAKE_CORE_ID(0,
-                                 0,
-                                 ((((u64)result >> MAP_CHIP_SHIFT) & ((1ULL<<MAP_CHIP_LEN) - 1)) - 1),
-                                 ((((u64)result >> MAP_UNIT_SHIFT) & ((1ULL<<MAP_UNIT_LEN) - 1)) - 2),
-                                 ((((u64)result >> MAP_BLOCK_SHIFT) & ((1ULL<<MAP_BLOCK_LEN) - 1)) - 2),
-                                 ID_AGENT_CE);
-        //DPRINTF(DEBUG_LVL_WARN, "check:%p , self:%p, myloc:0x%lx\n", check, self, self->myLocation);
-        ASSERT(check==self->myLocation);
-    }
-
-    if((u64)result <= CE_MSR_BASE && (u64)result >= BR_CE_BASE) {
-        result = (void *)DR_CE_BASE(CHIP_FROM_ID(self->myLocation),
-                                    UNIT_FROM_ID(self->myLocation),
-                                    BLOCK_FROM_ID(self->myLocation)) +
-                                    (u64)(result - BR_CE_BASE);
-        u64 check = MAKE_CORE_ID(0,
-                                 0,
-                                 ((((u64)result >> MAP_CHIP_SHIFT) & ((1ULL<<MAP_CHIP_LEN) - 1)) - 1),
-                                 ((((u64)result >> MAP_UNIT_SHIFT) & ((1ULL<<MAP_UNIT_LEN) - 1)) - 2),
-                                 ((((u64)result >> MAP_BLOCK_SHIFT) & ((1ULL<<MAP_BLOCK_LEN) - 1)) - 2),
-                                 ID_AGENT_CE);
-        //DPRINTF(DEBUG_LVL_WARN, "check:%p , self:%p, myloc:0x%lx, [%lx,%lx]\n", check, self, self->myLocation, CE_MSR_BASE, BR_CE_BASE);
-        ASSERT(check==self->myLocation);
-    }
-
-//    if (orig == result)
-//        DPRINTF(DEBUG_LVL_WARN, "globalize skipped : %p , id:%ld , 0x%lx < x < 0x%lx\n", result, id, BR_XE_BASE(id) , XE_MSR_BASE(id) );
-#endif
-#endif
-    return result;
-}
-
 
 static void simpleTest(u64 start, u64 size)
 {

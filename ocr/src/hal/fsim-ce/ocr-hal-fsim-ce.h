@@ -18,6 +18,7 @@
 #include "ocr-types.h"
 
 #include "mmio-table.h"
+#include "tg-mmio.h"
 
 /****************************************************/
 /* OCR LOW-LEVEL MACROS                             */
@@ -332,26 +333,33 @@
  *
  * This is used by CE to put an XE core in its block to sleep
  */
-// FIXME TG: need equivalent of XE_MSR_BASE(id) + FUB_POWER_CTL
-//#warning Review hal_sleep and hal_wake with proper assembly
-#define hal_sleep(id)
-/*
-#define hal_sleep(id) do {                                                                        \
-       *(u64 *)(XE_MSR_BASE(id) + FUB_POWER_CTL*sizeof(u64)) = 0x0ULL;  \
+#define hal_sleep(id) do {                                              \
+        *(u64 *)(BR_MSR_BASE(id + ID_AGENT_XE0) + POWER_GATE_RESET*sizeof(u64)) = 0x0ULL; \
     } while(0)
-*/
+
 /**
  * @brief Wake the XE core from sleep
  *
  * This is used by CE to wake an XE core in its block from sleep
  */
-// FIXME TG: same as above
-#define hal_wake(id)
-/*
 #define hal_wake(id) do {                                                    \
-       *(u64 *)(XE_MSR_BASE(id) + FUB_POWER_CTL*sizeof(u64)) = 0x1FFFFFFULL; \
+       *(u64 *)(BR_MSR_BASE(id + ID_AGENT_XE0) + POWER_GATE_RESET*sizeof(u64)) = 0x1ULL; \
     } while(0)
-*/
+
+/**
+ * @brief On architectures (like TG) that
+ * have different address "formats", canonicalize it
+ * to the unique form
+ */
+#define hal_globalizeAddr(addr) tg_canonical(addr)
+
+/**
+ * @brief On architectures (like TG) that have
+ * different address "formats", this returns the
+ * smallest usable address from the global address 'addr'
+ */
+#define hal_localizeAddr(addr) addr
+
 // Support for abstract load and store macros
 #define MAP_AGENT_SIZE_LOG2 (21)
 #define IS_REMOTE(addr) (((u64)(addr)) >= (1LL << MAP_AGENT_SIZE_LOG2))

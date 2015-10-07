@@ -71,4 +71,9 @@ extern const char * allocator_types[];
 ocrAllocatorFactory_t *newAllocatorFactory(allocatorType_t type, ocrParamList_t *typeArg);
 void allocatorFreeFunction(void* blockPayloadAddr);
 
+// Only for TG to deal with weird addressing. This should go
+// away when we have a better SAL/HAL layer to deal with
+// addresses
+void *addrGlobalizeOnTG(void *result, ocrPolicyDomain_t *self);
+
 #endif /* __ALLOCATOR_ALL_H__ */
