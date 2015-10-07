@@ -217,6 +217,8 @@ struct bmapOp {
 #define FLAG_FREE               (0)
 #define FLAG_INUSE              (1)
 #define FLAG_MERGE              (2) // block locked, and is to be merged
+#define FLAG_INUSE_SLAB         (3)
+#define FLAG_FOR_SLAB           (0x2)  // FLAG_INUSE | FLAG_FOR_SLAB == FLAG_INUSE_SLAB
 #define GET_FLAG(X)             (  3UL & (X))
 #define GET_BIT2(X)             (  4UL & (X)) // BIT2: 0 for user , 1 for runtime
 #define GET_SIZE(X)             ( ~7UL & (X))
@@ -410,8 +412,8 @@ typedef struct {
 
 typedef struct {
     u64 guard;          // some known value as a guard
-    u64 *glebeStart;
-    u64 *glebeEnd;
+    u64 *glebeStart;    // inclusive
+    u64 *glebeEnd;      // exclusive
     u32 lock;           // used for init only, if FINE_LOCKING
     u32 init_count;
     // counters
@@ -498,11 +500,43 @@ static void quickPrintCache(void)
 #endif
 }
 
+static void quickWalkPool(poolHdr_t *pool)
+{
+    u64 end   = (u64)pool->glebeEnd;
+    u64 *p = pool->glebeStart;
+    u64 size, flag, total = 0;
+    for(;;) {
+        size = GET_SIZE(HEAD(p));
+        flag = GET_FLAG(HEAD(p));
+        if (flag != FLAG_FREE) {
+            if (flag == FLAG_INUSE) {
+                DPRINTF(DEBUG_LVL_INFO, "[size %ld]\n", size);
+            } else if (flag == FLAG_INUSE_SLAB) {
+#ifdef PER_AGENT_CACHE
+                struct slab_header *head = (struct slab_header *)HEAD_TO_USER(p);
+                ASSERT(head->mark == SLAB_MARK);
+                DPRINTF(DEBUG_LVL_INFO, "[size %ld] slab for %p\n", size, head->per_agent);
+#else
+                ASSERT(0 && "FLAG_INUSE_SLAB without slab enabled?\n");
+#endif
+            } else {
+                DPRINTF(DEBUG_LVL_INFO, "{size %ld}\n", size);
+            }
+            total += size;
+        }
+        p = &PEER_RIGHT(p, size);
+        if ( (u64)p >= end )
+            break;
+    }
+    DPRINTF(DEBUG_LVL_INFO, "%ld bytes still in use\n", total);
+}
+
 static void quickPrintCounters(poolHdr_t *pool)
 {
     if (pool->count_used) {
         DPRINTF(DEBUG_LVL_INFO, "**** MEMORY LEAK REPORT (pool %p) ****\n", pool);
         DPRINTF(DEBUG_LVL_INFO, "%d bytes still in use, malloc %d times, free %d times\n", pool->count_used, pool->count_malloc, pool->count_free);
+        quickWalkPool(pool);
         DPRINTF(DEBUG_LVL_INFO, "****** END OF REPORT (pool %p) *******\n", pool);
     }
 }
@@ -1227,7 +1261,7 @@ static void quickFreeInternal(blkPayload_t *p)
     DPRINTF(DEBUG_LVL_WARN, "QuickAlloc : free: mark not found %p\n", p);
     ASSERT_BLOCK_END
 
-    ASSERT_BLOCK_BEGIN ( GET_FLAG(HEAD(q)) == FLAG_INUSE)
+    ASSERT_BLOCK_BEGIN ( GET_FLAG(HEAD(q)) == FLAG_INUSE || GET_FLAG(HEAD(q)) == FLAG_INUSE_SLAB )
     DPRINTF(DEBUG_LVL_WARN, "QuickAlloc : free not-allocated block? double free? p=%p\n", p);
     ASSERT_BLOCK_END
 
@@ -1241,7 +1275,8 @@ static void quickFreeInternal(blkPayload_t *p)
 
     mappingInsert(size - ALLOC_OVERHEAD, &flIndex, &slIndex);
 #ifdef FINE_LOCKING
-#if 1
+#define SKIP_MERGES
+#ifdef SKIP_MERGES
     // skip merges to add more 1's to bitmaps which will exploits parallelism
     // read without sync, so it's approximate
     if ( pool->sl[flIndex].listCount[slIndex] < 16)
@@ -1254,11 +1289,11 @@ static void quickFreeInternal(blkPayload_t *p)
     //quickPrint(pool);
 
     u64 *peer_right = &PEER_RIGHT(q, size);
-    ASSERT_BLOCK_BEGIN (!((u64)peer_right > end))
+    ASSERT_BLOCK_BEGIN ((u64)peer_right <= end) // peer_right may equal to end, it's checked again below
     DPRINTF(DEBUG_LVL_WARN, "QuickAlloc : PEER_RIGHT address %p is above the heap area\n", peer_right);
     ASSERT_BLOCK_END
 
-    ASSERT_BLOCK_BEGIN (!((u64)&HEAD(q) < start))
+    ASSERT_BLOCK_BEGIN ((u64)&HEAD(q) >= start)
     DPRINTF(DEBUG_LVL_WARN, "QuickAlloc : address %p is below the heap area\n", &HEAD(q));
     ASSERT_BLOCK_END
     VALGRIND_CHUNK_CLOSE(q);
@@ -1418,6 +1453,12 @@ static struct slab_header *quickNewSlab(poolHdr_t *pool,s32 slabMaxSize, struct 
             DPRINTF(DEBUG_LVL_VERB, "Slab alloc failed (slabMaxSize %d), falling back to central heap\n", slabMaxSize);
             return NULL;
         }
+
+        // mark flag as slab flag
+        u64 *q = USER_TO_HEAD(slab);
+        HEAD(q) |= FLAG_FOR_SLAB;
+        ASSERT(GET_FLAG(HEAD(q)) == FLAG_INUSE_SLAB);
+
         struct slab_header *head = slab;
         head->per_agent = addrGlobalizeOnTG((void *)per_agent, pd);
         head->next = head->prev = head;
