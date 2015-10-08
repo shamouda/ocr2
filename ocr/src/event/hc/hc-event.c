@@ -410,7 +410,8 @@ u8 satisfyEventHcLatch(ocrEvent_t *base, ocrFatGuid_t db, u32 slot) {
     s32 count;
     do {
         count = event->counter;
-    } while(hal_cmpswap32(&(event->counter), count, count+incr) != count);
+        // FIXME: the (u32 *) cast on the line below is because event->counter is an (s32 *)
+    } while(hal_cmpswap32((u32 *)&(event->counter), count, count+incr) != count);
 
     DPRINTF(DEBUG_LVL_INFO, "Satisfy %s: 0x%lx %s\n", eventTypeToString(base),
             base->guid, ((slot == OCR_EVENT_LATCH_DECR_SLOT) ? "decr":"incr"));
