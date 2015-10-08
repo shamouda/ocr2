@@ -19,6 +19,7 @@
 
 #include "mmio-table.h"
 #include "tg-mmio.h"
+#include "fsim-api.h"
 
 /****************************************************/
 /* OCR LOW-LEVEL MACROS                             */
@@ -33,10 +34,7 @@
  * @todo Do we want to differentiate different types
  * of fences?
  */
-
-// FIXME: TG: need to differentiate fences (in particular for memCopy below)
-#define hal_fence() \
-    do { __sync_synchronize(); } while(0)
+#define hal_fence() tg_fence_fbm()
 
 /**
  * @brief Memory copy from source to destination
@@ -54,34 +52,10 @@
  * @todo Define what behavior we want for overlapping
  * source and destination
  */
-// FIXME: TG: need to use a DMA gate
 #define hal_memCopy(dst, src, n, isBackground)                          \
     ({                                                                  \
-        int d0, d1, d2;                                                 \
-        switch (n % 4)                                                  \
-        {                                                               \
-        case 0:                                                         \
-            __asm__ __volatile__("rep movsl\n\t"                        \
-                                 : "=&c" (d0), "=&D" (d1), "=&S" (d2)   \
-                                 : "0" ((n)/4),"1" ((void *)(dst)),"2" ((void *)(src)) \
-                                 : "memory"); break;                    \
-        case 1:                                                         \
-            __asm__ __volatile__("rep movsl\n\tmovsb\n\t"               \
-                                 : "=&c" (d0), "=&D" (d1), "=&S" (d2)   \
-                                 : "0" ((n)/4),"1" ((void *)(dst)),"2" ((void *)(src)) \
-                                 : "memory"); break;                    \
-        case 2:                                                         \
-            __asm__ __volatile__("rep movsl\n\tmovsw\n\t"               \
-                                 : "=&c" (d0), "=&D" (d1), "=&S" (d2)   \
-                                 : "0" ((n)/4),"1" ((void *)(dst)),"2" ((void *)(src)) \
-                                 : "memory"); break;                    \
-        default:                                                        \
-            __asm__ __volatile__("rep movsl\n\tmovsw\n\tmovsb\n\t"      \
-                                 : "=&c" (d0), "=&D" (d1), "=&S" (d2)   \
-                                 : "0" ((n)/4),"1" ((void *)(dst)),"2" ((void *)(src)) \
-                                 : "memory"); break;                    \
-        }                                                               \
-        (void)(d0); (void)(d1); (void)(d2);                             \
+        tg_dma_copyregion_async(dst, src, n);                           \
+        if(!isBackground) tg_fence_b();                                 \
         n;                                                              \
     })
 
@@ -103,7 +77,7 @@
  * source and destination
  * @todo This implementation is heavily *NOT* optimized
  */
-#define hal_memMove(destination, source, size, isBackground) do {\
+#define hal_memMove(destination, source, size, isBackground) do {       \
     u64 _source = (u64)source;                                          \
     u64 _destination = (u64)destination;                                \
     u64 count = 0;                                                      \
@@ -131,11 +105,7 @@
  */
 #define hal_swap64(atomic, newValue)                                    \
     ({                                                                  \
-        u64 __tmp;                                                      \
-        __asm__ __volatile__("xchg %0, %1\n\t"                          \
-                             : "=m" (*(u64*)atomic),                    \
-                               "=r" (__tmp)                             \
-                             : "1" ((u64)newValue));                    \
+        u64 __tmp = tg_xchg64(atomic, newValue);                        \
         __tmp;                                                          \
     })
 
@@ -155,7 +125,7 @@
  */
 #define hal_cmpswap64(atomic, cmpValue, newValue)                            \
     ({                                                                       \
-        u64 __tmp = __sync_val_compare_and_swap(atomic, cmpValue, newValue); \
+        u64 __tmp = tg_cmpxchg64(atomic, cmpValue, newValue);                \
         __tmp;                                                               \
     })
 
@@ -172,7 +142,7 @@
  */
 #define hal_xadd64(atomic, addValue)                                    \
     ({                                                                  \
-        u64 __tmp = __sync_fetch_and_add(atomic, addValue);             \
+        u64 __tmp = tg_xadd64(atomic, addValue);                        \
         __tmp;                                                          \
     })
 
@@ -187,8 +157,7 @@
  * @param atomic    u64*: Pointer to the atomic value (location)
  * @param addValue  u64: Value to add to location
  */
-#define hal_radd64(atomic, addValue)            \
-    __sync_fetch_and_add(atomic, addValue)
+#define hal_radd64(atomic, addValue) hal_xadd64(atomic, addValue)
 
 /**
  * @brief Atomic swap (32 bit)
@@ -202,11 +171,7 @@
  */
 #define hal_swap32(atomic, newValue)                                    \
     ({                                                                  \
-        u32 __tmp;                                                      \
-        __asm__ __volatile__("xchg %0, %1\n\t"                          \
-                             : "=m" (*(u32*)atomic),                    \
-                               "=r" (__tmp)                             \
-                             : "1" ((u32)newValue));                    \
+        u32 __tmp = tg_xchg32(atomic, newValue);                        \
         __tmp;                                                          \
     })
 
@@ -224,10 +189,10 @@
  *
  * @return Old value of the atomic
  */
-#define hal_cmpswap32(atomic, cmpValue, newValue)                              \
-    ({                                                                         \
-        u32 __tmp = __sync_val_compare_and_swap(atomic, cmpValue, newValue);   \
-        __tmp;                                                                 \
+#define hal_cmpswap32(atomic, cmpValue, newValue)                       \
+    ({                                                                  \
+        u32 __tmp = tg_cmpxchg32(atomic, cmpValue, newValue);           \
+        __tmp;                                                          \
     })
 
 /**
@@ -243,7 +208,7 @@
  */
 #define hal_xadd32(atomic, addValue)                                    \
     ({                                                                  \
-        u32 __tmp = __sync_fetch_and_add(atomic, addValue);             \
+        u32 __tmp = tg_xadd32(atomic, addValue);                        \
         __tmp;                                                          \
     })
 
@@ -258,8 +223,7 @@
  * @param atomic    u32*: Pointer to the atomic value (location)
  * @param addValue  u32: Value to add to location
  */
-#define hal_radd32(atomic, addValue)            \
-    __sync_fetch_and_add(atomic, addValue)
+#define hal_radd32(atomic, addValue) hal_xadd32(atomic, addValue)
 
 /**
  * @brief Convenience function that basically implements a simple
@@ -270,9 +234,9 @@
  *
  * @param lock      Pointer to a 32 bit value
  */
-#define hal_lock32(lock)                                    \
-    do {                                                    \
-        while(__sync_lock_test_and_set(lock, 1) != 0) ;     \
+#define hal_lock32(lock)                                         \
+    do {                                                         \
+        while(tg_cmpxchg32(lock, 0, 1) != 0) ;                   \
     } while(0)
 
 /**
@@ -281,10 +245,10 @@
  *
  * @param lock      Pointer to a 32 bit value
  */
-#define hal_unlock32(lock)         \
-    do {                           \
-        __sync_lock_release(lock); \
-    } while(0)
+#define hal_unlock32(lock)                      \
+    ({                                          \
+        *(volatile u32 *)(lock) = 0;            \
+    })
 
 /**
  * @brief Convenience function to implement a simple
@@ -294,27 +258,25 @@
  * @return 0 if the lock has been acquired and a non-zero
  * value if it cannot be acquired
  */
-#define hal_trylock32(lock)                                             \
-    ({                                                                  \
-        u32 __tmp = __sync_lock_test_and_set(lock, 1);                  \
-        __tmp;                                                          \
-    })
+#define hal_trylock32(lock) tg_cmpxchg32(lock, 0, 1)
 
 /**
  * @brief Abort the runtime
  *
  * Will crash the runtime
  */
-#define hal_abort()                             \
-    __asm__ __volatile__("int $0xFD\n\t")
+#define hal_abort()                                             \
+    __asm__ __volatile__("int %0\n\t"                           \
+                         : : "i" (INT_CRASHNBURN))
 
 /**
  * @brief Exit the runtime
  *
  * This will exit the runtime more cleanly than abort
  */
-#define hal_exit(arg)                           \
-    __asm__ __volatile__("int $0xFE\n\t")
+#define hal_exit(arg)                                           \
+    __asm__ __volatile__("int %0\n\t"                           \
+                         : : "i" (INT_QEMU_SHUTDOWN))
 
 /**
  * @brief Pause execution
@@ -323,7 +285,6 @@
  * and may be deprecated in the future
  */
 #define hal_pause() do {                                        \
-        __asm__ __volatile__("cli");                            \
         /* Works because there is a periodic timer interupt */  \
         __asm__ __volatile__("sti;hlt;");                       \
     } while(0)
@@ -334,7 +295,7 @@
  * This is used by CE to put an XE core in its block to sleep
  */
 #define hal_sleep(id) do {                                              \
-        *(u64 *)(BR_MSR_BASE(id + ID_AGENT_XE0) + POWER_GATE_RESET*sizeof(u64)) = 0x0ULL; \
+        *(u64 *)(BR_MSR_BASE(ID_AGENT_XE(id)) + POWER_GATE_RESET*sizeof(u64)) = 0x0ULL; \
     } while(0)
 
 /**
@@ -343,7 +304,7 @@
  * This is used by CE to wake an XE core in its block from sleep
  */
 #define hal_wake(id) do {                                                    \
-       *(u64 *)(BR_MSR_BASE(id + ID_AGENT_XE0) + POWER_GATE_RESET*sizeof(u64)) = 0x1ULL; \
+        *(u64 *)(BR_MSR_BASE(ID_AGENT_XE(id)) + POWER_GATE_RESET*sizeof(u64)) = 0x1ULL; \
     } while(0)
 
 /**
@@ -358,11 +319,11 @@
  * different address "formats", this returns the
  * smallest usable address from the global address 'addr'
  */
-#define hal_localizeAddr(addr) addr
+#define hal_localizeAddr(addr, me) tg_localize(addr, me)
 
 // Support for abstract load and store macros
-#define MAP_AGENT_SIZE_LOG2 (21)
-#define IS_REMOTE(addr) (((u64)(addr)) >= (1LL << MAP_AGENT_SIZE_LOG2))
+#define IS_REMOTE(addr) (__builtin_clzl(addr) < ((sizeof(u64) - 1) - MAP_AGENT_SHIFT))
+
 // Abstraction to do a load operation from any level of the memory hierarchy
 //static inline u8 AbstractLoad8(u64 addr) { return *((u8 *) addr); }
 //#define GET8(temp,addr)  temp = AbstractLoad8(addr)
