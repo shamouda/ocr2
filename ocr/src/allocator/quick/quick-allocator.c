@@ -407,6 +407,8 @@ typedef struct {
 #ifdef FINE_LOCKING
     u32 listLock[SL_COUNT];
     s32 listCount[SL_COUNT];
+    s32 bmapLockSL;
+    s32 count;          // count for FL
 #endif
 } secondLevel_t;
 
@@ -424,7 +426,7 @@ typedef struct {
     u32 flCount;        // Number of first-level buckets.  This is invariant after constructor runs.
     u64 flAvailOrNot;   // bitmap that indicates the presence (1) or absence (0) of free blocks in blocks[i][*]
 #ifdef FINE_LOCKING
-    u32 bmapLock;
+    u32 bmapLockFL;
 #endif
     secondLevel_t sl[0];// second level structure in the annex area
 } poolHdr_t;
@@ -477,7 +479,7 @@ static u64 quickInitAnnex(poolHdr_t * pPool, u64 size) {
         (u64)pPool, (u64)pPool+size, size, size, flBucketCount, sizeof(poolHdr_t), (u64) poolHeaderSize, (u64)sizeRemainingAfterPoolHeader, (u64)sizeRemainingAfterPoolHeader);
     pPool->flAvailOrNot = 0; // Initialize the bitmaps to 0
 #ifdef FINE_LOCKING
-    pPool->bmapLock = 0;
+    pPool->bmapLockFL = 0;
 #endif
 
     return poolHeaderSize;
@@ -560,6 +562,13 @@ static void mappingInsert(u64 payloadSizeInBytes, u32* flIndex, u32* slIndex) {
     *slIndex = ts;
 }
 
+// counters for diagnosis
+u32 count_malloc_retry1;
+u32 count_malloc_retry2;
+u32 count_left_retry;
+u32 count_merge_retry;
+u32 count_fl_retry;
+
 /* Search for a suitable free block:
  *  - first search for a block in the fl/sl indicated.
  *  - if not found, search for higher sl (bigger) with same fl
@@ -592,24 +601,20 @@ static u64 *getFreeListMalloc(poolHdr_t *pPool, u64 size, u32 *fli, u32 *sli)
     if (flIndex >= pPool->flCount) {
         return NULL;
     }
-#ifdef FINE_LOCKING
-    hal_lock32(&(pPool->bmapLock));
-#endif
+
+    // read without locking
     u32 slBitmap = pPool->sl[flIndex].slAvailOrNot & (~0UL << slIndex); // This takes all SL bins bigger or equal to slIndex
+    u64 flBitmap;
     if (slBitmap == 0) {
         if (flIndex+1 >= pPool->flCount) {
-#ifdef FINE_LOCKING
-            hal_unlock32(&(pPool->bmapLock));
-#endif
             return NULL;
         }
 
+retry_FL:
+        // read without locking
         // We don't have any non-zero block here so we look at the flAvailOrNot map
-        u64 flBitmap = pPool->flAvailOrNot & (~0UL << (flIndex+1)); // all FL bins bigger or equal to flIndex
+        flBitmap = pPool->flAvailOrNot & (~0UL << (flIndex+1)); // all FL bins bigger or equal to flIndex
         if (flBitmap == 0) {
-#ifdef FINE_LOCKING
-            hal_unlock32(&(pPool->bmapLock));
-#endif
             return NULL;
         }
 
@@ -617,13 +622,13 @@ static u64 *getFreeListMalloc(poolHdr_t *pPool, u64 size, u32 *fli, u32 *sli)
         flIndex = myffs(flBitmap);
         ASSERT(flIndex < pPool->flCount);
 
-        // Now we get the slBitMap. There is definitely a 1 in there since there is a 1 in tf
+        // Now we get the slBitMap. Retry if no 1's there.
         slBitmap = pPool->sl[flIndex].slAvailOrNot;
-        ASSERT(slBitmap != 0);
+        if (slBitmap == 0) {
+            hal_xadd32(&count_fl_retry, 1);
+            goto retry_FL;
+        }
     }
-#ifdef FINE_LOCKING
-    hal_unlock32(&(pPool->bmapLock));
-#endif
     slIndex = myffs(slBitmap);
     ASSERT(slIndex < SL_COUNT);
 
@@ -670,41 +675,75 @@ static void setFreeList(poolHdr_t *pPool, u64 size, u64 *p, u32 flIndex, u32 slI
 #endif
 }
 #ifdef FINE_LOCKING
+int dobmap_count_case2;
+int dobmap_count_case3;
+int dobmap_arr[4];
+
+// calling function : count : delta
+// quickInit        : 1     : +1      init
+// MallocInternal   : 1     : -1      no split
+// MallocInternal   : 2     : -1+1    split
+// FreeInternal     : 1     : +1      no merge
+// FreeInternal     : 2     : -1+1    one merge
+// FreeInternal     : 3     : -1-1+1  two merges
+//
 void doBmapOp(poolHdr_t *pool, struct bmapOp *bmap_op)
 {
     int i;
-    // optimization for common cases.
-    if ( bmap_op->count == 2 && bmap_op->fli[0] == bmap_op->fli[1] && bmap_op->sli[0] == bmap_op->sli[1] ) {
-        ASSERT(bmap_op->delta[0] == -1 && bmap_op->delta[1] == 1);
-        return;
+    s32 u,v;
+    u32 flIndex, slIndex;
+//dobmap_arr[bmap_op->count]++;
+
+    switch(bmap_op->count) {
+    case 2:
+        // optimization for common cases.
+        if ( bmap_op->fli[0] == bmap_op->fli[1] && bmap_op->sli[0] == bmap_op->sli[1] ) {
+            ASSERT(bmap_op->delta[0] == -1 && bmap_op->delta[1] == 1);
+//dobmap_count_case2++;
+            return;
+        }
+        goto bmap_fallback;
+    case 3:
+        // optimization for count==3 case
+        // e.g.[ 13,15, -1 ], [ 0,8, -1 ], [13,15, +1]
+        if ( bmap_op->fli[0] == bmap_op->fli[2] && bmap_op->sli[0] == bmap_op->sli[2] ) {
+            ASSERT(bmap_op->delta[0] == -1 && bmap_op->delta[2] == 1);
+            bmap_op->count = 1;
+            bmap_op->fli[0] = bmap_op->fli[1];
+            bmap_op->sli[0] = bmap_op->sli[1];
+            // continue to count==1 case
+//dobmap_count_case3++;
+        } else {
+            goto bmap_fallback;
+        }
+/*
+    case 1:
+        // we can do a special case for count==1 here
+*/
     }
 
-    // dobmapOp count 3
-    // 13,15, -1
-    // 0,8, -1
-    // 13,15, 1
-    //
-    if ( bmap_op->count == 3 && bmap_op->fli[0] == bmap_op->fli[2] && bmap_op->sli[0] == bmap_op->sli[2] ) {
-        ASSERT(bmap_op->delta[0] == -1 && bmap_op->delta[2] == 1);
-        bmap_op->count = 1;
-        bmap_op->fli[0] = bmap_op->fli[1];
-        bmap_op->sli[0] = bmap_op->sli[1];
-    }
+bmap_fallback:
 /*  // some debugging code
     printf("dobmapOp count %d\n", bmap_op->count);
     for(i=0;i<bmap_op->count;i++) {
         printf("%d,%d, %d\n", bmap_op->fli[i], bmap_op->sli[i], bmap_op->delta[i]);
     }
 */
-    s32 u,v;
-    u32 flIndex, slIndex;
-    hal_lock32(&(pool->bmapLock));
-    for(i=0;i<bmap_op->count;i++) {
+    // general case for count==2,3 in reverse order
+    // to process +1 first before -1s
+    // ( move lock outside loop and add locks to getFreeListMalloc )
+    for(i=bmap_op->count-1;i>=0;i--) {
         flIndex = bmap_op->fli[i];
         slIndex = bmap_op->sli[i];
+        hal_lock32(&(pool->sl[flIndex].bmapLockSL));
         u = pool->sl[flIndex].listCount[slIndex];
         v = (pool->sl[flIndex].listCount[slIndex] += bmap_op->delta[i]);
         ASSERT(bmap_op->delta[i] == 1 || bmap_op->delta[i] == -1);
+
+        if (u && v) { // common cases. i.e. no bitmap change
+            hal_unlock32(&(pool->sl[flIndex].bmapLockSL));
+            continue;
+        }
 
         // adjust bitmap
         u32 oldBitmap = pool->sl[flIndex].slAvailOrNot;
@@ -713,22 +752,36 @@ void doBmapOp(poolHdr_t *pool, struct bmapOp *bmap_op)
         if (u == 0 && v == 1) {  // 0 -> 1
             ASSERT(!(oldBitmap & (1UL << slIndex)));
             pool->sl[flIndex].slAvailOrNot |= (1UL << slIndex);
+            hal_unlock32(&(pool->sl[flIndex].bmapLockSL));
             if (!oldBitmap) {
-                ASSERT(!(pool->flAvailOrNot & (1UL << flIndex)));
-                pool->flAvailOrNot |= (1UL << flIndex);
+                hal_lock32(&(pool->bmapLockFL));
+                pool->sl[flIndex].count++;
+                if (pool->sl[flIndex].count == 1) {
+                    ASSERT(!(pool->flAvailOrNot & (1UL << flIndex)));
+                    pool->flAvailOrNot |= (1UL << flIndex);
+                }
+                hal_unlock32(&(pool->bmapLockFL));
             }
+            continue;
         }
         if (u == 1 && v == 0) {  // 1 -> 0
             ASSERT(oldBitmap & (1UL << slIndex));
-            pool->sl[flIndex].slAvailOrNot &= ~(1UL << slIndex);
-            if (!(pool->sl[flIndex].slAvailOrNot)) {
-                ASSERT(pool->flAvailOrNot & (1UL << flIndex));
-                pool->flAvailOrNot &= ~(1UL << flIndex);
+            u32 newBitmap = (pool->sl[flIndex].slAvailOrNot &= ~(1UL << slIndex));
+            hal_unlock32(&(pool->sl[flIndex].bmapLockSL));
+            if (!newBitmap) {
+                hal_lock32(&(pool->bmapLockFL));
+                pool->sl[flIndex].count--;
+                if (pool->sl[flIndex].count == 0) {
+                    ASSERT(pool->flAvailOrNot & (1UL << flIndex));
+                    pool->flAvailOrNot &= ~(1UL << flIndex);
+                }
+                hal_unlock32(&(pool->bmapLockFL));
             }
+            continue;
         }
+        hal_unlock32(&(pool->sl[flIndex].bmapLockSL));
     }
 //quickPrint(pool);
-    hal_unlock32(&(pool->bmapLock));
 }
 #endif
 // end of tlsf core part
@@ -770,7 +823,10 @@ static void quickFinish(poolHdr_t *pool, u64 size)
     ASSERT(pool->lock == 0 || pool->lock == 1);
 
     quickPrintCache();
-
+/*
+DPRINTF(DEBUG_LVL_WARN, "bmap_arr  : %d, %d(was %d), %d\n", dobmap_arr[1], dobmap_arr[2]-dobmap_count_case2, dobmap_arr[2], dobmap_arr[3]);
+DPRINTF(DEBUG_LVL_WARN, "bmap_count: %d\n", dobmap_count_case3);
+*/
     hal_lock32(&(pool->lock));
     pool->init_count--;
     if (!(pool->init_count)) {
@@ -852,6 +908,8 @@ static void quickInit(poolHdr_t *pool, u64 size)
                 pool->sl[i].freeList[j] = -1;    // empty list
 #ifdef FINE_LOCKING
                 pool->sl[i].listCount[j] = 0;
+                pool->sl[i].bmapLockSL = 0;
+                pool->sl[i].count = 0;
 #endif
             }
         }
@@ -1035,12 +1093,6 @@ static inline void checkGuard(poolHdr_t *pool)
     DPRINTF(DEBUG_LVL_WARN, "quickMalloc : heap corruption! known value not found at the beginning of the pool.\n");
     ASSERT_BLOCK_END
 }
-
-// counters for diagnosis
-u32 count_malloc_retry1;
-u32 count_malloc_retry2;
-u32 count_left_retry;
-u32 count_merge_retry;
 
 static blkPayload_t *quickMallocInternal(poolHdr_t *pool,u64 size, struct _ocrPolicyDomain_t *pd)
 {
@@ -1279,7 +1331,7 @@ static void quickFreeInternal(blkPayload_t *p)
 #ifdef SKIP_MERGES
     // skip merges to add more 1's to bitmaps which will exploits parallelism
     // read without sync, so it's approximate
-    if ( pool->sl[flIndex].listCount[slIndex] < 16)
+    if ( pool->sl[flIndex].listCount[slIndex] < 16)	// TODO
         skip_merges = 1;
 #endif
 #endif
