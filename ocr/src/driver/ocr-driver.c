@@ -35,7 +35,9 @@
 #include "xstg-map.h"
 #endif
 
+#if 0 // TODO:4.1.0 - check if the below is needed and remove if not
 #include "tg-bin-files.h"
+#endif
 
 #define DEBUG_TYPE INIPARSING
 
