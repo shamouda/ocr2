@@ -42,7 +42,7 @@ typedef struct ocrEventHc_t {
                                               allocated waiter list is stored in waitersDb */
     ocrFatGuid_t waitersDb; /**< DB containing an array of regNode_t listing the
                              * events/EDTs depending on this event */
-    u32 waitersCount; /**< Number of waiters in waitersDb */
+    volatile u32 waitersCount; /**< Number of waiters in waitersDb */
     u32 waitersMax; /**< Maximum number of waiters in waitersDb */
     volatile u32 waitersLock;
     ocrRuntimeHint_t hint;
