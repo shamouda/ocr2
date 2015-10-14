@@ -48,8 +48,9 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrDbCreate(&dbGuid1,(void **) &k1, sizeof(int), /*flags=*/0,
                 /*location=*/NULL_GUID, NO_ALLOC);
     *k1 = 43;
-
-    // Satify first slot with db pointing to '42'
+    ocrDbRelease(dbGuid0);
+    ocrDbRelease(dbGuid1);
+    // Satisfy first slot with db pointing to '42'
     ocrEventSatisfy(e0, dbGuid0);
 
     // These should be ignored by the runtime and the db shouldn't be updated

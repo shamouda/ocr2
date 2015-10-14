@@ -42,6 +42,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     *k = 42;
 
     // Satisfy event's chain head
+    ocrDbRelease(dbGuid);
     ocrEventSatisfy(e0, dbGuid);
 
     return NULL_GUID;
