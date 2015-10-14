@@ -214,15 +214,8 @@ typedef void blkPayload_t; // Strongly type-check the ptr-to-void that comprises
 // known value is placed at the end of heap as a guard
 #define KNOWN_VALUE_AS_GUARD    0xfeed0000deadbeef
 
-//#define PER_AGENT_CACHE
-//TODO: 4.1.0 temporary disable since it's causing a crash
-
-#ifdef ENABLE_ALLOCATOR_QUICK_STANDALONE
-// standalone mode
-#define PER_AGENT_KEYWORD      __thread
-#define CACHE_POOL(ID)          (&_cache_pool)
-#define _CACHE_POOL(ID)         (_cache_pool)
-#elif defined(HAL_FSIM_CE) || defined(HAL_FSIM_XE)
+#if defined(HAL_FSIM_CE) || defined(HAL_FSIM_XE)
+//#define PER_THREAD_CACHE
 // TG
 #define PER_AGENT_KEYWORD
 #define CACHE_POOL(ID)          (&_cache_pool)
