@@ -102,7 +102,8 @@ u8 ocrEventSatisfySlot(ocrGuid_t eventGuid, ocrGuid_t dataGuid /*= INVALID_GUID*
     PD_MSG_FIELD_I(properties) = 0;
     u8 returnCode = pd->fcts.processMessage(pd, &msg, false);
     DPRINTF_COND_LVL(returnCode, DEBUG_LVL_WARN, DEBUG_LVL_INFO,
-                     "EXIT ocrEventSatisfySlot(evt=0x%lx) -> %u\n", eventGuid, returnCode);
+                    "EXIT ocrEventSatisfySlot(evt=0x%lx) -> %u\n", eventGuid, returnCode, true, OCR_TRACE_TYPE_EVENT,
+                    OCR_ACTION_SATISFY, dataGuid);
     RETURN_PROFILE(returnCode);
 #undef PD_MSG
 #undef PD_TYPE

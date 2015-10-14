@@ -129,6 +129,11 @@ static void populateTraceObject(bool evtType, ocrTraceType_t objType, ocrTraceAc
                 TRACE_FIELD(EVENT, eventDepAdd, tr, parentID) = parent;
                 break;
 
+            case OCR_ACTION_SATISFY:
+                src = va_arg(ap, ocrGuid_t);
+                TRACE_FIELD(EVENT, eventDepSatisfy, tr, depID) = src;
+                break;
+
             default:
                 break;
         }
@@ -207,7 +212,7 @@ void doTrace(u64 location, u64 wrkr, ocrGuid_t parent, char *str, ...){
         va_end(ap);
         return;
     }
-    populateTraceObject(evtType, objType, actionType, location, timestamp, parent, ap);
+    populateTraceObject(evtType, objType, actionType, wrkr, timestamp, parent, ap);
     va_end(ap);
 
 }

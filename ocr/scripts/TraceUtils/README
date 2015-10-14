@@ -1,0 +1,3 @@
+The following utils are available at this location:
+- traceDecode: convert binary trace format to a human readable text format.
+   Usage: ./traceDecode <path to binary file>

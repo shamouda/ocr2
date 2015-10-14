@@ -17,6 +17,7 @@
 #include "worker/system/system-worker.h"
 #include "utils/deque.h"
 #include "utils/tracer/tracer.h"
+#include "utils/tracer/trace-events.h"
 
 #define DEBUG_TYPE WORKER
 
@@ -29,29 +30,6 @@
 /*********************************************************/
 
 #define IDX_OFFSET OCR_TRACE_TYPE_EDT
-
-//Strings to identify user/runtime created objects
-const char *evt_type[] = {
-    "RUNTIME",
-    "USER",
-};
-//Strings for traced OCR objects
-const char *obj_type[] = {
-    "EDT",
-    "EVENT",
-    "DATABLOCK"
-};
-
-//Strings for traced OCR events
-const char *action_type[] = {
-    "CREATE",
-    "DESTROY",
-    "RUNNABLE",
-    "ADD_DEP",
-    "SATISFY",
-    "EXECUTE",
-    "FINISH",
-};
 
 //Utility functions
 bool allDequesEmpty(ocrPolicyDomain_t *pd){
@@ -76,15 +54,17 @@ void genericPrint(bool evtType, ocrTraceType_t ttype, ocrTraceAction_t action, u
         PRINTF("[TRACE] U/R: %s | LOCATION: 0x%lx | TIMESTAMP: %lu | TYPE: %s | ACTION: %s\n",
                 evt_type[evtType], location, timestamp, obj_type[ttype-IDX_OFFSET], action_type[action]);
     }
-
-
 }
+
 //Do custom processing for trace objects if provided by DPRINTF.
-//NOTE:  Does an extra PRINTF per trace record for now.  Could be easily
-//       adapted to write to file.
+#ifdef OCR_TRACE_BINARY
+void processTraceObject(ocrTraceObj_t *trace, FILE *f){
+
+    fwrite(trace, sizeof(ocrTraceObj_t), 1, f);
+    return;
+}
+#else
 void processTraceObject(ocrTraceObj_t *trace){
-
-
     //Common vars
     ocrTraceType_t  ttype = trace->typeSwitch;
     ocrTraceAction_t action =  trace->actionSwitch;
@@ -160,10 +140,16 @@ void processTraceObject(ocrTraceObj_t *trace){
             {
                 ocrGuid_t dest = TRACE_FIELD(EVENT, eventDepAdd, trace, depID);
                 ocrGuid_t parent = TRACE_FIELD(EVENT, eventDepAdd, trace, parentID);
-                PRINTF("[TRACE] U/R: %s | LOCATION: 0x%lx | TIMESTAMP: %lu | TYPE: EVENT | ACTION: ADD_DEP | DEP_GUID: 0x%lx | PARENT: 0x%lx\n",
-                        evt_type[evtType], location, timestamp, dest, parent);
-            }
+                PRINTF("[TRACE] U/R: %s | LOCATION: 0x%lx | TIMESTAMP: %lu | TYPE: EVENT | ACTION: ADD_DEP | DEP_GUID: 0x%lx | PARENT: 0x%lx\n", evt_type[evtType], location, timestamp, dest, parent);
                 break;
+            }
+
+            case OCR_ACTION_SATISFY:
+            {
+                ocrGuid_t src = TRACE_FIELD(EVENT, eventDepSatisfy, trace, depID);
+                PRINTF("[TRACE] U/R: %s | LOCATION: 0x%lx | TIMESTAMP: %lu | TYPE: EVENT | ACTION: DEP_SATISFY | DEP_GUID: 0x%llx\n", evt_type[evtType], location, timestamp, src);
+                break;
+            }
 
             default:
                 break;
@@ -178,8 +164,7 @@ void processTraceObject(ocrTraceObj_t *trace){
             {
                 ocrGuid_t parent = TRACE_FIELD(DATA, dataCreate, trace, parentID);
                 u64 size = TRACE_FIELD(DATA, dataCreate, trace, size);
-                PRINTF("[TRACE] U/R: %s | LOCATION: 0x%lx | TIMESTAMP: %lu | TYPE: DATABLOCK | ACTION: CREATE | SIZE: %lu | PARENT:     0x%lx\n",
-                        evt_type[evtType], location, timestamp, size, parent);
+                PRINTF("[TRACE] U/R: %s | LOCATION: 0x%lx | TIMESTAMP: %lu | TYPE: DATABLOCK | ACTION: CREATE | SIZE: %lu | PARENT:0x%lx\n", evt_type[evtType], location, timestamp, size, parent);
                 break;
             }
             case OCR_ACTION_DESTROY:
@@ -195,9 +180,15 @@ void processTraceObject(ocrTraceObj_t *trace){
     }
 
 }
+#endif
+
 
 //Drain remaining deque records if execution ends before all deque records have been popped off.
+#ifdef OCR_TRACE_BINARY
+void drainAllDeques(FILE *f){
+#else
 void drainAllDeques(){
+#endif
     ocrPolicyDomain_t *pd;
     getCurrentEnv(&pd, NULL, NULL, NULL);
     u32 i;
@@ -211,7 +202,13 @@ void drainAllDeques(){
         for(j = 0; j < remaining; j++){
             //Pop and process all remaining records
             ocrTraceObj_t *tr = (ocrTraceObj_t *)(deq->popFromHead(deq,0));
+            ASSERT(tr != NULL);
+#ifdef OCR_TRACE_BINARY
+            processTraceObject(tr, f);
+#else
             processTraceObject(tr);
+#endif
+
             pd->fcts.pdFree(pd, tr);
         }
     }
@@ -221,6 +218,11 @@ void drainAllDeques(){
 void workerLoopSystem(ocrWorker_t *worker){
 
     ASSERT(worker->curState == GET_STATE(RL_USER_OK, (RL_GET_PHASE_COUNT_DOWN(worker->pd, RL_USER_OK))));
+
+#ifdef OCR_TRACE_BINARY
+    //NP open file for binary writing
+    FILE *f = fopen("trace.bin", "a");
+#endif
 
     u8 continueLoop = true;
     bool toDrain = false;
@@ -238,7 +240,11 @@ void workerLoopSystem(ocrWorker_t *worker){
                 if(tail-head > 0){
                     //Trace record in deque. Pop
                     ocrTraceObj_t *tr = (ocrTraceObj_t *)(deq->popFromHead(deq, 0));
+#ifdef OCR_TRACE_BINARY
+                    processTraceObject(tr, f);
+#else
                     processTraceObject(tr);
+#endif
                     worker->pd->fcts.pdFree(worker->pd, tr);
                 }
             }
@@ -284,8 +290,17 @@ void workerLoopSystem(ocrWorker_t *worker){
     } while(continueLoop);
 
     if(toDrain){
+
+#ifdef OCR_TRACE_BINARY
+        drainAllDeques(f);
+        fclose(f);
+#else
         drainAllDeques();
+#endif
+
     }
+
+
 }
 
 

@@ -1,3 +1,6 @@
+#ifndef __TRACER_H__
+#define __TRACER_H__
+
 #include "ocr-config.h"
 #include "ocr-runtime-types.h"
 #include "ocr-types.h"
@@ -94,7 +97,7 @@ typedef struct {
 
             }action;
 
-        }TRACE_TYPE_NAME(DATA);
+        } TRACE_TYPE_NAME(DATA);
 
         struct{ /* Event (OCR module) */
             union{
@@ -106,6 +109,10 @@ typedef struct {
                     ocrGuid_t depID;                /*GUIDs of dependent OCR object*/
                     ocrGuid_t parentID;             /*GUIDs of parents (needed?)*/
                 }eventDepAdd;
+
+                struct{
+                    ocrGuid_t depID;                /*GUID responsible for satisfaction*/
+                }eventDepSatisfy;
 
                 struct{
                     void *placeHolder;              /* future TODO Define values.  What trigger?*/
@@ -164,3 +171,5 @@ typedef struct {
 
 #endif /* ENABLE_WORKER_SYSTEM */
 void doTrace(u64 location, u64 wrkr, ocrGuid_t taskGuid, char *str, ...);
+
+#endif

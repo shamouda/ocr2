@@ -88,6 +88,10 @@ DEFAULT_CONFIG ?= jenkins-common-8w-lockableDB.cfg
 # Requires -DOCR_ENABLE_EDT_NAMING and DEBUG_LVL_INFO
 # CFLAGS += -DOCR_ENABLE_VISUALIZER -DOCR_ENABLE_EDT_NAMING
 
+# Enable custom tracing to be written to binary neglecting console output
+# (Primarily for LLNL tools inter-operability)
+# CFLAGS += -DOCR_TRACE_BINARY
+
 ####################################################
 # Experimental flags
 ####################################################

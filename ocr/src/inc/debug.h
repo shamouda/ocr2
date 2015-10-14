@@ -380,13 +380,33 @@ extern void doTrace(u64 location, u64 wrkr, ocrGuid_t taskGuid, char *str, ...);
 #define DO_DEBUG_TYPE(type, level) \
     if(OCR_DEBUG_##type  && level <= DEBUG_LVL_##type) {
 
+#ifdef OCR_TRACE_BINARY
+
+#if (OCR_DEBUG_LVL==DEBUG_LVL_WARN)
+#define OCR_DEBUG_LVL DEBUG_LVL_INFO
+#warning Binary trace enabled, overriding debug verbosity to DEBUG_LVL_INFO
+#endif
+
 #define DPRINTF_TYPE(type, level, format, ...)   do {                       \
     if(OCR_DEBUG_##type && level <= DEBUG_LVL_##type) {                     \
         ocrTask_t *_task = NULL; ocrWorker_t *_worker = NULL;               \
         struct _ocrPolicyDomain_t *_pd = NULL;                              \
         getCurrentEnv(&_pd, &_worker, &_task, NULL);                        \
         doTrace(_pd?(u64)_pd->myLocation:0,                                 \
-                _worker?(u64)_worker->location:0,                           \
+                _worker?(u64)_worker->id:0,                                 \
+                _task?_task->guid:0,                                        \
+                format, ## __VA_ARGS__);                                    \
+    } } while(0)
+
+#else
+
+#define DPRINTF_TYPE(type, level, format, ...)   do {                       \
+    if(OCR_DEBUG_##type && level <= DEBUG_LVL_##type) {                     \
+        ocrTask_t *_task = NULL; ocrWorker_t *_worker = NULL;               \
+        struct _ocrPolicyDomain_t *_pd = NULL;                              \
+        getCurrentEnv(&_pd, &_worker, &_task, NULL);                        \
+        doTrace(_pd?(u64)_pd->myLocation:0,                                 \
+                _worker?(u64)_worker->id:0,                                 \
                 _task?_task->guid:0,                                        \
                 format, ## __VA_ARGS__);                                    \
         PRINTF(OCR_DEBUG_##type##_STR "(" OCR_DEBUG_##level##_STR           \
@@ -395,6 +415,8 @@ extern void doTrace(u64 location, u64 wrkr, ocrGuid_t taskGuid, char *str, ...);
                _worker?(u64)_worker->location:0,                            \
                _task?_task->guid:0, ## __VA_ARGS__);                        \
     } } while(0)
+
+#endif
 
 #define DPRINTF_TYPE_COND_LVL(type, cond, levelT, levelF, format, ...)  \
     do {                                                                \
