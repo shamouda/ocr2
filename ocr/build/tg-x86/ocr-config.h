@@ -102,7 +102,7 @@
 #define ENABLE_EXTENSION_LEGACY
 
 // Build pause/resume support
-#define ENABLE_EXTENSION_PAUSE
+//#define ENABLE_EXTENSION_PAUSE
 
 #endif /* __OCR_CONFIG_H__ */
 

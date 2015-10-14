@@ -1,5 +1,5 @@
 #include "ocr-config.h"
-#if defined(ENABLE_POLICY_DOMAIN_CE) && defined(ENABLE_COMP_PLATFORM_FSIM)
+#ifdef SAL_FSIM_CE
 
 #include "debug.h"
 #include "ocr-types.h"

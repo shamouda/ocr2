@@ -1,5 +1,5 @@
 #include "ocr-config.h"
-#ifdef ENABLE_POLICY_DOMAIN_HC
+#ifdef ENABLE_EXTENSION_PAUSE
 
 #include "ocr-types.h"
 #include "policy-domain/hc/hc-policy.h"

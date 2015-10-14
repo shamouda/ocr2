@@ -5,7 +5,7 @@
  */
 
 #include "ocr-config.h"
-#if defined(SAL_LINUX) && !defined(ENABLE_COMP_PLATFORM_FSIM)
+#ifdef SAL_LINUX
 
 #include "ocr-types.h"
 #ifdef __MACH__
@@ -51,6 +51,9 @@ u64 salGetTime(){
  * SIGUSR1: Toggles Pause and Resume
  * SIGUSR2: Query the contents of queued tasks (will only
  *          succeed if runtime is paused)
+ *
+ *      This was implemented as a segway into actual API calls and
+ *      may be deprecated in the future.
  */
 void sig_handler(u32 sigNum) {
 
@@ -174,6 +177,30 @@ void registerSignalHandler(){
         PRINTF("Couldn't catch SIGUSR2...\n");
     }
 }
+
+#else
+void sig_handler(u32 sigNum){
+    return;
+}
+
+u32 salPause(bool isBlocking){
+    PRINTF("PQR unsupported on this platform\n");
+    return 0;
+}
+
+ocrGuid_t salQuery(ocrQueryType_t query, ocrGuid_t guid, void **result, u32 *size, u8 flags){
+    PRINTF("PQR unsupported on this platform\n");
+    return NULL_GUID;
+}
+
+void salResume(u32 flag){
+    PRINTF("PQR unsupported on this platform\n");
+}
+
+void registerSignalHandler(){
+    return;
+}
+
 
 #endif /* ENABLE_EXTENSION_PAUSE  */
 #endif

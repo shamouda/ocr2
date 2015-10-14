@@ -1,5 +1,5 @@
 #include "ocr-config.h"
-#ifdef ENABLE_POLICY_DOMAIN_XE
+#ifdef SAL_FSIM_XE
 
 #include "debug.h"
 #include "ocr-types.h"
