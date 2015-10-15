@@ -1028,6 +1028,7 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
                         PD_MSG_FIELD_IO(guid.guid), PD_MSG_FIELD_IO(properties));
                 switch(proxyDb->state) {
                     case PROXY_DB_FETCH:
+                    {
                         // Processing an acquire response issued in the fetch state
                         // Update message properties
                         PD_MSG_FIELD_IO(properties) &= ~DB_FLAG_RT_FETCH;
@@ -1101,6 +1102,7 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
                                 msg->srcLocation = curLoc;
                                 msg->destLocation = curLoc;
                                 ocrPolicyDomainHcDist_t * pdSelfDist = (ocrPolicyDomainHcDist_t *) self;
+
                                 // This call MUST succeed or there's a bug in the implementation.
                                 u8 returnCode = pdSelfDist->baseProcessMessage(self, msg, false);
                                 ASSERT(PD_MSG_FIELD_O(returnDetail) == 0); // Message's processing return code
@@ -1113,8 +1115,13 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
                         }
                         hal_unlock32(&(proxyDb->lock));
                         relProxyDb(self, proxyDb);
+                        if (PD_MSG_FIELD_IO(edtSlot) == EDT_SLOT_NONE) {
+                            //BUG #190
+                            PROCESS_MESSAGE_RETURN_NOW(self, 0);
+                        }
                         // Fall-through to local processing:
                         // This acquire may be part of an acquire frontier that needs to be iterated over
+                    }
                     break;
                     // Handle all the invalid cases
                     case PROXY_DB_CREATED:
@@ -1345,7 +1352,6 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
             properties |= TWOWAY_MSG_PROP;
             properties |= PERSIST_MSG_PROP;
             ocrMsgHandle_t * handle = NULL;
-
             self->fcts.sendMessage(self, msg->destLocation, msg, &handle, properties);
             // Wait on the response handle for the communication to complete.
             DPRINTF(DEBUG_LVL_VVERB,"Waiting for reply from %d\n", (u32)msg->destLocation);
@@ -1370,8 +1376,17 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
             switch (response->type & PD_MSG_TYPE_ONLY) {
             case PD_MSG_DB_ACQUIRE:
             {
-                // Shouldn't happen in this implementation.
-                ASSERT(false && "Unhandled blocking acquire message");
+                //BUG #190
+                // When edtSlot equals EDT_SLOT_NONE and the message is remote we're *likely*
+                // dealing with an acquire made from a blocking calling context (such as legacy)
+                // so we need to do things differently. There are various checks across the impl
+                // that deals with this scenario and will be much better addressed when we have
+#define PD_MSG (msg)
+#define PD_TYPE PD_MSG_DB_ACQUIRE
+                bool blockingAcquire = (PD_MSG_FIELD_IO(edtSlot) == EDT_SLOT_NONE);
+#undef PD_MSG
+#undef PD_TYPE
+                ASSERT((blockingAcquire || false) && "Unhandled blocking acquire message");
             break;
             }
             case PD_MSG_DB_CREATE:
@@ -1677,12 +1692,14 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
             }
             case PD_MSG_DB_ACQUIRE:
             {
+                //BUG #190
 #define PD_MSG (msg)
 #define PD_TYPE PD_MSG_DB_ACQUIRE
                 DPRINTF(DEBUG_LVL_VVERB,"DB_ACQUIRE: post-process response, GUID=0x%lx serialize DB's ptr, dest is %d\n",
                         PD_MSG_FIELD_IO(guid.guid), (u32) msg->destLocation);
-
-                sendProp |= ASYNC_MSG_PROP;
+                if (PD_MSG_FIELD_IO(edtSlot) != EDT_SLOT_NONE) {
+                    sendProp |= ASYNC_MSG_PROP;
+                }
 #undef PD_MSG
 #undef PD_TYPE
             break;

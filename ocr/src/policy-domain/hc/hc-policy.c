@@ -1027,6 +1027,7 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             ocrFatGuid_t edtFGuid = PD_MSG_FIELD_IO(edt);
             ocrFatGuid_t dbFGuid = PD_MSG_FIELD_IO(guid);
             u32 edtSlot = PD_MSG_FIELD_IO(edtSlot);
+            ASSERT(edtSlot != EDT_SLOT_NONE); //BUG #190
             localDeguidify(self, &edtFGuid);
             // At this point the edt MUST be local as well as the acquire's message DB ptr
             ocrTask_t* task = (ocrTask_t*) edtFGuid.metaDataPtr;
