@@ -21,7 +21,6 @@
 
 #define DEBUG_TYPE WORKER
 
-
 // Phase numbering is ad-hoc. We just know the last phase of
 // RL_USER_OK going down is zero.
 #define PHASE_RUN ((u8) 3)
@@ -254,10 +253,42 @@ static void workerLoopHcCommInternal(ocrWorker_t * worker, ocrPolicyDomain_t *pd
                     createProcessRequestEdt(pd, processRequestTemplate, &msgParamv);
                 }
             #else
-                createProcessRequestEdt(pd, processRequestTemplate, &msgParamv);
+                if ((message->type & PD_MSG_TYPE_ONLY) == PD_MSG_DB_ACQUIRE) {
+                    //BUG #190
+#define PD_MSG (message)
+#define PD_TYPE PD_MSG_DB_ACQUIRE
+                    bool blockingAcquire = ((message->type & PD_MSG_RESPONSE) && (PD_MSG_FIELD_IO(edtSlot) == EDT_SLOT_NONE));
+#undef PD_MSG
+#undef PD_TYPE
+                    if (blockingAcquire) {
+                        // This going through the PD mecanism to deal with the incoming acquire response
+                        // and dequeue EDTs that may be waiting on the acquire.
+                        // The PD will not call the acquire callback because there's none in that case.
+                        processRequestEdt(1, &msgParamv, 0, NULL);
+                        // This is to unblock the calling blocked on the acquire
+                        ocrFatGuid_t fatGuid;
+                        fatGuid.metaDataPtr = handle;
+                        PD_MSG_STACK(giveMsg);
+                        getCurrentEnv(NULL, NULL, NULL, &giveMsg);
+                    #define PD_MSG (&giveMsg)
+                    #define PD_TYPE PD_MSG_SCHED_NOTIFY
+                        giveMsg.type = PD_MSG_SCHED_NOTIFY | PD_MSG_REQUEST;
+                        PD_MSG_FIELD_IO(schedArgs).kind = OCR_SCHED_NOTIFY_COMM_READY;
+                        PD_MSG_FIELD_IO(schedArgs).OCR_SCHED_ARG_FIELD(OCR_SCHED_NOTIFY_COMM_READY).guid = fatGuid;
+                        ASSERT(pd->fcts.processMessage(pd, &giveMsg, false) == 0);
+                    #undef PD_MSG
+                    #undef PD_TYPE
+                    } else {
+                        createProcessRequestEdt(pd, processRequestTemplate, &msgParamv);
+                        // We do not need the handle anymore
+                        handle->destruct(handle);
+                    }
+                } else {
+                    createProcessRequestEdt(pd, processRequestTemplate, &msgParamv);
+                    // We do not need the handle anymore
+                    handle->destruct(handle);
+                }
             #endif
-                // We do not need the handle anymore
-                handle->destruct(handle);
                 //BUG #587: depending on comm-worker implementation, the received message could
                 //then be 'wrapped' in an EDT and pushed to the deque for load-balancing purpose.
             }

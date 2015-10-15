@@ -86,7 +86,7 @@ static void printHelp(void) {
 }
 
 static void printVersion(void) {
-    fprintf(stderr, "Open Community Runtime (OCR) %s%s\n", "0.9", "");
+    fprintf(stderr, "Open Community Runtime (OCR) %s\n", OCR_VERSION);
 }
 
 static void setIniFile(ocrConfig_t * ocrConfig, const char * value) {
@@ -245,9 +245,9 @@ const char *inst_str[] = {
     "NULL",
 };
 
-/* The below array defines the list of dependences */
-
-dep_t deps[] = {
+/* The following arrays define the list of dependences */
+#define OCR_CONFIG_DEP_COUNT(x) (sizeof(x) / sizeof(dep_t))
+static dep_t instanceDeps[] = {
     { memtarget_type, memplatform_type, "memplatform"},
     { allocator_type, memtarget_type, "memtarget"},
     { commapi_type, commplatform_type, "commplatform"},
@@ -262,6 +262,9 @@ dep_t deps[] = {
     { policydomain_type, scheduler_type, "scheduler"},
     { policydomain_type, commapi_type, "commapi"},
     { policydomain_type, policydomain_type, "parent"},
+};
+// Special case of policy domain pointing to types rather than instances
+static dep_t typeDeps[] = {
     { policydomain_type, taskfactory_type, "taskfactory"},
     { policydomain_type, tasktemplatefactory_type, "tasktemplatefactory"},
     { policydomain_type, datablockfactory_type, "datablockfactory"},
@@ -484,6 +487,11 @@ void bringUpRuntime(ocrConfig_t *ocrConfig) {
         all_instances[j] = NULL;
     }
 
+    // Check the config file version number
+    char *version = (char *) iniparser_getstring(dict, "General:version", NULL);
+    if(version == NULL || (strncmp(version, OCR_VERSION, strlen(OCR_VERSION)) != 0))
+        DPRINTF(DEBUG_LVL_WARN, "Configuration file (%s) doesn't match OCR version %s, use at your own risk\n", version, OCR_VERSION);
+
     // POPULATE TYPES
     DPRINTF(DEBUG_LVL_INFO, "========= Create factories ==========\n");
 
@@ -551,14 +559,16 @@ void bringUpRuntime(ocrConfig_t *ocrConfig) {
     // BUILD DEPENDENCES
     DPRINTF(DEBUG_LVL_INFO, "========= Build dependences ==========\n");
 
-    for (i = 0; i <= 13; i++) {
-        build_deps(dict, deps[i].from, deps[i].to, deps[i].refstr, all_instances, inst_params);
+    for (i = 0; i < OCR_CONFIG_DEP_COUNT(instanceDeps); i++) {
+        build_deps(dict, instanceDeps[i].from, instanceDeps[i].to, instanceDeps[i].refstr,
+                   all_instances, inst_params);
     }
 
     // Special case of policy domain pointing to types rather than instances
-    for (i = 14; i <= 18; i++) {
-        build_deps_types(deps[i].from, deps[i].to, deps[i].refstr, all_instances[deps[i].from],
-                         inst_counts[deps[i].from], type_counts[deps[i].to], all_factories, type_params);
+    for (i = 0; i < OCR_CONFIG_DEP_COUNT(typeDeps); i++) {
+        build_deps_types(typeDeps[i].from, typeDeps[i].to, typeDeps[i].refstr,
+                         all_instances[typeDeps[i].from], inst_counts[typeDeps[i].from],
+                         type_counts[typeDeps[i].to], all_factories, type_params);
     }
 
 #ifdef ENABLE_BUILDER_ONLY

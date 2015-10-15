@@ -9,7 +9,7 @@
 #include "ocr-config.h"
 //Temporary condition until x86-mpi uses the new scheduler by default
 //or the x86 mpi-pause resume gets merged(keeps Jenkins happy)
-#if defined(ENABLE_POLICY_DOMAIN_HC) && defined(ENABLE_EXTENSION_PAUSE)
+#ifdef ENABLE_EXTENSION_PAUSE
 
 #include "ocr-types.h"
 #include "ocr-db.h"
@@ -18,6 +18,7 @@
 #include "ocr-policy-domain.h"
 #include "comp-platform/pthread/pthread-comp-platform.h"
 
+//Bug 846: pqr-utils not platform independent (hc-pd assumed)
 #include "policy-domain/hc/hc-policy.h"
 #include "ocr-scheduler.h"
 #include "ocr-scheduler-object.h"

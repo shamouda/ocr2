@@ -1,8 +1,11 @@
 #include "ocr-config.h"
-#ifdef ENABLE_POLICY_DOMAIN_XE
+#ifdef SAL_FSIM_XE
 
 #include "debug.h"
 #include "ocr-types.h"
+
+#include "mmio-table.h"
+#include "rmd-map.h"
 
 #define DEBUG_TYPE SAL
 
@@ -60,6 +63,14 @@ ocrGuid_t salQuery(ocrQueryType_t query, ocrGuid_t guid, void **result, u32 *siz
 void salResume(u32 flag){
      return;
 
+}
+
+u64 salGetTime(void){
+    u64 cycles = 0;
+#if !defined(ENABLE_BUILDER_ONLY)
+    cycles = *(u64 *)(XE_MSR_OFFT + CYCLE_COUNTER * sizeof(u64));
+#endif
+    return cycles;
 }
 
 #endif /* ENABLE_POLICY_DOMAIN_XE */

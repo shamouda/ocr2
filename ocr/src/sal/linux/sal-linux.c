@@ -4,11 +4,41 @@
  * removed or modified.
  */
 
-
 #include "ocr-config.h"
-//Temporary condition until x86-mpi uses the new scheduler by default
-//or the x86-mpi pause resume gets merged (keeps Jenkins happy)
-#if defined(ENABLE_POLICY_DOMAIN_HC) && defined(ENABLE_EXTENSION_PAUSE)
+#ifdef SAL_LINUX
+
+#include "ocr-types.h"
+#ifdef __MACH__
+
+#include <mach/mach_time.h>
+static double conversion_factor;
+static int getTimeNs_initialized = 0;
+
+u64 salGetTime(){
+    double timeStamp;
+    if(!getTimeNs_initialized){
+        mach_timebase_info_data_t timebase;
+        mach_timebase_info(&timebase);
+        conversion_factor = (double)timebase.numer / (double)timebase.denom;
+        getTimeNs_initialized = 1;
+    }
+    timeStamp = mach_absolute_time()*conversion_factor;
+    return (u64)timeStamp;
+}
+
+#else
+#include <time.h>
+
+u64 salGetTime(){
+    struct timespec ts;
+    clock_gettime(CLOCK_REALTIME, &ts);
+    return ts.tv_sec * 1000000000UL + ((u64)ts.tv_nsec);
+
+}
+#endif /*__MACH__*/
+
+
+#ifdef ENABLE_EXTENSION_PAUSE
 
 #include <signal.h>
 #include "utils/pqr-utils.h"
@@ -21,6 +51,9 @@
  * SIGUSR1: Toggles Pause and Resume
  * SIGUSR2: Query the contents of queued tasks (will only
  *          succeed if runtime is paused)
+ *
+ *      This was implemented as a segway into actual API calls and
+ *      may be deprecated in the future.
  */
 void sig_handler(u32 sigNum) {
 
@@ -145,4 +178,29 @@ void registerSignalHandler(){
     }
 }
 
-#endif /* ENABLE_COMP_PLATFORM_PTHREAD */
+#else
+void sig_handler(u32 sigNum){
+    return;
+}
+
+u32 salPause(bool isBlocking){
+    PRINTF("PQR unsupported on this platform\n");
+    return 0;
+}
+
+ocrGuid_t salQuery(ocrQueryType_t query, ocrGuid_t guid, void **result, u32 *size, u8 flags){
+    PRINTF("PQR unsupported on this platform\n");
+    return NULL_GUID;
+}
+
+void salResume(u32 flag){
+    PRINTF("PQR unsupported on this platform\n");
+}
+
+void registerSignalHandler(){
+    return;
+}
+
+
+#endif /* ENABLE_EXTENSION_PAUSE  */
+#endif

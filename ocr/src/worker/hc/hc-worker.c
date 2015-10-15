@@ -195,7 +195,6 @@ static void workerLoop(ocrWorker_t * worker) {
             ASSERT(0);
         }
     } while(continueLoop);
-
     DPRINTF(DEBUG_LVL_VERB, "Finished worker loop ... waiting to be reapped\n");
 }
 
@@ -225,7 +224,6 @@ u8 hcWorkerSwitchRunlevel(ocrWorker_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_
         toReturn |= self->computes[0]->fcts.switchRunlevel(self->computes[0], PD, runlevel, phase, properties,
                                                            NULL, 0);
     }
-
     switch(runlevel) {
     case RL_CONFIG_PARSE:
         // On bring-up: Update PD->phasesPerRunlevel on phase 0
@@ -258,6 +256,15 @@ u8 hcWorkerSwitchRunlevel(ocrWorker_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_
             self->pd = PD;
         break;
     case RL_MEMORY_OK:
+        //Check that OCR has been configured to utilize system worker.
+        //worker[n-1] by convention. If so initialize deques
+        if(PD->workers[(PD->workerCount)-1]->type == SYSTEM_WORKERTYPE){
+            if(self->type == MASTER_WORKERTYPE || self->type == SLAVE_WORKERTYPE) {
+                if(((ocrWorkerHc_t *)self)->sysDeque == NULL){
+                    ((ocrWorkerHc_t*)self)->sysDeque = newDeque(self->pd, NULL, SEMI_CONCURRENT_DEQUE);
+                }
+            }
+        }
         break;
     case RL_GUID_OK:
         break;
@@ -288,7 +295,6 @@ u8 hcWorkerSwitchRunlevel(ocrWorker_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_
                 callback(self->pd, val);
                 self->curState = GET_STATE(RL_COMPUTE_OK, 0);
             }
-
         }
         if((properties & RL_TEAR_DOWN)) {
             toReturn |= self->computes[0]->fcts.switchRunlevel(self->computes[0], PD, runlevel, phase, properties,
@@ -358,6 +364,7 @@ u8 hcWorkerSwitchRunlevel(ocrWorker_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_
                 // We make sure that we actually fully booted before shutting down.
                 // Addresses a race where a worker still hasn't started but
                 // another worker has started and executes the shutdown protocol
+                //while(self->curState != GET_STATE(RL_USER_OK, (phase+1))){
                 while(self->curState != GET_STATE(RL_USER_OK, (phase+1)));
                 ASSERT(self->curState == GET_STATE(RL_USER_OK, (phase+1)));
             }
@@ -384,7 +391,6 @@ void* hcRunWorker(ocrWorker_t * worker) {
     // that we have successfully achieved the RL_COMPUTE_OK RL
     ASSERT(worker->callback != NULL);
     worker->callback(worker->pd, worker->callbackArg);
-
     // Set the current environment
     worker->computes[0]->fcts.setCurrentEnv(worker->computes[0], worker->pd, worker);
     worker->curState = GET_STATE(RL_COMPUTE_OK, 0);
@@ -430,10 +436,17 @@ void initializeWorkerHc(ocrWorkerFactory_t * factory, ocrWorker_t* self, ocrPara
     initializeWorkerOcr(factory, self, perInstance);
     self->type = ((paramListWorkerHcInst_t*)perInstance)->workerType;
     u64 workerId = ((paramListWorkerInst_t*)perInstance)->workerId;
-    ASSERT((workerId && self->type == SLAVE_WORKERTYPE) ||
+    //TODO: try to get away from SYSTEM_WORKERTYPE and remove this check.
+    if (self->type !=  SYSTEM_WORKERTYPE)
+        ASSERT((workerId && self->type == SLAVE_WORKERTYPE) ||
            (workerId == 0 && self->type == MASTER_WORKERTYPE));
     ocrWorkerHc_t * workerHc = (ocrWorkerHc_t*) self;
-    workerHc->hcType = HC_WORKER_COMP;
+
+    if(self->type == SYSTEM_WORKERTYPE){
+        workerHc->hcType = HC_WORKER_SYSTEM;
+    }else{
+        workerHc->hcType = HC_WORKER_COMP;
+    }
     workerHc->legacySecondStart = false;
 }
 

@@ -60,6 +60,7 @@
 // GUID provider
 #define ENABLE_GUID_PTR
 #define ENABLE_GUID_COUNTED_MAP
+#define ENABLE_GUID_LABELED
 
 // HAL layer to use
 #define HAL_X86_64
@@ -103,6 +104,9 @@
 
 // Affinity support
 #define ENABLE_EXTENSION_AFFINITY
+
+//GUID Labeling
+#define ENABLE_EXTENSION_LABELING
 
 // Build pause/resume support
 // #define ENABLE_EXTENSION_PAUSE

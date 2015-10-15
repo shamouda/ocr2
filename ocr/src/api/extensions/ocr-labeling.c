@@ -197,7 +197,6 @@ u8 ocrGuidFromLabel(ocrGuid_t *outGuid, ocrGuid_t mapGuid, s64* tuple) {
         DPRINTF(DEBUG_LVL_WARN, "ocrGuidFromLabel requires a map created with ocrGuidMapCreate (not a range)\n");
         return OCR_EINVAL;
     }
-
     *outGuid = myMap->mapFunc(myMap->startGuid, myMap->skipGuid, myMap->params, tuple);
     DPRINTF(DEBUG_LVL_VERB, "Returning GUID 0x%lx\n", *outGuid);
     return 0;
