@@ -425,7 +425,10 @@ INSTALL_TARGETS += exec
 INSTALL_EXES += $(OCREXEC)
 endif
 
-MACHINE_CONFIGS   := $(notdir $(wildcard $(OCR_ROOT)/machine-configs/$(OCR_TYPE)/*))
+# WARNING: This next line actually generates the configurations. This will be cleaned
+# up in a later commit.
+GENERATE_CONFIGS  := $(shell cd $(OCR_ROOT)/machine-configs/$(OCR_TYPE) && ./generate-cfg.sh)
+MACHINE_CONFIGS   := $(notdir $(wildcard $(OCR_ROOT)/machine-configs/$(OCR_TYPE)/*.cfg))
 INC_FILES         := $(addprefix extensions/, $(notdir $(wildcard $(OCR_ROOT)/inc/extensions/*))) \
                      $(notdir $(wildcard $(OCR_ROOT)/inc/*))
 

@@ -1,8 +1,11 @@
 #include "ocr-config.h"
-#if defined(ENABLE_POLICY_DOMAIN_CE) && defined(ENABLE_COMP_PLATFORM_FSIM)
+#ifdef SAL_FSIM_CE
 
 #include "debug.h"
 #include "ocr-types.h"
+
+#include "mmio-table.h"
+#include "rmd-map.h"
 
 #define DEBUG_TYPE API
 /* NOTE: Below functions are placeholders for platform independence.
@@ -21,6 +24,14 @@ ocrGuid_t salQuery(ocrQueryType_t query, ocrGuid_t guid, void **result, u32 *siz
 void salResume(u32 flag){
      return;
 
+}
+
+u64 salGetTime(void){
+    u64 cycles = 0;
+#if !defined(ENABLE_BUILDER_ONLY)
+    cycles = rmd_ld64(CE_MSR_BASE + CYCLE_COUNTER * sizeof(u64));
+#endif
+    return cycles;
 }
 
 #endif

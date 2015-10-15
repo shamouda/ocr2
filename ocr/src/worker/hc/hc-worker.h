@@ -13,6 +13,7 @@
 #include "ocr-types.h"
 #include "utils/ocr-utils.h"
 #include "ocr-worker.h"
+#include "utils/deque.h"
 
 typedef struct {
     ocrWorkerFactory_t base;
@@ -25,7 +26,8 @@ typedef struct _paramListWorkerHcInst_t {
 
 typedef enum {
     HC_WORKER_COMP,
-    HC_WORKER_COMM
+    HC_WORKER_COMM,
+    HC_WORKER_SYSTEM
 } hcWorkerType_t;
 
 typedef struct {
@@ -43,6 +45,7 @@ typedef struct {
 #endif
     hcWorkerType_t hcType;
     u8 legacySecondStart;
+    deque_t *sysDeque;
 } ocrWorkerHc_t;
 
 ocrWorkerFactory_t* newOcrWorkerFactoryHc(ocrParamList_t *perType);

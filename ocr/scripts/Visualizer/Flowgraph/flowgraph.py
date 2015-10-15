@@ -208,7 +208,7 @@ def getFromSats(sats):
     satPairs = []
     for line in sats:
         curLine = line.split()
-        satPairs.append((curLine[7], curLine[9]))
+        satPairs.append((curLine[6], curLine[8]))
     return satPairs
 
 #=============== Generate key-val data structure for EDT guids to name =========

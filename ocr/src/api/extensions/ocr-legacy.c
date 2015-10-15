@@ -129,7 +129,6 @@ u8 ocrLegacyBlockProgress(ocrGuid_t handle, ocrGuid_t* guid, void** result, u64*
 
 #define PD_MSG (&msg)
 #define PD_TYPE PD_MSG_GUID_INFO
-    u64 backoff = 1024;
     do {
         getCurrentEnv(NULL, NULL, NULL, &msg);
         msg.type = PD_MSG_GUID_INFO | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
@@ -147,10 +146,7 @@ u8 ocrLegacyBlockProgress(ocrGuid_t handle, ocrGuid_t* guid, void** result, u64*
             if(properties == LEGACY_PROP_NONE) {
                 return OCR_EINVAL;
             } else if(properties == LEGACY_PROP_WAIT_FOR_CREATE) {
-                // We are going to loop
-                u64 origBackoff = backoff;
-                while(--backoff) hal_pause();
-                backoff = origBackoff << 1;
+                continue; // Tightest loop to see how this goes
             }
         } else {
             break;
@@ -183,17 +179,22 @@ u8 ocrLegacyBlockProgress(ocrGuid_t handle, ocrGuid_t* guid, void** result, u64*
             }
             if(result != NULL)
                 *result = PD_MSG_FIELD_O(ptr);
+            if(size != NULL) {
+                //BUG #162
+                // Because we do not have the metadata cloned, must read the size from the msg
+                *size = PD_MSG_FIELD_O(size);
+            }
             dbResult = PD_MSG_FIELD_IO(guid);
 #undef PD_TYPE
 #undef PD_MSG
         } else {
             if(result != NULL)
                 *result = ((ocrDataBlock_t*)(dbResult.metaDataPtr))->ptr;
+            if(size != NULL) {
+                *size = ((ocrDataBlock_t*)(dbResult.metaDataPtr))->size;
+            }
         }
         ASSERT(dbResult.metaDataPtr != NULL);
-        if(size != NULL) {
-            *size = ((ocrDataBlock_t*)(dbResult.metaDataPtr))->size;
-        }
     } else {
         if(size != NULL) {
             *size = 0;
