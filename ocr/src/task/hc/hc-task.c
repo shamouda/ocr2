@@ -603,9 +603,9 @@ u8 destructTaskHc(ocrTask_t* base) {
     } else {
         if (base->state != REAPING_EDTSTATE) {
             DPRINTF(DEBUG_LVL_WARN, "Destroy EDT 0x%lx is potentially racing with the EDT prelude or execution\n", base->guid);
+            ASSERT(false && "EDT destruction is racing with EDT execution");
+            return OCR_EPERM;
         }
-        ASSERT((base->state == REAPING_EDTSTATE) && "EDT destruction is racing with EDT execution");
-        return OCR_EPERM;
     }
 
 #ifdef OCR_ENABLE_STATISTICS
