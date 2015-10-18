@@ -86,7 +86,7 @@ static void hcWorkShift(ocrWorker_t * worker) {
     }
 #undef PD_MSG
 #undef PD_TYPE
-
+#ifdef ENABLE_EXTENSION_PAUSE
     if(self->pqrFlags.runtimePause == true) {
         hal_xadd32((u32*)&self->pqrFlags.pauseCounter, 1);
         //Pause called - stop workers
@@ -95,6 +95,7 @@ static void hcWorkShift(ocrWorker_t * worker) {
         }
         hal_xadd32((u32*)&self->pqrFlags.pauseCounter, -1);
     }
+#endif
 }
 
 static void workerLoop(ocrWorker_t * worker) {

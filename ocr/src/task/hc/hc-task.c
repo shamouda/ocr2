@@ -1121,8 +1121,12 @@ u8 taskExecute(ocrTask_t* base) {
 #ifdef OCR_ENABLE_VISUALIZER
         u64 startTime = salGetTime();
 #endif
+#ifdef OCR_TRACE
+// ifdef because the compiler doesn't get rid off this call
+// even when subsequent TPRINTF end up not being compiled
         char location[32];
         curWorker->fcts.printLocation(curWorker, &(location[0]));
+#endif
 #ifdef OCR_ENABLE_EDT_NAMING
         TPRINTF("EDT Start: %s 0x%llx in %s\n",
                 base->name, base->guid, location);

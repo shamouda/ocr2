@@ -1807,14 +1807,18 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             ASSERT(evt->fctId == self->eventFactories[0]->factoryId);
             PD_MSG_FIELD_O(returnDetail) = self->eventFactories[0]->fcts[evt->kind].satisfy(
                 evt, PD_MSG_FIELD_I(payload), PD_MSG_FIELD_I(slot));
+#ifdef ENABLE_EXTENSION_PAUSE
             rself->pqrFlags.prevDb = PD_MSG_FIELD_I(payload).guid;
+#endif
         } else {
             if(dstKind == OCR_GUID_EDT) {
                 ocrTask_t *edt = (ocrTask_t*)(dst.metaDataPtr);
                 ASSERT(edt->fctId == self->taskFactories[0]->factoryId);
                 PD_MSG_FIELD_O(returnDetail) = self->taskFactories[0]->fcts.satisfy(
                     edt, PD_MSG_FIELD_I(payload), PD_MSG_FIELD_I(slot));
+#ifdef ENABLE_EXTENSION_PAUSE
                 rself->pqrFlags.prevDb = PD_MSG_FIELD_I(payload).guid;
+#endif
             } else {
                 DPRINTF(DEBUG_LVL_WARN, "Attempting to satisfy a GUID of type %x, expected EDT\n", dstKind);
                 PD_MSG_FIELD_O(returnDetail) = OCR_ENOTSUP;

@@ -116,7 +116,7 @@
 #define ENABLE_EXTENSION_RTITF
 
 // Build pause/resume support
-#define ENABLE_EXTENSION_PAUSE
+// #define ENABLE_EXTENSION_PAUSE
 
 // GUID labeling extension
 #define ENABLE_EXTENSION_LABELING
