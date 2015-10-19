@@ -383,8 +383,9 @@ extern void doTrace(u64 location, u64 wrkr, ocrGuid_t taskGuid, char *str, ...);
 #ifdef OCR_TRACE_BINARY
 
 #if (OCR_DEBUG_LVL==DEBUG_LVL_WARN)
+#undef OCR_DEBUG_LVL
 #define OCR_DEBUG_LVL DEBUG_LVL_INFO
-#warning Binary trace enabled, overriding debug verbosity to DEBUG_LVL_INFO
+//Binary trace enabled, overriding debug verbosity to DEBUG_LVL_INFO
 #endif
 
 #define DPRINTF_TYPE(type, level, format, ...)   do {                       \
