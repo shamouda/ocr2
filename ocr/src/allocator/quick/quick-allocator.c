@@ -212,7 +212,9 @@ typedef void blkPayload_t; // Strongly type-check the ptr-to-void that comprises
 #define KNOWN_VALUE_AS_GUARD    0xfeed0000deadbeef
 
 #if defined(HAL_FSIM_CE) || defined(HAL_FSIM_XE)
-#define PER_THREAD_CACHE
+//TODO: Re-enable the below after moving the globals into allocator structs
+//Disabled for 4.1.0
+//#define PER_THREAD_CACHE
 // TG
 #define CACHE_POOL(ID)          (cache_pool)
 #define _CACHE_POOL(ID)         (_cache_pool)
