@@ -35,7 +35,7 @@ jobtype_ocr_build_perfs = {
     'isLocal': True,
     'run-cmd': '${JJOB_PRIVATE_HOME}/xstack/ocr/jenkins/scripts/build.sh',
     'param-cmd': '${JJOB_PRIVATE_HOME}/xstack/jenkins/scripts/empty-cmd.sh',
-    'keywords': ('ocr', 'nightly'),
+    'keywords': ('ocr', 'performance', 'nightly'),
     'timeout': 240,
     'sandbox': ('local', 'shared', 'shareOK'),
     'req-repos': ('xstack',),

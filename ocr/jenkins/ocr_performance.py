@@ -11,7 +11,7 @@ jobtype_ocr_performance = {
     # script know the caller is just probing for run parameters. For now rely on the default
     # 'remote-param-cmd.sh' to avoid duplicating run configurations.
     # 'param-cmd': '${JJOB_PRIVATE_HOME}/xstack/ocr/jenkins/scripts/performance-ubench.sh _params',
-    'keywords': ('ocr', 'performance'),
+    'keywords': ('ocr', 'performance', 'nightly'),
     'timeout': 600,
     'sandbox': ('local', 'shared', 'shareOK'),
     'req-repos': ('xstack',)
@@ -22,7 +22,7 @@ jobtype_gatherStats_performance = {
     'isLocal': True,
     'run-cmd': '${JJOB_SHARED_HOME}/xstack/ocr/jenkins/scripts/perfStatCollector.sh',
     'param-cmd': '${JJOB_SHARED_HOME}/xstack/jenkins/scripts/empty-cmd.sh',
-    'keywords': ('ocr', 'performance'),
+    'keywords': ('ocr', 'performance', 'nightly'),
     'timeout': 60,
     'sandbox': ('shared', 'shareOK'),
     'req-repos': ('xstack',)
