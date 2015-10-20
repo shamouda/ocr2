@@ -405,10 +405,6 @@ extern void doTrace(u64 location, u64 wrkr, ocrGuid_t taskGuid, char *str, ...);
         ocrTask_t *_task = NULL; ocrWorker_t *_worker = NULL;               \
         struct _ocrPolicyDomain_t *_pd = NULL;                              \
         getCurrentEnv(&_pd, &_worker, &_task, NULL);                        \
-        doTrace(_pd?(u64)_pd->myLocation:0,                                 \
-                _worker?(u64)_worker->id:0,                                 \
-                _task?_task->guid:0,                                        \
-                format, ## __VA_ARGS__);                                    \
         PRINTF(OCR_DEBUG_##type##_STR "(" OCR_DEBUG_##level##_STR           \
                ") [PD:0x%lx W:0x%lx EDT:0x%lx] " format,                    \
                _pd?(u64)_pd->myLocation:0,                                  \

@@ -32,8 +32,10 @@
 
 // For TG specific location functions
 #ifdef TG_X86_TARGET
-#include "rmd-map.h"
+#include "xstg-map.h"
 #endif
+
+#include "tg-bin-files.h"
 
 #define DEBUG_TYPE INIPARSING
 

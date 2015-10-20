@@ -13,7 +13,7 @@
  * @brief Function to drive the runlevel changes on boot-up as well
  * as the runlevel changes on tear-down
  *
- * This function will be called by rmdkrnl to start the PD for the CE
+ * This function will be called by tgkrnl to start the PD for the CE
  *
  * @param[in] pd    Pointer to the policy domain to start
  */

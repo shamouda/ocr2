@@ -21,7 +21,7 @@
 #define DEBUG_TYPE GUID
 
 #ifdef HAL_FSIM_CE
-#include "rmd-map.h"
+#include "xstg-map.h"
 #endif
 
 typedef struct {
@@ -134,13 +134,6 @@ u8 ptrCreateGuid(ocrGuidProvider_t* self, ocrFatGuid_t *fguid, u64 size, ocrGuid
     RESULT_PROPAGATE(policy->fcts.processMessage (policy, &msg, true));
 
     ocrGuidImpl_t * guidInst = (ocrGuidImpl_t *)PD_MSG_FIELD_O(ptr);
-#ifdef HAL_FSIM_CE
-    if((u64)PD_MSG_FIELD_O(ptr) < CE_MSR_BASE) // BUG #222: do this check properly
-        guidInst = (ocrGuidImpl_t *) DR_CE_BASE(CHIP_FROM_ID(policy->myLocation),
-                                                UNIT_FROM_ID(policy->myLocation),
-                                                BLOCK_FROM_ID(policy->myLocation))
-                                     + (u64)(PD_MSG_FIELD_O(ptr) - BR_CE_BASE);
-#endif
 
     guidInst->guid = (ocrGuid_t)((u64)guidInst + sizeof(ocrGuidImpl_t));
     guidInst->kind = kind;
