@@ -76,24 +76,11 @@
 
 // Ugly globals below, but would go away once FSim has QMA support trac #232
 
-// Special values in msgAddresses: EMPTY_SLOT means it can be written to and
+// Special values in MSG_CE_ADDR_OFF: EMPTY_SLOT means it can be written to and
 // RESERVED_SLOT means someone is holding it for writing later. Both are invalid
 // addresses so there should be no conflict
 #define EMPTY_SLOT 0x0ULL
 #define RESERVED_SLOT 0x1ULL
-#define OUTSTANDING_CE_MSGS 16
-u64 msgAddresses[OUTSTANDING_CE_MSGS] = {0xbadf00d, 0xbadf00d, 0xbadf00d, 0xbadf00d,
-                                         0xbadf00d, 0xbadf00d, 0xbadf00d, 0xbadf00d,
-                                         0xbadf00d, 0xbadf00d, 0xbadf00d, 0xbadf00d,
-                                         0xbadf00d, 0xbadf00d, 0xbadf00d, 0xbadf00d};
-
-#define OUTSTANDING_CE_SEND 4
-ocrPolicyMsg_t recvBuf; // Currently can only receive one message at a time
-ocrPolicyMsg_t sendBuffs[OUTSTANDING_CE_SEND]; // Have a bit more send buffers because for barriers, it
-                                               // is debilitating to not be able to release quickly
-
-// BUG #232: The above need to be placed in the CE's scratchpad, but once QMAs are ready, should
-// be no problem.
 
 static u8 ceCommSendMessageToCE(ocrCommPlatform_t *self, ocrLocation_t target,
                                 ocrPolicyMsg_t *message, u64 *id,
@@ -108,10 +95,11 @@ static u8 ceCommSendMessageToCE(ocrCommPlatform_t *self, ocrLocation_t target,
     ASSERT(self->location != target);
 
     // We look for an empty buffer to use
-    for(i=0; i<OUTSTANDING_CE_SEND; ++i) {
-        if(sendBuffs[i].type == 0) {
+    ocrPolicyMsg_t *buffers = (ocrPolicyMsg_t*)(AR_L1_BASE + MSG_CE_SEND_BUF_OFFT);
+    for(i=0; i<OUTSTANDING_CE_SEND; ++i, ++buffers) {
+        if(buffers->type == 0) {
             // Found one
-            sendBuf = &(sendBuffs[i]);
+            sendBuf = buffers;
             DPRINTF(DEBUG_LVL_VERB, "Using local buffer %u @ 0x%lx\n", i, sendBuf);
             break;
         }
@@ -137,9 +125,8 @@ static u8 ceCommSendMessageToCE(ocrCommPlatform_t *self, ocrLocation_t target,
     }
 
     // Figure out where our remote boxes our (where we are sending to)
-    // This relies on the fact that all CEs have the same layout
     rmbox = (u64 *) (UR_L1_BASE(SOCKET_FROM_ID(target), CLUSTER_FROM_ID(target), BLOCK_FROM_ID(target), AGENT_FROM_ID(target))
-                     + (u64)(msgAddresses));
+                     + MSG_CE_ADDR_OFFT);
 
     // Calculate our absolute sendBuf address
     msgAbsAddr = UR_L1_BASE(SOCKET_FROM_ID(self->location), CLUSTER_FROM_ID(self->location), BLOCK_FROM_ID(self->location),
@@ -151,7 +138,7 @@ static u8 ceCommSendMessageToCE(ocrCommPlatform_t *self, ocrLocation_t target,
     bool reservedSlot = false;
     if((message->type & (PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE)) == (PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE)) {
         reservedSlot = true;
-        u64 *lmbox = &(msgAddresses[0]);
+        u64 *lmbox = (u64*)(AR_L1_BASE + MSG_CE_ADDR_OFFT);
         retval = RESERVED_SLOT;
         for(i=0; i<OUTSTANDING_CE_MSGS; ++i) {
             retval = hal_cmpswap64(&(lmbox[i]), EMPTY_SLOT, RESERVED_SLOT);
@@ -217,10 +204,10 @@ static u8 ceCommSendMessageToCE(ocrCommPlatform_t *self, ocrLocation_t target,
 static u8 ceCommDestructCEMessage(ocrCommPlatform_t *self, u32 idx) {
 
     ASSERT(idx < OUTSTANDING_CE_MSGS);
-    DPRINTF(DEBUG_LVL_VERB, "Destructing message index %u (0x%lx)\n", idx, msgAddresses[idx]);
+    DPRINTF(DEBUG_LVL_VERB, "Destructing message index %u (0x%lx)\n", idx, *(u64*)(AR_L1_BASE + MSG_CE_ADDR_OFFT + sizeof(u64)*idx));
 
-    ocrPolicyMsg_t *msg = (ocrPolicyMsg_t*)msgAddresses[idx];
-    msgAddresses[idx] = 0;
+    ocrPolicyMsg_t *msg = (ocrPolicyMsg_t*)(*(u64*)(AR_L1_BASE + MSG_CE_ADDR_OFFT + sizeof(u64)*idx));
+    *(u64*)(AR_L1_BASE + MSG_CE_ADDR_OFFT + sizeof(u64)*idx) = EMPTY_SLOT;
     msg->type = 0;
     msg->msgId = (u64)-1;
 
@@ -230,29 +217,31 @@ static u8 ceCommDestructCEMessage(ocrCommPlatform_t *self, u32 idx) {
 static u8 ceCommCheckCEMessage(ocrCommPlatform_t *self, ocrPolicyMsg_t **msg) {
     u32 j;
 
+    ocrPolicyMsg_t *recvBuf = (ocrPolicyMsg_t*)(AR_L1_BASE + MSG_CE_RECV_BUF_OFFT);
     // Go through our mbox to check for valid messages
-    if(recvBuf.type) {
+    if(recvBuf->type) {
         // Receive buffer is busy
         DPRINTF(DEBUG_LVL_VERB, "Receive buffer @ 0x%lx is busy, cannot receive CE messages\n");
         return POLL_NO_MESSAGE;
     }
     for(j=0; j<OUTSTANDING_CE_MSGS; ++j) {
-        if((msgAddresses[j] != EMPTY_SLOT) &&
-           (msgAddresses[j] != RESERVED_SLOT)) {
-            DPRINTF(DEBUG_LVL_VERB, "Found an incoming CE message (0x%lx) @ idx %u\n", msgAddresses[j], j);
+        u64 addr = *(u64*)(AR_L1_BASE + MSG_CE_ADDR_OFFT + sizeof(u64)*j);
+        if((addr != EMPTY_SLOT) &&
+           (addr != RESERVED_SLOT)) {
+            DPRINTF(DEBUG_LVL_VERB, "Found an incoming CE message (0x%lx) @ idx %u\n", addr, j);
             // We fixup pointers
             u64 baseSize = 0, marshalledSize = 0;
-            ocrPolicyMsgGetMsgSize((ocrPolicyMsg_t*)msgAddresses[j], &baseSize, &marshalledSize, 0);
-            if(baseSize + marshalledSize > recvBuf.bufferSize) {
+            ocrPolicyMsgGetMsgSize((ocrPolicyMsg_t*)addr, &baseSize, &marshalledSize, 0);
+            if(baseSize + marshalledSize > recvBuf->bufferSize) {
                 DPRINTF(DEBUG_LVL_WARN, "Comm platform only handles messages up to size %ld\n",
-                                         recvBuf.bufferSize);
+                                         recvBuf->bufferSize);
                 ASSERT(0);
             }
-            ocrPolicyMsgUnMarshallMsg((u8*)msgAddresses[j], NULL, &recvBuf, MARSHALL_FULL_COPY);
+            ocrPolicyMsgUnMarshallMsg((u8*)addr, NULL, recvBuf, MARSHALL_FULL_COPY);
             DPRINTF(DEBUG_LVL_VERB, "Copied message from 0x%x of type 0x%x to receive buffer @ 0x%lx\n",
-                    recvBuf.srcLocation, recvBuf.type, &(recvBuf));
+                    recvBuf->srcLocation, recvBuf->type, recvBuf);
             ceCommDestructCEMessage(self, j);
-            *msg = &recvBuf;
+            *msg = recvBuf;
             return 0;
         }
     }
@@ -294,10 +283,11 @@ u8 ceCommSwitchRunlevel(ocrCommPlatform_t *self, ocrPolicyDomain_t *PD, ocrRunle
             // Figure out our location
             self->location = PD->myLocation;
 
-            // Initialize the bufferSize properly for recvBuf and sendBuf
-            initializePolicyMessage(&recvBuf, sizeof(ocrPolicyMsg_t));
-            for(i=0; i<OUTSTANDING_CE_SEND; ++i) {
-                initializePolicyMessage(&(sendBuffs[i]), sizeof(ocrPolicyMsg_t));
+            // Initialize the bufferSize properly for recvBuf sendBuf
+            initializePolicyMessage((ocrPolicyMsg_t*)(AR_L1_BASE + MSG_CE_RECV_BUF_OFFT), sizeof(ocrPolicyMsg_t));
+            ocrPolicyMsg_t *buffers = (ocrPolicyMsg_t*)(AR_L1_BASE + MSG_CE_SEND_BUF_OFFT);
+            for(i=0; i<OUTSTANDING_CE_SEND; ++i, ++buffers) {
+                initializePolicyMessage(buffers, sizeof(ocrPolicyMsg_t));
             }
 
             // Pre-compute pointer to our block's XEs' remote stages (where we send to)
@@ -313,8 +303,9 @@ u8 ceCommSwitchRunlevel(ocrCommPlatform_t *self, ocrPolicyDomain_t *PD, ocrRunle
             cp->pollq = 0;
 
             // Initialize things
-            for(i = 0; i < OUTSTANDING_CE_MSGS; ++i)
-                msgAddresses[i] = 0;
+            for(i = 0; i < OUTSTANDING_CE_MSGS; ++i) {
+                *(u64*)(AR_L1_BASE + MSG_CE_ADDR_OFFT + i*sizeof(u64)) = EMPTY_SLOT;
+            }
 
             // Statically check stage area is big enough for 1 policy message + F/E word
             COMPILE_TIME_ASSERT(MSG_QUEUE_SIZE >= (sizeof(u64) + sizeof(ocrPolicyMsg_t)));
@@ -507,11 +498,12 @@ u8 ceCommDestructMessage(ocrCommPlatform_t *self, ocrPolicyMsg_t *msg) {
     ocrCommPlatformCe_t * cp = (ocrCommPlatformCe_t *)self;
     u32 i;
 
-    if(msg == &(recvBuf)) {
+    ocrPolicyMsg_t *recvBuf = (ocrPolicyMsg_t*)(AR_L1_BASE + MSG_CE_RECV_BUF_OFFT);
+    if(msg == recvBuf) {
         // This is an incomming message from a CE, we say that we
         // are done with it so we can receive the next message
-        DPRINTF(DEBUG_LVL_VVERB, "Destroying recvBuf @ 0x%lx\n", &(recvBuf));
-        recvBuf.type = 0;
+        DPRINTF(DEBUG_LVL_VVERB, "Destroying recvBuf @ 0x%lx\n", recvBuf);
+        recvBuf->type = 0;
         return 0;
     } else {
         // We look for a message from the XE and un-clockgate it
@@ -522,7 +514,6 @@ u8 ceCommDestructMessage(ocrCommPlatform_t *self, ocrPolicyMsg_t *msg) {
                 cp->lq[i][0] = 0;
                 DPRINTF(DEBUG_LVL_VVERB, "Ungating XE %u\n", i + ID_AGENT_XE0);
                 {
-                    // Clear the XE pipeline clock gate while preserving other bits.
                     // Before unclockgating the XE, we make sure it is clock-gated to avoid
                     // a race where the CE sees the XE's message before the XE sends the
                     // alarm to the CE. The XE will clock-gate itself on the alarm
@@ -583,6 +574,10 @@ void destructCommPlatformFactoryCe(ocrCommPlatformFactory_t *factory) {
 }
 
 ocrCommPlatformFactory_t *newCommPlatformFactoryCe(ocrParamList_t *perType) {
+
+    // Check to make sure we are not going over the start of the heap
+    COMPILE_TIME_ASSERT(((MSG_CE_SEND_BUF_OFFT + OUTSTANDING_CE_SEND*sizeof(ocrPolicyMsg_t) + 7) & ~0x7ULL) < 0x1000);
+
     ocrCommPlatformFactory_t *base = (ocrCommPlatformFactory_t*)
                                      runtimeChunkAlloc(sizeof(ocrCommPlatformFactoryCe_t), NONPERSISTENT_CHUNK);
 
