@@ -157,10 +157,12 @@ u8 xeCommSendMessage(ocrCommPlatform_t *self, ocrLocation_t target,
     ASSERT(target == self->pd->parentLocation);
 
     // - Atomically test & set remote stage to Busy. Error if already non-Empty.
-    {
-        u64 tmp = hal_swap64(cp->rq, (u64)1);
-        ASSERT(tmp == 0);
-    }
+    DPRINTF(DEBUG_LVL_VVERB, "XE trying to grab its remote slot @ 0x%lx\n", cp->rq);
+    u64 tmp = 1;
+    do {
+        tmp = hal_cmpswap64(cp->rq, 0ULL, 1ULL);
+    } while(tmp != 0);
+    DPRINTF(DEBUG_LVL_VVERB, "XE successful at grabbing remote slot @ 0x%lx\n", cp->rq);
 
     // We marshall things properly
     u64 baseSize = 0, marshalledSize = 0;
@@ -181,6 +183,7 @@ u8 xeCommSendMessage(ocrCommPlatform_t *self, ocrLocation_t target,
             &(cp->rq)[1], message->type, message->usefulSize);
     hal_memCopy(&(cp->rq)[1], message, message->usefulSize, 0);
 
+    DPRINTF(DEBUG_LVL_VERB, "ALARM CE\n");
     // - Atomically test & set remote stage to Full. Error otherwise (Empty/Busy.)
     {
         u64 tmp = hal_swap64(cp->rq, (u64)2);
@@ -189,6 +192,7 @@ u8 xeCommSendMessage(ocrCommPlatform_t *self, ocrLocation_t target,
 
     // - Alarm remote to tell the CE it has something (in case it is halted)
     __asm__ __volatile__("alarm %0\n\t" : : "L" (XE_MSG_READY));
+    DPRINTF(DEBUG_LVL_VERB, "RELEASED\n");
 
 #endif
 
