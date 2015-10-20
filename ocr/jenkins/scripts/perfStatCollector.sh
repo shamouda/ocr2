@@ -11,9 +11,9 @@ NB_SAMPLES=$2
 SCRIPT_FOLDER=${JJOB_SHARED_HOME}/xstack/ocr/jenkins/scripts
 APPS_SCRIPT_FOLDER=${JJOB_SHARED_HOME}/xstack/apps/jenkins/scripts
 
-RESULTS_DIR=performanceResults/NightlyPerformanceStat
-STATS_FILE=NightlyPerformanceStat.txt
-PLOT_FILE=PerformanceTrendlineplot.png
+RESULTS_DIR=performanceResults/NightlyPerfStatMicroBench
+STATS_FILE=NightlyPerfStatMicroBench.txt
+PLOT_FILE=perfStatMicroBenchTrend.png
 
 # Create archive dirs if the framework is being run manually ( i.e. local run and not by jenkins)
 if [ -z $WORKSPACE ]; then
