@@ -54,7 +54,7 @@
  */
 #define hal_memCopy(dst, src, n, isBackground)                          \
     ({                                                                  \
-        tg_dma_copyregion_async(dst, src, n);                           \
+        tg_dma_copyregion_async((void*)dst, (void*)src, n);             \
         if(!isBackground) tg_fence_b();                                 \
         n;                                                              \
     })
@@ -105,7 +105,7 @@
  */
 #define hal_swap64(atomic, newValue)                                    \
     ({                                                                  \
-        u64 __tmp = tg_xchg64(atomic, newValue);                        \
+        u64 __tmp = tg_xchg64((u64*)atomic, newValue);                  \
         __tmp;                                                          \
     })
 
@@ -123,10 +123,10 @@
  *
  * @return Old value of the atomic
  */
-#define hal_cmpswap64(atomic, cmpValue, newValue)                            \
-    ({                                                                       \
-        u64 __tmp = tg_cmpxchg64(atomic, cmpValue, newValue);                \
-        __tmp;                                                               \
+#define hal_cmpswap64(atomic, cmpValue, newValue)                       \
+    ({                                                                  \
+        u64 __tmp = tg_cmpxchg64((u64*)atomic, cmpValue, newValue);     \
+        __tmp;                                                          \
     })
 
 /**
@@ -142,7 +142,7 @@
  */
 #define hal_xadd64(atomic, addValue)                                    \
     ({                                                                  \
-        u64 __tmp = tg_xadd64(atomic, addValue);                        \
+        u64 __tmp = tg_xadd64((u64*)atomic, addValue);                  \
         __tmp;                                                          \
     })
 
@@ -171,7 +171,7 @@
  */
 #define hal_swap32(atomic, newValue)                                    \
     ({                                                                  \
-        u32 __tmp = tg_xchg32(atomic, newValue);                        \
+        u32 __tmp = tg_xchg32((u32*)atomic, newValue);                  \
         __tmp;                                                          \
     })
 
@@ -191,7 +191,7 @@
  */
 #define hal_cmpswap32(atomic, cmpValue, newValue)                       \
     ({                                                                  \
-        u32 __tmp = tg_cmpxchg32(atomic, cmpValue, newValue);           \
+        u32 __tmp = tg_cmpxchg32((u32*)atomic, cmpValue, newValue);     \
         __tmp;                                                          \
     })
 
@@ -208,7 +208,7 @@
  */
 #define hal_xadd32(atomic, addValue)                                    \
     ({                                                                  \
-        u32 __tmp = tg_xadd32(atomic, addValue);                        \
+        u32 __tmp = tg_xadd32((u32*)atomic, addValue);                  \
         __tmp;                                                          \
     })
 
@@ -236,7 +236,7 @@
  */
 #define hal_lock32(lock)                                         \
     do {                                                         \
-        while(tg_cmpxchg32(lock, 0, 1) != 0) ;                   \
+        while(tg_cmpxchg32((u32*)lock, 0, 1) != 0) ;             \
     } while(0)
 
 /**
@@ -258,7 +258,7 @@
  * @return 0 if the lock has been acquired and a non-zero
  * value if it cannot be acquired
  */
-#define hal_trylock32(lock) tg_cmpxchg32(lock, 0, 1)
+#define hal_trylock32(lock) tg_cmpxchg32((u32*)lock, 0, 1)
 
 /**
  * @brief Abort the runtime
@@ -295,7 +295,7 @@
  * This is used by CE to put an XE core in its block to sleep
  */
 #define hal_sleep(id) do {                                              \
-        *(u64 *)(BR_MSR_BASE(ID_AGENT_XE(id)) + POWER_GATE_RESET*sizeof(u64)) = 0x0ULL; \
+        *(u64 *)(BR_MSR_BASE(id + ID_AGENT_XE0) + POWER_GATE_RESET*sizeof(u64)) = 0x0ULL; \
     } while(0)
 
 /**
@@ -304,7 +304,7 @@
  * This is used by CE to wake an XE core in its block from sleep
  */
 #define hal_wake(id) do {                                                    \
-        *(u64 *)(BR_MSR_BASE(ID_AGENT_XE(id)) + POWER_GATE_RESET*sizeof(u64)) = 0x1ULL; \
+        *(u64 *)(BR_MSR_BASE(id + ID_AGENT_XE0) + POWER_GATE_RESET*sizeof(u64)) = 0x1ULL; \
     } while(0)
 
 /**
