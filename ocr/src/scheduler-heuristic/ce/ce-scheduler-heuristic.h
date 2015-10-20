@@ -15,8 +15,6 @@
 #include "utils/ocr-utils.h"
 #include "ocr-scheduler-object.h"
 
-#include "rmd-map.h"
-
 /****************************************************/
 /* CE SCHEDULER_HEURISTIC                           */
 /****************************************************/

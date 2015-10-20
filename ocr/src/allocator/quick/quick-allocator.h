@@ -34,7 +34,5 @@ extern ocrAllocatorFactory_t* newAllocatorFactoryQuick(ocrParamList_t *perType);
 
 void quickDeallocate(void* address);
 
-void *addrGlobalizeOnTG(void *result, ocrPolicyDomain_t *self);
-
 #endif /* ENABLE_ALLOCATOR_QUICK */
 #endif /* __QUICK_ALLOCATOR_H__ */

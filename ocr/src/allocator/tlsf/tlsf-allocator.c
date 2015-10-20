@@ -196,7 +196,7 @@
 #include "tlsf-allocator.h"
 #include "allocator/allocator-all.h"
 #ifdef HAL_FSIM_CE
-#include "rmd-map.h"
+#include "xstg-map.h"
 #endif
 
 #define DEBUG_TYPE ALLOCATOR
@@ -1381,22 +1381,23 @@ static ocrAllocator_t * getAnchorCE (ocrAllocator_t * self) {
     ASSERT(self->memoryCount == 1);
 #ifdef HAL_FSIM_CE
     u32 level = self->memories[0]->level;
+#warning FIXME-OCRTG: REWROTE THE TWIDDLES BELOW FOR NEW HIERARCHY -- ORG AUTHOR SHOULD SANITY CHECK
     switch (level) {
     case 1:    // Agent level  (i.e. agent's scratch pad, managed by the CE of the agent's block.
     case 2:    // Block level  (i.e. block-shared memory, or block's private slice of a higher-level memory.
         anchorCE = (ocrAllocator_t *) (self);
         break;
-    case 3:    // Unit level   (i.e. unit-shared memory, or unit's private slice of a higher-level memory.
-        anchorCE = (ocrAllocator_t *) (((u64) self) | (UR_CE_BASE(0)));
+    case 3:    // Cluster level   (i.e. cluster-shared memory, or cluster's private slice of a higher-level memory.
+        anchorCE = (ocrAllocator_t *) (((u64) self) | (CR_L1_BASE(0, ID_AGENT_CE)));
         break;
-    case 4:    // Chip level   (i.e. chip-shared memory, or chip's private slice of a higher-level memory.
-        anchorCE = (ocrAllocator_t *) (((u64) self) | (CR_CE_BASE(0,0)));
+    case 4:    // Socket level   (i.e. socket-shared memory, or socket's private slice of a higher-level memory.
+        anchorCE = (ocrAllocator_t *) (((u64) self) | (SR_L1_BASE(0,0, ID_AGENT_CE)));
         break;
-    case 5:    // Board level  (i.e. board-shared memory, or board's private slice of a higher-level memory.
-        anchorCE = (ocrAllocator_t *) (((u64) self) | (DR_CE_BASE(0,0,0)));
+    case 5:    // cUbe level  (i.e. cube-shared memory, or cube's private slice of a higher-level memory.
+        anchorCE = (ocrAllocator_t *) (((u64) self) | (UR_L1_BASE(0,0,0, ID_AGENT_CE)));
         break;
     case 6:    // Rack level   (i.e. rack-shared memory
-        anchorCE = (ocrAllocator_t *) (((u64) self) | (RR_CE_BASE(0,0,0,0)));
+        anchorCE = (ocrAllocator_t *) (((u64) self) | (RR_L1_BASE(0,0,0,0, ID_AGENT_CE)));
         break;
     default:
         ASSERT(0);

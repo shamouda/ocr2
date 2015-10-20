@@ -21,11 +21,10 @@
 
 #include "policy-domain/xe/xe-policy.h"
 
-#ifdef ENABLE_SYSBOOT_FSIM
-#include "rmd-bin-files.h"
-#endif
-#include "rmd-map.h"
+#include "tg-bin-files.h"
+
 #include "mmio-table.h"
+#include "xstg-map.h"
 
 #include "utils/profiler/profiler.h"
 
@@ -80,9 +79,12 @@ static void doRLBarrier(ocrPolicyDomain_t *policy) {
 static void performNeighborDiscovery(ocrPolicyDomain_t *policy) {
     // Fill-in location tuples: ours and our parent's (the CE in FSIM)
 #ifdef HAL_FSIM_XE
-    policy->myLocation = (ocrLocation_t)(*(u64*)(XE_MSR_OFFT + CORE_LOCATION * sizeof(u64)));
+    policy->myLocation = (ocrLocation_t)(*(u64*)(AR_MSR_BASE + CORE_LOCATION_NUM * sizeof(u64)));
 #endif // For TG-x86, set in the driver code
-    policy->parentLocation = (policy->myLocation & ~ID_AGENT_MASK) | ID_AGENT_CE;
+    policy->parentLocation = MAKE_CORE_ID(RACK_FROM_ID(policy->myLocation), CUBE_FROM_ID(policy->myLocation),
+                                          SOCKET_FROM_ID(policy->myLocation), CLUSTER_FROM_ID(policy->myLocation),
+                                          BLOCK_FROM_ID(policy->myLocation), ID_AGENT_CE);
+    DPRINTF(DEBUG_LVL_INFO, "Got location 0x%lx and parent location 0x%lx\n", policy->myLocation, policy->parentLocation);
 }
 
 static void findNeighborsPd(ocrPolicyDomain_t *policy) {
@@ -93,7 +95,7 @@ static void findNeighborsPd(ocrPolicyDomain_t *policy) {
     ocrPolicyDomain_t** neighborsAll = policy->neighborPDs; // Initially set in the driver
     policy->neighborPDs = NULL; // We don't need it afterwards so cleaning up
 
-    policy->parentPD = neighborsAll[UNIT_FROM_ID(policy->parentLocation)*MAX_NUM_BLOCK +
+    policy->parentPD = neighborsAll[CLUSTER_FROM_ID(policy->parentLocation)*MAX_NUM_BLOCK +
                                     BLOCK_FROM_ID(policy->parentLocation)*(MAX_NUM_XE+MAX_NUM_CE) +
                                     ID_AGENT_CE];
     ASSERT(policy->parentPD->myLocation == policy->parentLocation);
@@ -138,7 +140,7 @@ static u8 helperSwitchInert(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, p
 u8 xePdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 properties) {
 #ifdef ENABLE_SYSBOOT_FSIM
     if (XE_PDARGS_OFFSET != offsetof(ocrPolicyDomainXe_t, packedArgsLocation)) {
-        DPRINTF(DEBUG_LVL_WARN, "XE_PDARGS_OFFSET (in .../ss/common/include/rmd-bin-files.h) is 0x%lx.  Should be 0x%lx\n",
+        DPRINTF(DEBUG_LVL_WARN, "XE_PDARGS_OFFSET (in .../ss/common/include/tg-bin-files.h) is 0x%lx.  Should be 0x%lx\n",
             (u64) XE_PDARGS_OFFSET, (u64) offsetof(ocrPolicyDomainXe_t, packedArgsLocation));
         ASSERT (0);
     }

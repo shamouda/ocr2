@@ -17,11 +17,9 @@
 
 #include "xe-comm-platform.h"
 
-#include "xe-abi.h"
-#include "rmd-arch.h"
-#include "rmd-map.h"
-#include "rmd-msg-queue.h"
 #include "mmio-table.h"
+#include "xstg-map.h"
+#include "xstg-msg-queue.h"
 
 #define DEBUG_TYPE COMM_PLATFORM
 
@@ -105,16 +103,18 @@ u8 xeCommSwitchRunlevel(ocrCommPlatform_t *self, ocrPolicyDomain_t *PD, ocrRunle
 
 
             // Zero-out our stage for receiving messages
-            for(i=MSG_QUEUE_OFFT; i<MSG_QUEUE_SIZE; i += sizeof(u64))
+            for(i=AR_L1_BASE + MSG_QUEUE_OFFT; i<AR_L1_BASE + MSG_QUEUE_SIZE; i += sizeof(u64))
                 *(volatile u64 *)i = 0;
+            DPRINTF(DEBUG_LVL_VVERB, "Zeroed out local addresses for incoming buffer @ 0x%lx for size %lu\n", AR_L1_BASE + MSG_QUEUE_OFFT, MSG_QUEUE_SIZE);
 
             // Remember which XE number we are
-            cp->N = (PD->myLocation & ID_AGENT_MASK);
+            cp->N = AGENT_FROM_ID(PD->myLocation) - ID_AGENT_XE0;
 
             // Pre-compute pointer to our stage at the CE
-            cp->rq = (u64 *)(BR_CE_BASE + MSG_QUEUE_OFFT + cp->N * MSG_QUEUE_SIZE);
+            cp->rq = (u64 *)(BR_L1_BASE(ID_AGENT_CE) + MSG_QUEUE_OFFT + cp->N * MSG_QUEUE_SIZE);
             // Initialize it to 0
-            *(cp->rq) = 0;
+            *(cp->rq) = 0ULL;
+            DPRINTF(DEBUG_LVL_VVERB, "Initializing receive queue for agent %lu @ CE @ 0x%lx\n", cp->N, (u64)(cp->rq));
 #endif
         }
         break;
@@ -188,7 +188,7 @@ u8 xeCommSendMessage(ocrCommPlatform_t *self, ocrLocation_t target,
     }
 
     // - Alarm remote to tell the CE it has something (in case it is halted)
-    __asm__ __volatile__("alarm %0\n\t" : : "L" (XE_MSG_QUEUE));
+    __asm__ __volatile__("alarm %0\n\t" : : "L" (XE_MSG_READY));
 
 #endif
 
@@ -201,8 +201,8 @@ u8 xeCommPollMessage(ocrCommPlatform_t *self, ocrPolicyMsg_t **msg,
     ASSERT(self != NULL);
     ASSERT(msg != NULL);
 
-    // Local stage is at well-known 0x0
-    volatile u64 * lq = 0x0;
+    // Local stage is at well-known address
+    u64 * lq = (u64*)AR_L1_BASE + MSG_QUEUE_OFFT;
 
     // Check local stage's Empty/Busy/Full word. If non-Full, return; else, return content.
     if(lq[0] != 2) {
@@ -235,8 +235,8 @@ u8 xeCommWaitMessage(ocrCommPlatform_t *self,  ocrPolicyMsg_t **msg,
     ASSERT(self != NULL);
     ASSERT(msg != NULL);
 
-    // Local stage is at well-known 0x0
-    volatile u64 * lq = 0x0;
+    // Local stage is at well-known address
+    volatile u64 * lq = (u64*)(AR_L1_BASE + MSG_QUEUE_OFFT);
 
     // While local stage non-Full, keep looping.
     // BUG #515: Sleep
@@ -276,8 +276,8 @@ u8 xeCommDestructMessage(ocrCommPlatform_t *self, ocrPolicyMsg_t *msg) {
     ASSERT(msg != NULL);
     DPRINTF(DEBUG_LVL_VERB, "Resetting incomming message buffer\n");
 #ifndef ENABLE_BUILDER_ONLY
-    // Local stage is at well-known 0x0
-    volatile u64 * lq = 0x0;
+    // Local stage is at well-known address
+    volatile u64 * lq = (u64*)(AR_L1_BASE + MSG_QUEUE_OFFT);
     // - Atomically test & set local stage to Empty. Error if prev not Full.
     {
         u64 old = hal_swap64(lq, 0);

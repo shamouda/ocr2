@@ -31,7 +31,7 @@
  */
 
 #define hal_fence()                                     \
-    do { __asm__ __volatile__("fence 0xF\n\t"); } while(0)
+    do { __asm__ __volatile__("fence 0xF, B\n\t"); } while(0)
 
 
 /**
@@ -51,12 +51,12 @@
  * source and destination
  */
 #define hal_memCopy(destination, source, size, isBackground)            \
-    do { __asm__ __volatile__("dma.copyregion %0, %1, %2\n\t"           \
+    do { __asm__ __volatile__("dma.copy %0, %1, %2, 0, 8\n\t"           \
                               :                                         \
                               : "r" ((void *)(destination)),            \
                                 "r" ((void *)(source)),                 \
                                 "r" (size));                            \
-        if (!isBackground) __asm__ __volatile__("fence 0xF\n\t");       \
+        if (!isBackground) hal_fence();                                 \
     } while(0)
 
 
@@ -105,12 +105,10 @@
  */
 #define hal_swap64(atomic, newValue)                                    \
     ({                                                                  \
-        u64 __tmp;                                                      \
-        __asm__ __volatile__("xchg64.any %0, %1, %2\n\t"                \
-                             : "=r" (__tmp)                             \
-                             : "r" (atomic),                            \
-                               "r" (0),                                 \
-                               "0" (newValue));                         \
+        u64 __tmp = newValue;                                           \
+        __asm__ __volatile__("xchg %0, %1, 64\n\t"                      \
+                             : "+r" (__tmp)                             \
+                             : "r" (atomic));                           \
         __tmp;                                                          \
     })
 
@@ -130,12 +128,11 @@
  */
 #define hal_cmpswap64(atomic, cmpValue, newValue)                       \
     ({                                                                  \
-        u64 __tmp;                                                      \
-        __asm__ __volatile__("cmpxchg64.any %0, %1, %2\n\t"             \
-                             : "=r" (__tmp)                             \
+        u64 __tmp = newValue;                                           \
+        __asm__ __volatile__("cmpxchg %0, %1, %2, 64\n\t"               \
+                             : "+r" (__tmp)                             \
                              : "r" (atomic),                            \
-                               "r" (cmpValue),                          \
-                               "0" (newValue));                         \
+                               "r" (cmpValue));                         \
         __tmp;                                                          \
     })
 
@@ -153,7 +150,7 @@
 #define hal_xadd64(atomic, addValue)                                    \
     ({                                                                  \
         u64 __tmp;                                                      \
-        __asm__ __volatile__("xadd64.any %0, %1, %2\n\t"                \
+        __asm__ __volatile__("xaddI %0, %1, %2, 64, 1\n\t"              \
                              : "=r" (__tmp)                             \
                              : "r" (atomic),                            \
                                "r" (addValue));                         \
@@ -171,11 +168,10 @@
  * @param atomic    u64*: Pointer to the atomic value (location)
  * @param addValue  u64: Value to add to location
  */
-#define hal_radd64(atomic, addValue)            \
-    __asm__ __volatile__("xadd64.any %0, %1, %0\n\t"                    \
-                         : "=r" (__tmp)                                 \
+#define hal_radd64(atomic, addValue)                                    \
+    __asm__ __volatile__("xaddI %1, %0, %1, 64, 0\n\t"                  \
                          : "r" (atomic),                                \
-                           "0" (addValue));
+                           "r" (addValue));
 
 /**
  * @brief Atomic swap (32 bit)
@@ -189,12 +185,10 @@
  */
 #define hal_swap32(atomic, newValue)                                    \
     ({                                                                  \
-        u32 __tmp;                                                      \
-        __asm__ __volatile__("xchg32.any %0, %1, %2\n\t"                \
-                             : "=r" (__tmp)                             \
-                             : "r" (atomic),                            \
-                               "r" (0),                                 \
-                               "0" (newValue));                         \
+        u64 __tmp = newValue;                                           \
+        __asm__ __volatile__("xchg %0, %1, 32\n\t"                      \
+                             : "+r" (__tmp)                             \
+                             : "r" (atomic));                           \
         __tmp;                                                          \
     })
 
@@ -214,12 +208,11 @@
  */
 #define hal_cmpswap32(atomic, cmpValue, newValue)                       \
     ({                                                                  \
-        u32 __tmp;                                                      \
-        __asm__ __volatile__("cmpxchg32.any %0, %1, %2\n\t"             \
-                             : "=r" (__tmp)                             \
+        u64 __tmp = newValue;                                           \
+        __asm__ __volatile__("cmpxchg %0, %1, %2, 32\n\t"               \
+                             : "+r" (__tmp)                             \
                              : "r" (atomic),                            \
-                               "r" (cmpValue),                          \
-                               "0" (newValue));                         \
+                               "r" (cmpValue));                         \
         __tmp;                                                          \
     })
 
@@ -236,8 +229,8 @@
  */
 #define hal_xadd32(atomic, addValue)                                    \
     ({                                                                  \
-        u32 __tmp;                                                      \
-        __asm__ __volatile__("xadd32.any %0, %1, %2\n\t"                \
+        u64 __tmp;                                                      \
+        __asm__ __volatile__("xaddI %0, %1, %2, 32, 1\n\t"              \
                              : "=r" (__tmp)                             \
                              : "r" (atomic),                            \
                                "r" (addValue));                         \
@@ -256,10 +249,9 @@
  * @param addValue  u32: Value to add to location
  */
 #define hal_radd32(atomic, addValue)                                    \
-    __asm__ __volatile__("xadd32.any %0, %1, %0\n\t"                    \
-                         : "=r" (__tmp)                                 \
+    __asm__ __volatile__("xaddI %1, %0, %1, 32, 0\n\t"                  \
                          : "r" (atomic),                                \
-                           "0" (addValue));
+                           "r" (addValue));
 
 /**
  * @brief Convenience function that basically implements a simple
@@ -307,7 +299,7 @@
  * This will exit the runtime more cleanly than abort
  */
 #define hal_exit(arg)                           \
-    __asm__ __volatile__("alarm %0\n\t" : : "L" (XE_TERMINATE))
+    __asm__ __volatile__("alarm %0\n\t" : : "L" (XE_TERMINATE_ALARM))
 
 /**
  * @brief Pause execution
@@ -335,6 +327,24 @@
  */
 #define hal_wake(id) do {                         \
     } while(0)
+
+/**
+ * @brief On architectures (like TG) that
+ * have different address "formats", canonicalize it
+ * to the unique form
+ */
+#define hal_globalizeAddr(addr) ({                                      \
+    u64 __dest;                                                         \
+    __asm__ __volatile__("lea %0, %1\n\t" : "=r" (__dest) : "r" (addr) ); \
+    __dest;                                                             \
+        })
+
+/**
+ * @brief On architectures (like TG) that have
+ * different address "formats", this returns the
+ * smallest usable address from the global address 'addr'
+ */
+#define hal_localizeAddr(addr) addr
 
 // Abstraction to do a load operation from any level of the memory hierarchy
 #define GET8(temp, addr)   ((temp) = *((u8*)(addr)))

@@ -148,7 +148,7 @@ CFLAGS += -DOCR_DEBUG_LVL=DEBUG_LVL_WARN
 CFLAGS += -DOCR_DEBUG_API
 # This next line shows how you can override the debug level for an
 # individual module, either raising or lowering it
-CFLAGS += -DOCR_DEBUG_ALLOCATOR -DDEBUG_LVL_ALLOCATOR=DEBUG_LVL_WARN
+CFLAGS += -DOCR_DEBUG_ALLOCATOR
 CFLAGS += -DOCR_DEBUG_COMP_PLATFORM
 CFLAGS += -DOCR_DEBUG_COMM_PLATFORM
 CFLAGS += -DOCR_DEBUG_COMM_API
@@ -170,7 +170,7 @@ CFLAGS += -DOCR_DEBUG_STATS
 CFLAGS += -DOCR_DEBUG_SYNC
 CFLAGS += -DOCR_DEBUG_SYSBOOT
 CFLAGS += -DOCR_DEBUG_TASK
-CFLAGS += -DOCR_DEBUG_UTIL
+CFLAGS += -DOCR_DEBUG_UTIL -DDEBUG_LVL_UTIL=DEBUG_LVL_WARN
 CFLAGS += -DOCR_DEBUG_WORKER
 CFLAGS += -DOCR_DEBUG_WORKPILE
 
@@ -237,6 +237,12 @@ CFLAGS := -g -Wall $(CFLAGS) $(CFLAGS_USER)
 ################################################################
 # END OF USER CONFIGURABLE OPTIONS                             #
 ################################################################
+
+# Verbosity of make
+V ?= 0
+AT_0 := @
+AT_1 :=
+AT = $(AT_$(V))
 
 #
 # Generate a list of all source files and the respective objects
@@ -329,7 +335,7 @@ debug-exec: supports-exec info-exec $(OCREXEC)
 
 # This is for the profiler-generated file
 $(OCR_BUILD)/src:
-	@$(MKDIR) -p $(OCR_BUILD)/src
+	$(AT)$(MKDIR) -p $(OCR_BUILD)/src
 
 # Static target
 
@@ -340,7 +346,7 @@ ifneq (${SUPPORTS_STATIC}, yes)
 endif
 
 ${OBJDIR}/static:
-	@$(MKDIR) -p $(OBJDIR)/static
+	$(AT)$(MKDIR) -p $(OBJDIR)/static
 
 
 .PHONY: info-static
@@ -349,9 +355,10 @@ info-static:
 	@printf "\033[32m>>>> Building a static library with\033[1;30m '$(AR) $(ARFLAGS)'\033[0m\n"
 
 $(OCRSTATIC): $(OBJS_STATIC)
+# Need this comment to make V=1 work (no idea why the first @ is causing so much issue)
 	@echo "Linking static library ${OCRSTATIC}"
-	@$(AR) $(ARFLAGS) $(OCRSTATIC) $^
-	@$(RANLIB) $(OCRSTATIC)
+	$(AT)$(AR) $(ARFLAGS) $(OCRSTATIC) $^
+	$(AT)$(RANLIB) $(OCRSTATIC)
 
 
 # Shared target
@@ -362,7 +369,7 @@ ifneq (${SUPPORTS_SHARED}, yes)
 endif
 
 ${OBJDIR}/shared:
-	@$(MKDIR) -p ${OBJDIR}/shared
+	$(AT)$(MKDIR) -p ${OBJDIR}/shared
 
 .PHONY: info-shared
 info-shared:
@@ -370,8 +377,9 @@ info-shared:
 	@printf "\033[32m>>>> Building a shared library with\033[1;30m '$(CC) $(LDFLAGS)'\033[0m\n"
 
 $(OCRSHARED): $(OBJS_SHARED)
+# Need this comment to make V=1 work (no idea why the first @ is causing so much issue)
 	@echo "Linking shared library ${OCRSHARED}"
-	@$(CC) $(LDFLAGS) -o $(OCRSHARED) $^
+	$(AT)$(CC) $(LDFLAGS) -o $(OCRSHARED) $^
 
 # Exec target
 
@@ -382,7 +390,7 @@ ifneq (${SUPPORTS_EXEC}, yes)
 endif
 
 ${OBJDIR}/exec:
-	@$(MKDIR) -p $(OBJDIR)/exec
+	$(AT)$(MKDIR) -p $(OBJDIR)/exec
 
 
 .PHONY: info-exec
@@ -390,8 +398,9 @@ info-exec:
 	@printf "\033[32m>>>> Compile command for .c files is\033[1;30m '$(CC) $(CFLAGS_EXEC) -MMD -c <src> -o <obj>'\033[0m\n"
 
 $(OCREXEC): $(OBJS_EXEC)
+# Need this comment to make V=1 work (no idea why the first @ is causing so much issue)
 	@echo "Linking executable binary ${OCREXEC}"
-	@$(CC) -o $(OCREXEC) $^ $(EXEFLAGS)
+	$(AT)$(CC) -o $(OCREXEC) $^ $(EXEFLAGS)
 
 
 #
@@ -399,41 +408,79 @@ $(OCREXEC): $(OBJS_EXEC)
 #
 
 $(PROFILER_FILE): $(SRCSORIG) | $(OCR_BUILD)/src
+# Need this comment to make V=1 work (no idea why the first @ is causing so much issue)
 	@echo "Generating profile file..."
-	@$(OCR_ROOT)/scripts/Profiler/generateProfilerFile.py $(OCR_ROOT)/src $(OCR_BUILD)/src/profilerAutoGen h,c .git profiler
+	$(AT)$(OCR_ROOT)/scripts/Profiler/generateProfilerFile.py $(OCR_ROOT)/src $(OCR_BUILD)/src/profilerAutoGen h,c .git profiler
 	@echo "\tDone."
 
+# This does a more complicate dependency computation so all the prereqs listed
+# will also become command-less, prereq-less targets. This causes make
+# to remake anything that depends on that file which is
+# exactly what we want. This is adapted from:
+# http://scottmcpeak.com/autodepend/autodepend.html
+#   sed:    strip the target (everything before colon)
+#   sed:    remove any continuation backslashes
+#   fmt -1: list words one per line
+#   sed:    strip leading spaces
+#   sed:    add trailing colons
 $(OBJDIR)/static/%.o: %.c Makefile ../common.mk $(PROFILER_FILE) | $(OBJDIR)/static
+# Need this comment to make V=1 work (no idea why the first @ is causing so much issue)
 	@echo "Compiling $<"
-	@$(CC) $(CFLAGS_STATIC) -MMD -c $< -o $@
+	$(AT)$(CC) $(CFLAGS_STATIC) -MMD -c $< -o $@
+	$(AT)cp -f $(@:.o=.d) $(@:.o=.d.tmp)
+	$(AT)sed -e 's/.*://' -e 's/\\$$//' < $(@:.o=.d.tmp) | fmt -1 | \
+	sed -e 's/^ *//' -e 's/$$/:/' >> $(@:.o=.d)
+	$(AT)rm -f $(@:.o=.d.tmp)
+
 
 $(OBJDIR)/shared/%.o: %.c Makefile ../common.mk $(PROFILER_FILE) | $(OBJDIR)/shared
+# Need this comment to make V=1 work (no idea why the first @ is causing so much issue)
 	@echo "Compiling $<"
-	@$(CC) $(CFLAGS_SHARED) -MMD -c $< -o $@
+	$(AT)$(CC) $(CFLAGS_SHARED) -MMD -c $< -o $@
+	$(AT)cp -f $(@:.o=.d) $(@:.o=.d.tmp)
+	$(AT)sed -e 's/.*://' -e 's/\\$$//' < $(@:.o=.d.tmp) | fmt -1 | \
+	sed -e 's/^ *//' -e 's/$$/:/' >> $(@:.o=.d)
+	$(AT)rm -f $(@:.o=.d.tmp)
 
 $(OBJDIR)/exec/%.o: %.c Makefile ../common.mk | $(OBJDIR)/exec
+# Need this comment to make V=1 work (no idea why the first @ is causing so much issue)
 	@echo "Compiling $<"
-	@$(CC) $(CFLAGS_EXEC) -MMD -c $< -o $@
+	$(AT)$(CC) $(CFLAGS_EXEC) -MMD -c $< -o $@
+	$(AT)cp -f $(@:.o=.d) $(@:.o=.d.tmp)
+	$(AT)sed -e 's/.*://' -e 's/\\$$//' < $(@:.o=.d.tmp) | fmt -1 | \
+	sed -e 's/^ *//' -e 's/$$/:/' >> $(@:.o=.d)
+	$(AT)rm -f $(@:.o=.d.tmp)
 
 $(OBJDIR)/static/%.o: %.S Makefile ../common.mk | $(OBJDIR)/static
+# Need this comment to make V=1 work (no idea why the first @ is causing so much issue)
 	@echo "Assembling $<"
-	@$(CC) $(CFLAGS_STATIC) -MMD -c $< -o $@
+	$(AT)$(CC) $(CFLAGS_STATIC) -MMD -c $< -o $@
+	$(AT)cp -f $(@:.o=.d) $(@:.o=.d.tmp)
+	$(AT)sed -e 's/.*://' -e 's/\\$$//' < $(@:.o=.d.tmp) | fmt -1 | \
+	sed -e 's/^ *//' -e 's/$$/:/' >> $(@:.o=.d)
+	$(AT)rm -f $(@:.o=.d.tmp)
 
 $(OBJDIR)/shared/%.o: %.S Makefile ../common.mk | $(OBJDIR)/shared
+# Need this comment to make V=1 work (no idea why the first @ is causing so much issue)
 	@echo "Assembling $<"
-	@$(CC) $(CFLAGS_SHARED) -MMD -c $< -o $@
+	$(AT)$(CC) $(CFLAGS_SHARED) -MMD -c $< -o $@
+	$(AT)cp -f $(@:.o=.d) $(@:.o=.d.tmp)
+	$(AT)sed -e 's/.*://' -e 's/\\$$//' < $(@:.o=.d.tmp) | fmt -1 | \
+	sed -e 's/^ *//' -e 's/$$/:/' >> $(@:.o=.d)
+	$(AT)rm -f $(@:.o=.d.tmp)
 
 #
 # Include auto-generated dependence files
+# We only include the ones for the .o that we need to generate
 #
 ifeq (${SUPPORTS_STATIC}, yes)
--include $(wildcard $(OBJDIR)/static/*.d)
+-include $(OBJS_STATIC:.o=.d)
 endif
 ifeq (${SUPPORTS_SHARED}, yes)
--include $(wildcard $(OBJDIR)/shared/*.d)
+-include $(OBJS_SHARED:.o=.d)
 endif
 ifeq (${SUPPORTS_EXEC}, yes)
--include $(wildcard $(OBJDIR)/exec/*.d)
+-include $(OBJS_EXEC:.o=.d)
 endif
 
 # Install
@@ -471,46 +518,46 @@ INSTALLED_INCS    := $(addprefix $(OCR_INSTALL)/include/, $(INC_FILES))
 # This is a bit ugly but putting this directly in the TG makefiles
 # means changing a lot of things. This is required for Jenkins
 # as the build directory is no longer available when the app
-# is building but RMDKRNL still needs rmd-bin-files.h
+# is building but TGKRNL still needs tg-bin-files.h
 ifeq ($(OCR_TYPE), tg-xe)
-INSTALLED_INCS    += $(OCR_INSTALL)/include/rmd-bin-files.h
-$(OCR_INSTALL)/include/rmd-bin-files.h: $(OCR_BUILD)/rmd-bin-files.h
-	@$(RM) -f $(OCR_INSTALL)/include/rmd-bin-files.h
-	@$(CP) $(OCR_BUILD)/rmd-bin-files.h $(OCR_INSTALL)/include/
+INSTALLED_INCS    += $(OCR_INSTALL)/include/tg-bin-files.h
+$(OCR_INSTALL)/include/tg-bin-files.h: $(OCR_BUILD)/tg-bin-files.h
+	$(AT)$(RM) -f $(OCR_INSTALL)/include/tg-bin-files.h
+	$(AT)$(CP) $(OCR_BUILD)/tg-bin-files.h $(OCR_INSTALL)/include/
 endif
 
 ifeq ($(OCR_TYPE), tg-ce)
-INSTALLED_INCS    += $(OCR_INSTALL)/include/rmd-bin-files.h
-$(OCR_INSTALL)/include/rmd-bin-files.h: $(OCR_BUILD)/rmd-bin-files.h
-	@$(RM) -f $(OCR_INSTALL)/include/rmd-bin-files.h
-	@$(CP) $(OCR_BUILD)/rmd-bin-files.h $(OCR_INSTALL)/include/
+INSTALLED_INCS    += $(OCR_INSTALL)/include/tg-bin-files.h
+$(OCR_INSTALL)/include/tg-bin-files.h: $(OCR_BUILD)/tg-bin-files.h
+	$(AT)$(RM) -f $(OCR_INSTALL)/include/tg-bin-files.h
+	$(AT)$(CP) $(OCR_BUILD)/tg-bin-files.h $(OCR_INSTALL)/include/
 endif
 
 $(OCR_INSTALL)/lib/%: $(BASE_LIBS)% | $(OCR_INSTALL)/lib
-	@$(RM) -f $@
-	@$(CP) $< $@
+	$(AT)$(RM) -f $@
+	$(AT)$(CP) $< $@
 
 $(OCR_INSTALL)/bin/%: $(BASE_EXES)% | $(OCR_INSTALL)/bin
-	@$(RM) -f $@
-	@$(CP) $< $@
+	$(AT)$(RM) -f $@
+	$(AT)$(CP) $< $@
 
 $(OCR_INSTALL)/config/%: $(OCR_ROOT)/machine-configs/$(OCR_TYPE)/% | $(OCR_INSTALL)/config
-	@$(RM) -f $@
-	@$(CP) $< $@
+	$(AT)$(RM) -f $@
+	$(AT)$(CP) $< $@
 
 $(OCR_INSTALL)/include/%: $(OCR_ROOT)/inc/% | $(OCR_INSTALL)/include $(OCR_INSTALL)/include/extensions
-	@$(RM) -f $@
-	@$(CP) $< $@
+	$(AT)$(RM) -f $@
+	$(AT)$(CP) $< $@
 
 $(OCR_INSTALL)/lib $(OCR_INSTALL)/bin $(OCR_INSTALL)/config $(OCR_INSTALL)/include \
 $(OCR_INSTALL)/include/extensions :
-	@$(MKDIR) -p $@
+	$(AT)$(MKDIR) -p $@
 
 .PHONY: install
-.ONESHELL:
 install: ${INSTALL_TARGETS} ${INSTALLED_LIBS} ${INSTALLED_EXES} ${INSTALLED_CONFIGS} ${INSTALLED_INCS}
+# Need this comment to make V=1 work (no idea why the first @ is causing so much issue)
 	@printf "\033[32m Installed '$(INSTALL_LIBS) $(INSTALL_EXES)' into '$(OCR_INSTALL)'\033[0m\n"
-	@if [ -d $(OCR_ROOT)/machine-configs/$(OCR_TYPE) ]; then \
+	$(AT)if [ -d $(OCR_ROOT)/machine-configs/$(OCR_TYPE) ]; then \
 		$(RM) -f $(OCR_INSTALL)/config/default.cfg; \
 		$(LN) -sf ./$(DEFAULT_CONFIG) $(OCR_INSTALL)/config/default.cfg; \
 	fi

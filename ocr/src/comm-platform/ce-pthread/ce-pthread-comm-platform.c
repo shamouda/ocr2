@@ -20,7 +20,7 @@
 #include "comm-platform/xe-pthread/xe-pthread-comm-platform.h"
 #include "policy-domain/ce/ce-policy.h"
 
-#include "rmd-map.h"
+#include "xstg-map.h"
 
 #define DEBUG_TYPE COMM_PLATFORM
 

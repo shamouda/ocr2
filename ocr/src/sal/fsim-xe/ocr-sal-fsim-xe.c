@@ -4,8 +4,8 @@
 #include "debug.h"
 #include "ocr-types.h"
 
+#include "xstg-arch.h"
 #include "mmio-table.h"
-#include "rmd-map.h"
 
 #define DEBUG_TYPE SAL
 
@@ -68,7 +68,7 @@ void salResume(u32 flag){
 u64 salGetTime(void){
     u64 cycles = 0;
 #if !defined(ENABLE_BUILDER_ONLY)
-    cycles = *(u64 *)(XE_MSR_OFFT + CYCLE_COUNTER * sizeof(u64));
+    cycles = *(u64 *)(AR_MSR_BASE + GLOBAL_TIME_STAMP_COUNTER * sizeof(u64));
 #endif
     return cycles;
 }

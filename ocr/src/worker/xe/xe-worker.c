@@ -18,7 +18,7 @@
 #include "worker/xe/xe-worker.h"
 
 #ifdef HAL_FSIM_XE
-#include "rmd-map.h"
+#include "xstg-map.h"
 #endif
 
 #ifdef OCR_ENABLE_STATISTICS
@@ -309,8 +309,8 @@ bool xeIsRunningWorker(ocrWorker_t * base) {
 
 void xePrintLocation(ocrWorker_t *base, char* location) {
 #ifdef HAL_FSIM_XE
-    SNPRINTF(location, 32, "XE %d Block %d Unit %d", AGENT_FROM_ID(base->location),
-             BLOCK_FROM_ID(base->location), UNIT_FROM_ID(base->location));
+    SNPRINTF(location, 32, "XE %d Block %d Cluster %d", AGENT_FROM_ID(base->location),
+             BLOCK_FROM_ID(base->location), CLUSTER_FROM_ID(base->location));
 #else
     SNPRINTF(location, 32, "XE");
 #endif
