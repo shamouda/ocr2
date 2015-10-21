@@ -35,7 +35,6 @@ ocrGuid_t finishEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
         i++;
     }
     ocrEdtTemplateDestroy(workEdtTemplateGuid);
-
     get_time(&dbPtr[1]);
     return NULL_GUID;
 }
@@ -63,7 +62,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
                  0, NULL, 1, NULL_GUID,  EDT_PROP_FINISH, NULL_GUID, &oEvtGuid);
 
     ocrAddDependence(oEvtGuid, terminateEdtGuid, 0, DB_MODE_CONST);
-    ocrAddDependence(dbGuid, finishEdtGuid, 0, DB_MODE_CONST);
+    ocrAddDependence(dbGuid, finishEdtGuid, 0, DB_MODE_RW);
 
     return NULL_GUID;
 }
