@@ -223,6 +223,7 @@ static void workerLoopHcCommInternal(ocrWorker_t * worker, ocrPolicyDomain_t *pd
                 DPRINTF(DEBUG_LVL_VVERB,"hc-comm-worker: Received message response for msgId: %ld\n",  message->msgId); // debug
                 // Someone is expecting this response, give it back to the PD
                 ocrFatGuid_t fatGuid;
+                fatGuid.guid = NULL_GUID;
                 fatGuid.metaDataPtr = handle;
                 PD_MSG_STACK(giveMsg);
                 getCurrentEnv(NULL, NULL, NULL, &giveMsg);
@@ -267,6 +268,7 @@ static void workerLoopHcCommInternal(ocrWorker_t * worker, ocrPolicyDomain_t *pd
                         processRequestEdt(1, &msgParamv, 0, NULL);
                         // This is to unblock the calling blocked on the acquire
                         ocrFatGuid_t fatGuid;
+                        fatGuid.guid = NULL_GUID;
                         fatGuid.metaDataPtr = handle;
                         PD_MSG_STACK(giveMsg);
                         getCurrentEnv(NULL, NULL, NULL, &giveMsg);

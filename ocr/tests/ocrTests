@@ -995,7 +995,6 @@ function runTests () {
 
     if [ -z ${LOG_DIR} ]; then
         LOG_DIR=`pwd`/tests-log
-        echo "Set logdir pampam"
     fi
 
     if [ -d ${LOG_DIR} ]; then

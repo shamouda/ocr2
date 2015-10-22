@@ -20,7 +20,7 @@ DEFAULT_CONFIG=mach-hc-dist-gasnet-clone-8w.cfg
 # Tool-chain to be used for the build
 #
 
-CC      := gcc
+CC      ?= gcc
 CFLAGS  :=
 
 RM      := rm
@@ -104,10 +104,17 @@ endif
 # GASNET_CONDUIT=ibv
 # GASNET_EXTRA_LIBS=-libverbs
 
-# ocrTests will pick that up if defined
-#ifndef OCR_LDFLAGS
-#	$(error OCR_LDFLAGS not specified)
-#endif
+# ocrTests will pick 'OCR_LDFLAGS' if defined
+
+ifeq ($(GASNET_TYPE),seq)
+GASNET_CFLAGS += -DGASNET_SEQ
+else
+ifeq ($(GASNET_TYPE),par)
+GASNET_CFLAGS += -DGASNET_PAR
+else
+GASNET_CFLAGS += GASNET_PARSYNC
+endif
+endif
 
 #
 # Gasnet setup
@@ -115,14 +122,13 @@ endif
 
 ## Gasnet includes
 
-CFLAGS += ${GASNET_CFLAGS}
-GASNET_TYPE=GASNET_PAR
 GASNET_INCL=${GASNET_ROOT}/include/${GASNET_CONDUIT}-conduit
-GASNET_CFLAGS += -D${GASNET_TYPE} -I${GASNET_ROOT}/include -I${GASNET_INCL}
+# -isystem instead of -I to avoid 'defined but not used' warnings from gasnet includes
+GASNET_CFLAGS += -D${GASNET_TYPE} -isystem ${GASNET_ROOT}/include -I${GASNET_INCL}
 
 ## Gasnet linking
 
-GASNET_LIB=gasnet-$(GASNET_CONDUIT)-par
+GASNET_LIB=gasnet-$(GASNET_CONDUIT)-$(GASNET_TYPE)
 # Gasnet dynamic linking
 GASNET_LDFLAGS = -L${GASNET_ROOT}/lib -L/usr/lib64 -lrt -l${GASNET_LIB} $(GASNET_EXTRA_LIBS)
 # Gasnet static linking

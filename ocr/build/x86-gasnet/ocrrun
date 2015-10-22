@@ -5,6 +5,28 @@
 OCR_CONFIG=
 PROGRAM_BIN=
 
+# Support for different mpi implementation, all overridable from the env
+if [[ ${OCRRUN_OPT_ENVKIND} == "CLE" ]]; then
+    OCRRUN_OPT_CMD=${OCRRUN_OPT_CMD-"aprun"}
+    OCRRUN_OPT_NUM_NODES=${OCRRUN_OPT_NUM_NODES-"-N 1 -n"}
+    OCRRUN_OPT_NODEFILE=${OCRRUN_OPT_NODEFILE-"-l"}
+else
+    # Try to guess the gasnet launcher
+    if [[ "${OCRRUN_OPT_CMD}" == "" ]]; then
+        if [[ "${GASNET_CONDUIT}" == "ibv" ]]; then
+            OCRRUN_OPT_CMD=${OCRRUN_OPT_CMD-"gasnetrun_ibv"}
+        elif [[ "${GASNET_CONDUIT}" == "udp" ]]; then
+            OCRRUN_OPT_CMD=${OCRRUN_OPT_CMD-"amudprun"}
+        elif [[ "${GASNET_CONDUIT}" == "mpi" ]]; then
+            OCRRUN_OPT_CMD=${OCRRUN_OPT_CMD-"gasnetrun_mpi"}
+        else
+            echo "error: OCRRUN_OPT_CMD is not known for conduit=${GASNET_CONDUIT}"
+            exit 1
+        fi
+    fi
+    OCRRUN_OPT_NUM_NODES=${OCRRUN_OPT_NUM_NODES-"-n"}
+fi
+
 #
 # Handling options
 #
@@ -66,7 +88,6 @@ if [[ "$RES" != "" ]]; then
                 echo "Warning: OCR_NUM_NODES differs from number of nodes declared in OCR_NODEFILE (${OLD_VALUE} and ${NODECOUNT})"
             fi
         fi
-
         if [[ "${GASNET_CONDUIT}" == "ibv" ]]; then
             if [[ "${GASNET_IBV_SPAWNER}" == "ssh" ]]; then
                 export GASNET_SSH_NODEFILE=${OCR_NODEFILE}
@@ -74,22 +95,10 @@ if [[ "$RES" != "" ]]; then
                 echo "Warning: ocrrun assumes IBV/MPI spawn uses intel mpi"
                 export MPIRUN_CMD="mpirun -np %N -machinefile ${OCR_NODEFILE} %C"
             fi
+        elif [[ "${GASNET_CONDUIT}" == "aries" ]]; then
+            OCR_GASNET_OPTS+=" ${OCRRUN_OPT_NODEFILE} ${OCR_NODEFILE}"
         else
             echo "error: ocrrun does not know how to use OCR_NODEFILE when conduit=${GASNET_CONDUIT}"
-            exit 1
-        fi
-    fi
-
-    # Try to guess the gasnet launcher
-    if [[ "${GASNET_LAUNCHER}" == "" ]]; then
-        if [[ "${GASNET_CONDUIT}" == "ibv" ]]; then
-            GASNET_LAUNCHER=gasnetrun_ibv
-        elif [[ "${GASNET_CONDUIT}" == "udp" ]]; then
-            GASNET_LAUNCHER=amudprun
-        elif [[ "${GASNET_CONDUIT}" == "mpi" ]]; then
-            GASNET_LAUNCHER=gasnetrun_mpi
-        else
-            echo "error: GASNET_LAUNCHER is not unknown for conduit=${GASNET_CONDUIT}"
             exit 1
         fi
     fi
@@ -100,7 +109,13 @@ if [[ "$RES" != "" ]]; then
         OCR_NUM_NODES=2
     fi
 
-    ${GASNET_LAUNCHER} -n ${OCR_NUM_NODES} ${PROGRAM_BIN} -ocr:cfg ${OCR_CONFIG}
+    if [ "${OCRRUN_OPT_ENVKIND}" == "CLE" ] && [ "${OCR_NODEFILE}" == "" ]; then
+        OCR_GASNET_OPTS+="-N ${OCR_NUM_NODES} -n ${OCR_NUM_NODES}"
+    else
+        OCR_GASNET_OPTS+=" ${OCRRUN_OPT_NUM_NODES} ${OCR_NUM_NODES}"
+    fi
+
+    ${OCRRUN_OPT_CMD} ${OCR_GASNET_OPTS} ${PROGRAM_BIN} -ocr:cfg ${OCR_CONFIG}
 
     RET_CODE=$?
     exit ${RET_CODE}

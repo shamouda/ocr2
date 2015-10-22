@@ -157,6 +157,7 @@ u8 delegateCommSendMessage(ocrCommApi_t *self, ocrLocation_t target,
             handlerDelegate, message, message->type);
     // Give comm handle to policy-domain
     ocrFatGuid_t fatGuid;
+    fatGuid.guid = NULL_GUID;
     fatGuid.metaDataPtr = handlerDelegate;
     PD_MSG_STACK(giveMsg);
     getCurrentEnv(NULL, NULL, NULL, &giveMsg);

@@ -22,7 +22,7 @@ Mandatory environment variables:
 Optional environment variables:
     OCR_NUM_NODES           Number of GASNet process to spawn (must be coherent with OCR_NODEFILE)
     OCR_NODEFILE            Specifies a host file to spawn processes to (must be coherent with OCR_NUM_NODES)
-    GASNET_LAUNCHER         Specify the name of the gasnet launcher (usually guessed from GASNET_CONDUIT)
+    OCRRUN_OPT_CMD          Specify the name of the gasnet launcher (usually guessed from GASNET_CONDUIT)
     GASNET_IBV_SPAWNER      Set to 'ssh' or 'mpi' spawn for ibv conduit (default intel mpi)
 
 
