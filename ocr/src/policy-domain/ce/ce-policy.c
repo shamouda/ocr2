@@ -272,7 +272,7 @@ static bool isChildLocation(ocrPolicyDomain_t *policy, ocrLocation_t location) {
 
     // Check if one of our XEs
     if(BLOCK_FROM_ID(location) == myBlock && CLUSTER_FROM_ID(location) == myCluster
-       && AGENT_FROM_ID(location) < ID_AGENT_CE) {
+       && AGENT_FROM_ID(location) > ID_AGENT_CE) {
         return true;
     }
 
