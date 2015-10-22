@@ -85,8 +85,10 @@ LIB_GCC = /usr/lib/gcc/x86_64-linux-gnu/4.9/libgcc_eh.a
 .PHONY: all
 all: static
 	ld -static -nodefaultlibs -nostdlib -o $(OBJDIR)/myocr.o --start-group $(OBJDIR)/static/*.o $(LIBC) $(PTHREAD_LIB) $(LIB_GCC) --end-group -zmuldefs
+	nm -u $(OBJDIR)/myocr.o | grep -E "^.*U " | sed 's/^.*U //' > syms
+	nm $(OBJDIR)/myocr.o | grep " T " | grep "ocr" | sed 's/^.*T //' >> syms
 	#ld -nostartfiles -nostdlib -nodefaultlibs -static -o $(OBJDIR)/ocr.o -r -s --start-group $(OBJDIR)/static/*.o $(LIBC) $(PTHREAD_LIB) --end-group -zmuldefs
-	#objcopy -S --keep-symbols=syms $(OBJDIR)/ocr.o $(OBJDIR)/myocr.o
+	objcopy -S --keep-symbols=syms $(OBJDIR)/myocr.o
 
 .PHONY: debug
 debug: debug-static
