@@ -31,7 +31,12 @@ MKDIR   := mkdir
 LN      := ln
 
 # Shared libraries specific builds
-LDFLAGS := -shared -fpic -lpthread -lrt
+LDFLAGS := -shared -fpic -lpthread
+
+# -lrt needed only for CentOS (more accurately, < glibc-2.17)
+ifeq ($(wildcard /etc/centos-release), /etc/centos-release)
+LDFLAGS += -lrt
+endif
 
 # CFLAGS_SHARED will be concatenated with any
 # common CFLAGS options
