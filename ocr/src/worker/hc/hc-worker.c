@@ -41,7 +41,6 @@ static void hcWorkShift(ocrWorker_t * worker) {
     PD_MSG_STACK(msg);
     getCurrentEnv(&pd, NULL, NULL, &msg);
 
-    ocrPolicyDomainHc_t *self = (ocrPolicyDomainHc_t *)pd;
     ocrWorkerHc_t *hcWorker = (ocrWorkerHc_t *) worker;
 
 #define PD_MSG (&msg)
@@ -87,6 +86,7 @@ static void hcWorkShift(ocrWorker_t * worker) {
 #undef PD_MSG
 #undef PD_TYPE
 #ifdef ENABLE_EXTENSION_PAUSE
+    ocrPolicyDomainHc_t *self = (ocrPolicyDomainHc_t *)pd;
     if(self->pqrFlags.runtimePause == true) {
         hal_xadd32((u32*)&self->pqrFlags.pauseCounter, 1);
         //Pause called - stop workers

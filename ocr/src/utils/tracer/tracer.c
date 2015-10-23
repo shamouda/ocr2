@@ -47,7 +47,7 @@ static void populateTraceObject(bool evtType, ocrTraceType_t objType, ocrTraceAc
 
     ocrGuid_t src = NULL_GUID;
     ocrGuid_t dest = NULL_GUID;
-    ocrEdt_t func = NULL_GUID;
+    ocrEdt_t func = NULL;
     u64 size = 0;
 
     ocrPolicyDomain_t *pd = NULL;

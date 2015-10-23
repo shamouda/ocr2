@@ -1804,7 +1804,9 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         // make sure this is one-way
         ASSERT(!(msg->type & PD_MSG_REQ_RESPONSE));
         ocrGuidKind dstKind;
+#ifdef ENABLE_EXTENSION_PAUSE
         ocrPolicyDomainHc_t *rself = (ocrPolicyDomainHc_t *)self;
+#endif
         self->guidProviders[0]->fcts.getVal(
             self->guidProviders[0], PD_MSG_FIELD_I(guid.guid),
             (u64*)(&(PD_MSG_FIELD_I(guid.metaDataPtr))), &dstKind);
