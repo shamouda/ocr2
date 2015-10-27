@@ -293,18 +293,20 @@
  * @brief Put the XE core to sleep
  *
  * This is used by CE to put an XE core in its block to sleep
+ * @warning 'id' is the agent ID (ID_AGENT_XE0 ... ID_AGENT_XE7)
  */
 #define hal_sleep(id) do {                                              \
-        *(u64 *)(BR_MSR_BASE(id + ID_AGENT_XE0) + POWER_GATE_RESET*sizeof(u64)) = 0x0ULL; \
+        *(u64 *)(BR_MSR_BASE(id) + POWER_GATE_RESET*sizeof(u64)) = 0x0ULL; \
     } while(0)
 
 /**
  * @brief Wake the XE core from sleep
  *
  * This is used by CE to wake an XE core in its block from sleep
+ * @warning 'id' is the agent ID (ID_AGENT_XE0 ... ID_AGENT_XE7)
  */
 #define hal_wake(id) do {                                                    \
-        *(u64 *)(BR_MSR_BASE(id + ID_AGENT_XE0) + POWER_GATE_RESET*sizeof(u64)) = 0x1ULL; \
+        *(u64 *)(BR_MSR_BASE(id) + POWER_GATE_RESET*sizeof(u64)) = 0x1ULL; \
     } while(0)
 
 /**

@@ -17,9 +17,8 @@
 #include "ocr-db.h"
 #include "worker/xe/xe-worker.h"
 
-#ifdef HAL_FSIM_XE
+#include "xstg-arch.h"
 #include "xstg-map.h"
-#endif
 
 #ifdef OCR_ENABLE_STATISTICS
 #include "ocr-statistics.h"
@@ -242,7 +241,7 @@ void* xeRunWorker(ocrWorker_t * worker) {
 
     // TODO: For x86 workers there's some notification/synchronization with the PD
     // to callback from RL_COMPUTE_OK, busy-wait, then get transition to RL_USER_OK
-    if (pd->myLocation == 0) { //Blessed worker
+    if (pd->myLocation == MAKE_CORE_ID(0, 0, 0, 0, 0, ID_AGENT_XE0)) { //Blessed worker
 
         // This is all part of the mainEdt setup
         // and should be executed by the "blessed" worker.
