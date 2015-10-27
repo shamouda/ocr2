@@ -403,6 +403,7 @@ u8 ceCommSendMessage(ocrCommPlatform_t *self, ocrLocation_t target,
             ASSERT(tmp == 0);
         }
         DPRINTF(DEBUG_LVL_VVERB, "DMA done and set 0x%lx to 2 (full)\n", &(rq[0]));
+
 #endif
     }
     return 0;
@@ -412,7 +413,7 @@ static u8 extractXEMessage(ocrCommPlatformCe_t *cp, ocrPolicyMsg_t **msg, u32 qu
     // We have a message
     *msg = (ocrPolicyMsg_t *)&((cp->lq[queueIdx])[1]);
     DPRINTF(DEBUG_LVL_VERB, "Found message from XE 0x%x @ 0x%lx of type 0x%x\n",
-            queueIdx + ID_AGENT_XE0, *msg, (*msg)->type);
+            queueIdx, *msg, (*msg)->type);
     // We fixup pointers
     u64 baseSize = 0, marshalledSize = 0;
     ocrPolicyMsgGetMsgSize(*msg, &baseSize, &marshalledSize, 0);
@@ -520,7 +521,7 @@ u8 ceCommDestructMessage(ocrCommPlatform_t *self, ocrPolicyMsg_t *msg) {
                 // We should have been reading it
                 ASSERT(cp->lq[i][0] == 3);
                 cp->lq[i][0] = 0;
-                DPRINTF(DEBUG_LVL_VVERB, "Ungating XE %u\n", i + ID_AGENT_XE0);
+                DPRINTF(DEBUG_LVL_VVERB, "Ungating XE %u\n", i);
                 {
                     // Clear the XE pipeline clock gate while preserving other bits.
                     // Before unclockgating the XE, we make sure it is clock-gated to avoid
@@ -541,6 +542,7 @@ u8 ceCommDestructMessage(ocrCommPlatform_t *self, ocrPolicyMsg_t *msg) {
                     // Bug #820: Further, this was a MMIO operation
                     *((u64*)(BR_MSR_BASE((i+ID_AGENT_XE0)) + (POWER_GATE_RESET * sizeof(u64)))) = 0x1ULL;
                 }
+                DPRINTF(DEBUG_LVL_VVERB, "XE %u ungated\n", i);
                 return 0;
             }
         }
