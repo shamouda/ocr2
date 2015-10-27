@@ -46,6 +46,9 @@ while [[ $# -gt 0 ]]; do
     elif [[ "$1" = "-ro" ]]; then
         shift
         STEP_RUN_ONLY="yes"
+    elif [[ "$1" = "-loop" ]]; then
+        shift
+        LOOP_UNTIL_CRASH="yes"
     elif [[ "$1" = "-valgrind" && $# -ge 2 ]]; then
         shift
         WRAPPER="valgrind"
@@ -322,7 +325,19 @@ function run () {
         TEST_RES=`cat ${TEST_RES_FILE}`
     fi
     echo "ocrrun ${RUN_WRAPPER} ${BIN_GEN_DIR}/${NAME} ${OCR_FLAGS} ${TEST_ARGS}"
-    ocrrun ${RUN_WRAPPER} ${BIN_GEN_DIR}/${NAME} ${OCR_FLAGS} ${TEST_ARGS}
+
+    if [[ "$LOOP_UNTIL_CRASH" == "yes" ]]; then
+        let i=0;
+        RES=0;
+        while (( $RES == 0)); do
+            echo "==== Loop until crash iteration $i ===="
+            ocrrun ${RUN_WRAPPER} ${BIN_GEN_DIR}/${NAME} ${OCR_FLAGS} ${TEST_ARGS}
+            RES=$?
+            let i=$i+1
+        done
+    else
+        ocrrun ${RUN_WRAPPER} ${BIN_GEN_DIR}/${NAME} ${OCR_FLAGS} ${TEST_ARGS}
+    fi
     RES=$?
     if [[ $RES -eq $TEST_RES ]]; then
         RES=0;
