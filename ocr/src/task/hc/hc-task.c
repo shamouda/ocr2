@@ -871,8 +871,9 @@ u8 satisfyTaskHc(ocrTask_t * base, ocrFatGuid_t data, u32 slot) {
                 self->frontierSlot++;
                 DPRINTF(DEBUG_LVL_VERB, "Slot Increment on task 0x%lx slot %d with 0x%lx slotCount=%u slotFrontier=%u depc=%u\n",
                     self->base.guid, slot, data.guid, self->slotSatisfiedCount, self->frontierSlot, base->depc);
+                ASSERT(self->frontierSlot < base->depc);
                 fsSlot = self->signalers[self->frontierSlot].slot;
-            } while((fsSlot == SLOT_SATISFIED_EVT) || (fsSlot == SLOT_SATISFIED_DB));
+            } while ((self->frontierSlot != (base->depc-1)) && ((fsSlot == SLOT_SATISFIED_EVT) || (fsSlot == SLOT_SATISFIED_DB)));
             // If here, there must be at least one satisfy that hasn't happened yet.
             ASSERT(self->slotSatisfiedCount < base->depc);
 
@@ -880,7 +881,7 @@ u8 satisfyTaskHc(ocrTask_t * base, ocrFatGuid_t data, u32 slot) {
             // in flight. Its .slot has been set, which is why we skipped over its slot
             // but the corresponding satisfy hasn't been executed yet. When it is,
             // slotSatisfiedCount equals depc and the task is scheduled.
-            if (self->frontierSlot < base->depc) {
+            if (!((fsSlot == SLOT_SATISFIED_EVT) || (fsSlot == SLOT_SATISFIED_DB))) {
                 // The slot we found is either:
                 // 1- not known: addDependence hasn't occured yet (UNINITIALIZED_GUID)
                 // 2- known: but the edt hasn't registered on it yet
