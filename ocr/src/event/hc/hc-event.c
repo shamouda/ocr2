@@ -166,20 +166,42 @@ u8 destructEventHc(ocrEvent_t *base) {
     return 0;
 }
 
+#define STATE_CHECKED_IN ((u32)-1)
+#define STATE_CHECKED_OUT ((u32)-2)
+#define STATE_DESTROY_SEEN ((u32)-3)
+
 u8 destructEventHcPersist(ocrEvent_t *base) {
     ocrEventHc_t *event = (ocrEventHc_t*) base;
     // Addresses a race when the EDT that's satisfying the
     // event is still using the event's metadata but the children
     // EDT is has already invoked the destruct function.
-    // NOTE: Current approach is to block. Progress is still ensured
-    // because the satisfier is not blocking, it may just take time.
-    // BUG #537 should improve on that by creating a lightweight
-    // asynchronous operation to reschedule the destruction.
-    if ((event->waitersCount) == -1) {
-        // Satisfier is checked-in, wait for signal it is done.
-        // Note that this is not addressing any other form of
-        // illegal race conditions as defined per the specification
-        while ((event->waitersCount) != ((u32) -2));
+    // BUG #537 could potentially improve on that by creating a lightweight
+    // asynchronous operation to reschedule the destruction instead
+    // of competing.
+    u32 wc = event->waitersCount;
+    // - Can be STATE_CHECKED_IN: competing for destruction with satisfy
+    // - Can be STATE_CHECKED_OUT: We should win this competition
+    // - Can be any other value: We are deleting the event before it is satisfied.
+    //   It's either a race in the user program or an early destruction of the event.
+    //
+    // By contract the satisfy code should directly call destructEventHc
+    // if it wins the right to invoke the destruction code
+    ASSERT(wc != STATE_DESTROY_SEEN);
+    if (wc == STATE_CHECKED_IN) {
+        // Competing with the satisfy waiters code
+        u32 oldV = hal_cmpswap32(&(event->waitersCount), wc, STATE_DESTROY_SEEN);
+        if (wc == oldV) {
+            // Successfully CAS from STATE_CHECKED_IN => STATE_DESTROY_SEEN
+            // i.e. we lost competition: Satisfier will destroy the event
+            // Return code zero as the event is 'scheduled' for deletion,
+            // it just won't happen through this path.
+            return 0;
+        } else { // CAS failed
+            // Was competing with the CAS in satisfy which only
+            // does one thing: STATE_CHECKED_IN => STATE_CHECKED_OUT
+            ASSERT(event->waitersCount == STATE_CHECKED_OUT);
+            // fall-through and destroy the event
+        }
     }
     return destructEventHc(base);
 }
@@ -353,12 +375,16 @@ static u8 commonSatisfyEventHcPersist(ocrEvent_t *base, ocrFatGuid_t db, u32 slo
         RESULT_PROPAGATE(commonSatisfyWaiters(pd, base, db, waitersCount, currentEdt, &msg, true));
     }
 
-    hal_fence();// make sure all operations are done
-    // This is to signal a concurrent destruct currently
-    // waiting on the satisfaction being done it can now
-    // proceed.
-    event->waitersCount = (u32)-2;
-
+    u32 oldV = hal_cmpswap32(&(event->waitersCount), STATE_CHECKED_IN, STATE_CHECKED_OUT);
+    if (oldV == STATE_DESTROY_SEEN) {
+        // CAS has failed because of a concurrent destroy operation, which means that we
+        // won the right to destroy the event. i.e. we are logically checked out and the
+        // destroy code marked the event for deletion but couldn't destroy because we were
+        // checked in.
+        destructEventHc(base);
+    }
+    // else we just checked out and there may be a concurrent deletion happening
+    // => do not touch the event pointer anymore
     return 0;
 }
 
@@ -385,7 +411,7 @@ u8 satisfyEventHcPersistSticky(ocrEvent_t *base, ocrFatGuid_t db, u32 slot) {
     ocrEventHc_t * event = (ocrEventHc_t*) base;
     hal_lock32(&(event->waitersLock));
     //BUG #809 Nanny-mode
-    if (event->waitersCount == (u32)-1) {
+    if (event->waitersCount == STATE_CHECKED_IN) {
         DPRINTF(DEBUG_LVL_WARN, "User-level error detected: try to satisfy a sticky event that's already satisfied\n");
         ASSERT(false);
         hal_unlock32(&(event->waitersLock));
@@ -393,7 +419,7 @@ u8 satisfyEventHcPersistSticky(ocrEvent_t *base, ocrFatGuid_t db, u32 slot) {
     }
     ((ocrEventHcPersist_t*)event)->data = db.guid;
     u32 waitersCount = event->waitersCount;
-    event->waitersCount = (u32)-1; // Indicate the event is satisfied
+    event->waitersCount = STATE_CHECKED_IN; // Indicate the event is satisfied
     hal_unlock32(&(event->waitersLock));
 
     return commonSatisfyEventHcPersist(base, db, slot, waitersCount);
