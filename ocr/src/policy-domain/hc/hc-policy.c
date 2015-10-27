@@ -2103,21 +2103,30 @@ u8 hcPdWaitMessage(ocrPolicyDomain_t *self,  ocrMsgHandle_t **handle) {
 
 void* hcPdMalloc(ocrPolicyDomain_t *self, u64 size) {
     START_PROFILE(pd_hc_PdMalloc);
+#ifdef NANNYMODE_SYSALLOC
+    // Just try in the first allocator
+    void* toReturn = malloc(size);
+    ASSERT(toReturn != NULL);
+#else
     // Just try in the first allocator
     void* toReturn = NULL;
     toReturn = self->allocators[0]->fcts.allocate(self->allocators[0], size, 0);
     if(toReturn == NULL)
         DPRINTF(DEBUG_LVL_WARN, "Failed PDMalloc for size %lx\n", size);
     ASSERT(toReturn != NULL);
+#endif
     RETURN_PROFILE(toReturn);
 }
 
 void hcPdFree(ocrPolicyDomain_t *self, void* addr) {
     START_PROFILE(pd_hc_PdFree);
+#ifdef NANNYMODE_SYSALLOC
+    // Just try in the first allocator
+    free(addr);
+#else
     // May result in leaks but better than the alternative...
-
     allocatorFreeFunction(addr);
-
+#endif
     RETURN_PROFILE();
 }
 

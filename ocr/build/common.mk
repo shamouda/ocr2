@@ -68,6 +68,9 @@ DEFAULT_CONFIG ?= jenkins-common-8w-lockableDB.cfg
 # Requires valgrind-devel package
 # CFLAGS += -I/usr/include -DENABLE_VALGRIND
 
+# Bypass runtime allocators in favor of standard malloc
+# CFLAGS += -DNANNYMODE_SYSALLOC
+
 # Runtime overhead profiler
 # x86 only
 #
