@@ -513,10 +513,14 @@ void bringUpRuntime(ocrConfig_t *ocrConfig) {
                     } else {
                         all_factories[j] = (void **)runtimeChunkAlloc(type_counts[j] * sizeof(void *), PERSISTENT_CHUNK);
                     }
-                    count = 0;
                 }
+
+                // Find next empty spot
+                for(count = 0; count < type_counts[j]; count++) if(all_factories[j][count] == NULL) break;
+                // And fill it
                 factory_names[j][count] = populate_type(&type_params[j][count], j, dict, secname);
                 all_factories[j][count] = create_factory(j, factory_names[j][count], type_params[j][count]);
+
                 if (all_factories[j][count] == NULL) {
                     runtimeChunkFree((u64)factory_names[j][count], NONPERSISTENT_CHUNK);
                     factory_names[j][count] = NULL;
