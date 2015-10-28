@@ -82,6 +82,28 @@
 #define EMPTY_SLOT 0x0ULL
 #define RESERVED_SLOT 0x1ULL
 
+static void releaseXE(u32 i) {
+    DPRINTF(DEBUG_LVL_VVERB, "Ungating XE %u\n", i);
+    // Before unclockgating the XE, we make sure it is clock-gated to avoid
+    // a race where the CE sees the XE's message before the XE sends the
+    // alarm to the CE. The XE will clock-gate itself on the alarm
+    // and never wake up.
+    u64 state = 0;
+    u64 loopcount = 0;
+    do {
+        // Bug #820: This was a MMIO LD call and should be replaced by one when they become available
+
+        state = *((u64*)(BR_MSR_BASE((i+ID_AGENT_XE0)) + (POWER_GATE_RESET * sizeof(u64))));
+        if(++loopcount > 1000000) {
+            loopcount = 0;
+            DPRINTF(DEBUG_LVL_WARN, "Stuck on unclockgating %u\n", i);
+        }
+    } while(!(state & 0x1ULL));
+    // Bug #820: Further, this was a MMIO operation
+    *((u64*)(BR_MSR_BASE((i+ID_AGENT_XE0)) + (POWER_GATE_RESET * sizeof(u64)))) &= ~(0x1ULL);
+    DPRINTF(DEBUG_LVL_VVERB, "XE %u ungated\n", i);
+}
+
 static u8 ceCommSendMessageToCE(ocrCommPlatform_t *self, ocrLocation_t target,
                                 ocrPolicyMsg_t *message, u64 *id,
                                 u32 properties, u32 mask) {
@@ -395,6 +417,12 @@ u8 ceCommSendMessage(ocrCommPlatform_t *self, ocrLocation_t target,
         }
         DPRINTF(DEBUG_LVL_VVERB, "DMA done and set 0x%lx to 2 (full)\n", &(rq[0]));
 
+        // Release the XE now that it has a response to see
+        // WARNING: This supposes that we cannot have just messages that are not responses!!!
+        // This is the case currently.
+        DPRINTF(DEBUG_LVL_VERB, "Releasing XE 0x%x after sending it a response\n",
+                (AGENT_FROM_ID((u64)target)) - ID_AGENT_XE0);
+        releaseXE((AGENT_FROM_ID((u64)target)) - ID_AGENT_XE0);
 #endif
     }
     return 0;
@@ -417,6 +445,12 @@ static u8 extractXEMessage(ocrCommPlatformCe_t *cp, ocrPolicyMsg_t **msg, u32 qu
     cp->lq[queueIdx][0] = 3; // Signify we are reading it so we don't read it twice if we
                              // go back in to poll before we destroyed this message (if, for
                              // example, we are stuck sending a needed message to a CE)
+    // We also un-clockgate the XE if no response is expected
+    if(!((*msg)->type & PD_MSG_REQ_RESPONSE)) {
+        DPRINTF(DEBUG_LVL_VERB, "Message does not require a response -- un-clockgating XE 0x%x\n",
+                queueIdx);
+        releaseXE(queueIdx);
+    }
     return 0;
 }
 
@@ -513,27 +547,6 @@ u8 ceCommDestructMessage(ocrCommPlatform_t *self, ocrPolicyMsg_t *msg) {
                 // We should have been reading it
                 ASSERT(cp->lq[i][0] == 3);
                 cp->lq[i][0] = 0;
-                DPRINTF(DEBUG_LVL_VVERB, "Ungating XE %u\n", i);
-                {
-                    // Before unclockgating the XE, we make sure it is clock-gated to avoid
-                    // a race where the CE sees the XE's message before the XE sends the
-                    // alarm to the CE. The XE will clock-gate itself on the alarm
-                    // and never wake up.
-                    u64 state = 0;
-                    u64 loopcount = 0;
-                    do {
-                        // Bug #820: This was a MMIO LD call and should be replaced by one when they become available
-
-                        state = *((u64*)(BR_MSR_BASE((i+ID_AGENT_XE0)) + (POWER_GATE_RESET * sizeof(u64))));
-                        if(++loopcount > 1000000) {
-                            loopcount = 0;
-                            DPRINTF(DEBUG_LVL_WARN, "Stuck on unclockgating %u\n", i);
-                        }
-                    } while(!(state & 0x1ULL));
-                    // Bug #820: Further, this was a MMIO operation
-                    *((u64*)(BR_MSR_BASE((i+ID_AGENT_XE0)) + (POWER_GATE_RESET * sizeof(u64)))) = 0x1ULL;
-                }
-                DPRINTF(DEBUG_LVL_VVERB, "XE %u ungated\n", i);
                 return 0;
             }
         }

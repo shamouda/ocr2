@@ -296,7 +296,7 @@
  * @warning 'id' is the agent ID (ID_AGENT_XE0 ... ID_AGENT_XE7)
  */
 #define hal_sleep(id) do {                                              \
-        *(u64 *)(BR_MSR_BASE(id) + POWER_GATE_RESET*sizeof(u64)) = 0x0ULL; \
+        *(u64 *)(BR_MSR_BASE(id) + POWER_GATE_RESET*sizeof(u64)) |= 0x1ULL; \
     } while(0)
 
 /**
@@ -306,7 +306,7 @@
  * @warning 'id' is the agent ID (ID_AGENT_XE0 ... ID_AGENT_XE7)
  */
 #define hal_wake(id) do {                                                    \
-        *(u64 *)(BR_MSR_BASE(id) + POWER_GATE_RESET*sizeof(u64)) = 0x1ULL; \
+        *(u64 *)(BR_MSR_BASE(id) + POWER_GATE_RESET*sizeof(u64)) &= ~(0x1ULL); \
     } while(0)
 
 /**

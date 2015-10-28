@@ -157,10 +157,12 @@ u8 xeCommSendMessage(ocrCommPlatform_t *self, ocrLocation_t target,
     ASSERT(target == self->pd->parentLocation);
 
     // - Atomically test & set remote stage to Busy. Error if already non-Empty.
-    {
-        u64 tmp = hal_swap64(cp->rq, (u64)1);
-        ASSERT(tmp == 0);
-    }
+    DPRINTF(DEBUG_LVL_VVERB, "XE trying to grab its remote slot @ 0x%lx\n", cp->rq);
+    u64 tmp = 0;
+    do {
+        tmp = hal_swap64(cp->rq, (u64)1);
+    } while(tmp != 0);
+    DPRINTF(DEBUG_LVL_VVERB, "XE successful at grabbing remote slot @ 0x%lx\n", cp->rq);
 
     // We marshall things properly
     u64 baseSize = 0, marshalledSize = 0;
