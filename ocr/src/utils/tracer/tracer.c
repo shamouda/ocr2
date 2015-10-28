@@ -36,7 +36,7 @@ static bool isSupportedTraceType(bool evtType, ocrTraceType_t ttype, ocrTraceAct
     //Hacky sanity check to ensure va_arg got valid trace info if provided.
     //return true if supported (list will expand as more trace types become needed/supported)
     return ((ttype >= OCR_TRACE_TYPE_EDT && ttype <= OCR_TRACE_TYPE_DATABLOCK) &&
-            (atype >= OCR_ACTION_CREATE  && atype <= OCR_ACTION_FINISH) &&
+            (atype >= OCR_ACTION_CREATE  && atype < OCR_ACTION_MAX) &&
             (evtType == true || evtType == false));
 }
 
@@ -107,6 +107,32 @@ static void populateTraceObject(bool evtType, ocrTraceType_t objType, ocrTraceAc
             case OCR_ACTION_FINISH:
                 TRACE_FIELD(TASK, taskExeEnd, tr, placeHolder) = NULL;
                 break;
+
+            case OCR_ACTION_DATA_ACQUIRE:
+            {
+                ocrGuid_t edtGuid = va_arg(ap, ocrGuid_t);
+                ocrGuid_t dbGuid = va_arg(ap, ocrGuid_t);
+                u64 dbSize = va_arg(ap, u64);
+                TRACE_FIELD(TASK, taskDataAcquire, tr, taskGuid) = edtGuid;
+                TRACE_FIELD(TASK, taskDataAcquire, tr, dbGuid) = dbGuid;
+                TRACE_FIELD(TASK, taskDataAcquire, tr, size) = dbSize;
+                break;
+            }
+
+            case OCR_ACTION_DATA_RELEASE:
+            {
+                ocrGuid_t edtGuid = va_arg(ap, ocrGuid_t);
+                ocrGuid_t dbGuid = va_arg(ap, ocrGuid_t);
+                u64 dbSize = va_arg(ap, u64);
+                TRACE_FIELD(TASK, taskDataRelease, tr, taskGuid) = edtGuid;
+                TRACE_FIELD(TASK, taskDataRelease, tr, dbGuid) = dbGuid;
+                TRACE_FIELD(TASK, taskDataRelease, tr, size) = dbSize;
+                break;
+            }
+
+            default:
+                break;
+
         }
         break;
 

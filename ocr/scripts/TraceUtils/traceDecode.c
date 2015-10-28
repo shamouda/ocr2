@@ -93,6 +93,27 @@ void translateObject(ocrTraceObj_t *trace){
                 genericPrint(evtType, ttype, action, location, timestamp, NULL_GUID);
                 break;
 
+            case OCR_ACTION_DATA_ACQUIRE:
+            {
+                ocrGuid_t edtGuid = TRACE_FIELD(TASK, taskDataAcquire, trace, taskGuid);
+                ocrGuid_t dbGuid = TRACE_FIELD(TASK, taskDataAcquire, trace, dbGuid);
+                u64 size = TRACE_FIELD(TASK, taskDataAcquire, trace, size);
+                printf("[TRACE] U/R: %s | LOCATION: 0x%lx | TIMESTAMP: %lu | TYPE: EDT | ACTION: DB_ACQUIRE | EDT_GUID: 0x%lx | DB_GUID: 0x%lx | DB_SIZE: %lu\n",
+                        evt_type[evtType], location, timestamp, edtGuid, dbGuid, size);
+
+                break;
+            }
+
+            case OCR_ACTION_DATA_RELEASE:
+            {
+                ocrGuid_t edtGuid = TRACE_FIELD(TASK, taskDataRelease, trace, taskGuid);
+                ocrGuid_t dbGuid = TRACE_FIELD(TASK, taskDataRelease, trace, dbGuid);
+                u64 size = TRACE_FIELD(TASK, taskDataRelease, trace, size);
+                printf("[TRACE] U/R: %s | LOCATION: 0x%lx | TIMESTAMP: %lu | TYPE: EDT | ACTION: DB_RELEASE | EDT_GUID: 0x%lx | DB_GUID: 0x%lx | DB_SIZE: %lu\n",
+                        evt_type[evtType], location, timestamp, edtGuid, dbGuid, size);
+
+                break;
+            }
 
         }
         break;

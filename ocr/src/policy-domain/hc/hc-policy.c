@@ -1012,9 +1012,13 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
                 if(PD_MSG_FIELD_O(returnDetail)!=0)
                     DPRINTF(DEBUG_LVL_WARN, "DB Acquire failed for guid %lx\n", PD_MSG_FIELD_IO(guid));
                 ASSERT(PD_MSG_FIELD_O(returnDetail) == 0);
+                DPRINTF(DEBUG_LVL_INFO, "DB guid 0x%lx of size %lu acquired by EDT 0x%lx\n",
+                        db->guid, db->size, PD_MSG_FIELD_IO(edt.guid),
+                        false, OCR_TRACE_TYPE_EDT, OCR_ACTION_DATA_ACQUIRE, PD_MSG_FIELD_IO(edt.guid), db->guid, db->size);
                 msg->type &= ~PD_MSG_REQUEST;
                 msg->type |= PD_MSG_RESPONSE;
             }
+
         #undef PD_MSG
         #undef PD_TYPE
         } else {
@@ -1046,8 +1050,12 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         localDeguidify(self, &(PD_MSG_FIELD_I(edt)));
         ocrDataBlock_t *db = (ocrDataBlock_t*)(PD_MSG_FIELD_IO(guid.metaDataPtr));
         ASSERT(db->fctId == self->dbFactories[0]->factoryId);
+        ocrGuid_t edtGuid =  PD_MSG_FIELD_I(edt.guid);
         PD_MSG_FIELD_O(returnDetail) = self->dbFactories[0]->fcts.release(
             db, PD_MSG_FIELD_I(edt), !!(PD_MSG_FIELD_I(properties) & DB_PROP_RT_ACQUIRE));
+        DPRINTF(DEBUG_LVL_INFO, "DB guid 0x%lx of size %lu released by EDT 0x%lx\n",
+                db->guid, db->size, edtGuid,
+                false, OCR_TRACE_TYPE_EDT, OCR_ACTION_DATA_RELEASE, edtGuid, db->guid, db->size);
 #undef PD_MSG
 #undef PD_TYPE
         msg->type &= ~PD_MSG_REQUEST;

@@ -63,6 +63,18 @@ typedef struct {
                     void *placeHolder;              /* future TODO: define useful fields*/
                 }taskDestroy;
 
+                struct{
+                    ocrGuid_t taskGuid;             /* EDT doing the acquire */
+                    ocrGuid_t dbGuid;               /* Datablock being acquired */
+                    u64 size;                       /* Size of Datablock being acquired */
+                }taskDataAcquire;
+
+                struct{
+                    ocrGuid_t taskGuid;             /* EDT doing the release */
+                    ocrGuid_t dbGuid;               /* Datablock being released */
+                    u64 size;                       /* Size of Datablock being released */
+                }taskDataRelease;
+
             }action;
 
         } TRACE_TYPE_NAME(TASK);
