@@ -63,6 +63,8 @@ DEFAULT_CONFIG ?= jenkins-common-8w-lockableDB.cfg
 # They are added here for reference
 ###################################################
 
+# Debug and Nanny mode
+
 # Valgrind compatibility for internal allocators
 # x86 only
 # Requires valgrind-devel package
@@ -70,6 +72,14 @@ DEFAULT_CONFIG ?= jenkins-common-8w-lockableDB.cfg
 
 # Bypass runtime allocators in favor of standard malloc
 # CFLAGS += -DNANNYMODE_SYSALLOC
+
+# Declare flags for AddressSanitizer
+# Warning: Applications must use the same flags else it will crash.
+ifeq (${OCR_ASAN}, yes)
+ASAN_FLAGS := -g -fsanitize=address -fno-omit-frame-pointer
+CFLAGS += $(ASAN_FLAGS)
+LDFLAGS += $(ASAN_FLAGS) $(LDFLAGS)
+endif
 
 # Runtime overhead profiler
 # x86 only

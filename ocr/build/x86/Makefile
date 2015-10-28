@@ -20,8 +20,15 @@ DEFAULT_CONFIG=jenkins-common-8w-lockableDB.cfg
 # Tool-chain to be used for the build
 #
 
-CC      := gcc
-CFLAGS  :=
+# Careful with variables that are implicitely defined by make
+# They may have a default value (CC, AR, ARFLAGS, RM).
+# See make doc "Variables Used by Implicit Rules"
+
+CC      ?= gcc
+
+# Conserve CFLAGS and LDFLAGS defined in environment
+CFLAGS  := ${CFLAGS}
+LDFLAGS := ${LDFLAGS}
 
 RM      := rm
 RMFLAGS := -rf
@@ -31,20 +38,20 @@ MKDIR   := mkdir
 LN      := ln
 
 # Shared libraries specific builds
-LDFLAGS := -shared -fpic -lpthread
+LDFLAGS += -shared -fpic -lpthread
 
 # -lrt needed only for CentOS (more accurately, < glibc-2.17)
 ifeq ($(wildcard /etc/centos-release), /etc/centos-release)
 LDFLAGS += -lrt
 endif
 
-# CFLAGS_SHARED will be concatenated with any
-# common CFLAGS options
-CFLAGS_SHARED := -fpic
+# CFLAGS_SHARED will be concatenated with any common CFLAGS options
+CFLAGS_SHARED := ${CFLAGS_SHARED} -fpic
 
 # Static libraries specific builds
 # Same as for CFLAGS_SHARED
-CFLAGS_STATIC :=
+CFLAGS_STATIC := ${CFLAGS_STATIC}
+
 AR := ar
 ARFLAGS := cru
 

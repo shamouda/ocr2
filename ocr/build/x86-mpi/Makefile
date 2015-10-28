@@ -22,6 +22,10 @@ DEFAULT_CONFIG=mach-hc-dist-mpi-clone-8w-lockable.cfg
 
 CC      := mpicc
 
+# Conserve CFLAGS and LDFLAGS defined in environment
+CFLAGS  := ${CFLAGS}
+LDFLAGS := ${LDFLAGS}
+
 RM      := rm
 RMFLAGS := -rf
 
@@ -30,7 +34,7 @@ MKDIR   := mkdir
 LN      := ln
 
 # Shared libraries specific builds
-LDFLAGS := -shared -fpic -lpthread
+LDFLAGS += -shared -fpic -lpthread
 
 # -lrt needed only for CentOS (more accurately, < glibc-2.17)
 ifeq ($(wildcard /etc/centos-release), /etc/centos-release)
@@ -39,11 +43,11 @@ endif
 
 # CFLAGS_SHARED will be concatenated with any
 # common CFLAGS options
-CFLAGS_SHARED := -fpic
+CFLAGS_SHARED := ${CFLAGS_SHARED} -fpic
 
 # Static libraries specific builds
 # Same as for CFLAGS_SHARED
-CFLAGS_STATIC :=
+CFLAGS_STATIC := ${CFLAGS_STATIC}
 AR := ar
 ARFLAGS := cru
 
@@ -82,9 +86,7 @@ OCRRUNNER=ocrrun
 # if MPI_ROOT is set, use the specified mpi install
 ifdef MPI_ROOT
 # Name of the MPI shared library to link with
-ifndef MPI_LIB
-MPI_LIB = mpi
-endif
+MPI_LIB ?= mpi
 CFLAGS += -I${MPI_ROOT}/include
 LDFLAGS += -L${MPI_ROOT}/lib -l${MPI_LIB}
 endif
