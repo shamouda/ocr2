@@ -35,7 +35,7 @@ fi
 
 if [ "${OCR_CONFIG}" = "" ]; then
     #Call the config generator
-    perl ${OCR_ROOT}/bin/config-generator.py
+    python ${OCR_ROOT}/bin/config-generator.py
     #TODO this only works with default CFG filename
     OCR_CONFIG=${PWD}/default.cfg
 fi
