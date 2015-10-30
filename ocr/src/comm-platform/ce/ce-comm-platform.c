@@ -83,25 +83,26 @@
 #define RESERVED_SLOT 0x1ULL
 
 static void releaseXE(u32 i) {
-    DPRINTF(DEBUG_LVL_VVERB, "Ungating XE %u\n", i);
+    DPRINTF(DEBUG_LVL_VERB, "Ungating XE %u\n", i);
     // Before unclockgating the XE, we make sure it is clock-gated to avoid
     // a race where the CE sees the XE's message before the XE sends the
     // alarm to the CE. The XE will clock-gate itself on the alarm
     // and never wake up.
     u64 state = 0;
-    u64 loopcount = 0;
+    u64 loopCount = 0;
+    u64 stuckCount = 0;
     do {
         // Bug #820: This was a MMIO LD call and should be replaced by one when they become available
 
         state = *((u64*)(BR_MSR_BASE((i+ID_AGENT_XE0)) + (POWER_GATE_RESET * sizeof(u64))));
-        if(++loopcount > 1000000) {
-            loopcount = 0;
-            DPRINTF(DEBUG_LVL_WARN, "Stuck on unclockgating %u\n", i);
+        if(++loopCount > 10) {
+            loopCount = 0;
+            DPRINTF(DEBUG_LVL_WARN, "Stuck on unclockgating %u (%d times)\n", i, stuckCount++);
         }
     } while(!(state & 0x1ULL));
     // Bug #820: Further, this was a MMIO operation
     *((u64*)(BR_MSR_BASE((i+ID_AGENT_XE0)) + (POWER_GATE_RESET * sizeof(u64)))) &= ~(0x1ULL);
-    DPRINTF(DEBUG_LVL_VVERB, "XE %u ungated\n", i);
+    DPRINTF(DEBUG_LVL_VERB, "XE %u ungated\n", i);
 }
 
 static u8 ceCommSendMessageToCE(ocrCommPlatform_t *self, ocrLocation_t target,
@@ -417,12 +418,14 @@ u8 ceCommSendMessage(ocrCommPlatform_t *self, ocrLocation_t target,
         }
         DPRINTF(DEBUG_LVL_VVERB, "DMA done and set 0x%lx to 2 (full)\n", &(rq[0]));
 
-        // Release the XE now that it has a response to see
-        // WARNING: This supposes that we cannot have just messages that are not responses!!!
-        // This is the case currently.
-        DPRINTF(DEBUG_LVL_VERB, "Releasing XE 0x%x after sending it a response\n",
-                (AGENT_FROM_ID((u64)target)) - ID_AGENT_XE0);
-        releaseXE((AGENT_FROM_ID((u64)target)) - ID_AGENT_XE0);
+        if(message->type & (PD_MSG_RESPONSE | PD_MSG_RESPONSE_OVERRIDE)) {
+            // Release the XE now that it has a response to see
+            // WARNING: we only release if this is a response. If this is an initial message
+            // (happens to release from barriers), we do not release (the XE is already released)
+            DPRINTF(DEBUG_LVL_VERB, "Releasing XE 0x%x after sending it a response of type 0x%lx\n",
+                    (AGENT_FROM_ID((u64)target)) - ID_AGENT_XE0, message->type);
+            releaseXE((AGENT_FROM_ID((u64)target)) - ID_AGENT_XE0);
+        }
 #endif
     }
     return 0;
@@ -446,9 +449,10 @@ static u8 extractXEMessage(ocrCommPlatformCe_t *cp, ocrPolicyMsg_t **msg, u32 qu
                              // go back in to poll before we destroyed this message (if, for
                              // example, we are stuck sending a needed message to a CE)
     // We also un-clockgate the XE if no response is expected
+    hal_fence();
     if(!((*msg)->type & PD_MSG_REQ_RESPONSE)) {
-        DPRINTF(DEBUG_LVL_VERB, "Message does not require a response -- un-clockgating XE 0x%x\n",
-                queueIdx);
+        DPRINTF(DEBUG_LVL_VERB, "Message type 0x%lx does not require a response -- un-clockgating XE 0x%x\n",
+                (*msg)->type, queueIdx);
         releaseXE(queueIdx);
     }
     return 0;
