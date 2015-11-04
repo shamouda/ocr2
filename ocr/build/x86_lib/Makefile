@@ -39,14 +39,14 @@ CFLAGS_SHARED := -fpic
 
 # Static libraries specific builds
 # Same as for CFLAGS_SHARED
-CFLAGS_STATIC := -std=c99 -isystem /usr/include -isystem ../../../apps/libs/x86_native/include
+CFLAGS_STATIC := -fPIC -std=c99 -isystem /usr/include -isystem ../../../apps/libs/x86_native/include
 AR := ar
 ARFLAGS := cru
 
 RANLIB := ranlib
 
 # Library supported
-SUPPORTS_SHARED=no
+SUPPORTS_SHARED=yes
 SUPPORTS_STATIC=yes
 OCRRUNNER=ocrrun
 
@@ -84,7 +84,7 @@ LIB_GCC = /usr/lib/gcc/x86_64-linux-gnu/4.9/libgcc_eh.a
 
 .PHONY: all
 all: static
-	ld -r -o $(OBJDIR)/myocr.o $(OBJDIR)/static/*.o
+	ld -shared -static -o $(OBJDIR)/libocr.so $(OBJDIR)/static/*.o
 	#nm -u $(OBJDIR)/myocr.o | grep -E "^.*U " | sed 's/^.*U //' > syms
 	#nm $(OBJDIR)/myocr.o | grep " T " | grep "ocr" | sed 's/^.*T //' >> syms
 	#ld -nostartfiles -nostdlib -nodefaultlibs -static -o $(OBJDIR)/ocr.o -r -s --start-group $(OBJDIR)/static/*.o $(LIBC) $(PTHREAD_LIB) --end-group -zmuldefs
