@@ -849,7 +849,7 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
                 hal_memCopy(metaDataPtr, mapOrg, metaDataSize, false);
                 ocrGuidMap_t * map = (ocrGuidMap_t *) metaDataPtr;
                 if (mapOrg->numParams) { // Fix-up params
-                    map->params = (s64*)((char*)mapOrg + ((sizeof(ocrGuidMap_t) + sizeof(s64) - 1) & ~(sizeof(s64)-1)));
+                    map->params = (s64*)((char*)map + ((sizeof(ocrGuidMap_t) + sizeof(s64) - 1) & ~(sizeof(s64)-1)));
                 }
                 ocrFatGuid_t mapFatGuid;
                 mapFatGuid.guid = PD_MSG_FIELD_IO(guid.guid);
