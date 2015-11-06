@@ -85,6 +85,12 @@ u8 ocrAffinityQuery(ocrGuid_t guid, u64 * count, ocrGuid_t * affinities) {
 u8 ocrAffinityGet(ocrAffinityKind kind, u64 * count, ocrGuid_t * affinities) {
     ocrPolicyDomain_t * pd = NULL;
     getCurrentEnv(&pd, NULL, NULL, NULL);
+    if (pd == NULL) {
+        ASSERT(*count > 0);
+        *count = 1;
+        affinities[0] = NULL_GUID;
+        return 0;
+    }
     ocrLocationPlacer_t * placer = ((ocrLocationPlacer_t*)pd->placer);
     if(placer == NULL) {
         ASSERT(*count > 0);
