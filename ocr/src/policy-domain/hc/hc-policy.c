@@ -1327,12 +1327,20 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_EVT_GET
         localDeguidify(self, &(PD_MSG_FIELD_I(guid)));
-        ocrEvent_t *evt = (ocrEvent_t*)PD_MSG_FIELD_I(guid.metaDataPtr);
-        ASSERT(evt->fctId == self->eventFactories[0]->factoryId);
-        PD_MSG_FIELD_O(data) = self->eventFactories[0]->fcts[evt->kind].get(evt);
-        // There's no way to check if this call has been
-        // successful without changing the 'get' signature
-        PD_MSG_FIELD_O(returnDetail) = 0;
+        if (PD_MSG_FIELD_I(guid.metaDataPtr) != NULL) {
+            ocrEvent_t * evt = (ocrEvent_t*)PD_MSG_FIELD_I(guid.metaDataPtr);
+            ASSERT(evt->fctId == self->eventFactories[0]->factoryId);
+            PD_MSG_FIELD_O(data) = self->eventFactories[0]->fcts[evt->kind].get(evt);
+            // There's no way to check if this call has been
+            // successful without changing the 'get' signature
+            PD_MSG_FIELD_O(returnDetail) = 0;
+        } else {
+            // Hack for BUG #865 This is for labeled GUIDs that are remote.
+            // If they are not created yet, return ERROR_GUID.
+            PD_MSG_FIELD_O(data.guid) = ERROR_GUID;
+            PD_MSG_FIELD_O(data.metaDataPtr) = NULL;
+            PD_MSG_FIELD_O(returnDetail) = 0;
+        }
 #undef PD_MSG
 #undef PD_TYPE
         msg->type &= ~PD_MSG_REQUEST;

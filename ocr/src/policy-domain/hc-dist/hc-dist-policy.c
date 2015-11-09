@@ -851,6 +851,7 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
                 if (mapOrg->numParams) { // Fix-up params
                     map->params = (s64*)((char*)map + ((sizeof(ocrGuidMap_t) + sizeof(s64) - 1) & ~(sizeof(s64)-1)));
                 }
+                PD_MSG_FIELD_IO(guid.metaDataPtr) = metaDataPtr;
                 ocrFatGuid_t mapFatGuid;
                 mapFatGuid.guid = PD_MSG_FIELD_IO(guid.guid);
                 mapFatGuid.metaDataPtr = metaDataPtr;
@@ -1288,6 +1289,15 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
         msg->destLocation = curLoc;
         break;
     }
+    case PD_MSG_EVT_GET: {
+#define PD_MSG (msg)
+#define PD_TYPE PD_MSG_EVT_GET
+        // HACK for BUG #865 Remote lookup for event completion
+        RETRIEVE_LOCATION_FROM_GUID_MSG(self, msg->destLocation, I);
+#undef PD_MSG
+#undef PD_TYPE
+        break;
+    }
     case PD_MSG_DEP_UNREGSIGNALER: {
         //Not implemented: see #521, #522
         ASSERT(false && "Not implemented PD_MSG_DEP_UNREGSIGNALER");
@@ -1305,7 +1315,6 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
     case PD_MSG_MEM_UNALLOC:
     case PD_MSG_WORK_EXECUTE:
     case PD_MSG_EDTTEMP_CREATE:
-    case PD_MSG_EVT_GET:
     case PD_MSG_GUID_CREATE:
     case PD_MSG_SCHED_NOTIFY:
     case PD_MSG_SAL_OP:
@@ -1387,6 +1396,9 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
 #undef PD_MSG
 #undef PD_TYPE
                 ASSERT((blockingAcquire || false) && "Unhandled blocking acquire message");
+                // We need to process the response to complete the acquire
+                // HACK for BUG #865
+                self->fcts.processMessage(self, response, true);
             break;
             }
             case PD_MSG_DB_CREATE:

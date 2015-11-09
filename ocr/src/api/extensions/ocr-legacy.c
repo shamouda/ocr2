@@ -115,7 +115,7 @@ ocrGuid_t ocrWait(ocrGuid_t outputEvent) {
     return ERROR_GUID;
 }
 
-u8 ocrLegacyBlockProgress(ocrGuid_t handle, ocrGuid_t* guid, void** result, u64* size, u16 properties) {
+u8 ocrLegacyBlockProgress(ocrGuid_t evtHandle, ocrGuid_t* guid, void** result, u64* size, u16 properties) {
     ocrPolicyDomain_t *pd = NULL;
     ocrEvent_t *eventToYieldFor = NULL;
     ocrFatGuid_t dbResult = {.guid = ERROR_GUID, .metaDataPtr = NULL};
@@ -126,47 +126,62 @@ u8 ocrLegacyBlockProgress(ocrGuid_t handle, ocrGuid_t* guid, void** result, u64*
     getCurrentEnv(&pd, NULL, &curTask, &msg);
     currentEdt.guid = (curTask == NULL) ? NULL_GUID : curTask->guid;
     currentEdt.metaDataPtr = curTask;
-
 #define PD_MSG (&msg)
+    ocrLocation_t loc;
+    pd->guidProviders[0]->fcts.getLocation(pd->guidProviders[0], evtHandle, &loc);
+    // HACK for BUG #865 This should be done as part of MD cloning
+    if (loc == pd->myLocation) {
 #define PD_TYPE PD_MSG_GUID_INFO
-    do {
-        getCurrentEnv(NULL, NULL, NULL, &msg);
-        msg.type = PD_MSG_GUID_INFO | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
-        PD_MSG_FIELD_IO(guid.guid) = handle;
-        PD_MSG_FIELD_IO(guid.metaDataPtr) = NULL;
-        PD_MSG_FIELD_I(properties) = KIND_GUIDPROP | RMETA_GUIDPROP;
-        u8 returnCode = pd->fcts.processMessage(pd, &msg, true);
-        //Warning PD_MSG_GUID_INFO returns GUID properties as 'returnDetail', not error code
-        if(returnCode != 0) {
-            return returnCode;
-        }
-        eventToYieldFor = (ocrEvent_t *)PD_MSG_FIELD_IO(guid.metaDataPtr);
-
-        if(PD_MSG_FIELD_IO(guid.metaDataPtr) == NULL_GUID) {
-            if(properties == LEGACY_PROP_NONE) {
-                return OCR_EINVAL;
-            } else if(properties == LEGACY_PROP_WAIT_FOR_CREATE) {
-                continue; // Tightest loop to see how this goes
+        do {
+            getCurrentEnv(NULL, NULL, NULL, &msg);
+            msg.type = PD_MSG_GUID_INFO | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
+            PD_MSG_FIELD_IO(guid.guid) = evtHandle;
+            PD_MSG_FIELD_IO(guid.metaDataPtr) = NULL;
+            PD_MSG_FIELD_I(properties) = KIND_GUIDPROP | RMETA_GUIDPROP;
+            u8 returnCode = pd->fcts.processMessage(pd, &msg, true);
+            //Warning PD_MSG_GUID_INFO returns GUID properties as 'returnDetail', not error code
+            if(returnCode != 0) {
+                return returnCode;
             }
-        } else {
-            break;
-        }
-    } while(true);
+            if(PD_MSG_FIELD_IO(guid.metaDataPtr) == NULL_GUID) {
+                if(properties == LEGACY_PROP_NONE) {
+                    return OCR_EINVAL;
+                } else if(properties == LEGACY_PROP_WAIT_FOR_CREATE) {
+                    continue; // Tightest loop to see how this goes
+                }
+            } else {
+                eventToYieldFor = (ocrEvent_t *)PD_MSG_FIELD_IO(guid.metaDataPtr);
+                ASSERT(eventToYieldFor->kind == OCR_EVENT_STICKY_T ||
+                       eventToYieldFor->kind == OCR_EVENT_IDEM_T);
+                break;
+            }
+        } while(true);
 #undef PD_TYPE
-
+#undef PD_MSG
+    } // end if local: ensures the event is created locally
+    // If it was remote we directly use the EVT_GET operation
     // We can't wait on once/latch events since they could get freed asynchronously
-    ASSERT(eventToYieldFor->kind == OCR_EVENT_STICKY_T ||
-           eventToYieldFor->kind == OCR_EVENT_IDEM_T);
     do {
         hal_pause();
-        dbResult.guid = ERROR_GUID;
-        dbResult = pd->eventFactories[0]->fcts[eventToYieldFor->kind].get(eventToYieldFor);
+        PD_MSG_STACK(msg2);
+        getCurrentEnv(NULL, NULL, NULL, &msg2);
+#define PD_MSG (&msg2)
+#define PD_TYPE PD_MSG_EVT_GET
+        msg2.type = PD_MSG_EVT_GET | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
+        PD_MSG_FIELD_I(guid.guid) = evtHandle;
+        PD_MSG_FIELD_I(guid.metaDataPtr) = NULL;
+        pd->fcts.processMessage(pd, &msg2, true);
+        dbResult = PD_MSG_FIELD_O(data);
+#undef PD_TYPE
+#undef PD_MSG
     } while(dbResult.guid == ERROR_GUID);
 
     if(dbResult.guid != NULL_GUID) {
         if(dbResult.metaDataPtr == NULL) {
             // We now need to acquire the DB
+            PD_MSG_STACK(msg);
             getCurrentEnv(NULL, NULL, NULL, &msg);
+#define PD_MSG (&msg)
 #define PD_TYPE PD_MSG_DB_ACQUIRE
             msg.type = PD_MSG_DB_ACQUIRE | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
             PD_MSG_FIELD_IO(guid) = dbResult;
