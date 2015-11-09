@@ -123,6 +123,8 @@ static u8 takeFromSchedulerAndSend(ocrWorker_t * worker, ocrPolicyDomain_t * pd)
             //and the comm-api contract is to at least set the HDL_SEND_OK flag ?
             ocrMsgHandle_t ** sendHandle = ((properties & TWOWAY_MSG_PROP) && !(properties & ASYNC_MSG_PROP))
                 ? &outgoingHandle : NULL;
+            ASSERT((outgoingHandle->msg->srcLocation == pd->myLocation) &&
+                   (outgoingHandle->msg->destLocation != pd->myLocation));
             //BUG #587 design: who's responsible for deallocating the handle ?
             //If the message is two-way, the creator of the handle is responsible for deallocation
             //If one-way, the comm-layer disposes of the handle when it is not needed anymore

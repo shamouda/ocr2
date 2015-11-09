@@ -272,7 +272,9 @@ u8 MPICommSendMessage(ocrCommPlatform_t * self,
     //If this assert bombs, we need to implement message chunking
     //or use a larger MPI datatype to send the message.
     ASSERT((fullMsgSize < INT_MAX) && "Outgoing message is too large");
-
+    ASSERT((messageBuffer->srcLocation == self->pd->myLocation) &&
+        (messageBuffer->destLocation != self->pd->myLocation) &&
+        (targetRank == messageBuffer->destLocation));
     int res = MPI_Isend(messageBuffer, (int) fullMsgSize, datatype, targetRank, tag, comm, status);
 
     if (res == MPI_SUCCESS) {
@@ -399,16 +401,27 @@ u8 MPICommPollMessageInternal(ocrCommPlatform_t *self, ocrPolicyMsg_t **msg,
         u8 res = probeIncoming(self, mpiHandle->src, (int) mpiHandle->msgId, &mpiHandle->msg, mpiHandle->msg->bufferSize);
         // The message is properly unmarshalled at this point
         if (res == POLL_MORE_MESSAGE) {
+#ifdef OCR_ASSERT
+            if (reqMsg != mpiHandle->msg) {
+                // Original request hasn't changed
+                ASSERT((reqMsg->srcLocation == pd->myLocation) && (reqMsg->destLocation != pd->myLocation));
+                // Newly received response
+                ASSERT((mpiHandle->msg->srcLocation != pd->myLocation) && (mpiHandle->msg->destLocation == pd->myLocation));
+            } else {
+                // Reused, so it is the response
+                ASSERT((reqMsg->srcLocation != pd->myLocation) && (reqMsg->destLocation == pd->myLocation));
+            }
+#endif
             if ((reqMsg != mpiHandle->msg) && mpiHandle->deleteSendMsg) {
                 // we did allocate a new message to store the response
                 // and the request message was already an internal copy
                 // made by the comm-platform, hence the pointer is only
                 // known here and must be deallocated. The sendMessage
                 // caller still has a pointer to the original message.
-                pd->fcts.pdFree(pd, mpiHandle->msg);
+                pd->fcts.pdFree(pd, reqMsg);
             }
-            ASSERT(reqMsg->msgId == mpiHandle->msgId);
-            *msg = reqMsg;
+            ASSERT(mpiHandle->msg->msgId == mpiHandle->msgId);
+            *msg = mpiHandle->msg;
             pd->fcts.pdFree(pd, mpiHandle);
             incomingIt->removeCurrent(incomingIt);
             return res;

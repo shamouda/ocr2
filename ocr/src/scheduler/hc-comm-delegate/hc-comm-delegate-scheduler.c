@@ -268,6 +268,10 @@ u8 hcCommSchedulerGiveComm(ocrScheduler_t *self, u32* count, ocrFatGuid_t* fatHa
         while (i < *count) {
             // Set delegate handle's box id.
             delegateMsgHandle_t* delHandle = (delegateMsgHandle_t *) fatHandlers[i].metaDataPtr;
+#ifdef OCR_ASSERT
+            ocrPolicyMsg_t * message = (delHandle->handle.status == HDL_RESPONSE_OK) ? delHandle->handle.response : delHandle->handle.msg;
+            ASSERT((message->srcLocation == self->pd->myLocation) && (message->destLocation != self->pd->myLocation));
+#endif
             //BUG #587: boxId is defined in del-handle however only the scheduler is using it
             delHandle->boxId = worker->id;
             DPRINTF(DEBUG_LVL_VVERB,"[%d] hc-comm-delegate-scheduler:: Comp-worker pushes at tail of box %d\n",
