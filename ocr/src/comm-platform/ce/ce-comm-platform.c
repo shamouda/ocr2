@@ -94,10 +94,10 @@ static void releaseXE(u32 i) {
     do {
         // Bug #820: This was a MMIO LD call and should be replaced by one when they become available
 
-        state = *((u64*)(BR_MSR_BASE((i+ID_AGENT_XE0)) + (POWER_GATE_RESET * sizeof(u64))));
-        if(++loopCount > 10) {
-            loopCount = 0;
-            DPRINTF(DEBUG_LVL_WARN, "Stuck on unclockgating %u (%d times)\n", i, stuckCount++);
+        state = *((volatile u64*)(BR_MSR_BASE((i+ID_AGENT_XE0)) + (POWER_GATE_RESET * sizeof(u64))));
+        if(++loopCount > 100) {
+            DPRINTF(DEBUG_LVL_WARN, "Stuck on unclockgating %u (%d times), ignoring\n", i, stuckCount++);
+            return;
         }
     } while(!(state & 0x1ULL));
     // Bug #820: Further, this was a MMIO operation
