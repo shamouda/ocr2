@@ -84,6 +84,8 @@ LIB_GCC = /usr/lib/gcc/x86_64-linux-gnu/4.9/libgcc_eh.a
 
 .PHONY: all
 all: static
+#	ld -static -o $(OBJDIR)/libocr.a --start-group $(OBJDIR)/static/*.o $(LIBC) $(PTHREAD_LIB) $(LIB_GCC) --end-group -zmuldefs
+#	ld -shared -static -o $(OBJDIR)/libocr.so $(OBJDIR)/static/*.o -lc -lpthread --unresolved-symbols=ignore-all -zmuldefs
 	ld -shared -static -o $(OBJDIR)/libocr.so $(OBJDIR)/static/*.o
 	#nm -u $(OBJDIR)/myocr.o | grep -E "^.*U " | sed 's/^.*U //' > syms
 	#nm $(OBJDIR)/myocr.o | grep " T " | grep "ocr" | sed 's/^.*T //' >> syms
