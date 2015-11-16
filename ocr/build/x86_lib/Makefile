@@ -31,11 +31,11 @@ MKDIR   := mkdir
 LN      := ln
 
 # Shared libraries specific builds
-#LDFLAGS := -shared -fpic -lpthread
+LDFLAGS := -shared -fpic -lpthread
 
 # CFLAGS_SHARED will be concatenated with any
 # common CFLAGS options
-CFLAGS_SHARED := -fpic
+CFLAGS_SHARED := -fPIC -std=c99 -isystem /usr/include -isystem ../../../apps/libs/x86_native/include
 
 # Static libraries specific builds
 # Same as for CFLAGS_SHARED
@@ -83,7 +83,7 @@ PTHREAD_LIB = /usr/lib/x86_64-linux-gnu/libpthread.a
 LIB_GCC = /usr/lib/gcc/x86_64-linux-gnu/4.9/libgcc_eh.a
 
 .PHONY: all
-all: static
+all: static shared
 #	ld -static -o $(OBJDIR)/libocr.a --start-group $(OBJDIR)/static/*.o $(LIBC) $(PTHREAD_LIB) $(LIB_GCC) --end-group -zmuldefs
 #	ld -shared -static -o $(OBJDIR)/libocr.so $(OBJDIR)/static/*.o -lc -lpthread --unresolved-symbols=ignore-all -zmuldefs
 	ld -shared -static -o $(OBJDIR)/libocr.so $(OBJDIR)/static/*.o
@@ -93,6 +93,6 @@ all: static
 	#objcopy -S --keep-symbols=syms $(OBJDIR)/myocr.o
 
 .PHONY: debug
-debug: debug-static
+debug: debug-static debug-shared
 
 include ../common.mk
