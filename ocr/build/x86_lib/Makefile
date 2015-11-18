@@ -35,11 +35,11 @@ LDFLAGS := -shared -fpic -lpthread
 
 # CFLAGS_SHARED will be concatenated with any
 # common CFLAGS options
-CFLAGS_SHARED := -fPIC -std=c99 -isystem /usr/include -isystem ../../../apps/libs/x86_native/include
+CFLAGS_SHARED := -fpic -std=c99 -isystem /usr/include -isystem ../../../apps/libs/x86_native/include
 
 # Static libraries specific builds
 # Same as for CFLAGS_SHARED
-CFLAGS_STATIC := -fPIC -std=c99 -isystem /usr/include -isystem ../../../apps/libs/x86_native/include
+CFLAGS_STATIC := -std=c99 -isystem /usr/include -isystem ../../../apps/libs/x86_native/include
 AR := ar
 ARFLAGS := cru
 
@@ -81,36 +81,11 @@ OCRRUNNER=ocrrun
 LIBC = /usr/lib/x86_64-linux-gnu/libc.a
 PTHREAD_LIB = /usr/lib/x86_64-linux-gnu/libpthread.a
 LIB_GCC = /usr/lib/gcc/x86_64-linux-gnu/4.9/libgcc_eh.a
-GLIBC_A = $(PTHREAD_LIB) $(LIB_GCC) $(LIBC)
 
 .PHONY: all
 all: static shared
-# this creates an archive out of ocr components, and glibc libs...
-#	ld -static -o $(OBJDIR)/libocr.a $(OBJDIR)/static/*.o $(PTHREAD_LIB) $(LIB_GCC) $(LIBC) #--unresolved-symbols=ignore-all
-#
-# this creates an shared library out of ocr components, and glibc libs...
-#	ld -shared -o $(OBJDIR)/libocr.so $(OBJDIR)/static/*.o -L/usr/lib/x86_64-linux-gnu -lc -lpthread -rpath=$(APPS_ROOT)/../ocr/build/x86_lib/objs
-#
-# this creates a shared library from static ocr components and native libraries
-# ... this doesn't build...
-#	ld -shared -static -o $(OBJDIR)/libocr.so $(OBJDIR)/static/*.o $(PTHREAD_LIB) $(LIB_GCC) $(LIBC)
-#
-# this creates a re-linkable static library out of ocr components and native libraries
-#	ld -r -static -o $(OBJDIR)/libocr.o $(OBJDIR)/static/*.o $(PTHREAD_LIB) $(LIB_GCC) $(LIBC)
-#
-# this creates a re-linkable static library out of ocr components
-#	ld -r -static -o $(OBJDIR)/libocr.a $(OBJDIR)/static/*.o
-#
-# this creates a shared library out of only the ocr components
-#	ld -shared -static -o $(OBJDIR)/libocr.so $(OBJDIR)/static/*.o
-#
-	ld -static -o $(OBJDIR)/libocr.a $(OBJDIR)/static/*.o $(GLIBC_A)
+	ld -r -static -o $(OBJDIR)/libocr.o $(OBJDIR)/static/*.o
 	ld -shared -o $(OBJDIR)/libocr.so $(OBJDIR)/shared/*.o
-#	ld -shared -static -o $(OBJDIR)/libocr.so $(OBJDIR)/static/*.o -lc -lpthread --unresolved-symbols=ignore-all -zmuldefs
-#	nm -u $(OBJDIR)/myocr.o | grep -E "^.*U " | sed 's/^.*U //' > syms
-#	nm $(OBJDIR)/myocr.o | grep " T " | grep "ocr" | sed 's/^.*T //' >> syms
-#	ld -nostartfiles -nostdlib -nodefaultlibs -static -o $(OBJDIR)/ocr.o -r -s --start-group $(OBJDIR)/static/*.o $(LIBC) $(PTHREAD_LIB) --end-group -zmuldefs
-#	objcopy -S --keep-symbols=syms $(OBJDIR)/myocr.o
 
 .PHONY: debug
 debug: debug-static debug-shared
