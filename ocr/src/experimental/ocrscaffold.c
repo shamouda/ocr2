@@ -128,6 +128,7 @@ struct _reent *_impure_ptr = &ocrreent;
 //{
 //}
 
+#if 0
 inline long int syscall (long int __sysno, ...)
 {
     unsigned long retval;
@@ -141,6 +142,7 @@ inline long int syscall (long int __sysno, ...)
                   "syscall" : "=a"(retval) );
     return retval;
 }
+#endif
 
 
 static inline int isNull( ocrGuid_t g ) { return g == NULL_GUID; }
@@ -158,6 +160,9 @@ static inline int isNull( ocrGuid_t g ) { return g == NULL_GUID; }
 #define DEF_SYSCALL( rtype, name, decl, ... ) \
     static inline rtype sys_##name decl { \
         unsigned long retval = syscall( SYS_##name, ##__VA_ARGS__ ); \
+        if( retval >= 0xfffffffffffff001 ) { \
+            retval = ~0L; \
+        } \
         return (rtype) retval; \
     }
 //
