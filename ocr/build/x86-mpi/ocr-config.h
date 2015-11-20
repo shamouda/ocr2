@@ -104,6 +104,9 @@
 // Affinity support
 #define ENABLE_EXTENSION_AFFINITY
 
+// Runtime extension support
+#define ENABLE_EXTENSION_RTITF
+
 //GUID Labeling
 #define ENABLE_EXTENSION_LABELING
 
