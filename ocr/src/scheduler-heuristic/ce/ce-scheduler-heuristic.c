@@ -275,8 +275,9 @@ static u8 ceSchedulerHeuristicWorkEdtUserInvoke(ocrSchedulerHeuristic_t *self, o
         // If the receiver is an XE, put it to sleep
         u64 agentId = AGENT_FROM_ID(context->location);
         if ((agentId >= ID_AGENT_XE0) && (agentId <= ID_AGENT_XE7)) {
-            DPRINTF(DEBUG_LVL_INFO, "XE %lx put to sleep\n", context->location);
-            hal_sleep(agentId);
+            //FIXME: enable this with #861
+            //DPRINTF(DEBUG_LVL_INFO, "XE %lx put to sleep\n", context->location);
+            //hal_sleep(agentId);
             derived->pendingXeCount++;
         }
         ceContext->inWorkRequestPending = true;
@@ -511,8 +512,9 @@ static u8 respondWorkRequest(ocrSchedulerHeuristic_t *self, ocrSchedulerHeuristi
     // If the receiver is an XE, wake it up
     u64 agentId = AGENT_FROM_ID(context->location);
     if ((agentId >= ID_AGENT_XE0) && (agentId <= ID_AGENT_XE7)) {
-        hal_wake(agentId);
-        DPRINTF(DEBUG_LVL_INFO, "XE %lx woken up\n", context->location);
+        //FIXME: enable this with #861
+        //hal_wake(agentId);
+        //DPRINTF(DEBUG_LVL_INFO, "XE %lx woken up\n", context->location);
         derived->pendingXeCount--;
     } else {
         ceMessage = true;

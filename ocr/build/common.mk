@@ -136,10 +136,10 @@ else
 endif
 
 # Define level
-# CFLAGS += -DOCR_DEBUG_LVL=DEBUG_LVL_WARN
+CFLAGS += -DOCR_DEBUG_LVL=DEBUG_LVL_WARN
 # CFLAGS += -DOCR_DEBUG_LVL=DEBUG_LVL_INFO
 # CFLAGS += -DOCR_DEBUG_LVL=DEBUG_LVL_VERB
-CFLAGS += -DOCR_DEBUG_LVL=DEBUG_LVL_VVERB
+# CFLAGS += -DOCR_DEBUG_LVL=DEBUG_LVL_VVERB
 
 # Define which modules you want for debugging
 # You can optionally define an individual debuging level by
