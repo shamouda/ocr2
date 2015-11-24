@@ -247,14 +247,11 @@ struct bmapOp {
 // known value is placed at the end of heap as a guard
 #define KNOWN_VALUE_AS_GUARD    0xfeed0000deadbeef
 
-#define PER_AGENT_CACHE
-
-#ifdef ENABLE_ALLOCATOR_QUICK_STANDALONE
-// standalone mode
-#define PER_AGENT_KEYWORD      __thread
-#define CACHE_POOL(ID)          (&_cache_pool)
-#define _CACHE_POOL(ID)         (_cache_pool)
-#elif defined(HAL_FSIM_CE) || defined(HAL_FSIM_XE)
+#if defined(HAL_FSIM_CE) || defined(HAL_FSIM_XE)
+// See bug #875
+//TODO: Re-enable the below after moving the globals into allocator structs
+//Disabled for 4.1.0
+//#define PER_THREAD_CACHE
 // TG
 #define PER_AGENT_KEYWORD
 #define CACHE_POOL(ID)          (&_cache_pool)
@@ -860,7 +857,10 @@ static void quickInit(poolHdr_t *pool, u64 size)
     // pool->lock and pool->init_count is already 0 at startup (on x86, it's done at mallocBegin())
     hal_lock32(&(pool->lock));
     if (!(pool->init_count)) {
+#if 0 // TODO: 4.1.0 - this test severely slows down FSim without any obvious benefit
+        // See bug #875
         quickTest((u64)pool, size);
+#endif
         // reserve 8 bytes for a guard
         size -= sizeof(u64);
 
@@ -1724,12 +1724,13 @@ u8 quickSwitchRunlevel(ocrAllocator_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_
                 "QUICK Allocator @ 0x%llx/0x%llx got pool at address 0x%llx of size 0x%llx(%lld), offset from storage addr by %lld\n",
                 (u64) rself, (u64) self,
                 (u64) (rself->poolAddr), (u64) (rself->poolSize), (u64)(rself->poolSize), (u64) (rself->poolStorageOffset));
-
+#if 0 // TODO: 4.1.0 - check if this is really needed
+            // See bug #875
             // at this moment, this is for only x86
             ASSERT(self->memories[0]->memories[0]->startAddr /* startAddr of the memory that memplatform allocated. (for x86, at mallocBegin()) */
                       + MEM_PLATFORM_ZEROED_AREA_SIZE >= /* Add the size of zero-ed area (for x86, at mallocBegin()), then this should be greater than */
                      rself->poolAddr + sizeof(poolHdr_t) /* the end of poolHdr_t, so this ensures zero'ed rangeTracker,pad,poolHdr_t */ );
-
+#endif
             quickInit((poolHdr_t *)addrGlobalizeOnTG((void *)rself->poolAddr, PD), rself->poolSize);
         } else if((properties & RL_TEAR_DOWN) && RL_IS_LAST_PHASE_DOWN(PD, RL_MEMORY_OK, phase)) {
             ocrAllocatorQuick_t * rself = (ocrAllocatorQuick_t *) self;
