@@ -33,9 +33,6 @@
 // For TG specific location functions
 #ifdef TG_X86_TARGET
 #include "xstg-map.h"
-#endif
-
-#if 0 // TODO:4.1.0 - check if the below is needed and remove if not
 #include "tg-bin-files.h"
 #endif
 
@@ -599,34 +596,37 @@ void bringUpRuntime(ocrConfig_t *ocrConfig) {
     // In TG-x86, we are going to create an array to contain all the policy domains so that we
     // can deguidify things that are "owned" by other PDs.
     // WARNING: This code assumes that if you have more than 1 block, you have MAX_NUM_XE and MAX_NUM_CE
-    // and that if you have more than one unit, each unit has MAX_NUM_BLOCK. This is similar to the restriction
+    // and that if you have more than one cluster, each cluster has MAX_NUM_BLOCK. This is similar to the restriction
     // made by the neighbor discovery but adds the restriction on the number of XE/CE
 
     // Since we already have all_instances, we can just reuse that but we will re-order things
-    // so that it is indiceable using unit*MAX_NUM_BLOCK + block*(MAX_NUM_XE+MAX_NUM_CE) + agent
+    // so that it is indiceable using cluster*MAX_NUM_BLOCK + block*(MAX_NUM_XE+MAX_NUM_CE) + agent
     for(i=0; i < inst_counts[policydomain_type]; ++i) {
         // We figure out myLocation based on its current value which is just an index (based on xeCount = 8)
         // Assumptions:
         //    - same number of XEs per block
         //    - if multiple units, all have MAX_NUM_BLOCK blocks in them
-        // 0-7: XEs of block 0
-        // 8: CE of block 0
-        // 9-16: XEs of block 1
-        // 17: CE of block 1
-        // 17-25: XEs of block 2
-        // 26: CE of block 2
+        // 0: CE of block 0
+        // 1-8: XEs of block 0
+        // 9: CE of block 1
+        // 10-17: XEs of block 1
+        // 18: CE of block 2
+        // 19-26: XEs of block 2
         // ...
+        // This scheme assumes that ID_AGENT_CE is 0 and that the XEs follow
+        COMPILE_ASSERT(0 == ID_AGENT_CE);
+        COMPILE_ASSERT(MAX_NUM_CE == ID_AGENT_XE0);
         ocrPolicyDomain_t *policy = (ocrPolicyDomain_t*)(all_instances[policydomain_type][i]);
-        u32 myUnit = (policy->myLocation) / ((MAX_NUM_XE + MAX_NUM_CE)*MAX_NUM_BLOCK);
-        u32 myBlock = (policy->myLocation - myUnit*((MAX_NUM_XE + MAX_NUM_CE)*MAX_NUM_BLOCK)) / (MAX_NUM_XE + MAX_NUM_CE);
-        policy->myLocation = MAKE_CORE_ID(0, 0, 0, myUnit, myBlock, (policy->myLocation - myUnit*MAX_NUM_BLOCK - myBlock*(MAX_NUM_XE+MAX_NUM_CE)));
+        u32 myCluster = (policy->myLocation) / ((MAX_NUM_XE + MAX_NUM_CE)*MAX_NUM_BLOCK);
+        u32 myBlock = (policy->myLocation - myCluster*((MAX_NUM_XE + MAX_NUM_CE)*MAX_NUM_BLOCK)) / (MAX_NUM_XE + MAX_NUM_CE);
+        policy->myLocation = MAKE_CORE_ID(0, 0, 0, myCluster, myBlock, (policy->myLocation - myCluster*MAX_NUM_BLOCK - myBlock*(MAX_NUM_XE+MAX_NUM_CE)));
     }
 
     ocrPolicyDomain_t* tpd = (ocrPolicyDomain_t*)(all_instances[policydomain_type][0]);
     ASSERT(inst_counts[policydomain_type] > 0);
     i = 0;
     while(true) {
-        u32 tpdIdx = UNIT_FROM_ID(tpd->myLocation)*MAX_NUM_BLOCK +
+        u32 tpdIdx = CLUSTER_FROM_ID(tpd->myLocation)*MAX_NUM_BLOCK +
             BLOCK_FROM_ID(tpd->myLocation)*(MAX_NUM_XE+MAX_NUM_CE) +
             AGENT_FROM_ID(tpd->myLocation);
         if(tpdIdx != i) {
@@ -692,7 +692,7 @@ void bringUpRuntime(ocrConfig_t *ocrConfig) {
     ocrPolicyDomain_t *rootPolicy;
     u32 rootPolicyID = 0;
 #ifdef TG_X86_TARGET
-    rootPolicyID = 8;
+    rootPolicyID = ID_AGENT_CE;
 #endif
     rootPolicy = (ocrPolicyDomain_t *)all_instances[policydomain_type][rootPolicyID]; // This is Unit 0, Block 0 CE
     ocrPolicyDomain_t *otherPolicyDomains = NULL;
@@ -777,7 +777,7 @@ void freeUpRuntime (bool doTeardown, u8 *returnCode) {
     ocrPolicyDomain_t *otherPolicyDomains = NULL;
     u32 rootPolicyID = 0;
 #ifdef TG_X86_TARGET
-    rootPolicyID = 8;
+    rootPolicyID = ID_AGENT_CE;
 #endif
     if(doTeardown) {
         // When we need to do the tear-down, we need to continue from RL_GUID_OK all the way down to CONFIG_PARSE

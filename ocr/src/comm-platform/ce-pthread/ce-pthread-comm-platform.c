@@ -117,7 +117,7 @@ u8 cePthreadCommSwitchRunlevel(ocrCommPlatform_t *self, ocrPolicyDomain_t *PD, o
                         (ocrCommPlatformXePthread_t*)(neighborPD->commApis[0]->commPlatform);
                     rself->outQueues[i].neighborLocation = neighborPD->myLocation;
                     rself->outQueues[i].outQueue = &(neighbor->inQueue);
-                    DPRINTF(DEBUG_LVL_VERB, "Location 0x%x: Outqueue for XE 0x%x is @ 0x%lx\n",
+                    DPRINTF(DEBUG_LVL_VERB, "Location 0x%lx: Outqueue for XE 0x%lx is @ 0x%lx\n",
                             PD->myLocation, neighborPD->myLocation, &(neighbor->inQueue));
                 }
                 for(i=xeCount; i<PD->neighborCount + xeCount; ++i) {
@@ -126,7 +126,7 @@ u8 cePthreadCommSwitchRunlevel(ocrCommPlatform_t *self, ocrPolicyDomain_t *PD, o
                         (ocrCommPlatformCePthread_t *)(neighborPD->commApis[0]->commPlatform);
                     rself->outQueues[i].neighborLocation = neighborPD->myLocation;
                     rself->outQueues[i].outQueue = &(neighbor->inQueueCE);
-                    DPRINTF(DEBUG_LVL_VERB, "Location 0x%lx: Outqueue for CE 0x%x is @ 0x%lx\n",
+                    DPRINTF(DEBUG_LVL_VERB, "Location 0x%lx: Outqueue for CE 0x%lx is @ 0x%lx\n",
                             PD->myLocation, neighborPD->myLocation, &(neighbor->inQueueCE));
                 }
             }
@@ -173,12 +173,12 @@ u8 cePthreadCommSendMessage(ocrCommPlatform_t *self, ocrLocation_t target, ocrPo
     }
     // We don't know how to send to this neighbor
     if(queue == NULL) {
-        DPRINTF(DEBUG_LVL_WARN, "Cannot send to 0x%x: no queue to destination\n", target);
+        DPRINTF(DEBUG_LVL_WARN, "Cannot send to 0x%lx: no queue to destination\n", target);
         ASSERT(0);
         return OCR_EINTR;
     }
-    DPRINTF(DEBUG_LVL_VERB, "Sending msg 0x%lx to 0x%x; using out queue @ 0x%lx\n",
-            msg, target, queue);
+    DPRINTF(DEBUG_LVL_VERB, "Sending msg 0x%lx (type: 0x%x) to 0x%lx; using out queue @ 0x%lx\n",
+            msg, msg->type, target, queue);
 
     if((msg->type & (PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE)) == (PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE)) {
         // If this is a request that requires a response, we
@@ -233,7 +233,7 @@ u8 cePthreadCommSendMessage(ocrCommPlatform_t *self, ocrLocation_t target, ocrPo
         status = comQueueReserveSlot(queue, &outSlot);
     }
     if(status == 0) {
-        DPRINTF(DEBUG_LVL_VVERB, "Grabbed slot %u on queue @ 0x%lx to send to 0x%x\n",
+        DPRINTF(DEBUG_LVL_VVERB, "Grabbed slot %u on queue @ 0x%lx to send to 0x%lx\n",
                 outSlot, queue, target);
         queue->slots[outSlot].properties = 0;
         // If this is a two-way message and a response is therefore required, we are
@@ -299,13 +299,13 @@ static u8 internalPoll(ocrCommPlatformCePthread_t *rself, ocrPolicyMsg_t **msg, 
         if(toPollQueue->slots[slot].msgPtr == NULL) {
             // We have to use the buffer
             curMsg = &(toPollQueue->slots[slot].msgBuffer);
-            DPRINTF(DEBUG_LVL_VERB, "Found a message (in buffer) @ 0x%lx\n",
-                    curMsg);
+            DPRINTF(DEBUG_LVL_VERB, "Found a message (in buffer) @ 0x%lx (type: 0x%x)\n",
+                    curMsg, curMsg->type);
             fixupPtrs = 1; // We need to unmarshall everytime
         } else {
             curMsg = toPollQueue->slots[slot].msgPtr;
-            DPRINTF(DEBUG_LVL_VERB, "Found a message as ptr @ 0x%lx\n",
-                    curMsg);
+            DPRINTF(DEBUG_LVL_VERB, "Found a message as ptr @ 0x%lx (type: 0x%x)\n",
+                    curMsg, curMsg->type);
         }
         ocrPolicyMsgGetMsgSize(curMsg, &baseSize, &marshalledSize, 0);
         if(*msg && (*msg)->bufferSize >= baseSize + marshalledSize) {
@@ -345,7 +345,7 @@ static u8 internalPoll(ocrCommPlatformCePthread_t *rself, ocrPolicyMsg_t **msg, 
             toPollQueue->slots[slot].properties |= COMQUEUE_EMPTY_PENDING;
         }
         // We do not check if there are more messages (for now)
-        DPRINTF(DEBUG_LVL_VERB, "Returning message 0x%lx from 0x%x\n", *msg, (*msg)->srcLocation);
+        DPRINTF(DEBUG_LVL_VERB, "Returning message 0x%lx from 0x%lx\n", *msg, (*msg)->srcLocation);
         return 0;
     } else if(status == OCR_ENOMEM) {
         return OCR_EINTR<<4; // This is not great because we can't encode full error codes

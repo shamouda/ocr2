@@ -78,7 +78,7 @@ u8 xePthreadCommSwitchRunlevel(ocrCommPlatform_t *self, ocrPolicyDomain_t *PD, o
                 (ocrCommPlatformCePthread_t *) cePD->commApis[0]->commPlatform;
             rself->outQueue.neighborLocation = cePD->myLocation;
             rself->outQueue.outQueue = &(parent->inQueueXE);
-            DPRINTF(DEBUG_LVL_VERB, "Outqueue for CE 0x%x is @ 0x%lx\n",
+            DPRINTF(DEBUG_LVL_VERB, "Outqueue for CE 0x%lx is @ 0x%lx\n",
                     cePD->myLocation, &(parent->inQueueXE));
         }
         break;
@@ -113,7 +113,7 @@ u8 xePthreadCommSendMessage(ocrCommPlatform_t *self, ocrLocation_t target, ocrPo
     ocrCommPlatformXePthread_t *rself = (ocrCommPlatformXePthread_t*)self;
 
     if(target != rself->outQueue.neighborLocation) {
-        DPRINTF(DEBUG_LVL_WARN, "Destination for message @ 0x%lx to 0x%x not found\n",
+        DPRINTF(DEBUG_LVL_WARN, "Destination for message @ 0x%lx to 0x%lx not found\n",
                 msg, target);
         ASSERT(0);
     }
@@ -123,8 +123,8 @@ u8 xePthreadCommSendMessage(ocrCommPlatform_t *self, ocrLocation_t target, ocrPo
     comQueue_t *queue = rself->outQueue.outQueue;
     comQueue_t *returnQueue = NULL;
 
-    DPRINTF(DEBUG_LVL_VERB, "Sending msg 0x%lx to 0x%x; using out queue @ 0x%lx\n",
-            msg, target, queue);
+    DPRINTF(DEBUG_LVL_VERB, "Sending msg 0x%lx (type: 0x%x) to 0x%lx; using out queue @ 0x%lx\n",
+            msg, msg->type, target, queue);
 
     if((msg->type & (PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE)) == (PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE)) {
         // If this is a request that requires a response, we
@@ -171,7 +171,7 @@ u8 xePthreadCommSendMessage(ocrCommPlatform_t *self, ocrLocation_t target, ocrPo
         status = comQueueReserveSlot(queue, &outSlot);
     }
     if(status == 0) {
-        DPRINTF(DEBUG_LVL_VVERB, "Grabbed slot %u on queue @ 0x%lx to send to 0x%x\n",
+        DPRINTF(DEBUG_LVL_VVERB, "Grabbed slot %u on queue @ 0x%lx to send to 0x%lx\n",
                 outSlot, queue, target);
         queue->slots[outSlot].properties = 0;
         // Check the properties flag to figure out if we need to copy the message
@@ -234,13 +234,13 @@ u8 xePthreadCommPollMessage(ocrCommPlatform_t *self, ocrPolicyMsg_t **msg,
         if(rself->inQueue.slots[slot].msgPtr == NULL) {
             // We have to use the buffer
             curMsg = &(rself->inQueue.slots[slot].msgBuffer);
-            DPRINTF(DEBUG_LVL_VERB, "Found a message (in buffer) @ 0x%lx\n",
-                    curMsg);
+            DPRINTF(DEBUG_LVL_VERB, "Found a message (in buffer) @ 0x%lx (type: 0x%x)\n",
+                    curMsg, curMsg->type);
             fixupPtrs = 1;
         } else {
             curMsg = rself->inQueue.slots[slot].msgPtr;
-            DPRINTF(DEBUG_LVL_VERB, "Found a message as ptr @ 0x%lx\n",
-                    curMsg);
+            DPRINTF(DEBUG_LVL_VERB, "Found a message as ptr @ 0x%lx (type: 0x%x)\n",
+                    curMsg, curMsg->type);
         }
         ocrPolicyMsgGetMsgSize(curMsg, &baseSize, &marshalledSize, 0);
         if(*msg && (*msg)->bufferSize >= baseSize + marshalledSize) {

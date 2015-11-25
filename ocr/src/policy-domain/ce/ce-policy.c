@@ -384,7 +384,7 @@ static void performNeighborDiscovery(ocrPolicyDomain_t *policy) {
 }
 
 static void findNeighborsPd(ocrPolicyDomain_t *policy) {
-#ifndef HAL_FSIM_CE
+#ifdef TG_X86_TARGET
     u32 myCluster = CLUSTER_FROM_ID(policy->myLocation);
     u32 myBlock = BLOCK_FROM_ID(policy->myLocation);
 
@@ -408,7 +408,7 @@ static void findNeighborsPd(ocrPolicyDomain_t *policy) {
     // and the CEs we are supposed to communicate with)
     for(i=0; i < rself->xeCount; ++i) {
         ocrLocation_t curNeighbor = MAKE_CORE_ID(0, 0, 0, myCluster, myBlock, (ID_AGENT_XE0 + i));
-        policy->neighborPDs[i] = neighborsAll[myCluster*MAX_NUM_BLOCK + myBlock*(MAX_NUM_XE + MAX_NUM_CE) + i];
+        policy->neighborPDs[i] = neighborsAll[myCluster*MAX_NUM_BLOCK + myBlock*(MAX_NUM_XE + MAX_NUM_CE) + i + MAX_NUM_CE];
         ASSERT(curNeighbor == policy->neighborPDs[i]->myLocation);
         DPRINTF(DEBUG_LVL_VERB, "PD 0x%lx (loc: 0x%lx) found XE neighbor %u at 0x%lx (loc: 0x%lx)\n",
                 policy, policy->myLocation, i, policy->neighborPDs[i],
@@ -416,6 +416,7 @@ static void findNeighborsPd(ocrPolicyDomain_t *policy) {
     }
     for(i = rself->xeCount; i < policy->neighborCount + rself->xeCount; ++i) {
         ocrLocation_t curNeighbor = policy->neighbors[i - rself->xeCount];
+        ASSERT(AGENT_FROM_ID(curNeighbor) == ID_AGENT_CE); // It should be a CE here
         policy->neighborPDs[i] = neighborsAll[CLUSTER_FROM_ID(curNeighbor)*MAX_NUM_BLOCK +
                                               BLOCK_FROM_ID(curNeighbor)*(MAX_NUM_XE + MAX_NUM_CE) +
                                               AGENT_FROM_ID(curNeighbor)];
@@ -551,7 +552,7 @@ u8 cePdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
         }
         if(toReturn && (properties & RL_TEAR_DOWN)) {
             // Free up the neighborPDs structure
-#ifndef HAL_FSIM_CE
+#ifdef TG_X86_TARGET
             runtimeChunkFree((u64)(policy->neighborPDs), PERSISTENT_CHUNK);
 #endif
             runtimeChunkFree((u64)(policy->neighbors), PERSISTENT_CHUNK);
@@ -1771,7 +1772,7 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
                     // Go and ask the other CE's provider
                     DPRINTF(DEBUG_LVL_VVERB, "Cannot create labeled GUID for 0x%lx, asking 0x%lx\n",
                         PD_MSG_FIELD_IO(guid.guid), guidLocation);
-#ifndef HAL_FSIM_CE
+#ifdef TG_X86_TARGET
                     ocrPolicyDomain_t *otherPd = rself->allPDs[CLUSTER_FROM_ID(guidLocation)*MAX_NUM_BLOCK +
                                                                BLOCK_FROM_ID(guidLocation)*(MAX_NUM_XE+MAX_NUM_CE) +
                                                                AGENT_FROM_ID(guidLocation)];
@@ -1839,7 +1840,7 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             // Go and ask the other CE's provider
             DPRINTF(DEBUG_LVL_VVERB, "Cannot resolve GUID_INFO, asking 0x%lx\n",
                     guidLocation);
-#ifndef HAL_FSIM_CE
+#ifdef TG_X86_TARGET
             ocrPolicyDomain_t *otherPd = rself->allPDs[CLUSTER_FROM_ID(guidLocation)*MAX_NUM_BLOCK +
                                                        BLOCK_FROM_ID(guidLocation)*(MAX_NUM_XE+MAX_NUM_CE) +
                                                        AGENT_FROM_ID(guidLocation)];
@@ -1950,7 +1951,7 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             } else {
                 DPRINTF(DEBUG_LVL_VVERB, "Cannot process local GUID_DESTROY, asking 0x%lx\n",
                         guidLocation);
-#ifndef HAL_FSIM_CE
+#ifdef TG_X86_TARGET
                 ocrPolicyDomain_t *otherPd = rself->allPDs[CLUSTER_FROM_ID(guidLocation)*MAX_NUM_BLOCK +
                                                            BLOCK_FROM_ID(guidLocation)*(MAX_NUM_XE+MAX_NUM_CE) +
                                                            AGENT_FROM_ID(guidLocation)];

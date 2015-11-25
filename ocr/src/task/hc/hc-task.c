@@ -1227,7 +1227,9 @@ u8 taskExecute(ocrTask_t* base) {
     #define PD_TYPE PD_MSG_DEP_ADD
             msg.type = PD_MSG_DEP_ADD | PD_MSG_REQUEST;
             PD_MSG_FIELD_I(source.guid) = retGuid;
+            PD_MSG_FIELD_I(source.metaDataPtr) = NULL;
             PD_MSG_FIELD_I(dest.guid) = base->outputEvent;
+            PD_MSG_FIELD_I(dest.metaDataPtr) = NULL;
             PD_MSG_FIELD_I(currentEdt.guid) = base->guid;
             PD_MSG_FIELD_I(currentEdt.metaDataPtr) = base;
             PD_MSG_FIELD_I(slot) = 0; // Always satisfy on slot 0. This will trickle to
