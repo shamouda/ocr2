@@ -88,7 +88,7 @@ static void performNeighborDiscovery(ocrPolicyDomain_t *policy) {
 }
 
 static void findNeighborsPd(ocrPolicyDomain_t *policy) {
-#ifndef HAL_FSIM_XE
+#ifdef TG_X86_TARGET
     // Fill out the parentPD information which is needed
     // by the communication layer on TG-x86. See comment in ce-policy.c
     // for how this works
