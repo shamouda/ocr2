@@ -150,7 +150,7 @@
 #define hal_xadd64(atomic, addValue)                                    \
     ({                                                                  \
         u64 __tmp;                                                      \
-        __asm__ __volatile__("xaddI %0, %1, %2, 64, 1\n\t"              \
+        __asm__ __volatile__("xaddI %0, %1, %2, 64, R\n\t"              \
                              : "=r" (__tmp)                             \
                              : "r" (atomic),                            \
                                "r" (addValue));                         \
@@ -169,7 +169,7 @@
  * @param addValue  u64: Value to add to location
  */
 #define hal_radd64(atomic, addValue)                                    \
-    __asm__ __volatile__("xaddI %1, %0, %1, 64, 0\n\t"                  \
+    __asm__ __volatile__("xaddI %1, %0, %1, 64, N\n\t"                  \
                          : "r" (atomic),                                \
                            "r" (addValue));
 
@@ -230,7 +230,7 @@
 #define hal_xadd32(atomic, addValue)                                    \
     ({                                                                  \
         u64 __tmp;                                                      \
-        __asm__ __volatile__("xaddI %0, %1, %2, 32, 1\n\t"              \
+        __asm__ __volatile__("xaddI %0, %1, %2, 32, R\n\t"              \
                              : "=r" (__tmp)                             \
                              : "r" (atomic),                            \
                                "r" (addValue));                         \
@@ -249,7 +249,7 @@
  * @param addValue  u32: Value to add to location
  */
 #define hal_radd32(atomic, addValue)                                    \
-    __asm__ __volatile__("xaddI %1, %0, %1, 32, 0\n\t"                  \
+    __asm__ __volatile__("xaddI %1, %0, %1, 32, N\n\t"                  \
                          : "r" (atomic),                                \
                            "r" (addValue));
 
