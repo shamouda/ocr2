@@ -53,9 +53,9 @@ jobtype_ocr_build_tg = {
     'keywords': ('ocr', 'percommit'),
     'timeout': 180,
     'sandbox': ('local', 'shared', 'shareOK'),
-    'req-repos': ('xstack', 'intel'),
+    'req-repos': ('xstack', 'tg'),
     'env-vars': {'TG_INSTALL': '${JJOB_ENVDIR}',
-                 'TG_ROOT': '${JJOB_PRIVATE_HOME}/intel/ss',
+                 'TG_ROOT': '${JJOB_PRIVATE_HOME}/tg/tg',
                  'OCR_ROOT': '${JJOB_PRIVATE_HOME}/xstack/ocr',
                  'OCR_BUILD_ROOT': '${JJOB_PRIVATE_HOME}/xstack/ocr/build',
                  'OCR_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/install'}
@@ -77,10 +77,10 @@ job_ocr_init = {
 
 job_ocr_init_tg = {
     'name': 'ocr-init-job-tg',
-    'depends': ('ss-build-check-env',),
+    'depends': ('tg-build-check-env',),
     'jobtype': 'ocr-init',
     'run-args': 'tg',
-    'req-repos': ('intel',)
+    'req-repos': ('tg',)
 }
 
 job_ocr_build_x86_pthread_x86 = {

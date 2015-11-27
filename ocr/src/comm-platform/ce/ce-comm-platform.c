@@ -96,7 +96,7 @@ static void releaseXE(u32 i) {
 
         state = *((volatile u64*)(BR_MSR_BASE((i+ID_AGENT_XE0)) + (POWER_GATE_RESET * sizeof(u64))));
         if(++loopCount > 100) {
-            DPRINTF(DEBUG_LVL_WARN, "Stuck on unclockgating %u (%d times), ignoring\n", i, stuckCount++);
+            DPRINTF(DEBUG_LVL_INFO, "Stuck on unclockgating %u (%d times), ignoring\n", i, stuckCount++);
             return;
         }
     } while(!(state & 0x1ULL));

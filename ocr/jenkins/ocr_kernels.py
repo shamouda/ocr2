@@ -9,7 +9,7 @@ jobtype_ocr_build_kernel = {
     'run-cmd': '${JJOB_SHARED_HOME}/xstack/ocr/jenkins/scripts/kernel-build.sh',
     'param-cmd': '${JJOB_SHARED_HOME}/xstack/jenkins/scripts/empty-cmd.sh',
     'keywords': ('ocr', 'percommit'),
-    'timeout': 300,
+    'timeout': 350,
     'sandbox': ('local', 'shared', 'shareOK'),
     'req-repos': ('xstack',),
     'env-vars': { 'APPS_ROOT': '${JJOB_INITDIR_XSTACK}/apps',
@@ -24,11 +24,11 @@ jobtype_ocr_build_kernel_tg = {
     'run-cmd': '${JJOB_SHARED_HOME}/xstack/ocr/jenkins/scripts/kernel-build.sh',
     'param-cmd': '${JJOB_SHARED_HOME}/xstack/jenkins/scripts/empty-cmd.sh',
     'keywords': ('ocr', 'percommit'),
-    'timeout': 300,
+    'timeout': 350,
     'sandbox': ('local', 'shared', 'shareOK'),
-    'req-repos': ('xstack', 'intel'),
+    'req-repos': ('xstack', 'tg'),
     'env-vars': { 'TG_INSTALL': '${JJOB_ENVDIR}',
-                  'TG_ROOT': '${JJOB_INITDIR_INTEL}/ss',
+                  'TG_ROOT': '${JJOB_INITDIR_TG}/tg',
                   'APPS_ROOT': '${JJOB_INITDIR_XSTACK}/apps',
                   'OCR_ROOT': '${JJOB_PRIVATE_HOME}/xstack/ocr',
                   'OCR_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/install',
@@ -41,7 +41,7 @@ jobtype_ocr_run_kernel_local = {
     'run-cmd': '${JJOB_SHARED_HOME}/xstack/ocr/jenkins/scripts/kernel-run-local.sh',
     'param-cmd': '${JJOB_SHARED_HOME}/xstack/jenkins/scripts/empty-cmd.sh',
     'keywords': ('ocr', 'percommit'),
-    'timeout': 300,
+    'timeout': 350,
     'sandbox': ('shared', 'shareOK'),
     'req-repos': ('xstack',),
     'env-vars': { 'APPS_ROOT': '${JJOB_SHARED_HOME}/xstack/apps', # Use this for the makefiles
@@ -54,12 +54,12 @@ jobtype_ocr_run_kernel_remote_tg = {
     'name': 'ocr-run-kernel-remote-tg',
     'isLocal': False,
     'run-cmd': '${JJOB_SHARED_HOME}/xstack/ocr/jenkins/scripts/kernel-run-remote.sh',
-    'param-cmd': '${JJOB_SHARED_HOME}/intel/ss/jenkins/scripts/fsim-param-cmd.sh',
-    'epilogue-cmd': '${JJOB_ENVDIR}/bin/fsim-scripts/fsim-epilogue.sh',
+    'param-cmd': '${JJOB_SHARED_HOME}/tg/tg/jenkins/scripts/fsim-param-cmd.sh',
+    'epilogue-cmd': '${JJOB_ENVDIR}/bin/scripts/fsim-epilogue.sh',
     'keywords': ('ocr', 'percommit'),
-    'timeout': 300,
+    'timeout': 350,
     'sandbox': ('shared', 'shareOK'),
-    'req-repos': ('xstack', 'intel'),
+    'req-repos': ('xstack', 'tg'),
     'env-vars': { 'TG_INSTALL': '${JJOB_ENVDIR}',
                   'APPS_ROOT': '${JJOB_SHARED_HOME}/xstack/apps', # Use this for the makefiles
                   'OCR_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/install'}
@@ -71,7 +71,7 @@ jobtype_ocr_verify_kernel_local = {
     'run-cmd': '${JJOB_SHARED_HOME}/xstack/ocr/jenkins/scripts/ocr-verify-local.sh',
     'param-cmd': '${JJOB_SHARED_HOME}/xstack/jenkins/scripts/empty-cmd.sh',
     'keywords': ('ocr', 'percommit'),
-    'timeout': 300,
+    'timeout': 350,
     'sandbox': ('shared', 'shareOK'),
     'req-repos': ('xstack',)
 }
@@ -82,7 +82,7 @@ jobtype_ocr_verify_kernel_remote = {
     'run-cmd': '${JJOB_SHARED_HOME}/xstack/ocr/jenkins/scripts/fsim-verify.sh',
     'param-cmd': '${JJOB_SHARED_HOME}/xstack/jenkins/scripts/empty-cmd.sh',
     'keywords': ('ocr', 'percommit'),
-    'timeout': 300,
+    'timeout': 350,
     'sandbox': ('shared', 'shareOK'),
     'req-repos': ('xstack',)
 }
@@ -93,7 +93,7 @@ jobtype_ocr_verify_by_diff = {
     'run-cmd': '${JJOB_SHARED_HOME}/xstack/ocr/jenkins/scripts/verify-diff.sh',
     'param-cmd': '${JJOB_SHARED_HOME}/xstack/jenkins/scripts/empty-cmd.sh',
     'keywords': ('ocr', 'percommit'),
-    'timeout': 300,
+    'timeout': 350,
     'sandbox': ('shared', 'shareOK'),
     'req-repos': ('xstack',),
     'env-vars': { 'APPS_ROOT': '${JJOB_INITDIR_XSTACK}/apps' }
