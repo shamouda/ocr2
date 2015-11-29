@@ -51,12 +51,19 @@ u8 ocrDbCreate(ocrGuid_t *db, void** addr, u64 len, u16 flags,
     PD_MSG_FIELD_I(dbType) = USER_DBTYPE;
     PD_MSG_FIELD_I(allocator) = allocator;
     returnCode = policy->fcts.processMessage(policy, &msg, true);
-    if((returnCode == 0) && ((returnCode = PD_MSG_FIELD_O(returnDetail)) == 0)) {
-        *db = PD_MSG_FIELD_IO(guid.guid);
-        *addr = PD_MSG_FIELD_O(ptr);
-    } else {
-        *db = NULL_GUID;
-        *addr = NULL;
+
+    if(returnCode == 0) {
+        returnCode = PD_MSG_FIELD_O(returnDetail);
+        if(returnCode == 0) {
+            *db = PD_MSG_FIELD_IO(guid.guid);
+            *addr = PD_MSG_FIELD_O(ptr);
+        } else {
+            if(returnCode != OCR_EGUIDEXISTS) {
+                *db = NULL_GUID;
+            }
+            // Addr is always NULL unless we were successful in creating it
+            *addr = NULL;
+        }
     }
 #undef PD_MSG
 #undef PD_TYPE
@@ -88,7 +95,9 @@ u8 ocrDbCreate(ocrGuid_t *db, void** addr, u64 len, u16 flags,
                     GUIDFS(*db));
         }
     }
-    DPRINTF(DEBUG_LVL_INFO, "EXIT ocrDbCreate -> %u; GUID: "GUIDSx"; ADDR: 0x%lx size: %lu\n", returnCode, GUIDFS(*db), *addr, len);
+    DPRINTF_COND_LVL(((returnCode != 0) && (returnCode != OCR_EGUIDEXISTS)), DEBUG_LVL_WARN, DEBUG_LVL_INFO,
+                     "EXIT ocrDbCreate -> %u; GUID: "GUIDSx"; ADDR: 0x%lx size: %lu\n",
+                     returnCode, GUIDFS(*db), *addr, len);
     RETURN_PROFILE(returnCode);
 }
 

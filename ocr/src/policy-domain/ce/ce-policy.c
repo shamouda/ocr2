@@ -1056,6 +1056,9 @@ static void* allocateDatablock (ocrPolicyDomain_t *self,
     return NULL;
 }
 
+static u8 ceMemUnalloc(ocrPolicyDomain_t *self, ocrFatGuid_t* allocator,
+                       void* ptr, ocrMemType_t memType);
+
 static u8 ceAllocateDb(ocrPolicyDomain_t *self, ocrFatGuid_t *guid, void** ptr, u64 size,
                        u32 properties, u64 engineIndex,
                        ocrFatGuid_t affinity, ocrInDbAllocator_t allocator,
@@ -1070,7 +1073,6 @@ static u8 ceAllocateDb(ocrPolicyDomain_t *self, ocrFatGuid_t *guid, void** ptr, 
     // which to attempt to allocate the block to a pool.
 
     u64 idx;
-    void* result;
     int preferredLevel = 0;
     // See BUG #928 on GUID issues
     #ifdef GUID_64
@@ -1084,23 +1086,24 @@ static u8 ceAllocateDb(ocrPolicyDomain_t *self, ocrFatGuid_t *guid, void** ptr, 
 #endif
         DPRINTF(DEBUG_LVL_WARN, "ceAllocateDb affinity.guid "GUIDSx"  .metaDataPtr %p\n", GUIDFS(affinity.guid), affinity.metaDataPtr);
         DPRINTF(DEBUG_LVL_WARN, "ceAllocateDb preferred %ld\n", preferredLevel);
-        result = allocateDatablock (self, size, engineIndex, prescription, preferredLevel, &idx);
-        if (!result) {
+        *ptr = allocateDatablock (self, size, engineIndex, prescription, preferredLevel, &idx);
+        if (!*ptr) {
             DPRINTF(DEBUG_LVL_WARN, "ceAllocateDb ignores preferredLevel hint to be successful in alloc%ld\n", preferredLevel);
-            result = allocateDatablock (self, size, engineIndex, prescription, 0, &idx);
+            *ptr = allocateDatablock (self, size, engineIndex, prescription, 0, &idx);
         }
     } else {
-        result = allocateDatablock (self, size, engineIndex, prescription, 0, &idx);
+        *ptr = allocateDatablock (self, size, engineIndex, prescription, 0, &idx);
     }
 
-    if (result) {
-        ocrDataBlock_t *block = self->dbFactories[0]->instantiate(
-            self->dbFactories[0], self->allocators[idx]->fguid, self->fguid,
-            size, result, properties, NULL);
-        *ptr = result;
-        (*guid).guid = block->guid;
-        (*guid).metaDataPtr = block;
-        return 0;
+    if (*ptr) {
+        u8 returnValue = 0;
+        returnValue = self->dbFactories[0]->instantiate(
+            self->dbFactories[0], guid, self->allocators[idx]->fguid, self->fguid,
+            size, *ptr, properties, NULL);
+        if(returnValue != 0) {
+            ceMemUnalloc(self, &(self->allocators[idx]->fguid), *ptr, DB_MEMTYPE);
+        }
+        return returnValue;
     } else {
         DPRINTF(DEBUG_LVL_WARN, "ceAllocateDb returning NULL for size %ld\n", (u64) size);
         return OCR_ENOMEM;
@@ -1336,11 +1339,16 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
                 RESULT_ASSERT(ocrSetHint(db->guid, &hintVar), ==, 0);
             }
 
-            // BUG #584: Check if properties want DB acquired
-            ASSERT(db->fctId == self->dbFactories[0]->factoryId);
-            PD_MSG_FIELD_O(returnDetail) = self->dbFactories[0]->fcts.acquire(
-                db, &(PD_MSG_FIELD_O(ptr)), edtFatGuid, EDT_SLOT_NONE,
-                DB_MODE_RW, !!(PD_MSG_FIELD_IO(properties) & DB_PROP_RT_ACQUIRE), (u32)DB_MODE_RW);
+            if((PD_MSG_FIELD_IO(properties) & GUID_PROP_IS_LABELED) ||
+               (PD_MSG_FIELD_IO(properties) & DB_PROP_NO_ACQUIRE)) {
+                DPRINTF(DEBUG_LVL_INFO, "Not acquiring DB since disabled by property flags");
+                PD_MSG_FIELD_O(ptr) = NULL;
+            } else {
+                ASSERT(db->fctId == self->dbFactories[0]->factoryId);
+                PD_MSG_FIELD_O(returnDetail) = self->dbFactories[0]->fcts.acquire(
+                    db, &(PD_MSG_FIELD_O(ptr)), edtFatGuid, EDT_SLOT_NONE,
+                    DB_MODE_RW, !!(PD_MSG_FIELD_IO(properties) & DB_PROP_RT_ACQUIRE), (u32)DB_MODE_RW);
+            }
         } else {
             // Cannot acquire
             PD_MSG_FIELD_O(ptr) = NULL;

@@ -601,20 +601,20 @@ static u8 xeAllocateDb(ocrPolicyDomain_t *self, ocrFatGuid_t *guid, void** ptr, 
         }
     }
 
-    void* result;
     s8 allocatorIndex = 0;
     u64 allocatorHints = 0;
-    result = self->allocators[allocatorIndex]->fcts.allocate(self->allocators[allocatorIndex], size, allocatorHints);
+    *ptr = self->allocators[allocatorIndex]->fcts.allocate(self->allocators[allocatorIndex], size, allocatorHints);
     // DPRINTF(DEBUG_LVL_WARN, "xeAllocateDb successfully returning %p\n", result);
 
-    if (result) {
-        ocrDataBlock_t *block = self->dbFactories[0]->instantiate(
-            self->dbFactories[0], self->allocators[idx]->fguid, self->fguid,
-            size, result, properties, NULL);
-        *ptr = result;
-        (*guid).guid = block->guid;
-        (*guid).metaDataPtr = block;
-        return 0;
+    if (*ptr) {
+        u8 returnValue = 0;
+        returnValue = self->dbFactories[0]->instantiate(
+            self->dbFactories[0], guid, self->allocators[idx]->fguid, self->fguid,
+            size, *ptr, properties, NULL);
+        if(returnValue != 0) {
+            allocatorFreeFunction(*ptr);
+        }
+        return returnValue;
     } else {
         DPRINTF(DEBUG_LVL_VERB, "xeAllocateDb returning NULL for size %ld\n", (u64) size);
         return OCR_ENOMEM;
@@ -700,9 +700,6 @@ u8 xePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         START_PROFILE(pd_xe_DbCreate);
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_DB_CREATE
-        // BUG #584: Add properties whether DB needs to be acquired or not
-        // This would impact where we do the PD_MSG_MEM_ALLOC for example
-        // For now we deal with both USER and RT dbs the same way
         ASSERT((PD_MSG_FIELD_I(dbType) == USER_DBTYPE) || (PD_MSG_FIELD_I(dbType) == RUNTIME_DBTYPE));
         DPRINTF(DEBUG_LVL_VVERB, "DB_CREATE request from 0x%lx for size %lu\n",
                 msg->srcLocation, PD_MSG_FIELD_IO(size));
@@ -721,11 +718,16 @@ u8 xePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             if(PD_MSG_FIELD_O(returnDetail) == 0) {
                 ocrDataBlock_t *db= PD_MSG_FIELD_IO(guid.metaDataPtr);
                 ASSERT(db);
-                // BUG #584: Check if properties want DB acquired
-                ASSERT(db->fctId == self->dbFactories[0]->factoryId);
-                PD_MSG_FIELD_O(returnDetail) = self->dbFactories[0]->fcts.acquire(
-                    db, &(PD_MSG_FIELD_O(ptr)), edtFatGuid, EDT_SLOT_NONE,
-                    DB_MODE_RW, !!(PD_MSG_FIELD_IO(properties) & DB_PROP_RT_ACQUIRE), (u32)DB_MODE_RW);
+                if((PD_MSG_FIELD_IO(properties) & GUID_PROP_IS_LABELED) ||
+                   (PD_MSG_FIELD_IO(properties) & DB_PROP_NO_ACQUIRE)) {
+                    DPRINTF(DEBUG_LVL_INFO, "Not acquiring DB since disabled by property flags");
+                    PD_MSG_FIELD_O(ptr) = NULL;
+                } else {
+                    ASSERT(db->fctId == self->dbFactories[0]->factoryId);
+                    PD_MSG_FIELD_O(returnDetail) = self->dbFactories[0]->fcts.acquire(
+                        db, &(PD_MSG_FIELD_O(ptr)), edtFatGuid, EDT_SLOT_NONE,
+                        DB_MODE_RW, !!(PD_MSG_FIELD_IO(properties) & DB_PROP_RT_ACQUIRE), (u32)DB_MODE_RW);
+                }
             } else {
                 // Cannot acquire
                 PD_MSG_FIELD_O(ptr) = NULL;
@@ -737,10 +739,13 @@ u8 xePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
 #undef PD_TYPE
             EXIT_PROFILE;
             break;
+        } else if(ret == OCR_EGUIDEXISTS) {
+            // No point falling out to the CE if the GUID exists; it will only tell us the same thing
+            EXIT_PROFILE;
+            break;
         }
-        EXIT_PROFILE;
         // fallbacks to CE
-        //DPRINTF(DEBUG_LVL_WARN, "xeAllocateDb failed, fallback to CE\n");
+        EXIT_PROFILE;
     }
 
 

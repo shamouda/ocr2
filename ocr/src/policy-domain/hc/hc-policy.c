@@ -704,6 +704,9 @@ static void* allocateDatablock (ocrPolicyDomain_t *self,
     return NULL;
 }
 
+static u8 hcMemUnAlloc(ocrPolicyDomain_t *self, ocrFatGuid_t* allocator,
+                       void* ptr, ocrMemType_t memType);
+
 static u8 hcAllocateDb(ocrPolicyDomain_t *self, ocrFatGuid_t *guid, void** ptr, u64 size,
                        u32 properties, ocrFatGuid_t affinity, ocrInDbAllocator_t allocator,
                        u64 prescription, ocrDataBlockType_t dbType) {
@@ -716,17 +719,15 @@ static u8 hcAllocateDb(ocrPolicyDomain_t *self, ocrFatGuid_t *guid, void** ptr, 
     // variable, which has been added to this argument list.  The prescription indicates an order in
     // which to attempt to allocate the block to a pool.
     u64 idx;
-    void* result = allocateDatablock (self, size, prescription, &idx);
+    void *result = allocateDatablock (self, size, prescription, &idx);
     if (result) {
-        ocrDataBlock_t *block = self->dbFactories[0]->instantiate(
-            self->dbFactories[0], self->allocators[idx]->fguid, self->fguid,
+        u8 returnValue = 0;
+        returnValue = self->dbFactories[0]->instantiate(
+            self->dbFactories[0], guid, self->allocators[idx]->fguid, self->fguid,
             size, result, properties, NULL);
-        *ptr = result;
-        (*guid).guid = block->guid;
-        (*guid).metaDataPtr = block;
-
-        // Notify scheduler of DB CREATE
-        if (result != NULL && block != NULL) {
+        if(returnValue == 0) {
+            *ptr = result;
+            // Notify scheduler of DB CREATE
             PD_MSG_STACK(msg);
             getCurrentEnv(NULL, NULL, NULL, &msg);
 
@@ -734,15 +735,18 @@ static u8 hcAllocateDb(ocrPolicyDomain_t *self, ocrFatGuid_t *guid, void** ptr, 
 #define PD_TYPE PD_MSG_SCHED_NOTIFY
             msg.type = PD_MSG_SCHED_NOTIFY | PD_MSG_REQUEST;
             PD_MSG_FIELD_IO(schedArgs).kind = OCR_SCHED_NOTIFY_DB_CREATE;
-            PD_MSG_FIELD_IO(schedArgs).OCR_SCHED_ARG_FIELD(OCR_SCHED_NOTIFY_DB_CREATE).guid.guid = block->guid;
-            PD_MSG_FIELD_IO(schedArgs).OCR_SCHED_ARG_FIELD(OCR_SCHED_NOTIFY_DB_CREATE).guid.metaDataPtr = block;
+            PD_MSG_FIELD_IO(schedArgs).OCR_SCHED_ARG_FIELD(OCR_SCHED_NOTIFY_DB_CREATE).guid = *guid;
             PD_MSG_FIELD_IO(schedArgs).OCR_SCHED_ARG_FIELD(OCR_SCHED_NOTIFY_DB_CREATE).dbType = dbType;
             RESULT_PROPAGATE(self->fcts.processMessage(self, &msg, false));
             ASSERT(PD_MSG_FIELD_O(returnDetail) != OCR_ENOTSUP);
 #undef PD_MSG
 #undef PD_TYPE
+        } else {
+            // We need to free the memory that was allocated
+            hcMemUnAlloc(self, &(self->allocators[idx]->fguid), *ptr, DB_MEMTYPE);
         }
-        return 0;
+        // This could be OCR_EGUIDEXISTS
+        return returnValue;
     } else {
         DPRINTF(DEBUG_LVL_WARN, "hcAllocateDb returning NULL for size %ld\n", (u64) size);
         return OCR_ENOMEM;
@@ -947,21 +951,32 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
                                   PRESCRIPTION, PD_MSG_FIELD_I(dbType));
         if(PD_MSG_FIELD_O(returnDetail) == 0) {
             ocrDataBlock_t *db = PD_MSG_FIELD_IO(guid.metaDataPtr);
-            if(db==NULL){
+            if(db == NULL) {
                 DPRINTF(DEBUG_LVL_WARN, "DB Create failed for size %lx\n", PD_MSG_FIELD_IO(size));
-            }else{
+
+            } else{
                 DPRINTF(DEBUG_LVL_VERB, "Creating a datablock of size %lu @ 0x%lx (GUID: "GUIDSx")\n",
                         db->size, db->ptr, GUIDFS(db->guid),
                         /*srcFlag*/ (PD_MSG_FIELD_I(dbType) == USER_DBTYPE), OCR_TRACE_TYPE_DATABLOCK, OCR_ACTION_CREATE, db->size);
             }
             ASSERT(db);
-            // BUG #584: Check if properties want DB acquired
-            ASSERT(db->fctId == self->dbFactories[0]->factoryId);
-            PD_MSG_FIELD_O(returnDetail) = self->dbFactories[0]->fcts.acquire(
-                db, &(PD_MSG_FIELD_O(ptr)), tEdt, EDT_SLOT_NONE, DB_MODE_RW, !!(PD_MSG_FIELD_IO(properties) & DB_PROP_RT_ACQUIRE),
-                (u32) DB_MODE_RW);
-            // Set the default mode in the response message for the caller
-            PD_MSG_FIELD_IO(properties) |= DB_MODE_RW;
+            // We do not acquire a data-block in two cases:
+            //  - it was created with a labeled-GUID. This is because it would be difficult
+            //    to handle cases where both EDTs create it but only one acquires it (particularly
+            //    in distributed case
+            //  - if the user does not want to acquire the data-block (DB_PROP_NO_ACQUIRE)
+            if((PD_MSG_FIELD_IO(properties) & GUID_PROP_IS_LABELED) ||
+               (PD_MSG_FIELD_IO(properties) & DB_PROP_NO_ACQUIRE)) {
+                DPRINTF(DEBUG_LVL_INFO, "Not acquiring DB since disabled by property flags");
+                PD_MSG_FIELD_O(ptr) = NULL;
+            } else {
+                ASSERT(db->fctId == self->dbFactories[0]->factoryId);
+                PD_MSG_FIELD_O(returnDetail) = self->dbFactories[0]->fcts.acquire(
+                    db, &(PD_MSG_FIELD_O(ptr)), tEdt, EDT_SLOT_NONE, DB_MODE_RW, !!(PD_MSG_FIELD_IO(properties) & DB_PROP_RT_ACQUIRE),
+                    (u32) DB_MODE_RW);
+                // Set the default mode in the response message for the caller
+                PD_MSG_FIELD_IO(properties) |= DB_MODE_RW;
+            }
         } else {
             // Cannot acquire
             PD_MSG_FIELD_O(ptr) = NULL;

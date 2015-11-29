@@ -551,10 +551,11 @@ u8 lockableUnregisterWaiter(ocrDataBlock_t *self, ocrFatGuid_t waiter, u32 slot,
     return OCR_ENOSYS;
 }
 
-ocrDataBlock_t* newDataBlockLockable(ocrDataBlockFactory_t *factory, ocrFatGuid_t allocator,
-                                    ocrFatGuid_t allocPD, u64 size, void* ptr,
-                                    u32 flags, ocrParamList_t *perInstance) {
+u8 newDataBlockLockable(ocrDataBlockFactory_t *factory, ocrFatGuid_t *guid, ocrFatGuid_t allocator,
+                        ocrFatGuid_t allocPD, u64 size, void* ptr, u32 flags, ocrParamList_t *perInstance) {
     ocrPolicyDomain_t *pd = NULL;
+    u8 returnValue = 0;
+    ocrGuid_t resultGuid = NULL_GUID;
     PD_MSG_STACK(msg);
     getCurrentEnv(&pd, NULL, NULL, &msg);
 
@@ -562,19 +563,22 @@ ocrDataBlock_t* newDataBlockLockable(ocrDataBlockFactory_t *factory, ocrFatGuid_
 #define PD_MSG (&msg)
 #define PD_TYPE PD_MSG_GUID_CREATE
     msg.type = PD_MSG_GUID_CREATE | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
-    PD_MSG_FIELD_IO(guid.guid) = NULL_GUID;
-    PD_MSG_FIELD_IO(guid.metaDataPtr) = NULL;
+    PD_MSG_FIELD_IO(guid) = *guid;
     PD_MSG_FIELD_I(size) = sizeof(ocrDataBlockLockable_t) + hintc*sizeof(u64);
     PD_MSG_FIELD_I(kind) = OCR_GUID_DB;
-    PD_MSG_FIELD_I(properties) = 0;
+    PD_MSG_FIELD_I(properties) = flags & GUID_PROP_ALL;
 
-    RESULT_PROPAGATE2(pd->fcts.processMessage(pd, &msg, true), NULL);
+    RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, true));
 
     ocrDataBlockLockable_t *result = (ocrDataBlockLockable_t*)PD_MSG_FIELD_IO(guid.metaDataPtr);
-    result->base.guid = PD_MSG_FIELD_IO(guid.guid);
+    resultGuid = PD_MSG_FIELD_IO(guid.guid);
+    returnValue = PD_MSG_FIELD_O(returnDetail);
 #undef PD_MSG
 #undef PD_TYPE
 
+    if(returnValue != 0) {
+        return returnValue;
+    }
     ASSERT(result);
     result->base.allocator = allocator.guid;
     result->base.allocatingPD = allocPD.guid;
@@ -615,8 +619,14 @@ ocrDataBlock_t* newDataBlockLockable(ocrDataBlockFactory_t *factory, ocrFatGuid_
             size, (u64)result->base.ptr, GUIDFS(result->base.guid),
             false, OCR_TRACE_TYPE_DATABLOCK, OCR_ACTION_CREATE, size);
 
+    // Do this at the very end; it indicates that the object
+    // is actually valid
+    hal_fence();
+    result->base.guid = resultGuid;
 
-    return (ocrDataBlock_t*)result;
+    guid->guid = resultGuid;
+    guid->metaDataPtr = result;
+    return 0;
 }
 
 u8 lockableSetHint(ocrDataBlock_t* self, ocrHint_t *hint) {
@@ -651,8 +661,8 @@ ocrDataBlockFactory_t *newDataBlockFactoryLockable(ocrParamList_t *perType, u32 
     ocrDataBlockFactory_t *base = (ocrDataBlockFactory_t*)
                                   runtimeChunkAlloc(sizeof(ocrDataBlockFactoryLockable_t), PERSISTENT_CHUNK);
 
-    base->instantiate = FUNC_ADDR(ocrDataBlock_t* (*)
-                                  (ocrDataBlockFactory_t*, ocrFatGuid_t, ocrFatGuid_t,
+    base->instantiate = FUNC_ADDR(u8 (*)
+                                  (ocrDataBlockFactory_t*, ocrFatGuid_t*, ocrFatGuid_t, ocrFatGuid_t,
                                    u64, void*, u32, ocrParamList_t*), newDataBlockLockable);
     base->destruct = FUNC_ADDR(void (*)(ocrDataBlockFactory_t*), destructLockableFactory);
     base->fcts.destruct = FUNC_ADDR(u8 (*)(ocrDataBlock_t*), lockableDestruct);

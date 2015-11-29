@@ -16,6 +16,12 @@
 
 #define INVALID_LOCATION ((u64)(-1))
 
+/* Summary of property flags visible to the user */
+#define EDT_PROP_ALL  ((u16) 0x3)
+#define EVT_PROP_ALL  ((u16) 0x1)
+#define DB_PROP_ALL   ((u16) 0x70)
+#define GUID_PROP_ALL ((u16) 0x700)
+
 /* Run-level support */
 typedef enum _ocrRunlevels_t {
     RL_CONFIG_PARSE, /**< Configuration has been parsed; RT structures exist */

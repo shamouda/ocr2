@@ -1066,13 +1066,15 @@ u8 newEventHc(ocrEventFactory_t * factory, ocrFatGuid_t *guid,
     PD_MSG_FIELD_I(properties) = properties;
     RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, true));
     ocrEventHc_t *event = (ocrEventHc_t*)PD_MSG_FIELD_IO(guid.metaDataPtr);
-    ocrEvent_t *base = (ocrEvent_t*)event;
+
     returnValue = PD_MSG_FIELD_O(returnDetail);
-    ASSERT(event);
 
     if(returnValue != 0) {
         return returnValue;
     }
+
+    ocrEvent_t *base = (ocrEvent_t*)event;
+    ASSERT(event);
 
     // Set-up base structures
     resultGuid = PD_MSG_FIELD_IO(guid.guid);

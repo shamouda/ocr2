@@ -225,18 +225,22 @@ typedef struct _ocrDataBlockFactory_t {
     /**
      * @brief Creates a data-block to represent a chunk of memory
      *
-     * @param factory       Pointer to this factory
-     * @param allocator     Allocator guid used to allocate memory
-     * @param allocPD       Policy-domain of the allocator
-     * @param size          data-block size
-     * @param ptr           Pointer to the memory to use (created through an allocator)
-     * @param properties    Properties for the data-block
-     * @param instanceArg   Arguments specific for this instance
+     * @param[in] factory       Pointer to this factory
+     * @param[in/out] guid      GUID for the object. If GUID_PROP_IS_LABELED is specified in
+     *                          properties, guid.guid contains the GUID to use. guid.metaDataPtr will
+     *                          contain the pointer to the object (an ocrDataBlock_t)
+     * @param[in] allocator     Allocator guid used to allocate memory
+     * @param[in] allocPD       Policy-domain of the allocator
+     * @param[in] size          data-block size
+     * @param[in] ptr           Pointer to the memory to use (created through an allocator)
+     * @param[in] properties    Properties for the data-block creation (GUID_PROP_* or DB_PROP_*)
+     * @param[in] instanceArg   Arguments specific for this instance
+     * @return 0 on success or an error code on failure:
+     *    - OCR_EGUIDEXISTS if the object exists (if GUID_PROP_IS_LABELED and GUID_PROP_CHECK)
      **/
-    ocrDataBlock_t* (*instantiate)(struct _ocrDataBlockFactory_t *factory,
-                                   ocrFatGuid_t allocator, ocrFatGuid_t allocPD,
-                                   u64 size, void* ptr, u32 properties,
-                                   ocrParamList_t *instanceArg);
+    u8 (*instantiate)(struct _ocrDataBlockFactory_t *factory, ocrFatGuid_t *guid,
+                      ocrFatGuid_t allocator, ocrFatGuid_t allocPD, u64 size,
+                      void* ptr, u32 properties, ocrParamList_t *instanceArg);
     /**
      * @brief Factory destructor
      * @param factory       Pointer to the factory to destroy.
