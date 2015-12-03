@@ -18,6 +18,11 @@ if [[ -z "$CORE_SCALING" ]]; then
     export CORE_SCALING="1 2 4 8 16"
 fi
 
+if [[ -z "$NODE_SCALING" ]]; then
+    export NODE_SCALING="1"
+fi
+
+
 #
 # OCR test setup
 #
@@ -58,6 +63,7 @@ while [[ $# -gt 0 ]]; do
         shift
         LOGDIR_OPT="yes"
         LOGDIR_ARG=("$@")
+    echo "LOGDIR_ARG=$LOGDIR_ARG"
         shift
     elif [[ "$1" = "-nbrun" && $# -ge 2 ]]; then
         shift
@@ -113,8 +119,9 @@ else
     LOGDIR=${LOGDIR_ARG}
 fi
 
+echo "LOGDIR=$LOGDIR"
 if [[ ! -e ${LOGDIR_ARG} ]]; then
-    echo "${SCRIPT_NAME} create log dir ${LOGDIR}"
+    echo "${SCRIPT_NAME} create log dir ${LOGDIR_ARG}"
     mkdir -p ${LOGDIR}
 fi
 
@@ -143,6 +150,7 @@ function deleteFiles() {
 #
 function defaultConfigTarget() {
     local target=$1
+    echo "defaultConfigTarget $target"
     case "$target" in
         x86)
             export CFGARG_GUID=${CFGARG_GUID-"PTR"}
@@ -160,10 +168,68 @@ function defaultConfigTarget() {
             export CFGARG_ALLOC=${CFGARG_ALLOC-"32"}
             export CFGARG_ALLOCTYPE=${CFGARG_ALLOCTYPE-"mallocproxy"}
         ;;
+        gasnet)
+            export CFGARG_GUID=${CFGARG_GUID-"COUNTED_MAP"}
+            export CFGARG_PLATFORM=${CFGARG_PLATFORM-"X86"}
+            export CFGARG_TARGET=${CFGARG_TARGET-"gasnet"}
+            export CFGARG_BINDING=${CFGARG_BINDING-"seq"}
+            export CFGARG_ALLOC=${CFGARG_ALLOC-"32"}
+            export CFGARG_ALLOCTYPE=${CFGARG_ALLOCTYPE-"mallocproxy"}
+        ;;
         *)
             echo $"Unknown target $target"
             exit 1
     esac
+}
+
+function generateMachineFile {
+    local  __resultvar=$1
+
+    VALUE="$PWD/mf${nodes}"
+
+    if [[ ${OCRRUN_OPT_ENVKIND} == "CLE" ]]; then
+        more $PBS_NODEFILE | sort | uniq | head -n ${nodes} > ${VALUE}
+        echo "Generated node file: ${OCR_NODEFILE} for ${OCR_NUM_NODES} number of nodes"
+    elif [[ ${OCRRUN_OPT_ENVKIND} == "SLURM" ]]; then
+        #Just rely on srun to do the mapping
+        echo "No node file has been generated - Slurm's srun does the mapping"
+        VALUE=""
+    else
+        # Check if user provided a node file template
+        # It should contain at least the number of nodes requested. If there are more, the list is truncated.
+        if [[ -n "${OCRRUN_OPT_TPL_NODEFILE}" ]]; then
+            if [[ ! -f "${OCRRUN_OPT_TPL_NODEFILE}" ]]; then
+                echo "Error: USER envkind requires OCRRUN_OPT_TPL_NODEFILE does not point to a file"
+                VALUE=""
+            fi
+            head -n ${nodes} > $VALUE
+            local nb= `more $VALUE | wc -l`;
+            if [[ "$nb" != "${nodes}" ]]; then
+                nb= `more ${OCRRUN_OPT_TPL_NODEFILE} | wc -l`;
+                echo "Error: not enough nodes (${nodes})/${nb}) declared in ${OCRRUN_OPT_TPL_NODEFILE}"
+                VALUE=""
+            else
+                echo "Generated node file: ${OCR_NODEFILE} for ${OCR_NUM_NODES} number of nodes from ${OCRRUN_OPT_TPL_NODEFILE}"
+            fi
+        else
+            VALUE=""
+            echo "No node file has been generated - default when OCRRUN_OPT_ENVKIND is not specified"
+        fi
+    fi
+
+    eval $__resultvar="'$VALUE'"
+}
+
+function toLower() {
+    local  input=$1
+    local  __resultvar=$2
+    BASH_VER=`echo "$BASH_VERSION" | cut -b1-1`
+    if [[ ${BASH_VER} -eq 4 ]]; then
+        input=${input,,}
+    else
+        input=`echo ${input} | tr '[:upper:]' '[:lower:]'`
+    fi
+    eval $__resultvar="'$input'"
 }
 
 # Generates an OCR configuration file
@@ -172,14 +238,18 @@ function defaultConfigTarget() {
 # arguments to the configuration generator, else the generator's
 # default values are used.
 function generateCfgFile {
-
     # Read all CFGARG_ environment variables and transform
     # them into config generator's arguments
     for cfgarg in `env | grep CFGARG_`; do
         #Extract argument name and value
         parsed=(${cfgarg//=/ })
         argNameU=${parsed[0]#CFGARG_}
-        argNameL=${argNameU,,}
+        toLower ${argNameU} argNameL
+        # if [[ ${BASH_VER} -eq 4 ]]; then
+        #     argNameL=${argNameU,,}
+        # else
+        #     argNameL=`echo ${argNameU} | tr '[:upper:]' '[:lower:]'`
+        # fi
         argValue=${parsed[1]}
         #Append to generator argument list
         arg="--${argNameL} ${argValue}"
@@ -201,43 +271,58 @@ function generateCfgFile {
 function scalingTest {
     prog=$1
     progDefines="$2"
-    for cores in `echo "${CORE_SCALING}"`; do
-        runInfo="NB_WORKERS=${cores} NB_NODES=${OCR_NUM_NODES}"
+    for nodes in `echo "${NODE_SCALING}"`; do
+        for cores in `echo "${CORE_SCALING}"`; do
+            runInfo="NB_WORKERS=${cores} NB_NODES=${nodes}"
 
-        # Generate the OCR CFG file
-        export CFGARG_THREADS=${cores}
-        export CFGARG_OUTPUT="${prog}-${cores}c.cfg"
-        generateCfgFile
+            if [[ -z "${OCR_NODEFILE}" ]]; then
+                export OCR_NUM_NODES=$nodes
+                export OCR_NODEFILE=
+                # Generate the machine file list, can be none
+                generateMachineFile OCR_NODEFILE
+                if [[ "${OCR_NODEFILE}" == "" ]]; then
+                    unset OCR_NODEFILE
+                fi
+            fi
 
-        if [[ ! -f ${CFGARG_OUTPUT} ]]; then
-            echo "error: ${SCRIPT_NAME} Cannot find generated OCR config file ${CFGARG_OUTPUT}"
-            exit 1
-        fi
+            # Generate the OCR CFG file
+            export CFGARG_THREADS=${cores}
+            export CFGARG_OUTPUT="${prog}-${cores}c.cfg"
+            generateCfgFile
 
-        if [[ -z "${BIN_GEN_DIR}" ]]; then
-            BIN_GEN_DIR=build
-        fi
-        if [[ ! -d ${BIN_GEN_DIR} ]]; then
-            mkdir -p ${BIN_GEN_DIR}
-        fi
+            if [[ ! -f ${CFGARG_OUTPUT} ]]; then
+                echo "error: ${SCRIPT_NAME} Cannot find generated OCR config file ${CFGARG_OUTPUT}"
+                exit 1
+            fi
 
-        # Compile the program with provided defines
-        echo "Compiling for OCR ${prog} ${runInfo}"
-        echo "${progDefines} ${runInfo} make -f ${OCR_MAKEFILE} benchmark ${BIN_GEN_DIR}/${prog} PROG=ocr/${prog}.c"
-        eval ${progDefines} ${runInfo} BUILD_GEN_DIR=${BIN_GEN_DIR} make -f ${OCR_MAKEFILE} benchmark ${BIN_GEN_DIR}/${prog} PROG=ocr/${prog}.c
+            # Compile the program with provided defines
+            echo "Compiling for OCR ${prog} ${runInfo}"
+            echo "${progDefines} ${runInfo} make -f ${OCR_MAKEFILE} benchmark build/${prog} PROG=ocr/${prog}.c"
+            eval ${progDefines} ${runInfo} make -f ${OCR_MAKEFILE} benchmark build/${prog} PROG=ocr/${prog}.c
 
-        # Run the program with the appropriate OCR cfg file
-        echo "Run with OCR ${prog} ${runInfo}"
-        make -f ${OCR_MAKEFILE} OCR_CONFIG=${CFGARG_OUTPUT} run ${BIN_GEN_DIR}/${prog}
-        RES=$?
+            # Run the program with the appropriate OCR cfg file
+            if [[ -z "${RUN_HPCTOOLKIT}" ]]; then
+                echo "Run with OCR ${prog} ${runInfo}"
+                make -f ${OCR_MAKEFILE} OCR_CONFIG=${PWD}/${CFGARG_OUTPUT} run build/${prog}
+                RES=$?
+            else
+                echo "Run HPCToolkit with OCR ${prog} ${runInfo}"
+                make -f ${OCR_MAKEFILE} OCR_CONFIG=${PWD}/${CFGARG_OUTPUT} hpcrun build/${prog}
+                RES=$?
+            fi
 
-        if [[ $RES -ne 0 ]]; then
-            echo "error: run failed !"
-            exit 1
-        fi
-        # Everything went fine, delete the generated cfg file
-        # unless instructed otherwise by NOCLEAN_OPT
-        deleteFiles ${CFGARG_OUTPUT}
+            if [[ $RES -ne 0 ]]; then
+                if [[ "${TARGET_ARG}" != "gasnet" ]]; then
+                    echo "error: run failed !"
+                else
+                    echo "Warning, gasnet returns an error"
+                fi
+                exit 1
+            fi
+            # Everything went fine, delete the generated cfg file
+            # unless instructed otherwise by NOCLEAN_OPT
+            deleteFiles ${CFGARG_OUTPUT}
+        done
     done
 }
 
@@ -267,6 +352,7 @@ function runTest() {
     if [[ "$NOCLEAN_OPT" = "no" ]]; then
         reportGenOpt="-noclean"
     fi
+    echo "${SCRIPT_ROOT}/reportGenerator.sh ${reportGenOpt} ${runlog} >> ${report}"
     ${SCRIPT_ROOT}/reportGenerator.sh ${reportGenOpt} ${runlog} >> ${report}
 }
 

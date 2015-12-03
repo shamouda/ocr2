@@ -1,6 +1,8 @@
 #
-# Input: a string of values
+# Input arguments:
+# 	- a string of values
 # Output: avg stddev count
+#
 
 if [[ -z "$SCRIPT_ROOT" ]]; then
     echo "SCRIPT_ROOT environment variable is not defined"
@@ -8,6 +10,7 @@ if [[ -z "$SCRIPT_ROOT" ]]; then
 fi
 
 VALUES="$1"
+PRINT_COUNT="$2"
 
 # Check arg validity
 
@@ -18,7 +21,7 @@ fi
 
 # Check environment for utils
 
-SCALE=3
+SCALE=${SCALE-3}
 
 # Invoking average
 
@@ -34,7 +37,6 @@ diffs=0
 for datum in `echo $VALUES`; do
     diffs=`echo "(($datum - $avg)^2)+$diffs" | bc`
 done
-
 stddev=`echo "scale=$SCALE; sqrt(($diffs / $count))" | bc`
 
 echo "$avg ${stddev} ${count}"

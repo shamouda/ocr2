@@ -57,10 +57,10 @@ RUN_FILES=$(subst ocr,run,$(C_FILES))
 RUNBIN_FILES=$(patsubst %.c,%,$(RUN_FILES))
 
 benchmark: $(PROG) $(BIN_GEN_DIR)/$(TYPE).o
-	$(CC) -o $(EXECUTABLE) $(PROG) $(INCS) $(C_DEFINES) $(BIN_GEN_DIR)/$(TYPE).o $(OCR_FLAGS)
+	$(CC) -o $(EXECUTABLE) $(PROG) $(INCS) $(C_DEFINES) $(BIN_GEN_DIR)/$(TYPE).o $(OCR_FLAGS) $(BENCH_FLAGS)
 
 run: $(EXECUTABLE)
-	LD_LIBRARY_PATH=$(OCR_INSTALL)/lib $(OCR_INSTALL)/bin/ocrrun $(EXECUTABLE) $(OCR_RUN_FLAGS)
+	LD_LIBRARY_PATH=$(OCR_INSTALL)/lib $(OCR_INSTALL)/bin/ocrrun $(PWD)/$(EXECUTABLE) $(OCR_RUN_FLAGS) $(WORKLOAD_ARGS)
 
 $(BIN_GEN_DIR)/$(TYPE).o: $(DEPS)
 	echo "Build $(CC) $(INCS) -g -c $< -o $@"

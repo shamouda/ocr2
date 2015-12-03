@@ -185,9 +185,8 @@ function run() {
         if [ -z "$found" ]; then
             echo ">>> ${prog}: Use defines from defaults.mk"
         fi
-
         runlogFilename=${RUNLOG_FILENAME_BASE}-${prog}
-        reportFilename=${REPORT_FILENAME_BASE}-${prog}
+        reportFilename=${REPORT_FILENAME_BASE}-${prog}${REPORT_FILENAME_EXT}
         ${SCRIPT_ROOT}/runner.sh -nbrun ${NB_RUN} -target ${TARGET_ARG} -logdir ${LOG_DIR} -runlog ${runlogFilename} -report ${reportFilename} ${runnerArgs} ${prog}
     done
 }

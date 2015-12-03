@@ -18,6 +18,7 @@ echo "NB_RUN=${NB_RUN}"
 export CUSTOM_BOUNDS="NB_INSTANCES=2500000"
 # Timings: 'crash #674' 1.3 0.7
 # SCRIPT_ROOT=./scripts ./scripts/perfDriver.sh edtCreateStickySync
+
 SCRIPT_ROOT=./scripts ./scripts/perfDriver.sh edtCreateFinishSync
 SCRIPT_ROOT=./scripts ./scripts/perfDriver.sh edtCreateLatchSync
 
@@ -84,8 +85,8 @@ function getTimePerOpFromThroughput() {
 
 function printTimePerOpNano() {
     local file=$1
-    local text=$2
-    local outfile=$3
+    local outfile=$2
+    local text=$3
     opDuration=
     getTimePerOpFromThroughput $file opDuration
     echo "$text $opDuration (ns)" >> ${outfile}

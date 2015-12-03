@@ -1,3 +1,6 @@
+#ifndef __BENCH_HELPER_H_
+#define __BENCH_HELPER_H_
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <assert.h>
@@ -20,8 +23,10 @@ double usec_to_sec (long usec);
 
 /* Printing functions */
 
-void print_throughput(char * timer_name, long nb_instances, double time_sec);
+void print_throughput(char * timer_name, unsigned long long nb_instances, double time_sec);
 
-void summary_throughput_timer(timestamp_t * start_t, timestamp_t * stop_t, int instances);
+void summary_throughput_timer(timestamp_t * start_t, timestamp_t * stop_t, unsigned long long instances);
 
-void summary_throughput_dbl(double secs, int instances);
+void summary_throughput_dbl(double secs, unsigned long long instances);
+
+#endif

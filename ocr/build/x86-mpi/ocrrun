@@ -12,11 +12,14 @@ if [[ ${OCRRUN_OPT_ENVKIND} == "mvapich" ]]; then
     OCRRUN_OPT_NUM_NODES=${OCRRUN_OPT_NUM_NODES-"-np"}
     OCRRUN_OPT_NODEFILE=${OCRRUN_OPT_NODEFILE-"-f"}
 elif [[ ${OCRRUN_OPT_ENVKIND} == "CLE" ]]; then
-# Cray Linux Environment (CLE)
+    # Cray Linux Environment (CLE)
     OCRRUN_OPT_CMD=${OCRRUN_OPT_CMD-"aprun"}
-# Default forces one mpi process per node
+    # Default forces one mpi process per node
     OCRRUN_OPT_NUM_NODES=${OCRRUN_OPT_NUM_NODES-"-N 1 -n"}
     OCRRUN_OPT_NODEFILE=${OCRRUN_OPT_NODEFILE-"-l"}
+elif [[ ${OCRRUN_OPT_ENVKIND} == "SLURM" ]]; then
+    OCRRUN_OPT_CMD=${OCRRUN_OPT_CMD-"srun --mpi=pmi2"}
+    OCRRUN_OPT_NUM_NODES=${OCRRUN_OPT_NUM_NODES-"-N"}
 elif [[ ${OCRRUN_OPT_ENVKIND} == "openmpi" ]]; then
     OCRRUN_OPT_CMD=${OCRRUN_OPT_CMD-"mpirun"}
     OCRRUN_OPT_NUM_NODES=${OCRRUN_OPT_NUM_NODES-"-np"}
