@@ -658,6 +658,9 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
                 PD_MSG_FIELD_IO(guid.guid) = NULL_GUID;
                 PD_MSG_FIELD_IO(guid.metaDataPtr) = NULL;
                 PD_MSG_FIELD_I(currentEdt) = currentEdt;
+#ifdef ENABLE_EXTENSION_PARAMS_EVT
+                PD_MSG_FIELD_I(params) = NULL;
+#endif
                 PD_MSG_FIELD_I(properties) = 0;
                 PD_MSG_FIELD_I(type) = OCR_EVENT_LATCH_T;
                 RESULT_PROPAGATE(self->fcts.processMessage(self, &msg2, true));

@@ -308,6 +308,9 @@ static u8 initTaskHcInternal(ocrTaskHc_t *task, ocrPolicyDomain_t * pd,
         PD_MSG_FIELD_I(currentEdt.guid) = curTask!=NULL?curTask->guid:NULL_GUID;
         PD_MSG_FIELD_I(currentEdt.metaDataPtr) = NULL;
         PD_MSG_FIELD_I(type) = OCR_EVENT_LATCH_T;
+#ifdef ENABLE_EXTENSION_PARAMS_EVT
+        PD_MSG_FIELD_I(params) = NULL;
+#endif
         PD_MSG_FIELD_I(properties) = 0;
         RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, true));
 
@@ -661,6 +664,9 @@ u8 newTaskHc(ocrTaskFactory_t* factory, ocrFatGuid_t * edtGuid, ocrFatGuid_t edt
         PD_MSG_FIELD_IO(guid.metaDataPtr) = NULL;
         PD_MSG_FIELD_I(currentEdt.guid) = curTask!=NULL?curTask->guid:NULL_GUID;
         PD_MSG_FIELD_I(currentEdt.metaDataPtr) = curTask;
+#ifdef ENABLE_EXTENSION_PARAMS_EVT
+        PD_MSG_FIELD_I(params) = NULL;
+#endif
         PD_MSG_FIELD_I(properties) = 0;
         PD_MSG_FIELD_I(type) = OCR_EVENT_ONCE_T; // Output events of EDTs are non sticky
 

@@ -171,7 +171,17 @@ u8 ocrPolicyMsgGetMsgSize(ocrPolicyMsg_t *msg, u64 *baseSize,
 #endif
         break;
 #undef PD_TYPE
-
+#ifdef ENABLE_EXTENSION_PARAMS_EVT
+    case PD_MSG_EVT_CREATE:
+#define PD_TYPE PD_MSG_EVT_CREATE
+        {
+            if(isIn) {
+                *marshalledSize = (PD_MSG_FIELD_I(params)?sizeof(ocrEventParams_t):0ULL);
+            }
+        }
+        break;
+#undef PD_TYPE
+#endif
     case PD_MSG_SCHED_GET_WORK:
 #define PD_TYPE PD_MSG_SCHED_GET_WORK
         switch(PD_MSG_FIELD_IO(schedArgs).kind) {
@@ -432,6 +442,36 @@ u8 ocrPolicyMsgMarshallMsg(ocrPolicyMsg_t* msg, u64 baseSize, u8* buffer, u32 mo
         break;
 #undef PD_TYPE
     }
+
+#ifdef ENABLE_EXTENSION_PARAMS_EVT
+    case PD_MSG_EVT_CREATE:
+#define PD_TYPE PD_MSG_EVT_CREATE
+    {
+        if(isIn) {
+            // First copy things over
+            u64 s = (PD_MSG_FIELD_I(params) != NULL) ? sizeof(ocrEventParams_t) : 0;
+            if(s) {
+                hal_memCopy(curPtr, PD_MSG_FIELD_I(params), s, false);
+
+                // Now fixup the pointer
+                if(fixupPtrs) {
+                    DPRINTF(DEBUG_LVL_VVERB, "Converting params (0x%lx) to 0x%lx\n",
+                            (u64)PD_MSG_FIELD_I(params), ((u64)(curPtr - startPtr)<<1) + isAddl);
+                    PD_MSG_FIELD_I(params) = (void*)((((u64)(curPtr - startPtr))<<1) + isAddl);
+                } else {
+                    DPRINTF(DEBUG_LVL_VVERB, "Copying params (0x%lx) to 0x%lx\n",
+                            (u64)PD_MSG_FIELD_I(params), curPtr);
+                    PD_MSG_FIELD_I(params) = (void*)curPtr;
+                }
+                // Finally move the curPtr for the next object
+                curPtr += s;
+            }
+        }
+    }
+        break;
+#undef PD_TYPE
+#endif
+
 
     case PD_MSG_SCHED_GET_WORK:
 #define PD_TYPE PD_MSG_SCHED_GET_WORK
@@ -788,6 +828,22 @@ u8 ocrPolicyMsgUnMarshallMsg(u8* mainBuffer, u8* addlBuffer,
         break;
 #undef PD_TYPE
     }
+
+#ifdef ENABLE_EXTENSION_PARAMS_EVT
+    case PD_MSG_EVT_CREATE: {
+#define PD_TYPE PD_MSG_EVT_CREATE
+        if(isIn) {
+            if(PD_MSG_FIELD_I(params) != NULL) {
+                u64 t = (u64)(PD_MSG_FIELD_I(params));
+                PD_MSG_FIELD_I(params) = (void*)((t&1?localAddlPtr:localMainPtr) + (t>>1));
+                DPRINTF(DEBUG_LVL_VVERB, "Converted field params from 0x%lx to 0x%lx\n",
+                        t, (u64)PD_MSG_FIELD_I(params));
+            }
+        }
+        break;
+#undef PD_TYPE
+    }
+#endif
 
     case PD_MSG_EDTTEMP_CREATE: {
 #define PD_TYPE PD_MSG_EDTTEMP_CREATE

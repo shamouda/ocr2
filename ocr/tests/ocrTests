@@ -40,6 +40,9 @@ while [[ $# -gt 0 ]]; do
     elif [[ "$1" = "-ext_labeling" ]]; then
         shift
         TEST_EXT_LABELING=yes
+    elif [[ "$1" = "-ext_params_evt" ]]; then
+        shift
+        TEST_EXT_PARAMS_EVT=yes
     elif [[ "$1" = "-co" ]]; then
         shift
         STEP_COMPILE_ONLY="yes"
@@ -106,6 +109,10 @@ if [ -n "${TEST_EXT_LABELING}" ]; then
 fi
 
 export LDFLAGS="-L${OCR_INSTALL}/lib -locr_${OCR_TYPE} -lpthread ${OCR_LDFLAGS}"
+if [ -n "${TEST_EXT_PARAMS_EVT}" ]; then
+    CFLAGS="$CFLAGS -DENABLE_EXTENSION_PARAMS_EVT"
+fi
+
 export OCR_TESTS_BIN_OUTPUT=
 
 if [ -z "${OCR_CONFIG}" ]; then

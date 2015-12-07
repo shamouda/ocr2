@@ -104,6 +104,9 @@
 // Affinity support
 #define ENABLE_EXTENSION_AFFINITY
 
+// Event creation with parameter
+#define ENABLE_EXTENSION_PARAMS_EVT
+
 //GUID Labeling
 #define ENABLE_EXTENSION_LABELING
 

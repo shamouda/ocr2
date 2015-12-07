@@ -872,10 +872,9 @@ static u8 createEdtTemplateHelper(ocrPolicyDomain_t *self, ocrFatGuid_t *guid,
 }
 
 static u8 createEventHelper(ocrPolicyDomain_t *self, ocrFatGuid_t *guid,
-                        ocrEventTypes_t type, u32 properties) {
-
+                        ocrEventTypes_t type, u32 properties, ocrParamList_t * paramList) {
     return self->eventFactories[0]->instantiate(
-        self->eventFactories[0], guid, type, properties, NULL);
+        self->eventFactories[0], guid, type, properties, paramList);
 }
 
 static u8 convertDepAddToSatisfy(ocrPolicyDomain_t *self, ocrFatGuid_t dbGuid,
@@ -1295,9 +1294,17 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         START_PROFILE(pd_hc_EvtCreate);
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_EVT_CREATE
+
+        ocrParamList_t * paramList = NULL;
+#ifdef ENABLE_EXTENSION_PARAMS_EVT
+        if (PD_MSG_FIELD_I(params) != NULL) {
+            // Forcefully convert ocrEventParams_t to ocrParamList_t
+            paramList = (ocrParamList_t *) PD_MSG_FIELD_I(params);
+        }
+#endif
         PD_MSG_FIELD_O(returnDetail) = createEventHelper(
             self, &(PD_MSG_FIELD_IO(guid)),
-            PD_MSG_FIELD_I(type), PD_MSG_FIELD_I(properties));
+            PD_MSG_FIELD_I(type), PD_MSG_FIELD_I(properties), paramList);
 #undef PD_MSG
 #undef PD_TYPE
         msg->type &= ~PD_MSG_REQUEST;

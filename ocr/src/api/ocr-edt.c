@@ -15,7 +15,8 @@
 
 #define DEBUG_TYPE API
 
-u8 ocrEventCreate(ocrGuid_t *guid, ocrEventTypes_t eventType, u16 properties) {
+u8 ocrEventCreateParams(ocrGuid_t *guid, ocrEventTypes_t eventType, u16 properties, ocrEventParams_t * params) {
+
     START_PROFILE(api_EventCreate);
     DPRINTF(DEBUG_LVL_INFO, "ENTER ocrEventCreate(*guid=0x%lx, eventType=%u, properties=%u)\n", *guid,
             (u32)eventType, (u32)properties);
@@ -32,6 +33,9 @@ u8 ocrEventCreate(ocrGuid_t *guid, ocrEventTypes_t eventType, u16 properties) {
     PD_MSG_FIELD_IO(guid.metaDataPtr) = NULL;
     PD_MSG_FIELD_I(currentEdt.guid) = curEdt ? curEdt->guid : NULL_GUID;
     PD_MSG_FIELD_I(currentEdt.metaDataPtr) = curEdt;
+#ifdef ENABLE_EXTENSION_PARAMS_EVT
+    PD_MSG_FIELD_I(params) = params;
+#endif
     PD_MSG_FIELD_I(properties) = properties;
     PD_MSG_FIELD_I(type) = eventType;
     returnCode = pd->fcts.processMessage(pd, &msg, true);
@@ -50,6 +54,11 @@ u8 ocrEventCreate(ocrGuid_t *guid, ocrEventTypes_t eventType, u16 properties) {
     DPRINTF_COND_LVL(((returnCode != 0) && (returnCode != OCR_EGUIDEXISTS)), DEBUG_LVL_WARN, DEBUG_LVL_INFO,
                      "EXIT ocrEventCreate -> %u; GUID: 0x%lx\n", returnCode, *guid, true, OCR_TRACE_TYPE_EVENT, OCR_ACTION_CREATE);
     RETURN_PROFILE(returnCode);
+
+}
+
+u8 ocrEventCreate(ocrGuid_t *guid, ocrEventTypes_t eventType, u16 properties) {
+    return ocrEventCreateParams(guid, eventType, properties, NULL);
 }
 
 u8 ocrEventDestroy(ocrGuid_t eventGuid) {

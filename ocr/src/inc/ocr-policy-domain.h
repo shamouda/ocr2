@@ -607,6 +607,9 @@ typedef struct _ocrPolicyMsg_t {
             union {
                 struct {
                     ocrFatGuid_t currentEdt;   /**< In: EDT that is creating event */
+#ifdef ENABLE_EXTENSION_PARAMS_EVT
+                    ocrEventParams_t * params;
+#endif
                     u32 properties;       /**< In: Properties for this creation */
                     ocrEventTypes_t type; /**< In: Type of the event created: Bit 0: 1 if event takes an argument */
                 } in;

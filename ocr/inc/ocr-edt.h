@@ -23,6 +23,23 @@ extern "C" {
    @{
 **/
 
+#ifdef ENABLE_EXTENSION_PARAMS_EVT
+
+typedef struct {
+    union {
+        u64 counter;
+    } EVENT_LATCH;
+} ocrEventParams_t;
+
+u8 ocrEventCreateParams(ocrGuid_t *guid, ocrEventTypes_t eventType, u16 properties, ocrEventParams_t * params);
+
+#else
+
+typedef struct {
+} ocrEventParams_t;
+
+#endif
+
 /**
  * @brief Creates an event
  *

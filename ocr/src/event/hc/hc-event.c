@@ -962,7 +962,14 @@ u8 newEventHc(ocrEventFactory_t * factory, ocrFatGuid_t *guid,
 
     if(eventType == OCR_EVENT_LATCH_T) {
         // Initialize the counter
-        ((ocrEventHcLatch_t*)event)->counter = 0;
+        if (perInstance != NULL) {
+#ifdef ENABLE_EXTENSION_PARAMS_EVT
+            ocrEventParams_t * params = (ocrEventParams_t *) perInstance;
+            ((ocrEventHcLatch_t*)event)->counter = params->EVENT_LATCH.counter;
+#endif
+        } else {
+            ((ocrEventHcLatch_t*)event)->counter = 0;
+        }
     }
     if(eventType == OCR_EVENT_IDEM_T || eventType == OCR_EVENT_STICKY_T) {
         ((ocrEventHcPersist_t*)event)->data = UNINITIALIZED_GUID;

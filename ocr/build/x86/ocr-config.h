@@ -115,6 +115,9 @@
 // Affinity support
 #define ENABLE_EXTENSION_AFFINITY
 
+// Event creation with parameter
+#define ENABLE_EXTENSION_PARAMS_EVT
+
 // Runtime extension support
 #define ENABLE_EXTENSION_RTITF
 
