@@ -1460,8 +1460,8 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
                         // Here nobody else can acquire a reference on the proxy
                         if (proxyDb->refCount == 1) {
                             DPRINTF(DEBUG_LVL_VVERB,"DB_RELEASE response received for DB GUID 0x%lx, destroy proxy\n", dbGuid);
-                            // Nullify the entry for the proxy DB in the GUID provider
-                            self->guidProviders[0]->fcts.registerGuid(self->guidProviders[0], dbGuid, (u64) 0);
+                            // Removes the entry for the proxy DB in the GUID provider
+                            self->guidProviders[0]->fcts.unregisterGuid(self->guidProviders[0], dbGuid, (u64) 0);
                             // Nobody else can get a reference on the proxy's lock now
                             hal_unlock32(&((ocrPolicyDomainHcDist_t *) self)->lockDbLookup);
                             // Deallocate the proxy DB and the cached ptr

@@ -261,6 +261,14 @@ u8 countedMapRegisterGuid(ocrGuidProvider_t* self, ocrGuid_t guid, u64 val) {
     return 0;
 }
 
+/**
+ * @brief Remove an already existing GUID and its associated value from the provider
+ */
+u8 countedMapUnregisterGuid(ocrGuidProvider_t* self, ocrGuid_t guid, u64 ** val) {
+    hashtableConcBucketLockedRemove(((ocrGuidProviderCountedMap_t *) self)->guidImplTable, (void *) guid, (void **) val);
+    return 0;
+}
+
 u8 countedMapReleaseGuid(ocrGuidProvider_t *self, ocrFatGuid_t fatGuid, bool releaseVal) {
     ocrGuid_t guid = fatGuid.guid;
     // If there's metaData associated with guid we need to deallocate memory
@@ -324,6 +332,7 @@ ocrGuidProviderFactory_t *newGuidProviderFactoryCountedMap(ocrParamList_t *typeA
     base->providerFcts.getKind = FUNC_ADDR(u8 (*)(ocrGuidProvider_t*, ocrGuid_t, ocrGuidKind*), countedMapGetKind);
     base->providerFcts.getLocation = FUNC_ADDR(u8 (*)(ocrGuidProvider_t*, ocrGuid_t, ocrLocation_t*), countedMapGetLocation);
     base->providerFcts.registerGuid = FUNC_ADDR(u8 (*)(ocrGuidProvider_t*, ocrGuid_t, u64), countedMapRegisterGuid);
+    base->providerFcts.unregisterGuid = FUNC_ADDR(u8 (*)(ocrGuidProvider_t*, ocrGuid_t, u64**), countedMapUnregisterGuid);
     base->providerFcts.releaseGuid = FUNC_ADDR(u8 (*)(ocrGuidProvider_t*, ocrFatGuid_t, bool), countedMapReleaseGuid);
     return base;
 }

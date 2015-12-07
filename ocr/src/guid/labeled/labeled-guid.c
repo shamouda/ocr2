@@ -354,6 +354,14 @@ u8 labeledGuidRegisterGuid(ocrGuidProvider_t* self, ocrGuid_t guid, u64 val) {
     return 0;
 }
 
+/**
+ * @brief Remove an already existing GUID and its associated value from the provider
+ */
+u8 labeledGuidUnregisterGuid(ocrGuidProvider_t* self, ocrGuid_t guid, u64 ** val) {
+    hashtableConcBucketLockedRemove(((ocrGuidProviderLabeled_t *) self)->guidImplTable, (void *) guid, (void **) val);
+    return 0;
+}
+
 u8 labeledGuidReleaseGuid(ocrGuidProvider_t *self, ocrFatGuid_t fatGuid, bool releaseVal) {
     // We can only destroy GUIDs that we created
     ASSERT(extractLocIdFromGuid(fatGuid.guid) == locationToLocId(self->pd->myLocation));
@@ -427,6 +435,7 @@ ocrGuidProviderFactory_t *newGuidProviderFactoryLabeled(ocrParamList_t *typeArg,
     base->providerFcts.getKind = FUNC_ADDR(u8 (*)(ocrGuidProvider_t*, ocrGuid_t, ocrGuidKind*), labeledGuidGetKind);
     base->providerFcts.getLocation = FUNC_ADDR(u8 (*)(ocrGuidProvider_t*, ocrGuid_t, ocrLocation_t*), labeledGuidGetLocation);
     base->providerFcts.registerGuid = FUNC_ADDR(u8 (*)(ocrGuidProvider_t*, ocrGuid_t, u64), labeledGuidRegisterGuid);
+    base->providerFcts.unregisterGuid = FUNC_ADDR(u8 (*)(ocrGuidProvider_t*, ocrGuid_t, u64**), labeledGuidUnregisterGuid);
     base->providerFcts.releaseGuid = FUNC_ADDR(u8 (*)(ocrGuidProvider_t*, ocrFatGuid_t, bool), labeledGuidReleaseGuid);
 
     return base;
