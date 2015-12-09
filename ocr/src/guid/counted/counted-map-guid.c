@@ -39,7 +39,7 @@
 // GUID 'id' counter, atomically incr when a new GUID is requested
 static u64 guidCounter = 0;
 
-#ifdef COUNTED_MAP_DESTRUCT_CHECK
+#ifdef GUID_PROVIDER_DESTRUCT_CHECK
 // Fwd declaration
 static ocrGuidKind getKindFromGuid(ocrGuid_t guid);
 
@@ -87,7 +87,7 @@ u8 countedMapSwitchRunlevel(ocrGuidProvider_t *self, ocrPolicyDomain_t *PD, ocrR
             //       call their specific destructors which may not work in MEM_OK ?
             //       - If there are any runtime GUID not deallocated then they should
             //       be considered as leaking memory.
-#ifdef COUNTED_MAP_DESTRUCT_CHECK
+#ifdef GUID_PROVIDER_DESTRUCT_CHECK
             deallocFct entryDeallocator = countedMapHashmapEntryDestructChecker;
 #else
             deallocFct entryDeallocator = NULL;

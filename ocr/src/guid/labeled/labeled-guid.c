@@ -43,6 +43,16 @@ static u64 guidCounter = 0;
 // Counter for the reserved part of the GUIDs
 static u64 guidReservedCounter = 0;
 
+#ifdef GUID_PROVIDER_DESTRUCT_CHECK
+// Fwd declaration
+static ocrGuidKind getKindFromGuid(ocrGuid_t guid);
+
+void labeledGuidHashmapEntryDestructChecker(void * key, void * value) {
+    ocrGuid_t guid = (ocrGuid_t) key;
+    DPRINTF(DEBUG_LVL_WARN, "Remnant GUID 0x%x of kind %d still registered on GUID provider\n", guid, getKindFromGuid(guid));
+}
+#endif
+
 void labeledGuidDestruct(ocrGuidProvider_t* self) {
     //destructHashtable(((ocrGuidProviderLabeled_t *) self)->guidImplTable);
     runtimeChunkFree((u64)self, PERSISTENT_CHUNK);
@@ -86,7 +96,12 @@ u8 labeledGuidSwitchRunlevel(ocrGuidProvider_t *self, ocrPolicyDomain_t *PD, ocr
             //       call their specific destructors which may not work in MEM_OK ?
             //       - If there are any runtime GUID not deallocated then they should
             //       be considered as leaking memory.
-            destructHashtable(((ocrGuidProviderLabeled_t *) self)->guidImplTable, NULL);
+#ifdef GUID_PROVIDER_DESTRUCT_CHECK
+            deallocFct entryDeallocator = labeledGuidHashmapEntryDestructChecker;
+#else
+            deallocFct entryDeallocator = NULL;
+#endif
+            destructHashtableBucketLocked(((ocrGuidProviderLabeled_t *) self)->guidImplTable, entryDeallocator);
         }
         break;
     case RL_GUID_OK:
