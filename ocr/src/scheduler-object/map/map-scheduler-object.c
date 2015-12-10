@@ -96,10 +96,10 @@ u8 mapSchedulerObjectDestroy(ocrSchedulerObjectFactory_t *fact, ocrSchedulerObje
         ocrSchedulerObjectMap_t* mapSchedObj = (ocrSchedulerObjectMap_t*)self;
         switch(mapSchedObj->type) {
         case OCR_MAP_TYPE_MODULO:
-            destructHashtable(mapSchedObj->map, NULL);
+            destructHashtable(mapSchedObj->map, NULL, NULL);
             break;
         case OCR_MAP_TYPE_MODULO_LOCKED:
-            destructHashtableBucketLocked(mapSchedObj->map, NULL);
+            destructHashtableBucketLocked(mapSchedObj->map, NULL, NULL);
             break;
         default:
             ASSERT(0);

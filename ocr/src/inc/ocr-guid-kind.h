@@ -12,6 +12,8 @@
 #ifndef __OCR_GUID_KIND_H__
 #define __OCR_GUID_KIND_H__
 
+// Warning: Any updates made to the enum must also be applied
+//          to the implementation of the ocrGuidKindToChar function
 typedef enum {
     OCR_GUID_NONE = 0,
     OCR_GUID_ALLOCATOR = 1,
@@ -33,7 +35,10 @@ typedef enum {
     OCR_GUID_EVENT_ONCE = 17,
     OCR_GUID_EVENT_IDEM = 18,
     OCR_GUID_EVENT_STICKY = 19,
-    OCR_GUID_EVENT_LATCH = 20
+    OCR_GUID_EVENT_LATCH = 20,
+    OCR_GUID_MAX = 21 // Not a guid kind, just a marker
 } ocrGuidKind;
+
+char * ocrGuidKindToChar(ocrGuidKind kind);
 
 #endif /* __OCR_GUID_KIND_H__ */

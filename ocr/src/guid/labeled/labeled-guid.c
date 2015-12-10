@@ -17,7 +17,9 @@
 
 // Default hashtable's number of buckets
 //PERF: This parameter heavily impacts the GUID provider scalability !
-#define DEFAULT_NB_BUCKETS 1000
+#ifndef GUID_PROVIDER_NB_BUCKETS
+#define GUID_PROVIDER_NB_BUCKETS 10000
+#endif
 
 // Guid is composed of : (1/0 LOCID KIND COUNTER)
 // The 1 at the top is if this is a "reserved" GUID (for checking purposes)
@@ -47,9 +49,12 @@ static u64 guidReservedCounter = 0;
 // Fwd declaration
 static ocrGuidKind getKindFromGuid(ocrGuid_t guid);
 
-void labeledGuidHashmapEntryDestructChecker(void * key, void * value) {
+void labeledGuidHashmapEntryDestructChecker(void * key, void * value, void * deallocParam) {
     ocrGuid_t guid = (ocrGuid_t) key;
-    DPRINTF(DEBUG_LVL_WARN, "Remnant GUID 0x%x of kind %d still registered on GUID provider\n", guid, getKindFromGuid(guid));
+    ((u32*)deallocParam)[getKindFromGuid(guid)]++;
+#ifdef GUID_PROVIDER_DESTRUCT_CHECK_VERBOSE
+    DPRINTF(DEBUG_LVL_WARN, "Remnant GUID 0x%x of kind %s still registered on GUID provider\n", guid,  ocrGuidKindToChar(getKindFromGuid(guid));
+#endif
 }
 #endif
 
@@ -98,10 +103,28 @@ u8 labeledGuidSwitchRunlevel(ocrGuidProvider_t *self, ocrPolicyDomain_t *PD, ocr
             //       be considered as leaking memory.
 #ifdef GUID_PROVIDER_DESTRUCT_CHECK
             deallocFct entryDeallocator = labeledGuidHashmapEntryDestructChecker;
+            u32 guidTypeCounters[OCR_GUID_MAX];
+            u32 i;
+            for(i=0; i < OCR_GUID_MAX; i++) {
+                guidTypeCounters[i] = 0;
+                i++;
+            }
+            void * deallocParam = (void *) &guidTypeCounters;
 #else
             deallocFct entryDeallocator = NULL;
+            void * deallocParam = NULL;
 #endif
-            destructHashtableBucketLocked(((ocrGuidProviderLabeled_t *) self)->guidImplTable, entryDeallocator);
+            destructHashtableBucketLocked(((ocrGuidProviderLabeled_t *) self)->guidImplTable, entryDeallocator, deallocParam);
+#ifdef GUID_PROVIDER_DESTRUCT_CHECK
+            PRINTF("=========================\n");
+            PRINTF("Remnant GUIDs summary:\n");
+            for(i=0; i < OCR_GUID_MAX; i++) {
+                if (guidTypeCounters[i] != 0) {
+                    PRINTF("%s => %lu instances\n", ocrGuidKindToChar(i), guidTypeCounters[i]);
+                }
+            }
+            PRINTF("=========================\n");
+#endif
         }
         break;
     case RL_GUID_OK:
@@ -109,7 +132,7 @@ u8 labeledGuidSwitchRunlevel(ocrGuidProvider_t *self, ocrPolicyDomain_t *PD, ocr
         if((properties & RL_BRING_UP) && RL_IS_LAST_PHASE_UP(PD, RL_GUID_OK, phase)) {
             //Initialize the map now that we have an assigned policy domain
             ocrGuidProviderLabeled_t * derived = (ocrGuidProviderLabeled_t *) self;
-            derived->guidImplTable = newHashtableBucketLockedModulo(PD, DEFAULT_NB_BUCKETS);
+            derived->guidImplTable = newHashtableBucketLockedModulo(PD, GUID_PROVIDER_NB_BUCKETS);
         }
         break;
     case RL_COMPUTE_OK:

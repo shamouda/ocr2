@@ -1798,7 +1798,7 @@ u8 hcDistPdSwitchRunlevel(ocrPolicyDomain_t *self, ocrRunlevel_t runlevel, u32 p
             if (runlevel == RL_GUID_OK) {
                 // The template map should be empty. Do not check, because this
                 // data-structure should go away with #536 GUID metadata
-                destructHashtable(dself->proxyTplMap, NULL);
+                destructHashtable(dself->proxyTplMap, NULL, NULL);
             }
 
         }

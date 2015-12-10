@@ -213,7 +213,7 @@ u8 simpleCommApiSwitchRunlevel(ocrCommApi_t *self, ocrPolicyDomain_t *PD, ocrRun
             //BUG #527: memory reclaim: would like to make sure this is empty, otherwise it probably
             //means there are pending communication so we shouldn't be in tear down.
             ocrCommApiSimple_t * commApiSimple = (ocrCommApiSimple_t *) self;
-            destructHashtable(commApiSimple->handleMap, NULL);
+            destructHashtable(commApiSimple->handleMap, NULL, NULL);
         }
         break;
     case RL_COMPUTE_OK:
