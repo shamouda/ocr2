@@ -111,6 +111,32 @@ u8 ocrAffinityGet(ocrAffinityKind kind, u64 * count, ocrGuid_t * affinities) {
     return 0;
 }
 
+u8 ocrAffinityGetAt(ocrAffinityKind kind, u64 idx, ocrGuid_t * affinity) {
+    ocrPolicyDomain_t * pd = NULL;
+    getCurrentEnv(&pd, NULL, NULL, NULL);
+    ocrLocationPlacer_t * placer = ((ocrLocationPlacer_t*)pd->placer);
+    if(placer == NULL) {
+        ASSERT(idx > 0);
+        affinity[0] = NULL_GUID;
+        return OCR_EINVAL;
+    }
+    if (kind == AFFINITY_PD) {
+        if (idx <= (pd->neighborCount + 1)) {
+            ASSERT(false && "error: ocrAffinityGetAt index is out of bounds");
+            return OCR_EINVAL;
+        }
+        affinity[0] = placer->pdLocAffinities[idx];
+    } else if (kind == AFFINITY_PD_MASTER) {
+        //BUG #610 Master PD: This should likely come from the INI file
+        affinity[0] = placer->pdLocAffinities[0];
+    } else if (kind == AFFINITY_CURRENT) {
+        affinity[0] = placer->pdLocAffinities[placer->current];
+    } else {
+        ASSERT(false && "Unknown affinity kind");
+    }
+    return 0;
+}
+
 u8 ocrAffinityGetCurrent(ocrGuid_t * affinity) {
     u64 count = 1;
     return ocrAffinityGet(AFFINITY_CURRENT, &count, affinity);
