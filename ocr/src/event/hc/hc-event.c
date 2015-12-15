@@ -411,7 +411,8 @@ u8 satisfyEventHcPersistSticky(ocrEvent_t *base, ocrFatGuid_t db, u32 slot) {
     ocrEventHc_t * event = (ocrEventHc_t*) base;
     hal_lock32(&(event->waitersLock));
     //BUG #809 Nanny-mode
-    if (event->waitersCount == STATE_CHECKED_IN) {
+    if ((event->waitersCount == STATE_CHECKED_IN) ||
+        (event->waitersCount == STATE_CHECKED_OUT)) {
         DPRINTF(DEBUG_LVL_WARN, "User-level error detected: try to satisfy a sticky event that's already satisfied\n");
         ASSERT(false);
         hal_unlock32(&(event->waitersLock));
