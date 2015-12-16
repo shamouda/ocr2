@@ -510,7 +510,7 @@ endif
 
 # WARNING: This next line actually generates the configurations. This will be cleaned
 # up in a later commit.
-GENERATE_CONFIGS  := $(shell cd $(OCR_ROOT)/machine-configs/$(OCR_TYPE) && ./generate-cfg.sh)
+GENERATE_CONFIGS  := $(shell if [ -d $(OCR_ROOT)/machine-configs/$(OCR_TYPE) ]; then cd $(OCR_ROOT)/machine-configs/$(OCR_TYPE) && ./generate-cfg.sh ; fi)
 MACHINE_CONFIGS   := $(notdir $(wildcard $(OCR_ROOT)/machine-configs/$(OCR_TYPE)/*.cfg))
 INC_FILES         := $(addprefix extensions/, $(notdir $(wildcard $(OCR_ROOT)/inc/extensions/*))) \
                      $(notdir $(wildcard $(OCR_ROOT)/inc/*))
