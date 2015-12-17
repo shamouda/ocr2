@@ -305,6 +305,12 @@ typedef u64 ocrLocation_t;
 
 #define UNINITIALIZED_NEIGHBOR_INDEX ((u64)-1)
 
+//Resiliency
+typedef enum {
+    OCR_FAULT_FREQUENCY,
+    OCR_FAULT_MAX,
+} ocrFaultCode_t;
+
 /**
  * @brief Returned by the pollMessage function in
  * either the comp-target and comp-platform to indicate

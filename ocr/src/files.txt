@@ -17,6 +17,7 @@ machine-description  - functions to interpret the configuration file that descri
 mem-platform         - memory environment that OCR uses
 mem-target           - memory environment that OCR is targeted to use
 policy-domain        - functions to manage policy domains (abstract containers for managing local resources)
+resilience           - resiliency manager implementation
 sal                  - system specific functionality (print, file I/O, etc.)
 scheduler            - scheduler management functions
 statistics           - statistics related functions
