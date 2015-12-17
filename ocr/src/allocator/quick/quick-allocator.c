@@ -135,6 +135,7 @@
 // for regular OCR runs
 #include "ocr-hal.h"
 #include "debug.h"
+#include "ocr-errors.h"
 #include "ocr-policy-domain.h"
 #include "ocr-runtime-types.h"
 #include "ocr-sysboot.h"
@@ -1805,6 +1806,22 @@ void* quickReallocate(
     return 0;
 }
 
+#ifdef OCR_ENABLE_INTROSPECTION
+u8 quickQueryOp(ocrAllocator_t* self, queryType_t query, u32 properties, void** result) {
+    switch(query) {
+    case QUERY_ALLOC_MAXSIZE:
+        DPRINTF(DEBUG_LVL_INFO, "Introspecting maxsize\n");
+        break;
+    case QUERY_ALLOC_FREEBYTES:
+        DPRINTF(DEBUG_LVL_INFO, "Introspecting freebytes\n");
+        break;
+    default:
+        return OCR_ENOTSUP;
+    }
+    return 0;
+}
+#endif
+
 /******************************************************/
 /* OCR ALLOCATOR QUICK FACTORY                        */
 /******************************************************/
@@ -1848,6 +1865,9 @@ ocrAllocatorFactory_t * newAllocatorFactoryQuick(ocrParamList_t *perType) {
     base->allocFcts.allocate = FUNC_ADDR(void* (*)(ocrAllocator_t*, u64, u64), quickAllocate);
     //base->allocFcts.free = FUNC_ADDR(void (*)(void*), quickDeallocate);
     base->allocFcts.reallocate = FUNC_ADDR(void* (*)(ocrAllocator_t*, void*, u64), quickReallocate);
+#ifdef OCR_ENABLE_INTROSPECTION
+    base->allocFcts.queryOp = FUNC_ADDR(u8 (*)(ocrAllocator_t*, queryType_t, u32, void**), quickQueryOp);
+#endif
     return base;
 }
 #endif

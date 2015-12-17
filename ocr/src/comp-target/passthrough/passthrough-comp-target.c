@@ -9,6 +9,7 @@
 
 #include "comp-target/passthrough/passthrough-comp-target.h"
 #include "debug.h"
+#include "ocr-errors.h"
 #include "ocr-comp-platform.h"
 #include "ocr-comp-target.h"
 #include "ocr-policy-domain.h"
@@ -19,6 +20,7 @@
 #include "ocr-statistics-callbacks.h"
 #endif
 
+#define DEBUG_TYPE COMP_TARGET
 
 void ptDestruct(ocrCompTarget_t *compTarget) {
     u32 i = 0;
@@ -129,6 +131,22 @@ u8 ptSetCurrentEnv(ocrCompTarget_t *compTarget, ocrPolicyDomain_t *pd,
     return compTarget->platforms[0]->fcts.setCurrentEnv(compTarget->platforms[0], pd, worker);
 }
 
+#ifdef OCR_ENABLE_INTROSPECTION
+u8 ptQueryOp(ocrCompTarget_t* self, queryType_t query, u32 properties, void** result) {
+    switch(query) {
+    case QUERY_COMP_CUR_TEMP:
+        DPRINTF(DEBUG_LVL_INFO, "Introspecting current temperature\n");
+        break;
+    case QUERY_COMP_CUR_FREQ:
+        DPRINTF(DEBUG_LVL_INFO, "Introspecting current frequency\n");
+        break;
+    default:
+        return OCR_ENOTSUP;
+    }
+    return 0;
+}
+#endif
+
 ocrCompTarget_t * newCompTargetPt(ocrCompTargetFactory_t * factory,
                                   ocrParamList_t* perInstance) {
     ocrCompTargetPt_t * compTarget = (ocrCompTargetPt_t*)runtimeChunkAlloc(sizeof(ocrCompTargetPt_t), PERSISTENT_CHUNK);
@@ -160,7 +178,9 @@ ocrCompTargetFactory_t *newCompTargetFactoryPt(ocrParamList_t *perType) {
     base->targetFcts.getThrottle = FUNC_ADDR(u8 (*)(ocrCompTarget_t*, u64*), ptGetThrottle);
     base->targetFcts.setThrottle = FUNC_ADDR(u8 (*)(ocrCompTarget_t*, u64), ptSetThrottle);
     base->targetFcts.setCurrentEnv = FUNC_ADDR(u8 (*)(ocrCompTarget_t*, ocrPolicyDomain_t*, ocrWorker_t*), ptSetCurrentEnv);
-
+#ifdef OCR_ENABLE_INTROSPECTION
+    base->targetFcts.queryOp = FUNC_ADDR(u8 (*)(ocrCompTarget_t*, queryType_t, u32, void**), ptQueryOp);
+#endif
     return base;
 }
 

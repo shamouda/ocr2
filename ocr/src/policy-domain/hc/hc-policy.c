@@ -909,6 +909,41 @@ static ocrStats_t* hcGetStats(ocrPolicyDomain_t *self) {
 }
 #endif
 
+#ifdef OCR_ENABLE_INTROSPECTION
+u8 hcQueryOp(ocrPolicyDomain_t *policy, ocrGuid_t guid, queryType_t query, u32 properties,
+             void** result) {
+    u32 i, maxCount;
+    switch(query) {
+    case QUERY_ALLOC_MAXSIZE: case QUERY_ALLOC_FREEBYTES:
+        maxCount = policy->allocatorCount;
+        for(i = 0; i < maxCount; ++i) {
+            if(policy->allocators[i]->fguid.guid == guid) {
+                return policy->allocators[i]->fcts.queryOp(
+                    policy->allocators[i], query, properties, result);
+            }
+        }
+        // GUID is invalid
+        return OCR_EINVAL;
+    case QUERY_COMP_CUR_TEMP: case QUERY_COMP_CUR_FREQ:
+        maxCount = policy->workerCount;
+        for(i = 0; i < maxCount; ++i) {
+            u32 maxCountComp = policy->workers[i]->computeCount;
+            u32 j;
+            for(j = 0; j < maxCountComp; ++j) {
+                if(policy->workers[i]->computes[j]->fguid.guid == guid) {
+                    return policy->workers[i]->computes[j]->fcts.queryOp(
+                        policy->workers[i]->computes[j], query, properties, result);
+                }
+            }
+        }
+        // GUID is invalid
+        return OCR_EINVAL;
+    default:
+        return OCR_ENOTSUP;
+    }
+}
+#endif
+
 u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlocking) {
 
     START_PROFILE(pd_hc_ProcessMessage);
@@ -2214,7 +2249,10 @@ ocrPolicyDomainFactory_t * newPolicyDomainFactoryHc(ocrParamList_t *perType) {
 #ifdef OCR_ENABLE_STATISTICS
     base->policyDomainFcts.getStats = FUNC_ADDR(ocrStats_t*(*)(ocrPolicyDomain_t*),hcGetStats);
 #endif
-
+#ifdef OCR_ENABLE_INTROSPECTION
+    base->policyDomainFcts.ocrPDQueryOp = FUNC_ADDR(u8 (*)(ocrPolicyDomain_t*, ocrGuid_t,
+                                                           queryType_t, u32, void**), hcQueryOp);
+#endif
     return base;
 }
 

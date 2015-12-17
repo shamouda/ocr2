@@ -13,6 +13,9 @@
 #include "ocr-datablock.h"
 #include "ocr-event.h"
 #include "ocr-guid.h"
+#ifdef OCR_ENABLE_INTROSPECTION
+#include "ocr-introspection.h"
+#endif
 #include "ocr-scheduler.h"
 #ifdef OCR_ENABLE_STATISTICS
 #include "ocr-statistics.h"
@@ -1254,6 +1257,27 @@ typedef struct _ocrPolicyDomainFcts_t {
 #ifdef OCR_ENABLE_STATISTICS
     ocrStats_t* (*getStats)(struct _ocrPolicyDomain_t *self);
 #endif
+
+#ifdef OCR_ENABLE_INTROSPECTION
+    /**
+     * @brief Generic interface to answer introspection queries
+     *
+     * This is a generic interface to respond to various
+     * introspection-related queries from different modules.
+     * The policy domain simply looks up the relevant module
+     * from the provided GUID and passes the query to it.
+     *
+     * @param[in] self       Pointer to this policy domain
+     * @param[in] guid       GUID of module to query
+     * @param[in] query      Type of query
+     * @param[in] properties Query properties
+     * @param[in/out] result Result of query (allocated and freed by caller)
+     * @return Status of operation
+     */
+    u8 (*ocrPDQueryOp)(struct _ocrPolicyDomain_t *self, ocrGuid_t guid,
+                       queryType_t query, u32 properties, void **result);
+#endif
+
 } ocrPolicyDomainFcts_t;
 
 /**

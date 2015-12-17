@@ -12,6 +12,7 @@
 #ifndef __OCR_CONFIG_H__
 #define __OCR_CONFIG_H__
 
+#define OCR_ENABLE_INTROSPECTION
 // Constants used in the runtime
 
 // Define this if building the PD builder program

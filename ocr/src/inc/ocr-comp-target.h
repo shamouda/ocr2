@@ -12,6 +12,9 @@
 #ifndef __OCR_COMP_TARGET_H__
 #define __OCR_COMP_TARGET_H__
 
+#ifdef OCR_ENABLE_INTROSPECTION
+#include "ocr-introspection.h"
+#endif
 #include "ocr-runtime-types.h"
 #include "ocr-types.h"
 #include "utils/ocr-utils.h"
@@ -127,6 +130,9 @@ typedef struct _ocrCompTargetFcts_t {
     u8 (*setCurrentEnv)(struct _ocrCompTarget_t *self, struct _ocrPolicyDomain_t *pd,
                         struct _ocrWorker_t *worker);
 
+#ifdef OCR_ENABLE_INTROSPECTION
+    u8 (*queryOp)(struct _ocrCompTarget_t *self, queryType_t query, u32 properties, void** result);
+#endif
 } ocrCompTargetFcts_t;
 
 struct _ocrCompTarget_t;

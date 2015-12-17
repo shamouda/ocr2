@@ -12,6 +12,10 @@
 #ifndef __OCR_ALLOCATOR_H__
 #define __OCR_ALLOCATOR_H__
 
+#ifdef OCR_ENABLE_INTROSPECTION
+#include "ocr-introspection.h"
+#endif
+
 #include "ocr-mem-target.h"
 #include "ocr-types.h"
 #include "utils/ocr-utils.h"
@@ -141,6 +145,10 @@ typedef struct _ocrAllocatorFcts_t {
      *   - if size is 0, equivalent to free
      */
     void* (*reallocate)(struct _ocrAllocator_t *self, void* address, u64 size);
+
+#ifdef OCR_ENABLE_INTROSPECTION
+    u8 (*queryOp)(struct _ocrAllocator_t *self, queryType_t query, u32 properties, void** result);
+#endif
 } ocrAllocatorFcts_t;
 
 struct _ocrMemTarget_t;
