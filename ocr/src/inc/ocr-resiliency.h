@@ -9,6 +9,7 @@
 #define __OCR_RESILIENCY_H__
 
 #include "ocr-runtime-types.h"
+#include "utils/ocr-utils.h"
 #include "ocr-types.h"
 
 #ifdef OCR_ENABLE_STATISTICS

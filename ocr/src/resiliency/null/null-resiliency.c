@@ -15,6 +15,8 @@
 #include "ocr-sysboot.h"
 #include "ocr-workpile.h"
 #include "ocr-resiliency.h"
+
+#include "policy-domain/hc/hc-policy.h"
 #include "resiliency/null/null-resiliency.h"
 
 /******************************************************/
@@ -74,8 +76,34 @@ u8 nullResiliencyNotify(ocrResiliency_t *self, ocrPolicyMsg_t *msg, u32 properti
     return OCR_ENOTSUP;
 }
 
-u8 nullResiliencyRecover(ocrResiliency_t *self, ocrFaultCode_t faultCode, ocrLocation_t loc, u8 *buffer) {
-    return OCR_ENOTSUP;
+u8 nullResiliencyRecover(ocrResiliency_t *self, ocrFaultCode_t faultCode, ocrLocation_t loc, u64 *buffer) {
+
+    PRINTF("Fault detected on worker %lu ......\n", loc);
+    if(faultCode == OCR_FAULT_FREQUENCY){
+        PRINTF("\nAttempting to recover from fault code 0x%lx\n", faultCode);
+        PRINTF("\nNew freqeuncy detected. Need to tranistion to %lu mHz\n\n", buffer[0]);
+
+        //TODO -Need to update and sync new frequency. Not yet supported
+        //     -Need to restart worker state to retry current EDT.  Not yet supported
+        //
+        //     Normal Pause Wakeup for now (No-op)
+        ocrPolicyDomain_t *pd;
+        getCurrentEnv(&pd, NULL, NULL, NULL);
+        ocrPolicyDomainHc_t *rself = (ocrPolicyDomainHc_t *)pd;
+
+        if(hal_cmpswap32((u32 *)&rself->pqrFlags.runtimePause, true, false) == true){
+            hal_xadd32((u32 *)&rself->pqrFlags.pauseCounter, -1);
+        }
+
+        //SUCCESS
+        PRINTF("Successfully recovered; continuing app execution...\n\n");
+        return 0;
+
+    //Only testing for FREQUENCY fault for now
+    }else{
+        return OCR_ENOTSUP;
+    }
+
 }
 
 /******************************************************/
