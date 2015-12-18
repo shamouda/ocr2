@@ -29,7 +29,6 @@ typedef struct _paramListResiliencyFact_t {
 
 typedef struct _paramListResiliencyInst_t {
     ocrParamList_t base;
-    u64 resiliencyId;
 } paramListResiliencyInst_t;
 
 /******************************************************/
@@ -65,11 +64,11 @@ typedef struct _ocrResiliencyFcts_t {
 
     /** @brief Invoke Resiliency Manager
      */
-    u8 (*invoke)(struct _ocrResiliency_t *self, ocrPolicyMsg_t *msg, u32 properties);
+    u8 (*invoke)(struct _ocrResiliency_t *self, struct _ocrPolicyMsg_t *msg, u32 properties);
 
     /** @brief Notify Resiliency Manager of runtime op
      */
-    u8 (*notify)(struct _ocrResiliency_t *self, ocrPolicyMsg_t *msg, u32 properties);
+    u8 (*notify)(struct _ocrResiliency_t *self, struct _ocrPolicyMsg_t *msg, u32 properties);
 
     /** @brief Recover from fault
      */
@@ -79,7 +78,6 @@ typedef struct _ocrResiliencyFcts_t {
 
 typedef struct _ocrResiliency_t {
     ocrFatGuid_t fguid;
-    struct _ocrPolicyDomain_t *pd;
     ocrResiliencyFcts_t fcts;
 } ocrResiliency_t;
 
@@ -89,11 +87,9 @@ typedef struct _ocrResiliency_t {
 /****************************************************/
 
 typedef struct _ocrResiliencyFactory_t {
-    ocrResiliency_t* (*instantiate) (struct _ocrResiliencyFactory_t * factory,
-                                 ocrParamList_t *perInstance);
-    void (*initialize) (struct _ocrResiliencyFactory_t * factory, struct _ocrResiliency_t * resiliency, ocrParamList_t *perInstance);
+    ocrResiliency_t* (*instantiate) (struct _ocrResiliencyFactory_t * factory, ocrParamList_t *perInstance);
     void (*destruct)(struct _ocrResiliencyFactory_t * factory);
-    ocrResiliencyFcts_t resiliencyFcts;
+    ocrResiliencyFcts_t fcts;
 } ocrResiliencyFactory_t;
 
 void initializeResiliencyOcr(ocrResiliencyFactory_t * factory, ocrResiliency_t * self, ocrParamList_t *perInstance);

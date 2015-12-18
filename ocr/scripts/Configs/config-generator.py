@@ -75,6 +75,7 @@ def GeneratePd(output, pdtype, dbtype, threads):
     output.write("\tworker\t\t\t=\t0-%d\n" % (threads-1))
     output.write("\tscheduler\t\t=\t0\n")
     output.write("\tallocator\t\t=\t0\n")
+    output.write("\tresiliency\t\t=\t0\n")
     if pdtype == 'HCDist':
         output.write("\tcommapi\t\t\t=\t0-%d\n" % (threads-1))
     else:
@@ -93,6 +94,13 @@ def GenerateCommon(output, pdtype, dbtype):
     output.write("[TaskTemplateType0]\n\tname=\t%s\n\n" % (pdtype))
     output.write("[DataBlockType0]\n\tname=\t%s\n\n" % (dbtype))
     output.write("[EventType0]\n\tname=\t%s\n\n" % (pdtype))
+    output.write("\n#======================================================\n")
+
+def GenerateResiliency(output, rmtype):
+    output.write("[ResiliencyType0]\n\tname\t=\t%s\n" % (rmtype))
+    output.write("[ResiliencyInst0]\n")
+    output.write("\tid\t=\t0\n")
+    output.write("\ttype\t=\t%s\n" % (rmtype))
     output.write("\n#======================================================\n")
 
 def GenerateMem(output, size, count, alloctype):
@@ -306,11 +314,13 @@ def GenerateConfig(filehandle, guid, platform, target, threads, binding, syswork
         GenerateMem(filehandle, alloc, 1, alloctype)
         GenerateComm(filehandle, "null", "HC", threads)
         GenerateComp(filehandle, "HC", threads, binding, sysworker, "COMMON")
+        GenerateResiliency(filehandle, "NULL")
     elif target=='FSIM':
         GeneratePd(filehandle, "CE", dbtype, 1)
         GeneratePd(filehandle, "XE", dbtype, threads)
         GenerateCommon(filehandle, "HC", dbtype)
         GenerateMem(filehandle, alloc, 1, alloctype)
+        GenerateResiliency(filehandle, "NULL")
     elif (target=='MPI') or (target=='GASNet'):
         # catch default value errors for distributed
         if dbtype != 'Lockable':
@@ -328,6 +338,7 @@ def GenerateConfig(filehandle, guid, platform, target, threads, binding, syswork
         GenerateMem(filehandle, alloc, 1, alloctype)
         GenerateComm(filehandle, target, pdtype, threads)
         GenerateComp(filehandle, pdtype, threads, binding, sysworker, "HC_COMM_DELEGATE")
+        GenerateResiliency(filehandle, "NULL")
     else:
         print 'Target ', target, ' unsupported'
         sys.exit(0)

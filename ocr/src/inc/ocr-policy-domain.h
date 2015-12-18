@@ -23,6 +23,7 @@
 #include "ocr-task.h"
 #include "ocr-types.h"
 #include "ocr-worker.h"
+#include "ocr-resiliency.h"
 
 #include "experimental/ocr-placer.h"
 
@@ -1329,6 +1330,7 @@ typedef struct _ocrPolicyDomain_t {
     u64 guidProviderCount;                      /**< Number of GUID providers */
     u64 allocatorCount;                         /**< Number of allocators */
     u64 schedulerCount;                         /**< Number of schedulers */
+    u64 resiliencyCount;                        /**< Number of resiliency managers */
 
     /* Capable modules */
     u64 workerCount;                            /**< Number of workers */
@@ -1346,6 +1348,7 @@ typedef struct _ocrPolicyDomain_t {
     ocrGuidProvider_t ** guidProviders;         /**< GUID generators */
     ocrAllocator_t  ** allocators;              /**< All the allocators */
     ocrScheduler_t  ** schedulers;              /**< All the schedulers */
+    ocrResiliency_t  ** resiliency;             /**< All the resiliency managers */
 
     ocrWorker_t     ** workers;                 /**< All the workers */
 

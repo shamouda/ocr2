@@ -9,13 +9,13 @@
 
 const char * resiliency_types[] = {
 #ifdef ENABLE_RESILIENCY_NULL
-    "null",
+    "NULL",
 #endif
 #ifdef ENABLE_RESILIENCY_X86
-    "x86",
+    "X86",
 #endif
 #ifdef ENABLE_RESILIENCY_TG
-    "tg",
+    "TG",
 #endif
     NULL,
 };
@@ -38,5 +38,11 @@ ocrResiliencyFactory_t *newResiliencyFactory(resiliencyType_t type, ocrParamList
         ASSERT(0);
         return NULL;
     };
+}
+
+void initializeResiliencyOcr(ocrResiliencyFactory_t * factory, ocrResiliency_t * self, ocrParamList_t *perInstance) {
+    self->fguid.guid = UNINITIALIZED_GUID;
+    self->fguid.metaDataPtr = self;
+    self->fcts = factory->fcts;
 }
 

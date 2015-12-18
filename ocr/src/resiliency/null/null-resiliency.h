@@ -18,11 +18,6 @@
 /* NULL RESILIENCY                                  */
 /****************************************************/
 
-// Cached information about context
-typedef struct _ocrResiliencyContextNull_t {
-    ocrResiliencyContext_t base;
-} ocrResiliencyContextNull_t;
-
 typedef struct _ocrResiliencyNull_t {
     ocrResiliency_t base;
 } ocrResiliencyNull_t;
@@ -32,14 +27,14 @@ typedef struct _ocrResiliencyNull_t {
 /****************************************************/
 
 typedef struct _paramListResiliencyNull_t {
-    paramListResiliency_t base;
-} paramListResiliencyNull_t;
+    paramListResiliencyFact_t base;
+} paramListResiliencyFactNull_t;
 
 typedef struct _ocrResiliencyFactoryNull_t {
     ocrResiliencyFactory_t base;
 } ocrResiliencyFactoryNull_t;
 
-ocrResiliencyFactory_t * newOcrResiliencyFactoryNull(ocrParamList_t *perType, u32 factoryId);
+ocrResiliencyFactory_t * newResiliencyFactoryNull(ocrParamList_t *perType);
 
 #endif /* ENABLE_RESILIENCY_NULL */
 #endif /* __NULL_RESILIENCY_H__ */

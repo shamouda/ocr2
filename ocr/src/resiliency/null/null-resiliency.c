@@ -86,10 +86,9 @@ void destructResiliencyFactoryNull(ocrResiliencyFactory_t * factory) {
     runtimeChunkFree((u64)factory, NONPERSISTENT_CHUNK);
 }
 
-ocrResiliencyFactory_t * newOcrResiliencyFactoryNull(ocrParamList_t *perType, u32 factoryId) {
+ocrResiliencyFactory_t * newResiliencyFactoryNull(ocrParamList_t *perType) {
     ocrResiliencyFactory_t* base = (ocrResiliencyFactory_t*) runtimeChunkAlloc(
                                       sizeof(ocrResiliencyFactoryNull_t), NONPERSISTENT_CHUNK);
-    base->factoryId = factoryId;
     base->instantiate = &newResiliencyNull;
     base->destruct = &destructResiliencyFactoryNull;
     base->fcts.switchRunlevel = FUNC_ADDR(u8 (*)(ocrResiliency_t*, ocrPolicyDomain_t*, ocrRunlevel_t,

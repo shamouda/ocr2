@@ -12,7 +12,7 @@
 #ifndef __OCR_CONFIG_H__
 #define __OCR_CONFIG_H__
 
-#define OCR_ENABLE_INTROSPECTION
+//#define OCR_ENABLE_INTROSPECTION
 // Constants used in the runtime
 
 // Define this if building the PD builder program
@@ -72,6 +72,9 @@
 
 // Policy domain
 #define ENABLE_POLICY_DOMAIN_HC
+
+// Resiliency
+#define ENABLE_RESILIENCY_NULL
 
 // Scheduler
 #define ENABLE_SCHEDULER_COMMON

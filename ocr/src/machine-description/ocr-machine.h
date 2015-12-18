@@ -37,6 +37,7 @@ typedef enum {
     comptarget_type,
     workpile_type,
     worker_type,
+    resiliency_type,
     scheduler_type,
     schedulerObject_type,
     schedulerHeuristic_type,

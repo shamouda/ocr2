@@ -28,6 +28,7 @@
 #endif
 #include "task/task-all.h"
 #include "worker/worker-all.h"
+#include "resiliency/resiliency-all.h"
 #include "workpile/workpile-all.h"
 #include "scheduler-heuristic/scheduler-heuristic-all.h"
 #include "scheduler-object/scheduler-object-all.h"
@@ -50,6 +51,7 @@ u32 type_max[] = {
     compTargetMax_id,
     workpileMax_id,
     workerMax_id,
+    resiliencyMax_id,
     schedulerMax_id,
     schedulerObjectMax_id,
     schedulerHeuristicMax_id,
@@ -271,6 +273,9 @@ char* populate_type(ocrParamList_t **type_param, type_enum index, dictionary *di
     case worker_type:
         ALLOC_PARAM_LIST(*type_param, paramListWorkerFact_t);
         break;
+    case resiliency_type:
+        ALLOC_PARAM_LIST(*type_param, paramListResiliencyFact_t);
+        break;
     case scheduler_type:
         ALLOC_PARAM_LIST(*type_param, paramListSchedulerFact_t);
         break;
@@ -450,6 +455,18 @@ ocrWorkerFactory_t *create_factory_worker(char *name, ocrParamList_t *paramlist)
     }
 }
 
+ocrResiliencyFactory_t *create_factory_resiliency(char *name, ocrParamList_t *paramlist) {
+    resiliencyType_t mytype = resiliencyMax_id;
+    TO_ENUM (mytype, name, resiliencyType_t, resiliency_types, resiliencyMax_id);
+    if (mytype == resiliencyMax_id) {
+        DPRINTF(DEBUG_LVL_WARN, "Unrecognized type %s. Check name and ocr-config header\n", name);
+        return NULL;
+    } else {
+        DPRINTF(DEBUG_LVL_INFO, "Creating a resiliency factory of type %d\n", mytype);
+        return (ocrResiliencyFactory_t *)newResiliencyFactory(mytype, paramlist);
+    }
+}
+
 ocrSchedulerFactory_t *create_factory_scheduler(char *name, ocrParamList_t *paramlist) {
     schedulerType_t mytype = schedulerMax_id;
     TO_ENUM (mytype, name, schedulerType_t, scheduler_types, schedulerMax_id);
@@ -573,6 +590,9 @@ void *create_factory (type_enum index, char *factory_name, ocrParamList_t *param
         break;
     case worker_type:
         new_factory = (void *)create_factory_worker(factory_name, paramlist);
+        break;
+    case resiliency_type:
+        new_factory = (void *)create_factory_resiliency(factory_name, paramlist);
         break;
     case scheduler_type:
         new_factory = (void *)create_factory_scheduler(factory_name, paramlist);
@@ -923,6 +943,14 @@ s32 populate_inst(ocrParamList_t **inst_param, int inst_param_size, void **insta
                 DPRINTF(DEBUG_LVL_INFO, "Created worker of type %s, index %d\n", inststr, j);
         }
         break;
+    case resiliency_type:
+        for (j = low; j<=high; j++) {
+            ALLOC_PARAM_LIST(inst_param[j], paramListResiliencyInst_t);
+            instance[j] = (void *)((ocrResiliencyFactory_t *)factory)->instantiate(factory, inst_param[j]);
+            if (instance[j])
+                DPRINTF(DEBUG_LVL_INFO, "Created resiliency of type %s, index %d\n", inststr, j);
+        }
+        break;
     case scheduler_type:
         for (j = low; j<=high; j++) {
             schedulerType_t mytype = -1;
@@ -1162,6 +1190,14 @@ void add_dependence (type_enum fromtype, type_enum totype, char *refstr,
                 f->workers = (ocrWorker_t **)runtimeChunkAlloc(dependence_count * sizeof(ocrWorker_t *), PERSISTENT_CHUNK);
             }
             f->workers[dependence_index] = (ocrWorker_t *)toinstance;
+            break;
+        }
+        case resiliency_type: {
+            if (f->resiliency == NULL) {
+                f->resiliencyCount = dependence_count;
+                f->resiliency = (ocrResiliency_t **)runtimeChunkAlloc(dependence_count * sizeof(ocrResiliency_t *), PERSISTENT_CHUNK);
+            }
+            f->resiliency[dependence_index] = (ocrResiliency_t *)toinstance;
             break;
         }
         case scheduler_type: {

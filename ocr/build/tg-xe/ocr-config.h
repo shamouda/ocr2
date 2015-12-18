@@ -69,6 +69,9 @@
 // Policy domain
 #define ENABLE_POLICY_DOMAIN_XE
 
+// Resiliency
+#define ENABLE_RESILIENCY_NULL
+
 // Scheduler
 #define ENABLE_SCHEDULER_XE
 
