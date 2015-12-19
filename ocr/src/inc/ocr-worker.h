@@ -124,7 +124,8 @@ typedef struct _ocrWorker_t {
     u64 computeCount;           /**< Number of compute node(s) associated */
 
     struct _ocrTask_t * volatile curTask; /**< Currently executing task */
-
+    u64 curFreq; /**< Current operating frequency */ //TODO: Until we get full introspection support
+    bool active;
     ocrWorkerFcts_t fcts;
 } ocrWorker_t;
 

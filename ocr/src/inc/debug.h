@@ -68,6 +68,17 @@ extern void doTrace(u64 location, u64 wrkr, ocrGuid_t taskGuid, char *str, ...);
 #define OCR_DEBUG_LVL DEBUG_LVL_INFO
 #endif /* OCR_DEBUG_LVL */
 
+#ifdef OCR_DEBUG_RESILIENCY
+#define OCR_DEBUG_RESILIENCY 1
+#else
+#define OCR_DEBUG_RESILIENCY 0
+#endif
+
+#define OCR_DEBUG_RESILIENCY_STR "RESILIENCY"
+#ifndef DEBUG_LVL_RESILIENCY
+#define DEBUG_LVL_RESILIENCY OCR_DEBUG_LVL
+#endif
+
 #ifdef OCR_DEBUG_ALLOCATOR
 #define OCR_DEBUG_ALLOCATOR 1
 #else
@@ -430,6 +441,12 @@ extern void doTrace(u64 location, u64 wrkr, ocrGuid_t taskGuid, char *str, ...);
 #endif /* OCR_DEBUG */
 
 #ifdef OCR_TRACE
+
+#ifdef OCR_TRACE_RESILIENCY
+#define OCR_TRACE_RESILIENCY 1
+#else
+#define OCR_TRACE_RESILIENCY 0
+#endif
 
 #ifdef OCR_TRACE_ALLOCATOR
 #define OCR_TRACE_ALLOCATOR 1

@@ -105,6 +105,7 @@ void initializePolicyDomainOcr(ocrPolicyDomainFactory_t * factory, ocrPolicyDoma
     self->neighbors = NULL;
     self->neighborCount = 0;
     self->shutdownCode = 0;
+    self->rmMaster = 0;
     self->neighborPDs = NULL;
     self->parentPD = NULL;
 }

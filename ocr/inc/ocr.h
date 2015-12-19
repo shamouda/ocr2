@@ -21,7 +21,6 @@ extern "C" {
 #include "ocr-types.h"
 #include "ocr-std.h"
 
-#include "extensions/ocr-resiliency-sim.h"
 #include "extensions/ocr-hints.h"
 
 /**

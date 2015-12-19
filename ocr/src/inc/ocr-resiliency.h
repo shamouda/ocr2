@@ -39,6 +39,9 @@ typedef struct _paramListResiliencyInst_t {
 struct _ocrResiliency_t;
 struct _ocrTask_t;
 
+#define RM_INVOKE_PROP_REGULAR   0
+#define RM_INVOKE_PROP_PROACTIVE 1
+
 typedef struct _ocrResiliencyFcts_t {
     void (*destruct)(struct _ocrResiliency_t *self);
 

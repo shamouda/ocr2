@@ -1399,6 +1399,7 @@ typedef struct _ocrPolicyDomain_t {
     ocrLocation_t * neighbors;                  /**< Array of neighbor locations */
     u32 neighborCount;                          /**< Number of neighboring policy domains */
     u8 shutdownCode;
+    volatile u32 rmMaster;
 
     // BUG #605: Location support
     struct _ocrPolicyDomain_t **neighborPDs;

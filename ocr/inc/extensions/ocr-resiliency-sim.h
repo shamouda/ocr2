@@ -18,14 +18,20 @@ extern "C" {
 
 #include "ocr-types.h"
 
+//Fault simulation codes
+typedef enum {
+    OCR_FAULT_SIM_FREQUENCY,
+    OCR_FAULT_SIM_MAX,
+} ocrFaultSimCode_t;
+
 /**
- * @brief Injects a simulated FREQUENCY fault into the runtime
+ * @brief Injects a simulated fault into the runtime
  *
- *
- * @param[in] newFreq new frequency alue detected (mHz)
+ * @param[in] code : Simulated fault code
+ * @param[in] faultData : Fault data associated with fault
  *
  **/
-u8 ocrInjectFault(u64 newFreq);
+u8 ocrInjectFault(ocrFaultSimCode_t code, void *faultData);
 
 #ifdef __cplusplus
 }

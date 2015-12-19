@@ -16,56 +16,26 @@
 #include "ocr-runtime-types.h"
 #include "policy-domain/hc/hc-policy.h"
 
-#include "ocr-sal.h"
+#include "ocr-errors.h"
 
-
-u8 ocrInjectFault(u64 newFreq){
-    PRINTF("\nINJECTING FAULT CODE\n\n");
-
+u8 ocrInjectFault(ocrFaultSimCode_t code, void *faultData) {
     ocrPolicyDomain_t *pd;
     ocrWorker_t *worker;
     getCurrentEnv(&pd, &worker, NULL, NULL);
-    ocrPolicyDomainHc_t *rself = (ocrPolicyDomainHc_t *)pd;
+    ocrLocation_t loc = (ocrLocation_t) worker->id;
 
-    bool leaderFlag = false;
-
-    if(hal_cmpswap32((u32 *)&rself->pqrFlags.pausingWorker, -1, worker->id) != -1 ||
-        hal_cmpswap32((u32*)&rself->pqrFlags.runtimePause, false, true) == true){
-        while(hal_cmpswap32((u32*)&rself->pqrFlags.runtimePause, false, true) == true){
-            if(rself->pqrFlags.runtimePause == true){
-                hal_xadd32((u32*)&rself->pqrFlags.pauseCounter, 1);
-                while(rself->pqrFlags.runtimePause == true){
-                    hal_pause();
-                }
-                hal_xadd32((u32*)&rself->pqrFlags.pauseCounter, -1);
-            }
-        }
-    }else{
-        leaderFlag = true;
+    ocrFaultCode_t faultCode = OCR_FAULT_MAX;
+    switch(code) {
+    case OCR_FAULT_SIM_FREQUENCY:
+        faultCode = OCR_FAULT_FREQUENCY;
+        break;
+    default:
+        return OCR_ENOTSUP;
     }
 
-    hal_xadd32((u32*)&rself->pqrFlags.pauseCounter, 1);
-
-    //Ensure rest of workers have reached queiescence
-    while(rself->pqrFlags.pauseCounter < pd->workerCount){
-        hal_pause();
-    }
-
-    //Worker responsible for injecting fault
-    if(leaderFlag == true){
-        //Arrange recover() parameters
-        ocrResiliency_t *self = pd->resiliency[0];
-        ocrFaultCode_t faultCode = OCR_FAULT_FREQUENCY;
-        ocrLocation_t loc = (ocrLocation_t) rself->pqrFlags.pausingWorker;
-        u64 *buffer = malloc(sizeof(u64));
-        buffer[0] = newFreq;
-
-        u32 returnCode = self->fcts.recover(self, faultCode, loc, buffer);
-        ASSERT(returnCode == 0);
-
-    }
-
+    ocrResiliency_t *rm = pd->resiliency[0];
+    u32 returnCode = rm->fcts.recover(rm, faultCode, loc, (u8*)faultData);
+    ASSERT(returnCode == 0);
     return 0;
 }
-
 

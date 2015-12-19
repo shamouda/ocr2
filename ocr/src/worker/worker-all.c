@@ -72,6 +72,8 @@ void initializeWorkerOcr(ocrWorkerFactory_t * factory, ocrWorker_t * self, ocrPa
     self->curState = self->desiredState = GET_STATE(RL_CONFIG_PARSE, 0);
     self->callback = NULL;
     self->callbackArg = 0ULL;
+    self->curFreq = 2000;
+    self->active = true;
     self->id = ((paramListWorkerInst_t *) perInstance)->workerId;
 }
 

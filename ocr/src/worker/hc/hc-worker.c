@@ -15,6 +15,7 @@
 #include "ocr-sysboot.h"
 #include "ocr-types.h"
 #include "ocr-worker.h"
+#include "ocr-resiliency.h"
 #include "worker/hc/hc-worker.h"
 #include "policy-domain/hc/hc-policy.h"
 
@@ -36,10 +37,22 @@
 /* OCR-HC WORKER                                      */
 /******************************************************/
 
+#define PROACTIVE_DELAY 5
+u32 proactiveCount = 0;
+
 static void hcWorkShift(ocrWorker_t * worker) {
     ocrPolicyDomain_t * pd;
     PD_MSG_STACK(msg);
     getCurrentEnv(&pd, NULL, NULL, &msg);
+
+    if (proactiveCount++ > PROACTIVE_DELAY) {
+        pd->resiliency[0]->fcts.invoke(pd->resiliency[0], NULL, RM_INVOKE_PROP_PROACTIVE);
+        proactiveCount = 0;
+    }
+    if (!worker->active) {
+        proactiveCount = 0;
+        return;
+    }
 
     ocrWorkerHc_t *hcWorker = (ocrWorkerHc_t *) worker;
 

@@ -36,6 +36,7 @@
 #include "debug.h"
 #include "ocr-sysboot.h"
 #include "ocr-types.h"
+#include "ocr-errors.h"
 #include "mallocproxy-allocator.h"
 #include "allocator/allocator-all.h"
 
@@ -354,6 +355,22 @@ void initializeAllocatorMallocProxy(ocrAllocatorFactory_t * factory, ocrAllocato
     initializeAllocatorOcr(factory, self, perInstance);
 }
 
+#ifdef OCR_ENABLE_INTROSPECTION
+u8 mallocProxyQueryOp(ocrAllocator_t* self, queryType_t query, u32 properties, void** result) {
+    switch(query) {
+    case QUERY_ALLOC_MAXSIZE:
+        DPRINTF(DEBUG_LVL_INFO, "Introspecting maxsize\n");
+        break;
+    case QUERY_ALLOC_FREEBYTES:
+        DPRINTF(DEBUG_LVL_INFO, "Introspecting freebytes\n");
+        break;
+    default:
+        return OCR_ENOTSUP;
+    }
+    return 0;
+}
+#endif
+
 /******************************************************/
 /* OCR ALLOCATOR MALLOX FACTORY                       */
 /******************************************************/
@@ -375,6 +392,9 @@ ocrAllocatorFactory_t * newAllocatorFactoryMallocProxy(ocrParamList_t *perType) 
     base->allocFcts.allocate = FUNC_ADDR(void* (*)(ocrAllocator_t*, u64, u64), mallocProxyAllocate);
     //base->allocFcts.free = FUNC_ADDR(void (*)(void*), mallocProxyDeallocate);
     base->allocFcts.reallocate = FUNC_ADDR(void* (*)(ocrAllocator_t*, void*, u64), mallocProxyReallocate);
+#ifdef OCR_ENABLE_INTROSPECTION
+    base->allocFcts.queryOp = FUNC_ADDR(u8 (*)(ocrAllocator_t*, queryType_t, u32, void**), mallocProxyQueryOp);
+#endif
     return base;
 }
 #endif /* ENABLE_MALLOCPROXY_ALLOCATOR */

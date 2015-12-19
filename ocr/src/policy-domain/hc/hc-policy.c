@@ -968,6 +968,7 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
     switch(msg->type & PD_MSG_TYPE_ONLY) {
     case PD_MSG_DB_CREATE: {
         START_PROFILE(pd_hc_DbCreate);
+        self->resiliency[0]->fcts.notify(self->resiliency[0], msg, 0);
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_DB_CREATE
         // BUG #584: Add properties whether DB needs to be acquired or not
@@ -1102,6 +1103,7 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
     case PD_MSG_DB_FREE: {
         // Call the appropriate free function
         START_PROFILE(pd_hc_DbFree);
+        self->resiliency[0]->fcts.invoke(self->resiliency[0], msg, 0);
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_DB_FREE
         localDeguidify(self, &(PD_MSG_FIELD_I(guid)));
@@ -1166,6 +1168,7 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
 
     case PD_MSG_WORK_CREATE: {
         START_PROFILE(pd_hc_WorkCreate);
+        self->resiliency[0]->fcts.notify(self->resiliency[0], msg, 0);
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_WORK_CREATE
         localDeguidify(self, &(PD_MSG_FIELD_I(templateGuid)));
@@ -1272,6 +1275,7 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
 
     case PD_MSG_WORK_DESTROY: {
         START_PROFILE(pd_hc_WorkDestroy);
+        self->resiliency[0]->fcts.invoke(self->resiliency[0], msg, 0);
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_WORK_DESTROY
         localDeguidify(self, &(PD_MSG_FIELD_I(guid)));
@@ -1328,6 +1332,7 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
 
     case PD_MSG_EVT_CREATE: {
         START_PROFILE(pd_hc_EvtCreate);
+        self->resiliency[0]->fcts.notify(self->resiliency[0], msg, 0);
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_EVT_CREATE
         PD_MSG_FIELD_O(returnDetail) = createEventHelper(
@@ -1343,6 +1348,7 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
 
     case PD_MSG_EVT_DESTROY: {
         START_PROFILE(pd_hc_EvtDestroy);
+        self->resiliency[0]->fcts.invoke(self->resiliency[0], msg, 0);
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_EVT_DESTROY
         localDeguidify(self, &(PD_MSG_FIELD_I(guid)));
@@ -1581,6 +1587,7 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
 
     case PD_MSG_DEP_ADD: {
         START_PROFILE(pd_hc_AddDep);
+        self->resiliency[0]->fcts.notify(self->resiliency[0], msg, 0);
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_DEP_ADD
         // We first get information about the source and destination
@@ -1842,6 +1849,7 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
 
     case PD_MSG_DEP_SATISFY: {
         START_PROFILE(pd_hc_Satisfy);
+        self->resiliency[0]->fcts.invoke(self->resiliency[0], msg, 0);
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_DEP_SATISFY
         // make sure this is one-way

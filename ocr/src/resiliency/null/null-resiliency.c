@@ -15,9 +15,15 @@
 #include "ocr-sysboot.h"
 #include "ocr-workpile.h"
 #include "ocr-resiliency.h"
+#include "ocr-hal.h"
 
 #include "policy-domain/hc/hc-policy.h"
 #include "resiliency/null/null-resiliency.h"
+
+#define DEBUG_TYPE RESILIENCY
+
+#define WORKER_FREQ_NORMAL 2000
+#define FREQUENCY_SLOWDOWN_THRESHOLD 10
 
 /******************************************************/
 /* OCR-NULL RESILIENCY                                */
@@ -69,41 +75,109 @@ void nullResiliencyDestruct(ocrResiliency_t * self) {
 }
 
 u8 nullResiliencyInvoke(ocrResiliency_t *self, ocrPolicyMsg_t *msg, u32 properties) {
-    return OCR_ENOTSUP;
+    if (properties == RM_INVOKE_PROP_PROACTIVE) {
+        ocrPolicyDomain_t *pd;
+        ocrWorker_t *worker;
+        getCurrentEnv(&pd, &worker, NULL, NULL);
+        if (hal_cmpswap32(&(pd->rmMaster), 0, 1) == 0) {
+            DPRINTF(DEBUG_LVL_VERB, "Resiliency Manager Proactive Monitoring PD... (worker %lu)\n", (u64)worker->id);
+            pd->allocators[0]->fcts.queryOp(pd->allocators[0], QUERY_ALLOC_MAXSIZE, 0, NULL);
+            pd->allocators[0]->fcts.queryOp(pd->allocators[0], QUERY_ALLOC_FREEBYTES, 0, NULL);
+            ASSERT(hal_cmpswap32(&(pd->rmMaster), 1, 0) == 1);
+        }
+        DPRINTF(DEBUG_LVL_VVERB, "Resiliency Manager Proactive Monitoring Platform... (worker %lu)\n", (u64)worker->id);
+        ocrCompTarget_t *compTarget = pd->workers[0]->computes[0];
+        compTarget->fcts.queryOp(compTarget, QUERY_COMP_CUR_TEMP, 0, NULL);
+        compTarget->fcts.queryOp(compTarget, QUERY_COMP_CUR_FREQ, 0, NULL);
+        if (worker->curFreq < WORKER_FREQ_NORMAL) {
+            u32 changePercentage = ((WORKER_FREQ_NORMAL - worker->curFreq) * 100) / WORKER_FREQ_NORMAL;
+            if (changePercentage > FREQUENCY_SLOWDOWN_THRESHOLD) {
+                if (worker->active) {
+                    DPRINTF(DEBUG_LVL_WARN, "%u%% frequency slowdown detected on worker %lu. Above threshold (%u%%). Deactivating worker!\n", changePercentage, (u64)worker->id, FREQUENCY_SLOWDOWN_THRESHOLD);
+                    worker->active = false;
+                }
+            } else {
+                DPRINTF(DEBUG_LVL_WARN, "%u%% frequency slowdown detected on worker %lu. Within threshold (%u%%).\n", changePercentage, (u64)worker->id, FREQUENCY_SLOWDOWN_THRESHOLD);
+                worker->active = true;
+            }
+        }
+    } else {
+        switch(msg->type & PD_MSG_TYPE_ONLY) {
+        case PD_MSG_DB_FREE:
+        {
+            DPRINTF(DEBUG_LVL_INFO, "Resiliency Manager invoke: [DB_FREE]\n");
+            break;
+        }
+        case PD_MSG_WORK_DESTROY:
+        {
+            DPRINTF(DEBUG_LVL_INFO, "Resiliency Manager invoke: [EDT_DESTROY]\n");
+            break;
+        }
+        case PD_MSG_EVT_DESTROY:
+        {
+            DPRINTF(DEBUG_LVL_INFO, "Resiliency Manager invoke: [EVT_DESTROY]\n");
+            break;
+        }
+        case PD_MSG_DEP_SATISFY:
+        {
+            DPRINTF(DEBUG_LVL_INFO, "Resiliency Manager invoke: [DEP_SATISFY]\n");
+            break;
+        }
+        default:
+            break;
+        }
+    }
+    return 0;
 }
 
 u8 nullResiliencyNotify(ocrResiliency_t *self, ocrPolicyMsg_t *msg, u32 properties) {
-    return OCR_ENOTSUP;
+    switch(msg->type & PD_MSG_TYPE_ONLY) {
+    case PD_MSG_DB_CREATE:
+    {
+        DPRINTF(DEBUG_LVL_INFO, "Resiliency Manager notify: [DB_CREATE]\n");
+        break;
+    }
+    case PD_MSG_WORK_CREATE:
+    {
+        DPRINTF(DEBUG_LVL_INFO, "Resiliency Manager notify: [EDT_CREATE]\n");
+        break;
+    }
+    case PD_MSG_EVT_CREATE:
+    {
+        DPRINTF(DEBUG_LVL_INFO, "Resiliency Manager notify: [EVT_CREATE]\n");
+        break;
+    }
+    case PD_MSG_DEP_ADD:
+    {
+        DPRINTF(DEBUG_LVL_INFO, "Resiliency Manager notify: [DEP_ADD]\n");
+        break;
+    }
+    default:
+        break;
+    }
+    return 0;
 }
 
-u8 nullResiliencyRecover(ocrResiliency_t *self, ocrFaultCode_t faultCode, ocrLocation_t loc, u64 *buffer) {
+u8 nullResiliencyRecover(ocrResiliency_t *self, ocrFaultCode_t faultCode, ocrLocation_t loc, u8 *buffer) {
 
-    PRINTF("Fault detected on worker %lu ......\n", loc);
-    if(faultCode == OCR_FAULT_FREQUENCY){
-        PRINTF("\nAttempting to recover from fault code 0x%lx\n", faultCode);
-        PRINTF("\nNew freqeuncy detected. Need to tranistion to %lu mHz\n\n", buffer[0]);
-
-        //TODO -Need to update and sync new frequency. Not yet supported
-        //     -Need to restart worker state to retry current EDT.  Not yet supported
-        //
-        //     Normal Pause Wakeup for now (No-op)
-        ocrPolicyDomain_t *pd;
-        getCurrentEnv(&pd, NULL, NULL, NULL);
-        ocrPolicyDomainHc_t *rself = (ocrPolicyDomainHc_t *)pd;
-
-        if(hal_cmpswap32((u32 *)&rself->pqrFlags.runtimePause, true, false) == true){
-            hal_xadd32((u32 *)&rself->pqrFlags.pauseCounter, -1);
+    DPRINTF(DEBUG_LVL_WARN, "Resiliency Manager Fault Handler:......\n");
+    switch(faultCode) {
+    case OCR_FAULT_FREQUENCY:
+        {
+            u64 curFreq = *((u64*)buffer);
+            ocrWorker_t *worker;
+            getCurrentEnv(NULL, &worker, NULL, NULL);
+            //if (worker->curFreq < WORKER_FREQ_NORMAL) {
+                DPRINTF(DEBUG_LVL_WARN, "Frequency fault detected in worker %lu (new frequency %lu MHz)\n", (u64)loc, curFreq);
+                worker->curFreq = curFreq;
+            //}
         }
-
-        //SUCCESS
-        PRINTF("Successfully recovered; continuing app execution...\n\n");
-        return 0;
-
-    //Only testing for FREQUENCY fault for now
-    }else{
+        break;
+    default:
+        ASSERT(0);
         return OCR_ENOTSUP;
     }
-
+    return 0;
 }
 
 /******************************************************/
