@@ -413,7 +413,7 @@ u8 satisfyEventHcPersistSticky(ocrEvent_t *base, ocrFatGuid_t db, u32 slot) {
     //BUG #809 Nanny-mode
     if ((event->waitersCount == STATE_CHECKED_IN) ||
         (event->waitersCount == STATE_CHECKED_OUT)) {
-        DPRINTF(DEBUG_LVL_WARN, "User-level error detected: try to satisfy a sticky event that's already satisfied\n");
+        DPRINTF(DEBUG_LVL_WARN, "User-level error detected: try to satisfy a sticky event that's already satisfied: 0x%lx\n", base->guid);
         ASSERT(false);
         hal_unlock32(&(event->waitersLock));
         return 1; //BUG #603 error codes: Put some error code here.
@@ -646,7 +646,7 @@ u8 registerWaiterEventHc(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot, bool i
     //BUG #809 this should be part of the n
     if (event->waitersCount == (u32)-1) {
         // This is best effort race check
-        DPRINTF(DEBUG_LVL_WARN, "User-level error detected: try to register on a non-persistent event already satisfied\n");
+        DPRINTF(DEBUG_LVL_WARN, "User-level error detected: try to satisfy a sticky event that's already satisfied: 0x%lx\n", base->guid);
         ASSERT(false);
         return 1; //BUG #603 error codes: Put some error code here.
     }
