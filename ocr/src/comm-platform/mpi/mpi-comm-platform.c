@@ -18,8 +18,19 @@
 #include "mpi-comm-platform.h"
 #include <mpi.h>
 
+ #ifdef DEBUG_MPI_HOSTNAMES
+// For gethostname
+#include <unistd.h>
+#endif
+
 //BUG #609 system header: replace this with some INT_MAX from sal header
 #include "limits.h"
+
+//
+// Compile-time constants
+//
+
+// DEBUG_MPI_HOSTNAMES: Dumps hostname MPI processes are started on
 
 #define DEBUG_TYPE COMM_PLATFORM
 
@@ -559,6 +570,11 @@ u8 MPICommSwitchRunlevel(ocrCommPlatform_t *self, ocrPolicyDomain_t *PD, ocrRunl
                 DPRINTF(DEBUG_LVL_VERB,"[MPI %d] Neighbors[%d] is %d\n", myRank, i, PD->neighbors[i]);
                 i++;
             }
+#ifdef DEBUG_MPI_HOSTNAMES
+            char hostname[256];
+            gethostname(hostname,255);
+            PRINTF("MPI rank %d on host %s\n", myRank, hostname);
+#endif
             // Runlevel barrier across policy-domains
             MPI_Barrier(MPI_COMM_WORLD);
 
