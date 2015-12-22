@@ -147,14 +147,30 @@ static u8 hcSchedulerHeuristicWorkEdtUserInvoke(ocrSchedulerHeuristic_t *self, o
     ocrSchedulerHeuristicContextHc_t *hcContext = (ocrSchedulerHeuristicContextHc_t*)context;
     ocrSchedulerObjectFactory_t *fact;
 
+    s32 type=0;
+
     { //First try to pop from own deque
         s32 j = 0;
-        for (j = 0; retVal != 0 && j <= 1; j++) { // first quenching, then stoking deques
+
+	if(type==0)
+	{
+	  for (j = 0; retVal != 0 && j <= 1; j++) { // first quenching, then stoking deques
             ocrSchedulerObject_t *schedObj = (&hcContext->mySchedulerObject)[j];
             ASSERT(schedObj);
             fact = self->scheduler->pd->schedulerObjectFactories[schedObj->fctId];
             retVal = fact->fcts.remove(fact, schedObj, OCR_SCHEDULER_OBJECT_EDT, 1, &edtObj, NULL, SCHEDULER_OBJECT_REMOVE_DEQ_POP);
-        }
+	  }
+	}
+	else
+	{
+	  for(j=1;(retVal!=0)&&(j>=0);j--)
+	  {
+	    ocrSchedulerObject_t *schedObj=(&hcContext->mySchedulerObject)[j];
+	    ASSERT(schedObj);
+	    fact=self->scheduler->pd->schedulerObjectFactories[schedObj->fctId];
+	    retVal=fact->fcts.remove(fact, schedObj, OCR_SCHEDULER_OBJECT_EDT, 1, &edtObj, NULL, SCHEDULER_OBJECT_REMOVE_DEQ_POP);
+	  }
+	}
     }
 
     //If pop fails, then try to steal from other deques
@@ -169,16 +185,37 @@ static u8 hcSchedulerHeuristicWorkEdtUserInvoke(ocrSchedulerHeuristic_t *self, o
         ocrSchedulerObjectFactory_t *sFact = self->scheduler->pd->schedulerObjectFactories[rootObj->fctId];
         while (edtObj.guid.guid == NULL_GUID && sFact->fcts.count(sFact, rootObj, (SCHEDULER_OBJECT_COUNT_EDT | SCHEDULER_OBJECT_COUNT_RECURSIVE) ) != 0) {
             s32 j = 0;
-            for (j = 1; retVal != 0 && j >= 0; j--) { // first stoking, then quenching deques
+
+	    if(type==0)
+	    {
+	      for(j=0;(retVal!=0)&&(j<=1);j++)
+	      {
+		u32 i;
+
+		for(i=1;(edtObj.guid.guid==NULL_GUID)&&(i<self->contextCount);i++)
+		{
+		  hcContext->stealSchedulerObjectIndex=(context->id+1)%self->contextCount;
+		  ocrSchedulerHeuristicContextHc_t *stealCtx=(ocrSchedulerHeuristicContextHc_t*)self->contexts[hcContext->stealSchedulerObjectIndex];
+		  stealSchedulerObject=(&stealCtx->mySchedulerObject)[j];
+
+		  if(stealSchedulerObject)
+		    retVal=fact->fcts.remove(fact, stealSchedulerObject, OCR_SCHEDULER_OBJECT_EDT, 1, &edtObj, NULL, SCHEDULER_OBJECT_REMOVE_DEQ_STEAL);
+		}
+	      }
+	    }
+	    else
+	    {
+	      for (j = 1; retVal != 0 && j >= 0; j--) { // first stoking, then quenching deques
                 u32 i;
                 for (i = 1; edtObj.guid.guid == NULL_GUID && i < self->contextCount; i++) {
-                    hcContext->stealSchedulerObjectIndex = (context->id + i) % self->contextCount; //simple round robin stealing
-                    ocrSchedulerHeuristicContextHc_t *stealCtx = (ocrSchedulerHeuristicContextHc_t*)self->contexts[hcContext->stealSchedulerObjectIndex];
-                    stealSchedulerObject = (&stealCtx->mySchedulerObject)[j];
-                    if (stealSchedulerObject)
-                        retVal = fact->fcts.remove(fact, stealSchedulerObject, OCR_SCHEDULER_OBJECT_EDT, 1, &edtObj, NULL, SCHEDULER_OBJECT_REMOVE_DEQ_STEAL);
+		  hcContext->stealSchedulerObjectIndex = (context->id + i) % self->contextCount; //simple round robin stealing
+		  ocrSchedulerHeuristicContextHc_t *stealCtx = (ocrSchedulerHeuristicContextHc_t*)self->contexts[hcContext->stealSchedulerObjectIndex];
+		  stealSchedulerObject = (&stealCtx->mySchedulerObject)[j];
+		  if (stealSchedulerObject)
+		    retVal = fact->fcts.remove(fact, stealSchedulerObject, OCR_SCHEDULER_OBJECT_EDT, 1, &edtObj, NULL, SCHEDULER_OBJECT_REMOVE_DEQ_STEAL);
                 }
-            }
+	      }
+	    }
         }
     }
 
