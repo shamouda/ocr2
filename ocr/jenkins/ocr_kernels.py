@@ -243,39 +243,42 @@ job_ocr_verify_kernel_fib_tgemul = {
     'env-vars': { 'WORKLOAD_EXEC': '${JJOB_SHARED_HOME}/xstack/ocr/examples/fib/install/tg-x86'}
 }
 
-job_ocr_build_kernel_fib_tg = {
-    'name': 'ocr-build-kernel-fib-tg',
-    'depends': ('ocr-build-builder-ce', 'ocr-build-builder-xe',
-                'ocr-build-tg-ce', 'ocr-build-tg-xe'),
-    'jobtype': 'ocr-build-kernel-tg',
-    'run-args': 'fib tg',
-    'sandbox': ('inherit0',),
-    'env-vars': { 'APPS_LIBS_ROOT': '${JJOB_SHARED_HOME}/xstack/apps/libs/tg',
-                  'WORKLOAD_SRC': '${JJOB_INITDIR_XSTACK}/ocr/examples/fib',
-                  'WORKLOAD_BUILD_ROOT': '${JJOB_PRIVATE_HOME}/xstack/ocr/examples/fib/build',
-                  'WORKLOAD_ARGS': '9',
-                  'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/examples/fib/install'}
-}
+#
+# Disable because of time-out issues (Bug #883)
+#
+#job_ocr_build_kernel_fib_tg = {
+#    'name': 'ocr-build-kernel-fib-tg',
+#    'depends': ('ocr-build-builder-ce', 'ocr-build-builder-xe',
+#                'ocr-build-tg-ce', 'ocr-build-tg-xe'),
+#    'jobtype': 'ocr-build-kernel-tg',
+#    'run-args': 'fib tg',
+#    'sandbox': ('inherit0',),
+#    'env-vars': { 'APPS_LIBS_ROOT': '${JJOB_SHARED_HOME}/xstack/apps/libs/tg',
+#                  'WORKLOAD_SRC': '${JJOB_INITDIR_XSTACK}/ocr/examples/fib',
+#                  'WORKLOAD_BUILD_ROOT': '${JJOB_PRIVATE_HOME}/xstack/ocr/examples/fib/build',
+#                  'WORKLOAD_ARGS': '9',
+#                  'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/examples/fib/install'}
+#}
 
-job_ocr_run_kernel_fib_tg = {
-    'name': 'ocr-run-kernel-fib-tg',
-    'depends': ('ocr-build-kernel-fib-tg',),
-    'jobtype': 'ocr-run-kernel-remote-tg',
-    'run-args': 'fib tg',
-    'param-args': '-c ${WORKLOAD_INSTALL_ROOT}/tg/config.cfg',
-    'sandbox': ('inherit0',),
-    'env-vars': { 'APPS_LIBS_ROOT': '${JJOB_SHARED_HOME}/xstack/apps/libs/tg',
-                  'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/examples/fib/install'}
-}
+#job_ocr_run_kernel_fib_tg = {
+#    'name': 'ocr-run-kernel-fib-tg',
+#    'depends': ('ocr-build-kernel-fib-tg',),
+#    'jobtype': 'ocr-run-kernel-remote-tg',
+#    'run-args': 'fib tg',
+#    'param-args': '-c ${WORKLOAD_INSTALL_ROOT}/tg/config.cfg',
+#    'sandbox': ('inherit0',),
+#    'env-vars': { 'APPS_LIBS_ROOT': '${JJOB_SHARED_HOME}/xstack/apps/libs/tg',
+#                  'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/examples/fib/install'}
+#}
 
-job_ocr_verify_kernel_fib_tg = {
-    'name': 'ocr-verify-kernel-fib-tg',
-    'depends': ('ocr-run-kernel-fib-tg',),
-    'jobtype': 'ocr-verify-kernel-remote',
-    'run-args': '-w -c 1',
-    'sandbox': ('inherit0',),
-    'env-vars': { 'WORKLOAD_EXEC': '${JJOB_SHARED_HOME}/xstack/ocr/examples/fib/install/tg'}
-}
+#job_ocr_verify_kernel_fib_tg = {
+#    'name': 'ocr-verify-kernel-fib-tg',
+#    'depends': ('ocr-run-kernel-fib-tg',),
+#    'jobtype': 'ocr-verify-kernel-remote',
+#    'run-args': '-w -c 1',
+#    'sandbox': ('inherit0',),
+#    'env-vars': { 'WORKLOAD_EXEC': '${JJOB_SHARED_HOME}/xstack/ocr/examples/fib/install/tg'}
+#}
 
 # FFT
 
@@ -418,39 +421,39 @@ job_ocr_verify_kernel_fft_tgemul = {
     'env-vars': { 'WORKLOAD_EXEC': '${JJOB_SHARED_HOME}/xstack/ocr/examples/fft/install/tg-x86'}
 }
 
-job_ocr_build_kernel_fft_tg = {
-    'name': 'ocr-build-kernel-fft-tg',
-    'depends': ('ocr-build-builder-ce', 'ocr-build-builder-xe',
-                'ocr-build-tg-ce', 'ocr-build-tg-xe'),
-    'jobtype': 'ocr-build-kernel-tg',
-    'run-args': 'fft tg',
-    'sandbox': ('inherit0',),
-    'env-vars': { 'APPS_LIBS_ROOT': '${JJOB_SHARED_HOME}/xstack/apps/libs/tg',
-                  'WORKLOAD_SRC': '${JJOB_INITDIR_XSTACK}/ocr/examples/fft',
-                  'WORKLOAD_BUILD_ROOT': '${JJOB_PRIVATE_HOME}/xstack/ocr/examples/fft/build',
-                  'WORKLOAD_ARGS': '9',
-                  'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/examples/fft/install'}
-}
+#job_ocr_build_kernel_fft_tg = {
+#    'name': 'ocr-build-kernel-fft-tg',
+#    'depends': ('ocr-build-builder-ce', 'ocr-build-builder-xe',
+#                'ocr-build-tg-ce', 'ocr-build-tg-xe'),
+#    'jobtype': 'ocr-build-kernel-tg',
+#    'run-args': 'fft tg',
+#    'sandbox': ('inherit0',),
+#    'env-vars': { 'APPS_LIBS_ROOT': '${JJOB_SHARED_HOME}/xstack/apps/libs/tg',
+#                  'WORKLOAD_SRC': '${JJOB_INITDIR_XSTACK}/ocr/examples/fft',
+#                  'WORKLOAD_BUILD_ROOT': '${JJOB_PRIVATE_HOME}/xstack/ocr/examples/fft/build',
+#                   'WORKLOAD_ARGS': '9',
+#                   'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/examples/fft/install'}
+# }
 
-job_ocr_run_kernel_fft_tg = {
-    'name': 'ocr-run-kernel-fft-tg',
-    'depends': ('ocr-build-kernel-fft-tg',),
-    'jobtype': 'ocr-run-kernel-remote-tg',
-    'run-args': 'fft tg',
-    'param-args': '-c ${WORKLOAD_INSTALL_ROOT}/tg/config.cfg',
-    'sandbox': ('inherit0',),
-    'env-vars': { 'APPS_LIBS_ROOT': '${JJOB_SHARED_HOME}/xstack/apps/libs/tg',
-                  'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/examples/fft/install'}
-}
+# job_ocr_run_kernel_fft_tg = {
+#     'name': 'ocr-run-kernel-fft-tg',
+#     'depends': ('ocr-build-kernel-fft-tg',),
+#     'jobtype': 'ocr-run-kernel-remote-tg',
+#     'run-args': 'fft tg',
+#     'param-args': '-c ${WORKLOAD_INSTALL_ROOT}/tg/config.cfg',
+#     'sandbox': ('inherit0',),
+#     'env-vars': { 'APPS_LIBS_ROOT': '${JJOB_SHARED_HOME}/xstack/apps/libs/tg',
+#                   'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/examples/fft/install'}
+# }
 
-job_ocr_verify_kernel_fft_tg = {
-    'name': 'ocr-verify-kernel-fft-tg',
-    'depends': ('ocr-run-kernel-fft-tg',),
-    'jobtype': 'ocr-verify-kernel-remote',
-    'run-args': '-w -c 1',
-    'sandbox': ('inherit0',),
-    'env-vars': { 'WORKLOAD_EXEC': '${JJOB_SHARED_HOME}/xstack/ocr/examples/fft/install/tg'}
-}
+# job_ocr_verify_kernel_fft_tg = {
+#     'name': 'ocr-verify-kernel-fft-tg',
+#     'depends': ('ocr-run-kernel-fft-tg',),
+#     'jobtype': 'ocr-verify-kernel-remote',
+#     'run-args': '-w -c 1',
+#     'sandbox': ('inherit0',),
+#     'env-vars': { 'WORKLOAD_EXEC': '${JJOB_SHARED_HOME}/xstack/ocr/examples/fft/install/tg'}
+# }
 
 # Smith-Waterman
 
@@ -598,39 +601,39 @@ job_ocr_verify_kernel_sw_tgemul = {
     'env-vars': { 'WORKLOAD_EXEC': '${JJOB_SHARED_HOME}/xstack/ocr/examples/smith-waterman/install/tg-x86'}
 }
 
-job_ocr_build_kernel_sw_tg = {
-    'name': 'ocr-build-kernel-sw-tg',
-    'depends': ('ocr-build-builder-ce', 'ocr-build-builder-xe',
-                'ocr-build-tg-ce', 'ocr-build-tg-xe'),
-    'jobtype': 'ocr-build-kernel-tg',
-    'run-args': 'smith-waterman tg',
-    'sandbox': ('inherit0',),
-    'env-vars': { 'APPS_LIBS_ROOT': '${JJOB_SHARED_HOME}/xstack/apps/libs/tg',
-                  'WORKLOAD_SRC': '${JJOB_INITDIR_XSTACK}/ocr/examples/smith-waterman',
-                  'WORKLOAD_BUILD_ROOT': '${JJOB_PRIVATE_HOME}/xstack/ocr/examples/smith-waterman/build',
-                  'WORKLOAD_ARGS': '10 10 ${JJOB_SHARED_HOME}/xstack/apps/smithwaterman/datasets/string1-medium.txt ${JJOB_SHARED_HOME}/xstack/apps/smithwaterman/datasets/string2-medium.txt ${JJOB_SHARED_HOME}/xstack/apps/smithwaterman/datasets/score-medium.txt',
-                  'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/examples/smith-waterman/install'}
-}
+# job_ocr_build_kernel_sw_tg = {
+#     'name': 'ocr-build-kernel-sw-tg',
+#     'depends': ('ocr-build-builder-ce', 'ocr-build-builder-xe',
+#                 'ocr-build-tg-ce', 'ocr-build-tg-xe'),
+#     'jobtype': 'ocr-build-kernel-tg',
+#     'run-args': 'smith-waterman tg',
+#     'sandbox': ('inherit0',),
+#     'env-vars': { 'APPS_LIBS_ROOT': '${JJOB_SHARED_HOME}/xstack/apps/libs/tg',
+#                   'WORKLOAD_SRC': '${JJOB_INITDIR_XSTACK}/ocr/examples/smith-waterman',
+#                   'WORKLOAD_BUILD_ROOT': '${JJOB_PRIVATE_HOME}/xstack/ocr/examples/smith-waterman/build',
+#                   'WORKLOAD_ARGS': '10 10 ${JJOB_SHARED_HOME}/xstack/apps/smithwaterman/datasets/string1-medium.txt ${JJOB_SHARED_HOME}/xstack/apps/smithwaterman/datasets/string2-medium.txt ${JJOB_SHARED_HOME}/xstack/apps/smithwaterman/datasets/score-medium.txt',
+#                   'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/examples/smith-waterman/install'}
+# }
 
-job_ocr_run_kernel_sw_tg = {
-    'name': 'ocr-run-kernel-sw-tg',
-    'depends': ('ocr-build-kernel-sw-tg',),
-    'jobtype': 'ocr-run-kernel-remote-tg',
-    'run-args': 'fft tg',
-    'param-args': '-c ${WORKLOAD_INSTALL_ROOT}/tg/config.cfg',
-    'sandbox': ('inherit0',),
-    'env-vars': { 'APPS_LIBS_ROOT': '${JJOB_SHARED_HOME}/xstack/apps/libs/tg',
-                  'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/examples/smith-waterman/install'}
-}
+# job_ocr_run_kernel_sw_tg = {
+#     'name': 'ocr-run-kernel-sw-tg',
+#     'depends': ('ocr-build-kernel-sw-tg',),
+#     'jobtype': 'ocr-run-kernel-remote-tg',
+#     'run-args': 'fft tg',
+#     'param-args': '-c ${WORKLOAD_INSTALL_ROOT}/tg/config.cfg',
+#     'sandbox': ('inherit0',),
+#     'env-vars': { 'APPS_LIBS_ROOT': '${JJOB_SHARED_HOME}/xstack/apps/libs/tg',
+#                   'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/examples/smith-waterman/install'}
+# }
 
-job_ocr_verify_kernel_sw_tg = {
-    'name': 'ocr-verify-kernel-sw-tg',
-    'depends': ('ocr-run-kernel-sw-tg',),
-    'jobtype': 'ocr-verify-kernel-remote',
-    'run-args': '-w -c 1',
-    'sandbox': ('inherit0',),
-    'env-vars': { 'WORKLOAD_EXEC': '${JJOB_SHARED_HOME}/xstack/ocr/examples/smith-waterman/install/tg'}
-}
+# job_ocr_verify_kernel_sw_tg = {
+#     'name': 'ocr-verify-kernel-sw-tg',
+#     'depends': ('ocr-run-kernel-sw-tg',),
+#     'jobtype': 'ocr-verify-kernel-remote',
+#     'run-args': '-w -c 1',
+#     'sandbox': ('inherit0',),
+#     'env-vars': { 'WORKLOAD_EXEC': '${JJOB_SHARED_HOME}/xstack/ocr/examples/smith-waterman/install/tg'}
+# }
 # Cholesky
 
 job_ocr_build_kernel_cholesky_x86 = {
@@ -776,38 +779,38 @@ job_ocr_verify_kernel_cholesky_tgemul = {
     'env-vars': { 'WORKLOAD_EXEC': '${JJOB_SHARED_HOME}/xstack/ocr/examples/cholesky/install/tg-x86' }
 }
 
-job_ocr_build_kernel_cholesky_tg = {
-    'name': 'ocr-build-kernel-cholesky-tg',
-    'depends': ('ocr-build-builder-ce', 'ocr-build-builder-xe',
-                'ocr-build-tg-ce', 'ocr-build-tg-xe'),
-    'jobtype': 'ocr-build-kernel-tg',
-    'run-args': 'cholesky tg',
-    'sandbox': ('inherit0',),
-    'env-vars': { 'APPS_LIBS_ROOT': '${JJOB_SHARED_HOME}/xstack/apps/libs/tg',
-                  'WORKLOAD_SRC': '${JJOB_INITDIR_XSTACK}/ocr/examples/cholesky',
-                  'WORKLOAD_BUILD_ROOT': '${JJOB_PRIVATE_HOME}/xstack/ocr/examples/cholesky/build',
-                  'WORKLOAD_ARGS': '--ds 50 --ts 10 --fi ${JJOB_SHARED_HOME}/xstack/apps/cholesky/datasets/m_50.in',
-                  'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/examples/cholesky/install'}
-}
+# job_ocr_build_kernel_cholesky_tg = {
+#     'name': 'ocr-build-kernel-cholesky-tg',
+#     'depends': ('ocr-build-builder-ce', 'ocr-build-builder-xe',
+#                 'ocr-build-tg-ce', 'ocr-build-tg-xe'),
+#     'jobtype': 'ocr-build-kernel-tg',
+#     'run-args': 'cholesky tg',
+#     'sandbox': ('inherit0',),
+#     'env-vars': { 'APPS_LIBS_ROOT': '${JJOB_SHARED_HOME}/xstack/apps/libs/tg',
+#                   'WORKLOAD_SRC': '${JJOB_INITDIR_XSTACK}/ocr/examples/cholesky',
+#                   'WORKLOAD_BUILD_ROOT': '${JJOB_PRIVATE_HOME}/xstack/ocr/examples/cholesky/build',
+#                   'WORKLOAD_ARGS': '--ds 50 --ts 10 --fi ${JJOB_SHARED_HOME}/xstack/apps/cholesky/datasets/m_50.in',
+#                   'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/examples/cholesky/install'}
+# }
 
-job_ocr_run_kernel_cholesky_tg = {
-    'name': 'ocr-run-kernel-cholesky-tg',
-    'depends': ('ocr-build-kernel-cholesky-tg',),
-    'jobtype': 'ocr-run-kernel-remote-tg',
-    'run-args': 'cholesky tg',
-    'param-args': '-c ${WORKLOAD_INSTALL_ROOT}/tg/config.cfg',
-    'sandbox': ('inherit0',),
-    'env-vars': { 'APPS_LIBS_ROOT': '${JJOB_SHARED_HOME}/xstack/apps/libs/tg',
-                  'WORKLOAD_ARGS': '--ds 50 --ts 10 --fi ${JJOB_SHARED_HOME}/xstack/apps/cholesky/datasets/m_50.in',
-                  'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/examples/cholesky/install'}
-}
+# job_ocr_run_kernel_cholesky_tg = {
+#     'name': 'ocr-run-kernel-cholesky-tg',
+#     'depends': ('ocr-build-kernel-cholesky-tg',),
+#     'jobtype': 'ocr-run-kernel-remote-tg',
+#     'run-args': 'cholesky tg',
+#     'param-args': '-c ${WORKLOAD_INSTALL_ROOT}/tg/config.cfg',
+#     'sandbox': ('inherit0',),
+#     'env-vars': { 'APPS_LIBS_ROOT': '${JJOB_SHARED_HOME}/xstack/apps/libs/tg',
+#                   'WORKLOAD_ARGS': '--ds 50 --ts 10 --fi ${JJOB_SHARED_HOME}/xstack/apps/cholesky/datasets/m_50.in',
+#                   'WORKLOAD_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/examples/cholesky/install'}
+# }
 
-job_ocr_verify_kernel_cholesky_tg = {
-    'name': 'ocr-verify-kernel-cholesky-tg',
-    'depends': ('ocr-run-kernel-cholesky-tg',),
-    'jobtype': 'ocr-verify-diff',
-    'run-args': '${WORKLOAD_EXEC}/cholesky.out.txt ${JJOB_SHARED_HOME}/xstack/apps/cholesky/datasets/cholesky_out_50.txt',
-    'sandbox': ('inherit0',),
-    'env-vars': { 'WORKLOAD_EXEC': '${JJOB_SHARED_HOME}/xstack/ocr/examples/cholesky/install/tg' }
-}
+# job_ocr_verify_kernel_cholesky_tg = {
+#     'name': 'ocr-verify-kernel-cholesky-tg',
+#     'depends': ('ocr-run-kernel-cholesky-tg',),
+#     'jobtype': 'ocr-verify-diff',
+#     'run-args': '${WORKLOAD_EXEC}/cholesky.out.txt ${JJOB_SHARED_HOME}/xstack/apps/cholesky/datasets/cholesky_out_50.txt',
+#     'sandbox': ('inherit0',),
+#     'env-vars': { 'WORKLOAD_EXEC': '${JJOB_SHARED_HOME}/xstack/ocr/examples/cholesky/install/tg' }
+# }
 
