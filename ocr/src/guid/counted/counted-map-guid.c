@@ -28,6 +28,7 @@
 #define GUID_KIND_SIZE 5 // Warning! check ocrGuidKind struct definition for correct size
 
 #define GUID_COUNTER_SIZE (GUID_BIT_SIZE-(GUID_KIND_SIZE+GUID_LOCID_SIZE))
+#define GUID_COUNTER_MASK ((((u64)1)<<(GUID_COUNTER_SIZE))-1)
 
 #define GUID_LOCID_MASK (((((u64)1)<<GUID_LOCID_SIZE)-1)<<(GUID_COUNTER_SIZE+GUID_KIND_SIZE))
 #define GUID_LOCID_SHIFT_RIGHT (GUID_BIT_SIZE-GUID_LOCID_SIZE)
@@ -53,6 +54,11 @@ void countedMapHashmapEntryDestructChecker(void * key, void * value, void * deal
 #endif
 }
 #endif
+
+static u32 hashGuidCounterModulo(void * ptr, u32 nbBuckets) {
+    u64 guid = (u64) ptr;
+    return ((guid & GUID_COUNTER_MASK) % nbBuckets);
+}
 
 u8 countedMapSwitchRunlevel(ocrGuidProvider_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
                       phase_t phase, u32 properties, void (*callback)(ocrPolicyDomain_t*, u64), u64 val) {
@@ -123,7 +129,7 @@ u8 countedMapSwitchRunlevel(ocrGuidProvider_t *self, ocrPolicyDomain_t *PD, ocrR
         if((properties & RL_BRING_UP) && RL_IS_LAST_PHASE_UP(PD, RL_GUID_OK, phase)) {
             //Initialize the map now that we have an assigned policy domain
             ocrGuidProviderCountedMap_t * derived = (ocrGuidProviderCountedMap_t *) self;
-            derived->guidImplTable = newHashtableBucketLockedModulo(PD, GUID_PROVIDER_NB_BUCKETS);
+            derived->guidImplTable = newHashtableBucketLocked(PD, GUID_PROVIDER_NB_BUCKETS, hashGuidCounterModulo);
         }
         break;
     case RL_COMPUTE_OK:
