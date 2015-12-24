@@ -299,6 +299,41 @@ void * lockedDequePopHead(deque_t * self, u8 doTry) {
     return rt;
 }
 
+
+/*
+ * Push an entry onto the tail of the deque
+ * This operation locks the whole deque.
+ */
+void lockedDequePushTailSemiConc(deque_t* self, void* entry, u8 doTry) {
+    dequeSingleLocked_t* dself = (dequeSingleLocked_t*)self;
+    hal_lock32(&dself->lock);
+    u32 head = self->head;
+    u32 tail = ((u32)self->tail);
+    u32 ptail = (tail == (INIT_DEQUE_CAPACITY-1)) ? 0 : tail+1;
+    if (ptail == head) {
+        ASSERT("DEQUE full, increase deque's size" && 0);
+    }
+    self->data[tail] = entry;
+    self->tail = ptail;
+    hal_unlock32(&dself->lock);
+}
+
+/*
+ *  pop the task out of the deque from the head
+ */
+void * nonConcDequePopHeadSemiConc(deque_t * self, u8 doTry) {
+    u32 head = self->head;
+    u32 tail = self->tail;
+    if (head == tail) {
+        return NULL;
+    }
+    void * rt = (void*) self->data[head];
+    ASSERT(rt != NULL);
+    self->data[head] = NULL; // DEBUG
+    self->head = ((head == (INIT_DEQUE_CAPACITY-1)) ? 0 : head+1);
+    return rt;
+}
+
 /******************************************************/
 /* DEQUE CONSTRUCTORS                                 */
 /******************************************************/
@@ -330,10 +365,10 @@ deque_t * newDeque(ocrPolicyDomain_t *pd, void * initValue, ocrDequeType_t type)
     case SEMI_CONCURRENT_DEQUE:
         self = newBaseDeque(pd, initValue, SINGLE_LOCK_BASE_DEQUE);
         // Specialize push/pop implementations
-        self->pushAtTail = lockedDequePushTail;
+        self->pushAtTail = lockedDequePushTailSemiConc;
         self->popFromTail = NULL;
         self->pushAtHead = NULL;
-        self->popFromHead = nonConcDequePopHead;
+        self->popFromHead = nonConcDequePopHeadSemiConc;
         break;
     case LOCKED_DEQUE:
         self = newBaseDeque(pd, initValue, SINGLE_LOCK_BASE_DEQUE);
