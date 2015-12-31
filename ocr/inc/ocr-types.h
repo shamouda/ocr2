@@ -257,6 +257,13 @@ typedef enum {
                           * A LATCH event has the same persistent as a ONCE event and
                           * is automatically destroyed when its post-slot is triggered.
                           */
+#ifdef ENABLE_EXTENSION_COUNTED_EVT
+    OCR_EVENT_COUNTED_T, /**< A COUNTED event is a hybrid ONCE/STICKY events. It is
+                          * initialized at creation time with a fixed number of expected
+                          * dependences. The event can auto-destroy itself but only when
+                          * both all dependences have been registered and satisfy has happened.
+                          */
+#endif
     OCR_EVENT_T_MAX      /**< This is *NOT* an event and is only used to count
                           * the number of event types. Its use is reserved for the
                           * runtime. */

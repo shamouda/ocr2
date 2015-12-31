@@ -902,17 +902,23 @@ u8 satisfyTaskHc(ocrTask_t * base, ocrFatGuid_t data, u32 slot) {
             //       been executed yet. When it is, slotSatisfiedCount will equal depc and the task will be scheduled.
             if ((self->signalers[self->frontierSlot].guid != UNINITIALIZED_GUID) &&
                 (self->signalers[self->frontierSlot].slot == self->frontierSlot)) {
-                // Just for debugging purpose
-                ocrFatGuid_t signalerGuid;
-                signalerGuid.guid = self->signalers[self->frontierSlot].guid;
-                // Warning double check if that works for regular implementation
-                signalerGuid.metaDataPtr = NULL; // should be ok because guid encodes the kind in distributed
-                ocrGuidKind signalerKind = OCR_GUID_NONE;
                 ocrPolicyDomain_t *pd = NULL;
                 PD_MSG_STACK(msg);
                 getCurrentEnv(&pd, NULL, NULL, &msg);
-                deguidify(pd, &signalerGuid, &signalerKind);
-                ASSERT((signalerKind == OCR_GUID_EVENT_STICKY) || (signalerKind == OCR_GUID_EVENT_IDEM));
+ #ifdef OCR_ASSERT
+                    // Just for debugging purpose
+                    ocrFatGuid_t signalerGuid;
+                    signalerGuid.guid = self->signalers[self->frontierSlot].guid;
+                    // Warning double check if that works for regular implementation
+                    signalerGuid.metaDataPtr = NULL; // should be ok because guid encodes the kind in distributed
+                    ocrGuidKind signalerKind = OCR_GUID_NONE;
+                    deguidify(pd, &signalerGuid, &signalerKind);
+#ifdef ENABLE_EXTENSION_COUNTED_EVT
+                    ASSERT((signalerKind == OCR_GUID_EVENT_STICKY) || (signalerKind == OCR_GUID_EVENT_IDEM) || (signalerKind == OCR_GUID_EVENT_COUNTED));
+#else
+                    ASSERT((signalerKind == OCR_GUID_EVENT_STICKY) || (signalerKind == OCR_GUID_EVENT_IDEM));
+#endif
+#endif
                 hal_unlock32(&(self->lock));
                 // Case 2: A sticky, the EDT registers as a lazy waiter
                 // Here it should be ok to read the frontierSlot since we are on the frontier

@@ -16,6 +16,11 @@
 #define TPL_DRIVER_DEPV 1
 #define TPL_DRIVER_PROP EDT_PROP_FINISH
 
+#ifndef ENABLE_EXTENSION_COUNTED_EVT
+#define PRODUCER_EVENT_TYPE OCR_EVENT_STICKY_T
+#warning ENABLE_EXTENSION_COUNTED_EVT is not enabled, defaulting to OCR_EVENT_STICKY_T
+#endif
+
 ocrGuid_t cleanupEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrGuid_t * consGuids = (ocrGuid_t *) paramv;
     u32 i = 0;
@@ -61,9 +66,15 @@ ocrGuid_t driverEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
         // Setting up producer
         //
 
+#if PRODUCER_EVENT_TYPE == OCR_EVENT_COUNTED_T
+        ocrEventParams_t params;
+        params.EVENT_COUNTED.nbDeps = FAN_OUT;
+        ocrGuid_t prodGuid;
+        ocrEventCreateParams(&prodGuid, PRODUCER_EVENT_TYPE, false, &params);
+#else
         ocrGuid_t prodGuid;
         ocrEventCreate(&prodGuid, PRODUCER_EVENT_TYPE, false);
-
+#endif
         //
         // Setting up consumers
         //
@@ -79,7 +90,14 @@ ocrGuid_t driverEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
 #endif
         int i = 0;
         while (i < FAN_OUT) {
+#if PRODUCER_EVENT_TYPE == OCR_EVENT_COUNTED_T
+            ocrEventParams_t params;
+            params.EVENT_COUNTED.nbDeps = 1;
+            ocrGuid_t prodGuid;
+            ocrEventCreateParams(&consGuids[i], PRODUCER_EVENT_TYPE, false, &params);
+#else
             ocrEventCreate(&consGuids[i], PRODUCER_EVENT_TYPE, false);
+#endif
             i++;
         }
 
@@ -131,8 +149,15 @@ ocrGuid_t driverEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
 #if TIME_CONSUMER_CREATE
             get_time(&start);
 #endif
+#if PRODUCER_EVENT_TYPE == OCR_EVENT_COUNTED_T
+            ocrEventParams_t params;
+            params.EVENT_COUNTED.nbDeps = 1;
+            ocrGuid_t consGuid;
+            ocrEventCreateParams(&consGuid, PRODUCER_EVENT_TYPE, false, &params);
+#else
             ocrGuid_t consGuid;
             ocrEventCreate(&consGuid, PRODUCER_EVENT_TYPE, false);
+#endif
 #if TIME_CONSUMER_CREATE
             get_time(&stop);
             accTimerConsCreate += elapsed_usec(&start, &stop);

@@ -79,6 +79,10 @@ char * ocrGuidKindToChar(ocrGuidKind kind) {
         return "event-abstract";
         case OCR_GUID_EVENT_ONCE:
         return "event-once";
+#ifdef ENABLE_EXTENSION_COUNTED_EVT
+        case OCR_GUID_EVENT_COUNTED:
+        return "event-counted";
+#endif
         case OCR_GUID_EVENT_IDEM:
         return "event-idem";
         case OCR_GUID_EVENT_STICKY:

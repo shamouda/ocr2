@@ -1634,6 +1634,7 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             //
             // Are we revealing too much of the underlying implementation here ?
             //
+            // We omit counted events here since it won't be destroyed until the addDependence happens.
             bool srcIsNonPersistent = ((srcKind == OCR_GUID_EVENT_ONCE) ||
                                         (srcKind == OCR_GUID_EVENT_LATCH));
             // 'Push' registration when source is non-persistent and/or destination is another event.
@@ -1788,6 +1789,7 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         if (dstKind & OCR_GUID_EVENT) {
             ocrEvent_t *evt = (ocrEvent_t*)(dest.metaDataPtr);
             ASSERT(evt->fctId == self->eventFactories[0]->factoryId);
+            // Warning: A counted-event can be destroyed by this call
             PD_MSG_FIELD_O(returnDetail) = self->eventFactories[0]->fcts[evt->kind].registerWaiter(
                 evt, waiter, PD_MSG_FIELD_I(slot), isAddDep);
         } else {
@@ -1797,6 +1799,7 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             // When an EDT want to register to a DB, for instance to get EW access.
             ocrDataBlock_t *db = (ocrDataBlock_t*)(dest.metaDataPtr);
             ASSERT(db->fctId == self->dbFactories[0]->factoryId);
+            // Warning: A counted-event can be destroyed by this call
             PD_MSG_FIELD_O(returnDetail) = self->dbFactories[0]->fcts.registerWaiter(
                 db, waiter, PD_MSG_FIELD_I(slot), isAddDep);
         }

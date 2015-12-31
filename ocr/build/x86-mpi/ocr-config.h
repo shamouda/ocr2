@@ -110,6 +110,9 @@
 //GUID Labeling
 #define ENABLE_EXTENSION_LABELING
 
+//Counted Events support
+#define ENABLE_EXTENSION_COUNTED_EVT
+
 // Build pause support
 //#define ENABLE_EXTENSION_PAUSE
 

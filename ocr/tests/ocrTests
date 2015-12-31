@@ -43,6 +43,11 @@ while [[ $# -gt 0 ]]; do
     elif [[ "$1" = "-ext_params_evt" ]]; then
         shift
         TEST_EXT_PARAMS_EVT=yes
+    elif [[ "$1" = "-ext_counted_evt" ]]; then
+        shift
+	# Need both
+        TEST_EXT_PARAMS_EVT=yes
+        TEST_EXT_COUNTED_EVT=yes
     elif [[ "$1" = "-co" ]]; then
         shift
         STEP_COMPILE_ONLY="yes"
@@ -108,11 +113,15 @@ if [ -n "${TEST_EXT_LABELING}" ]; then
     CFLAGS="$CFLAGS -DENABLE_EXTENSION_LABELING"
 fi
 
-export LDFLAGS="-L${OCR_INSTALL}/lib -locr_${OCR_TYPE} -lpthread ${OCR_LDFLAGS}"
 if [ -n "${TEST_EXT_PARAMS_EVT}" ]; then
     CFLAGS="$CFLAGS -DENABLE_EXTENSION_PARAMS_EVT"
 fi
 
+if [ -n "${TEST_EXT_COUNTED_EVT}" ]; then
+    CFLAGS="$CFLAGS -DENABLE_EXTENSION_COUNTED_EVT"
+fi
+
+export LDFLAGS="-L${OCR_INSTALL}/lib -locr_${OCR_TYPE} -lpthread ${OCR_LDFLAGS}"
 export OCR_TESTS_BIN_OUTPUT=
 
 if [ -z "${OCR_CONFIG}" ]; then

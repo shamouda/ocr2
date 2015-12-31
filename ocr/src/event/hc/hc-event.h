@@ -53,7 +53,12 @@ typedef struct _ocrEventHcPersist_t {
     ocrGuid_t data;
 } ocrEventHcPersist_t;
 
-typedef struct ocrEventHcLatch_t {
+typedef struct _ocrEventHcCounted_t {
+    ocrEventHcPersist_t base;
+    u64 nbDeps; // this is only updated inside a lock
+} ocrEventHcCounted_t;
+
+typedef struct _ocrEventHcLatch_t {
     ocrEventHc_t base;
     volatile s32 counter;
 } ocrEventHcLatch_t;

@@ -27,7 +27,7 @@ else
     if [[ "${OCR_TYPE}" == "x86" ]]; then
         # Also tests legacy and rt-api supports
         # These MUST be built by default for OCR x86
-        TEST_OPTIONS="-ext_rtapi -ext_legacy"
+        TEST_OPTIONS="-ext_rtapi -ext_legacy -ext_params_evt -ext_counted_evt"
     fi
 
     OCR_TYPE=${OCR_TYPE} ./ocrTests ${TEST_OPTIONS} -unstablefile unstable.${OCR_TYPE}-${DB_IMPL}

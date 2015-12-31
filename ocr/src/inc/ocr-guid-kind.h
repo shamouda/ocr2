@@ -33,10 +33,13 @@ typedef enum {
     OCR_GUID_GUIDMAP = 15,
     OCR_GUID_EVENT = 16, // 0x10 bit denotes an event
     OCR_GUID_EVENT_ONCE = 17,
-    OCR_GUID_EVENT_IDEM = 18,
-    OCR_GUID_EVENT_STICKY = 19,
-    OCR_GUID_EVENT_LATCH = 20,
-    OCR_GUID_MAX = 21 // Not a guid kind, just a marker
+#ifdef ENABLE_EXTENSION_COUNTED_EVT
+    OCR_GUID_EVENT_COUNTED = 18,
+#endif
+    OCR_GUID_EVENT_IDEM = 19,
+    OCR_GUID_EVENT_STICKY = 21,
+    OCR_GUID_EVENT_LATCH = 22,
+    OCR_GUID_MAX = 23 // Not a guid kind, just a marker
 } ocrGuidKind;
 
 char * ocrGuidKindToChar(ocrGuidKind kind);

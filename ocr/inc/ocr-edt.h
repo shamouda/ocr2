@@ -29,6 +29,11 @@ typedef struct {
     union {
         u64 counter;
     } EVENT_LATCH;
+#ifdef ENABLE_EXTENSION_COUNTED_EVT
+    union {
+        u64 nbDeps;
+    } EVENT_COUNTED;
+#endif
 } ocrEventParams_t;
 
 u8 ocrEventCreateParams(ocrGuid_t *guid, ocrEventTypes_t eventType, u16 properties, ocrEventParams_t * params);

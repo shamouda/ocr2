@@ -40,6 +40,10 @@ static char * eventTypeToString(ocrEvent_t * base) {
     ocrEventTypes_t type = base->kind;
     if(type == OCR_EVENT_ONCE_T) {
         return "once";
+#ifdef ENABLE_EXTENSION_COUNTED_EVT
+    } else if (type == OCR_EVENT_COUNTED_T) {
+        return "counted";
+#endif
     } else if (type == OCR_EVENT_IDEM_T) {
         return "idem";
     } else if (type == OCR_EVENT_STICKY_T) {
@@ -213,6 +217,9 @@ ocrFatGuid_t getEventHc(ocrEvent_t *base) {
     case OCR_EVENT_LATCH_T:
         break;
     case OCR_EVENT_STICKY_T:
+#ifdef ENABLE_EXTENSION_COUNTED_EVT
+    case OCR_EVENT_COUNTED_T:
+#endif
     case OCR_EVENT_IDEM_T: {
         ocrEventHcPersist_t *event = (ocrEventHcPersist_t*)base;
         res.guid = (event->data == UNINITIALIZED_GUID) ? ERROR_GUID : event->data;
@@ -261,7 +268,7 @@ static u8 commonSatisfyWaiters(ocrPolicyDomain_t *pd, ocrEvent_t *base, ocrFatGu
     ocrEventHc_t * event = (ocrEventHc_t *) base;
     // waitersDb is safe to read because non-persistent event forbids further
     // registrations and persistent event registration is closed because of
-    // event->waitersCount set to -1.
+    // event->waitersCount set to STATE_CHECKED_IN.
     ocrFatGuid_t dbWaiters = event->waitersDb;
     u32 i;
 #if HCEVT_WAITER_STATIC_COUNT
@@ -336,7 +343,7 @@ u8 satisfyEventHcOnce(ocrEvent_t *base, ocrFatGuid_t db, u32 slot) {
     currentEdt.metaDataPtr = curTask;
     u32 waitersCount = event->waitersCount;
     // This is only to help users find out about wrongful use of events
-    event->waitersCount = (u32)-1; // Indicate that the event is satisfied
+    event->waitersCount = STATE_CHECKED_IN; // Indicate that the event is satisfied
 
 #ifdef OCR_ENABLE_STATISTICS
     statsDEP_SATISFYToEvt(pd, currentEdt.guid, NULL, base->guid, base, data, slot);
@@ -388,19 +395,52 @@ static u8 commonSatisfyEventHcPersist(ocrEvent_t *base, ocrFatGuid_t db, u32 slo
     return 0;
 }
 
+#ifdef ENABLE_EXTENSION_COUNTED_EVT
+// For counted event
+u8 satisfyEventHcCounted(ocrEvent_t *base, ocrFatGuid_t db, u32 slot) {
+    ocrEventHc_t * event = (ocrEventHc_t*) base;
+    bool destroy = false;
+    hal_lock32(&(event->waitersLock));
+    //BUG #809 Nanny-mode
+    if ((event->waitersCount == STATE_CHECKED_IN) ||
+        (event->waitersCount == STATE_CHECKED_OUT)) {
+        DPRINTF(DEBUG_LVL_WARN, "User-level error detected: try to satisfy a counted event that's already satisfied: 0x%lx\n", base->guid);
+        ASSERT(false);
+        hal_unlock32(&(event->waitersLock));
+        return 1; //BUG #603 error codes: Put some error code here.
+    }
+    ((ocrEventHcPersist_t*)event)->data = db.guid;
+    u32 waitersCount = event->waitersCount;
+    event->waitersCount = STATE_CHECKED_IN; // Indicate the event is satisfied
+    ocrEventHcCounted_t * devt = (ocrEventHcCounted_t *) event;
+    ASSERT_BLOCK_BEGIN(waitersCount <= devt->nbDeps)
+    DPRINTF(DEBUG_LVL_WARN, "User-level error detected: too many registrations on counted-event 0x%lx\n", base->guid);
+    ASSERT_BLOCK_END
+
+    devt->nbDeps -= waitersCount;
+    destroy = ((devt->nbDeps) == 0);
+    hal_unlock32(&(event->waitersLock));
+    u8 ret = commonSatisfyEventHcPersist(base, db, slot, waitersCount);
+    if (destroy) {
+        ret = destructEventHc(base);
+    }
+    return ret;
+}
+#endif
+
 // For idempotent events
 u8 satisfyEventHcPersistIdem(ocrEvent_t *base, ocrFatGuid_t db, u32 slot) {
     ocrEventHc_t * event = (ocrEventHc_t*) base;
     u32 waitersCount;
     hal_lock32(&(event->waitersLock));
-    if ((event->waitersCount == (u32)-1) || (event->waitersCount == (u32)-2))  {
+    if ((event->waitersCount == STATE_CHECKED_IN) || (event->waitersCount == STATE_CHECKED_OUT)) {
         hal_unlock32(&(event->waitersLock));
         // Legal for idempotent to ignore subsequent satisfy
         return 1; //BUG #603 error codes: Put some error code here.
     } else {
         ((ocrEventHcPersist_t*)event)->data = db.guid;
         waitersCount = event->waitersCount;
-        event->waitersCount = (u32)-1; // Indicate the event is satisfied
+        event->waitersCount = STATE_CHECKED_IN; // Indicate the event is satisfied
         hal_unlock32(&(event->waitersLock));
     }
     return commonSatisfyEventHcPersist(base, db, slot, waitersCount);
@@ -461,7 +501,7 @@ u8 satisfyEventHcLatch(ocrEvent_t *base, ocrFatGuid_t db, u32 slot) {
 
     u32 waitersCount = event->base.waitersCount;
     // This is only to help users find out about wrongful use of events
-    event->base.waitersCount = (u32)-1; // Indicate that the event is satisfied
+    event->base.waitersCount = STATE_CHECKED_IN; // Indicate that the event is satisfied
 
     if (waitersCount) {
         RESULT_PROPAGATE(commonSatisfyWaiters(pd, base, db, waitersCount, currentEdt, &msg, false));
@@ -649,7 +689,7 @@ u8 registerWaiterEventHc(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot, bool i
          DPRINTF(DEBUG_LVL_WARN, "User-level error detected: adding dependence to a non-persistent event that's already satisfied: 0x%lx\n", base->guid);
          ASSERT(false);
          return 1; //BUG #603 error codes: Put some error code here.
-     }
+    }
     ocrFatGuid_t currentEdt = {.guid = curTask!=NULL?curTask->guid:NULL_GUID, .metaDataPtr = curTask};
     hal_lock32(&(event->waitersLock)); // Lock is released by commonEnqueueWaiter
     return commonEnqueueWaiter(pd, base, waiter, slot, currentEdt, &msg);
@@ -658,6 +698,7 @@ u8 registerWaiterEventHc(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot, bool i
 
 /**
  * @brief Registers waiters on persistent events such as sticky or idempotent.
+ *        Also handles counted-event which is a little in between persistent and non-persistent.
  *
  * This code contends with a satisfy call and with concurrent add-dependences that try
  * to register their waiter.
@@ -696,9 +737,10 @@ u8 registerWaiterEventHcPersist(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot,
 
     DPRINTF(DEBUG_LVL_INFO, "Register waiter %s: 0x%lx with waiter 0x%lx on slot %d\n",
             eventTypeToString(base), base->guid, waiter.guid, slot);
+    // Lock to read the event->data
     hal_lock32(&(event->base.waitersLock));
-
-    if(event->data != UNINITIALIZED_GUID) {
+    if (event->data != UNINITIALIZED_GUID) {
+        ocrGuid_t dataGuid = event->data;
         hal_unlock32(&(event->base.waitersLock));
         // We send a message saying that we satisfy whatever tried to wait on us
 #define PD_MSG (&msg)
@@ -707,7 +749,7 @@ u8 registerWaiterEventHcPersist(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot,
         PD_MSG_FIELD_I(satisfierGuid.guid) = base->guid;
         PD_MSG_FIELD_I(satisfierGuid.metaDataPtr) = base;
         PD_MSG_FIELD_I(guid) = waiter;
-        PD_MSG_FIELD_I(payload.guid) = event->data;
+        PD_MSG_FIELD_I(payload.guid) = dataGuid;
         PD_MSG_FIELD_I(payload.metaDataPtr) = NULL;
         PD_MSG_FIELD_I(currentEdt) = currentEdt;
         PD_MSG_FIELD_I(slot) = slot;
@@ -722,6 +764,92 @@ u8 registerWaiterEventHcPersist(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot,
     // Lock is released by commonEnqueueWaiter
     return commonEnqueueWaiter(pd, base, waiter, slot, currentEdt, &msg);
 }
+
+/**
+ * @brief Registers waiters on a counted-event.
+ *
+ * Pretty much the same code as for persistent events, see comments there
+ *
+ * Returns non-zero if the registerWaiter requires registerSignaler to be called there-after
+ */
+#ifdef ENABLE_EXTENSION_COUNTED_EVT
+u8 registerWaiterEventHcCounted(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot, bool isDepAdd) {
+    ocrEventHcPersist_t *event = (ocrEventHcPersist_t*)base;
+
+    ocrPolicyDomain_t *pd = NULL;
+    ocrTask_t *curTask = NULL;
+    PD_MSG_STACK(msg);
+    getCurrentEnv(&pd, NULL, &curTask, &msg);
+    ocrFatGuid_t currentEdt;
+    currentEdt.guid = (curTask == NULL) ? NULL_GUID : curTask->guid;
+    currentEdt.metaDataPtr = curTask;
+
+    // EDTs incrementally register on their dependences as elements
+    // get satisfied (Guarantees O(n) traversal of dependence list).
+    // Other events register when the dependence is added
+    ocrGuidKind waiterKind = OCR_GUID_NONE;
+    RESULT_ASSERT(guidKind(pd, waiter, &waiterKind), ==, 0);
+
+    if(isDepAdd && waiterKind == OCR_GUID_EDT) {
+        ASSERT(false && "Should never happen anymore");
+        // If we're adding a dependence and the waiter is an EDT we
+        // skip this part. The event is registered on the EDT and
+        // the EDT will register on the event only when its dependence
+        // frontier reaches this event.
+        return 0; //Require registerSignaler invocation
+    }
+    ASSERT(waiterKind == OCR_GUID_EDT || (waiterKind & OCR_GUID_EVENT));
+
+    DPRINTF(DEBUG_LVL_INFO, "Register waiter %s: 0x%lx with waiter 0x%lx on slot %d\n",
+            eventTypeToString(base), base->guid, waiter.guid, slot);
+    // Lock to read the data field
+    hal_lock32(&(event->base.waitersLock));
+    if (event->data != UNINITIALIZED_GUID) {
+        ocrGuid_t dataGuid = event->data;
+        hal_unlock32(&(event->base.waitersLock));
+        // We send a message saying that we satisfy whatever tried to wait on us
+#define PD_MSG (&msg)
+#define PD_TYPE PD_MSG_DEP_SATISFY
+        msg.type = PD_MSG_DEP_SATISFY | PD_MSG_REQUEST;
+        PD_MSG_FIELD_I(satisfierGuid.guid) = base->guid;
+        PD_MSG_FIELD_I(satisfierGuid.metaDataPtr) = base;
+        PD_MSG_FIELD_I(guid) = waiter;
+        PD_MSG_FIELD_I(payload.guid) = dataGuid;
+        PD_MSG_FIELD_I(payload.metaDataPtr) = NULL;
+        PD_MSG_FIELD_I(currentEdt) = currentEdt;
+        PD_MSG_FIELD_I(slot) = slot;
+        PD_MSG_FIELD_I(properties) = 0;
+        //BUG #603 error codes
+        RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, false));
+#undef PD_MSG
+#undef PD_TYPE
+
+        // Here it is still safe to use the base pointer because the satisfy
+        // call cannot trigger the destruction of the event. For counted-events
+        // the runtime takes care of it
+        hal_lock32(&(event->base.waitersLock));
+        ocrEventHcCounted_t * devt = (ocrEventHcCounted_t *) event;
+        // Account for this registration. When it reaches zero the event
+        // can be deallocated since it is already satisfied and this call
+        // was the last ocrAddDepednence.
+        ASSERT(devt->nbDeps > 0);
+        devt->nbDeps--;
+        u64 nbDeps = devt->nbDeps;
+        hal_unlock32(&(event->base.waitersLock));
+        // Check if we'll need to destroy the event
+        if (nbDeps == 0) {
+            // Can move that after satisfy to reduce CPL
+            destructEventHc(base);
+        }
+
+        return 0; //Require registerSignaler invocation
+    }
+
+    // Lock is released by commonEnqueueWaiter
+    return commonEnqueueWaiter(pd, base, waiter, slot, currentEdt, &msg);
+}
+#endif
+
 
 // In this call, we do not contend with satisfy
 u8 unregisterWaiterEventHc(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot, bool isDepRem) {
@@ -895,6 +1023,11 @@ u8 newEventHc(ocrEventFactory_t * factory, ocrFatGuid_t *guid,
 
     // Create the event itself by getting a GUID
     u64 sizeOfGuid = sizeof(ocrEventHc_t);
+#ifdef ENABLE_EXTENSION_COUNTED_EVT
+    if(eventType == OCR_EVENT_COUNTED_T) {
+        sizeOfGuid = sizeof(ocrEventHcCounted_t);
+    }
+#endif
     if(eventType == OCR_EVENT_LATCH_T) {
         sizeOfGuid = sizeof(ocrEventHcLatch_t);
     }
@@ -908,6 +1041,11 @@ u8 newEventHc(ocrEventFactory_t * factory, ocrFatGuid_t *guid,
         case OCR_EVENT_ONCE_T:
             kind = OCR_GUID_EVENT_ONCE;
             break;
+#ifdef ENABLE_EXTENSION_COUNTED_EVT
+        case OCR_EVENT_COUNTED_T:
+            kind = OCR_GUID_EVENT_COUNTED;
+            break;
+#endif
         case OCR_EVENT_IDEM_T:
             kind = OCR_GUID_EVENT_IDEM;
             break;
@@ -959,11 +1097,11 @@ u8 newEventHc(ocrEventFactory_t * factory, ocrFatGuid_t *guid,
         event->waiters[jj].mode = -1;
         jj++;
     }
-
     if(eventType == OCR_EVENT_LATCH_T) {
         // Initialize the counter
         if (perInstance != NULL) {
 #ifdef ENABLE_EXTENSION_PARAMS_EVT
+            // Expecting ocrEventParams_t as the paramlist
             ocrEventParams_t * params = (ocrEventParams_t *) perInstance;
             ((ocrEventHcLatch_t*)event)->counter = params->EVENT_LATCH.counter;
 #endif
@@ -971,9 +1109,15 @@ u8 newEventHc(ocrEventFactory_t * factory, ocrFatGuid_t *guid,
             ((ocrEventHcLatch_t*)event)->counter = 0;
         }
     }
+#ifdef ENABLE_EXTENSION_COUNTED_EVT
+    if(eventType == OCR_EVENT_IDEM_T || eventType == OCR_EVENT_STICKY_T || eventType == OCR_EVENT_COUNTED_T) {
+        ((ocrEventHcPersist_t*)event)->data = UNINITIALIZED_GUID;
+    }
+#else
     if(eventType == OCR_EVENT_IDEM_T || eventType == OCR_EVENT_STICKY_T) {
         ((ocrEventHcPersist_t*)event)->data = UNINITIALIZED_GUID;
     }
+#endif
 
     if (hintc == 0) {
         event->hint.hintMask = 0;
@@ -986,6 +1130,21 @@ u8 newEventHc(ocrEventFactory_t * factory, ocrFatGuid_t *guid,
     // Initialize GUIDs for the waiters data-blocks
     event->waitersDb.guid = UNINITIALIZED_GUID;
     event->waitersDb.metaDataPtr = NULL;
+
+#ifdef ENABLE_EXTENSION_COUNTED_EVT
+    if(eventType == OCR_EVENT_COUNTED_T) {
+        // Initialize the counter for dependencies tracking
+        ASSERT_BLOCK_BEGIN((perInstance != NULL) && (((ocrEventParams_t *) perInstance)->EVENT_COUNTED.nbDeps != 0))
+        DPRINTF(DEBUG_LVL_WARN, "error: Illegal nbDeps value (zero) for OCR_EVENT_COUNTED_T 0x%lx\n", eventTypeToString(base), base->guid);
+        factory->fcts[OCR_EVENT_COUNTED_T].destruct(base);
+        ASSERT(false);
+        return OCR_EINVAL;
+        ASSERT_BLOCK_END
+        // Expecting ocrEventParams_t as the paramlist
+        ocrEventParams_t * params = (ocrEventParams_t *) perInstance;
+        ((ocrEventHcCounted_t*)event)->nbDeps = params->EVENT_COUNTED.nbDeps;
+    }
+#endif
 
     // Do this at the very end; it indicates that the object
     // of the GUID is actually valid
@@ -1030,12 +1189,16 @@ ocrEventFactory_t * newEventFactoryHc(ocrParamList_t *perType, u32 factoryId) {
         base->fcts[i].registerSignaler = FUNC_ADDR(u8 (*)(ocrEvent_t*, ocrFatGuid_t, u32, ocrDbAccessMode_t, bool), registerSignalerHc);
         base->fcts[i].unregisterSignaler = FUNC_ADDR(u8 (*)(ocrEvent_t*, ocrFatGuid_t, u32, bool), unregisterSignalerHc);
     }
-    base->fcts[OCR_EVENT_STICKY_T].destruct = FUNC_ADDR(u8 (*)(ocrEvent_t*), destructEventHcPersist);
+    base->fcts[OCR_EVENT_STICKY_T].destruct =
     base->fcts[OCR_EVENT_IDEM_T].destruct = FUNC_ADDR(u8 (*)(ocrEvent_t*), destructEventHcPersist);
 
     // Setup satisfy function pointers
     base->fcts[OCR_EVENT_ONCE_T].satisfy =
         FUNC_ADDR(u8 (*)(ocrEvent_t*, ocrFatGuid_t, u32), satisfyEventHcOnce);
+#ifdef ENABLE_EXTENSION_COUNTED_EVT
+    base->fcts[OCR_EVENT_COUNTED_T].satisfy =
+        FUNC_ADDR(u8 (*)(ocrEvent_t*, ocrFatGuid_t, u32), satisfyEventHcCounted);
+#endif
     base->fcts[OCR_EVENT_LATCH_T].satisfy =
         FUNC_ADDR(u8 (*)(ocrEvent_t*, ocrFatGuid_t, u32), satisfyEventHcLatch);
     base->fcts[OCR_EVENT_IDEM_T].satisfy =
@@ -1050,11 +1213,18 @@ ocrEventFactory_t * newEventFactoryHc(ocrParamList_t *perType, u32 factoryId) {
     base->fcts[OCR_EVENT_IDEM_T].registerWaiter =
     base->fcts[OCR_EVENT_STICKY_T].registerWaiter =
         FUNC_ADDR(u8 (*)(ocrEvent_t*, ocrFatGuid_t, u32, bool), registerWaiterEventHcPersist);
+#ifdef ENABLE_EXTENSION_COUNTED_EVT
+    base->fcts[OCR_EVENT_COUNTED_T].registerWaiter =
+        FUNC_ADDR(u8 (*)(ocrEvent_t*, ocrFatGuid_t, u32, bool), registerWaiterEventHcCounted);
+#endif
 
     base->fcts[OCR_EVENT_ONCE_T].unregisterWaiter =
     base->fcts[OCR_EVENT_LATCH_T].unregisterWaiter =
         FUNC_ADDR(u8 (*)(ocrEvent_t*, ocrFatGuid_t, u32, bool), unregisterWaiterEventHc);
     base->fcts[OCR_EVENT_IDEM_T].unregisterWaiter =
+#ifdef ENABLE_EXTENSION_COUNTED_EVT
+    base->fcts[OCR_EVENT_COUNTED_T].unregisterWaiter =
+#endif
     base->fcts[OCR_EVENT_STICKY_T].unregisterWaiter =
         FUNC_ADDR(u8 (*)(ocrEvent_t*, ocrFatGuid_t, u32, bool), unregisterWaiterEventHcPersist);
 
