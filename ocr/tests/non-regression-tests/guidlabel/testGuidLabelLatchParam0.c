@@ -6,7 +6,7 @@
 
 #include "ocr.h"
 
-#ifdef ENABLE_EXTENSION_LABELING
+#if defined ENABLE_EXTENSION_LABELING && ENABLE_EXTENSION_PARAMS_EVT
 #include "extensions/ocr-labeling.h"
 
 /**
@@ -69,7 +69,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
 #else
 
 ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
-    PRINTF("Test disabled - ENABLE_EXTENSION_LABELING not defined\n");
+    PRINTF("Test disabled - ENABLE_EXTENSION_LABELING & ENABLE_EXTENSION_PARAMS_EVT not defined\n");
     ocrShutdown();
     return NULL_GUID;
 }

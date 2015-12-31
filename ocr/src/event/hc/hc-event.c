@@ -27,7 +27,6 @@
 
 #define SEALED_LIST ((void *) -1)
 #define END_OF_LIST NULL
-#define UNINITIALIZED_DATA ((ocrGuid_t) -2)
 
 #define DEBUG_TYPE EVENT
 
@@ -43,6 +42,10 @@ static char * eventTypeToString(ocrEvent_t * base) {
 #ifdef ENABLE_EXTENSION_COUNTED_EVT
     } else if (type == OCR_EVENT_COUNTED_T) {
         return "counted";
+#endif
+#ifdef ENABLE_EXTENSION_CHANNEL_EVT
+    } else if (type == OCR_EVENT_CHANNEL_T) {
+        return "channel";
 #endif
     } else if (type == OCR_EVENT_IDEM_T) {
         return "idem";
@@ -828,7 +831,7 @@ u8 registerWaiterEventHcCounted(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot,
         ocrEventHcCounted_t * devt = (ocrEventHcCounted_t *) event;
         // Account for this registration. When it reaches zero the event
         // can be deallocated since it is already satisfied and this call
-        // was the last ocrAddDepednence.
+        // was the last ocrAddDependence.
         ASSERT(devt->nbDeps > 0);
         devt->nbDeps--;
         u64 nbDeps = devt->nbDeps;
@@ -1024,6 +1027,20 @@ u8 newEventHc(ocrEventFactory_t * factory, ocrFatGuid_t *guid,
         sizeOfGuid = sizeof(ocrEventHcCounted_t);
     }
 #endif
+#ifdef ENABLE_EXTENSION_CHANNEL_EVT
+    if(eventType == OCR_EVENT_CHANNEL_T) {
+#ifndef ENABLE_EXTENSION_PARAMS_EVT
+        ASSERT(false && "ENABLE_EXTENSION_PARAMS_EVT must be defined to use Channel-events");
+#endif
+        ASSERT((perInstance != NULL) && "error: No parameters specified at Channel-event creation");
+        // Expecting ocrEventParams_t as the paramlist
+        ocrEventParams_t * params = (ocrEventParams_t *) perInstance;
+        // Allocate extra space to store backing data-structures that are parameter-dependent
+        u32 sizeSat = (sizeof(ocrGuid_t) * params->EVENT_CHANNEL.nbSat * params->EVENT_CHANNEL.maxGen);
+        u32 sizeWaiters = (sizeof(regNode_t) * params->EVENT_CHANNEL.nbDeps * params->EVENT_CHANNEL.maxGen);
+        sizeOfGuid = sizeof(ocrEventHcChannel_t) + sizeSat + sizeWaiters;
+    }
+#endif
     if(eventType == OCR_EVENT_LATCH_T) {
         sizeOfGuid = sizeof(ocrEventHcLatch_t);
     }
@@ -1031,6 +1048,7 @@ u8 newEventHc(ocrEventFactory_t * factory, ocrFatGuid_t *guid,
         sizeOfGuid = sizeof(ocrEventHcPersist_t);
     }
     u32 hintc = OCR_HINT_COUNT_EVT_HC;
+    sizeOfGuid += hintc*sizeof(u64);
 
     ocrGuidKind kind;
     switch(eventType) {
@@ -1040,6 +1058,11 @@ u8 newEventHc(ocrEventFactory_t * factory, ocrFatGuid_t *guid,
 #ifdef ENABLE_EXTENSION_COUNTED_EVT
         case OCR_EVENT_COUNTED_T:
             kind = OCR_GUID_EVENT_COUNTED;
+            break;
+#endif
+#ifdef ENABLE_EXTENSION_CHANNEL_EVT
+        case OCR_EVENT_CHANNEL_T:
+            kind = OCR_GUID_EVENT_CHANNEL;
             break;
 #endif
         case OCR_EVENT_IDEM_T:
@@ -1061,7 +1084,7 @@ u8 newEventHc(ocrEventFactory_t * factory, ocrFatGuid_t *guid,
     msg.type = PD_MSG_GUID_CREATE | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
     PD_MSG_FIELD_IO(guid) = *guid;
     // We allocate everything in the meta-data to keep things simple
-    PD_MSG_FIELD_I(size) = sizeOfGuid + hintc*sizeof(u64);
+    PD_MSG_FIELD_I(size) = sizeOfGuid;
     PD_MSG_FIELD_I(kind) = kind;
     PD_MSG_FIELD_I(properties) = properties;
     RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, true));
@@ -1144,6 +1167,47 @@ u8 newEventHc(ocrEventFactory_t * factory, ocrFatGuid_t *guid,
     }
 #endif
 
+#ifdef ENABLE_EXTENSION_CHANNEL_EVT
+    if(eventType == OCR_EVENT_CHANNEL_T) {
+        // Check current extension implementation restrictions
+        ocrEventHcChannel_t * devt = ((ocrEventHcChannel_t*)event);
+        // Expecting ocrEventParams_t as the paramlist
+        ocrEventParams_t * params = (ocrEventParams_t *) perInstance;
+        ASSERT((params->EVENT_CHANNEL.nbSat == 1) && "Channel-event limitation nbSat must be set to 1");
+        ASSERT((params->EVENT_CHANNEL.nbDeps == 1) && "Channel-event limitation nbDeps must be set to 1");
+        ASSERT((params->EVENT_CHANNEL.maxGen != EVENT_CHANNEL_UNBOUNDED) && "Channel-event unbounded not implemented");
+        ASSERT((params->EVENT_CHANNEL.maxGen != 0) && "Channel-event maxGen=0 invalid value");
+        devt->maxGen = params->EVENT_CHANNEL.maxGen;
+        devt->nbSat = params->EVENT_CHANNEL.nbSat;
+        devt->satBufSz = devt->maxGen * devt->nbSat;
+        devt->nbDeps = params->EVENT_CHANNEL.nbDeps;
+        devt->waitBufSz = devt->maxGen * devt->nbDeps;
+        // Setup backing data-structure pointers
+        u32 baseSize = sizeof(ocrEventHcChannel_t);
+        u32 sizeSat = (sizeof(ocrGuid_t) * devt->satBufSz);
+        devt->satBuffer = (ocrGuid_t *)((u64)base + baseSize);
+        devt->waiters = (regNode_t *)((u64)base + baseSize + sizeSat);
+        regNode_t regnode;
+        regnode.guid = NULL_GUID;
+        regnode.slot = 0;
+        regnode.mode = -1;
+        devt->headSat = 0;
+        devt->tailSat = 0;
+        devt->headWaiter = 0;
+        devt->tailWaiter = 0;
+        u32 i;
+        for (i=0; i<devt->satBufSz; i++) {
+            devt->satBuffer[i] = UNINITIALIZED_GUID;
+        }
+#ifdef OCR_ASSERT
+        // This is not really necessary outside of debug mode
+        for (i=0; i<devt->waitBufSz; i++) {
+            devt->waiters[i] = regnode;
+        }
+#endif
+    }
+#endif
+
     // Do this at the very end; it indicates that the object
     // of the GUID is actually valid
     hal_fence(); // Make sure sure this really happens last
@@ -1159,6 +1223,124 @@ u8 newEventHc(ocrEventFactory_t * factory, ocrFatGuid_t *guid,
     }
     return returnValue;
 }
+
+/******************************************************/
+/* MOAE scratchspace */
+/******************************************************/
+
+//
+// Simple Channel
+//
+
+#ifdef ENABLE_EXTENSION_CHANNEL_EVT
+
+#ifndef DEBUG_LVL_CHANNEL
+#define DEBUG_LVL_CHANNEL DEBUG_LVL_INFO
+#endif
+
+static void pushDependence(ocrEventHcChannel_t * devt, regNode_t * node) {
+    //TODO rollover u32/u64
+    // tail - head cannot go be more that the bound
+    ASSERT(devt->tailWaiter < (devt->headWaiter + devt->waitBufSz));
+    u32 idx = devt->tailWaiter % devt->waitBufSz;
+    devt->tailWaiter++;
+    devt->waiters[idx] = *node;
+}
+
+static u8 popDependence(ocrEventHcChannel_t * devt, regNode_t * node) {
+    if (devt->headWaiter == devt->tailWaiter) {
+        return 1;
+    } else {
+        u32 idx = devt->headWaiter % devt->waitBufSz;
+        devt->headWaiter++;
+        *node = devt->waiters[idx];
+        return 0;
+    }
+}
+
+static void pushSatisfy(ocrEventHcChannel_t * devt, ocrGuid_t data) {
+    ASSERT(devt->tailSat < (devt->headSat + devt->satBufSz));
+    u32 idx = devt->tailSat % devt->satBufSz;
+    devt->tailSat++;
+    devt->satBuffer[idx] = data;
+}
+
+static ocrGuid_t popSatisfy(ocrEventHcChannel_t * devt) {
+    if (devt->headSat == devt->tailSat) {
+        return UNINITIALIZED_GUID;
+    } else {
+        u32 idx = devt->headSat % devt->satBufSz;
+        devt->headSat++;
+        ocrGuid_t res = devt->satBuffer[idx];
+        ASSERT(!IS_GUID_UNINITIALIZED(res));
+        return res;
+    }
+}
+
+u8 registerWaiterEventHcChannel(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot, bool isDepAdd) {
+    ocrEventHc_t * evt = ((ocrEventHc_t*)base);
+    ocrEventHcChannel_t * devt = ((ocrEventHcChannel_t*)base);
+    hal_lock32(&evt->waitersLock);
+    ocrGuid_t data = popSatisfy(devt);
+    regNode_t regnode;
+    regnode.guid = waiter.guid;
+    regnode.slot = slot;
+    if (!IS_GUID_UNINITIALIZED(data)) {
+        DPRINTF(DEBUG_LVL_CHANNEL, "registerWaiterEventHcChannel 0x%lx push dep and deque satisfy\n", base->guid);
+        hal_unlock32(&evt->waitersLock);
+        // We can fire the event
+        ocrPolicyDomain_t *pd = NULL;
+        ocrTask_t *curTask = NULL;
+        PD_MSG_STACK(msg);
+        getCurrentEnv(&pd, NULL, &curTask, &msg);
+        ocrFatGuid_t currentEdt;
+        currentEdt.guid = (curTask == NULL) ? NULL_GUID : curTask->guid;
+        currentEdt.metaDataPtr = curTask;
+        ocrFatGuid_t db;
+        db.guid = data;
+        db.metaDataPtr = NULL;
+        DPRINTF(DEBUG_LVL_CHANNEL, "registerWaiterEventHcChannel satisfy edt with DB=0x%lx\n", data);
+        return commonSatisfyRegNode(pd, &msg, base->guid, db, currentEdt, &regnode);
+    } else {
+        DPRINTF(DEBUG_LVL_CHANNEL, "registerWaiterEventHcChannel 0x%lx push dependence\n", base->guid);
+        pushDependence(devt, &regnode);
+        hal_unlock32(&evt->waitersLock);
+    }
+    return 0;
+}
+
+u8 satisfyEventHcChannel(ocrEvent_t *base, ocrFatGuid_t db, u32 slot) {
+    ocrEventHc_t * evt = ((ocrEventHc_t*)base);
+    ocrEventHcChannel_t * devt = ((ocrEventHcChannel_t*)base);
+    hal_lock32(&evt->waitersLock);
+    regNode_t regnode;
+    u8 res = popDependence(devt, &regnode);
+    if (res == 0) {
+        DPRINTF(DEBUG_LVL_CHANNEL, "satisfyEventHcChannel 0x%lx satisfy go through\n", base->guid);
+        hal_unlock32(&evt->waitersLock);
+        // We can fire the event
+        ocrPolicyDomain_t *pd = NULL;
+        ocrTask_t *curTask = NULL;
+        PD_MSG_STACK(msg);
+        getCurrentEnv(&pd, NULL, &curTask, &msg);
+        ocrFatGuid_t currentEdt;
+        currentEdt.guid = (curTask == NULL) ? NULL_GUID : curTask->guid;
+        currentEdt.metaDataPtr = curTask;
+        DPRINTF(DEBUG_LVL_CHANNEL, "satisfyEventHcChannel satisfy edt with DB=0x%lx\n", db.guid);
+        return commonSatisfyRegNode(pd, &msg, base->guid, db, currentEdt, &regnode);
+    } else {
+        DPRINTF(DEBUG_LVL_CHANNEL, "satisfyEventHcChannel 0x%lx satisfy enqueued\n", base->guid);
+        pushSatisfy(devt, db.guid);
+        hal_unlock32(&evt->waitersLock);
+    }
+    return 0;
+}
+
+u8 unregisterWaiterEventHcChannel(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot, bool isDepRem) {
+    ASSERT(false && "Not supported");
+}
+
+#endif
 
 void destructEventFactoryHc(ocrEventFactory_t * factory) {
     runtimeChunkFree((u64)factory->hintPropMap, PERSISTENT_CHUNK);
@@ -1197,6 +1379,10 @@ ocrEventFactory_t * newEventFactoryHc(ocrParamList_t *perType, u32 factoryId) {
     base->fcts[OCR_EVENT_COUNTED_T].satisfy =
         FUNC_ADDR(u8 (*)(ocrEvent_t*, ocrFatGuid_t, u32), satisfyEventHcCounted);
 #endif
+#ifdef ENABLE_EXTENSION_CHANNEL_EVT
+    base->fcts[OCR_EVENT_CHANNEL_T].satisfy =
+        FUNC_ADDR(u8 (*)(ocrEvent_t*, ocrFatGuid_t, u32), satisfyEventHcChannel);
+#endif
     base->fcts[OCR_EVENT_LATCH_T].satisfy =
         FUNC_ADDR(u8 (*)(ocrEvent_t*, ocrFatGuid_t, u32), satisfyEventHcLatch);
     base->fcts[OCR_EVENT_IDEM_T].satisfy =
@@ -1215,7 +1401,10 @@ ocrEventFactory_t * newEventFactoryHc(ocrParamList_t *perType, u32 factoryId) {
     base->fcts[OCR_EVENT_COUNTED_T].registerWaiter =
         FUNC_ADDR(u8 (*)(ocrEvent_t*, ocrFatGuid_t, u32, bool), registerWaiterEventHcCounted);
 #endif
-
+#ifdef ENABLE_EXTENSION_CHANNEL_EVT
+    base->fcts[OCR_EVENT_CHANNEL_T].registerWaiter =
+        FUNC_ADDR(u8 (*)(ocrEvent_t*, ocrFatGuid_t, u32, bool), registerWaiterEventHcChannel);
+#endif
     base->fcts[OCR_EVENT_ONCE_T].unregisterWaiter =
     base->fcts[OCR_EVENT_LATCH_T].unregisterWaiter =
         FUNC_ADDR(u8 (*)(ocrEvent_t*, ocrFatGuid_t, u32, bool), unregisterWaiterEventHc);
@@ -1225,6 +1414,10 @@ ocrEventFactory_t * newEventFactoryHc(ocrParamList_t *perType, u32 factoryId) {
 #endif
     base->fcts[OCR_EVENT_STICKY_T].unregisterWaiter =
         FUNC_ADDR(u8 (*)(ocrEvent_t*, ocrFatGuid_t, u32, bool), unregisterWaiterEventHcPersist);
+#ifdef ENABLE_EXTENSION_CHANNEL_EVT
+    base->fcts[OCR_EVENT_CHANNEL_T].unregisterWaiter =
+        FUNC_ADDR(u8 (*)(ocrEvent_t*, ocrFatGuid_t, u32, bool), unregisterWaiterEventHcChannel);
+#endif
 
     base->factoryId = factoryId;
 

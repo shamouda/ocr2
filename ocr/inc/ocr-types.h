@@ -278,6 +278,10 @@ typedef enum {
                           * both all dependences have been registered and satisfy has happened.
                           */
 #endif
+#ifdef ENABLE_EXTENSION_CHANNEL_EVT
+    OCR_EVENT_CHANNEL_T, /**< TODO
+                          */
+#endif
     OCR_EVENT_T_MAX      /**< This is *NOT* an event and is only used to count
                           * the number of event types. Its use is reserved for the
                           * runtime. */

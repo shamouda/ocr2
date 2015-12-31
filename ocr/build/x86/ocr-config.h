@@ -121,6 +121,9 @@
 //Counted Events support
 #define ENABLE_EXTENSION_COUNTED_EVT
 
+//Channel Events support
+#define ENABLE_EXTENSION_CHANNEL_EVT
+
 // Runtime extension support
 #define ENABLE_EXTENSION_RTITF
 

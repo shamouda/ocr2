@@ -27,7 +27,7 @@ else
     if [[ "${OCR_TYPE}" == "x86" ]]; then
         # Also tests legacy and rt-api supports
         # These MUST be built by default for OCR x86
-        TEST_OPTIONS="-ext_rtapi -ext_legacy -ext_params_evt -ext_counted_evt"
+        TEST_OPTIONS="-ext_rtapi -ext_legacy -ext_params_evt -ext_counted_evt -ext_channel_evt"
     fi
 
     OCR_TYPE=${OCR_TYPE} ./ocrTests ${TEST_OPTIONS} -unstablefile unstable.${OCR_TYPE}-${DB_IMPL}
@@ -35,8 +35,7 @@ else
 
     #Conditionally execute to preserve logs if previous run failed.
     if [[ $RES -eq 0 ]]; then
-        #TODO: disable gasnet tests for now
-        # Also disable for tg-x86
+        #TODO: disable performance test for x86-gasnet and tg-x86
         if [[ "${OCR_TYPE}" != "x86-gasnet" && "${OCR_TYPE}" != "tg-x86" ]]; then
             #Run performance tests as non-regression tests too
             OCR_TYPE=${OCR_TYPE} ./ocrTests -unstablefile unstable.${OCR_TYPE}-${DB_IMPL} -perftest

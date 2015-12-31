@@ -906,18 +906,21 @@ u8 satisfyTaskHc(ocrTask_t * base, ocrFatGuid_t data, u32 slot) {
                 PD_MSG_STACK(msg);
                 getCurrentEnv(&pd, NULL, NULL, &msg);
  #ifdef OCR_ASSERT
-                    // Just for debugging purpose
-                    ocrFatGuid_t signalerGuid;
-                    signalerGuid.guid = self->signalers[self->frontierSlot].guid;
-                    // Warning double check if that works for regular implementation
-                    signalerGuid.metaDataPtr = NULL; // should be ok because guid encodes the kind in distributed
-                    ocrGuidKind signalerKind = OCR_GUID_NONE;
-                    deguidify(pd, &signalerGuid, &signalerKind);
+                // Just for debugging purpose
+                ocrFatGuid_t signalerGuid;
+                signalerGuid.guid = self->signalers[self->frontierSlot].guid;
+                // Warning double check if that works for regular implementation
+                signalerGuid.metaDataPtr = NULL; // should be ok because guid encodes the kind in distributed
+                ocrGuidKind signalerKind = OCR_GUID_NONE;
+                deguidify(pd, &signalerGuid, &signalerKind);
+                bool cond = (signalerKind == OCR_GUID_EVENT_STICKY) || (signalerKind == OCR_GUID_EVENT_IDEM);
 #ifdef ENABLE_EXTENSION_COUNTED_EVT
-                    ASSERT((signalerKind == OCR_GUID_EVENT_STICKY) || (signalerKind == OCR_GUID_EVENT_IDEM) || (signalerKind == OCR_GUID_EVENT_COUNTED));
-#else
-                    ASSERT((signalerKind == OCR_GUID_EVENT_STICKY) || (signalerKind == OCR_GUID_EVENT_IDEM));
+                cond |= (signalerKind == OCR_GUID_EVENT_COUNTED);
 #endif
+#ifdef ENABLE_EXTENSION_CHANNEL_EVT
+                cond |= (signalerKind == OCR_GUID_EVENT_CHANNEL);
+#endif
+                ASSERT(cond);
 #endif
                 hal_unlock32(&(self->lock));
                 // Case 2: A sticky, the EDT registers as a lazy waiter

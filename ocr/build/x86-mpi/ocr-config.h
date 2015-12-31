@@ -119,17 +119,17 @@
 // Event creation with parameter
 #define ENABLE_EXTENSION_PARAMS_EVT
 
-//Counted Events support
+// Counted Events support
 #define ENABLE_EXTENSION_COUNTED_EVT
+
+// Channel Events support
+#define ENABLE_EXTENSION_CHANNEL_EVT
 
 // OCR legacy support
 #define ENABLE_EXTENSION_LEGACY
 
 // Affinity support
 #define ENABLE_EXTENSION_AFFINITY
-
-//GUID Labeling
-#define ENABLE_EXTENSION_LABELING
 
 //GUID Labeling
 #define ENABLE_EXTENSION_LABELING

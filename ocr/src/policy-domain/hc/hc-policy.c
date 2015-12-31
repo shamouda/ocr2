@@ -1875,8 +1875,26 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         START_PROFILE(pd_hc_Satisfy);
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_DEP_SATISFY
+#ifdef ENABLE_EXTENSION_CHANNEL_EVT
+#ifdef OCR_ASSERT
+        // In theory we should always make satisfy synchronous for channel-event
+        // but because it's only relevant to distributed for now we only set the
+        // flags in the distributed policy domain. Hence, discriminate on the
+        // location to see whether or not we should do the check.
+        if (msg->srcLocation != msg->destLocation) {
+            ocrGuidKind kind;
+            u8 ret = self->guidProviders[0]->fcts.getKind(
+                self->guidProviders[0], PD_MSG_FIELD_I(guid.guid), &kind);
+            ASSERT(ret == 0);
+            if (kind == OCR_GUID_EVENT_CHANNEL) {
+                ASSERT((kind == OCR_GUID_EVENT_CHANNEL) ? (msg->type & PD_MSG_REQ_RESPONSE) : !(msg->type & PD_MSG_REQ_RESPONSE));
+            }
+        }
+#endif
+#else
         // make sure this is one-way
         ASSERT(!(msg->type & PD_MSG_REQ_RESPONSE));
+#endif
         ocrGuidKind dstKind;
 #ifdef ENABLE_EXTENSION_PAUSE
         ocrPolicyDomainHc_t *rself = (ocrPolicyDomainHc_t *)self;
@@ -1914,6 +1932,9 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
 #endif
 #undef PD_MSG
 #undef PD_TYPE
+#ifdef ENABLE_EXTENSION_CHANNEL_EVT
+        msg->type |= PD_MSG_RESPONSE;
+#endif
         msg->type &= ~PD_MSG_REQUEST;
         EXIT_PROFILE;
         break;

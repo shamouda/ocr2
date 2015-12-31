@@ -89,6 +89,10 @@ char * ocrGuidKindToChar(ocrGuidKind kind) {
         return "event-sticky";
         case OCR_GUID_EVENT_LATCH:
         return "event-latch";
+#ifdef ENABLE_EXTENSION_CHANNEL_EVT
+        case OCR_GUID_EVENT_CHANNEL:
+        return "event-channel";
+#endif
         default:
         return "unknown kind";
     }

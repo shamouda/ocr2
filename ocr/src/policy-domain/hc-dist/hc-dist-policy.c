@@ -766,6 +766,19 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
 #define PD_TYPE PD_MSG_DEP_SATISFY
         RETRIEVE_LOCATION_FROM_GUID_MSG(self, msg->destLocation, I);
         DPRINTF(DEBUG_LVL_VVERB,"DEP_SATISFY: target is %d\n", (u32) msg->destLocation);
+#ifdef ENABLE_EXTENSION_CHANNEL_EVT
+        if (msg->destLocation != curLoc) {
+            ocrGuidKind kind;
+            // Check if it's a channel event that needs a blocking satisfy
+            u8 ret = self->guidProviders[0]->fcts.getKind(
+                self->guidProviders[0], PD_MSG_FIELD_I(guid.guid), &kind);
+            ASSERT(ret == 0);
+            // Turn the call into a blocking call
+            if (kind == OCR_GUID_EVENT_CHANNEL) {
+                msg->type |= PD_MSG_REQ_RESPONSE;
+            }
+        }
+#endif
 #undef PD_MSG
 #undef PD_TYPE
         break;

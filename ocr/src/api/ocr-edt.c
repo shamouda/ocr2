@@ -20,6 +20,7 @@ u8 ocrEventCreateParams(ocrGuid_t *guid, ocrEventTypes_t eventType, u16 properti
     START_PROFILE(api_EventCreate);
     DPRINTF(DEBUG_LVL_INFO, "ENTER ocrEventCreate(*guid="GUIDSx", eventType=%u, properties=%u)\n", GUIDFS(*guid),
             (u32)eventType, (u32)properties);
+
     PD_MSG_STACK(msg);
     ocrPolicyDomain_t * pd = NULL;
     u8 returnCode = 0;

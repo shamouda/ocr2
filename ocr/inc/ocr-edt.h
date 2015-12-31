@@ -36,11 +36,25 @@ typedef struct {
 } ocrEventCounterParams_t;
 #endif
 
+// Special unbounded value for 'bound' parameter of channel events
+#define EVENT_CHANNEL_UNBOUNDED ((u32) -1)
+
+#ifdef ENABLE_EXTENSION_CHANNEL_EVT
+typedef struct {
+    u32 maxGen;
+    u32 nbSat; // Upper bound on how many satisfy calls are expected to be simultaneously present in the channel
+    u32 nbDeps; // How many dependences must be added before triggering on a single satisfy.
+} ocrEventChannelParams_t;
+#endif
+
 typedef struct {
     union {
         ocrEventLatchParams_t EVENT_LATCH;
 #ifdef ENABLE_EXTENSION_COUNTED_EVT
         ocrEventCounterParams_t EVENT_COUNTED;
+#endif
+#ifdef ENABLE_EXTENSION_CHANNEL_EVT
+        ocrEventChannelParams_t EVENT_CHANNEL;
 #endif
     };
 } ocrEventParams_t;
