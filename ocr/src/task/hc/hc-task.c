@@ -942,6 +942,10 @@ u8 registerSignalerTaskHc(ocrTask_t * base, ocrFatGuid_t signalerGuid, u32 slot,
     deguidify(pd, &signalerGuid, &signalerKind);
     regNode_t * node = &(self->signalers[slot]);
     node->mode = mode;
+    ASSERT_BLOCK_BEGIN(node->slot < base->depc);
+    DPRINTF(DEBUG_LVL_WARN, "User-level error detected: add dependence slot is out of bounds: EDT=0x%lx slot=%lu depc=%lu\n",
+                            base->guid, slot, base->depc);
+    ASSERT_BLOCK_END
     ASSERT(node->slot == slot); // assumption from initialization
     ASSERT(signalerGuid.guid != NULL_GUID); // This should have been caught earlier on
     hal_lock32(&(self->lock));

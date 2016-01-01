@@ -644,12 +644,12 @@ u8 registerWaiterEventHc(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot, bool i
     PD_MSG_STACK(msg);
     getCurrentEnv(&pd, NULL, &curTask, &msg);
     //BUG #809 this should be part of the n
-    if (event->waitersCount == (u32)-1) {
-        // This is best effort race check
-        DPRINTF(DEBUG_LVL_WARN, "User-level error detected: try to satisfy a sticky event that's already satisfied: 0x%lx\n", base->guid);
-        ASSERT(false);
-        return 1; //BUG #603 error codes: Put some error code here.
-    }
+    if (event->waitersCount == STATE_CHECKED_IN) {
+         // This is best effort race check
+         DPRINTF(DEBUG_LVL_WARN, "User-level error detected: adding dependence to a non-persistent event that's already satisfied: 0x%lx\n", base->guid);
+         ASSERT(false);
+         return 1; //BUG #603 error codes: Put some error code here.
+     }
     ocrFatGuid_t currentEdt = {.guid = curTask!=NULL?curTask->guid:NULL_GUID, .metaDataPtr = curTask};
     hal_lock32(&(event->waitersLock)); // Lock is released by commonEnqueueWaiter
     return commonEnqueueWaiter(pd, base, waiter, slot, currentEdt, &msg);

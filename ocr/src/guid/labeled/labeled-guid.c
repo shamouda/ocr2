@@ -53,7 +53,7 @@ void labeledGuidHashmapEntryDestructChecker(void * key, void * value, void * dea
     ocrGuid_t guid = (ocrGuid_t) key;
     ((u32*)deallocParam)[getKindFromGuid(guid)]++;
 #ifdef GUID_PROVIDER_DESTRUCT_CHECK_VERBOSE
-    DPRINTF(DEBUG_LVL_WARN, "Remnant GUID 0x%x of kind %s still registered on GUID provider\n", guid,  ocrGuidKindToChar(getKindFromGuid(guid));
+    DPRINTF(DEBUG_LVL_WARN, "Remnant GUID 0x%lx of kind %s still registered on GUID provider\n", guid, ocrGuidKindToChar(getKindFromGuid(guid)));
 #endif
 }
 #endif
@@ -107,9 +107,8 @@ u8 labeledGuidSwitchRunlevel(ocrGuidProvider_t *self, ocrPolicyDomain_t *PD, ocr
             u32 i;
             for(i=0; i < OCR_GUID_MAX; i++) {
                 guidTypeCounters[i] = 0;
-                i++;
             }
-            void * deallocParam = (void *) &guidTypeCounters;
+            void * deallocParam = (void *) guidTypeCounters;
 #else
             deallocFct entryDeallocator = NULL;
             void * deallocParam = NULL;

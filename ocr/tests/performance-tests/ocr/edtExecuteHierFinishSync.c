@@ -12,6 +12,12 @@
 // - NODE_FANOUT
 // - LEAF_FANOUT
 
+#ifdef REC_SPAWN_FINISH
+#define EDT_SPAWN_PROPS EDT_PROP_FINISH
+#else
+#define EDT_SPAWN_PROPS EDT_PROP_NONE
+#endif
+
 ocrGuid_t terminateEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     timestamp_t * timers = (timestamp_t *) depv[1].ptr;
     get_time(&timers[1]);
@@ -50,7 +56,7 @@ ocrGuid_t spawnerEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
         while (i < NODE_FANOUT) {
             ocrGuid_t spawnerEdtGuid;
             ocrEdtCreate(&spawnerEdtGuid, spawnerEdtTemplateGuid,
-                         1, &depth, 0, NULL_GUID, EDT_PROP_NONE, NULL_GUID, NULL);
+                         1, &depth, 0, NULL_GUID, EDT_SPAWN_PROPS, NULL_GUID, NULL);
             i++;
         }
         ocrEdtTemplateDestroy(spawnerEdtTemplateGuid);
@@ -71,7 +77,7 @@ ocrGuid_t finishEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     u64 depth = 1;
     ocrGuid_t spawnerEdtGuid;
     ocrEdtCreate(&spawnerEdtGuid, spawnerEdtTemplateGuid,
-                 1, &depth, 0, NULL_GUID, EDT_PROP_NONE, NULL_GUID, NULL);
+                 1, &depth, 0, NULL_GUID, EDT_SPAWN_PROPS, NULL_GUID, NULL);
 
     ocrEdtTemplateDestroy(spawnerEdtTemplateGuid);
     return NULL_GUID;
