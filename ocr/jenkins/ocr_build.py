@@ -5,12 +5,12 @@ import os
 jobtype_ocr_init = {
     'name': 'ocr-init',
     'isLocal': True,
-    'run-cmd': '${JJOB_PRIVATE_HOME}/xstack/ocr/jenkins/scripts/init.sh',
-    'param-cmd': '${JJOB_PRIVATE_HOME}/xstack/jenkins/scripts/empty-cmd.sh',
-    'keywords': ('ocr', 'percommit'),
-    'timeout': 300,
+    'run-cmd': '${JJOB_INITDIR_OCR}/ocr/jenkins/scripts/init.sh',
+    'param-cmd': '${JJOB_INITDIR_OCR}/jenkins/scripts/empty-cmd.sh',
+    'keywords': ('ocr',),
+    'timeout': 60,
     'sandbox': ('local', 'shared', 'emptyShared', 'shareOK'),
-    'req-repos': ('xstack',)
+    'req-repos': ('ocr',)
 }
 
 # Note that we could do away with the copy entirely and just
@@ -18,51 +18,34 @@ jobtype_ocr_init = {
 jobtype_ocr_build = {
     'name': 'ocr-build',
     'isLocal': True,
-    'run-cmd': '${JJOB_PRIVATE_HOME}/xstack/ocr/jenkins/scripts/build.sh',
-    'param-cmd': '${JJOB_PRIVATE_HOME}/xstack/jenkins/scripts/empty-cmd.sh',
-    'keywords': ('ocr', 'percommit'),
+    'run-cmd': '${JJOB_INITDIR_OCR}/ocr/jenkins/scripts/build.sh',
+    'param-cmd': '${JJOB_INITDIR_OCR}/jenkins/scripts/empty-cmd.sh',
+    'keywords': ('ocr', ),
     'timeout': 240,
     'sandbox': ('local', 'shared', 'shareOK'),
-    'req-repos': ('xstack',),
-    'env-vars': {'OCR_ROOT': '${JJOB_PRIVATE_HOME}/xstack/ocr',
-                 'OCR_BUILD_ROOT': '${JJOB_PRIVATE_HOME}/xstack/ocr/build',
-                 'OCR_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/install'}
+    'req-repos': ('ocr',),
+    'env-vars': {'OCR_ROOT': '${JJOB_PRIVATE_HOME}/ocr/ocr',
+                 'OCR_BUILD_ROOT': '${JJOB_PRIVATE_HOME}/ocr/ocr/build',
+                 'OCR_INSTALL_ROOT': '${JJOB_SHARED_HOME}/ocr/ocr/install'}
 }
-
-# identical to 'ocr-build' but with the 'nightly' keyword
-jobtype_ocr_build_perfs = {
-    'name': 'ocr-build-perfs',
-    'isLocal': True,
-    'run-cmd': '${JJOB_PRIVATE_HOME}/xstack/ocr/jenkins/scripts/build.sh',
-    'param-cmd': '${JJOB_PRIVATE_HOME}/xstack/jenkins/scripts/empty-cmd.sh',
-    'keywords': ('ocr', 'performance', 'nightly'),
-    'timeout': 240,
-    'sandbox': ('local', 'shared', 'shareOK'),
-    'req-repos': ('xstack',),
-    'env-vars': {'OCR_ROOT': '${JJOB_PRIVATE_HOME}/xstack/ocr',
-                 'OCR_BUILD_ROOT': '${JJOB_PRIVATE_HOME}/xstack/ocr/build',
-                 'OCR_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/install'}
-}
-
 
 jobtype_ocr_build_tg = {
     'name': 'ocr-build-tg',
     'isLocal': True,
-    'run-cmd': '${JJOB_PRIVATE_HOME}/xstack/ocr/jenkins/scripts/build.sh',
-    'param-cmd': '${JJOB_PRIVATE_HOME}/xstack/jenkins/scripts/empty-cmd.sh',
+    'run-cmd': '${JJOB_INITDIR_OCR}/ocr/jenkins/scripts/build.sh',
+    'param-cmd': '${JJOB_INITDIR_OCR}/jenkins/scripts/empty-cmd.sh',
     'keywords': ('ocr', 'percommit'),
     'timeout': 180,
     'sandbox': ('local', 'shared', 'shareOK'),
-    'req-repos': ('xstack', 'tg'),
+    'req-repos': ('ocr', 'tg'),
     'env-vars': {'TG_INSTALL': '${JJOB_ENVDIR}',
-                 'TG_ROOT': '${JJOB_PRIVATE_HOME}/tg/tg',
-                 'OCR_ROOT': '${JJOB_PRIVATE_HOME}/xstack/ocr',
-                 'OCR_BUILD_ROOT': '${JJOB_PRIVATE_HOME}/xstack/ocr/build',
-                 'OCR_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/install'}
+                 'TG_ROOT': '${JJOB_INITDIR_tg}/tg',
+                 'OCR_ROOT': '${JJOB_PRIVATE_HOME}/ocr/ocr',
+                 'OCR_BUILD_ROOT': '${JJOB_PRIVATE_HOME}/ocr/ocr/build',
+                 'OCR_INSTALL_ROOT': '${JJOB_SHARED_HOME}/ocr/ocr/install'}
 }
 
 # Specific jobs
-
 pick_one_of_ocr_init = {
     'name': 'ocr-init',
     'alternates': ( 'ocr-init-job', 'ocr-init-job-tg' )
@@ -85,6 +68,7 @@ job_ocr_init_tg = {
 
 job_ocr_build_x86_pthread_x86 = {
     'name': 'ocr-build-x86',
+    'keywords': ('percommit', ),
     'depends': ('__alternate ocr-init',),
     'jobtype': 'ocr-build',
     'run-args': 'x86',
@@ -94,18 +78,21 @@ job_ocr_build_x86_pthread_x86 = {
 # Special runtime configuration to run micro-benchmarks
 job_ocr_build_x86_pthread_x86_perfs = {
     'name': 'ocr-build-x86-perfs',
+    'keywords': ('nightly', 'performance'),
     'depends': ('__alternate ocr-init',),
-    'jobtype': 'ocr-build-perfs',
+    'jobtype': 'ocr-build',
     'run-args': 'x86',
     'sandbox': ('inherit0',),
     'env-vars': {
             'NO_DEBUG': 'yes',
-            'CFLAGS_USER': '-DINIT_DEQUE_CAPACITY=2500000 -DELS_USER_SIZE=0',}
+            'CFLAGS_USER': '-DINIT_DEQUE_CAPACITY=2500000 -DELS_USER_SIZE=0',
+    }
 }
 
 #TODO: not sure how to not hardcode MPI_ROOT here
 job_ocr_build_x86_pthread_mpi = {
     'name': 'ocr-build-x86-mpi',
+    'keywords': ('percommit', ),
     'depends': ('__alternate ocr-init',),
     'jobtype': 'ocr-build',
     'run-args': 'x86-mpi',
@@ -116,6 +103,7 @@ job_ocr_build_x86_pthread_mpi = {
 
 job_ocr_build_x86_pthread_gasnet = {
     'name': 'ocr-build-x86-gasnet',
+    'keywords': ('percommit', ),
     'depends': ('__alternate ocr-init',),
     'jobtype': 'ocr-build',
     'run-args': 'x86-gasnet',
@@ -128,6 +116,7 @@ job_ocr_build_x86_pthread_gasnet = {
 
 job_ocr_build_x86_pthread_tg = {
     'name': 'ocr-build-tg-x86',
+    'keywords': ('percommit', ),
     'depends': ('__alternate ocr-init',),
     'jobtype': 'ocr-build',
     'run-args': 'tg-x86',

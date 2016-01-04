@@ -7,12 +7,12 @@ import os
 jobtype_ocr_regression = {
     'name': 'ocr-regression',
     'isLocal': True,
-    'run-cmd': '${JJOB_PRIVATE_HOME}/xstack/ocr/jenkins/scripts/regression.sh',
-    'param-cmd': '${JJOB_PRIVATE_HOME}/xstack/ocr/jenkins/scripts/regression.sh _params',
-    'keywords': ('ocr', 'percommit'),
+    'run-cmd': '${JJOB_INITDIR_OCR}/ocr/jenkins/scripts/regression.sh',
+    'param-cmd': '${JJOB_INITDIR_OCR}/ocr/jenkins/scripts/regression.sh _params',
+    'keywords': ('ocr', 'regression', 'percommit'),
     'timeout': 240,
     'sandbox': ('local', 'shared', 'shareOK'),
-    'req-repos': ('xstack',)
+    'req-repos': ('ocr',)
 }
 
 # Specific jobs

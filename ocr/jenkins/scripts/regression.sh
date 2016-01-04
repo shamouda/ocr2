@@ -2,13 +2,13 @@
 
 if [ $1 == "_params" ]; then
     if [ $2 == "output" ]; then
-        echo "${JJOB_PRIVATE_HOME}/xstack/ocr/tests-${JJOB_ID}/tests-log/TESTS-TestSuites.xml"
+        echo "${JJOB_PRIVATE_HOME}/ocr/ocr/tests-${JJOB_ID}/tests-log/TESTS-TestSuites.xml"
         exit 0
     fi
 else
     # ARGS: ARCH CFG_FILE DB_IMPL
     ARCH=$1
-    export OCR_INSTALL=${JJOB_SHARED_HOME}/xstack/ocr/install/${ARCH}/
+    export OCR_INSTALL=${JJOB_SHARED_HOME}/ocr/ocr/install/${ARCH}/
     export PATH=${OCR_INSTALL}/bin:$PATH
     export LD_LIBRARY_PATH=${OCR_INSTALL}/lib:${LD_LIBRARY_PATH}
 
@@ -20,8 +20,8 @@ else
 
     # Make a copy of the tests directory so we can run in parallel
     # with other regressions
-    cp -r ${JJOB_PRIVATE_HOME}/xstack/ocr/tests ${JJOB_PRIVATE_HOME}/xstack/ocr/tests-${JJOB_ID}
-    cd ${JJOB_PRIVATE_HOME}/xstack/ocr/tests-${JJOB_ID}
+    cp -r ${JJOB_PRIVATE_HOME}/ocr/ocr/tests ${JJOB_PRIVATE_HOME}/ocr/ocr/tests-${JJOB_ID}
+    cd ${JJOB_PRIVATE_HOME}/ocr/ocr/tests-${JJOB_ID}
     TEST_OPTIONS=""
 
     if [[ "${ARCH}" == "x86" ]]; then

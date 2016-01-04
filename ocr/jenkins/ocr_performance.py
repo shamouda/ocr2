@@ -5,27 +5,23 @@ import os
 jobtype_ocr_performance = {
     'name': 'ocr-performance',
     'isLocal': True,
-    'run-cmd': '${JJOB_PRIVATE_HOME}/xstack/ocr/jenkins/scripts/performance-ubench.sh',
-    'param-cmd': '${JJOB_SHARED_HOME}/xstack/apps/jenkins/scripts/remote-param-cmd.sh',
-    # Note: Alternatively, we can call 'performance-ubench.sh' with '_params' to let the
-    # script know the caller is just probing for run parameters. For now rely on the default
-    # 'remote-param-cmd.sh' to avoid duplicating run configurations.
-    # 'param-cmd': '${JJOB_PRIVATE_HOME}/xstack/ocr/jenkins/scripts/performance-ubench.sh _params',
+    'run-cmd': '${JJOB_INITDIR_OCR}/ocr/jenkins/scripts/performance-ubench.sh',
+    'param-cmd': '${JJOB_INITDIR_OCR}/ocr/jenkins/scripts/performance-ubench.sh _params',
     'keywords': ('ocr', 'performance', 'nightly'),
     'timeout': 600,
     'sandbox': ('local', 'shared', 'shareOK'),
-    'req-repos': ('xstack',)
+    'req-repos': ('ocr',)
 }
 
 jobtype_gatherStats_performance = {
     'name': 'gatherStats-performance',
     'isLocal': True,
-    'run-cmd': '${JJOB_SHARED_HOME}/xstack/ocr/jenkins/scripts/perfStatCollector.sh',
-    'param-cmd': '${JJOB_SHARED_HOME}/xstack/jenkins/scripts/empty-cmd.sh',
+    'run-cmd': '${JJOB_INITDIR_OCR}/ocr/jenkins/scripts/perfStatCollector.sh',
+    'param-cmd': '${JJOB_INITDIR_ocf}/jenkins/scripts/empty-cmd.sh',
     'keywords': ('ocr', 'performance', 'nightly'),
     'timeout': 60,
     'sandbox': ('shared', 'shareOK'),
-    'req-repos': ('xstack',)
+    'req-repos': ('ocr',)
 }
 
 # Specific jobs
@@ -44,6 +40,6 @@ job_ocr_performance_gatherStats = {
     'depends': ('ocr-performance-x86',),
     'jobtype': 'gatherStats-performance',
     # This folder is where the 'ocr-performance' job puts results
-    'run-args': '${JJOB_SHARED_HOME}/xstack/ocr/tests/performance-tests 10',
+    'run-args': '${JJOB_SHARED_HOME}/ocr/ocr/tests/performance-tests 10',
     'sandbox': ('shared','inherit0')
 }
