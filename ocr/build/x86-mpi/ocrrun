@@ -58,7 +58,8 @@ elif [ ${NB_ARGS} -lt 1 ]; then
     echo "error: unexpected number of arguments"
     exit 2
 else
-    PROGRAM_BIN=${ARGS}
+    # Get program name and remove trailing whitespaces
+    PROGRAM_BIN=`echo ${ARGS} | sed -e "s/^ .//g"`
 fi
 
 if [ "${OCR_CONFIG}" = "" ]; then
@@ -78,6 +79,9 @@ fi
 RES=`grep "MPI" ${OCR_CONFIG}`
 
 if [[ "$RES" != "" ]]; then
+
+    PROGPATH="${PROGRAM_BIN%/*}"
+    PROGNAME="${PROGRAM_BIN##*/}"
 
     if [[ "${OCR_NODEFILE}" != "" ]]; then
         # count words since hostnames shouldn't have spaces (-l only counts new lines)
@@ -117,9 +121,30 @@ if [[ "$RES" != "" ]]; then
         PROGRAM_BIN="valgrind ${OCRRUN_VALGRIND_OPTS} ${PROGRAM_BIN}"
     fi
 
-    ${OCRRUN_OPT_CMD} ${OCR_MPI_OPTS} ${PROGRAM_BIN} -ocr:cfg ${OCR_CONFIG}
+    if [[ "${OCRRUN_HPCTOOLKIT}" == "yes" ]]; then
+        if [[ -z "${OCR_INSTALL}" ]]; then
+            echo "error: ocrrun support for hpctoolkit needs OCR_INSTALL to be defined"
+            exit 1
+        fi
+        rm -Rf ${PROGNAME}.db
+        rm -Rf ${PROGNAME}_meas
+        rm *.hpcstruct
+        hpcstruct ${OCR_INSTALL}/lib/libocr.so
+        hpcstruct "${PROGPATH}/${PROGNAME}"
+        PROGRAM_BIN="hpcrun -t ${OCRRUN_HPCTOOLKIT_OPTS} ${PROGRAM_BIN}"
+    fi
 
+    ${OCRRUN_OPT_CMD} ${OCR_MPI_OPTS} ${PROGRAM_BIN} -ocr:cfg ${OCR_CONFIG}
     RET_CODE=$?
+
+    if [[ ${RET_CODE} -eq 0 ]]; then
+        if [[ "${OCRRUN_HPCTOOLKIT}" == "yes" ]]; then
+            HPCSTRUCT="-S libocr.so.hpcstruct -S ${PROGNAME}.hpcstruct"
+            hpcprof-mpi -I . ${HPCSTRUCT} -o $PWD/${PROGNAME}.db $PWD/${PROGNAME}_meas
+        fi
+    fi
+
+
     exit ${RET_CODE}
 fi
 
