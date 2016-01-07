@@ -35,11 +35,11 @@ LDFLAGS := -shared -fpic -lpthread
 
 # CFLAGS_SHARED will be concatenated with any
 # common CFLAGS options
-CFLAGS_SHARED := -fpic -std=c99 -isystem /usr/include -isystem ../../../apps/libs/x86_native/include
+CFLAGS_SHARED := -fpic -std=c99 -isystem /usr/include -isystem ../../../../apps/apps/libs/x86_native/include
 
 # Static libraries specific builds
 # Same as for CFLAGS_SHARED
-CFLAGS_STATIC := -std=c99 -isystem /usr/include -isystem ../../../apps/libs/x86_native/include
+CFLAGS_STATIC := -std=c99 -isystem /usr/include -isystem ../../../../apps/apps/libs/x86_native/include
 AR := ar
 ARFLAGS := cru
 
