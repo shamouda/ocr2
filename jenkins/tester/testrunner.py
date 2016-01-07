@@ -168,18 +168,18 @@ def checkJob(inputDict):
                    'sandbox': (), 'req-repos': (),
                    'timeout': int(0),
                    'env-vars': {}}
-    checkPresence = ('name', 'depends', 'jobtype',
+    checkPresence = ('name', 'jobtype',
                      'run-args')
     return checkDict(inputDict, "JobObject", checkStruct, checkPresence)
 
 # Check whether a job type has the proper format
 def checkJobType(inputDict):
-    checkStruct = {'name': "", 'keywords': (), 'isLocal': False,
+    checkStruct = {'name': "", 'keywords': (), 'depends': (),
+                   'isLocal': False,
                    'run-cmd': "", 'param-cmd': "",
                    'epilogue-cmd': "", 'prologue-cmd': "",
                    'sandbox': (), 'timeout': int(0),
-                   'env-vars': {},
-                   'req-repos': () }
+                   'env-vars': {}, 'req-repos': () }
     checkPresence = ('name', 'keywords', 'isLocal', 'run-cmd', 'param-cmd',
                      'sandbox', 'req-repos')
     return checkDict(inputDict, "JobObject type", checkStruct, checkPresence)
@@ -423,6 +423,9 @@ def importFromFile(name, tempJobs, jobTypeToName, alternateJobs):
                     raise Usage("Duplicate job name '%s'" % (v['name']))
                 myLog.info("Checking job '%s' for correctness" % (v['name']))
                 if checkJob(v):
+                    # Set up an empty dependence list if it doesn't have one
+                    if not v.has_key('depends'):
+                        v['depends'] = ()
                     tempJobs[v['name']] = v
                     # Add jobname and jobtype to dictionary
                     if jobTypeToName.has_key(v['jobtype']):
@@ -463,6 +466,7 @@ def main(argv=None):
     global streamHandlerStdOut
     global maxLocalJobs
     testKeywords = []
+    negativeTestKeywords = []
 
     allJobsStatus['blocked'] = []
     allJobsStatus['ok'] = []
@@ -529,7 +533,16 @@ def main(argv=None):
                     Optional if '--local-only' is specified
     -p,--private:   Root directory to use for "private" (local) workspaces
     -t,--time:      Time to wait before each iteration of the job scheduling algorithm
-    -k,--keyword:   (optional) Keywords to use to select the test to run. If specified multiple times,
+    -k,--keyword:   (optional) Keywords to use to select the test to run. They keywords specified
+                    can either be positive or negative. The test runner will run:
+                        - ALL the tests that match ALL the keywords specified positively
+                        - EXCEPT those that match a keyword specified negatively
+                    To specify a keyword negatively, use ~keyword
+                    As an example, if you specify the keywords: foo bar ~baz:
+                       - a test with keywords foo bar blah will run
+                       - a test with keywords foo will NOT run (does not contain bar)
+                       - a test with keywords foo bar baz will NOT run (contains baz)
+      If specified multiple times,
                     only the tests that match ALL the keywords will be run.
     -o,--output:    Filename to produce containing the results of the tests
     --hier-results: Output results hierarchically in Jenkins. This means that the top-level
@@ -572,6 +585,8 @@ def main(argv=None):
         - req-repos:   (tuple of strings) Repositories that are required to run this job type. The
                        strings correspond to the name passed in with the "-r" option
     It can also optionally specify:
+        - depends:      (tuple of strings) List of jobs all jobs of this type will depend on.
+                        See 'depends' in the job description for more detail
         - timeout:      (int) Number of seconds before a job is killed. If non specified or 0,
                         the job will never timeout
         - prologue-cmd: (string) A script to be run right before the job. This is mostly
@@ -591,26 +606,30 @@ def main(argv=None):
 
     Each job must specify the following arguments:
         - name:        (string) Name of the job (must be unique)
-        - depends:     (tuple of strings): Specifies the dependences this job needs to wait on. It can
-                       be one of. A dependence is either skippable or non-skippable. A skippable dependence
-                       will not block the execution of this job
-                         - job name (non skippable)
-                         - a job type where all specific jobs are skippable ('__type xyz')
-                         - a job type where all specific jobs are not skippable ('__alltype xyz')
-                         - a skippable job name ('__skippable xyz')
-                         - one of a set of alternate jobs ('__alternate xyz')
-                       If the dependence is on an alternate, the system
-                       will replace it with the choice it makes in "pick_one_of_" for the name given.
-                       If the dependence is on a jobtype,
-                       this job will wait on all jobs of that jobtype to complete before running.
-                       In that case the inheritX arguments are valid but the order of the jobs
-                       is undetermined.
         - jobtype:     (string) Name of the job type of this job
         - run-args:    (string) Arguments for this job (will be concatenated with 'run-cmd'
                        from its job type to actually run the job
     It can optionally specify:
         - keywords:    (tuple) Additional keywords specific to this job. These keywords will be
                        appended to the keywords defined for the jobtype
+        - depends:     (tuple of strings): Specifies the dependences this job needs to wait on. A dependence
+                       is either skippable or non-skippable. A skippable dependence will not block the execution
+                       of this job if it fails. A dependence is described by either:
+                         - a job name: this is a normal non-skippable dependence
+                         - a skippable job name (syntax: '__skippable <jobname>'): a skippable dependence
+                         - a non-skippable job from a list of alternatives (syntax: '__alternate <identifier>'):
+                           a non-skippable job picked from a set of alternate that are described in a dictionary
+                           called 'pick_one_of_<identifier>'
+                         - a skippable job type (syntax: '__type <jobtype>'): a dependence on jobs of the
+                           specified job-type. All dependences are skippable
+                         - a non-skippable job type (syntax: '__alltype <jobtype>'): a dependence on jobs of the
+                           specified job-type. All dependences are non-skippable and the failure of any one
+                           job will cause this job to be blocked
+                       If the dependence is on a jobtype, this job will wait on all jobs of that
+                       jobtype to complete before running. In that case the inheritX arguments are valid
+                       but the order of the jobs is undetermined.
+                       In all cases, the 'depends' list of a specific job is concatenated with the (optional)
+                       'depends' list for the job-type.
         - param-args:  (string) Arguments for this job to get parameter information for this
                        job. Will be concatenated with 'param-cmd' from its job type AFTER
                        the type of parameter required.
@@ -732,7 +751,10 @@ def main(argv=None):
             elif o in ("-t", "--time"):
                 sleepInterval = int(a)
             elif o in ("-k", "--keyword"):
-                testKeywords.append(a)
+                if a[0] == '~':
+                    negativeTestKeywords.append(a[1:])
+                else:
+                    testKeywords.append(a)
             elif o in ("-o", "--output"):
                 resultFileName = a
             elif o in ("--hier-results",):
@@ -867,14 +889,21 @@ def main(argv=None):
                 del tempJobs[k]
         #end if
 
-        # Third step: check for __alternate
+        # Third step: replicate the job-type's depends list to all the jobs of that type
+        # We do this now because in the next step, we start looking at dependences.
+
+        for k, v in tempJobs.iteritems():
+            jobType = allJobTypes.get(v['jobtype'])
+            # We should have the job type properly
+            assert(jobType is not None)
+            v['depends'] = jobType.depends + v['depends']
+        # end for
+
+        # Fourth step: check for __alternate
         # We do this now because if the job is pushed aside and re-added later
         # we will have issues
         toRemoveKeys = []
         for k, v in tempJobs.iteritems():
-            jobType = allJobTypes.get(v['jobtype'])
-            # Check happened before
-            assert(jobType is not None)
             # Replace any "__alternate" dependence
             newList = []
             for item in v['depends']:
@@ -884,7 +913,7 @@ def main(argv=None):
                     newList.append(item)
             v['depends'] = tuple(newList)
 
-        # Fourth step: check the keywords. Remove all jobs that don't match the keywords.
+        # Fifth step: check the keywords. Remove all jobs that don't match the keywords.
         # They may be re-added later as dependences (ie: if another job depends on it)
         toRemoveKeys = []
         sideJobs = dict() # Jobs that don't match keyword restrictions. May be re-added due to dependences
@@ -892,14 +921,18 @@ def main(argv=None):
             jobType = allJobTypes.get(v['jobtype'])
             if jobType is None:
                 raise Usage("JobObject '%s' uses a job type '%s' which is not defined" % (k, v['jobtype']))
-            if not hasKeywords(jobType.keywords + v.get('keywords', ()), testKeywords, True):
+            tkey = jobType.keywords + v.get('keywords', ())
+            if not hasKeywords(tkey, testKeywords, True):
                 myLog.info("Ignoring job '%s' due to keyword restrictions" % (v['name']))
+                toRemoveKeys.append(k)
+            elif hasKeywords(tkey, negativeTestKeywords, False):
+                myLog.info("Ignoring job '%s' due to negative keyword restrictions" % (v['name']))
                 toRemoveKeys.append(k)
         for k in toRemoveKeys:
             sideJobs[k] = tempJobs[k]
             del tempJobs[k]
 
-        # Fifth step: Look at __type dependences
+        # Sixth step: Look at __type dependences
         # This allows us to wait only on the jobs that are currently enabled
 
         # Keep track of jobs that depend on a given type if

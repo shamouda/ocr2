@@ -119,6 +119,7 @@ class JobTypeObject(object):
         # Public variables (to avoid getter/setter)
         self.name = inputDict['name']
         self.keywords = inputDict['keywords']
+        self.depends = inputDict.get('depends', ())
         self.isLocal = inputDict['isLocal']
         self.run_cmd = inputDict['run-cmd']
         self.param_cmd = inputDict['param-cmd']
