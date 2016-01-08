@@ -148,13 +148,13 @@ static u8 ceCommSendMessageToCE(ocrCommPlatform_t *self, ocrLocation_t target,
     }
 
     // Figure out where our remote boxes our (where we are sending to)
-    rmbox = (u64 *) (UR_L1_BASE(SOCKET_FROM_ID(target), CLUSTER_FROM_ID(target), BLOCK_FROM_ID(target), AGENT_FROM_ID(target))
+    rmbox = (u64 *) (SR_L1_BASE(CLUSTER_FROM_ID(target), BLOCK_FROM_ID(target), AGENT_FROM_ID(target))
                      + MSG_CE_ADDR_OFFT);
 
     // Calculate our absolute sendBuf address
-    msgAbsAddr = UR_L1_BASE(SOCKET_FROM_ID(self->location), CLUSTER_FROM_ID(self->location), BLOCK_FROM_ID(self->location),
+    msgAbsAddr = SR_L1_BASE(CLUSTER_FROM_ID(self->location), BLOCK_FROM_ID(self->location),
                             AGENT_FROM_ID(self->location))
-        + (u64)(sendBuf);
+        + ((u64)(sendBuf) - AR_L1_BASE);
 
     // We now check to see if the message requires a response, if so, we will reserve
     // the response slot
@@ -184,7 +184,7 @@ static u8 ceCommSendMessageToCE(ocrCommPlatform_t *self, ocrLocation_t target,
         message->type &= ~PD_MSG_RESPONSE_OVERRIDE;
 
         // Make sure we are sending back to the right CE
-        if((message->msgId >> 8) != target) {
+        if((message->msgId &= ~0xFFULL) != (target << 8)) {
             DPRINTF(DEBUG_LVL_WARN, "Expected to send response to 0x%lx but read msgId 0x%lx (location: 0x%lx)\n",
                     target, message->msgId, message->msgId >> 8);
             ASSERT(0);
