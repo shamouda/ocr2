@@ -822,9 +822,7 @@ u8 satisfyTaskHc(ocrTask_t * base, ocrFatGuid_t data, u32 slot) {
     // Replace the signaler's guid by the data guid, this is to avoid
     // further references to the event's guid, which is good in general
     // and crucial for once-event since they are being destroyed on satisfy.
-
     hal_lock32(&(self->lock));
-
 
     DPRINTF(DEBUG_LVL_INFO,
             "Satisfy on task 0x%lx slot %d with 0x%lx slotSatisfiedCount=%u frontierSlot=%u depc=%u\n",
@@ -847,7 +845,6 @@ u8 satisfyTaskHc(ocrTask_t * base, ocrFatGuid_t data, u32 slot) {
         self->signalers[slot].guid = data.guid;
 
     if(self->slotSatisfiedCount == base->depc) {
-
         DPRINTF(DEBUG_LVL_VERB, "Scheduling task 0x%lx, satisfied dependences %d/%d\n",
                 self->base.guid, self->slotSatisfiedCount , base->depc,
                 false, OCR_TRACE_TYPE_EDT, OCR_ACTION_RUNNABLE);
@@ -862,55 +859,65 @@ u8 satisfyTaskHc(ocrTask_t * base, ocrFatGuid_t data, u32 slot) {
         if (self->signalers[slot].slot != SLOT_SATISFIED_DB) {
             self->signalers[slot].slot = SLOT_SATISFIED_EVT;
         }
-        // Check frontier status
+        // When we're here we can make few assumptions about the frontier.
+        // - If the frontier is greater than the current slot, then it was
+        //   a dependence registration carrying a DB that marked the slot
+        //   as SLOT_SATISFIED_DB. The satisfy still needs to happen, but
+        //   it's already marked to let the frontier progress faster.
+        ASSERT((self->frontierSlot > slot) ? (self->signalers[slot].slot == SLOT_SATISFIED_DB) : 1);
+        // - The frontier is less than the current slot (the satisfy is ahead of the frontier). We just
+        // need to mark down the slot as satisfied. These would have to be either ephemeral event or direct dbs.
+        ASSERT((self->frontierSlot < slot) ?
+               ((self->signalers[slot].slot == SLOT_SATISFIED_DB) ||
+                (self->signalers[slot].slot == SLOT_SATISFIED_EVT)) : 1);
+        // - The frontier is equal to the current slot, we need to iterate
         if (slot == self->frontierSlot) { // we are on the frontier slot
             // Try to advance the frontier over all consecutive satisfied events
             // and DB dependence that may be in flight (safe because we have the lock)
             u32 fsSlot = 0;
-            do {
+            bool cond = true;
+            while ((self->frontierSlot != (base->depc-1)) && cond) {
                 self->frontierSlot++;
                 DPRINTF(DEBUG_LVL_VERB, "Slot Increment on task 0x%lx slot %d with 0x%lx slotCount=%u slotFrontier=%u depc=%u\n",
                     self->base.guid, slot, data.guid, self->slotSatisfiedCount, self->frontierSlot, base->depc);
                 ASSERT(self->frontierSlot < base->depc);
                 fsSlot = self->signalers[self->frontierSlot].slot;
-            } while ((self->frontierSlot != (base->depc-1)) && ((fsSlot == SLOT_SATISFIED_EVT) || (fsSlot == SLOT_SATISFIED_DB)));
-            // If here, there must be at least one satisfy that hasn't happened yet.
-            ASSERT(self->slotSatisfiedCount < base->depc);
-
-            // If we reach the end of the dependences, there's most likely a DB satisfy
-            // in flight. Its .slot has been set, which is why we skipped over its slot
-            // but the corresponding satisfy hasn't been executed yet. When it is,
-            // slotSatisfiedCount equals depc and the task is scheduled.
-            if (!((fsSlot == SLOT_SATISFIED_EVT) || (fsSlot == SLOT_SATISFIED_DB))) {
-                // The slot we found is either:
-                // 1- not known: addDependence hasn't occured yet (UNINITIALIZED_GUID)
-                // 2- known: but the edt hasn't registered on it yet
-                // 3- a once event not yet satisfied: (.slot == SLOT_REGISTERED_EPHEMERAL_EVT, registered but not yet satisfied)
-                if ((self->signalers[self->frontierSlot].guid != UNINITIALIZED_GUID) &&
-                    (self->signalers[self->frontierSlot].slot != SLOT_REGISTERED_EPHEMERAL_EVT)) {
-                    // Just for debugging purpose
-                    ocrFatGuid_t signalerGuid;
-                    signalerGuid.guid = self->signalers[self->frontierSlot].guid;
-                    // Warning double check if that works for regular implementation
-                    signalerGuid.metaDataPtr = NULL; // should be ok because guid encodes the kind in distributed
-                    ocrGuidKind signalerKind = OCR_GUID_NONE;
-                    ocrPolicyDomain_t *pd = NULL;
-                    PD_MSG_STACK(msg);
-                    getCurrentEnv(&pd, NULL, NULL, &msg);
-                    deguidify(pd, &signalerGuid, &signalerKind);
-                    ASSERT((signalerKind == OCR_GUID_EVENT_STICKY) || (signalerKind == OCR_GUID_EVENT_IDEM));
-                    hal_unlock32(&(self->lock));
-                    // Case 2: A sticky, the EDT registers as a lazy waiter
-                    // Here it should be ok to read the frontierSlot since we are on the frontier
-                    // only a satisfy on the event in that slot can advance the frontier and we
-                    // haven't registered on it yet.
-                    u8 res = registerOnFrontier(self, pd, &msg, self->frontierSlot);
-                    return res;
-                }
-                //else:
-                // case 1, registerSignaler will do the registration
-                // case 3, just have to wait for the satisfy on the once event to happen.
+                cond = ((fsSlot == SLOT_SATISFIED_EVT) || (fsSlot == SLOT_SATISFIED_DB));
             }
+            // If here, there must be that at least one satisfy hasn't happened yet.
+            ASSERT(self->slotSatisfiedCount < base->depc);
+            // The slot we found is either:
+            // 1- not known: addDependence hasn't occured yet (UNINITIALIZED_GUID)
+            // 2- known: but the edt hasn't registered on it yet
+            // 3- a once event not yet satisfied: (.slot == SLOT_REGISTERED_EPHEMERAL_EVT, registered but not yet satisfied)
+            // Note: the "last" dependence, which is either one of the above or has already been satisfied.
+            //       Note that if it's a pure data dependence (SLOT_SATISFIED_DB), the operation may still be in flight.
+            //       Its .slot has been set, which is why we skipped over its slot but the corresponding satisfy hasn't
+            //       been executed yet. When it is, slotSatisfiedCount will equal depc and the task will be scheduled.
+            if ((self->signalers[self->frontierSlot].guid != UNINITIALIZED_GUID) &&
+                (self->signalers[self->frontierSlot].slot == self->frontierSlot)) {
+                // Just for debugging purpose
+                ocrFatGuid_t signalerGuid;
+                signalerGuid.guid = self->signalers[self->frontierSlot].guid;
+                // Warning double check if that works for regular implementation
+                signalerGuid.metaDataPtr = NULL; // should be ok because guid encodes the kind in distributed
+                ocrGuidKind signalerKind = OCR_GUID_NONE;
+                ocrPolicyDomain_t *pd = NULL;
+                PD_MSG_STACK(msg);
+                getCurrentEnv(&pd, NULL, NULL, &msg);
+                deguidify(pd, &signalerGuid, &signalerKind);
+                ASSERT((signalerKind == OCR_GUID_EVENT_STICKY) || (signalerKind == OCR_GUID_EVENT_IDEM));
+                hal_unlock32(&(self->lock));
+                // Case 2: A sticky, the EDT registers as a lazy waiter
+                // Here it should be ok to read the frontierSlot since we are on the frontier
+                // only a satisfy on the event in that slot can advance the frontier and we
+                // haven't registered on it yet.
+                u8 res = registerOnFrontier(self, pd, &msg, self->frontierSlot);
+                return res;
+            }
+            //else:
+            // case 1, registerSignaler will do the registration
+            // case 3, just have to wait for the satisfy on the once event to happen.
         }
         //else: not on frontier slot, nothing to do
         // Two cases:
