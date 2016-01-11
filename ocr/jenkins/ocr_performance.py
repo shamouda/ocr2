@@ -17,7 +17,7 @@ jobtype_gatherStats_performance = {
     'name': 'gatherStats-performance',
     'isLocal': True,
     'run-cmd': '${JJOB_INITDIR_OCR}/ocr/jenkins/scripts/perfStatCollector.sh',
-    'param-cmd': '${JJOB_INITDIR_ocf}/jenkins/scripts/empty-cmd.sh',
+    'param-cmd': '${JJOB_INITDIR_OCR}/jenkins/scripts/empty-cmd.sh',
     'keywords': ('ocr', 'performance', 'nightly'),
     'timeout': 60,
     'sandbox': ('shared', 'shareOK'),
