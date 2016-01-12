@@ -20,13 +20,12 @@
 /* OCR-DBTIME SCHEDULER_OBJECT FUNCTIONS              */
 /******************************************************/
 
-static void dbtimeSchedulerObjectStart(ocrSchedulerObject_t *self, ocrPolicyDomain_t *PD, ocrLocation_t space, u64 time, ocrDbAccessMode_t mode) {
+static void dbtimeSchedulerObjectStart(ocrSchedulerObject_t *self, ocrPolicyDomain_t *PD, ocrLocation_t space, u64 time) {
     self->loc = PD->myLocation;
     self->mapping = OCR_SCHEDULER_OBJECT_MAPPING_PINNED;
     ocrSchedulerObjectDbtime_t* dbtimeSchedObj = (ocrSchedulerObjectDbtime_t*)self;
     dbtimeSchedObj->space = space;
     dbtimeSchedObj->time = time;
-    dbtimeSchedObj->mode = mode;
 #ifdef ENABLE_SCHEDULER_OBJECT_LIST
     paramListSchedulerObjectList_t paramList;
     paramList.base.config = 0;
@@ -35,7 +34,8 @@ static void dbtimeSchedulerObjectStart(ocrSchedulerObject_t *self, ocrPolicyDoma
     paramList.elSize = 0;
     paramList.arrayChunkSize = 8;
     ocrSchedulerObjectFactory_t *listFactory = PD->schedulerObjectFactories[schedulerObjectList_id];
-    dbtimeSchedObj->edtList = listFactory->fcts.create(listFactory, (ocrParamList_t*)(&paramList));
+    dbtimeSchedObj->waitList = listFactory->fcts.create(listFactory, (ocrParamList_t*)(&paramList));
+    dbtimeSchedObj->readyList = listFactory->fcts.create(listFactory, (ocrParamList_t*)(&paramList));
 #else
     ASSERT(0);
 #endif
@@ -51,12 +51,13 @@ static void dbtimeSchedulerObjectInitialize(ocrSchedulerObjectFactory_t *fact, o
     ocrSchedulerObjectDbtime_t* dbtimeSchedObj = (ocrSchedulerObjectDbtime_t*)self;
     dbtimeSchedObj->space = INVALID_LOCATION;
     dbtimeSchedObj->time = 0;
-    dbtimeSchedObj->mode = 0;
-    dbtimeSchedObj->dbRequestSent = false;
-    dbtimeSchedObj->edtList = NULL;
-    dbtimeSchedObj->edtSchedCount = 0;
+    dbtimeSchedObj->waitList = NULL;
+    dbtimeSchedObj->readyList = NULL;
+    dbtimeSchedObj->edtScheduledCount = 0;
     dbtimeSchedObj->edtDoneCount = 0;
-    dbtimeSchedObj->lock = 0;
+    dbtimeSchedObj->exclusiveWaiterCount = 0;
+    dbtimeSchedObj->schedulerCount = 0;
+    dbtimeSchedObj->schedulerDone = false;
 }
 
 ocrSchedulerObject_t* newSchedulerObjectDbtime(ocrSchedulerObjectFactory_t *factory, ocrParamList_t *perInstance) {
@@ -81,7 +82,7 @@ ocrSchedulerObject_t* dbtimeSchedulerObjectCreate(ocrSchedulerObjectFactory_t *f
     ocrSchedulerObject_t *schedObj = (ocrSchedulerObject_t*)pd->fcts.pdMalloc(pd, sizeof(ocrSchedulerObjectDbtime_t));
     dbtimeSchedulerObjectInitialize(factory, schedObj);
     paramListSchedulerObjectDbtime_t *paramsDbtime = (paramListSchedulerObjectDbtime_t*)perInstance;
-    dbtimeSchedulerObjectStart(schedObj, pd, paramsDbtime->space, paramsDbtime->time, paramsDbtime->mode);
+    dbtimeSchedulerObjectStart(schedObj, pd, paramsDbtime->space, paramsDbtime->time);
     schedObj->kind |= OCR_SCHEDULER_OBJECT_ALLOC_PD;
     return schedObj;
 }
@@ -93,8 +94,9 @@ u8 dbtimeSchedulerObjectDestroy(ocrSchedulerObjectFactory_t *fact, ocrSchedulerO
         ASSERT(IS_SCHEDULER_OBJECT_PD_ALLOCATED(self->kind));
         ocrPolicyDomain_t *pd = fact->pd;
         ocrSchedulerObjectDbtime_t* dbtimeSchedObj = (ocrSchedulerObjectDbtime_t*)self;
-        ocrSchedulerObjectFactory_t *listFactory = pd->schedulerObjectFactories[dbtimeSchedObj->edtList->fctId];
-        listFactory->fcts.destroy(listFactory, dbtimeSchedObj->edtList);
+        ocrSchedulerObjectFactory_t *listFactory = pd->schedulerObjectFactories[dbtimeSchedObj->waitList->fctId];
+        listFactory->fcts.destroy(listFactory, dbtimeSchedObj->waitList);
+        listFactory->fcts.destroy(listFactory, dbtimeSchedObj->readyList);
         pd->fcts.pdFree(pd, self);
     }
     return 0;
@@ -130,7 +132,7 @@ u8 dbtimeSchedulerObjectIterate(ocrSchedulerObjectFactory_t *fact, ocrSchedulerO
     return OCR_ENOTSUP;
 }
 
-ocrSchedulerObject_t* dbtimeGetSchedulerObjectForLocation(ocrSchedulerObjectFactory_t *fact, ocrSchedulerObject_t *self, ocrLocation_t loc, ocrSchedulerObjectMappingKind mapping, u32 properties) {
+ocrSchedulerObject_t* dbtimeGetSchedulerObjectForLocation(ocrSchedulerObjectFactory_t *fact, ocrSchedulerObject_t *self, ocrSchedulerObjectKind kind, ocrLocation_t loc, ocrSchedulerObjectMappingKind mapping, u32 properties) {
     ASSERT(0);
     return NULL;
 }
@@ -200,7 +202,7 @@ ocrSchedulerObjectFactory_t * newOcrSchedulerObjectFactoryDbtime(ocrParamList_t 
     schedObjFact->fcts.createIterator = FUNC_ADDR(ocrSchedulerObjectIterator_t* (*)(ocrSchedulerObjectFactory_t*, ocrSchedulerObject_t*, u32), dbtimeSchedulerObjectCreateIterator);
     schedObjFact->fcts.destroyIterator = FUNC_ADDR(u8 (*)(ocrSchedulerObjectFactory_t*, ocrSchedulerObjectIterator_t*), dbtimeSchedulerObjectDestroyIterator);
     schedObjFact->fcts.setLocationForSchedulerObject = FUNC_ADDR(u8 (*)(ocrSchedulerObjectFactory_t*, ocrSchedulerObject_t*, ocrLocation_t, ocrSchedulerObjectMappingKind), dbtimeSetLocationForSchedulerObject);
-    schedObjFact->fcts.getSchedulerObjectForLocation = FUNC_ADDR(ocrSchedulerObject_t* (*)(ocrSchedulerObjectFactory_t*, ocrSchedulerObject_t*, ocrLocation_t, ocrSchedulerObjectMappingKind, u32), dbtimeGetSchedulerObjectForLocation);
+    schedObjFact->fcts.getSchedulerObjectForLocation = FUNC_ADDR(ocrSchedulerObject_t* (*)(ocrSchedulerObjectFactory_t*, ocrSchedulerObject_t*, ocrSchedulerObjectKind, ocrLocation_t, ocrSchedulerObjectMappingKind, u32), dbtimeGetSchedulerObjectForLocation);
     schedObjFact->fcts.createActionSet = FUNC_ADDR(ocrSchedulerObjectActionSet_t* (*)(ocrSchedulerObjectFactory_t*, ocrSchedulerObject_t*, u32), dbtimeSchedulerObjectNewActionSet);
     schedObjFact->fcts.destroyActionSet = FUNC_ADDR(u8 (*)(ocrSchedulerObjectFactory_t*, ocrSchedulerObjectActionSet_t*), dbtimeSchedulerObjectDestroyActionSet);
     schedObjFact->fcts.switchRunlevel = FUNC_ADDR(u8 (*)(ocrSchedulerObject_t*, ocrPolicyDomain_t*, ocrRunlevel_t,

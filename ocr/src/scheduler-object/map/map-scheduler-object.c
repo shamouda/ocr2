@@ -186,7 +186,9 @@ ocrSchedulerObjectIterator_t* mapSchedulerObjectCreateIterator(ocrSchedulerObjec
     ocrSchedulerObjectIterator_t* iterator = (ocrSchedulerObjectIterator_t*)pd->fcts.pdMalloc(pd, sizeof(ocrSchedulerObjectMapIterator_t));
     iterator->schedObj = self;
     iterator->data = NULL;
+    iterator->fctId = fact->factoryId;
     ocrSchedulerObjectMapIterator_t *mit = (ocrSchedulerObjectMapIterator_t*)iterator;
+    mit->internal = self;
     mit->key = NULL;
     return iterator;
 }
@@ -199,7 +201,12 @@ u8 mapSchedulerObjectDestroyIterator(ocrSchedulerObjectFactory_t * fact, ocrSche
 
 u8 mapSchedulerObjectIterate(ocrSchedulerObjectFactory_t *fact, ocrSchedulerObjectIterator_t *iterator, u32 properties) {
     ocrSchedulerObjectMap_t *mapObj = (ocrSchedulerObjectMap_t*)iterator->schedObj;
+    ASSERT(mapObj);
     ocrSchedulerObjectMapIterator_t *mit = (ocrSchedulerObjectMapIterator_t*)iterator;
+    if (mit->internal != iterator->schedObj) {
+        mit->internal = iterator->schedObj;
+        mit->key = NULL;
+    }
     switch(properties) {
     case SCHEDULER_OBJECT_ITERATE_CURRENT:
         {
@@ -229,7 +236,7 @@ u8 mapSchedulerObjectIterate(ocrSchedulerObjectFactory_t *fact, ocrSchedulerObje
     return 0;
 }
 
-ocrSchedulerObject_t* mapGetSchedulerObjectForLocation(ocrSchedulerObjectFactory_t *fact, ocrSchedulerObject_t *self, ocrLocation_t loc, ocrSchedulerObjectMappingKind mapping, u32 properties) {
+ocrSchedulerObject_t* mapGetSchedulerObjectForLocation(ocrSchedulerObjectFactory_t *fact, ocrSchedulerObject_t *self, ocrSchedulerObjectKind kind, ocrLocation_t loc, ocrSchedulerObjectMappingKind mapping, u32 properties) {
     ASSERT(0);
     return NULL;
 }
@@ -299,7 +306,7 @@ ocrSchedulerObjectFactory_t * newOcrSchedulerObjectFactoryMap(ocrParamList_t *pe
     schedObjFact->fcts.destroyIterator = FUNC_ADDR(u8 (*)(ocrSchedulerObjectFactory_t*, ocrSchedulerObjectIterator_t*), mapSchedulerObjectDestroyIterator);
     schedObjFact->fcts.iterate = FUNC_ADDR(u8 (*)(ocrSchedulerObjectFactory_t*, ocrSchedulerObjectIterator_t*, u32), mapSchedulerObjectIterate);
     schedObjFact->fcts.setLocationForSchedulerObject = FUNC_ADDR(u8 (*)(ocrSchedulerObjectFactory_t*, ocrSchedulerObject_t*, ocrLocation_t, ocrSchedulerObjectMappingKind), mapSetLocationForSchedulerObject);
-    schedObjFact->fcts.getSchedulerObjectForLocation = FUNC_ADDR(ocrSchedulerObject_t* (*)(ocrSchedulerObjectFactory_t*, ocrSchedulerObject_t*, ocrLocation_t, ocrSchedulerObjectMappingKind, u32), mapGetSchedulerObjectForLocation);
+    schedObjFact->fcts.getSchedulerObjectForLocation = FUNC_ADDR(ocrSchedulerObject_t* (*)(ocrSchedulerObjectFactory_t*, ocrSchedulerObject_t*, ocrSchedulerObjectKind, ocrLocation_t, ocrSchedulerObjectMappingKind, u32), mapGetSchedulerObjectForLocation);
     schedObjFact->fcts.createActionSet = FUNC_ADDR(ocrSchedulerObjectActionSet_t* (*)(ocrSchedulerObjectFactory_t*, ocrSchedulerObject_t*, u32), mapSchedulerObjectNewActionSet);
     schedObjFact->fcts.destroyActionSet = FUNC_ADDR(u8 (*)(ocrSchedulerObjectFactory_t*, ocrSchedulerObjectActionSet_t*), mapSchedulerObjectDestroyActionSet);
     schedObjFact->fcts.switchRunlevel = FUNC_ADDR(u8 (*)(ocrSchedulerObject_t*, ocrPolicyDomain_t*, ocrRunlevel_t,

@@ -769,20 +769,6 @@ static u8 hcAllocateDb(ocrPolicyDomain_t *self, ocrFatGuid_t *guid, void** ptr, 
             size, result, properties, NULL);
         if(returnValue == 0) {
             *ptr = result;
-            // Notify scheduler of DB CREATE
-            PD_MSG_STACK(msg);
-            getCurrentEnv(NULL, NULL, NULL, &msg);
-
-#define PD_MSG (&msg)
-#define PD_TYPE PD_MSG_SCHED_NOTIFY
-            msg.type = PD_MSG_SCHED_NOTIFY | PD_MSG_REQUEST;
-            PD_MSG_FIELD_IO(schedArgs).kind = OCR_SCHED_NOTIFY_DB_CREATE;
-            PD_MSG_FIELD_IO(schedArgs).OCR_SCHED_ARG_FIELD(OCR_SCHED_NOTIFY_DB_CREATE).guid = *guid;
-            PD_MSG_FIELD_IO(schedArgs).OCR_SCHED_ARG_FIELD(OCR_SCHED_NOTIFY_DB_CREATE).dbType = dbType;
-            RESULT_PROPAGATE(self->fcts.processMessage(self, &msg, false));
-            ASSERT(PD_MSG_FIELD_O(returnDetail) != OCR_ENOTSUP);
-#undef PD_MSG
-#undef PD_TYPE
         } else {
             // We need to free the memory that was allocated
             hcMemUnAlloc(self, &(self->allocators[idx]->fguid), *ptr, DB_MEMTYPE);
@@ -852,7 +838,7 @@ static u8 createEdtHelper(ocrPolicyDomain_t *self, ocrFatGuid_t *guid,
                       ocrFatGuid_t  edtTemplate, u32 *paramc, u64* paramv,
                       u32 *depc, u32 properties, ocrFatGuid_t affinity,
                       ocrFatGuid_t * outputEvent, ocrTask_t * currentEdt,
-                      ocrFatGuid_t parentLatch) {
+                      ocrFatGuid_t parentLatch, ocrWorkType_t workType) {
     ocrTaskTemplate_t *taskTemplate = (ocrTaskTemplate_t*)edtTemplate.metaDataPtr;
     DPRINTF(DEBUG_LVL_VVERB, "Creating EDT with template GUID "GUIDSx" (0x%lx) (paramc=%d; depc=%d)"
             " and have paramc=%d; depc=%d\n", GUIDFS(edtTemplate.guid), edtTemplate.metaDataPtr,
@@ -894,10 +880,15 @@ static u8 createEdtHelper(ocrPolicyDomain_t *self, ocrFatGuid_t *guid,
         ASSERT(false);
         return OCR_EINVAL;
     }
+
+    //Setup task parameters
+    paramListTask_t taskparams;
+    taskparams.workType = workType;
+
     u8 returnCode = self->taskFactories[0]->instantiate(
                            self->taskFactories[0], guid, edtTemplate, *paramc, paramv,
                            *depc, properties, affinity, outputEvent, currentEdt,
-                           parentLatch, NULL);
+                           parentLatch, (ocrParamList_t*)(&taskparams));
     if(returnCode) {
         DPRINTF(DEBUG_LVL_WARN, "unable to create EDT, instantiate returnCode is %x\n", returnCode);
         ASSERT(false);
@@ -953,6 +944,33 @@ static ocrStats_t* hcGetStats(ocrPolicyDomain_t *self) {
 }
 #endif
 
+//Notify scheduler of policy message before it is processed
+static inline void hcSchedNotifyPreProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg) {
+    if (msg->type & PD_MSG_IGNORE_PRE_PROCESS_SCHEDULER)
+        return;
+    ocrSchedulerOpNotifyArgs_t notifyArgs;
+    notifyArgs.base.location = msg->srcLocation;
+    notifyArgs.kind = OCR_SCHED_NOTIFY_PRE_PROCESS_MSG;
+    notifyArgs.OCR_SCHED_ARG_FIELD(OCR_SCHED_NOTIFY_PRE_PROCESS_MSG).msg = msg;
+    //Ignore the return code here
+    self->schedulers[0]->fcts.op[OCR_SCHEDULER_OP_NOTIFY].invoke(
+            self->schedulers[0], (ocrSchedulerOpArgs_t*) &notifyArgs, NULL);
+    msg->type |= PD_MSG_IGNORE_PRE_PROCESS_SCHEDULER;
+}
+
+//Notify scheduler of policy message after it is processed
+static inline void hcSchedNotifyPostProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg) {
+    if (!(msg->type & PD_MSG_REQ_POST_PROCESS_SCHEDULER))
+        return;
+    ocrSchedulerOpNotifyArgs_t notifyArgs;
+    notifyArgs.base.location = msg->srcLocation;
+    notifyArgs.kind = OCR_SCHED_NOTIFY_POST_PROCESS_MSG;
+    notifyArgs.OCR_SCHED_ARG_FIELD(OCR_SCHED_NOTIFY_POST_PROCESS_MSG).msg = msg;
+    RESULT_ASSERT(self->schedulers[0]->fcts.op[OCR_SCHEDULER_OP_NOTIFY].invoke(
+                    self->schedulers[0], (ocrSchedulerOpArgs_t*) &notifyArgs, NULL), ==, 0);
+    msg->type &= ~PD_MSG_REQ_POST_PROCESS_SCHEDULER;
+}
+
 u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlocking) {
 
     START_PROFILE(pd_hc_ProcessMessage);
@@ -973,6 +991,8 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
     u64 baseSizeOut = ocrPolicyMsgGetMsgBaseSize(msg, false);
     ASSERT(((baseSizeIn < baseSizeOut) && (msg->bufferSize >= baseSizeOut)) || (baseSizeIn >= baseSizeOut));
 #endif
+
+    hcSchedNotifyPreProcessMessage(self, msg);
 
     switch(msg->type & PD_MSG_TYPE_ONLY) {
     case PD_MSG_DB_CREATE: {
@@ -1213,7 +1233,8 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
                 self, &(PD_MSG_FIELD_IO(guid)), PD_MSG_FIELD_I(templateGuid),
                 &(PD_MSG_FIELD_IO(paramc)), PD_MSG_FIELD_I(paramv), &(PD_MSG_FIELD_IO(depc)),
                 PD_MSG_FIELD_I(properties), PD_MSG_FIELD_I(affinity), outputEvent,
-                (ocrTask_t*)(PD_MSG_FIELD_I(currentEdt).metaDataPtr), PD_MSG_FIELD_I(parentLatch));
+                (ocrTask_t*)(PD_MSG_FIELD_I(currentEdt).metaDataPtr), PD_MSG_FIELD_I(parentLatch),
+                PD_MSG_FIELD_I(workType));
         if (msg->type & PD_MSG_REQ_RESPONSE) {
             PD_MSG_FIELD_O(returnDetail) = returnCode;
         }
@@ -1590,8 +1611,26 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         break;
     }
 
+    case PD_MSG_SCHED_TRANSACT: {
+        START_PROFILE(pd_hc_Sched_Transact);
+#define PD_MSG msg
+#define PD_TYPE PD_MSG_SCHED_TRANSACT
+        ocrSchedulerOpTransactArgs_t *transactArgs = &PD_MSG_FIELD_IO(schedArgs);
+        transactArgs->base.location = msg->srcLocation;
+        PD_MSG_FIELD_O(returnDetail) =
+            self->schedulers[0]->fcts.op[OCR_SCHEDULER_OP_TRANSACT].invoke(
+                self->schedulers[0], (ocrSchedulerOpArgs_t*)transactArgs, NULL);
+#undef PD_MSG
+#undef PD_TYPE
+        msg->type &= ~PD_MSG_REQUEST;
+        if (msg->type & PD_MSG_REQ_RESPONSE)
+            msg->type |= PD_MSG_RESPONSE;
+        EXIT_PROFILE;
+        break;
+    }
+
     case PD_MSG_SCHED_ANALYZE: {
-        START_PROFILE(pd_hc_Sched_Notify);
+        START_PROFILE(pd_hc_Sched_Analyze);
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_SCHED_ANALYZE
         ocrSchedulerOpAnalyzeArgs_t *analyzeArgs = &PD_MSG_FIELD_IO(schedArgs);
@@ -1602,7 +1641,8 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
 #undef PD_MSG
 #undef PD_TYPE
         msg->type &= ~PD_MSG_REQUEST;
-        msg->type |= PD_MSG_RESPONSE;
+        if (msg->type & PD_MSG_REQ_RESPONSE)
+            msg->type |= PD_MSG_RESPONSE;
         EXIT_PROFILE;
         break;
     }
@@ -2169,6 +2209,8 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         // Not handled
         ASSERT(0);
     }
+
+    hcSchedNotifyPostProcessMessage(self, msg);
 
     if ((msg->type & PD_MSG_RESPONSE) && (msg->type & PD_MSG_REQ_RESPONSE)) {
         // response is issued:

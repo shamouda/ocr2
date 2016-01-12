@@ -104,7 +104,7 @@ u8 hcSchedulerHeuristicSwitchRunlevel(ocrSchedulerHeuristic_t *self, ocrPolicyDo
             ocrSchedulerObjectFactory_t *rootFact = PD->schedulerObjectFactories[rootObj->fctId];
             for (i = 0; i < self->contextCount; i++) {
                 ocrSchedulerHeuristicContextHc_t *hcContext = (ocrSchedulerHeuristicContextHc_t*)self->contexts[i];
-                hcContext->mySchedulerObject = rootFact->fcts.getSchedulerObjectForLocation(rootFact, rootObj, i, OCR_SCHEDULER_OBJECT_MAPPING_WORKER, 0);
+                hcContext->mySchedulerObject = rootFact->fcts.getSchedulerObjectForLocation(rootFact, rootObj, OCR_SCHEDULER_OBJECT_DEQUE, i, OCR_SCHEDULER_OBJECT_MAPPING_WORKER, 0);
                 ASSERT(hcContext->mySchedulerObject);
                 hcContext->stealSchedulerObjectIndex = (i + 1) % self->contextCount;
             }
@@ -129,9 +129,9 @@ u8 hcSchedulerHeuristicUpdate(ocrSchedulerHeuristic_t *self, u32 properties) {
 }
 
 ocrSchedulerHeuristicContext_t* hcSchedulerHeuristicGetContext(ocrSchedulerHeuristic_t *self, ocrLocation_t loc) {
-    ASSERT(loc == self->scheduler->pd->myLocation);
     ocrWorker_t * worker = NULL;
     getCurrentEnv(NULL, &worker, NULL, NULL);
+    if (worker == NULL) return NULL;
     return self->contexts[worker->id];
 }
 
@@ -234,11 +234,9 @@ u8 hcSchedulerHeuristicNotifyInvoke(ocrSchedulerHeuristic_t *self, ocrSchedulerO
         break;
     // Notifies ignored by this heuristic
     case OCR_SCHED_NOTIFY_EDT_SATISFIED:
-    case OCR_SCHED_NOTIFY_DB_CREATE:
         return OCR_ENOP;
     // Unknown ops
     default:
-        ASSERT(0);
         return OCR_ENOTSUP;
     }
     return 0;

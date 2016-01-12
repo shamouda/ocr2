@@ -46,6 +46,7 @@ typedef struct _ocrSchedulerObjectMap_t {
 
 typedef struct _ocrSchedulerObjectMapIterator_t {
     ocrSchedulerObjectIterator_t base;
+    ocrSchedulerObject_t *internal;                 /* Internal scheduler object for sanity checking */
     void *key;
 } ocrSchedulerObjectMapIterator_t;
 

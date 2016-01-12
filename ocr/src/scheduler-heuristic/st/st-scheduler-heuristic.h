@@ -16,6 +16,25 @@
 #include "ocr-scheduler-object.h"
 
 /****************************************************/
+/* ST SCHEDULER_HEURISTIC SPECIFIC STRUCTURES       */
+/****************************************************/
+
+/* The EDT proxy is used by the scheduler node to keep
+ * track of EDTs that are blocked from carrying out the
+ * analysis of space/time heuristic because their dependences
+ * have not yet arrived at the scheduler node. Once they arrive,
+ * the analysis is resumed for the EDT.
+ */
+typedef struct _ocrEdtProxy_t {
+    ocrGuid_t edtGuid;          // The guid of the EDT being analyzed
+    ocrLocation_t edtLocation;  // The location where the EDT is currently placed
+    ocrEdtDep_t *depv;          // The dependence vector of the EDT
+    u32 depc;                   // The number of dependences of the EDT
+    u32 deps;                   // The number of useful dependences of the EDT (not counting NULL_GUID etc).
+    u32 frontierIdx;            // Suspension point in the dependence vector
+} ocrEdtProxy_t;
+
+/****************************************************/
 /* ST SCHEDULER_HEURISTIC                           */
 /****************************************************/
 
@@ -25,11 +44,14 @@ typedef struct _ocrSchedulerHeuristicContextSt_t {
     ocrSchedulerObject_t *mySchedulerObject;    // The deque owned by a specific worker (context)
     u64 stealSchedulerObjectIndex;              // Cached index of the deque lasted visited during steal attempts
     ocrSchedulerObjectIterator_t *mapIterator;  // Preallocated map iterator
+    ocrSchedulerObjectIterator_t *listIterator; // Preallocated reusable list iterator
 } ocrSchedulerHeuristicContextSt_t;
 
 typedef struct _ocrSchedulerHeuristicSt_t {
     ocrSchedulerHeuristic_t base;
     ocrLocation_t schedulerLocation;            // The node location where the scheduling analysis is done on behalf of this node.
+    ocrLocation_t locationPlacement;            // Location where last EDT was placed
+    volatile u32 locationLock;                  // Lock to make round-robin decision
 } ocrSchedulerHeuristicSt_t;
 
 /****************************************************/

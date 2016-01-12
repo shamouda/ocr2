@@ -483,6 +483,7 @@ static void workerLoopHcComm(ocrWorker_t * worker) {
             ASSERT(0);
         }
     } while(continueLoop);
+    DPRINTF(DEBUG_LVL_VERB, "Finished comm worker loop ... waiting to be reapped\n");
 }
 
 u8 hcCommWorkerSwitchRunlevel(ocrWorker_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,

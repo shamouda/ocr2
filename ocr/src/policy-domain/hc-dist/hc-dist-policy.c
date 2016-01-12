@@ -56,6 +56,20 @@
 #define PROCESS_MESSAGE_RETURN_NOW(pd, retCode) \
     return retCode;
 
+#define PROCESS_MESSAGE_WITH_PROXY_DB_AND_RETURN \
+    ocrPolicyDomainHcDist_t * pdSelfDist = (ocrPolicyDomainHcDist_t *) self; \
+    ProxyDb_t * proxyDb = getProxyDb(self, PD_MSG_FIELD_IO(guid.guid), false); \
+    ASSERT(proxyDb && proxyDb->db); \
+    PD_MSG_FIELD_IO(guid.metaDataPtr) = proxyDb->db; \
+    msg->destLocation = curLoc; \
+    relProxyDb(self, proxyDb); \
+    return pdSelfDist->baseProcessMessage(self, msg, isBlocking);
+
+#define CHECK_PROCESS_MESSAGE_LOCALLY_AND_RETURN \
+    if (msg->type & PD_MSG_LOCAL_PROCESS) { \
+        ocrPolicyDomainHcDist_t * pdSelfDist = (ocrPolicyDomainHcDist_t *) self; \
+        return pdSelfDist->baseProcessMessage(self, msg, isBlocking); \
+    }
 
 /****************************************************/
 /* PROXY TEMPLATE MANAGEMENT                        */
@@ -329,6 +343,7 @@ typedef struct {
     u64 size;
     void * volatile ptr;
     u32 flags;
+    ocrDataBlock_t *db;
 } ProxyDb_t;
 
 /**
@@ -346,6 +361,7 @@ static ProxyDb_t * createProxyDb(ocrPolicyDomain_t * pd) {
     proxyDb->size = 0;
     proxyDb->ptr = NULL;
     proxyDb->flags = 0;
+    proxyDb->db = NULL;
     return proxyDb;
 }
 
@@ -515,6 +531,33 @@ static void * acquireLocalDbOblivious(ocrPolicyDomain_t * pd, ocrGuid_t dbGuid) 
 #undef PD_TYPE
 }
 
+//Notify scheduler of policy message before it is processed
+static inline void hcDistSchedNotifyPreProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg) {
+    if (msg->type & PD_MSG_IGNORE_PRE_PROCESS_SCHEDULER)
+        return;
+    ocrSchedulerOpNotifyArgs_t notifyArgs;
+    notifyArgs.base.location = msg->srcLocation;
+    notifyArgs.kind = OCR_SCHED_NOTIFY_PRE_PROCESS_MSG;
+    notifyArgs.OCR_SCHED_ARG_FIELD(OCR_SCHED_NOTIFY_PRE_PROCESS_MSG).msg = msg;
+    //Ignore the return code here
+    self->schedulers[0]->fcts.op[OCR_SCHEDULER_OP_NOTIFY].invoke(
+            self->schedulers[0], (ocrSchedulerOpArgs_t*) &notifyArgs, NULL);
+    msg->type |= PD_MSG_IGNORE_PRE_PROCESS_SCHEDULER;
+}
+
+//Notify scheduler of policy message after it is processed
+static inline void hcDistSchedNotifyPostProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg) {
+    if (!(msg->type & PD_MSG_REQ_POST_PROCESS_SCHEDULER))
+        return;
+    ocrSchedulerOpNotifyArgs_t notifyArgs;
+    notifyArgs.base.location = msg->srcLocation;
+    notifyArgs.kind = OCR_SCHED_NOTIFY_POST_PROCESS_MSG;
+    notifyArgs.OCR_SCHED_ARG_FIELD(OCR_SCHED_NOTIFY_POST_PROCESS_MSG).msg = msg;
+    RESULT_ASSERT(self->schedulers[0]->fcts.op[OCR_SCHEDULER_OP_NOTIFY].invoke(
+                    self->schedulers[0], (ocrSchedulerOpArgs_t*) &notifyArgs, NULL), ==, 0);
+    msg->type &= ~PD_MSG_REQ_POST_PROCESS_SCHEDULER;
+}
+
 /*
  * Handle messages requiring remote communications, delegate locals to shared memory implementation.
  */
@@ -561,18 +604,7 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
     suggestLocationPlacement(self, curLoc, (ocrPlatformModelAffinity_t *) self->platformModel,
                              (ocrLocationPlacer_t *) self->placer, msg);
 #else
-    // We segregate on the message type to avoid unnecessarily calling into the scheduler.
-    // Ideally, we should always call and the scheduler should be robust enough and
-    // return an error code if it does not support the operation + leave the message unchanged.
-    if (((msg->type & PD_MSG_TYPE_ONLY) == PD_MSG_WORK_CREATE) ||
-        ((msg->type & PD_MSG_TYPE_ONLY) == PD_MSG_DB_CREATE)) {
-        ocrSchedulerOpNotifyArgs_t notifyArgs;
-        notifyArgs.base.location = msg->srcLocation;
-        notifyArgs.kind = OCR_SCHED_NOTIFY_PROCESS_MSG;
-        notifyArgs.OCR_SCHED_ARG_FIELD(OCR_SCHED_NOTIFY_PROCESS_MSG).msg = msg;
-        self->schedulers[0]->fcts.op[OCR_SCHEDULER_OP_NOTIFY].invoke(
-            self->schedulers[0], (ocrSchedulerOpArgs_t*) &notifyArgs, NULL);
-    }
+    hcDistSchedNotifyPreProcessMessage(self, msg);
 #endif
 
     DPRINTF(DEBUG_LVL_VERB, "HC-dist processing message @ 0x%lx of type 0x%x\n", msg, msg->type);
@@ -983,6 +1015,7 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
     {
 #define PD_MSG (msg)
 #define PD_TYPE PD_MSG_DEP_DYNADD
+        CHECK_PROCESS_MESSAGE_LOCALLY_AND_RETURN;
         RETRIEVE_LOCATION_FROM_MSG(self, edt, msg->destLocation, I);
         DPRINTF(DEBUG_LVL_VVERB, "DEP_DYNADD: target is %d\n", (u32)msg->destLocation);
 #undef PD_MSG
@@ -1022,6 +1055,10 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
                 // Fall-through to local processing
             }
             if ((msg->srcLocation == curLoc) && (msg->destLocation != curLoc)) {
+                if (msg->type & PD_MSG_LOCAL_PROCESS) { //BUG #162 - This is a workaround until metadata cloning
+                    DPRINTF(DEBUG_LVL_VVERB,"DB_ACQUIRE local processing: DB GUID 0x%lx\n", PD_MSG_FIELD_IO(guid.guid));
+                    PROCESS_MESSAGE_WITH_PROXY_DB_AND_RETURN
+                }
                 // Outgoing acquire request
                 ProxyDb_t * proxyDb = getProxyDb(self, PD_MSG_FIELD_IO(guid.guid), true);
                 hal_lock32(&(proxyDb->lock)); // lock the db
@@ -1078,10 +1115,16 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
             }
         } else { // DB_ACQUIRE response
             ASSERT(msg->type & PD_MSG_RESPONSE);
-            RETRIEVE_LOCATION_FROM_MSG(self, edt, msg->destLocation, IO)
+            if (!IS_GUID_NULL(PD_MSG_FIELD_IO(edt.guid))) {
+                RETRIEVE_LOCATION_FROM_MSG(self, edt, msg->destLocation, IO)
+            } else {
+                //If PD acquire of DB was issued, then EDT field would be empty.
+                ASSERT(msg->destLocation == curLoc);
+            }
             if ((msg->srcLocation != curLoc) && (msg->destLocation == curLoc)) {
                 // Incoming acquire response
-                ProxyDb_t * proxyDb = getProxyDb(self, PD_MSG_FIELD_IO(guid.guid), false);
+                ocrGuid_t dbGuid = PD_MSG_FIELD_IO(guid.guid);
+                ProxyDb_t * proxyDb = getProxyDb(self, dbGuid, false);
                 // Cannot receive a response to an acquire if we don't have a proxy
                 ASSERT(proxyDb != NULL);
                 hal_lock32(&(proxyDb->lock)); // lock the db
@@ -1124,6 +1167,19 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
                         proxyDb->ptr = newPtr;
                         // Update message to be consistent, but no calling context should need to read it.
                         PD_MSG_FIELD_O(ptr) = proxyDb->ptr;
+                        if (proxyDb->db != NULL && !IS_GUID_EQUAL(proxyDb->db->guid, dbGuid)) {
+                            self->dbFactories[0]->fcts.destruct(proxyDb->db);
+                            proxyDb->db = NULL;
+                        }
+                        if (proxyDb->db == NULL) {
+                            ocrFatGuid_t tGuid;
+                            RESULT_ASSERT(self->dbFactories[0]->instantiate(
+                                              self->dbFactories[0], &tGuid, self->allocators[0]->fguid, self->fguid,
+                                              proxyDb->size, proxyDb->ptr, DB_PROP_RT_PROXY, NULL), ==, 0);
+                            proxyDb->db = (ocrDataBlock_t*)tGuid.metaDataPtr;
+                            proxyDb->db->guid = dbGuid;
+                        }
+
                         DPRINTF(DEBUG_LVL_VVERB,"DB_ACQUIRE: caching data copy for DB GUID "GUIDSx" ptr=%p size=%lu flags=0x%x\n",
                             GUIDFS(PD_MSG_FIELD_IO(guid.guid)), proxyDb->ptr, proxyDb->size, proxyDb->flags);
                         // Scan queue for compatible acquire that could use this cached proxy DB
@@ -1220,6 +1276,10 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
 #define PD_TYPE PD_MSG_DB_RELEASE
         RETRIEVE_LOCATION_FROM_GUID_MSG(self, msg->destLocation, IO)
         if ((msg->srcLocation == curLoc) && (msg->destLocation != curLoc)) {
+            if (msg->type & PD_MSG_LOCAL_PROCESS) { //BUG #162 - This is a workaround until metadata cloning
+                DPRINTF(DEBUG_LVL_VVERB,"DB_RELEASE local processing: DB GUID 0x%lx\n", PD_MSG_FIELD_IO(guid.guid));
+                PROCESS_MESSAGE_WITH_PROXY_DB_AND_RETURN
+            }
             DPRINTF(DEBUG_LVL_VVERB,"DB_RELEASE outgoing request send for DB GUID "GUIDSx"\n", GUIDFS(PD_MSG_FIELD_IO(guid.guid)));
             // Outgoing release request
             ProxyDb_t * proxyDb = getProxyDb(self, PD_MSG_FIELD_IO(guid.guid), false);
@@ -1353,6 +1413,18 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
     case PD_MSG_SCHED_GET_WORK:
     {
         // fall-through and do regular take
+        break;
+    }
+    case PD_MSG_SCHED_TRANSACT:
+    {
+        // Scheduler sets dest location
+        DPRINTF(DEBUG_LVL_VVERB, "SCHED_TRANSACT: target is %d\n", (u32)msg->destLocation);
+        break;
+    }
+    case PD_MSG_SCHED_ANALYZE:
+    {
+        // Scheduler sets dest location
+        DPRINTF(DEBUG_LVL_VVERB, "SCHED_ANALYZE: target is %d\n", (u32)msg->destLocation);
         break;
     }
     case PD_MSG_MGT_MONITOR_PROGRESS:
@@ -1506,6 +1578,13 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
                 self->guidProviders[0]->fcts.registerGuid(self->guidProviders[0], dbGuid, (u64) proxyDb);
                 // Update message with proxy DB ptr
                 PD_MSG_FIELD_O(ptr) = proxyDb->ptr;
+                ASSERT(proxyDb->db == NULL);
+                ocrFatGuid_t tGuid;
+                RESULT_ASSERT(self->dbFactories[0]->instantiate(
+                                  self->dbFactories[0], &tGuid, self->allocators[0]->fguid, self->fguid,
+                                  proxyDb->size, proxyDb->ptr, DB_PROP_RT_PROXY, NULL), ==, 0);
+                proxyDb->db = (ocrDataBlock_t*)tGuid.metaDataPtr;
+                proxyDb->db->guid = dbGuid;
 #undef PD_MSG
 #undef PD_TYPE
             break;
@@ -1538,6 +1617,8 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
                             // Deallocate the proxy DB and the cached ptr
                             // NOTE: we do not unlock proxyDb->lock not call relProxyDb
                             // since we're destroying the whole proxy and we're the last user.
+                            ASSERT(proxyDb->db != NULL);
+                            self->dbFactories[0]->fcts.destruct(proxyDb->db);
                             self->fcts.pdFree(self, proxyDb->ptr);
                             if (proxyDb->acquireQueue != NULL) {
                                 self->fcts.pdFree(self, proxyDb->acquireQueue);
@@ -1799,6 +1880,9 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
             }
         }
     }
+
+    hcDistSchedNotifyPostProcessMessage(self, msg);
+
     return ret;
 }
 

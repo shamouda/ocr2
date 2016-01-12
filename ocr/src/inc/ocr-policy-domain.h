@@ -290,12 +290,20 @@ typedef struct _paramListPolicyDomainInst_t {
 #define PD_MSG_RESPONSE         0x02000000
 /**< Defines if the message requires a return message */
 #define PD_MSG_REQ_RESPONSE     0x04000000
-
 /**< Defines a message that is a request
  * but actually a response to another query (ie:
  * the receiver was expecting something else but
  * we changed the response (shutdown for example) */
-#define PD_MSG_RESPONSE_OVERRIDE 0x10000000
+#define PD_MSG_RESPONSE_OVERRIDE 0x08000000
+
+/**< Defines if/how a message needs to be processed by the scheduler
+ * By default, every msg is pre-processed by scheduler by default.
+ * However the post-processing is not default and is dependent on
+ * the scheduler heuristic that is used.
+ * BUG 929 - A generic framework would be useful */
+#define PD_MSG_IGNORE_PRE_PROCESS_SCHEDULER 0x10000000 /* Bit used to turn off default pre-process of msgs */
+#define PD_MSG_REQ_POST_PROCESS_SCHEDULER   0x20000000 /* Bit to indicate if msg requires post processing */
+#define PD_MSG_LOCAL_PROCESS                0x40000000 /* Bit to indicate that the msg should be locally processed by the PD */
 
 #define PD_MSG_ARG_NAME_SUB(ID) _data_##ID
 #define PD_MSG_STRUCT_NAME(ID) PD_MSG_ARG_NAME_SUB(ID)
@@ -823,6 +831,7 @@ typedef struct _ocrPolicyMsg_t {
         /* Operation where schedulers transact a scheduler object (scheduler-scheduler operation) */
         struct {
             ocrSchedulerOpTransactArgs_t schedArgs;        /**< In/Out: Arguments for the scheduler transact operation */
+            u64 size;                                      /**< In/Out: Size of transacted object */
             union {
                 struct {
                     u32 properties;                         /**< In: properties for the op */

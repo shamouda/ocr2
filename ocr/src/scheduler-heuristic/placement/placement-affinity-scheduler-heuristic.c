@@ -115,8 +115,8 @@ static u8 placerAffinitySchedHeuristicGetWorkSimulate(ocrSchedulerHeuristic_t *s
 
 static u8 placerAffinitySchedHeuristicNotifyProcessMsgInvoke(ocrSchedulerHeuristic_t *self, ocrSchedulerHeuristicContext_t *context, ocrSchedulerOpArgs_t *opArgs, ocrRuntimeHint_t *hints) {
     ocrSchedulerOpNotifyArgs_t *notifyArgs = (ocrSchedulerOpNotifyArgs_t*)opArgs;
-    ASSERT(notifyArgs->kind == OCR_SCHED_NOTIFY_PROCESS_MSG);
-    ocrPolicyMsg_t * msg = notifyArgs->OCR_SCHED_ARG_FIELD(OCR_SCHED_NOTIFY_PROCESS_MSG).msg;
+    ASSERT(notifyArgs->kind == OCR_SCHED_NOTIFY_PRE_PROCESS_MSG);
+    ocrPolicyMsg_t * msg = notifyArgs->OCR_SCHED_ARG_FIELD(OCR_SCHED_NOTIFY_PRE_PROCESS_MSG).msg;
     u64 msgType = (msg->type & PD_MSG_TYPE_ONLY);
     ocrSchedulerHeuristicPlacementAffinity_t * dself = (ocrSchedulerHeuristicPlacementAffinity_t *) self;
     ocrPlatformModelAffinity_t * model = dself->platformModel; // Cached from the PD initialization
@@ -181,7 +181,7 @@ static u8 placerAffinitySchedHeuristicNotifyProcessMsgInvoke(ocrSchedulerHeurist
 static u8 placerAffinitySchedHeuristicNotifyInvoke(ocrSchedulerHeuristic_t *self, ocrSchedulerOpArgs_t *opArgs, ocrRuntimeHint_t *hints) {
     ocrSchedulerOpNotifyArgs_t *notifyArgs = (ocrSchedulerOpNotifyArgs_t*)opArgs;
     switch(notifyArgs->kind) {
-    case OCR_SCHED_NOTIFY_PROCESS_MSG:
+    case OCR_SCHED_NOTIFY_PRE_PROCESS_MSG:
         return placerAffinitySchedHeuristicNotifyProcessMsgInvoke(self, /*context*/ NULL, opArgs, hints);
     case OCR_SCHED_NOTIFY_EDT_DONE:
         {

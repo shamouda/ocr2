@@ -30,7 +30,7 @@ parser.add_argument('--alloctype', dest='alloctype', default='mallocproxy', choi
                    help='type of allocator to use (default: mallocproxy)')
 parser.add_argument('--dbtype', dest='dbtype', default='Lockable', choices=['Lockable', 'Regular'],
                    help='type of datablocks to use (default: Lockable)')
-parser.add_argument('--scheduler', dest='scheduler', default='HC', choices=['HC', 'PRIORITY', 'PLACEMENT_AFFINITY', 'LEGACY'],
+parser.add_argument('--scheduler', dest='scheduler', default='HC', choices=['HC', 'PRIORITY', 'PLACEMENT_AFFINITY', 'LEGACY', 'ST'],
                    help='scheduler heuristic (default: HC)')
 parser.add_argument('--output', dest='output', default='default.cfg',
                    help='config output filename (default: default.cfg)')
@@ -268,9 +268,7 @@ def GenerateComp(output, pdtype, threads, binding, sysworker, schedtype):
         output.write("\tname\t=\t%s\n" % ("WST"))
         if scheduler == 'HC' or scheduler == 'PLACEMENT_AFFINITY':
             output.write("\tkind\t=\t%s\n" % ("root"))
-            output.write("[SchedulerObjectInst0]\n")
-            output.write("\tid\t=\t0\n")
-            output.write("\ttype\t=\t%s\n" % ("WST"))
+            rootObj = 'WST'
         output.write("[SchedulerObjectType2]\n")
         output.write("\tname\t=\t%s\n" % ("DEQ"))
         output.write("[SchedulerObjectType3]\n")
@@ -279,6 +277,9 @@ def GenerateComp(output, pdtype, threads, binding, sysworker, schedtype):
         output.write("\tname\t=\t%s\n" % ("MAP"))
         output.write("[SchedulerObjectType5]\n")
         output.write("\tname\t=\t%s\n" % ("PDSPACE"))
+        if scheduler == 'ST':
+            output.write("\tkind\t=\t%s\n" % ("root"))
+            rootObj = 'PDSPACE'
         output.write("[SchedulerObjectType6]\n")
         output.write("\tname\t=\t%s\n" % ("DBSPACE"))
         output.write("[SchedulerObjectType7]\n")
@@ -287,11 +288,12 @@ def GenerateComp(output, pdtype, threads, binding, sysworker, schedtype):
         output.write("\tname\t=\t%s\n" % ("PR_WSH"))
         if scheduler == 'PRIORITY':
             output.write("\tkind\t=\t%s\n" % ("root"))
-            output.write("[SchedulerObjectInst0]\n")
-            output.write("\tid\t=\t0\n")
-            output.write("\ttype\t=\t%s\n" % ("PR_WSH"))
+            rootObj = 'PR_WSH'
         output.write("[SchedulerObjectType9]\n")
         output.write("\tname\t=\t%s\n" % ("BIN_HEAP"))
+        output.write("[SchedulerObjectInst0]\n")
+        output.write("\tid\t\t=\t0\n")
+        output.write("\ttype\t=\t%s\n" % (rootObj))
         output.write("\n#======================================================\n")
         if (pdtype == 'HCDist'):
             output.write("[SchedulerHeuristicType0]\n\tname\t=\t%s\n" % ("NULL"))
@@ -303,18 +305,24 @@ def GenerateComp(output, pdtype, threads, binding, sysworker, schedtype):
                 heuristics = ["HC", "PLACEMENT_AFFINITY", "HC_COMM_DELEGATE"]
                 for i in range(0, 3):
                     output.write("[SchedulerHeuristicInst%d]\n" % i)
-                    output.write("\tid\t=\t%d\n" % i)
+                    output.write("\tid\t\t=\t%d\n" % i)
+                    output.write("\ttype\t=\t%s\n" % (heuristics[i]))
+            elif scheduler == 'ST':
+                heuristics = ["ST", "HC_COMM_DELEGATE"]
+                for i in range(0, 2):
+                    output.write("[SchedulerHeuristicInst%d]\n" % i)
+                    output.write("\tid\t\t=\t%d\n" % i)
                     output.write("\ttype\t=\t%s\n" % (heuristics[i]))
             else:
                     output.write("[SchedulerHeuristicInst0]\n")
-                    output.write("\tid\t=\t0\n")
+                    output.write("\tid\t\t=\t0\n")
                     output.write("\ttype\t=\t%s\n" % (scheduler))
         else:
             output.write("[SchedulerHeuristicType0]\n\tname\t=\t%s\n" % ("NULL"))
             output.write("[SchedulerHeuristicType1]\n\tname\t=\t%s\n" % ("HC"))
             output.write("[SchedulerHeuristicType2]\n\tname\t=\t%s\n" % ("ST"))
             output.write("[SchedulerHeuristicInst0]\n")
-            output.write("\tid\t=\t0\n")
+            output.write("\tid\t\t=\t0\n")
             output.write("\ttype\t=\t%s\n" % (scheduler))
         output.write("\n#======================================================\n")
         output.write("[SchedulerType0]\n\tname\t=\t%s\n" % (schedtype))
@@ -327,6 +335,9 @@ def GenerateComp(output, pdtype, threads, binding, sysworker, schedtype):
         if (scheduler == 'PLACEMENT_AFFINITY'):
             output.write("\tconfig\t=\tcomp0:plc1:comm2\n")
             output.write("\tschedulerHeuristic\t=\t0-2\n")
+        elif (scheduler == 'ST'):
+            output.write("\tconfig\t=\tcomp0:plc0:comm1\n")
+            output.write("\tschedulerHeuristic\t=\t0-1\n")
         else:
             output.write("\tschedulerHeuristic\t=\t0\n")
     output.write("\n#======================================================\n")

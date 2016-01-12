@@ -47,7 +47,9 @@ u64 ocrHintPropTaskHc[] = {
     OCR_HINT_EDT_PRIORITY,
     OCR_HINT_EDT_SLOT_MAX_ACCESS,
     OCR_HINT_EDT_AFFINITY,
-    OCR_HINT_EDT_PHASE
+    /* BUG #923 - Separation of runtime vs user hints ? */
+    OCR_HINT_EDT_SPACE,
+    OCR_HINT_EDT_TIME
 #endif
 };
 
@@ -497,6 +499,7 @@ static u8 taskAllDepvSatisfied(ocrTask_t *self) {
             rself->signalers[i].slot = i; // reset the slot info
             resolvedDeps[i].guid = signalers[i].guid; // DB guids by now
             resolvedDeps[i].ptr = NULL; // resolved by acquire messages
+            resolvedDeps[i].mode = signalers[i].mode;
             i++;
         }
         // Sort regnode in guid's ascending order.
@@ -738,13 +741,25 @@ u8 newTaskHc(ocrTaskFactory_t* factory, ocrFatGuid_t * edtGuid, ocrFatGuid_t edt
         ocrTaskTemplateHc_t *derived = (ocrTaskTemplateHc_t*)(edtTemplate.metaDataPtr);
         edt->hint.hintMask = derived->hint.hintMask;
         edt->hint.hintVal = (u64*)((u64)base + sizeof(ocrTaskHc_t) + paramc*sizeof(u64) + depc*sizeof(regNode_t));
-        for (i = 0; i < hintc; i++) edt->hint.hintVal[i] = derived->hint.hintVal[i]; //copy the hints from the template
+        u64 hintSize = OCR_RUNTIME_HINT_GET_SIZE(derived->hint.hintMask);
+        for (i = 0; i < hintc; i++) edt->hint.hintVal[i] = (hintSize == 0) ? 0 : derived->hint.hintVal[i]; //copy the hints from the template
     }
 
     if (schedc != 0) {
         base->flags |= OCR_TASK_FLAG_USES_SCHEDULER_OBJECT;
         u64* schedObjPtr = (u64*)HC_TASK_SCHED_OBJ_PTR(edt);
         *schedObjPtr = 0;
+    }
+
+    if (perInstance != NULL) {
+        paramListTask_t *taskparams = (paramListTask_t*)perInstance;
+        if (taskparams->workType == EDT_RT_WORKTYPE) {
+            base->flags |= OCR_TASK_FLAG_RUNTIME_EDT;
+        }
+    }
+
+    if (!IS_GUID_NULL(affinity.guid)) {
+        base->flags |= OCR_TASK_FLAG_USES_AFFINITY;
     }
 
     // Set up HC specific stuff
@@ -799,14 +814,28 @@ u8 newTaskHc(ocrTaskFactory_t* factory, ocrFatGuid_t * edtGuid, ocrFatGuid_t edt
 
 u8 dependenceResolvedTaskHc(ocrTask_t * self, ocrGuid_t dbGuid, void * localDbPtr, u32 slot) {
     ocrTaskHc_t * rself = (ocrTaskHc_t *) self;
-    // EDT already has all its dependences satisfied, now we're getting acquire notifications
-    // should only happen on RT event slot to manage DB acquire
-    ASSERT(slot == (self->depc+1));
-    ASSERT(rself->slotSatisfiedCount == slot);
-    // Implementation acquires DB sequentially, so the DB's GUID
-    // must match the frontier's DB and we do not need to lock this code
-    ASSERT(IS_GUID_EQUAL(dbGuid, rself->signalers[rself->frontierSlot-1].guid));
-    rself->resolvedDeps[rself->signalers[rself->frontierSlot-1].slot].ptr = localDbPtr;
+
+    //BUG #924 - We need to decouple satisfy and acquire. Until then, we will
+    //use this workaround of using the slot info to do that.
+    if (slot == EDT_SLOT_NONE) {
+        //This is called after the scheduler moves an EDT to the right place,
+        //and also decides the right time for the EDT to start acquiring the DBs.
+        ASSERT(IS_GUID_NULL(dbGuid) && localDbPtr == NULL);
+        // Sort regnode in guid's ascending order.
+        // This is the order in which we acquire the DBs
+        sortRegNode(rself->signalers, self->depc);
+        // Start the DB acquisition process
+        rself->frontierSlot = 0;
+    } else {
+        // EDT already has all its dependences satisfied, now we're getting acquire notifications
+        // should only happen on RT event slot to manage DB acquire
+        ASSERT(slot == (self->depc+1));
+        ASSERT(rself->slotSatisfiedCount == slot);
+        // Implementation acquires DB sequentially, so the DB's GUID
+        // must match the frontier's DB and we do not need to lock this code
+        ASSERT(IS_GUID_EQUAL(dbGuid, rself->signalers[rself->frontierSlot-1].guid));
+        rself->resolvedDeps[rself->signalers[rself->frontierSlot-1].slot].ptr = localDbPtr;
+    }
     if (!iterateDbFrontier(self)) {
         scheduleTask(self);
     }

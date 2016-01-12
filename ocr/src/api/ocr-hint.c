@@ -53,7 +53,8 @@ u8 ocrHintInit(ocrHint_t *hint, ocrHintType_t hintType) {
             OCR_HINT_FIELD(hint, OCR_HINT_EDT_SLOT_MAX_ACCESS) = ((u64)-1);
             // See BUG #928: If this is a GUID, we cannot store affinities in the hint table
             OCR_HINT_FIELD(hint, OCR_HINT_EDT_AFFINITY) = (u64)0;
-            OCR_HINT_FIELD(hint, OCR_HINT_EDT_PHASE) = ((u64)-1);
+            OCR_HINT_FIELD(hint, OCR_HINT_EDT_SPACE) = ((u64)-1);
+            OCR_HINT_FIELD(hint, OCR_HINT_EDT_TIME) = 0;
         }
         break;
     case OCR_HINT_DB_T:

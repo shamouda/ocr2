@@ -456,6 +456,16 @@ u8 lockableRelease(ocrDataBlock_t *self, ocrFatGuid_t edt, bool isInternal) {
 }
 
 u8 lockableDestruct(ocrDataBlock_t *self) {
+    DPRINTF(DEBUG_LVL_VERB, "Freeing DB (GUID: "GUIDSx")\n", GUIDFS(self->guid));
+    ocrPolicyDomain_t *pd = NULL;
+    PD_MSG_STACK(msg);
+    getCurrentEnv(&pd, NULL, NULL, &msg);
+
+    if (self->flags & DB_PROP_RT_PROXY) {
+        pd->fcts.pdFree(pd, self);
+        return 0;
+    }
+
 #ifdef OCR_ASSERT
     ocrDataBlockLockable_t *rself = (ocrDataBlockLockable_t*)self;
     // Any of these wrong would indicate a race between free and DB's consumers
@@ -467,11 +477,6 @@ u8 lockableDestruct(ocrDataBlock_t *self) {
     ASSERT(rself->itwWaiterList == NULL);
     ASSERT(rself->lock == 0);
 #endif
-
-    DPRINTF(DEBUG_LVL_VERB, "Freeing DB (GUID: "GUIDSx")\n", GUIDFS(self->guid));
-    ocrPolicyDomain_t *pd = NULL;
-    PD_MSG_STACK(msg);
-    getCurrentEnv(&pd, NULL, NULL, &msg);
 
 #define PD_MSG (&msg)
 #define PD_TYPE PD_MSG_MEM_UNALLOC
@@ -559,22 +564,30 @@ u8 newDataBlockLockable(ocrDataBlockFactory_t *factory, ocrFatGuid_t *guid, ocrF
     PD_MSG_STACK(msg);
     getCurrentEnv(&pd, NULL, NULL, &msg);
 
+    ocrDataBlockLockable_t *result = NULL;
     u32 hintc = (flags & DB_PROP_NO_HINT) ? 0 : OCR_HINT_COUNT_DB_LOCKABLE;
+    u32 mSize = sizeof(ocrDataBlockLockable_t) + hintc*sizeof(u64);
+
+    if (flags & DB_PROP_RT_PROXY) {
+        result = (ocrDataBlockLockable_t*)pd->fcts.pdMalloc(pd, mSize);
+        result->base.guid = NULL_GUID;
+    } else {
 #define PD_MSG (&msg)
 #define PD_TYPE PD_MSG_GUID_CREATE
-    msg.type = PD_MSG_GUID_CREATE | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
-    PD_MSG_FIELD_IO(guid) = *guid;
-    PD_MSG_FIELD_I(size) = sizeof(ocrDataBlockLockable_t) + hintc*sizeof(u64);
-    PD_MSG_FIELD_I(kind) = OCR_GUID_DB;
-    PD_MSG_FIELD_I(properties) = flags & GUID_PROP_ALL;
+        msg.type = PD_MSG_GUID_CREATE | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
+        PD_MSG_FIELD_IO(guid) = *guid;
+        PD_MSG_FIELD_I(size) = mSize;
+        PD_MSG_FIELD_I(kind) = OCR_GUID_DB;
+        PD_MSG_FIELD_I(properties) = flags & GUID_PROP_ALL;
 
-    RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, true));
+        RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, true));
 
-    ocrDataBlockLockable_t *result = (ocrDataBlockLockable_t*)PD_MSG_FIELD_IO(guid.metaDataPtr);
-    resultGuid = PD_MSG_FIELD_IO(guid.guid);
-    returnValue = PD_MSG_FIELD_O(returnDetail);
+        result = (ocrDataBlockLockable_t*)PD_MSG_FIELD_IO(guid.metaDataPtr);
+        resultGuid = PD_MSG_FIELD_IO(guid.guid);
+        returnValue = PD_MSG_FIELD_O(returnDetail);
 #undef PD_MSG
 #undef PD_TYPE
+    }
 
     if(returnValue != 0) {
         return returnValue;
@@ -587,7 +600,7 @@ u8 newDataBlockLockable(ocrDataBlockFactory_t *factory, ocrFatGuid_t *guid, ocrF
     result->base.fctId = factory->factoryId;
     // Only keep flags that represent the nature of
     // the DB as opposed to one-time usage creation flags
-    result->base.flags = (flags & DB_PROP_SINGLE_ASSIGNMENT);
+    result->base.flags = (flags & (DB_PROP_SINGLE_ASSIGNMENT | DB_PROP_RT_PROXY));
     result->lock = 0;
     result->attributes.flags = result->base.flags;
     result->attributes.numUsers = 0;

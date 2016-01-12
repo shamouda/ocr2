@@ -35,13 +35,6 @@
 // Comp-target
 #define ENABLE_COMP_TARGET_PASSTHROUGH
 
-// Scheduler Objects
-#define ENABLE_SCHEDULER_OBJECT_WST
-#define ENABLE_SCHEDULER_OBJECT_DEQ
-
-// Scheduler Heuristic
-#define ENABLE_SCHEDULER_HEURISTIC_CE
-
 // Datablock
 #define ENABLE_DATABLOCK_REGULAR
 #define ENABLE_DATABLOCK_LOCKABLE
@@ -77,6 +70,13 @@
 
 // Scheduler
 #define ENABLE_SCHEDULER_COMMON
+
+// Scheduler Heuristic
+#define ENABLE_SCHEDULER_HEURISTIC_CE
+
+// Scheduler Objects
+#define ENABLE_SCHEDULER_OBJECT_WST
+#define ENABLE_SCHEDULER_OBJECT_DEQ
 
 // Sysboot layer to use
 // None - this is a builder

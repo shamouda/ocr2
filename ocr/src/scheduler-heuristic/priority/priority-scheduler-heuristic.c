@@ -103,7 +103,7 @@ u8 prioritySchedulerHeuristicSwitchRunlevel(ocrSchedulerHeuristic_t *self, ocrPo
             ocrSchedulerObjectFactory_t *rootFact = PD->schedulerObjectFactories[rootObj->fctId];
             for (i = 0; i < self->contextCount; i++) {
                 ocrSchedulerHeuristicContextPriority_t *priorityContext = (ocrSchedulerHeuristicContextPriority_t*)self->contexts[i];
-                priorityContext->mySchedulerObject = rootFact->fcts.getSchedulerObjectForLocation(rootFact, rootObj, i, OCR_SCHEDULER_OBJECT_MAPPING_WORKER, 0);
+                priorityContext->mySchedulerObject = rootFact->fcts.getSchedulerObjectForLocation(rootFact, rootObj, OCR_SCHEDULER_OBJECT_UNDEFINED, i, OCR_SCHEDULER_OBJECT_MAPPING_WORKER, 0);
                 ASSERT(priorityContext->mySchedulerObject);
             }
         }

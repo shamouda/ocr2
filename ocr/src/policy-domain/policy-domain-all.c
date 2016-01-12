@@ -212,10 +212,31 @@ u8 ocrPolicyMsgGetMsgSize(ocrPolicyMsg_t *msg, u64 *baseSize,
     case PD_MSG_SCHED_ANALYZE:
 #define PD_TYPE PD_MSG_SCHED_ANALYZE
         {
-            ocrPolicyDomain_t *pd = NULL;
-            getCurrentEnv(&pd, NULL, NULL, NULL);
-            ocrSchedulerObjectFactory_t *fact = (ocrSchedulerObjectFactory_t*)pd->schedulerObjectFactories[PD_MSG_FIELD_IO(schedArgs).schedObj.fctId];
-            fact->fcts.ocrPolicyMsgGetMsgSize(fact, msg, marshalledSize, mode);
+            //BUG #920 - Move implementation specific details to the factories
+            ocrSchedulerOpAnalyzeArgs_t *analyzeArgs = &PD_MSG_FIELD_IO(schedArgs);
+            switch(analyzeArgs->kind) {
+            case OCR_SCHED_ANALYZE_SPACETIME_EDT:
+                {
+                    switch(analyzeArgs->properties) {
+                    case OCR_SCHED_ANALYZE_REQUEST:
+                        *marshalledSize = sizeof(ocrEdtDep_t) * analyzeArgs->OCR_SCHED_ARG_FIELD(OCR_SCHED_ANALYZE_SPACETIME_EDT).req.depc;
+                        break;
+                    //Nothing to marshall
+                    case OCR_SCHED_ANALYZE_RESPONSE:
+                        break;
+                    default:
+                        ASSERT(0);
+                        break;
+                    }
+                }
+                break;
+            //Nothing to marshall
+            case OCR_SCHED_ANALYZE_SPACETIME_DB:
+                break;
+            default:
+                ASSERT(0);
+                break;
+            }
         }
         break;
 #undef PD_TYPE
@@ -509,10 +530,26 @@ u8 ocrPolicyMsgMarshallMsg(ocrPolicyMsg_t* msg, u64 baseSize, u8* buffer, u32 mo
     case PD_MSG_SCHED_TRANSACT:
 #define PD_TYPE PD_MSG_SCHED_TRANSACT
         {
+            u64 s = 0;
             ocrPolicyDomain_t *pd = NULL;
             getCurrentEnv(&pd, NULL, NULL, NULL);
             ocrSchedulerObjectFactory_t *fact = (ocrSchedulerObjectFactory_t*)pd->schedulerObjectFactories[PD_MSG_FIELD_IO(schedArgs).schedObj.fctId];
-            fact->fcts.ocrPolicyMsgMarshallMsg(fact, msg, curPtr, mode);
+            if (PD_MSG_FIELD_IO(schedArgs).schedObj.guid.metaDataPtr != NULL)
+                fact->fcts.ocrPolicyMsgGetMsgSize(fact, msg, &s, mode);
+            if (s) {
+                if (fact->fcts.ocrPolicyMsgMarshallMsg(fact, PD_MSG, curPtr, mode) == 0) {
+                    if(fixupPtrs) {
+                        PD_MSG_FIELD_IO(schedArgs).schedObj.guid.metaDataPtr = (void*)((((u64)(curPtr - startPtr))<<1) + isAddl);
+                    } else {
+                        PD_MSG_FIELD_IO(schedArgs).schedObj.guid.metaDataPtr = (void*)curPtr;
+                    }
+                    curPtr += s;
+                } else {
+                    PD_MSG_FIELD_IO(schedArgs).schedObj.guid.metaDataPtr = NULL;
+                }
+            } else {
+                PD_MSG_FIELD_IO(schedArgs).schedObj.guid.metaDataPtr = NULL;
+            }
         }
         break;
 #undef PD_TYPE
@@ -520,10 +557,42 @@ u8 ocrPolicyMsgMarshallMsg(ocrPolicyMsg_t* msg, u64 baseSize, u8* buffer, u32 mo
     case PD_MSG_SCHED_ANALYZE:
 #define PD_TYPE PD_MSG_SCHED_ANALYZE
         {
-            ocrPolicyDomain_t *pd = NULL;
-            getCurrentEnv(&pd, NULL, NULL, NULL);
-            ocrSchedulerObjectFactory_t *fact = (ocrSchedulerObjectFactory_t*)pd->schedulerObjectFactories[PD_MSG_FIELD_IO(schedArgs).schedObj.fctId];
-            fact->fcts.ocrPolicyMsgMarshallMsg(fact, msg, curPtr, mode);
+            //BUG #920 - Move implementation specific details to the factories
+            ocrSchedulerOpAnalyzeArgs_t *analyzeArgs = &PD_MSG_FIELD_IO(schedArgs);
+            switch(analyzeArgs->kind) {
+            case OCR_SCHED_ANALYZE_SPACETIME_EDT:
+                {
+                    switch(analyzeArgs->properties) {
+                    case OCR_SCHED_ANALYZE_REQUEST:
+                        {
+                            u64 s = sizeof(ocrEdtDep_t) * analyzeArgs->OCR_SCHED_ARG_FIELD(OCR_SCHED_ANALYZE_SPACETIME_EDT).req.depc;
+                            if (s) {
+                                hal_memCopy(curPtr, analyzeArgs->OCR_SCHED_ARG_FIELD(OCR_SCHED_ANALYZE_SPACETIME_EDT).req.depv, s, false);
+                                if(fixupPtrs) {
+                                    analyzeArgs->OCR_SCHED_ARG_FIELD(OCR_SCHED_ANALYZE_SPACETIME_EDT).req.depv = (ocrEdtDep_t*)((((u64)(curPtr - startPtr))<<1) + isAddl);
+                                } else {
+                                    analyzeArgs->OCR_SCHED_ARG_FIELD(OCR_SCHED_ANALYZE_SPACETIME_EDT).req.depv = (ocrEdtDep_t*)curPtr;
+                                }
+                                curPtr += s;
+                            }
+                        }
+                        break;
+                    //Nothing to marshall
+                    case OCR_SCHED_ANALYZE_RESPONSE:
+                        break;
+                    default:
+                        ASSERT(0);
+                        break;
+                    }
+                }
+                break;
+            //Nothing to marshall
+            case OCR_SCHED_ANALYZE_SPACETIME_DB:
+                break;
+            default:
+                ASSERT(0);
+                break;
+            }
         }
         break;
 #undef PD_TYPE
@@ -886,10 +955,15 @@ u8 ocrPolicyMsgUnMarshallMsg(u8* mainBuffer, u8* addlBuffer,
     case PD_MSG_SCHED_TRANSACT:
 #define PD_TYPE PD_MSG_SCHED_TRANSACT
         {
-            ocrPolicyDomain_t *pd = NULL;
-            getCurrentEnv(&pd, NULL, NULL, NULL);
-            ocrSchedulerObjectFactory_t *fact = (ocrSchedulerObjectFactory_t*)pd->schedulerObjectFactories[PD_MSG_FIELD_IO(schedArgs).schedObj.fctId];
-            fact->fcts.ocrPolicyMsgUnMarshallMsg(fact, msg, localMainPtr, localAddlPtr, mode);
+            if (PD_MSG_FIELD_IO(schedArgs).schedObj.guid.metaDataPtr != NULL) {
+                u64 t = (u64)(PD_MSG_FIELD_IO(schedArgs).schedObj.guid.metaDataPtr);
+                PD_MSG_FIELD_IO(schedArgs).schedObj.guid.metaDataPtr = (void*)((t&1?localAddlPtr:localMainPtr) + (t>>1));
+
+                ocrPolicyDomain_t *pd = NULL;
+                getCurrentEnv(&pd, NULL, NULL, NULL);
+                ocrSchedulerObjectFactory_t *fact = (ocrSchedulerObjectFactory_t*)pd->schedulerObjectFactories[PD_MSG_FIELD_IO(schedArgs).schedObj.fctId];
+                fact->fcts.ocrPolicyMsgUnMarshallMsg(fact, msg, localMainPtr, localAddlPtr, mode);
+            }
         }
         break;
 #undef PD_TYPE
@@ -897,10 +971,36 @@ u8 ocrPolicyMsgUnMarshallMsg(u8* mainBuffer, u8* addlBuffer,
     case PD_MSG_SCHED_ANALYZE:
 #define PD_TYPE PD_MSG_SCHED_ANALYZE
         {
-            ocrPolicyDomain_t *pd = NULL;
-            getCurrentEnv(&pd, NULL, NULL, NULL);
-            ocrSchedulerObjectFactory_t *fact = (ocrSchedulerObjectFactory_t*)pd->schedulerObjectFactories[PD_MSG_FIELD_IO(schedArgs).schedObj.fctId];
-            fact->fcts.ocrPolicyMsgUnMarshallMsg(fact, msg, localMainPtr, localAddlPtr, mode);
+            //BUG #920 - Move implementation specific details to the factories
+            ocrSchedulerOpAnalyzeArgs_t *analyzeArgs = &PD_MSG_FIELD_IO(schedArgs);
+            switch(analyzeArgs->kind) {
+            case OCR_SCHED_ANALYZE_SPACETIME_EDT:
+                {
+                    switch(analyzeArgs->properties) {
+                    case OCR_SCHED_ANALYZE_REQUEST:
+                        {
+                            if (analyzeArgs->OCR_SCHED_ARG_FIELD(OCR_SCHED_ANALYZE_SPACETIME_EDT).req.depc > 0) {
+                                u64 t = (u64)(analyzeArgs->OCR_SCHED_ARG_FIELD(OCR_SCHED_ANALYZE_SPACETIME_EDT).req.depv);
+                                analyzeArgs->OCR_SCHED_ARG_FIELD(OCR_SCHED_ANALYZE_SPACETIME_EDT).req.depv = (ocrEdtDep_t*)((t&1?localAddlPtr:localMainPtr) + (t>>1));
+                            }
+                        }
+                        break;
+                    //Nothing to unmarshall
+                    case OCR_SCHED_ANALYZE_RESPONSE:
+                        break;
+                    default:
+                        ASSERT(0);
+                        break;
+                    }
+                }
+                break;
+            //Nothing to unmarshall
+            case OCR_SCHED_ANALYZE_SPACETIME_DB:
+                break;
+            default:
+                ASSERT(0);
+                break;
+            }
         }
         break;
 #undef PD_TYPE

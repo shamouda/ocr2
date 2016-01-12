@@ -22,23 +22,24 @@ typedef struct _paramListSchedulerObjectDbtime_t {
     paramListSchedulerObject_t base;
     ocrLocation_t space;
     u64 time;
-    ocrDbAccessMode_t mode;
 } paramListSchedulerObjectDbtime_t;
 
+// A DB time object keeps track of a specific time slot
+// in the DB's timeline on this PD. EDTs are scheduled
+// to access DBs according to these time slots.
 typedef struct _ocrSchedulerObjectDbtime_t {
     ocrSchedulerObject_t base;
-    ocrLocation_t space;                //Current location of DB (updated only on scheduler nodes)
-                                        // - On a non-scheduling node this is always current PD location
-                                        // - A scheduling node maintains DbTime objects for all locations of the DB
-    u64 time;                           //Scheduler reference global time tick
-    ocrDbAccessMode_t mode;             //Max access mode according to mode lattice
-    bool dbRequestSent;                 //Flag to indicate if request to fetch DB has been sent
-    ocrSchedulerObject_t *edtList;      //List of EDTs scheduled to access this DB at this time (and in space)
-                                        // - Only maintained on current nodes, i.e. scheduling nodes don’t maintain
-                                        //   EDT lists for other locations for which it has DbTime nodes
-    u32 edtSchedCount;                  //Number of EDTs scheduled for this time slice for this DB
-    u32 edtDoneCount;                   //Number of scheduled EDTs that have completed execution
-    volatile u32 lock;                  //Lock for this scheduler object
+    ocrLocation_t space;                            //Scheduled location of DB (updated only on scheduler nodes)
+                                                    // - A scheduling node maintains DbTime objects for all locations of the DB
+                                                    // - On a non-scheduling node this is always current PD location
+    u64 time;                                       //Scheduler reference global time tick
+    ocrSchedulerObject_t *waitList;                 //List of EDTs that are waiting either for DB data
+    ocrSchedulerObject_t *readyList;                //List of EDTs that are ready to acquire the DB
+    u32 exclusiveWaiterCount;                       //Number of EDTs that are waiting to acquire DB in exclusive mode
+    u32 edtScheduledCount;                          //Total number of EDTs overall that have been scheduled to access this DB for this time slot
+    u32 edtDoneCount;                               //Total number of EDTs that have completed execution in this time slot
+    u32 schedulerCount;                             //Count kept by scheduler node for number of EDTs scheduled
+    bool schedulerDone;                             //Flag used to identify if this time slot is complete at scheduler node
 } ocrSchedulerObjectDbtime_t;
 
 /****************************************************/

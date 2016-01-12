@@ -91,23 +91,44 @@ typedef struct _ocrSchedulerOpWorkArgs_t {
 typedef enum {
     //Note: PROCESS_MSG is intentionally vague for now so that there's an easy way to experiment
     //      with what it would actually make sense for the scheduler to look at.
-    OCR_SCHED_NOTIFY_PROCESS_MSG,                   /* Notify scheduler a PD message is being processed */
-    OCR_SCHED_NOTIFY_DB_CREATE,                     /* Notify scheduler that a DB is created */
-    OCR_SCHED_NOTIFY_DB_DONE,                       /* Notify scheduler that a DB's use is done */
+    OCR_SCHED_NOTIFY_PRE_PROCESS_MSG,               /* Notify scheduler before a PD message will be processed */
+    OCR_SCHED_NOTIFY_POST_PROCESS_MSG,              /* Notify scheduler after a PD message has been processed */
+    OCR_SCHED_NOTIFY_DB_CREATE,                     /* BUG #920 Cleanup - Notify scheduler that a DB is created */
+    OCR_SCHED_NOTIFY_DB_ACQUIRE,                    /* BUG #920 Cleanup - Notify scheduler that a DB is acquired by an EDT */
+    OCR_SCHED_NOTIFY_DB_RELEASE,                    /* BUG #920 Cleanup - Notify scheduler that a DB is released by an EDT */
+    OCR_SCHED_NOTIFY_DB_DESTROY,                    /* BUG #920 Cleanup - Notify scheduler that a DB is destroyed */
+    OCR_SCHED_NOTIFY_EDT_CREATE,                    /* BUG #920 Cleanup - Notify scheduler that an EDT is created */
     OCR_SCHED_NOTIFY_EDT_SATISFIED,                 /* Notify scheduler that an EDT is fully satisfied */
     OCR_SCHED_NOTIFY_EDT_READY,                     /* Notify scheduler that an EDT is ready to execute */
-    OCR_SCHED_NOTIFY_EDT_DONE,                      /* Notify scheduler that an EDT is done executing */
+    OCR_SCHED_NOTIFY_EDT_DONE,                      /* BUG #920 Cleanup - Notify scheduler that an EDT is done executing */
     OCR_SCHED_NOTIFY_COMM_READY,                    /* Notify scheduler that a communication task is ready to execute */
 } ocrSchedNotifyKind;
 
 typedef union _ocrSchedNotifyData_t {
+    struct {
+        struct _ocrPolicyMsg_t * msg;
+    } OCR_SCHED_ARG_NAME(OCR_SCHED_NOTIFY_PRE_PROCESS_MSG);
+    struct {
+        struct _ocrPolicyMsg_t * msg;
+    } OCR_SCHED_ARG_NAME(OCR_SCHED_NOTIFY_POST_PROCESS_MSG);
     struct {
         ocrFatGuid_t guid;                          /* Scheduler is notified about this db guid */
         ocrDataBlockType_t dbType;                  /* Type of datablock being created */
     } OCR_SCHED_ARG_NAME(OCR_SCHED_NOTIFY_DB_CREATE);
     struct {
         ocrFatGuid_t guid;                          /* Scheduler is notified about this db guid */
-    } OCR_SCHED_ARG_NAME(OCR_SCHED_NOTIFY_DB_DONE);
+        ocrFatGuid_t edtGuid;                       /* EDT which is acquiring the DB */
+    } OCR_SCHED_ARG_NAME(OCR_SCHED_NOTIFY_DB_ACQUIRE);
+    struct {
+        ocrFatGuid_t guid;                          /* Scheduler is notified about this db guid */
+        ocrFatGuid_t edtGuid;                       /* EDT which is releasing the DB */
+    } OCR_SCHED_ARG_NAME(OCR_SCHED_NOTIFY_DB_RELEASE);
+    struct {
+        ocrFatGuid_t guid;                          /* Scheduler is notified about this db guid */
+    } OCR_SCHED_ARG_NAME(OCR_SCHED_NOTIFY_DB_DESTROY);
+    struct {
+        ocrFatGuid_t guid;                          /* Scheduler is notified about this edt guid */
+    } OCR_SCHED_ARG_NAME(OCR_SCHED_NOTIFY_EDT_CREATE);
     struct {
         ocrFatGuid_t guid;                          /* Scheduler is notified about this edt guid */
     } OCR_SCHED_ARG_NAME(OCR_SCHED_NOTIFY_EDT_SATISFIED);
@@ -120,15 +141,13 @@ typedef union _ocrSchedNotifyData_t {
     struct {
         ocrFatGuid_t guid;                          /* Scheduler is notified about this communication guid */
     } OCR_SCHED_ARG_NAME(OCR_SCHED_NOTIFY_COMM_READY);
-    struct {
-        struct _ocrPolicyMsg_t * msg;
-    } OCR_SCHED_ARG_NAME(OCR_SCHED_NOTIFY_PROCESS_MSG);
 } ocrSchedNotifyData_t;
 
 typedef struct _ocrSchedulerOpNotifyArgs_t {
     ocrSchedulerOpArgs_t base;
     ocrSchedNotifyKind kind;                        /* Kind of notify */
     ocrSchedNotifyData_t data;                      /* Notify op related data */
+    u32 properties;                                 /* Properties of this op */
 } ocrSchedulerOpNotifyArgs_t;
 
 /* Scheduler transaction related arguments */
@@ -144,9 +163,26 @@ typedef struct _ocrSchedulerOpTransactArgs_t {
     struct _ocrSchedulerObject_t schedObj;          /* The scheduler object element transacted */
 } ocrSchedulerOpTransactArgs_t;
 
-/* Scheduler negotiation related arguments */
+/* Scheduler analysis related arguments:
+ * Analyze msgs are lightweight msgs intended for example,
+ * to setup a heavyweight transfer of a scheduler object or
+ * to keep distributed scheduler state consistent. During
+ * analyze no scheduler object is transferred between PDs.
+ */
 typedef enum {
-    OCR_SCHED_ANALYZE_PHASE,
+    OCR_SCHED_ANALYZE_CREATE,                       /* Property for creating a scheduler object in another scheduler */
+    OCR_SCHED_ANALYZE_DESTROY,                      /* Property for destroying a scheduler object in another scheduler */
+    OCR_SCHED_ANALYZE_REQUEST,                      /* Property for requesting data from another scheduler (get) */
+    OCR_SCHED_ANALYZE_RESPONSE,                     /* Property for responding to a request from another scheduler (get response) */
+    OCR_SCHED_ANALYZE_DONE,                         /* Property for notifying a scheduler that the response from a request has been processed */
+    OCR_SCHED_ANALYZE_UPDATE,                       /* Property for updating the data in another scheduler (set) */
+    OCR_SCHED_ANALYZE_ACK,                          /* Property to acknowledge successful update of data (positive set response) */
+    OCR_SCHED_ANALYZE_NACK,                         /* Property to acknowledge unsuccessful update of data (negative set response) */
+} ocrSchedulerAnalyzeProp;
+
+typedef enum {
+    OCR_SCHED_ANALYZE_SPACETIME_EDT,
+    OCR_SCHED_ANALYZE_SPACETIME_DB,
 } ocrSchedAnalyzeKind;
 
 typedef union _ocrSchedAnalyzeData_t {
@@ -154,30 +190,43 @@ typedef union _ocrSchedAnalyzeData_t {
         struct {
             u32 depc;
             ocrEdtDep_t *depv;
-            ocrRuntimeHint_t *hint;
         } req;
         struct {
-            u64 scheduledPhase;                     /* Scheduler phase when task will be scheduled */
-            u64 scheduledLocation;                  /* Scheduler location where task will be scheduled */
-            ocrGuid_t affinity;                     /* Affinity to specific DB/group etc */
+            ocrLocation_t space;                    /* Scheduler location where task will be scheduled */
+            u64 time;                               /* Scheduler time when task will be scheduled */
         } resp;
-    } OCR_SCHED_ARG_NAME(OCR_SCHED_ANALYZE_PHASE);
+    } OCR_SCHED_ARG_NAME(OCR_SCHED_ANALYZE_SPACETIME_EDT);
+    union {
+        struct {
+            u64 dbSize;                             /* Size of DB */
+            u64 time;                               /* Time at DB location */
+            u64 count;                              /* Number of EDTs accessing the DB */
+        } create;
+        struct {
+            u64 srcTime;                            /* Time at source location from where DB is requested */
+            u64 dstTime;                            /* Time at source location from where DB is requested */
+        } req;
+        struct {
+            u64 dbSize;                             /* Size of DB */
+            ocrLocation_t srcLoc;                   /* Location where DB is currently placed */
+            u64 srcTime;                            /* Time at DB's current location */
+            u64 dstTime;                            /* Time at DB's destination location */
+        } update;
+        struct {
+            u64 dbSize;                             /* Size of DB */
+            u64 time;                               /* Scheduler time when at DB */
+            u64 edtDoneCount;                       /* Number of EDTs that have accessed this DB during this space and time */
+            bool free;                              /* DB has been freed by user */
+        } done;
+    } OCR_SCHED_ARG_NAME(OCR_SCHED_ANALYZE_SPACETIME_DB);
 } ocrSchedAnalyzeData_t;
-
-typedef enum {
-    OCR_SCHED_ANALYZE_REQUEST,                      /* Property for requesting data from another scheduler (get) */
-    OCR_SCHED_ANALYZE_RESPONSE,                     /* Property for responding to a request from another scheduler (get response) */
-    OCR_SCHED_ANALYZE_UPDATE,                       /* Property for updating the data in another scheduler (set) */
-    OCR_SCHED_ANALYZE_ACK,                          /* Property to acknowledge successful update of data (positive set response) */
-    OCR_SCHED_ANALYZE_NACK,                         /* Property to acknowledge unsuccessful update of data (negative set response) */
-} ocrSchedulerAnalyzeProp;
 
 typedef struct _ocrSchedulerOpAnalyzeArgs_t {
     ocrSchedulerOpArgs_t base;
-    ocrSchedAnalyzeKind kind;
-    ocrSchedAnalyzeData_t data;                     /* Analyze op related data */
+    ocrGuid_t guid;                                 /* Guid to analyze */
     ocrSchedulerAnalyzeProp properties;             /* Analyze properties */
-    struct _ocrSchedulerObject_t schedObj;          /* The scheduler object element analyzed */
+    ocrSchedAnalyzeKind kind;                       /* Kind of analysis (heuristic defined) */
+    ocrSchedAnalyzeData_t data;                     /* Analyze op related data */
 } ocrSchedulerOpAnalyzeArgs_t;
 
 /****************************************************/

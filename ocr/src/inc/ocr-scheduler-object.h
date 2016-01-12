@@ -77,7 +77,9 @@ struct _ocrPolicyMsg_t;
 typedef enum {
     OCR_SCHEDULER_OBJECT_MAPPING_POTENTIAL,    /* schedulerObjects are potentially mapped to certain locations or policy domains but not placed yet. Potential mappings can change. */
     OCR_SCHEDULER_OBJECT_MAPPING_MAPPED,       /* mappings are identified and they are currently in the process of being placed at specific locations */
+    OCR_SCHEDULER_OBJECT_MAPPING_UNMAPPED,     /* scheduler object is no longer mapped to the location */
     OCR_SCHEDULER_OBJECT_MAPPING_PINNED,       /* schedulerObjects are already placed at specific locations */
+    OCR_SCHEDULER_OBJECT_MAPPING_RELEASED,     /* scheduler object has been released by the resource that acquired it */
     OCR_SCHEDULER_OBJECT_MAPPING_WORKER,       /* schedulerObjects are mapped to a specific worker in current PD location */
     OCR_SCHEDULER_OBJECT_MAPPING_UNDEFINED,
 } ocrSchedulerObjectMappingKind;
@@ -105,8 +107,9 @@ typedef enum {
     //    support the functions in ocrSchedulerObjectFcts_t.
     //    They are managed as part of aggregate schedulerObjects.
     OCR_SCHEDULER_OBJECT_SINGLETON                         =0x010,
-    OCR_SCHEDULER_OBJECT_EDT                               =0x110,
-    OCR_SCHEDULER_OBJECT_DB                                =0x210,
+    OCR_SCHEDULER_OBJECT_VOIDPTR                           =0x110,
+    OCR_SCHEDULER_OBJECT_EDT                               =0x210,
+    OCR_SCHEDULER_OBJECT_DB                                =0x310,
 
     //aggregate schedulerObjects:
     //    These schedulerObjects can hold other schedulerObjects, both singleton and aggregate.
@@ -133,6 +136,8 @@ typedef enum {
     OCR_SCHEDULER_OBJECT_DBTIME                            =0x430,
 } ocrSchedulerObjectKind;
 
+#define SCHEDULER_OBJECT_TYPE(kind)                (kind & ~0xF)
+#define SCHEDULER_OBJECT_CLASS(kind)               (kind & 0xF0)
 #define IS_SCHEDULER_OBJECT_TYPE_SINGLETON(kind)   ((kind & 0xF0) == OCR_SCHEDULER_OBJECT_SINGLETON)
 #define IS_SCHEDULER_OBJECT_TYPE_AGGREGATE(kind)   ((kind & 0xF0) == OCR_SCHEDULER_OBJECT_AGGREGATE)
 #define IS_SCHEDULER_OBJECT_TYPE_SPECIALIZED(kind) ((kind & 0xF0) == OCR_SCHEDULER_OBJECT_SPECIALIZED)
@@ -165,8 +170,13 @@ typedef struct _ocrSchedulerObject_t {
 /*! \brief OCR schedulerObject Iterator data structure
  */
 typedef struct _ocrSchedulerObjectIterator_t {
-    ocrSchedulerObject_t *schedObj;                         /* The scheduler object to iterate */
-    void *data;                                             /* In/Out data assocciated with each iterate call */
+    ocrSchedulerObject_t *schedObj;                         /* The scheduler object to iterate.
+                                                               This can be updated to reuse the iterator for another scheduler object.
+                                                               If this pointer is updated, the next call to "iterate" will first reset
+                                                               the iterator to the initial state before performing the iterate operation. */
+    void *data;                                             /* In/Out data assocciated with each iterate call.
+                                                               Check the SCHEDULER_OBJECT_ITERATE_* properties above. */
+    u32 fctId;                                              /* Factory Id for the iterator. It should match the scheduler object factory Id. */
 } ocrSchedulerObjectIterator_t;
 
 /****************************************************/
@@ -311,6 +321,7 @@ typedef struct _ocrSchedulerObjectFcts_t {
      *
      *  @param[in] fact         Pointer to this schedulerObject factory
      *  @param[in] self         Scheduler object to iterate over
+     *                          (If NULL, then ensure iterator->schedObj is set before calling "iterate")
      *  @param[in] properties   Properties of the operation
      *
      *  @return iterator object on success and a NULL value on failure
@@ -330,7 +341,7 @@ typedef struct _ocrSchedulerObjectFcts_t {
      *
      *  @param[in] fact         Pointer to this schedulerObject factory
      *  @param[in] self         Scheduler object to iterate over
-     *  @param[in] iterator     Iterator object
+     *  @param[in] iterator     Iterator object (iterator->schedObj cannot be NULL)
      *  @param[in] properties   Properties of the operation
      *
      *  @return 0 on success and a non-zero value on failure
@@ -358,6 +369,7 @@ typedef struct _ocrSchedulerObjectFcts_t {
      *
      *  @param[in] fact         Pointer to this schedulerObject factory
      *  @param[in] self         Pointer to this schedulerObject
+     *  @param[in] kind         Kind of schedulerObject to get
      *  @param[in] loc          Location to query with
      *  @param[in] mapping      Mapping kind
      *  @param[in] properties   Properties of the operation
@@ -365,7 +377,7 @@ typedef struct _ocrSchedulerObjectFcts_t {
      *
      *  @return pointer to schedulerObject on success and NULL on failure
      */
-    ocrSchedulerObject_t* (*getSchedulerObjectForLocation)(struct _ocrSchedulerObjectFactory_t *fact, ocrSchedulerObject_t *self, ocrLocation_t loc, ocrSchedulerObjectMappingKind mapping, u32 properties);
+    ocrSchedulerObject_t* (*getSchedulerObjectForLocation)(struct _ocrSchedulerObjectFactory_t *fact, ocrSchedulerObject_t *self, ocrSchedulerObjectKind kind, ocrLocation_t loc, ocrSchedulerObjectMappingKind mapping, u32 properties);
 
     /** @brief Set the location this schedulerObject is mapped to
      *

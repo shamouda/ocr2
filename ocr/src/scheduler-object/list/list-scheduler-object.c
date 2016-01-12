@@ -20,6 +20,32 @@
 /* OCR-LIST SCHEDULER_OBJECT FUNCTIONS                */
 /******************************************************/
 
+void* ocrSchedulerObjectListHead(ocrSchedulerObject_t *self) {
+    ocrSchedulerObjectList_t *listObj = (ocrSchedulerObjectList_t*)self;
+    ASSERT(listObj && listObj->list);
+    if (listObj->list->head)
+        return listObj->list->head->data;
+    return NULL;
+}
+
+void* ocrSchedulerObjectListHeadNext(ocrSchedulerObject_t *self) {
+    ocrSchedulerObjectList_t *listObj = (ocrSchedulerObjectList_t*)self;
+    ASSERT(listObj && listObj->list);
+    slistNode_t *node = listObj->list->head;
+    if (node) node = node->next;
+    if (node) return node->data;
+    return NULL;
+}
+
+void* ocrSchedulerObjectListHeadPlus(ocrSchedulerObject_t *self, u32 index) {
+    ocrSchedulerObjectList_t *listObj = (ocrSchedulerObjectList_t*)self;
+    ASSERT(listObj && listObj->list);
+    slistNode_t *node = listObj->list->head;
+    while (node && index--) node = node->next;
+    if (node) return node->data;
+    return NULL;
+}
+
 static void listSchedulerObjectStart(ocrSchedulerObject_t *self, ocrPolicyDomain_t *PD, ocrListType listType, u32 elSize, u32 arrayChunkSize) {
     self->loc = PD->myLocation;
     self->mapping = OCR_SCHEDULER_OBJECT_MAPPING_PINNED;
@@ -88,7 +114,7 @@ u8 listSchedulerObjectInsert(ocrSchedulerObjectFactory_t *fact, ocrSchedulerObje
             switch(properties & SCHEDULER_OBJECT_INSERT_KIND) {
             case SCHEDULER_OBJECT_INSERT_BEFORE:
                 {
-                    pushFrontArrayList(listObj->list, element);
+                    node = newArrayListNodeBefore(listObj->list, listObj->list->head);
                 }
                 break;
             case SCHEDULER_OBJECT_INSERT_AFTER:
@@ -117,7 +143,7 @@ u8 listSchedulerObjectInsert(ocrSchedulerObjectFactory_t *fact, ocrSchedulerObje
                 break;
             case SCHEDULER_OBJECT_INSERT_AFTER:
                 {
-                    pushBackArrayList(listObj->list, element);
+                    node = newArrayListNodeAfter(listObj->list, listObj->list->tail);
                 }
                 break;
             case SCHEDULER_OBJECT_INSERT_INPLACE:
@@ -210,7 +236,7 @@ u8 listSchedulerObjectRemove(ocrSchedulerObjectFactory_t *fact, ocrSchedulerObje
                 hal_memCopy(dst->guid.metaDataPtr, node->data, listObj->list->elSize, 0);
             }
         } else {
-            dst->guid.metaDataPtr = node->data;
+            if (dst) dst->guid.metaDataPtr = node->data;
         }
         freeArrayListNode(listObj->list, node);
     }
@@ -227,9 +253,11 @@ ocrSchedulerObjectIterator_t* listSchedulerObjectCreateIterator(ocrSchedulerObje
     ocrSchedulerObjectIterator_t* iterator = (ocrSchedulerObjectIterator_t*)pd->fcts.pdMalloc(pd, sizeof(ocrSchedulerObjectListIterator_t));
     iterator->schedObj = self;
     iterator->data = NULL;
+    iterator->fctId = fact->factoryId;
     ocrSchedulerObjectListIterator_t *lit = (ocrSchedulerObjectListIterator_t*)iterator;
     ocrSchedulerObjectList_t *listObj = (ocrSchedulerObjectList_t*)self;
-    lit->current = listObj->list->head;
+    lit->internal = self;
+    lit->current = listObj ? listObj->list->head : NULL;
     return iterator;
 }
 
@@ -241,7 +269,12 @@ u8 listSchedulerObjectDestroyIterator(ocrSchedulerObjectFactory_t * fact, ocrSch
 
 u8 listSchedulerObjectIterate(ocrSchedulerObjectFactory_t *fact, ocrSchedulerObjectIterator_t *iterator, u32 properties) {
     ocrSchedulerObjectList_t *listObj = (ocrSchedulerObjectList_t*)iterator->schedObj;
+    ASSERT(listObj);
     ocrSchedulerObjectListIterator_t *lit = (ocrSchedulerObjectListIterator_t*)iterator;
+    if (lit->internal != iterator->schedObj) {
+        lit->internal = iterator->schedObj;
+        lit->current = listObj->list->head;
+    }
     iterator->data = NULL;
     switch(properties) {
     case SCHEDULER_OBJECT_ITERATE_CURRENT:
@@ -293,7 +326,7 @@ u8 listSchedulerObjectIterate(ocrSchedulerObjectFactory_t *fact, ocrSchedulerObj
     return 0;
 }
 
-ocrSchedulerObject_t* listGetSchedulerObjectForLocation(ocrSchedulerObjectFactory_t *fact, ocrSchedulerObject_t *self, ocrLocation_t loc, ocrSchedulerObjectMappingKind mapping, u32 properties) {
+ocrSchedulerObject_t* listGetSchedulerObjectForLocation(ocrSchedulerObjectFactory_t *fact, ocrSchedulerObject_t *self, ocrSchedulerObjectKind kind, ocrLocation_t loc, ocrSchedulerObjectMappingKind mapping, u32 properties) {
     ASSERT(0);
     return NULL;
 }
@@ -363,7 +396,7 @@ ocrSchedulerObjectFactory_t * newOcrSchedulerObjectFactoryList(ocrParamList_t *p
     schedObjFact->fcts.destroyIterator = FUNC_ADDR(u8 (*)(ocrSchedulerObjectFactory_t*, ocrSchedulerObjectIterator_t*), listSchedulerObjectDestroyIterator);
     schedObjFact->fcts.iterate = FUNC_ADDR(u8 (*)(ocrSchedulerObjectFactory_t*, ocrSchedulerObjectIterator_t*, u32), listSchedulerObjectIterate);
     schedObjFact->fcts.setLocationForSchedulerObject = FUNC_ADDR(u8 (*)(ocrSchedulerObjectFactory_t*, ocrSchedulerObject_t*, ocrLocation_t, ocrSchedulerObjectMappingKind), listSetLocationForSchedulerObject);
-    schedObjFact->fcts.getSchedulerObjectForLocation = FUNC_ADDR(ocrSchedulerObject_t* (*)(ocrSchedulerObjectFactory_t*, ocrSchedulerObject_t*, ocrLocation_t, ocrSchedulerObjectMappingKind, u32), listGetSchedulerObjectForLocation);
+    schedObjFact->fcts.getSchedulerObjectForLocation = FUNC_ADDR(ocrSchedulerObject_t* (*)(ocrSchedulerObjectFactory_t*, ocrSchedulerObject_t*, ocrSchedulerObjectKind, ocrLocation_t, ocrSchedulerObjectMappingKind, u32), listGetSchedulerObjectForLocation);
     schedObjFact->fcts.createActionSet = FUNC_ADDR(ocrSchedulerObjectActionSet_t* (*)(ocrSchedulerObjectFactory_t*, ocrSchedulerObject_t*, u32), listSchedulerObjectNewActionSet);
     schedObjFact->fcts.destroyActionSet = FUNC_ADDR(u8 (*)(ocrSchedulerObjectFactory_t*, ocrSchedulerObjectActionSet_t*), listSchedulerObjectDestroyActionSet);
     schedObjFact->fcts.switchRunlevel = FUNC_ADDR(u8 (*)(ocrSchedulerObject_t*, ocrPolicyDomain_t*, ocrRunlevel_t,

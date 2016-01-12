@@ -322,7 +322,7 @@ u8 hcSchedulerGetWorkInvoke(ocrScheduler_t *self, ocrSchedulerOpArgs_t *opArgs, 
 u8 hcSchedulerNotifyInvoke(ocrScheduler_t *self, ocrSchedulerOpArgs_t *opArgs, ocrRuntimeHint_t *hints) {
     ocrSchedulerOpNotifyArgs_t *notifyArgs = (ocrSchedulerOpNotifyArgs_t*)opArgs;
     switch(notifyArgs->kind) {
-    case OCR_SCHED_NOTIFY_PROCESS_MSG: {
+    case OCR_SCHED_NOTIFY_PRE_PROCESS_MSG: {
         return OCR_ENOP;
     }
     case OCR_SCHED_NOTIFY_EDT_READY: {
@@ -351,8 +351,12 @@ u8 hcSchedulerNotifyInvoke(ocrScheduler_t *self, ocrSchedulerOpArgs_t *opArgs, o
             return self->fcts.giveComm(self, &count, &notifyArgs->OCR_SCHED_ARG_FIELD(OCR_SCHED_NOTIFY_COMM_READY).guid, 0);
         }
     // Notifies ignored by this scheduler
+    case OCR_SCHED_NOTIFY_EDT_CREATE:
     case OCR_SCHED_NOTIFY_EDT_SATISFIED:
     case OCR_SCHED_NOTIFY_DB_CREATE:
+    case OCR_SCHED_NOTIFY_DB_ACQUIRE:
+    case OCR_SCHED_NOTIFY_DB_RELEASE:
+    case OCR_SCHED_NOTIFY_DB_DESTROY:
         return OCR_ENOP;
     // Unknown ops
     default:

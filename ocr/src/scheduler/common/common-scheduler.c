@@ -247,7 +247,7 @@ u8 commonSchedulerNotifyInvoke(ocrScheduler_t *self, ocrSchedulerOpArgs_t *opArg
     ocrSchedulerHeuristic_t * schedulerHeuristic;
     ocrSchedulerOpNotifyArgs_t * notifyArgs = (ocrSchedulerOpNotifyArgs_t *) opArgs;
     switch(notifyArgs->kind) {
-    case OCR_SCHED_NOTIFY_PROCESS_MSG: {
+    case OCR_SCHED_NOTIFY_PRE_PROCESS_MSG: {
         //BUG #917
         // Still open to debate what we should really be doing here.
         // Situation:

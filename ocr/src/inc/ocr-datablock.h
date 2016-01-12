@@ -207,12 +207,14 @@ typedef struct _ocrDataBlock_t {
 #define DB_ACCESS_MODE_MASK 0xF /**< Bits encoding the access modes (see inc/ocr-types.h) */
 
 // Runtime DB properties (upper 16 bits of a u32)
-#define DB_PROP_RT_ACQUIRE     0x10000 // DB acquired by runtime
-#define DB_PROP_RT_OBLIVIOUS   0x20000 //BUG #607 DB RO mode: (Flag is for runtime use)
-#define DB_PROP_NO_RELEASE     0x40000 // Indicate a release is not required
+#define DB_PROP_RT_ACQUIRE          0x10000 // DB acquired by runtime
+#define DB_PROP_RT_OBLIVIOUS        0x20000 // BUG #607 DB RO mode: (Flag is for runtime use)
+#define DB_PROP_NO_RELEASE          0x40000 // Indicate a release is not required
+#define DB_PROP_RT_PD_ACQUIRE       0x80000 // DB acquired by scheduler for whole PD
+#define DB_PROP_RT_PROXY            0x100000// DB metadata instantiated as proxy (workaround for BUG #162)
 
-#define DB_FLAG_RT_FETCH       0x100000
-#define DB_FLAG_RT_WRITE_BACK  0x200000
+#define DB_FLAG_RT_FETCH            0x1000000
+#define DB_FLAG_RT_WRITE_BACK       0x2000000
 
 /****************************************************/
 /* OCR DATABLOCK FACTORY                            */

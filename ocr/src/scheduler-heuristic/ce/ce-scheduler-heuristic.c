@@ -166,8 +166,9 @@ u8 ceSchedulerHeuristicSwitchRunlevel(ocrSchedulerHeuristic_t *self, ocrPolicyDo
             for (i = 0; i < self->contextCount; i++) {
                 ocrSchedulerHeuristicContext_t *context = (ocrSchedulerHeuristicContext_t*)self->contexts[i];
                 ocrSchedulerHeuristicContextCe_t *ceContext = (ocrSchedulerHeuristicContextCe_t*)context;
-                ceContext->mySchedulerObject = rootFact->fcts.getSchedulerObjectForLocation(rootFact, rootObj,
-                                                    context->location, OCR_SCHEDULER_OBJECT_MAPPING_PINNED, 0);
+                //BUG #920 - Revisit getSchedulerObjectForLocation API
+                ceContext->mySchedulerObject = rootFact->fcts.getSchedulerObjectForLocation(rootFact, rootObj, OCR_SCHEDULER_OBJECT_DEQUE,
+                                                    context->location, OCR_SCHEDULER_OBJECT_MAPPING_MAPPED, 0);
                 ASSERT(ceContext->mySchedulerObject && ceContext->mySchedulerObject != rootObj);
                 ceContext->stealSchedulerObjectIndex = (i + 1) % self->contextCount;
                 DPRINTF(DEBUG_LVL_VVERB, "Scheduler object %lx (fact: %d) for location: %lx\n", ceContext->mySchedulerObject, ceContext->mySchedulerObject->fctId, context->location);
