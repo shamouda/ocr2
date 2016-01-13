@@ -96,13 +96,13 @@ void initializePolicyDomainOcr(ocrPolicyDomainFactory_t * factory, ocrPolicyDoma
     self->eventFactories = NULL;
     self->schedulerObjectFactories = NULL;
     self->placer = NULL;
+    self->platformModel = NULL;
     u32 i = 0, j = 0;
     for(i = 0; i < RL_MAX; ++i) {
         for(j = 0; j < RL_PHASE_MAX; ++j) {
             self->phasesPerRunlevel[i][j] = 0;
         }
     }
-    self->costFunction = NULL;
     self->myLocation = ((paramListPolicyDomainInst_t*)perInstance)->location;
     self->parentLocation = 0;
     self->neighbors = NULL;

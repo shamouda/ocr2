@@ -534,10 +534,6 @@ void xePolicyDomainDestruct(ocrPolicyDomain_t * policy) {
         policy->allocators[i]->fcts.destruct(policy->allocators[i]);
     }
 
-
-    //Anticipate those to be null-impl for some time
-    ASSERT(policy->costFunction == NULL);
-
     // Destroy these last in case some of the other destructs make use of them
     maxCount = policy->guidProviderCount;
     for(i = 0; i < maxCount; ++i) {
@@ -1041,14 +1037,14 @@ ocrPolicyDomain_t * newPolicyDomainXe(ocrPolicyDomainFactory_t * factory,
 #ifdef OCR_ENABLE_STATISTICS
                                       ocrStats_t *statsObject,
 #endif
-                                      ocrCost_t *costFunction, ocrParamList_t *perInstance) {
+                                      ocrParamList_t *perInstance) {
     ocrPolicyDomainXe_t * derived = (ocrPolicyDomainXe_t *) runtimeChunkAlloc(sizeof(ocrPolicyDomainXe_t), PERSISTENT_CHUNK);
     ocrPolicyDomain_t * base = (ocrPolicyDomain_t *) derived;
     ASSERT(base);
 #ifdef OCR_ENABLE_STATISTICS
-    factory->initialize(factory, base, statsObject, costFunction, perInstance);
+    factory->initialize(factory, base, statsObject, perInstance);
 #else
-    factory->initialize(factory, base, costFunction, perInstance);
+    factory->initialize(factory, base, perInstance);
 #endif
     return base;
 }
@@ -1057,7 +1053,7 @@ void initializePolicyDomainXe(ocrPolicyDomainFactory_t * factory, ocrPolicyDomai
 #ifdef OCR_ENABLE_STATISTICS
                               ocrStats_t *statsObject,
 #endif
-                              ocrCost_t *costFunction, ocrParamList_t *perInstance) {
+                              ocrParamList_t *perInstance) {
 #ifdef OCR_ENABLE_STATISTICS
     self->statsObject = statsObject;
 #endif

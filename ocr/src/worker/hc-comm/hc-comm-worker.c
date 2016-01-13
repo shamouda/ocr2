@@ -16,7 +16,8 @@
 #include "worker/hc-comm/hc-comm-worker.h"
 #include "ocr-errors.h"
 
-#include "experimental/ocr-placer.h"
+// Load the affinities
+#include "experimental/ocr-platform-model.h"
 #include "extensions/ocr-affinity.h"
 
 #define DEBUG_TYPE WORKER

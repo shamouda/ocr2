@@ -1016,7 +1016,7 @@ s32 populate_inst(ocrParamList_t **inst_param, int inst_param_size, void **insta
             }
 
             instance[j] = (void *)((ocrPolicyDomainFactory_t *)factory)->instantiate(
-                              factory, NULL, inst_param[j]);
+                              factory, inst_param[j]);
 
             if (instance[j])
                 DPRINTF(DEBUG_LVL_INFO, "Created policy domain of index %d\n", j);

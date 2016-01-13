@@ -343,8 +343,10 @@ u8 hcPdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
             for(i = rself->rlSwitch.nextPhase; i < phaseCount; ++i) {
                 if(RL_IS_FIRST_PHASE_UP(policy, RL_COMPUTE_OK, i)) {
                     guidify(policy, (u64)policy, &(policy->fguid), OCR_GUID_POLICY);
-                    // Create and initialize the placer (work in progress)
+                    // To be deprecated
                     policy->placer = createLocationPlacer(policy);
+                    // Create and initialize the platform model (work in progress)
+                    policy->platformModel = createPlatformModelAffinity(policy);
                 }
                 toReturn |= helperSwitchInert(policy, runlevel, i, masterWorkerProperties);
 
@@ -407,7 +409,9 @@ u8 hcPdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
                         policy->workers[j], policy, runlevel, rself->rlSwitch.nextPhase, properties, NULL, 0);
                 }
 
+                //to be deprecated
                 destroyLocationPlacer(policy);
+                destroyPlatformModelAffinity(policy);
 
                 PD_MSG_STACK(msg);
                 getCurrentEnv(NULL, NULL, NULL, &msg);
@@ -633,9 +637,6 @@ void hcPolicyDomainDestruct(ocrPolicyDomain_t * policy) {
         if(policy->dbFactories[i])
             policy->dbFactories[i]->destruct(policy->dbFactories[i]);
     }
-
-    //Anticipate those to be null-impl for some time
-    ASSERT(policy->costFunction == NULL);
 
     // Destroy these last in case some of the other destructs make use of them
     maxCount = policy->guidProviderCount;
@@ -2161,15 +2162,15 @@ ocrPolicyDomain_t * newPolicyDomainHc(ocrPolicyDomainFactory_t * factory,
 #ifdef OCR_ENABLE_STATISTICS
                                       ocrStats_t *statsObject,
 #endif
-                                      ocrCost_t *costFunction, ocrParamList_t *perInstance) {
+                                      ocrParamList_t *perInstance) {
 
     ocrPolicyDomainHc_t * derived = (ocrPolicyDomainHc_t *) runtimeChunkAlloc(sizeof(ocrPolicyDomainHc_t), PERSISTENT_CHUNK);
     ocrPolicyDomain_t * base = (ocrPolicyDomain_t *) derived;
     ASSERT(base);
 #ifdef OCR_ENABLE_STATISTICS
-    factory->initialize(factory, base, statsObject, costFunction, perInstance);
+    factory->initialize(factory, base, statsObject, perInstance);
 #else
-    factory->initialize(factory, base, costFunction, perInstance);
+    factory->initialize(factory, base, perInstance);
 #endif
 
     return base;
@@ -2179,7 +2180,7 @@ void initializePolicyDomainHc(ocrPolicyDomainFactory_t * factory, ocrPolicyDomai
 #ifdef OCR_ENABLE_STATISTICS
                               ocrStats_t *statsObject,
 #endif
-                              ocrCost_t *costFunction, ocrParamList_t *perInstance) {
+                              ocrParamList_t *perInstance) {
 #ifdef OCR_ENABLE_STATISTICS
     self->statsObject = statsObject;
 #endif

@@ -18,7 +18,7 @@
 #include "worker/hc/hc-worker.h"
 #include "policy-domain/hc/hc-policy.h"
 
-#include "experimental/ocr-placer.h"
+#include "experimental/ocr-platform-model.h"
 #include "extensions/ocr-affinity.h"
 
 #ifdef OCR_ENABLE_STATISTICS

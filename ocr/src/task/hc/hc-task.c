@@ -969,7 +969,7 @@ u8 registerSignalerTaskHc(ocrTask_t * base, ocrFatGuid_t signalerGuid, u32 slot,
     ASSERT(signalerGuid.guid != NULL_GUID); // This should have been caught earlier on
     hal_lock32(&(self->lock));
     node->guid = signalerGuid.guid;
-    //BUG #536 metadata cloning: Had to introduce new kinds of guids because we don't
+    //BUG #162 metadata cloning: Had to introduce new kinds of guids because we don't
     //         have support for cloning metadata around yet
     if(signalerKind & OCR_GUID_EVENT) {
         if((signalerKind == OCR_GUID_EVENT_ONCE) ||

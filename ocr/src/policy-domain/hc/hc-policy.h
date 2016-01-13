@@ -54,7 +54,7 @@ ocrPolicyDomain_t * newPolicyDomainHc(ocrPolicyDomainFactory_t * policy,
 #ifdef OCR_ENABLE_STATISTICS
                                       ocrStats_t *statsObject,
 #endif
-                                      ocrCost_t *costFunction, ocrParamList_t *perInstance);
+                                      ocrParamList_t *perInstance);
 
 #endif /* ENABLE_POLICY_DOMAIN_HC */
 #endif /* __HC_POLICY_H__ */

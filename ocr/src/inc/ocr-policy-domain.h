@@ -21,7 +21,9 @@
 #include "ocr-types.h"
 #include "ocr-worker.h"
 
+#include "experimental/ocr-platform-model.h"
 #include "experimental/ocr-placer.h"
+
 
 /****************************************************/
 /* PARAMETER LISTS                                  */
@@ -1312,7 +1314,6 @@ typedef struct _ocrPolicyDomain_t {
     /* Capable modules */
     u64 workerCount;                            /**< Number of workers */
 
-
     /* Factories */
     u64 taskFactoryCount;                       /**< Number of task factories */
     u64 taskTemplateFactoryCount;               /**< Number of task-template factories */
@@ -1338,8 +1339,8 @@ typedef struct _ocrPolicyDomain_t {
     ocrSchedulerObjectFactory_t **schedulerObjectFactories; /**< All the schedulerObject factories
                                                  * known to this policy domain */
 
-    ocrPlacer_t * placer;                       /**< Affinity and placement
-                                                 * (work in progress) */
+    ocrPlacer_t * placer;                       /**< Placement policy (WIP) */
+    ocrPlatformModel_t * platformModel;         /**< Platform model (WIP) */
 
     /**
      * @brief Two dimensional array:
@@ -1365,11 +1366,6 @@ typedef struct _ocrPolicyDomain_t {
      */
     s8 phasesPerRunlevel[RL_MAX][RL_PHASE_MAX];
 
-    // BUG #612: Clean up scheduler interface
-    ocrCost_t *costFunction; /**< Cost function used to determine
-                              * what to schedule/steal/take/etc.
-                              * Currently a placeholder for future
-                              * objective driven scheduling */
     ocrLocation_t myLocation;
     ocrLocation_t parentLocation;
     ocrLocation_t * neighbors;                  /**< Array of neighbor locations */
@@ -1420,19 +1416,18 @@ typedef struct _ocrPolicyDomainFactory_t {
      * @param lockFactory         The factory to use to generate locks
      * @param atomicFactory       The factory to use to generate atomics
      * @param queueFactory        The factory to use to generate queues
-     * @param costFunction        The cost function used by this policy domain
      */
 
     ocrPolicyDomain_t * (*instantiate) (struct _ocrPolicyDomainFactory_t *factory,
 #ifdef OCR_ENABLE_STATISTICS
                                         ocrStats_t *statsObject,
 #endif
-                                        ocrCost_t *costFunction, ocrParamList_t *perInstance);
+                                        ocrParamList_t *perInstance);
     void (*initialize) (struct _ocrPolicyDomainFactory_t *factory, ocrPolicyDomain_t* self,
 #ifdef OCR_ENABLE_STATISTICS
                         ocrStats_t *statsObject,
 #endif
-                        ocrCost_t *costFunction, ocrParamList_t *perInstance);
+                        ocrParamList_t *perInstance);
     void (*destruct)(struct _ocrPolicyDomainFactory_t * factory);
     ocrPolicyDomainFcts_t policyDomainFcts;
 } ocrPolicyDomainFactory_t;

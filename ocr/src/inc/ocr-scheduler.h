@@ -187,7 +187,6 @@ typedef struct _ocrSchedulerOpAnalyzeArgs_t {
 /****************************************************/
 
 struct _ocrScheduler_t;
-struct _ocrCost_t;
 struct _ocrPolicyCtx_t;
 struct _ocrMsgHandle_t;
 

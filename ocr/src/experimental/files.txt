@@ -1,1 +1,2 @@
-ocr-placer.c    - implementation of data-block and EDT placement if the user does not specify a location
+ocr-platform-model.c    - Embryo for a platform model (WIP)
+ocr-placer.c            - implementation of data-block and EDT placement if the user does not specify a location

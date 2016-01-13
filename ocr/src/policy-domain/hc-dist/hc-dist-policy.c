@@ -14,6 +14,7 @@
 #include "ocr-policy-domain.h"
 #include "ocr-sysboot.h"
 #include "experimental/ocr-placer.h"
+#include "experimental/ocr-platform-model.h"
 #include "utils/hashtable.h"
 #include "utils/queue.h"
 
@@ -534,9 +535,9 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
     ocrLocation_t curLoc = self->myLocation;
     u32 properties = 0;
 
-    // Try to automatically place datablocks and edts
-    // Only support naive PD-based placement for now.
-    suggestLocationPlacement(self, curLoc, (ocrLocationPlacer_t *) self->placer, msg);
+    // Try to automatically place datablocks and edts. Only support naive PD-based placement for now.
+    suggestLocationPlacement(self, curLoc, (ocrPlatformModelAffinity_t *) self->platformModel,
+                             (ocrLocationPlacer_t *) self->placer, msg);
 
     DPRINTF(DEBUG_LVL_VERB, "HC-dist processing message @ 0x%lx of type 0x%x\n", msg, msg->type);
 
@@ -1848,15 +1849,15 @@ ocrPolicyDomain_t * newPolicyDomainHcDist(ocrPolicyDomainFactory_t * factory,
 #ifdef OCR_ENABLE_STATISTICS
                                       ocrStats_t *statsObject,
 #endif
-                                      ocrCost_t *costFunction, ocrParamList_t *perInstance) {
+                                      ocrParamList_t *perInstance) {
 
     ocrPolicyDomainHcDist_t * derived = (ocrPolicyDomainHcDist_t *) runtimeChunkAlloc(sizeof(ocrPolicyDomainHcDist_t), PERSISTENT_CHUNK);
     ocrPolicyDomain_t * base = (ocrPolicyDomain_t *) derived;
 
 #ifdef OCR_ENABLE_STATISTICS
-    factory->initialize(factory, statsObject, base, costFunction, perInstance);
+    factory->initialize(factory, statsObject, base, perInstance);
 #else
-    factory->initialize(factory, base, costFunction, perInstance);
+    factory->initialize(factory, base, perInstance);
 #endif
     return base;
 }
@@ -1865,13 +1866,13 @@ void initializePolicyDomainHcDist(ocrPolicyDomainFactory_t * factory,
 #ifdef OCR_ENABLE_STATISTICS
                                   ocrStats_t *statsObject,
 #endif
-                                  ocrPolicyDomain_t *self, ocrCost_t *costFunction, ocrParamList_t *perInstance) {
+                                  ocrPolicyDomain_t *self, ocrParamList_t *perInstance) {
     ocrPolicyDomainFactoryHcDist_t * derivedFactory = (ocrPolicyDomainFactoryHcDist_t *) factory;
     // Initialize the base policy-domain
 #ifdef OCR_ENABLE_STATISTICS
-    derivedFactory->baseInitialize(factory, statsObject, self, costFunction, perInstance);
+    derivedFactory->baseInitialize(factory, statsObject, self, perInstance);
 #else
-    derivedFactory->baseInitialize(factory, self, costFunction, perInstance);
+    derivedFactory->baseInitialize(factory, self, perInstance);
 #endif
     ocrPolicyDomainHcDist_t * hcDistPd = (ocrPolicyDomainHcDist_t *) self;
     hcDistPd->baseProcessMessage = derivedFactory->baseProcessMessage;

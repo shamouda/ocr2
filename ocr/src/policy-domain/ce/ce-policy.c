@@ -754,6 +754,7 @@ u8 cePdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
                 if(RL_IS_FIRST_PHASE_UP(policy, RL_COMPUTE_OK, i)) {
                     guidify(policy, (u64)policy, &(policy->fguid), OCR_GUID_POLICY);
                     policy->placer = NULL; // No placer for TG
+                    policy->platformModel = NULL; // No platform model for TG
                 }
                 toReturn |= helperSwitchInert(policy, runlevel, i, masterWorkerProperties);
 
@@ -936,9 +937,6 @@ void cePolicyDomainDestruct(ocrPolicyDomain_t * policy) {
     for(i = 0; i < maxCount; ++i) {
         policy->allocators[i]->fcts.destruct(policy->allocators[i]);
     }
-
-    //Anticipate those to be null-impl for some time
-    ASSERT(policy->costFunction == NULL);
 
     // Destroy these last in case some of the other destructs make use of them
     maxCount = policy->guidProviderCount;
@@ -2787,7 +2785,7 @@ ocrPolicyDomain_t * newPolicyDomainCe(ocrPolicyDomainFactory_t * factory,
 #ifdef OCR_ENABLE_STATISTICS
                                       ocrStats_t *statsObject,
 #endif
-                                      ocrCost_t *costFunction, ocrParamList_t *perInstance) {
+                                      ocrParamList_t *perInstance) {
 
     ocrPolicyDomainCe_t * derived = (ocrPolicyDomainCe_t *) runtimeChunkAlloc(sizeof(ocrPolicyDomainCe_t), PERSISTENT_CHUNK);
     ocrPolicyDomain_t * base = (ocrPolicyDomain_t *) derived;
@@ -2795,9 +2793,9 @@ ocrPolicyDomain_t * newPolicyDomainCe(ocrPolicyDomainFactory_t * factory,
     ASSERT(base);
 
 #ifdef OCR_ENABLE_STATISTICS
-    factory->initialize(factory, base, statsObject, costFunction, perInstance);
+    factory->initialize(factory, base, statsObject, perInstance);
 #else
-    factory->initialize(factory, base, costFunction, perInstance);
+    factory->initialize(factory, base, perInstance);
 #endif
 
     return base;
@@ -2807,7 +2805,7 @@ void initializePolicyDomainCe(ocrPolicyDomainFactory_t * factory, ocrPolicyDomai
 #ifdef OCR_ENABLE_STATISTICS
                               ocrStats_t *statObject,
 #endif
-                              ocrCost_t *costFunction, ocrParamList_t *perInstance) {
+                              ocrParamList_t *perInstance) {
     u64 i;
 #ifdef OCR_ENABLE_STATISTICS
     self->statsObject = statsObject;

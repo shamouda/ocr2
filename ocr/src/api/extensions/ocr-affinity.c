@@ -9,7 +9,7 @@
 
 #include "extensions/ocr-affinity.h"
 #include "ocr-policy-domain.h"
-#include "experimental/ocr-placer.h"
+#include "experimental/ocr-platform-model.h"
 #include "ocr-errors.h"
 
 #pragma message "AFFINITY extension is experimental and may not be supported on all platforms"
@@ -28,8 +28,8 @@
 u8 ocrAffinityCount(ocrAffinityKind kind, u64 * count) {
     ocrPolicyDomain_t * pd = NULL;
     getCurrentEnv(&pd, NULL, NULL, NULL);
-    // If no placer, we know nothing so just say that we are the only one
-    if(pd->placer == NULL) {
+    // If no platformModel, we know nothing so just say that we are the only one
+    if(pd->platformModel == NULL) {
         *count = 1;
         return 0;
     }
@@ -50,8 +50,8 @@ u8 ocrAffinityCount(ocrAffinityKind kind, u64 * count) {
 u8 ocrAffinityQuery(ocrGuid_t guid, u64 * count, ocrGuid_t * affinities) {
     ocrPolicyDomain_t * pd = NULL;
     getCurrentEnv(&pd, NULL, NULL, NULL);
-    ocrLocationPlacer_t * placer = ((ocrLocationPlacer_t*)pd->placer);
-    if(placer == NULL) {
+    ocrPlatformModelAffinity_t * platformModel = ((ocrPlatformModelAffinity_t*)pd->platformModel);
+    if(platformModel == NULL) {
         if (count != NULL) {
             ASSERT(*count > 0);
             *count = 1;
@@ -64,7 +64,7 @@ u8 ocrAffinityQuery(ocrGuid_t guid, u64 * count, ocrGuid_t * affinities) {
             *count = 1;
         }
         if (guid == NULL_GUID) {
-            affinities[0] = placer->pdLocAffinities[placer->current];
+            affinities[0] = platformModel->pdLocAffinities[platformModel->current];
             return 0;
         }
         ocrLocation_t loc = 0;
@@ -74,8 +74,8 @@ u8 ocrAffinityQuery(ocrGuid_t guid, u64 * count, ocrGuid_t * affinities) {
         //So we resolve the affinity of the GUID by looking up its
         //location and use that to index into the affinity array.
         //NOTE: Shortcoming is that it assumes location are integers.
-        ASSERT(((u32)loc) < placer->pdLocAffinitiesSize);
-        affinities[0] = placer->pdLocAffinities[(u32)loc];
+        ASSERT(((u32)loc) < platformModel->pdLocAffinitiesSize);
+        affinities[0] = platformModel->pdLocAffinities[(u32)loc];
     }
     return 0;
 }
@@ -85,8 +85,8 @@ u8 ocrAffinityQuery(ocrGuid_t guid, u64 * count, ocrGuid_t * affinities) {
 u8 ocrAffinityGet(ocrAffinityKind kind, u64 * count, ocrGuid_t * affinities) {
     ocrPolicyDomain_t * pd = NULL;
     getCurrentEnv(&pd, NULL, NULL, NULL);
-    ocrLocationPlacer_t * placer = ((ocrLocationPlacer_t*)pd->placer);
-    if(placer == NULL) {
+    ocrPlatformModelAffinity_t * platformModel = ((ocrPlatformModelAffinity_t*)pd->platformModel);
+    if(platformModel == NULL) {
         ASSERT(*count > 0);
         *count = 1;
         affinities[0] = NULL_GUID;
@@ -97,14 +97,14 @@ u8 ocrAffinityGet(ocrAffinityKind kind, u64 * count, ocrGuid_t * affinities) {
         ASSERT(*count <= (pd->neighborCount + 1));
         u64 i = 0;
         while(i < *count) {
-            affinities[i] = placer->pdLocAffinities[i];
+            affinities[i] = platformModel->pdLocAffinities[i];
             i++;
         }
     } else if (kind == AFFINITY_PD_MASTER) {
         //BUG #610 Master PD: This should likely come from the INI file
-        affinities[0] = placer->pdLocAffinities[0];
+        affinities[0] = platformModel->pdLocAffinities[0];
     } else if (kind == AFFINITY_CURRENT) {
-        affinities[0] = placer->pdLocAffinities[placer->current];
+        affinities[0] = platformModel->pdLocAffinities[platformModel->current];
     } else {
         ASSERT(false && "Unknown affinity kind");
     }
@@ -114,8 +114,8 @@ u8 ocrAffinityGet(ocrAffinityKind kind, u64 * count, ocrGuid_t * affinities) {
 u8 ocrAffinityGetAt(ocrAffinityKind kind, u64 idx, ocrGuid_t * affinity) {
     ocrPolicyDomain_t * pd = NULL;
     getCurrentEnv(&pd, NULL, NULL, NULL);
-    ocrLocationPlacer_t * placer = ((ocrLocationPlacer_t*)pd->placer);
-    if(placer == NULL) {
+    ocrPlatformModelAffinity_t * platformModel = ((ocrPlatformModelAffinity_t*)pd->platformModel);
+    if(platformModel == NULL) {
         ASSERT(idx > 0);
         affinity[0] = NULL_GUID;
         return OCR_EINVAL;
@@ -125,12 +125,12 @@ u8 ocrAffinityGetAt(ocrAffinityKind kind, u64 idx, ocrGuid_t * affinity) {
             ASSERT(false && "error: ocrAffinityGetAt index is out of bounds");
             return OCR_EINVAL;
         }
-        affinity[0] = placer->pdLocAffinities[idx];
+        affinity[0] = platformModel->pdLocAffinities[idx];
     } else if (kind == AFFINITY_PD_MASTER) {
         //BUG #610 Master PD: This should likely come from the INI file
-        affinity[0] = placer->pdLocAffinities[0];
+        affinity[0] = platformModel->pdLocAffinities[0];
     } else if (kind == AFFINITY_CURRENT) {
-        affinity[0] = placer->pdLocAffinities[placer->current];
+        affinity[0] = platformModel->pdLocAffinities[platformModel->current];
     } else {
         ASSERT(false && "Unknown affinity kind");
     }
