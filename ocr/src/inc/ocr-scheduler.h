@@ -347,7 +347,6 @@ struct _ocrWorkpile_t;
 typedef struct _ocrScheduler_t {
     ocrFatGuid_t fguid;
     struct _ocrPolicyDomain_t *pd;
-
     struct _ocrWorkpile_t **workpiles;
     u64 workpileCount;
 

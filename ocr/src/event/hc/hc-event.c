@@ -697,8 +697,7 @@ u8 registerWaiterEventHc(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot, bool i
 
 
 /**
- * @brief Registers waiters on persistent events such as sticky or idempotent.
- *        Also handles counted-event which is a little in between persistent and non-persistent.
+ * @brief Registers waiters on persistent events such as sticky or idempotent. 
  *
  * This code contends with a satisfy call and with concurrent add-dependences that try
  * to register their waiter.
@@ -823,7 +822,6 @@ u8 registerWaiterEventHcCounted(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot,
         RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, false));
 #undef PD_MSG
 #undef PD_TYPE
-
         // Here it is still safe to use the base pointer because the satisfy
         // call cannot trigger the destruction of the event. For counted-events
         // the runtime takes care of it
@@ -841,7 +839,6 @@ u8 registerWaiterEventHcCounted(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot,
             // Can move that after satisfy to reduce CPL
             destructEventHc(base);
         }
-
         return 0; //Require registerSignaler invocation
     }
 

@@ -18,6 +18,16 @@
 
 #define DEBUG_TYPE SCHEDULER
 
+// This scheduler is expecting at least two heuristics to be present
+// - Heuristic zero is able to handle notify for tasks
+// - Heuristic one is able to handle communications
+// For now we still keep a "master" heuristic around. It currently defaults
+// to either the heuristic that has the master flag set to true in the CFG file
+// or heuristic 0, which must be the computation heuristic by contract
+
+#define COMP_HEURISTIC_ID 0
+#define COMM_HEURISTIC_ID 1
+
 /******************************************************/
 /* OCR-COMMON SCHEDULER                               */
 /******************************************************/
@@ -25,7 +35,7 @@
 void commonSchedulerDestruct(ocrScheduler_t * self) {
     u64 i;
 
-    // Destruct the root scheduler object
+   // Destruct the root scheduler object
     ocrSchedulerObjectFactory_t *rootFact = (ocrSchedulerObjectFactory_t*)self->pd->schedulerObjectFactories[self->rootObj->fctId];
     rootFact->fcts.destroy(rootFact, self->rootObj);
 
@@ -55,6 +65,8 @@ u8 commonSchedulerSwitchRunlevel(ocrScheduler_t *self, ocrPolicyDomain_t *PD, oc
     u64 i;
     if(runlevel == RL_CONFIG_PARSE && (properties & RL_BRING_UP) && RL_IS_FIRST_PHASE_UP(PD, RL_CONFIG_PARSE, phase)) {
         // First transition, setup some backpointers
+        // By contract, this scheduler implementation requires two heuristics
+        // Note: Improvement could be to check for heuristic capabilities to make the contract more flexible
         bool masterFound = false;
         for(i = 0; i < self->schedulerHeuristicCount; ++i) {
             ocrSchedulerHeuristic_t *heuristic = self->schedulerHeuristics[i];
@@ -73,6 +85,7 @@ u8 commonSchedulerSwitchRunlevel(ocrScheduler_t *self, ocrPolicyDomain_t *PD, oc
     }
 
     if(properties & RL_BRING_UP) {
+        //TODO for now this root object is only for COMP_HEURISTIC_ID. We need to add a new root type to cover 2*deques + ioboxes
         // Take care of all other sub-objects
         ocrSchedulerObjectFactory_t *rootFact = (ocrSchedulerObjectFactory_t*)PD->schedulerObjectFactories[self->rootObj->fctId];
         toReturn |= rootFact->fcts.switchRunlevel(self->rootObj, PD, runlevel, phase, properties, NULL, 0);
@@ -155,22 +168,22 @@ u8 commonSchedulerSwitchRunlevel(ocrScheduler_t *self, ocrPolicyDomain_t *PD, oc
 }
 
 u8 commonSchedulerTakeEdt (ocrScheduler_t *self, u32 *count, ocrFatGuid_t *edts) {
-    ASSERT(0); //old scheduler interfaces not supported
+    ASSERT(false && "deprecated scheduler interface");
     return OCR_ENOTSUP;
 }
 
 u8 commonSchedulerGiveEdt (ocrScheduler_t* base, u32* count, ocrFatGuid_t* edts) {
-    ASSERT(0); //old scheduler interfaces not supported
+    ASSERT(false && "deprecated scheduler interface");
     return OCR_ENOTSUP;
 }
 
 u8 commonSchedulerTakeComm(ocrScheduler_t *self, u32* count, ocrFatGuid_t* handlers, u32 properties) {
-    ASSERT(0); //old scheduler interfaces not supported
+    ASSERT(false && "deprecated scheduler interface");
     return OCR_ENOTSUP;
 }
 
 u8 commonSchedulerGiveComm(ocrScheduler_t *self, u32* count, ocrFatGuid_t* handlers, u32 properties) {
-    ASSERT(0); //old scheduler interfaces not supported
+    ASSERT(false && "deprecated scheduler interface");
     return OCR_ENOTSUP;
 }
 
@@ -185,17 +198,27 @@ u8 commonSchedulerMonitorProgress(ocrScheduler_t *self, ocrMonitorProgress_t typ
     return 0;
 }
 
-///////////////////////////////
-//      Scheduler 1.0        //
-///////////////////////////////
-
 u8 commonSchedulerGetWorkInvoke(ocrScheduler_t *self, ocrSchedulerOpArgs_t *opArgs, ocrRuntimeHint_t *hints) {
-    ocrSchedulerHeuristic_t *schedulerHeuristic = self->schedulerHeuristics[self->masterHeuristicId];
+    // Dispatch notify to the correct scheduler
+    ocrSchedulerHeuristic_t *schedulerHeuristic;
+    ocrSchedulerOpWorkArgs_t * notifyArgs = (ocrSchedulerOpWorkArgs_t *) opArgs;
+    if (notifyArgs->kind == OCR_SCHED_WORK_COMM) {
+        schedulerHeuristic = self->schedulerHeuristics[COMM_HEURISTIC_ID];
+    } else {
+        schedulerHeuristic = self->schedulerHeuristics[COMP_HEURISTIC_ID];
+    }
     return schedulerHeuristic->fcts.op[OCR_SCHEDULER_HEURISTIC_OP_GET_WORK].invoke(schedulerHeuristic, opArgs, hints);
 }
 
 u8 commonSchedulerNotifyInvoke(ocrScheduler_t *self, ocrSchedulerOpArgs_t *opArgs, ocrRuntimeHint_t *hints) {
-    ocrSchedulerHeuristic_t *schedulerHeuristic = self->schedulerHeuristics[self->masterHeuristicId];
+    // Dispatch notify to the correct scheduler
+    ocrSchedulerHeuristic_t * schedulerHeuristic;
+    ocrSchedulerOpNotifyArgs_t * notifyArgs = (ocrSchedulerOpNotifyArgs_t *) opArgs;
+    if (notifyArgs->kind == OCR_SCHED_NOTIFY_COMM_READY) {
+        schedulerHeuristic = self->schedulerHeuristics[COMM_HEURISTIC_ID];
+    } else {
+        schedulerHeuristic = self->schedulerHeuristics[COMP_HEURISTIC_ID];
+    }
     return schedulerHeuristic->fcts.op[OCR_SCHEDULER_HEURISTIC_OP_NOTIFY].invoke(schedulerHeuristic, opArgs, hints);
 }
 
