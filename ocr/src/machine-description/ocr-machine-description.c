@@ -947,6 +947,28 @@ s32 populate_inst(ocrParamList_t **inst_param, int inst_param_size, void **insta
             }
             break;
 #endif
+#if defined(ENABLE_SCHEDULER_COMMON)
+            case schedulerCommon_id:
+            {
+                ALLOC_PARAM_LIST(inst_param[j], paramListSchedulerCommonInst_t);
+                if (key_exists(dict, secname, "config")) {
+                    char *valuestr = NULL;
+                    snprintf(key, MAX_KEY_SZ, "%s:%s", secname, "config");
+                    INI_GET_STR (key, valuestr, "");
+                    ((paramListSchedulerCommonInst_t*)inst_param[j])->config = valuestr;
+                } else {
+                    // Scheduler implementation will warn if necessary
+                    ((paramListSchedulerCommonInst_t*)inst_param[j])->config = NULL;
+                }
+                ((paramListSchedulerCommonInst_t*)inst_param[j])->heuristics = (ocrSchedulerHeuristic_t **) all_instances[schedulerHeuristic_type];
+                // This is reading the range of 'schedulerHeuristic' for the current scheduler instance
+                int low, high;
+                read_range(dict, secname, "schedulerHeuristic", &low, &high);
+                ((paramListSchedulerCommonInst_t*)inst_param[j])->heuristicIdLow = low;
+                ((paramListSchedulerCommonInst_t*)inst_param[j])->heuristicIdHigh = high;
+            }
+            break;
+#endif
             default:
                 ALLOC_PARAM_LIST(inst_param[j], paramListSchedulerInst_t);
                 break;

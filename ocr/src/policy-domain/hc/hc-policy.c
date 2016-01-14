@@ -144,7 +144,6 @@ u8 hcPdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
     masterWorkerProperties = properties;
     properties &= ~RL_NODE_MASTER;
 
-
     if(!(fromPDMsg)) {
         // RL changes called directly through switchRunlevel should
         // only transition until PD_OK. After that, transitions should

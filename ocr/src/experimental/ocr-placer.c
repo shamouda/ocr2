@@ -20,6 +20,8 @@
 // Internal Placement API
 //
 
+//BUG #476 - This code is being deprecated
+
 //Part of policy-domain debug messages
 #define DEBUG_TYPE POLICY
 

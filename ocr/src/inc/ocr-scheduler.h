@@ -73,7 +73,7 @@ typedef enum {
 
 typedef union _ocrSchedWorkData_t {
     struct {
-        ocrFatGuid_t edt;                           // For user EDTs, count is always 1
+        ocrFatGuid_t edt;                           /* For user EDTs, count is always 1 */
     } OCR_SCHED_ARG_NAME(OCR_SCHED_WORK_EDT_USER);
     struct {
         ocrFatGuid_t *guids;
@@ -89,6 +89,9 @@ typedef struct _ocrSchedulerOpWorkArgs_t {
 
 /* Scheduler notify related arguments */
 typedef enum {
+    //Note: PROCESS_MSG is intentionally vague for now so that there's an easy way to experiment
+    //      with what it would actually make sense for the scheduler to look at.
+    OCR_SCHED_NOTIFY_PROCESS_MSG,                   /* Notify scheduler a PD message is being processed */
     OCR_SCHED_NOTIFY_DB_CREATE,                     /* Notify scheduler that a DB is created */
     OCR_SCHED_NOTIFY_DB_DONE,                       /* Notify scheduler that a DB's use is done */
     OCR_SCHED_NOTIFY_EDT_SATISFIED,                 /* Notify scheduler that an EDT is fully satisfied */
@@ -117,6 +120,9 @@ typedef union _ocrSchedNotifyData_t {
     struct {
         ocrFatGuid_t guid;                          /* Scheduler is notified about this communication guid */
     } OCR_SCHED_ARG_NAME(OCR_SCHED_NOTIFY_COMM_READY);
+    struct {
+        struct _ocrPolicyMsg_t * msg;
+    } OCR_SCHED_ARG_NAME(OCR_SCHED_NOTIFY_PROCESS_MSG);
 } ocrSchedNotifyData_t;
 
 typedef struct _ocrSchedulerOpNotifyArgs_t {

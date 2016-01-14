@@ -168,7 +168,7 @@ static ocrSchedulerHeuristicContext_t* hcCommDelegateSchedulerHeuristicGetContex
  * @brief Take communication work
  *
  * The scheduler must identify the type of the worker doing the call to determine what to return.
- * In the case of comp-worker, a take returns a handle that has completed, whilefor comm-worker
+ * In the case of comp-worker, a take returns a handle that has completed, while for comm-worker
  * a take returns a handle representing a message to be sent out.
  */
 static inline u8 hcCommDelegateWorkEdtUserInvoke(ocrSchedulerHeuristic_t *self, ocrSchedulerHeuristicContext_t *context, ocrSchedulerOpArgs_t *opArgs, ocrRuntimeHint_t *hints) {

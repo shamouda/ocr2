@@ -15,6 +15,8 @@
 #include "ocr-types.h"
 #include "ocr-runtime-types.h"
 
+//BUG #476 - This code is being deprecated
+
 typedef struct _ocrPlacer_t {
 } ocrPlacer_t;
 

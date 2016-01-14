@@ -535,9 +535,24 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
     ocrLocation_t curLoc = self->myLocation;
     u32 properties = 0;
 
+#ifdef PLACER_LEGACY //BUG #476 - This code is being deprecated
     // Try to automatically place datablocks and edts. Only support naive PD-based placement for now.
     suggestLocationPlacement(self, curLoc, (ocrPlatformModelAffinity_t *) self->platformModel,
                              (ocrLocationPlacer_t *) self->placer, msg);
+#else
+    // We segregate on the message type to avoid unnecessarily calling into the scheduler.
+    // Ideally, we should always call and the scheduler should be robust enough and
+    // return an error code if it does not support the operation + leave the message unchanged.
+    if (((msg->type & PD_MSG_TYPE_ONLY) == PD_MSG_WORK_CREATE) ||
+        ((msg->type & PD_MSG_TYPE_ONLY) == PD_MSG_DB_CREATE)) {
+        ocrSchedulerOpNotifyArgs_t notifyArgs;
+        notifyArgs.base.location = msg->srcLocation;
+        notifyArgs.kind = OCR_SCHED_NOTIFY_PROCESS_MSG;
+        notifyArgs.OCR_SCHED_ARG_FIELD(OCR_SCHED_NOTIFY_PROCESS_MSG).msg = msg;
+        self->schedulers[0]->fcts.op[OCR_SCHEDULER_OP_NOTIFY].invoke(
+            self->schedulers[0], (ocrSchedulerOpArgs_t*) &notifyArgs, NULL);
+    }
+#endif
 
     DPRINTF(DEBUG_LVL_VERB, "HC-dist processing message @ 0x%lx of type 0x%x\n", msg, msg->type);
 

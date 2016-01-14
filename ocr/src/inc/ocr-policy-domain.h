@@ -1339,7 +1339,8 @@ typedef struct _ocrPolicyDomain_t {
     ocrSchedulerObjectFactory_t **schedulerObjectFactories; /**< All the schedulerObject factories
                                                  * known to this policy domain */
 
-    ocrPlacer_t * placer;                       /**< Placement policy (WIP) */
+    ocrPlacer_t * placer;                       //BUG #476 - This code is being deprecated
+
     ocrPlatformModel_t * platformModel;         /**< Platform model (WIP) */
 
     /**
