@@ -13,7 +13,15 @@ OCR_ROOT := $(shell cd "${OCR_ROOT}" && pwd)
 OCR_INSTALL_ROOT := $(shell mkdir -p "${OCR_INSTALL_ROOT}" && cd "${OCR_INSTALL_ROOT}" && pwd)
 OCR_BUILD := $(shell cd "${OCR_BUILD}" && pwd)
 
+OCR_INSTALL_IS_ROOT ?= no
+
+# For external build systems, we just build in the INSTALL_ROOT
+# Otherwise, we create a sub-directory based on the type
+ifeq (${OCR_INSTALL_IS_ROOT}, yes)
+OCR_INSTALL := ${OCR_INSTALL_ROOT}
+else
 OCR_INSTALL := $(OCR_INSTALL_ROOT)/$(OCR_TYPE)
+endif
 
 #
 # Object & dependence file subdirectory
