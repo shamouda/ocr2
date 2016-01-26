@@ -46,15 +46,15 @@ TARGET_OPT="no"
 TARGET_ARG="x86"
 PROGRAMS=""
 
-SWEEP_FOLDER="configSweep"
-TEST_FOLDER="ocr"
+SWEEP_FOLDER="${SCRIPT_ROOT}/../configSweep"
+TEST_FOLDER="${SCRIPT_ROOT}/../ocr"
 
-if [[ ! -d ${SWEEP_FOLDER} ]]; then
+if [[ ! -d ${SCRIPT_ROOT} ]]; then
     echo "error: ${SCRIPT_NAME} cannot find sweep config folder ${SWEEP_FOLDER}"
     exit 1
 fi
 
-if [[ ! -d ${TEST_FOLDER} ]]; then
+if [[ ! -d ${SCRIPT_ROOT} ]]; then
     echo "error: ${SCRIPT_NAME} cannot find test folder ${TEST_FOLDER}"
     exit 1
 fi

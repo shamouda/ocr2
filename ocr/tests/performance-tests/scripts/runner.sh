@@ -41,7 +41,9 @@ SWEEPFILE_ARG=""
 TARGET_ARG="x86"
 NOCLEAN_OPT="no"
 
-OCR_MAKEFILE="Makefile"
+# Default options are for micro-benchmarks
+RUNNER_TYPE=${RUNNER_TYPE-"MicroBenchmark"}
+OCR_MAKEFILE=${OCR_MAKEFILE-"Makefile"}
 
 #
 # Option Parsing and Checking
@@ -268,6 +270,43 @@ function generateCfgFile {
 # Compile and Run Function
 #
 
+function runMicroBenchmark {
+    local  __resultvar=$1
+
+    # Compile the program with provided defines
+    echo "Compiling for OCR ${prog} ${runInfo}"
+    echo "${progDefines} ${runInfo} make -f ${OCR_MAKEFILE} benchmark build/${prog} PROG=ocr/${prog}.c"
+    eval ${progDefines} ${runInfo} make -f ${OCR_MAKEFILE} benchmark build/${prog} PROG=ocr/${prog}.c
+
+    # Run the program with the appropriate OCR cfg file
+    if [[ -z "${RUN_HPCTOOLKIT}" ]]; then
+        echo "Run with OCR ${prog} ${runInfo}"
+        make -f ${OCR_MAKEFILE} OCR_CONFIG=${PWD}/${CFGARG_OUTPUT} run build/${prog}
+        RES=$?
+    else
+        echo "Run HPCToolkit with OCR ${prog} ${runInfo}"
+        make -f ${OCR_MAKEFILE} OCR_CONFIG=${PWD}/${CFGARG_OUTPUT} hpcrun build/${prog}
+        RES=$?
+    fi
+    eval $__resultvar="'$RES'"
+}
+
+function runApplication {
+    local  __resultvar=$1
+
+    # Compile the program with provided defines
+    echo "Compiling OCR Application ${prog} ${runInfo}"
+    echo "${progDefines} ${runInfo} make -f ${OCR_MAKEFILE}"
+    eval ${progDefines} ${runInfo} make -f ${OCR_MAKEFILE}
+
+    # Run the program with the appropriate OCR cfg file
+    echo "Run OCR Application ${prog} ${runInfo}"
+    make -f ${OCR_MAKEFILE} OCR_CONFIG=${PWD}/${CFGARG_OUTPUT} run
+    RES=$?
+    eval $__resultvar="'$RES'"
+}
+
+
 function scalingTest {
     prog=$1
     progDefines="$2"
@@ -290,26 +329,19 @@ function scalingTest {
             export CFGARG_OUTPUT="${prog}-${cores}c.cfg"
             generateCfgFile
 
+            if [[ "${RUNNER_TYPE}" == "Application" ]]; then
+                runApplication RES
+            else
+                # Default is micro-benchmark
+                runMicroBenchmark RES
+            fi
+
+
             if [[ ! -f ${CFGARG_OUTPUT} ]]; then
                 echo "error: ${SCRIPT_NAME} Cannot find generated OCR config file ${CFGARG_OUTPUT}"
                 exit 1
             fi
 
-            # Compile the program with provided defines
-            echo "Compiling for OCR ${prog} ${runInfo}"
-            echo "${progDefines} ${runInfo} make -f ${OCR_MAKEFILE} benchmark build/${prog} PROG=ocr/${prog}.c"
-            eval ${progDefines} ${runInfo} make -f ${OCR_MAKEFILE} benchmark build/${prog} PROG=ocr/${prog}.c
-
-            # Run the program with the appropriate OCR cfg file
-            if [[ -z "${RUN_HPCTOOLKIT}" ]]; then
-                echo "Run with OCR ${prog} ${runInfo}"
-                make -f ${OCR_MAKEFILE} OCR_CONFIG=${PWD}/${CFGARG_OUTPUT} run build/${prog}
-                RES=$?
-            else
-                echo "Run HPCToolkit with OCR ${prog} ${runInfo}"
-                make -f ${OCR_MAKEFILE} OCR_CONFIG=${PWD}/${CFGARG_OUTPUT} hpcrun build/${prog}
-                RES=$?
-            fi
 
             if [[ $RES -ne 0 ]]; then
                 if [[ "${TARGET_ARG}" != "gasnet" ]]; then
