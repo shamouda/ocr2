@@ -50,10 +50,33 @@ if [[ "${OCRRUN_VALGRIND}" == "yes" ]]; then
     PROGRAM_BIN="valgrind ${OCRRUN_VALGRIND_OPTS} ${PROGRAM_BIN}"
 fi
 
+if [[ "${OCRRUN_HPCTOOLKIT}" == "yes" ]]; then
+    PROGPATH=`echo "${PROGRAM_BIN%/*}" | sed 's/^ *//'`
+    PROGNAME=`echo "${PROGRAM_BIN##*/}" | cut -d' ' -f1-1`
+    if [[ -z "${OCR_INSTALL}" ]]; then
+        echo "error: ocrrun support for hpctoolkit needs OCR_INSTALL to be defined"
+        exit 1
+    fi
+    rm -Rf ${PROGPATH}/${PROGNAME}.db
+    rm -Rf ${PROGPATH}/${PROGNAME}_meas
+    rm -Rf ${PROGPATH}/*.hpcstruct
+    hpcstruct ${OCR_INSTALL}/lib/libocr_x86.so
+    hpcstruct "${PROGPATH}/${PROGNAME}"
+    PROGRAM_BIN="hpcrun -t -o ${PROGPATH}/${PROGNAME}_meas ${OCRRUN_HPCTOOLKIT_OPTS} ${PROGRAM_BIN}"
+fi
+
 # Default is regular X86-backend
 ${PROGRAM_BIN} -ocr:cfg ${OCR_CONFIG}
-
 RET_CODE=$?
+
+if [[ ${RET_CODE} -eq 0 ]]; then
+    if [[ "${OCRRUN_HPCTOOLKIT}" == "yes" ]]; then
+        HPCSTRUCT="-S ${PROGPATH}/libocr_x86.so.hpcstruct -S ${PROGPATH}/${PROGNAME}.hpcstruct"
+        hpcprof-mpi -I . ${HPCSTRUCT} -o ${PROGPATH}/${PROGNAME}.db ${PROGPATH}/${PROGNAME}_meas
+
+    fi
+fi
+
 exit ${RET_CODE}
 
 

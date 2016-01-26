@@ -77,9 +77,8 @@ fi
 RES=`grep "MPI" ${OCR_CONFIG}`
 
 if [[ "$RES" != "" ]]; then
-
-    PROGPATH="${PROGRAM_BIN%/*}"
-    PROGNAME="${PROGRAM_BIN##*/}"
+    PROGPATH=`echo "${PROGRAM_BIN%/*}" | sed 's/^ *//'`
+    PROGNAME=`echo "${PROGRAM_BIN##*/}" | cut -d' ' -f1-1`
 
     if [[ "${OCR_NODEFILE}" != "" ]]; then
         # count words since hostnames shouldn't have spaces (-l only counts new lines)
@@ -124,12 +123,13 @@ if [[ "$RES" != "" ]]; then
             echo "error: ocrrun support for hpctoolkit needs OCR_INSTALL to be defined"
             exit 1
         fi
-        rm -Rf ${PROGNAME}.db
-        rm -Rf ${PROGNAME}_meas
-        rm *.hpcstruct
-        hpcstruct ${OCR_INSTALL}/lib/libocr.so
+        rm -Rf ${PROGPATH}/${PROGNAME}.db
+        rm -Rf ${PROGPATH}/${PROGNAME}_meas
+        rm -Rf ${PROGPATH}/*.hpcstruct
+        hpcstruct ${OCR_INSTALL}/lib/libocr_x86-mpi.so
         hpcstruct "${PROGPATH}/${PROGNAME}"
-        PROGRAM_BIN="hpcrun -t ${OCRRUN_HPCTOOLKIT_OPTS} ${PROGRAM_BIN}"
+        # The db file should be generated in the folder that contains the executable
+        PROGRAM_BIN="hpcrun -t -o ${PROGPATH}/${PROGNAME}_meas ${OCRRUN_HPCTOOLKIT_OPTS} ${PROGRAM_BIN}"
     fi
 
     ${OCRRUN_OPT_CMD} ${OCR_MPI_OPTS} ${PROGRAM_BIN} -ocr:cfg ${OCR_CONFIG}
@@ -137,23 +137,14 @@ if [[ "$RES" != "" ]]; then
 
     if [[ ${RET_CODE} -eq 0 ]]; then
         if [[ "${OCRRUN_HPCTOOLKIT}" == "yes" ]]; then
-            HPCSTRUCT="-S libocr.so.hpcstruct -S ${PROGNAME}.hpcstruct"
-            hpcprof-mpi -I . ${HPCSTRUCT} -o $PWD/${PROGNAME}.db $PWD/${PROGNAME}_meas
+            HPCSTRUCT="-S ${PROGPATH}/libocr_x86-mpi.so.hpcstruct -S ${PROGPATH}/${PROGNAME}.hpcstruct"
+            hpcprof-mpi -I . ${HPCSTRUCT} -o ${PROGPATH}/${PROGNAME}.db ${PROGPATH}/${PROGNAME}_meas
         fi
     fi
 
 
     exit ${RET_CODE}
 fi
-
-# Checking for FSIM-backed runtime
-RES=`grep "fsim" ${OCR_CONFIG}`
-
-if [[ "$RES" != "" ]]; then
-    echo "TODO invoke FSIM"
-    exit 1
-fi
-
 
 # Default is regular X86-backend
 ${PROGRAM_BIN} -ocr:cfg ${OCR_CONFIG}
