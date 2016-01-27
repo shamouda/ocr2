@@ -63,10 +63,14 @@ while [[ $# -gt 0 ]]; do
 done
 
 # try to lookup for a default ocr install
+if [ -z "${OCR_TYPE}" ]; then
+    echo "OCR_TYPE is not set, defaulting to x86"
+fi
+
 if [ -z "${OCR_INSTALL}" ]; then
-    echo "OCR_INSTALL is not set, defaulting to ../install/x86"
-    OCR_INSTALL_TMP=`pwd`/../install/x86
-    if [ -x ${OCR_INSTALL_TMP}/lib/libocr.so ]; then
+    echo "OCR_INSTALL is not set, defaulting to ../install/"
+    OCR_INSTALL_TMP=`pwd`/../install/
+    if [ -x ${OCR_INSTALL_TMP}/lib/libocr_${OCR_TYPE}.so ]; then
         export OCR_INSTALL=${OCR_INSTALL_TMP}
     fi
 fi
@@ -82,12 +86,12 @@ if [ -z "${CC}" ]; then
 fi
 
 export INCLUDES="-I${OCR_INSTALL}/include"
-
-if [[ ("$OCR_INSTALL" =~ "mpi") || ("$OCR_INSTALL" =~ "gasnet") ]]; then
-    export CFLAGS=" -Wall -g -Werror -DOCR_ENABLE_EDT_NAMING -DOCR_ASSERT -DENABLE_EXTENSION_AFFINITY"
-else
-    export CFLAGS=" -Wall -g -Werror -DOCR_ENABLE_EDT_NAMING -DOCR_ASSERT -DENABLE_EXTENSION_AFFINITY -DENABLE_EXTENSION_PAUSE"
-fi
+# See bug #894
+#if [[ ("$OCR_INSTALL" =~ "mpi") || ("$OCR_INSTALL" =~ "gasnet") ]]; then
+export CFLAGS=" -Wall -g -Werror -DOCR_ENABLE_EDT_NAMING -DOCR_ASSERT -DENABLE_EXTENSION_AFFINITY"
+#else
+#    export CFLAGS=" -Wall -g -Werror -DOCR_ENABLE_EDT_NAMING -DOCR_ASSERT -DENABLE_EXTENSION_AFFINITY -DENABLE_EXTENSION_PAUSE"
+#fi
 
 if [ -n "${TEST_EXT_RTAPI}" ]; then
     CFLAGS="$CFLAGS -DENABLE_EXTENSION_RTITF"
@@ -101,12 +105,12 @@ if [ -n "${TEST_EXT_LABELING}" ]; then
     CFLAGS="$CFLAGS -DENABLE_EXTENSION_LABELING"
 fi
 
-export LDFLAGS="-L${OCR_INSTALL}/lib -locr -lpthread ${OCR_LDFLAGS}"
+export LDFLAGS="-L${OCR_INSTALL}/lib -locr_${OCR_TYPE} -lpthread ${OCR_LDFLAGS}"
 export OCR_TESTS_BIN_OUTPUT=
 
 if [ -z "${OCR_CONFIG}" ]; then
-    export OCR_CONFIG=${OCR_INSTALL}/config/generated.cfg
-    ../scripts/Configs/config-generator.py --output ${OCR_CONFIG}
+    export OCR_CONFIG=${OCR_INSTALL}/share/ocr/config/${OCR_TYPE}/generated_ocrTests.cfg
+    ${OCR_INSTALL}/share/ocr/scripts/Configs/config-generator.py --output ${OCR_CONFIG}
     echo "OCR_CONFIG is not set, defaulting to ${OCR_CONFIG}"
 fi
 
@@ -119,7 +123,7 @@ export OCR_FLAGS=" -ocr:cfg ${OCR_CONFIG}"
 BIN_DIR=${OCR_INSTALL}/bin
 LIB_DIR=${OCR_INSTALL}/lib
 
-if [ -x ${LIB_DIR}/libocr.so -o -e ${LIB_DIR}/libocr.a ]; then
+if [ -x ${LIB_DIR}/libocr_${OCR_TYPE}.so -o -e ${LIB_DIR}/libocr_${OCR_TYPE}.a ]; then
     echo "OCR library found in ${OCR_INSTALL}/lib"
 else
     echo "ERROR OCR library not found in ${OCR_INSTALL}/lib"
@@ -324,19 +328,19 @@ function run () {
     if [ -f ${TEST_RES_FILE} ]; then
         TEST_RES=`cat ${TEST_RES_FILE}`
     fi
-    echo "ocrrun ${RUN_WRAPPER} ${BIN_GEN_DIR}/${NAME} ${OCR_FLAGS} ${TEST_ARGS}"
+    echo "ocrrun_${OCR_TYPE} ${RUN_WRAPPER} ${BIN_GEN_DIR}/${NAME} ${OCR_FLAGS} ${TEST_ARGS}"
 
     if [[ "$LOOP_UNTIL_CRASH" == "yes" ]]; then
         let i=0;
         RES=0;
         while (( $RES == 0)); do
             echo "==== Loop until crash iteration $i ===="
-            ocrrun ${RUN_WRAPPER} ${BIN_GEN_DIR}/${NAME} ${OCR_FLAGS} ${TEST_ARGS}
+            ocrrun_${OCR_TYPE} ${RUN_WRAPPER} ${BIN_GEN_DIR}/${NAME} ${OCR_FLAGS} ${TEST_ARGS}
             RES=$?
             let i=$i+1
         done
     else
-        ocrrun ${RUN_WRAPPER} ${BIN_GEN_DIR}/${NAME} ${OCR_FLAGS} ${TEST_ARGS}
+        ocrrun_${OCR_TYPE} ${RUN_WRAPPER} ${BIN_GEN_DIR}/${NAME} ${OCR_FLAGS} ${TEST_ARGS}
     fi
     RES=$?
     if [[ $RES -eq $TEST_RES ]]; then

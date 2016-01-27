@@ -2,7 +2,6 @@
 
 
 # User-provided or generated
-OCR_CONFIG=
 PROGRAM_BIN=
 
 #
@@ -35,9 +34,8 @@ fi
 
 if [ "${OCR_CONFIG}" = "" ]; then
     #Call the config generator
-    python ${OCR_ROOT}/bin/config-generator.py
-    #TODO this only works with default CFG filename
-    OCR_CONFIG=${PWD}/default.cfg
+    python ${OCR_INSTALL}/share/ocr/scripts/Configs/config-generator.py --output ${PWD}/generated_ocrrun.cfg
+    OCR_CONFIG=${PWD}/generated_ocrrun.cfg
 fi
 
 if [[ "${OCRRUN_GDB}" == "yes" ]]; then

@@ -18,13 +18,18 @@ ifeq (benchmark, $(GOAL))
  endif
 endif
 
+ifndef OCR_TYPE
+OCR_TYPE ?= x86
+$(warning OCR_TYPE not set, defaulting to ${OCR_TYPE})
+endif
+
 ifndef OCR_INSTALL
-OCR_INSTALL?=../../install/x86
+OCR_INSTALL?=../../install
 $(warning OCR_INSTALL not set, defaulting to ${OCR_INSTALL})
 endif
 
 ifndef OCR_CONFIG
-OCR_CONFIG=${OCR_INSTALL}/config/default.cfg
+OCR_CONFIG=${OCR_INSTALL}/share/ocr/config/${OCR_TYPE}/default.cfg
 $(warning OCR_CONFIG not set, defaulting to ${OCR_CONFIG})
 endif
 
@@ -39,7 +44,7 @@ endif
 
 INCS=-I./inc
 CFLAGS=-O3 -g -Wp,-w $(INCS) -c
-OCR_FLAGS=-L${OCR_INSTALL}/lib -I${OCR_INSTALL}/include -locr -lpthread -lm ${OCR_LDFLAGS}
+OCR_FLAGS=-L${OCR_INSTALL}/lib -I${OCR_INSTALL}/include -locr_${OCR_TYPE} -lpthread -lm ${OCR_LDFLAGS}
 
 OCR_RUN_FLAGS=-ocr:cfg ${OCR_CONFIG}
 
@@ -60,7 +65,7 @@ benchmark: $(PROG) $(BIN_GEN_DIR)/$(TYPE).o
 	$(CC) -o $(EXECUTABLE) $(PROG) $(INCS) $(C_DEFINES) $(BIN_GEN_DIR)/$(TYPE).o $(OCR_FLAGS) $(BENCH_FLAGS)
 
 run: $(EXECUTABLE)
-	LD_LIBRARY_PATH=$(OCR_INSTALL)/lib $(OCR_INSTALL)/bin/ocrrun $(PWD)/$(EXECUTABLE) $(OCR_RUN_FLAGS) $(WORKLOAD_ARGS)
+	LD_LIBRARY_PATH=$(OCR_INSTALL)/lib $(OCR_INSTALL)/bin/ocrrun_${OCR_TYPE} $(PWD)/$(EXECUTABLE) $(OCR_RUN_FLAGS) $(WORKLOAD_ARGS)
 
 $(BIN_GEN_DIR)/$(TYPE).o: $(DEPS)
 	echo "Build $(CC) $(INCS) -g -c $< -o $@"

@@ -6,14 +6,14 @@ if [ $1 == "_params" ]; then
         exit 0
     fi
 else
-    # ARGS: ARCH CFG_FILE DB_IMPL
-    ARCH=$1
-    export OCR_INSTALL=${JJOB_SHARED_HOME}/ocr/ocr/install/${ARCH}/
+    # ARGS: OCR_TYPE CFG_FILE DB_IMPL
+    OCR_TYPE=$1
+    export OCR_INSTALL=${JJOB_SHARED_HOME}/ocr/ocr/install/
     export PATH=${OCR_INSTALL}/bin:$PATH
     export LD_LIBRARY_PATH=${OCR_INSTALL}/lib:${LD_LIBRARY_PATH}
 
     CFG_FILE=$2;
-    export OCR_CONFIG=${OCR_INSTALL}/config/${CFG_FILE}
+    export OCR_CONFIG=${OCR_INSTALL}/share/ocr/config/${OCR_TYPE}/${CFG_FILE}
     echo "regression.sh: Setting OCR_CONFIG to ${OCR_CONFIG} =${CC}"
 
     DB_IMPL=$3;
@@ -24,22 +24,22 @@ else
     cd ${JJOB_PRIVATE_HOME}/ocr/ocr/tests-${JJOB_ID}
     TEST_OPTIONS=""
 
-    if [[ "${ARCH}" == "x86" ]]; then
+    if [[ "${OCR_TYPE}" == "x86" ]]; then
         # Also tests legacy and rt-api supports
         # These MUST be built by default for OCR x86
         TEST_OPTIONS="-ext_rtapi -ext_legacy"
     fi
 
-    ./ocrTests ${TEST_OPTIONS} -unstablefile unstable.${ARCH}-${DB_IMPL}
+    OCR_TYPE=${OCR_TYPE} ./ocrTests ${TEST_OPTIONS} -unstablefile unstable.${OCR_TYPE}-${DB_IMPL}
     RES=$?
 
     #Conditionally execute to preserve logs if previous run failed.
     if [[ $RES -eq 0 ]]; then
         #TODO: disable gasnet tests for now
         # Also disable for tg-x86
-        if [[ "${ARCH}" != "x86-gasnet" && "${ARCH}" != "tg-x86" ]]; then
+        if [[ "${OCR_TYPE}" != "x86-gasnet" && "${OCR_TYPE}" != "tg-x86" ]]; then
             #Run performance tests as non-regression tests too
-            ./ocrTests -unstablefile unstable.${ARCH}-${DB_IMPL} -perftest
+            OCR_TYPE=${OCR_TYPE} ./ocrTests -unstablefile unstable.${OCR_TYPE}-${DB_IMPL} -perftest
             RES=$?
         fi
     fi
