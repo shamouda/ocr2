@@ -68,13 +68,13 @@ clean:
 
 .PHONY: squeaky
 squeaky:
-	OCR_TYPE=x86 $(MAKE) -C x86 clean uninstall
-#	OCR_TYPE=tg-x86 $(MAKE) -C tg-x86 clean uninstall
-	OCR_TYPE=tg-ce $(MAKE) -C tg-ce clean uninstall
-	OCR_TYPE=tg-xe $(MAKE) -C tg-xe clean uninstall
-	OCR_TYPE=builder-ce $(MAKE) -C builder-ce clean uninstall
-	OCR_TYPE=builder-xe $(MAKE) -C builder-xe clean uninstall
-	OCR_TYPE=x86-mpi $(MAKE) -C x86-mpi clean uninstall
-#	OCR_TYPE=x86-gasnet $(MAKE) -C x86-gasnet clean uninstall
+	OCR_TYPE=x86 $(MAKE) -C x86 squeaky
+#	OCR_TYPE=tg-x86 $(MAKE) -C tg-x86 squeaky
+	OCR_TYPE=tg-ce $(MAKE) -C tg-ce squeaky
+	OCR_TYPE=tg-xe $(MAKE) -C tg-xe squeaky
+	OCR_TYPE=builder-ce $(MAKE) -C builder-ce squeaky
+	OCR_TYPE=builder-xe $(MAKE) -C builder-xe squeaky
+	OCR_TYPE=x86-mpi $(MAKE) -C x86-mpi squeaky
+#	OCR_TYPE=x86-gasnet $(MAKE) -C x86-gasnet squeaky
 
 

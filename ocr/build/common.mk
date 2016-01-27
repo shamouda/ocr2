@@ -2,7 +2,7 @@
 # OCR top level directory
 #
 OCR_ROOT ?= ../..
-OCR_INSTALL_ROOT ?= ../../install
+OCR_INSTALL ?= ../../install
 
 OCR_BUILD := .
 
@@ -10,10 +10,9 @@ OCR_BUILD := .
 # Make sure we have absolute paths
 #
 OCR_ROOT := $(shell cd "${OCR_ROOT}" && pwd)
-OCR_INSTALL_ROOT := $(shell mkdir -p "${OCR_INSTALL_ROOT}" && cd "${OCR_INSTALL_ROOT}" && pwd)
+OCR_INSTALL := $(shell mkdir -p "${OCR_INSTALL}" && cd "${OCR_INSTALL}" && pwd)
 OCR_BUILD := $(shell cd "${OCR_BUILD}" && pwd)
 
-OCR_INSTALL := $(OCR_INSTALL_ROOT)/$(OCR_TYPE)
 
 #
 # Object & dependence file subdirectory
@@ -240,7 +239,7 @@ CFLAGS := -I . -I $(OCR_ROOT)/inc -I $(OCR_ROOT)/src -I $(OCR_ROOT)/src/inc $(CF
 
 # Static library name (only set if not set in OCR_TYPE specific file)
 ifeq (${SUPPORTS_STATIC}, yes)
-OCRSTATIC ?= libocr.a
+OCRSTATIC ?= libocr_${OCR_TYPE}.a
 OCRSTATIC := $(OCR_BUILD)/$(OCRSTATIC)
 CFLAGS_STATIC ?=
 CFLAGS_STATIC := ${CFLAGS} ${CFLAGS_STATIC}
@@ -249,14 +248,14 @@ endif
 ifeq (${SUPPORTS_SHARED}, yes)
 CFLAGS_SHARED ?=
 CFLAGS_SHARED := ${CFLAGS} ${CFLAGS_SHARED}
-OCRSHARED ?= libocr.so
+OCRSHARED ?= libocr_${OCR_TYPE}.so
 OCRSHARED := $(OCR_BUILD)/$(OCRSHARED)
 endif
 # Executable name (only set if not set in OCR_TYPE specific file)
 ifeq (${SUPPORTS_EXEC}, yes)
 CFLAGS_EXEC ?=
 CFLAGS_EXEC := ${CFLAGS} ${CFLAGS_EXEC}
-OCREXEC ?= builder.exe
+OCREXEC ?= ocrBuilder_$(OCR_TYPE).exe
 OCREXEC := $(OCR_BUILD)/$(OCREXEC)
 endif
 
@@ -425,16 +424,26 @@ INSTALL_TARGETS += exec
 INSTALL_EXES += $(OCREXEC)
 endif
 
-MACHINE_CONFIGS   := $(notdir $(wildcard $(OCR_ROOT)/machine-configs/$(OCR_TYPE)/*))
 INC_FILES         := $(addprefix extensions/, $(notdir $(wildcard $(OCR_ROOT)/inc/extensions/*))) \
                      $(notdir $(wildcard $(OCR_ROOT)/inc/*))
+
+MACHINE_CONFIGS   := $(notdir $(wildcard $(OCR_ROOT)/machine-configs/$(OCR_TYPE)/*.cfg))
+
+# Install scripts that are potentially needed
+SCRIPT_FILES      := Configs/config-generator.py
+
+ifneq (,$(findstring $(OCR_TYPE),"tg-ce tg-xe builder-xe builder-ce"))
+SCRIPT_FILES      += $(addprefix Configs/, ce_config_fix.py combine-configs.py mem_config_fix.py tg-fsim_config_fix.py)
+SCRIPT_FILES      += $(patsubst $(OCR_ROOT)/scripts/%,%,$(wildcard $(OCR_ROOT)/scripts/Blob/*))
+endif
 
 INSTALLED_LIBS    := $(addprefix $(OCR_INSTALL)/lib/, $(notdir $(INSTALL_LIBS)))
 BASE_LIBS         := $(firstword $(dir $(INSTALL_LIBS)))
 INSTALLED_EXES    := $(addprefix $(OCR_INSTALL)/bin/, $(notdir $(INSTALL_EXES)))
 BASE_EXES         := $(firstword $(dir $(INSTALL_EXES)))
-INSTALLED_CONFIGS := $(addprefix $(OCR_INSTALL)/config/, $(MACHINE_CONFIGS))
 INSTALLED_INCS    := $(addprefix $(OCR_INSTALL)/include/, $(INC_FILES))
+INSTALLED_CONFIGS := $(addprefix $(OCR_INSTALL)/share/ocr/config/$(OCR_TYPE)/, $(MACHINE_CONFIGS))
+INSTALLED_SCRIPTS := $(addprefix $(OCR_INSTALL)/share/ocr/scripts/, $(SCRIPT_FILES))
 
 # Special include files for tg-ce and tg-xe
 # This is a bit ugly but putting this directly in the TG makefiles
@@ -455,39 +464,39 @@ $(OCR_INSTALL)/include/rmd-bin-files.h: $(OCR_BUILD)/rmd-bin-files.h
 	@$(CP) $(OCR_BUILD)/rmd-bin-files.h $(OCR_INSTALL)/include/
 endif
 
-$(OCR_INSTALL)/lib/%: $(BASE_LIBS)% | $(OCR_INSTALL)/lib
-	@$(RM) -f $@
-	@$(CP) $< $@
+$(OCR_INSTALL)/lib/%: $(BASE_LIBS)%
+	$(AT)install -D -m 0644 $< $@
 
-$(OCR_INSTALL)/bin/%: $(BASE_EXES)% | $(OCR_INSTALL)/bin
-	@$(RM) -f $@
-	@$(CP) $< $@
+$(OCR_INSTALL)/bin/%: $(BASE_EXES)%
+	$(AT)install -D -m 0755 $< $@
 
-$(OCR_INSTALL)/config/%: $(OCR_ROOT)/machine-configs/$(OCR_TYPE)/% | $(OCR_INSTALL)/config
-	@$(RM) -f $@
-	@$(CP) $< $@
+$(OCR_INSTALL)/include/%: $(OCR_ROOT)/inc/%
+	$(AT)install -D -m 0644 $< $@
 
-$(OCR_INSTALL)/include/%: $(OCR_ROOT)/inc/% | $(OCR_INSTALL)/include $(OCR_INSTALL)/include/extensions
-	@$(RM) -f $@
-	@$(CP) $< $@
+$(OCR_INSTALL)/share/ocr/config/$(OCR_TYPE)/%: $(OCR_ROOT)/machine-configs/$(OCR_TYPE)/%
+	$(AT)install -D -m 0644 $< $@
 
-$(OCR_INSTALL)/lib $(OCR_INSTALL)/bin $(OCR_INSTALL)/config $(OCR_INSTALL)/include \
-$(OCR_INSTALL)/include/extensions :
-	@$(MKDIR) -p $@
+$(OCR_INSTALL)/share/ocr/scripts/%: $(OCR_ROOT)/scripts/%
+	$(AT)install -D -m 0755 $< $@
+
 
 .PHONY: install
-.ONESHELL:
-install: ${INSTALL_TARGETS} ${INSTALLED_LIBS} ${INSTALLED_EXES} ${INSTALLED_CONFIGS} ${INSTALLED_INCS}
-	@printf "\033[32m Installed '$(INSTALL_LIBS) $(INSTALL_EXES)' into '$(OCR_INSTALL)'\033[0m\n"
-	@if [ -d $(OCR_ROOT)/machine-configs/$(OCR_TYPE) ]; then \
-		$(RM) -f $(OCR_INSTALL)/config/default.cfg; \
-		$(LN) -sf ./$(DEFAULT_CONFIG) $(OCR_INSTALL)/config/default.cfg; \
+install: ${INSTALL_TARGETS} ${INSTALLED_LIBS} ${INSTALLED_EXES} ${INSTALLED_INCS} \
+	${INSTALLED_CONFIGS} ${INSTALLED_SCRIPTS}
+	@printf "\033[32m Installed OCR for $(OCR_TYPE) into '$(OCR_INSTALL)'\033[0m\n"
+	$(AT)if [ -d $(OCR_ROOT)/machine-configs/$(OCR_TYPE) ]; then \
+		$(RM) -f $(OCR_INSTALL)/share/ocr/config/$(OCR_TYPE)/default.cfg; \
+		$(LN) -sf ./$(DEFAULT_CONFIG) $(OCR_INSTALL)/share/ocr/config/$(OCR_TYPE)/default.cfg; \
 	fi
 
 .PHONY: uninstall
 uninstall:
-	-$(RM) $(RMFLAGS) $(OCR_INSTALL)/*
+	-$(AT)$(RM) $(RMFLAGS) $(INSTALLED_LIBS) $(INSTALLED_EXES) $(INSTALLED_CONFIGS)
 
 .PHONY:clean
 clean:
-	-$(RM) $(RMFLAGS) $(OBJDIR)/* $(OCRSHARED) $(OCRSTATIC) $(OCREXEC) src/*
+	-$(AT)$(RM) $(RMFLAGS) $(OBJDIR)/* $(OCRSHARED) $(OCRSTATIC) $(OCREXEC) src/*
+
+.PHONY: squeaky
+squeaky: clean uninstall
+	-$(AT)$(RM) $(RMFLAGS) $(INSTALLED_INCS) $(INSTALLED_SCRIPTS)

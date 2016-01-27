@@ -48,7 +48,7 @@ RANLIB := ranlib
 # Library supported
 SUPPORTS_SHARED=yes
 SUPPORTS_STATIC=yes
-OCRRUNNER=ocrrun
+OCRRUNNER=ocrrun_$(OCR_TYPE)
 
 # Valgrind compatibility for internal allocators
 # x86 only

@@ -191,7 +191,7 @@ function generateCfgFile {
     fi
 
     # Invoke the cfg file generator
-    ${SCRIPT_ROOT}/../../../scripts/Configs/config-generator.py --remove-destination ${CFG_ARGS}
+    ${OCR_INSTALL}/share/ocr/scripts/Configs/config-generator.py --remove-destination ${CFG_ARGS}
 }
 
 #

@@ -23,10 +23,10 @@ jobtype_ocr_build = {
     'keywords': ('ocr', 'percommit'),
     'timeout': 240,
     'sandbox': ('local', 'shared', 'shareOK'),
-    'req-repos': ('xstack',),
-    'env-vars': {'OCR_ROOT': '${JJOB_PRIVATE_HOME}/xstack/ocr',
-                 'OCR_BUILD_ROOT': '${JJOB_PRIVATE_HOME}/xstack/ocr/build',
-                 'OCR_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/install'}
+    'req-repos': ('ocr',),
+    'env-vars': {'OCR_ROOT': '${JJOB_PRIVATE_HOME}/ocr/ocr',
+                 'OCR_BUILD_ROOT': '${JJOB_PRIVATE_HOME}/ocr/ocr/build',
+                 'OCR_INSTALL': '${JJOB_SHARED_HOME}/ocr/ocr/install'}
 }
 
 jobtype_ocr_build_tg = {
@@ -39,10 +39,10 @@ jobtype_ocr_build_tg = {
     'sandbox': ('local', 'shared', 'shareOK'),
     'req-repos': ('xstack', 'intel'),
     'env-vars': {'TG_INSTALL': '${JJOB_ENVDIR}',
-                 'TG_ROOT': '${JJOB_PRIVATE_HOME}/intel/ss',
-                 'OCR_ROOT': '${JJOB_PRIVATE_HOME}/xstack/ocr',
-                 'OCR_BUILD_ROOT': '${JJOB_PRIVATE_HOME}/xstack/ocr/build',
-                 'OCR_INSTALL_ROOT': '${JJOB_SHARED_HOME}/xstack/ocr/install'}
+                 'TG_ROOT': '${JJOB_INITDIR_tg}/tg',
+                 'OCR_ROOT': '${JJOB_PRIVATE_HOME}/ocr/ocr',
+                 'OCR_BUILD_ROOT': '${JJOB_PRIVATE_HOME}/ocr/ocr/build',
+                 'OCR_INSTALL': '${JJOB_SHARED_HOME}/ocr/ocr/install'}
 }
 
 # Specific jobs

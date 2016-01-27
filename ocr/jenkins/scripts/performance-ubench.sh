@@ -6,14 +6,15 @@ if [ $1 == "_params" ]; then
         exit 0
     fi
 else
-    # ARGS: ARCH CFG_FILE DB_IMPL
-    ARCH=$1
-    export OCR_INSTALL=${JJOB_SHARED_HOME}/xstack/ocr/install/${ARCH}/
+    # ARGS: OCR_TYPE CFG_FILE DB_IMPL
+    OCR_TYPE=$1
+    export OCR_INSTALL=${JJOB_SHARED_HOME}/ocr/ocr/install
+    export OCR_TYPE=${OCR_TYPE}
     export PATH=${OCR_INSTALL}/bin:$PATH
     export LD_LIBRARY_PATH=${OCR_INSTALL}/lib:${LD_LIBRARY_PATH}
 
     CFG_FILE=$2;
-    export OCR_CONFIG=${OCR_INSTALL}/config/${CFG_FILE}
+    export OCR_CONFIG=${OCR_INSTALL}/share/ocr/config/${OCR_TYPE}/${CFG_FILE}
     echo "$0: Setting OCR_CONFIG to ${OCR_CONFIG} =${CC}"
 
     DB_IMPL=$3;
