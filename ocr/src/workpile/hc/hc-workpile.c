@@ -52,7 +52,12 @@ u8 hcWorkpileSwitchRunlevel(ocrWorkpile_t *self, ocrPolicyDomain_t *PD, ocrRunle
         if((properties & RL_BRING_UP) && RL_IS_FIRST_PHASE_UP(PD, RL_GUID_OK, phase)) {
             // Does this need to move up in RL_MEMORY_OK?
             ocrWorkpileHc_t* derived = (ocrWorkpileHc_t*)self;
+            // See BUG #928 on GUID issues
+#ifdef GUID_64
             derived->deque = newDeque(self->pd, (void *) NULL_GUID, WORK_STEALING_DEQUE);
+#elif defined(GUID_128)
+            derived->deque = newDeque(self->pd, (void *) NULL_GUID.lower, WORK_STEALING_DEQUE);
+#endif
             // Can switch to locked implementation for debugging purpose
             // derived->deque = newDeque(self->pd, (void *) NULL_GUID, LOCKED_DEQUE);
         }
@@ -100,10 +105,22 @@ ocrFatGuid_t hcWorkpilePop(ocrWorkpile_t * base, ocrWorkPopType_t type,
     ocrFatGuid_t fguid;
     switch(type) {
     case POP_WORKPOPTYPE:
-        fguid.guid = (ocrGuid_t)derived->deque->popFromTail(derived->deque, 0);
+        // See BUG #928 on GUID issues
+#ifdef GUID_64
+        fguid.guid = (u64)derived->deque->popFromTail(derived->deque, 0);
+#elif defined(GUID_128)
+        fguid.guid.lower = (u64)derived->deque->popFromTail(derived->deque, 0);
+        fguid.guid.upper = 0x0;
+#endif
         break;
     case STEAL_WORKPOPTYPE:
-        fguid.guid = (ocrGuid_t)derived->deque->popFromHead(derived->deque, 1);
+        // See BUG #928 on GUID issues
+#ifdef GUID_64
+        fguid.guid = (u64)derived->deque->popFromHead(derived->deque, 1);
+#elif defined(GUID_128)
+        fguid.guid.lower = (u64)derived->deque->popFromHead(derived->deque, 1);
+        fguid.guid.upper = 0x0;
+#endif
         break;
     default:
         ASSERT(0);
@@ -115,7 +132,12 @@ ocrFatGuid_t hcWorkpilePop(ocrWorkpile_t * base, ocrWorkPopType_t type,
 void hcWorkpilePush(ocrWorkpile_t * base, ocrWorkPushType_t type,
                     ocrFatGuid_t g ) {
     ocrWorkpileHc_t* derived = (ocrWorkpileHc_t*) base;
+    // See BUG #928 on GUID issues
+#ifdef GUID_64
     derived->deque->pushAtTail(derived->deque, (void *)(g.guid), 0);
+#elif defined(GUID_128)
+    derived->deque->pushAtTail(derived->deque, (void *)(g.guid.lower), 0);
+#endif
 }
 
 ocrWorkpile_t * newWorkpileHc(ocrWorkpileFactory_t * factory, ocrParamList_t *perInstance) {

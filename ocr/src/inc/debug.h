@@ -406,16 +406,16 @@ extern void doTrace(u64 location, u64 wrkr, ocrGuid_t taskGuid, char *str, ...);
 
 #else
 
-#define DPRINTF_TYPE(type, level, format, ...)   do {                       \
-    if(OCR_DEBUG_##type && level <= DEBUG_LVL_##type) {                     \
-        ocrTask_t *_task = NULL; ocrWorker_t *_worker = NULL;               \
-        struct _ocrPolicyDomain_t *_pd = NULL;                              \
-        getCurrentEnv(&_pd, &_worker, &_task, NULL);                        \
-        PRINTF(OCR_DEBUG_##type##_STR "(" OCR_DEBUG_##level##_STR           \
-               ") [PD:0x%lx W:0x%lx EDT:0x%lx] " format,                    \
-               _pd?(u64)_pd->myLocation:0,                                  \
-               _worker?(u64)_worker->location:0,                            \
-               _task?_task->guid:0, ## __VA_ARGS__);                        \
+#define DPRINTF_TYPE(type, level, format, ...)   do {                   \
+    if(OCR_DEBUG_##type && level <= DEBUG_LVL_##type) {                 \
+        ocrTask_t *_task = NULL; ocrWorker_t *_worker = NULL;           \
+        struct _ocrPolicyDomain_t *_pd = NULL;                          \
+        getCurrentEnv(&_pd, &_worker, &_task, NULL);                    \
+        PRINTF(OCR_DEBUG_##type##_STR "(" OCR_DEBUG_##level##_STR       \
+               ") [PD:0x%lx W:0x%lx EDT:"GUIDSx"] " format,                \
+               _pd?(u64)_pd->myLocation:0,                              \
+               _worker?(u64)_worker->location:0,                        \
+               _task?GUIDFS(_task->guid):0, ## __VA_ARGS__);                    \
     } } while(0)
 
 #endif

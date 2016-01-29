@@ -198,7 +198,13 @@ u8 listSchedulerObjectRemove(ocrSchedulerObjectFactory_t *fact, ocrSchedulerObje
         if (listObj->list->elSize) {
             if (IS_SCHEDULER_OBJECT_TYPE_SINGLETON(dst->kind)) {
                 ASSERT(listObj->list->elSize == sizeof(ocrGuid_t));
+                // See BUG #928 on GUID issues
+#ifdef GUID_64
                 dst->guid.guid = *((u64*)(node->data));
+#elif defined(GUID_128)
+                dst->guid.guid.lower = *((u64*)(node->data));
+                dst->guid.guid.upper = 0x0;
+#endif
             } else {
                 ASSERT(dst->guid.metaDataPtr);
                 hal_memCopy(dst->guid.metaDataPtr, node->data, listObj->list->elSize, 0);

@@ -140,6 +140,9 @@ endif
 # Enable profiling data to be used by runtime. This requires EDT_NAMING
 #CFLAGS += -DOCR_ENABLE_EDT_PROFILING -DOCR_ENABLE_EDT_NAMING
 
+# Flag to test 128-bit guids.
+# CFLAGS += -DENABLE_128_BIT_GUID
+
 ####################################################
 # Debug flags
 ####################################################

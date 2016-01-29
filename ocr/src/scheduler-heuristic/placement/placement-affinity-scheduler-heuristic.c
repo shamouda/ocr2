@@ -130,8 +130,8 @@ static u8 placerAffinitySchedHeuristicNotifyProcessMsgInvoke(ocrSchedulerHeurist
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_WORK_CREATE
                 doAutoPlace = (PD_MSG_FIELD_I(workType) == EDT_USER_WORKTYPE) &&
-                    (PD_MSG_FIELD_I(affinity.guid) == NULL_GUID);
-                if (PD_MSG_FIELD_I(affinity.guid) != NULL_GUID) {
+                    (IS_GUID_NULL(PD_MSG_FIELD_I(affinity.guid)));
+                if (!(IS_GUID_NULL(PD_MSG_FIELD_I(affinity.guid)))) {
                     msg->destLocation = affinityToLocation(PD_MSG_FIELD_I(affinity.guid));
                 }
 #undef PD_MSG
@@ -144,7 +144,7 @@ static u8 placerAffinitySchedHeuristicNotifyProcessMsgInvoke(ocrSchedulerHeurist
 #define PD_TYPE PD_MSG_DB_CREATE
                 // For now a DB is always created where the current EDT executes unless
                 // it has an affinity specified (i.e. no auto-placement)
-                if (PD_MSG_FIELD_I(affinity.guid) != NULL_GUID) {
+                if (!(IS_GUID_NULL(PD_MSG_FIELD_I(affinity.guid)))) {
                     msg->destLocation = affinityToLocation(PD_MSG_FIELD_I(affinity.guid));
                 }
                 // When we do place DBs make sure we only place USER DBs

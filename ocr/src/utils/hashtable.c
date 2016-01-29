@@ -210,7 +210,7 @@ void destructHashtableBucketLocked(hashtable_t * hashtable, deallocFct entryDeal
  */
 void * hashtableNonConcGet(hashtable_t * hashtable, void * key) {
     ocr_hashtable_entry * entry = hashtableFindEntry(hashtable, key);
-    return (entry == NULL) ? NULL_GUID : entry->value;
+    return (entry == NULL) ? 0x0: entry->value;
 }
 
 /**
@@ -282,7 +282,7 @@ bool hashtableNonConcRemove(hashtable_t * hashtable, void * key, void ** value) 
  */
 void * hashtableConcGet(hashtable_t * hashtable, void * key) {
     ocr_hashtable_entry * entry = hashtableFindEntry(hashtable, key);
-    return (entry == NULL) ? NULL_GUID : entry->value;
+    return (entry == NULL) ? 0x0 : entry->value;
 }
 
 /**
@@ -373,7 +373,7 @@ void * hashtableConcBucketLockedGet(hashtable_t * hashtable, void * key) {
     hal_lock32(&(rhashtable->bucketLock[bucket]));
     ocr_hashtable_entry * entry = hashtableFindEntry(hashtable, key);
     hal_unlock32(&(rhashtable->bucketLock[bucket]));
-    return (entry == NULL) ? NULL_GUID : entry->value;
+    return (entry == NULL) ? 0x0 : entry->value;
 }
 
 bool hashtableConcBucketLockedPut(hashtable_t * hashtable, void * key, void * value) {

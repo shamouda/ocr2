@@ -193,7 +193,7 @@ static u8 createProcessRequestEdt(ocrPolicyDomain_t * pd, ocrGuid_t templateGuid
     returnCode = pd->fcts.processMessage(pd, &msg, true);
     if(returnCode) {
         edtGuid = PD_MSG_FIELD_IO(guid.guid);
-        DPRINTF(DEBUG_LVL_VVERB,"hc-comm-worker: Created processRequest EDT GUID 0x%lx\n", edtGuid);
+        DPRINTF(DEBUG_LVL_VVERB,"hc-comm-worker: Created processRequest EDT GUID "GUIDSx"\n", GUIDFS(edtGuid));
         RETURN_PROFILE(returnCode);
     }
 

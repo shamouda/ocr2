@@ -171,7 +171,7 @@ u8 ocrGuidMapSetDefaultMap(u32 numParams, ocrGuid_t (*mapFunc)(
 }
 
 u8 ocrGuidFromLabel(ocrGuid_t *outGuid, ocrGuid_t mapGuid, s64* tuple) {
-    ASSERT(mapGuid != NULL_GUID); // Default map unsupported for now
+    ASSERT(!(IS_GUID_NULL(mapGuid)));  // Default map unsupported for now
     ocrPolicyDomain_t *pd = NULL;
     ocrGuidMap_t *myMap = NULL;
     PD_MSG_STACK(msg);
@@ -191,19 +191,19 @@ u8 ocrGuidFromLabel(ocrGuid_t *outGuid, ocrGuid_t mapGuid, s64* tuple) {
 #undef PD_TYPE
 #undef PD_MSG
     ASSERT(myMap != NULL);
-    DPRINTF(DEBUG_LVL_VVERB, "For map 0x%lx, calling map with start: 0x%lx, stride: %lu\n",
-            mapGuid, myMap->startGuid, myMap->skipGuid);
+    DPRINTF(DEBUG_LVL_VVERB, "For map "GUIDSx", calling map with start: "GUIDSx", stride: 0x%lx\n",
+            GUIDFS(mapGuid), GUIDFS(myMap->startGuid), myMap->skipGuid);
     if(myMap->mapFunc == NULL) {
         DPRINTF(DEBUG_LVL_WARN, "ocrGuidFromLabel requires a map created with ocrGuidMapCreate (not a range)\n");
         return OCR_EINVAL;
     }
     *outGuid = myMap->mapFunc(myMap->startGuid, myMap->skipGuid, myMap->params, tuple);
-    DPRINTF(DEBUG_LVL_VERB, "Returning GUID 0x%lx\n", *outGuid);
+    DPRINTF(DEBUG_LVL_VERB, "Returning GUID GUIDSx\n", GUIDFS(*outGuid));
     return 0;
 }
 
 u8 ocrGuidFromIndex(ocrGuid_t *outGuid, ocrGuid_t rangeGuid, u64 idx) {
-    if(rangeGuid == NULL_GUID) {
+    if(IS_GUID_NULL(rangeGuid)){
         return OCR_EINVAL;
     }
 
@@ -226,8 +226,8 @@ u8 ocrGuidFromIndex(ocrGuid_t *outGuid, ocrGuid_t rangeGuid, u64 idx) {
 #undef PD_TYPE
 #undef PD_MSG
     ASSERT(myMap != NULL);
-    DPRINTF(DEBUG_LVL_VVERB, "For range 0x%lx, calling map with start: 0x%lx, stride: %lu\n",
-            rangeGuid, myMap->startGuid, myMap->skipGuid);
+    DPRINTF(DEBUG_LVL_VVERB, "For range "GUIDSx", calling map with start: "GUIDSx", stride: 0x%lx\n",
+            GUIDFS(rangeGuid), GUIDFS(myMap->startGuid), myMap->skipGuid);
     if(myMap->mapFunc != NULL) {
         DPRINTF(DEBUG_LVL_WARN, "ocrGuidFromLabel requires a map created with ocrGuidRangeCreate (not a map)\n");
         return OCR_EINVAL;
@@ -237,8 +237,15 @@ u8 ocrGuidFromIndex(ocrGuid_t *outGuid, ocrGuid_t rangeGuid, u64 idx) {
                 idx, myMap->numGuids-1);
         return OCR_EINVAL;
     }
+
+    // See BUG #928 on GUID issues
+#ifdef GUID_64
     *outGuid = myMap->startGuid + myMap->skipGuid*idx;
-    DPRINTF(DEBUG_LVL_VERB, "Returning GUID 0x%lx\n", *outGuid);
+#elif defined(GUID_128)
+    outGuid->lower = myMap->startGuid.lower + myMap->skipGuid*idx;
+    outGuid->upper = 0x0;
+#endif
+    DPRINTF(DEBUG_LVL_VERB, "Returning GUID "GUIDSx"\n", GUIDFS(*outGuid));
     return 0;
 }
 

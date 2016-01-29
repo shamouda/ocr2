@@ -61,8 +61,8 @@ FILTER_DUMP {
     intSimpleMessageNode_t *tmess = &(rself->messages[chunk]);
 
 
-    snprintf(*out, sizeof(char)*82, "%ld : T 0x%x 0x%lx (%d) -> 0x%lx (%d) ", tmess->tick,
-    tmess->type, tmess->src, tmess->srcK, tmess->dest, tmess->destK);
+    snprintf(*out, sizeof(char)*82, "%ld : T 0x%x "GUIDSx" (%d) -> "GUIDSx" (%d) ", tmess->tick,
+    tmess->type, GUIDFS(tmess->src), tmess->srcK, GUIDFS(tmess->dest), tmess->destK);
 
     if(chunk < rself->count - 1)
         return chunk+1;
@@ -81,8 +81,8 @@ FILTER_NOTIFY {
         rself->messages = t;
     }
 
-    DPRINTF(DEBUG_LVL_VVERB, "Filter @ 0x%lx received message 0x%lx src:0x%lx (%d) dest:0x%lx (%d) type:0x%x, now have %ld messages.\n",
-    (u64)self, (u64)mess, mess->src, mess->srcK, mess->dest, mess->destK, (u32)mess->type, rself->count);
+    DPRINTF(DEBUG_LVL_VVERB, "Filter @ 0x%lx received message 0x%lx src:"GUIDSx" (%d) dest:"GUIDSx" (%d) type:0x%x, now have %ld messages.\n",
+    (u64)self, (u64)mess, GUIDFS(mess->src), mess->srcK, GUIDFS(mess->dest), mess->destK, (u32)mess->type, rself->count);
 
     intSimpleMessageNode_t* tmess = &(rself->messages[rself->count++]);
     tmess->tick = mess->tick;

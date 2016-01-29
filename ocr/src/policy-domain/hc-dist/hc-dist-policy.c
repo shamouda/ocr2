@@ -102,7 +102,7 @@ static u8 createProcessRequestEdtDistPolicy(ocrPolicyDomain_t * pd, ocrGuid_t te
     returnCode = pd->fcts.processMessage(pd, &msg, true);
     if(returnCode) {
         edtGuid = PD_MSG_FIELD_IO(guid.guid);
-        DPRINTF(DEBUG_LVL_VVERB,"hc-comm-worker: Created processRequest EDT GUID 0x%lx\n", edtGuid);
+        DPRINTF(DEBUG_LVL_VVERB,"hc-comm-worker: Created processRequest EDT GUID "GUIDSx"\n", GUIDFS(edtGuid));
         RETURN_PROFILE(returnCode);
     }
 
@@ -127,7 +127,15 @@ static u8 registerRemoteMetaData(ocrPolicyDomain_t * pd, ocrFatGuid_t tplFatGuid
     hal_lock32(&dself->lockTplLookup);
     pd->guidProviders[0]->fcts.registerGuid(pd->guidProviders[0], tplFatGuid.guid, (u64) tplFatGuid.metaDataPtr);
     ProxyTpl_t * proxyTpl = NULL;
+
+    // See BUG #928 on GUID issues
+#ifdef GUID_64
     bool found = hashtableNonConcRemove(dself->proxyTplMap, (void *) tplFatGuid.guid, (void **) &proxyTpl);
+#elif defined(GUID_128)
+    //TODO Should this change to metaDataPtr rather than void * of GUID? (like in deque)
+    bool found = hashtableNonConcRemove(dself->proxyTplMap, (void *) tplFatGuid.guid.lower, (void **) &proxyTpl);
+#endif
+
     ASSERT(found && (proxyTpl != NULL));
     proxyTpl->count++;
     hal_unlock32(&dself->lockTplLookup);
@@ -153,9 +161,9 @@ static u8 registerRemoteMetaData(ocrPolicyDomain_t * pd, ocrFatGuid_t tplFatGuid
     ocrGuid_t processRequestTemplateGuid;
     ocrEdtTemplateCreate(&processRequestTemplateGuid, &processRequestEdt, 1, 0);
     ProxyTplNode_t * queueHead = (ProxyTplNode_t *) oldValue;
-    DPRINTF(DEBUG_LVL_VVERB,"About to process stored clone requests for template 0x%lx queueHead=%x)\n", tplFatGuid.guid, queueHead);
+    DPRINTF(DEBUG_LVL_VVERB,"About to process stored clone requests for template "GUIDSx" queueHead=%x)\n", GUIDFS(tplFatGuid.guid), queueHead);
     while (queueHead != ((void*) 0x1)) { // sentinel value
-        DPRINTF(DEBUG_LVL_VVERB,"Processing stored clone requests for template 0x%lx)\n", tplFatGuid.guid);
+        DPRINTF(DEBUG_LVL_VVERB,"Processing stored clone requests for template "GUIDSx")\n", GUIDFS(tplFatGuid.guid));
         u64 paramv = (u64) queueHead->msg;
         createProcessRequestEdtDistPolicy(pd, processRequestTemplateGuid, &paramv);
         ProxyTplNode_t * currNode = queueHead;
@@ -191,12 +199,24 @@ static u8 resolveRemoteMetaData(ocrPolicyDomain_t * pd, ocrFatGuid_t * tplFatGui
             return 0;
         }
         // Check if the proxy exists or not.
+        // See BUG #928 on GUID issues
+#ifdef GUID_64
         ProxyTpl_t * proxyTpl = (ProxyTpl_t *) hashtableNonConcGet(dself->proxyTplMap, (void *) tplFatGuid->guid);
+#elif defined(GUID_128)
+        //TODO Should this change to metaDataPtr rather than void * of GUID? (like in deque)
+        ProxyTpl_t * proxyTpl = (ProxyTpl_t *) hashtableNonConcGet(dself->proxyTplMap, (void *) tplFatGuid->guid.lower);
+#endif
         if (proxyTpl == NULL) {
             proxyTpl = (ProxyTpl_t *) pd->fcts.pdMalloc(pd, sizeof(ProxyTpl_t));
             proxyTpl->count = 1;
             proxyTpl->queueHead = (void *) 0x1; // sentinel value
+            // See BUG #928 on GUID issues
+#ifdef GUID_64
             void * ret = hashtableNonConcTryPut(dself->proxyTplMap, (void *) tplFatGuid->guid, (void *) proxyTpl);
+#elif defined(GUID_128)
+            //TODO Should this change to metaDataPtr rather than void * of GUID? (like in deque)
+            void * ret = hashtableNonConcTryPut(dself->proxyTplMap, (void *) tplFatGuid->guid.lower, (void *) proxyTpl);
+#endif
             ASSERT(ret == proxyTpl);
             hal_unlock32(&dself->lockTplLookup);
             // GUID is unknown, request a copy of the metadata
@@ -573,7 +593,7 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
             // template's metadata not available, message processing will be rescheduled.
             PROCESS_MESSAGE_RETURN_NOW(self, OCR_EPEND);
         }
-        DPRINTF(DEBUG_LVL_VVERB,"WORK_CREATE: try to resolve template GUID 0x%lx\n", PD_MSG_FIELD_I(templateGuid.guid));
+        DPRINTF(DEBUG_LVL_VVERB,"WORK_CREATE: try to resolve template GUID "GUIDSx"\n", GUIDFS(PD_MSG_FIELD_I(templateGuid.guid)));
         // Now that we have the template, we can set paramc and depc correctly
         // This needs to be done because the marshalling of messages relies on paramc and
         // depc being correctly set (so no negative values)
@@ -592,7 +612,7 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
 
         // The placer may have altered msg->destLocation
         if (msg->destLocation == curLoc) {
-            DPRINTF(DEBUG_LVL_VVERB,"WORK_CREATE: local EDT creation for template GUID 0x%lx\n", PD_MSG_FIELD_I(templateGuid.guid));
+            DPRINTF(DEBUG_LVL_VVERB,"WORK_CREATE: local EDT creation for template GUID "GUIDSx"\n", GUIDFS(PD_MSG_FIELD_I(templateGuid.guid)));
         } else {
             // For asynchronous EDTs we check the content of depv.
             // If it contains non-persistent events the creation
@@ -602,7 +622,7 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
                 u32 depc = ((depv != NULL) ? PD_MSG_FIELD_IO(depc) : 0);
                 u32 i;
                 for(i=0; i<depc; i++) {
-                    ASSERT(depv[i].guid != UNINITIALIZED_GUID);
+                    ASSERT(!(IS_GUID_UNINITIALIZED(depv[i].guid)));
                     ocrGuidKind kind;
                     u8 ret = self->guidProviders[0]->fcts.getKind(self->guidProviders[0], depv[i].guid, &kind);
                     ASSERT(!ret);
@@ -615,7 +635,7 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
             }
 
             // Outgoing EDT create message
-            DPRINTF(DEBUG_LVL_VVERB,"WORK_CREATE: remote EDT creation at %lu for template GUID 0x%lx\n", (u64)msg->destLocation, PD_MSG_FIELD_I(templateGuid.guid));
+            DPRINTF(DEBUG_LVL_VVERB,"WORK_CREATE: remote EDT creation at %lu for template GUID "GUIDSx"\n", (u64)msg->destLocation, GUIDFS(PD_MSG_FIELD_I(templateGuid.guid)));
 #undef PD_MSG
 #undef PD_TYPE
             /* The support for finish EDT and latch in distributed OCR
@@ -628,7 +648,7 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
              * This latch will eventually be decremented through the proxy
              * latch on the remote node.
              */
-            if (parentLatch.guid != NULL_GUID) {
+            if (!(IS_GUID_NULL(parentLatch.guid))) {
                 ocrLocation_t parentLatchLoc;
                 RETRIEVE_LOCATION_FROM_GUID(self, parentLatchLoc, parentLatch.guid);
                 if (parentLatchLoc == curLoc) {
@@ -659,7 +679,7 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
         if ((msg->srcLocation != curLoc) && (msg->destLocation == curLoc)) {
             // we're receiving a message
             DPRINTF(DEBUG_LVL_VVERB, "WORK_CREATE: received request from %d\n", msg->srcLocation);
-            if (parentLatch.guid != NULL_GUID) {
+            if (!(IS_GUID_NULL(parentLatch.guid))) {
                 //Create a proxy latch in current node
                 /* On the remote side, a proxy latch is first created and a dep
                  * is added to the source latch. Within the remote node, this
@@ -824,8 +844,8 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
             // and we go into a deadlock when cloning GUID maps
             // RETRIEVE_LOCATION_FROM_GUID_MSG(self, msg->destLocation, IO);
             self->guidProviders[0]->fcts.getLocation(self->guidProviders[0], PD_MSG_FIELD_IO(guid.guid), &(msg->destLocation));
-            DPRINTF(DEBUG_LVL_VVERB,"METADATA_CLONE: request for guid=0x%lx src=%d dest=%d\n",
-                    PD_MSG_FIELD_IO(guid.guid), (u32)msg->srcLocation);
+            DPRINTF(DEBUG_LVL_VVERB,"METADATA_CLONE: request for guid="GUIDSx" src=%d dest=%d\n",
+                    GUIDFS(PD_MSG_FIELD_IO(guid.guid)), (u32)msg->srcLocation, (u32)msg->destLocation);
             if ((msg->destLocation != curLoc) && (msg->srcLocation == curLoc)) {
                 // Outgoing request
                 // NOTE: In the current implementation when we call metadata-clone
@@ -844,7 +864,7 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
             ocrGuidKind tkind;
             self->guidProviders[0]->fcts.getKind(self->guidProviders[0], PD_MSG_FIELD_IO(guid.guid), &tkind);
             if (tkind == OCR_GUID_EDT_TEMPLATE) {
-                DPRINTF(DEBUG_LVL_VVERB,"METADATA_CLONE: Incoming response for template=0x%lx)\n", PD_MSG_FIELD_IO(guid.guid));
+                DPRINTF(DEBUG_LVL_VVERB,"METADATA_CLONE: Incoming response for template="GUIDSx")\n", GUIDFS(PD_MSG_FIELD_IO(guid.guid)));
                 // Incoming response to an asynchronous metadata clone
                 u64 metaDataSize = sizeof(ocrTaskTemplateHc_t) + (sizeof(u64) * OCR_HINT_COUNT_EDT_HC);
                 void * metaDataPtr = self->fcts.pdMalloc(self, metaDataSize);
@@ -865,7 +885,7 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
             }
 #ifdef ENABLE_EXTENSION_LABELING
             else if (tkind == OCR_GUID_GUIDMAP) {
-                DPRINTF(DEBUG_LVL_VVERB,"METADATA_CLONE: Incoming response for guidMap=0x%lx)\n", PD_MSG_FIELD_IO(guid.guid));
+                DPRINTF(DEBUG_LVL_VVERB,"METADATA_CLONE: Incoming response for guidMap="GUIDSx")\n", GUIDFS(PD_MSG_FIELD_IO(guid.guid)));
                 ocrGuidMap_t * mapOrg = (ocrGuidMap_t *) PD_MSG_FIELD_IO(guid.metaDataPtr);
                 u64 metaDataSize = ((sizeof(ocrGuidMap_t) + sizeof(s64) - 1) & ~(sizeof(s64)-1)) + mapOrg->numParams*sizeof(s64);
                 void * metaDataPtr = self->fcts.pdMalloc(self, metaDataSize);
@@ -885,7 +905,7 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
 #endif
             else {
                 ASSERT(tkind == OCR_GUID_AFFINITY);
-                DPRINTF(DEBUG_LVL_VVERB,"METADATA_CLONE: Incoming response for affinity 0x%lx)\n", PD_MSG_FIELD_IO(guid.guid));
+                DPRINTF(DEBUG_LVL_VVERB,"METADATA_CLONE: Incoming response for affinity "GUIDSx")\n", GUIDFS(PD_MSG_FIELD_IO(guid.guid)));
             }
         }
 #undef PD_MSG
@@ -980,11 +1000,11 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
                 u64 val;
                 self->guidProviders[0]->fcts.getVal(self->guidProviders[0], PD_MSG_FIELD_IO(guid.guid), &val, NULL);
                 ASSERT_BLOCK_BEGIN(val != 0)
-                DPRINTF(DEBUG_LVL_WARN, "User-level error detected: DB acquire failed for DB 0x%lx. It most likely has already been destroyed\n", PD_MSG_FIELD_IO(guid.guid));
+                DPRINTF(DEBUG_LVL_WARN, "User-level error detected: DB acquire failed for DB "GUIDSx". It most likely has already been destroyed\n", GUIDFS(PD_MSG_FIELD_IO(guid.guid)));
                 ASSERT_BLOCK_END
                 PD_MSG_FIELD_IO(guid.metaDataPtr) = (void *) val;
-                DPRINTF(DEBUG_LVL_VVERB,"DB_ACQUIRE: Incoming request for DB GUID 0x%lx with properties=0x%x\n",
-                        PD_MSG_FIELD_IO(guid.guid), PD_MSG_FIELD_IO(properties));
+                DPRINTF(DEBUG_LVL_VVERB,"DB_ACQUIRE: Incoming request for DB GUID "GUIDSx" with properties=0x%x\n",
+                        GUIDFS(PD_MSG_FIELD_IO(guid.guid)), PD_MSG_FIELD_IO(properties));
                 // Fall-through to local processing
             }
             if ((msg->srcLocation == curLoc) && (msg->destLocation != curLoc)) {
@@ -993,8 +1013,8 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
                 hal_lock32(&(proxyDb->lock)); // lock the db
                 switch(proxyDb->state) {
                     case PROXY_DB_CREATED:
-                        DPRINTF(DEBUG_LVL_VVERB,"DB_ACQUIRE: Outgoing request for DB GUID 0x%lx with properties=0x%x, creation fetch\n",
-                                PD_MSG_FIELD_IO(guid.guid), PD_MSG_FIELD_IO(properties));
+                        DPRINTF(DEBUG_LVL_VVERB,"DB_ACQUIRE: Outgoing request for DB GUID "GUIDSx" with properties=0x%x, creation fetch\n",
+                                GUIDFS(PD_MSG_FIELD_IO(guid.guid)), PD_MSG_FIELD_IO(properties));
                         // The proxy has just been created, need to fetch the DataBlock
                         PD_MSG_FIELD_IO(properties) |= DB_FLAG_RT_FETCH;
                         proxyDb->state = PROXY_DB_FETCH;
@@ -1003,8 +1023,8 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
                         // The DB is already in use locally
                         // Check if the acquire is compatible with the current usage
                         if (isAcquireEligibleForProxy(proxyDb->mode, (PD_MSG_FIELD_IO(properties) & DB_ACCESS_MODE_MASK))) {
-                            DPRINTF(DEBUG_LVL_VVERB,"DB_ACQUIRE: Outgoing request for DB GUID 0x%lx with properties=0x%x, intercepted for local proxy DB\n",
-                                    PD_MSG_FIELD_IO(guid.guid), PD_MSG_FIELD_IO(properties));
+                            DPRINTF(DEBUG_LVL_VVERB,"DB_ACQUIRE: Outgoing request for DB GUID "GUIDSx" with properties=0x%x, intercepted for local proxy DB\n",
+                                    GUIDFS(PD_MSG_FIELD_IO(guid.guid)), PD_MSG_FIELD_IO(properties));
                             //Use the local cached version of the DB
                             updateAcquireMessage(msg, proxyDb);
                             proxyDb->nbUsers++;
@@ -1024,8 +1044,8 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
                         //WARN: Do NOT move implementation: 'PROXY_DB_RUN' falls-through here
                         // The proxy is in a state requiring stalling outgoing acquires.
                         // The acquire 'msg' is copied and enqueued.
-                        DPRINTF(DEBUG_LVL_VVERB,"DB_ACQUIRE: Outgoing request for DB GUID 0x%lx with properties=0x%x, enqueued\n",
-                                PD_MSG_FIELD_IO(guid.guid), PD_MSG_FIELD_IO(properties));
+                        DPRINTF(DEBUG_LVL_VVERB,"DB_ACQUIRE: Outgoing request for DB GUID "GUIDSx" with properties=0x%x, enqueued\n",
+                                GUIDFS(PD_MSG_FIELD_IO(guid.guid)), PD_MSG_FIELD_IO(properties));
                         enqueueAcquireMessageInProxy(self, proxyDb, msg);
                         // Inform caller the acquire is pending.
                         hal_unlock32(&(proxyDb->lock));
@@ -1051,8 +1071,8 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
                 // Cannot receive a response to an acquire if we don't have a proxy
                 ASSERT(proxyDb != NULL);
                 hal_lock32(&(proxyDb->lock)); // lock the db
-                DPRINTF(DEBUG_LVL_VVERB,"DB_ACQUIRE: Incoming response for DB GUID 0x%lx with properties=0x%x\n",
-                        PD_MSG_FIELD_IO(guid.guid), PD_MSG_FIELD_IO(properties));
+                DPRINTF(DEBUG_LVL_VVERB,"DB_ACQUIRE: Incoming response for DB GUID "GUIDSx" with properties=0x%x\n",
+                        GUIDFS(PD_MSG_FIELD_IO(guid.guid)), PD_MSG_FIELD_IO(properties));
                 switch(proxyDb->state) {
                     case PROXY_DB_FETCH:
                     {
@@ -1068,8 +1088,8 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
                         // Try to double check that across acquires the DB size do not change
                         ASSERT((proxyDb->size != 0) ? (proxyDb->size == PD_MSG_FIELD_O(size)) : true);
 
-                        DPRINTF(DEBUG_LVL_VVERB,"DB_ACQUIRE: caching data copy for DB GUID 0x%lx size=%lu \n",
-                            PD_MSG_FIELD_IO(guid.guid), PD_MSG_FIELD_O(size));
+                        DPRINTF(DEBUG_LVL_VVERB,"DB_ACQUIRE: caching data copy for DB GUID "GUIDSx" size=%lu \n",
+                            GUIDFS(PD_MSG_FIELD_IO(guid.guid)), PD_MSG_FIELD_O(size));
 
                         // update the proxy DB
                         ASSERT(proxyDb->nbUsers == 0);
@@ -1090,8 +1110,8 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
                         proxyDb->ptr = newPtr;
                         // Update message to be consistent, but no calling context should need to read it.
                         PD_MSG_FIELD_O(ptr) = proxyDb->ptr;
-                        DPRINTF(DEBUG_LVL_VVERB,"DB_ACQUIRE: caching data copy for DB GUID 0x%lx ptr=%p size=%lu flags=0x%x\n",
-                            PD_MSG_FIELD_IO(guid.guid), proxyDb->ptr, proxyDb->size, proxyDb->flags);
+                        DPRINTF(DEBUG_LVL_VVERB,"DB_ACQUIRE: caching data copy for DB GUID "GUIDSx" ptr=%p size=%lu flags=0x%x\n",
+                            GUIDFS(PD_MSG_FIELD_IO(guid.guid)), proxyDb->ptr, proxyDb->size, proxyDb->flags);
                         // Scan queue for compatible acquire that could use this cached proxy DB
                         Queue_t * eligibleQueue = dequeueCompatibleAcquireMessageInProxy(self, proxyDb->acquireQueue, proxyDb->mode);
 
@@ -1114,8 +1134,8 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
                                 //not have a pointer to the proxy, we would have one to the DB ptr data.
                                 //I'm not sure if that means we're breaking the refCount abstraction.
                                 updateAcquireMessage(msg, proxyDb);
-                                DPRINTF(DEBUG_LVL_VVERB,"DB_ACQUIRE: dequeued eligible acquire for DB GUID 0x%lx with properties=0x%x\n",
-                                    PD_MSG_FIELD_IO(guid.guid), proxyDb->flags);
+                                DPRINTF(DEBUG_LVL_VVERB,"DB_ACQUIRE: dequeued eligible acquire for DB GUID "GUIDSx" with properties=0x%x\n",
+                                    GUIDFS(PD_MSG_FIELD_IO(guid.guid)), proxyDb->flags);
                                 // The acquire message had been processed once and was enqueued.
                                 // Now it is processed 'again' but immediately succeeds in acquiring
                                 // the cached data from the proxy and potentially iterates the acquire
@@ -1171,8 +1191,8 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
             } // else outgoing acquire response to be sent out, fall-through
         }
         if ((msg->srcLocation == curLoc) && (msg->destLocation == curLoc)) {
-            DPRINTF(DEBUG_LVL_VVERB,"DB_ACQUIRE: local request for DB GUID 0x%lx with properties 0x%x\n",
-                    PD_MSG_FIELD_IO(guid.guid), PD_MSG_FIELD_IO(properties));
+            DPRINTF(DEBUG_LVL_VVERB,"DB_ACQUIRE: local request for DB GUID "GUIDSx" with properties 0x%x\n",
+                    GUIDFS(PD_MSG_FIELD_IO(guid.guid)), PD_MSG_FIELD_IO(properties));
         }
         // Let the base policy's processMessage acquire the DB on behalf of the remote EDT
         // and then append the db data to the message.
@@ -1186,7 +1206,7 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
 #define PD_TYPE PD_MSG_DB_RELEASE
         RETRIEVE_LOCATION_FROM_GUID_MSG(self, msg->destLocation, IO)
         if ((msg->srcLocation == curLoc) && (msg->destLocation != curLoc)) {
-            DPRINTF(DEBUG_LVL_VVERB,"DB_RELEASE outgoing request send for DB GUID 0x%lx\n", PD_MSG_FIELD_IO(guid.guid));
+            DPRINTF(DEBUG_LVL_VVERB,"DB_RELEASE outgoing request send for DB GUID "GUIDSx"\n", GUIDFS(PD_MSG_FIELD_IO(guid.guid)));
             // Outgoing release request
             ProxyDb_t * proxyDb = getProxyDb(self, PD_MSG_FIELD_IO(guid.guid), false);
             hal_lock32(&(proxyDb->lock)); // lock the db
@@ -1195,8 +1215,8 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
                     if (proxyDb->nbUsers == 1) {
                         // Last checked-in user of the proxy DB in this PD
                         proxyDb->state = PROXY_DB_RELINQUISH;
-                        DPRINTF(DEBUG_LVL_VVERB,"DB_RELEASE outgoing request send for DB GUID 0x%lx with WB=%d\n",
-                            PD_MSG_FIELD_IO(guid.guid), !!(proxyDb->flags & DB_FLAG_RT_WRITE_BACK));
+                        DPRINTF(DEBUG_LVL_VVERB,"DB_RELEASE outgoing request send for DB GUID "GUIDSx" with WB=%d\n",
+                            GUIDFS(PD_MSG_FIELD_IO(guid.guid)), !!(proxyDb->flags & DB_FLAG_RT_WRITE_BACK));
                         if (proxyDb->flags & DB_FLAG_RT_WRITE_BACK) {
                             // Serialize the cached DB ptr for write back
                             u64 dbSize = proxyDb->size;
@@ -1217,8 +1237,8 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
                         // Fall-through and send the release request
                         // The count is decremented when the release response is received
                     } else {
-                        DPRINTF(DEBUG_LVL_VVERB,"DB_RELEASE outgoing request send for DB GUID 0x%lx intercepted for local proxy DB\n",
-                            PD_MSG_FIELD_IO(guid.guid), !!(proxyDb->flags & DB_FLAG_RT_WRITE_BACK));
+                        DPRINTF(DEBUG_LVL_VVERB,"DB_RELEASE outgoing request send for DB GUID "GUIDSx" intercepted for local proxy DB\n",
+                            GUIDFS(PD_MSG_FIELD_IO(guid.guid)), !!(proxyDb->flags & DB_FLAG_RT_WRITE_BACK));
                         // The proxy DB is still in use locally, no need to notify the original DB.
                         proxyDb->nbUsers--;
                         // fill in response message
@@ -1262,8 +1282,8 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
             self->guidProviders[0]->fcts.getVal(self->guidProviders[0], PD_MSG_FIELD_IO(guid.guid), &val, NULL);
             ASSERT(val != 0);
             PD_MSG_FIELD_IO(guid.metaDataPtr) = (void *) val;
-            DPRINTF(DEBUG_LVL_VVERB,"DB_RELEASE incoming request received for DB GUID 0x%lx WB=%d\n",
-                    PD_MSG_FIELD_IO(guid.guid), !!(PD_MSG_FIELD_I(properties) & DB_FLAG_RT_WRITE_BACK));
+            DPRINTF(DEBUG_LVL_VVERB,"DB_RELEASE incoming request received for DB GUID "GUIDSx" WB=%d\n",
+                    GUIDFS(PD_MSG_FIELD_IO(guid.guid)), !!(PD_MSG_FIELD_I(properties) & DB_FLAG_RT_WRITE_BACK));
             //BUG #587 db: We may want to double check this writeback (first one) is legal wrt single assignment
             if (PD_MSG_FIELD_I(properties) & DB_FLAG_RT_WRITE_BACK) {
                 // Unmarshall and write back
@@ -1279,7 +1299,7 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
             } // else fall-through and do the regular release
         }
         if ((msg->srcLocation == curLoc) && (msg->destLocation == curLoc)) {
-            DPRINTF(DEBUG_LVL_VVERB,"DB_RELEASE local processing: DB GUID 0x%lx\n", PD_MSG_FIELD_IO(guid.guid));
+            DPRINTF(DEBUG_LVL_VVERB,"DB_RELEASE local processing: DB GUID "GUIDSx"\n", GUIDFS(PD_MSG_FIELD_IO(guid.guid)));
         }
 #undef PD_MSG
 #undef PD_TYPE
@@ -1485,7 +1505,7 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
                         hal_lock32(&((ocrPolicyDomainHcDist_t *) self)->lockDbLookup);
                         // Here nobody else can acquire a reference on the proxy
                         if (proxyDb->refCount == 1) {
-                            DPRINTF(DEBUG_LVL_VVERB,"DB_RELEASE response received for DB GUID 0x%lx, destroy proxy\n", dbGuid);
+                            DPRINTF(DEBUG_LVL_VVERB,"DB_RELEASE response received for DB GUID "GUIDSx", destroy proxy\n", GUIDFS(dbGuid));
                             // Removes the entry for the proxy DB in the GUID provider
                             self->guidProviders[0]->fcts.unregisterGuid(self->guidProviders[0], dbGuid, (u64) 0);
                             // Nobody else can get a reference on the proxy's lock now
@@ -1508,7 +1528,7 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
                             resetProxyDb(proxyDb);
                             // Allow others to use the proxy
                             hal_unlock32(&(proxyDb->lock));
-                            DPRINTF(DEBUG_LVL_VVERB,"DB_RELEASE response received for DB GUID 0x%lx, proxy is referenced\n", dbGuid);
+                            DPRINTF(DEBUG_LVL_VVERB,"DB_RELEASE response received for DB GUID "GUIDSx", proxy is referenced\n", GUIDFS(dbGuid));
                             relProxyDb(self, proxyDb);
                         }
                     } else {
@@ -1516,7 +1536,7 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
                         // Resetting the state to created means the popped acquire or any concurrent
                         // acquire to the currently executing call will try to fetch the DB.
                         resetProxyDb(proxyDb);
-                        DPRINTF(DEBUG_LVL_VVERB,"DB_RELEASE response received for DB GUID 0x%lx, processing queued acquire\n", dbGuid);
+                        DPRINTF(DEBUG_LVL_VVERB,"DB_RELEASE response received for DB GUID "GUIDSx", processing queued acquire\n", GUIDFS(dbGuid));
                         // DBs are not supposed to be resizable hence, do NOT reset
                         // size and ptr so they can be reused in the subsequent fetch.
                         // NOTE: There's a size check when an acquire fetch completes and we reuse the proxy.
@@ -1642,8 +1662,8 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
                 {
 #define PD_MSG (msg)
 #define PD_TYPE PD_MSG_DB_ACQUIRE
-                    DPRINTF(DEBUG_LVL_VVERB,"DB_ACQUIRE: Outgoing response for DB GUID 0x%lx with properties=0x%x and dest=%d\n",
-                            PD_MSG_FIELD_IO(guid.guid), PD_MSG_FIELD_IO(properties), (u32) msg->destLocation);
+                    DPRINTF(DEBUG_LVL_VVERB,"DB_ACQUIRE: Outgoing response for DB GUID "GUIDSx" with properties=0x%x and dest=%d\n",
+                            GUIDFS(PD_MSG_FIELD_IO(guid.guid)), PD_MSG_FIELD_IO(properties), (u32) msg->destLocation);
 #undef PD_MSG
 #undef PD_TYPE
                 break;
@@ -1655,7 +1675,7 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_WORK_CREATE
                 if (((msg->type & PD_MSG_TYPE_ONLY) == PD_MSG_WORK_CREATE) && !(msg->type & PD_MSG_REQ_RESPONSE)) {
-                    ASSERT(PD_MSG_FIELD_IO(guid.guid) == NULL_GUID);
+                    ASSERT(IS_GUID_NULL(PD_MSG_FIELD_IO(guid.guid)));
                     // Do a full marshalling to make sure we capture paramv/depv
                     ocrMarshallMode_t marshallMode = MARSHALL_FULL_COPY;
                     sendProp |= (((u32)marshallMode) << COMM_PROP_BEHAVIOR_OFFSET);
@@ -1733,8 +1753,8 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
                 //BUG #190
 #define PD_MSG (msg)
 #define PD_TYPE PD_MSG_DB_ACQUIRE
-                DPRINTF(DEBUG_LVL_VVERB,"DB_ACQUIRE: post-process response, GUID=0x%lx serialize DB's ptr, dest is %d\n",
-                        PD_MSG_FIELD_IO(guid.guid), (u32) msg->destLocation);
+                DPRINTF(DEBUG_LVL_VVERB,"DB_ACQUIRE: post-process response, GUID="GUIDSx" serialize DB's ptr, dest is %d\n",
+                        GUIDFS(PD_MSG_FIELD_IO(guid.guid)), (u32) msg->destLocation);
                 if (PD_MSG_FIELD_IO(edtSlot) != EDT_SLOT_NONE) {
                     sendProp |= ASYNC_MSG_PROP;
                 }

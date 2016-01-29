@@ -53,7 +53,7 @@ static u8 resolveRemoteMetaData(ocrPolicyDomain_t * self, ocrFatGuid_t * fGuid, 
         // and set the fatGuid's metadata ptr to point to the copy
         void * metaDataPtr = self->fcts.pdMalloc(self, metaDataSize);
         ASSERT(PD_MSG_FIELD_IO(guid.metaDataPtr) != NULL);
-        ASSERT(PD_MSG_FIELD_IO(guid.guid) == remoteGuid);
+        ASSERT(IS_GUID_EQUAL(PD_MSG_FIELD_IO(guid.guid), remoteGuid));
         ASSERT(PD_MSG_FIELD_O(size) == metaDataSize);
         hal_memCopy(metaDataPtr, PD_MSG_FIELD_IO(guid.metaDataPtr), metaDataSize, false);
         //BUG #162 metadata cloning: Potentially multiple concurrent registerGuid on the same template

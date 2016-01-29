@@ -52,11 +52,11 @@ static void hcWorkShift(ocrWorker_t * worker) {
     if(pd->fcts.processMessage(pd, &msg, true) == 0) {
         // We got a response
         ocrFatGuid_t taskGuid = PD_MSG_FIELD_IO(schedArgs).OCR_SCHED_ARG_FIELD(OCR_SCHED_WORK_EDT_USER).edt;
-        if(taskGuid.guid != NULL_GUID) {
+        if(!(IS_GUID_NULL(taskGuid.guid))){
             // Task sanity checks
             ASSERT(taskGuid.metaDataPtr != NULL);
             worker->curTask = (ocrTask_t*)taskGuid.metaDataPtr;
-            DPRINTF(DEBUG_LVL_VERB, "Worker shifting to execute EDT GUID 0x%lx\n", taskGuid.guid);
+            DPRINTF(DEBUG_LVL_VERB, "Worker shifting to execute EDT GUID "GUIDSx"\n", GUIDFS(taskGuid.guid));
             u32 factoryId = PD_MSG_FIELD_O(factoryId);
             pd->taskFactories[factoryId]->fcts.execute(worker->curTask);
 

@@ -33,6 +33,42 @@ typedef int64_t  s64; /**< 64-bit signed integer */
 typedef int32_t  s32; /**< 32-bit signed integer */
 typedef int8_t   s8;  /**< 8-bit signed integer */
 
+
+#ifdef ENABLE_128_BIT_GUID
+
+#define GUID_128
+typedef struct {
+    intptr_t lower;
+    intptr_t upper;
+} ocrGuid_t;
+
+#else
+
+#define GUID_64
+typedef intptr_t ocrGuid_t; /**< GUID type */
+
+#endif
+
+/* Defined vals for 64-bit GUIDs */
+#ifdef GUID_64
+
+#define NULL_GUID ((ocrGuid_t)0x0)
+
+#define UNINITIALIZED_GUID ((ocrGuid_t)-2)
+
+#define ERROR_GUID ((ocrGuid_t)-1)
+
+/* Defined vals for 128-bit GUIDs */
+#elif defined(GUID_128)
+
+#define NULL_GUID ((ocrGuid_t){.lower = 0x0, .upper = 0x0})
+
+#define UNINITIALIZED_GUID ((ocrGuid_t){.lower = -2, .upper = -2})
+
+#define ERROR_GUID ((ocrGuid_t){.lower = -1, .upper = -1})
+
+#endif
+
 #ifdef __MACH__
 #include <stdbool.h>
 #else
@@ -53,26 +89,6 @@ typedef u8 bool;
 
 #endif
 
-/**
- * @brief Type describing the unique identifier of most
- * objects in OCR (EDTs, data-blocks, etc).
- **/
-typedef intptr_t ocrGuid_t; /**< GUID type */
-
-/**
- * @brief A NULL ocrGuid_t
- */
-#define NULL_GUID ((ocrGuid_t)0x0)
-
-/**
- * @brief An Unitialized GUID (ie: never set)
- */
-#define UNINITIALIZED_GUID ((ocrGuid_t)-2)
-
-/**
- * @brief An invalid GUID
- */
-#define ERROR_GUID ((ocrGuid_t)-1)
 
 /**
  * @}

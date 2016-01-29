@@ -22,8 +22,8 @@ static u8 masterHelper(ocrWorker_t * worker) {
     // Save current worker context
     //BUG #204 this should be implemented in the worker
     ocrTask_t * suspendedTask = worker->curTask;
-    DPRINTF(DEBUG_LVL_VERB, "Shifting worker from EDT GUID 0x%lx\n",
-            suspendedTask->guid);
+    DPRINTF(DEBUG_LVL_VERB, "Shifting worker from EDT GUID "GUIDSx"\n",
+            GUIDFS(suspendedTask->guid));
     // printf("MARKER2 MASTER HELPER invoked\n");
     // In helper mode, just try to execute another task
     // on top of the currently executing task's stack.
@@ -31,8 +31,8 @@ static u8 masterHelper(ocrWorker_t * worker) {
 
     // restore worker context
     //BUG #204 this should be implemented in the worker
-    DPRINTF(DEBUG_LVL_VERB, "Worker shifting back to EDT GUID 0x%lx\n",
-            suspendedTask->guid);
+    DPRINTF(DEBUG_LVL_VERB, "Worker shifting back to EDT GUID "GUIDSx"\n",
+            GUIDFS(suspendedTask->guid));
     worker->curTask = suspendedTask;
 
     return 0;

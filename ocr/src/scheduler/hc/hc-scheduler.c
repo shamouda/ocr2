@@ -238,10 +238,10 @@ u8 hcSchedulerTakeEdt (ocrScheduler_t *self, u32 *count, ocrFatGuid_t *edts) {
     }
 
     START_PROFILE(sched_hc_Steal);
-    if(NULL_GUID == popped.guid) {
+    if(IS_GUID_NULL(popped.guid)) {
         // If popping failed, try to steal
         hcWorkpileIterator_t* it = stealMappingOneToAllButSelf(self, workerId);
-        while(workpileIteratorHasNext(it) && (NULL_GUID == popped.guid)) {
+        while(workpileIteratorHasNext(it) && (IS_GUID_NULL(popped.guid))) {
             ocrWorkpile_t * next = workpileIteratorNext(it);
             popped = next->fcts.pop(next, STEAL_WORKPOPTYPE, NULL);
         }
@@ -251,7 +251,7 @@ u8 hcSchedulerTakeEdt (ocrScheduler_t *self, u32 *count, ocrFatGuid_t *edts) {
     // In this implementation we expect the caller to have
     // allocated memory for us since we can return at most one
     // guid (most likely store using the address of a local)
-    if(NULL_GUID != popped.guid) {
+    if(!(IS_GUID_NULL(popped.guid))) {
         *count = 1;
         edts[0] = popped;
     } else {

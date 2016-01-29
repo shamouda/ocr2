@@ -282,7 +282,7 @@ u8 pthreadSetThrottle(ocrCompPlatform_t *self, u64 value) {
 u8 pthreadSetCurrentEnv(ocrCompPlatform_t *self, ocrPolicyDomain_t *pd,
                         ocrWorker_t *worker) {
 
-    ASSERT(pd->fguid.guid == self->pd->fguid.guid);
+    ASSERT(IS_GUID_EQUAL(pd->fguid.guid, self->pd->fguid.guid));
     perThreadStorage_t *tls = pthread_getspecific(selfKey);
     tls->pd = pd;
     tls->worker = worker;

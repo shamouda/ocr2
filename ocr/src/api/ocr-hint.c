@@ -117,7 +117,7 @@ u8 ocrSetHint(ocrGuid_t guid, ocrHint_t *hint) {
     }
 
     START_PROFILE(api_SetHint);
-    DPRINTF(DEBUG_LVL_INFO, "ENTER ocrSetHint(guid=0x%lx)\n", guid);
+    DPRINTF(DEBUG_LVL_INFO, "ENTER ocrSetHint(guid="GUIDSx"\n", GUIDFS(guid));
     PD_MSG_STACK(msg);
     ocrPolicyDomain_t *pd = NULL;
     ocrTask_t * curEdt = NULL;
@@ -130,7 +130,7 @@ u8 ocrSetHint(ocrGuid_t guid, ocrHint_t *hint) {
     PD_MSG_FIELD_I(hint) = *hint;
     u8 returnCode = pd->fcts.processMessage(pd, &msg, false);
     DPRINTF_COND_LVL(returnCode, DEBUG_LVL_WARN, DEBUG_LVL_INFO,
-                     "EXIT ocrSetHint(guid=0x%lx) -> %u\n", guid, returnCode);
+                     "EXIT ocrSetHint(guid="GUIDSx") -> %u\n", GUIDFS(guid), returnCode);
     RETURN_PROFILE(returnCode);
 #undef PD_MSG
 #undef PD_TYPE
@@ -148,7 +148,7 @@ u8 ocrGetHint(ocrGuid_t guid, ocrHint_t *hint) {
     }
 
     START_PROFILE(api_SetHint);
-    DPRINTF(DEBUG_LVL_INFO, "ENTER ocrSetHint(guid=0x%lx)\n", guid);
+    DPRINTF(DEBUG_LVL_INFO, "ENTER ocrSetHint(guid="GUIDSx")\n", GUIDFS(guid));
     PD_MSG_STACK(msg);
     ocrPolicyDomain_t *pd = NULL;
     ocrTask_t * curEdt = NULL;
@@ -167,7 +167,7 @@ u8 ocrGetHint(ocrGuid_t guid, ocrHint_t *hint) {
         }
     }
     DPRINTF_COND_LVL(returnCode, DEBUG_LVL_WARN, DEBUG_LVL_INFO,
-                     "EXIT ocrSetHint(guid=0x%lx) -> %u\n", guid, returnCode);
+                     "EXIT ocrSetHint(guid="GUIDSx") -> %u\n", GUIDFS(guid), returnCode);
     RETURN_PROFILE(returnCode);
 #undef PD_MSG
 #undef PD_TYPE

@@ -91,7 +91,7 @@ u8 ocrLegacySpawnOCR(ocrGuid_t* handle, ocrGuid_t finishEdtTemplate, u64 paramc,
 
     for(i=0; i < depc; ++i) {
         // Verify that all dependences are known
-        ASSERT(depv[i] != UNINITIALIZED_GUID);
+        ASSERT(!(IS_GUID_UNINITIALIZED(depv[i])));
     }
 
     // Hold off the start by saying that one dependence is not satisfied
@@ -143,7 +143,8 @@ u8 ocrLegacyBlockProgress(ocrGuid_t evtHandle, ocrGuid_t* guid, void** result, u
             if(returnCode != 0) {
                 return returnCode;
             }
-            if(PD_MSG_FIELD_IO(guid.metaDataPtr) == NULL_GUID) {
+
+            if(PD_MSG_FIELD_IO(guid.metaDataPtr) == NULL) {
                 if(properties == LEGACY_PROP_NONE) {
                     return OCR_EINVAL;
                 } else if(properties == LEGACY_PROP_WAIT_FOR_CREATE) {
@@ -174,9 +175,9 @@ u8 ocrLegacyBlockProgress(ocrGuid_t evtHandle, ocrGuid_t* guid, void** result, u
         dbResult = PD_MSG_FIELD_O(data);
 #undef PD_TYPE
 #undef PD_MSG
-    } while(dbResult.guid == ERROR_GUID);
+    } while(IS_GUID_ERROR(dbResult.guid));
 
-    if(dbResult.guid != NULL_GUID) {
+    if(!(IS_GUID_NULL(dbResult.guid))) {
         if(dbResult.metaDataPtr == NULL) {
             // We now need to acquire the DB
             PD_MSG_STACK(msg);

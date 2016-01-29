@@ -63,7 +63,7 @@ u8 ocrAffinityQuery(ocrGuid_t guid, u64 * count, ocrGuid_t * affinities) {
             ASSERT(*count > 0);
             *count = 1;
         }
-        if (guid == NULL_GUID) {
+        if (IS_GUID_NULL(guid)) {
             affinities[0] = platformModel->pdLocAffinities[platformModel->current];
             return 0;
         }

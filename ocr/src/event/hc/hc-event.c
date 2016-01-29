@@ -133,8 +133,7 @@ u8 destructEventHc(ocrEvent_t *base) {
     ocrTask_t *curTask = NULL;
     getCurrentEnv(&pd, NULL, &curTask, &msg);
 
-
-    DPRINTF(DEBUG_LVL_INFO, "Destroy %s: 0x%lx\n", eventTypeToString(base), base->guid,
+    DPRINTF(DEBUG_LVL_INFO, "Destroy %s: "GUIDSx"\n", eventTypeToString(base), GUIDFS(base->guid),
             false, OCR_TRACE_TYPE_EVENT, OCR_ACTION_DESTROY);
 
 #ifdef OCR_ENABLE_STATISTICS
@@ -142,7 +141,7 @@ u8 destructEventHc(ocrEvent_t *base) {
 #endif
 
     // Destroy datablocks linked with this event
-    if (event->waitersDb.guid != UNINITIALIZED_GUID) {
+    if (!(IS_GUID_UNINITIALIZED(event->waitersDb.guid))) {
 #define PD_MSG (&msg)
 #define PD_TYPE PD_MSG_DB_FREE
         msg.type = PD_MSG_DB_FREE | PD_MSG_REQUEST;
@@ -222,7 +221,7 @@ ocrFatGuid_t getEventHc(ocrEvent_t *base) {
 #endif
     case OCR_EVENT_IDEM_T: {
         ocrEventHcPersist_t *event = (ocrEventHcPersist_t*)base;
-        res.guid = (event->data == UNINITIALIZED_GUID) ? ERROR_GUID : event->data;
+        res.guid = (IS_GUID_UNINITIALIZED(event->data)) ? ERROR_GUID : event->data;
         break;
     }
     default:
@@ -240,7 +239,7 @@ static u8 commonSatisfyRegNode(ocrPolicyDomain_t * pd, ocrPolicyMsg_t * msg,
     statsDEP_SATISFYFromEvt(pd, evtGuid, NULL, node->guid,
                             db.guid, node->slot);
 #endif
-    DPRINTF(DEBUG_LVL_INFO, "SatisfyFromEvent: src: 0x%lx dst: 0x%lx\n", evtGuid, node->guid);
+    DPRINTF(DEBUG_LVL_INFO, "SatisfyFromEvent: src: "GUIDSx" dst: "GUIDSx" \n", GUIDFS(evtGuid), GUIDFS(node->guid));
 #define PD_MSG (msg)
 #define PD_TYPE PD_MSG_DEP_SATISFY
     getCurrentEnv(NULL, NULL, NULL, msg);
@@ -281,7 +280,7 @@ static u8 commonSatisfyWaiters(ocrPolicyDomain_t *pd, ocrEvent_t *base, ocrFatGu
 #endif
 
     if(waitersCount > 0) {
-        ASSERT(dbWaiters.guid != UNINITIALIZED_GUID);
+        ASSERT(!(IS_GUID_UNINITIALIZED(dbWaiters.guid)));
         // First acquire the DB that contains the waiters
 #define PD_MSG (msg)
 #define PD_TYPE PD_MSG_DB_ACQUIRE
@@ -332,7 +331,7 @@ u8 satisfyEventHcOnce(ocrEvent_t *base, ocrFatGuid_t db, u32 slot) {
     ocrEventHc_t *event = (ocrEventHc_t*)base;
     ASSERT(slot == 0); // For non-latch events, only one slot
 
-    DPRINTF(DEBUG_LVL_INFO, "Satisfy: 0x%lx with 0x%lx\n", base->guid, db.guid);
+    DPRINTF(DEBUG_LVL_INFO, "Satisfy: "GUIDSx" with "GUIDSx"\n", GUIDFS(base->guid), GUIDFS(db.guid));
 
     ocrPolicyDomain_t *pd = NULL;
     ocrTask_t *curTask = NULL;
@@ -361,8 +360,8 @@ u8 satisfyEventHcOnce(ocrEvent_t *base, ocrFatGuid_t db, u32 slot) {
 static u8 commonSatisfyEventHcPersist(ocrEvent_t *base, ocrFatGuid_t db, u32 slot, u32 waitersCount) {
     ocrEventHc_t * event = (ocrEventHc_t*) base;
     ASSERT(slot == 0); // Persistent-events are single slot
-    DPRINTF(DEBUG_LVL_INFO, "Satisfy %s: 0x%lx with 0x%lx\n", eventTypeToString(base),
-            base->guid, db.guid);
+    DPRINTF(DEBUG_LVL_INFO, "Satisfy %s: "GUIDSx" with "GUIDSx"\n", eventTypeToString(base),
+            GUIDFS(base->guid), GUIDFS(db.guid));
 
 #ifdef OCR_ENABLE_STATISTICS
     ocrPolicyDomain_t *pd = getCurrentPD();
@@ -404,7 +403,7 @@ u8 satisfyEventHcCounted(ocrEvent_t *base, ocrFatGuid_t db, u32 slot) {
     //BUG #809 Nanny-mode
     if ((event->waitersCount == STATE_CHECKED_IN) ||
         (event->waitersCount == STATE_CHECKED_OUT)) {
-        DPRINTF(DEBUG_LVL_WARN, "User-level error detected: try to satisfy a counted event that's already satisfied: 0x%lx\n", base->guid);
+        DPRINTF(DEBUG_LVL_WARN, "User-level error detected: try to satisfy a counted event that's already satisfied: "GUIDSx"\n", GUIDFS(base->guid));
         ASSERT(false);
         hal_unlock32(&(event->waitersLock));
         return 1; //BUG #603 error codes: Put some error code here.
@@ -414,7 +413,7 @@ u8 satisfyEventHcCounted(ocrEvent_t *base, ocrFatGuid_t db, u32 slot) {
     event->waitersCount = STATE_CHECKED_IN; // Indicate the event is satisfied
     ocrEventHcCounted_t * devt = (ocrEventHcCounted_t *) event;
     ASSERT_BLOCK_BEGIN(waitersCount <= devt->nbDeps)
-    DPRINTF(DEBUG_LVL_WARN, "User-level error detected: too many registrations on counted-event 0x%lx\n", base->guid);
+    DPRINTF(DEBUG_LVL_WARN, "User-level error detected: too many registrations on counted-event "GUIDSx"\n", GUIDFS(base->guid));
     ASSERT_BLOCK_END
 
     devt->nbDeps -= waitersCount;
@@ -453,7 +452,7 @@ u8 satisfyEventHcPersistSticky(ocrEvent_t *base, ocrFatGuid_t db, u32 slot) {
     //BUG #809 Nanny-mode
     if ((event->waitersCount == STATE_CHECKED_IN) ||
         (event->waitersCount == STATE_CHECKED_OUT)) {
-        DPRINTF(DEBUG_LVL_WARN, "User-level error detected: try to satisfy a sticky event that's already satisfied: 0x%lx\n", base->guid);
+        DPRINTF(DEBUG_LVL_WARN, "User-level error detected: try to satisfy a sticky event that's already satisfied: "GUIDSx"\n", GUIDFS(base->guid));
         ASSERT(false);
         hal_unlock32(&(event->waitersLock));
         return 1; //BUG #603 error codes: Put some error code here.
@@ -479,8 +478,8 @@ u8 satisfyEventHcLatch(ocrEvent_t *base, ocrFatGuid_t db, u32 slot) {
         // FIXME: the (u32 *) cast on the line below is because event->counter is an (s32 *)
     } while(hal_cmpswap32((u32 *)&(event->counter), count, count+incr) != count);
 
-    DPRINTF(DEBUG_LVL_INFO, "Satisfy %s: 0x%lx %s\n", eventTypeToString(base),
-            base->guid, ((slot == OCR_EVENT_LATCH_DECR_SLOT) ? "decr":"incr"));
+    DPRINTF(DEBUG_LVL_INFO, "Satisfy %s: "GUIDSx" %s\n", eventTypeToString(base),
+            GUIDFS(base->guid), ((slot == OCR_EVENT_LATCH_DECR_SLOT) ? "decr":"incr"));
 
     ocrPolicyDomain_t *pd = NULL;
     ocrTask_t *curTask = NULL;
@@ -497,7 +496,7 @@ u8 satisfyEventHcLatch(ocrEvent_t *base, ocrFatGuid_t db, u32 slot) {
         return 0;
     }
     // Here the event is satisfied
-    DPRINTF(DEBUG_LVL_INFO, "Satisfy %s: 0x%lx reached zero\n", eventTypeToString(base), base->guid);
+    DPRINTF(DEBUG_LVL_INFO, "Satisfy %s: "GUIDSx" reached zero\n", eventTypeToString(base), GUIDFS(base->guid));
 
     u32 waitersCount = event->base.waitersCount;
     // This is only to help users find out about wrongful use of events
@@ -676,8 +675,8 @@ u8 registerWaiterEventHc(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot, bool i
     // Here we always add the waiter to our list so we ignore isDepAdd
     ocrEventHc_t *event = (ocrEventHc_t*)base;
 
-    DPRINTF(DEBUG_LVL_INFO, "Register waiter %s: 0x%lx with waiter 0x%lx on slot %d\n",
-            eventTypeToString(base), base->guid, waiter.guid, slot);
+    DPRINTF(DEBUG_LVL_INFO, "Register waiter %s: "GUIDSx" with waiter "GUIDSx" on slot %d\n",
+            eventTypeToString(base), GUIDFS(base->guid), GUIDFS(waiter.guid), slot);
 
     ocrPolicyDomain_t *pd = NULL;
     ocrTask_t *curTask = NULL;
@@ -686,7 +685,7 @@ u8 registerWaiterEventHc(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot, bool i
     //BUG #809 this should be part of the n
     if (event->waitersCount == STATE_CHECKED_IN) {
          // This is best effort race check
-         DPRINTF(DEBUG_LVL_WARN, "User-level error detected: adding dependence to a non-persistent event that's already satisfied: 0x%lx\n", base->guid);
+         DPRINTF(DEBUG_LVL_WARN, "User-level error detected: adding dependence to a non-persistent event that's already satisfied: "GUIDSx"\n", GUIDFS(base->guid));
          ASSERT(false);
          return 1; //BUG #603 error codes: Put some error code here.
     }
@@ -697,7 +696,7 @@ u8 registerWaiterEventHc(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot, bool i
 
 
 /**
- * @brief Registers waiters on persistent events such as sticky or idempotent. 
+ * @brief Registers waiters on persistent events such as sticky or idempotent.
  *
  * This code contends with a satisfy call and with concurrent add-dependences that try
  * to register their waiter.
@@ -734,11 +733,11 @@ u8 registerWaiterEventHcPersist(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot,
     }
     ASSERT(waiterKind == OCR_GUID_EDT || (waiterKind & OCR_GUID_EVENT));
 
-    DPRINTF(DEBUG_LVL_INFO, "Register waiter %s: 0x%lx with waiter 0x%lx on slot %d\n",
-            eventTypeToString(base), base->guid, waiter.guid, slot);
+    DPRINTF(DEBUG_LVL_INFO, "Register waiter %s: "GUIDSx" with waiter "GUIDSx" on slot %d\n",
+            eventTypeToString(base), GUIDFS(base->guid), GUIDFS(waiter.guid), slot);
     // Lock to read the event->data
     hal_lock32(&(event->base.waitersLock));
-    if (event->data != UNINITIALIZED_GUID) {
+    if (!(IS_GUID_UNINITIALIZED(event->data))) {
         ocrGuid_t dataGuid = event->data;
         hal_unlock32(&(event->base.waitersLock));
         // We send a message saying that we satisfy whatever tried to wait on us
@@ -799,11 +798,11 @@ u8 registerWaiterEventHcCounted(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot,
     }
     ASSERT(waiterKind == OCR_GUID_EDT || (waiterKind & OCR_GUID_EVENT));
 
-    DPRINTF(DEBUG_LVL_INFO, "Register waiter %s: 0x%lx with waiter 0x%lx on slot %d\n",
-            eventTypeToString(base), base->guid, waiter.guid, slot);
+    DPRINTF(DEBUG_LVL_INFO, "Register waiter %s: "GUIDSx" with waiter "GUIDSx" on slot %d\n",
+            eventTypeToString(base), GUIDFS(base->guid), GUIDFS(waiter.guid), slot);
     // Lock to read the data field
     hal_lock32(&(event->base.waitersLock));
-    if (event->data != UNINITIALIZED_GUID) {
+    if(!(IS_GUID_UNINITIALIZED(event->data))) {
         ocrGuid_t dataGuid = event->data;
         hal_unlock32(&(event->base.waitersLock));
         // We send a message saying that we satisfy whatever tried to wait on us
@@ -855,8 +854,8 @@ u8 unregisterWaiterEventHc(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot, bool
     ocrEventHc_t *event = (ocrEventHc_t*)base;
 
 
-    DPRINTF(DEBUG_LVL_INFO, "UnRegister waiter %s: 0x%lx with waiter 0x%lx on slot %d\n",
-            eventTypeToString(base), base->guid, waiter.guid, slot);
+    DPRINTF(DEBUG_LVL_INFO, "UnRegister waiter %s: "GUIDSx" with waiter "GUIDSx" on slot %d\n",
+            eventTypeToString(base), GUIDFS(base->guid), GUIDFS(waiter.guid), slot);
 
     ocrPolicyDomain_t *pd = NULL;
     ocrTask_t *curTask = NULL;
@@ -886,7 +885,7 @@ u8 unregisterWaiterEventHc(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot, bool
 #undef PD_TYPE
     // We search for the waiter that we need and remove it
     for(i = 0; i < event->waitersCount; ++i) {
-        if(waiters[i].guid == waiter.guid && waiters[i].slot == slot) {
+        if(IS_GUID_EQUAL(waiters[i].guid, waiter.guid) && waiters[i].slot == slot) {
             // We will copy all the other ones
             hal_memCopy((void*)&waiters[i], (void*)&waiters[i+1],
                         sizeof(regNode_t)*(event->waitersCount - i - 1), false);
@@ -916,8 +915,8 @@ u8 unregisterWaiterEventHcPersist(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slo
     ocrEventHcPersist_t *event = (ocrEventHcPersist_t*)base;
 
 
-    DPRINTF(DEBUG_LVL_INFO, "Unregister waiter %s: 0x%lx with waiter 0x%lx on slot %d\n",
-            eventTypeToString(base), base->guid, waiter.guid, slot);
+    DPRINTF(DEBUG_LVL_INFO, "Unregister waiter %s: "GUIDSx" with waiter "GUIDSx" on slot %d\n",
+            eventTypeToString(base), GUIDFS(base->guid), GUIDFS(waiter.guid), slot);
 
     ocrPolicyDomain_t *pd = NULL;
     ocrTask_t *curTask = NULL;
@@ -929,7 +928,7 @@ u8 unregisterWaiterEventHcPersist(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slo
     getCurrentEnv(&pd, NULL, &curTask, &msg);
     ocrFatGuid_t curEdt = {.guid = curTask!=NULL?curTask->guid:NULL_GUID, .metaDataPtr = curTask};
     hal_lock32(&(event->base.waitersLock));
-    if(event->data != UNINITIALIZED_GUID) {
+    if(!(IS_GUID_UNINITIALIZED(event->data))) {
         // We don't really care at this point so we don't do anything
         hal_unlock32(&(event->base.waitersLock));
         return 0;
@@ -957,7 +956,7 @@ u8 unregisterWaiterEventHcPersist(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slo
 #undef PD_TYPE
     // We search for the waiter that we need and remove it
     for(i = 0; i < event->base.waitersCount; ++i) {
-        if(waiters[i].guid == waiter.guid && waiters[i].slot == slot) {
+        if(IS_GUID_EQUAL(waiters[i].guid, waiter.guid) && waiters[i].slot == slot) {
             // We will copy all the other ones
             hal_memCopy((void*)&waiters[i], (void*)&waiters[i+1],
                         sizeof(regNode_t)*(event->base.waitersCount - i - 1), false);
@@ -1132,7 +1131,7 @@ u8 newEventHc(ocrEventFactory_t * factory, ocrFatGuid_t *guid,
     if(eventType == OCR_EVENT_COUNTED_T) {
         // Initialize the counter for dependencies tracking
         ASSERT_BLOCK_BEGIN((perInstance != NULL) && (((ocrEventParams_t *) perInstance)->EVENT_COUNTED.nbDeps != 0))
-        DPRINTF(DEBUG_LVL_WARN, "error: Illegal nbDeps value (zero) for OCR_EVENT_COUNTED_T 0x%lx\n", eventTypeToString(base), base->guid);
+        DPRINTF(DEBUG_LVL_WARN, "error: Illegal nbDeps value (zero) for OCR_EVENT_COUNTED_T 0x%lx\n", GUIDFS(base->guid));
         factory->fcts[OCR_EVENT_COUNTED_T].destruct(base);
         ASSERT(false);
         return OCR_EINVAL;
@@ -1148,7 +1147,7 @@ u8 newEventHc(ocrEventFactory_t * factory, ocrFatGuid_t *guid,
     hal_fence(); // Make sure sure this really happens last
     base->guid = resultGuid;
 
-    DPRINTF(DEBUG_LVL_INFO, "Create %s: 0x%lx\n", eventTypeToString(base), base->guid);
+    DPRINTF(DEBUG_LVL_INFO, "Create %s: "GUIDSx"\n", eventTypeToString(base), GUIDFS(base->guid));
 #ifdef OCR_ENABLE_STATISTICS
     statsEVT_CREATE(getCurrentPD(), getCurrentEDT(), NULL, base->guid, base);
 #endif

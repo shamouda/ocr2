@@ -65,7 +65,7 @@ void countedMapHashmapEntryDestructChecker(void * key, void * value, void * deal
     ocrGuid_t guid = (ocrGuid_t) key;
     ((u32*)deallocParam)[getKindFromGuid(guid)]++;
 #ifdef GUID_PROVIDER_DESTRUCT_CHECK_VERBOSE
-    DPRINTF(DEBUG_LVL_WARN, "Remnant GUID 0x%lx of kind %s still registered on GUID provider\n", guid,  ocrGuidKindToChar(getKindFromGuid(guid)));
+    DPRINTF(DEBUG_LVL_WARN, "Remnant GUID "GUIDSx" of kind %s still registered on GUID provider\n", GUIDFS(guid),  ocrGuidKindToChar(getKindFromGuid(guid)));
 #endif
 }
 #endif
@@ -166,14 +166,26 @@ void countedMapDestruct(ocrGuidProvider_t* self) {
  * @brief Utility function to extract a kind from a GUID.
  */
 static ocrGuidKind getKindFromGuid(ocrGuid_t guid) {
+
+    // See BUG #928 on GUID issues
+#ifdef GUID_64
     return (ocrGuidKind) ((guid & GUID_KIND_MASK) >> GUID_COUNTER_SIZE);
+#elif defined(GUID_128)
+    return (ocrGuidKind) ((guid.lower & GUID_KIND_MASK) >> GUID_COUNTER_SIZE);
+#endif
+
 }
 
 /**
  * @brief Utility function to extract a kind from a GUID.
  */
 static u64 extractLocIdFromGuid(ocrGuid_t guid) {
+// See BUG #928 on GUID issues
+#ifdef GUID_64
     return (u64) ((guid & GUID_LOCID_MASK) >> GUID_LOCID_SHIFT_RIGHT);
+#elif defined(GUID_128)
+    return (u64) ((guid.lower & GUID_LOCID_MASK) >> GUID_LOCID_SHIFT_RIGHT);
+#endif
 }
 
 static ocrLocation_t locIdtoLocation(u64 locId) {
@@ -230,7 +242,15 @@ static u8 countedMapGetGuid(ocrGuidProvider_t* self, ocrGuid_t* guid, u64 val, o
     // Here no need to allocate
     u64 newGuid = generateNextGuid(self, kind);
     GP_HASHTABLE_PUT(((ocrGuidProviderCountedMap_t *) self)->guidImplTable, (void *) newGuid, (void *) val);
+    // See BUG #928 on GUID issues
+#ifdef GUID_64
     *guid = (ocrGuid_t) newGuid;
+#elif defined(GUID_128)
+    ocrGuid_t tempGuid = {.lower = (u64)newGuid, .upper = 0x0};
+    *guid = tempGuid;
+#else
+#error Unknown type of GUID
+#endif
     return 0;
 }
 
@@ -273,7 +293,15 @@ u8 countedMapCreateGuid(ocrGuidProvider_t* self, ocrFatGuid_t *fguid, u64 size, 
  * @brief Returns the value associated with a guid and its kind if requested.
  */
 static u8 countedMapGetVal(ocrGuidProvider_t* self, ocrGuid_t guid, u64* val, ocrGuidKind* kind) {
+    // See BUG #928 on GUID issues
+#ifdef GUID_64
     *val = (u64) GP_HASHTABLE_GET(((ocrGuidProviderCountedMap_t *) self)->guidImplTable, (void *) guid);
+#elif defined(GUID_128)
+    *val = (u64) GP_HASHTABLE_GET(((ocrGuidProviderCountedMap_t *) self)->guidImplTable, (void *) guid.lower);
+#else
+#error Unknown type of GUID
+#endif
+
     if(kind) {
         *kind = getKindFromGuid(guid);
     }
@@ -303,7 +331,14 @@ u8 countedMapGetLocation(ocrGuidProvider_t* self, ocrGuid_t guid, ocrLocation_t*
  * a local metadata represent for a foreign GUID.
  */
 u8 countedMapRegisterGuid(ocrGuidProvider_t* self, ocrGuid_t guid, u64 val) {
+    // See BUG #928 on GUID issues
+#ifdef GUID_64
     GP_HASHTABLE_PUT(((ocrGuidProviderCountedMap_t *) self)->guidImplTable, (void *) guid, (void *) val);
+#elif defined(GUID_128)
+    GP_HASHTABLE_PUT(((ocrGuidProviderCountedMap_t *) self)->guidImplTable, (void *) guid.lower, (void *) val);
+#else
+#error Unknown type of GUID
+#endif
     return 0;
 }
 
@@ -311,7 +346,14 @@ u8 countedMapRegisterGuid(ocrGuidProvider_t* self, ocrGuid_t guid, u64 val) {
  * @brief Remove an already existing GUID and its associated value from the provider
  */
 u8 countedMapUnregisterGuid(ocrGuidProvider_t* self, ocrGuid_t guid, u64 ** val) {
+    // See BUG #928 on GUID issues
+#ifdef GUID_64
     GP_HASHTABLE_DEL(((ocrGuidProviderCountedMap_t *) self)->guidImplTable, (void *) guid, (void **) val);
+#elif defined(GUID_128)
+    GP_HASHTABLE_DEL(((ocrGuidProviderCountedMap_t *) self)->guidImplTable, (void *) guid.lower, (void **) val);
+#else
+#error Unknown type of GUID
+#endif
     return 0;
 }
 
@@ -338,7 +380,14 @@ u8 countedMapReleaseGuid(ocrGuidProvider_t *self, ocrFatGuid_t fatGuid, bool rel
     }
     // In any case, we need to recycle the guid
     ocrGuidProviderCountedMap_t * derived = (ocrGuidProviderCountedMap_t *) self;
+    // See BUG #928 on GUID issues
+#ifdef GUID_64
     GP_HASHTABLE_DEL(derived->guidImplTable, (void *)guid, NULL);
+#elif defined(GUID_128)
+    GP_HASHTABLE_DEL(derived->guidImplTable, (void *) guid.lower, NULL);
+#else
+#error Unknown type of GUID
+#endif
     return 0;
 }
 

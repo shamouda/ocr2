@@ -19,6 +19,7 @@ extern "C" {
 #include "ocr-edt.h"
 #include "ocr-errors.h"
 #include "ocr-types.h"
+#include "ocr-guid-macros.h"
 #include "ocr-std.h"
 #include "extensions/ocr-hints.h"
 #include "ocr-version.h"

@@ -553,7 +553,7 @@ void xePolicyDomainDestruct(ocrPolicyDomain_t * policy) {
 }
 
 static void localDeguidify(ocrPolicyDomain_t *self, ocrFatGuid_t *guid) {
-    if((guid->guid != NULL_GUID) && (guid->guid != UNINITIALIZED_GUID)) {
+    if((!(IS_GUID_NULL(guid->guid))) && (!(IS_GUID_UNINITIALIZED(guid->guid)))) {
         // The XE cannot deguidify since it does not really have a GUID
         // provider and relies on the CE for that. It used to be OK
         // when we used the PTR GUID provider since deguidification was
@@ -584,9 +584,17 @@ static u8 xeAllocateDb(ocrPolicyDomain_t *self, ocrFatGuid_t *guid, void** ptr, 
 //    void* result = allocateDatablock (self, size, engineIndex, prescription, &idx);
 
     int preferredLevel = 0;
+    // See BUG #928 on GUID issues
+#ifdef GUID_64
     if ((u64)affinity.guid > 0 && (u64)affinity.guid <= NUM_MEM_LEVELS_SUPPORTED) {
         preferredLevel = (u64)affinity.guid;
-//        DPRINTF(DEBUG_LVL_WARN, "xeAllocateDb affinity.guid %llx  .metaDataPtr %p\n", affinity.guid, affinity.metaDataPtr);
+#elif defined(GUID_128)
+    if ((u64)affinity.guid.lower > 0 && (u64)affinity.guid.lower <= NUM_MEM_LEVELS_SUPPORTED) {
+        preferredLevel = (u64)(affinity.guid.lower);
+#else
+#error Unknown GUID type
+#endif
+//        DPRINTF(DEBUG_LVL_WARN, "xeAllocateDb affinity.guid "GUIDSx"  .metaDataPtr %p\n", GUIDFS(affinity.guid), affinity.metaDataPtr);
 //        DPRINTF(DEBUG_LVL_WARN, "xeAllocateDb preferred %ld\n", preferredLevel);
         if (preferredLevel >= 2) {
             return OCR_ENOMEM;
@@ -722,8 +730,8 @@ u8 xePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
                 // Cannot acquire
                 PD_MSG_FIELD_O(ptr) = NULL;
             }
-            DPRINTF(DEBUG_LVL_VVERB, "DB_CREATE response for size %lu: GUID: 0x%lx; PTR: 0x%lx)\n",
-                    reqSize, PD_MSG_FIELD_IO(guid.guid), PD_MSG_FIELD_O(ptr));
+            DPRINTF(DEBUG_LVL_VVERB, "DB_CREATE response for size %lu: GUID: "GUIDSx"; PTR: 0x%lx)\n",
+                    reqSize, GUIDFS(PD_MSG_FIELD_IO(guid.guid)), PD_MSG_FIELD_O(ptr));
             returnCode = xeProcessResponse(self, msg, 0);
 #undef PD_MSG
 #undef PD_TYPE
@@ -792,11 +800,11 @@ u8 xePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_COMM_TAKE
             if (PD_MSG_FIELD_IO(guidCount) > 0) {
-                DPRINTF(DEBUG_LVL_VVERB, "Received EDT with GUID 0x%lx (@ 0x%lx)\n",
-                        PD_MSG_FIELD_IO(guids[0].guid), &(PD_MSG_FIELD_IO(guids[0].guid)));
+                DPRINTF(DEBUG_LVL_VVERB, "Received EDT with GUID "GUIDSx" (@ 0x%lx)\n",
+                        GUIDFS(PD_MSG_FIELD_IO(guids[0].guid)), &(PD_MSG_FIELD_IO(guids[0].guid)));
                 localDeguidify(self, (PD_MSG_FIELD_IO(guids)));
-                DPRINTF(DEBUG_LVL_VVERB, "Received EDT (0x%lx; 0x%lx)\n",
-                        (PD_MSG_FIELD_IO(guids))->guid, (PD_MSG_FIELD_IO(guids))->metaDataPtr);
+                DPRINTF(DEBUG_LVL_VVERB, "Received EDT ("GUIDSx"; 0x%lx)\n",
+                        GUIDFS((PD_MSG_FIELD_IO(guids))->guid), (PD_MSG_FIELD_IO(guids))->metaDataPtr);
                 // For now, we return the execute function for EDTs
                 PD_MSG_FIELD_IO(extra) = (u64)(self->taskFactories[0]->fcts.execute);
             }
@@ -808,11 +816,11 @@ u8 xePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
 #define PD_TYPE PD_MSG_SCHED_GET_WORK
             ASSERT(PD_MSG_FIELD_IO(schedArgs).kind == OCR_SCHED_WORK_EDT_USER);
             ocrFatGuid_t *fguid = &PD_MSG_FIELD_IO(schedArgs).OCR_SCHED_ARG_FIELD(OCR_SCHED_WORK_EDT_USER).edt;
-            if (fguid->guid != NULL_GUID) {
-                DPRINTF(DEBUG_LVL_VVERB, "Received EDT with GUID 0x%lx\n", fguid->guid);
+            if (!(IS_GUID_NULL(fguid->guid))) {
+                DPRINTF(DEBUG_LVL_VVERB, "Received EDT with GUID "GUIDSx"\n", GUIDFS(fguid->guid));
                 localDeguidify(self, fguid);
-                DPRINTF(DEBUG_LVL_VVERB, "Received EDT (0x%lx; 0x%lx)\n",
-                        fguid->guid, fguid->metaDataPtr);
+                DPRINTF(DEBUG_LVL_VVERB, "Received EDT ("GUIDSx"; 0x%lx)\n",
+                        GUIDFS(fguid->guid), fguid->metaDataPtr);
                 PD_MSG_FIELD_O(factoryId) = 0;
             }
 #undef PD_MSG
@@ -848,10 +856,10 @@ u8 xePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         // itself
         // Also, this should only happen when there is an actual EDT
         ASSERT(curTask &&
-               curTask->guid == PD_MSG_FIELD_I(edt.guid));
+               IS_GUID_EQUAL(curTask->guid, PD_MSG_FIELD_I(edt.guid)));
 
-        DPRINTF(DEBUG_LVL_VVERB, "DEP_DYNADD req/resp for GUID 0x%lx\n",
-                PD_MSG_FIELD_I(db.guid));
+        DPRINTF(DEBUG_LVL_VVERB, "DEP_DYNADD req/resp for GUID "GUIDSx"\n",
+                GUIDFS(PD_MSG_FIELD_I(db.guid)));
         ASSERT(curTask->fctId == self->taskFactories[0]->factoryId);
         PD_MSG_FIELD_O(returnDetail) = self->taskFactories[0]->fcts.notifyDbAcquire(curTask, PD_MSG_FIELD_I(db));
 #undef PD_MSG
@@ -870,9 +878,9 @@ u8 xePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         // itself
         // Also, this should only happen when there is an actual EDT
         ASSERT(curTask &&
-            curTask->guid == PD_MSG_FIELD_I(edt.guid));
-        DPRINTF(DEBUG_LVL_VVERB, "DEP_DYNREMOVE req/resp for GUID 0x%lx\n",
-                PD_MSG_FIELD_I(db.guid));
+               IS_GUID_EQUAL(curTask->guid, PD_MSG_FIELD_I(edt.guid)));
+        DPRINTF(DEBUG_LVL_VVERB, "DEP_DYNREMOVE req/resp for GUID "GUIDSx"\n",
+                GUIDFS(PD_MSG_FIELD_I(db.guid)));
         ASSERT(curTask->fctId == self->taskFactories[0]->factoryId);
         PD_MSG_FIELD_O(returnDetail) = self->taskFactories[0]->fcts.notifyDbRelease(curTask, PD_MSG_FIELD_I(db));
 #undef PD_MSG

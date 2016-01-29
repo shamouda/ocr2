@@ -98,7 +98,14 @@ u8 binHeapSchedulerObjectInsert(ocrSchedulerObjectFactory_t *fact, ocrSchedulerO
         ocrGetHint(edtGuid, &edtHints);
         ocrGetHintValue(&edtHints, OCR_HINT_EDT_PRIORITY, (u64*)&priority);
     }
+
+    // See BUG #928 on GUID issues
+#ifdef GUID_64
     heap->push(heap, (void *)edtGuid, priority, 0);
+#elif defined(GUID_128)
+    heap->push(heap, (void *)edtGuid.lower, priority, 0);
+#endif
+
     return 0;
 }
 
@@ -115,14 +122,26 @@ u8 binHeapSchedulerObjectRemove(ocrSchedulerObjectFactory_t *fact, ocrSchedulerO
         case SCHEDULER_OBJECT_REMOVE_TAIL:
             {
                 START_PROFILE(sched_binHeap_Pop);
+                // See BUG #928 on GUID issues
+#ifdef GUID_64
                 retGuid = (ocrGuid_t)binHeap->pop(binHeap, 0);
+#elif defined(GUID_128)
+                ocrGuid_t *myGuid = (ocrGuid_t *)binHeap->pop(binHeap, 0);
+                retGuid = *myGuid;
+#endif
                 EXIT_PROFILE;
             }
             break;
         case SCHEDULER_OBJECT_REMOVE_HEAD:
             {
                 START_PROFILE(sched_binHeap_Steal);
+                // See BUG #928 on GUID issues
+#ifdef GUID_64
                 retGuid = (ocrGuid_t)binHeap->pop(binHeap, 1);
+#elif defined(GUID_128)
+                ocrGuid_t *myGuid = (ocrGuid_t *)binHeap->pop(binHeap, 1);
+                retGuid = *myGuid;
+#endif
                 EXIT_PROFILE;
             }
             break;
@@ -131,11 +150,11 @@ u8 binHeapSchedulerObjectRemove(ocrSchedulerObjectFactory_t *fact, ocrSchedulerO
             return OCR_ENOTSUP;
         }
 
-        if (retGuid == NULL_GUID)
+        if(IS_GUID_NULL(retGuid))
             break;
 
         if (IS_SCHEDULER_OBJECT_TYPE_SINGLETON(dst->kind)) {
-            ASSERT(dst->guid.guid == NULL_GUID && count == 1);
+            ASSERT(IS_GUID_NULL(dst->guid.guid) && count == 1);
             dst->guid.guid = retGuid;
         } else {
             ocrSchedulerObject_t taken;

@@ -151,7 +151,7 @@ static u8 hcSchedulerHeuristicWorkEdtUserInvoke(ocrSchedulerHeuristic_t *self, o
     u8 retVal = fact->fcts.remove(fact, schedObj, OCR_SCHEDULER_OBJECT_EDT, 1, &edtObj, NULL, SCHEDULER_OBJECT_REMOVE_TAIL);
 
     //If pop fails, then try to steal from other deques
-    if (edtObj.guid.guid == NULL_GUID) {
+    if (IS_GUID_NULL(edtObj.guid.guid)) {
         //First try to steal from the last deque that was visited (probably had a successful steal)
         ocrSchedulerObject_t *stealSchedulerObject = ((ocrSchedulerHeuristicContextHc_t*)self->contexts[hcContext->stealSchedulerObjectIndex])->mySchedulerObject;
         ASSERT(stealSchedulerObject);
@@ -160,9 +160,9 @@ static u8 hcSchedulerHeuristicWorkEdtUserInvoke(ocrSchedulerHeuristic_t *self, o
         //If cached steal failed, then restart steal loop from starting index
         ocrSchedulerObject_t *rootObj = self->scheduler->rootObj;
         ocrSchedulerObjectFactory_t *sFact = self->scheduler->pd->schedulerObjectFactories[rootObj->fctId];
-        while (edtObj.guid.guid == NULL_GUID && sFact->fcts.count(sFact, rootObj, (SCHEDULER_OBJECT_COUNT_EDT | SCHEDULER_OBJECT_COUNT_RECURSIVE) ) != 0) {
+        while (IS_GUID_NULL(edtObj.guid.guid) && sFact->fcts.count(sFact, rootObj, (SCHEDULER_OBJECT_COUNT_EDT | SCHEDULER_OBJECT_COUNT_RECURSIVE) ) != 0) {
             u32 i;
-            for (i = 1; edtObj.guid.guid == NULL_GUID && i < self->contextCount; i++) {
+            for (i = 1; IS_GUID_NULL(edtObj.guid.guid) && i < self->contextCount; i++) {
                 hcContext->stealSchedulerObjectIndex = (context->id + i) % self->contextCount; //simple round robin stealing
                 stealSchedulerObject = ((ocrSchedulerHeuristicContextHc_t*)self->contexts[hcContext->stealSchedulerObjectIndex])->mySchedulerObject;
                 if (stealSchedulerObject)
@@ -171,7 +171,7 @@ static u8 hcSchedulerHeuristicWorkEdtUserInvoke(ocrSchedulerHeuristic_t *self, o
         }
     }
 
-    if (edtObj.guid.guid != NULL_GUID)
+    if (!(IS_GUID_NULL(edtObj.guid.guid)))
         taskArgs->OCR_SCHED_ARG_FIELD(OCR_SCHED_WORK_EDT_USER).edt = edtObj.guid;
 
     return retVal;

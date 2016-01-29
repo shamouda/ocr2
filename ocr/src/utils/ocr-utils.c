@@ -123,7 +123,7 @@ u32 ocrGuidTrackerTrack(ocrGuidTracker_t *self, ocrGuid_t toTrack) {
 
 bool ocrGuidTrackerRemove(ocrGuidTracker_t *self, ocrGuid_t toTrack, u32 id) {
     if(id > 63) return false;
-    if(self->slots[id] != toTrack) return false;
+    if(!(IS_GUID_EQUAL(self->slots[id], toTrack))) return false;
 
     self->slotsStatus |= (1ULL<<(id));
     return true;
@@ -144,7 +144,7 @@ u32 ocrGuidTrackerFind(ocrGuidTracker_t *self, ocrGuid_t toFind) {
     while(rstatus) {
         slot = fls64(rstatus);
         rstatus &= ~(1ULL << slot);
-        if(self->slots[slot] == toFind) {
+        if(IS_GUID_EQUAL(self->slots[slot], toFind)) {
             result = slot;
             break;
         }

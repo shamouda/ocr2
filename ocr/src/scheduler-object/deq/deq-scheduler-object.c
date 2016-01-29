@@ -98,7 +98,9 @@ u8 deqSchedulerObjectInsert(ocrSchedulerObjectFactory_t *fact, ocrSchedulerObjec
         deq = newDeque(pd, NULL, schedObj->dequeType);
         schedObj->deque = deq;
     }
-    deq->pushAtTail(deq, (void *)(element->guid.guid), 0);
+    //Sanity check - Ensure work is local
+    ASSERT(element->guid.metaDataPtr != NULL);
+    deq->pushAtTail(deq, (void *)(element->guid.metaDataPtr), 0);
     return 0;
 }
 
@@ -115,14 +117,26 @@ u8 deqSchedulerObjectRemove(ocrSchedulerObjectFactory_t *fact, ocrSchedulerObjec
         case SCHEDULER_OBJECT_REMOVE_TAIL:
             {
                 START_PROFILE(sched_deq_Pop);
-                retGuid = (ocrGuid_t)deq->popFromTail(deq, 0);
+
+                void *popVal = deq->popFromTail(deq, 0);
+                if(popVal != NULL){
+                    ocrTask_t *popTask = (ocrTask_t *)popVal;
+                    retGuid = popTask->guid;
+                }
+
                 EXIT_PROFILE;
             }
             break;
         case SCHEDULER_OBJECT_REMOVE_HEAD:
             {
                 START_PROFILE(sched_deq_Steal);
-                retGuid = (ocrGuid_t)deq->popFromHead(deq, 1);
+
+                void *popVal = deq->popFromHead(deq, 1);
+                if(popVal != NULL){
+                    ocrTask_t *popTask = (ocrTask_t *)popVal;
+                    retGuid = popTask->guid;
+                }
+
                 EXIT_PROFILE;
             }
             break;
@@ -131,11 +145,11 @@ u8 deqSchedulerObjectRemove(ocrSchedulerObjectFactory_t *fact, ocrSchedulerObjec
             return OCR_ENOTSUP;
         }
 
-        if (retGuid == NULL_GUID)
+        if (IS_GUID_NULL(retGuid))
             break;
 
         if (IS_SCHEDULER_OBJECT_TYPE_SINGLETON(dst->kind)) {
-            ASSERT(dst->guid.guid == NULL_GUID && count == 1);
+            ASSERT((IS_GUID_NULL(dst->guid.guid)) && count == 1);
             dst->guid.guid = retGuid;
         } else {
             ocrSchedulerObject_t taken;
