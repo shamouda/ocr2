@@ -44,18 +44,6 @@ bool allDequesEmpty(ocrPolicyDomain_t *pd){
     return true;
 }
 
-void genericPrint(bool evtType, ocrTraceType_t ttype, ocrTraceAction_t action, u64 location, u64 timestamp, ocrGuid_t parent){
-
-    if(parent != NULL_GUID){
-        PRINTF("[TRACE] U/R: %s | LOCATION: 0x%lx | TIMESTAMP: %lu | TYPE: %s | ACTION: %s | PARENT: 0x%lx\n",
-                evt_type[evtType], location, timestamp, obj_type[ttype-IDX_OFFSET], action_type[action], parent);
-    }else{
-
-        PRINTF("[TRACE] U/R: %s | LOCATION: 0x%lx | TIMESTAMP: %lu | TYPE: %s | ACTION: %s\n",
-                evt_type[evtType], location, timestamp, obj_type[ttype-IDX_OFFSET], action_type[action]);
-    }
-}
-
 //Do custom processing for trace objects if provided by DPRINTF.
 #ifdef OCR_TRACE_BINARY
 void processTraceObject(ocrTraceObj_t *trace, FILE *f){
@@ -63,132 +51,9 @@ void processTraceObject(ocrTraceObj_t *trace, FILE *f){
     fwrite(trace, sizeof(ocrTraceObj_t), 1, f);
     return;
 }
-#else
-void processTraceObject(ocrTraceObj_t *trace){
-    //Common vars
-    ocrTraceType_t  ttype = trace->typeSwitch;
-    ocrTraceAction_t action =  trace->actionSwitch;
-    u64 timestamp = trace->time;
-    u64 location = trace->location;
-    bool evtType = trace->eventType;
-
-    switch(trace->typeSwitch){
-
-    case OCR_TRACE_TYPE_EDT:
-
-        switch(trace->actionSwitch){
-
-            case OCR_ACTION_CREATE:
-            {
-                ocrGuid_t parent = TRACE_FIELD(TASK, taskCreate, trace, parentID);
-                genericPrint(evtType, ttype, action, location, timestamp, parent);
-                break;
-            }
-            case OCR_ACTION_DESTROY:
-                //No need to grab value from trace object for this trace action yet. Currently only hold no-op placeholders.
-                genericPrint(evtType, ttype, action, location, timestamp, NULL_GUID);
-                break;
-            case OCR_ACTION_RUNNABLE:
-                //No need to grab value from trace object for this trace action yet. Currently only hold no-op placeholders.
-                genericPrint(evtType, ttype, action, location, timestamp, NULL_GUID);
-                break;
-            case OCR_ACTION_SATISFY:
-            {
-                ocrGuid_t src = TRACE_FIELD(TASK, taskDepSatisfy, trace, depID);
-                PRINTF("[TRACE] U/R: %s | LOCATION: 0x%lx | TIMESTAMP: %lu | TYPE: EDT | ACTION: DEP_SATISFY | DEP_GUID: 0x%llx\n",
-                        evt_type[evtType], location, timestamp, src);
-                break;
-            }
-            case OCR_ACTION_ADD_DEP:
-            {
-                ocrGuid_t dest = TRACE_FIELD(TASK, taskDepReady, trace, depID);
-                PRINTF("[TRACE] U/R: %s | LOCATION: 0x%lx | TIMESTAMP: %lu | TYPE: EDT | ACTION: ADD_DEP | DEP_GUID: 0x%lx\n",
-                        evt_type[evtType], location, timestamp, dest);
-                break;
-            }
-            case OCR_ACTION_EXECUTE:
-            {
-                ocrEdt_t funcPtr = TRACE_FIELD(TASK, taskExeBegin, trace, funcPtr);
-                PRINTF("[TRACE] U/R: %s | LOCATION: 0x%lx | TIMESTAMP: %lu | TYPE: EDT | ACTION: EXECUTE | FUNC_PTR: 0x%llx\n",
-                        evt_type[evtType], location, timestamp, funcPtr);
-                break;
-            }
-            case OCR_ACTION_FINISH:
-                //No need to grab value from trace object for this trace action yet. Currently only hold no-op placeholders.
-                genericPrint(evtType, ttype, action, location, timestamp, NULL_GUID);
-                break;
-
-
-        }
-        break;
-
-    case OCR_TRACE_TYPE_EVENT:
-
-        switch(trace->actionSwitch){
-
-            case OCR_ACTION_CREATE:
-            {
-                ocrGuid_t parent = TRACE_FIELD(EVENT, eventCreate, trace, parentID);
-                genericPrint(evtType, ttype, action, location, timestamp, parent);
-                break;
-            }
-            case OCR_ACTION_DESTROY:
-                //No need to grab value from trace object for this trace action yet. Currently only hold no-op placeholders.
-                genericPrint(evtType, ttype, action, location, timestamp, NULL_GUID);
-                break;
-            case OCR_ACTION_ADD_DEP:
-            {
-                ocrGuid_t dest = TRACE_FIELD(EVENT, eventDepAdd, trace, depID);
-                ocrGuid_t parent = TRACE_FIELD(EVENT, eventDepAdd, trace, parentID);
-                PRINTF("[TRACE] U/R: %s | LOCATION: 0x%lx | TIMESTAMP: %lu | TYPE: EVENT | ACTION: ADD_DEP | DEP_GUID: 0x%lx | PARENT: 0x%lx\n", evt_type[evtType], location, timestamp, dest, parent);
-                break;
-            }
-
-            case OCR_ACTION_SATISFY:
-            {
-                ocrGuid_t src = TRACE_FIELD(EVENT, eventDepSatisfy, trace, depID);
-                PRINTF("[TRACE] U/R: %s | LOCATION: 0x%lx | TIMESTAMP: %lu | TYPE: EVENT | ACTION: DEP_SATISFY | DEP_GUID: 0x%llx\n", evt_type[evtType], location, timestamp, src);
-                break;
-            }
-
-            default:
-                break;
-        }
-        break;
-
-    case OCR_TRACE_TYPE_DATABLOCK:
-
-        switch(trace->actionSwitch){
-
-            case OCR_ACTION_CREATE:
-            {
-                ocrGuid_t parent = TRACE_FIELD(DATA, dataCreate, trace, parentID);
-                u64 size = TRACE_FIELD(DATA, dataCreate, trace, size);
-                PRINTF("[TRACE] U/R: %s | LOCATION: 0x%lx | TIMESTAMP: %lu | TYPE: DATABLOCK | ACTION: CREATE | SIZE: %lu | PARENT:0x%lx\n", evt_type[evtType], location, timestamp, size, parent);
-                break;
-            }
-            case OCR_ACTION_DESTROY:
-                //No need to grab value from trace object for this trace action yet. Currently only hold no-op placeholders.
-                genericPrint(evtType, ttype, action, location, timestamp, NULL_GUID);
-                break;
-
-            default:
-                break;
-        }
-        break;
-
-    }
-
-}
 #endif
 
-
-//Drain remaining deque records if execution ends before all deque records have been popped off.
-#ifdef OCR_TRACE_BINARY
 void drainAllDeques(FILE *f){
-#else
-void drainAllDeques(){
-#endif
     ocrPolicyDomain_t *pd;
     getCurrentEnv(&pd, NULL, NULL, NULL);
     u32 i;
@@ -203,12 +68,10 @@ void drainAllDeques(){
             //Pop and process all remaining records
             ocrTraceObj_t *tr = (ocrTraceObj_t *)(deq->popFromHead(deq,0));
             ASSERT(tr != NULL);
+
 #ifdef OCR_TRACE_BINARY
             processTraceObject(tr, f);
-#else
-            processTraceObject(tr);
 #endif
-
             pd->fcts.pdFree(pd, tr);
         }
     }
@@ -242,8 +105,6 @@ void workerLoopSystem(ocrWorker_t *worker){
                     ocrTraceObj_t *tr = (ocrTraceObj_t *)(deq->popFromHead(deq, 0));
 #ifdef OCR_TRACE_BINARY
                     processTraceObject(tr, f);
-#else
-                    processTraceObject(tr);
 #endif
                     worker->pd->fcts.pdFree(worker->pd, tr);
                 }
@@ -294,8 +155,6 @@ void workerLoopSystem(ocrWorker_t *worker){
 #ifdef OCR_TRACE_BINARY
         drainAllDeques(f);
         fclose(f);
-#else
-        drainAllDeques();
 #endif
 
     }

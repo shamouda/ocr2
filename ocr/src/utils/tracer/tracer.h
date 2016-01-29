@@ -26,6 +26,7 @@ typedef struct {
     ocrTraceAction_t actionSwitch;    //
 
     u64 time;               /*Timestamp for event*/
+    u64 workerId;           /*Worker where event occured*/
     u64 location;           /*PD where event occured*/
     bool eventType;         /* TODO make this more descriptive than bool*/
     unsigned char **blob;   /* TODO Carry generic blob*/

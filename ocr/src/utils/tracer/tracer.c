@@ -41,8 +41,8 @@ static bool isSupportedTraceType(bool evtType, ocrTraceType_t ttype, ocrTraceAct
 }
 
 //Create a trace object subject to trace type, and push to HC worker's deque, to be processed by system worker.
-static void populateTraceObject(bool evtType, ocrTraceType_t objType, ocrTraceAction_t actionType,
-                                u64 location, u64 timestamp, ocrGuid_t parent, va_list ap){
+static void populateTraceObject(u64 location, bool evtType, ocrTraceType_t objType, ocrTraceAction_t actionType,
+                                u64 workerId, u64 timestamp, ocrGuid_t parent, va_list ap){
 
 
     ocrGuid_t src = NULL_GUID;
@@ -59,6 +59,7 @@ static void populateTraceObject(bool evtType, ocrTraceType_t objType, ocrTraceAc
     //Populate fields common to all trace objects.
     tr->typeSwitch = objType;
     tr->actionSwitch = actionType;
+    tr->workerId = workerId;
     tr->location = location;
     tr->time = timestamp;
     tr->eventType = evtType;
@@ -238,7 +239,7 @@ void doTrace(u64 location, u64 wrkr, ocrGuid_t parent, char *str, ...){
         va_end(ap);
         return;
     }
-    populateTraceObject(evtType, objType, actionType, wrkr, timestamp, parent, ap);
+    populateTraceObject(location, evtType, objType, actionType, wrkr, timestamp, parent, ap);
     va_end(ap);
 
 }

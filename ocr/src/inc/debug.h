@@ -381,6 +381,12 @@ extern void doTrace(u64 location, u64 wrkr, ocrGuid_t taskGuid, char *str, ...);
 
 #ifdef OCR_TRACE_BINARY
 
+#undef OCR_DEBUG_INIPARSING
+#define OCR_DEBUG_INIPARSING DEBUG_LVL_NONE
+#undef OCR_DEBUG_MACHINE
+#define OCR_DEBUG_MACHINE DEBUG_LVL_NONE
+//Binary trace enabled, suppressing INIPARSING and MACHINE
+//DPRINTFs until bug #829 is addressed.
 #if (OCR_DEBUG_LVL==DEBUG_LVL_WARN)
 #undef OCR_DEBUG_LVL
 #define OCR_DEBUG_LVL DEBUG_LVL_INFO
