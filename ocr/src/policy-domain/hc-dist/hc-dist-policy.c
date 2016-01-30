@@ -656,7 +656,12 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
     // that require a response. For now, only PD_MSG_DEP_REGWAITER message is using this feature.
     if ((isBlocking == false) && (msg->type & PD_MSG_REQ_RESPONSE)) {
         ASSERT(((msg->type & PD_MSG_TYPE_ONLY) == PD_MSG_DB_ACQUIRE)
-            || ((msg->type & PD_MSG_TYPE_ONLY) == PD_MSG_GUID_METADATA_CLONE));
+            || ((msg->type & PD_MSG_TYPE_ONLY) == PD_MSG_GUID_METADATA_CLONE)
+#ifdef ENABLE_EXTENSION_BLOCKING_SUPPORT
+            || ((msg->type & PD_MSG_TYPE_ONLY) == PD_MSG_EVT_CREATE)
+#endif
+            );
+
         // for a clone the cloning should actually be of an edt template
     }
 

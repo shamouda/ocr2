@@ -99,6 +99,11 @@
 #define ENABLE_SCHEDULER_OBJECT_PR_WSH
 #define ENABLE_SCHEDULER_OBJECT_BIN_HEAP
 
+// Support for MPIlite blocking operations
+#ifndef DISABLE_EXTENSION_BLOCKING_SUPPORT
+#define ENABLE_EXTENSION_BLOCKING_SUPPORT
+#endif
+
 // Sysboot layer to use
 #define ENABLE_SYSBOOT_LINUX
 

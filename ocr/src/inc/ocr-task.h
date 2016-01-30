@@ -351,6 +351,9 @@ typedef struct _ocrTask_t {
 #define OCR_TASK_FLAG_RUNTIME_EDT           0x2 /* Identifies if the task is a runtime EDT as opposed to a user EDT */
 #define OCR_TASK_FLAG_USES_SCHEDULER_OBJECT 0x4 /* BUG #920 Cleanup */
 #define OCR_TASK_FLAG_USES_AFFINITY         0x8 /* BUG #921: This should go away once affinity is folded into hints */
+#ifdef ENABLE_EXTENSION_BLOCKING_SUPPORT
+#define OCR_TASK_FLAG_LONG                  0x10
+#endif
 
 /****************************************************/
 /* OCR TASK FACTORY                                 */

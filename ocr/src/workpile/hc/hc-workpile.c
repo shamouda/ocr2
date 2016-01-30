@@ -54,12 +54,13 @@ u8 hcWorkpileSwitchRunlevel(ocrWorkpile_t *self, ocrPolicyDomain_t *PD, ocrRunle
             ocrWorkpileHc_t* derived = (ocrWorkpileHc_t*)self;
             // See BUG #928 on GUID issues
 #ifdef GUID_64
-            derived->deque = newDeque(self->pd, (void *) NULL_GUID, WORK_STEALING_DEQUE);
+            void * nullVal = (void *) NULL_GUID;
 #elif defined(GUID_128)
-            derived->deque = newDeque(self->pd, (void *) NULL_GUID.lower, WORK_STEALING_DEQUE);
+            void * nullVal =  (void *) NULL_GUID.lower;
 #endif
-            // Can switch to locked implementation for debugging purpose
-            // derived->deque = newDeque(self->pd, (void *) NULL_GUID, LOCKED_DEQUE);
+            // By convention we stash the deque type here else default
+            ocrDequeType_t type = (derived->deque != NULL) ? (ocrDequeType_t) derived->deque : WORK_STEALING_DEQUE;
+            derived->deque = newDeque(self->pd, nullVal, type);
         }
         if((properties & RL_TEAR_DOWN) && RL_IS_LAST_PHASE_DOWN(PD, RL_GUID_OK, phase)) {
             ocrWorkpileHc_t* derived = (ocrWorkpileHc_t*) self;
@@ -134,10 +135,17 @@ void hcWorkpilePush(ocrWorkpile_t * base, ocrWorkPushType_t type,
     ocrWorkpileHc_t* derived = (ocrWorkpileHc_t*) base;
     // See BUG #928 on GUID issues
 #ifdef GUID_64
-    derived->deque->pushAtTail(derived->deque, (void *)(g.guid), 0);
+    void * pushVal = (void *)(g.guid);
 #elif defined(GUID_128)
-    derived->deque->pushAtTail(derived->deque, (void *)(g.guid.lower), 0);
+    void * pushVal = (void *)(g.guid.lower);
 #endif
+    if (type == PUSH_WORKPUSHTYPE) {
+        derived->deque->pushAtTail(derived->deque, pushVal, 0);
+    } else {
+        ASSERT(type == PUSH_WORKPUSHBACKTYPE);
+        ASSERT(derived->deque->pushAtHead != NULL);
+        derived->deque->pushAtHead(derived->deque, (void *)pushVal, 0);
+    }
 }
 
 ocrWorkpile_t * newWorkpileHc(ocrWorkpileFactory_t * factory, ocrParamList_t *perInstance) {
@@ -148,6 +156,14 @@ ocrWorkpile_t * newWorkpileHc(ocrWorkpileFactory_t * factory, ocrParamList_t *pe
 
 void initializeWorkpileHc(ocrWorkpileFactory_t * factory, ocrWorkpile_t* self, ocrParamList_t * perInstance) {
     initializeWorkpileOcr(factory, self, perInstance);
+    ocrWorkpileHc_t* derived = (ocrWorkpileHc_t*)self;
+    derived->deque = NULL;
+    if (perInstance) {
+        paramListWorkpileHcInst_t * perInstanceType = (paramListWorkpileHcInst_t *) perInstance;
+        // Contract to remember the type for the initialization
+        // without storing it as an extra entry in the struct.
+        derived->deque = (deque_t *) perInstanceType->dequeType;
+    }
 }
 
 /******************************************************/

@@ -1371,7 +1371,6 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         START_PROFILE(pd_hc_EvtCreate);
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_EVT_CREATE
-
         ocrParamList_t * paramList = NULL;
 #ifdef ENABLE_EXTENSION_PARAMS_EVT
         if (PD_MSG_FIELD_I(params) != NULL) {
@@ -1379,13 +1378,31 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             paramList = (ocrParamList_t *) PD_MSG_FIELD_I(params);
         }
 #endif
+#ifdef ENABLE_EXTENSION_BLOCKING_SUPPORT
+        if (isBlocking == false) {
+            u32 returnDetail = createEventHelper(
+                self, &(PD_MSG_FIELD_IO(guid)),
+                PD_MSG_FIELD_I(type), PD_MSG_FIELD_I(properties), paramList);
+            if (returnDetail == OCR_EGUIDEXISTS) {
+                RETURN_PROFILE(OCR_EPEND);
+            } else {
+                PD_MSG_FIELD_O(returnDetail) = returnDetail;
+                msg->type &= ~PD_MSG_REQUEST;
+                msg->type |= PD_MSG_RESPONSE;
+            }
+        } else {
+#endif
         PD_MSG_FIELD_O(returnDetail) = createEventHelper(
             self, &(PD_MSG_FIELD_IO(guid)),
             PD_MSG_FIELD_I(type), PD_MSG_FIELD_I(properties), paramList);
+            msg->type &= ~PD_MSG_REQUEST;
+            msg->type |= PD_MSG_RESPONSE;
+#ifdef ENABLE_EXTENSION_BLOCKING_SUPPORT
+        }
+#endif
+
 #undef PD_MSG
 #undef PD_TYPE
-        msg->type &= ~PD_MSG_REQUEST;
-        msg->type |= PD_MSG_RESPONSE;
         EXIT_PROFILE;
         break;
     }
@@ -1442,6 +1459,7 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             PD_MSG_FIELD_O(returnDetail) = self->guidProviders[0]->fcts.createGuid(
                 self->guidProviders[0], &(PD_MSG_FIELD_IO(guid)), PD_MSG_FIELD_I(size),
                 PD_MSG_FIELD_I(kind), PD_MSG_FIELD_I(properties));
+            // This returnDetail is OCR_EGUIDEXISTS
         } else {
             // Here we just need to associate a GUID
             ocrGuid_t temp;

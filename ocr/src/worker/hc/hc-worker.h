@@ -46,6 +46,10 @@ typedef struct {
     hcWorkerType_t hcType;
     u8 legacySecondStart;
     deque_t *sysDeque;
+#ifdef ENABLE_EXTENSION_BLOCKING_SUPPORT
+    u32 isHelping;
+    bool stealFirst;
+#endif
 } ocrWorkerHc_t;
 
 ocrWorkerFactory_t* newOcrWorkerFactoryHc(ocrParamList_t *perType);

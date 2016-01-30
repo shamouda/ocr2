@@ -607,6 +607,13 @@ u8 destructTaskHc(ocrTask_t* base) {
 #undef PD_TYPE
         }
     } else {
+#ifdef ENABLE_EXTENSION_BLOCKING_SUPPORT
+        if (base->state == RESCHED_EDTSTATE) {
+            DPRINTF(DEBUG_LVL_WARN, "error: Detected inconsistency, check the CFG file uses the LEGACY scheduler");
+            ASSERT(false && "error: Detected inconsistency, check the CFG file uses the LEGACY scheduler");
+            return OCR_EPERM;
+        }
+#endif
         if (base->state != REAPING_EDTSTATE) {
             DPRINTF(DEBUG_LVL_WARN, "Destroy EDT "GUIDSx" is potentially racing with the EDT prelude or execution\n", GUIDFS(base->guid));
             ASSERT(false && "EDT destruction is racing with EDT execution");
@@ -648,7 +655,6 @@ u8 newTaskHc(ocrTaskFactory_t* factory, ocrFatGuid_t * edtGuid, ocrFatGuid_t edt
     ocrTask_t *curTask = NULL;
     u32 i;
     getCurrentEnv(&pd, NULL, &curTask, NULL);
-
     ocrFatGuid_t outputEvent = {.guid = NULL_GUID, .metaDataPtr = NULL};
     // We need an output event for the EDT if either:
     //  - the user requested one (outputEventPtr is non NULL)
@@ -750,14 +756,17 @@ u8 newTaskHc(ocrTaskFactory_t* factory, ocrFatGuid_t * edtGuid, ocrFatGuid_t edt
         u64* schedObjPtr = (u64*)HC_TASK_SCHED_OBJ_PTR(edt);
         *schedObjPtr = 0;
     }
-
     if (perInstance != NULL) {
         paramListTask_t *taskparams = (paramListTask_t*)perInstance;
         if (taskparams->workType == EDT_RT_WORKTYPE) {
             base->flags |= OCR_TASK_FLAG_RUNTIME_EDT;
         }
     }
-
+#ifdef ENABLE_EXTENSION_BLOCKING_SUPPORT
+    if (hasProperty(properties, EDT_PROP_LONG)) {
+        base->flags |= OCR_TASK_FLAG_LONG;
+    }
+#endif
     if (!IS_GUID_NULL(affinity.guid)) {
         base->flags |= OCR_TASK_FLAG_USES_AFFINITY;
     }
@@ -809,6 +818,7 @@ u8 newTaskHc(ocrTaskFactory_t* factory, ocrFatGuid_t * edtGuid, ocrFatGuid_t edt
 
         RESULT_PROPAGATE2(taskAllDepvSatisfied(base), 1);
     }
+
     return 0;
 }
 
@@ -1283,54 +1293,63 @@ u8 taskExecute(ocrTask_t* base) {
         }
         pd->fcts.pdFree(pd, derived->unkDbs);
     }
-
-    // Now deal with the output event
-    if(!(IS_GUID_NULL(base->outputEvent))) {
-        if(!(IS_GUID_NULL(retGuid))) {
-            getCurrentEnv(NULL, NULL, NULL, &msg);
-    #define PD_MSG (&msg)
-    #define PD_TYPE PD_MSG_DEP_ADD
-            msg.type = PD_MSG_DEP_ADD | PD_MSG_REQUEST;
-            PD_MSG_FIELD_I(source.guid) = retGuid;
-            PD_MSG_FIELD_I(source.metaDataPtr) = NULL;
-            PD_MSG_FIELD_I(dest.guid) = base->outputEvent;
-            PD_MSG_FIELD_I(dest.metaDataPtr) = NULL;
-            PD_MSG_FIELD_I(currentEdt.guid) = base->guid;
-            PD_MSG_FIELD_I(currentEdt.metaDataPtr) = base;
-            PD_MSG_FIELD_I(slot) = 0; // Always satisfy on slot 0. This will trickle to
-            // the finish latch if needed
-            PD_MSG_FIELD_IO(properties) = DB_MODE_CONST;
-            // Ignore failure for now
-            // Bug #615
-            pd->fcts.processMessage(pd, &msg, false);
-    #undef PD_MSG
-    #undef PD_TYPE
-        } else {
-            getCurrentEnv(NULL, NULL, NULL, &msg);
-    #define PD_MSG (&msg)
-    #define PD_TYPE PD_MSG_DEP_SATISFY
-            msg.type = PD_MSG_DEP_SATISFY | PD_MSG_REQUEST;
-            PD_MSG_FIELD_I(satisfierGuid.guid) = base->guid;
-            PD_MSG_FIELD_I(satisfierGuid.metaDataPtr) = base;
-            PD_MSG_FIELD_I(guid.guid) = base->outputEvent;
-            PD_MSG_FIELD_I(guid.metaDataPtr) = NULL;
-            PD_MSG_FIELD_I(payload.guid) = retGuid;
-            PD_MSG_FIELD_I(payload.metaDataPtr) = NULL;
-            PD_MSG_FIELD_I(currentEdt.guid) = base->guid;
-            PD_MSG_FIELD_I(currentEdt.metaDataPtr) = base;
-            PD_MSG_FIELD_I(slot) = 0; // Always satisfy on slot 0. This will trickle to
-            // the finish latch if needed
-            PD_MSG_FIELD_I(properties) = 0;
-            // Ignore failure for now
-            // Bug #615
-            pd->fcts.processMessage(pd, &msg, false);
-    #undef PD_MSG
-    #undef PD_TYPE
+    // If marked to be rescheduled, do not satisfy output
+    // event and do not update the task state to reaping
+    if (base->state == RUNNING_EDTSTATE) {
+        // Now deal with the output event
+        if(!(IS_GUID_NULL(base->outputEvent))) {
+            if(!(IS_GUID_NULL(retGuid))) {
+                getCurrentEnv(NULL, NULL, NULL, &msg);
+        #define PD_MSG (&msg)
+        #define PD_TYPE PD_MSG_DEP_ADD
+                msg.type = PD_MSG_DEP_ADD | PD_MSG_REQUEST;
+                PD_MSG_FIELD_I(source.guid) = retGuid;
+                PD_MSG_FIELD_I(source.metaDataPtr) = NULL;
+                PD_MSG_FIELD_I(dest.guid) = base->outputEvent;
+                PD_MSG_FIELD_I(dest.metaDataPtr) = NULL;
+                PD_MSG_FIELD_I(currentEdt.guid) = base->guid;
+                PD_MSG_FIELD_I(currentEdt.metaDataPtr) = base;
+                PD_MSG_FIELD_I(slot) = 0; // Always satisfy on slot 0. This will trickle to
+                // the finish latch if needed
+                PD_MSG_FIELD_IO(properties) = DB_MODE_CONST;
+                // Ignore failure for now
+                // Bug #615
+                pd->fcts.processMessage(pd, &msg, false);
+        #undef PD_MSG
+        #undef PD_TYPE
+            } else {
+                getCurrentEnv(NULL, NULL, NULL, &msg);
+        #define PD_MSG (&msg)
+        #define PD_TYPE PD_MSG_DEP_SATISFY
+                msg.type = PD_MSG_DEP_SATISFY | PD_MSG_REQUEST;
+                PD_MSG_FIELD_I(satisfierGuid.guid) = base->guid;
+                PD_MSG_FIELD_I(satisfierGuid.metaDataPtr) = base;
+                PD_MSG_FIELD_I(guid.guid) = base->outputEvent;
+                PD_MSG_FIELD_I(guid.metaDataPtr) = NULL;
+                PD_MSG_FIELD_I(payload.guid) = retGuid;
+                PD_MSG_FIELD_I(payload.metaDataPtr) = NULL;
+                PD_MSG_FIELD_I(currentEdt.guid) = base->guid;
+                PD_MSG_FIELD_I(currentEdt.metaDataPtr) = base;
+                PD_MSG_FIELD_I(slot) = 0; // Always satisfy on slot 0. This will trickle to
+                // the finish latch if needed
+                PD_MSG_FIELD_I(properties) = 0;
+                // Ignore failure for now
+                // Bug #615
+                pd->fcts.processMessage(pd, &msg, false);
+        #undef PD_MSG
+        #undef PD_TYPE
+            }
+            // Because the output event is non-persistent it is deallocated automatically
+            base->outputEvent = NULL_GUID;
         }
-        // Because the output event is non-persistent it is deallocated automatically
-        base->outputEvent = NULL_GUID;
+        base->state = REAPING_EDTSTATE;
     }
-    base->state = REAPING_EDTSTATE;
+#ifdef ENABLE_EXTENSION_BLOCKING_SUPPORT
+    else { // else EDT must be rescheduled
+        ASSERT(base->state == RESCHED_EDTSTATE);
+        ASSERT(base->depc == 0); //Limitation
+    }
+#endif
     return 0;
 }
 

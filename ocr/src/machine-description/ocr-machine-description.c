@@ -801,7 +801,25 @@ s32 populate_inst(ocrParamList_t **inst_param, int inst_param_size, void **insta
         break;
     case workpile_type:
         for (j = low; j<=high; j++) {
+#ifdef ENABLE_WORKPILE_HC
+            ALLOC_PARAM_LIST(inst_param[j], paramListWorkpileHcInst_t);
+            char *valuestr = "WORK_STEALING_DEQUE";
+            if (key_exists(dict, secname, "dequetype")) {
+                snprintf(key, MAX_KEY_SZ, "%s:%s", secname, "dequetype");
+                INI_GET_STR (key, valuestr, "");
+            }
+            ocrDequeType_t value = WORK_STEALING_DEQUE;
+            if (strcmp("LOCKED_DEQUE",valuestr) == 0) {
+                value = LOCKED_DEQUE;
+            } else {
+                if (strcmp("WORK_STEALING_DEQUE",valuestr) != 0) {
+                    DPRINTF(DEBUG_LVL_WARN, "Error: Unsupported dequetype %s\n", valuestr);
+                }
+            }
+            ((paramListWorkpileHcInst_t *)inst_param[j])->dequeType = value;
+#else
             ALLOC_PARAM_LIST(inst_param[j], paramListWorkpileInst_t);
+#endif
             instance[j] = (void *)((ocrWorkpileFactory_t *)factory)->instantiate(factory, inst_param[j]);
             if (instance[j])
                 DPRINTF(DEBUG_LVL_INFO, "Created workpile of type %s, index %d\n", inststr, j);
