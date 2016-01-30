@@ -282,6 +282,39 @@ void * lockedDequePopTail(deque_t * self, u8 doTry) {
 }
 
 /*
+ * Push an entry onto the tail of the deque
+ * This operation locks the whole deque.
+ */
+void lockedDequePushHead(deque_t* self, void* entry, u8 doTry) {
+    dequeSingleLocked_t* dself = (dequeSingleLocked_t*)self;
+    hal_lock32(&dself->lock);
+    u32 head = self->head;
+    u32 tail = self->tail;
+    if (tail == INIT_DEQUE_CAPACITY + head) { /* deque looks full */
+        /* may not grow the deque if some interleaving steal occur */
+        ASSERT("DEQUE full, increase deque's size" && 0);
+    }
+    // Not full so I must be able to write
+    u32 n;
+    if (head == tail) { // empty
+        // PRINTF("PUSH_HEAD empty\n");
+        ++(self->tail);
+        n = head % INIT_DEQUE_CAPACITY;
+    } else if (head == 0) { // no space at head, need to shift
+        hal_memMove(&self->data[1], self->data, (tail-head) * sizeof(void *), false);
+        self->tail++;
+        n = 0;
+    } else { // ok to just prepend
+        // PRINTF("PUSH_HEAD prepend\n");
+        --(self->head);
+        n = (head-1) % INIT_DEQUE_CAPACITY;
+    }
+    self->data[n] = entry;
+    hal_unlock32(&dself->lock);
+}
+
+
+/*
  * Pop the task out of the deque from the head
  * This operation locks the whole deque.
  */
@@ -381,7 +414,7 @@ deque_t * newDeque(ocrPolicyDomain_t *pd, void * initValue, ocrDequeType_t type)
         // Specialize push/pop implementations
         self->pushAtTail =  lockedDequePushTail;
         self->popFromTail = lockedDequePopTail;
-        self->pushAtHead = NULL;
+        self->pushAtHead = lockedDequePushHead;
         self->popFromHead = lockedDequePopHead;
         break;
     default:

@@ -32,6 +32,8 @@ parser.add_argument('--dbtype', dest='dbtype', default='Lockable', choices=['Loc
                    help='type of datablocks to use (default: Lockable)')
 parser.add_argument('--scheduler', dest='scheduler', default='HC', choices=['HC', 'PRIORITY', 'PLACEMENT_AFFINITY', 'LEGACY', 'ST', 'STATIC'],
                    help='scheduler heuristic (default: HC)')
+parser.add_argument('--dequetype', dest='dequetype', default='WORK_STEALING_DEQUE', choices=['WORK_STEALING_DEQUE', 'LOCKED_DEQUE'],
+                   help='deque type to use with LEGACY scheduler (default: WORK_STEALING_DEQUE)')
 parser.add_argument('--output', dest='output', default='default.cfg',
                    help='config output filename (default: default.cfg)')
 parser.add_argument('--remove-destination', dest='rmdest', action='store_true',
@@ -50,6 +52,7 @@ alloc = args.alloc
 alloctype = args.alloctype
 dbtype = args.dbtype
 scheduler = args.scheduler
+dequetype = args.dequetype
 outputfilename = args.output
 rmdest = args.rmdest
 sysworker = args.sysworker
@@ -240,6 +243,7 @@ def GenerateComp(output, pdtype, threads, binding, sysworker, schedtype):
     output.write("[WorkPileInst0]\n")
     output.write("\tid\t=\t0-%d\n" % (threads-1))
     output.write("\ttype\t=\tHC\n")
+    output.write("\tdequetype\t=\t%s\n" % (dequetype))
     output.write("\n#======================================================\n")
     if scheduler == 'LEGACY':
         output.write("[SchedulerObjectType0]\n")

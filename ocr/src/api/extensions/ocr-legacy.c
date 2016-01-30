@@ -147,10 +147,32 @@ u8 ocrLegacyBlockProgress(ocrGuid_t evtHandle, ocrGuid_t* guid, void** result, u
             if(PD_MSG_FIELD_IO(guid.metaDataPtr) == NULL) {
                 if(properties == LEGACY_PROP_NONE) {
                     return OCR_EINVAL;
-                } else if(properties == LEGACY_PROP_WAIT_FOR_CREATE) {
+                }
+                // Everytime there's a busy wait loop like this we need to
+                // call into the PD to try and make progress on other work
+                // For instance: might have to unlock some incoming label create here
+                else if(properties == LEGACY_PROP_WAIT_FOR_CREATE) {
+                    ocrPolicyDomain_t * pd;
+                    PD_MSG_STACK(msg);
+                    getCurrentEnv(&pd, NULL, NULL, &msg);
+                #undef PD_MSG
+                #undef PD_TYPE
+                #define PD_MSG (&msg)
+                #define PD_TYPE PD_MSG_MGT_MONITOR_PROGRESS
+                    msg.type = PD_MSG_MGT_MONITOR_PROGRESS | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
+                    //BUG #131 helper-mode: not sure if the caller should register a progress function or if the
+                    //scheduler should know what to do for each type of monitor progress
+                    PD_MSG_FIELD_IO(properties) = 0;
+                    PD_MSG_FIELD_I(monitoree) = NULL;
+                    RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, true));
+                #undef PD_MSG
+                #undef PD_TYPE
+#define PD_MSG (&msg)
+#define PD_TYPE PD_MSG_GUID_INFO
                     continue; // Tightest loop to see how this goes
                 }
-            } else {
+            }
+            else {
                 eventToYieldFor = (ocrEvent_t *)PD_MSG_FIELD_IO(guid.metaDataPtr);
                 ASSERT(eventToYieldFor->kind == OCR_EVENT_STICKY_T ||
                        eventToYieldFor->kind == OCR_EVENT_IDEM_T);
@@ -175,6 +197,24 @@ u8 ocrLegacyBlockProgress(ocrGuid_t evtHandle, ocrGuid_t* guid, void** result, u
         dbResult = PD_MSG_FIELD_O(data);
 #undef PD_TYPE
 #undef PD_MSG
+        // Everytime there's a busy wait loop like this we need to
+        // call into the PD to try and make progress on other work
+        // For instance: might have to unlock some incoming label create here
+        if (IS_GUID_ERROR(dbResult.guid)) {
+            ocrPolicyDomain_t * pd;
+            PD_MSG_STACK(msg);
+            getCurrentEnv(&pd, NULL, NULL, &msg);
+#define PD_MSG (&msg)
+#define PD_TYPE PD_MSG_MGT_MONITOR_PROGRESS
+            msg.type = PD_MSG_MGT_MONITOR_PROGRESS | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
+            //BUG #131 helper-mode: not sure if the caller should register a progress function or if the
+            //scheduler should know what to do for each type of monitor progress
+            PD_MSG_FIELD_IO(properties) = 0;
+            PD_MSG_FIELD_I(monitoree) = NULL;
+            RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, true));
+#undef PD_MSG
+#undef PD_TYPE
+        }
     } while(IS_GUID_ERROR(dbResult.guid));
 
     if(!(IS_GUID_NULL(dbResult.guid))) {

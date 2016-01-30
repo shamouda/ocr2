@@ -53,17 +53,43 @@ ocrGuid_t processRequestEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[
     // the callback my have completed and deallocated the message.
     u32 msgTypeOnly = (msg->type & PD_MSG_TYPE_ONLY);
 
+#ifdef ENABLE_EXTENSION_BLOCKING_SUPPORT
+    bool checkLabeled = false;
+    if (((msg->type & PD_MSG_TYPE_ONLY) == PD_MSG_EVT_CREATE) && (msg->type & PD_MSG_REQUEST)) {
+#define PD_MSG (msg)
+#define PD_TYPE PD_MSG_EVT_CREATE
+        u32 properties = PD_MSG_FIELD_I(properties);
+        ASSERT((properties & GUID_PROP_IS_LABELED)); // Only labeled guid can be remotely created
+        checkLabeled = ((properties & GUID_PROP_BLOCK) == GUID_PROP_BLOCK);
+        if (checkLabeled) { // Make the check asynchronous
+            PD_MSG_FIELD_I(properties) |= GUID_PROP_CHECK;
+        }
+        syncProcess = !checkLabeled;
+#undef PD_MSG
+#undef PD_TYPE
+    }
+#endif
+
     // All one-way request can be freed after processing
     bool toBeFreed = !(msg->type & PD_MSG_REQ_RESPONSE);
     DPRINTF(DEBUG_LVL_VVERB,"hc-comm-worker: Process incoming EDT request @ %p of type 0x%x\n", msg, msg->type);
     u8 res = pd->fcts.processMessage(pd, msg, syncProcess);
     DPRINTF(DEBUG_LVL_VVERB,"hc-comm-worker: [done] Process incoming EDT @ %p request of type 0x%x\n", msg, msg->type);
     //BUG #587 probably want a return code that tells if the message can be discarded or not
+
     if (res == OCR_EPEND) {
         if (msgTypeOnly == PD_MSG_DB_ACQUIRE) {
             // Acquire requests are consumed and can be discarded.
             pd->fcts.pdFree(pd, msg);
-        } else {
+        }
+#ifdef ENABLE_EXTENSION_BLOCKING_SUPPORT
+        else if (checkLabeled) {
+            ocrTask_t *task = NULL;
+            getCurrentEnv(NULL, NULL, &task, NULL);
+            task->state = RESCHED_EDTSTATE;
+        }
+#endif
+        else {
             ASSERT(msgTypeOnly == PD_MSG_WORK_CREATE);
             // Do not deallocate: Message has been enqueued for further processing.
             // Actually, message may have been deallocated in the meanwhile because

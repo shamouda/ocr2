@@ -226,7 +226,10 @@ typedef enum {
     ALLSAT_EDTSTATE     = 0x4, /**< EDT has all dependences satisfied */
     ALLACQ_EDTSTATE     = 0x5, /**< EDT has DB dependences acquired */
     RUNNING_EDTSTATE    = 0x6, /**< EDT is executing */
-    REAPING_EDTSTATE    = 0x7  /**< EDT finished executing and is cleaning up */
+#ifdef ENABLE_EXTENSION_BLOCKING_SUPPORT
+    RESCHED_EDTSTATE    = 0x7, /**< EDT needs to be rescheduled */
+#endif
+    REAPING_EDTSTATE    = 0x8  /**< EDT finished executing and is cleaning up */
 } ocrEdtState_t;
 
 
@@ -254,8 +257,9 @@ typedef enum {
  * @see ocrWorkPopType_t
  */
 typedef enum {
-    PUSH_WORKPUSHTYPE   = 0x1,
-    MAX_WORKPUSHTYPE    = 0x2
+    PUSH_WORKPUSHTYPE       = 0x1,
+    PUSH_WORKPUSHBACKTYPE   = 0x2,
+    MAX_WORKPUSHTYPE        = 0x3
 } ocrWorkPushType_t;
 
 /**
