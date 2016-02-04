@@ -51,25 +51,25 @@ def RewriteConfig(cfg):
         lines = fp.readlines()
         fp.seek(0)
         fp.truncate()
-        found = 0
+        section = 0    # Keeps track of section being parsed
         for line in lines:
             if 'MemPlatformInst0' in line:
-                found = 1
+                section = 1
             if 'MemTargetInst0' in line:
-                found = 2
+                section = 2
             if 'AllocatorInst0' in line:
-                found = 3
-            if found == 1 and 'start' in line:
+                section = 3
+            if section == 1 and 'start' in line:
                 line = '   start = \t' + hex(long(platstart,16)+binsize) + '\n'
-            if found == 1 and 'size' in line:
+            if section == 1 and 'size' in line:
                 line = '   size =\t' + hex(long(platsize,16)-binsize) + '\n'
-                found = 0
-            if found == 2 and 'size' in line:
+                section = 0
+            if section == 2 and 'size' in line:
                 line = '   size =\t' + hex(long(tgtsize,16)-binsize) + '\n'
-                found = 0
-            if found == 3 and 'size' in line:
+                section = 0
+            if section == 3 and 'size' in line:
                 line = '   size =\t' + hex(long(allocsize,16)-binsize) + '\n'
-                found = 0
+                section = 0
 
             fp.write(line)
 
