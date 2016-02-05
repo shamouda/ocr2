@@ -151,10 +151,6 @@ def GenerateComm(output, comms, pdtype, threads):
         output.write("\ttype\t=\t%s\n" % ("Handleless"))
         output.write("\tcommplatform\t=\t0\n")
         output.write("\n#======================================================\n")
-        output.write("[CommPlatformType0]\n\tname\t=\t%s\n" % ("None"))
-        output.write("[CommPlatformInst0]\n")
-        output.write("\tid\t=\t0\n")
-        output.write("\ttype\t=\t%s\n" % ("None"))
     output.write("\n#======================================================\n")
 
 def GenerateComp(output, pdtype, threads, binding, sysworker, schedtype):
