@@ -110,7 +110,16 @@ export OCR_TESTS_BIN_OUTPUT=
 
 if [ -z "${OCR_CONFIG}" ]; then
     export OCR_CONFIG=${OCR_INSTALL}/share/ocr/config/${OCR_TYPE}/generated_ocrTests.cfg
-    ${OCR_INSTALL}/share/ocr/scripts/Configs/config-generator.py --output ${OCR_CONFIG}
+    args="--threads 8 --alloctype mallocproxy --dbtype Lockable"
+    if [ "${OCR_TYPE}" = "x86-mpi" ]; then
+        args="${args} --guid COUNTED_MAP --target mpi"
+    elif [[ "${OCR_TYPE}" = "x86-gasnet" ]]; then
+        args="${args} --guid COUNTED_MAP --target gasnet"
+    elif [[ "${OCR_TYPE}" = "tg-x86" ]]; then
+        echo "error: ocrrun cannot call config-generator for tg-x86 (not supported - set OCR_CONFIG)"
+        exit 1
+    fi
+    ${OCR_INSTALL}/share/ocr/scripts/Configs/config-generator.py ${args} --output ${OCR_CONFIG} --remove-destination
     echo "OCR_CONFIG is not set, defaulting to ${OCR_CONFIG}"
 fi
 

@@ -2,7 +2,6 @@
 
 
 # User-provided or generated
-OCR_CONFIG=
 PROGRAM_BIN=
 
 #
@@ -34,14 +33,25 @@ else
 fi
 
 if [ "${OCR_CONFIG}" = "" ]; then
-    #Call the config generator
-    python ${OCR_ROOT}/bin/config-generator.py
-    #TODO this only works with default CFG filename
-    OCR_CONFIG=${PWD}/default.cfg
+    echo "error: ocrrun cannot call config-generator for tg-x86 (not supported - set OCR_CONFIG)"
+    exit 1
+fi
+
+if [[ "${OCRRUN_GDB}" == "yes" ]]; then
+    PROGRAM_BIN="gdb --args ${PROGRAM_BIN}"
+fi
+
+if [[ "${OCRRUN_VALGRIND_OPTS}" != "" ]]; then
+    OCRRUN_VALGRIND="yes";
+fi
+
+if [[ "${OCRRUN_VALGRIND}" == "yes" ]]; then
+    PROGRAM_BIN="valgrind ${OCRRUN_VALGRIND_OPTS} ${PROGRAM_BIN}"
 fi
 
 # Default is regular X86-backend
 ${PROGRAM_BIN} -ocr:cfg ${OCR_CONFIG}
+
 RET_CODE=$?
 exit ${RET_CODE}
 
