@@ -955,7 +955,9 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
                 // The sender didn't know about the metadataPtr, receiver does.
                 u64 val;
                 self->guidProviders[0]->fcts.getVal(self->guidProviders[0], PD_MSG_FIELD_IO(guid.guid), &val, NULL);
-                ASSERT(val != 0);
+                ASSERT_BLOCK_BEGIN(val != 0)
+                DPRINTF(DEBUG_LVL_WARN, "User-level error detected: DB acquire failed for DB 0x%lx. It most likely has already been destroyed\n", PD_MSG_FIELD_IO(guid.guid));
+                ASSERT_BLOCK_END
                 PD_MSG_FIELD_IO(guid.metaDataPtr) = (void *) val;
                 DPRINTF(DEBUG_LVL_VVERB,"DB_ACQUIRE: Incoming request for DB GUID 0x%lx with properties=0x%x\n",
                         PD_MSG_FIELD_IO(guid.guid), PD_MSG_FIELD_IO(properties));

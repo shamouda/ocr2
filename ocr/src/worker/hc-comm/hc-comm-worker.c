@@ -72,7 +72,11 @@ ocrGuid_t processRequestEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[
             // Makes sure the runtime doesn't try to reuse this message
             // even though it was not supposed to issue a response.
             // If that's the case, this check is racy
-            ASSERT(!(msg->type & PD_MSG_RESPONSE) || processResponse);
+            // Cannot just test (|| !(msg->type & PD_MSG_RESPONSE)) because the way things
+            // are currently setup, the various policy-domain implementations are always setting
+            // the response flag although req_response is not set but the destLocation is still local.
+            // Hence there are no race between freeing the message and sending the hypotetical response.
+            ASSERT(processResponse || (msg->destLocation == pd->myLocation));
             DPRINTF(DEBUG_LVL_VVERB,"hc-comm-worker: Deleted incoming EDT request @ %p of type 0x%x\n", msg, msg->type);
             // if request was an incoming one-way we can delete the message now.
             pd->fcts.pdFree(pd, msg);
