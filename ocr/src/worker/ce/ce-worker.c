@@ -56,7 +56,7 @@ static void workerLoop(ocrWorker_t * worker) {
 #define PD_TYPE PD_MSG_SCHED_UPDATE
         umsg.type = PD_MSG_SCHED_UPDATE | PD_MSG_REQUEST;
         PD_MSG_FIELD_I(properties) = OCR_SCHEDULER_UPDATE_PROP_IDLE;
-        ASSERT(pd->fcts.processMessage(pd, &umsg, false) == 0);
+        RESULT_ASSERT(pd->fcts.processMessage(pd, &umsg, false), ==, 0);
         ASSERT(PD_MSG_FIELD_O(returnDetail) == 0);
 #undef PD_MSG
 #undef PD_TYPE

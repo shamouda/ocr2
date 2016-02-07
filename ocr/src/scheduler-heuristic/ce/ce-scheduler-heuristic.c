@@ -342,7 +342,7 @@ static u8 ceSchedulerHeuristicNotifyEdtReadyInvoke(ocrSchedulerHeuristic_t *self
     u64 affinitySlot = ((u64)-1);
     ocrHint_t edtHint;
     ocrHintInit(&edtHint, OCR_HINT_EDT_T);
-    ASSERT(ocrGetHint(task->guid, &edtHint) == 0);
+    RESULT_ASSERT(ocrGetHint(task->guid, &edtHint), ==, 0);
     if (ocrGetHintValue(&edtHint, OCR_HINT_EDT_SLOT_MAX_ACCESS, &affinitySlot) == 0) {
         ASSERT(affinitySlot < task->depc);
         ocrTaskHc_t *hcTask = (ocrTaskHc_t*)task; //TODO:This is temporary until we get proper introspection support
@@ -354,7 +354,7 @@ static u8 ceSchedulerHeuristicNotifyEdtReadyInvoke(ocrSchedulerHeuristic_t *self
         u64 dbMemAffinity = ((u64)-1);
         ocrHint_t dbHint;
         ocrHintInit(&dbHint, OCR_HINT_DB_T);
-        ASSERT(ocrGetHint(dbGuid, &dbHint) == 0);
+        RESULT_ASSERT(ocrGetHint(dbGuid, &dbHint), ==, 0);
         if (ocrGetHintValue(&dbHint, OCR_HINT_DB_MEM_AFFINITY, &dbMemAffinity) == 0) {
             ocrLocation_t myLoc = pd->myLocation;
             ocrLocation_t dbLoc = dbMemAffinity;
@@ -387,7 +387,7 @@ static u8 ceSchedulerHeuristicNotifyEdtReadyInvoke(ocrSchedulerHeuristic_t *self
     edtObj.guid = fguid;
     edtObj.kind = OCR_SCHEDULER_OBJECT_EDT;
     ocrSchedulerObjectFactory_t *fact = pd->schedulerObjectFactories[insertSchedObj->fctId];
-    ASSERT(fact->fcts.insert(fact, insertSchedObj, &edtObj, NULL, (SCHEDULER_OBJECT_INSERT_AFTER | SCHEDULER_OBJECT_INSERT_POSITION_TAIL)) == 0);
+    RESULT_ASSERT(fact->fcts.insert(fact, insertSchedObj, &edtObj, NULL, (SCHEDULER_OBJECT_INSERT_AFTER | SCHEDULER_OBJECT_INSERT_POSITION_TAIL)), ==, 0);
     derived->workCount++;
     if (AGENT_FROM_ID(context->location) == ID_AGENT_CE) {
         ocrSchedulerHeuristicContextCe_t *ceContext = (ocrSchedulerHeuristicContextCe_t*)context;
@@ -419,7 +419,7 @@ u8 ceSchedulerHeuristicNotifyInvoke(ocrSchedulerHeuristic_t *self, ocrSchedulerO
             PD_MSG_FIELD_I(guid) = notifyArgs->OCR_SCHED_ARG_FIELD(OCR_SCHED_NOTIFY_EDT_DONE).guid;
             PD_MSG_FIELD_I(currentEdt) = notifyArgs->OCR_SCHED_ARG_FIELD(OCR_SCHED_NOTIFY_EDT_DONE).guid;
             PD_MSG_FIELD_I(properties) = 0;
-            ASSERT(pd->fcts.processMessage(pd, &msg, false) == 0);
+            RESULT_ASSERT(pd->fcts.processMessage(pd, &msg, false), ==, 0);
 #undef PD_MSG
 #undef PD_TYPE
         }
@@ -542,7 +542,7 @@ static u8 respondWorkRequest(ocrSchedulerHeuristic_t *self, ocrSchedulerHeuristi
         returnCode = pd->fcts.sendMessage(pd, msg.destLocation, &msg, NULL, 0);
         ASSERT(returnCode == 0);
     } else {
-        ASSERT(pd->fcts.sendMessage(pd, msg.destLocation, &msg, NULL, 0) == 0);
+        RESULT_ASSERT(pd->fcts.sendMessage(pd, msg.destLocation, &msg, NULL, 0), ==, 0);
     }
 #undef PD_MSG
 #undef PD_TYPE
@@ -610,7 +610,7 @@ u8 ceSchedulerHeuristicUpdate(ocrSchedulerHeuristic_t *self, u32 properties) {
                         ocrSchedulerHeuristicContextCe_t *ceContext = (ocrSchedulerHeuristicContextCe_t*)context;
                         if (context->location == pd->parentLocation && ceContext->outWorkRequestPending == false) {
                             DPRINTF(DEBUG_LVL_VVERB, "FORCE WORK REQUEST to parent %lx\n", context->location);
-                            ASSERT(makeWorkRequest(self, context, true) == 0);
+                            RESULT_ASSERT(makeWorkRequest(self, context, true), ==, 0);
                             DPRINTF(DEBUG_LVL_VVERB, "FORCE WORK REQUEST SUCCESS to parent %lx\n", context->location);
                             break;
                         }

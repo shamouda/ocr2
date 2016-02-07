@@ -238,7 +238,7 @@ static void workerLoopHcCommInternal(ocrWorker_t * worker, ocrPolicyDomain_t *pd
                 giveMsg.type = PD_MSG_SCHED_NOTIFY | PD_MSG_REQUEST;
                 PD_MSG_FIELD_IO(schedArgs).kind = OCR_SCHED_NOTIFY_COMM_READY;
                 PD_MSG_FIELD_IO(schedArgs).OCR_SCHED_ARG_FIELD(OCR_SCHED_NOTIFY_COMM_READY).guid = fatGuid;
-                ASSERT(pd->fcts.processMessage(pd, &giveMsg, false) == 0);
+                RESULT_ASSERT(pd->fcts.processMessage(pd, &giveMsg, false), ==, 0);
             #undef PD_MSG
             #undef PD_TYPE
                 //For now, assumes all the responses are for workers that are
@@ -283,7 +283,7 @@ static void workerLoopHcCommInternal(ocrWorker_t * worker, ocrPolicyDomain_t *pd
                         giveMsg.type = PD_MSG_SCHED_NOTIFY | PD_MSG_REQUEST;
                         PD_MSG_FIELD_IO(schedArgs).kind = OCR_SCHED_NOTIFY_COMM_READY;
                         PD_MSG_FIELD_IO(schedArgs).OCR_SCHED_ARG_FIELD(OCR_SCHED_NOTIFY_COMM_READY).guid = fatGuid;
-                        ASSERT(pd->fcts.processMessage(pd, &giveMsg, false) == 0);
+                        RESULT_ASSERT(pd->fcts.processMessage(pd, &giveMsg, false), ==, 0);
                     #undef PD_MSG
                     #undef PD_TYPE
                     } else {

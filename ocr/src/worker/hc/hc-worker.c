@@ -75,7 +75,7 @@ static void hcWorkShift(ocrWorker_t * worker) {
             PD_MSG_FIELD_IO(schedArgs).kind = OCR_SCHED_NOTIFY_EDT_DONE;
             PD_MSG_FIELD_IO(schedArgs).OCR_SCHED_ARG_FIELD(OCR_SCHED_NOTIFY_EDT_DONE).guid.guid = taskGuid.guid;
             PD_MSG_FIELD_IO(schedArgs).OCR_SCHED_ARG_FIELD(OCR_SCHED_NOTIFY_EDT_DONE).guid.metaDataPtr = taskGuid.metaDataPtr;
-            ASSERT(pd->fcts.processMessage(pd, &msg, false) == 0);
+            RESULT_ASSERT(pd->fcts.processMessage(pd, &msg, false), ==, 0);
 
             // Important for this to be the last
             worker->curTask = NULL;

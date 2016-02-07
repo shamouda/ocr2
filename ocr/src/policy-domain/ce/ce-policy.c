@@ -1325,9 +1325,9 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             // Set the affinity hint (TODO: Use sched notify)
             if (msg->srcLocation != self->myLocation) {
                 ocrHint_t hintVar;
-                ASSERT(ocrHintInit(&hintVar, OCR_HINT_DB_T) == 0);
-                ASSERT(ocrSetHintValue(&hintVar, OCR_HINT_DB_MEM_AFFINITY, (u64)(msg->srcLocation)) == 0);
-                ASSERT(ocrSetHint(db->guid, &hintVar) == 0);
+                RESULT_ASSERT(ocrHintInit(&hintVar, OCR_HINT_DB_T), ==, 0);
+                RESULT_ASSERT(ocrSetHintValue(&hintVar, OCR_HINT_DB_MEM_AFFINITY, (u64)(msg->srcLocation)), ==, 0);
+                RESULT_ASSERT(ocrSetHint(db->guid, &hintVar), ==, 0);
             }
 
             // BUG #584: Check if properties want DB acquired
@@ -2536,7 +2536,7 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
                            (PD_MSG_FIELD_I(properties) & RL_TEAR_DOWN)) {
                             self->shutdownCode = PD_MSG_FIELD_I(errorCode);
                             //Release pending responses from the scheduler
-                            ASSERT(self->schedulers[0]->fcts.update(self->schedulers[0], OCR_SCHEDULER_UPDATE_PROP_SHUTDOWN) == 0);
+                            RESULT_ASSERT(self->schedulers[0]->fcts.update(self->schedulers[0], OCR_SCHEDULER_UPDATE_PROP_SHUTDOWN), ==, 0);
                         }
                         RESULT_ASSERT(self->fcts.switchRunlevel(
                                           self, PD_MSG_FIELD_I(runlevel),
@@ -2575,7 +2575,7 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
                     self->shutdownCode = PD_MSG_FIELD_I(errorCode);
 
                     //Release pending responses from the scheduler
-                    ASSERT(self->schedulers[0]->fcts.update(self->schedulers[0], OCR_SCHEDULER_UPDATE_PROP_SHUTDOWN) == 0);
+                    RESULT_ASSERT(self->schedulers[0]->fcts.update(self->schedulers[0], OCR_SCHEDULER_UPDATE_PROP_SHUTDOWN), ==, 0);
                     self->fcts.switchRunlevel(self, RL_USER_OK, RL_TEAR_DOWN | RL_REQUEST | RL_BARRIER | RL_FROM_MSG | cePolicy->rlSwitch.pdStatus);
                     // This will cause the worker to switch out of USER_OK and, on its next
                     // loop iteration, will drop back out in the switchRunlevel function (in RL_USER_OK
@@ -2606,7 +2606,7 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
                     cePolicy->rlSwitch.checkedIn = 0;
 
                     //Release pending responses from the scheduler
-                    ASSERT(self->schedulers[0]->fcts.update(self->schedulers[0], OCR_SCHEDULER_UPDATE_PROP_SHUTDOWN) == 0);
+                    RESULT_ASSERT(self->schedulers[0]->fcts.update(self->schedulers[0], OCR_SCHEDULER_UPDATE_PROP_SHUTDOWN), ==, 0);
                     self->fcts.switchRunlevel(self, RL_USER_OK, RL_TEAR_DOWN | RL_REQUEST | RL_BARRIER | RL_FROM_MSG | cePolicy->rlSwitch.pdStatus);
                     // This will cause the worker to switch out of USER_OK and, on its next
                     // loop iteration, will drop back out in the switchRunlevel function (in RL_USER_OK

@@ -143,7 +143,7 @@ u8 pcSchedulerHeuristicRegisterContext(ocrSchedulerHeuristic_t *self, u64 contex
     params.kind = OCR_SCHEDULER_OBJECT_ITERATOR;
     params.guidRequired = 0;
     pcContext->mapIterator = (ocrSchedulerObjectIterator_t*)tablFact->fcts.create(tablFact, (ocrParamList_t*)&params);
-    ASSERT(tablFact->fcts.iterate(tablFact, domainObj->dbMap, pcContext->mapIterator, SCHEDULER_OBJECT_ITERATE_BEGIN) == 0);
+    RESULT_ASSERT(tablFact->fcts.iterate(tablFact, domainObj->dbMap, pcContext->mapIterator, SCHEDULER_OBJECT_ITERATE_BEGIN), ==, 0);
     return 0;
 }
 
@@ -190,7 +190,7 @@ static u8 pcSchedulerHeuristicWorkEdtUserInvoke(ocrSchedulerHeuristic_t *self, o
         ocrTask_t *currentEdt = (ocrTask_t*)edtObj.guid.metaDataPtr;
         ocrHint_t edtHint;
         ocrHintInit(&edtHint, OCR_HINT_EDT_T);
-        ASSERT(ocrSetHintValue(&edtHint, OCR_HINT_EDT_PHASE, 0) == 0);
+        RESULT_ASSERT(ocrSetHintValue(&edtHint, OCR_HINT_EDT_PHASE, 0), ==, 0);
         fact->pd->taskFactories[0]->fcts.setHint(currentEdt, &edtHint);
         taskArgs->OCR_SCHED_ARG_FIELD(OCR_SCHED_WORK_EDT_USER).edt = edtObj.guid;
     }
@@ -259,7 +259,7 @@ static u8 pcSchedulerHeuristicNotifyEdtSatisfiedInvoke(ocrSchedulerHeuristic_t *
     PD_MSG_FIELD_IO(schedArgs).properties = OCR_SCHED_ANALYZE_REQUEST;
     PD_MSG_FIELD_IO(schedArgs).dstObj = NULL;
     PD_MSG_FIELD_IO(schedArgs).srcObj = &edtObj;
-    ASSERT(pd->fcts.processMessage(pd, &msg, false) == 0);
+    RESULT_ASSERT(pd->fcts.processMessage(pd, &msg, false), ==, 0);
 #undef PD_MSG
 #undef PD_TYPE
     return 0;
@@ -277,7 +277,7 @@ static u8 pcSchedulerHeuristicNotifyEdtDoneInvoke(ocrSchedulerHeuristic_t *self,
     PD_MSG_FIELD_I(guid) = notifyArgs->OCR_SCHED_ARG_FIELD(OCR_SCHED_NOTIFY_EDT_DONE).guid;
     PD_MSG_FIELD_I(currentEdt) = notifyArgs->OCR_SCHED_ARG_FIELD(OCR_SCHED_NOTIFY_EDT_DONE).guid;
     PD_MSG_FIELD_I(properties) = 0;
-    ASSERT(pd->fcts.processMessage(pd, &msg, false) == 0);
+    RESULT_ASSERT(pd->fcts.processMessage(pd, &msg, false), ==, 0);
 #undef PD_MSG
 #undef PD_TYPE
     return 0;
@@ -297,7 +297,7 @@ static u8 pcSchedulerHeuristicNotifyDbCreateInvoke(ocrSchedulerHeuristic_t *self
         ocrHint_t edtHint;
         ocrHintInit(&edtHint, OCR_HINT_EDT_T);
         pd->taskFactories[0]->fcts.getHint(currentEdt, &edtHint);
-        ASSERT(ocrGetHintValue(&edtHint, OCR_HINT_EDT_PHASE, &currentPhase) == 0);
+        RESULT_ASSERT(ocrGetHintValue(&edtHint, OCR_HINT_EDT_PHASE, &currentPhase), ==, 0);
     } else {
         //ASSERT(0); //TODO: We should assert if ocrDbCreate is called outside an EDT. We need identify user vs runtime calls.
     }
@@ -320,7 +320,7 @@ static u8 pcSchedulerHeuristicNotifyDbCreateInvoke(ocrSchedulerHeuristic_t *self
     it->ITERATOR_ARG_FIELD(OCR_SCHEDULER_OBJECT_MAP).key = (void*)db->guid;
     it->ITERATOR_ARG_FIELD(OCR_SCHEDULER_OBJECT_MAP).value = (void*)dbNode;
     DPRINTF(DEBUG_LVL_VERB, "DB node. Key: %lu Value: %lu\n", db->guid, dbNode);
-    ASSERT(tablFact->fcts.insert(tablFact, domainObj->dbMap, (ocrSchedulerObject_t*)it, SCHEDULER_OBJECT_INSERT_MAP_CONC_PUT) == 0);
+    RESULT_ASSERT(tablFact->fcts.insert(tablFact, domainObj->dbMap, (ocrSchedulerObject_t*)it, SCHEDULER_OBJECT_INSERT_MAP_CONC_PUT), ==, 0);
     return 0;
 }
 
@@ -385,7 +385,7 @@ static u8 sendPhaseResponse(ocrSchedulerHeuristic_t *self, ocrSchedulerHeuristic
     PD_MSG_FIELD_IO(schedArgs).properties = OCR_SCHED_ANALYZE_RESPONSE;
     PD_MSG_FIELD_IO(schedArgs).dstObj = analyzeArgs->srcObj;
     PD_MSG_FIELD_IO(schedArgs).srcObj = NULL;
-    ASSERT(pd->fcts.processMessage(pd, &msg, false) == 0);
+    RESULT_ASSERT(pd->fcts.processMessage(pd, &msg, false), ==, 0);
 #undef PD_MSG
 #undef PD_TYPE
     return 0;
@@ -407,7 +407,7 @@ static u8 pcSchedulerHeuristicAnalyzePhaseRequestInvoke(ocrSchedulerHeuristic_t 
         if (depv[i].guid != NULL_GUID) {
             it->ITERATOR_ARG_FIELD(OCR_SCHEDULER_OBJECT_MAP).key = (void*)depv[i].guid;
             it->ITERATOR_ARG_FIELD(OCR_SCHEDULER_OBJECT_MAP).value = NULL;
-            ASSERT(tablFact->fcts.iterate(tablFact, domainObj->dbMap, it, SCHEDULER_OBJECT_ITERATE_MAP_GET_NON_CONC) == 0);
+            RESULT_ASSERT(tablFact->fcts.iterate(tablFact, domainObj->dbMap, it, SCHEDULER_OBJECT_ITERATE_MAP_GET_NON_CONC), ==, 0);
             ASSERT(it->ITERATOR_ARG_FIELD(OCR_SCHEDULER_OBJECT_MAP).value);
             depv[i].ptr = it->ITERATOR_ARG_FIELD(OCR_SCHEDULER_OBJECT_MAP).value; //Repurpose the data ptr to hold the DB node pointer
         }
@@ -473,7 +473,7 @@ static u8 pcSchedulerHeuristicAnalyzePhaseResponseInvoke(ocrSchedulerHeuristic_t
         if (depv[i].guid != NULL_GUID) {
             it->ITERATOR_ARG_FIELD(OCR_SCHEDULER_OBJECT_MAP).key = (void*)depv[i].guid;
             it->ITERATOR_ARG_FIELD(OCR_SCHEDULER_OBJECT_MAP).value = NULL;
-            ASSERT(tablFact->fcts.iterate(tablFact, domainObj->dbMap, it, SCHEDULER_OBJECT_ITERATE_MAP_GET_NON_CONC) == 0);
+            RESULT_ASSERT(tablFact->fcts.iterate(tablFact, domainObj->dbMap, it, SCHEDULER_OBJECT_ITERATE_MAP_GET_NON_CONC), ==, 0);
             ASSERT(it->ITERATOR_ARG_FIELD(OCR_SCHEDULER_OBJECT_MAP).value);
             ocrSchedulerObjectDbNode_t *dbNode = (ocrSchedulerObjectDbNode_t*)it->ITERATOR_ARG_FIELD(OCR_SCHEDULER_OBJECT_MAP).value; //Repurpose the data ptr to hold the DB node pointer
             depv[i].ptr = dbNode->dataPtr;

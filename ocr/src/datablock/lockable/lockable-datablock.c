@@ -371,7 +371,7 @@ u8 lockableRelease(ocrDataBlock_t *self, ocrFatGuid_t edt, bool isInternal) {
                     waiter = next;
                     //PERF: Would be nice to do that outside the lock but it incurs allocating
                     // an array of messages and traversing the list of waiters again
-                    ASSERT(!pd->fcts.processMessage(pd, &msg, true));
+                    RESULT_ASSERT(pd->fcts.processMessage(pd, &msg, true), ==, 0);
                 } else {
                     prev = waiter;
                     waiter = next;
@@ -403,7 +403,7 @@ u8 lockableRelease(ocrDataBlock_t *self, ocrFatGuid_t edt, bool isInternal) {
             rself->worker = NULL;
             hal_unlock32(&(rself->lock));
             pd->fcts.pdFree(pd, waiter);
-            ASSERT(!pd->fcts.processMessage(pd, &msg, true));
+            RESULT_ASSERT(pd->fcts.processMessage(pd, &msg, true), ==, 0);
             return 0;
         } else { // RO
             //NOTE: if waiter is NULL it means there was nobody queued up for any mode
@@ -419,7 +419,7 @@ u8 lockableRelease(ocrDataBlock_t *self, ocrFatGuid_t edt, bool isInternal) {
                     pd->fcts.pdFree(pd, waiter);
                     //PERF: Would be nice to do that outside the lock but it incurs allocating
                     // an array of messages and traversing the list of waiters again
-                    ASSERT(!pd->fcts.processMessage(pd, &msg, true));
+                    RESULT_ASSERT(pd->fcts.processMessage(pd, &msg, true), ==, 0);
                     waiter = next;
                 } while (waiter != NULL);
                 ASSERT(rself->roWaiterList == NULL);
