@@ -25,9 +25,11 @@
 
 #define DEBUG_TYPE COMM_PLATFORM
 
+u32 XeIrqReq[8];
+
 //
 // Hgh-Level Theory of Operation / Design
-//
+//pp
 // Communication will always involve one local->remote copy of
 // information. Whether it is a source initiated bulk DMA or a series
 // of remote initiated loads, it *will* happen. What does *not* need
@@ -84,22 +86,11 @@
 
 static void releaseXE(u32 i) {
     DPRINTF(DEBUG_LVL_VERB, "Ungating XE %u\n", i);
-    // Before unclockgating the XE, we make sure it is clock-gated to avoid
-    // a race where the CE sees the XE's message before the XE sends the
-    // alarm to the CE. The XE will clock-gate itself on the alarm
-    // and never wake up.
     u64 state = 0;
-    u64 loopCount = 0;
-    u64 stuckCount = 0;
-    do {
-        // Bug #820: This was a MMIO LD call and should be replaced by one when they become available
-
-        state = *((volatile u64*)(BR_MSR_BASE((i+ID_AGENT_XE0)) + (POWER_GATE_RESET * sizeof(u64))));
-        if(++loopCount > 100) {
-            DPRINTF(DEBUG_LVL_INFO, "Stuck on unclockgating %u (%d times), ignoring\n", i, stuckCount++);
-            return;
-        }
-    } while(!(state & 0x1ULL));
+    // Bug #820: This was a MMIO LD call and should be replaced by one when they become available
+    state = *((volatile u64*)(BR_MSR_BASE((i+ID_AGENT_XE0)) + (POWER_GATE_RESET * sizeof(u64))));
+    // The XE should be clock-gated already because we don't process its message before it is
+    ASSERT(state & 0x1ULL);
     // Bug #820: Further, this was a MMIO operation
     *((u64*)(BR_MSR_BASE((i+ID_AGENT_XE0)) + (POWER_GATE_RESET * sizeof(u64)))) &= ~(0x1ULL);
     DPRINTF(DEBUG_LVL_VERB, "XE %u ungated\n", i);
@@ -477,7 +468,8 @@ u8 ceCommPollMessage(ocrCommPlatform_t *self, ocrPolicyMsg_t **msg,
 
     // Loop through the stages till we receive something
     for(i = cp->pollq, j=(cp->pollq - 1 + ((ocrPolicyDomainCe_t*)self->pd)->xeCount) % ((ocrPolicyDomainCe_t*)self->pd)->xeCount;
-           (cp->lq[i])[0] != 2; i = (i+1) % ((ocrPolicyDomainCe_t*)self->pd)->xeCount) {
+        XeIrqReq[i] == 0; i = (i+1) % ((ocrPolicyDomainCe_t*)self->pd)->xeCount) {
+
         // Halt the CPU, instead of burning rubber
         // An alarm would wake us, so no delay will result
         // Note that a timer alarm wakes us up periodically
@@ -487,7 +479,13 @@ u8 ceCommPollMessage(ocrCommPlatform_t *self, ocrPolicyMsg_t **msg,
             return POLL_NO_MESSAGE;
         }
     }
-
+    // If we found a message it means that cp->lq[i][0] should be 2
+    // We now rely on the XeIrqReq vector to tell us if we have a message
+    // but we should still look to make sure we actually have a message
+    ASSERT(cp->lq[i][0] == 2);
+    // We also reset the IRQ vector here (just to say that we saw the alarm)
+    ASSERT(XeIrqReq[i] == 1);
+    XeIrqReq[i] = 0;
     // Try to be fair to all XEs (somewhat anyways)
     cp->pollq = (i + 1) % ((ocrPolicyDomainCe_t*)self->pd)->xeCount;
     // One message being returned
@@ -515,7 +513,7 @@ u8 ceCommWaitMessage(ocrCommPlatform_t *self,  ocrPolicyMsg_t **msg,
             cp->pollq);
     // Loop through the stages till we receive something
     for(i = cp->pollq, j=(cp->pollq - 1 + ((ocrPolicyDomainCe_t*)self->pd)->xeCount) % ((ocrPolicyDomainCe_t*)self->pd)->xeCount;
-           (cp->lq[i])[0] != 2; i = (i+1) % ((ocrPolicyDomainCe_t*)self->pd)->xeCount) {
+           XeIrqReq[i] == 0; i = (i+1) % ((ocrPolicyDomainCe_t*)self->pd)->xeCount) {
         // Halt the CPU, instead of burning rubber
         // An alarm would wake us, so no delay will result
         // Note that a timer alarm wakes us up periodically
@@ -527,6 +525,13 @@ u8 ceCommWaitMessage(ocrCommPlatform_t *self,  ocrPolicyMsg_t **msg,
         }
     }
 
+    // If we found a message it means that cp->lq[i][0] should be 2
+    // We now rely on the XeIrqReq vector to tell us if we have a message
+    // but we should still look to make sure we actually have a message
+    ASSERT(cp->lq[i][0] == 2);
+    // We also reset the IRQ vector here (just to say that we saw the alarm)
+    ASSERT(XeIrqReq[i] == 1);
+    XeIrqReq[i] = 0;
     // Try to be fair to all XEs (somewhat anyways)
     cp->pollq = (i + 1) % ((ocrPolicyDomainCe_t*)self->pd)->xeCount;
     // One message being returned

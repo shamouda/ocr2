@@ -190,7 +190,9 @@ u8 xeCommSendMessage(ocrCommPlatform_t *self, ocrLocation_t target,
         ASSERT(tmp == 1);
     }
 
-    // - Alarm remote to tell the CE it has something (in case it is halted)
+    // - Alarm remote to tell the CE it has something from us. The message will
+    // not be processed until this happens (the swap above is just used as an additional
+    // check but does not trigger the CE)
     __asm__ __volatile__("alarm %0\n\t" : : "L" (XE_MSG_READY));
     DPRINTF(DEBUG_LVL_VERB, "RELEASED\n");
 
