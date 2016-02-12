@@ -14,6 +14,8 @@
 
 // Warning: Any updates made to the enum must also be applied
 //          to the implementation of the ocrGuidKindToChar function
+// Warning: This also needs to be kept in sync with the ocrGuidUserKind
+//          struct in inc/extensions/ocr-labeling.h. See BUG #561
 typedef enum {
     OCR_GUID_NONE = 0,
     OCR_GUID_ALLOCATOR = 1,
