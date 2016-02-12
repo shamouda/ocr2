@@ -73,13 +73,17 @@ done
 # try to lookup for a default ocr install
 if [ -z "${OCR_TYPE}" ]; then
     echo "OCR_TYPE is not set, defaulting to x86"
+    export OCR_TYPE=x86
 fi
 
 if [ -z "${OCR_INSTALL}" ]; then
-    echo "OCR_INSTALL is not set, defaulting to ../install/"
-    OCR_INSTALL_TMP=`pwd`/../install/
-    if [ -x ${OCR_INSTALL_TMP}/lib/libocr_${OCR_TYPE}.so ]; then
+    echo "OCR_INSTALL is not set, defaulting to ../install"
+    OCR_INSTALL_TMP=`pwd`/../install
+    if [ -e ${OCR_INSTALL_TMP}/lib/libocr_${OCR_TYPE}.so ]; then
         export OCR_INSTALL=${OCR_INSTALL_TMP}
+    else
+        echo "Error ${OCR_INSTALL_TMP}/lib/libocr_${OCR_TYPE}.so not found..."
+        exit 1
     fi
 fi
 
@@ -148,7 +152,7 @@ export OCR_FLAGS=" -ocr:cfg ${OCR_CONFIG}"
 BIN_DIR=${OCR_INSTALL}/bin
 LIB_DIR=${OCR_INSTALL}/lib
 
-if [ -x ${LIB_DIR}/libocr_${OCR_TYPE}.so -o -e ${LIB_DIR}/libocr_${OCR_TYPE}.a ]; then
+if [ -e ${LIB_DIR}/libocr_${OCR_TYPE}.so -o -e ${LIB_DIR}/libocr_${OCR_TYPE}.a ]; then
     echo "OCR library found in ${OCR_INSTALL}/lib"
 else
     echo "ERROR OCR library not found in ${OCR_INSTALL}/lib"
