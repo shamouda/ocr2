@@ -23,7 +23,7 @@ DEFAULT_CONFIG = ce-default.cfg
 
 
 CC      := gcc
-CFLAGS  := -m64 -mcmodel=large -fno-builtin -fno-stack-protector -Wno-unused-local-typedefs \
+CFLAGS  := -m64 -mcmodel=large -mno-sse -fno-builtin -fno-stack-protector -Wno-unused-local-typedefs \
 		-I${TG_INSTALL}/include
 
 RM      := rm
