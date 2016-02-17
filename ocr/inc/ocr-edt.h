@@ -23,17 +23,26 @@ extern "C" {
    @{
 **/
 
+
 #ifdef ENABLE_EXTENSION_PARAMS_EVT
 
 typedef struct {
-    union {
-        u64 counter;
-    } EVENT_LATCH;
+    u64 counter;
+} ocrEventLatchParams_t;
+
 #ifdef ENABLE_EXTENSION_COUNTED_EVT
-    union {
-        u64 nbDeps;
-    } EVENT_COUNTED;
+typedef struct {
+    u64 nbDeps;
+} ocrEventCounterParams_t;
 #endif
+
+typedef struct {
+    union {
+        ocrEventLatchParams_t EVENT_LATCH;
+#ifdef ENABLE_EXTENSION_COUNTED_EVT
+        ocrEventCounterParams_t EVENT_COUNTED;
+#endif
+    };
 } ocrEventParams_t;
 
 u8 ocrEventCreateParams(ocrGuid_t *guid, ocrEventTypes_t eventType, u16 properties, ocrEventParams_t * params);
@@ -70,7 +79,7 @@ u8 ocrEventCreate(ocrGuid_t *guid, ocrEventTypes_t eventType, u16 properties);
  * by the programmer. This call enables this.
  *
  * @param[in] guid     The GUID of the event to destroy
- * @return a statuc code
+ * @return a status code
  *     - 0: successful
  *     - EINVAL: If guid does not refer to a valid event to destroy
  **/
