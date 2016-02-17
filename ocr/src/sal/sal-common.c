@@ -471,20 +471,7 @@ static u32 internal_vsnprintf(char *buf, u32 size, const char *fmt, __builtin_va
                     if(!precision) precision = 6;
 
                     // We are always promoted to a double
-                    {
-                        //
-                        // I'd use this:
-                        //
-                        //  arg_f = __builtin_va_arg(ap, double);
-                        //
-                        // But GCC's __builtin_va_arg() uses SSE even
-                        // when we tell it not to...  So, we work
-                        // around it by another type of the same size
-                        // to extract the bits...
-                        //
-                        unsigned long long * tmp = (unsigned long long *)&arg_f;
-                        *tmp = __builtin_va_arg(ap, unsigned long long);
-                    }
+                    arg_f = (double)__builtin_va_arg(ap, double);
                     ftona(&buf, &chars, size, precision, arg_f, c);
                     break;
 
