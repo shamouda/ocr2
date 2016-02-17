@@ -18,7 +18,8 @@ Build requirements:
 
 3) Go back to the main OCR directory and Set environment variable
 
-    export OCR_INSTALL=${PWD}/install/x86/
+    export OCR_TYPE=x86
+    export OCR_INSTALL=${PWD}/install/
     export LD_LIBRARY_PATH=${OCR_INSTALL}/lib:${LD_LIBRARY_PATH}
 
 3) Run printf

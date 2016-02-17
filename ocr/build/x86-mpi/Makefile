@@ -36,9 +36,13 @@ LN      := ln
 # Shared libraries specific builds
 LDFLAGS += -shared -fpic -lpthread
 
-# -lrt needed only for CentOS (more accurately, < glibc-2.17)
-ifeq ($(wildcard /etc/centos-release), /etc/centos-release)
+# -lrt needed only for < glibc-2.17 in Linux systems (not needed for OS X)
+UNAME := $(shell uname -s)
+ifeq ($(UNAME),Linux)
+ret := $(shell echo "`ldd --version | awk '/ldd/{print $$NF}'` < 2.17" | bc)
+ifeq ($(ret), 1)
 LDFLAGS += -lrt
+endif
 endif
 
 # CFLAGS_SHARED will be concatenated with any
