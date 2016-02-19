@@ -1,0 +1,22 @@
+REPO=$1
+CMD=$2
+
+ARCH=x86
+BUILD_DIR=$REPO/ocr/build/${ARCH}
+
+cd ${BUILD_DIR}
+
+INSTALL_DIR=${PWD}/../../install/${ARCH}
+
+export OCR_INSTALL=${PWD}/../../install/x86
+export LD_LIBRARY_PATH=${OCR_INSTALL}/lib:$LD_LIBRARY_PATH
+export OCR_CONFIG=${OCR_INSTALL}/config/mach-hc-4w.cfg
+
+cd ../../tests
+
+if [ -n "$CMD" ]; then
+   cd ../build/${ARCH}; make clean && make && make install; cd -
+fi
+
+# this is for ocrrun
+export PATH=${INSTALL_DIR}/bin:$PATH

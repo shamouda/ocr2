@@ -1,0 +1,2 @@
+mv hooks hooks-old
+ln -s ../git-hooks hooks

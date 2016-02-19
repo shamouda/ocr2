@@ -1,0 +1,10 @@
+#
+# Sample XST configuration
+#
+# Should be named 'xst.conf' and placed in ${HOME}
+#
+
+export XST_GITNAME=XXXX
+
+export XST_SYS=${XST_SYS-thor}
+export XST_MPI=${XST_MPI-intel}

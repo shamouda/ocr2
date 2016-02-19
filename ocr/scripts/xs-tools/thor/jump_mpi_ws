@@ -1,0 +1,25 @@
+REPO=$1
+CMD=$2
+
+unset OCR_TYPE
+export OCR_TYPE=x86-mpi
+
+BUILD_DIR=$REPO/ocr/ocr/build/${OCR_TYPE}
+
+cd ${BUILD_DIR}
+
+. ${XST_ROOT}/${XST_SYS}/mpi_intel_env
+
+MAKE_THREADS=${MAKE_THREADS-16}
+
+if [ -n "$CMD" ]; then
+   make -j${MAKE_THREADS} clean && make -j${MAKE_THREADS} && make -j${MAKE_THREADS} install
+fi
+
+export OCR_INSTALL=${PWD}/../../install/${OCR_TYPE}
+export PATH=${OCR_INSTALL}/bin:${PATH}
+export LD_LIBRARY_PATH=${OCR_INSTALL}/lib:${LD_LIBRARY_PATH}
+export OCR_CONFIG=${OCR_INSTALL}/share/ocr/config/x86-mpi/mach-hc-dist-mpi-clone-8w-lockableDB.cfg
+
+# drops in test folder by default
+cd ../../tests

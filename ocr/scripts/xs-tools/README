@@ -1,0 +1,11 @@
+These are experimental aimed at simplifying development on various
+machines. Use them as templates to develop your own.
+
+Provided scripts:
+    - co_xstack:       Checkout the OCR runtime and applications
+    - jump_xxx_ws:     Configure an environment and build OCR on a given
+                       platform
+    - */mpi_xxx_env    Per system environment file to load the MPI implementation
+
+setup_git is a helper script and xst.conf-sample provides a sample file to use
+to get all the other scripts to work (you need to modify it)
