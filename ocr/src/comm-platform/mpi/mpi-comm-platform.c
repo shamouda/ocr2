@@ -331,6 +331,15 @@ u8 probeIncoming(ocrCommPlatform_t *self, int src, int tag, ocrPolicyMsg_t ** ms
         (*msg)->bufferSize = count;
         ASSERT(success == MPI_SUCCESS);
 
+        // This check usually fails in the 'ocrPolicyMsgGetMsgSize' when there
+        // has been an issue in MPI. It manifest as a received buffer being complete
+        // garbage whereas the sender doesn't detect any corruption of the message when
+        // it is recycled. Tinkering with multiple MPI implementation it sounds the issue
+        // is with the MPI library not being able to register a hook for malloc calls.
+        ASSERT((((*msg)->type & (PD_MSG_REQUEST | PD_MSG_RESPONSE)) != (PD_MSG_REQUEST | PD_MSG_RESPONSE)) &&
+           (((*msg)->type & PD_MSG_REQUEST) || ((*msg)->type & PD_MSG_RESPONSE)) &&
+           "error: Try to link the MPI library first when compiling your OCR program");
+
         // Unmarshall the message. We check to make sure the size is OK
         // This should be true since MPI seems to make sure to send the whole message
         u64 baseSize = 0, marshalledSize = 0;

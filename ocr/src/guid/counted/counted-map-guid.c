@@ -194,15 +194,17 @@ static u64 generateNextGuid(ocrGuidProvider_t* self, ocrGuidKind kind) {
 
 u8 countedMapGuidReserve(ocrGuidProvider_t *self, ocrGuid_t* startGuid, u64* skipGuid,
                          u64 numberGuids, ocrGuidKind guidType) {
-    // Non supported; use labeled provider
-    ASSERT(0);
+    // Not supported; use labeled provider
+    DPRINTF(DEBUG_LVL_WARN, "error: Must use labeled GUID provider for labeled GUID support, current is counted-map\n");
+    ASSERT(false);
     return OCR_ENOTSUP;
 }
 
 u8 countedMapGuidUnreserve(ocrGuidProvider_t *self, ocrGuid_t startGuid, u64 skipGuid,
                            u64 numberGuids) {
-    // Non supported; use labeled provider
-    ASSERT(0);
+    // Not supported; use labeled provider
+    DPRINTF(DEBUG_LVL_WARN, "error: Must use labeled GUID provider for labeled GUID support, current is counted-map\n");
+    ASSERT(false);
     return OCR_ENOTSUP;
 }
 
@@ -225,7 +227,8 @@ static u8 countedMapGetGuid(ocrGuidProvider_t* self, ocrGuid_t* guid, u64 val, o
 u8 countedMapCreateGuid(ocrGuidProvider_t* self, ocrFatGuid_t *fguid, u64 size, ocrGuidKind kind, u32 properties) {
     if(properties & GUID_PROP_IS_LABELED) {
         // Not supported; use labeled provider
-        ASSERT(0);
+        DPRINTF(DEBUG_LVL_WARN, "error: Must use labeled GUID provider for labeled GUID support, current is counted-map\n");
+        ASSERT(false);
     }
 
     PD_MSG_STACK(msg);
