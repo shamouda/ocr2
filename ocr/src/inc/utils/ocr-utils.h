@@ -78,6 +78,7 @@ void ocr_exit();
  *
  * @param val  Value to look at
  * @return  MSB set to 1 (from 0 to 15)
+ * @warn returns 0 if val is 0
  */
 u32 fls16(u16 val);
 
@@ -87,6 +88,7 @@ u32 fls16(u16 val);
  *
  * @param val  Value to look at
  * @return  MSB set to 1 (from 0 to 31)
+ * @warn returns 0 if val is 0
  */
 u32 fls32(u32 val);
 
@@ -96,8 +98,36 @@ u32 fls32(u32 val);
  *
  * @param val  Value to look at
  * @return  MSB set to 1 (from 0 to 63)
+ * @warn returns 0 if val is 0
  */
 u32 fls64(u64 val);
+
+/**
+ * @brief Counts trailing zeros therefore
+ * returning LSB position
+ *
+ * @param val  Value to look at
+ * @return  LSB set to 1 (from 0 to 15)
+ */
+u32 ctz16(u16 val);
+
+/**
+ * @brief Counts trailing zeros therefore
+ * returning LSB position
+ *
+ * @param val  Value to look at
+ * @return  LSB set to 1 (from 0 to 31)
+ */
+u32 ctz32(u32 val);
+
+/**
+ * @brief Counts trailing zeros therefore
+ * returning LSB position
+ *
+ * @param val  Value to look at
+ * @return  LSB set to 1 (from 0 to 63)
+ */
+u32 ctz64(u64 val);
 
 /**
  * @brief Convenient structure to keep track

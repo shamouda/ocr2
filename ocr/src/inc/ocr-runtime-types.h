@@ -356,6 +356,7 @@ typedef u64 ocrLocation_t;
         if(__result) RETURN_PROFILE(returnValue);       \
     } while(0);
 
+
 /**
  * @brief Static assertion check macro
  */

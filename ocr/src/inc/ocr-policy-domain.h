@@ -1261,6 +1261,9 @@ typedef struct _ocrPolicyDomainFcts_t {
 #endif
 } ocrPolicyDomainFcts_t;
 
+// Forward declaration of the strand tables
+struct _pdStrandTable_t;
+
 /**
  * @brief A policy domain is OCR's way of dividing up the runtime in scalable
  * chunks
@@ -1342,6 +1345,8 @@ typedef struct _ocrPolicyDomain_t {
     ocrPlacer_t * placer;                       //BUG #476 - This code is being deprecated
 
     ocrPlatformModel_t * platformModel;         /**< Platform model (WIP) */
+
+    struct _pdStrandTable_t* strandTables[2];
 
     /**
      * @brief Two dimensional array:

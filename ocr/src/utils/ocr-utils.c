@@ -25,6 +25,16 @@ void ocr_exit() {
     hal_exit(1);
 }
 
+// These operations could be replaced by hardware versions of them. Keeping general
+// for now
+// FLS: Find last set:
+//  - returns the MSB that is set.
+//  - WARNING: returns 0 for both input of 0 and 1
+// CTZ: Count trailing zeros:
+//  - returns the number of trailing zeros, so for 100b, returns 2 which is the bit
+//    position of the LSB set
+//  - If If the input value is 0, returns the number of bits -1 of the size of the input
+//    (so 15, 31 or 63)
 
 u32 fls16(u16 val) {
     u32 bit = 15;
@@ -104,6 +114,84 @@ u32 fls64(u64 val) {
         bit -= 1;
     }
 
+    return bit;
+}
+
+u32 ctz16(u16 val) {
+    // Fast path for odd numbers
+    if (val & 0x1) {
+        return 0;
+    }
+    u32 bit = 1;
+    if ((val & 0xff) == 0) {
+        val >>= 8;
+        bit += 8;
+    }
+    if ((val & 0xf) == 0) {
+        val >>= 4;
+        bit += 4;
+    }
+    if ((val & 0x3) == 0) {
+        val >>= 2;
+        bit += 2;
+    }
+    bit -= val & 0x1;
+    return bit;
+}
+
+u32 ctz32(u32 val) {
+    // Fast path for odd numbers
+    if (val & 0x1) {
+        return 0;
+    }
+    u32 bit = 1;
+    if ((val & 0xffff) == 0) {
+        val >>= 16;
+        bit += 16;
+    }
+    if ((val & 0xff) == 0) {
+        val >>= 8;
+        bit += 8;
+    }
+    if ((val & 0xf) == 0) {
+        val >>= 4;
+        bit += 4;
+    }
+    if ((val & 0x3) == 0) {
+        val >>= 2;
+        bit += 2;
+    }
+    bit -= val & 0x1;
+    return bit;
+}
+
+u32 ctz64(u64 val) {
+    // Fast path for odd numbers
+    if (val & 0x1) {
+        return 0;
+    }
+    u32 bit = 1;
+    if ((val & 0xffffffff) == 0) {
+        val >>= 32;
+        bit += 32;
+    }
+    if ((val & 0xffff) == 0) {
+        val >>= 16;
+        bit += 16;
+    }
+    if ((val & 0xff) == 0) {
+        val >>= 8;
+        bit += 8;
+    }
+    if ((val & 0xf) == 0) {
+        val >>= 4;
+        bit += 4;
+    }
+    if ((val & 0x3) == 0) {
+        val >>= 2;
+        bit += 2;
+    }
+    bit -= val & 0x1;
     return bit;
 }
 

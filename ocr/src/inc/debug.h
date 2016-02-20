@@ -245,6 +245,17 @@ extern void doTrace(u64 location, u64 wrkr, ocrGuid_t taskGuid, char *str, ...);
 #define DEBUG_LVL_POLICY OCR_DEBUG_LVL
 #endif
 
+#ifdef OCR_DEBUG_MICROTASKS
+#define OCR_DEBUG_MICROTASKS 1
+#else
+#define OCR_DEBUG_MICROTASKS 0
+#endif
+
+#define OCR_DEBUG_MICROTASKS_STR "MICROTASKS"
+#ifndef DEBUG_LVL_MICROTASKS
+#define DEBUG_LVL_MICROTASKS OCR_DEBUG_LVL
+#endif
+
 #ifdef OCR_DEBUG_SAL
 #define OCR_DEBUG_SAL 1
 #else

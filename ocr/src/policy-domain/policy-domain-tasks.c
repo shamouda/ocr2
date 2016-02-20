@@ -1,0 +1,1172 @@
+/*
+ * This file is subject to the license agreement located in the file LICENSE
+ * and cannot be distributed without it. This notice cannot be
+ * removed or modified.
+ */
+#include "ocr-errors.h"
+#include "ocr-policy-domain.h"
+#include "utils/ocr-utils.h"
+#include "ocr-policy-domain-tasks.h"
+
+/* Use a separate type of debug-type just for micro-tasks */
+#define DEBUG_TYPE MICROTASKS
+
+
+/***************************************/
+/********** Internal functions *********/
+/***************************************/
+
+// Macros to help with code factoring
+#define CHECK_MALLOC(expr, cleanup) do {    \
+    if((expr) == NULL) {            \
+        DPRINTF(DEBUG_LVL_WARN, "Cannot allocate memory for \"" #expr "\"\n");   \
+        toReturn = OCR_ENOMEM;      \
+        cleanup;                    \
+        ASSERT(false);              \
+        goto _END_FUNC;             \
+    }                               \
+} while(0);
+
+// WARNING: CHECK_RESULT looks for the result to be 0. So it works the opposite
+// of an assert. If result is 0, all will be good, otherwise it will error out.
+// This is meant to check the return value of functions
+#define CHECK_RESULT(expr, cleanup, newcode) do {   \
+    if((expr) != 0) {               \
+        DPRINTF(DEBUG_LVL_WARN, "Error in check \"" #expr "\"; aborting\n");   \
+        cleanup;                    \
+        newcode;                    \
+        ASSERT(false);              \
+        goto _END_FUNC;             \
+    }                               \
+} while(0);
+
+#define CHECK_RESULT_T(expr, cleanup, newcode) CHECK_RESULT(!(expr), cleanup, newcode)
+
+#define END_LABEL(label) label: __attribute__((unused));
+
+
+#define PROPAGATE_UP_TREE(node, parent, cond, actions) do {      \
+    while (((parent) != NULL) && (cond)) {                       \
+        hal_lock32(&((parent)->lock));                                  \
+        DPRINTF(DEBUG_LVL_VVERB, "BEFORE: 0x%lx -> 0x%lx [%u] "         \
+                "curNode: [F;NP;R: 0x%lx; 0x%lx; 0x%lx], "              \
+                "parent: [F;NP;R: 0x%lx; 0x%lx; 0x%lx]\n",              \
+                (node), (parent), (node)->parentSlot,                   \
+                (node)->nodeFree, (node)->nodeNeedsProcess,             \
+                (node)->nodeReady, (parent)->nodeFree,                  \
+                (parent)->nodeNeedsProcess, (parent)->nodeReady);       \
+        actions;                                                        \
+        DPRINTF(DEBUG_LVL_VVERB, "AFTER:  0x%lx -> 0x%lx [%u] "         \
+                "curNode: [F;NP;R: 0x%lx; 0x%lx; 0x%lx], "              \
+                "parent: [F;NP;R: 0x%lx; 0x%lx; 0x%lx]\n",              \
+                (node), (parent), (node)->parentSlot,                   \
+                (node)->nodeFree, (node)->nodeNeedsProcess,             \
+                (node)->nodeReady, (parent)->nodeFree,                  \
+                (parent)->nodeNeedsProcess, (parent)->nodeReady);       \
+        hal_unlock32(&(curNode->lock));                                 \
+        curNode = parent;                                               \
+        parent = curNode->parent;                                       \
+    }                                                                   \
+    /* Unlock the final one */                                          \
+    hal_unlock32(&(curNode->lock));                                     \
+    } while(0);
+
+#define PROPAGATE_UP_TREE_CHECK_LOCK(node, parent, cond, actions) do {  \
+    bool _releaseLock = node->lock == 1;                                \
+    while (((parent) != NULL) && (cond)) {                              \
+        hal_lock32(&((parent)->lock));                                  \
+        DPRINTF(DEBUG_LVL_VVERB, "BEFORE: 0x%lx -> 0x%lx [%u] "         \
+                "curNode: [F;NP;R: 0x%lx; 0x%lx; 0x%lx], "              \
+                "parent: [F;NP;R: 0x%lx; 0x%lx; 0x%lx]\n",              \
+                (node), (parent), (node)->parentSlot,                   \
+                (node)->nodeFree, (node)->nodeNeedsProcess,             \
+                (node)->nodeReady, (parent)->nodeFree,                  \
+                (parent)->nodeNeedsProcess, (parent)->nodeReady);       \
+        actions;                                                        \
+        DPRINTF(DEBUG_LVL_VVERB, "AFTER:  0x%lx -> 0x%lx [%u] "         \
+                "curNode: [F;NP;R: 0x%lx; 0x%lx; 0x%lx], "              \
+                "parent: [F;NP;R: 0x%lx; 0x%lx; 0x%lx]\n",              \
+                (node), (parent), (node)->parentSlot,                   \
+                (node)->nodeFree, (node)->nodeNeedsProcess,             \
+                (node)->nodeReady, (parent)->nodeFree,                  \
+                (parent)->nodeNeedsProcess, (parent)->nodeReady);       \
+        if(_releaseLock) hal_unlock32(&(curNode->lock));                \
+        _releaseLock = true; /* Always lock/unlock up the chain */      \
+        curNode = parent;                                               \
+        parent = curNode->parent;                                       \
+    }                                                                   \
+    /* Unlock the final one (which can be the first one */              \
+    if(_releaseLock) hal_unlock32(&(curNode->lock));                    \
+    } while(0);
+
+#define PROPAGATE_UP_TREE_NO_UNLOCK(node, parent, cond, actions) do {   \
+    bool _releaseLock = false;                                          \
+    while (((parent) != NULL) && (cond)) {                              \
+        hal_lock32(&((parent)->lock));                                  \
+        DPRINTF(DEBUG_LVL_VVERB, "BEFORE: 0x%lx -> 0x%lx [%u] "         \
+                "curNode: [F;NP;R: 0x%lx; 0x%lx; 0x%lx], "              \
+                "parent: [F;NP;R: 0x%lx; 0x%lx; 0x%lx]\n",              \
+                (node), (parent), (node)->parentSlot,                   \
+                (node)->nodeFree, (node)->nodeNeedsProcess,             \
+                (node)->nodeReady, (parent)->nodeFree,                  \
+                (parent)->nodeNeedsProcess, (parent)->nodeReady);       \
+        actions;                                                        \
+        DPRINTF(DEBUG_LVL_VVERB, "AFTER:  0x%lx -> 0x%lx [%u] "         \
+                "curNode: [F;NP;R: 0x%lx; 0x%lx; 0x%lx], "              \
+                "parent: [F;NP;R: 0x%lx; 0x%lx; 0x%lx]\n",              \
+                (node), (parent), (node)->parentSlot,                   \
+                (node)->nodeFree, (node)->nodeNeedsProcess,             \
+                (node)->nodeReady, (parent)->nodeFree,                  \
+                (parent)->nodeNeedsProcess, (parent)->nodeReady);       \
+        if(_releaseLock) hal_unlock32(&(curNode->lock));                \
+        _releaseLock = true; /* Always lock/unlock up the chain */      \
+        curNode = parent;                                               \
+        parent = curNode->parent;                                       \
+    }                                                                   \
+    /* Unlock the final one (which can be the first one) */             \
+    if(_releaseLock) hal_unlock32(&(curNode->lock));                    \
+    } while(0);
+// Size of the bit vector we use
+#define BV_SIZE 64
+#define BV_SIZE_LOG2 6
+
+#define ctz(val) ctz64(val)
+
+// ----- Action related functions -----
+
+/**
+ * @brief Processes and acts on a given action
+ *
+ * This call will process the action 'action'
+ *
+ * @param[in] pd            Policy domain to use
+ * @param[in] strand        Strand this action is associated with
+ * @param[in] action        Action to process
+ * @param[in] properties    Properties (unused for now)
+ * @return a status code:
+ *    - 0: all went well
+ *    - OCR_EINVAL: invalid value for action or properties
+ */
+static u8 _pdProcessAction(ocrPolicyDomain_t *pd, pdStrand_t *strand,
+                           pdAction_t* action, u32 properties);
+
+
+// ----- Strand related functions -----
+
+#define HAS_EXPECTED_VALUE  0x1
+#define BLOCK               0x2
+/**
+ * @brief Attempts to grab a lock on a strand by switching its properties value
+ *
+ * If 'BLOCK' is set, this call will block until the lock can be acquired.
+ * Otherwise, the call will attempt once to grab the lock (if it is free) and return
+ * if it cannot
+ *
+ * @param[in] strand        Strand to grab the lock on
+ * @param[in] expectedValue (optional) The expected value of the properties field
+ *                          to lock
+ * @param[in] properties    Combination of HAS_EXPECTED_VALUE and BLOCK
+ * @return a status code:
+ *     - 0: the lock was acquired
+ *     - OCR_EBUSY: the lock could not be acquired (properties does not have BLOCK)
+ *     - OCR_EINVAL: Invalid expectedValue (properties has HAS_EXPECTED_VALUE)
+ * @warning If you use an expected value and pass a value that has PDST_LOCK in it,
+ * this call will return OCR_EBUSY if you do not have BLOCK and OCR_EINVAL if you do
+ */
+static u8 _pdLockStrand(pdStrand_t *strand, u32 expectedValue, u32 properties);
+
+#define IS_STRAND        0x1 /**< The node is a strand node */
+#define IS_LEAF          0x2 /**< The node is a leaf node */
+/**
+ * @brief Initialize a strand table node
+ *
+ * This function initializes a strand table node setting its parent, initializing
+ * it to be fully empty and creating the sub-nodes/leafs if numChildrenToInit is non
+ * zero. This only applies to leaf nodes. This MUST be zero for non-leaf nodes.
+ *
+ * @param[in] pd                    Policy domain to use (can be NULL and will be resolved)
+ * @param[in] node                  Node to initialize
+ * @param[in] parent                Parent of the node or NULL if no parent
+ * @param[in] parentSlot            Slot in the parent (ignored if parent is NULL)
+ * @param[in] rdepth                Reverse depth of node. Is 0 for leaf nodes and goes up
+ *                                  from there
+  *                                  the leaf strand. Otherwise, must be 0
+ * @param[in] numChildrenToInit     For leaf nodes, create this number of strands.
+ *                                  Otherwise, must be 0
+ * @param[in] flags                 Flags for creation: IS_LEAF
+ *
+ * @note This function does not grab any locks but requires a lock on node or exclusive
+ * access to it
+ *
+ * @return a status code:
+ *      - 0: successful
+ *      - OCR_ENOMEM: insufficient memory
+ *      - OCR_EINVAL: invalid numChildrenToInit or lock not held on parent
+ */
+static u8 _pdInitializeStrandTableNode(ocrPolicyDomain_t *pd, pdStrandTableNode_t *node,
+                                       pdStrandTableNode_t *parent, u32 parentSlot,
+                                       u32 level, u32 numChildrenToInit, u8 flags);
+
+
+/**
+ * @brief Sets the child of a strand node
+ *
+ * Sets the child tablenode or strand for a tablenode. There should be no
+ * existing child at that index.
+ *
+ * @param[in] pd                    Policy domain
+ * @param[in] parent                Parent to modify
+ * @param[in] idx                   Index in the parent
+ * @param[in] child                 Either a pdStrand_t or pdStrandTableNode_t
+ * @param[in] flags                 Flags (IS_STRAND if the child is a strand)
+ *
+ * @note This function does not grab any locks but requires a lock on both the
+ * parent and child (or ensure non-concurrency of accesses to parent and child)
+ *
+ * @return a status code:
+ *      - 0: successful
+ *      - OCR_EACCES: a child already exists at that index
+ *      - OCR_EINVAL: child has the wrong parent
+ */
+static u8 _pdSetStrandNodeAtIdx(ocrPolicyDomain_t *pd, pdStrandTableNode_t *parent,
+                                u32 idx, void* child, u8 flags);
+
+
+/**
+ * @brief Frees the strand at index 'index' in 'table'
+ *
+ * The strand must be locked prior to calling this function.
+ *
+ * @param[in] pd        Policy domain to use. Must not be NULL
+  * @param[in] index     Strand to free
+ * @return a status code:
+ *      - 0: successful
+ *      - OCR_EINVAL: index points to an invalid strand or strand is not locked
+ */
+static u8 _pdFreeStrand(ocrPolicyDomain_t* pd, pdStrand_t *strand);
+
+/***************************************/
+/***** pdEvent_t related functions *****/
+/***************************************/
+
+/**< Returns the strand table of a "fake" event pointer */
+#define EVT_DECODE_ST_TBL(evt) ((evt) & 0x7)
+/**< Rreturns the strand table index of a "fake" event pointer */
+#define EVT_DECODE_ST_IDX(evt) ((evt) >> 3)
+
+u8 pdCreateEvent(ocrPolicyDomain_t *pd, pdEvent_t **event, u32 type, u8 reserveInTable) {
+    DPRINTF(DEBUG_LVL_INFO, "ENTER pdCreateEvent(pd:0x%lx, event**:0x%lx [0x%lx], type:%u, table:%u)\n",
+            pd, event, *event, type, reserveInTable);
+
+#define _END_FUNC createEventEnd
+    ASSERT(event); // Cannot call if you don't want the event back.
+    u8 toReturn = 0;
+    if (pd == NULL) {
+        getCurrentEnv(&pd, NULL, NULL, NULL);
+    }
+    u64 sizeToAllocate = 0;
+    *event = NULL;
+    switch (type) {
+        case PDEVT_TYPE_BASIC:
+            sizeToAllocate = sizeof(pdEvent_t);
+            break;
+        case PDEVT_TYPE_LIST:
+            sizeToAllocate = sizeof(pdEventList_t);
+            break;
+        case PDEVT_TYPE_MERGE:
+            sizeToAllocate = sizeof(pdEventMerge_t);
+            break;
+        case PDEVT_TYPE_MSG:
+            sizeToAllocate = sizeof(pdEventMsg_t);
+            break;
+        default:
+            DPRINTF(DEBUG_LVL_WARN, "PD Event type 0x%u not known\n", type);
+            return OCR_EINVAL;
+    }
+    /* BUG #899: replace with proper slab allocator */
+    CHECK_MALLOC(*event = (pdEvent_t*)pd->fcts.pdMalloc(pd, sizeToAllocate), );
+    DPRINTF(DEBUG_LVL_VERB, "Allocated event of size %lu -> ptr: 0x%lx\n",
+            sizeToAllocate, *event);
+
+    // Initialize base aspect
+    (*event)->slabObj.userCount = 1;
+    (*event)->properties = type;
+
+    // TODO: Type specific initialization here
+    switch (type) {
+        case PDEVT_TYPE_BASIC:
+            break;
+        case PDEVT_TYPE_LIST:
+            break;
+        case PDEVT_TYPE_MERGE:
+            break;
+        case PDEVT_TYPE_MSG:
+            break;
+        default:
+            break;
+    }
+
+    // Deal with insertion into the strands table if needed
+    pdStrandTable_t *stTable = NULL;
+    if(reserveInTable  && reserveInTable <= PDSTT_COMM) {
+        DPRINTF(DEBUG_LVL_VERB, "Reserving slot in table %u\n", reserveInTable);
+        // This means it is PDSTT_COMM or PDSTT_EVT so we look for the proper table
+        stTable = pd->strandTables[reserveInTable - 1];
+        pdStrand_t* myStrand = NULL;
+        CHECK_RESULT(
+            toReturn |= pdGetNewStrand(pd, &myStrand, stTable, *event, PDST_UHOLD),
+            pd->fcts.pdFree(pd, *event),);
+        DPRINTF(DEBUG_LVL_VERB, "Event 0x%lx has index %lu\n", *event, (*event)->strand->index);
+        // This assert failure indicates a coding issue in the runtime
+        RESULT_ASSERT(pdUnlockStrand(myStrand), ==, 0);
+    } else {
+        DPRINTF(DEBUG_LVL_WARN, "Invalid value for reserveInTable: %u\n", reserveInTable);
+        return OCR_EINVAL;
+    }
+
+END_LABEL(createEventEnd)
+    DPRINTF(DEBUG_LVL_INFO, "EXIT pdCreateEvent -> %u; event: 0x%lx; event->strand->index: %lu\n",
+            toReturn, *event, (*event)->strand->index);
+    return toReturn;
+#undef _END_FUNC
+}
+
+u8 pdResolveEvent(ocrPolicyDomain_t *pd, u64 *evtValue, u8 clearFwdHold) {
+    DPRINTF(DEBUG_LVL_INFO, "ENTER pdResolveEvent(pd:0x%lx, evtValue*:0x%lx [0x%lx], clearHold:%u)\n",
+            pd, evtValue, *evtValue, clearFwdHold);
+#define _END_FUNC resolveEventEnd
+
+    u8 toReturn = 0;
+    if(pd == NULL) {
+        getCurrentEnv(&pd, NULL, NULL, NULL);
+    }
+    u8 stTableIdx = EVT_DECODE_ST_TBL(*evtValue);
+    if (stTableIdx) {
+        DPRINTF(DEBUG_LVL_VERB, "Event = (table %u, idx: %u)\n",
+                stTableIdx, EVT_DECODE_ST_IDX(*evtValue));
+        // This is a pointer in a strands table
+        pdStrandTable_t *stTable = NULL;
+        if(stTableIdx < PDSTT_COMM) {
+            stTable = pd->strandTables[stTableIdx-1];
+        } else {
+            DPRINTF(DEBUG_LVL_WARN, "Invalid event value: %u does not represent "
+                    "a valid table (from event value 0x%lx)\n",
+                    stTableIdx, *evtValue);
+            return OCR_EINVAL;
+        }
+        DPRINTF(DEBUG_LVL_VERB, "Looking in table 0x%lx\n", stTable);
+        pdStrand_t* myStrand = NULL;
+        CHECK_RESULT(toReturn |= pdGetStrandForIndex(pd, &myStrand, stTable,
+                                                     EVT_DECODE_ST_IDX(*evtValue)),,);
+
+        // Here, we managed to get the strand properly
+        // The pdGetStrandForIndex function will lock the strand, we can then
+        // observe the state freely
+        DPRINTF(DEBUG_LVL_VVERB, "Event 0x%lx -> strand 0x%lx (props: 0x%lx)\n",
+                *evtValue, myStrand, myStrand->properties);
+        ASSERT(myStrand->properties & PDST_LOCK);
+        if((myStrand->properties & PDST_WAIT) == 0) {
+            // Event is ready
+            // The following assert ensures that the event in the slot has
+            // the slot's index. Failure indicates a runtime error
+            ASSERT(myStrand->index == (*evtValue));
+            DPRINTF(DEBUG_LVL_VERB, "Event 0x%lx -> 0x%lx\n",
+                    *evtValue, myStrand->curEvent);
+            *evtValue = (u64)(myStrand->curEvent);
+            if(clearFwdHold) {
+                myStrand->properties &= ~PDST_RHOLD;
+            }
+            if((myStrand->properties & PDST_HOLD) == 0) {
+                DPRINTF(DEBUG_LVL_VVERB, "Freeing strand 0x%lx [idx %u] after resolution\n",
+                        myStrand, myStrand->index);
+                RESULT_ASSERT(_pdFreeStrand(pd, ((pdEvent_t*)evtValue)->strand), ==, 0);
+            } else {
+                RESULT_ASSERT(pdUnlockStrand(myStrand), ==, 0);
+            }
+        } else {
+            // The event is not ready
+            DPRINTF(DEBUG_LVL_VERB, "Event 0x%lx not ready\n", *evtValue);
+            *evtValue = (u64)(myStrand->curEvent);
+            RESULT_ASSERT(pdUnlockStrand(myStrand), ==, 0);
+            toReturn = OCR_EBUSY;
+        }
+    } else {
+        DPRINTF(DEBUG_LVL_VERB, "Event 0x%lx is already a pointer\n", *evtValue);
+        toReturn = OCR_ENOP;
+    }
+END_LABEL(resolveEventEnd)
+    DPRINTF(DEBUG_LVL_INFO, "EXIT pdResolveEvent -> %u; event: 0x%lx\n",
+            toReturn, *evtValue);
+    return toReturn;
+#undef _END_FUNC
+}
+
+
+/***************************************/
+/***** pdAction_t related functions ****/
+/***************************************/
+
+
+/***************************************/
+/***** pdStrand_t related functions ****/
+/***************************************/
+
+
+// NOTE on the lock order: if you want to hold multiple locks, you must hold
+// the lock for the child FIRST and then acquire the lock of your parent.
+
+u8 pdGetNewStrand(ocrPolicyDomain_t *pd, pdStrand_t **returnStrand, pdStrandTable_t *table,
+                  pdEvent_t* event, u32 properties) {
+    DPRINTF(DEBUG_LVL_INFO, "ENTER pdGetNewStrand(pd:0x%lx, strand**:0x%lx [0x%lx], table:0x%lx)\n",
+            pd, returnStrand, *returnStrand, table);
+#define _END_FUNC getNewStrandEnd
+
+    u8 toReturn = 0;
+    *returnStrand = NULL;
+    if (pd == NULL) {
+        getCurrentEnv(&pd, NULL, NULL, NULL);
+    }
+
+    // We check if the properties are sane
+    // This makes sure that no other bits than those allowed are set
+    CHECK_RESULT(properties & ~(PDST_UHOLD), , toReturn |= OCR_EINVAL);
+
+    pdStrandTableNode_t *leafToUse = NULL;
+    hal_lock32(&(table->lock));
+    // Look for a leaf to use
+    u32 curLevel = 1;
+    u32 cachedLevelCount = table->levelCount; // To be able to release the lock earlier
+    if (table->levelCount == 0) {
+        // If level is 0, it means that the table should be empty
+        // We need to initialize it
+        ASSERT(table->head == NULL);
+        DPRINTF(DEBUG_LVL_VERB, "Table 0x%lx: empty -- adding level 1\n",
+                table);
+        // See BUG #899: this should be slab allocated
+        CHECK_MALLOC(table->head = (pdStrandTableNode_t*)pd->fcts.pdMalloc
+                     (pd, sizeof(pdStrandTableNode_t)), hal_unlock32(&(table->lock)));
+        CHECK_RESULT(
+            toReturn |= _pdInitializeStrandTableNode(pd, table->head, NULL, 0, 0, PDST_NODE_SIZE, IS_LEAF),
+                     {hal_unlock32(&(table->lock)); pd->fcts.pdFree(pd, table->head);},);
+        DPRINTF(DEBUG_LVL_VVERB, "Table 0x%lx: added head 0x%lx\n", table, table->head);
+        table->levelCount = 1;
+        cachedLevelCount = 1;
+        leafToUse = table->head;
+        hal_lock32(&(leafToUse->lock)); // Need lock to be able to read nodeFree later in a race-free manner
+                                        // (otherwise, another thread may grab the head)
+        hal_unlock32(&(table->lock));
+        // Lock held here: leafToUse
+    } else {
+        // In this case, there is at least something in the table, go down the tree
+        // to find something that is free. If nothing is found, we will create a new
+        // leaf node
+        pdStrandTableNode_t *curNode = table->head;
+        hal_lock32(&(curNode->lock)); // Need lock to check curNode->nodeFree
+
+        // Before releasing the table, we check if we have a snowball's chance in hell
+        // of getting a free slot
+        if(curNode->nodeFree == 0ULL) {
+            // Nothing at all is free
+            DPRINTF(DEBUG_LVL_VERB, "Table 0x%lx: fully loaded -- adding level %u\n",
+                    table, cachedLevelCount + 1);
+            pdStrandTableNode_t *newNode = NULL;
+            // See BUG #899: this should be slab allocated
+            CHECK_MALLOC(newNode = (pdStrandTableNode_t*)pd->fcts.pdMalloc
+                         (pd, sizeof(pdStrandTableNode_t)),
+                {hal_unlock32(&(curNode->lock)); hal_unlock32(&(table->lock));});
+
+            // We don't initialize any sub nodes. This is also always a non-leaf node
+            CHECK_RESULT(
+                toReturn |=_pdInitializeStrandTableNode(pd, newNode, NULL, 0, cachedLevelCount, 0, 0),
+                {pd->fcts.pdFree(pd, table->head); hal_unlock32(&(curNode->lock)); hal_unlock32(&(table->lock));},);
+
+            // We need to "update" curNode to pretend we initialized it. In particular, we need
+            // to set the parent
+            curNode->parent = newNode;
+            curNode->parentSlot = 0;
+            RESULT_ASSERT(_pdSetStrandNodeAtIdx(pd, newNode, 0, curNode, 0), ==, 0);
+            hal_unlock32(&(curNode->lock));
+
+            // newNode->nodeFree should be 0 at bit 0 since curNode is full)
+            ASSERT((newNode->nodeFree & 1ULL) == 0ULL);
+            // Check the other bit vectors in a similar fashion
+            ASSERT((newNode->nodeNeedsProcess & 1ULL) == (curNode->nodeNeedsProcess != 0ULL));
+            ASSERT((newNode->nodeReady & 1ULL) == (curNode->nodeReady != 0ULL));
+
+            DPRINTF(DEBUG_LVL_VVERB, "Table 0x%lx: level 1 is now 0x%lx (from 0x%lx)\n",
+                    table, newNode, curNode);
+            cachedLevelCount = ++table->levelCount;
+            curNode = table->head = newNode;
+            hal_lock32(&(curNode->lock)); // At this point, the head is visible
+            hal_unlock32(&(table->lock));
+            // Lock held here: curNode
+        } else if(table->levelCount == 1) {
+            DPRINTF(DEBUG_LVL_VERB, "Table 0x%lx has one level with free space (0x%lx)\n",
+                    table, curNode);
+            hal_unlock32(&(table->lock));
+            // If we have some free room and only one level, we know what to use
+            leafToUse = curNode;
+            // Lock held here: curNode/leafToUse
+
+        } else {
+            DPRINTF(DEBUG_LVL_VERB, "Proceeding down table with curNode 0x%lx\n",
+                    curNode);
+            hal_unlock32(&(table->lock));
+
+        }
+
+        // At this point, we hold the lock on curNode and leafToUse (if set)
+
+        // Now we know that we at least have room in our tree to accomodate a new
+        // strand.
+        while(leafToUse == NULL) {
+            ASSERT(curNode->nodeFree);  // We should never go to a place that has
+                                        // no room
+            ASSERT(curLevel < cachedLevelCount); // We never go all the way to the leaf
+            u32 freeSlot = ctz(curNode->nodeFree);
+
+            pdStrandTableNode_t **node = &(curNode->data.nodes[freeSlot]);
+            DPRINTF(DEBUG_LVL_VERB, "Found free slot %u [0x%lx] at level %u [0x%lx]\n",
+                    freeSlot, *node, curLevel, curNode);
+            if (*node == NULL) {
+                // See BUG #899: This should be slab allocated
+                pdStrandTableNode_t *t = NULL;
+                CHECK_MALLOC(
+                    t = (pdStrandTableNode_t*)pd->fcts.pdMalloc(pd, sizeof(pdStrandTableNode_t)),
+                                                                hal_unlock32(&(curNode->lock)));
+                // If we are at the penultimate level, create a leaf node, otherwise
+                // create a regular one
+                if (curLevel == cachedLevelCount - 1) {
+                    DPRINTF(DEBUG_LVL_VVERB, "Initializing leaf-node 0x%lx at level %u\n",
+                            t, curLevel+1);
+                    CHECK_RESULT(
+                        toReturn |= _pdInitializeStrandTableNode(pd, t, curNode,
+                                                                 freeSlot, 0,
+                                                                 PDST_NODE_SIZE, IS_LEAF),
+                                 {pd->fcts.pdFree(pd, *node); hal_unlock32(&(curNode->lock));},);
+                    // An error here indicates a runtime logic error
+                    RESULT_ASSERT(_pdSetStrandNodeAtIdx(pd, curNode, freeSlot, t, 0), ==, 0);
+                    // Set the bit for nodeFree on curNode to prevent anyone else from
+                    // going down this path.
+                    curNode->nodeFree &= ~(1ULL<<freeSlot);
+                    hal_unlock32(&(curNode->lock));
+                    leafToUse = *node = t;
+                    hal_lock32(&(leafToUse->lock));
+                    // Lock held here: leafToUse
+                } else {
+                    CHECK_RESULT(
+                        toReturn |= _pdInitializeStrandTableNode(pd, t, curNode,
+                                                                 freeSlot, cachedLevelCount - curLevel,
+                                                                 0, 0),
+                        {pd->fcts.pdFree(pd, t); hal_unlock32(&(curNode->lock));},);
+                    // An error here indicates a runtime logic error
+                    RESULT_ASSERT(_pdSetStrandNodeAtIdx(pd, curNode, freeSlot, t, 0), ==, 0);
+                    // Set the bit for nodeFree on curNode to prevent anyone else from
+                    // going down this path.
+                    curNode->nodeFree &= ~(1ULL<<freeSlot);
+                    hal_unlock32(&(curNode->lock));
+                    curNode = *node = t;
+                    hal_lock32(&(curNode->lock));
+                    // Lock held here: curNode
+                }
+            } else {
+                // Set the bit for nodeFree on curNode to prevent anyone else from
+                // going down this path.
+                curNode->nodeFree &= ~(1ULL<<freeSlot);
+                hal_unlock32(&(curNode->lock));
+                // The node exists. If this is a leaf node, we are good to go
+                if (curLevel == cachedLevelCount - 1) {
+                    leafToUse = *node;
+                    hal_lock32(&(leafToUse->lock));
+                } else {
+                    curNode = *node;
+                    hal_lock32(&(curNode->lock));
+                }
+            }
+            ++curLevel;
+        }
+    }
+
+    // At this point:
+    //  - we hold the lock on leafToUse (and nothing else)
+    //  - we have "locked" down the path by saying there is no-one free
+    //    in our path so no-one else should be trying to compete for our
+    //    space.
+    //  - there is room to add a strand
+    // In this implementation, the leaf nodes are always fully initialized
+    // so any child will exist. This can be changed by changing the parameters
+    // to _pdInitializeStrandTableNode if needed (for example, only create all of
+    // them for the first leaf node and then don't create any or just half).
+
+    // We should have room in our leaf
+    ASSERT(leafToUse->nodeFree);
+    ASSERT(curLevel == cachedLevelCount); // We should be at the leaf level
+    u32 freeSlot = ctz(leafToUse->nodeFree);
+
+    pdStrand_t *strand = leafToUse->data.slots[freeSlot];
+    DPRINTF(DEBUG_LVL_VERB, "Found free strand %u [0x%lx] at leaf level %u [0x%lx]\n",
+            freeSlot, strand, curLevel, leafToUse);
+
+    // All strands should be initialized here.
+    ASSERT(strand);
+
+    // The strand should be free
+    RESULT_ASSERT(_pdLockStrand(strand, PDST_FREE, HAS_EXPECTED_VALUE | BLOCK), ==, 0);
+    strand->curEvent = event;
+    strand->actions = NULL;
+    strand->properties |= PDST_RHOLD |
+        (((event->properties & PDEVT_READY) != 0)?0:PDST_WAIT_EVT);
+    strand->properties |= properties;
+    DPRINTF(DEBUG_LVL_VVERB, "Strand 0x%lx: event: 0x%lx | actions: 0x%lx | props: 0x%x\n",
+            strand, strand->curEvent, strand->actions, strand->properties);
+
+    // Now set the value for the event
+    event->strand = strand;
+    *returnStrand = strand;
+
+    // Now set the proper bits in the bit vectors and go up the chain
+    // and update their bits if needed as well
+
+    u8 propagateReady = false;
+    leafToUse->nodeFree &= ~(1ULL<<freeSlot);
+
+    // After inserting an event in a new strand, there
+    // is definitely no way for the event to need processing
+    // (which requires actions to process)
+
+    // It can be ready though
+    if((strand->properties & PDST_WAIT) == 0) {
+        leafToUse->nodeReady |= (1ULL<<freeSlot);
+        propagateReady = true;
+    }
+
+    pdStrandTableNode_t *curNode = leafToUse;
+    pdStrandTableNode_t *parent = leafToUse->parent;
+    ASSERT(curNode->lock  == 1);
+    // This propagation needs to go all the way up irrespective
+    // since we cleared the nodeFree bit to go down and know nothing of
+    // sibling states
+    PROPAGATE_UP_TREE(curNode, parent, true, {
+            /* We had cleared the bit on the way down */
+            ASSERT((parent->nodeFree & (1ULL<< curNode->parentSlot)) == 0);
+            if (curNode->nodeFree) {
+                parent->nodeFree |= (1ULL<<curNode->parentSlot);
+            }
+
+            if (propagateReady) {
+                propagateReady = parent->nodeReady == 0ULL;
+                parent->nodeReady |= (1ULL << curNode->parentSlot);
+            }
+        });
+END_LABEL(getNewStrandEnd)
+    DPRINTF(DEBUG_LVL_INFO, "EXIT pdGetNewStrand -> %u [strand: 0x%lx]\n",
+            toReturn, *returnStrand);
+    return toReturn;
+#undef _END_FUNC
+}
+
+
+u8 pdGetStrandForIndex(ocrPolicyDomain_t* pd, pdStrand_t **returnStrand, pdStrandTable_t* table,
+                       u64 index) {
+    DPRINTF(DEBUG_LVL_INFO, "ENTER pdGetStrandForIndex(pd:0x%lx, strand**:0x%lx [0x%lx], table:0x%lx, idx:%lu)\n",
+            pd, returnStrand, *returnStrand, table, index);
+#define _END_FUNC getStrandForIndex
+
+    u8 toReturn = 0;
+    *returnStrand = NULL;
+
+    if (pd == NULL) {
+        getCurrentEnv(&pd, NULL, NULL, NULL);
+    }
+
+    // We will just go down the tree until we find the strand we need
+    hal_lock32(&(table->lock));
+    u32 maxLevel = table->levelCount;
+    pdStrandTableNode_t *curNode = table->head;
+    u32 curIndex;
+    hal_unlock32(&(table->lock));
+    if (maxLevel == 0) {
+        DPRINTF(DEBUG_LVL_WARN, "Table empty; index %lu not found\n", index);
+        CHECK_RESULT_T(false, , toReturn = OCR_EINVAL);
+    }
+    u32 curLevel = 1;
+#define _LVL_MASK ((1ULL<<BV_SIZE_LOG2) - 1)
+    if (index > (1ULL<<(maxLevel*BV_SIZE_LOG2))) {
+        DPRINTF(DEBUG_LVL_WARN, "Table has only %u levels; cannot contain %lu\n",
+                maxLevel, index);
+        CHECK_RESULT_T(false, , toReturn = OCR_EINVAL);
+    }
+    // At this point, we are pretty sure that the index is valid in the table
+    while (curLevel < maxLevel) {
+        curIndex = (index >> (BV_SIZE_LOG2*(maxLevel-curLevel))) & _LVL_MASK;
+        curNode = curNode->data.nodes[curIndex];
+        ++curLevel;
+    }
+    // Now extract the strand at the last level
+    *returnStrand = curNode->data.slots[index & _LVL_MASK];
+
+    // This makes sure that the strand actually has the proper index
+    ASSERT((*returnStrand)->index == index);
+
+END_LABEL(getStrandForIndex)
+    DPRINTF(DEBUG_LVL_INFO, "EXIT pdStrandForIndex -> %u [strand: 0x%lx]\n",
+            toReturn, *returnStrand);
+    return toReturn;
+#undef _LVL_MASK
+#undef _END_FUNC
+}
+
+
+u8 pdEnqueueActions(ocrPolicyDomain_t *pd, pdStrand_t* strand, u32 actionCount,
+                    pdAction_t** actions, u8 clearFwdHold) {
+    DPRINTF(DEBUG_LVL_INFO, "ENTER pdEnqueueActions(pd:0x%lx, strand:0x%lx, count:%u, actions**:0x%lx [0x%lx], clearHold:%u)\n",
+            pd, strand, actionCount, actions, *actions, clearFwdHold);
+#define _END_FUNC enqueueActionsEnd
+
+    u8 toReturn = 0;
+
+    if (pd == NULL) {
+        getCurrentEnv(&pd, NULL, NULL, NULL);
+    }
+
+    // Basic sanity checks
+    // !(actionCount == 0 || actions != NULL)
+    CHECK_RESULT_T(actionCount == 0 || actions != NULL, , toReturn = OCR_EINVAL);
+
+    // A lock should be held while we enqueue actions. Make sure it is. If this
+    // fails, most likely an internal runtime error
+    ASSERT(strand->properties & PDST_LOCK);
+
+    // Create the deque if it doesn't exist
+    if (strand->actions == NULL) {
+        // We only need a non-locked queue since we are taking care of the lock
+        // ourself
+        CHECK_MALLOC(strand->actions = newDeque(pd, NULL, NON_CONCURRENT_DEQUE), );
+    }
+
+    DPRINTF(DEBUG_LVL_VERB, "Going to enqueue %u actions on 0x%lx\n",
+            actionCount, strand->actions);
+    // At this point, we can enqueue things on the strand->actions deque
+    u32 i;
+    for (i = 0; i < actionCount; ++i, ++actions) {
+        DPRINTF(DEBUG_LVL_VVERB, "Pushing action 0x%lx\n", *actions);
+        strand->actions->pushAtTail(strand->actions, *actions, 1);
+    }
+
+    if (strand->actions->size(strand->actions) == actionCount) {
+        // This means that no actions were pending
+        DPRINTF(DEBUG_LVL_VVERB, "Strand 0x%lx had no actions [props: 0x%x] -> setting WAIT_ACT\n",
+                strand, strand->properties);
+        ASSERT((strand->properties & PDST_WAIT_ACT) == 0);
+        strand->properties |= PDST_WAIT_ACT;
+        DPRINTF(DEBUG_LVL_VVERB, "Strand 0x%lx [props: 0x%x]\n", strand,
+                strand->properties);
+
+        if((strand->properties & PDST_WAIT_EVT) == 0) {
+            // Check if the event was also ready. If that's
+            // the case, we need to switch to being *not* ready
+            // We need to propagate that back up the tree
+            pdStrandTableNode_t *curNode = strand->parent;
+            ASSERT(curNode);
+            pdStrandTableNode_t *parent = curNode->parent;
+            u32 stIdx = strand->index & ((1<<BV_SIZE_LOG2)-1);
+            bool propagateReady = false, propagateNP = false;
+
+            hal_lock32(&(curNode->lock));
+            // We need processing
+            propagateNP = curNode->nodeNeedsProcess == 0ULL;
+            curNode->nodeNeedsProcess |= (1ULL<<stIdx);
+            // We are no longer ready
+            ASSERT((curNode->nodeReady & (1ULL<<stIdx)) != 0);
+            curNode->nodeReady &= ~(1ULL<<stIdx);
+            propagateReady = (curNode->nodeReady == 0ULL);
+
+            ASSERT(curNode->lock  == 1);
+            // In this case, we flipped:
+            // NP from 0 to 1 (stop when we see a 1)
+            // Ready from 1 to 0 (stop when sibblings have ready nodes)
+            PROPAGATE_UP_TREE(
+                curNode, parent,
+                propagateReady || propagateNP, {
+                    if (propagateReady) {
+                        parent->nodeReady &= ~(1ULL<<curNode->parentSlot);
+                        propagateReady = parent->nodeReady == 0ULL;
+                    }
+                    if (propagateNP) {
+                        propagateNP = parent->nodeNeedsProcess == 0ULL;
+                        parent->nodeNeedsProcess |= (1ULL<<curNode->parentSlot);
+                    }
+                });
+        }
+    }
+    if (clearFwdHold) {
+        DPRINTF(DEBUG_LVL_VERB, "Clearing fwd hold on 0x%lx [props: 0x%x]\n",
+                strand, strand->properties);
+        if ((strand->properties & PDST_RHOLD) == 0) {
+            DPRINTF(DEBUG_LVL_WARN, "Clearing non-existant hold on 0x%lx [props: 0x%x]\n",
+                    strand, strand->properties);
+        }
+        strand->properties &= ~PDST_RHOLD;
+    }
+END_LABEL(enqueueActionsEnd)
+    DPRINTF(DEBUG_LVL_INFO, "EXIT pdEnqueueActions -> %u\n", toReturn);
+    return toReturn;
+#undef _END_FUNC
+}
+
+
+u8 pdLockStrand(pdStrand_t *strand, bool doTry) {
+    DPRINTF(DEBUG_LVL_INFO, "ENTER pdLockStrand(strand:0x%lx, doTry:%u)\n",
+            strand, doTry);
+#define _END_FUNC lockStrandEnd
+
+    u8 toReturn = 0;
+    toReturn = _pdLockStrand(strand, 0, doTry?0:BLOCK);
+
+END_LABEL(lockStrandEnd)
+    DPRINTF(DEBUG_LVL_INFO, "EXIT pdLockStrand -> %u\n", toReturn);
+    return toReturn;
+#undef _END_FUNC
+}
+
+u8 pdUnlockStrand(pdStrand_t *strand) {
+    DPRINTF(DEBUG_LVL_INFO, "ENTER pdUnlockStrand(strand:0x%lx)\n",
+            strand);
+#define _END_FUNC unlockStrandEnd
+
+    u8 toReturn = 0;
+    CHECK_RESULT_T(((strand->properties & PDST_LOCK)), , toReturn = OCR_EINVAL);
+
+    strand->properties &= ~PDST_LOCK;
+
+END_LABEL(unlockStrandEnd)
+    DPRINTF(DEBUG_LVL_INFO, "EXIT pdUnlockStrand -> %u\n", toReturn);
+    return toReturn;
+#undef _END_FUNC
+}
+
+
+/***************************************/
+/********** Internal functions *********/
+/***************************************/
+
+
+static u8 _pdLockStrand(pdStrand_t *strand, u32 expectedValue, u32 properties) {
+    volatile u32 initialValue;
+    if (properties & HAS_EXPECTED_VALUE) {
+        initialValue = expectedValue;
+        if ((initialValue & PDST_LOCK) == PDST_LOCK) {
+            // The expected value is already locked, this is an error however you look
+            // at it
+            return ((properties & BLOCK) == BLOCK)?OCR_EINVAL:OCR_EBUSY;
+        }
+    } else {
+        initialValue = strand->properties;
+        if(((properties & BLOCK) == 0) && ((initialValue & PDST_LOCK) != 0)) {
+            return OCR_EBUSY; // Already locked so no point trying
+        }
+    }
+
+    // Try once
+    u32 t, oldValue = initialValue;
+    while ((oldValue & PDST_LOCK) == PDST_LOCK) {
+        // We re-read the value
+        // Note that in this case, we never have HAS_EXPECTED_VALUE set
+        ASSERT((properties & HAS_EXPECTED_VALUE) == 0);
+        oldValue = strand->properties;
+    }
+    t = oldValue;
+    ASSERT((t & PDST_LOCK) == 0);
+    oldValue = hal_cmpswap32(&(strand->properties), t, t | PDST_LOCK);
+
+    if ((oldValue != t) && ((properties & BLOCK) == 0))
+        return OCR_EBUSY;
+    if (t == oldValue)
+        return 0; // Successful
+
+    // Go in a tighter loop now
+    do {
+        while ((oldValue & PDST_LOCK) == PDST_LOCK) {
+            oldValue = strand->properties;
+        }
+        t = oldValue;
+        ASSERT((t & PDST_LOCK) == 0);
+        oldValue = hal_cmpswap32(&(strand->properties), t, t | PDST_LOCK);
+    } while (t != oldValue);
+
+    if (((properties & HAS_EXPECTED_VALUE) == HAS_EXPECTED_VALUE) && (initialValue != oldValue)) {
+        strand->properties &= ~PDST_LOCK;
+        return OCR_EINVAL;
+    }
+    return 0;
+}
+
+
+static u8 _pdInitializeStrandTableNode(ocrPolicyDomain_t *pd, pdStrandTableNode_t *node,
+                                       pdStrandTableNode_t *parent, u32 parentSlot,
+                                       u32 rdepth, u32 numChildrenToInit,
+                                       u8 flags) {
+    DPRINTF(DEBUG_LVL_INFO, "ENTER _pdInitializeStrandTableNode(pd:0x%lx, node:0x%lx, parent:0x%lx, pSlot:%u, rdepth:%u, childCount:%u, flags:0x%x)\n",
+            pd, node, parent, parentSlot, rdepth, numChildrenToInit, flags);
+#define _END_FUNC initializeStrandTableNodeEnd
+
+    // Does not check for lock on node because could be in exclusive access
+    // Does check on parent though if non-NULL
+    u8 toReturn = 0;
+    u32 i = 0;
+
+    if (pd == NULL) {
+        getCurrentEnv(&pd, NULL, NULL, NULL);
+    }
+
+    if (parent) {
+        CHECK_RESULT_T(parent->lock, , toReturn = OCR_EINVAL);
+    }
+
+    // Some sanity checks
+    ASSERT(node);
+    ASSERT((parent == NULL) || parentSlot < BV_SIZE);
+    ASSERT(numChildrenToInit <= BV_SIZE);
+    if (!(flags & IS_LEAF)) {
+        // If not a leaf node, numChildrenToInit should be 0
+        CHECK_RESULT_T(numChildrenToInit == 0, , toReturn = OCR_EINVAL);
+    } else {
+        CHECK_RESULT(rdepth, , toReturn = OCR_EINVAL);
+    }
+
+    node->nodeFree = (u64)-1;   // All nodes are free to start with
+    node->nodeNeedsProcess = 0; // Nothing needs to be processed
+    node->nodeReady = 0;        // Nothing is ready
+    // This is parent->lmIndex + parentSlot*BV_SIZE^(rdepth+1)
+    node->lmIndex = parent?(parent->lmIndex + (parentSlot << (BV_SIZE_LOG2*(rdepth+1))))<<1:0;
+    node->lock = 0;             // No lock for now.
+    node->parent = parent;
+    node->parentSlot = parent?parentSlot:(u32)-1; // If no parent, put -1
+
+    if (flags & IS_LEAF) {
+        // Indicate leaf status
+        node->lmIndex |= 0x1;
+
+        // Now take care of the data
+        pdStrand_t * slab = NULL;
+        if (numChildrenToInit) {
+            // BUG #899: should be slab allocated
+            // We allocate once so that if it fails, the cleanup is easy :)
+            CHECK_MALLOC(slab = (pdStrand_t*)pd->fcts.pdMalloc(pd, sizeof(pdStrand_t)*numChildrenToInit),);
+            DPRINTF(DEBUG_LVL_VERB, "Allocated %u strands for node 0x%lx\n",
+                    numChildrenToInit, node);
+        }
+        // If we reach here, we allocated OK
+        for (i = 0; i < numChildrenToInit; ++i, ++slab) {
+            slab->curEvent = NULL;
+            slab->actions = NULL;
+            slab->parent = node;
+            slab->properties = PDST_FREE;
+            slab->index = (node->lmIndex>>1) + (u64)i;
+            node->data.slots[i] = slab;
+            DPRINTF(DEBUG_LVL_VVERB, "Created strand %lu @ 0x%lx\n",
+                    slab->index, slab);
+        }
+    }
+
+    // We NULL-ify everything else. Note that this works in all cases because
+    // numChildrenToInit will be 0 if not a leaf
+    // Continues the previous loop if isLeaf
+    for ( ; i < BV_SIZE; ++i) {
+        node->data.slots[i] = NULL; // Does not matter if we use slots or nodes
+    }
+
+
+END_LABEL(initializeStrandTableNodeEnd)
+    DPRINTF(DEBUG_LVL_INFO, "EXIT _pdInitializeStrandTableNode -> %u\n", toReturn);
+    return toReturn;
+#undef _END_FUNC
+}
+
+
+static u8 _pdSetStrandNodeAtIdx(ocrPolicyDomain_t *pd, pdStrandTableNode_t *parent,
+                                u32 idx, void* child, u8 flags) {
+    DPRINTF(DEBUG_LVL_INFO, "ENTER _pdSetStrandNodeAtIdx(pd:0x%lx, parent:0x%lx, idx:%u, child:0x%lx, flags:0x%x)\n",
+            pd, parent, idx, child, flags);
+#define _END_FUNC setStrandNodeAtIdxEnd
+
+    // Does not check for lock on anything since we may have exclusive access
+    u8 toReturn = 0;
+
+    if (pd == NULL) {
+        getCurrentEnv(&pd, NULL, NULL, NULL);
+    }
+
+    // Sanity check
+    ASSERT(idx < BV_SIZE);
+
+    // If this fails, it means there is already a child there
+    CHECK_RESULT_T(parent->data.slots[idx] == NULL, , toReturn |= OCR_EACCES);
+
+    // If this assert fails, this means a runtime error happened and state is
+    // no longer consistent
+    ASSERT(parent->nodeFree & (1ULL<<idx));
+
+    // If this fails, the child is invalid
+    if (flags & IS_STRAND) {
+        CHECK_RESULT_T(((pdStrand_t*)child)->parent == parent, , toReturn |= OCR_EINVAL);
+        CHECK_RESULT_T(((pdStrand_t*)child)->index >= (parent->lmIndex>>1), , toReturn |= OCR_EINVAL);
+        CHECK_RESULT_T(((pdStrand_t*)child)->index < (parent->lmIndex>>1) + BV_SIZE, , toReturn |= OCR_EINVAL);
+    } else {
+        CHECK_RESULT_T(((pdStrandTableNode_t*)child)->parent == parent, , toReturn |= OCR_EINVAL);
+        CHECK_RESULT_T(((pdStrandTableNode_t*)child)->parentSlot == idx, , toReturn |= OCR_EINVAL);
+    }
+
+    pdStrandTableNode_t *curNode = NULL;
+    bool propagateFree = false, propagateReady = false, propagateNP = false;
+    if (flags & IS_STRAND) {
+        parent->data.slots[idx] = child;
+        pdStrand_t *strand = (pdStrand_t*)child;
+        // Update the flags
+        if (!(strand->properties & PDST_FREE)) {
+            parent->nodeFree &= ~(1ULL<<idx);
+            propagateFree = parent->nodeFree == 0ULL;
+        }
+
+        if ((strand->properties & PDST_WAIT) == 0) {
+            propagateReady = parent->nodeReady == 0ULL;
+            parent->nodeReady |= (1ULL<<idx);
+        }
+
+        if ((strand->properties & PDST_WAIT) == PDST_WAIT_ACT) {
+            // This means that we only have to wait for actions
+            propagateNP = parent->nodeNeedsProcess == 0ULL;
+            parent->nodeNeedsProcess |= (1ULL<<idx);
+        }
+        curNode = parent;
+    } else {
+        parent->data.nodes[idx] = child;
+        // Update the flags
+        pdStrandTableNode_t *childNode = (pdStrandTableNode_t*)child;
+        if (childNode->nodeFree == 0ULL) {
+            parent->nodeFree &= ~(1ULL<<idx);
+            propagateFree = parent->nodeFree == 0ULL;
+        }
+
+        if (childNode->nodeReady != 0ULL) {
+            propagateReady = parent->nodeReady == 0ULL;
+            parent->nodeReady |= 1ULL<<idx;
+        }
+
+        if (childNode->nodeNeedsProcess != 0ULL) {
+            propagateNP = parent->nodeNeedsProcess == 0ULL;
+            parent->nodeNeedsProcess |= 1ULL<<idx;
+        }
+        curNode = parent;
+    }
+
+    parent = curNode->parent;
+
+    // We need to propagate things (possibly)
+    // Free bits: we flipped from 1 to 0, see if this makes others 0 (stop when sibblings have free slots)
+    // Ready bits: we flipped from 0 to 1, see if this makes others 1 (stop when see 1)
+    // NP bits: we flipped from 0 to 1, see if this makes others 1 (stop when see 1)
+
+
+    // If we have the lock on curNode, we should *not* release it.
+    PROPAGATE_UP_TREE_NO_UNLOCK(
+        curNode, parent,
+        propagateFree || propagateReady || propagateNP, {
+            if (propagateFree) {
+                parent->nodeFree &= ~(1ULL<<curNode->parentSlot);
+                propagateFree = parent->nodeFree == 0ULL;
+            }
+            if (propagateReady) {
+                propagateReady = parent->nodeReady == 0ULL;
+                parent->nodeReady |= (1ULL<<curNode->parentSlot);
+            }
+            if (propagateNP) {
+                propagateNP = parent->nodeNeedsProcess == 0ULL;
+                parent->nodeNeedsProcess |= (1ULL<<curNode->parentSlot);
+            }
+        });
+
+END_LABEL(setStrandNodeAtIdxEnd)
+    DPRINTF(DEBUG_LVL_INFO, "EXIT _pdSetStrandNodeAtIdx -> %u\n", toReturn);
+    return toReturn;
+#undef _END_FUNC
+}
+
+
+static u8 _pdFreeStrand(ocrPolicyDomain_t* pd, pdStrand_t *strand) {
+    DPRINTF(DEBUG_LVL_INFO, "ENTER _pdFreeStrand(pd:0x%lx, strand:0x%lx)\n",
+            pd, strand);
+#define _END_FUNC freeStrandEnd
+
+    u8 toReturn = 0;
+
+    if (pd == NULL) {
+        getCurrentEnv(&pd, NULL, NULL, NULL);
+    }
+
+    // The lock must be held on the strand
+    CHECK_RESULT_T((strand->properties & PDST_LOCK), , toReturn = OCR_EINVAL);
+
+    // We should not be freeing strands that are still going to be used, so a bit
+    // of sanity check here
+    CHECK_RESULT(strand->properties & PDST_WAIT, , toReturn = OCR_EINVAL);
+    if (strand->actions) {
+        CHECK_RESULT_T(strand->actions->size(strand->actions) != 0, , toReturn = OCR_EINVAL);
+    }
+
+    // At this stage, we can free the strand
+    // Clean up data a bit:
+    strand->curEvent = NULL;
+
+    // Go up and hold the parent lock so we can propagate the proper information on
+    // free slots
+    pdStrandTableNode_t *curNode = strand->parent;
+    ASSERT(curNode);
+    hal_lock32(&(curNode->lock));
+
+    // This should not fail since we have a lock. This is basically an unlock but
+    // we make sure that no one else did something.
+    RESULT_ASSERT(hal_cmpswap32(&(strand->properties), PDST_LOCK, PDST_FREE), ==, PDST_LOCK);
+
+    // Propgate things up. We free a node and it may remove the
+    // "ready" flag from it. It can't be NP because none of the
+    // wait flags are set
+
+    bool propagateReady = false, propagateFree = false;
+    u32 stIdx = strand->index & ((1<<BV_SIZE_LOG2) - 1);
+
+    ASSERT((curNode->nodeNeedsProcess & (1ULL<<stIdx)) == 0);
+
+    // Only propagate if this is the first free slot we are adding
+    propagateFree = curNode->nodeFree == 0ULL;
+    curNode->nodeFree |= (1ULL<<stIdx);
+
+
+    if(curNode->nodeReady & (1ULL<<stIdx)) {
+        curNode->nodeReady &= ~(1ULL<<stIdx);
+        // Only propagate if we removed the last ready node
+        propagateReady = curNode->nodeReady == 0ULL;
+    }
+    pdStrandTableNode_t *parent = curNode->parent;
+
+    ASSERT(curNode->lock == 1);
+    // We flipped nodeFree from 0 to 1. Propagate until we hit a 1
+    // We flipped nodeReady from 1 to 0. Propagate until we find sibblings
+    PROPAGATE_UP_TREE(
+        curNode, parent,
+        propagateFree || propagateReady, {
+            if (propagateFree) {
+                propagateFree = parent->nodeFree == 0ULL;
+                parent->nodeFree |= (1ULL<<curNode->parentSlot);
+            }
+            if (propagateReady) {
+                parent->nodeReady &= ~(1ULL<<curNode->parentSlot);
+                propagateReady = parent->nodeReady == 0ULL;
+            }
+        });
+END_LABEL(freeStrandEnd)
+    DPRINTF(DEBUG_LVL_INFO, "EXIT _pdFreeStrand -> %u\n", toReturn);
+    return toReturn;
+#undef _END_FUNC
+}
+
