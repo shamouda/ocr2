@@ -14,7 +14,7 @@
 #include "ocr-types.h"
 #include "utils/profiler/profiler.h"
 
-#define INVALID_LOCATION (u64)(-1)
+#define INVALID_LOCATION ((u64)(-1))
 
 /* Run-level support */
 typedef enum _ocrRunlevels_t {

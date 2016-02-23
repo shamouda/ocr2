@@ -69,7 +69,7 @@ static ocrLocation_t fatGuidToLocation(ocrPolicyDomain_t * pd, ocrFatGuid_t fatG
     if (fatGuid.guid == NULL_GUID) {
         return pd->myLocation;
     } else {
-        ocrLocation_t edtLoc = -1;
+        ocrLocation_t edtLoc = INVALID_LOCATION;
         u8 res __attribute__((unused)) = guidLocation(pd, fatGuid, &edtLoc);
         // Check that the GUID is valid
         ASSERT(!res);
@@ -85,7 +85,7 @@ static ocrLocation_t guidToLocation(ocrPolicyDomain_t * pd, ocrGuid_t edtGuid) {
         ocrFatGuid_t fatGuid;
         fatGuid.guid = edtGuid;
         fatGuid.metaDataPtr = NULL;
-        ocrLocation_t edtLoc = -1;
+        ocrLocation_t edtLoc = INVALID_LOCATION;
         u8 res __attribute__((unused)) = guidLocation(pd, fatGuid, &edtLoc);
         // Check that the GUID is valid
         ASSERT(!res);
@@ -325,7 +325,7 @@ u8 lockableRelease(ocrDataBlock_t *self, ocrFatGuid_t edt, bool isInternal) {
             // Last ITW writer. Most likely there are either more ITW on their way
             // or we're done writing and there are RO piling up or on their way.
             rself->attributes.modeLock = DB_LOCKED_NONE; // release and see what we got
-            rself->itwLocation = -1;
+            rself->itwLocation = INVALID_LOCATION;
             if (rself->roWaiterList != NULL) {
                 waiter = popRoWaiter(self);
             }
@@ -593,7 +593,7 @@ ocrDataBlock_t* newDataBlockLockable(ocrDataBlockFactory_t *factory, ocrFatGuid_
     result->ewWaiterList = NULL;
     result->roWaiterList = NULL;
     result->itwWaiterList = NULL;
-    result->itwLocation = -1;
+    result->itwLocation = INVALID_LOCATION;
     result->worker = NULL;
 
     if (hintc == 0) {

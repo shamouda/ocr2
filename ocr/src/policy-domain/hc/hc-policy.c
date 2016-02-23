@@ -727,9 +727,8 @@ static u8 hcAllocateDb(ocrPolicyDomain_t *self, ocrFatGuid_t *guid, void** ptr, 
 
         // Notify scheduler of DB CREATE
         if (result != NULL && block != NULL) {
-            ocrWorker_t *worker = NULL;
             PD_MSG_STACK(msg);
-            getCurrentEnv(NULL, &worker, NULL, &msg);
+            getCurrentEnv(NULL, NULL, NULL, &msg);
 
 #define PD_MSG (&msg)
 #define PD_TYPE PD_MSG_SCHED_NOTIFY
