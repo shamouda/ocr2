@@ -306,6 +306,7 @@ void * lockedDequePopHead(deque_t * self, u8 doTry) {
  */
 void lockedDequePushTailSemiConc(deque_t* self, void* entry, u8 doTry) {
     dequeSingleLocked_t* dself = (dequeSingleLocked_t*)self;
+    ASSERT(entry != NULL);
     hal_lock32(&dself->lock);
     u32 head = self->head;
     u32 tail = ((u32)self->tail);
@@ -314,6 +315,9 @@ void lockedDequePushTailSemiConc(deque_t* self, void* entry, u8 doTry) {
         ASSERT("DEQUE full, increase deque's size" && 0);
     }
     self->data[tail] = entry;
+    // The fence ensures a concurrent head pop cannot see
+    // self->tail increased without seeing the entry being written
+    hal_fence();
     self->tail = ptail;
     hal_unlock32(&dself->lock);
 }
@@ -329,7 +333,9 @@ void * nonConcDequePopHeadSemiConc(deque_t * self, u8 doTry) {
     }
     void * rt = (void*) self->data[head];
     ASSERT(rt != NULL);
+#ifdef OCR_ASSERT
     self->data[head] = NULL; // DEBUG
+#endif
     self->head = ((head == (INIT_DEQUE_CAPACITY-1)) ? 0 : head+1);
     return rt;
 }
