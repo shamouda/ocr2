@@ -11,6 +11,9 @@
 #include "experimental/ocr-labeling-runtime.h"
 #endif
 
+// This is to resolve sizeof ocrTaskTemplateHc_t and set the hints pointers.
+#include "task/hc/hc-task.h"
+
 #define DEBUG_TYPE POLICY
 
 // Everything in the marshalling code will be
@@ -961,13 +964,21 @@ u8 ocrPolicyMsgUnMarshallMsg(u8* mainBuffer, u8* addlBuffer,
             PD_MSG_FIELD_IO(guid.metaDataPtr) = (void*)((t&1?localAddlPtr:localMainPtr) + (t>>1));
             DPRINTF(DEBUG_LVL_VVERB, "Converted metadata ptr from 0x%lx to 0x%lx\n",
                     t, (u64)PD_MSG_FIELD_IO(guid.metaDataPtr));
-#ifdef ENABLE_EXTENSION_LABELING
             u64 val;
             ocrGuidKind kind;
             ocrPolicyDomain_t * pd;
             getCurrentEnv(&pd, NULL, NULL, NULL);
             pd->guidProviders[0]->fcts.getVal(pd->guidProviders[0], PD_MSG_FIELD_IO(guid.guid), &val, &kind);
-            if (kind == OCR_GUID_GUIDMAP) {
+            if (kind == OCR_GUID_EDT_TEMPLATE) {
+                // Handle unmarshalling formatted as: ocrTaskTemplateHc_t + hints
+                void * base = PD_MSG_FIELD_IO(guid.metaDataPtr);
+                ocrTaskTemplateHc_t * tpl = (ocrTaskTemplateHc_t *) base;
+                if (tpl->hint.hintVal != NULL) {
+                    tpl->hint.hintVal  = (u64*)((u64)base + sizeof(ocrTaskTemplateHc_t));
+                }
+            }
+#ifdef ENABLE_EXTENSION_LABELING
+            else if (kind == OCR_GUID_GUIDMAP) {
                 // Handle unmarshalling formatted as: map data-structure + serialized params array
                 void * orgMdPtr = PD_MSG_FIELD_IO(guid.metaDataPtr);
                 ocrGuidMap_t * orgMap = (ocrGuidMap_t *) orgMdPtr;

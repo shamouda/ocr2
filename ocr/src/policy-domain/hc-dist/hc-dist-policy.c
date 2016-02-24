@@ -838,6 +838,11 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
                 ocrFatGuid_t tplFatGuid;
                 tplFatGuid.guid = PD_MSG_FIELD_IO(guid.guid);
                 tplFatGuid.metaDataPtr = metaDataPtr;
+                void * base = PD_MSG_FIELD_IO(guid.metaDataPtr);
+                ocrTaskTemplateHc_t * tpl = (ocrTaskTemplateHc_t *) metaDataPtr;
+                if (tpl->hint.hintVal != NULL) {
+                    tpl->hint.hintVal  = (u64*)((u64)base + sizeof(ocrTaskTemplateHc_t));
+                }
                 // Register the metadata, process the waiter queue and checks out from the proxy.
                 registerRemoteMetaData(self, tplFatGuid);
                 PROCESS_MESSAGE_RETURN_NOW(self, 0);
