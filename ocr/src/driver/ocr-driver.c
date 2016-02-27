@@ -16,6 +16,7 @@
 #include "ocr-runtime.h"
 #include "ocr-types.h"
 #include "ocr-sysboot.h"
+#include "ocr-version.h"
 #include "extensions/ocr-legacy.h"
 #include "machine-description/ocr-machine.h"
 #include "utils/ocr-utils.h"
