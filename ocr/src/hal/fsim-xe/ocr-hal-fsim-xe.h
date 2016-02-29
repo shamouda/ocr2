@@ -291,7 +291,7 @@
  * Will crash the runtime
  */
 #define hal_abort()                             \
-    __asm__ __volatile__(".long 0\n\t")
+    __asm__ __volatile__(".quad 0\n\t")
 
 /**
  * @brief Exit the runtime
