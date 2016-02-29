@@ -44,6 +44,17 @@
 #define KIND_LOCATION 0
 #define LOCID_LOCATION (GUID_KIND_SIZE)
 
+#ifdef GUID_PROVIDER_CUSTOM_MAP
+// Set -DGUID_PROVIDER_CUSTOM_MAP and put other #ifdef for alternate implementation here
+#else
+#define GP_RESOLVE_HASHTABLE(hashtable, key) hashtable
+#define GP_HASHTABLE_CREATE_MODULO newHashtableBucketLocked
+#define GP_HASHTABLE_DESTRUCT(hashtable, key, entryDealloc, deallocParam) destructHashtableBucketLocked(hashtable, entryDealloc, deallocParam)
+#define GP_HASHTABLE_GET(hashtable, key) hashtableConcBucketLockedGet(GP_RESOLVE_HASHTABLE(hashtable,key), key)
+#define GP_HASHTABLE_PUT(hashtable, key, value) hashtableConcBucketLockedPut(GP_RESOLVE_HASHTABLE(hashtable,key), key, value)
+#define GP_HASHTABLE_DEL(hashtable, key, valueBack) hashtableConcBucketLockedRemove(GP_RESOLVE_HASHTABLE(hashtable,key), key, valueBack)
+#endif
+
 // GUID 'id' counter, atomically incr when a new GUID is requested
 static u64 guidCounter = 0;
 // Counter for the reserved part of the GUIDs
@@ -63,8 +74,12 @@ void labeledGuidHashmapEntryDestructChecker(void * key, void * value, void * dea
 #endif
 
 void labeledGuidDestruct(ocrGuidProvider_t* self) {
-    //destructHashtable(((ocrGuidProviderLabeled_t *) self)->guidImplTable);
     runtimeChunkFree((u64)self, PERSISTENT_CHUNK);
+}
+
+static u32 hashGuidCounterModulo(void * ptr, u32 nbBuckets) {
+    u64 guid = (u64) ptr;
+    return ((guid & GUID_COUNTER_MASK) % nbBuckets);
 }
 
 u8 labeledGuidSwitchRunlevel(ocrGuidProvider_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
@@ -117,7 +132,7 @@ u8 labeledGuidSwitchRunlevel(ocrGuidProvider_t *self, ocrPolicyDomain_t *PD, ocr
             deallocFct entryDeallocator = NULL;
             void * deallocParam = NULL;
 #endif
-            destructHashtableBucketLocked(((ocrGuidProviderLabeled_t *) self)->guidImplTable, entryDeallocator, deallocParam);
+            GP_HASHTABLE_DESTRUCT(((ocrGuidProviderLabeled_t *) self)->guidImplTable, NULL, entryDeallocator, deallocParam);
 #ifdef GUID_PROVIDER_DESTRUCT_CHECK
             PRINTF("=========================\n");
             PRINTF("Remnant GUIDs summary:\n");
@@ -135,7 +150,7 @@ u8 labeledGuidSwitchRunlevel(ocrGuidProvider_t *self, ocrPolicyDomain_t *PD, ocr
         if((properties & RL_BRING_UP) && RL_IS_LAST_PHASE_UP(PD, RL_GUID_OK, phase)) {
             //Initialize the map now that we have an assigned policy domain
             ocrGuidProviderLabeled_t * derived = (ocrGuidProviderLabeled_t *) self;
-            derived->guidImplTable = newHashtableBucketLockedModulo(PD, GUID_PROVIDER_NB_BUCKETS);
+            derived->guidImplTable = GP_HASHTABLE_CREATE_MODULO(PD, GUID_PROVIDER_NB_BUCKETS, hashGuidCounterModulo);
         }
         break;
     case RL_COMPUTE_OK:
@@ -230,7 +245,7 @@ u8 labeledGuidGetGuid(ocrGuidProvider_t* self, ocrGuid_t* guid, u64 val, ocrGuid
     // Here no need to allocate
     u64 newGuid = generateNextGuid(self, kind);
     DPRINTF(DEBUG_LVL_VERB, "LabeledGUID: insert into hash table 0x%lx -> 0x%lx\n", newGuid, val);
-    hashtableConcBucketLockedPut(((ocrGuidProviderLabeled_t *) self)->guidImplTable, (void *) newGuid, (void *) val);
+    GP_HASHTABLE_PUT(((ocrGuidProviderLabeled_t *) self)->guidImplTable, (void *) newGuid, (void *) val);
     *guid = (ocrGuid_t) newGuid;
     return 0;
 }
@@ -313,7 +328,7 @@ u8 labeledGuidCreateGuid(ocrGuidProvider_t* self, ocrFatGuid_t *fguid, u64 size,
         } else {
             // "Trust me" mode. We insert into the hashtable
             DPRINTF(DEBUG_LVL_VERB, "LabeledGUID: trust insert into hash table 0x%lx -> 0x%lx\n", fguid->guid, ptr);
-            hashtableConcBucketLockedPut(((ocrGuidProviderLabeled_t*)self)->guidImplTable,
+            GP_HASHTABLE_PUT(((ocrGuidProviderLabeled_t*)self)->guidImplTable,
                                          (void*)(fguid->guid), ptr);
         }
     } else {
@@ -328,7 +343,7 @@ u8 labeledGuidCreateGuid(ocrGuidProvider_t* self, ocrFatGuid_t *fguid, u64 size,
  * @brief Returns the value associated with a guid and its kind if requested.
  */
 u8 labeledGuidGetVal(ocrGuidProvider_t* self, ocrGuid_t guid, u64* val, ocrGuidKind* kind) {
-    *val = (u64) hashtableConcBucketLockedGet(((ocrGuidProviderLabeled_t *) self)->guidImplTable, (void *) guid);
+    *val = (u64) GP_HASHTABLE_GET(((ocrGuidProviderLabeled_t *) self)->guidImplTable, (void *) guid);
     DPRINTF(DEBUG_LVL_VERB, "LabeledGUID: got val for GUID 0x%lx: 0x%lx\n", guid, *val);
     if(*val == (u64)NULL) {
         // Does not exist in the hashtable
@@ -376,7 +391,7 @@ u8 labeledGuidGetLocation(ocrGuidProvider_t* self, ocrGuid_t guid, ocrLocation_t
  */
 u8 labeledGuidRegisterGuid(ocrGuidProvider_t* self, ocrGuid_t guid, u64 val) {
     DPRINTF(DEBUG_LVL_VERB, "LabeledGUID: register GUID 0x%lx -> 0x%lx\n", guid, val);
-    hashtableConcBucketLockedPut(((ocrGuidProviderLabeled_t *) self)->guidImplTable, (void *) guid, (void *) val);
+    GP_HASHTABLE_PUT(((ocrGuidProviderLabeled_t *) self)->guidImplTable, (void *) guid, (void *) val);
     return 0;
 }
 
@@ -384,7 +399,7 @@ u8 labeledGuidRegisterGuid(ocrGuidProvider_t* self, ocrGuid_t guid, u64 val) {
  * @brief Remove an already existing GUID and its associated value from the provider
  */
 u8 labeledGuidUnregisterGuid(ocrGuidProvider_t* self, ocrGuid_t guid, u64 ** val) {
-    hashtableConcBucketLockedRemove(((ocrGuidProviderLabeled_t *) self)->guidImplTable, (void *) guid, (void **) val);
+    GP_HASHTABLE_DEL(((ocrGuidProviderLabeled_t *) self)->guidImplTable, (void *) guid, (void **) val);
     return 0;
 }
 
@@ -402,7 +417,7 @@ u8 labeledGuidReleaseGuid(ocrGuidProvider_t *self, ocrFatGuid_t fatGuid, bool re
     //   - this function removes the value from the hashtable
     //   => the creator thinks all is swell but the data was actually *removed*
     ocrGuidProviderLabeled_t * derived = (ocrGuidProviderLabeled_t *) self;
-    RESULT_ASSERT(hashtableConcBucketLockedRemove(derived->guidImplTable, (void *)guid, NULL), ==, true);
+    RESULT_ASSERT(GP_HASHTABLE_DEL(derived->guidImplTable, (void *)guid, NULL), ==, true);
     // If there's metaData associated with guid we need to deallocate memory
     if(releaseVal && (fatGuid.metaDataPtr != NULL)) {
         PD_MSG_STACK(msg);

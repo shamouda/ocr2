@@ -49,9 +49,14 @@ DEFAULT_CONFIG ?= jenkins-common-8w-lockableDB.cfg
 
 # **** GUID-Provider Parameters ****
 
-# Impl-specific for counted-map and labeled-guid providers
+# All impl-specific for counted-map and labeled-guid providers
+
 # - Controls how many bits in the GUID are used for PD location
 # CFLAGS += -DGUID_PROVIDER_LOCID_SIZE=7
+
+# Activate a different hashmap implementation
+# Warning: Necessitates an additional -D activating the alternate implementation
+# CFLAGS += -DGUID_PROVIDER_CUSTOM_MAP -D_TODO_FILL_ME_IN
 
 # **** EDTs parameters ****
 

@@ -43,6 +43,17 @@
 #define KIND_LOCATION 0
 #define LOCID_LOCATION GUID_KIND_SIZE
 
+#ifdef GUID_PROVIDER_CUSTOM_MAP
+// Set -DGUID_PROVIDER_CUSTOM_MAP and put other #ifdef for alternate implementation here
+#else
+#define GP_RESOLVE_HASHTABLE(hashtable, key) hashtable
+#define GP_HASHTABLE_CREATE_MODULO newHashtableBucketLocked
+#define GP_HASHTABLE_DESTRUCT(hashtable, key, entryDealloc, deallocParam) destructHashtableBucketLocked(hashtable, entryDealloc, deallocParam)
+#define GP_HASHTABLE_GET(hashtable, key) hashtableConcBucketLockedGet(GP_RESOLVE_HASHTABLE(hashtable,key), key)
+#define GP_HASHTABLE_PUT(hashtable, key, value) hashtableConcBucketLockedPut(GP_RESOLVE_HASHTABLE(hashtable,key), key, value)
+#define GP_HASHTABLE_DEL(hashtable, key, valueBack) hashtableConcBucketLockedRemove(GP_RESOLVE_HASHTABLE(hashtable,key), key, valueBack)
+#endif
+
 // GUID 'id' counter, atomically incr when a new GUID is requested
 static u64 guidCounter = 0;
 
@@ -114,7 +125,7 @@ u8 countedMapSwitchRunlevel(ocrGuidProvider_t *self, ocrPolicyDomain_t *PD, ocrR
             deallocFct entryDeallocator = NULL;
             void * deallocParam = NULL;
 #endif
-            destructHashtableBucketLocked(((ocrGuidProviderCountedMap_t *) self)->guidImplTable, entryDeallocator, deallocParam);
+            GP_HASHTABLE_DESTRUCT(((ocrGuidProviderCountedMap_t *) self)->guidImplTable, NULL, entryDeallocator, deallocParam);
 #ifdef GUID_PROVIDER_DESTRUCT_CHECK
             PRINTF("=========================\n");
             PRINTF("Remnant GUIDs summary:\n");
@@ -132,7 +143,7 @@ u8 countedMapSwitchRunlevel(ocrGuidProvider_t *self, ocrPolicyDomain_t *PD, ocrR
         if((properties & RL_BRING_UP) && RL_IS_LAST_PHASE_UP(PD, RL_GUID_OK, phase)) {
             //Initialize the map now that we have an assigned policy domain
             ocrGuidProviderCountedMap_t * derived = (ocrGuidProviderCountedMap_t *) self;
-            derived->guidImplTable = newHashtableBucketLocked(PD, GUID_PROVIDER_NB_BUCKETS, hashGuidCounterModulo);
+            derived->guidImplTable = GP_HASHTABLE_CREATE_MODULO(PD, GUID_PROVIDER_NB_BUCKETS, hashGuidCounterModulo);
         }
         break;
     case RL_COMPUTE_OK:
@@ -218,7 +229,7 @@ u8 countedMapGuidUnreserve(ocrGuidProvider_t *self, ocrGuid_t startGuid, u64 ski
 static u8 countedMapGetGuid(ocrGuidProvider_t* self, ocrGuid_t* guid, u64 val, ocrGuidKind kind) {
     // Here no need to allocate
     u64 newGuid = generateNextGuid(self, kind);
-    hashtableConcBucketLockedPut(((ocrGuidProviderCountedMap_t *) self)->guidImplTable, (void *) newGuid, (void *) val);
+    GP_HASHTABLE_PUT(((ocrGuidProviderCountedMap_t *) self)->guidImplTable, (void *) newGuid, (void *) val);
     *guid = (ocrGuid_t) newGuid;
     return 0;
 }
@@ -262,7 +273,7 @@ u8 countedMapCreateGuid(ocrGuidProvider_t* self, ocrFatGuid_t *fguid, u64 size, 
  * @brief Returns the value associated with a guid and its kind if requested.
  */
 static u8 countedMapGetVal(ocrGuidProvider_t* self, ocrGuid_t guid, u64* val, ocrGuidKind* kind) {
-    *val = (u64) hashtableConcBucketLockedGet(((ocrGuidProviderCountedMap_t *) self)->guidImplTable, (void *) guid);
+    *val = (u64) GP_HASHTABLE_GET(((ocrGuidProviderCountedMap_t *) self)->guidImplTable, (void *) guid);
     if(kind) {
         *kind = getKindFromGuid(guid);
     }
@@ -292,7 +303,7 @@ u8 countedMapGetLocation(ocrGuidProvider_t* self, ocrGuid_t guid, ocrLocation_t*
  * a local metadata represent for a foreign GUID.
  */
 u8 countedMapRegisterGuid(ocrGuidProvider_t* self, ocrGuid_t guid, u64 val) {
-    hashtableConcBucketLockedPut(((ocrGuidProviderCountedMap_t *) self)->guidImplTable, (void *) guid, (void *) val);
+    GP_HASHTABLE_PUT(((ocrGuidProviderCountedMap_t *) self)->guidImplTable, (void *) guid, (void *) val);
     return 0;
 }
 
@@ -300,7 +311,7 @@ u8 countedMapRegisterGuid(ocrGuidProvider_t* self, ocrGuid_t guid, u64 val) {
  * @brief Remove an already existing GUID and its associated value from the provider
  */
 u8 countedMapUnregisterGuid(ocrGuidProvider_t* self, ocrGuid_t guid, u64 ** val) {
-    hashtableConcBucketLockedRemove(((ocrGuidProviderCountedMap_t *) self)->guidImplTable, (void *) guid, (void **) val);
+    GP_HASHTABLE_DEL(((ocrGuidProviderCountedMap_t *) self)->guidImplTable, (void *) guid, (void **) val);
     return 0;
 }
 
@@ -327,7 +338,7 @@ u8 countedMapReleaseGuid(ocrGuidProvider_t *self, ocrFatGuid_t fatGuid, bool rel
     }
     // In any case, we need to recycle the guid
     ocrGuidProviderCountedMap_t * derived = (ocrGuidProviderCountedMap_t *) self;
-    hashtableConcBucketLockedRemove(derived->guidImplTable, (void *)guid, NULL);
+    GP_HASHTABLE_DEL(derived->guidImplTable, (void *)guid, NULL);
     return 0;
 }
 
