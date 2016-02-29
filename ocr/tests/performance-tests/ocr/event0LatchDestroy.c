@@ -12,6 +12,7 @@
 #define TIME_CREATION 0
 #define TIME_DESTRUCTION 1
 #define CLEAN_UP_ITERATION 1
+#define TIME_ALL 0
 
 // Can clean-up non-persistent event here because events
 // are only created but not satisfied in this test.

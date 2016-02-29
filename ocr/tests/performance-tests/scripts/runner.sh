@@ -94,7 +94,7 @@ while [[ $# -gt 0 ]]; do
         echo "       -nbrun  integer    : Number of runs per program"
         echo "       -runlog name       : Naming for run logs"
         echo "       -report name       : Naming for run reports"
-        echo "       -target name       : Target to run on (x86|mpi)"
+        echo "       -target name       : Target to run on (x86|x86-mpi|x86-gasnet)"
         echo "       -noclean           : Do not cleanup temporary files"
         echo "Environment variables:"
         echo "       - CUSTOM_BOUNDS: defines to use when compiling the program"
@@ -160,7 +160,7 @@ function defaultConfigTarget() {
             export CFGARG_ALLOC=${CFGARG_ALLOC-"32"}
             export CFGARG_ALLOCTYPE=${CFGARG_ALLOCTYPE-"mallocproxy"}
         ;;
-        mpi)
+        x86-mpi)
             export CFGARG_GUID=${CFGARG_GUID-"COUNTED_MAP"}
             export CFGARG_PLATFORM=${CFGARG_PLATFORM-"X86"}
             export CFGARG_TARGET=${CFGARG_TARGET-"mpi"}
@@ -168,7 +168,7 @@ function defaultConfigTarget() {
             export CFGARG_ALLOC=${CFGARG_ALLOC-"32"}
             export CFGARG_ALLOCTYPE=${CFGARG_ALLOCTYPE-"mallocproxy"}
         ;;
-        gasnet)
+        x86-gasnet)
             export CFGARG_GUID=${CFGARG_GUID-"COUNTED_MAP"}
             export CFGARG_PLATFORM=${CFGARG_PLATFORM-"X86"}
             export CFGARG_TARGET=${CFGARG_TARGET-"gasnet"}
