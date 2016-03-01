@@ -122,6 +122,8 @@ u8 ocrDbDestroy(ocrGuid_t db) {
         if(returnCode != 0) {
             DPRINTF(DEBUG_LVL_WARN, "Destroying DB (GUID: 0x%lx) -> %u; Issue unregistering the datablock\n", db, returnCode);
         }
+        // If dynRemoved is true, it means the task was using the data-block and we will therefore
+        // need to remove it automatically. Otherwise, we won't need to release it
         dynRemoved = (PD_MSG_FIELD_O(returnDetail)==0);
 #undef PD_MSG
 #undef PD_TYPE
@@ -139,6 +141,7 @@ u8 ocrDbDestroy(ocrGuid_t db) {
         PD_MSG_FIELD_I(edt.metaDataPtr) = task;
         // Tell whether or not the task was using the DB. This is useful
         // to know if the DB actually needs to be released or not.
+        // If dynRemoved is true, we will release the data-block. Otherwise, we won't
         PD_MSG_FIELD_I(properties) = dynRemoved ? 0 : DB_PROP_NO_RELEASE;
         returnCode = policy->fcts.processMessage(policy, &msg, false);
 #undef PD_MSG

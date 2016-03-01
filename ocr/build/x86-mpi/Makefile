@@ -14,7 +14,7 @@ $(error OCR_TYPE is set to ${OCR_TYPE} but expected x86-mpi)
 endif
 endif
 
-DEFAULT_CONFIG=mach-hc-dist-mpi-clone-8w-lockable.cfg
+DEFAULT_CONFIG=mach-hc-dist-mpi-clone-8w-lockableDB.cfg
 
 #
 # Tool-chain to be used for the build

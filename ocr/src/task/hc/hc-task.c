@@ -1089,15 +1089,22 @@ u8 notifyDbReleaseTaskHc(ocrTask_t *base, ocrFatGuid_t db) {
         while(count < maxCount) {
             // We bound our search (in case there is an error)
             if(db.guid == derived->resolvedDeps[count].guid) {
-                DPRINTF(DEBUG_LVL_VVERB, "Dynamic Releasing DB (GUID 0x%lx) from EDT 0x%lx, "
-                        "match in dependence list for count %lu\n",
-                        db.guid, base->guid, count);
                 // If the below asserts, rebuild OCR with a higher OCR_MAX_MULTI_SLOT (in build/common.mk)
                 ASSERT(count / 64 < OCR_MAX_MULTI_SLOT);
-                derived->doNotReleaseSlots[count / 64] |= (1ULL << (count % 64));
-                // we can return on the first instance found since iterateDbFrontier
-                // already marked duplicated DB and the selection sort in sortRegNode is stable.
-                return 0;
+                if(derived->doNotReleaseSlots[count / 64 ] & (1ULL << (count % 64))) {
+                    DPRINTF(DEBUG_LVL_VVERB, "DB (GUID 0x%lx) already released from EDT 0x%lx (dependence %lu)\n",
+                            db.guid, base->guid, count);
+                    return OCR_ENOENT;
+                } else {
+                    DPRINTF(DEBUG_LVL_VVERB, "Dynamic Releasing DB (GUID 0x%lx) from EDT 0x%lx, "
+                            "match in dependence list for count %lu\n",
+                            db.guid, base->guid, count);
+
+                    derived->doNotReleaseSlots[count / 64] |= (1ULL << (count % 64));
+                    // we can return on the first instance found since iterateDbFrontier
+                    // already marked duplicated DB and the selection sort in sortRegNode is stable.
+                    return 0;
+                }
             }
             ++count;
         }

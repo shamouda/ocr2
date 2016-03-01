@@ -175,7 +175,7 @@ u8 regularDestruct(ocrDataBlock_t *self) {
 
 u8 regularFree(ocrDataBlock_t *self, ocrFatGuid_t edt, u32 properties) {
     bool isInternal = ((properties & DB_PROP_RT_ACQUIRE) != 0);
-    bool reqRelease = !(properties & DB_PROP_NO_RELEASE);
+    bool reqRelease = ((properties & DB_PROP_NO_RELEASE) == 0);
     ocrDataBlockRegular_t *rself = (ocrDataBlockRegular_t*)self;
 
     DPRINTF(DEBUG_LVL_VERB, "Requesting a free for DB @ 0x%lx (GUID: 0x%lx)\n",

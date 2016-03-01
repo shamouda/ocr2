@@ -510,10 +510,10 @@ u8 lockableDestruct(ocrDataBlock_t *self) {
 
 u8 lockableFree(ocrDataBlock_t *self, ocrFatGuid_t edt, u32 properties) {
     bool isInternal = ((properties & DB_PROP_RT_ACQUIRE) != 0);
-    bool reqRelease = !(properties & DB_PROP_NO_RELEASE);
+    bool reqRelease = ((properties & DB_PROP_NO_RELEASE) == 0);
     ocrDataBlockLockable_t *rself = (ocrDataBlockLockable_t*)self;
-    DPRINTF(DEBUG_LVL_VERB, "Requesting a free for DB @ 0x%lx (GUID: 0x%lx)\n",
-            (u64)self->ptr, rself->base.guid);
+    DPRINTF(DEBUG_LVL_VERB, "Requesting a free for DB @ 0x%lx (GUID: 0x%lx); props: 0x%x\n",
+            (u64)self->ptr, rself->base.guid, properties);
 
     hal_lock32(&(rself->lock));
     if(rself->attributes.freeRequested) {
@@ -531,6 +531,8 @@ u8 lockableFree(ocrDataBlock_t *self, ocrFatGuid_t edt, u32 properties) {
         // The datablock may not have been acquired by the current EDT hence
         // we do not need to account for a release.
         if (reqRelease) {
+            DPRINTF(DEBUG_LVL_VVERB, "Free triggering release for DB @ 0x%lx (GUID: 0x%lx)\n",
+                    (u64)self->ptr, rself->base.guid);
             lockableRelease(self, edt, isInternal);
         }
     }
