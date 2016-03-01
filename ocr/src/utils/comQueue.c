@@ -117,7 +117,7 @@ u8 comQueueReadSlot(comQueue_t *queue, u32 *slot) {
     // We look up to writeIdx (including writeIdx)
     u32 lastIdx = queue->writeIdx; // We read now; it does not matter if we miss
                                    // some; we will catch them next time
-    u32 firstIdx, curIdx, firstWriteable = (u32)-1, lastWriteable;
+    u32 firstIdx, curIdx, firstWriteable = (u32)-1, lastWriteable = 0;
     curIdx = queue->readIdx;
     firstIdx = curIdx;
     u8 allEmpty = true;

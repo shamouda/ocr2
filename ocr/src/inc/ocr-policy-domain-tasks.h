@@ -271,7 +271,7 @@ typedef struct _pdStrandTable_t {
  * @brief Creates a slab-allocated event of the given type.
  *
  * A pointer to the event is returned. If reserveInTable is not zero, the event
- * is also inserted directly in a strands table (001b -> event table; 010b -> comm
+ * is also inserted directly in a strands table (PDSTT_EVT -> event table; PDSTT_COMM -> comm
  * table and marked as held by the user.
  * A created event is always non-ready.
  *
@@ -316,6 +316,50 @@ u8 pdCreateEvent(ocrPolicyDomain_t *pd, pdEvent_t **event, u32 type, u8 reserveI
  */
 u8 pdResolveEvent(ocrPolicyDomain_t *pd, u64 *evtValue, u8 clearFwdHold);
 
+/**
+ * @brief Marks the event as ready and updates internal data-structures
+ *
+ * The runtime makes no assumptions as to what it means for an event to
+ * be ready and instead relies on the user to tell it when an event is ready.
+ * However, the user should not flip the ready bit in the property field by him/herself
+ * and should instead use this call to do so. The readying of an event has
+ * internal consequences for the micro-task scheduler and these changes need
+ * to be properly propagated. This call takes care of that.
+ *
+ * This call expects the event to be NON-READY and will fail if the event
+ * is not in that state.
+ *
+ * @param[in] pd    Policy domain to use. Can be NULL.
+ * @param[in] event Event to mark as ready
+ * @return a status indicating the status of the satisfaction:
+ *     - 0: everything went OK
+ *     - OCR_EINVAL: event is not a valid event
+ */
+u8 pdMarkReadyEvent(ocrPolicyDomain_t *pd, pdEvent_t *event);
+
+/**
+ * @brief Marks the event as no longer ready and updates internal data-structures
+ *
+ * This makes the event 'not ready' and is used if an event is being reused (for
+ * example at various points in a strand).
+ *
+ * @warn There is a natural race between this call and the automatic deletion of
+ * events by the runtime (when the strand they are in is fully ready). The user
+ * is responsible for making sure this cannot happen. A few rules should be followed:
+ *     - If the event is not part of a strand, there is no issue since the
+ *       event will not be freed.
+ *     - If the event is part of a strand, make sure that there are either
+ *       actions left and/or a hold (RHOLD or UHOLD is exercised on the strand)
+ * This call expects the event to be READY and will fail if the event
+ * is not in that state.
+ *
+ * @param[in] pd    Policy domain to use. Can be NULL.
+ * @param[in] event Event to mark as non-ready
+ * @return a status indicating the status of the change:
+ *     - 0: everything went OK
+ *     - OCR_EINVAL: event is not a valid event
+ */
+u8 pdMarkWaitEvent(ocrPolicyDomain_t *pd, pdEvent_t *event);
 
 /***************************************/
 /***** pdAction_t related functions ****/
@@ -325,6 +369,39 @@ u8 pdResolveEvent(ocrPolicyDomain_t *pd, u64 *evtValue, u8 clearFwdHold);
 /***************************************/
 /***** pdStrand_t related functions ****/
 /***************************************/
+
+/**
+ * @brief Initialize a strand table
+ *
+ * This should be called to initialize a table. This does not allocate any memory
+ * but sets up the data-structures to sane values
+ *
+ * @param[in] pd            Policy domain
+ * @param[in] table         Table to initialize
+ * @param[in] properties    Unused for now
+ * @return a status code:
+ *     - 0: successful
+ *     - OCR_EINVAL: 'table' is NULL
+ */
+u8 pdInitializeStrandTable(ocrPolicyDomain_t* pd, pdStrandTable_t *table, u32 properties);
+
+
+/**
+ * @brief Destroy the internal structures of a strand table
+ *
+ * This should be called to destroy any memory that has been allocated as part of
+ * building and using the strand table. This does not free the table itself.
+ *
+ * @warn The table should be entirely empty (all nodes freed up) prior to calling this
+  *
+ * @param[in] pd            Policy domain
+ * @param[in] table         Table to destroy
+ * @param[in] properties    Unused for now
+ * @return a status code:
+ *     - 0: successful
+ *     - OCR_EINVAL: 'table' was not entirely empty
+ */
+u8 pdDestroyStrandTable(ocrPolicyDomain_t* pd, pdStrandTable_t *table, u32 properties);
 
 
 /**
@@ -440,5 +517,43 @@ u8 pdUnlockStrand(pdStrand_t *strand);
 /****** Global scheduler functions *****/
 /***************************************/
 
+#define PDSTT_EMPTYTABLES 0x1
+
+/**
+ * @brief Main entry into the micro-task processor
+ *
+ * This function will process a certain number of events as determined by the
+ * policy of the micro-task scheduler and the properties passed. This call
+ * will not block.
+ *
+ * @param[in] pd            Policy domain to use
+ * @param[in] properties    Properties (currently just PDSTT_EMPTYTABLES)
+ * @return a status code:
+ *      - 0: successful
+ *      - OCR_EAGAIN: temporary failure, retry later
+ *
+ */
+u8 pdProcessStrands(ocrPolicyDomain_t *pd, u32 properties);
+
+/**
+ * @brief Process tasks until the events required are resolved
+ *
+ * This function will not return until the events specified have been fully
+ * resolved. It will continue processing tasks until that happens. This is
+ * used to implement a wait on a given event (for example). On return, the
+ * event array will contain the resolved events.
+ *
+ * @param[in] pd            Policy domain to use
+ * @param[in] count         Number of events to try to resolve
+ * @param[in/out] events    Events to resolve. On successful return, contains the
+ *                          resolved events
+ * @param[in] properties    Properties
+ * @return a status code:
+ *      - 0: successful
+ *      - OCR_EAGAIN: temporary failure, retry later
+ * @todo Define properties
+ */
+u8 pdProcessResolveEvents(ocrPolicyDomain_t *pd, u32 count, pdEvent_t **events,
+                          u64 properties);
 
 #endif /* __POLICY_DOMAIN_TASKS_H__ */

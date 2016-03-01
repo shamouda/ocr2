@@ -153,6 +153,23 @@ static u8 _pdProcessAction(ocrPolicyDomain_t *pd, pdStrand_t *strand,
 
 // ----- Strand related functions -----
 
+/**
+ * @brief Destroys (and frees) a table node
+ *
+ * This function goes down the subtree freeing everything it can
+ *
+ * @warn This function expects the node to be totally free
+ *
+ * @param[in] pd        Policy domain to use
+ * @param[in] node      Node to destroy
+ *
+ * @return a status code:
+ *     - 0 on success
+ *     - OCR_EINVAL if node is NULL
+ */
+static u8 _pdDestroyStrandTableNode(ocrPolicyDomain_t *pd, pdStrandTableNode_t *node);
+
+
 #define HAS_EXPECTED_VALUE  0x1
 #define BLOCK               0x2
 /**
@@ -401,6 +418,187 @@ END_LABEL(resolveEventEnd)
 #undef _END_FUNC
 }
 
+u8 pdMarkReadyEvent(ocrPolicyDomain_t *pd, pdEvent_t *evt) {
+    DPRINTF(DEBUG_LVL_INFO, "ENTER pdMarkReadyEvent(pd:0x%lx, evt:0x%lx)\n",
+            pd, evt);
+#define _END_FUNC markReadyEventEnd
+
+    u8 toReturn = 0;
+    if(pd == NULL) {
+        getCurrentEnv(&pd, NULL, NULL, NULL);
+    }
+
+    CHECK_RESULT_T(evt != NULL, , toReturn = OCR_EINVAL);
+    CHECK_RESULT_T((evt->properties & PDEVT_READY) == 0, , toReturn = OCR_EINVAL);
+
+    evt->properties |= PDEVT_READY;
+    if(evt->strand != NULL) {
+        DPRINTF(DEBUG_LVL_VERB, "Event has strand 0x%lx -> going to update\n", evt->strand);
+        // First grab the lock on the strand
+        pdStrand_t *strand = evt->strand;
+        u32 stIdx = strand->index & ((1<<BV_SIZE_LOG2) - 1);
+        pdStrandTableNode_t *curNode = strand->parent;
+        ASSERT(curNode);
+
+        // Lock the strand
+        RESULT_ASSERT(_pdLockStrand(strand, 0, BLOCK), ==, 0);
+
+        // This should be the case since the event was not ready yet
+        ASSERT((strand->properties & PDST_WAIT_EVT) != 0);
+        strand->properties &= ~PDST_WAIT_EVT;
+
+        // The following things can happen here
+        //     - there are actions so this strand needs processing
+        //     - there are no actions -> this strand becomes ready (destroyed or kept around)
+        bool propagateReady = false, propagateNP = false, didFree = false;
+        hal_lock32(&(curNode->lock));
+        if ((strand->properties & PDST_WAIT_ACT) != 0) {
+            DPRINTF(DEBUG_LVL_VERB, "Strand 0x%lx has waiting actions -> setting NP\n", strand);
+            // We have pending actions, making this a NP node
+            propagateNP = curNode->nodeNeedsProcess == 0ULL;
+            curNode->nodeNeedsProcess |= (1ULL<<stIdx);
+        } else {
+            DPRINTF(DEBUG_LVL_VERB, "Strand 0x%lx is fully ready\n", strand);
+            propagateReady = curNode->nodeReady == 0ULL;
+            curNode->nodeReady |= (1ULL<<stIdx);
+        }
+
+        if((strand->properties & PDST_WAIT) == 0) {
+            // Strand is ready; we either free it or keep it there due to a hold
+            if ((strand->properties & PDST_HOLD) == 0) {
+                // We can free the strand now
+                DPRINTF(DEBUG_LVL_VERB, "(POSSIBLE RACE) Freeing strand 0x%lx [idx %u] after making event ready\n",
+                        strand, strand->index);
+                // We unset the nodeReady bit to prevent unecessary propagation
+                curNode->nodeReady &= ~(1ULL<<stIdx);
+                hal_unlock32(&(curNode->lock));
+                RESULT_ASSERT(_pdFreeStrand(pd, strand), ==, 0);
+                ASSERT(!propagateNP);
+                propagateReady = false; // No need to change this since we freed the node
+                didFree = true;
+            } else {
+                DPRINTF(DEBUG_LVL_VERB, "Strand 0x%lx is ready but has a hold -- leaving as is\n",
+                        strand);
+                strand->properties &= ~PDST_LOCK;
+            }
+        } else {
+            strand->properties &= ~PDST_LOCK;
+        }
+
+        // We still hold lock on curNode EXCEPT if didFree
+        if (propagateReady || propagateNP) {
+            ASSERT(!didFree);
+            DPRINTF(DEBUG_LVL_VERB, "Propagating properties: ready: %u; np: %u\n",
+                    propagateReady, propagateNP);
+
+            pdStrandTableNode_t *parent = curNode->parent;
+            ASSERT(curNode->lock == 1);
+            // We flipped nodeReady from 0 to 1; to up until we see a 1
+            // We flipped nodeNeedsProcessing from 0 to 1; same as above
+            PROPAGATE_UP_TREE(
+                curNode, parent,
+                propagateReady || propagateNP, {
+                    if (propagateReady) {
+                        propagateReady = parent->nodeReady == 0ULL;
+                        parent->nodeReady |= (1ULL<<curNode->parentSlot);
+                    }
+                    if (propagateNP) {
+                        propagateNP = parent->nodeNeedsProcess == 0ULL;
+                        parent->nodeNeedsProcess |= (1ULL<<curNode->parentSlot);
+                    }
+                });
+        } else {
+            if(!didFree)
+                hal_unlock32(&(curNode->lock));
+        }
+    }
+END_LABEL(markReadyEventEnd)
+    DPRINTF(DEBUG_LVL_INFO, "EXIT pdMarkReadyEvent -> %u\n",
+            toReturn);
+    return toReturn;
+#undef _END_FUNC
+}
+
+u8 pdMarkWaitEvent(ocrPolicyDomain_t *pd, pdEvent_t *evt) {
+    DPRINTF(DEBUG_LVL_INFO, "ENTER pdMarkWaitEvent(pd:0x%lx, evt:0x%lx)\n",
+            pd, evt);
+#define _END_FUNC markWaitEventEnd
+
+    u8 toReturn = 0;
+    if(pd == NULL) {
+        getCurrentEnv(&pd, NULL, NULL, NULL);
+    }
+
+    CHECK_RESULT_T(evt != NULL, , toReturn = OCR_EINVAL);
+    CHECK_RESULT_T((evt->properties & PDEVT_READY) == PDEVT_READY, , toReturn = OCR_EINVAL);
+
+    evt->properties &= ~PDEVT_READY;
+    if(evt->strand != NULL) {
+        DPRINTF(DEBUG_LVL_VERB, "Event has strand 0x%lx -> going to update\n", evt->strand);
+        // First grab the lock on the strand
+        pdStrand_t *strand = evt->strand;
+        u32 stIdx = strand->index & ((1<<BV_SIZE_LOG2) - 1);
+        pdStrandTableNode_t *curNode = strand->parent;
+        ASSERT(curNode);
+
+        // Lock the strand
+        RESULT_ASSERT(_pdLockStrand(strand, 0, BLOCK), ==, 0);
+
+        // This should be the case since the event was ready prior to this
+        ASSERT((strand->properties & PDST_WAIT_EVT) == 0);
+        strand->properties |= PDST_WAIT_EVT;
+
+        // The following things can happen here
+        //     - there are actions so this strand no longer needs processing
+        //     - there are no actions -> this strand is no longer ready
+        bool propagateReady = false, propagateNP = false;
+        hal_lock32(&(curNode->lock));
+        if ((strand->properties & PDST_WAIT_ACT) != 0) {
+            DPRINTF(DEBUG_LVL_VERB, "(POSSIBLE RACE) Strand 0x%lx has waiting actions\n", strand);
+            // We are no longer in need of processing
+            curNode->nodeNeedsProcess &= ~(1ULL<<stIdx);
+            propagateNP = curNode->nodeNeedsProcess == 0ULL;
+        } else {
+            DPRINTF(DEBUG_LVL_VERB, "Strand 0x%lx is no longer ready\n", strand);
+            // If we are still around, it means we have an active hold
+            ASSERT(strand->properties & PDST_HOLD);
+            curNode->nodeReady &= ~(1ULL<<stIdx);
+            propagateReady = curNode->nodeReady == 0ULL;
+        }
+
+        strand->properties &= ~PDST_LOCK;
+
+        // We still hold lock on curNode
+        if (propagateReady || propagateNP) {
+            DPRINTF(DEBUG_LVL_VERB, "Propagating properties: ready: %u; np: %u\n",
+                    propagateReady, propagateNP);
+
+            pdStrandTableNode_t *parent = curNode->parent;
+            ASSERT(curNode->lock == 1);
+            // We flipped nodeReady from 1 to 0; to up until we see a sibbling
+            // We flipped nodeNeedsProcessing from 1 to 0; same as above
+            PROPAGATE_UP_TREE(
+                curNode, parent,
+                propagateReady || propagateNP, {
+                    if (propagateReady) {
+                        parent->nodeReady &= ~(1ULL<<curNode->parentSlot);
+                        propagateReady = parent->nodeReady == 0ULL;
+                    }
+                    if (propagateNP) {
+                        parent->nodeNeedsProcess &= ~(1ULL<<curNode->parentSlot);
+                        propagateNP = parent->nodeNeedsProcess == 0ULL;
+                    }
+                });
+        } else {
+            hal_unlock32(&(curNode->lock));
+        }
+    }
+END_LABEL(markWaitEventEnd)
+    DPRINTF(DEBUG_LVL_INFO, "EXIT pdMarkWaitEvent -> %u\n",
+            toReturn);
+    return toReturn;
+#undef _END_FUNC
+}
 
 /***************************************/
 /***** pdAction_t related functions ****/
@@ -411,6 +609,60 @@ END_LABEL(resolveEventEnd)
 /***** pdStrand_t related functions ****/
 /***************************************/
 
+u8 pdInitializeStrandTable(ocrPolicyDomain_t* pd, pdStrandTable_t *table,
+                           u32 properties) {
+    DPRINTF(DEBUG_LVL_INFO, "ENTER pdInitializeStrandTable(pd:0x%lx, table:0x%lx, props:0x%x)\n",
+            pd, table, properties);
+#define _END_FUNC initializeStrandTableEnd
+    u8 toReturn = 0;
+
+    CHECK_RESULT_T(table != NULL, , toReturn |= OCR_EINVAL);
+
+    table->levelCount = 0;
+    table->head = NULL;
+    table->lock = 0;
+
+END_LABEL(initializeStrandTableEnd)
+    DPRINTF(DEBUG_LVL_INFO, "EXIT pdInitializeStrandTable -> %u\n",
+            toReturn);
+    return toReturn;
+#undef _END_FUNC
+
+}
+
+u8 pdDestroyStrandTable(ocrPolicyDomain_t* pd, pdStrandTable_t *table,
+                           u32 properties) {
+    DPRINTF(DEBUG_LVL_INFO, "ENTER pdDestroyStrandTable(pd:0x%lx, table:0x%lx, props:0x%x)\n",
+            pd, table, properties);
+#define _END_FUNC destroyStrandTableEnd
+    u8 toReturn = 0;
+
+    CHECK_RESULT_T(table != NULL, , toReturn |= OCR_EINVAL);
+    hal_lock32(&(table->lock));
+    if (table->head != NULL) {
+        // If the head exists, make sure all nodes are marked as free
+        hal_lock32(&(table->head->lock));
+        CHECK_RESULT_T(table->head->nodeFree == ~0ULL, {
+                hal_unlock32(&(table->head->lock));
+                hal_unlock32(&(table->lock));
+            }, toReturn |= OCR_EINVAL);
+        hal_unlock32(&(table->head->lock));
+        // At this point, we hold the lock on the table and unless something is
+        // fishy, since the table is empty, nothing else can be happening in
+        // parallel. We will therefore free stuff happily.
+        _pdDestroyStrandTableNode(pd, table->head);
+        pd->fcts.pdFree(pd, table->head);
+    } else {
+        DPRINTF(DEBUG_LVL_VERB, "Freeing NULL table\n");
+    }
+    hal_unlock32(&(table->lock));
+
+END_LABEL(destroyStrandTableEnd)
+    DPRINTF(DEBUG_LVL_INFO, "EXIT pdDestroyStrandTable -> %u\n",
+            toReturn);
+    return toReturn;
+#undef _END_FUNC
+}
 
 // NOTE on the lock order: if you want to hold multiple locks, you must hold
 // the lock for the child FIRST and then acquire the lock of your parent.
@@ -847,9 +1099,306 @@ END_LABEL(unlockStrandEnd)
 
 
 /***************************************/
+/****** Global scheduler functions *****/
+/***************************************/
+
+
+u8 pdProcessStrands(ocrPolicyDomain_t *pd, u32 properties) {
+    DPRINTF(DEBUG_LVL_INFO, "ENTER pdProcessStrands(pd:0x%lx, props:0x%x)\n",
+            pd, properties);
+#define _END_FUNC processStrandsEnd
+
+    u8 toReturn = 0;
+
+    if (pd == NULL) {
+        getCurrentEnv(&pd, NULL, NULL, NULL);
+    }
+
+    /* In this function, we are currently very dumb and follow a simple algorithm.
+     * In the future, this could be extended to having a plug-in model to write
+     * what is basically a very fast scheduler for micro-tasks. I don't want to have
+     * a full-fledged module model here because this part is performance sensitive
+     * and I also do not think there are that many possibilities for such a "simple"
+     * scheduler.
+     * Ideas considered for the future:
+     *    - some sort of callback to determine priorities
+     *    - a better determination of how much work to do in one of these calls
+     *    - dynamic throttling (related to previous point) or priorities
+     *
+     * Current algorithm:
+     *    - look at all tables in the policy domain and for each table do the following:
+     *    - look for strands that require action processing up to X (compile time
+     *      constant) times.
+     *    - for all such strands, process their action queue until stuck again
+     */
+
+
+    u32 i = 0;
+    u32 processCount = 0;
+    u32 curLevel = 1;
+    for (; i < PDSTT_COMM; ++i) {
+        pdStrandTable_t *table = pd->strandTables[i];
+        DPRINTF(DEBUG_LVL_VERB, "Looking at table 0x%lx [idx: %u]\n", table, i);
+        processCount = 0;
+        hal_lock32(&(table->lock));
+        pdStrandTableNode_t *curNode = table->head;
+        hal_unlock32(&(table->lock));
+        if (curNode == NULL) {
+            DPRINTF(DEBUG_LVL_VVERB, "Table empty -- continuing to next table\n");
+            continue; // We don't even have a head so we really don't have much to do
+        }
+        hal_lock32(&(curNode->lock));
+        // Continue "forever" if emptytables or just until the maximum count is reached
+        while ((properties & PDSTT_EMPTYTABLES) || (processCount < PDPROCESS_MAX_COUNT)) {
+            // Go down the tree and see if we have nodeNeedsProcess set anywhere
+            // Note that if multiple threads show up, the lock will serialize them
+            // and they will each pick a different path ensuring at most 64 way parallelism
+            // in this endeavor. This can also happen concurrently with adding new strands and
+            // what not
+            ASSERT(curNode);
+            ASSERT(curNode->lock == 1);
+            if (curNode->nodeNeedsProcess) {
+                DPRINTF(DEBUG_LVL_VERB, "Node 0x%lx has children to process [0x%lx]\n",
+                        curNode, curNode->nodeNeedsProcess);
+                u32 processSlot = ctz(curNode->nodeNeedsProcess);
+                // Clear the bit for nodeNeedsProcess on curNode to prevent anyone else from
+                // going down this path.
+                curNode->nodeNeedsProcess &= ~(1ULL<<processSlot);
+
+                if (!(curNode->lmIndex & 0x1)) {
+                    // This is not a leaf node so we need to keep going down
+                    pdStrandTableNode_t *node = curNode->data.nodes[processSlot];
+                    // If we have something that needs to be processed, there should definitely be a node
+                    hal_unlock32(&(curNode->lock));
+                    ASSERT(node);
+                    DPRINTF(DEBUG_LVL_VERB, "Going down slot %u to 0x%lx\n", processSlot, node);
+                    curNode = node;
+                    hal_lock32(&(curNode->lock));
+                    ++curLevel;
+                    continue;
+                }
+                // If we are here, we are in a leaf node so we may have found something
+                // to process
+
+                ASSERT((curNode->nodeNeedsProcess & (1ULL<<processSlot)) == 0);
+                pdStrand_t *toProcess = curNode->data.slots[processSlot];
+                DPRINTF(DEBUG_LVL_VERB, "Found strand 0x%lx in slot %u\n", toProcess, processSlot);
+
+                // Grab the lock on it and then we are going to release all the other "locks"
+                // to free-up parallelism if needed.
+                RESULT_ASSERT(_pdLockStrand(toProcess, 0, BLOCK), ==, 0);
+
+                // At this point, we need to re-jigger the nodeNeedsProcess bits
+                // back up to the top of the chain. We need to re-jigger all the
+                // way up
+                DPRINTF(DEBUG_LVL_VVERB, "Going back up the stack to set nodeNeedsProcess\n");
+                pdStrandTableNode_t *parent = curNode->parent;
+                ASSERT(curNode->lock == 1);
+                PROPAGATE_UP_TREE(curNode, parent, true, {
+                        /* We cleared it on the way down */
+                        ASSERT((parent->nodeNeedsProcess & (1ULL<<curNode->parentSlot)) == 0);
+                        if(curNode->nodeNeedsProcess != 0ULL) {
+                            parent->nodeNeedsProcess |= (1ULL << curNode->parentSlot);
+                        }
+                    });
+
+                curNode = toProcess->parent; // Reset properly
+
+                // At this point, we found the strand to process so we can actually
+                // go and process each action. We hold no locks except on the strand
+
+                // First some sanity checks
+                ASSERT((toProcess->properties & PDST_WAIT) == PDST_WAIT_ACT); // The node should have the event ready and stuff to process
+                // We loop while the event is ready and there is stuff to do
+                // Note that the actions may make the event not ready thus the importance
+                // of checking every time
+                while (((toProcess->properties & PDST_WAIT_EVT) == 0) &&
+                       toProcess->actions->size(toProcess->actions)) {
+                    pdAction_t *curAction = (pdAction_t*)(toProcess->actions->popFromHead(toProcess->actions, false));
+                    ASSERT(curAction);
+                    DPRINTF(DEBUG_LVL_VERB, "Processing action 0x%lx\n", curAction);
+                    RESULT_ASSERT(_pdProcessAction(pd, toProcess, curAction, 0), ==, 0);
+                    DPRINTF(DEBUG_LVL_VERB, "Done processing action 0x%lx\n", curAction);
+                }
+
+                // Update properties
+                hal_lock32(&(curNode->lock));
+                bool propagateReady = false, propagateNP = false, didFree = false;
+                if(toProcess->actions->size(toProcess->actions) == 0) {
+                    toProcess->properties &= ~(PDST_WAIT_ACT);
+                    if((toProcess->properties & PDST_WAIT_EVT) == 0) {
+                        DPRINTF(DEBUG_LVL_VERB, "Strand 0x%lx now ready\n", toProcess);
+                        propagateReady = curNode->nodeReady == 0ULL;
+                        ASSERT((curNode->nodeReady & (1ULL<<processSlot)) == 0);
+                        ASSERT((curNode->nodeNeedsProcess & (1ULL<<processSlot)) == 0);
+
+                        curNode->nodeReady |= (1ULL<<processSlot);
+                    } else {
+                        DPRINTF(DEBUG_LVL_VERB, "Strand 0x%lx is not ready and has no actions\n",
+                                toProcess);
+                        ASSERT((curNode->nodeReady & (1ULL<<processSlot)) == 0);
+                        ASSERT((curNode->nodeNeedsProcess & (1ULL<<processSlot)) == 0);
+                        ASSERT((curNode->nodeReady & (1ULL<<processSlot)) == 0);
+                    }
+                } else {
+                    ASSERT(toProcess->properties & PDST_WAIT_ACT);
+                    if((toProcess->properties & PDST_WAIT_EVT) == 0) {
+                        DPRINTF(DEBUG_LVL_VERB, "Strand 0x%lx still has pending actions that need processing\n",
+                                toProcess);
+                        propagateNP = curNode->nodeNeedsProcess == 0ULL;
+                        curNode->nodeNeedsProcess |= (1ULL<<processSlot);
+
+                        ASSERT((curNode->nodeReady & (1ULL<<processSlot)) == 0);
+                    } else {
+                        DPRINTF(DEBUG_LVL_VERB, "Strand 0x%lx has pending actions but not ready\n",
+                                toProcess);
+
+                        ASSERT((curNode->nodeNeedsProcess & (1ULL<<processSlot)) == 0);
+                        ASSERT((curNode->nodeReady & (1ULL<<processSlot)) == 0);
+                    }
+                }
+
+                // Holding curNode->lock and strand lock
+
+                // Do clean up actions:
+                if ((toProcess->properties & PDST_WAIT) == 0) {
+                    // Strand is ready; we either free it or keep it there due to a hold
+                    if ((toProcess->properties & PDST_HOLD) == 0) {
+                        // We can free the strand now
+                        DPRINTF(DEBUG_LVL_VERB, "Freeing strand 0x%lx [idx %u] after processing actions\n",
+                                toProcess, toProcess->index);
+                        // We unset the nodeReady bit to prevent unecessary propagation
+                        curNode->nodeReady &= ~(1ULL<<processSlot);
+                        hal_unlock32(&(curNode->lock));
+                        RESULT_ASSERT(_pdFreeStrand(pd, toProcess), ==, 0);
+                        ASSERT(!propagateNP);
+                        propagateReady = false; // No need to change this since we freed the node
+                        didFree = true;
+                    } else {
+                        DPRINTF(DEBUG_LVL_VERB, "Strand 0x%lx is ready but has a hold -- leaving as is\n",
+                                toProcess);
+                        toProcess->properties &= ~PDST_LOCK;
+                    }
+                } else {
+                    toProcess->properties &= ~PDST_LOCK;
+                }
+
+                // Holding lock on curNode->lock EXCEPT if freed strand
+                // (in that case, the following if statement is false)
+                if (propagateReady || propagateNP) {
+                    ASSERT(!didFree);
+                    DPRINTF(DEBUG_LVL_VERB, "Propagating properties: ready: %u; np: %u\n",
+                            propagateReady, propagateNP);
+
+                    pdStrandTableNode_t *parent = curNode->parent;
+                    ASSERT(curNode->lock == 1);
+                    // We flipped nodeReady from 0 to 1; to up until we see a 1
+                    // We flipped nodeNeedsProcessing from 0 to 1; same as above
+                    PROPAGATE_UP_TREE(
+                        curNode, parent,
+                        propagateReady || propagateNP, {
+                            if (propagateReady) {
+                                propagateReady = parent->nodeReady == 0ULL;
+                                parent->nodeReady |= (1ULL<<curNode->parentSlot);
+                            }
+                            if (propagateNP) {
+                                propagateNP = parent->nodeNeedsProcess == 0ULL;
+                                parent->nodeNeedsProcess |= (1ULL<<curNode->parentSlot);
+                            }
+                        });
+                } else {
+                    if(!didFree)
+                        hal_unlock32(&(curNode->lock));
+                }
+
+                // We processed a node so we go and look for the next one
+                ++processCount;
+                hal_lock32(&(table->lock));
+                curNode = table->head;
+                hal_unlock32(&(table->lock));
+                ASSERT(curNode); // The table can't empty out from under us
+                hal_lock32(&(curNode->lock));
+            } else {
+                // Nothing left to process
+                DPRINTF(DEBUG_LVL_VERB, "No actions to process -- breaking out after %u\n",
+                        processCount);
+                break; // Breaks out of processing loop
+            }
+        } /* End of while loop in one table */
+        // At the end of the loop, we always hold the lock on curNode so
+        // we release it
+        hal_unlock32(&(curNode->lock));
+    } /* End of for loop on tables */
+
+END_LABEL(processStrandsEnd)
+    DPRINTF(DEBUG_LVL_INFO, "EXIT pdProcessStrands -> %u\n", toReturn);
+    return toReturn;
+#undef _END_FUNC
+}
+
+
+/***************************************/
 /********** Internal functions *********/
 /***************************************/
 
+static u8 _pdProcessAction(ocrPolicyDomain_t *pd, pdStrand_t *strand, pdAction_t* action,
+                           u32 properties) {
+
+    DPRINTF(DEBUG_LVL_INFO, "ENTER _pdProcessAction(pd:0x%lx, strand:0x%lx, action:0x%lx, props:0x%x)\n",
+            pd, strand, action, properties);
+#define _END_FUNC processActionEnd
+
+    u8 toReturn = 0;
+
+    /* For now, empty function, we just print something */
+    DPRINTF(DEBUG_LVL_INFO, "Pretending to execution action 0x%lx\n", action);
+
+
+END_LABEL(processActionEnd)
+    DPRINTF(DEBUG_LVL_INFO, "EXIT _pdProcessAction -> %u\n", toReturn);
+    return toReturn;
+#undef _END_FUNC
+}
+
+static u8 _pdDestroyStrandTableNode(ocrPolicyDomain_t *pd, pdStrandTableNode_t *node) {
+
+    DPRINTF(DEBUG_LVL_INFO, "ENTER _pdDestroyStrandTableNode(pd:0x%lx, node:0x%lx)\n",
+            pd, node);
+#define _END_FUNC destroyStrandTableNodeEnd
+
+    u8 toReturn = 0;
+    u32 i;
+
+    CHECK_RESULT_T(node != NULL, , toReturn |= OCR_EINVAL);
+
+    // This should not contain anything
+    ASSERT(node->nodeFree == ~0ULL);
+    bool isLeaf = node->lmIndex & 0x1;
+
+    for (i=0; i<BV_SIZE; ++i) {
+        if(node->data.slots[i] != NULL) {
+            if(isLeaf) {
+                DPRINTF(DEBUG_LVL_VERB, "Freeing strand %u: 0x%lx\n",
+                        i, node->data.slots[i]);
+                pd->fcts.pdFree(pd, node->data.slots[i]);
+                node->data.slots[i] = NULL;
+            } else {
+                DPRINTF(DEBUG_LVL_VERB, "Freeing down sub-node %u: 0x%lx\n",
+                        i, node->data.nodes[i]);
+                CHECK_RESULT(toReturn |= _pdDestroyStrandTableNode(pd, node->data.nodes[i]), ,);
+                DPRINTF(DEBUG_LVL_VERB, "Freeing su-node %u: 0x%lx\n",
+                        i, node->data.nodes[i]);
+                pd->fcts.pdFree(pd, node->data.nodes[i]);
+                node->data.nodes[i] = NULL;
+            }
+        }
+    }
+
+END_LABEL(destroyStrandTableNodeEnd)
+        DPRINTF(DEBUG_LVL_INFO, "EXIT _pdDestroyStrandTableNode -> %u\n", toReturn);
+    return toReturn;
+#undef _END_FUNC
+}
 
 static u8 _pdLockStrand(pdStrand_t *strand, u32 expectedValue, u32 properties) {
     volatile u32 initialValue;

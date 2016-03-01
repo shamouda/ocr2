@@ -12,6 +12,7 @@
 #include "ocr-errors.h"
 #include "ocr-db.h"
 #include "ocr-policy-domain.h"
+#include "ocr-policy-domain-tasks.h"
 #include "ocr-sysboot.h"
 #include "ocr-runtime-hints.h"
 
@@ -81,10 +82,11 @@ void hcWorkerCallback(ocrPolicyDomain_t *self, u64 val) {
     s8 nextPhase = rself->rlSwitch.nextPhase;
     u32 properties = rself->rlSwitch.properties;
     hal_fence();
-    u32 oldVal, newVal;
+
+    u64 oldVal, newVal;
     do {
         oldVal = rself->rlSwitch.checkedIn;
-        newVal = hal_cmpswap32(&(rself->rlSwitch.checkedIn), oldVal, oldVal - 1);
+        newVal = hal_cmpswap64(&(rself->rlSwitch.checkedIn), oldVal, oldVal - 1);
     } while(oldVal != newVal);
     if(oldVal == 1) {
         // This means we managed to set it to 0
@@ -125,7 +127,7 @@ void hcWorkerCallback(ocrPolicyDomain_t *self, u64 val) {
 u8 hcPdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 properties) {
     s32 j, k=0;
     phase_t i=0, curPhase, phaseCount;
-    u32 maxCount;
+    u64 maxCount;
 
     u8 toReturn = 0;
     u32 origProperties = properties;
@@ -296,6 +298,10 @@ u8 hcPdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
         // don't actually "wait" but rather re-enter this function on incomming
         // messages from neighbors. If not RL_FROM_MSG, you do block.
 
+        // This is also the first stage at which we can allocate the microtask tables
+        // Memory has been brought up so we have all allocators up and running (including
+        // the forthcoming slab allocator)
+
         if(properties & RL_BRING_UP) {
             // On BRING_UP, bring up GUID provider
             // We assert that there are two phases. The first phase is mostly to bring
@@ -303,6 +309,28 @@ u8 hcPdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
             // the various components if needed
             phaseCount = policy->phasesPerRunlevel[RL_GUID_OK][0] & 0xF;
             maxCount = policy->workerCount;
+
+            // Before we switch any of the inert components, set up the tables
+            COMPILE_ASSERT(PDSTT_COMM <= 2);
+
+            policy->strandTables[PDSTT_EVT - 1] = policy->fcts.pdMalloc(policy, sizeof(pdStrandTable_t));
+            policy->strandTables[PDSTT_COMM - 1] = policy->fcts.pdMalloc(policy, sizeof(pdStrandTable_t));
+
+            // We need to make sure we have our micro tables up and running
+            toReturn = (policy->strandTables[PDSTT_EVT-1] == NULL) ||
+            (policy->strandTables[PDSTT_COMM-1] == NULL);
+
+            if (toReturn) {
+                DPRINTF(DEBUG_LVL_WARN, "Cannot allocate strand tables\n");
+                ASSERT(0);
+            } else {
+                DPRINTF(DEBUG_LVL_VERB, "Created EVT strand table @ 0x%lx\n",
+                        policy->strandTables[PDSTT_EVT-1]);
+                toReturn |= pdInitializeStrandTable(policy, policy->strandTables[PDSTT_EVT-1], 0);
+                DPRINTF(DEBUG_LVL_VERB, "Created COMM strand table @ 0x%lx\n",
+                        policy->strandTables[PDSTT_COMM-1]);
+                toReturn |= pdInitializeStrandTable(policy, policy->strandTables[PDSTT_COMM-1], 0);
+            }
 
             for(i = 0; i < phaseCount; ++i) {
                 if(toReturn) break;
@@ -324,6 +352,17 @@ u8 hcPdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
                         policy->workers[j], policy, runlevel, i, j==0?masterWorkerProperties:properties, NULL, 0);
                 }
             }
+            // At the end, we clear out the strand tables and free them.
+            DPRINTF(DEBUG_LVL_VERB, "Emptying strand tables\n");
+            RESULT_ASSERT(pdProcessStrands(policy, PDSTT_EMPTYTABLES), ==, 0);
+            // Free the tables
+            DPRINTF(DEBUG_LVL_VERB, "Freeing EVT strand table: 0x%lx\n", policy->strandTables[PDSTT_EVT-1]);
+            policy->fcts.pdFree(policy, policy->strandTables[PDSTT_EVT-1]);
+            policy->strandTables[PDSTT_EVT-1] = NULL;
+
+            DPRINTF(DEBUG_LVL_VERB, "Freeing COMM strand table: 0x%lx\n", policy->strandTables[PDSTT_COMM-1]);
+            policy->fcts.pdFree(policy, policy->strandTables[PDSTT_COMM-1]);
+            policy->strandTables[PDSTT_COMM-1] = NULL;
         }
 
         if(toReturn) {
@@ -377,7 +416,8 @@ u8 hcPdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
                     // Here we need to block because when we return from the function, we need to have
                     // transitioned
                     DPRINTF(DEBUG_LVL_VVERB, "switchRunlevel: synchronous switch to RL_COMPUTE_OK phase %d ... will block\n", i);
-                    while(rself->rlSwitch.checkedIn) ;
+                    while(rself->rlSwitch.checkedIn)
+                        ;
                     ASSERT(rself->rlSwitch.checkedIn == 0);
                 } else {
                     DPRINTF(DEBUG_LVL_VVERB, "switchRunlevel: asynchronous switch to RL_COMPUTE_OK phase %d\n", i);
@@ -474,7 +514,8 @@ u8 hcPdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
                 //Warning: here make sure the code in hcWorkerCallback reads all the rlSwitch
                 //info BEFORE decrementing checkedIn. Otherwise there's a race on rlSwitch
                 //between the following code and hcWorkerCallback.
-                while(rself->rlSwitch.checkedIn != 0);
+                while(rself->rlSwitch.checkedIn != 0)
+                    ;
 
                 ASSERT(rself->rlSwitch.runlevel == RL_COMPUTE_OK && rself->rlSwitch.nextPhase == 0);
                 DPRINTF(DEBUG_LVL_VVERB, "PD_MASTER worker LEGACY mode, wrapping up shutdown\n");
@@ -529,7 +570,8 @@ u8 hcPdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
                     //Warning: here make sure the code in hcWorkerCallback reads all the rlSwitch
                     //info BEFORE decrementing checkedIn. Otherwise there's a race on rlSwitch
                     //between the following code and hcWorkerCallback.
-                    while(rself->rlSwitch.checkedIn != 0);
+                    while(rself->rlSwitch.checkedIn != 0)
+                        ;
 
                     ASSERT(rself->rlSwitch.runlevel == RL_COMPUTE_OK && rself->rlSwitch.nextPhase == 0);
                     DPRINTF(DEBUG_LVL_VVERB, "PD_MASTER worker wrapping up shutdown\n");
@@ -1063,7 +1105,7 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         localDeguidify(self, &(PD_MSG_FIELD_I(edt)));
         ocrDataBlock_t *db = (ocrDataBlock_t*)(PD_MSG_FIELD_IO(guid.metaDataPtr));
         ASSERT(db->fctId == self->dbFactories[0]->factoryId);
-        ocrGuid_t edtGuid =  PD_MSG_FIELD_I(edt.guid);
+        ocrGuid_t edtGuid __attribute__((unused)) =  PD_MSG_FIELD_I(edt.guid);
         PD_MSG_FIELD_O(returnDetail) = self->dbFactories[0]->fcts.release(
             db, PD_MSG_FIELD_I(edt), !!(PD_MSG_FIELD_I(properties) & DB_PROP_RT_ACQUIRE));
         DPRINTF(DEBUG_LVL_INFO, "DB guid "GUIDSx" of size %lu released by EDT "GUIDSx"\n",

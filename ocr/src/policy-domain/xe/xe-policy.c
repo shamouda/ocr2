@@ -11,6 +11,7 @@
 #include "debug.h"
 #include "ocr-errors.h"
 #include "ocr-policy-domain.h"
+#include "ocr-policy-domain-tasks.h"
 #include "ocr-sysboot.h"
 #include "ocr-runtime-types.h"
 #include "allocator/allocator-all.h"
@@ -311,6 +312,27 @@ u8 xePdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
             phaseCount = RL_GET_PHASE_COUNT_UP(policy, RL_GUID_OK);
             maxCount = policy->workerCount;
 
+            // Before we switch any of the inert components, set up the tables
+            COMPILE_ASSERT(PDSTT_COMM <= 2);
+            policy->strandTables[PDSTT_EVT - 1] = policy->fcts.pdMalloc(policy, sizeof(pdStrandTable_t));
+            policy->strandTables[PDSTT_COMM - 1] = policy->fcts.pdMalloc(policy, sizeof(pdStrandTable_t));
+
+            // We need to make sure we have our micro tables up and running
+            toReturn = (policy->strandTables[PDSTT_EVT-1] == NULL) ||
+            (policy->strandTables[PDSTT_COMM-1] == NULL);
+
+            if (toReturn) {
+                DPRINTF(DEBUG_LVL_WARN, "Cannot allocate strand tables\n");
+                ASSERT(0);
+            } else {
+                DPRINTF(DEBUG_LVL_VERB, "Created EVT strand table @ 0x%lx\n",
+                        policy->strandTables[PDSTT_EVT-1]);
+                toReturn |= pdInitializeStrandTable(policy, policy->strandTables[PDSTT_EVT-1], 0);
+                DPRINTF(DEBUG_LVL_VERB, "Created COMM strand table @ 0x%lx\n",
+                        policy->strandTables[PDSTT_COMM-1]);
+                toReturn |= pdInitializeStrandTable(policy, policy->strandTables[PDSTT_COMM-1], 0);
+            }
+
             for(i = 0; i < phaseCount; ++i) {
                 if(toReturn) break;
                 toReturn |= helperSwitchInert(policy, runlevel, i, masterWorkerProperties);
@@ -345,6 +367,18 @@ u8 xePdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
                         policy->workers[j], policy, runlevel, i, j==0?masterWorkerProperties:properties, NULL, 0);
                 }
             }
+
+            // At the end, we clear out the strand tables and free them.
+            DPRINTF(DEBUG_LVL_VERB, "Emptying strand tables\n");
+            RESULT_ASSERT(pdProcessStrands(policy, PDSTT_EMPTYTABLES), ==, 0);
+            // Free the tables
+            DPRINTF(DEBUG_LVL_VERB, "Freeing EVT strand table: 0x%lx\n", policy->strandTables[PDSTT_EVT-1]);
+            policy->fcts.pdFree(policy, policy->strandTables[PDSTT_EVT-1]);
+            policy->strandTables[PDSTT_EVT-1] = NULL;
+
+            DPRINTF(DEBUG_LVL_VERB, "Freeing COMM strand table: 0x%lx\n", policy->strandTables[PDSTT_COMM-1]);
+            policy->fcts.pdFree(policy, policy->strandTables[PDSTT_COMM-1]);
+            policy->strandTables[PDSTT_COMM-1] = NULL;
         }
 
         if(toReturn) {
