@@ -147,7 +147,10 @@ typedef struct _pdEventMerge_t {
  * which encodes a common action (to avoid the cost of memory allocation). This
  * differentiation happens on the bottom 3 bits: for a regular action (a pointer),
  * those three bits are 0. Other special values currently supported:
- * 001:  Call the function pointer encoded in the top 61 bits passing the
+ * 001:  Calls the processMessageMT call passing the event to it.
+ *       This allows the very quick encoding of a mechanism to do a callback or
+ *       a deferred call (setup an event, enqueue this simple action and let the micro
+ *       task scheduler deal with it at some later point) to processMessageMT
  *       pdEvent_t as an argument and 0 as the PC argument
  * 111: Extended action, the next 5 bits encode the action type:
  *      - 00001: Satisfy another event:
@@ -165,10 +168,11 @@ typedef struct _pdEventMerge_t {
  *     - PDSTT_COMM: in communication strands table
  */
 typedef struct _pdAction_t {
-    slabObject_t slabObj;     /**< Slab object (used for slab allocation and garbage collection) */
-    u32 properties;           /**< Type and other properties for this event. This includes
-                               * if the event is "ready" or not. */
+    slabObject_t slabObj;   /**< Slab object (used for slab allocation and garbage collection) */
+    u32 properties;         /**< Type and other properties for this action. This includes
+                             the type of the action */
 } pdAction_t;
+
 
 #define PDACT_TYPE_TASK 0x02
 /**< A "continuation" task (or simply a callback) */
@@ -236,7 +240,7 @@ typedef struct _pdStrandTableNode_t {
     u64 nodeFree;           /**< Bit will be 1 if slot/node contains a free slot */
     u64 nodeNeedsProcess;   /**< Bit will be 1 if slot/node needs to be processed */
     u64 nodeReady;          /**< Bit will be 1 if slot/node has ready slot */
-    u64 lmIndex  ;          /**< Bit 0: 1 if leaf node; 0 otherwise. Other bits:
+    u64 lmIndex;            /**< Bit 0: 1 if leaf node; 0 otherwise. Other bits:
                                index of the left-most strand in this subtree */
     union {
         pdStrand_t* slots[PDST_NODE_SIZE];
@@ -364,6 +368,21 @@ u8 pdMarkWaitEvent(ocrPolicyDomain_t *pd, pdEvent_t *event);
 /***************************************/
 /***** pdAction_t related functions ****/
 /***************************************/
+
+/**
+ * @brief Creates an action that is a simple callback
+ *
+ * This action will simply execute the function processMessageMT, passing
+ * it:
+ *  - the current policy domain
+ *  - the ready event in the strand
+ *  - the value 0 signifying the start of the function (if this is a continuable function
+ *
+  * @return A pdAction_t pointer encoding the action. This can be used in pdEnqueueAction()
+ *         to add this action to a strand. Note that the "pointer" returned may not be
+ *         a true pointer and should not be used directly
+ */
+pdAction_t* pdGetProcessMessageAction(void);
 
 
 /***************************************/

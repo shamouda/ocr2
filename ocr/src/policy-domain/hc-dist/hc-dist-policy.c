@@ -12,6 +12,7 @@
 #include "debug.h"
 #include "ocr-errors.h"
 #include "ocr-policy-domain.h"
+#include "ocr-policy-domain-tasks.h"
 #include "ocr-sysboot.h"
 #include "experimental/ocr-placer.h"
 #include "experimental/ocr-platform-model.h"
@@ -1777,6 +1778,16 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
     return ret;
 }
 
+pdEvent_t* hcDistProcessMessageMT(ocrPolicyDomain_t* self, pdEvent_t *evt, u32 idx) {
+    // Simple version to test out micro tasks for now. This just executes a blocking
+    // call to the regular process message and returns NULL
+    ASSERT(idx == 0);
+    ASSERT((evt->properties & PDEVT_TYPE_MASK) == PDEVT_TYPE_MSG);
+    pdEventMsg_t *evtMsg = (pdEventMsg_t*)evt;
+    hcDistProcessMessage(self, evtMsg->msg, true);
+    return NULL;
+}
+
 u8 hcDistPdSwitchRunlevel(ocrPolicyDomain_t *self, ocrRunlevel_t runlevel, u32 properties) {
     ocrPolicyDomainHc_t *rself = (ocrPolicyDomainHc_t*) self;
 
@@ -1939,6 +1950,7 @@ ocrPolicyDomainFactory_t * newPolicyDomainFactoryHcDist(ocrParamList_t *perType)
     // specialize some of the function pointers
     derivedBase->policyDomainFcts.switchRunlevel = FUNC_ADDR(u8 (*)(ocrPolicyDomain_t*, ocrRunlevel_t, u32), hcDistPdSwitchRunlevel);
     derivedBase->policyDomainFcts.processMessage = FUNC_ADDR(u8(*)(ocrPolicyDomain_t*,ocrPolicyMsg_t*,u8), hcDistProcessMessage);
+    derivedBase->policyDomainFcts.processMessageMT = FUNC_ADDR(pdEvent_t* (*)(ocrPolicyDomain_t*, pdEvent_t*, u32), hcDistProcessMessageMT);
     derivedBase->policyDomainFcts.sendMessage = FUNC_ADDR(u8 (*)(ocrPolicyDomain_t*, ocrLocation_t, ocrPolicyMsg_t *, ocrMsgHandle_t**, u32),
                                                    hcDistPdSendMessage);
     derivedBase->policyDomainFcts.pollMessage = FUNC_ADDR(u8 (*)(ocrPolicyDomain_t*, ocrMsgHandle_t**), hcDistPdPollMessage);

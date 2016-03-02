@@ -24,6 +24,7 @@
 #include "experimental/ocr-platform-model.h"
 #include "experimental/ocr-placer.h"
 
+struct _pdEvent_t;
 
 /****************************************************/
 /* PARAMETER LISTS                                  */
@@ -1193,6 +1194,25 @@ typedef struct _ocrPolicyDomainFcts_t {
     u8 (*processMessage)(struct _ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg,
                          u8 isBlocking);
 
+    /**
+     * @brief Micro-tasks version of processMessage
+     *
+     * This function can be called either by user code (for when the user code
+     * requires runtime services) or internally by the runtime (when a message
+     * has been received via CT.pollMessage for example)
+     *
+     * All code executed by processMessageMT until it reaches a sendMessage
+     * is executed synchronously and inside the same address space.
+     *
+     * @param[in]     self       This policy domain
+     * @param[in/out] evt        Input event which contains the message
+     *                           to process.
+     * @param[in]     idx        Position in the code to resume at (if the code
+     *                           was interrupted due to a blocking call
+     * @return 0 on success and a non-zero value on failure
+     */
+    struct _pdEvent_t* (*processMessageMT)(struct _ocrPolicyDomain_t *self,
+                                           struct _pdEvent_t* evt, u32 idx);
     /**
      * @brief Send a message outside of the policy domain.
      * This API can be used by any client of the policy domain and

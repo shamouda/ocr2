@@ -2733,6 +2733,16 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
     return returnCode;
 }
 
+pdEvent_t* cePdProcessMessageMT(ocrPolicyDomain_t* self, pdEvent_t *evt, u32 idx) {
+    // Simple version to test out micro tasks for now. This just executes a blocking
+    // call to the regular process message and returns NULL
+    ASSERT(idx == 0);
+    ASSERT((evt->properties & PDEVT_TYPE_MASK) == PDEVT_TYPE_MSG);
+    pdEventMsg_t *evtMsg = (pdEventMsg_t*)evt;
+    cePolicyDomainProcessMessage(self, evtMsg->msg, true);
+    return NULL;
+}
+
 u8 cePdSendMessage(ocrPolicyDomain_t* self, ocrLocation_t target, ocrPolicyMsg_t *message,
                    ocrMsgHandle_t **handle, u32 properties) {
     ocrMsgHandle_t thandle;
@@ -2909,6 +2919,7 @@ ocrPolicyDomainFactory_t * newPolicyDomainFactoryCe(ocrParamList_t *perType) {
     base->policyDomainFcts.destruct = FUNC_ADDR(void(*)(ocrPolicyDomain_t*), cePolicyDomainDestruct);
     base->policyDomainFcts.switchRunlevel = FUNC_ADDR(u8 (*)(ocrPolicyDomain_t*, ocrRunlevel_t, u32), cePdSwitchRunlevel);
     base->policyDomainFcts.processMessage = FUNC_ADDR(u8(*)(ocrPolicyDomain_t*,ocrPolicyMsg_t*,u8), cePolicyDomainProcessMessage);
+    base->policyDomainFcts.processMessageMT = FUNC_ADDR(pdEvent_t* (*)(ocrPolicyDomain_t*, pdEvent_t*, u32), cePdProcessMessageMT);
 
     base->policyDomainFcts.sendMessage = FUNC_ADDR(u8 (*)(ocrPolicyDomain_t*, ocrLocation_t,
                                                           ocrPolicyMsg_t *, ocrMsgHandle_t**, u32),

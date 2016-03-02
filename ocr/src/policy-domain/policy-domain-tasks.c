@@ -604,6 +604,16 @@ END_LABEL(markWaitEventEnd)
 /***** pdAction_t related functions ****/
 /***************************************/
 
+/* Macros defining the special encoding of pdAction_t* */
+#define PDACTION_ENC_PROCESS_MESSAGE  0b001
+#define PDACTION_ENC_EXTEND           0b111
+
+pdAction_t* pdGetProcessMessageAction() {
+
+    DPRINTF(DEBUG_LVL_INFO, "ENTER pdGetCallbackAction()\n");
+    DPRINTF(DEBUG_LVL_INFO, "EXIT pdGetCallbackAction -> action:0x%lx\n", PDACTION_ENC_PROCESS_MESSAGE);
+    return (pdAction_t*)(0x0ULL | PDACTION_ENC_PROCESS_MESSAGE);
+}
 
 /***************************************/
 /***** pdStrand_t related functions ****/
@@ -1341,6 +1351,8 @@ END_LABEL(processStrandsEnd)
 /********** Internal functions *********/
 /***************************************/
 
+typedef pdEvent_t* (*actionCallback_t)(ocrPolicyDomain_t*, pdEvent_t*, u32);
+
 static u8 _pdProcessAction(ocrPolicyDomain_t *pd, pdStrand_t *strand, pdAction_t* action,
                            u32 properties) {
 
@@ -1348,10 +1360,43 @@ static u8 _pdProcessAction(ocrPolicyDomain_t *pd, pdStrand_t *strand, pdAction_t
             pd, strand, action, properties);
 #define _END_FUNC processActionEnd
 
+    if (pd == NULL) {
+        getCurrentEnv(&pd, NULL, NULL, NULL);
+    }
+
+    // If we are processing, the event better be ready
+    ASSERT(strand->curEvent->properties & PDEVT_READY);
+
     u8 toReturn = 0;
 
-    /* For now, empty function, we just print something */
-    DPRINTF(DEBUG_LVL_INFO, "Pretending to execution action 0x%lx\n", action);
+    u64 actionPtr = (u64)action;
+
+    // Figure out the encoding for the action
+    switch (actionPtr & 0x7) {
+        case PDACTION_ENC_PROCESS_MESSAGE:
+        {
+            actionCallback_t callback = (actionCallback_t)(pd->fcts.processMessageMT);
+            DPRINTF(DEBUG_LVL_VERB, "Action is a callback to processMessage (0x%lx)\n", callback);
+            pdEvent_t* returnedValue = callback(pd, strand->curEvent, 0);
+            if (returnedValue) {
+                DPRINTF(DEBUG_LVL_VVERB, "Callback returned event 0x%lx -- replacing strand event 0x%lx\n",
+                        returnedValue, strand->curEvent);
+                /* SEE BUG #899: This should be a slab free */
+                pd->fcts.pdFree(pd, strand->curEvent);
+                strand->curEvent = returnedValue;
+            } else {
+                DPRINTF(DEBUG_LVL_VVERB, "Callback returned NULL\n");
+            }
+            break;
+        }
+        case PDACTION_ENC_EXTEND:
+            ASSERT(0);
+            break;
+        default:
+            /* For now, empty function, we just print something */
+            DPRINTF(DEBUG_LVL_INFO, "Pretending to execution action 0x%lx\n", action);
+            break;
+    }
 
 
 END_LABEL(processActionEnd)
