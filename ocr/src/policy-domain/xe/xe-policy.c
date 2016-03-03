@@ -618,10 +618,11 @@ static u8 xeAllocateDb(ocrPolicyDomain_t *self, ocrFatGuid_t *guid, void** ptr, 
 //    void* result = allocateDatablock (self, size, engineIndex, prescription, &idx);
 
     int preferredLevel = 0;
+
     // See BUG #928 on GUID issues
 #ifdef GUID_64
-    if ((u64)affinity.guid > 0 && (u64)affinity.guid <= NUM_MEM_LEVELS_SUPPORTED) {
-        preferredLevel = (u64)affinity.guid;
+    if ((u64)affinity.guid.guid > 0 && (u64)affinity.guid.guid <= NUM_MEM_LEVELS_SUPPORTED) {
+        preferredLevel = (u64)affinity.guid.guid;
 #elif defined(GUID_128)
     if ((u64)affinity.guid.lower > 0 && (u64)affinity.guid.lower <= NUM_MEM_LEVELS_SUPPORTED) {
         preferredLevel = (u64)(affinity.guid.lower);

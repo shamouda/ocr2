@@ -169,7 +169,7 @@ static ocrGuidKind getKindFromGuid(ocrGuid_t guid) {
 
     // See BUG #928 on GUID issues
 #ifdef GUID_64
-    return (ocrGuidKind) ((guid & GUID_KIND_MASK) >> GUID_COUNTER_SIZE);
+    return (ocrGuidKind) ((guid.guid & GUID_KIND_MASK) >> GUID_COUNTER_SIZE);
 #elif defined(GUID_128)
     return (ocrGuidKind) ((guid.lower & GUID_KIND_MASK) >> GUID_COUNTER_SIZE);
 #endif
@@ -181,8 +181,9 @@ static ocrGuidKind getKindFromGuid(ocrGuid_t guid) {
  */
 static u64 extractLocIdFromGuid(ocrGuid_t guid) {
 // See BUG #928 on GUID issues
+
 #ifdef GUID_64
-    return (u64) ((guid & GUID_LOCID_MASK) >> GUID_LOCID_SHIFT_RIGHT);
+    return (u64) ((guid.guid & GUID_LOCID_MASK) >> GUID_LOCID_SHIFT_RIGHT);
 #elif defined(GUID_128)
     return (u64) ((guid.lower & GUID_LOCID_MASK) >> GUID_LOCID_SHIFT_RIGHT);
 #endif
@@ -241,10 +242,13 @@ u8 countedMapGuidUnreserve(ocrGuidProvider_t *self, ocrGuid_t startGuid, u64 ski
 static u8 countedMapGetGuid(ocrGuidProvider_t* self, ocrGuid_t* guid, u64 val, ocrGuidKind kind) {
     // Here no need to allocate
     u64 newGuid = generateNextGuid(self, kind);
+
     GP_HASHTABLE_PUT(((ocrGuidProviderCountedMap_t *) self)->guidImplTable, (void *) newGuid, (void *) val);
     // See BUG #928 on GUID issues
+
 #ifdef GUID_64
-    *guid = (ocrGuid_t) newGuid;
+    ocrGuid_t tempGuid = {.guid = newGuid};
+    *guid = tempGuid;
 #elif defined(GUID_128)
     ocrGuid_t tempGuid = {.lower = (u64)newGuid, .upper = 0x0};
     *guid = tempGuid;
@@ -295,7 +299,7 @@ u8 countedMapCreateGuid(ocrGuidProvider_t* self, ocrFatGuid_t *fguid, u64 size, 
 static u8 countedMapGetVal(ocrGuidProvider_t* self, ocrGuid_t guid, u64* val, ocrGuidKind* kind) {
     // See BUG #928 on GUID issues
 #ifdef GUID_64
-    *val = (u64) GP_HASHTABLE_GET(((ocrGuidProviderCountedMap_t *) self)->guidImplTable, (void *) guid);
+    *val = (u64) GP_HASHTABLE_GET(((ocrGuidProviderCountedMap_t *) self)->guidImplTable, (void *) guid.guid);
 #elif defined(GUID_128)
     *val = (u64) GP_HASHTABLE_GET(((ocrGuidProviderCountedMap_t *) self)->guidImplTable, (void *) guid.lower);
 #else
@@ -333,7 +337,7 @@ u8 countedMapGetLocation(ocrGuidProvider_t* self, ocrGuid_t guid, ocrLocation_t*
 u8 countedMapRegisterGuid(ocrGuidProvider_t* self, ocrGuid_t guid, u64 val) {
     // See BUG #928 on GUID issues
 #ifdef GUID_64
-    GP_HASHTABLE_PUT(((ocrGuidProviderCountedMap_t *) self)->guidImplTable, (void *) guid, (void *) val);
+    GP_HASHTABLE_PUT(((ocrGuidProviderCountedMap_t *) self)->guidImplTable, (void *) guid.guid, (void *) val);
 #elif defined(GUID_128)
     GP_HASHTABLE_PUT(((ocrGuidProviderCountedMap_t *) self)->guidImplTable, (void *) guid.lower, (void *) val);
 #else
@@ -348,7 +352,7 @@ u8 countedMapRegisterGuid(ocrGuidProvider_t* self, ocrGuid_t guid, u64 val) {
 u8 countedMapUnregisterGuid(ocrGuidProvider_t* self, ocrGuid_t guid, u64 ** val) {
     // See BUG #928 on GUID issues
 #ifdef GUID_64
-    GP_HASHTABLE_DEL(((ocrGuidProviderCountedMap_t *) self)->guidImplTable, (void *) guid, (void **) val);
+    GP_HASHTABLE_DEL(((ocrGuidProviderCountedMap_t *) self)->guidImplTable, (void *) guid.guid, (void **) val);
 #elif defined(GUID_128)
     GP_HASHTABLE_DEL(((ocrGuidProviderCountedMap_t *) self)->guidImplTable, (void *) guid.lower, (void **) val);
 #else
@@ -382,7 +386,7 @@ u8 countedMapReleaseGuid(ocrGuidProvider_t *self, ocrFatGuid_t fatGuid, bool rel
     ocrGuidProviderCountedMap_t * derived = (ocrGuidProviderCountedMap_t *) self;
     // See BUG #928 on GUID issues
 #ifdef GUID_64
-    GP_HASHTABLE_DEL(derived->guidImplTable, (void *)guid, NULL);
+    GP_HASHTABLE_DEL(derived->guidImplTable, (void *)guid.guid, NULL);
 #elif defined(GUID_128)
     GP_HASHTABLE_DEL(derived->guidImplTable, (void *) guid.lower, NULL);
 #else

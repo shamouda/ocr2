@@ -106,12 +106,12 @@ u8 ptrGetGuid(ocrGuidProvider_t* self, ocrGuid_t* guid, u64 val, ocrGuidKind kin
     guidInst = (ocrGuidImpl_t *)PD_MSG_FIELD_O(ptr);
     // See BUG #928 on GUID issues
 #ifdef GUID_64
-    guidInst->guid = (ocrGuid_t)val;
+    guidInst->guid.guid = val;
     guidInst->kind = kind;
     // Bug #694: Better handling of cross PDs and cross address-spaces GUID providers
     guidInst->location = UNDEFINED_LOCATION; //self->pd->myLocation;
     guidInst->location = self->pd->myLocation;
-    *guid = (ocrGuid_t) guidInst;
+    guid->guid = (u64) guidInst;
 
 #elif defined(GUID_128)
     guidInst->guid.lower = val;
@@ -148,11 +148,11 @@ u8 ptrCreateGuid(ocrGuidProvider_t* self, ocrFatGuid_t *fguid, u64 size, ocrGuid
     ocrGuidImpl_t * guidInst = (ocrGuidImpl_t *)PD_MSG_FIELD_O(ptr);
     // See BUG #928 on GUID issues
 #ifdef GUID_64
-    guidInst->guid = (ocrGuid_t)((u64)guidInst + sizeof(ocrGuidImpl_t));
+    guidInst->guid.guid = ((u64)guidInst + sizeof(ocrGuidImpl_t));
     guidInst->kind = kind;
     guidInst->location = policy->myLocation;
 
-    fguid->guid = (ocrGuid_t)guidInst;
+    fguid->guid.guid = (u64)guidInst;
     fguid->metaDataPtr = (void*)((u64)guidInst + sizeof(ocrGuidImpl_t));
 
 #elif defined(GUID_128)
@@ -174,9 +174,9 @@ u8 ptrCreateGuid(ocrGuidProvider_t* self, ocrFatGuid_t *fguid, u64 size, ocrGuid
 u8 ptrGetVal(ocrGuidProvider_t* self, ocrGuid_t guid, u64* val, ocrGuidKind* kind) {
     // See BUG #928 on GUID issues
 #ifdef GUID_64
-    ASSERT(guid != NULL_GUID);
-    ocrGuidImpl_t * guidInst = (ocrGuidImpl_t *) guid;
-    *val = (u64) guidInst->guid;
+    ASSERT(!(IS_GUID_NULL(guid)));
+    ocrGuidImpl_t * guidInst = (ocrGuidImpl_t *) guid.guid;
+    *val = (u64) guidInst->guid.guid;
 
 #elif defined(GUID_128)
     ASSERT(!(IS_GUID_NULL(guid)));
@@ -193,7 +193,7 @@ u8 ptrGetKind(ocrGuidProvider_t* self, ocrGuid_t guid, ocrGuidKind* kind) {
     ASSERT(!(IS_GUID_NULL(guid)));
     // See BUG #928 on GUID issues
 #ifdef GUID_64
-    ocrGuidImpl_t * guidInst = (ocrGuidImpl_t *) guid;
+    ocrGuidImpl_t * guidInst = (ocrGuidImpl_t *) guid.guid;
 #elif defined(GUID_128)
     ocrGuidImpl_t * guidInst = (ocrGuidImpl_t *) guid.lower;
 #endif
@@ -206,7 +206,7 @@ u8 ptrGetLocation(ocrGuidProvider_t* self, ocrGuid_t guid, ocrLocation_t* locati
     ASSERT(!(IS_GUID_NULL(guid)));
     // See BUG #928 on GUID issues
 #ifdef GUID_64
-    ocrGuidImpl_t * guidInst = (ocrGuidImpl_t *) guid;
+    ocrGuidImpl_t * guidInst = (ocrGuidImpl_t *) guid.guid;
 #elif defined(GUID_128)
     ocrGuidImpl_t * guidInst = (ocrGuidImpl_t *) guid.lower;
 #endif
@@ -230,7 +230,7 @@ u8 ptrReleaseGuid(ocrGuidProvider_t *self, ocrFatGuid_t guid, bool releaseVal) {
         ASSERT(guid.metaDataPtr);
         // See BUG #928 on GUID issues
 #ifdef GUID_64
-        ASSERT((u64)guid.metaDataPtr == (u64)guid.guid + sizeof(ocrGuidImpl_t));
+        ASSERT((u64)guid.metaDataPtr == (u64)guid.guid.guid + sizeof(ocrGuidImpl_t));
 #elif defined(GUID_128)
         ASSERT((u64)guid.metaDataPtr == (u64)guid.guid.lower + sizeof(ocrGuidImpl_t));
 #endif
@@ -247,11 +247,11 @@ u8 ptrReleaseGuid(ocrGuidProvider_t *self, ocrFatGuid_t guid, bool releaseVal) {
     PD_MSG_FIELD_I(allocator.guid) = NULL_GUID;
     PD_MSG_FIELD_I(allocator.metaDataPtr) = NULL;
     // See BUG #928 on GUID issues
+    //Lower 64 bits only; new deque impl needed
 #ifdef GUID_64
-    PD_MSG_FIELD_I(ptr) = ((void *) guid.guid);
+    PD_MSG_FIELD_I(ptr) = ((void *) guid.guid.guid);
 #elif defined(GUID_128)
-    //Lower 64 bits onlyl; new deque impl needed
-    PD_MSG_FIELD_I(ptr) = (void *) *(u64 *)(&(guid.guid));
+    PD_MSG_FIELD_I(ptr) = ((void *) guid.guid.lower);
 #endif
     PD_MSG_FIELD_I(type) = GUID_MEMTYPE;
     PD_MSG_FIELD_I(properties) = 0;

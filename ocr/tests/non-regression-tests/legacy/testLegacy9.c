@@ -60,7 +60,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     void * result;
     u64 size;
     ocrLegacyBlockProgress(stickyEvtGuid, &dbGuid, &result, &size, LEGACY_PROP_NONE);
-    ASSERT(dbGuid != NULL_GUID);
+    ASSERT(!(IS_GUID_NULL(dbGuid)));
     ASSERT(result != NULL);
     ASSERT(((u64 *) result)[0] == MARK);
     ASSERT(size == sizeof(u64));

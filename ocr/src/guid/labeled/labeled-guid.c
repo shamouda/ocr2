@@ -42,9 +42,9 @@
 
 // See BUG #928 on GUID issues
 #ifdef GUID_64
-#define IS_RESERVED_GUID(guid) ((guid & 0x8000000000000000ULL) != 0ULL)
+#define IS_RESERVED_GUID(guidVal) ((guidVal.guid & 0x8000000000000000ULL) != 0ULL)
 #elif defined GUID_128
-#define IS_RESERVED_GUID(guid) ((guid.lower & 0x8000000000000000ULL) != 0ULL)
+#define IS_RESERVED_GUID(guidVal) ((guidVal.lower & 0x8000000000000000ULL) != 0ULL)
 #endif
 
 #define KIND_LOCATION 0
@@ -177,7 +177,7 @@ u8 labeledGuidSwitchRunlevel(ocrGuidProvider_t *self, ocrPolicyDomain_t *PD, ocr
 static ocrGuidKind getKindFromGuid(ocrGuid_t guid) {
     // See BUG #928 on GUID issues
 #ifdef GUID_64
-    return (ocrGuidKind) ((guid & GUID_KIND_MASK) >> GUID_KIND_SHIFT_RIGHT);
+    return (ocrGuidKind) ((guid.guid & GUID_KIND_MASK) >> GUID_KIND_SHIFT_RIGHT);
 #elif defined(GUID_128)
     return (ocrGuidKind) ((guid.lower & GUID_KIND_MASK) >> GUID_KIND_SHIFT_RIGHT);
 #endif
@@ -189,7 +189,7 @@ static ocrGuidKind getKindFromGuid(ocrGuid_t guid) {
 static u64 extractLocIdFromGuid(ocrGuid_t guid) {
     // See BUG #928 on GUID issues
 #ifdef GUID_64
-    return (u64) ((guid & GUID_LOCID_MASK) >> GUID_LOCID_SHIFT_RIGHT);
+    return (u64) ((guid.guid & GUID_LOCID_MASK) >> GUID_LOCID_SHIFT_RIGHT);
 #elif defined(GUID_128)
     return (u64) ((guid.lower & GUID_LOCID_MASK) >> GUID_LOCID_SHIFT_RIGHT);
 #endif
@@ -240,7 +240,7 @@ u8 labeledGuidReserve(ocrGuidProvider_t *self, ocrGuid_t *startGuid, u64* skipGu
     u64 kindShifted = guidType << KIND_LOCATION;
     // See BUG #928 on GUID issues
 #ifdef GUID_64
-    *startGuid = ((1 << (GUID_LOCID_SIZE + LOCID_LOCATION)) | locIdShifted | kindShifted) <<
+    (*(startGuid)).guid = ((1 << (GUID_LOCID_SIZE + LOCID_LOCATION)) | locIdShifted | kindShifted) <<
         GUID_COUNTER_SIZE;
 #elif defined(GUID_128)
     (*(startGuid)).lower = ((1 << (GUID_LOCID_SIZE + LOCID_LOCATION)) | locIdShifted | kindShifted) <<
@@ -251,9 +251,10 @@ u8 labeledGuidReserve(ocrGuidProvider_t *self, ocrGuid_t *startGuid, u64* skipGu
     *skipGuid = 1; // Each GUID will just increment by 1
     u64 firstCount = hal_xadd64(&guidReservedCounter, numberGuids);
     ASSERT(firstCount  + numberGuids < (u64)1<<GUID_COUNTER_SIZE);
+
     // See BUG #928 on GUID issues
 #ifdef GUID_64
-    *startGuid |= firstCount;
+    (*(startGuid)).guid |= firstCount;
 #elif defined(GUID_128)
     (*(startGuid)).lower |= firstCount;
 #endif
@@ -276,10 +277,11 @@ u8 labeledGuidGetGuid(ocrGuidProvider_t* self, ocrGuid_t* guid, u64 val, ocrGuid
     // Here no need to allocate
     u64 newGuid = generateNextGuid(self, kind);
     DPRINTF(DEBUG_LVL_VERB, "LabeledGUID: insert into hash table 0x%lx -> 0x%lx\n", newGuid, val);
-    GP_HASHTABLE_PUT(((ocrGuidProviderLabeled_t *) self)->guidImplTable, (void *) newGuid, (void *) val);
     // See BUG #928 on GUID issues
+
+    GP_HASHTABLE_PUT(((ocrGuidProviderLabeled_t *) self)->guidImplTable, (void *) newGuid, (void *) val);
 #ifdef GUID_64
-    *guid = (ocrGuid_t) newGuid;
+    (*(guid)).guid =  newGuid;
 #elif defined(GUID_128)
     (*(guid)).lower = newGuid;
     (*(guid)).upper = 0x0;
@@ -305,10 +307,9 @@ u8 labeledGuidCreateGuid(ocrGuidProvider_t* self, ocrFatGuid_t *fguid, u64 size,
 
         // Other sanity check
         ASSERT(getKindFromGuid(fguid->guid) == kind); // Kind properly encoded
-        //NP  DEBUG Checked fguid on entry +
         // See BUG #928 on GUID issues
 #ifdef GUID_64
-        ASSERT((fguid->guid & GUID_COUNTER_MASK) < guidReservedCounter); // Range actually reserved
+        ASSERT((fguid->guid.guid & GUID_COUNTER_MASK) < guidReservedCounter); // Range actually reserved
 #elif defined(GUID_128)
         ASSERT((fguid->guid.lower & GUID_COUNTER_MASK) < guidReservedCounter); // Range actually reserved
 #endif
@@ -341,7 +342,7 @@ u8 labeledGuidCreateGuid(ocrGuidProvider_t* self, ocrFatGuid_t *fguid, u64 size,
 #ifdef GUID_64
             void *value = hashtableConcBucketLockedTryPut(
                 ((ocrGuidProviderLabeled_t*)self)->guidImplTable,
-                (void*)(fguid->guid), ptr);
+                (void*)(fguid->guid.guid), ptr);
 #elif defined(GUID_128)
             void *value = hashtableConcBucketLockedTryPut(
                 ((ocrGuidProviderLabeled_t*)self)->guidImplTable,
@@ -366,9 +367,10 @@ u8 labeledGuidCreateGuid(ocrGuidProvider_t* self, ocrFatGuid_t *fguid, u64 size,
                 // Bug #627: We do not return OCR_EGUIDEXISTS until the GUID is valid. We test this
                 // by looking at the first field of ptr and waiting for it to be the GUID value (meaning the
                 // object has been initialized
+
                 // See BUG #928 on GUID issues
 #ifdef GUID_64
-                while(!(IS_GUID_EQUAL((*(volatile ocrGuid_t*)value), fguid->guid)));
+                while((*(volatile u64*)value) != fguid->guid.guid);
 #elif defined(GUID_128)
                 //TODO The below workaround is to get things working. Should use the IS_GUID_EQUAL macro but right
                 //     now only the lower 64 bits are coming back from the hash table PUT in <value>, due to 64 bit
@@ -382,11 +384,13 @@ u8 labeledGuidCreateGuid(ocrGuidProvider_t* self, ocrFatGuid_t *fguid, u64 size,
             void* value = NULL;
             DPRINTF(DEBUG_LVL_VERB, "LabeledGUID: force insert into hash table "GUIDSx" -> 0x%lx\n", GUIDFS(fguid->guid), ptr);
             do {
+
 // See BUG #928 on GUID issues
+
 #ifdef GUID_64
                 value = hashtableConcBucketLockedTryPut(
                     ((ocrGuidProviderLabeled_t*)self)->guidImplTable,
-                    (void*)(fguid->guid), ptr);
+                    (void*)(fguid->guid.guid), ptr);
 #elif defined(GUID_128)
                 value = hashtableConcBucketLockedTryPut(
                     ((ocrGuidProviderLabeled_t*)self)->guidImplTable,
@@ -400,7 +404,7 @@ u8 labeledGuidCreateGuid(ocrGuidProvider_t* self, ocrFatGuid_t *fguid, u64 size,
             // See BUG #928 on GUID issues
 #ifdef GUID_64
             GP_HASHTABLE_PUT(((ocrGuidProviderLabeled_t*)self)->guidImplTable,
-                             (void*)(fguid->guid), ptr);
+                             (void*)(fguid->guid.guid), ptr);
 #elif defined(GUID_128)
             GP_HASHTABLE_PUT(((ocrGuidProviderLabeled_t*)self)->guidImplTable,
                              (void*)(fguid->guid.lower), ptr);
@@ -422,7 +426,7 @@ u8 labeledGuidCreateGuid(ocrGuidProvider_t* self, ocrFatGuid_t *fguid, u64 size,
 u8 labeledGuidGetVal(ocrGuidProvider_t* self, ocrGuid_t guid, u64* val, ocrGuidKind* kind) {
     // See BUG #928 on GUID issues
 #ifdef GUID_64
-    *val = (u64) GP_HASHTABLE_GET(((ocrGuidProviderLabeled_t *) self)->guidImplTable, (void *) guid);
+    *val = (u64) GP_HASHTABLE_GET(((ocrGuidProviderLabeled_t *) self)->guidImplTable, (void *) guid.guid);
 #elif defined(GUID_128)
     *val = (u64) GP_HASHTABLE_GET(((ocrGuidProviderLabeled_t *) self)->guidImplTable, (void *) guid.lower);
 #else
@@ -440,13 +444,11 @@ u8 labeledGuidGetVal(ocrGuidProvider_t* self, ocrGuid_t guid, u64* val, ocrGuidK
         // by looking at the first field of ptr and waiting for it to be the GUID value (meaning the
         // object has been initialized
         if(IS_RESERVED_GUID(guid)) {
+
             // See BUG #928 on GUID issues
 #ifdef GUID_64
-            while(!(IS_GUID_EQUAL((*((volatile ocrGuid_t*)(*val))),  guid)));
+            while((*(volatile u64*)(*val)) != guid.guid);
 #elif defined GUID_128
-            //TODO The below workaround is to get things working. Should use the IS_GUID_EQUAL macro but right
-            //     now only the lower 64 bits are coming back from the hash table GET in <val>, due to 64 bit
-            //     assumptions.
             while((*(volatile u64*)(*val)) != guid.lower);
 #endif
             hal_fence(); // May be overkill but there is a race that I don't get
@@ -485,7 +487,7 @@ u8 labeledGuidRegisterGuid(ocrGuidProvider_t* self, ocrGuid_t guid, u64 val) {
     DPRINTF(DEBUG_LVL_VERB, "LabeledGUID: register GUID "GUIDSx" -> 0x%lx\n", GUIDFS(guid), val);
     // See BUG #928 on GUID issues
 #ifdef GUID_64
-    GP_HASHTABLE_PUT(((ocrGuidProviderLabeled_t *) self)->guidImplTable, (void *) guid, (void *) val);
+    GP_HASHTABLE_PUT(((ocrGuidProviderLabeled_t *) self)->guidImplTable, (void *) guid.guid, (void *) val);
 #elif defined(GUID_128)
     GP_HASHTABLE_PUT(((ocrGuidProviderLabeled_t *) self)->guidImplTable, (void *) guid.lower, (void *) val);
 #else
@@ -500,7 +502,7 @@ u8 labeledGuidRegisterGuid(ocrGuidProvider_t* self, ocrGuid_t guid, u64 val) {
 u8 labeledGuidUnregisterGuid(ocrGuidProvider_t* self, ocrGuid_t guid, u64 ** val) {
     // See BUG #928 on GUID issues
 #ifdef GUID_64
-    GP_HASHTABLE_DEL(((ocrGuidProviderLabeled_t *) self)->guidImplTable, (void *) guid, (void **) val);
+    GP_HASHTABLE_DEL(((ocrGuidProviderLabeled_t *) self)->guidImplTable, (void *) guid.guid, (void **) val);
 #elif defined(GUID_128)
     GP_HASHTABLE_DEL(((ocrGuidProviderLabeled_t *) self)->guidImplTable, (void *) guid.lower, (void **) val);
 #else
@@ -525,7 +527,7 @@ u8 labeledGuidReleaseGuid(ocrGuidProvider_t *self, ocrFatGuid_t fatGuid, bool re
     ocrGuidProviderLabeled_t * derived = (ocrGuidProviderLabeled_t *) self;
     // See BUG #928 on GUID issues
 #ifdef GUID_64
-    RESULT_ASSERT(GP_HASHTABLE_DEL(derived->guidImplTable, (void *)guid, NULL), ==, true);
+    RESULT_ASSERT(GP_HASHTABLE_DEL(derived->guidImplTable, (void *)guid.guid, NULL), ==, true);
 #elif defined(GUID_128)
     RESULT_ASSERT(GP_HASHTABLE_DEL(derived->guidImplTable, (void *)guid.lower, NULL), ==, true);
 #else

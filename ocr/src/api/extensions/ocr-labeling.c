@@ -240,7 +240,7 @@ u8 ocrGuidFromIndex(ocrGuid_t *outGuid, ocrGuid_t rangeGuid, u64 idx) {
 
     // See BUG #928 on GUID issues
 #ifdef GUID_64
-    *outGuid = myMap->startGuid + myMap->skipGuid*idx;
+    outGuid->guid = myMap->startGuid.guid + myMap->skipGuid*idx;
 #elif defined(GUID_128)
     outGuid->lower = myMap->startGuid.lower + myMap->skipGuid*idx;
     outGuid->upper = 0x0;

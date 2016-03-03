@@ -23,7 +23,7 @@ ocrGuid_t edtCode(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
 
     u64 driverIteration = paramv[0];
     long timerUsAcc = (long) paramv[1];
-    ocrGuid_t dbAllGuids = (ocrGuid_t) paramv[2];
+    ocrGuid_t dbAllGuids = {.guid=paramv[2]};
 
     // Spawn the next driver iteration
     ocrGuid_t edtDriverTemplateGuid;
@@ -66,11 +66,11 @@ ocrGuid_t driverEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
         u64 paramvEdtCode[3];
         paramvEdtCode[0] = driverIteration;
         paramvEdtCode[1] = (u64) timerUsAcc;
-        paramvEdtCode[2] = (u64) dbAllGuids;
+        paramvEdtCode[2] = (u64) dbAllGuids.guid;
 
         ocrGuid_t edtGuid;
         ocrEdtCreate(&edtGuid, edtCodeTemplateGuid,
-                     3, paramvEdtCode, DB_NBS+1, NULL_GUID, EDT_PROP_NONE, NULL_GUID, NULL);
+                     3, paramvEdtCode, DB_NBS+1, NULL, EDT_PROP_NONE, NULL_GUID, NULL);
         ocrEdtTemplateDestroy(edtCodeTemplateGuid);
 
         // Cannot spawn the next iteration here becaues we can create a deadlock if the edtCode
@@ -122,7 +122,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     paramvDriverEdt[1] = (u64) 0; //timerUsAcc
     ocrGuid_t driverEdtGuid;
     ocrEdtCreate(&driverEdtGuid, edtDriverTemplateGuid,
-                 2, paramvDriverEdt, 2, NULL_GUID, EDT_PROP_NONE, NULL_GUID, NULL);
+                 2, paramvDriverEdt, 2, NULL, EDT_PROP_NONE, NULL_GUID, NULL);
     ocrAddDependence(dbAllGuids, driverEdtGuid, 0, DB_MODE_CONST);
     ocrAddDependence(dbTimerGuid, driverEdtGuid, 1, DB_MODE_RW);
     ocrEdtTemplateDestroy(edtDriverTemplateGuid);

@@ -25,7 +25,7 @@ ocrGuid_t remoteEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrGuid_t expectedAffinityGuid = ((ocrGuid_t *) depv[0].ptr)[1];
     ocrGuid_t currentAffinity;
     ocrAffinityGetCurrent(&currentAffinity);
-    ASSERT(expectedAffinityGuid == currentAffinity);
+    ASSERT(IS_GUID_EQUAL(expectedAffinityGuid, currentAffinity));
     ocrEventSatisfy(eventGuid, NULL_GUID);
     return NULL_GUID;
 }

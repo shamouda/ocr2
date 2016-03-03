@@ -23,7 +23,7 @@ ocrGuid_t shtEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
 }
 
 ocrGuid_t taskForEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
-    ocrGuid_t evtGuid = (ocrGuid_t) (paramv[0]);
+    ocrGuid_t evtGuid = {.guid=paramv[0]};
     ocrEventSatisfy(evtGuid, NULL_GUID);
     return NULL_GUID;
 }

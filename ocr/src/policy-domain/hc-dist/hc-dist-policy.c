@@ -145,9 +145,8 @@ static u8 registerRemoteMetaData(ocrPolicyDomain_t * pd, ocrFatGuid_t tplFatGuid
 
     // See BUG #928 on GUID issues
 #ifdef GUID_64
-    bool found = hashtableNonConcRemove(dself->proxyTplMap, (void *) tplFatGuid.guid, (void **) &proxyTpl);
+    bool found = hashtableNonConcRemove(dself->proxyTplMap, (void *) tplFatGuid.guid.guid, (void **) &proxyTpl);
 #elif defined(GUID_128)
-    //TODO Should this change to metaDataPtr rather than void * of GUID? (like in deque)
     bool found = hashtableNonConcRemove(dself->proxyTplMap, (void *) tplFatGuid.guid.lower, (void **) &proxyTpl);
 #endif
 
@@ -214,11 +213,11 @@ static u8 resolveRemoteMetaData(ocrPolicyDomain_t * pd, ocrFatGuid_t * tplFatGui
             return 0;
         }
         // Check if the proxy exists or not.
+
         // See BUG #928 on GUID issues
 #ifdef GUID_64
-        ProxyTpl_t * proxyTpl = (ProxyTpl_t *) hashtableNonConcGet(dself->proxyTplMap, (void *) tplFatGuid->guid);
+        ProxyTpl_t * proxyTpl = (ProxyTpl_t *) hashtableNonConcGet(dself->proxyTplMap, (void *) tplFatGuid->guid.guid);
 #elif defined(GUID_128)
-        //TODO Should this change to metaDataPtr rather than void * of GUID? (like in deque)
         ProxyTpl_t * proxyTpl = (ProxyTpl_t *) hashtableNonConcGet(dself->proxyTplMap, (void *) tplFatGuid->guid.lower);
 #endif
         if (proxyTpl == NULL) {
@@ -227,9 +226,8 @@ static u8 resolveRemoteMetaData(ocrPolicyDomain_t * pd, ocrFatGuid_t * tplFatGui
             proxyTpl->queueHead = (void *) 0x1; // sentinel value
             // See BUG #928 on GUID issues
 #ifdef GUID_64
-            void * ret = hashtableNonConcTryPut(dself->proxyTplMap, (void *) tplFatGuid->guid, (void *) proxyTpl);
+            void * ret = hashtableNonConcTryPut(dself->proxyTplMap, (void *) tplFatGuid->guid.guid, (void *) proxyTpl);
 #elif defined(GUID_128)
-            //TODO Should this change to metaDataPtr rather than void * of GUID? (like in deque)
             void * ret = hashtableNonConcTryPut(dself->proxyTplMap, (void *) tplFatGuid->guid.lower, (void *) proxyTpl);
 #endif
             ASSERT(ret == proxyTpl);

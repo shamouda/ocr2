@@ -48,7 +48,7 @@ ocrGuid_t hcDumpNextEdt(ocrWorker_t *worker, u32 *size){
         ocrFatGuid_t fguid;
         // See BUG #928 on GUIDs
 #ifdef GUID_64
-        fguid.guid = deqObj->deque->data[tail-1];
+        fguid.guid.guid = deqObj->deque->data[tail-1];
 #elif defined(GUID_128)
         fguid.guid.lower = deqObj->deque->data[tail-1];
         fguid.guid.upper = 0x0;

@@ -45,18 +45,19 @@ typedef struct {
 #else
 
 #define GUID_64
-typedef intptr_t ocrGuid_t; /**< GUID type */
-
+typedef struct {
+    intptr_t guid;
+} ocrGuid_t;
 #endif
 
 /* Defined vals for 64-bit GUIDs */
 #ifdef GUID_64
 
-#define NULL_GUID ((ocrGuid_t)0x0)
+#define NULL_GUID ((ocrGuid_t){.guid = 0x0})
 
-#define UNINITIALIZED_GUID ((ocrGuid_t)-2)
+#define UNINITIALIZED_GUID ((ocrGuid_t){.guid = -2})
 
-#define ERROR_GUID ((ocrGuid_t)-1)
+#define ERROR_GUID ((ocrGuid_t){.guid = -1})
 
 /* Defined vals for 128-bit GUIDs */
 #elif defined(GUID_128)

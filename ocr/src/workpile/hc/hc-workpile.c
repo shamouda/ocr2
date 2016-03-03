@@ -54,7 +54,7 @@ u8 hcWorkpileSwitchRunlevel(ocrWorkpile_t *self, ocrPolicyDomain_t *PD, ocrRunle
             ocrWorkpileHc_t* derived = (ocrWorkpileHc_t*)self;
             // See BUG #928 on GUID issues
 #ifdef GUID_64
-            derived->deque = newDeque(self->pd, (void *) NULL_GUID, WORK_STEALING_DEQUE);
+            derived->deque = newDeque(self->pd, (void *) NULL_GUID.guid, WORK_STEALING_DEQUE);
 #elif defined(GUID_128)
             derived->deque = newDeque(self->pd, (void *) NULL_GUID.lower, WORK_STEALING_DEQUE);
 #endif
@@ -107,7 +107,7 @@ ocrFatGuid_t hcWorkpilePop(ocrWorkpile_t * base, ocrWorkPopType_t type,
     case POP_WORKPOPTYPE:
         // See BUG #928 on GUID issues
 #ifdef GUID_64
-        fguid.guid = (u64)derived->deque->popFromTail(derived->deque, 0);
+        fguid.guid.guid = (u64)derived->deque->popFromTail(derived->deque, 0);
 #elif defined(GUID_128)
         fguid.guid.lower = (u64)derived->deque->popFromTail(derived->deque, 0);
         fguid.guid.upper = 0x0;
@@ -116,7 +116,7 @@ ocrFatGuid_t hcWorkpilePop(ocrWorkpile_t * base, ocrWorkPopType_t type,
     case STEAL_WORKPOPTYPE:
         // See BUG #928 on GUID issues
 #ifdef GUID_64
-        fguid.guid = (u64)derived->deque->popFromHead(derived->deque, 1);
+        fguid.guid.guid = (u64)derived->deque->popFromHead(derived->deque, 1);
 #elif defined(GUID_128)
         fguid.guid.lower = (u64)derived->deque->popFromHead(derived->deque, 1);
         fguid.guid.upper = 0x0;
@@ -134,7 +134,7 @@ void hcWorkpilePush(ocrWorkpile_t * base, ocrWorkPushType_t type,
     ocrWorkpileHc_t* derived = (ocrWorkpileHc_t*) base;
     // See BUG #928 on GUID issues
 #ifdef GUID_64
-    derived->deque->pushAtTail(derived->deque, (void *)(g.guid), 0);
+    derived->deque->pushAtTail(derived->deque, (void *)(g.guid.guid), 0);
 #elif defined(GUID_128)
     derived->deque->pushAtTail(derived->deque, (void *)(g.guid.lower), 0);
 #endif

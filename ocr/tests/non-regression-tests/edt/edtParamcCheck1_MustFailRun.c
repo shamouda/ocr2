@@ -22,7 +22,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrGuid_t terminateEdtGuid;
     ocrGuid_t terminateEdtTemplateGuid;
     ocrEdtTemplateCreate(&terminateEdtTemplateGuid, terminateEdt, EDT_PARAM_UNK /*paramc*/, 0 /*depc*/);
-    u8 res = ocrEdtCreate(&terminateEdtGuid, terminateEdtTemplateGuid, 1, NULL, 0, NULL_GUID,
+    u8 res = ocrEdtCreate(&terminateEdtGuid, terminateEdtTemplateGuid, 1, NULL, 0, NULL,
                  /*properties=*/EDT_PROP_FINISH, NULL_GUID, /*outEvent=*/ NULL);
     ASSERT(!res);
     if(res) {

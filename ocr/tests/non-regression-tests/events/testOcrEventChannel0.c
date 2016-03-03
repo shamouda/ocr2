@@ -22,8 +22,8 @@ ocrGuid_t shtEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
 }
 
 ocrGuid_t prodEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
-    ocrGuid_t evtToConsGuid = (ocrGuid_t) (paramv[0]);
-    ocrGuid_t evtToProdGuid = (ocrGuid_t) (paramv[1]);
+    ocrGuid_t evtToConsGuid = {.guid=paramv[0]};
+    ocrGuid_t evtToProdGuid = {.guid=paramv[1]};
     u64 countSalvo = paramv[2];
     u32 i = 0;
     while (i < PROD_SALVO) {
@@ -45,8 +45,8 @@ ocrGuid_t prodEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
         ocrGuid_t prodTpl;
         ocrEdtTemplateCreate(&prodTpl, prodEdt, 3, 1);
         u64 pparamv[3];
-        pparamv[0] = (u64) evtToConsGuid;
-        pparamv[1] = (u64) evtToProdGuid;
+        pparamv[0] = (u64) evtToConsGuid.guid;
+        pparamv[1] = (u64) evtToProdGuid.guid;
         pparamv[2] = (u64) countSalvo;
         ocrGuid_t edtProdGuid;
         ocrEdtCreate(&edtProdGuid, prodTpl, EDT_PARAM_DEF, pparamv,
@@ -58,8 +58,10 @@ ocrGuid_t prodEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
 }
 
 ocrGuid_t consEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
-    ocrGuid_t evtToConsGuid = (ocrGuid_t) (paramv[0]);
-    ocrGuid_t evtToProdGuid = (ocrGuid_t) (paramv[1]);
+    ocrGuid_t evtToConsGuid;
+    evtToConsGuid.guid = paramv[0];
+    ocrGuid_t evtToProdGuid;
+    evtToProdGuid.guid = paramv[1];
     u64 countProd = paramv[2];
     u64 countSalvo = paramv[3];
     u64 expVal = paramv[4];
@@ -92,8 +94,8 @@ ocrGuid_t consEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrGuid_t consTpl;
     ocrEdtTemplateCreate(&consTpl, consEdt, 5, 1);
     u64 pparamv[5];
-    pparamv[0] = (u64) evtToConsGuid;
-    pparamv[1] = (u64) evtToProdGuid;
+    pparamv[0] = (u64) evtToConsGuid.guid;
+    pparamv[1] = (u64) evtToProdGuid.guid;
     pparamv[2] = (u64) countProd;
     pparamv[3] = (u64) countSalvo;
     pparamv[4] = (u64) expVal+1;
@@ -128,8 +130,8 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrGuid_t prodTpl;
     ocrEdtTemplateCreate(&prodTpl, prodEdt, 3, 1);
     u64 pparamv[3];
-    pparamv[0] = (u64) evtToConsGuid;
-    pparamv[1] = (u64) evtToProdGuid;
+    pparamv[0] = (u64) evtToConsGuid.guid;
+    pparamv[1] = (u64) evtToProdGuid.guid;
     pparamv[2] = 0;
     ocrGuid_t edtProdGuid;
     ocrEdtCreate(&edtProdGuid, prodTpl, EDT_PARAM_DEF, pparamv,
@@ -138,8 +140,8 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrGuid_t consTpl;
     ocrEdtTemplateCreate(&consTpl, consEdt, 5, 1);
     u64 cparamv[5];
-    cparamv[0] = (u64) evtToConsGuid;
-    cparamv[1] = (u64) evtToProdGuid;
+    cparamv[0] = (u64) evtToConsGuid.guid;
+    cparamv[1] = (u64) evtToProdGuid.guid;
     cparamv[2] = 0;
     cparamv[3] = 0;
     cparamv[4] = 0; //expected value

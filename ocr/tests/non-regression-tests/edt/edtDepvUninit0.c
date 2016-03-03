@@ -45,5 +45,5 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrAddDependence(db2Guid, edtGuid, 1, DB_MODE_RO);
     ocrAddDependence(db1Guid, edtGuid, 0, DB_MODE_RO);
 
-    return 0;
+    return NULL_GUID;
 }

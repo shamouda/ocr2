@@ -28,7 +28,7 @@ ocrGuid_t addEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     PRINTF("[remote] addEdt: DB written to, releasing...\n");
     ocrDbRelease(dbCloneGuid); // Forces writeback
     ASSERT(paramc == 1);
-    ocrGuid_t eventGuid = (ocrGuid_t) paramv[0];
+    ocrGuid_t eventGuid = {.guid=paramv[0]};
     PRINTF("[remote] addEdt: Satisfy checkerEdt's event guid 0x%lx\n", eventGuid);
     ocrEventSatisfy(eventGuid, dbCloneGuid);
     return NULL_GUID;
@@ -90,7 +90,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
                  EDT_PROP_NONE, NULL_GUID, NULL);
 
     // create remote edt that depends the db which is automatically cloned
-    u64 rparamv = (u64) eventGuid; // NASTY cast: the event to satisfy later on
+    u64 rparamv = (u64) eventGuid.guid; // NASTY cast: the event to satisfy later on
     ocrGuid_t addEdtGuid;
     ocrEdtCreate(&addEdtGuid, addEdtTemplateGuid, 1, &rparamv, 1, &dbGuid,
                  EDT_PROP_NONE, edtAffinity, NULL);

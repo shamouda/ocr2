@@ -20,12 +20,12 @@ ocrGuid_t remoteEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrGuid_t * dbPtr = depv[0].ptr;
     ocrGuid_t currentAffinity;
     ocrAffinityGetCurrent(&currentAffinity);
-    PRINTF("remoteEdt: executing at affinity %lld\n", (u64) currentAffinity);
+    PRINTF("remoteEdt: executing at affinity "GUIDSx"\n", GUIDFS(currentAffinity));
 
     ocrGuid_t queriedAffAffinityGuid;
     u64 count = 1;
     ocrAffinityQuery(dbPtr[0], &count, &queriedAffAffinityGuid);
-    ASSERT(queriedAffAffinityGuid == currentAffinity);
+    ASSERT(IS_GUID_EQUAL(queriedAffAffinityGuid, currentAffinity));
 
     ocrShutdown();
     return NULL_GUID;

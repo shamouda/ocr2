@@ -19,7 +19,7 @@
 
 // This edt is triggered when the output event of the other edt is satisfied by the runtime
 ocrGuid_t terminateEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
-    ASSERT(depv[1].guid != NULL_GUID);
+    ASSERT(!(IS_GUID_NULL(depv[1].guid)));
     u64 * array = (u64*)depv[1].ptr;
     u64 i = 0;
     while (i < N) {
@@ -52,7 +52,7 @@ ocrGuid_t rootEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
         u64 nparamv = i;
         // Pass the guid we got fron depv to the updaterEdt through depv
         ocrGuid_t updaterEdtGuid;
-        ocrEdtCreate(&updaterEdtGuid, updaterEdtTemplateGuid, EDT_PARAM_DEF, &nparamv, EDT_PARAM_DEF, &dbGuid, 0, NULL_GUID, NULL_GUID);
+        ocrEdtCreate(&updaterEdtGuid, updaterEdtTemplateGuid, EDT_PARAM_DEF, &nparamv, EDT_PARAM_DEF, &dbGuid, 0, NULL_GUID, NULL);
         i++;
     }
     return NULL_GUID;

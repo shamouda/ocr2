@@ -31,29 +31,29 @@
 /* Macros for 64-bit GUID values */
 #ifdef GUID_64
 
-#define IS_GUID_NULL(guid)                      \
-    ((guid) == ((ocrGuid_t)0x0))
+#define IS_GUID_NULL(g)                      \
+    ((g).guid == 0x0)
 
-#define IS_GUID_UNINITIALIZED(guid)             \
-    ((guid) == ((ocrGuid_t)-2))
+#define IS_GUID_UNINITIALIZED(g)             \
+    ((g).guid == -2)
 
-#define IS_GUID_ERROR(guid)                     \
-    ((guid) == ((ocrGuid_t)-1))
+#define IS_GUID_ERROR(g)                     \
+    ((g).guid == -1)
 
 #define IS_GUID_EQUAL(g1, g2)                   \
-    ((g1) == (g2))
+    ((g1).guid == (g2).guid)
 
 #define IS_GUID_LESS_THAN(g1, g2)               \
-    ((g1) < (g2))
+    ((g1).guid < (g2).guid)
 
 #define GUID_ASSIGN_VALUE(g1, g2)               \
     do {                                        \
-        (g1) = (g2);                            \
+        (g1).guid = (g2).guid;                  \
     } while(0)
 
-#define GUIDFS(guid) (guid)
+#define GUIDFS(g) (g).guid
 
-#define GUIDFL(guid) (guid)
+#define GUIDFL(g) (g).guid
 
 #define GUIDSx "0x%lx"
 

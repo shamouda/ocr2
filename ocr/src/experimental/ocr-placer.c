@@ -33,7 +33,6 @@
 // - neighbors contains all ranks but self
 // - placer's affinities array represents all the PD locations and is sorted by rank id
 
-
 ocrPlacer_t * createLocationPlacer(ocrPolicyDomain_t *pd) {
     ocrLocationPlacer_t * placer = pd->fcts.pdMalloc(pd, sizeof(ocrLocationPlacer_t));
     placer->lock = 0;

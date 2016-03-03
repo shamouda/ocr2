@@ -226,7 +226,7 @@ u8 listSchedulerObjectRemove(ocrSchedulerObjectFactory_t *fact, ocrSchedulerObje
                 ASSERT(listObj->list->elSize == sizeof(ocrGuid_t));
                 // See BUG #928 on GUID issues
 #ifdef GUID_64
-                dst->guid.guid = *((u64*)(node->data));
+                dst->guid.guid.guid = *((u64*)(node->data));
 #elif defined(GUID_128)
                 dst->guid.guid.lower = *((u64*)(node->data));
                 dst->guid.guid.upper = 0x0;

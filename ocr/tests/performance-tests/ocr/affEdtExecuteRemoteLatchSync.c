@@ -50,7 +50,7 @@ ocrGuid_t headEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
         get_time(&ts_start);
         ocrGuid_t workEdtGuid;
         ocrEdtCreate(&workEdtGuid, workEdtTemplateGuid,
-                     1, (u64 *) &evtGuid, 0, NULL_GUID, EDT_PROP_NONE, affinities[count-1], NULL);
+                     1, (u64 *) &evtGuid, 0, NULL, EDT_PROP_NONE, affinities[count-1], NULL);
         get_time(&ts_stop);
         timings[k] = elapsed_usec(&ts_start, &ts_stop);
         k++;

@@ -101,7 +101,7 @@ u8 binHeapSchedulerObjectInsert(ocrSchedulerObjectFactory_t *fact, ocrSchedulerO
 
     // See BUG #928 on GUID issues
 #ifdef GUID_64
-    heap->push(heap, (void *)edtGuid, priority, 0);
+    heap->push(heap, (void *)edtGuid.guid, priority, 0);
 #elif defined(GUID_128)
     heap->push(heap, (void *)edtGuid.lower, priority, 0);
 #endif
@@ -123,12 +123,8 @@ u8 binHeapSchedulerObjectRemove(ocrSchedulerObjectFactory_t *fact, ocrSchedulerO
             {
                 START_PROFILE(sched_binHeap_Pop);
                 // See BUG #928 on GUID issues
-#ifdef GUID_64
-                retGuid = (ocrGuid_t)binHeap->pop(binHeap, 0);
-#elif defined(GUID_128)
                 ocrGuid_t *myGuid = (ocrGuid_t *)binHeap->pop(binHeap, 0);
                 retGuid = *myGuid;
-#endif
                 EXIT_PROFILE;
             }
             break;
@@ -136,12 +132,8 @@ u8 binHeapSchedulerObjectRemove(ocrSchedulerObjectFactory_t *fact, ocrSchedulerO
             {
                 START_PROFILE(sched_binHeap_Steal);
                 // See BUG #928 on GUID issues
-#ifdef GUID_64
-                retGuid = (ocrGuid_t)binHeap->pop(binHeap, 1);
-#elif defined(GUID_128)
                 ocrGuid_t *myGuid = (ocrGuid_t *)binHeap->pop(binHeap, 1);
                 retGuid = *myGuid;
-#endif
                 EXIT_PROFILE;
             }
             break;

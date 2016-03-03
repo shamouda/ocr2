@@ -32,7 +32,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
 
     ocrGuid_t terminateEdtGuid;
     ocrEdtCreate(&terminateEdtGuid, terminateEdtTemplateGuid,
-                 0, NULL, NB_INSTANCES+1, NULL_GUID, EDT_PROP_NONE, NULL_GUID, NULL);
+                 0, NULL, NB_INSTANCES+1, NULL, EDT_PROP_NONE, NULL_GUID, NULL);
 
     int k = 0;
     while (k < NB_INSTANCES) {
@@ -54,7 +54,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     while (i < NB_INSTANCES) {
         ocrGuid_t workEdtGuid;
         ocrEdtCreate(&workEdtGuid, workEdtTemplateGuid,
-                     1, (u64 *) &dbEvtPtr[i], 0, NULL_GUID, EDT_PROP_NONE, NULL_GUID, NULL);
+                     1, (u64 *) &dbEvtPtr[i], 0, NULL, EDT_PROP_NONE, NULL_GUID, NULL);
         i++;
     }
     ocrEdtTemplateDestroy(workEdtTemplateGuid);

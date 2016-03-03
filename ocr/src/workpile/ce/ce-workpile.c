@@ -100,7 +100,7 @@ ocrFatGuid_t ceWorkpilePop(ocrWorkpile_t * base, ocrWorkPopType_t type,
     case POP_WORKPOPTYPE:
         // See BUG #928 on GUIDs
 #ifdef GUID_64
-        fguid.guid = (ocrGuid_t)derived->deque->popFromHead(derived->deque, 0);
+        fguid.guid.guid = (u64)derived->deque->popFromHead(derived->deque, 0);
 #elif defined GUID_128
         fguid.guid.lower = (u64)derived->deque->popFromHead(derived->deque, 0);
         fguid.guid.upper = 0ULL;
@@ -120,7 +120,7 @@ void ceWorkpilePush(ocrWorkpile_t * base, ocrWorkPushType_t type,
     ocrWorkpileCe_t* derived = (ocrWorkpileCe_t*) base;
     // See BUG #928 on GUIDs
 #ifdef GUID_64
-    derived->deque->pushAtTail(derived->deque, (void *)(g.guid), 0);
+    derived->deque->pushAtTail(derived->deque, (void *)(g.guid.guid), 0);
 #elif defined GUID_128
     derived->deque->pushAtTail(derived->deque, (void *)(g.guid.lower), 0);
 #else

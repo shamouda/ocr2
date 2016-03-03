@@ -17,7 +17,7 @@
 #define TPL_DRIVER_PROP EDT_PROP_FINISH
 
 ocrGuid_t consumerEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
-    ocrGuid_t consDoneGuid = (ocrGuid_t) paramv[0];
+    ocrGuid_t consDoneGuid = {.guid=paramv[0]};
     ocrEventSatisfySlot(consDoneGuid, NULL_GUID, OCR_EVENT_LATCH_DECR_SLOT);
     return NULL_GUID;
 }

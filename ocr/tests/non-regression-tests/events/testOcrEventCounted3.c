@@ -23,10 +23,10 @@ ocrGuid_t shtEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
 
 
 ocrGuid_t taskForEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
-    ocrGuid_t shtGuid = (ocrGuid_t) (paramv[0]);
+    ocrGuid_t shtGuid = {.guid=paramv[0]};
     if (paramc == 2) {
         // shtGuid is the edt
-        ocrGuid_t evtGuid = (ocrGuid_t) (paramv[1]);
+        ocrGuid_t evtGuid = {.guid=paramv[1]};
         ocrGuid_t tplEdt;
         ocrEdtTemplateCreate(&tplEdt, taskForEdt, 1 , 1);
         u32 i;
@@ -70,8 +70,8 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrGuid_t tplEdt;
     ocrEdtTemplateCreate(&tplEdt, taskForEdt, 2 , 1);
     u64 nparamv[2];
-    nparamv[0] = (u64) shtEdtGuid;
-    nparamv[1] = (u64) evtGuid;
+    nparamv[0] = (u64) shtEdtGuid.guid;
+    nparamv[1] = (u64) evtGuid.guid;
     ocrGuid_t edtGuid;
     ocrEdtCreate(&edtGuid, tplEdt, EDT_PARAM_DEF, nparamv, EDT_PARAM_DEF, NULL,
                  EDT_PROP_NONE, NULL_GUID, NULL);
