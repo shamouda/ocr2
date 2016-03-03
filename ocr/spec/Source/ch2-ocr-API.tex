@@ -1297,4 +1297,11 @@ The following dependences can be added:
 \item NULL\_GUID to event or EDT: This is equivalent to ``data block to event''
   or ``data block to EDT'' where the data is non-existent.
 \end{DoxyItemize}
+
+Note that an EDT instance may legally have multiple pre-slots satisfied with the same
+data block if those dependences have the same access mode. An EDT instance acquiring the
+same data block through multiple pre-slots, but with differing access modes, results in
+undefined behavior. The user is always responsible for ensuring that each data block is
+explicitly released (via \hyperlink{func_ocrDbRelease}{\code{ocrDbRelease}}) at most once
+per EDT instance.
 % This is the end of ch2-ocrAPI.tex of the OCR specification.
