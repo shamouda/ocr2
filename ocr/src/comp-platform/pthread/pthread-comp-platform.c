@@ -249,6 +249,12 @@ u8 pthreadSwitchRunlevel(ocrCompPlatform_t *self, ocrPolicyDomain_t *PD, ocrRunl
             if(!(properties & RL_PD_MASTER)) {
                 // We do not join with ourself; covers both PD_MASTER and NODE_MASTER
                 toReturn |= pthread_join(pthreadCompPlatform->osThread, NULL);
+            } else {
+#ifdef OCR_RUNTIME_PROFILER
+                // We also destroy the profile data here for the master thread
+                _profilerData *pData = pthread_getspecific(_profilerThreadData);
+                _profilerDataDestroy(pData);
+#endif
             }
 #ifdef OCR_RUNTIME_PROFILER
             {
