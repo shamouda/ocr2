@@ -28,11 +28,18 @@ DEFAULT_CONFIG ?= jenkins-common-8w-lockableDB.cfg
 # User Configurable settings
 ####################################################
 
+# **** Runtime extension parameters (ENABLE_EXTENSION_RTITF) ****
+
 # Number of elements in EDT local storage
 # CFLAGS += -DELS_USER_SIZE=0
 
-# Static size for deques used to contain EDTs
+# **** Workpiles Parameters ****
+
+# Impl-specific for Work-stealing deques
+# - Static size for deques used to contain EDTs
 # CFLAGS += -DINIT_DEQUE_CAPACITY=2048
+
+# **** Events Parameters ****
 
 # Initialisation size for statically allocated HC event's waiter array
 # CFLAGS += -DHCEVT_WAITER_STATIC_COUNT=4
@@ -40,13 +47,23 @@ DEFAULT_CONFIG ?= jenkins-common-8w-lockableDB.cfg
 # Initialisation size for dynamically allocated HC event's waiter array
 # CFLAGS += -DHCEVT_WAITER_DYNAMIC_COUNT=4
 
-# Maximum number of characters handled by a single PRINTF
-# CFLAGS += -DPRINTF_MAX=1024
+# **** GUID-Provider Parameters ****
+
+# Impl-specific for counted-map and labeled-guid providers
+# - Controls how many bits in the GUID are used for PD location
+# CFLAGS += -DGUID_PROVIDER_LOCID_SIZE=7
+
+# **** EDTs parameters ****
 
 # Maximum number of blocks of 64 slots that an EDT
 # can have IFF it needs to acquire the same DB on
 # multiple slots
 # CFLAGS += -DOCR_MAX_MULTI_SLOT=1
+
+# **** Debugging parameters ****
+
+# Maximum number of characters handled by a single PRINTF
+# CFLAGS += -DPRINTF_MAX=1024
 
 # Enables naming of EDTs for easier debugging
 # CFLAGS += -DOCR_ENABLE_EDT_NAMING

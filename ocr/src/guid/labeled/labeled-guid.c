@@ -24,7 +24,11 @@
 // Guid is composed of : (1/0 LOCID KIND COUNTER)
 // The 1 at the top is if this is a "reserved" GUID (for checking purposes)
 #define GUID_BIT_SIZE 64
+#ifndef GUID_PROVIDER_LOCID_SIZE
 #define GUID_LOCID_SIZE 7 // Warning! 2^7 locId max, bump that up for more.
+#else
+#define GUID_LOCID_SIZE GUID_PROVIDER_LOCID_SIZE
+#endif
 #define GUID_KIND_SIZE 5 // Warning! check ocrGuidKind struct definition for correct size
 
 #define GUID_COUNTER_SIZE (GUID_BIT_SIZE-(GUID_KIND_SIZE+GUID_LOCID_SIZE+1))
