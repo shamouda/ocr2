@@ -355,6 +355,221 @@ A conformant implementation may limit the number of characters in the
 output string.
 \end{DoxyNote}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% GUID MANAGEMENT API
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{GUID management}
+\index{GUID management API}
+\label{sec:OCRGuidManagement}
+
+GUIDs are opaque values used to uniquely identify OCR objects. In
+previous versions of OCR, GUID values could be safely cast to 64-bit
+values. To preserve the runtime's freedom in encoding information into
+GUIDs, users can no longer rely on the ability to convert GUIDs to
+64-bit values and must instead use the provided functions to
+manipulate GUIDs.
+
+\subsection*{Functions}
+\begin{DoxyCompactItemize}
+\item
+  \hyperlink{type_bool}{bool} \hyperlink{func_ocrGuidIsNull}
+            {\code{ocrGuidIsNull}}(\hyperlink{type_ocrGuid_t}{ocr\-Guid\-\_\-t} guid)
+    \begin{DoxyCompactList}
+      \small\item \emph{Checks if the GUID provided is equivalent to NULL\_GUID.}
+    \end{DoxyCompactList}
+\item
+  \hyperlink{type_bool}{bool} \hyperlink{func_ocrGuidIsUninitialized}
+            {\code{ocrGuidIsUninitialized}}(\hyperlink{type_ocrGuid_t}{ocr\-Guid\-\_\-t} guid)
+    \begin{DoxyCompactList}
+      \small\item \emph{Checks if the GUID provided is equivalent to UNINITIALIZED\_GUID.}
+    \end{DoxyCompactList}
+\item
+  \hyperlink{type_bool}{bool} \hyperlink{func_ocrGuidIsError}
+            {\code{ocrGuidIsError}}(\hyperlink{type_ocrGuid_t}{ocr\-Guid\-\_\-t} guid)
+    \begin{DoxyCompactList}
+      \small\item \emph{Checks if the GUID provided is equivalent to ERROR\_GUID.}
+    \end{DoxyCompactList}
+\item
+  \hyperlink{type_bool}{bool} \hyperlink{func_ocrGuidIsEq}
+            {\code{ocrGuidIsEq}}(\hyperlink{type_ocrGuid_t}{ocr\-Guid\-\_\-t} guid1,
+    \hyperlink{type_ocrGuid_t}{ocr\-Guid\-\_\-t} guid2)
+    \begin{DoxyCompactList}
+      \small\item \emph{Checks if the two GUIDs provided are equivalent.}
+    \end{DoxyCompactList}
+\item
+  \hyperlink{type_bool}{bool} \hyperlink{func_ocrGuidIsLt}
+            {\code{ocrGuidIsLt}}(\hyperlink{type_ocrGuid_t}{ocr\-Guid\-\_\-t} guid1,
+    \hyperlink{type_ocrGuid_t}{ocr\-Guid\-\_\-t} guid2)
+    \begin{DoxyCompactList}
+      \small\item \emph{Checks if guid1 is less than guid2.}
+    \end{DoxyCompactList}
+\end{DoxyCompactItemize}
+
+%
+%  ocrGuidIsNull
+%
+\hypertarget{func_ocrGuidIsNull}{
+  \index{GUID management@{GUID management}!ocr\-Guid\-Is\-Null@{ocr\-Guid\-Is\-Null}}
+  \subsection[{ocr\-Guid\-Is\-Null}]{\setlength{\rightskip}{0pt plus 5cm}{\bf bool} ocr\-Guid\-Is\-Null(
+\begin{DoxyParamCaption}
+\item[{{\bf ocr\-Guid\-\_\-t}}]{guid }
+\end{DoxyParamCaption}
+)}}
+\label{func_ocrGuidIsNull}
+
+NULL\_GUID is a special value representing a NULL ocrGuid\_t. This
+returns true if \code{guid} is equivalent to NULL\_GUID.
+
+\begin{DoxyParams}[1]{Parameters}
+\mbox{\tt in}  & \code{guid} & GUID to be evaluated.\\
+\hline
+\end{DoxyParams}
+
+\returns
+A boolean:
+\begin{DoxyItemize}
+\item true: guid is equivalent to NULL\_GUID
+\item false: guid is not equivalent to NULL\_GUID
+\end{DoxyItemize}
+
+%
+%  ocrGuidIsUninitialized
+%
+\hypertarget{func_ocrGuidIsUninitialized}{
+  \index{GUID management@{GUID management}!ocr\-Guid\-Is\-Uninitialized@{ocr\-Guid\-Is\-Uninitialized}}
+  \subsection[{ocr\-Guid\-Is\-Uninitialized}]{\setlength{\rightskip}{0pt plus 5cm}{\bf bool} ocr\-Guid\-Is\-Uninitialized(
+\begin{DoxyParamCaption}
+\item[{{\bf ocr\-Guid\-\_\-t}}]{guid }
+\end{DoxyParamCaption}
+)}}
+\label{func_ocrGuidIsUninitialized}
+
+UNINITIALIZED\_GUID is a special value representing an uninitialized ocrGuid\_t.
+This function checks if the GUID provided is equivalent to UNINITIALIZED\_GUID.
+
+\begin{DoxyParams}[1]{Parameters}
+\mbox{\tt in}  & \code{guid} & GUID to be evaluated.\\
+\hline
+\end{DoxyParams}
+
+\returns
+A boolean:
+\begin{DoxyItemize}
+\item true: guid is equivalent to UNINITIALIZED\_GUID
+\item false: guid is not equivalent to UNINITIALIZED\_GUID
+\end{DoxyItemize}
+
+%
+%  ocrGuidIsError
+%
+\hypertarget{func_ocrGuidIsError}{
+  \index{GUID management@{GUID management}!ocr\-Guid\-Is\-Error@{ocr\-Guid\-Is\-Error}}
+  \subsection[{ocr\-Guid\-Is\-Error}]{\setlength{\rightskip}{0pt plus 5cm}{\bf bool} ocr\-Guid\-Is\-Error(
+\begin{DoxyParamCaption}
+\item[{{\bf ocr\-Guid\-\_\-t}}]{guid }
+\end{DoxyParamCaption}
+)}}
+\label{func_ocrGuidIsError}
+
+ERROR\_GUID is a special value representing a invalid ocrGuid\_t. This
+function checks if the GUID provided is equivalent to ERROR\_GUID.
+
+\begin{DoxyParams}[1]{Parameters}
+\mbox{\tt in}  & \code{guid} & GUID to be evaluated.\\
+\hline
+\end{DoxyParams}
+
+\returns
+A boolean:
+\begin{DoxyItemize}
+\item true: guid value is equivalent to ERROR\_GUID
+\item false: guid value is not equivalent to ERROR\_GUID
+\end{DoxyItemize}
+
+%
+%  ocrGuidIsEq
+%
+\hypertarget{func_ocrGuidIsEq}{
+  \index{GUID management@{GUID management}!ocr\-Guid\-Is\-Eq@{ocr\-Guid\-Is\-Eq}}
+  \subsection[{ocr\-Guid\-Is\-Eq}]{\setlength{\rightskip}{0pt plus 5cm}{\bf bool} ocr\-Guid\-Is\-Eq(
+\begin{DoxyParamCaption}
+\item[{{\bf ocr\-Guid\-\_\-t}}]{guid1, }
+\item[{{\bf ocr\-Guid\-\_\-t}}]{guid2  }
+\end{DoxyParamCaption}
+)}}
+\label{func_ocrGuidIsEq}
+
+This function checks if guid1 and guid2 are equivalent.
+
+\begin{DoxyParams}[1]{Parameters}
+\mbox{\tt in}  & \code{guid1} & GUID to be evaluated.\\
+\hline
+\mbox{\tt in}  & \code{guid2} & GUID to be evaluated.\\
+\hline
+\end{DoxyParams}
+
+\returns
+A boolean:
+\begin{DoxyItemize}
+\item true: guid1 and guid2 are equivalent
+\item false: guid1 and guid2 are not equivalent
+\end{DoxyItemize}
+
+%
+%  ocrGuidIsLt
+%
+\hypertarget{func_ocrGuidIsLt}{
+  \index{GUID management@{GUID management}!ocr\-Guid\-Is\-Lt@{ocr\-Guid\-Is\-Lt}}
+  \subsection[{ocr\-Guid\-Is\-Lt}]{\setlength{\rightskip}{0pt plus 5cm}{\bf bool} ocr\-Guid\-Is\-Lt(
+\begin{DoxyParamCaption}
+\item[{{\bf ocr\-Guid\-\_\-t}}]{guid1, }
+\item[{{\bf ocr\-Guid\-\_\-t}}]{guid2  }
+\end{DoxyParamCaption}
+)}}
+\label{func_ocrGuidIsLt}
+
+This function checks if guid1 is less than guid2.
+
+\begin{DoxyParams}[1]{Parameters}
+\mbox{\tt in}  & \code{guid1} & GUID to be evaluated.\\
+\hline
+\mbox{\tt in}  & \code{guid2} & GUID to be evaluated.\\
+\hline
+\end{DoxyParams}
+
+\returns
+A boolean:
+\begin{DoxyItemize}
+\item true: guid1 is less than guid2
+\item false: guid1 is greater than or equal to guid2
+\end{DoxyItemize}
+
+\subsection{Macros for printing GUIDs}
+It is often desirable in both applications and runtime to
+print the value of a GUID for debugging purposes. Under previous
+assumptions that GUIDs were \code{unsigned long} values, they were printed using
+the \code{"\%PRIx64"} placeholder. Since GUIDs are opaque, their size
+cannot be assumed and format specifiers are therefore provided to
+properly print GUIDs.
+
+\begin{itemize}
+\item \code{GUIDF}
+  \small \emph{Format placeholder representing a GUID.}
+\item \code{GUIDA(guid)}
+  \small \emph{Expands guid value into format arguments
+  corresponding to the GUIDF format placeholder.}
+\end{itemize}
+
+The following snippet shows how to print a GUID:
+\begin{ocrsnip}
+PRINTF("DB Guid "GUIDF" acquired by "GUIDF"\n", GUIDA(db.guid), GUIDA(edt.guid));
+\end{ocrsnip}
+
+Note that the \code{GUIDF} format placeholder macro may actually expand into
+multiple concrete format placeholders. Likewise, the \code{GUIDA} macro may
+expand its single GUID argument into multiple arguments for a format function's
+argument list, corresponding to the number of concrete placeholders included
+by the \code{GUIDF} macro.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Data Block Management
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Data block management}
@@ -1306,4 +1521,5 @@ same data block through multiple pre-slots, but with differing access modes, res
 undefined behavior. The user is always responsible for ensuring that each data block is
 explicitly released (via \hyperlink{func_ocrDbRelease}{\code{ocrDbRelease}}) at most once
 per EDT instance.
+
 % This is the end of ch2-ocrAPI.tex of the OCR specification.
