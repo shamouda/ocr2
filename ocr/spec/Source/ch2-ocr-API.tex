@@ -45,6 +45,8 @@ inside \code{ocr.h}:
 \item \code{\#define TRUE 1};
 \item \code{\#define false 0};
 \item \code{\#define FALSE 0};
+\item \code{\#define NULL\_HINT}: A NULL pointer to ocrHint\_t. This value cannot
+  be assumed to be equal to zero.
 \item \code{\#define NULL\_GUID}: A NULL ocrGuid\_t. This value cannot
   be assumed to be equal to zero. In other words, a programmer should
   explicitly test for equality to NULL\_GUID.
@@ -427,7 +429,7 @@ The following macros and enums are used with OCR data blocks.
   \hyperlink{type_u8}{u8} \hyperlink{func_ocrDbCreate}
             {\code{ocrDbCreate}}(\hyperlink{type_ocrGuid_t}{ocr\-Guid\-\_\-t} $\ast$db,
     void $\ast$$\ast$addr, \hyperlink{type_u64}{u64} len, \hyperlink{type_u16}{u16} flags,
-    \hyperlink{type_ocrGuid_t}{ocr\-Guid\-\_\-t} affinity,
+    \hyperlink{type_ocrHint_t}{ocr\-Hint\-\_\-t} $\ast$hint,
     \hyperlink{type_ocrInDbAllocator_t}{ocr\-In\-Db\-Allocator\-\_\-t} allocator)
     \begin{DoxyCompactList}
       \small\item \emph{Request the creation of a data block.}
@@ -457,7 +459,7 @@ The following macros and enums are used with OCR data blocks.
 \item[{void $\ast$$\ast$}]{addr, }
 \item[{{\bf u64}}]{len, }
 \item[{{\bf u16}}]{flags, }
-\item[{{\bf ocr\-Guid\-\_\-t}}]{affinity, }
+\item[{{\bf ocr\-Hint\-\_\-t} $\ast$}]{hint, }
 \item[{{\bf ocr\-In\-Db\-Allocator\-\_\-t}}]{allocator}
 \end{DoxyParamCaption}
 )}}
@@ -491,8 +493,8 @@ data block creation. The supported flags are:
   acquired by another EDT.
 \end{DoxyItemize}\\
 \hline
-\mbox{\tt in,out}  & \code{affinity} & Reserved for future use. This parameter
-should be NULL\_GUID \\
+\mbox{\tt in}  & \code{hint} & Reserved for future use. This parameter
+should be NULL\_HINT \\
 \hline
 \mbox{\tt in}  & \code{allocator} & A data block can be used as the
 backing memory for malloc/free-like operations. This parameter
@@ -972,7 +974,7 @@ The prototype of an EDT function is given by
     \hyperlink{type_ocrGuid_t}{ocr\-Guid\-\_\-t} template\-Guid,
     \hyperlink{type_u32}{u32} paramc, \hyperlink{type_u64}{u64} $\ast$paramv,
     \hyperlink{type_u32}{u32} depc, \hyperlink{type_ocrGuid_t}{ocr\-Guid\-\_\-t} $\ast$depv,
-    \hyperlink{type_u16}{u16} flags, \hyperlink{type_ocrGuid_t}{ocr\-Guid\-\_\-t} affinity,
+    \hyperlink{type_u16}{u16} flags, \hyperlink{type_ocrHint_t}{ocr\-Hint\-\_\-t} $\ast$hint,
     \hyperlink{type_ocrGuid_t}{ocr\-Guid\-\_\-t} $\ast$output\-Event)
     \begin{DoxyCompactList}
       \small\item \emph{Request the creation of an EDT instance using
@@ -1087,7 +1089,7 @@ however, be used to create new EDTs once it has been destroyed.
 \item[{{\bf u32}}]{depc, }
 \item[{{\bf ocr\-Guid\-\_\-t} $\ast$}]{depv, }
 \item[{{\bf u16}}]{flags, }
-\item[{{\bf ocr\-Guid\-\_\-t}}]{affinity, }
+\item[{{\bf ocr\-Hint\-\_\-t} $\ast$}]{hint, }
 \item[{{\bf ocr\-Guid\-\_\-t} $\ast$}]{output\-Event}
 \end{DoxyParamCaption}
 )}}
@@ -1130,8 +1132,8 @@ The supported flags are:
 \item EDT\_PROP\_FINISH: Create a \emph{finish} EDT
 \end{DoxyItemize}\\
 \hline
-\mbox{\tt in}  & \code{affinity} & Unsupported and reserved for future use. Set
-to NULL\_GUID.\\
+\mbox{\tt in}  & \code{hint} & Reserved for future use. Set
+to NULL\_HINT.\\
 \hline
 \mbox{\tt in,out}  & \code{outputEvent} & If non-NULL on input, on successful creation,
 contains the GUID of the event associated with the post-slot of the EDT. For a

@@ -83,15 +83,15 @@ ocrGuid_t fftComputeEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrGuid_t edtGuid, edtGuid2, twiddleEdtGuid, finishEventGuid, finishEventGuid2;
 
     ocrEdtCreate(&edtGuid, computeGuid, EDT_PARAM_DEF, childParamv,
-         EDT_PARAM_DEF, NULL_GUID, EDT_PROP_FINISH, NULL_GUID,
+         EDT_PARAM_DEF, NULL_GUID, EDT_PROP_FINISH, NULL_HINT,
          &finishEventGuid);
     ocrEdtCreate(&edtGuid2, computeGuid, EDT_PARAM_DEF, childParamv2,
-         EDT_PARAM_DEF, NULL_GUID, EDT_PROP_FINISH, NULL_GUID,
+         EDT_PARAM_DEF, NULL_GUID, EDT_PROP_FINISH, NULL_HINT,
          &finishEventGuid2);
 
     ocrGuid_t twiddleDependencies[3] = { dataGuid, finishEventGuid, finishEventGuid2 };
     ocrEdtCreate(&twiddleEdtGuid, twiddleGuid, EDT_PARAM_DEF, paramv, 3,
-         twiddleDependencies, EDT_PROP_FINISH, NULL_GUID, NULL);
+         twiddleDependencies, EDT_PROP_FINISH, NULL_HINT, NULL);
 
     ocrAddDependence(dataGuid, edtGuid, 0, DB_MODE_RW);
     ocrAddDependence(dataGuid, edtGuid2, 0, DB_MODE_RW);
@@ -136,7 +136,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
   double *x;
 
   ocrGuid_t dataGuid;
-  ocrDbCreate(&dataGuid, (void **) &x, sizeof(double) * N * 3, DB_PROP_NONE, NULL_GUID, NO_ALLOC);
+  ocrDbCreate(&dataGuid, (void **) &x, sizeof(double) * N * 3, DB_PROP_NONE, NULL_HINT, NO_ALLOC);
 
   // Cook up some arbitrary data
   for(i=0;i<N;i++) {
@@ -149,12 +149,12 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
 
   // Launch compute EDT
   ocrEdtCreate(&edtGuid, computeTempGuid, EDT_PARAM_DEF, edtParamv,
-               EDT_PARAM_DEF, NULL_GUID, EDT_PROP_FINISH, NULL_GUID,
+               EDT_PARAM_DEF, NULL_GUID, EDT_PROP_FINISH, NULL_HINT,
                &eventGuid);
 
   // Launch finish EDT
   ocrEdtCreate(&endGuid, endTempGuid, EDT_PARAM_DEF, &dataGuid,
-               EDT_PARAM_DEF, NULL_GUID, EDT_PROP_FINISH, NULL_GUID,
+               EDT_PARAM_DEF, NULL_GUID, EDT_PROP_FINISH, NULL_HINT,
                NULL);
 
   ocrAddDependence(dataGuid, edtGuid, 0, DB_MODE_RW);

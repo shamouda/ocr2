@@ -68,7 +68,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     u32 nbElem = NB_ELEM_DB;
     // Create a DataBlock (DB). Note that the currently executing EDT
     // acquires the DB in Read-Write (RW) mode
-    ocrDbCreate(&dbGuid, &dbPtr, sizeof(u64) * NB_ELEM_DB, 0, NULL_GUID, NO_ALLOC);
+    ocrDbCreate(&dbGuid, &dbPtr, sizeof(u64) * NB_ELEM_DB, 0, NULL_HINT, NO_ALLOC);
     u64 i = 0;
     int * data = (int *) dbPtr;
     while (i < nbElem) {
@@ -87,7 +87,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     // Create the shutdown EDT indicating this instance of the shutdown EDT template
     // has the same number of parameters and dependences the template declares.
     ocrEdtCreate(&shutdownGuid, shutdownEdtTemplateGuid, 0, NULL, EDT_PARAM_DEF, NULL,
-                 EDT_PROP_NONE, NULL_GUID, NULL);
+                 EDT_PROP_NONE, NULL_HINT, NULL);
     // EDT is created, but it does not have its four dependences set up yet.
     // Set the third dependence of EDT shutdown to be the DB
     ocrAddDependence(dbGuid, shutdownGuid, 3, DB_MODE_CONST);
@@ -117,7 +117,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     // This is the main reason why we have a start event. It allows to create all the
     // EDT before-hand and set up all the dependences before any scheduling occurs.
     ocrEdtCreate(&writer1Guid, writeEdtTemplateGuid, EDT_PARAM_DEF, writerParamv1, EDT_PARAM_DEF, NULL,
-                 EDT_PROP_NONE, NULL_GUID, &oeWriter1Guid);
+                 EDT_PROP_NONE, NULL_HINT, &oeWriter1Guid);
     // Set up the sink EDT dependence slot 0 (2 dependences added so far)
     ocrAddDependence(oeWriter1Guid, shutdownGuid, 0, false);
     // EDT1 depends on the DB in RW mode on its slot '0'
@@ -130,7 +130,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrGuid_t writer2Guid;
     u64 writerParamv2[3] = {NB_ELEM_DB/2, NB_ELEM_DB, 2};
     ocrEdtCreate(&writer2Guid, writeEdtTemplateGuid, EDT_PARAM_DEF, writerParamv2, EDT_PARAM_DEF, NULL,
-                 EDT_PROP_NONE, NULL_GUID, &oeWriter2Guid);
+                 EDT_PROP_NONE, NULL_HINT, &oeWriter2Guid);
     // Set up the sink EDT dependence slot 1 (3 dependences added so far)
     ocrAddDependence(oeWriter2Guid, shutdownGuid, 1, false);
     ocrAddDependence(dbGuid, writer2Guid, 0, DB_MODE_RW);
@@ -141,7 +141,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrGuid_t writer3Guid;
     u64 writerParamv3[3] = {NB_ELEM_DB/4, (NB_ELEM_DB/4)*3, 3};
     ocrEdtCreate(&writer3Guid, writeEdtTemplateGuid, EDT_PARAM_DEF, writerParamv3, EDT_PARAM_DEF, NULL,
-                 EDT_PROP_NONE, NULL_GUID, &oeWriter3Guid);
+                 EDT_PROP_NONE, NULL_HINT, &oeWriter3Guid);
     // Set up the sink EDT dependence slot 2.
     // At this point the shutdown EDT has all its dependences
     // and will be eligible for scheduling when they are satisfied

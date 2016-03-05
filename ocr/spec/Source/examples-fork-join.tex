@@ -20,7 +20,7 @@ This example illustrates the creation of a fork-join pattern in OCR.
 ocrGuid_t fun1(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     int* k;
     ocrGuid_t db_guid;
-    ocrDbCreate(&db_guid,(void **) &k, sizeof(int), 0, NULL_GUID, NO_ALLOC); (@ \label{line:FJ_db1}@)
+    ocrDbCreate(&db_guid,(void **) &k, sizeof(int), 0, NULL_HINT, NO_ALLOC); (@ \label{line:FJ_db1}@)
     k[0]=1; (@ \label{line:FJ_k1}@)
     PRINTF("Hello from fun1, sending k = %lu\n",*k);
     return db_guid; (@ \label{line:FJ_retDB1}@)
@@ -29,7 +29,7 @@ ocrGuid_t fun1(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
 ocrGuid_t fun2(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     int* k;
     ocrGuid_t db_guid;
-    ocrDbCreate(&db_guid,(void **) &k, sizeof(int), 0, NULL_GUID, NO_ALLOC); (@ \label{line:FJ_db2}@)
+    ocrDbCreate(&db_guid,(void **) &k, sizeof(int), 0, NULL_HINT, NO_ALLOC); (@ \label{line:FJ_db2}@)
     k[0]=2; (@ \label{line:FJ_k2}@)
     PRINTF("Hello from fun2, sending k = %lu\n",*k);
     return db_guid; (@ \label{line:FJ_retDB2}@)
@@ -57,9 +57,9 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) { (@ \l
     ocrEdtTemplateCreate(&edt3_template, shutdownEdt, 0, 2);  (@ \label{line:FJ_edtTemplt3} @)
 
     //Create the EDTs
-    ocrEdtCreate(&edt1, edt1_template, EDT_PARAM_DEF, NULL, EDT_PARAM_DEF, NULL, EDT_PROP_NONE, NULL_GUID, &outputEvent1); (@ \label{line:FJ_edt1} @)
-    ocrEdtCreate(&edt2, edt2_template, EDT_PARAM_DEF, NULL, EDT_PARAM_DEF, NULL, EDT_PROP_NONE, NULL_GUID, &outputEvent2); (@ \label{line:FJ_edt2} @)
-    ocrEdtCreate(&edt3, edt3_template, EDT_PARAM_DEF, NULL, 2, NULL, EDT_PROP_NONE, NULL_GUID, NULL); (@ \label{line:FJ_edt3} @)
+    ocrEdtCreate(&edt1, edt1_template, EDT_PARAM_DEF, NULL, EDT_PARAM_DEF, NULL, EDT_PROP_NONE, NULL_HINT, &outputEvent1); (@ \label{line:FJ_edt1} @)
+    ocrEdtCreate(&edt2, edt2_template, EDT_PARAM_DEF, NULL, EDT_PARAM_DEF, NULL, EDT_PROP_NONE, NULL_HINT, &outputEvent2); (@ \label{line:FJ_edt2} @)
+    ocrEdtCreate(&edt3, edt3_template, EDT_PARAM_DEF, NULL, 2, NULL, EDT_PROP_NONE, NULL_HINT, NULL); (@ \label{line:FJ_edt3} @)
 
     //Setup dependences for the shutdown EDT
     ocrAddDependence(outputEvent1, edt3, 0, DB_MODE_CONST); (@ \label{line:FJ_edt3Dep1} @)

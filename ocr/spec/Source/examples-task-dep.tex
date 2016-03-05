@@ -64,14 +64,14 @@ ocrGuid_t stage1a(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrGuid_t dbGuid = NULL_GUID, stage2aTemplateGuid = NULL_GUID,
         stage2aEdtGuid = NULL_GUID;
     u64* dbPtr = NULL;
-    ocrDbCreate(&dbGuid, (void**)&dbPtr, sizeof(u64), 0, NULL_GUID, NO_ALLOC);
+    ocrDbCreate(&dbGuid, (void**)&dbPtr, sizeof(u64), 0, NULL_HINT, NO_ALLOC);
     *dbPtr = 1ULL;
 
     // Create an EDT and pass it the data-block we just created
     // The EDT is immediately ready to execute
     ocrEdtTemplateCreate(&stage2aTemplateGuid, stage2a, 1, 1);
     ocrEdtCreate(&stage2aEdtGuid, stage2aTemplateGuid, EDT_PARAM_DEF,(@ \label{line:expDep} @)
-                 paramv, EDT_PARAM_DEF, &dbGuid, EDT_PROP_NONE, NULL_GUID, NULL);
+                 paramv, EDT_PARAM_DEF, &dbGuid, EDT_PROP_NONE, NULL_HINT, NULL);
 
     // Pass the same data-block created to stage2b (links setup in mainEdt)
     return dbGuid; (@ \label{line:EdtGuidReturn} @)
@@ -84,7 +84,7 @@ ocrGuid_t stage1b(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     // We create a data-block for one u64 and put data in it
     ocrGuid_t dbGuid = NULL_GUID;
     u64* dbPtr = NULL;
-    ocrDbCreate(&dbGuid, (void**)&dbPtr, sizeof(u64), 0, NULL_GUID, NO_ALLOC);
+    ocrDbCreate(&dbGuid, (void**)&dbPtr, sizeof(u64), 0, NULL_HINT, NO_ALLOC);
     *dbPtr = 2ULL;
 
     // Pass the created data-block created to stage2b (links setup in mainEdt)
@@ -135,7 +135,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
 
     ocrEdtTemplateCreate(&shutdownEdtTemplateGuid, shutdownEdt, 0, 2);
     ocrEdtCreate(&shutdownEdtGuid, shutdownEdtTemplateGuid, 0, NULL, EDT_PARAM_DEF, NULL,
-                 EDT_PROP_NONE, NULL_GUID, NULL);
+                 EDT_PROP_NONE, NULL_HINT, NULL);
 
     // Create the event to satisfy shutdownEdt by stage 2a
     // (stage 2a is created by 1a)
@@ -146,15 +146,15 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     // setting up the event links and running the EDT
     ocrEdtTemplateCreate(&stage1aTemplateGuid, stage1a, 1, 1);
     ocrEdtCreate(&stage1aEdtGuid, stage1aTemplateGuid, EDT_PARAM_DEF, &evtGuid,
-                 EDT_PARAM_DEF, NULL, EDT_PROP_NONE, NULL_GUID, &stage1aOut);
+                 EDT_PARAM_DEF, NULL, EDT_PROP_NONE, NULL_HINT, &stage1aOut);
 
     ocrEdtTemplateCreate(&stage1bTemplateGuid, stage1b, 0, 1);
     ocrEdtCreate(&stage1bEdtGuid, stage1bTemplateGuid, EDT_PARAM_DEF, NULL,
-                 EDT_PARAM_DEF, NULL, EDT_PROP_NONE, NULL_GUID, &stage1bOut);
+                 EDT_PARAM_DEF, NULL, EDT_PROP_NONE, NULL_HINT, &stage1bOut);
 
     ocrEdtTemplateCreate(&stage2bTemplateGuid, stage2b, 0, 2);
     ocrEdtCreate(&stage2bEdtGuid, stage2bTemplateGuid, EDT_PARAM_DEF, NULL,
-                 EDT_PARAM_DEF, NULL, EDT_PROP_NONE, NULL_GUID, &stage2bOut);
+                 EDT_PARAM_DEF, NULL, EDT_PROP_NONE, NULL_HINT, &stage2bOut);
 
     // Set up all the links
     // 1a -> 2b
