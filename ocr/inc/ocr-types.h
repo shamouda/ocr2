@@ -60,9 +60,10 @@ typedef u8 bool;
 typedef intptr_t ocrGuid_t; /**< GUID type */
 
 /**
- * @brief A NULL ocrGuid_t
+ * @brief A NULL ocrGuid_t and ocrHint_t
  */
 #define NULL_GUID ((ocrGuid_t)0x0)
+#define NULL_HINT ((ocrHint_t *)0x0)
 
 /**
  * @brief An Unitialized GUID (ie: never set)

@@ -15,6 +15,7 @@
 extern "C" {
 #endif
 #include "ocr-types.h"
+#include "ocr-version.h"
 
 /**
    @defgroup OCREvents Event Management for OCR
@@ -262,7 +263,13 @@ u8 ocrEdtTemplateDestroy(ocrGuid_t guid);
  **/
 u8 ocrEdtCreate(ocrGuid_t * guid, ocrGuid_t templateGuid,
                 u32 paramc, u64* paramv, u32 depc, ocrGuid_t *depv,
-                u16 properties, ocrGuid_t affinity, ocrGuid_t *outputEvent);
+                u16 properties,
+#if OCR_MAJOR_VERSION >= 1 && OCR_MINOR_VERSION >= 1
+                ocrHint_t *hint,
+#else
+                ocrGuid_t affinity,
+#endif
+                ocrGuid_t *outputEvent);
 
 /**
  * @brief Destroy an EDT

@@ -197,17 +197,28 @@ u8 ocrEdtTemplateDestroy(ocrGuid_t guid) {
 
 u8 ocrEdtCreate(ocrGuid_t* edtGuidPtr, ocrGuid_t templateGuid,
                 u32 paramc, u64* paramv, u32 depc, ocrGuid_t *depv,
-                u16 properties, ocrGuid_t affinity, ocrGuid_t *outputEvent) {
+                u16 properties,
+#if OCR_MAJOR_VERSION >= 1 && OCR_MINOR_VERSION >= 1
+                ocrHint_t *hint,
+#else
+                ocrGuid_t affinity,
+#endif
+                ocrGuid_t *outputEvent) {
     ocrGuid_t edtGuid = (edtGuidPtr != NULL) ? *edtGuidPtr : NULL_GUID;
     START_PROFILE(api_EdtCreate);
 
     DPRINTF(DEBUG_LVL_INFO,
             "ENTER ocrEdtCreate(*guid=0x%lx, template=0x%lx, paramc=%d, paramv=0x%lx"
+#if OCR_MAJOR_VERSION >= 1 && OCR_MINOR_VERSION >= 1
+            ", depc=%d, depv=0x%lx, prop=%u, hint=0x%lx, outEvt=0x%lx)\n",
+            edtGuid, templateGuid, (s32)paramc, paramv, (s32)depc, depv,
+            (u32)properties, hint, outputEvent,
+#else
             ", depc=%d, depv=0x%lx, prop=%u, aff=0x%lx, outEvt=0x%lx)\n",
             edtGuid, templateGuid, (s32)paramc, paramv, (s32)depc, depv,
             (u32)properties, affinity, outputEvent,
+#endif
             true, OCR_TRACE_TYPE_EDT, OCR_ACTION_CREATE);
-
     PD_MSG_STACK(msg);
     ocrPolicyDomain_t * pd = NULL;
     u8 returnCode = 0;
@@ -271,7 +282,15 @@ u8 ocrEdtCreate(ocrGuid_t* edtGuidPtr, ocrGuid_t templateGuid,
     PD_MSG_FIELD_IO(depc) = depc;
     PD_MSG_FIELD_I(templateGuid.guid) = templateGuid;
     PD_MSG_FIELD_I(templateGuid.metaDataPtr) = NULL;
+#if OCR_MAJOR_VERSION >= 1 && OCR_MINOR_VERSION >= 1
+    if (hint != NULL_HINT && hint->type == OCR_HINT_EDT_T && (hint->propMask & OCR_HINT_BIT_MASK(hint, OCR_HINT_EDT_AFFINITY))) {
+        PD_MSG_FIELD_I(affinity.guid) = OCR_HINT_FIELD(hint, OCR_HINT_EDT_AFFINITY);
+    } else {
+        PD_MSG_FIELD_I(affinity.guid) = NULL_GUID;
+    }
+#else
     PD_MSG_FIELD_I(affinity.guid) = affinity;
+#endif
     PD_MSG_FIELD_I(affinity.metaDataPtr) = NULL;
     PD_MSG_FIELD_I(parentLatch.guid) = curEdt ? ((curEdt->finishLatch != NULL_GUID) ? curEdt->finishLatch : curEdt->parentLatch) : NULL_GUID;
     PD_MSG_FIELD_I(parentLatch.metaDataPtr) = NULL;

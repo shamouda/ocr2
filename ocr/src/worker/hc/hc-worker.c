@@ -20,6 +20,7 @@
 
 #include "experimental/ocr-placer.h"
 #include "extensions/ocr-affinity.h"
+#include "extensions/ocr-hints.h"
 
 #ifdef OCR_ENABLE_STATISTICS
 #include "ocr-statistics.h"
@@ -119,8 +120,16 @@ static void workerLoop(ocrWorker_t * worker) {
         packedUserArgv = (void *) (((u64)packedUserArgv) + sizeof(u64)); // skip first totalLength argument
         ocrGuid_t dbGuid;
         void* dbPtr;
+#if OCR_MAJOR_VERSION >= 1 && OCR_MINOR_VERSION >= 1
+        ocrHint_t dbHint;
+        ocrHintInit( &dbHint, OCR_HINT_DB_T );
+        ocrSetHintValue( & dbHint, OCR_HINT_DB_AFFINITY, affinityMasterPD );
+        ocrDbCreate(&dbGuid, &dbPtr, totalLength,
+                    DB_PROP_IGNORE_WARN, &dbHint, NO_ALLOC);
+#else
         ocrDbCreate(&dbGuid, &dbPtr, totalLength,
                     DB_PROP_IGNORE_WARN, affinityMasterPD, NO_ALLOC);
+#endif
         // copy packed args to DB
         hal_memCopy(dbPtr, packedUserArgv, totalLength, 0);
         PD_MSG_STACK(msg);
@@ -142,9 +151,18 @@ static void workerLoop(ocrWorker_t * worker) {
         // Prepare the mainEdt for scheduling
         ocrGuid_t edtTemplateGuid = NULL_GUID, edtGuid = NULL_GUID;
         ocrEdtTemplateCreate(&edtTemplateGuid, mainEdt, 0, 1);
+#if OCR_MAJOR_VERSION >= 1 && OCR_MINOR_VERSION >= 1
+        ocrHint_t edtHint;
+        ocrHintInit( &edtHint, OCR_HINT_EDT_T );
+        ocrSetHintValue( & edtHint, OCR_HINT_EDT_AFFINITY, affinityMasterPD );
+        ocrEdtCreate(&edtGuid, edtTemplateGuid, EDT_PARAM_DEF, /* paramv = */ NULL,
+                     /* depc = */ EDT_PARAM_DEF, /* depv = */ &dbGuid,
+                     EDT_PROP_NONE, &edtHint, NULL);
+#else
         ocrEdtCreate(&edtGuid, edtTemplateGuid, EDT_PARAM_DEF, /* paramv = */ NULL,
                      /* depc = */ EDT_PARAM_DEF, /* depv = */ &dbGuid,
                      EDT_PROP_NONE, affinityMasterPD, NULL);
+#endif
         // Once mainEdt is created, its template is no longer needed
         ocrEdtTemplateDestroy(edtTemplateGuid);
     }

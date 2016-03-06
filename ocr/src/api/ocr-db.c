@@ -26,11 +26,21 @@
 #define DEBUG_TYPE API
 
 u8 ocrDbCreate(ocrGuid_t *db, void** addr, u64 len, u16 flags,
-               ocrGuid_t affinity, ocrInDbAllocator_t allocator) {
+#if OCR_MAJOR_VERSION >= 1 && OCR_MINOR_VERSION >= 1
+               ocrHint_t *hint,
+#else
+               ocrGuid_t affinity,
+#endif
+               ocrInDbAllocator_t allocator) {
 
     START_PROFILE(api_DbCreate);
     DPRINTF(DEBUG_LVL_INFO, "ENTER ocrDbCreate(*guid=0x%lx, len=%lu, flags=%u"
-            ", aff=0x%lx, alloc=%u)\n", *db, len, (u32)flags, affinity, (u32)allocator);
+#if OCR_MAJOR_VERSION >= 1 && OCR_MINOR_VERSION >= 1
+            ", hint=0x%lx, alloc=%u)\n", *db, len, (u32)flags, hint,
+#else
+            ", aff=0x%lx, alloc=%u)\n", *db, len, (u32)flags, affinity,
+#endif
+            (u32)allocator);
     PD_MSG_STACK(msg);
     ocrPolicyDomain_t *policy = NULL;
     ocrTask_t *task = NULL;
@@ -46,7 +56,15 @@ u8 ocrDbCreate(ocrGuid_t *db, void** addr, u64 len, u16 flags,
     PD_MSG_FIELD_IO(size) = len;
     PD_MSG_FIELD_I(edt.guid) = task?task->guid:NULL_GUID; // Can happen when non EDT creates the DB
     PD_MSG_FIELD_I(edt.metaDataPtr) = task;
+#if OCR_MAJOR_VERSION >= 1 && OCR_MINOR_VERSION >= 1
+    if (hint != NULL_HINT && hint->type == OCR_HINT_DB_T && (hint->propMask & OCR_HINT_BIT_MASK(hint, OCR_HINT_DB_AFFINITY))) {
+        PD_MSG_FIELD_I(affinity.guid) = OCR_HINT_FIELD(hint, OCR_HINT_DB_AFFINITY);
+    } else {
+        PD_MSG_FIELD_I(affinity.guid) = NULL_GUID;
+    }
+#else
     PD_MSG_FIELD_I(affinity.guid) = affinity;
+#endif
     PD_MSG_FIELD_I(affinity.metaDataPtr) = NULL;
     PD_MSG_FIELD_I(dbType) = USER_DBTYPE;
     PD_MSG_FIELD_I(allocator) = allocator;
