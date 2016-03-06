@@ -1326,7 +1326,7 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             if (msg->srcLocation != self->myLocation) {
                 ocrHint_t hintVar;
                 RESULT_ASSERT(ocrHintInit(&hintVar, OCR_HINT_DB_T), ==, 0);
-                RESULT_ASSERT(ocrSetHintValue(&hintVar, OCR_HINT_DB_MEM_AFFINITY, (u64)(msg->srcLocation)), ==, 0);
+                RESULT_ASSERT(ocrSetHintValue(&hintVar, OCR_HINT_DB_AFFINITY, (u64)(msg->srcLocation)), ==, 0);
                 RESULT_ASSERT(ocrSetHint(db->guid, &hintVar), ==, 0);
             }
 

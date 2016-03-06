@@ -319,7 +319,7 @@ typedef enum {
 
     //DB Hint Properties                    (OCR_HINT_DB_T)
     OCR_HINT_DB_PROP_START,                 /* This is NOT a hint. Its use is reserved for the runtime */
-    OCR_HINT_DB_MEM_AFFINITY,               /* [u64] : DB affinity to a mem level */
+    OCR_HINT_DB_AFFINITY,               /* [u64] : DB affinity to a mem level */
     OCR_HINT_DB_PROP_END,                   /* This is NOT a hint. Its use is reserved for the runtime */
 
     //EVT Hint Properties                   (OCR_HINT_EVT_T)

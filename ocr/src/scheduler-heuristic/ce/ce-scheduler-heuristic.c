@@ -355,7 +355,7 @@ static u8 ceSchedulerHeuristicNotifyEdtReadyInvoke(ocrSchedulerHeuristic_t *self
         ocrHint_t dbHint;
         ocrHintInit(&dbHint, OCR_HINT_DB_T);
         RESULT_ASSERT(ocrGetHint(dbGuid, &dbHint), ==, 0);
-        if (ocrGetHintValue(&dbHint, OCR_HINT_DB_MEM_AFFINITY, &dbMemAffinity) == 0) {
+        if (ocrGetHintValue(&dbHint, OCR_HINT_DB_AFFINITY, &dbMemAffinity) == 0) {
             ocrLocation_t myLoc = pd->myLocation;
             ocrLocation_t dbLoc = dbMemAffinity;
             ocrLocation_t affinityLoc = dbLoc;

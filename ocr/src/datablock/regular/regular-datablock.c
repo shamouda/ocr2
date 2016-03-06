@@ -36,7 +36,7 @@
 
 u64 ocrHintPropDbRegular[] = {
 #ifdef ENABLE_HINTS
-    OCR_HINT_DB_MEM_AFFINITY
+    OCR_HINT_DB_AFFINITY
 #endif
 };
 
