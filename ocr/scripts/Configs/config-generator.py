@@ -30,7 +30,7 @@ parser.add_argument('--alloctype', dest='alloctype', default='mallocproxy', choi
                    help='type of allocator to use (default: mallocproxy)')
 parser.add_argument('--dbtype', dest='dbtype', default='Lockable', choices=['Lockable', 'Regular'],
                    help='type of datablocks to use (default: Lockable)')
-parser.add_argument('--scheduler', dest='scheduler', default='HC', choices=['HC', 'PRIORITY', 'PLACEMENT_AFFINITY', 'LEGACY', 'ST'],
+parser.add_argument('--scheduler', dest='scheduler', default='HC', choices=['HC', 'PRIORITY', 'PLACEMENT_AFFINITY', 'LEGACY', 'ST', 'STATIC'],
                    help='scheduler heuristic (default: HC)')
 parser.add_argument('--output', dest='output', default='default.cfg',
                    help='config output filename (default: default.cfg)')
@@ -266,7 +266,7 @@ def GenerateComp(output, pdtype, threads, binding, sysworker, schedtype):
         output.write("\tname\t=\t%s\n" % ("NULL"))
         output.write("[SchedulerObjectType1]\n")
         output.write("\tname\t=\t%s\n" % ("WST"))
-        if scheduler == 'HC' or scheduler == 'PLACEMENT_AFFINITY':
+        if scheduler == 'HC' or scheduler == 'PLACEMENT_AFFINITY' or scheduler == 'STATIC':
             output.write("\tkind\t=\t%s\n" % ("root"))
             rootObj = 'WST'
         output.write("[SchedulerObjectType2]\n")
@@ -294,6 +294,8 @@ def GenerateComp(output, pdtype, threads, binding, sysworker, schedtype):
         output.write("[SchedulerObjectInst0]\n")
         output.write("\tid\t\t=\t0\n")
         output.write("\ttype\t=\t%s\n" % (rootObj))
+        if scheduler == 'STATIC':
+            output.write("\tconfig\t=\t%s\n" % ("STATIC"))
         output.write("\n#======================================================\n")
         if (pdtype == 'HCDist'):
             output.write("[SchedulerHeuristicType0]\n\tname\t=\t%s\n" % ("NULL"))
@@ -301,6 +303,7 @@ def GenerateComp(output, pdtype, threads, binding, sysworker, schedtype):
             output.write("[SchedulerHeuristicType2]\n\tname\t=\t%s\n" % ("ST"))
             output.write("[SchedulerHeuristicType3]\n\tname\t=\t%s\n" % ("HC_COMM_DELEGATE"))
             output.write("[SchedulerHeuristicType4]\n\tname\t=\t%s\n" % ("PLACEMENT_AFFINITY"))
+            output.write("[SchedulerHeuristicType5]\n\tname\t=\t%s\n" % ("STATIC"))
             if scheduler == 'PLACEMENT_AFFINITY':
                 heuristics = ["HC", "PLACEMENT_AFFINITY", "HC_COMM_DELEGATE"]
                 for i in range(0, 3):
@@ -313,6 +316,12 @@ def GenerateComp(output, pdtype, threads, binding, sysworker, schedtype):
                     output.write("[SchedulerHeuristicInst%d]\n" % i)
                     output.write("\tid\t\t=\t%d\n" % i)
                     output.write("\ttype\t=\t%s\n" % (heuristics[i]))
+            elif scheduler == 'STATIC':
+                heuristics = ["STATIC", "HC_COMM_DELEGATE"]
+                for i in range(0, 2):
+                    output.write("[SchedulerHeuristicInst%d]\n" % i)
+                    output.write("\tid\t\t=\t%d\n" % i)
+                    output.write("\ttype\t=\t%s\n" % (heuristics[i]))
             else:
                     output.write("[SchedulerHeuristicInst0]\n")
                     output.write("\tid\t\t=\t0\n")
@@ -321,6 +330,7 @@ def GenerateComp(output, pdtype, threads, binding, sysworker, schedtype):
             output.write("[SchedulerHeuristicType0]\n\tname\t=\t%s\n" % ("NULL"))
             output.write("[SchedulerHeuristicType1]\n\tname\t=\t%s\n" % ("HC"))
             output.write("[SchedulerHeuristicType2]\n\tname\t=\t%s\n" % ("ST"))
+            output.write("[SchedulerHeuristicType3]\n\tname\t=\t%s\n" % ("STATIC"))
             output.write("[SchedulerHeuristicInst0]\n")
             output.write("\tid\t\t=\t0\n")
             output.write("\ttype\t=\t%s\n" % (scheduler))
@@ -335,7 +345,7 @@ def GenerateComp(output, pdtype, threads, binding, sysworker, schedtype):
         if (scheduler == 'PLACEMENT_AFFINITY'):
             output.write("\tconfig\t=\tcomp0:plc1:comm2\n")
             output.write("\tschedulerHeuristic\t=\t0-2\n")
-        elif (scheduler == 'ST'):
+        elif (scheduler == 'ST') or (scheduler == 'STATIC'):
             output.write("\tconfig\t=\tcomp0:plc0:comm1\n")
             output.write("\tschedulerHeuristic\t=\t0-1\n")
         else:

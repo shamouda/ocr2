@@ -338,6 +338,7 @@ typedef enum {
     OCR_HINT_EDT_PRIORITY,                  /* [u64] : Global priority number of EDT. Higher value is greater priority. */
     OCR_HINT_EDT_SLOT_MAX_ACCESS,           /* [u64] : EDT slot number that contains the DB which is accessed most by the EDT. */
     OCR_HINT_EDT_AFFINITY,                  /* [u64] : Affinitizes an EDT to a guid */
+    OCR_HINT_EDT_DISPERSE,                  /* [xxx] : Tells scheduler to schedule EDT away from current location */
     OCR_HINT_EDT_SPACE,                     /* [u64] : Used internally by the runtime for spatial locality of EDTs */
     OCR_HINT_EDT_TIME,                      /* [u64] : Used internally by the runtime for temporal locality of EDTs */
     OCR_HINT_EDT_PROP_END,                  /* This is NOT a hint. Its use is reserved for the runtime */

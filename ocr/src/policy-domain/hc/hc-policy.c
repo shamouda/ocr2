@@ -837,7 +837,7 @@ static u8 hcMemUnAlloc(ocrPolicyDomain_t *self, ocrFatGuid_t* allocator,
  */
 static u8 createEdtHelper(ocrPolicyDomain_t *self, ocrFatGuid_t *guid,
                       ocrFatGuid_t  edtTemplate, u32 *paramc, u64* paramv,
-                      u32 *depc, u32 properties, ocrFatGuid_t affinity,
+                      u32 *depc, u32 properties, ocrHint_t *hint,
                       ocrFatGuid_t * outputEvent, ocrTask_t * currentEdt,
                       ocrFatGuid_t parentLatch, ocrWorkType_t workType) {
     ocrTaskTemplate_t *taskTemplate = (ocrTaskTemplate_t*)edtTemplate.metaDataPtr;
@@ -888,7 +888,7 @@ static u8 createEdtHelper(ocrPolicyDomain_t *self, ocrFatGuid_t *guid,
 
     u8 returnCode = self->taskFactories[0]->instantiate(
                            self->taskFactories[0], guid, edtTemplate, *paramc, paramv,
-                           *depc, properties, affinity, outputEvent, currentEdt,
+                           *depc, properties, hint, outputEvent, currentEdt,
                            parentLatch, (ocrParamList_t*)(&taskparams));
     if(returnCode) {
         DPRINTF(DEBUG_LVL_WARN, "unable to create EDT, instantiate returnCode is %x\n", returnCode);
@@ -1226,20 +1226,6 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         if(PD_MSG_FIELD_I(templateGuid.metaDataPtr) == NULL)
             DPRINTF(DEBUG_LVL_WARN, "Invalid template GUID "GUIDSx"\n", GUIDFS(PD_MSG_FIELD_I(templateGuid.guid)));
         ASSERT(PD_MSG_FIELD_I(templateGuid.metaDataPtr) != NULL);
-        ocrHint_t *hint = PD_MSG_FIELD_I(hint);
-        ocrFatGuid_t affinityGuid = {.guid = NULL_GUID, .metaDataPtr = NULL };
-        u64 hintValue = 0ULL;
-        if (hint != NULL_HINT && ocrGetHintValue(hint, OCR_HINT_EDT_AFFINITY, &hintValue) == 0) {
-#ifdef GUID_64
-            affinityGuid.guid.guid = hintValue;
-#elif defined(GUID_128)
-            affinityGuid.guid.upper = 0ULL;
-            affinityGuid.guid.lower = hintValue;
-#else
-#error Unknown GUID type
-#endif
-        }
-        localDeguidify(self, &affinityGuid);
         localDeguidify(self, &(PD_MSG_FIELD_I(currentEdt)));
         localDeguidify(self, &(PD_MSG_FIELD_I(parentLatch)));
 
@@ -1256,12 +1242,16 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         ASSERT((PD_MSG_FIELD_I(workType) == EDT_USER_WORKTYPE) || (PD_MSG_FIELD_I(workType) == EDT_RT_WORKTYPE));
         u32 depc = PD_MSG_FIELD_IO(depc); // intentionally read before processing
         ocrFatGuid_t * depv = PD_MSG_FIELD_I(depv);
+        ocrHint_t *hint = PD_MSG_FIELD_I(hint);
+        u32 properties = PD_MSG_FIELD_I(properties);
         u8 returnCode = createEdtHelper(
                 self, &(PD_MSG_FIELD_IO(guid)), PD_MSG_FIELD_I(templateGuid),
                 &(PD_MSG_FIELD_IO(paramc)), PD_MSG_FIELD_I(paramv), &(PD_MSG_FIELD_IO(depc)),
-                PD_MSG_FIELD_I(properties), affinityGuid, outputEvent,
-                (ocrTask_t*)(PD_MSG_FIELD_I(currentEdt).metaDataPtr), PD_MSG_FIELD_I(parentLatch),
-                PD_MSG_FIELD_I(workType));
+                properties, hint, outputEvent, (ocrTask_t*)(PD_MSG_FIELD_I(currentEdt).metaDataPtr),
+                PD_MSG_FIELD_I(parentLatch), PD_MSG_FIELD_I(workType));
+        if ((properties & EDT_PROP_RT_HINT_ALLOC) && (msg->srcLocation == self->myLocation)) {
+            self->fcts.pdFree(self, hint);
+        }
         if (msg->type & PD_MSG_REQ_RESPONSE) {
             PD_MSG_FIELD_O(returnDetail) = returnCode;
         }

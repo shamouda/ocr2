@@ -20,6 +20,7 @@
 #include "ocr-worker.h"
 #include "task/hc/hc-task.h"
 #include "utils/ocr-utils.h"
+#include "extensions/ocr-hints.h"
 
 #ifdef OCR_ENABLE_EDT_PROFILING
 extern struct _profileStruct gProfilingTable[] __attribute__((weak));
@@ -47,6 +48,7 @@ u64 ocrHintPropTaskHc[] = {
     OCR_HINT_EDT_PRIORITY,
     OCR_HINT_EDT_SLOT_MAX_ACCESS,
     OCR_HINT_EDT_AFFINITY,
+    OCR_HINT_EDT_DISPERSE,
     /* BUG #923 - Separation of runtime vs user hints ? */
     OCR_HINT_EDT_SPACE,
     OCR_HINT_EDT_TIME
@@ -639,7 +641,7 @@ u8 destructTaskHc(ocrTask_t* base) {
 
 u8 newTaskHc(ocrTaskFactory_t* factory, ocrFatGuid_t * edtGuid, ocrFatGuid_t edtTemplate,
                       u32 paramc, u64* paramv, u32 depc, u32 properties,
-                      ocrFatGuid_t affinity, ocrFatGuid_t * outputEventPtr,
+                      ocrHint_t *hint, ocrFatGuid_t * outputEventPtr,
                       ocrTask_t *curEdt, ocrFatGuid_t parentLatch,
                       ocrParamList_t *perInstance) {
 
@@ -743,6 +745,7 @@ u8 newTaskHc(ocrTaskFactory_t* factory, ocrFatGuid_t * edtGuid, ocrFatGuid_t edt
         edt->hint.hintVal = (u64*)((u64)base + sizeof(ocrTaskHc_t) + paramc*sizeof(u64) + depc*sizeof(regNode_t));
         u64 hintSize = OCR_RUNTIME_HINT_GET_SIZE(derived->hint.hintMask);
         for (i = 0; i < hintc; i++) edt->hint.hintVal[i] = (hintSize == 0) ? 0 : derived->hint.hintVal[i]; //copy the hints from the template
+        if (hint != NULL_HINT) factory->fcts.setHint(base, hint);
     }
 
     if (schedc != 0) {
@@ -758,7 +761,8 @@ u8 newTaskHc(ocrTaskFactory_t* factory, ocrFatGuid_t * edtGuid, ocrFatGuid_t edt
         }
     }
 
-    if (!IS_GUID_NULL(affinity.guid)) {
+    u64 val = 0;
+    if (hint != NULL_HINT && (ocrGetHintValue(hint, OCR_HINT_EDT_AFFINITY, &val) == 0)) {
         base->flags |= OCR_TASK_FLAG_USES_AFFINITY;
     }
 
@@ -1361,7 +1365,7 @@ void destructTaskFactoryHc(ocrTaskFactory_t* factory) {
 ocrTaskFactory_t * newTaskFactoryHc(ocrParamList_t* perInstance, u32 factoryId) {
     ocrTaskFactory_t* base = (ocrTaskFactory_t*)runtimeChunkAlloc(sizeof(ocrTaskFactoryHc_t), PERSISTENT_CHUNK);
 
-    base->instantiate = FUNC_ADDR(u8 (*) (ocrTaskFactory_t*, ocrFatGuid_t*, ocrFatGuid_t, u32, u64*, u32, u32, ocrFatGuid_t, ocrFatGuid_t*, ocrTask_t *, ocrFatGuid_t, ocrParamList_t*), newTaskHc);
+    base->instantiate = FUNC_ADDR(u8 (*) (ocrTaskFactory_t*, ocrFatGuid_t*, ocrFatGuid_t, u32, u64*, u32, u32, ocrHint_t*, ocrFatGuid_t*, ocrTask_t *, ocrFatGuid_t, ocrParamList_t*), newTaskHc);
     base->destruct =  FUNC_ADDR(void (*) (ocrTaskFactory_t*), destructTaskFactoryHc);
     base->factoryId = factoryId;
 

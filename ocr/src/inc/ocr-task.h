@@ -28,6 +28,9 @@
 #endif
 #endif
 
+//Runtime defined properties for EDT create (upper 16 bits)
+#define EDT_PROP_RT_HINT_ALLOC  0x10000 //Hint variable is runtime allocated
+
 struct _ocrTask_t;
 struct _ocrTaskTemplate_t;
 
@@ -374,7 +377,7 @@ typedef struct _ocrTaskFactory_t {
      */
     u8  (*instantiate)(struct _ocrTaskFactory_t * factory, ocrFatGuid_t * edtGuid, ocrFatGuid_t edtTemplate,
                               u32 paramc, u64* paramv, u32 depc, u32 properties,
-                              ocrFatGuid_t affinity, ocrFatGuid_t *outputEvent,
+                              ocrHint_t *hint, ocrFatGuid_t *outputEvent,
                               ocrTask_t *curEdt, ocrFatGuid_t parentLatch,
                               ocrParamList_t *perInstance);
 

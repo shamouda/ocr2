@@ -18,15 +18,22 @@
 /* OCR WST SCHEDULER_OBJECT                         */
 /****************************************************/
 
+typedef enum {
+    SCHEDULER_OBJECT_WST_CONFIG_NONE,
+    SCHEDULER_OBJECT_WST_CONFIG_REGULAR,
+    SCHEDULER_OBJECT_WST_CONFIG_STATIC,
+} wstConfigType;
 typedef struct _paramListSchedulerObjectWst_t {
     paramListSchedulerObject_t base;
     u32 numDeques;                    /* Number of deques */
+    wstConfigType config;             /* Config option for wst object */
 } paramListSchedulerObjectWst_t;
 
 typedef struct _ocrSchedulerObjectWst_t {
     ocrSchedulerObject_t base;
     ocrSchedulerObject_t **deques;    /* Array of deques */
     u32 numDeques;                    /* Number of deques */
+    wstConfigType config;             /* Config option for wst object */
 } ocrSchedulerObjectWst_t;
 
 /****************************************************/

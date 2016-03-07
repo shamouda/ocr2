@@ -812,6 +812,31 @@ s32 populate_inst(ocrParamList_t **inst_param, int inst_param_size, void **insta
             ALLOC_PARAM_LIST(inst_param[j], paramListSchedulerObject_t);
             ((paramListSchedulerObject_t*)inst_param[j])->config = true;
             ((paramListSchedulerObject_t*)inst_param[j])->guidRequired = false;
+            schedulerObjectType_t mytype = schedulerObjectMax_id;
+            TO_ENUM (mytype, inststr, schedulerObjectType_t, schedulerObject_types, schedulerObjectMax_id);
+            switch(mytype) {
+#ifdef ENABLE_SCHEDULER_OBJECT_WST
+            case schedulerObjectWst_id:
+                {
+                    if (key_exists(dict, secname, "config")) {
+                        char *valuestr = NULL;
+                        snprintf(key, MAX_KEY_SZ, "%s:%s", secname, "config");
+                        INI_GET_STR (key, valuestr, "");
+                        if (strcmp(valuestr, "STATIC") == 0) {
+                            ((paramListSchedulerObjectWst_t*)inst_param[j])->config = SCHEDULER_OBJECT_WST_CONFIG_STATIC;
+                        } else {
+                            ((paramListSchedulerObjectWst_t*)inst_param[j])->config = SCHEDULER_OBJECT_WST_CONFIG_REGULAR;
+                        }
+                    }
+                }
+                break;
+#endif
+            case schedulerObjectMax_id:
+                ASSERT (0); // Unimplemented scheduler object type
+                break;
+            default:
+                break;
+            }
             instance[j] = (void *)((ocrSchedulerObjectFactory_t *)factory)->instantiate(factory, inst_param[j]);
             if (instance[j]) {
                 DPRINTF(DEBUG_LVL_INFO, "Created schedulerObject of type %s, index %d\n", inststr, j);
