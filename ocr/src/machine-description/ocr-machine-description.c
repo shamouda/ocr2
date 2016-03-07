@@ -60,7 +60,7 @@ u32 type_max[] = {
     eventMax_id,
 };
 
-#define MAX_INSTANCES 64
+#define MAX_INSTANCES 1024
 #define MAX_KEY_SZ 64
 #define DEBUG_TYPE INIPARSING
 

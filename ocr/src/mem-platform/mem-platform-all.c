@@ -11,6 +11,9 @@ const char * memplatform_types[] = {
 #ifdef ENABLE_MEM_PLATFORM_MALLOC
     "malloc",
 #endif
+#ifdef ENABLE_MEM_PLATFORM_NUMA_ALLOC
+    "numa_alloc",
+#endif
 #ifdef ENABLE_MEM_PLATFORM_FSIM
     "fsim",
 #endif
@@ -22,6 +25,10 @@ ocrMemPlatformFactory_t *newMemPlatformFactory(memPlatformType_t type, ocrParamL
 #ifdef ENABLE_MEM_PLATFORM_MALLOC
     case memPlatformMalloc_id:
         return newMemPlatformFactoryMalloc(typeArg);
+#endif
+#ifdef ENABLE_MEM_PLATFORM_NUMA_ALLOC
+    case memPlatformNumaAlloc_id:
+        return newMemPlatformFactoryNumaAlloc(typeArg);
 #endif
 #ifdef ENABLE_MEM_PLATFORM_FSIM
     case memPlatformFsim_id:
