@@ -35,7 +35,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrAffinityCount(AFFINITY_PD, &affinityCount);
     ocrGuid_t dbAffGuid;
     ocrGuid_t * dbAffPtr;
-    ocrDbCreate(&dbAffGuid, (void **)&dbAffPtr, sizeof(ocrGuid_t) * affinityCount, DB_PROP_SINGLE_ASSIGNMENT, NULL_GUID, NO_ALLOC);
+    ocrDbCreate(&dbAffGuid, (void **)&dbAffPtr, sizeof(ocrGuid_t) * affinityCount, DB_PROP_SINGLE_ASSIGNMENT, PICK_1_1(NULL_HINT,NULL_GUID), NO_ALLOC);
     ocrAffinityGet(AFFINITY_PD, &affinityCount, dbAffPtr);
     ASSERT(affinityCount >= 1);
     ocrGuid_t firstAffinityGuid = dbAffPtr[0];
@@ -51,7 +51,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     while(i < COUNT_EDT) {
         ocrEventCreate(&eventsGuid[i],OCR_EVENT_ONCE_T, EVT_PROP_NONE);
         ocrGuid_t * dbPtr;
-        ocrDbCreate(&dbsGuid[i], (void **)&dbPtr, sizeof(ocrGuid_t)*2, DB_PROP_SINGLE_ASSIGNMENT, NULL_GUID, NO_ALLOC);
+        ocrDbCreate(&dbsGuid[i], (void **)&dbPtr, sizeof(ocrGuid_t)*2, DB_PROP_SINGLE_ASSIGNMENT, PICK_1_1(NULL_HINT,NULL_GUID), NO_ALLOC);
         dbPtr[0] = eventsGuid[i];
         dbPtr[1] = firstAffinityGuid;
         ocrDbRelease(dbsGuid[i]);
@@ -61,10 +61,13 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     // Setup shutdown EDT
     ocrGuid_t shutdownEdtTemplateGuid;
     ocrEdtTemplateCreate(&shutdownEdtTemplateGuid, shutdownEdt, 0, COUNT_EDT);
+    ocrHint_t edtHint;
+    ocrHintInit( &edtHint, OCR_HINT_EDT_T );
+    ocrSetHintValue( & edtHint, OCR_HINT_EDT_AFFINITY, firstAffinityGuid );
 
     ocrGuid_t shutdownEdtGuid;
     ocrEdtCreate(&shutdownEdtGuid, shutdownEdtTemplateGuid, 0, NULL, EDT_PARAM_DEF, eventsGuid,
-                 EDT_PROP_NONE, NULL_GUID, NULL);
+                 EDT_PROP_NONE, PICK_1_1(NULL_HINT,NULL_GUID), NULL);
 
     // Spawn 'COUNT_EDT' EDTs, each satisfying its event
     i = 0;
@@ -72,7 +75,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
         // Create EDTs
         ocrGuid_t edtGuid;
         ocrEdtCreate(&edtGuid, remoteEdtTemplateGuid, 0, NULL, EDT_PARAM_DEF, &dbsGuid[i],
-            EDT_PROP_NONE, firstAffinityGuid, NULL);
+            EDT_PROP_NONE, PICK_1_1(&edtHint,firstAffinityGuid), NULL);
         i++;
     }
 

@@ -31,8 +31,11 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrGuid_t terminateEdtGuid;
     ocrGuid_t terminateEdtTemplateGuid;
     ocrEdtTemplateCreate(&terminateEdtTemplateGuid, terminateEdt, EDT_PARAM_UNK /*paramc*/, 0 /*depc*/);
+    ocrHint_t edtHint;
+    ocrHintInit( &edtHint, OCR_HINT_EDT_T );
+    ocrSetHintValue( & edtHint, OCR_HINT_EDT_AFFINITY, edtAffinity );
     u8 res = ocrEdtCreate(&terminateEdtGuid, terminateEdtTemplateGuid, 1, NULL, 0, NULL_GUID,
-                 /*properties=*/EDT_PROP_FINISH, edtAffinity, /*outEvent=*/ NULL);
+                 /*properties=*/EDT_PROP_FINISH, PICK_1_1(&edtHint,edtAffinity), /*outEvent=*/ NULL);
     ASSERT(!res);
     return NULL_GUID;
 }

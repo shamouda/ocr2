@@ -27,7 +27,7 @@ ocrGuid_t keyEdt ( u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrEdtTemplateCreate(&templateGuid, workerEdt, 0, 0);
 
     ocrGuid_t edtGuid;
-    ocrEdtCreate(&edtGuid, templateGuid, 0, NULL, 0, NULL_GUID, EDT_PROP_FINISH, NULL_GUID, NULL);
+    ocrEdtCreate(&edtGuid, templateGuid, 0, NULL, 0, NULL_GUID, EDT_PROP_FINISH, PICK_1_1(NULL_HINT,NULL_GUID), NULL);
     return NULL_GUID;
 }
 

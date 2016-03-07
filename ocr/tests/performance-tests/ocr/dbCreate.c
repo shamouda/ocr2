@@ -54,7 +54,7 @@ ocrGuid_t edtCode(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
 
         dbGuid = NULL_GUID;
         get_time(&t0);
-        ocrDbCreate(&dbGuid, (void **)&dbPtr, DB_SZ, 0, NULL_GUID, NO_ALLOC);
+        ocrDbCreate(&dbGuid, (void **)&dbPtr, DB_SZ, 0, PICK_1_1(NULL_HINT,NULL_GUID), NO_ALLOC);
         // Check that the DB creates succeeded
         ASSERT(dbGuid != NULL_GUID);
         ASSERT(dbPtr != NULL);
@@ -108,7 +108,7 @@ ocrGuid_t driverEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
 
     ocrGuid_t edtWrapupGuid;
     ocrEdtCreate(&edtWrapupGuid, finishTemplateGuid,
-                 0, NULL, 1+DB_NBS, NULL_GUID, EDT_PROP_NONE, NULL_GUID, NULL);
+                 0, NULL, 1+DB_NBS, NULL_GUID, EDT_PROP_NONE, PICK_1_1(NULL_HINT,NULL_GUID), NULL);
 
     ocrAddDependence(dbTimerGuid, edtWrapupGuid, DB_NBS, DB_MODE_RW);
 
@@ -116,7 +116,7 @@ ocrGuid_t driverEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
         ocrGuid_t edtGuid;
         ocrGuid_t eventGuid;
         ocrEdtCreate(&edtGuid, edtCodeTemplateGuid,
-                     1, &i, 2, NULL_GUID, EDT_PROP_NONE, NULL_GUID, &eventGuid);
+                     1, &i, 2, NULL_GUID, EDT_PROP_NONE, PICK_1_1(NULL_HINT,NULL_GUID), &eventGuid);
 
         // Add timer dependence
         ocrAddDependence(eventGuid, edtWrapupGuid, i, DB_MODE_RW);
@@ -137,10 +137,10 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     u64 *syncPtr;
     ocrGuid_t syncGuid;
 
-    ocrDbCreate(&dbTimerGuid, (void **)&dbTimerPtr, sizeof(u64)*3*DB_NBS, 0, NULL_GUID, NO_ALLOC);
+    ocrDbCreate(&dbTimerGuid, (void **)&dbTimerPtr, sizeof(u64)*3*DB_NBS, 0, PICK_1_1(NULL_HINT,NULL_GUID), NO_ALLOC);
     ocrDbRelease(dbTimerGuid);
 
-    ocrDbCreate(&syncGuid, (void **)&syncPtr, sizeof(u64), 0, NULL_GUID, NO_ALLOC);
+    ocrDbCreate(&syncGuid, (void **)&syncPtr, sizeof(u64), 0, PICK_1_1(NULL_HINT,NULL_GUID), NO_ALLOC);
     ocrDbRelease(syncGuid);
 
     *(u64 *)syncPtr = 0;
@@ -153,7 +153,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
 
     ocrGuid_t driverEdtGuid;
     ocrEdtCreate(&driverEdtGuid, edtDriverTemplateGuid,
-                 1, paramvDriverEdt, 2, NULL_GUID, EDT_PROP_NONE, NULL_GUID, NULL);
+                 1, paramvDriverEdt, 2, NULL_GUID, EDT_PROP_NONE, PICK_1_1(NULL_HINT,NULL_GUID), NULL);
     ocrAddDependence(dbTimerGuid, driverEdtGuid, 0, DB_MODE_RW);
     ocrAddDependence(syncGuid, driverEdtGuid, 1, DB_MODE_RW);
     ocrEdtTemplateDestroy(edtDriverTemplateGuid);

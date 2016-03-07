@@ -36,12 +36,15 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrGuid_t affinities[affinityCount];
     ocrAffinityGet(AFFINITY_PD, &affinityCount, affinities);
     ocrGuid_t otherAffinity = affinities[affinityCount-1]; //TODO this implies we know current PD is '0'
+    ocrHint_t dbHint;
+    ocrHintInit( &dbHint, OCR_HINT_DB_T );
+    ocrSetHintValue( & dbHint, OCR_HINT_DB_AFFINITY, otherAffinity );
 
     // Create a DB
     void * dbPtr;
     ocrGuid_t dbGuid;
     u64 nbElem = NB_ELEM_DB;
-    ocrDbCreate(&dbGuid, &dbPtr, sizeof(TYPE_ELEM_DB) * NB_ELEM_DB, DB_PROP_SINGLE_ASSIGNMENT, otherAffinity, NO_ALLOC);
+    ocrDbCreate(&dbGuid, &dbPtr, sizeof(TYPE_ELEM_DB) * NB_ELEM_DB, DB_PROP_SINGLE_ASSIGNMENT, PICK_1_1(&dbHint,otherAffinity), NO_ALLOC);
     PRINTF("[local] mainEdt: create remote DB/SA guid is 0x%lx, dbPtr=%p\n",dbGuid, dbPtr);
     int v = 1;
     int i = 0;
@@ -57,11 +60,14 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     // create local edt that depends on the remote edt, the db is automatically cloned
     ocrGuid_t remoteEdtTemplateGuid;
     ocrEdtTemplateCreate(&remoteEdtTemplateGuid, remoteEdt, 0, 1);
+    ocrHint_t edtHint;
+    ocrHintInit( &edtHint, OCR_HINT_EDT_T );
+    ocrSetHintValue( & edtHint, OCR_HINT_EDT_AFFINITY, otherAffinity );
 
     PRINTF("[local] mainEdt: create remote EDT to check the DB/SA has been written back\n");
     ocrGuid_t remoteEdtGuid;
     ocrEdtCreate(&remoteEdtGuid, remoteEdtTemplateGuid, 0, NULL, 1, &dbGuid,
-                 EDT_PROP_NONE, otherAffinity, NULL);
+                 EDT_PROP_NONE, PICK_1_1(&edtHint,otherAffinity), NULL);
 
     return NULL_GUID;
 }

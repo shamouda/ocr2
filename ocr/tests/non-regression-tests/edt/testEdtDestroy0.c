@@ -25,7 +25,7 @@ void noDeps() {
     ocrGuid_t workEdtTplGuid;
     ocrEdtTemplateCreate(&workEdtTplGuid, workEdt, 0 /*paramc*/, MAX_SLOT /*depc*/);
     ocrEdtCreate(&workEdtGuid, workEdtTplGuid, 0, NULL, MAX_SLOT, NULL_GUID,
-                 /*properties=*/EDT_PROP_NONE, NULL_GUID, /*outEvent=*/ NULL);
+                 /*properties=*/EDT_PROP_NONE, PICK_1_1(NULL_HINT,NULL_GUID), /*outEvent=*/ NULL);
     ocrEdtDestroy(workEdtGuid);
 }
 
@@ -34,7 +34,7 @@ void allEventDeps(ocrEventTypes_t eventType) {
     ocrGuid_t workEdtTplGuid;
     ocrEdtTemplateCreate(&workEdtTplGuid, workEdt, 0 /*paramc*/, MAX_SLOT /*depc*/);
     ocrEdtCreate(&workEdtGuid, workEdtTplGuid, 0, NULL, MAX_SLOT, NULL_GUID,
-                 /*properties=*/EDT_PROP_NONE, NULL_GUID, /*outEvent=*/ NULL);
+                 /*properties=*/EDT_PROP_NONE, PICK_1_1(NULL_HINT,NULL_GUID), /*outEvent=*/ NULL);
     u32 i = 0;
     while (i < MAX_SLOT) {
         ocrGuid_t e0;
@@ -57,7 +57,7 @@ void eventDeps(u32 slot, bool isPreSatisfied, bool isPostSatisfied, ocrEventType
     ocrGuid_t workEdtTplGuid;
     ocrEdtTemplateCreate(&workEdtTplGuid, workEdt, 0 /*paramc*/, MAX_SLOT /*depc*/);
     ocrEdtCreate(&workEdtGuid, workEdtTplGuid, 0, NULL, MAX_SLOT, NULL_GUID,
-                 /*properties=*/EDT_PROP_NONE, NULL_GUID, /*outEvent=*/ NULL);
+                 /*properties=*/EDT_PROP_NONE, PICK_1_1(NULL_HINT,NULL_GUID), /*outEvent=*/ NULL);
     ocrAddDependence(e0, workEdtGuid, slot, DB_MODE_CONST);
     ocrEdtDestroy(workEdtGuid);
     if (isPostSatisfied) {

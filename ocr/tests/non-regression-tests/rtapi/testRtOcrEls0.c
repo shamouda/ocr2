@@ -30,7 +30,7 @@ void someUserFunction() {
 ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     int *k;
     ocrGuid_t dbGuid;
-    ocrDbCreate(&dbGuid,(void **) &k, sizeof(int), DB_PROP_NONE, NULL_GUID, NO_ALLOC);
+    ocrDbCreate(&dbGuid,(void **) &k, sizeof(int), DB_PROP_NONE, PICK_1_1(NULL_HINT,NULL_GUID), NO_ALLOC);
     *k = 42;
     if (TEST_OCR_ELS) {
         ocrElsUserSet(ELS_OFFSET, (u64) k);

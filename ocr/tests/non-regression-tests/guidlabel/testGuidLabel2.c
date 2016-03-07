@@ -45,7 +45,7 @@ ocrGuid_t createEvtEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
         // Return a DB to mark this EDT has succeeded
         ocrGuid_t dbGuid;
         void * dbPtr;
-        ocrDbCreate(&dbGuid, &dbPtr, sizeof(u64), DB_PROP_NONE, NULL_GUID, NO_ALLOC);
+        ocrDbCreate(&dbGuid, &dbPtr, sizeof(u64), DB_PROP_NONE, PICK_1_1(NULL_HINT,NULL_GUID), NO_ALLOC);
         ocrDbRelease(dbGuid);
         return dbGuid;
     }
@@ -61,7 +61,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrGuid_t templGuid;
     ocrEdtTemplateCreate(&templGuid, shutEdt, 0, NB_EDT);
     ocrGuid_t shutGuid;
-    ocrEdtCreate(&shutGuid, templGuid, 0, NULL, NB_EDT, NULL, EDT_PROP_NONE, NULL_GUID, NULL);
+    ocrEdtCreate(&shutGuid, templGuid, 0, NULL, NB_EDT, NULL, EDT_PROP_NONE, PICK_1_1(NULL_HINT,NULL_GUID), NULL);
 
     ocrGuid_t crtEvtTmplGuid;
     ocrEdtTemplateCreate(&crtEvtTmplGuid, createEvtEdt, 1, 1);
@@ -70,7 +70,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     while (i < NB_EDT) {
         ocrGuid_t outputEvtGuid;
         ocrGuid_t edtGuid;
-        ocrEdtCreate(&edtGuid, crtEvtTmplGuid, 1, &nparamv, 1, &startGuid, EDT_PROP_NONE, NULL_GUID, &outputEvtGuid);
+        ocrEdtCreate(&edtGuid, crtEvtTmplGuid, 1, &nparamv, 1, &startGuid, EDT_PROP_NONE, PICK_1_1(NULL_HINT,NULL_GUID), &outputEvtGuid);
         ocrAddDependence(outputEvtGuid, shutGuid, i, DB_MODE_RO);
         i++;
     }

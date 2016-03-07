@@ -33,7 +33,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrGuid_t taskForEdtTemplateGuid;
     ocrEdtTemplateCreate(&taskForEdtTemplateGuid, taskForEdt, nparamc, 1 /*depc*/);
     ocrEdtCreate(&edtGuid, taskForEdtTemplateGuid, EDT_PARAM_DEF, &nparamv, EDT_PARAM_DEF, /*depv=*/NULL,
-                 /*properties=*/0, NULL_GUID, /*outEvent=*/NULL);
+                 /*properties=*/0, PICK_1_1(NULL_HINT,NULL_GUID), /*outEvent=*/NULL);
 
     // Register a dependence between an event and an edt
     ocrAddDependence(eventGuid, edtGuid, 0, DB_MODE_CONST);
@@ -42,7 +42,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrGuid_t dbGuid;
     ocrDbCreate(&dbGuid,(void **) &k,
                 sizeof(u64), /*flags=*/DB_PROP_NONE,
-                /*location=*/NULL_GUID,
+                /*location=*/PICK_1_1(NULL_HINT,NULL_GUID),
                 NO_ALLOC);
     *k = 42;
 

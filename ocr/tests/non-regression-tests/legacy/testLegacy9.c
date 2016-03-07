@@ -27,9 +27,13 @@ ocrGuid_t keyEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ASSERT(affinityCount >= 1);
     ocrGuid_t affinities[affinityCount];
     ocrAffinityGet(AFFINITY_PD, &affinityCount, affinities);
+    ocrHint_t dbHint;
+    ocrHintInit( &dbHint, OCR_HINT_DB_T );
+    ocrSetHintValue( & dbHint, OCR_HINT_DB_AFFINITY, affinities[affinityCount-1] );
+
     u64 * array;
     ocrGuid_t dbGuid;
-    ocrDbCreate(&dbGuid,(void **) &array, sizeof(u64), 0, affinities[affinityCount-1], NO_ALLOC);
+    ocrDbCreate(&dbGuid,(void **) &array, sizeof(u64), 0, PICK_1_1(&dbHint, affinities[affinityCount-1]), NO_ALLOC);
     array[0] = MARK;
     ocrDbRelease(dbGuid);
     return dbGuid;
@@ -49,8 +53,11 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
 
     // Make sure the EDT and DBs are not affinitized with one another
     ocrGuid_t edtGuid, outputEventGuid;
+    ocrHint_t edtHint;
+    ocrHintInit( &edtHint, OCR_HINT_EDT_T );
+    ocrSetHintValue( & edtHint, OCR_HINT_EDT_AFFINITY, affinities[0] );
     ocrEdtCreate(&edtGuid, template, 0, NULL,
-                 1, NULL, EDT_PROP_NONE, affinities[0], &outputEventGuid);
+                 1, NULL, EDT_PROP_NONE, PICK_1_1(&edtHint, affinities[0]), &outputEventGuid);
     ocrAddDependence(outputEventGuid, stickyEvtGuid, 0, DB_DEFAULT_MODE);
 
     // Schedule the EDT

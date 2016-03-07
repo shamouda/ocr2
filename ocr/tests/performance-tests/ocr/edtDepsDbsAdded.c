@@ -34,7 +34,7 @@ ocrGuid_t edtCode(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     paramvDriverEdt[1] = (u64) timerUsAcc;
     ocrGuid_t edtDriverGuid;
     ocrEdtCreate(&edtDriverGuid, edtDriverTemplateGuid,
-                 2, paramvDriverEdt, 2, NULL, EDT_PROP_NONE, NULL_GUID, NULL);
+                 2, paramvDriverEdt, 2, NULL, EDT_PROP_NONE, PICK_1_1(NULL_HINT,NULL_GUID), NULL);
     ocrAddDependence(dbAllGuids, edtDriverGuid, 0, DB_MODE_CONST);
     ocrAddDependence(dbTimerGuid, edtDriverGuid, 1, DB_MODE_RW);
     ocrEdtTemplateDestroy(edtDriverTemplateGuid);
@@ -69,7 +69,7 @@ ocrGuid_t driverEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
 
         ocrGuid_t edtGuid;
         ocrEdtCreate(&edtGuid, edtCodeTemplateGuid,
-                     3, paramvEdtCode, DB_NBS+1, NULL_GUID, EDT_PROP_NONE, NULL_GUID, NULL);
+                     3, paramvEdtCode, DB_NBS+1, NULL_GUID, EDT_PROP_NONE, PICK_1_1(NULL_HINT,NULL_GUID), NULL);
         ocrEdtTemplateDestroy(edtCodeTemplateGuid);
 
         // Cannot spawn the next iteration here becaues we can create a deadlock if the edtCode
@@ -97,13 +97,13 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
 
     ocrGuid_t * dbAllPtr;
     ocrGuid_t dbAllGuids;
-    ocrDbCreate(&dbAllGuids, (void **)&dbAllPtr, (sizeof(ocrGuid_t)*DB_NBS), 0, NULL_GUID, NO_ALLOC);
+    ocrDbCreate(&dbAllGuids, (void **)&dbAllPtr, (sizeof(ocrGuid_t)*DB_NBS), 0, PICK_1_1(NULL_HINT,NULL_GUID), NO_ALLOC);
 
     // Create all DBs and record their guid in dbAllPtr
     int i = 0;
     while (i < DB_NBS) {
         DB_TYPE * dbPtr;
-        ocrDbCreate(&dbAllPtr[i], (void **)&dbPtr, (sizeof(DB_TYPE)*DB_NB_ELT), 0, NULL_GUID, NO_ALLOC);
+        ocrDbCreate(&dbAllPtr[i], (void **)&dbPtr, (sizeof(DB_TYPE)*DB_NB_ELT), 0, PICK_1_1(NULL_HINT,NULL_GUID), NO_ALLOC);
         // Doesn't really matter to fill the DB
         // Make sure the DB has been released for measurements purpose
         ocrDbRelease(dbAllPtr[i]);
@@ -113,7 +113,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
 
     timestamp_t * dbTimerPtr;
     ocrGuid_t dbTimerGuid;
-    ocrDbCreate(&dbTimerGuid, (void **)&dbTimerPtr, sizeof(timestamp_t)*2, 0, NULL_GUID, NO_ALLOC);
+    ocrDbCreate(&dbTimerGuid, (void **)&dbTimerPtr, sizeof(timestamp_t)*2, 0, PICK_1_1(NULL_HINT,NULL_GUID), NO_ALLOC);
     ocrDbRelease(dbTimerGuid);
 
     ocrGuid_t edtDriverTemplateGuid;
@@ -124,7 +124,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     paramvDriverEdt[1] = (u64) 0; //timerUsAcc
     ocrGuid_t driverEdtGuid;
     ocrEdtCreate(&driverEdtGuid, edtDriverTemplateGuid,
-                 2, paramvDriverEdt, 2, NULL_GUID, EDT_PROP_NONE, NULL_GUID, NULL);
+                 2, paramvDriverEdt, 2, NULL_GUID, EDT_PROP_NONE, PICK_1_1(NULL_HINT,NULL_GUID), NULL);
     ocrAddDependence(dbAllGuids, driverEdtGuid, 0, DB_MODE_CONST);
     ocrAddDependence(dbTimerGuid, driverEdtGuid, 1, DB_MODE_RW);
     ocrEdtTemplateDestroy(edtDriverTemplateGuid);

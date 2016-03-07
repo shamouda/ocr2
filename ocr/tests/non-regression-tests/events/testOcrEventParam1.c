@@ -38,13 +38,13 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrGuid_t taskForEdtTemplateGuid;
     ocrEdtTemplateCreate(&taskForEdtTemplateGuid, taskForEdt, nparamc, 1 /*depc*/);
     ocrEdtCreate(&edtGuid, taskForEdtTemplateGuid, EDT_PARAM_DEF, &nparamv, EDT_PARAM_DEF, /*depv=*/ndepv,
-                 /*properties=*/0, NULL_GUID, /*outEvent=*/NULL);
+                 /*properties=*/0, PICK_1_1(NULL_HINT,NULL_GUID), /*outEvent=*/NULL);
 
     int *k;
     ocrGuid_t dbGuid;
     ocrDbCreate(&dbGuid,(void **) &k,
                 sizeof(int), /*flags=*/DB_PROP_NONE,
-                /*location=*/NULL_GUID,
+                /*location=*/PICK_1_1(NULL_HINT,NULL_GUID),
                 NO_ALLOC);
     *k = 42;
 

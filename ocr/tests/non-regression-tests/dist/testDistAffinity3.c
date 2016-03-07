@@ -36,7 +36,7 @@ ocrGuid_t finishEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     while(i < COUNT_EDT) {
         ocrEventCreate(&eventsGuid[i],OCR_EVENT_ONCE_T, EVT_PROP_NONE);
         ocrGuid_t * dbPtr;
-        ocrDbCreate(&dbsGuid[i], (void **)&dbPtr, sizeof(ocrGuid_t), DB_PROP_SINGLE_ASSIGNMENT, NULL_GUID, NO_ALLOC);
+        ocrDbCreate(&dbsGuid[i], (void **)&dbPtr, sizeof(ocrGuid_t), DB_PROP_SINGLE_ASSIGNMENT, PICK_1_1(NULL_HINT,NULL_GUID), NO_ALLOC);
         dbPtr[0] = eventsGuid[i];
         ocrDbRelease(dbsGuid[i]);
         i++;
@@ -48,16 +48,20 @@ ocrGuid_t finishEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
 
     ocrGuid_t shutdownEdtGuid;
     ocrEdtCreate(&shutdownEdtGuid, shutdownEdtTemplateGuid, 0, NULL, EDT_PARAM_DEF, eventsGuid,
-                 EDT_PROP_NONE, NULL_GUID, NULL);
+                 EDT_PROP_NONE, PICK_1_1(NULL_HINT,NULL_GUID), NULL);
     ocrGuid_t currentAffinity;
     ocrAffinityGetCurrent(&currentAffinity);
+
+    ocrHint_t edtHint;
+    ocrHintInit( &edtHint, OCR_HINT_EDT_T );
+    ocrSetHintValue( & edtHint, OCR_HINT_EDT_AFFINITY, currentAffinity );
     // Spawn 'COUNT_EDT' EDTs, each satisfying its event
     i = 0;
     while(i < COUNT_EDT) {
         // Create EDTs
         ocrGuid_t edtGuid;
         ocrEdtCreate(&edtGuid, edtTemplateGuid, 0, NULL, EDT_PARAM_DEF, &dbsGuid[i],
-            EDT_PROP_NONE, currentAffinity, NULL);
+            EDT_PROP_NONE, PICK_1_1(&edtHint,currentAffinity), NULL);
         i++;
     }
     return NULL_GUID;
@@ -68,7 +72,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrAffinityCount(AFFINITY_PD, &affinityCount);
     ocrGuid_t dbAffGuid;
     ocrGuid_t * dbAffPtr;
-    ocrDbCreate(&dbAffGuid, (void **)&dbAffPtr, sizeof(ocrGuid_t) * affinityCount, DB_PROP_SINGLE_ASSIGNMENT, NULL_GUID, NO_ALLOC);
+    ocrDbCreate(&dbAffGuid, (void **)&dbAffPtr, sizeof(ocrGuid_t) * affinityCount, DB_PROP_SINGLE_ASSIGNMENT, PICK_1_1(NULL_HINT,NULL_GUID), NO_ALLOC);
     ocrAffinityGet(AFFINITY_PD, &affinityCount, dbAffPtr);
     ASSERT(affinityCount >= 1);
     ocrGuid_t affinityGuid = dbAffPtr[affinityCount-1];
@@ -77,11 +81,14 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     // Finish EDT potentially remote, but spawning all children on the same node
     ocrGuid_t finishEdtTemplateGuid;
     ocrEdtTemplateCreate(&finishEdtTemplateGuid, finishEdt, 0, 0);
+    ocrHint_t edtHint;
+    ocrHintInit( &edtHint, OCR_HINT_EDT_T );
+    ocrSetHintValue( & edtHint, OCR_HINT_EDT_AFFINITY, affinityGuid );
 
     PRINTF("mainEdt: spawning remote finish-EDT\n");
     ocrGuid_t edtGuid;
     ocrEdtCreate(&edtGuid, finishEdtTemplateGuid, 0, NULL, EDT_PARAM_DEF, 0,
-        EDT_PROP_NONE, affinityGuid, NULL);
+        EDT_PROP_NONE, PICK_1_1(&edtHint,affinityGuid), NULL);
 
     return NULL_GUID;
 }

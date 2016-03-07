@@ -45,7 +45,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     // Create a datablock to wrap the latch's guid
     ocrGuid_t *dbLatchPtr;
     ocrGuid_t dbLatchGuid;
-    ocrDbCreate(&dbLatchGuid,(void **)&dbLatchPtr, sizeof(ocrGuid_t), 0, NULL_GUID, NO_ALLOC);
+    ocrDbCreate(&dbLatchGuid,(void **)&dbLatchPtr, sizeof(ocrGuid_t), 0, PICK_1_1(NULL_HINT,NULL_GUID), NO_ALLOC);
     *dbLatchPtr = latchGuid;
     ocrDbRelease(dbLatchGuid);
 
@@ -53,14 +53,14 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     // can check each child did a write at their index.
     int *arrayPtr;
     ocrGuid_t arrayGuid;
-    ocrDbCreate(&arrayGuid,(void **)&arrayPtr, sizeof(int)*N, 0, NULL_GUID, NO_ALLOC);
+    ocrDbCreate(&arrayGuid,(void **)&arrayPtr, sizeof(int)*N, 0, PICK_1_1(NULL_HINT,NULL_GUID), NO_ALLOC);
 
     // Set up the sink edt, activated by the latch satisfaction
     ocrGuid_t terminateEDTGuid;
     ocrGuid_t terminateEdtTemplateGuid;
     ocrEdtTemplateCreate(&terminateEdtTemplateGuid, terminateEDT, 0 /*paramc*/, 2 /*depc*/);
     ocrEdtCreate(&terminateEDTGuid, terminateEdtTemplateGuid, EDT_PARAM_DEF, /*paramv=*/NULL, EDT_PARAM_DEF, /*depv=*/NULL,
-                 /*properties=*/0, NULL_GUID, /*outEvent=*/NULL);
+                 /*properties=*/0, PICK_1_1(NULL_HINT,NULL_GUID), /*outEvent=*/NULL);
     ocrAddDependence(latchGuid, terminateEDTGuid, 0, DB_MODE_CONST);
     ocrAddDependence(arrayGuid, terminateEDTGuid, 1, DB_MODE_CONST);
 
@@ -75,14 +75,14 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
 
         int *idxPtr;
         ocrGuid_t idxGuid;
-        ocrDbCreate(&idxGuid,(void **)&idxPtr, sizeof(int), 0, NULL_GUID, NO_ALLOC);
+        ocrDbCreate(&idxGuid,(void **)&idxPtr, sizeof(int), 0, PICK_1_1(NULL_HINT,NULL_GUID), NO_ALLOC);
         *idxPtr = i;
 
         ocrGuid_t childEdtGuid;
         ocrGuid_t childEdtTemplateGuid;
         ocrEdtTemplateCreate(&childEdtTemplateGuid, childEDT, 0 /*paramc*/, 3 /*depc*/);
         ocrEdtCreate(&childEdtGuid, childEdtTemplateGuid, EDT_PARAM_DEF, /*paramv=*/NULL, EDT_PARAM_DEF, /*depv=*/NULL,
-                     /*properties=*/0, NULL_GUID, /*outEvent=*/NULL);
+                     /*properties=*/0, PICK_1_1(NULL_HINT,NULL_GUID), /*outEvent=*/NULL);
 
         ocrAddDependence(dbLatchGuid, childEdtGuid, 0, DB_MODE_CONST);
         ocrAddDependence(idxGuid, childEdtGuid, 1, DB_MODE_CONST);

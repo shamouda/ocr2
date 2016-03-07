@@ -21,7 +21,7 @@
 ocrGuid_t keyEdt ( u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     u64 * array;
     ocrGuid_t dbGuid;
-    ocrDbCreate(&dbGuid,(void **) &array, sizeof(u64), 0, NULL_GUID, NO_ALLOC);
+    ocrDbCreate(&dbGuid,(void **) &array, sizeof(u64), 0, PICK_1_1(NULL_HINT,NULL_GUID), NO_ALLOC);
     array[0] = MARK;
     ocrDbRelease(dbGuid);
     return dbGuid;

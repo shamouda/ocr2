@@ -41,7 +41,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     void * dbPtr;
     ocrGuid_t dbGuid;
     u64 nbElem = NB_ELEM_DB;
-    ocrDbCreate(&dbGuid, &dbPtr, sizeof(TYPE_ELEM_DB) * NB_ELEM_DB, 0, NULL_GUID, NO_ALLOC);
+    ocrDbCreate(&dbGuid, &dbPtr, sizeof(TYPE_ELEM_DB) * NB_ELEM_DB, 0, PICK_1_1(NULL_HINT, NULL_GUID), NO_ALLOC);
     int v = 1;
     int i = 0;
     int * data = (int *) dbPtr;
@@ -55,10 +55,13 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     // create local edt that depends on the remote edt, the db is automatically cloned
     ocrGuid_t edtTemplateGuid;
     ocrEdtTemplateCreate(&edtTemplateGuid, consumerEdt, 0, 1);
+    ocrHint_t edtHint;
+    ocrHintInit( &edtHint, OCR_HINT_EDT_T );
+    ocrSetHintValue( & edtHint, OCR_HINT_EDT_AFFINITY, edtAffinity );
 
     ocrGuid_t edtGuid;
     ocrEdtCreate(&edtGuid, edtTemplateGuid, 0, NULL, 1, NULL,
-                 EDT_PROP_NONE, edtAffinity, NULL);
+                 EDT_PROP_NONE, PICK_1_1(&edtHint, edtAffinity), NULL);
     ocrAddDependence(dbGuid, edtGuid, 0, DB_MODE_RW);
 
     return NULL_GUID;

@@ -40,7 +40,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrEdtTemplateCreate(&templGuid, shutEdt, 0, 1);
 
     ocrGuid_t edtGuid;
-    ocrEdtCreate(&edtGuid, templGuid, 0, NULL, 1, &evtGuid, EDT_PROP_NONE, NULL_GUID, NULL);
+    ocrEdtCreate(&edtGuid, templGuid, 0, NULL, 1, &evtGuid, EDT_PROP_NONE, PICK_1_1(NULL_HINT,NULL_GUID), NULL);
 
     ocrEventSatisfy(evtGuid, NULL_GUID);
 
