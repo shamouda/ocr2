@@ -1,3 +1,5 @@
+TEST
+
 allocator            - to manage internal & external requests for memory allocation & management
 api                  - functions exposed for use by the application (OCR User API)
 comm-api             - high-level functions used by policy domains to communicate (two-way messages)
