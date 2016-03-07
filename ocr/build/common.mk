@@ -54,8 +54,12 @@ DEFAULT_CONFIG ?= jenkins-common-8w-lockableDB.cfg
 # - Controls how many bits in the GUID are used for PD location
 CFLAGS += -DGUID_PROVIDER_LOCID_SIZE=10
 
-# Activate a different hashmap implementation
-# Warning: Necessitates an additional -D activating the alternate implementation
+# - Per worker GUID generation: GUID_WID_SIZE is the maximum
+#   number of workers supported per PD
+# CFLAGS += -DGUID_PROVIDER_WID_INGUID += -DGUID_WID_SIZE=4
+
+# - Activate a different hashmap implementation
+#   Warning: Necessitates an additional -D activating the alternate implementation
 # CFLAGS += -DGUID_PROVIDER_CUSTOM_MAP -D_TODO_FILL_ME_IN
 
 # **** EDTs parameters ****

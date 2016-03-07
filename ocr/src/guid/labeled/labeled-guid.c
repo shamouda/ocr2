@@ -31,14 +31,34 @@
 #endif
 #define GUID_KIND_SIZE 5 // Warning! check ocrGuidKind struct definition for correct size
 
+#ifdef GUID_PROVIDER_WID_INGUID
+#ifndef GUID_WID_SIZE
+#define GUID_WID_SIZE 4
+#else
+#define GUID_WID_SIZE GUID_PROVIDER_WID_SIZE
+#endif
+
+#define GUID_COUNTER_SIZE (GUID_BIT_SIZE-(GUID_LOCID_SIZE+GUID_KIND_SIZE+GUID_WID_SIZE+1))
+#define GUID_WID_MASK (((((u64)1)<<GUID_WID_SIZE)-1)<<(GUID_COUNTER_SIZE))
+#define GUID_COUNTER_MASK ((((u64)1)<<(GUID_COUNTER_SIZE))-1)
+#define GUID_LOCID_MASK (((((u64)1)<<GUID_LOCID_SIZE)-1)<<(GUID_COUNTER_SIZE+GUID_WID_SIZE+GUID_KIND_SIZE))
+#define GUID_LOCID_SHIFT_RIGHT (GUID_BIT_SIZE-GUID_LOCID_SIZE-1)
+#define GUID_KIND_MASK (((((u64)1)<<GUID_KIND_SIZE)-1)<<(GUID_COUNTER_SIZE+GUID_WID_SIZE))
+#define GUID_KIND_SHIFT_RIGHT (GUID_LOCID_SHIFT_RIGHT-GUID_KIND_SIZE)
+#define GUID_WID_SHIFT_RIGHT (GUID_KIND_SHIFT_RIGHT-GUID_WID_SIZE)
+#define WID_LOCATION (0)
+#define KIND_LOCATION (GUID_WID_SIZE)
+#define LOCID_LOCATION (KIND_LOCATION+GUID_KIND_SIZE)
+#else
 #define GUID_COUNTER_SIZE (GUID_BIT_SIZE-(GUID_KIND_SIZE+GUID_LOCID_SIZE+1))
-#define GUID_COUNTER_MASK ((((u64)1)<<GUID_COUNTER_SIZE)-1)
-
+#define GUID_COUNTER_MASK ((((u64)1)<<(GUID_COUNTER_SIZE))-1)
 #define GUID_LOCID_MASK (((((u64)1)<<GUID_LOCID_SIZE)-1)<<(GUID_COUNTER_SIZE+GUID_KIND_SIZE))
-#define GUID_LOCID_SHIFT_RIGHT (GUID_KIND_SIZE + GUID_COUNTER_SIZE)
-
-#define GUID_KIND_MASK (((((u64)1)<<GUID_KIND_SIZE)-1)<< GUID_COUNTER_SIZE)
-#define GUID_KIND_SHIFT_RIGHT (GUID_COUNTER_SIZE)
+#define GUID_LOCID_SHIFT_RIGHT (GUID_BIT_SIZE-GUID_LOCID_SIZE-1)
+#define GUID_KIND_MASK (((((u64)1)<<GUID_KIND_SIZE)-1)<<GUID_COUNTER_SIZE)
+#define GUID_KIND_SHIFT_RIGHT (GUID_LOCID_SHIFT_RIGHT-GUID_KIND_SIZE)
+#define KIND_LOCATION (0)
+#define LOCID_LOCATION (GUID_KIND_SIZE)
+#endif
 
 // See BUG #928 on GUID issues
 #ifdef GUID_64
@@ -46,9 +66,6 @@
 #elif defined GUID_128
 #define IS_RESERVED_GUID(guid) ((guid.lower & 0x8000000000000000ULL) != 0ULL)
 #endif
-
-#define KIND_LOCATION 0
-#define LOCID_LOCATION (GUID_KIND_SIZE)
 
 #ifdef GUID_PROVIDER_CUSTOM_MAP
 // Set -DGUID_PROVIDER_CUSTOM_MAP and put other #ifdef for alternate implementation here
@@ -61,8 +78,14 @@
 #define GP_HASHTABLE_DEL(hashtable, key, valueBack) hashtableConcBucketLockedRemove(GP_RESOLVE_HASHTABLE(hashtable,key), key, valueBack)
 #endif
 
+#ifdef GUID_PROVIDER_WID_INGUID
+#define MAX_WORKERS 16
+#define CACHE_SIZE 8
+static u64 guidCounters[(((u64)1)<<GUID_WID_SIZE)*CACHE_SIZE];
+#else
 // GUID 'id' counter, atomically incr when a new GUID is requested
 static u64 guidCounter = 0;
+#endif
 // Counter for the reserved part of the GUIDs
 static u64 guidReservedCounter = 0;
 
@@ -112,6 +135,17 @@ u8 labeledGuidSwitchRunlevel(ocrGuidProvider_t *self, ocrPolicyDomain_t *PD, ocr
     case RL_PD_OK:
         if ((properties & RL_BRING_UP) && RL_IS_FIRST_PHASE_UP(PD, RL_PD_OK, phase)) {
             self->pd = PD;
+#ifdef GUID_PROVIDER_WID_INGUID
+        u32 i = 0, ub = PD->workerCount;
+        u64 max = ((u64)1<<GUID_COUNTER_SIZE);
+        u64 incr = (max/ub);
+        while (i < ub) {
+            // Initialize to 'i' to distribute the count over the buckets. Helps with scalability.
+            // This is knowing we use a modulo hash but is not hurting generally speaking...
+            guidCounters[i*CACHE_SIZE] = incr*i;
+            i++;
+        }
+#endif
         }
         break;
     case RL_MEMORY_OK:
@@ -157,6 +191,9 @@ u8 labeledGuidSwitchRunlevel(ocrGuidProvider_t *self, ocrPolicyDomain_t *PD, ocr
             //Initialize the map now that we have an assigned policy domain
             ocrGuidProviderLabeled_t * derived = (ocrGuidProviderLabeled_t *) self;
             derived->guidImplTable = GP_HASHTABLE_CREATE_MODULO(PD, GUID_PROVIDER_NB_BUCKETS, hashGuidCounterModulo);
+#ifdef GUID_PROVIDER_WID_INGUID
+            ASSERT(((PD->workerCount-1) < ((u64)1 << GUID_WID_SIZE)) && "GUID worker count overflows");
+#endif
         }
         break;
     case RL_COMPUTE_OK:
@@ -217,9 +254,19 @@ static u64 generateNextGuid(ocrGuidProvider_t* self, ocrGuidKind kind) {
     u64 locId = (u64) locationToLocId(self->pd->myLocation);
     u64 locIdShifted = locId << LOCID_LOCATION;
     u64 kindShifted = kind << KIND_LOCATION;
+#ifdef GUID_PROVIDER_WID_INGUID
+    ocrWorker_t * worker = NULL;
+    getCurrentEnv(NULL, &worker, NULL, NULL);
+    // ASSERT((worker != NULL) && "GUID-Provider Cannot identify currently executing worker");
+    // GUIDs are generated before the current worker is setup.
+    u64 wid = (worker == NULL) ? 0 : worker->id;
+    u64 widShifted = (wid << WID_LOCATION);
+    u64 guid = (locIdShifted | kindShifted | widShifted) << GUID_COUNTER_SIZE;
+    u64 newCount = guidCounters[wid*CACHE_SIZE]++;
+#else
     u64 guid = (locIdShifted | kindShifted) << GUID_COUNTER_SIZE;
-    //PERF: Can privatize the counter by working out something with thread-id
     u64 newCount = hal_xadd64(&guidCounter, 1);
+#endif
     // double check if we overflow the guid's counter size
     ASSERT((newCount + 1 < ((u64)1<<GUID_COUNTER_SIZE)) && "GUID counter overflows");
     guid |= newCount;
