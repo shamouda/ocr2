@@ -20,8 +20,9 @@
 #define OCR_PATCH_VERSION 1
 
 /* OCR version string */
-#define OCR_VERSION tostr(OCR_MAJOR_VERSION) DOT tostr(OCR_MINOR_VERSION) \
-                    DOT tostr(OCR_PATCH_VERSION)
+#define OCR_VERSION tostring(OCR_MAJOR_VERSION) \
+                    DOT tostring(OCR_MINOR_VERSION) \
+                    DOT tostring(OCR_PATCH_VERSION)
 
 /****************************************************************************/
 /* The below macros can be used on any version string to extract its pieces */
@@ -59,8 +60,8 @@
 
 /***************** Versioning internals below **************************/
 
-#define str(s) #s
-#define tostr(s) str(s)
+#define strmacro(s) #s
+#define tostring(s) strmacro(s)
 #define DOT "."
 
 extern u64 ocrVersionExtensionBitmap(void);
