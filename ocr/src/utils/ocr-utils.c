@@ -249,12 +249,28 @@ s32 ocrStrcmp(u8 *str1, u8 *str2) {
     return(str1[index]-str2[index]);
 }
 
+s32 ocrStrncmp(u8 *str1, u8 *str2, u32 n) {
+    if (n == 0) { return 0; }
+    u32 index = 0;
+    while((index < (n-1)) && (str1[index] != '\0') && (str2[index] != '\0')) {
+        if(str1[index] == str2[index]) index++;
+        else break;
+    }
+    return(str1[index]-str2[index]);
+}
+
 u64 ocrStrlen(const char* str) {
     u64 res = 0;
     if(str == NULL) return res;
     while(*str++ != '\0') ++res;
     return res;
 }
+
+bool ocrIsDigit(u8 c) {
+    return ((c >= '0') && (c <= '9'));
+}
+
+
 
 /* This is not currently used. What to do with it?
 void ocrPlaceTrackerAllocate ( ocrPlaceTracker_t** toFill ) {
