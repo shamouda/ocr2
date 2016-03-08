@@ -34,8 +34,9 @@
 /* OCR-COMMON SCHEDULER                               */
 /******************************************************/
 
-static bool isDigit(char c) {
-    return ((c >= '0') && (c <= '9'));
+// Single ascii to integer
+static u32 sglAtoi(char c) {
+    return c - '0';
 }
 
 // Parses something like "comp0:plc2:comm1" in any order. String must be well formed
@@ -44,27 +45,27 @@ static void parseConfigStr(ocrSchedulerHeuristic_t ** pdSchedulerHeuristics, ocr
     int l = 0;
     if (cfgStr == NULL)
         return;
-    int lg = strlen(cfgStr);
+    int lg = ocrStrlen(cfgStr);
     while (r < lg) {
-        while (!isDigit(cfgStr[r])) {
+        while (!ocrIsDigit((u8) cfgStr[r])) {
             r++;
         }
         u8 id;
-        if (strncmp("comp", &cfgStr[l], (r-l)) == 0) {
-            DPRINTF(DEBUG_LVL_INFO, "Assigning heuristic %d to slot COMP_HEURISTIC_ID\n", atoi(&cfgStr[r]));
+        if (ocrStrncmp((u8*)"comp", (u8*)&cfgStr[l], (r-l)) == 0) {
+            DPRINTF(DEBUG_LVL_INFO, "Assigning heuristic %d to slot COMP_HEURISTIC_ID\n", sglAtoi(cfgStr[r]));
             id = COMP_HEURISTIC_ID;
-        } else if (strncmp("comm", &cfgStr[l], (r-l)) == 0) {
-            DPRINTF(DEBUG_LVL_INFO, "Assigning heuristic %d to slot COMM_HEURISTIC_ID\n", atoi(&cfgStr[r]));
+        } else if (ocrStrncmp((u8*)"comm", (u8*)&cfgStr[l], (r-l)) == 0) {
+            DPRINTF(DEBUG_LVL_INFO, "Assigning heuristic %d to slot COMM_HEURISTIC_ID\n", sglAtoi(cfgStr[r]));
             id = COMM_HEURISTIC_ID;
-        } else if (strncmp("plc", &cfgStr[l], (r-l)) == 0) {
-            DPRINTF(DEBUG_LVL_INFO, "Assigning heuristic %d to slot PLACEMENT_HEURISTIC_ID\n", atoi(&cfgStr[r]));
+        } else if (ocrStrncmp((u8*)"plc", (u8*)&cfgStr[l], (r-l)) == 0) {
+            DPRINTF(DEBUG_LVL_INFO, "Assigning heuristic %d to slot PLACEMENT_HEURISTIC_ID\n", sglAtoi(cfgStr[r]));
             id = PLACEMENT_HEURISTIC_ID;
         } else {
             cfgStr[r] = '\0';
             DPRINTF(DEBUG_LVL_WARN, "error: Unrecognized heuristic %s\n", cfgStr[l]);
             ASSERT(false);
         }
-        schedulerHeuristics[id] = pdSchedulerHeuristics[atoi(&cfgStr[r])];
+        schedulerHeuristics[id] = pdSchedulerHeuristics[sglAtoi(cfgStr[r])];
         r+=2; //skip digit and delimiter
         l = r;
     }
