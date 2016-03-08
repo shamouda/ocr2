@@ -144,6 +144,8 @@ u8 ocrDbDestroy(ocrGuid_t db) {
         // If dynRemoved is true, we will release the data-block. Otherwise, we won't
         PD_MSG_FIELD_I(properties) = dynRemoved ? 0 : DB_PROP_NO_RELEASE;
         returnCode = policy->fcts.processMessage(policy, &msg, false);
+        if(returnCode == 0)
+            returnCode = PD_MSG_FIELD_O(returnDetail);
 #undef PD_MSG
 #undef PD_TYPE
     } else {
