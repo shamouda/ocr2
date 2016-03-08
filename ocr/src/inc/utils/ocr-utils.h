@@ -207,12 +207,30 @@ u32 ocrGuidTrackerFind(ocrGuidTracker_t *self, ocrGuid_t toFind);
 s32 ocrStrcmp(u8 *str1, u8 *str2);
 
 /**
+ * @brief String compare; behaves similar to libc's strcmp()
+ *
+ * @param str1              First string to compare
+ * @param str2              Second string to compare
+ * @param n                 Length to compare
+ * @return zero if the strings match, non-zero if they don't match
+ */
+s32 ocrStrncmp(u8 *str1, u8 *str2, u32 n);
+
+/**
  * @brief String length operation; behaves similar to libc's strlen()
  *
  * @param[in] str           NULL-terminated string
  * @return the number of characters (not including the null termination
  */
 u64 ocrStrlen(const char* str);
+
+/**
+ * @brief ascii to unsigned integer; behaves similar to atoi
+ *
+ * @param[in] char           character to convert
+ * @return the integer value of the character ranging from 0 to 9
+ */
+bool ocrIsDigit(u8 c);
 
 /* Not currently used
 typedef struct ocrPlaceTrackerStruct_t {
