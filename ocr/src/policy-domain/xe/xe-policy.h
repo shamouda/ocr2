@@ -44,9 +44,10 @@ ocrPolicyDomainFactory_t *newPolicyDomainFactoryXe(ocrParamList_t *perType);
 #ifdef ENABLE_SYSBOOT_FSIM
 #include "tg-bin-files.h"
 COMPILE_ASSERT(offsetof(ocrPolicyDomain_t, fcts) + offsetof(ocrPolicyDomainFcts_t, switchRunlevel) == PD_SWITCH_RL_OFFSET);
-               // If this fails, go to ss/common/include/tg-bin-files.h and change PD_SWITCH_RL_OFFSET
-//COMPILE_ASSERT(offsetof(ocrPolicyDomainXe_t, packedArgsLocation) == XE_PDARGS_OFFSET);
-               // If this fails, go to ss/common/include/tg-bin-files.h and change XE_PDARGS_OFFSET
+               // If this fails, go to <build>/tg-xe/tg-bin-files.h and change PD_SWITCH_RL_OFFSET
+COMPILE_ASSERT(offsetof(ocrPolicyDomainXe_t, packedArgsLocation) == XE_PDARGS_OFFSET);
+               // If this fails, go to tg/tgkrnl/inc/tg-bin-files.h and change XE_PDARGS_OFFSET. Also change in
+               // <build>/tg-xe/tg-bin-files.h
 #endif
 
 
