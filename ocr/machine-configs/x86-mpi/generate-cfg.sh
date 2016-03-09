@@ -28,4 +28,8 @@ done
 ARGS="--guid COUNTED_MAP --target ${PLATFORM} --scheduler PLACEMENT_AFFINITY --threads 8 --remove-destination"
 $CFG_SCRIPT ${ARGS} --output jenkins-x86-${PLATFORM}.cfg
 
+# Jenkins ST config
+ARGS="--guid COUNTED_MAP --target ${PLATFORM} --scheduler ST --threads 8 --remove-destination"
+$CFG_SCRIPT ${ARGS} --output jenkins-x86-${PLATFORM}-st.cfg
+
 unset CFG_SCRIPT

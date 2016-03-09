@@ -65,6 +65,18 @@ job_ocr_regression_x86_pthread_mpi_lockableDB = {
                  'LD_LIBRARY_PATH': '${MPI_ROOT}/lib64',}
 }
 
+#TODO: not sure how to not hardcode MPI_ROOT here
+job_ocr_regression_x86_pthread_mpi_st_lockableDB = {
+    'name': 'ocr-regression-x86-mpi-st-lockableDB',
+    'depends': ('ocr-build-x86-mpi',),
+    'jobtype': 'ocr-regression',
+    'run-args': 'x86-mpi jenkins-x86-mpi-st.cfg lockableDB',
+    'sandbox': ('inherit0',),
+    'env-vars': {'MPI_ROOT': '/opt/intel/tools/impi/5.1.1.109/intel64',
+                 'PATH': '${MPI_ROOT}/bin:'+os.environ['PATH'],
+                 'LD_LIBRARY_PATH': '${MPI_ROOT}/lib64',}
+}
+
 #TODO: not sure how to not hardcode GASNET_ROOT here
 job_ocr_regression_x86_pthread_gasnet_lockableDB = {
     'name': 'ocr-regression-x86-gasnet-lockableDB',
