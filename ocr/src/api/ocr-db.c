@@ -50,6 +50,7 @@ u8 ocrDbCreate(ocrGuid_t *db, void** addr, u64 len, u16 flags,
     PD_MSG_FIELD_I(affinity.metaDataPtr) = NULL;
     PD_MSG_FIELD_I(dbType) = USER_DBTYPE;
     PD_MSG_FIELD_I(allocator) = allocator;
+    PD_MSG_FIELD_I(hint) = NULL;
     returnCode = policy->fcts.processMessage(policy, &msg, true);
 
     if(returnCode == 0) {

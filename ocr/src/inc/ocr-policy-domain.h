@@ -426,6 +426,7 @@ typedef struct _ocrPolicyMsg_t {
                     ocrFatGuid_t affinity;        /**< In: Affinity group for the DB */
                     ocrDataBlockType_t dbType;    /**< In: Type of memory requested */
                     ocrInDbAllocator_t allocator; /**< In: In-DB allocator */
+                    ocrHint_t * hint;             /**< In: Hints passed by the user at DB creation time */
                 } in;
                 struct {
                     void* ptr;                    /**< Out: Address of created DB */
@@ -546,6 +547,7 @@ typedef struct _ocrPolicyMsg_t {
                     ocrFatGuid_t currentEdt;   /**< In: EDT that is creating work */
                     u64 *paramv;               /**< In: Parameters for this EDT */
                     ocrFatGuid_t * depv;       /**< In: Dependences for this EDT */
+                    ocrHint_t * hint;          /**< In: Hints passed by the user at EDT creation time */
                     ocrWorkType_t workType;    /**< In: Type of work to create */
                     u32 properties;            /**< In: properties for the creation */
                 } in;

@@ -152,12 +152,22 @@ u8 ocrPolicyMsgGetMsgSize(ocrPolicyMsg_t *msg, u64 *baseSize,
 
 #define PD_MSG msg
     switch(msg->type & PD_MSG_TYPE_ONLY) {
+    case PD_MSG_DB_CREATE:
+#define PD_TYPE PD_MSG_DB_CREATE
+        if(isIn) {
+            ASSERT(MAX_ALIGN % sizeof(u64) == 0);
+            *marshalledSize = (PD_MSG_FIELD_I(hint)?sizeof(ocrHint_t):0ULL);
+        }
+        break;
+#undef PD_TYPE
+
     case PD_MSG_WORK_CREATE:
 #define PD_TYPE PD_MSG_WORK_CREATE
         if(isIn) {
             ASSERT(MAX_ALIGN % sizeof(u64) == 0);
             *marshalledSize = (PD_MSG_FIELD_I(paramv)?sizeof(u64)*PD_MSG_FIELD_IO(paramc):0ULL) +
-                              (PD_MSG_FIELD_I(depv)?sizeof(ocrFatGuid_t)*PD_MSG_FIELD_IO(depc):0ULL);
+                              (PD_MSG_FIELD_I(depv)?sizeof(ocrFatGuid_t)*PD_MSG_FIELD_IO(depc):0ULL) +
+                              (PD_MSG_FIELD_I(hint)?sizeof(ocrHint_t):0ULL);
         }
         break;
 #undef PD_TYPE
@@ -386,6 +396,32 @@ u8 ocrPolicyMsgMarshallMsg(ocrPolicyMsg_t* msg, u64 baseSize, u8* buffer, u32 mo
 
 #define PD_MSG outputMsg
     switch(outputMsg->type & PD_MSG_TYPE_ONLY) {
+    case PD_MSG_DB_CREATE: {
+#define PD_TYPE PD_MSG_DB_CREATE
+        if(isIn) {
+            // marshall hints if passed by user
+            u64 s = ((PD_MSG_FIELD_I(hint) != NULL) ? sizeof(ocrHint_t) : 0);
+            if(s) {
+                hal_memCopy(curPtr, PD_MSG_FIELD_I(hint), s, false);
+                // Now fixup the pointer
+                if(fixupPtrs) {
+                    DPRINTF(DEBUG_LVL_VVERB, "Converting hint (0x%lx) to 0x%lx\n",
+                            (u64)PD_MSG_FIELD_I(hint), ((u64)(curPtr - startPtr)<<1) + isAddl);
+                    PD_MSG_FIELD_I(hint) = (ocrHint_t*)((((u64)(curPtr - startPtr))<<1) + isAddl);
+                } else {
+                    DPRINTF(DEBUG_LVL_VVERB, "Copying hint (0x%lx) to 0x%lx\n",
+                            (u64)PD_MSG_FIELD_I(hint), curPtr);
+                    PD_MSG_FIELD_I(hint) = (ocrHint_t*)curPtr;
+                }
+                curPtr += s;
+            } else {
+                PD_MSG_FIELD_I(hint) = NULL;
+            }
+        }
+        break;
+#undef PD_TYPE
+    }
+
     case PD_MSG_WORK_CREATE: {
 #define PD_TYPE PD_MSG_WORK_CREATE
         if(isIn) {
@@ -432,6 +468,25 @@ u8 ocrPolicyMsgMarshallMsg(ocrPolicyMsg_t* msg, u64 baseSize, u8* buffer, u32 mo
                 curPtr += s;
             } else {
                 PD_MSG_FIELD_I(depv) = NULL;
+            }
+
+            // marshall hints if passed by user
+            s = ((PD_MSG_FIELD_I(hint) != NULL) ? sizeof(ocrHint_t) : 0);
+            if(s) {
+                hal_memCopy(curPtr, PD_MSG_FIELD_I(hint), s, false);
+                // Now fixup the pointer
+                if(fixupPtrs) {
+                    DPRINTF(DEBUG_LVL_VVERB, "Converting hint (0x%lx) to 0x%lx\n",
+                            (u64)PD_MSG_FIELD_I(hint), ((u64)(curPtr - startPtr)<<1) + isAddl);
+                    PD_MSG_FIELD_I(hint) = (ocrHint_t*)((((u64)(curPtr - startPtr))<<1) + isAddl);
+                } else {
+                    DPRINTF(DEBUG_LVL_VVERB, "Copying hint (0x%lx) to 0x%lx\n",
+                            (u64)PD_MSG_FIELD_I(hint), curPtr);
+                    PD_MSG_FIELD_I(hint) = (ocrHint_t*)curPtr;
+                }
+                curPtr += s;
+            } else {
+                PD_MSG_FIELD_I(hint) = NULL;
             }
         }
         break;
@@ -881,6 +936,20 @@ u8 ocrPolicyMsgUnMarshallMsg(u8* mainBuffer, u8* addlBuffer,
     // fix them up
 #define PD_MSG msg
     switch(msg->type & PD_MSG_TYPE_ONLY) {
+    case PD_MSG_DB_CREATE: {
+#define PD_TYPE PD_MSG_DB_CREATE
+        if(isIn) {
+            if(PD_MSG_FIELD_I(hint) != NULL) {
+                u64 t = (u64)(PD_MSG_FIELD_I(hint));
+                PD_MSG_FIELD_I(hint) = (void*)((t&1?localAddlPtr:localMainPtr) + (t>>1));
+                DPRINTF(DEBUG_LVL_VVERB, "Converted field hint from 0x%lx to 0x%lx\n",
+                        t, (u64)PD_MSG_FIELD_I(hint));
+            }
+        }
+        break;
+#undef PD_TYPE
+    }
+
     case PD_MSG_WORK_CREATE: {
 #define PD_TYPE PD_MSG_WORK_CREATE
         if(isIn) {
@@ -895,6 +964,12 @@ u8 ocrPolicyMsgUnMarshallMsg(u8* mainBuffer, u8* addlBuffer,
                 PD_MSG_FIELD_I(depv) = (void*)((t&1?localAddlPtr:localMainPtr) + (t>>1));
                 DPRINTF(DEBUG_LVL_VVERB, "Converted field depv from 0x%lx to 0x%lx\n",
                         t, (u64)PD_MSG_FIELD_I(depv));
+            }
+            if(PD_MSG_FIELD_I(hint) != NULL) {
+                u64 t = (u64)(PD_MSG_FIELD_I(hint));
+                PD_MSG_FIELD_I(hint) = (void*)((t&1?localAddlPtr:localMainPtr) + (t>>1));
+                DPRINTF(DEBUG_LVL_VVERB, "Converted field hint from 0x%lx to 0x%lx\n",
+                        t, (u64)PD_MSG_FIELD_I(hint));
             }
         }
         break;

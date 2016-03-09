@@ -97,6 +97,7 @@ static u8 createDbRegNode(ocrFatGuid_t * dbFatGuid, u32 nbElems, bool doRelease,
     PD_MSG_FIELD_I(affinity.metaDataPtr) = NULL;
     PD_MSG_FIELD_I(dbType) = RUNTIME_DBTYPE;
     PD_MSG_FIELD_I(allocator) = NO_ALLOC;
+    PD_MSG_FIELD_I(hint) = NULL;
     RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, true));
     (*dbFatGuid) = PD_MSG_FIELD_IO(guid);
     regNode_t * temp = (regNode_t*) PD_MSG_FIELD_O(ptr);
@@ -591,6 +592,7 @@ static u8 commonEnqueueWaiter(ocrPolicyDomain_t *pd, ocrEvent_t *base, ocrFatGui
                 PD_MSG_FIELD_I(affinity.metaDataPtr) = NULL;
                 PD_MSG_FIELD_I(dbType) = RUNTIME_DBTYPE;
                 PD_MSG_FIELD_I(allocator) = NO_ALLOC;
+                PD_MSG_FIELD_I(hint) = NULL;
                 if((toReturn = pd->fcts.processMessage(pd, msg, true))) {
                     ASSERT(false); // debug
                     hal_unlock32(&(event->waitersLock));

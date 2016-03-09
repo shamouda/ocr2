@@ -188,6 +188,7 @@ static u8 createProcessRequestEdt(ocrPolicyDomain_t * pd, ocrGuid_t templateGuid
     PD_MSG_FIELD_I(parentLatch.metaDataPtr) = NULL;
     PD_MSG_FIELD_I(paramv) = paramv;
     PD_MSG_FIELD_I(depv) = NULL;
+    PD_MSG_FIELD_I(hint) = NULL;
     PD_MSG_FIELD_I(workType) = workType;
     PD_MSG_FIELD_I(properties) = properties;
     returnCode = pd->fcts.processMessage(pd, &msg, true);

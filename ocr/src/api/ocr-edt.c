@@ -282,6 +282,7 @@ u8 ocrEdtCreate(ocrGuid_t* edtGuidPtr, ocrGuid_t templateGuid,
     PD_MSG_FIELD_I(currentEdt.metaDataPtr) = curEdt;
     PD_MSG_FIELD_I(paramv) = paramv;
     PD_MSG_FIELD_I(depv) = depvFatGuids;
+    PD_MSG_FIELD_I(hint) = NULL;
     PD_MSG_FIELD_I(workType) = EDT_USER_WORKTYPE;
     PD_MSG_FIELD_I(properties) = properties;
 
