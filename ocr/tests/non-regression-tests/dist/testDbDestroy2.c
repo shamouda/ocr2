@@ -17,7 +17,7 @@
 
 ocrGuid_t destroyEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrGuid_t * dbGuidArray = (ocrGuid_t *) depv[0].ptr;
-    PRINTF("destroyEdt: destroy DB guid 0x%lx \n", dbGuidArray[0]);
+    PRINTF("destroyEdt: destroy DB guid "GUIDF" \n", GUIDA(dbGuidArray[0]));
     ocrDbDestroy(dbGuidArray[0]);
     ocrShutdown();
     return NULL_GUID;
@@ -31,7 +31,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     // Set the other db guid in the guid array
     void * dbPtr;
     ocrDbCreate(&dbPtrArray[0], &dbPtr, sizeof(TYPE_ELEM_DB) * NB_ELEM_DB, 0, NULL_HINT, NO_ALLOC);
-    PRINTF("mainEdt: local DB guid is 0x%lx\n", dbPtrArray[0]);
+    PRINTF("mainEdt: local DB guid is "GUIDF"\n", GUIDA(dbPtrArray[0]));
     ocrDbRelease(dbGuidArray);
     // create local edt that depends on the remote edt, the db is automatically cloned
     ocrGuid_t destroyEdtTemplateGuid;

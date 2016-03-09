@@ -47,7 +47,7 @@ ocrGuid_t eWriteEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     TYPE_ELEM_DB c = data[0];
     u32 i = 0;
     while (i < NB_ELEM_DB) {
-        // PRINTF("[%d] data[%d] == %d\n", c, i, data[i]);
+        // PRINTF("[%"PRId32"] data[%"PRId32"] == %"PRId32"\n", c, i, data[i]);
         ASSERT ((data[i] == c) && "Inconsistent check before write detected");
         i++;
     }
@@ -59,7 +59,7 @@ ocrGuid_t eWriteEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
         i++;
     }
     ocrDbRelease(depv[0].guid);
-    // PRINTF("Done with write %d\n", c);
+    // PRINTF("Done with write %"PRId32"\n", c);
     // fflush(stdout);
     return NULL_GUID;
 }
@@ -88,7 +88,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     }
     ocrDbRelease(dbGuid);
 
-    PRINTF("DB (GUID: 0x%lx)\n",dbGuid);
+    PRINTF("DB (GUID: "GUIDF")\n",GUIDA(dbGuid));
 
     ocrGuid_t shutdownEdtTemplateGuid;
     ocrEdtTemplateCreate(&shutdownEdtTemplateGuid, shutdownEdt, 0, (NB_WRITERS+(NB_WRITERS*NB_READERS_PER_WRITER)));

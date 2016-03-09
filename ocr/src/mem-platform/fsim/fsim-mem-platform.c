@@ -77,7 +77,7 @@ u8 fsimSwitchRunlevel(ocrMemPlatform_t *self, ocrPolicyDomain_t *PD, ocrRunlevel
            }
 #endif
 
-            DPRINTF(DEBUG_LVL_VERB, "Initializing memory range %lx to %lx\n", self->startAddr, self->endAddr);
+            DPRINTF(DEBUG_LVL_VERB, "Initializing memory range %"PRIx64" to %"PRIx64"\n", self->startAddr, self->endAddr);
             ocrMemPlatformFsim_t *rself = (ocrMemPlatformFsim_t*)self;
             rself->pRangeTracker = initializeRange(16, self->startAddr,
                     self->endAddr, USER_FREE_TAG);
@@ -114,7 +114,7 @@ u8 fsimChunkAndTag(ocrMemPlatform_t *self, u64 *startAddr, u64 size,
                    ocrMemoryTag_t oldTag, ocrMemoryTag_t newTag) {
 
     if(oldTag >= MAX_TAG || newTag >= MAX_TAG) {
-        DPRINTF(DEBUG_LVL_WARN, "Cannot chunk and tag because oldTag (%d) or newTag (%d) are bigger than %d\n",
+        DPRINTF(DEBUG_LVL_WARN, "Cannot chunk and tag because oldTag (%"PRId32") or newTag (%"PRId32") are bigger than %"PRId32"\n",
                 (u32)oldTag, (u32)newTag, (u32)MAX_TAG);
         return 3;
     }
@@ -161,7 +161,7 @@ u8 fsimChunkAndTag(ocrMemPlatform_t *self, u64 *startAddr, u64 size,
                                   &endRange, &iterate);
         if(result == 0 && endRange - startRange >= size) {
             *startAddr = startRange;
-            DPRINTF(DEBUG_LVL_VERB, "ChunkAndTag returning (existing) start of 0x%llx for size %lld (0x%llx) Tag %d\n",
+            DPRINTF(DEBUG_LVL_VERB, "ChunkAndTag returning (existing) start of 0x%"PRIx64" for size %"PRId64" (0x%"PRIx64") Tag %"PRId32"\n",
                     *startAddr, size, size, newTag);
             // exit.
             UNLOCK(&(rself->pRangeTracker->lockChunkAndTag));
@@ -177,14 +177,14 @@ u8 fsimChunkAndTag(ocrMemPlatform_t *self, u64 *startAddr, u64 size,
         if(result == 0 && endRange - startRange >= size) {
             // This is a fit, we do not look for "best" fit for now
             *startAddr = startRange;
-            DPRINTF(DEBUG_LVL_VERB, "ChunkAndTag returning start of 0x%llx for size %lld (0x%llx) and newTag %d\n",
+            DPRINTF(DEBUG_LVL_VERB, "ChunkAndTag returning start of 0x%"PRIx64" for size %"PRId64" (0x%"PRIx64") and newTag %"PRId32"\n",
                     *startAddr, size, size, newTag);
             RESULT_ASSERT(splitRange(rself->pRangeTracker,
                                      startRange, size, newTag, 0), ==, 0);
             break;
         } else {
             if(result == 0) {
-                DPRINTF(DEBUG_LVL_VVERB, "ChunkAndTag, found [0x%llx; 0x%llx[ but too small for size %lld (0xllx)\n",
+                DPRINTF(DEBUG_LVL_VVERB, "ChunkAndTag, found [0x%"PRIx64"; 0x%"PRIx64"[ but too small for size %"PRId64" (0x%"PRIx64")\n",
                         startRange, endRange, size, size);
             }
         }

@@ -31,7 +31,7 @@ END_FILTER
 
 FILTER_DESTRUCT {
     FILTER_CAST(rself, self);
-    DPRINTF(DEBUG_LVL_VERB, "Destroying file-dump filter @ 0x%lx\n", (u64)self);
+    DPRINTF(DEBUG_LVL_VERB, "Destroying file-dump filter @ 0x%"PRIx64"\n", (u64)self);
 // We close out the output file
     if(rself->outFile) {
         fclose(rself->outFile);
@@ -54,7 +54,7 @@ FILTER_NOTIFY {
 
 FILTER_MERGE {
     FILTER_CAST(rself, self);
-    DPRINTF(DEBUG_LVL_VERB, "Filter @ 0x%lx received merging from filter 0x%lx\n", (u64)self, (u64)other);
+    DPRINTF(DEBUG_LVL_VERB, "Filter @ 0x%"PRIx64" received merging from filter 0x%"PRIx64"\n", (u64)self, (u64)other);
 
     if(rself->outFile) {
         char* outString = NULL;
@@ -92,7 +92,7 @@ FILTER_CREATE {
         rself->outFile = fopen((char*)instanceArg, "w");
     else
         rself->outFile = fopen("ocrStats.log", "w");
-    DPRINTF(DEBUG_LVL_VERB, "Created a file-dump filter @ 0x%lx with file 0x%lx\n",
+    DPRINTF(DEBUG_LVL_VERB, "Created a file-dump filter @ 0x%"PRIx64" with file 0x%"PRIx64"\n",
     (u64)rself, (u64)rself->outFile);
     ASSERT(rself->outFile);
 

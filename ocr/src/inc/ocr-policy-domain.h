@@ -267,18 +267,18 @@ typedef struct _paramListPolicyDomainInst_t {
 /**< And this to just get the type of the message (note that the number
  * of ocrFatGuid_t is part of the type as for a given type, this won't change)
  */
-#define PD_MSG_TYPE_ONLY        0x00FFFFFFULL
+#define PD_MSG_TYPE_ONLY        0x00FFFFFFUL
 
 /**< Get just the flags */
-#define PD_MSG_META_ONLY        0xFF000000ULL
+#define PD_MSG_META_ONLY        0xFF000000UL
 
 /**< Get just the number of ocrFatGuid_t in the in/out part */
-#define PD_MSG_FG_IO_COUNT_ONLY    0x00030000ULL
+#define PD_MSG_FG_IO_COUNT_ONLY    0x00030000UL
 
 /**< Get just the number of ocrFatGuid_t in the in part */
-#define PD_MSG_FG_I_COUNT_ONLY     0x001C0000ULL
+#define PD_MSG_FG_I_COUNT_ONLY     0x001C0000UL
 
-#define PD_MSG_FG_O_COUNT_ONLY     0x00E00000ULL
+#define PD_MSG_FG_O_COUNT_ONLY     0x00E00000UL
 
 #define PD_MSG_FG_IO_COUNT_ONLY_GET(__msgtype) ((u32) (__msgtype & PD_MSG_FG_IO_COUNT_ONLY) >> 16)
 #define PD_MSG_FG_I_COUNT_ONLY_GET(__msgtype) ((u32) (__msgtype & PD_MSG_FG_I_COUNT_ONLY) >> 18)

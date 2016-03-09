@@ -64,8 +64,8 @@ void AMH_REGISTER_FCN(handler) (void)                   \
     int _retval;                                                     \
     if ((_retval = fncall) != GASNET_OK) {                           \
         fprintf(stderr, "ERROR calling: %s\n"                        \
-            " at: %s:%i\n"                                           \
-            " error: %s (%s)\n",                                     \
+                " at: %s:%"PRId32"\n"                                \
+                " error: %s (%s)\n",                                 \
             #fncall, __FILE__, __LINE__,                             \
             gasnet_ErrorName(_retval), gasnet_ErrorDesc(_retval));   \
         fflush(stderr);                                              \

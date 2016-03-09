@@ -191,7 +191,7 @@ u8 ocrGuidFromLabel(ocrGuid_t *outGuid, ocrGuid_t mapGuid, s64* tuple) {
 #undef PD_TYPE
 #undef PD_MSG
     ASSERT(myMap != NULL);
-    DPRINTF(DEBUG_LVL_VVERB, "For map "GUIDF", calling map with start: "GUIDF", stride: 0x%lx\n",
+    DPRINTF(DEBUG_LVL_VVERB, "For map "GUIDF", calling map with start: "GUIDF", stride: 0x%"PRIx64"\n",
             GUIDA(mapGuid), GUIDA(myMap->startGuid), myMap->skipGuid);
     if(myMap->mapFunc == NULL) {
         DPRINTF(DEBUG_LVL_WARN, "ocrGuidFromLabel requires a map created with ocrGuidMapCreate (not a range)\n");
@@ -226,14 +226,14 @@ u8 ocrGuidFromIndex(ocrGuid_t *outGuid, ocrGuid_t rangeGuid, u64 idx) {
 #undef PD_TYPE
 #undef PD_MSG
     ASSERT(myMap != NULL);
-    DPRINTF(DEBUG_LVL_VVERB, "For range "GUIDF", calling map with start: "GUIDF", stride: 0x%lx\n",
+    DPRINTF(DEBUG_LVL_VVERB, "For range "GUIDF", calling map with start: "GUIDF", stride: 0x%"PRIx64"\n",
             GUIDA(rangeGuid), GUIDA(myMap->startGuid), myMap->skipGuid);
     if(myMap->mapFunc != NULL) {
         DPRINTF(DEBUG_LVL_WARN, "ocrGuidFromLabel requires a map created with ocrGuidRangeCreate (not a map)\n");
         return OCR_EINVAL;
     }
     if(idx >= myMap->numGuids) {
-        DPRINTF(DEBUG_LVL_WARN, "Invalid index value in ocrGuidFromIndex. Got %lu, expected 0..%lu\n",
+        DPRINTF(DEBUG_LVL_WARN, "Invalid index value in ocrGuidFromIndex. Got %"PRIu64", expected 0..%"PRIu64"\n",
                 idx, myMap->numGuids-1);
         return OCR_EINVAL;
     }

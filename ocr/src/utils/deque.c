@@ -181,8 +181,8 @@ void wstDequePushTail(deque_t* self, void* entry, u8 doTry) {
     }
     s32 n = (self->tail) % INIT_DEQUE_CAPACITY;
     self->data[n] = entry;
-    DPRINTF(DEBUG_LVL_VERB, "Pushing h:%d t:%d deq[%d] elt:0x%lx into conc deque @ 0x%lx\n",
-            head, self->tail, n, (u64)entry, (u64)self);
+    DPRINTF(DEBUG_LVL_VERB, "Pushing h:%"PRId32" t:%"PRId32" deq[%"PRId32"] elt:0x%p into conc deque @ 0x%p\n",
+            head, self->tail, n, entry, self);
     hal_fence();
     ++(self->tail);
 }
@@ -205,7 +205,7 @@ void * wstDequePopTail(deque_t * self, u8 doTry) {
     void * rt = (void*) self->data[(tail) % INIT_DEQUE_CAPACITY];
 
     if (tail > head) {
-        DPRINTF(DEBUG_LVL_VERB, "Popping (tail) h:%d t:%d deq[%d] elt:0x%lx from conc deque @ 0x%lx\n",
+        DPRINTF(DEBUG_LVL_VERB, "Popping (tail) h:%"PRId32" t:%"PRId32" deq[%"PRId32"] elt:0x%"PRIx64" from conc deque @ 0x%"PRIx64"\n",
                 head, tail, tail % INIT_DEQUE_CAPACITY, (u64)rt, (u64)self);
         return rt;
     }
@@ -216,7 +216,7 @@ void * wstDequePopTail(deque_t * self, u8 doTry) {
 
     /* now the deque is empty */
     self->tail = self->head;
-    DPRINTF(DEBUG_LVL_VERB, "Popping (tail 2) h:%d t:%d deq[%d] elt:0x%lx from conc deque @ 0x%lx\n",
+    DPRINTF(DEBUG_LVL_VERB, "Popping (tail 2) h:%"PRId32" t:%"PRId32" deq[%"PRId32"] elt:0x%"PRIx64" from conc deque @ 0x%"PRIx64"\n",
             head, tail, tail % INIT_DEQUE_CAPACITY, (u64)rt, (u64)self);
     return rt;
 }
@@ -243,7 +243,7 @@ void * wstDequePopHead(deque_t * self, u8 doTry) {
 
         /* compete with other thieves and possibly the owner (if the size == 1) */
         if (hal_cmpswap32(&self->head, head, head + 1) == head) { /* competing */
-            DPRINTF(DEBUG_LVL_VERB, "Popping (head) h:%d t:%d deq[%d] elt:0x%lx from conc deque @ 0x%lx\n",
+            DPRINTF(DEBUG_LVL_VERB, "Popping (head) h:%"PRId32" t:%"PRId32" deq[%"PRId32"] elt:0x%"PRIx64" from conc deque @ 0x%"PRIx64"\n",
                      head, tail, head % INIT_DEQUE_CAPACITY, (u64)rt, (u64)self);
             return rt;
         }

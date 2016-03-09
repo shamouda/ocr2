@@ -327,7 +327,7 @@ OBJS_EXEC     := $(addprefix $(OBJDIR)/exec/, $(addsuffix .o, $(basename $(notdi
 
 
 # Update include paths
-CFLAGS := -I . -I $(OCR_ROOT)/inc -I $(OCR_ROOT)/src -I $(OCR_ROOT)/src/inc $(CFLAGS)
+CFLAGS := -I . -I $(OCR_ROOT)/inc -I $(OCR_ROOT)/src -I $(OCR_ROOT)/src/inc $(CFLAGS) -Werror
 
 # Static library name (only set if not set in OCR_TYPE specific file)
 ifeq (${SUPPORTS_STATIC}, yes)

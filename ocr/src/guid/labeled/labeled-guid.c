@@ -178,7 +178,7 @@ u8 labeledGuidSwitchRunlevel(ocrGuidProvider_t *self, ocrPolicyDomain_t *PD, ocr
             PRINTF("Remnant GUIDs summary:\n");
             for(i=0; i < OCR_GUID_MAX; i++) {
                 if (guidTypeCounters[i] != 0) {
-                    PRINTF("%s => %lu instances\n", ocrGuidKindToChar(i), guidTypeCounters[i]);
+                    PRINTF("%s => %"PRIu64" instances\n", ocrGuidKindToChar(i), guidTypeCounters[i]);
                 }
             }
             PRINTF("=========================\n");
@@ -272,7 +272,7 @@ static u64 generateNextGuid(ocrGuidProvider_t* self, ocrGuidKind kind) {
     guid |= newCount;
 
     //64-bit assumption.  Should probably return a guid.
-    DPRINTF(DEBUG_LVL_VVERB, "LabeledGUID generated GUID %lx\n", guid);
+    DPRINTF(DEBUG_LVL_VVERB, "LabeledGUID generated GUID %"PRIx64"\n", guid);
     return guid;
 }
 
@@ -306,7 +306,7 @@ u8 labeledGuidReserve(ocrGuidProvider_t *self, ocrGuid_t *startGuid, u64* skipGu
     (*(startGuid)).lower |= firstCount;
 #endif
 
-    DPRINTF(DEBUG_LVL_VVERB, "LabeledGUID reserved a range for %lu GUIDs starting at "GUIDF"\n",
+    DPRINTF(DEBUG_LVL_VVERB, "LabeledGUID reserved a range for %"PRIu64" GUIDs starting at "GUIDF"\n",
             numberGuids, GUIDA(*startGuid));
     return 0;
 }
@@ -323,7 +323,7 @@ u8 labeledGuidUnreserve(ocrGuidProvider_t *self, ocrGuid_t startGuid, u64 skipGu
 u8 labeledGuidGetGuid(ocrGuidProvider_t* self, ocrGuid_t* guid, u64 val, ocrGuidKind kind) {
     // Here no need to allocate
     u64 newGuid = generateNextGuid(self, kind);
-    DPRINTF(DEBUG_LVL_VERB, "LabeledGUID: insert into hash table 0x%lx -> 0x%lx\n", newGuid, val);
+    DPRINTF(DEBUG_LVL_VERB, "LabeledGUID: insert into hash table 0x%"PRIx64" -> 0x%"PRIx64"\n", newGuid, val);
     // See BUG #928 on GUID issues
 
     GP_HASHTABLE_PUT(((ocrGuidProviderLabeled_t *) self)->guidImplTable, (void *) newGuid, (void *) val);
@@ -384,7 +384,7 @@ u8 labeledGuidCreateGuid(ocrGuidProvider_t* self, ocrFatGuid_t *fguid, u64 size,
     if(properties & GUID_PROP_IS_LABELED) {
         if((properties & GUID_PROP_CHECK) == GUID_PROP_CHECK) {
             // We need to actually check things
-            DPRINTF(DEBUG_LVL_VERB, "LabeledGUID: try insert into hash table "GUIDF" -> 0x%lx\n", GUIDA(fguid->guid), ptr);
+            DPRINTF(DEBUG_LVL_VERB, "LabeledGUID: try insert into hash table "GUIDF" -> %p\n", GUIDA(fguid->guid), ptr);
             // See BUG #928 on GUID issues
 #if GUID_BIT_COUNT == 64
             void *value = hashtableConcBucketLockedTryPut(
@@ -396,7 +396,7 @@ u8 labeledGuidCreateGuid(ocrGuidProvider_t* self, ocrFatGuid_t *fguid, u64 size,
                 (void*)(fguid->guid.lower), ptr);
 #endif
             if(value != ptr) {
-                DPRINTF(DEBUG_LVL_VVERB, "LabeledGUID: FAILED to insert (got 0x%lx instead of 0x%lx)\n",
+                DPRINTF(DEBUG_LVL_VVERB, "LabeledGUID: FAILED to insert (got %p instead of %p)\n",
                         value, ptr);
                 // Fail; already exists
                 fguid->metaDataPtr = value; // Do we need to return this?
@@ -426,7 +426,7 @@ u8 labeledGuidCreateGuid(ocrGuidProvider_t* self, ocrFatGuid_t *fguid, u64 size,
             }
         } else if((properties & GUID_PROP_BLOCK) == GUID_PROP_BLOCK) {
             void* value = NULL;
-            DPRINTF(DEBUG_LVL_VERB, "LabeledGUID: force insert into hash table "GUIDF" -> 0x%lx\n", GUIDA(fguid->guid), ptr);
+            DPRINTF(DEBUG_LVL_VERB, "LabeledGUID: force insert into hash table "GUIDF" -> %p\n", GUIDA(fguid->guid), ptr);
             do {
 
 // See BUG #928 on GUID issues
@@ -443,7 +443,7 @@ u8 labeledGuidCreateGuid(ocrGuidProvider_t* self, ocrFatGuid_t *fguid, u64 size,
             } while(value != ptr);
         } else {
             // "Trust me" mode. We insert into the hashtable
-            DPRINTF(DEBUG_LVL_VERB, "LabeledGUID: trust insert into hash table "GUIDF" -> 0x%lx\n", GUIDA(fguid->guid), ptr);
+            DPRINTF(DEBUG_LVL_VERB, "LabeledGUID: trust insert into hash table "GUIDF" -> %p\n", GUIDA(fguid->guid), ptr);
 
             // See BUG #928 on GUID issues
 #if GUID_BIT_COUNT == 64
@@ -460,7 +460,7 @@ u8 labeledGuidCreateGuid(ocrGuidProvider_t* self, ocrFatGuid_t *fguid, u64 size,
         labeledGuidGetGuid(self, &(fguid->guid), (u64)(fguid->metaDataPtr), kind);
     }
 #undef PD_MSG
-    DPRINTF(DEBUG_LVL_VERB, "LabeledGUID: create GUID: "GUIDF" -> 0x%lx\n", GUIDA(fguid->guid), fguid->metaDataPtr);
+    DPRINTF(DEBUG_LVL_VERB, "LabeledGUID: create GUID: "GUIDF" -> 0x%p\n", GUIDA(fguid->guid), fguid->metaDataPtr);
     return 0;
 }
 
@@ -476,7 +476,7 @@ u8 labeledGuidGetVal(ocrGuidProvider_t* self, ocrGuid_t guid, u64* val, ocrGuidK
 #else
 #error Unknown GUID type
 #endif
-    DPRINTF(DEBUG_LVL_VERB, "LabeledGUID: got val for GUID "GUIDF": 0x%lx\n", GUIDA(guid), *val);
+    DPRINTF(DEBUG_LVL_VERB, "LabeledGUID: got val for GUID "GUIDF": 0x%"PRIx64"\n", GUIDA(guid), *val);
     if(*val == (u64)NULL) {
         // Does not exist in the hashtable
         if(kind) {
@@ -528,7 +528,7 @@ u8 labeledGuidGetLocation(ocrGuidProvider_t* self, ocrGuid_t guid, ocrLocation_t
  * a local metadata represent for a foreign GUID.
  */
 u8 labeledGuidRegisterGuid(ocrGuidProvider_t* self, ocrGuid_t guid, u64 val) {
-    DPRINTF(DEBUG_LVL_VERB, "LabeledGUID: register GUID "GUIDF" -> 0x%lx\n", GUIDA(guid), val);
+    DPRINTF(DEBUG_LVL_VERB, "LabeledGUID: register GUID "GUIDF" -> 0x%"PRIx64"\n", GUIDA(guid), val);
     // See BUG #928 on GUID issues
 #if GUID_BIT_COUNT == 64
     GP_HASHTABLE_PUT(((ocrGuidProviderLabeled_t *) self)->guidImplTable, (void *) guid.guid, (void *) val);

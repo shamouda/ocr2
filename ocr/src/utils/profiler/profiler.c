@@ -296,7 +296,7 @@ void _profilerDataInit(_profilerData *self) {
     _gettime(end);
     ASSERT(end > start);
     self->overheadTimer = (end - start)/1000;
-    //fprintf(stderr, "Got RDTSCP overhead of %lu ticks\n", self->overheadTimer);
+    //fprintf(stderr, "Got RDTSCP overhead of %"PRIu64" ticks\n", self->overheadTimer);
 
     memset(&(self->stackPosition[0]), 0, sizeof(u32)*MAX_EVENTS);
 }
@@ -308,7 +308,7 @@ void _profilerDataDestroy(void* _self) {
     // when the thread is exiting (and the TLS is destroyed)
     u32 i;
     for(i=0; i<(u32)MAX_EVENTS; ++i) {
-        fprintf(self->output, "DEF %s %u\n", _profilerEventNames[i], i);
+        fprintf(self->output, "DEF %s %"PRIu32"\n", _profilerEventNames[i], i);
     }
 
     // Print out the entries
@@ -318,14 +318,14 @@ void _profilerDataDestroy(void* _self) {
             if(j == i) {
                 _profilerSelfEntry *entry = &(self->selfEvents[i]);
                 if(entry->count == 0) continue; // Skip entries with no content
-                fprintf(self->output, "ENTRY %u:%u = count(%lu), sum(%lu.%06u), sumSq(%lu.%012lu)\n",
+                fprintf(self->output, "ENTRY %"PRIu32":%"PRIu32" = count(%"PRIu64"), sum(%"PRIu64".%06"PRIu32"), sumSq(%"PRIu64".%012"PRIu64")\n",
                         i, j, entry->count, entry->sumMs, entry->sumNs, entry->sumSqMs, entry->sumSqNs);
             } else {
                 // Child entry
                 _profilerChildEntry *entry = &(self->childrenEvents[i][j<i?j:(j-1)]);
                 if(entry->count == 0) continue;
                 fprintf(self->output,
-                        "ENTRY %u:%u = count(%lu), sum(%lu.%06u), sumSq(%lu.%012lu), sumChild(%lu.%06u), sumSqChild(%lu.%012lu), sumRecurse(%lu.%06u), sumSqRecurse(%lu.%012lu)\n",
+                        "ENTRY %"PRIu32":%"PRIu32" = count(%"PRIu64"), sum(%"PRIu64".%06"PRIu32"), sumSq(%"PRIu64".%012"PRIu64"), sumChild(%"PRIu64".%06"PRIu32"), sumSqChild(%"PRIu64".%012"PRIu64"), sumRecurse(%"PRIu64".%06"PRIu32"), sumSqRecurse(%"PRIu64".%012"PRIu64")\n",
                         i, j, entry->count, entry->sumMs, entry->sumNs, entry->sumSqMs,
                         entry->sumSqNs, entry->sumInChildrenMs, entry->sumInChildrenNs,
                         entry->sumSqInChildrenMs, entry->sumSqInChildrenNs,

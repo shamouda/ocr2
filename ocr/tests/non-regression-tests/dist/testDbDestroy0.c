@@ -17,7 +17,7 @@
 
 ocrGuid_t readerEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrGuid_t dbGuid = (ocrGuid_t) depv[0].guid;
-    PRINTF("[remote] readerEdt: executing, depends on DB guid 0x%lx \n", dbGuid);
+    PRINTF("[remote] readerEdt: executing, depends on DB guid "GUIDF" \n", GUIDA(dbGuid));
     ocrDbDestroy(dbGuid);
     ocrShutdown(); // This prevents the db from being properly released
     return NULL_GUID;
@@ -37,7 +37,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
         i++;
     }
     ocrDbRelease(dbGuid);
-    PRINTF("[local] mainEdt: local DB guid is 0x%lx, dbPtr=%p\n", dbGuid, dbPtr);
+    PRINTF("[local] mainEdt: local DB guid is "GUIDF", dbPtr=%p\n", GUIDA(dbGuid), dbPtr);
 
     // create local edt that depends on the remote edt, the db is automatically cloned
     ocrGuid_t readerEdtTemplateGuid;

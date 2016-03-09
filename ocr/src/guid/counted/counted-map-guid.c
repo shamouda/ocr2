@@ -165,7 +165,7 @@ u8 countedMapSwitchRunlevel(ocrGuidProvider_t *self, ocrPolicyDomain_t *PD, ocrR
             PRINTF("Remnant GUIDs summary:\n");
             for(i=0; i < OCR_GUID_MAX; i++) {
                 if (guidTypeCounters[i] != 0) {
-                    PRINTF("%s => %lu instances\n", ocrGuidKindToChar(i), guidTypeCounters[i]);
+                    PRINTF("%s => %"PRIu64" instances\n", ocrGuidKindToChar(i), guidTypeCounters[i]);
                 }
             }
             PRINTF("=========================\n");

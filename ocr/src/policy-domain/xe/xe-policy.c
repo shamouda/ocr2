@@ -46,7 +46,7 @@ static void doRLBarrier(ocrPolicyDomain_t *policy) {
     ocrMsgHandle_t handle;
     ocrMsgHandle_t * pHandle = &handle;
 
-    DPRINTF(DEBUG_LVL_VERB, "Location 0x%lx: Notifying parent 0x%lx of reaching barrier %d\n",
+    DPRINTF(DEBUG_LVL_VERB, "Location 0x%"PRIx64": Notifying parent 0x%"PRIx64" of reaching barrier %"PRId32"\n",
             policy->myLocation, policy->parentLocation, rself->rlSwitch.barrierRL);
     // We first notify our parent
     rself->rlSwitch.barrierState = RL_BARRIER_STATE_PARENT_NOTIFIED;
@@ -65,7 +65,7 @@ static void doRLBarrier(ocrPolicyDomain_t *policy) {
 #undef PD_MSG
 #undef PD_TYPE
 
-    DPRINTF(DEBUG_LVL_VERB, "Location 0x%lx: waiting for parent release\n", policy->myLocation);
+    DPRINTF(DEBUG_LVL_VERB, "Location 0x%"PRIx64": waiting for parent release\n", policy->myLocation);
     // Now we wait for our parent to notify us
     while(rself->rlSwitch.barrierState != RL_BARRIER_STATE_PARENT_RESPONSE) {
         policy->commApis[0]->fcts.initHandle(policy->commApis[0], pHandle);
@@ -75,7 +75,7 @@ static void doRLBarrier(ocrPolicyDomain_t *policy) {
         RESULT_ASSERT(policy->fcts.processMessage(policy, msg, true), ==, 0);
         pHandle->destruct(pHandle);
     }
-    DPRINTF(DEBUG_LVL_VERB, "Location 0x%lx: released by parent\n", policy->myLocation);
+    DPRINTF(DEBUG_LVL_VERB, "Location 0x%"PRIx64": released by parent\n", policy->myLocation);
 }
 
 static void performNeighborDiscovery(ocrPolicyDomain_t *policy) {
@@ -86,7 +86,7 @@ static void performNeighborDiscovery(ocrPolicyDomain_t *policy) {
     policy->parentLocation = MAKE_CORE_ID(RACK_FROM_ID(policy->myLocation), CUBE_FROM_ID(policy->myLocation),
                                           SOCKET_FROM_ID(policy->myLocation), CLUSTER_FROM_ID(policy->myLocation),
                                           BLOCK_FROM_ID(policy->myLocation), ID_AGENT_CE);
-    DPRINTF(DEBUG_LVL_INFO, "Got location 0x%lx and parent location 0x%lx\n", policy->myLocation, policy->parentLocation);
+    DPRINTF(DEBUG_LVL_INFO, "Got location 0x%"PRIx64" and parent location 0x%"PRIx64"\n", policy->myLocation, policy->parentLocation);
 }
 
 static void findNeighborsPd(ocrPolicyDomain_t *policy) {
@@ -101,7 +101,7 @@ static void findNeighborsPd(ocrPolicyDomain_t *policy) {
                                     BLOCK_FROM_ID(policy->parentLocation)*(MAX_NUM_XE+MAX_NUM_CE) +
                                     ID_AGENT_CE];
     ASSERT(policy->parentPD->myLocation == policy->parentLocation);
-    DPRINTF(DEBUG_LVL_VERB, "PD 0x%lx (loc: 0x%lx) found parent at 0x%lx (loc: 0x%lx)\n",
+    DPRINTF(DEBUG_LVL_VERB, "PD %p (loc: 0x%"PRIx64") found parent at %p (loc: 0x%"PRIx64")\n",
             policy, policy->myLocation, policy->parentPD, policy->parentPD->myLocation);
 
 #endif
@@ -142,7 +142,7 @@ static u8 helperSwitchInert(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, p
 u8 xePdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 properties) {
 #ifdef ENABLE_SYSBOOT_FSIM
     if (XE_PDARGS_OFFSET != offsetof(ocrPolicyDomainXe_t, packedArgsLocation)) {
-        DPRINTF(DEBUG_LVL_WARN, "XE_PDARGS_OFFSET (in .../ss/common/include/tg-bin-files.h) is 0x%lx.  Should be 0x%lx\n",
+        DPRINTF(DEBUG_LVL_WARN, "XE_PDARGS_OFFSET (in .../ss/common/include/tg-bin-files.h) is 0x%"PRIx64".  Should be 0x%"PRIx64"\n",
             (u64) XE_PDARGS_OFFSET, (u64) offsetof(ocrPolicyDomainXe_t, packedArgsLocation));
         ASSERT (0);
     }
@@ -224,7 +224,7 @@ u8 xePdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
             }
         }
         if(toReturn) {
-            DPRINTF(DEBUG_LVL_WARN, "RL_CONFIG_PARSE(%d) phase %d failed: %d\n", properties, curPhase, toReturn);
+            DPRINTF(DEBUG_LVL_WARN, "RL_CONFIG_PARSE(%"PRId32") phase %"PRId32" failed: %"PRId32"\n", properties, curPhase, toReturn);
         }
 
         break;
@@ -248,7 +248,7 @@ u8 xePdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
             }
         }
         if(toReturn) {
-            DPRINTF(DEBUG_LVL_WARN, "RL_NETWORK_OK(%d) phase %d failed: %d\n", properties, curPhase, toReturn);
+            DPRINTF(DEBUG_LVL_WARN, "RL_NETWORK_OK(%"PRId32") phase %"PRId32" failed: %"PRId32"\n", properties, curPhase, toReturn);
         }
         break;
     }
@@ -270,7 +270,7 @@ u8 xePdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
         }
 
         if(toReturn) {
-            DPRINTF(DEBUG_LVL_WARN, "RL_PD_OK(%d) phase %d failed: %d\n", properties, curPhase, toReturn);
+            DPRINTF(DEBUG_LVL_WARN, "RL_PD_OK(%"PRId32") phase %"PRId32" failed: %"PRId32"\n", properties, curPhase, toReturn);
         }
         break;
     }
@@ -294,7 +294,7 @@ u8 xePdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
             }
         }
         if(toReturn) {
-            DPRINTF(DEBUG_LVL_WARN, "RL_MEMORY_OK(%d) phase %d failed: %d\n", properties, curPhase, toReturn);
+            DPRINTF(DEBUG_LVL_WARN, "RL_MEMORY_OK(%"PRId32") phase %"PRId32" failed: %"PRId32"\n", properties, curPhase, toReturn);
         }
         break;
     }
@@ -326,10 +326,10 @@ u8 xePdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
                 DPRINTF(DEBUG_LVL_WARN, "Cannot allocate strand tables\n");
                 ASSERT(0);
             } else {
-                DPRINTF(DEBUG_LVL_VERB, "Created EVT strand table @ 0x%lx\n",
+                DPRINTF(DEBUG_LVL_VERB, "Created EVT strand table @ %p\n",
                         policy->strandTables[PDSTT_EVT-1]);
                 toReturn |= pdInitializeStrandTable(policy, policy->strandTables[PDSTT_EVT-1], 0);
-                DPRINTF(DEBUG_LVL_VERB, "Created COMM strand table @ 0x%lx\n",
+                DPRINTF(DEBUG_LVL_VERB, "Created COMM strand table @ %p\n",
                         policy->strandTables[PDSTT_COMM-1]);
                 toReturn |= pdInitializeStrandTable(policy, policy->strandTables[PDSTT_COMM-1], 0);
             }
@@ -373,17 +373,17 @@ u8 xePdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
             DPRINTF(DEBUG_LVL_VERB, "Emptying strand tables\n");
             RESULT_ASSERT(pdProcessStrands(policy, PDSTT_EMPTYTABLES), ==, 0);
             // Free the tables
-            DPRINTF(DEBUG_LVL_VERB, "Freeing EVT strand table: 0x%lx\n", policy->strandTables[PDSTT_EVT-1]);
+            DPRINTF(DEBUG_LVL_VERB, "Freeing EVT strand table: %p\n", policy->strandTables[PDSTT_EVT-1]);
             policy->fcts.pdFree(policy, policy->strandTables[PDSTT_EVT-1]);
             policy->strandTables[PDSTT_EVT-1] = NULL;
 
-            DPRINTF(DEBUG_LVL_VERB, "Freeing COMM strand table: 0x%lx\n", policy->strandTables[PDSTT_COMM-1]);
+            DPRINTF(DEBUG_LVL_VERB, "Freeing COMM strand table: %p\n", policy->strandTables[PDSTT_COMM-1]);
             policy->fcts.pdFree(policy, policy->strandTables[PDSTT_COMM-1]);
             policy->strandTables[PDSTT_COMM-1] = NULL;
         }
 
         if(toReturn) {
-            DPRINTF(DEBUG_LVL_WARN, "RL_GUID_OK(%d) phase %d failed: %d\n", properties, i-1, toReturn);
+            DPRINTF(DEBUG_LVL_WARN, "RL_GUID_OK(%"PRId32") phase %"PRId32" failed: %"PRId32"\n", properties, i-1, toReturn);
         }
         break;
     }
@@ -457,7 +457,7 @@ u8 xePdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
             }
         }
         if(toReturn) {
-            DPRINTF(DEBUG_LVL_WARN, "RL_COMPUTE_OK(%d) phase %d failed: %d\n", properties, i-1, toReturn);
+            DPRINTF(DEBUG_LVL_WARN, "RL_COMPUTE_OK(%"PRId32") phase %"PRId32" failed: %"PRId32"\n", properties, i-1, toReturn);
         }
         break;
     }
@@ -482,7 +482,7 @@ u8 xePdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
             }
 
             if(toReturn) {
-                DPRINTF(DEBUG_LVL_WARN, "RL_USER_OK(%d) phase %d failed: %d\n", properties, i-1, toReturn);
+                DPRINTF(DEBUG_LVL_WARN, "RL_USER_OK(%"PRId32") phase %"PRId32" failed: %"PRId32"\n", properties, i-1, toReturn);
             }
 
             // When I get here, it means that I dropped out of the RL_USER_OK level
@@ -527,7 +527,7 @@ u8 xePdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
             }
         }
         if(toReturn) {
-            DPRINTF(DEBUG_LVL_WARN, "RL_USER_OK(%d) phase %d failed: %d\n", properties, i-1, toReturn);
+            DPRINTF(DEBUG_LVL_WARN, "RL_USER_OK(%"PRId32") phase %"PRId32" failed: %"PRId32"\n", properties, i-1, toReturn);
         }
         break;
     }
@@ -628,7 +628,7 @@ static u8 xeAllocateDb(ocrPolicyDomain_t *self, ocrFatGuid_t *guid, void** ptr, 
         } else if (ocrGetHintValue(hint, OCR_HINT_DB_FAR, &hintValue) == 0 && hintValue) {
             preferredLevel = 3;
         }
-        DPRINTF(DEBUG_LVL_VERB, "xeAllocateDb preferredLevel set to %ld\n", preferredLevel);
+        DPRINTF(DEBUG_LVL_VERB, "xeAllocateDb preferredLevel set to %"PRId32"\n", preferredLevel);
         if (preferredLevel >= 2) {
             return OCR_ENOMEM;
         }
@@ -649,7 +649,7 @@ static u8 xeAllocateDb(ocrPolicyDomain_t *self, ocrFatGuid_t *guid, void** ptr, 
         }
         return returnValue;
     } else {
-        DPRINTF(DEBUG_LVL_VERB, "xeAllocateDb returning NULL for size %ld\n", (u64) size);
+        DPRINTF(DEBUG_LVL_VERB, "xeAllocateDb returning NULL for size %"PRId64"\n", (u64) size);
         DPRINTF(DEBUG_LVL_WARN, "*** WARNING : OUT-OF-MEMORY ***\n");
         DPRINTF(DEBUG_LVL_WARN, "*** Please increase sizes in *ALL* MemPlatformInst, MemTargetInst, AllocatorInst sections.\n");
         DPRINTF(DEBUG_LVL_WARN, "*** Same amount increasing is recommended.\n");
@@ -683,7 +683,7 @@ static u8 xeProcessCeRequest(ocrPolicyDomain_t *self, ocrPolicyMsg_t **msg) {
             ASSERT(pHandle->msg == *msg); // This is what we passed in
             RESULT_ASSERT(self->fcts.waitMessage(self, &pHandle), ==, 0);
             ASSERT(pHandle->response);
-            DPRINTF(DEBUG_LVL_VVERB, "XE got response from CE @ 0x%lx of type 0x%x\n",
+            DPRINTF(DEBUG_LVL_VVERB, "XE got response from CE @ %p of type 0x%"PRIx32"\n",
                     pHandle->response, pHandle->response->type);
             // Check if the message was a proper response and came from the right place
             ASSERT(pHandle->response->srcLocation == self->parentLocation);
@@ -706,7 +706,7 @@ static u8 xeProcessCeRequest(ocrPolicyDomain_t *self, ocrPolicyMsg_t **msg) {
                 // We need to copy things back into *msg
                 // BUG #68: This should go away when that issue is fully implemented
                 // We use the marshalling function to "copy" this message
-                DPRINTF(DEBUG_LVL_VVERB, "Copying response from 0x%lx to 0x%lx\n",
+                DPRINTF(DEBUG_LVL_VVERB, "Copying response from %p to %p\n",
                         pHandle->response, *msg);
                 u64 baseSize = 0, marshalledSize = 0;
                 ocrPolicyMsgGetMsgSize(pHandle->response, &baseSize, &marshalledSize, 0);
@@ -727,7 +727,7 @@ u8 xePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
     u8 returnCode = 0;
 
 
-    DPRINTF(DEBUG_LVL_VVERB, "Going to process message of type 0x%lx\n",
+    DPRINTF(DEBUG_LVL_VVERB, "Going to process message of type 0x%"PRIx64"\n",
             (msg->type & PD_MSG_TYPE_ONLY));
     switch(msg->type & PD_MSG_TYPE_ONLY) {
 
@@ -737,7 +737,7 @@ u8 xePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_DB_CREATE
         ASSERT((PD_MSG_FIELD_I(dbType) == USER_DBTYPE) || (PD_MSG_FIELD_I(dbType) == RUNTIME_DBTYPE));
-        DPRINTF(DEBUG_LVL_VVERB, "DB_CREATE request from 0x%lx for size %lu\n",
+        DPRINTF(DEBUG_LVL_VVERB, "DB_CREATE request from 0x%"PRIx64" for size %"PRIu64"\n",
                 msg->srcLocation, PD_MSG_FIELD_IO(size));
 // BUG #145: The prescription needs to be derived from the affinity, and needs to default to something sensible.
         u64 engineIndex = self->myLocation & 0xF;
@@ -768,7 +768,7 @@ u8 xePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
                 // Cannot acquire
                 PD_MSG_FIELD_O(ptr) = NULL;
             }
-            DPRINTF(DEBUG_LVL_VVERB, "DB_CREATE response for size %lu: GUID: "GUIDF"; PTR: 0x%lx)\n",
+            DPRINTF(DEBUG_LVL_VVERB, "DB_CREATE response for size %"PRIu64": GUID: "GUIDF"; PTR: %p)\n",
                     reqSize, GUIDA(PD_MSG_FIELD_IO(guid.guid)), PD_MSG_FIELD_O(ptr));
             returnCode = xeProcessResponse(self, msg, 0);
 #undef PD_MSG
@@ -832,7 +832,7 @@ u8 xePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             EXIT_PROFILE;
         }
 
-        DPRINTF(DEBUG_LVL_VVERB, "Offloading message of type 0x%x to CE\n",
+        DPRINTF(DEBUG_LVL_VVERB, "Offloading message of type 0x%"PRIx64" to CE\n",
                 msg->type & PD_MSG_TYPE_ONLY);
         returnCode = xeProcessCeRequest(self, &msg);
 
@@ -841,10 +841,10 @@ u8 xePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_COMM_TAKE
             if (PD_MSG_FIELD_IO(guidCount) > 0) {
-                DPRINTF(DEBUG_LVL_VVERB, "Received EDT with GUID "GUIDF" (@ 0x%lx)\n",
+                DPRINTF(DEBUG_LVL_VVERB, "Received EDT with GUID "GUIDF" (@ %p)\n",
                         GUIDA(PD_MSG_FIELD_IO(guids[0].guid)), &(PD_MSG_FIELD_IO(guids[0].guid)));
                 localDeguidify(self, (PD_MSG_FIELD_IO(guids)));
-                DPRINTF(DEBUG_LVL_VVERB, "Received EDT ("GUIDF"; 0x%lx)\n",
+                DPRINTF(DEBUG_LVL_VVERB, "Received EDT ("GUIDF"; %p\n",
                         GUIDA((PD_MSG_FIELD_IO(guids))->guid), (PD_MSG_FIELD_IO(guids))->metaDataPtr);
                 // For now, we return the execute function for EDTs
                 PD_MSG_FIELD_IO(extra) = (u64)(self->taskFactories[0]->fcts.execute);
@@ -860,7 +860,7 @@ u8 xePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             if (!(ocrGuidIsNull(fguid->guid))) {
                 DPRINTF(DEBUG_LVL_VVERB, "Received EDT with GUID "GUIDF"\n", GUIDA(fguid->guid));
                 localDeguidify(self, fguid);
-                DPRINTF(DEBUG_LVL_VVERB, "Received EDT ("GUIDF"; 0x%lx)\n",
+                DPRINTF(DEBUG_LVL_VVERB, "Received EDT ("GUIDF"; %p)\n",
                         GUIDA(fguid->guid), fguid->metaDataPtr);
                 PD_MSG_FIELD_O(factoryId) = 0;
             }
@@ -879,7 +879,7 @@ u8 xePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
     case PD_MSG_SAL_TERMINATE:
     case PD_MSG_GUID_METADATA_CLONE: case PD_MSG_MGT_MONITOR_PROGRESS:
     {
-        DPRINTF(DEBUG_LVL_WARN, "XE PD does not handle call of type 0x%x\n",
+        DPRINTF(DEBUG_LVL_WARN, "XE PD does not handle call of type 0x%"PRIx32"\n",
                 (u32)(msg->type & PD_MSG_TYPE_ONLY));
         ASSERT(0);
         returnCode = OCR_ENOTSUP;
@@ -933,7 +933,7 @@ u8 xePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         ocrPolicyDomainXe_t *rself = (ocrPolicyDomainXe_t*)self;
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_MGT_RL_NOTIFY
-        DPRINTF(DEBUG_LVL_VERB, "Received RL_NOTIFY from 0x%lx with properties 0x%x\n",
+        DPRINTF(DEBUG_LVL_VERB, "Received RL_NOTIFY from 0x%"PRIx64" with properties 0x%"PRIx32"\n",
                 msg->srcLocation, PD_MSG_FIELD_I(properties));
         if(PD_MSG_FIELD_I(properties) & RL_FROM_MSG) {
             // This is a message that can only come from the CE
@@ -957,13 +957,13 @@ u8 xePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
                 }
                 ASSERT(PD_MSG_FIELD_I(runlevel) == rself->rlSwitch.barrierRL);
                 if(rself->rlSwitch.barrierState == RL_BARRIER_STATE_UNINIT) {
-                    DPRINTF(DEBUG_LVL_VVERB, "Request to switch to RL %u\n", rself->rlSwitch.barrierRL);
+                    DPRINTF(DEBUG_LVL_VVERB, "Request to switch to RL %"PRIu32"\n", rself->rlSwitch.barrierRL);
                     RESULT_ASSERT(self->fcts.switchRunlevel(
                                       self, PD_MSG_FIELD_I(runlevel),
                                       PD_MSG_FIELD_I(properties) | rself->rlSwitch.pdStatus), ==, 0);
                 } else {
                     // We already know about the shutdown so we just ignore this
-                    DPRINTF(DEBUG_LVL_INFO, "IGNORE 0: runlevel: %u, properties: %u, rlSwitch.barrierRL: rlSwitch.barrierState: %u\n",
+                    DPRINTF(DEBUG_LVL_INFO, "IGNORE 0: runlevel: %"PRIu32", properties: %"PRIu32", rlSwitch.barrierRL: %"PRIu32" rlSwitch.barrierState: %"PRIu32"\n",
                             PD_MSG_FIELD_I(runlevel), PD_MSG_FIELD_I(properties), rself->rlSwitch.barrierRL,
                             rself->rlSwitch.barrierState);
                 }
@@ -985,7 +985,7 @@ u8 xePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
 #undef PD_TYPE
     }
     default: {
-        DPRINTF(DEBUG_LVL_WARN, "Unknown message type 0x%x\n", (u32)(msg->type & PD_MSG_TYPE_ONLY));
+        DPRINTF(DEBUG_LVL_WARN, "Unknown message type 0x%"PRIx32"\n", (u32)(msg->type & PD_MSG_TYPE_ONLY));
         ASSERT(0);
     }
     }; // End of giant switch
@@ -1042,7 +1042,7 @@ void* xePdMalloc(ocrPolicyDomain_t *self, u64 size) {
     if (result) {
         RETURN_PROFILE(result);
     }
-    DPRINTF(DEBUG_LVL_INFO, "xePdMalloc falls back to MSG_MEM_ALLOC for size %ld\n", (u64) size);
+    DPRINTF(DEBUG_LVL_INFO, "xePdMalloc falls back to MSG_MEM_ALLOC for size %"PRId64"\n", (u64) size);
     // fallback to messaging
 
     // send allocation mesg to CE

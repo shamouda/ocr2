@@ -238,7 +238,7 @@ static u8 lockableAcquireInternal(ocrDataBlock_t *self, void** ptr, ocrFatGuid_t
     }
 
     rself->attributes.numUsers += 1;
-    DPRINTF(DEBUG_LVL_VERB, "Acquiring DB @ 0x%lx (GUID: "GUIDF") from EDT (GUID: "GUIDF") (runtime acquire: %d) (mode: %d) (numUsers: %d) (modeLock: %d)\n",
+    DPRINTF(DEBUG_LVL_VERB, "Acquiring DB @ 0x%"PRIx64" (GUID: "GUIDF") from EDT (GUID: "GUIDF") (runtime acquire: %"PRId32") (mode: %"PRId32") (numUsers: %"PRId32") (modeLock: %"PRId32")\n",
             (u64)self->ptr, GUIDA(rself->base.guid), GUIDA(edt.guid), (u32)isInternal, (int) mode,
             rself->attributes.numUsers, rself->attributes.modeLock);
 
@@ -298,7 +298,7 @@ u8 lockableAcquire(ocrDataBlock_t *self, void** ptr, ocrFatGuid_t edt, u32 edtSl
 u8 lockableRelease(ocrDataBlock_t *self, ocrFatGuid_t edt, bool isInternal) {
     ocrDataBlockLockable_t *rself = (ocrDataBlockLockable_t*)self;
     dbWaiter_t * waiter = NULL;
-    DPRINTF(DEBUG_LVL_VERB, "Releasing DB @ 0x%lx (GUID "GUIDF") from EDT "GUIDF" (runtime release: %d)\n",
+    DPRINTF(DEBUG_LVL_VERB, "Releasing DB @ 0x%"PRIx64" (GUID "GUIDF") from EDT "GUIDF" (runtime release: %"PRId32")\n",
             (u64)self->ptr, GUIDA(rself->base.guid), GUIDA(edt.guid), (u32)isInternal);
     // Start critical section
     hal_lock32(&(rself->lock));
@@ -434,7 +434,7 @@ u8 lockableRelease(ocrDataBlock_t *self, ocrFatGuid_t edt, bool isInternal) {
             }
         }
     }
-    DPRINTF(DEBUG_LVL_VVERB, "DB (GUID: "GUIDF") attributes: numUsers %d (including %d runtime users); freeRequested %d\n",
+    DPRINTF(DEBUG_LVL_VVERB, "DB (GUID: "GUIDF") attributes: numUsers %"PRId32" (including %"PRId32" runtime users); freeRequested %"PRId32"\n",
             GUIDA(self->guid), rself->attributes.numUsers, rself->attributes.internalUsers, rself->attributes.freeRequested);
 
 #ifdef OCR_ENABLE_STATISTICS
@@ -517,7 +517,7 @@ u8 lockableFree(ocrDataBlock_t *self, ocrFatGuid_t edt, u32 properties) {
     bool isInternal = ((properties & DB_PROP_RT_ACQUIRE) != 0);
     bool reqRelease = ((properties & DB_PROP_NO_RELEASE) == 0);
     ocrDataBlockLockable_t *rself = (ocrDataBlockLockable_t*)self;
-    DPRINTF(DEBUG_LVL_VERB, "Requesting a free for DB @ 0x%lx (GUID: "GUIDF"); props: 0x%x\n",
+    DPRINTF(DEBUG_LVL_VERB, "Requesting a free for DB @ 0x%"PRIx64" (GUID: "GUIDF"); props: 0x%"PRIx32"\n",
             (u64)self->ptr, GUIDA(rself->base.guid), properties);
 
     hal_lock32(&(rself->lock));
@@ -536,8 +536,8 @@ u8 lockableFree(ocrDataBlock_t *self, ocrFatGuid_t edt, u32 properties) {
         // The datablock may not have been acquired by the current EDT hence
         // we do not need to account for a release.
         if (reqRelease) {
-            DPRINTF(DEBUG_LVL_VVERB, "Free triggering release for DB @ 0x%lx (GUID: 0x%lx)\n",
-                    (u64)self->ptr, rself->base.guid);
+            DPRINTF(DEBUG_LVL_VVERB, "Free triggering release for DB @ 0x%"PRIx64" (GUID: "GUIDF")\n",
+                    (u64)self->ptr, GUIDA(rself->base.guid));
             lockableRelease(self, edt, isInternal);
         }
     }
@@ -629,7 +629,7 @@ u8 newDataBlockLockable(ocrDataBlockFactory_t *factory, ocrFatGuid_t *guid, ocrF
                    &(result->base));
 #endif /* OCR_ENABLE_STATISTICS */
 
-    DPRINTF(DEBUG_LVL_VERB, "Creating a datablock of size %lu, @ 0x%lx (GUID: "GUIDF")\n",
+    DPRINTF(DEBUG_LVL_VERB, "Creating a datablock of size %"PRIu64", @ 0x%"PRIx64" (GUID: "GUIDF")\n",
             size, (u64)result->base.ptr, GUIDA(result->base.guid));
     OCR_TOOL_TRACE(false, OCR_TRACE_TYPE_DATABLOCK, OCR_ACTION_CREATE, size);
 

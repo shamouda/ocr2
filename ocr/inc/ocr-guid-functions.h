@@ -111,7 +111,7 @@ static inline bool ocrGuidIsLt(ocrGuid_t g1, ocrGuid_t g2){
  * @brief Format specifier when printing a GUID
  * @see #GUIDA
  */
-#define GUIDF "0x%lx"
+#define GUIDF "0x%"PRIxPTR
 
 /**
  * @}
@@ -141,7 +141,7 @@ static inline bool ocrGuidIsLt(ocrGuid_t g1, ocrGuid_t g2){
 
 /*Macros for printing 128-bit GUIDS */
 #define GUIDA(v) ((v).lower)
-#define GUIDF "0x%lx"
+#define GUIDF "0x%"PRIxPTR
 
 #else
 //Will never happen unless the preprocessor goes haywire

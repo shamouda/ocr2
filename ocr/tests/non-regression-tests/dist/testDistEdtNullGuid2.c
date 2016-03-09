@@ -7,7 +7,7 @@
 
 ocrGuid_t terminateEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     u32 * dbPtr = (u32 *) depv[0].ptr;
-    PRINTF("Received depv[0] 0x%lx\n", depv[0].guid);
+    PRINTF("Received depv[0] "GUIDF"\n", GUIDA(depv[0].guid));
     u32 i = 0;
     while (i < 10) {
         ASSERT(dbPtr[i] == i);
@@ -38,7 +38,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
         i++;
     }
     ocrDbRelease(db1Guid);
-    PRINTF("DB guid is 0x%lx\n", db1Guid);
+    PRINTF("DB guid is "GUIDF"\n", GUIDA(db1Guid));
     ocrGuid_t terminateEdtTemplateGuid;
     ocrEdtTemplateCreate(&terminateEdtTemplateGuid, terminateEdt, 0 /*paramc*/, 2 /*depc*/);
     ocrHint_t edtHint;

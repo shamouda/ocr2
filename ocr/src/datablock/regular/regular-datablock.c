@@ -57,7 +57,7 @@ u8 regularAcquire(ocrDataBlock_t *self, void** ptr, ocrFatGuid_t edt, u32 edtSlo
     ocrDataBlockRegular_t *rself = (ocrDataBlockRegular_t*)self;
     *ptr = NULL;
 
-    DPRINTF(DEBUG_LVL_VERB, "Acquiring DB @ 0x%lx (GUID: "GUIDF") from EDT (GUID: "GUIDF") (runtime acquire: %d) size: %lu\n",
+    DPRINTF(DEBUG_LVL_VERB, "Acquiring DB @ 0x%"PRIx64" (GUID: "GUIDF") from EDT (GUID: "GUIDF") (runtime acquire: %"PRId32") size: %"PRIu64"\n",
             (u64)self->ptr, GUIDA(rself->base.guid), GUIDA(edt.guid), (u32)isInternal, self->size);
 
     // Critical section
@@ -72,7 +72,7 @@ u8 regularAcquire(ocrDataBlock_t *self, void** ptr, ocrFatGuid_t edt, u32 edtSlo
 
     hal_unlock32(&(rself->lock));
     // End critical section
-    DPRINTF(DEBUG_LVL_VERB, "DB (GUID: "GUIDF") added EDT (GUID: "GUIDF"). Have %d users (of which %d runtime)\n",
+    DPRINTF(DEBUG_LVL_VERB, "DB (GUID: "GUIDF") added EDT (GUID: "GUIDF"). Have %"PRId32" users (of which %"PRId32" runtime)\n",
             GUIDA(self->guid), GUIDA(edt.guid), rself->attributes.numUsers, rself->attributes.internalUsers);
 
 #ifdef OCR_ENABLE_STATISTICS
@@ -89,7 +89,7 @@ u8 regularRelease(ocrDataBlock_t *self, ocrFatGuid_t edt,
 
     ocrDataBlockRegular_t *rself = (ocrDataBlockRegular_t*)self;
 
-    DPRINTF(DEBUG_LVL_VERB, "Releasing DB @ 0x%lx (GUID "GUIDF") from EDT "GUIDF" (runtime release: %d)\n",
+    DPRINTF(DEBUG_LVL_VERB, "Releasing DB @ 0x%"PRIx64" (GUID "GUIDF") from EDT "GUIDF" (runtime release: %"PRId32")\n",
             (u64)self->ptr, GUIDA(rself->base.guid), GUIDA(edt.guid), (u32)isInternal);
 
     // Start critical section
@@ -99,7 +99,7 @@ u8 regularRelease(ocrDataBlock_t *self, ocrFatGuid_t edt,
     if(isInternal)
         rself->attributes.internalUsers -= 1;
 
-    DPRINTF(DEBUG_LVL_VVERB, "DB (GUID: "GUIDF") attributes: numUsers %d (including %d runtime users); freeRequested %d\n",
+    DPRINTF(DEBUG_LVL_VVERB, "DB (GUID: "GUIDF") attributes: numUsers %"PRId32" (including %"PRId32" runtime users); freeRequested %"PRId32"\n",
             GUIDA(self->guid), rself->attributes.numUsers, rself->attributes.internalUsers, rself->attributes.freeRequested);
     // Check if we need to free the block
 #ifdef OCR_ENABLE_STATISTICS
@@ -178,7 +178,7 @@ u8 regularFree(ocrDataBlock_t *self, ocrFatGuid_t edt, u32 properties) {
     bool reqRelease = ((properties & DB_PROP_NO_RELEASE) == 0);
     ocrDataBlockRegular_t *rself = (ocrDataBlockRegular_t*)self;
 
-    DPRINTF(DEBUG_LVL_VERB, "Requesting a free for DB @ 0x%lx (GUID: "GUIDF")\n",
+    DPRINTF(DEBUG_LVL_VERB, "Requesting a free for DB @ 0x%"PRIx64" (GUID: "GUIDF")\n",
             (u64)self->ptr, GUIDA(rself->base.guid));
     // Begin critical section
     hal_lock32(&(rself->lock));
@@ -280,8 +280,7 @@ u8 newDataBlockRegular(ocrDataBlockFactory_t *factory, ocrFatGuid_t *guid, ocrFa
                    (ocrAllocator_t*)allocator.metaDataPtr, result->base.guid,
                    &(result->base));
 #endif /* OCR_ENABLE_STATISTICS */
-
-    DPRINTF(DEBUG_LVL_VERB, "Creating a datablock of size %lu, @ 0x%lx (GUID: "GUIDF")\n",
+    DPRINTF(DEBUG_LVL_VERB, "Creating a datablock of size %"PRIu64", @ 0x%"PRIx64" (GUID: "GUIDF")\n",
             size, (u64)result->base.ptr, GUIDA(result->base.guid));
     OCR_TOOL_TRACE(false, OCR_TRACE_TYPE_DATABLOCK, OCR_ACTION_CREATE, size);
 

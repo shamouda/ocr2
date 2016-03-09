@@ -100,7 +100,7 @@ u8 ceSchedulerHeuristicSwitchRunlevel(ocrSchedulerHeuristic_t *self, ocrPolicyDo
         ASSERT(scheduler);
         self->contextCount = ((ocrPolicyDomainCe_t*)PD)->xeCount + PD->neighborCount;
         ASSERT(self->contextCount > 0);
-        DPRINTF(DEBUG_LVL_INFO, "ContextCount: %lu (XE: %lu + Neighbors: %lu)\n", self->contextCount, ((ocrPolicyDomainCe_t*)PD)->xeCount, PD->neighborCount);
+        DPRINTF(DEBUG_LVL_INFO, "ContextCount: %"PRIu64" (XE: %"PRIu32" + Neighbors: %"PRIu32")\n", self->contextCount, ((ocrPolicyDomainCe_t*)PD)->xeCount, PD->neighborCount);
         break;
     }
     case RL_GUID_OK:
@@ -141,9 +141,9 @@ u8 ceSchedulerHeuristicSwitchRunlevel(ocrSchedulerHeuristic_t *self, ocrPolicyDo
                     }
                 }
                 if (ceContext->isChild) {
-                    DPRINTF(DEBUG_LVL_VVERB, "Created context %d for location: %lx (CHILD)\n", i, context->location);
+                    DPRINTF(DEBUG_LVL_VVERB, "Created context %"PRId32" for location: %"PRIx64" (CHILD)\n", i, context->location);
                 } else {
-                    DPRINTF(DEBUG_LVL_VVERB, "Created context %d for location: %lx\n", i, context->location);
+                    DPRINTF(DEBUG_LVL_VVERB, "Created context %"PRId32" for location: %"PRIx64"\n", i, context->location);
                 }
             }
             ocrSchedulerHeuristicCe_t *derived = (ocrSchedulerHeuristicCe_t*)self;
@@ -162,7 +162,7 @@ u8 ceSchedulerHeuristicSwitchRunlevel(ocrSchedulerHeuristic_t *self, ocrPolicyDo
             u32 i;
             ocrSchedulerObject_t *rootObj = self->scheduler->rootObj;
             ocrSchedulerObjectFactory_t *rootFact = PD->schedulerObjectFactories[rootObj->fctId];
-            DPRINTF(DEBUG_LVL_VVERB, "Root scheduler object %lx (fact: %d)\n", rootObj, rootObj->fctId);
+            DPRINTF(DEBUG_LVL_VVERB, "Root scheduler object %p (fact: %"PRId32")\n", rootObj, rootObj->fctId);
             for (i = 0; i < self->contextCount; i++) {
                 ocrSchedulerHeuristicContext_t *context = (ocrSchedulerHeuristicContext_t*)self->contexts[i];
                 ocrSchedulerHeuristicContextCe_t *ceContext = (ocrSchedulerHeuristicContextCe_t*)context;
@@ -171,7 +171,7 @@ u8 ceSchedulerHeuristicSwitchRunlevel(ocrSchedulerHeuristic_t *self, ocrPolicyDo
                                                     context->location, OCR_SCHEDULER_OBJECT_MAPPING_MAPPED, 0);
                 ASSERT(ceContext->mySchedulerObject && ceContext->mySchedulerObject != rootObj);
                 ceContext->stealSchedulerObjectIndex = (i + 1) % self->contextCount;
-                DPRINTF(DEBUG_LVL_VVERB, "Scheduler object %lx (fact: %d) for location: %lx\n", ceContext->mySchedulerObject, ceContext->mySchedulerObject->fctId, context->location);
+                DPRINTF(DEBUG_LVL_VVERB, "Scheduler object %p (fact: %"PRId32") for location: %"PRIx64"\n", ceContext->mySchedulerObject, ceContext->mySchedulerObject->fctId, context->location);
             }
         }
         break;
@@ -272,12 +272,12 @@ static u8 ceSchedulerHeuristicWorkEdtUserInvoke(ocrSchedulerHeuristic_t *self, o
     if (retVal) {
         ocrSchedulerHeuristicContextCe_t *ceContext = (ocrSchedulerHeuristicContextCe_t*)context;
         ASSERT(ceContext->inWorkRequestPending == false);
-        DPRINTF(DEBUG_LVL_VVERB, "TAKE_WORK_INVOKE from %lx (pending)\n", context->location);
+        DPRINTF(DEBUG_LVL_VVERB, "TAKE_WORK_INVOKE from %"PRIx64" (pending)\n", context->location);
         // If the receiver is an XE, put it to sleep
         u64 agentId = AGENT_FROM_ID(context->location);
         if ((agentId >= ID_AGENT_XE0) && (agentId <= ID_AGENT_XE7)) {
             //FIXME: enable this with #861
-            //DPRINTF(DEBUG_LVL_INFO, "XE %lx put to sleep\n", context->location);
+            //DPRINTF(DEBUG_LVL_INFO, "XE %"PRIx64" put to sleep\n", context->location);
             //hal_sleep(agentId);
             derived->pendingXeCount++;
         }
@@ -287,9 +287,9 @@ static u8 ceSchedulerHeuristicWorkEdtUserInvoke(ocrSchedulerHeuristic_t *self, o
         ceContext->msgId = message->msgId; //HACK: Store the msgId for future response
         derived->inPendingCount++;
     } else {
-        DPRINTF(DEBUG_LVL_VVERB, "TAKE_WORK_INVOKE from %lx (found)\n", context->location);
+        DPRINTF(DEBUG_LVL_VVERB, "TAKE_WORK_INVOKE from %"PRIx64" (found)\n", context->location);
     }
-    DPRINTF(DEBUG_LVL_VVERB, "TAKE_WORK_INVOKE DONE from %lx \n", context->location);
+    DPRINTF(DEBUG_LVL_VVERB, "TAKE_WORK_INVOKE DONE from %"PRIx64" \n", context->location);
     return retVal;
 }
 
@@ -326,7 +326,7 @@ static u8 handleEmptyResponse(ocrSchedulerHeuristic_t *self, ocrSchedulerHeurist
 static u8 ceSchedulerHeuristicNotifyEdtReadyInvoke(ocrSchedulerHeuristic_t *self, ocrSchedulerHeuristicContext_t *context, ocrSchedulerOpArgs_t *opArgs, ocrRuntimeHint_t *hints) {
     ocrSchedulerHeuristicCe_t *derived = (ocrSchedulerHeuristicCe_t*)self;
     ASSERT(!derived->shutdownMode);
-    DPRINTF(DEBUG_LVL_VVERB, "GIVE WORK INVOKE from %lx\n", opArgs->location);
+    DPRINTF(DEBUG_LVL_VVERB, "GIVE WORK INVOKE from %"PRIx64"\n", opArgs->location);
     ocrSchedulerOpNotifyArgs_t *notifyArgs = (ocrSchedulerOpNotifyArgs_t*)opArgs;
     ocrPolicyDomain_t *pd = self->scheduler->pd;
     ocrFatGuid_t fguid = notifyArgs->OCR_SCHED_ARG_FIELD(OCR_SCHED_NOTIFY_EDT_READY).guid;
@@ -396,7 +396,7 @@ static u8 ceSchedulerHeuristicNotifyEdtReadyInvoke(ocrSchedulerHeuristic_t *self
         ceContext->outWorkRequestPending = false;
         derived->outWorkVictimsAvailable++;
     }
-    DPRINTF(DEBUG_LVL_VVERB, "GIVEN WORK to context %lx\n", insertContext->location);
+    DPRINTF(DEBUG_LVL_VVERB, "GIVEN WORK to context %"PRIx64"\n", insertContext->location);
     return 0;
 }
 
@@ -465,7 +465,7 @@ u8 ceSchedulerHeuristicAnalyzeSimulate(ocrSchedulerHeuristic_t *self, ocrSchedul
 static u8 makeWorkRequest(ocrSchedulerHeuristic_t *self, ocrSchedulerHeuristicContext_t *context, bool isBlocking) {
     u8 returnCode = 0;
     ocrPolicyDomain_t *pd = self->scheduler->pd;
-    DPRINTF(DEBUG_LVL_VVERB, "MAKE_WORK_REQUEST to %lx\n", context->location);
+    DPRINTF(DEBUG_LVL_VVERB, "MAKE_WORK_REQUEST to %"PRIx64"\n", context->location);
     ASSERT(AGENT_FROM_ID(context->location) == ID_AGENT_CE);
     ocrSchedulerHeuristicContextCe_t *ceContext = (ocrSchedulerHeuristicContextCe_t*)context;
     ASSERT(ceContext->outWorkRequestPending == false);
@@ -494,15 +494,15 @@ static u8 makeWorkRequest(ocrSchedulerHeuristic_t *self, ocrSchedulerHeuristicCo
         ceContext->outWorkRequestPending = true;
         ocrSchedulerHeuristicCe_t *derived = (ocrSchedulerHeuristicCe_t*)self;
         derived->outWorkVictimsAvailable--;
-        DPRINTF(DEBUG_LVL_VVERB, "MAKE_WORK_REQUEST SUCCESS to %lx\n", context->location);
+        DPRINTF(DEBUG_LVL_VVERB, "MAKE_WORK_REQUEST SUCCESS to %"PRIx64"\n", context->location);
     } else {
-        DPRINTF(DEBUG_LVL_VVERB, "MAKE WORK REQUEST ERROR CODE: %u\n", returnCode);
+        DPRINTF(DEBUG_LVL_VVERB, "MAKE WORK REQUEST ERROR CODE: %"PRIu32"\n", returnCode);
     }
     return returnCode;
 }
 
 static u8 respondWorkRequest(ocrSchedulerHeuristic_t *self, ocrSchedulerHeuristicContext_t *context, ocrFatGuid_t *fguid) {
-    DPRINTF(DEBUG_LVL_VVERB, "RESPOND_WORK_REQUEST to %lx\n", context->location);
+    DPRINTF(DEBUG_LVL_VVERB, "RESPOND_WORK_REQUEST to %"PRIx64"\n", context->location);
     ocrSchedulerHeuristicCe_t *derived = (ocrSchedulerHeuristicCe_t*)self;
     ocrSchedulerHeuristicContextCe_t *ceContext = (ocrSchedulerHeuristicContextCe_t*)context;
     ASSERT(ceContext->inWorkRequestPending);
@@ -515,7 +515,7 @@ static u8 respondWorkRequest(ocrSchedulerHeuristic_t *self, ocrSchedulerHeuristi
     if ((agentId >= ID_AGENT_XE0) && (agentId <= ID_AGENT_XE7)) {
         //FIXME: enable this with #861
         //hal_wake(agentId);
-        //DPRINTF(DEBUG_LVL_INFO, "XE %lx woken up\n", context->location);
+        //DPRINTF(DEBUG_LVL_INFO, "XE %"PRIx64" woken up\n", context->location);
         derived->pendingXeCount--;
     } else {
         ceMessage = true;
@@ -548,7 +548,7 @@ static u8 respondWorkRequest(ocrSchedulerHeuristic_t *self, ocrSchedulerHeuristi
 #undef PD_MSG
 #undef PD_TYPE
     ASSERT(ceContext->inWorkRequestPending == false);
-    DPRINTF(DEBUG_LVL_VVERB, "RESPOND_WORK_REQUEST SUCCESS to %lx\n", context->location);
+    DPRINTF(DEBUG_LVL_VVERB, "RESPOND_WORK_REQUEST SUCCESS to %"PRIx64"\n", context->location);
     return 0;
 }
 
@@ -571,7 +571,7 @@ u8 ceSchedulerHeuristicUpdate(ocrSchedulerHeuristic_t *self, u32 properties) {
             if (derived->shutdownMode)
                 break; //We are shutting down, no more processing
 
-            DPRINTF(DEBUG_LVL_VVERB, "IDLE [work: %lu pending: (%u, %u) victims: %u]\n", derived->workCount, derived->inPendingCount, derived->pendingXeCount, derived->outWorkVictimsAvailable);
+            DPRINTF(DEBUG_LVL_VVERB, "IDLE [work: %"PRIu64" pending: (%"PRIu32", %"PRIu32") victims: %"PRIu32"]\n", derived->workCount, derived->inPendingCount, derived->pendingXeCount, derived->outWorkVictimsAvailable);
             //High-level logic:
             //First check if any remote agent (XE or CE) is waiting for a response from this CE.
             //If nobody is waiting, then we return back to caller.
@@ -610,9 +610,9 @@ u8 ceSchedulerHeuristicUpdate(ocrSchedulerHeuristic_t *self, u32 properties) {
                         ocrSchedulerHeuristicContext_t *context = self->contexts[i];
                         ocrSchedulerHeuristicContextCe_t *ceContext = (ocrSchedulerHeuristicContextCe_t*)context;
                         if (context->location == pd->parentLocation && ceContext->outWorkRequestPending == false) {
-                            DPRINTF(DEBUG_LVL_VVERB, "FORCE WORK REQUEST to parent %lx\n", context->location);
+                            DPRINTF(DEBUG_LVL_VVERB, "FORCE WORK REQUEST to parent %"PRIx64"\n", context->location);
                             RESULT_ASSERT(makeWorkRequest(self, context, true), ==, 0);
-                            DPRINTF(DEBUG_LVL_VVERB, "FORCE WORK REQUEST SUCCESS to parent %lx\n", context->location);
+                            DPRINTF(DEBUG_LVL_VVERB, "FORCE WORK REQUEST SUCCESS to parent %"PRIx64"\n", context->location);
                             break;
                         }
                     }

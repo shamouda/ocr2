@@ -31,7 +31,7 @@ ocrGuid_t complete(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     in1 = *(u32*)depv[0].ptr;
     in2 = *(u32*)depv[1].ptr;
     out = *(u32*)depv[2].ptr;
-    PRINTF("Done with %d (%d + %d)\n", out, in1, in2);
+    PRINTF("Done with %"PRId32" (%"PRId32" + %"PRId32")\n", out, in1, in2);
 
     if (out > 3) {
         /* Destruction
@@ -78,7 +78,7 @@ ocrGuid_t fibEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     compTemplateGuid = (ocrGuid_t)paramv[2];
 
     u32 n = *(u32*)(depv[0].ptr);
-    PRINTF("Starting fibEdt(%u)\n", n);
+    PRINTF("Starting fibEdt(%"PRIu32")\n", n);
     ASSERT(n >= 2);
 
     /* create the completion EDT and pass it the in/out argument as a dependency */
@@ -86,18 +86,18 @@ ocrGuid_t fibEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrEdtCreate(&comp, compTemplateGuid, 1, paramv, 3, NULL, EDT_PROP_NONE,
                  NULL_HINT, NULL);
 
-    PRINTF("In fibEdt(%d) -- checking for required answers\n", n);
+    PRINTF("In fibEdt(%"PRId32") -- checking for required answers\n", n);
 
     // Check if n-1 exists
     t = n - 1;
     ocrGuidFromLabel(&evt0, mapGuid, &t);
     if(ocrEventCreate(&evt0, OCR_EVENT_STICKY_T, GUID_PROP_IS_LABELED | GUID_PROP_CHECK | EVT_PROP_TAKES_ARG) == OCR_EGUIDEXISTS) {
         // Event already exists so I can just link to it
-        PRINTF("In fibEdt(%d), reusing answer for %d\n", n, n-1);
+        PRINTF("In fibEdt(%"PRId32"), reusing answer for %"PRId32"\n", n, n-1);
     } else {
         // We created the event so we need to launch the computation
         ocrDbCreate(&dbArg, (void**)&ptr, sizeof(u32), DB_PROP_NONE, NULL_HINT, NO_ALLOC);
-        PRINTF("In fibEdt(%u) -- created arg DB for %d GUID 0x%llx\n", n, n-1, dbArg);
+        PRINTF("In fibEdt(%"PRIu32") -- created arg DB for %"PRId32" GUID "GUIDF"\n", n, n-1, GUIDA(dbArg));
         *((u32*)ptr) = n-1;
         ocrEdtCreate(&fibEdt, fibTemplateGuid, 3, paramv, 1, &dbArg, EDT_PROP_NONE,
                     NULL_HINT, NULL);
@@ -109,21 +109,21 @@ ocrGuid_t fibEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrGuidFromLabel(&evt1, mapGuid, &t);
     if(ocrEventCreate(&evt1, OCR_EVENT_STICKY_T, GUID_PROP_IS_LABELED | GUID_PROP_CHECK | EVT_PROP_TAKES_ARG) == OCR_EGUIDEXISTS) {
         // Event already exists so I can just link to it
-        PRINTF("In fibEdt(%d), reusing answer for %d\n", n, n-2);
+        PRINTF("In fibEdt(%"PRId32"), reusing answer for %"PRId32"\n", n, n-2);
     } else {
         // We created the event so we need to launch the computation
         ocrDbCreate(&dbArg, (void**)&ptr, sizeof(u32), DB_PROP_NONE, NULL_HINT, NO_ALLOC);
-        PRINTF("In fibEdt(%u) -- created arg DB for %d GUID 0x%llx\n", n, n-2, dbArg);
+        PRINTF("In fibEdt(%"PRIu32") -- created arg DB for %"PRId32" GUID "GUIDF"\n", n, n-2, GUIDA(dbArg));
         *((u32*)ptr) = n-2;
         ocrEdtCreate(&fibEdt, fibTemplateGuid, 3, paramv, 1, &dbArg, EDT_PROP_NONE,
                     NULL_HINT, NULL);
     }
     ocrAddDependence(evt1, comp, 1, DB_DEFAULT_MODE);
 
-    PRINTF("In fibEdt(%u) -- spawned complete EDT GUID 0x%llx\n", n, (u64)comp);
+    PRINTF("In fibEdt(%"PRIu32") -- spawned complete EDT GUID "GUIDF"\n", n, GUIDA(comp));
     ocrAddDependence(depv[0].guid, comp, 2, DB_DEFAULT_MODE);
 
-    PRINTF("Returning from fibEdt(%u)\n", n);
+    PRINTF("Returning from fibEdt(%"PRIu32")\n", n);
     return NULL_GUID;
 
 }
@@ -131,7 +131,7 @@ ocrGuid_t fibEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
 ocrGuid_t absFinal(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     u32 ans;
     ans = *(u32*)depv[0].ptr;
-    VERIFY(ans == (u32)paramv[0], "Totally done: answer is %d\n", ans);
+    VERIFY(ans == (u32)paramv[0], "Totally done: answer is %"PRId32"\n", ans);
     // Lots of leaks here (events and DBs)
     ocrShutdown();
 
@@ -196,10 +196,10 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     {
         ocrGuid_t templateGuid;
         ocrEdtTemplateCreate(&templateGuid, absFinal, 1, 1);
-        PRINTF("Created template and got GUID 0x%llx\n", templateGuid);
+        PRINTF("Created template and got GUID "GUIDF"\n", GUIDA(templateGuid));
         ocrEdtCreate(&absFinalEdt, templateGuid, 1, &correctAns, 1, NULL, EDT_PROP_NONE,
                     NULL_HINT, NULL);
-        PRINTF("Created ABS EDT and got  GUID 0x%llx\n", absFinalEdt);
+        PRINTF("Created ABS EDT and got  GUID "GUIDF"\n", GUIDA(absFinalEdt));
         ocrEdtTemplateDestroy(templateGuid);
     }
 

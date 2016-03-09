@@ -24,7 +24,7 @@ ocrGuid_t computeEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     void * dbPtr;
     ocrGuid_t dbGuid;
     ocrDbCreate(&dbGuid, &dbPtr, sizeof(TYPE_ELEM_DB) * NB_ELEM_DB, 0, NULL_HINT, NO_ALLOC);
-    PRINTF("Created 0x%lx\n", dbGuid);
+    PRINTF("Created "GUIDF"\n", GUIDA(dbGuid));
     ocrDbDestroy(dbGuid);
     ocrGuid_t tplGuid;
     ocrEdtTemplateCreate(&tplGuid, endEdt, 0, 0);

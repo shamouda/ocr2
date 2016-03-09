@@ -345,15 +345,15 @@ static inline u8 hcCommDelegateNotifyCommReadyInvoke(ocrSchedulerHeuristic_t *se
                 // In that case, the comm-worker should only be able to give outgoing responses to the scheduler
                 ASSERT(message->type & PD_MSG_RESPONSE);
                 // Push to the comm worker outbox
-                DPRINTF(DEBUG_LVL_VVERB,"[%d] hc-comm-delegate-scheduler:: Comm-worker pushes outgoing to own outbox %d\n",
+                DPRINTF(DEBUG_LVL_VVERB,"[%"PRId32"] hc-comm-delegate-scheduler:: Comm-worker pushes outgoing to own outbox %"PRId32"\n",
                     (int) pd->myLocation, worker->id);
                 deque_t * outbox = commSched->outboxes[worker->id];
                 outbox->pushAtTail(outbox, handle, 0);
             } else {
         #endif
                 // Comm-worker giving back to a worker's inbox
-                DPRINTF(DEBUG_LVL_VVERB,"[%d] hc-comm-delegate-scheduler:: Comm-worker pushes at tail of box %d\n",
-                    (int) pd->myLocation, handle->boxId);
+                DPRINTF(DEBUG_LVL_VVERB,"[%"PRIu64"] hc-comm-delegate-scheduler:: Comm-worker pushes at tail of box %"PRIu64"\n",
+                    pd->myLocation, handle->boxId);
                 // Push is concurrent because the comp-worker may pushing/poping from inbox in parallel
                 deque_t * inbox = commSched->inboxes[handle->boxId];
                 inbox->pushAtTail(inbox, (ocrMsgHandle_t *) handle, 0);
@@ -375,8 +375,8 @@ static inline u8 hcCommDelegateNotifyCommReadyInvoke(ocrSchedulerHeuristic_t *se
 #endif
             //BUG #587: boxId is defined in del-handle however only the scheduler is using it
             delHandle->boxId = worker->id;
-            DPRINTF(DEBUG_LVL_VVERB,"[%d] hc-comm-delegate-scheduler:: Comp-worker pushes at tail of box %d\n",
-                (int) pd->myLocation, delHandle->boxId);
+            DPRINTF(DEBUG_LVL_VVERB,"[%"PRIu64"] hc-comm-delegate-scheduler:: Comp-worker pushes at tail of box %"PRIu64"\n",
+                pd->myLocation, delHandle->boxId);
             ASSERT((delHandle->boxId >= 0) && (delHandle->boxId < pd->workerCount));
             // Put handle to worker's outbox
             deque_t * outbox = commSched->outboxes[delHandle->boxId];

@@ -31,7 +31,7 @@ ocrGuid_t prodEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
         u32 * dbPtr;
         ocrDbCreate(&dbGuid, (void **)&dbPtr, sizeof(u32), 0, NULL_HINT, NO_ALLOC);
         dbPtr[0] = (countSalvo * PROD_SALVO) + i;
-        PRINTF("Send=%d val=%d guid=0x%lx @ salvo=%d\n", i, dbPtr[0], dbGuid, countSalvo);
+        PRINTF("Send=%"PRId32" val=%"PRId32" guid="GUIDF" @ salvo=%"PRId32"\n", i, dbPtr[0], GUIDA(dbGuid), countSalvo);
         ocrDbRelease(dbGuid);
         ocrEventSatisfy(evtToConsGuid, dbGuid);
         i++;
@@ -70,7 +70,7 @@ ocrGuid_t consEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     u64 expVal = paramv[4];
     u32 * dbPtr = (u32 *) depv[0].ptr;
     countProd++;
-    PRINTF("Recv val=%d guid=0x%lx countProd=%d @ salvo=%d\n", dbPtr[0], depv[0].guid, countProd, countSalvo);
+    PRINTF("Recv val=%"PRId32" guid="GUIDF" countProd=%"PRId32" @ salvo=%"PRId32"\n", dbPtr[0], GUIDA(depv[0].guid), countProd, countSalvo);
     ASSERT(expVal == *dbPtr);
     // Time to
     if (countProd == PROD_SALVO) {

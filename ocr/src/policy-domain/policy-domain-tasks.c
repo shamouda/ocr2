@@ -48,17 +48,17 @@
 #define PROPAGATE_UP_TREE(node, parent, cond, actions) do {      \
     while (((parent) != NULL) && (cond)) {                       \
         hal_lock32(&((parent)->lock));                                  \
-        DPRINTF(DEBUG_LVL_VVERB, "BEFORE: 0x%lx -> 0x%lx [%u] "         \
-                "curNode: [F;NP;R: 0x%lx; 0x%lx; 0x%lx], "              \
-                "parent: [F;NP;R: 0x%lx; 0x%lx; 0x%lx]\n",              \
+        DPRINTF(DEBUG_LVL_VVERB, "BEFORE: %p -> %p [%"PRIu32"] "         \
+                "curNode: [F;NP;R: 0x%"PRIx64"; 0x%"PRIx64"; 0x%"PRIx64"], "              \
+                "parent: [F;NP;R: 0x%"PRIx64"; 0x%"PRIx64"; 0x%"PRIx64"]\n",              \
                 (node), (parent), (node)->parentSlot,                   \
                 (node)->nodeFree, (node)->nodeNeedsProcess,             \
                 (node)->nodeReady, (parent)->nodeFree,                  \
                 (parent)->nodeNeedsProcess, (parent)->nodeReady);       \
         actions;                                                        \
-        DPRINTF(DEBUG_LVL_VVERB, "AFTER:  0x%lx -> 0x%lx [%u] "         \
-                "curNode: [F;NP;R: 0x%lx; 0x%lx; 0x%lx], "              \
-                "parent: [F;NP;R: 0x%lx; 0x%lx; 0x%lx]\n",              \
+        DPRINTF(DEBUG_LVL_VVERB, "AFTER:  %p -> %p [%"PRIu32"] "         \
+                "curNode: [F;NP;R: 0x%"PRIx64"; 0x%"PRIx64"; 0x%"PRIx64"], "              \
+                "parent: [F;NP;R: 0x%"PRIx64"; 0x%"PRIx64"; 0x%"PRIx64"]\n",              \
                 (node), (parent), (node)->parentSlot,                   \
                 (node)->nodeFree, (node)->nodeNeedsProcess,             \
                 (node)->nodeReady, (parent)->nodeFree,                  \
@@ -75,17 +75,17 @@
     bool _releaseLock = node->lock == 1;                                \
     while (((parent) != NULL) && (cond)) {                              \
         hal_lock32(&((parent)->lock));                                  \
-        DPRINTF(DEBUG_LVL_VVERB, "BEFORE: 0x%lx -> 0x%lx [%u] "         \
-                "curNode: [F;NP;R: 0x%lx; 0x%lx; 0x%lx], "              \
-                "parent: [F;NP;R: 0x%lx; 0x%lx; 0x%lx]\n",              \
+        DPRINTF(DEBUG_LVL_VVERB, "BEFORE: %p -> %p [%"PRIu32"] "         \
+                "curNode: [F;NP;R: 0x%"PRIx64"; 0x%"PRIx64"; 0x%"PRIx64"], "              \
+                "parent: [F;NP;R: 0x%"PRIx64"; 0x%"PRIx64"; 0x%"PRIx64"]\n",              \
                 (node), (parent), (node)->parentSlot,                   \
                 (node)->nodeFree, (node)->nodeNeedsProcess,             \
                 (node)->nodeReady, (parent)->nodeFree,                  \
                 (parent)->nodeNeedsProcess, (parent)->nodeReady);       \
         actions;                                                        \
-        DPRINTF(DEBUG_LVL_VVERB, "AFTER:  0x%lx -> 0x%lx [%u] "         \
-                "curNode: [F;NP;R: 0x%lx; 0x%lx; 0x%lx], "              \
-                "parent: [F;NP;R: 0x%lx; 0x%lx; 0x%lx]\n",              \
+        DPRINTF(DEBUG_LVL_VVERB, "AFTER:  %p -> %p [%"PRIu32"] "         \
+                "curNode: [F;NP;R: 0x%"PRIx64"; 0x%"PRIx64"; 0x%"PRIx64"], "              \
+                "parent: [F;NP;R: 0x%"PRIx64"; 0x%"PRIx64"; 0x%"PRIx64"]\n",              \
                 (node), (parent), (node)->parentSlot,                   \
                 (node)->nodeFree, (node)->nodeNeedsProcess,             \
                 (node)->nodeReady, (parent)->nodeFree,                  \
@@ -103,17 +103,17 @@
     bool _releaseLock = false;                                          \
     while (((parent) != NULL) && (cond)) {                              \
         hal_lock32(&((parent)->lock));                                  \
-        DPRINTF(DEBUG_LVL_VVERB, "BEFORE: 0x%lx -> 0x%lx [%u] "         \
-                "curNode: [F;NP;R: 0x%lx; 0x%lx; 0x%lx], "              \
-                "parent: [F;NP;R: 0x%lx; 0x%lx; 0x%lx]\n",              \
+        DPRINTF(DEBUG_LVL_VVERB, "BEFORE: %p -> %p [%"PRIu32"] "         \
+                "curNode: [F;NP;R: 0x%"PRIx64"; 0x%"PRIx64"; 0x%"PRIx64"], "              \
+                "parent: [F;NP;R: 0x%"PRIx64"; 0x%"PRIx64"; 0x%"PRIx64"]\n",              \
                 (node), (parent), (node)->parentSlot,                   \
                 (node)->nodeFree, (node)->nodeNeedsProcess,             \
                 (node)->nodeReady, (parent)->nodeFree,                  \
                 (parent)->nodeNeedsProcess, (parent)->nodeReady);       \
         actions;                                                        \
-        DPRINTF(DEBUG_LVL_VVERB, "AFTER:  0x%lx -> 0x%lx [%u] "         \
-                "curNode: [F;NP;R: 0x%lx; 0x%lx; 0x%lx], "              \
-                "parent: [F;NP;R: 0x%lx; 0x%lx; 0x%lx]\n",              \
+        DPRINTF(DEBUG_LVL_VVERB, "AFTER:  %p -> %p [%"PRIu32"] "         \
+                "curNode: [F;NP;R: 0x%"PRIx64"; 0x%"PRIx64"; 0x%"PRIx64"], "              \
+                "parent: [F;NP;R: 0x%"PRIx64"; 0x%"PRIx64"; 0x%"PRIx64"]\n",              \
                 (node), (parent), (node)->parentSlot,                   \
                 (node)->nodeFree, (node)->nodeNeedsProcess,             \
                 (node)->nodeReady, (parent)->nodeFree,                  \
@@ -272,7 +272,7 @@ static u8 _pdFreeStrand(ocrPolicyDomain_t* pd, pdStrand_t *strand);
 #define EVT_DECODE_ST_IDX(evt) ((evt) >> 3)
 
 u8 pdCreateEvent(ocrPolicyDomain_t *pd, pdEvent_t **event, u32 type, u8 reserveInTable) {
-    DPRINTF(DEBUG_LVL_INFO, "ENTER pdCreateEvent(pd:0x%lx, event**:0x%lx [0x%lx], type:%u, table:%u)\n",
+    DPRINTF(DEBUG_LVL_INFO, "ENTER pdCreateEvent(pd:%p, event**:%p [%p], type:%"PRIu32", table:%"PRIu32")\n",
             pd, event, *event, type, reserveInTable);
 
 #define _END_FUNC createEventEnd
@@ -297,12 +297,12 @@ u8 pdCreateEvent(ocrPolicyDomain_t *pd, pdEvent_t **event, u32 type, u8 reserveI
             sizeToAllocate = sizeof(pdEventMsg_t);
             break;
         default:
-            DPRINTF(DEBUG_LVL_WARN, "PD Event type 0x%u not known\n", type);
+            DPRINTF(DEBUG_LVL_WARN, "PD Event type 0x%"PRIu32" not known\n", type);
             return OCR_EINVAL;
     }
     /* BUG #899: replace with proper slab allocator */
     CHECK_MALLOC(*event = (pdEvent_t*)pd->fcts.pdMalloc(pd, sizeToAllocate), );
-    DPRINTF(DEBUG_LVL_VERB, "Allocated event of size %lu -> ptr: 0x%lx\n",
+    DPRINTF(DEBUG_LVL_VERB, "Allocated event of size %"PRIu64" -> ptr: %p\n",
             sizeToAllocate, *event);
 
     // Initialize base aspect
@@ -326,30 +326,30 @@ u8 pdCreateEvent(ocrPolicyDomain_t *pd, pdEvent_t **event, u32 type, u8 reserveI
     // Deal with insertion into the strands table if needed
     pdStrandTable_t *stTable = NULL;
     if(reserveInTable  && reserveInTable <= PDSTT_COMM) {
-        DPRINTF(DEBUG_LVL_VERB, "Reserving slot in table %u\n", reserveInTable);
+        DPRINTF(DEBUG_LVL_VERB, "Reserving slot in table %"PRIu32"\n", reserveInTable);
         // This means it is PDSTT_COMM or PDSTT_EVT so we look for the proper table
         stTable = pd->strandTables[reserveInTable - 1];
         pdStrand_t* myStrand = NULL;
         CHECK_RESULT(
             toReturn |= pdGetNewStrand(pd, &myStrand, stTable, *event, PDST_UHOLD),
             pd->fcts.pdFree(pd, *event),);
-        DPRINTF(DEBUG_LVL_VERB, "Event 0x%lx has index %lu\n", *event, (*event)->strand->index);
+        DPRINTF(DEBUG_LVL_VERB, "Event %p has index %"PRIu64"\n", *event, (*event)->strand->index);
         // This assert failure indicates a coding issue in the runtime
         RESULT_ASSERT(pdUnlockStrand(myStrand), ==, 0);
     } else {
-        DPRINTF(DEBUG_LVL_WARN, "Invalid value for reserveInTable: %u\n", reserveInTable);
+        DPRINTF(DEBUG_LVL_WARN, "Invalid value for reserveInTable: %"PRIu32"\n", reserveInTable);
         return OCR_EINVAL;
     }
 
 END_LABEL(createEventEnd)
-    DPRINTF(DEBUG_LVL_INFO, "EXIT pdCreateEvent -> %u; event: 0x%lx; event->strand->index: %lu\n",
+    DPRINTF(DEBUG_LVL_INFO, "EXIT pdCreateEvent -> %"PRIu32"; event: %p; event->strand->index: %"PRIu64"\n",
             toReturn, *event, (*event)->strand->index);
     return toReturn;
 #undef _END_FUNC
 }
 
 u8 pdResolveEvent(ocrPolicyDomain_t *pd, u64 *evtValue, u8 clearFwdHold) {
-    DPRINTF(DEBUG_LVL_INFO, "ENTER pdResolveEvent(pd:0x%lx, evtValue*:0x%lx [0x%lx], clearHold:%u)\n",
+    DPRINTF(DEBUG_LVL_INFO, "ENTER pdResolveEvent(pd:%p, evtValue*:%p [0x%"PRIx64"], clearHold:%"PRIu32")\n",
             pd, evtValue, *evtValue, clearFwdHold);
 #define _END_FUNC resolveEventEnd
 
@@ -359,19 +359,19 @@ u8 pdResolveEvent(ocrPolicyDomain_t *pd, u64 *evtValue, u8 clearFwdHold) {
     }
     u8 stTableIdx = EVT_DECODE_ST_TBL(*evtValue);
     if (stTableIdx) {
-        DPRINTF(DEBUG_LVL_VERB, "Event = (table %u, idx: %u)\n",
+        DPRINTF(DEBUG_LVL_VERB, "Event = (table %"PRIu32", idx: %"PRIu64")\n",
                 stTableIdx, EVT_DECODE_ST_IDX(*evtValue));
         // This is a pointer in a strands table
         pdStrandTable_t *stTable = NULL;
         if(stTableIdx < PDSTT_COMM) {
             stTable = pd->strandTables[stTableIdx-1];
         } else {
-            DPRINTF(DEBUG_LVL_WARN, "Invalid event value: %u does not represent "
-                    "a valid table (from event value 0x%lx)\n",
+            DPRINTF(DEBUG_LVL_WARN, "Invalid event value: %"PRIu32" does not represent "
+                    "a valid table (from event value 0x%"PRIx64")\n",
                     stTableIdx, *evtValue);
             return OCR_EINVAL;
         }
-        DPRINTF(DEBUG_LVL_VERB, "Looking in table 0x%lx\n", stTable);
+        DPRINTF(DEBUG_LVL_VERB, "Looking in table %p\n", stTable);
         pdStrand_t* myStrand = NULL;
         CHECK_RESULT(toReturn |= pdGetStrandForIndex(pd, &myStrand, stTable,
                                                      EVT_DECODE_ST_IDX(*evtValue)),,);
@@ -379,7 +379,7 @@ u8 pdResolveEvent(ocrPolicyDomain_t *pd, u64 *evtValue, u8 clearFwdHold) {
         // Here, we managed to get the strand properly
         // The pdGetStrandForIndex function will lock the strand, we can then
         // observe the state freely
-        DPRINTF(DEBUG_LVL_VVERB, "Event 0x%lx -> strand 0x%lx (props: 0x%lx)\n",
+        DPRINTF(DEBUG_LVL_VVERB, "Event 0x%"PRIx64" -> strand %p (props: 0x%"PRIx32")\n",
                 *evtValue, myStrand, myStrand->properties);
         ASSERT(myStrand->properties & PDST_LOCK);
         if((myStrand->properties & PDST_WAIT) == 0) {
@@ -387,14 +387,14 @@ u8 pdResolveEvent(ocrPolicyDomain_t *pd, u64 *evtValue, u8 clearFwdHold) {
             // The following assert ensures that the event in the slot has
             // the slot's index. Failure indicates a runtime error
             ASSERT(myStrand->index == (*evtValue));
-            DPRINTF(DEBUG_LVL_VERB, "Event 0x%lx -> 0x%lx\n",
+            DPRINTF(DEBUG_LVL_VERB, "Event 0x%"PRIx64" -> %p\n",
                     *evtValue, myStrand->curEvent);
             *evtValue = (u64)(myStrand->curEvent);
             if(clearFwdHold) {
                 myStrand->properties &= ~PDST_RHOLD;
             }
             if((myStrand->properties & PDST_HOLD) == 0) {
-                DPRINTF(DEBUG_LVL_VVERB, "Freeing strand 0x%lx [idx %u] after resolution\n",
+                DPRINTF(DEBUG_LVL_VVERB, "Freeing strand %p [idx %"PRIu64"] after resolution\n",
                         myStrand, myStrand->index);
                 RESULT_ASSERT(_pdFreeStrand(pd, ((pdEvent_t*)evtValue)->strand), ==, 0);
             } else {
@@ -402,24 +402,24 @@ u8 pdResolveEvent(ocrPolicyDomain_t *pd, u64 *evtValue, u8 clearFwdHold) {
             }
         } else {
             // The event is not ready
-            DPRINTF(DEBUG_LVL_VERB, "Event 0x%lx not ready\n", *evtValue);
+            DPRINTF(DEBUG_LVL_VERB, "Event 0x%"PRIx64" not ready\n", *evtValue);
             *evtValue = (u64)(myStrand->curEvent);
             RESULT_ASSERT(pdUnlockStrand(myStrand), ==, 0);
             toReturn = OCR_EBUSY;
         }
     } else {
-        DPRINTF(DEBUG_LVL_VERB, "Event 0x%lx is already a pointer\n", *evtValue);
+        DPRINTF(DEBUG_LVL_VERB, "Event 0x%"PRIx64" is already a pointer\n", *evtValue);
         toReturn = OCR_ENOP;
     }
 END_LABEL(resolveEventEnd)
-    DPRINTF(DEBUG_LVL_INFO, "EXIT pdResolveEvent -> %u; event: 0x%lx\n",
+    DPRINTF(DEBUG_LVL_INFO, "EXIT pdResolveEvent -> %"PRIu32"; event: 0x%"PRIx64"\n",
             toReturn, *evtValue);
     return toReturn;
 #undef _END_FUNC
 }
 
 u8 pdMarkReadyEvent(ocrPolicyDomain_t *pd, pdEvent_t *evt) {
-    DPRINTF(DEBUG_LVL_INFO, "ENTER pdMarkReadyEvent(pd:0x%lx, evt:0x%lx)\n",
+    DPRINTF(DEBUG_LVL_INFO, "ENTER pdMarkReadyEvent(pd:%p, evt:%p)\n",
             pd, evt);
 #define _END_FUNC markReadyEventEnd
 
@@ -433,7 +433,7 @@ u8 pdMarkReadyEvent(ocrPolicyDomain_t *pd, pdEvent_t *evt) {
 
     evt->properties |= PDEVT_READY;
     if(evt->strand != NULL) {
-        DPRINTF(DEBUG_LVL_VERB, "Event has strand 0x%lx -> going to update\n", evt->strand);
+        DPRINTF(DEBUG_LVL_VERB, "Event has strand %p -> going to update\n", evt->strand);
         // First grab the lock on the strand
         pdStrand_t *strand = evt->strand;
         u32 stIdx = strand->index & ((1<<BV_SIZE_LOG2) - 1);
@@ -453,12 +453,12 @@ u8 pdMarkReadyEvent(ocrPolicyDomain_t *pd, pdEvent_t *evt) {
         bool propagateReady = false, propagateNP = false, didFree = false;
         hal_lock32(&(curNode->lock));
         if ((strand->properties & PDST_WAIT_ACT) != 0) {
-            DPRINTF(DEBUG_LVL_VERB, "Strand 0x%lx has waiting actions -> setting NP\n", strand);
+            DPRINTF(DEBUG_LVL_VERB, "Strand %p has waiting actions -> setting NP\n", strand);
             // We have pending actions, making this a NP node
             propagateNP = curNode->nodeNeedsProcess == 0ULL;
             curNode->nodeNeedsProcess |= (1ULL<<stIdx);
         } else {
-            DPRINTF(DEBUG_LVL_VERB, "Strand 0x%lx is fully ready\n", strand);
+            DPRINTF(DEBUG_LVL_VERB, "Strand %p is fully ready\n", strand);
             propagateReady = curNode->nodeReady == 0ULL;
             curNode->nodeReady |= (1ULL<<stIdx);
         }
@@ -467,7 +467,7 @@ u8 pdMarkReadyEvent(ocrPolicyDomain_t *pd, pdEvent_t *evt) {
             // Strand is ready; we either free it or keep it there due to a hold
             if ((strand->properties & PDST_HOLD) == 0) {
                 // We can free the strand now
-                DPRINTF(DEBUG_LVL_VERB, "(POSSIBLE RACE) Freeing strand 0x%lx [idx %u] after making event ready\n",
+                DPRINTF(DEBUG_LVL_VERB, "(POSSIBLE RACE) Freeing strand %p [idx %"PRIu64"] after making event ready\n",
                         strand, strand->index);
                 // We unset the nodeReady bit to prevent unecessary propagation
                 curNode->nodeReady &= ~(1ULL<<stIdx);
@@ -477,7 +477,7 @@ u8 pdMarkReadyEvent(ocrPolicyDomain_t *pd, pdEvent_t *evt) {
                 propagateReady = false; // No need to change this since we freed the node
                 didFree = true;
             } else {
-                DPRINTF(DEBUG_LVL_VERB, "Strand 0x%lx is ready but has a hold -- leaving as is\n",
+                DPRINTF(DEBUG_LVL_VERB, "Strand %p is ready but has a hold -- leaving as is\n",
                         strand);
                 strand->properties &= ~PDST_LOCK;
             }
@@ -488,7 +488,7 @@ u8 pdMarkReadyEvent(ocrPolicyDomain_t *pd, pdEvent_t *evt) {
         // We still hold lock on curNode EXCEPT if didFree
         if (propagateReady || propagateNP) {
             ASSERT(!didFree);
-            DPRINTF(DEBUG_LVL_VERB, "Propagating properties: ready: %u; np: %u\n",
+            DPRINTF(DEBUG_LVL_VERB, "Propagating properties: ready: %"PRIu32"; np: %"PRIu32"\n",
                     propagateReady, propagateNP);
 
             pdStrandTableNode_t *parent = curNode->parent;
@@ -513,14 +513,14 @@ u8 pdMarkReadyEvent(ocrPolicyDomain_t *pd, pdEvent_t *evt) {
         }
     }
 END_LABEL(markReadyEventEnd)
-    DPRINTF(DEBUG_LVL_INFO, "EXIT pdMarkReadyEvent -> %u\n",
+    DPRINTF(DEBUG_LVL_INFO, "EXIT pdMarkReadyEvent -> %"PRIu32"\n",
             toReturn);
     return toReturn;
 #undef _END_FUNC
 }
 
 u8 pdMarkWaitEvent(ocrPolicyDomain_t *pd, pdEvent_t *evt) {
-    DPRINTF(DEBUG_LVL_INFO, "ENTER pdMarkWaitEvent(pd:0x%lx, evt:0x%lx)\n",
+    DPRINTF(DEBUG_LVL_INFO, "ENTER pdMarkWaitEvent(pd:%p, evt:%p)\n",
             pd, evt);
 #define _END_FUNC markWaitEventEnd
 
@@ -534,7 +534,7 @@ u8 pdMarkWaitEvent(ocrPolicyDomain_t *pd, pdEvent_t *evt) {
 
     evt->properties &= ~PDEVT_READY;
     if(evt->strand != NULL) {
-        DPRINTF(DEBUG_LVL_VERB, "Event has strand 0x%lx -> going to update\n", evt->strand);
+        DPRINTF(DEBUG_LVL_VERB, "Event has strand %p -> going to update\n", evt->strand);
         // First grab the lock on the strand
         pdStrand_t *strand = evt->strand;
         u32 stIdx = strand->index & ((1<<BV_SIZE_LOG2) - 1);
@@ -554,12 +554,12 @@ u8 pdMarkWaitEvent(ocrPolicyDomain_t *pd, pdEvent_t *evt) {
         bool propagateReady = false, propagateNP = false;
         hal_lock32(&(curNode->lock));
         if ((strand->properties & PDST_WAIT_ACT) != 0) {
-            DPRINTF(DEBUG_LVL_VERB, "(POSSIBLE RACE) Strand 0x%lx has waiting actions\n", strand);
+            DPRINTF(DEBUG_LVL_VERB, "(POSSIBLE RACE) Strand %p has waiting actions\n", strand);
             // We are no longer in need of processing
             curNode->nodeNeedsProcess &= ~(1ULL<<stIdx);
             propagateNP = curNode->nodeNeedsProcess == 0ULL;
         } else {
-            DPRINTF(DEBUG_LVL_VERB, "Strand 0x%lx is no longer ready\n", strand);
+            DPRINTF(DEBUG_LVL_VERB, "Strand %p is no longer ready\n", strand);
             // If we are still around, it means we have an active hold
             ASSERT(strand->properties & PDST_HOLD);
             curNode->nodeReady &= ~(1ULL<<stIdx);
@@ -570,7 +570,7 @@ u8 pdMarkWaitEvent(ocrPolicyDomain_t *pd, pdEvent_t *evt) {
 
         // We still hold lock on curNode
         if (propagateReady || propagateNP) {
-            DPRINTF(DEBUG_LVL_VERB, "Propagating properties: ready: %u; np: %u\n",
+            DPRINTF(DEBUG_LVL_VERB, "Propagating properties: ready: %"PRIu32"; np: %"PRIu32"\n",
                     propagateReady, propagateNP);
 
             pdStrandTableNode_t *parent = curNode->parent;
@@ -594,7 +594,7 @@ u8 pdMarkWaitEvent(ocrPolicyDomain_t *pd, pdEvent_t *evt) {
         }
     }
 END_LABEL(markWaitEventEnd)
-    DPRINTF(DEBUG_LVL_INFO, "EXIT pdMarkWaitEvent -> %u\n",
+    DPRINTF(DEBUG_LVL_INFO, "EXIT pdMarkWaitEvent -> %"PRIu32"\n",
             toReturn);
     return toReturn;
 #undef _END_FUNC
@@ -611,7 +611,7 @@ END_LABEL(markWaitEventEnd)
 pdAction_t* pdGetProcessMessageAction() {
 
     DPRINTF(DEBUG_LVL_INFO, "ENTER pdGetCallbackAction()\n");
-    DPRINTF(DEBUG_LVL_INFO, "EXIT pdGetCallbackAction -> action:0x%lx\n", PDACTION_ENC_PROCESS_MESSAGE);
+    DPRINTF(DEBUG_LVL_INFO, "EXIT pdGetCallbackAction -> action:0x%"PRIx64"\n", (u64)PDACTION_ENC_PROCESS_MESSAGE);
     return (pdAction_t*)(0x0ULL | PDACTION_ENC_PROCESS_MESSAGE);
 }
 
@@ -621,7 +621,7 @@ pdAction_t* pdGetProcessMessageAction() {
 
 u8 pdInitializeStrandTable(ocrPolicyDomain_t* pd, pdStrandTable_t *table,
                            u32 properties) {
-    DPRINTF(DEBUG_LVL_INFO, "ENTER pdInitializeStrandTable(pd:0x%lx, table:0x%lx, props:0x%x)\n",
+    DPRINTF(DEBUG_LVL_INFO, "ENTER pdInitializeStrandTable(pd:%p, table:%p, props:0x%"PRIx32")\n",
             pd, table, properties);
 #define _END_FUNC initializeStrandTableEnd
     u8 toReturn = 0;
@@ -633,7 +633,7 @@ u8 pdInitializeStrandTable(ocrPolicyDomain_t* pd, pdStrandTable_t *table,
     table->lock = 0;
 
 END_LABEL(initializeStrandTableEnd)
-    DPRINTF(DEBUG_LVL_INFO, "EXIT pdInitializeStrandTable -> %u\n",
+    DPRINTF(DEBUG_LVL_INFO, "EXIT pdInitializeStrandTable -> %"PRIu32"\n",
             toReturn);
     return toReturn;
 #undef _END_FUNC
@@ -642,7 +642,7 @@ END_LABEL(initializeStrandTableEnd)
 
 u8 pdDestroyStrandTable(ocrPolicyDomain_t* pd, pdStrandTable_t *table,
                            u32 properties) {
-    DPRINTF(DEBUG_LVL_INFO, "ENTER pdDestroyStrandTable(pd:0x%lx, table:0x%lx, props:0x%x)\n",
+    DPRINTF(DEBUG_LVL_INFO, "ENTER pdDestroyStrandTable(pd:%p, table:%p, props:0x%"PRIx32")\n",
             pd, table, properties);
 #define _END_FUNC destroyStrandTableEnd
     u8 toReturn = 0;
@@ -668,7 +668,7 @@ u8 pdDestroyStrandTable(ocrPolicyDomain_t* pd, pdStrandTable_t *table,
     hal_unlock32(&(table->lock));
 
 END_LABEL(destroyStrandTableEnd)
-    DPRINTF(DEBUG_LVL_INFO, "EXIT pdDestroyStrandTable -> %u\n",
+    DPRINTF(DEBUG_LVL_INFO, "EXIT pdDestroyStrandTable -> %"PRIu32"\n",
             toReturn);
     return toReturn;
 #undef _END_FUNC
@@ -679,7 +679,7 @@ END_LABEL(destroyStrandTableEnd)
 
 u8 pdGetNewStrand(ocrPolicyDomain_t *pd, pdStrand_t **returnStrand, pdStrandTable_t *table,
                   pdEvent_t* event, u32 properties) {
-    DPRINTF(DEBUG_LVL_INFO, "ENTER pdGetNewStrand(pd:0x%lx, strand**:0x%lx [0x%lx], table:0x%lx)\n",
+    DPRINTF(DEBUG_LVL_INFO, "ENTER pdGetNewStrand(pd:%p, strand**:%p [%p], table:%p)\n",
             pd, returnStrand, *returnStrand, table);
 #define _END_FUNC getNewStrandEnd
 
@@ -702,7 +702,7 @@ u8 pdGetNewStrand(ocrPolicyDomain_t *pd, pdStrand_t **returnStrand, pdStrandTabl
         // If level is 0, it means that the table should be empty
         // We need to initialize it
         ASSERT(table->head == NULL);
-        DPRINTF(DEBUG_LVL_VERB, "Table 0x%lx: empty -- adding level 1\n",
+        DPRINTF(DEBUG_LVL_VERB, "Table %p: empty -- adding level 1\n",
                 table);
         // See BUG #899: this should be slab allocated
         CHECK_MALLOC(table->head = (pdStrandTableNode_t*)pd->fcts.pdMalloc
@@ -710,7 +710,7 @@ u8 pdGetNewStrand(ocrPolicyDomain_t *pd, pdStrand_t **returnStrand, pdStrandTabl
         CHECK_RESULT(
             toReturn |= _pdInitializeStrandTableNode(pd, table->head, NULL, 0, 0, PDST_NODE_SIZE, IS_LEAF),
                      {hal_unlock32(&(table->lock)); pd->fcts.pdFree(pd, table->head);},);
-        DPRINTF(DEBUG_LVL_VVERB, "Table 0x%lx: added head 0x%lx\n", table, table->head);
+        DPRINTF(DEBUG_LVL_VVERB, "Table %p: added head %p\n", table, table->head);
         table->levelCount = 1;
         cachedLevelCount = 1;
         leafToUse = table->head;
@@ -729,7 +729,7 @@ u8 pdGetNewStrand(ocrPolicyDomain_t *pd, pdStrand_t **returnStrand, pdStrandTabl
         // of getting a free slot
         if(curNode->nodeFree == 0ULL) {
             // Nothing at all is free
-            DPRINTF(DEBUG_LVL_VERB, "Table 0x%lx: fully loaded -- adding level %u\n",
+            DPRINTF(DEBUG_LVL_VERB, "Table %p: fully loaded -- adding level %"PRIu32"\n",
                     table, cachedLevelCount + 1);
             pdStrandTableNode_t *newNode = NULL;
             // See BUG #899: this should be slab allocated
@@ -755,7 +755,7 @@ u8 pdGetNewStrand(ocrPolicyDomain_t *pd, pdStrand_t **returnStrand, pdStrandTabl
             ASSERT((newNode->nodeNeedsProcess & 1ULL) == (curNode->nodeNeedsProcess != 0ULL));
             ASSERT((newNode->nodeReady & 1ULL) == (curNode->nodeReady != 0ULL));
 
-            DPRINTF(DEBUG_LVL_VVERB, "Table 0x%lx: level 1 is now 0x%lx (from 0x%lx)\n",
+            DPRINTF(DEBUG_LVL_VVERB, "Table %p: level 1 is now %p (from %p)\n",
                     table, newNode, curNode);
             cachedLevelCount = ++table->levelCount;
             curNode = table->head = newNode;
@@ -763,7 +763,7 @@ u8 pdGetNewStrand(ocrPolicyDomain_t *pd, pdStrand_t **returnStrand, pdStrandTabl
             hal_unlock32(&(table->lock));
             // Lock held here: curNode
         } else if(table->levelCount == 1) {
-            DPRINTF(DEBUG_LVL_VERB, "Table 0x%lx has one level with free space (0x%lx)\n",
+            DPRINTF(DEBUG_LVL_VERB, "Table %p has one level with free space (%p)\n",
                     table, curNode);
             hal_unlock32(&(table->lock));
             // If we have some free room and only one level, we know what to use
@@ -771,7 +771,7 @@ u8 pdGetNewStrand(ocrPolicyDomain_t *pd, pdStrand_t **returnStrand, pdStrandTabl
             // Lock held here: curNode/leafToUse
 
         } else {
-            DPRINTF(DEBUG_LVL_VERB, "Proceeding down table with curNode 0x%lx\n",
+            DPRINTF(DEBUG_LVL_VERB, "Proceeding down table with curNode %p\n",
                     curNode);
             hal_unlock32(&(table->lock));
 
@@ -788,7 +788,7 @@ u8 pdGetNewStrand(ocrPolicyDomain_t *pd, pdStrand_t **returnStrand, pdStrandTabl
             u32 freeSlot = ctz(curNode->nodeFree);
 
             pdStrandTableNode_t **node = &(curNode->data.nodes[freeSlot]);
-            DPRINTF(DEBUG_LVL_VERB, "Found free slot %u [0x%lx] at level %u [0x%lx]\n",
+            DPRINTF(DEBUG_LVL_VERB, "Found free slot %"PRIu32" [%p] at level %"PRIu32" [%p]\n",
                     freeSlot, *node, curLevel, curNode);
             if (*node == NULL) {
                 // See BUG #899: This should be slab allocated
@@ -799,7 +799,7 @@ u8 pdGetNewStrand(ocrPolicyDomain_t *pd, pdStrand_t **returnStrand, pdStrandTabl
                 // If we are at the penultimate level, create a leaf node, otherwise
                 // create a regular one
                 if (curLevel == cachedLevelCount - 1) {
-                    DPRINTF(DEBUG_LVL_VVERB, "Initializing leaf-node 0x%lx at level %u\n",
+                    DPRINTF(DEBUG_LVL_VVERB, "Initializing leaf-node %p at level %"PRIu32"\n",
                             t, curLevel+1);
                     CHECK_RESULT(
                         toReturn |= _pdInitializeStrandTableNode(pd, t, curNode,
@@ -866,7 +866,7 @@ u8 pdGetNewStrand(ocrPolicyDomain_t *pd, pdStrand_t **returnStrand, pdStrandTabl
     u32 freeSlot = ctz(leafToUse->nodeFree);
 
     pdStrand_t *strand = leafToUse->data.slots[freeSlot];
-    DPRINTF(DEBUG_LVL_VERB, "Found free strand %u [0x%lx] at leaf level %u [0x%lx]\n",
+    DPRINTF(DEBUG_LVL_VERB, "Found free strand %"PRIu32" [%p] at leaf level %"PRIu32" [%p]\n",
             freeSlot, strand, curLevel, leafToUse);
 
     // All strands should be initialized here.
@@ -879,7 +879,7 @@ u8 pdGetNewStrand(ocrPolicyDomain_t *pd, pdStrand_t **returnStrand, pdStrandTabl
     strand->properties |= PDST_RHOLD |
         (((event->properties & PDEVT_READY) != 0)?0:PDST_WAIT_EVT);
     strand->properties |= properties;
-    DPRINTF(DEBUG_LVL_VVERB, "Strand 0x%lx: event: 0x%lx | actions: 0x%lx | props: 0x%x\n",
+    DPRINTF(DEBUG_LVL_VVERB, "Strand %p: event: %p | actions: %p | props: 0x%"PRIx32"\n",
             strand, strand->curEvent, strand->actions, strand->properties);
 
     // Now set the value for the event
@@ -921,7 +921,7 @@ u8 pdGetNewStrand(ocrPolicyDomain_t *pd, pdStrand_t **returnStrand, pdStrandTabl
             }
         });
 END_LABEL(getNewStrandEnd)
-    DPRINTF(DEBUG_LVL_INFO, "EXIT pdGetNewStrand -> %u [strand: 0x%lx]\n",
+    DPRINTF(DEBUG_LVL_INFO, "EXIT pdGetNewStrand -> %"PRIu32" [strand: %p]\n",
             toReturn, *returnStrand);
     return toReturn;
 #undef _END_FUNC
@@ -930,7 +930,7 @@ END_LABEL(getNewStrandEnd)
 
 u8 pdGetStrandForIndex(ocrPolicyDomain_t* pd, pdStrand_t **returnStrand, pdStrandTable_t* table,
                        u64 index) {
-    DPRINTF(DEBUG_LVL_INFO, "ENTER pdGetStrandForIndex(pd:0x%lx, strand**:0x%lx [0x%lx], table:0x%lx, idx:%lu)\n",
+    DPRINTF(DEBUG_LVL_INFO, "ENTER pdGetStrandForIndex(pd:%p, strand**:%p [%p], table:%p, idx:%"PRIu64")\n",
             pd, returnStrand, *returnStrand, table, index);
 #define _END_FUNC getStrandForIndex
 
@@ -948,13 +948,13 @@ u8 pdGetStrandForIndex(ocrPolicyDomain_t* pd, pdStrand_t **returnStrand, pdStran
     u32 curIndex;
     hal_unlock32(&(table->lock));
     if (maxLevel == 0) {
-        DPRINTF(DEBUG_LVL_WARN, "Table empty; index %lu not found\n", index);
+        DPRINTF(DEBUG_LVL_WARN, "Table empty; index %"PRIu64" not found\n", index);
         CHECK_RESULT_T(false, , toReturn = OCR_EINVAL);
     }
     u32 curLevel = 1;
 #define _LVL_MASK ((1ULL<<BV_SIZE_LOG2) - 1)
     if (index > (1ULL<<(maxLevel*BV_SIZE_LOG2))) {
-        DPRINTF(DEBUG_LVL_WARN, "Table has only %u levels; cannot contain %lu\n",
+        DPRINTF(DEBUG_LVL_WARN, "Table has only %"PRIu32" levels; cannot contain %"PRIu64"\n",
                 maxLevel, index);
         CHECK_RESULT_T(false, , toReturn = OCR_EINVAL);
     }
@@ -971,7 +971,7 @@ u8 pdGetStrandForIndex(ocrPolicyDomain_t* pd, pdStrand_t **returnStrand, pdStran
     ASSERT((*returnStrand)->index == index);
 
 END_LABEL(getStrandForIndex)
-    DPRINTF(DEBUG_LVL_INFO, "EXIT pdStrandForIndex -> %u [strand: 0x%lx]\n",
+    DPRINTF(DEBUG_LVL_INFO, "EXIT pdStrandForIndex -> %"PRIu32" [strand: %p]\n",
             toReturn, *returnStrand);
     return toReturn;
 #undef _LVL_MASK
@@ -981,7 +981,7 @@ END_LABEL(getStrandForIndex)
 
 u8 pdEnqueueActions(ocrPolicyDomain_t *pd, pdStrand_t* strand, u32 actionCount,
                     pdAction_t** actions, u8 clearFwdHold) {
-    DPRINTF(DEBUG_LVL_INFO, "ENTER pdEnqueueActions(pd:0x%lx, strand:0x%lx, count:%u, actions**:0x%lx [0x%lx], clearHold:%u)\n",
+    DPRINTF(DEBUG_LVL_INFO, "ENTER pdEnqueueActions(pd:%p, strand:%p, count:%"PRIu32", actions**:%p [%p], clearHold:%"PRIu32")\n",
             pd, strand, actionCount, actions, *actions, clearFwdHold);
 #define _END_FUNC enqueueActionsEnd
 
@@ -1006,22 +1006,22 @@ u8 pdEnqueueActions(ocrPolicyDomain_t *pd, pdStrand_t* strand, u32 actionCount,
         CHECK_MALLOC(strand->actions = newDeque(pd, NULL, NON_CONCURRENT_DEQUE), );
     }
 
-    DPRINTF(DEBUG_LVL_VERB, "Going to enqueue %u actions on 0x%lx\n",
+    DPRINTF(DEBUG_LVL_VERB, "Going to enqueue %"PRIu32" actions on %p\n",
             actionCount, strand->actions);
     // At this point, we can enqueue things on the strand->actions deque
     u32 i;
     for (i = 0; i < actionCount; ++i, ++actions) {
-        DPRINTF(DEBUG_LVL_VVERB, "Pushing action 0x%lx\n", *actions);
+        DPRINTF(DEBUG_LVL_VVERB, "Pushing action %p\n", *actions);
         strand->actions->pushAtTail(strand->actions, *actions, 1);
     }
 
     if (strand->actions->size(strand->actions) == actionCount) {
         // This means that no actions were pending
-        DPRINTF(DEBUG_LVL_VVERB, "Strand 0x%lx had no actions [props: 0x%x] -> setting WAIT_ACT\n",
+        DPRINTF(DEBUG_LVL_VVERB, "Strand %p had no actions [props: 0x%"PRIx32"] -> setting WAIT_ACT\n",
                 strand, strand->properties);
         ASSERT((strand->properties & PDST_WAIT_ACT) == 0);
         strand->properties |= PDST_WAIT_ACT;
-        DPRINTF(DEBUG_LVL_VVERB, "Strand 0x%lx [props: 0x%x]\n", strand,
+        DPRINTF(DEBUG_LVL_VVERB, "Strand %p [props: 0x%"PRIx32"]\n", strand,
                 strand->properties);
 
         if((strand->properties & PDST_WAIT_EVT) == 0) {
@@ -1062,23 +1062,23 @@ u8 pdEnqueueActions(ocrPolicyDomain_t *pd, pdStrand_t* strand, u32 actionCount,
         }
     }
     if (clearFwdHold) {
-        DPRINTF(DEBUG_LVL_VERB, "Clearing fwd hold on 0x%lx [props: 0x%x]\n",
+        DPRINTF(DEBUG_LVL_VERB, "Clearing fwd hold on %p [props: 0x%"PRIx32"]\n",
                 strand, strand->properties);
         if ((strand->properties & PDST_RHOLD) == 0) {
-            DPRINTF(DEBUG_LVL_WARN, "Clearing non-existant hold on 0x%lx [props: 0x%x]\n",
+            DPRINTF(DEBUG_LVL_WARN, "Clearing non-existant hold on %p [props: 0x%"PRIx32"]\n",
                     strand, strand->properties);
         }
         strand->properties &= ~PDST_RHOLD;
     }
 END_LABEL(enqueueActionsEnd)
-    DPRINTF(DEBUG_LVL_INFO, "EXIT pdEnqueueActions -> %u\n", toReturn);
+    DPRINTF(DEBUG_LVL_INFO, "EXIT pdEnqueueActions -> %"PRIu32"\n", toReturn);
     return toReturn;
 #undef _END_FUNC
 }
 
 
 u8 pdLockStrand(pdStrand_t *strand, bool doTry) {
-    DPRINTF(DEBUG_LVL_INFO, "ENTER pdLockStrand(strand:0x%lx, doTry:%u)\n",
+    DPRINTF(DEBUG_LVL_INFO, "ENTER pdLockStrand(strand:%p, doTry:%"PRIu32")\n",
             strand, doTry);
 #define _END_FUNC lockStrandEnd
 
@@ -1086,13 +1086,13 @@ u8 pdLockStrand(pdStrand_t *strand, bool doTry) {
     toReturn = _pdLockStrand(strand, 0, doTry?0:BLOCK);
 
 END_LABEL(lockStrandEnd)
-    DPRINTF(DEBUG_LVL_INFO, "EXIT pdLockStrand -> %u\n", toReturn);
+    DPRINTF(DEBUG_LVL_INFO, "EXIT pdLockStrand -> %"PRIu32"\n", toReturn);
     return toReturn;
 #undef _END_FUNC
 }
 
 u8 pdUnlockStrand(pdStrand_t *strand) {
-    DPRINTF(DEBUG_LVL_INFO, "ENTER pdUnlockStrand(strand:0x%lx)\n",
+    DPRINTF(DEBUG_LVL_INFO, "ENTER pdUnlockStrand(strand:%p)\n",
             strand);
 #define _END_FUNC unlockStrandEnd
 
@@ -1102,7 +1102,7 @@ u8 pdUnlockStrand(pdStrand_t *strand) {
     strand->properties &= ~PDST_LOCK;
 
 END_LABEL(unlockStrandEnd)
-    DPRINTF(DEBUG_LVL_INFO, "EXIT pdUnlockStrand -> %u\n", toReturn);
+    DPRINTF(DEBUG_LVL_INFO, "EXIT pdUnlockStrand -> %"PRIu32"\n", toReturn);
     return toReturn;
 #undef _END_FUNC
 }
@@ -1114,7 +1114,7 @@ END_LABEL(unlockStrandEnd)
 
 
 u8 pdProcessStrands(ocrPolicyDomain_t *pd, u32 properties) {
-    DPRINTF(DEBUG_LVL_INFO, "ENTER pdProcessStrands(pd:0x%lx, props:0x%x)\n",
+    DPRINTF(DEBUG_LVL_INFO, "ENTER pdProcessStrands(pd:%p, props:0x%"PRIx32")\n",
             pd, properties);
 #define _END_FUNC processStrandsEnd
 
@@ -1148,7 +1148,7 @@ u8 pdProcessStrands(ocrPolicyDomain_t *pd, u32 properties) {
     u32 curLevel = 1;
     for (; i < PDSTT_COMM; ++i) {
         pdStrandTable_t *table = pd->strandTables[i];
-        DPRINTF(DEBUG_LVL_VERB, "Looking at table 0x%lx [idx: %u]\n", table, i);
+        DPRINTF(DEBUG_LVL_VERB, "Looking at table %p [idx: %"PRIu32"]\n", table, i);
         processCount = 0;
         hal_lock32(&(table->lock));
         pdStrandTableNode_t *curNode = table->head;
@@ -1168,7 +1168,7 @@ u8 pdProcessStrands(ocrPolicyDomain_t *pd, u32 properties) {
             ASSERT(curNode);
             ASSERT(curNode->lock == 1);
             if (curNode->nodeNeedsProcess) {
-                DPRINTF(DEBUG_LVL_VERB, "Node 0x%lx has children to process [0x%lx]\n",
+                DPRINTF(DEBUG_LVL_VERB, "Node %p has children to process [0x%"PRIx64"]\n",
                         curNode, curNode->nodeNeedsProcess);
                 u32 processSlot = ctz(curNode->nodeNeedsProcess);
                 // Clear the bit for nodeNeedsProcess on curNode to prevent anyone else from
@@ -1181,7 +1181,7 @@ u8 pdProcessStrands(ocrPolicyDomain_t *pd, u32 properties) {
                     // If we have something that needs to be processed, there should definitely be a node
                     hal_unlock32(&(curNode->lock));
                     ASSERT(node);
-                    DPRINTF(DEBUG_LVL_VERB, "Going down slot %u to 0x%lx\n", processSlot, node);
+                    DPRINTF(DEBUG_LVL_VERB, "Going down slot %"PRIu32" to %p\n", processSlot, node);
                     curNode = node;
                     hal_lock32(&(curNode->lock));
                     ++curLevel;
@@ -1192,7 +1192,7 @@ u8 pdProcessStrands(ocrPolicyDomain_t *pd, u32 properties) {
 
                 ASSERT((curNode->nodeNeedsProcess & (1ULL<<processSlot)) == 0);
                 pdStrand_t *toProcess = curNode->data.slots[processSlot];
-                DPRINTF(DEBUG_LVL_VERB, "Found strand 0x%lx in slot %u\n", toProcess, processSlot);
+                DPRINTF(DEBUG_LVL_VERB, "Found strand %p in slot %"PRIu32"\n", toProcess, processSlot);
 
                 // Grab the lock on it and then we are going to release all the other "locks"
                 // to free-up parallelism if needed.
@@ -1226,9 +1226,9 @@ u8 pdProcessStrands(ocrPolicyDomain_t *pd, u32 properties) {
                        toProcess->actions->size(toProcess->actions)) {
                     pdAction_t *curAction = (pdAction_t*)(toProcess->actions->popFromHead(toProcess->actions, false));
                     ASSERT(curAction);
-                    DPRINTF(DEBUG_LVL_VERB, "Processing action 0x%lx\n", curAction);
+                    DPRINTF(DEBUG_LVL_VERB, "Processing action %p\n", curAction);
                     RESULT_ASSERT(_pdProcessAction(pd, toProcess, curAction, 0), ==, 0);
-                    DPRINTF(DEBUG_LVL_VERB, "Done processing action 0x%lx\n", curAction);
+                    DPRINTF(DEBUG_LVL_VERB, "Done processing action %p\n", curAction);
                 }
 
                 // Update properties
@@ -1237,14 +1237,14 @@ u8 pdProcessStrands(ocrPolicyDomain_t *pd, u32 properties) {
                 if(toProcess->actions->size(toProcess->actions) == 0) {
                     toProcess->properties &= ~(PDST_WAIT_ACT);
                     if((toProcess->properties & PDST_WAIT_EVT) == 0) {
-                        DPRINTF(DEBUG_LVL_VERB, "Strand 0x%lx now ready\n", toProcess);
+                        DPRINTF(DEBUG_LVL_VERB, "Strand %p now ready\n", toProcess);
                         propagateReady = curNode->nodeReady == 0ULL;
                         ASSERT((curNode->nodeReady & (1ULL<<processSlot)) == 0);
                         ASSERT((curNode->nodeNeedsProcess & (1ULL<<processSlot)) == 0);
 
                         curNode->nodeReady |= (1ULL<<processSlot);
                     } else {
-                        DPRINTF(DEBUG_LVL_VERB, "Strand 0x%lx is not ready and has no actions\n",
+                        DPRINTF(DEBUG_LVL_VERB, "Strand %p is not ready and has no actions\n",
                                 toProcess);
                         ASSERT((curNode->nodeReady & (1ULL<<processSlot)) == 0);
                         ASSERT((curNode->nodeNeedsProcess & (1ULL<<processSlot)) == 0);
@@ -1253,14 +1253,14 @@ u8 pdProcessStrands(ocrPolicyDomain_t *pd, u32 properties) {
                 } else {
                     ASSERT(toProcess->properties & PDST_WAIT_ACT);
                     if((toProcess->properties & PDST_WAIT_EVT) == 0) {
-                        DPRINTF(DEBUG_LVL_VERB, "Strand 0x%lx still has pending actions that need processing\n",
+                        DPRINTF(DEBUG_LVL_VERB, "Strand %p still has pending actions that need processing\n",
                                 toProcess);
                         propagateNP = curNode->nodeNeedsProcess == 0ULL;
                         curNode->nodeNeedsProcess |= (1ULL<<processSlot);
 
                         ASSERT((curNode->nodeReady & (1ULL<<processSlot)) == 0);
                     } else {
-                        DPRINTF(DEBUG_LVL_VERB, "Strand 0x%lx has pending actions but not ready\n",
+                        DPRINTF(DEBUG_LVL_VERB, "Strand %p has pending actions but not ready\n",
                                 toProcess);
 
                         ASSERT((curNode->nodeNeedsProcess & (1ULL<<processSlot)) == 0);
@@ -1275,7 +1275,7 @@ u8 pdProcessStrands(ocrPolicyDomain_t *pd, u32 properties) {
                     // Strand is ready; we either free it or keep it there due to a hold
                     if ((toProcess->properties & PDST_HOLD) == 0) {
                         // We can free the strand now
-                        DPRINTF(DEBUG_LVL_VERB, "Freeing strand 0x%lx [idx %u] after processing actions\n",
+                        DPRINTF(DEBUG_LVL_VERB, "Freeing strand %p [idx %"PRIu64"] after processing actions\n",
                                 toProcess, toProcess->index);
                         // We unset the nodeReady bit to prevent unecessary propagation
                         curNode->nodeReady &= ~(1ULL<<processSlot);
@@ -1285,7 +1285,7 @@ u8 pdProcessStrands(ocrPolicyDomain_t *pd, u32 properties) {
                         propagateReady = false; // No need to change this since we freed the node
                         didFree = true;
                     } else {
-                        DPRINTF(DEBUG_LVL_VERB, "Strand 0x%lx is ready but has a hold -- leaving as is\n",
+                        DPRINTF(DEBUG_LVL_VERB, "Strand %p is ready but has a hold -- leaving as is\n",
                                 toProcess);
                         toProcess->properties &= ~PDST_LOCK;
                     }
@@ -1297,7 +1297,7 @@ u8 pdProcessStrands(ocrPolicyDomain_t *pd, u32 properties) {
                 // (in that case, the following if statement is false)
                 if (propagateReady || propagateNP) {
                     ASSERT(!didFree);
-                    DPRINTF(DEBUG_LVL_VERB, "Propagating properties: ready: %u; np: %u\n",
+                    DPRINTF(DEBUG_LVL_VERB, "Propagating properties: ready: %"PRIu32"; np: %"PRIu32"\n",
                             propagateReady, propagateNP);
 
                     pdStrandTableNode_t *parent = curNode->parent;
@@ -1330,7 +1330,7 @@ u8 pdProcessStrands(ocrPolicyDomain_t *pd, u32 properties) {
                 hal_lock32(&(curNode->lock));
             } else {
                 // Nothing left to process
-                DPRINTF(DEBUG_LVL_VERB, "No actions to process -- breaking out after %u\n",
+                DPRINTF(DEBUG_LVL_VERB, "No actions to process -- breaking out after %"PRIu32"\n",
                         processCount);
                 break; // Breaks out of processing loop
             }
@@ -1341,7 +1341,7 @@ u8 pdProcessStrands(ocrPolicyDomain_t *pd, u32 properties) {
     } /* End of for loop on tables */
 
 END_LABEL(processStrandsEnd)
-    DPRINTF(DEBUG_LVL_INFO, "EXIT pdProcessStrands -> %u\n", toReturn);
+    DPRINTF(DEBUG_LVL_INFO, "EXIT pdProcessStrands -> %"PRIu32"\n", toReturn);
     return toReturn;
 #undef _END_FUNC
 }
@@ -1356,7 +1356,7 @@ typedef pdEvent_t* (*actionCallback_t)(ocrPolicyDomain_t*, pdEvent_t*, u32);
 static u8 _pdProcessAction(ocrPolicyDomain_t *pd, pdStrand_t *strand, pdAction_t* action,
                            u32 properties) {
 
-    DPRINTF(DEBUG_LVL_INFO, "ENTER _pdProcessAction(pd:0x%lx, strand:0x%lx, action:0x%lx, props:0x%x)\n",
+    DPRINTF(DEBUG_LVL_INFO, "ENTER _pdProcessAction(pd:%p, strand:%p, action:%p, props:0x%"PRIx32")\n",
             pd, strand, action, properties);
 #define _END_FUNC processActionEnd
 
@@ -1376,10 +1376,10 @@ static u8 _pdProcessAction(ocrPolicyDomain_t *pd, pdStrand_t *strand, pdAction_t
         case PDACTION_ENC_PROCESS_MESSAGE:
         {
             actionCallback_t callback = (actionCallback_t)(pd->fcts.processMessageMT);
-            DPRINTF(DEBUG_LVL_VERB, "Action is a callback to processMessage (0x%lx)\n", callback);
+            DPRINTF(DEBUG_LVL_VERB, "Action is a callback to processMessage (%p)\n", callback);
             pdEvent_t* returnedValue = callback(pd, strand->curEvent, 0);
             if (returnedValue) {
-                DPRINTF(DEBUG_LVL_VVERB, "Callback returned event 0x%lx -- replacing strand event 0x%lx\n",
+                DPRINTF(DEBUG_LVL_VVERB, "Callback returned event %p -- replacing strand event %p\n",
                         returnedValue, strand->curEvent);
                 /* SEE BUG #899: This should be a slab free */
                 pd->fcts.pdFree(pd, strand->curEvent);
@@ -1394,20 +1394,20 @@ static u8 _pdProcessAction(ocrPolicyDomain_t *pd, pdStrand_t *strand, pdAction_t
             break;
         default:
             /* For now, empty function, we just print something */
-            DPRINTF(DEBUG_LVL_INFO, "Pretending to execution action 0x%lx\n", action);
+            DPRINTF(DEBUG_LVL_INFO, "Pretending to execute action %p\n", action);
             break;
     }
 
 
 END_LABEL(processActionEnd)
-    DPRINTF(DEBUG_LVL_INFO, "EXIT _pdProcessAction -> %u\n", toReturn);
+    DPRINTF(DEBUG_LVL_INFO, "EXIT _pdProcessAction -> %"PRIu32"\n", toReturn);
     return toReturn;
 #undef _END_FUNC
 }
 
 static u8 _pdDestroyStrandTableNode(ocrPolicyDomain_t *pd, pdStrandTableNode_t *node) {
 
-    DPRINTF(DEBUG_LVL_INFO, "ENTER _pdDestroyStrandTableNode(pd:0x%lx, node:0x%lx)\n",
+    DPRINTF(DEBUG_LVL_INFO, "ENTER _pdDestroyStrandTableNode(pd:%p, node:%p)\n",
             pd, node);
 #define _END_FUNC destroyStrandTableNodeEnd
 
@@ -1423,15 +1423,15 @@ static u8 _pdDestroyStrandTableNode(ocrPolicyDomain_t *pd, pdStrandTableNode_t *
     for (i=0; i<BV_SIZE; ++i) {
         if(node->data.slots[i] != NULL) {
             if(isLeaf) {
-                DPRINTF(DEBUG_LVL_VERB, "Freeing strand %u: 0x%lx\n",
+                DPRINTF(DEBUG_LVL_VERB, "Freeing strand %"PRIu32": %p\n",
                         i, node->data.slots[i]);
                 pd->fcts.pdFree(pd, node->data.slots[i]);
                 node->data.slots[i] = NULL;
             } else {
-                DPRINTF(DEBUG_LVL_VERB, "Freeing down sub-node %u: 0x%lx\n",
+                DPRINTF(DEBUG_LVL_VERB, "Freeing down sub-node %"PRIu32": %p\n",
                         i, node->data.nodes[i]);
                 CHECK_RESULT(toReturn |= _pdDestroyStrandTableNode(pd, node->data.nodes[i]), ,);
-                DPRINTF(DEBUG_LVL_VERB, "Freeing su-node %u: 0x%lx\n",
+                DPRINTF(DEBUG_LVL_VERB, "Freeing su-node %"PRIu32": %p\n",
                         i, node->data.nodes[i]);
                 pd->fcts.pdFree(pd, node->data.nodes[i]);
                 node->data.nodes[i] = NULL;
@@ -1440,7 +1440,7 @@ static u8 _pdDestroyStrandTableNode(ocrPolicyDomain_t *pd, pdStrandTableNode_t *
     }
 
 END_LABEL(destroyStrandTableNodeEnd)
-        DPRINTF(DEBUG_LVL_INFO, "EXIT _pdDestroyStrandTableNode -> %u\n", toReturn);
+        DPRINTF(DEBUG_LVL_INFO, "EXIT _pdDestroyStrandTableNode -> %"PRIu32"\n", toReturn);
     return toReturn;
 #undef _END_FUNC
 }
@@ -1500,7 +1500,7 @@ static u8 _pdInitializeStrandTableNode(ocrPolicyDomain_t *pd, pdStrandTableNode_
                                        pdStrandTableNode_t *parent, u32 parentSlot,
                                        u32 rdepth, u32 numChildrenToInit,
                                        u8 flags) {
-    DPRINTF(DEBUG_LVL_INFO, "ENTER _pdInitializeStrandTableNode(pd:0x%lx, node:0x%lx, parent:0x%lx, pSlot:%u, rdepth:%u, childCount:%u, flags:0x%x)\n",
+    DPRINTF(DEBUG_LVL_INFO, "ENTER _pdInitializeStrandTableNode(pd:%p, node:%p, parent:%p, pSlot:%"PRIu32", rdepth:%"PRIu32", childCount:%"PRIu32", flags:0x%"PRIx32")\n",
             pd, node, parent, parentSlot, rdepth, numChildrenToInit, flags);
 #define _END_FUNC initializeStrandTableNodeEnd
 
@@ -1547,7 +1547,7 @@ static u8 _pdInitializeStrandTableNode(ocrPolicyDomain_t *pd, pdStrandTableNode_
             // BUG #899: should be slab allocated
             // We allocate once so that if it fails, the cleanup is easy :)
             CHECK_MALLOC(slab = (pdStrand_t*)pd->fcts.pdMalloc(pd, sizeof(pdStrand_t)*numChildrenToInit),);
-            DPRINTF(DEBUG_LVL_VERB, "Allocated %u strands for node 0x%lx\n",
+            DPRINTF(DEBUG_LVL_VERB, "Allocated %"PRIu32" strands for node %p\n",
                     numChildrenToInit, node);
         }
         // If we reach here, we allocated OK
@@ -1558,7 +1558,7 @@ static u8 _pdInitializeStrandTableNode(ocrPolicyDomain_t *pd, pdStrandTableNode_
             slab->properties = PDST_FREE;
             slab->index = (node->lmIndex>>1) + (u64)i;
             node->data.slots[i] = slab;
-            DPRINTF(DEBUG_LVL_VVERB, "Created strand %lu @ 0x%lx\n",
+            DPRINTF(DEBUG_LVL_VVERB, "Created strand %"PRIu64" @ %p\n",
                     slab->index, slab);
         }
     }
@@ -1572,7 +1572,7 @@ static u8 _pdInitializeStrandTableNode(ocrPolicyDomain_t *pd, pdStrandTableNode_
 
 
 END_LABEL(initializeStrandTableNodeEnd)
-    DPRINTF(DEBUG_LVL_INFO, "EXIT _pdInitializeStrandTableNode -> %u\n", toReturn);
+    DPRINTF(DEBUG_LVL_INFO, "EXIT _pdInitializeStrandTableNode -> %"PRIu32"\n", toReturn);
     return toReturn;
 #undef _END_FUNC
 }
@@ -1580,7 +1580,7 @@ END_LABEL(initializeStrandTableNodeEnd)
 
 static u8 _pdSetStrandNodeAtIdx(ocrPolicyDomain_t *pd, pdStrandTableNode_t *parent,
                                 u32 idx, void* child, u8 flags) {
-    DPRINTF(DEBUG_LVL_INFO, "ENTER _pdSetStrandNodeAtIdx(pd:0x%lx, parent:0x%lx, idx:%u, child:0x%lx, flags:0x%x)\n",
+    DPRINTF(DEBUG_LVL_INFO, "ENTER _pdSetStrandNodeAtIdx(pd:%p, parent:%p, idx:%"PRIu32", child:%p, flags:0x%"PRIx32")\n",
             pd, parent, idx, child, flags);
 #define _END_FUNC setStrandNodeAtIdxEnd
 
@@ -1681,14 +1681,14 @@ static u8 _pdSetStrandNodeAtIdx(ocrPolicyDomain_t *pd, pdStrandTableNode_t *pare
         });
 
 END_LABEL(setStrandNodeAtIdxEnd)
-    DPRINTF(DEBUG_LVL_INFO, "EXIT _pdSetStrandNodeAtIdx -> %u\n", toReturn);
+    DPRINTF(DEBUG_LVL_INFO, "EXIT _pdSetStrandNodeAtIdx -> %"PRIu32"\n", toReturn);
     return toReturn;
 #undef _END_FUNC
 }
 
 
 static u8 _pdFreeStrand(ocrPolicyDomain_t* pd, pdStrand_t *strand) {
-    DPRINTF(DEBUG_LVL_INFO, "ENTER _pdFreeStrand(pd:0x%lx, strand:0x%lx)\n",
+    DPRINTF(DEBUG_LVL_INFO, "ENTER _pdFreeStrand(pd:%p, strand:%p)\n",
             pd, strand);
 #define _END_FUNC freeStrandEnd
 
@@ -1759,7 +1759,7 @@ static u8 _pdFreeStrand(ocrPolicyDomain_t* pd, pdStrand_t *strand) {
             }
         });
 END_LABEL(freeStrandEnd)
-    DPRINTF(DEBUG_LVL_INFO, "EXIT _pdFreeStrand -> %u\n", toReturn);
+    DPRINTF(DEBUG_LVL_INFO, "EXIT _pdFreeStrand -> %"PRIu32"\n", toReturn);
     return toReturn;
 #undef _END_FUNC
 }

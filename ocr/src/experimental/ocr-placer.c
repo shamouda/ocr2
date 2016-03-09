@@ -126,7 +126,7 @@ u8 suggestLocationPlacement(ocrPolicyDomain_t *pd, ocrLocation_t curLoc, ocrPlat
             }
             hal_unlock32(&(placer->lock));
             msg->destLocation = affinityToLocation(pdLocAffinity);
-            DPRINTF(DEBUG_LVL_VVERB,"Auto-Placement for msg %p, type 0x%x, at location %d\n",
+            DPRINTF(DEBUG_LVL_VVERB,"Auto-Placement for msg %p, type 0x%"PRIx64", at location %"PRId32"\n",
                     msg, msgType, (u32)placementIndex);
         }
     }

@@ -469,8 +469,10 @@ static u64 quickInitAnnex(poolHdr_t * pPool, u64 size) {
     }
     pPool->flCount = flBucketCount;
     poolHeaderSize = (poolHeaderSize + ALIGNMENT_MASK)&(~ALIGNMENT_MASK);   // ceiling
-    DPRINTF(DEBUG_LVL_VERB,"Allocating a pool at [0x%lx,0x%lx) of %ld(0x%lx) bytes. flCount %d, sizeof(poolHdr_t)=0x%x (glebe: offset 0x%lx, and size is %ld(0x%lx), i.e. net size after pool overhead)\n",
-        (u64)pPool, (u64)pPool+size, size, size, flBucketCount, sizeof(poolHdr_t), (u64) poolHeaderSize, (u64)sizeRemainingAfterPoolHeader, (u64)sizeRemainingAfterPoolHeader);
+    DPRINTF(DEBUG_LVL_VERB,"Allocating a pool at [0x%"PRIx64",0x%"PRIx64") of %"PRId64" (0x%"PRIx64") bytes. "
+            "flCount %"PRId64", sizeof(poolHdr_t)=0x%zx (glebe: offset 0x%"PRIx64", and size is %"PRId64" (0x%"PRIx64"), i.e. net size after pool overhead)\n",
+            (u64)pPool, (u64)pPool+size, size, size, flBucketCount, sizeof(poolHdr_t), (u64) poolHeaderSize, (u64)sizeRemainingAfterPoolHeader,
+            (u64)sizeRemainingAfterPoolHeader);
     pPool->flAvailOrNot = 0; // Initialize the bitmaps to 0
 #ifdef FINE_LOCKING
     pPool->bmapLockFL = 0;
@@ -489,7 +491,7 @@ static void quickPrintCache(void)
         s32 m = CACHE_POOL(myid)->count_malloc[i];
         s32 f = CACHE_POOL(myid)->count_free[i];
         if (m || f)
-            DPRINTF(DEBUG_LVL_INFO, "(%d~%d] : malloc %d free %d\n", SLAB_MAX_SIZE(i-1), SLAB_MAX_SIZE(i), m, f);
+            DPRINTF(DEBUG_LVL_INFO, "(%"PRId32"~%"PRId32"] : malloc %"PRId32" free %"PRId32"\n", SLAB_MAX_SIZE(i-1), SLAB_MAX_SIZE(i), m, f);
     }
     hal_unlock32(&CACHE_POOL(myid)->lock);
     DPRINTF(DEBUG_LVL_INFO, "====== END OF REPORT (cache %p) =======\n", CACHE_POOL(myid));
@@ -506,17 +508,17 @@ static void quickWalkPool(poolHdr_t *pool)
         flag = GET_FLAG(HEAD(p));
         if (flag != FLAG_FREE) {
             if (flag == FLAG_INUSE) {
-                DPRINTF(DEBUG_LVL_INFO, "[size %ld]\n", size);
+                DPRINTF(DEBUG_LVL_INFO, "[size %"PRId64"]\n", size);
             } else if (flag == FLAG_INUSE_SLAB) {
 #ifdef PER_AGENT_CACHE
                 struct slab_header *head = (struct slab_header *)HEAD_TO_USER(p);
                 ASSERT(head->mark == SLAB_MARK);
-                DPRINTF(DEBUG_LVL_INFO, "[size %ld] slab for %p\n", size, head->per_agent);
+                DPRINTF(DEBUG_LVL_INFO, "[size %"PRId64"] slab for %p\n", size, head->per_agent);
 #else
                 ASSERT(0 && "FLAG_INUSE_SLAB without slab enabled?\n");
 #endif
             } else {
-                DPRINTF(DEBUG_LVL_INFO, "{size %ld}\n", size);
+                DPRINTF(DEBUG_LVL_INFO, "{size %"PRId64"}\n", size);
             }
             total += size;
         }
@@ -524,14 +526,14 @@ static void quickWalkPool(poolHdr_t *pool)
         if ( (u64)p >= end )
             break;
     }
-    DPRINTF(DEBUG_LVL_INFO, "%ld bytes still in use\n", total);
+    DPRINTF(DEBUG_LVL_INFO, "%"PRId64" bytes still in use\n", total);
 }
 
 static void quickPrintCounters(poolHdr_t *pool)
 {
     if (pool->count_used) {
         DPRINTF(DEBUG_LVL_INFO, "**** MEMORY LEAK REPORT (pool %p) ****\n", pool);
-        DPRINTF(DEBUG_LVL_INFO, "%d bytes still in use, malloc %d times, free %d times\n", pool->count_used, pool->count_malloc, pool->count_free);
+        DPRINTF(DEBUG_LVL_INFO, "%"PRId32" bytes still in use, malloc %"PRId32" times, free %"PRId32" times\n", pool->count_used, pool->count_malloc, pool->count_free);
         quickWalkPool(pool);
         DPRINTF(DEBUG_LVL_INFO, "****** END OF REPORT (pool %p) *******\n", pool);
     }
@@ -718,9 +720,9 @@ void doBmapOp(poolHdr_t *pool, struct bmapOp *bmap_op)
 
 bmap_fallback:
 /*  // some debugging code
-    printf("dobmapOp count %d\n", bmap_op->count);
+    printf("dobmapOp count %"PRId32"\n", bmap_op->count);
     for(i=0;i<bmap_op->count;i++) {
-        printf("%d,%d, %d\n", bmap_op->fli[i], bmap_op->sli[i], bmap_op->delta[i]);
+        printf("%"PRId32",%"PRId32", %"PRId32"\n", bmap_op->fli[i], bmap_op->sli[i], bmap_op->delta[i]);
     }
 */
     // general case for count==2,3 in reverse order
@@ -790,7 +792,7 @@ static void quickTest(u64 start, u64 size)
     // boundary check code for sanity check.
     // This helps early detection of malformed addresses.
     do {
-        DPRINTF(DEBUG_LVL_VERB, "quickTest : pool range [%p - %p)\n", start, start+size);
+        DPRINTF(DEBUG_LVL_VERB, "quickTest : pool range [0x%"PRIx64" - 0x%"PRIx64")\n", start, start+size);
 
         u8 *p = (u8 *)((start + size - 128)&(~0x7UL));      // at least 128 bytes
         u8 *q = (u8 *)(start + size);
@@ -814,15 +816,15 @@ static void quickFinish(poolHdr_t *pool, u64 size)
     ASSERT((sizeof(poolHdr_t) & ALIGNMENT_MASK) == 0);
     ASSERT((size & ALIGNMENT_MASK) == 0);
 
-    DPRINTF(DEBUG_LVL_VERB, "quickFinish called. size 0x%lx at %p\n", size, (u8 *)pool);
+    DPRINTF(DEBUG_LVL_VERB, "quickFinish called. size 0x%"PRIx64" at %p\n", size, (u8 *)pool);
 
     // spinlock value must be 0 or 1. If not, it means it's not properly zero'ed before, or corrupted.
     ASSERT(pool->lock == 0 || pool->lock == 1);
 
     quickPrintCache();
 /*
-DPRINTF(DEBUG_LVL_WARN, "bmap_arr  : %d, %d(was %d), %d\n", dobmap_arr[1], dobmap_arr[2]-dobmap_count_case2, dobmap_arr[2], dobmap_arr[3]);
-DPRINTF(DEBUG_LVL_WARN, "bmap_count: %d\n", dobmap_count_case3);
+DPRINTF(DEBUG_LVL_WARN, "bmap_arr  : %"PRId32", %"PRId32"(was %"PRId32"), %"PRId32"\n", dobmap_arr[1], dobmap_arr[2]-dobmap_count_case2, dobmap_arr[2], dobmap_arr[3]);
+DPRINTF(DEBUG_LVL_WARN, "bmap_count: %"PRId32"\n", dobmap_count_case3);
 */
     hal_lock32(&(pool->lock));
     pool->init_count--;
@@ -928,7 +930,7 @@ static void quickInit(poolHdr_t *pool, u64 size)
 
         doBmapOp(pool, &bmap_op);
 #endif
-        DPRINTF(DEBUG_LVL_INFO, "init'ed pool %p, avail %ld bytes , sizeof(poolHdr_t) = %ld\n", pool, size, sizeof(poolHdr_t));
+        DPRINTF(DEBUG_LVL_INFO, "init'ed pool %p, avail %"PRId64" bytes , sizeof(poolHdr_t) = %zd\n", pool, size, sizeof(poolHdr_t));
         pool->init_count++;
 #ifdef ENABLE_VALGRIND
         VALGRIND_CREATE_MEMPOOL(p, 0, 1);  // BUG #600: Mempool needs to be destroyed
@@ -1097,7 +1099,7 @@ static inline void checkGuard(poolHdr_t *pool)
 static blkPayload_t *quickMallocInternal(poolHdr_t *pool,u64 size, struct _ocrPolicyDomain_t *pd)
 {
     u64 size_orig = size;
-//    DPRINTF(DEBUG_LVL_VERB, "before malloc size %ld:\n", size_orig);
+//    DPRINTF(DEBUG_LVL_VERB, "before malloc size %"PRId64":\n", size_orig);
 
     // This guarantees that the block will be able to embed NEXT/PREV
     // in case that it's freed in the future.
@@ -1502,7 +1504,7 @@ static struct slab_header *quickNewSlab(poolHdr_t *pool,s32 slabMaxSize, struct 
         // goes to the central heap to allocate slab
         void *slab = quickMallocInternal(pool, sizeof(struct slab_header)+(SLAB_OVERHEAD+slabMaxSize)*MAX_OBJ_PER_SLAB, pd );
         if (slab == NULL) {
-            DPRINTF(DEBUG_LVL_VERB, "Slab alloc failed (slabMaxSize %d), falling back to central heap\n", slabMaxSize);
+            DPRINTF(DEBUG_LVL_VERB, "Slab alloc failed (slabMaxSize %"PRId32"), falling back to central heap\n", slabMaxSize);
             return NULL;
         }
 
@@ -1589,8 +1591,8 @@ static void quickFree(blkPayload_t *p)
     s64 offset = (s64)q - (s64)head - sizeof(struct slab_header);
     s64 pos = offset / (head->size+SLAB_OVERHEAD);
     ASSERT(pos >= 0 && pos < MAX_OBJ_PER_SLAB);
-    //printf("%lx , %ld, pos %d\n", HEAD(q), HEAD(q), pos);
-    //printf("offset %ld , size %d \n", offset, head->size+SLAB_OVERHEAD);
+    //printf("%"PRIx64" , %"PRId64", pos %"PRId32"\n", HEAD(q), HEAD(q), pos);
+    //printf("offset %"PRId64" , size %"PRId32" \n", offset, head->size+SLAB_OVERHEAD);
     ASSERT((offset % (head->size+SLAB_OVERHEAD)) == 0);
 
     // local if (addrGlobalizeOnTG(CACHE_POOL(X)) == head->per_agent)
@@ -1646,7 +1648,7 @@ static inline void quickFree(blkPayload_t *p)
 
 #ifndef ENABLE_ALLOCATOR_QUICK_STANDALONE
 void quickDestruct(ocrAllocator_t *self) {
-    DPRINTF(DEBUG_LVL_VERB, "Entered quickDestruct on allocator 0x%lx\n", (u64) self);
+    DPRINTF(DEBUG_LVL_VERB, "Entered quickDestruct on allocator 0x%"PRIx64"\n", (u64) self);
     ASSERT(self->memoryCount == 1);
     self->memories[0]->fcts.destruct(self->memories[0]);
     /*
@@ -1658,7 +1660,7 @@ void quickDestruct(ocrAllocator_t *self) {
     //DPRINTF(DEBUG_LVL_WARN, "quickDestruct free %p\n", (u64)self->memories );
 
     runtimeChunkFree((u64)self, NULL);
-    DPRINTF(DEBUG_LVL_VERB, "Leaving quickDestruct on allocator 0x%lx (free)\n", (u64) self);
+    DPRINTF(DEBUG_LVL_VERB, "Leaving quickDestruct on allocator 0x%"PRIx64" (free)\n", (u64) self);
 }
 
 
@@ -1701,7 +1703,8 @@ u8 quickSwitchRunlevel(ocrAllocator_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_
             ocrAllocatorQuick_t * rself = (ocrAllocatorQuick_t *) self;
 
             u64 poolAddr = 0;
-            DPRINTF(DEBUG_LVL_VERB, "quickBegin : poolsize 0x%llx, level %d, startAddr 0x%lx\n",  rself->poolSize, self->memories[0]->level, self->memories[0]->memories[0]->startAddr);
+            DPRINTF(DEBUG_LVL_VERB, "quickBegin : poolsize 0x%"PRIx64", level %"PRIu64", startAddr 0x%"PRIx64"\n",
+                    rself->poolSize, self->memories[0]->level, self->memories[0]->memories[0]->startAddr);
 
             // if this RESULT_ASSERT fails, it usually means not-enough-free-memory.
             // For example, for L1, increased executable size easily shrinks free area.
@@ -1710,7 +1713,7 @@ u8 quickSwitchRunlevel(ocrAllocator_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_
                 self->memories[0], &poolAddr, rself->poolSize,
                 USER_FREE_TAG, USER_USED_TAG), ==, 0);
             rself->poolAddr = poolAddr;
-            DPRINTF(DEBUG_LVL_VERB, "quickBegin : poolAddr %p\n", poolAddr);
+            DPRINTF(DEBUG_LVL_VERB, "quickBegin : poolAddr 0x%"PRIx64"\n", poolAddr);
 
             // Adjust alignment if required
             u64 fiddlyBits = ((u64) rself->poolAddr) & (ALIGNMENT - 1LL);
@@ -1723,10 +1726,9 @@ u8 quickSwitchRunlevel(ocrAllocator_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_
             }
             rself->poolStorageSuffix = rself->poolSize & (ALIGNMENT-1LL);
             rself->poolSize &= ~(ALIGNMENT-1LL);
-            DPRINTF(DEBUG_LVL_VERB,
-                "QUICK Allocator @ 0x%llx/0x%llx got pool at address 0x%llx of size 0x%llx(%lld), offset from storage addr by %lld\n",
-                (u64) rself, (u64) self,
-                (u64) (rself->poolAddr), (u64) (rself->poolSize), (u64)(rself->poolSize), (u64) (rself->poolStorageOffset));
+            DPRINTF(DEBUG_LVL_VERB, "QUICK Allocator @ %p got pool at address 0x%"PRIx64" of size 0x%"PRIx64"(%"PRId64"), "
+                    "offset from storage addr by %"PRId64"\n",
+                    rself, rself->poolAddr, (u64) (rself->poolSize), (u64)(rself->poolSize), (u64) (rself->poolStorageOffset));
 #if 0 // TODO: 4.1.0 - check if this is really needed
             // See bug #875
             // at this moment, this is for only x86
@@ -1792,7 +1794,7 @@ void* quickAllocate(
 
     ocrAllocatorQuick_t * rself = (ocrAllocatorQuick_t *) self;
     void *ret = quickMalloc((poolHdr_t *)rself->poolAddr, size, self->pd);
-    DPRINTF(DEBUG_LVL_VERB, "quickAllocate called, ret %p from PoolAddr %p\n", ret, rself->poolAddr);
+    DPRINTF(DEBUG_LVL_VERB, "quickAllocate called, ret %p from PoolAddr %"PRIx64"\n", ret, rself->poolAddr);
     return ret;
 }
 void quickDeallocate(void* address) {

@@ -29,8 +29,8 @@ u8 ocrDbCreate(ocrGuid_t *db, void** addr, u64 len, u16 flags,
                ocrHint_t *hint, ocrInDbAllocator_t allocator) {
 
     START_PROFILE(api_DbCreate);
-    DPRINTF(DEBUG_LVL_INFO, "ENTER ocrDbCreate(*guid="GUIDF", len=%lu, flags=%u"
-            ", hint=0x%lx, alloc=%u)\n", GUIDA(*db), len, (u32)flags, hint, (u32)allocator);
+    DPRINTF(DEBUG_LVL_INFO, "ENTER ocrDbCreate(*guid="GUIDF", len=%"PRIu64", flags=%"PRIu32""
+            ", hint=%p, alloc=%"PRIu32")\n", GUIDA(*db), len, (u32)flags, hint, (u32)allocator);
     PD_MSG_STACK(msg);
     ocrPolicyDomain_t *policy = NULL;
     ocrTask_t *task = NULL;
@@ -83,7 +83,7 @@ u8 ocrDbCreate(ocrGuid_t *db, void** addr, u64 len, u16 flags,
         PD_MSG_FIELD_I(properties) = 0;
         returnCode = policy->fcts.processMessage(policy, &msg, false);
         if(returnCode != 0) {
-            DPRINTF(DEBUG_LVL_WARN, "EXIT ocrDbCreate -> %u; Issue registering datablock\n", returnCode);
+            DPRINTF(DEBUG_LVL_WARN, "EXIT ocrDbCreate -> %"PRIu32"; Issue registering datablock\n", returnCode);
             RETURN_PROFILE(returnCode);
         }
 #undef PD_MSG
@@ -95,7 +95,7 @@ u8 ocrDbCreate(ocrGuid_t *db, void** addr, u64 len, u16 flags,
         }
     }
     DPRINTF_COND_LVL(((returnCode != 0) && (returnCode != OCR_EGUIDEXISTS)), DEBUG_LVL_WARN, DEBUG_LVL_INFO,
-                     "EXIT ocrDbCreate -> %u; GUID: "GUIDF"; ADDR: 0x%lx size: %lu\n",
+                     "EXIT ocrDbCreate -> %"PRIu32"; GUID: "GUIDF"; ADDR: %p size: %"PRIu64"\n",
                      returnCode, GUIDA(*db), *addr, len);
     RETURN_PROFILE(returnCode);
 }
@@ -128,7 +128,7 @@ u8 ocrDbDestroy(ocrGuid_t db) {
         PD_MSG_FIELD_I(properties) = 0;
         returnCode = policy->fcts.processMessage(policy, &msg, true);
         if(returnCode != 0) {
-            DPRINTF(DEBUG_LVL_WARN, "Destroying DB (GUID: "GUIDF") -> %u; Issue unregistering the datablock\n", GUIDA(db), returnCode);
+            DPRINTF(DEBUG_LVL_WARN, "Destroying DB (GUID: "GUIDF") -> %"PRIu32"; Issue unregistering the datablock\n", GUIDA(db), returnCode);
         }
         // If dynRemoved is true, it means the task was using the data-block and we will therefore
         // need to remove it automatically. Otherwise, we won't need to release it
@@ -161,7 +161,7 @@ u8 ocrDbDestroy(ocrGuid_t db) {
     }
 
     DPRINTF_COND_LVL(returnCode, DEBUG_LVL_WARN, DEBUG_LVL_INFO,
-                     "EXIT ocrDbDestroy(guid="GUIDF") -> %u\n", GUIDA(db), returnCode);
+                     "EXIT ocrDbDestroy(guid="GUIDF") -> %"PRIu32"\n", GUIDA(db), returnCode);
     RETURN_PROFILE(returnCode);
 }
 
@@ -207,7 +207,7 @@ u8 ocrDbRelease(ocrGuid_t db) {
         PD_MSG_FIELD_I(properties) = 0;
         returnCode = policy->fcts.processMessage(policy, &msg, true);
         if (returnCode != 0) {
-            DPRINTF(DEBUG_LVL_WARN, "Releasing DB  -> %u; Issue unregistering DB datablock\n", returnCode);
+            DPRINTF(DEBUG_LVL_WARN, "Releasing DB  -> %"PRIu32"; Issue unregistering DB datablock\n", returnCode);
         }
 #undef PD_MSG
 #undef PD_TYPE
@@ -218,7 +218,7 @@ u8 ocrDbRelease(ocrGuid_t db) {
     }
 
     DPRINTF_COND_LVL(returnCode, DEBUG_LVL_WARN, DEBUG_LVL_INFO,
-                     "EXIT ocrDbRelease(guid=0x%lx) -> %u\n", db, returnCode);
+                     "EXIT ocrDbRelease(guid="GUIDF") -> %"PRIu32"\n", GUIDA(db), returnCode);
     RETURN_PROFILE(returnCode);
 }
 

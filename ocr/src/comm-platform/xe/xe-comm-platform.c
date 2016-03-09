@@ -105,7 +105,7 @@ u8 xeCommSwitchRunlevel(ocrCommPlatform_t *self, ocrPolicyDomain_t *PD, ocrRunle
             // Zero-out our stage for receiving messages
             for(i=AR_L1_BASE + MSG_QUEUE_OFFT; i<AR_L1_BASE + MSG_QUEUE_SIZE; i += sizeof(u64))
                 *(volatile u64 *)i = 0;
-            DPRINTF(DEBUG_LVL_VVERB, "Zeroed out local addresses for incoming buffer @ 0x%lx for size %lu\n", AR_L1_BASE + MSG_QUEUE_OFFT, MSG_QUEUE_SIZE);
+            DPRINTF(DEBUG_LVL_VVERB, "Zeroed out local addresses for incoming buffer @ 0x%"PRIx64" for size %"PRIu32"\n", AR_L1_BASE + MSG_QUEUE_OFFT, MSG_QUEUE_SIZE);
 
             // Remember which XE number we are
             cp->N = AGENT_FROM_ID(PD->myLocation) - ID_AGENT_XE0;
@@ -114,7 +114,7 @@ u8 xeCommSwitchRunlevel(ocrCommPlatform_t *self, ocrPolicyDomain_t *PD, ocrRunle
             cp->rq = (u64 *)(BR_L1_BASE(ID_AGENT_CE) + MSG_QUEUE_OFFT + cp->N * MSG_QUEUE_SIZE);
             // Initialize it to 0
             *(cp->rq) = 0ULL;
-            DPRINTF(DEBUG_LVL_VVERB, "Initializing receive queue for agent %lu @ CE @ 0x%lx\n", cp->N, (u64)(cp->rq));
+            DPRINTF(DEBUG_LVL_VVERB, "Initializing receive queue for agent %"PRIu64" @ CE @ 0x%"PRIx64"\n", cp->N, (u64)(cp->rq));
 #endif
         }
         break;
@@ -153,33 +153,33 @@ u8 xeCommSendMessage(ocrCommPlatform_t *self, ocrLocation_t target,
 
     // For now, XEs only sent to their CE; make sure!
     if(target != self->pd->parentLocation)
-        DPRINTF(DEBUG_LVL_WARN, "XE trying to send to %lx not parent %lx\n", target, self->pd->parentLocation);
+        DPRINTF(DEBUG_LVL_WARN, "XE trying to send to %"PRIx64" not parent %"PRIx64"\n", target, self->pd->parentLocation);
     ASSERT(target == self->pd->parentLocation);
 
     // - Atomically test & set remote stage to Busy. Error if already non-Empty.
-    DPRINTF(DEBUG_LVL_VVERB, "XE trying to grab its remote slot @ 0x%lx\n", cp->rq);
+    DPRINTF(DEBUG_LVL_VVERB, "XE trying to grab its remote slot @ %p\n", cp->rq);
     u64 tmp = 1;
     do {
         tmp = hal_cmpswap64(cp->rq, 0ULL, 1ULL);
     } while(tmp != 0);
-    DPRINTF(DEBUG_LVL_VVERB, "XE successful at grabbing remote slot @ 0x%lx\n", cp->rq);
+    DPRINTF(DEBUG_LVL_VVERB, "XE successful at grabbing remote slot @ %p\n", cp->rq);
 
     // We marshall things properly
     u64 baseSize = 0, marshalledSize = 0;
     ocrPolicyMsgGetMsgSize(message, &baseSize, &marshalledSize, 0);
     // We can only deal with the case where everything fits in the message
     if(baseSize + marshalledSize > message->bufferSize) {
-        DPRINTF(DEBUG_LVL_WARN, "Message can only be of size %ld got %ld\n",
+        DPRINTF(DEBUG_LVL_WARN, "Message can only be of size %"PRId64" got %"PRId64"\n",
                 message->bufferSize, baseSize + marshalledSize);
         ASSERT(0);
     }
     ocrPolicyMsgMarshallMsg(message, baseSize, (u8*)message, MARSHALL_APPEND);
     if(message->usefulSize > MSG_QUEUE_SIZE - sizeof(u64))
-        DPRINTF(DEBUG_LVL_WARN, "Message of type %x has size (%lx) too large (limit %lx)\n",
+        DPRINTF(DEBUG_LVL_WARN, "Message of type %"PRIx32" has size (%"PRIx64") too large (limit %"PRIx64")\n",
                                 message->type, message->usefulSize, MSG_QUEUE_SIZE-sizeof(u64));
     ASSERT(message->usefulSize <= MSG_QUEUE_SIZE - sizeof(u64))
     // - DMA to remote stage, with fence
-    DPRINTF(DEBUG_LVL_VVERB, "DMA-ing out message to 0x%lx of type 0x%x and size 0x%lx\n",
+    DPRINTF(DEBUG_LVL_VVERB, "DMA-ing out message to %p of type 0x%"PRIx32" and size 0x%"PRIx64"\n",
             &(cp->rq)[1], message->type, message->usefulSize);
     hal_memCopy(&(cp->rq)[1], message, message->usefulSize, 0);
 
@@ -218,14 +218,14 @@ u8 xeCommPollMessage(ocrCommPlatform_t *self, ocrPolicyMsg_t **msg,
     // Provide a ptr to the local stage's contents
     *msg = (ocrPolicyMsg_t *)&lq[1];
     if((*msg)->bufferSize > MSG_QUEUE_SIZE - sizeof(u64))
-        DPRINTF(DEBUG_LVL_WARN, "Message of type %x has buffer size (%lx) too large (limit %lx)\n",
+        DPRINTF(DEBUG_LVL_WARN, "Message of type %"PRIx32" has buffer size (%"PRIx64") too large (limit %"PRIx64")\n",
                                 (*msg)->type, (*msg)->bufferSize, MSG_QUEUE_SIZE-sizeof(u64));
     ASSERT((*msg)->bufferSize <= MSG_QUEUE_SIZE - sizeof(u64));
     // We fixup pointers
     u64 baseSize = 0, marshalledSize = 0;
     ocrPolicyMsgGetMsgSize(*msg, &baseSize, &marshalledSize, 0);
     if(baseSize + marshalledSize > (*msg)->bufferSize) {
-        DPRINTF(DEBUG_LVL_WARN, "Comm platform only handles messages up to size %ld\n",
+        DPRINTF(DEBUG_LVL_WARN, "Comm platform only handles messages up to size %"PRId64"\n",
                 (*msg)->bufferSize);
         ASSERT(0);
     }
@@ -257,16 +257,16 @@ u8 xeCommWaitMessage(ocrCommPlatform_t *self,  ocrPolicyMsg_t **msg,
     u64 baseSize = 0, marshalledSize = 0;
     ocrPolicyMsgGetMsgSize(*msg, &baseSize, &marshalledSize, 0);
     if((*msg)->bufferSize > MSG_QUEUE_SIZE - sizeof(u64))
-        DPRINTF(DEBUG_LVL_WARN, "Message of type %x has buffer size (%lx) too large (limit %lx)\n",
+        DPRINTF(DEBUG_LVL_WARN, "Message of type %"PRIx32" has buffer size (%"PRIx64") too large (limit %"PRIx64")\n",
                                 (*msg)->type, (*msg)->bufferSize, MSG_QUEUE_SIZE-sizeof(u64));
     ASSERT((*msg)->bufferSize <= MSG_QUEUE_SIZE - sizeof(u64));
     if(baseSize + marshalledSize > (*msg)->bufferSize) {
-        DPRINTF(DEBUG_LVL_WARN, "Comm platform only handles messages up to size %ld\n",
+        DPRINTF(DEBUG_LVL_WARN, "Comm platform only handles messages up to size %"PRId64"\n",
                 (*msg)->bufferSize);
         ASSERT(0);
     }
     ocrPolicyMsgUnMarshallMsg((u8*)*msg, NULL, *msg, MARSHALL_APPEND);
-    DPRINTF(DEBUG_LVL_VERB, "Found full message @ 0x%lx of type 0x%x\n", *msg, (*msg)->type);
+    DPRINTF(DEBUG_LVL_VERB, "Found full message @ %p of type 0x%"PRIx32"\n", *msg, (*msg)->type);
 
     return 0;
 }

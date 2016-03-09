@@ -26,7 +26,7 @@ double elapsed_sec(struct timeval * t_start, struct timeval * t_stop) {
 
 void print_throughput(char * timer_name, long nb_instances, double time_sec) {
     printf("Timer Name        : %s\n", timer_name);
-    printf("Workload    (unit): %ld\n", nb_instances);
+    printf("Workload    (unit): %"PRId64"\n", nb_instances);
     printf("Duration    (s)   : %f\n", time_sec);
     printf("Throughput  (op/s): %f\n", nb_instances/time_sec);
 }
@@ -36,7 +36,7 @@ void print_elapsed(double time_sec) {
 }
 
 void print_elapsed_usec(long time_usec) {
-    printf("Elapsed       (us): %ld\n", time_usec);
+    printf("Elapsed       (us): %"PRId64"\n", time_usec);
 }
 
 void summary_throughput_timer(timestamp_t * start_t, timestamp_t * stop_t, int instances) {

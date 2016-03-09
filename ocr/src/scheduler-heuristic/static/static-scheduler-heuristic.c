@@ -315,7 +315,7 @@ static u8 staticSchedulerHeuristicNotifyPreProcessMsgInvoke(ocrSchedulerHeuristi
                 }
                 ASSERT(edtHint);
                 RESULT_ASSERT(ocrSetHintValue(edtHint, OCR_HINT_EDT_SPACE, workerId), ==, 0);
-                DPRINTF(DEBUG_LVL_VERB, "WORK_CREATE: msg: %p msgId: %lx Affinity (PD: %lx Worker: %lx)\n", msg, msg->msgId, msg->destLocation, workerId);
+                DPRINTF(DEBUG_LVL_VERB, "WORK_CREATE: msg: %p msgId: %"PRIx64" Affinity (PD: %"PRIx64" Worker: %"PRIx64")\n", msg, msg->msgId, msg->destLocation, workerId);
             }
 #undef PD_MSG
 #undef PD_TYPE

@@ -30,6 +30,24 @@ extern "C" {
  * @{
  **/
 
+/**
+ * @brief Build string from format args
+ *
+ * This maps to the typical C-like snprintf() functionality.
+ *
+ * @param[in] buf       Output buffer for formatted string.
+ * @param[in] size      Maximum number of characters to write to
+ *                      buf (including the terminating '\0').
+ * @param[in] fmt       Format specifier, as per printf(). Not
+ *                      all modifiers are supported. Standard ones
+ *                      like %d, %f, %s, %x, %p work properly
+ * @param[in] ...       Arguments, as per printf().
+ *
+ * @return number of characters in output, as per snprintf().
+ *
+ **/
+u32 SNPRINTF(char * buf, u32 size, const char * fmt, ...) /*__attribute__((__format__ (__printf__, 3, 4))) */;
+
 
 /**
  * @brief Console output
@@ -44,7 +62,7 @@ extern "C" {
  * @return number of characters printed, as per printf().
  *
  **/
-extern u32 PRINTF(const char * fmt, ...);
+extern u32 PRINTF(const char * fmt, ...) /* __attribute__((__format__ (__printf__, 1, 2))) */;
 
 /**
  * @brief Platform independent 'assert' functionality
@@ -92,9 +110,9 @@ extern void _ocrAssert(bool val, const char* str, const char* file, u32 line);
 #define VERIFY(cond, format, ...)                                       \
     do {                                                                \
         if(!(cond)) {                                                   \
-            PRINTF("FAILURE @ '%s:%d' " format, __FILE__, __LINE__, ## __VA_ARGS__); \
+            PRINTF("FAILURE @ '%s:%"PRId32"' " format, __FILE__, __LINE__, ## __VA_ARGS__); \
         } else {                                                        \
-            PRINTF("PASSED @ '%s:%d' " format, __FILE__, __LINE__, ## __VA_ARGS__); \
+            PRINTF("PASSED @ '%s:%"PRId32"' " format, __FILE__, __LINE__, ## __VA_ARGS__); \
         }                                                               \
     } while(0);
 

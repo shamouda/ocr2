@@ -535,7 +535,6 @@ static u8 taskAllDepvSatisfied(ocrTask_t *self) {
 #define SLOT_SATISFIED_DB               ((u32) -3)
 
 u8 destructTaskHc(ocrTask_t* base) {
-
     DPRINTF(DEBUG_LVL_INFO,
             "Destroy "GUIDF"\n", GUIDA(base->guid));
     OCR_TOOL_TRACE(false, OCR_TRACE_TYPE_EDT, OCR_ACTION_DESTROY);
@@ -810,18 +809,16 @@ u8 newTaskHc(ocrTaskFactory_t* factory, ocrFatGuid_t * edtGuid, ocrFatGuid_t edt
         }
     }
 #endif /* OCR_ENABLE_STATISTICS */
-    DPRINTF(DEBUG_LVL_INFO, "Create "GUIDF" depc %d outputEvent "GUIDF"\n", GUIDA(base->guid), depc, GUIDA(outputEventPtr?outputEventPtr->guid:NULL_GUID));
+    DPRINTF(DEBUG_LVL_INFO, "Create "GUIDF" depc %"PRId32" outputEvent "GUIDF"\n", GUIDA(base->guid), depc, GUIDA(outputEventPtr?outputEventPtr->guid:NULL_GUID));
 
     edtGuid->guid = base->guid;
     edtGuid->metaDataPtr = base;
 
     // Check to see if the EDT can be run
     if(base->depc == edt->slotSatisfiedCount) {
-
         DPRINTF(DEBUG_LVL_INFO,
                 "Scheduling task "GUIDF" due to initial satisfactions\n", GUIDA(base->guid));
         OCR_TOOL_TRACE(false, OCR_TRACE_TYPE_EDT, OCR_ACTION_RUNNABLE);
-
         RESULT_PROPAGATE2(taskAllDepvSatisfied(base), 1);
     }
 
@@ -874,9 +871,8 @@ u8 satisfyTaskHc(ocrTask_t * base, ocrFatGuid_t data, u32 slot) {
     // further references to the event's guid, which is good in general
     // and crucial for once-event since they are being destroyed on satisfy.
     hal_lock32(&(self->lock));
-
     DPRINTF(DEBUG_LVL_INFO,
-            "Satisfy on task "GUIDF" slot %d with "GUIDF" slotSatisfiedCount=%u frontierSlot=%u depc=%u\n",
+            "Satisfy on task "GUIDF" slot %"PRId32" with "GUIDF" slotSatisfiedCount=%"PRIu32" frontierSlot=%"PRIu32" depc=%"PRIu32"\n",
             GUIDA(self->base.guid), slot, GUIDA(data.guid), self->slotSatisfiedCount, self->frontierSlot, base->depc);
     OCR_TOOL_TRACE(false, OCR_TRACE_TYPE_EDT, OCR_ACTION_SATISFY, data.guid);
 
@@ -884,7 +880,7 @@ u8 satisfyTaskHc(ocrTask_t * base, ocrFatGuid_t data, u32 slot) {
     ASSERT_BLOCK_BEGIN(self->signalers[slot].slot != SLOT_SATISFIED_EVT)
     ocrTask_t * taskPut = NULL;
     getCurrentEnv(NULL, NULL, &taskPut, NULL);
-    DPRINTF(DEBUG_LVL_WARN, "detected double satisfy on sticky for task "GUIDF" on slot %d by "GUIDF"\n", GUIDA(base->guid), slot, GUIDA(taskPut->guid));
+    DPRINTF(DEBUG_LVL_WARN, "detected double satisfy on sticky for task "GUIDF" on slot %"PRId32" by "GUIDF"\n", GUIDA(base->guid), slot, GUIDA(taskPut->guid));
     ASSERT_BLOCK_END
     ASSERT(self->slotSatisfiedCount < base->depc);
 
@@ -896,7 +892,7 @@ u8 satisfyTaskHc(ocrTask_t * base, ocrFatGuid_t data, u32 slot) {
         self->signalers[slot].guid = data.guid;
 
     if(self->slotSatisfiedCount == base->depc) {
-        DPRINTF(DEBUG_LVL_VERB, "Scheduling task "GUIDF", satisfied dependences %d/%d\n",
+        DPRINTF(DEBUG_LVL_VERB, "Scheduling task "GUIDF", satisfied dependences %"PRId32"/%"PRId32"\n",
                 GUIDA(self->base.guid), self->slotSatisfiedCount , base->depc);
         OCR_TOOL_TRACE(false, OCR_TRACE_TYPE_EDT, OCR_ACTION_RUNNABLE);
 
@@ -929,7 +925,7 @@ u8 satisfyTaskHc(ocrTask_t * base, ocrFatGuid_t data, u32 slot) {
             bool cond = true;
             while ((self->frontierSlot != (base->depc-1)) && cond) {
                 self->frontierSlot++;
-                DPRINTF(DEBUG_LVL_VERB, "Slot Increment on task "GUIDF" slot %d with "GUIDF" slotCount=%u slotFrontier=%u depc=%u\n",
+                DPRINTF(DEBUG_LVL_VERB, "Slot Increment on task "GUIDF" slot %"PRId32" with "GUIDF" slotCount=%"PRIu32" slotFrontier=%"PRIu32" depc=%"PRIu32"\n",
                     GUIDA(self->base.guid), slot, GUIDA(data.guid), self->slotSatisfiedCount, self->frontierSlot, base->depc);
                 ASSERT(self->frontierSlot < base->depc);
                 fsSlot = self->signalers[self->frontierSlot].slot;
@@ -1010,7 +1006,7 @@ u8 registerSignalerTaskHc(ocrTask_t * base, ocrFatGuid_t signalerGuid, u32 slot,
     regNode_t * node = &(self->signalers[slot]);
     node->mode = mode;
     ASSERT_BLOCK_BEGIN(node->slot < base->depc);
-    DPRINTF(DEBUG_LVL_WARN, "User-level error detected: add dependence slot is out of bounds: EDT="GUIDF" slot=%lu depc=%lu\n",
+    DPRINTF(DEBUG_LVL_WARN, "User-level error detected: add dependence slot is out of bounds: EDT="GUIDF" slot=%"PRIu32" depc=%"PRIu32"\n",
                             GUIDA(base->guid), slot, base->depc);
     ASSERT_BLOCK_END
     ASSERT(node->slot == slot); // assumption from initialization
@@ -1075,7 +1071,7 @@ u8 registerSignalerTaskHc(ocrTask_t * base, ocrFatGuid_t signalerGuid, u32 slot,
     #undef PD_TYPE
     }
 
-    DPRINTF(DEBUG_LVL_INFO, "AddDependence from "GUIDF" to "GUIDF" slot %d\n",
+    DPRINTF(DEBUG_LVL_INFO, "AddDependence from "GUIDF" to "GUIDF" slot %"PRId32"\n",
         GUIDA(signalerGuid.guid), GUIDA(base->guid), slot);
     return 0;
 }
@@ -1106,7 +1102,7 @@ u8 notifyDbAcquireTaskHc(ocrTask_t *base, ocrFatGuid_t db) {
     // Tack on this DB
     derived->unkDbs[derived->countUnkDbs] = db.guid;
     ++derived->countUnkDbs;
-    DPRINTF(DEBUG_LVL_VERB, "EDT (GUID: "GUIDF") added DB (GUID: "GUIDF") to its list of dyn. acquired DBs (have %d)\n",
+    DPRINTF(DEBUG_LVL_VERB, "EDT (GUID: "GUIDF") added DB (GUID: "GUIDF") to its list of dyn. acquired DBs (have %"PRId32")\n",
             GUIDA(base->guid), GUIDA(db.guid), derived->countUnkDbs);
     return 0;
 }
@@ -1122,7 +1118,7 @@ u8 notifyDbReleaseTaskHc(ocrTask_t *base, ocrFatGuid_t db) {
         while(count < maxCount) {
             // We bound our search (in case there is an error)
             if(ocrGuidIsEq(db.guid, derived->unkDbs[count])) {
-                DPRINTF(DEBUG_LVL_VVERB, "Dynamic Releasing DB @ 0x%lx (GUID "GUIDF") from EDT "GUIDF", match in unkDbs list for count %lu\n",
+                DPRINTF(DEBUG_LVL_VVERB, "Dynamic Releasing DB @ %p (GUID "GUIDF") from EDT "GUIDF", match in unkDbs list for count %"PRIu64"\n",
                        db.metaDataPtr, GUIDA(db.guid), GUIDA(base->guid), count);
                 derived->unkDbs[count] = derived->unkDbs[maxCount - 1];
                 --(derived->countUnkDbs);
@@ -1138,18 +1134,18 @@ u8 notifyDbReleaseTaskHc(ocrTask_t *base, ocrFatGuid_t db) {
             // We bound our search (in case there is an error)
             if(ocrGuidIsEq(db.guid, derived->resolvedDeps[count].guid)) {
                 DPRINTF(DEBUG_LVL_VVERB, "Dynamic Releasing DB (GUID "GUIDF") from EDT "GUIDF", "
-                        "match in dependence list for count %lu\n",
+                        "match in dependence list for count %"PRIu64"\n",
                         GUIDA(db.guid), GUIDA(base->guid), count);
                 // If the below asserts, rebuild OCR with a higher OCR_MAX_MULTI_SLOT (in build/common.mk)
                 ASSERT(count / 64 < OCR_MAX_MULTI_SLOT);
                 if(derived->doNotReleaseSlots[count / 64 ] & (1ULL << (count % 64))) {
-                    DPRINTF(DEBUG_LVL_VVERB, "DB (GUID 0x%lx) already released from EDT 0x%lx (dependence %lu)\n",
-                            db.guid, base->guid, count);
+                    DPRINTF(DEBUG_LVL_VVERB, "DB (GUID "GUIDF") already released from EDT "GUIDF" (dependence %"PRIu64")\n",
+                            GUIDA(db.guid), GUIDA(base->guid), count);
                     return OCR_ENOENT;
                 } else {
-                    DPRINTF(DEBUG_LVL_VVERB, "Dynamic Releasing DB (GUID 0x%lx) from EDT 0x%lx, "
-                            "match in dependence list for count %lu\n",
-                            db.guid, base->guid, count);
+                    DPRINTF(DEBUG_LVL_VVERB, "Dynamic Releasing DB (GUID "GUIDF") from EDT "GUIDF", "
+                            "match in dependence list for count %"PRIu64"\n",
+                            GUIDA(db.guid), GUIDA(base->guid), count);
 
                     derived->doNotReleaseSlots[count / 64] |= (1ULL << (count % 64));
                     // we can return on the first instance found since iterateDbFrontier
@@ -1168,7 +1164,7 @@ u8 taskExecute(ocrTask_t* base) {
     base->state = RUNNING_EDTSTATE;
 
     //TODO Execute can be considered user on x86, but need to differentiate processRequestEdts in x86-mpi
-    DPRINTF(DEBUG_LVL_INFO, "Execute "GUIDF" paramc:%d depc:%d\n", GUIDA(base->guid), base->paramc, base->depc);
+    DPRINTF(DEBUG_LVL_INFO, "Execute "GUIDF" paramc:%"PRId32" depc:%"PRId32"\n", GUIDA(base->guid), base->paramc, base->depc);
     OCR_TOOL_TRACE(true, OCR_TRACE_TYPE_EDT, OCR_ACTION_EXECUTE, base->funcPtr);
 
     ocrTaskHc_t* derived = (ocrTaskHc_t*)base;
@@ -1212,26 +1208,26 @@ u8 taskExecute(ocrTask_t* base) {
         curWorker->fcts.printLocation(curWorker, &(location[0]));
 #endif
 #ifdef OCR_ENABLE_EDT_NAMING
-        TPRINTF("EDT Start: %s 0x%llx in %s\n",
+        TPRINTF("EDT Start: %s 0x%"PRIx64" in %s\n",
                 base->name, base->guid, location);
 #else
-        TPRINTF("EDT Start: 0x%llx 0x%llx in %s\n",
+        TPRINTF("EDT Start: 0x%"PRIx64" 0x%"PRIx64" in %s\n",
                 base->funcPtr, base->guid, location);
 #endif
         START_PROFILE(userCode);
         retGuid = base->funcPtr(paramc, paramv, depc, depv);
         EXIT_PROFILE;
 #ifdef OCR_ENABLE_EDT_NAMING
-        TPRINTF("EDT End: %s 0x%llx in %s\n",
+        TPRINTF("EDT End: %s 0x%"PRIx64" in %s\n",
                 base->name, base->guid, location);
 #else
-        TPRINTF("EDT End: 0x%llx 0x%llx in %s\n",
+        TPRINTF("EDT End: 0x%"PRIx64" 0x%"PRIx64" in %s\n",
                 base->funcPtr, base->guid, location);
 #endif
 
 #ifdef OCR_ENABLE_VISUALIZER
         u64 endTime = salGetTime();
-        DPRINTF(DEBUG_LVL_INFO, "Execute "GUIDF" FctName: %s Start: %lu End: %lu\n", GUIDA(base->guid), base->name, startTime, endTime);
+        DPRINTF(DEBUG_LVL_INFO, "Execute "GUIDF" FctName: %s Start: %"PRIu64" End: %"PRIu64"\n", GUIDA(base->guid), base->name, startTime, endTime);
 #endif
     }
 
@@ -1287,10 +1283,10 @@ u8 taskExecute(ocrTask_t* base) {
             PD_MSG_FIELD_I(edt.metaDataPtr) = base;
             PD_MSG_FIELD_I(ptr) = NULL;
             PD_MSG_FIELD_I(size) = 0;
-            PD_MSG_FIELD_I(properties) = 0; // Not a runtime free since it was acquired using DB create
+            PD_MSG_FIELD_I(properties) = 0; // Not a runtime free xosince it was acquired using DB create
             if(pd->fcts.processMessage(pd, &msg, true)) {
-                DPRINTF(DEBUG_LVL_WARN, "EDT (GUID: "GUIDF") could not release dynamically acquired DB (GUID: 0x%lx)\n",
-                        GUIDA(base->guid), extraToFree[0]);
+                DPRINTF(DEBUG_LVL_WARN, "EDT (GUID: "GUIDF") could not release dynamically acquired DB (GUID: "GUIDF")\n",
+                        GUIDA(base->guid), GUIDA(extraToFree[0]));
                 break;
             }
 #undef PD_MSG

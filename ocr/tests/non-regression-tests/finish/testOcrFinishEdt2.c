@@ -21,7 +21,7 @@ ocrGuid_t terminateEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
 }
 
 ocrGuid_t updaterEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
-    // PRINTF("Run updaterEdt %d\n", (int)paramv[0]);
+    // PRINTF("Run updaterEdt %"PRId32"\n", (int)paramv[0]);
     return NULL_GUID;
 }
 

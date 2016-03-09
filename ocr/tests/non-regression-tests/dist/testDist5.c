@@ -11,15 +11,15 @@
  */
 
 ocrGuid_t remoteEdt1(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
-    PRINTF("[remote] RemoteEdt1 will satisfy [0] 0x%lx \n", ((u64 *) depv[0].ptr)[0]);
-    PRINTF("[remote] RemoteEdt1 will satisfy [1] 0x%lx \n", ((u64 *) depv[0].ptr)[1]);
+    PRINTF("[remote] RemoteEdt1 will satisfy [0] 0x%"PRIx64" \n", ((u64 *) depv[0].ptr)[0]);
+    PRINTF("[remote] RemoteEdt1 will satisfy [1] 0x%"PRIx64" \n", ((u64 *) depv[0].ptr)[1]);
     ocrEventSatisfy(((ocrGuid_t *) depv[0].ptr)[0], NULL_GUID);
     return NULL_GUID;
 }
 
 ocrGuid_t remoteEdt2(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
-    PRINTF("[remote] RemoteEdt2 will satisfy [0] 0x%lx \n", ((u64 *) depv[0].ptr)[0]);
-    PRINTF("[remote] RemoteEdt2 will satisfy [1] 0x%lx \n", ((u64 *) depv[0].ptr)[1]);
+    PRINTF("[remote] RemoteEdt2 will satisfy [0] 0x%"PRIx64" \n", ((u64 *) depv[0].ptr)[0]);
+    PRINTF("[remote] RemoteEdt2 will satisfy [1] 0x%"PRIx64" \n", ((u64 *) depv[0].ptr)[1]);
     ocrEventSatisfy(((ocrGuid_t *) depv[0].ptr)[1], NULL_GUID);
     return NULL_GUID;
 }

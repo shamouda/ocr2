@@ -176,9 +176,9 @@ void destructHashtableBucketLocked(hashtable_t * hashtable, deallocFct entryDeal
                 continue;
             } else { // Print previous if any
                 if ((i-lb) == 1) {
-                    DPRINTF(DEBUG_LVL_WARN, "Bucket[%d]: watermark=%lu\n", lb, curWm);
+                    DPRINTF(DEBUG_LVL_WARN, "Bucket[%"PRId32"]: watermark=%"PRIu64"\n", lb, curWm);
                 } else {
-                    DPRINTF(DEBUG_LVL_WARN, "Bucket[%d-%d]: watermark=%lu\n", lb, i-1, curWm);
+                    DPRINTF(DEBUG_LVL_WARN, "Bucket[%"PRId32"-%"PRId32"]: watermark=%"PRIu64"\n", lb, i-1, curWm);
                 }
                 lb = i;
                 curWm = wm;
@@ -190,12 +190,12 @@ void destructHashtableBucketLocked(hashtable_t * hashtable, deallocFct entryDeal
         }
 #ifdef STATS_HASHTABLE_VERB
         if ((i-lb) == 1) {
-            DPRINTF(DEBUG_LVL_WARN, "Bucket[%d]: watermark=%lu\n", lb, curWm);
+            DPRINTF(DEBUG_LVL_WARN, "Bucket[%"PRId32"]: watermark=%"PRIu64"\n", lb, curWm);
         } else {
-            DPRINTF(DEBUG_LVL_WARN, "Bucket[%d-%d]: watermark=%lu\n", lb, i-1, curWm);
+            DPRINTF(DEBUG_LVL_WARN, "Bucket[%"PRId32"-%"PRId32"]: watermark=%"PRIu64"\n", lb, i-1, curWm);
         }
 #endif
-        DPRINTF(DEBUG_LVL_WARN, "High Watermark=%lu\n", hWm);
+        DPRINTF(DEBUG_LVL_WARN, "High Watermark=%"PRIu64"\n", hWm);
     }
 #endif
     destructHashtable(hashtable, entryDeallocator, deallocatorParam);

@@ -76,7 +76,7 @@ void initializeAllocatorOcr(ocrAllocatorFactory_t * factory, ocrAllocator_t * se
 
 void allocatorFreeFunction(void* blockPayloadAddr) {
     u8 * pPoolHeaderDescr = ((u8 *)(((u64) blockPayloadAddr)-sizeof(u64)));
-    DPRINTF(DEBUG_LVL_VERB, "allocatorFreeFunction:  PoolHeaderDescr at 0x%lx is 0x%x\n",
+    DPRINTF(DEBUG_LVL_VERB, "allocatorFreeFunction:  PoolHeaderDescr at 0x%"PRIx64" is 0x%"PRIx32"\n",
         (u64) pPoolHeaderDescr, *pPoolHeaderDescr);
 #ifdef ENABLE_VALGRIND
     VALGRIND_MAKE_MEM_DEFINED((u64) pPoolHeaderDescr, sizeof(u64));

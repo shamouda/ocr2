@@ -46,7 +46,7 @@ ocrGuid_t pqrTaskA(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]){
         ocrGuid_t curResult = resultEdts[i];
         //At this point it is up to the user to decide
         //what to do with each EDT guid... here we just print
-        PRINTF("Next workiple EDT on worker %d: 0x%lx", i, curResult);
+        PRINTF("Next workiple EDT on worker %"PRId32": "GUIDF"\n", i, GUIDA(curResult));
     }
 
     //Destroy the datablock - Must be done by user
@@ -81,7 +81,7 @@ ocrGuid_t pqrTaskB(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]){
 
     for(i = 0; i < numEdts; i++){
         ocrGuid_t curResult = resultEdts[i];
-        PRINTF("Next workiple EDT on worker %d: 0x%lx", i, curResult);
+        PRINTF("Next workiple EDT on worker %"PRId32": "GUIDF"\n", i, GUIDA(curResult));
     }
 
     //Destroy the datablock

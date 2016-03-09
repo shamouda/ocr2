@@ -44,14 +44,14 @@ static void * pthreadRoutineExecute(ocrWorker_t * worker) {
 static void pthreadRoutineInitializer(ocrCompPlatformPthread_t * pthreadCompPlatform) {
     s32 cpuBind = pthreadCompPlatform->binding;
     if(cpuBind != -1) {
-        DPRINTF(DEBUG_LVL_INFO, "Binding comp-platform to cpu_id %d\n", cpuBind);
+        DPRINTF(DEBUG_LVL_INFO, "Binding comp-platform to cpu_id %"PRId32"\n", cpuBind);
         bindThread(cpuBind);
     }
 #ifdef OCR_RUNTIME_PROFILER
     {
         _profilerData *d = (_profilerData*) runtimeChunkAlloc(sizeof(_profilerData), PERSISTENT_CHUNK);
         char buffer[50];
-        snprintf(buffer, 50, "profiler_%lx-%lx",
+        snprintf(buffer, 50, "profiler_%"PRIx64"-%"PRIx64"",
                      ((ocrPolicyDomain_t *)(pthreadCompPlatform->base.pd))->myLocation, (u64)pthreadCompPlatform);
         d->output = fopen(buffer, "w");
         ASSERT(d->output);

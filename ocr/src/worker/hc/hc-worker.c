@@ -186,7 +186,7 @@ static void workerLoop(ocrWorker_t * worker) {
             worker->fcts.workShift(worker);
             EXIT_PROFILE;
         }
-        DPRINTF(DEBUG_LVL_VERB, "Dropped out of curState(%u,%u) going to desiredState(%u,%u)\n", worker->id,
+        DPRINTF(DEBUG_LVL_VERB, "Worker %"PRIu64" dropped out of curState(%"PRIu32",%"PRIu32") going to desiredState(%"PRIu32",%"PRIu32")\n", worker->id,
                                 GET_STATE_RL(worker->curState), GET_STATE_PHASE(worker->curState),
                                 GET_STATE_RL(worker->desiredState), GET_STATE_PHASE(worker->desiredState));
 
@@ -344,7 +344,7 @@ u8 hcWorkerSwitchRunlevel(ocrWorker_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_
 #undef PD_TYPE
                 // At this stage, only the RL_PD_MASTER should be actually
                 // capable
-                DPRINTF(DEBUG_LVL_VERB, "Last phase in RL_COMPUTE_OK DOWN for 0x%llx (am PD master: %d)\n",
+                DPRINTF(DEBUG_LVL_VERB, "Last phase in RL_COMPUTE_OK DOWN for %p (am PD master: %"PRId32")\n",
                     self, properties & RL_PD_MASTER);
                 self->desiredState = self->curState = GET_STATE(RL_COMPUTE_OK, phase);
             } else if(RL_IS_FIRST_PHASE_DOWN(PD, RL_COMPUTE_OK, phase)) {
@@ -447,7 +447,7 @@ bool hcIsRunningWorker(ocrWorker_t * base) {
 }
 
 void hcPrintLocation(ocrWorker_t *base, char* location) {
-    SNPRINTF(location, 32, "Worker 0x%lx", base->location);
+    SNPRINTF(location, 32, "Worker 0x%"PRIx64"", base->location);
 }
 
 /**

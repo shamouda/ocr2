@@ -153,7 +153,7 @@ u8 delegateCommSendMessage(ocrCommApi_t *self, ocrLocation_t target,
     }
 
     ocrMsgHandle_t * handlerDelegate = createMsgHandlerDelegate(self, message, properties);
-    DPRINTF(DEBUG_LVL_VVERB,"Delegate API: end message handle=%p, msg=%p, type=0x%x\n",
+    DPRINTF(DEBUG_LVL_VVERB,"Delegate API: end message handle=%p, msg=%p, type=0x%"PRIx32"\n",
             handlerDelegate, message, message->type);
     // Give comm handle to policy-domain
     ocrFatGuid_t fatGuid;

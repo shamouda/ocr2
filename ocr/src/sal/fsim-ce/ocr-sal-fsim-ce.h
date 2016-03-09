@@ -30,7 +30,7 @@ extern void salResume(u32 flag);
 #define sal_exit(x)   hal_exit(x)
 
 #define sal_assert(x, fn, ln)   do { if(!(x)) {                         \
-            PRINTF("ASSERT FAILURE: CE at line %d in '%s'\n", (int)(ln), fn); \
+            PRINTF("ASSERT FAILURE: CE at line %"PRId32" in '%s'\n", (int)(ln), fn); \
             hal_abort();                                                \
         } } while(0)
 

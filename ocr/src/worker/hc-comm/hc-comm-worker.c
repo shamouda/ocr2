@@ -72,9 +72,9 @@ ocrGuid_t processRequestEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[
 
     // All one-way request can be freed after processing
     bool toBeFreed = !(msg->type & PD_MSG_REQ_RESPONSE);
-    DPRINTF(DEBUG_LVL_VVERB,"hc-comm-worker: Process incoming EDT request @ %p of type 0x%x\n", msg, msg->type);
+    DPRINTF(DEBUG_LVL_VVERB,"hc-comm-worker: Process incoming EDT request @ %p of type 0x%"PRIx32"\n", msg, msg->type);
     u8 res = pd->fcts.processMessage(pd, msg, syncProcess);
-    DPRINTF(DEBUG_LVL_VVERB,"hc-comm-worker: [done] Process incoming EDT @ %p request of type 0x%x\n", msg, msg->type);
+    DPRINTF(DEBUG_LVL_VVERB,"hc-comm-worker: [done] Process incoming EDT @ %p request of type 0x%"PRIx32"\n", msg, msg->type);
     //BUG #587 probably want a return code that tells if the message can be discarded or not
 
     if (res == OCR_EPEND) {
@@ -105,7 +105,7 @@ ocrGuid_t processRequestEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[
             // the response flag although req_response is not set but the destLocation is still local.
             // Hence there are no race between freeing the message and sending the hypotetical response.
             ASSERT(processResponse || (msg->destLocation == pd->myLocation));
-            DPRINTF(DEBUG_LVL_VVERB,"hc-comm-worker: Deleted incoming EDT request @ %p of type 0x%x\n", msg, msg->type);
+            DPRINTF(DEBUG_LVL_VVERB,"hc-comm-worker: Deleted incoming EDT request @ %p of type 0x%"PRIx32"\n", msg, msg->type);
             // if request was an incoming one-way we can delete the message now.
             pd->fcts.pdFree(pd, msg);
         }
@@ -142,7 +142,7 @@ static u8 takeFromSchedulerAndSend(ocrWorker_t * worker, ocrPolicyDomain_t * pd)
 #undef PD_TYPE
         if (outgoingHandle != NULL) {
             // This code handles the pd's outgoing messages. They can be requests or responses.
-            DPRINTF(DEBUG_LVL_VVERB,"hc-comm-worker: outgoing handle comm take successful handle=%p, msg=%p type=0x%x\n",
+            DPRINTF(DEBUG_LVL_VVERB,"hc-comm-worker: outgoing handle comm take successful handle=%p, msg=%p type=0x%"PRIx32"\n",
                     outgoingHandle, outgoingHandle->msg, outgoingHandle->msg->type);
             //We can never have an outgoing handle with the response ptr set because
             //when we process an incoming request, we lose the handle by calling the
@@ -253,7 +253,7 @@ static void workerLoopHcCommInternal(ocrWorker_t * worker, ocrPolicyDomain_t *pd
 
             // Poll a response to a message we had sent.
             if ((message->type & PD_MSG_RESPONSE) && !(handle->properties & ASYNC_MSG_PROP)) {
-                DPRINTF(DEBUG_LVL_VVERB,"hc-comm-worker: Received message response for msgId: %ld\n",  message->msgId); // debug
+                DPRINTF(DEBUG_LVL_VVERB,"hc-comm-worker: Received message response for msgId: %"PRId64"\n",  message->msgId); // debug
                 // Someone is expecting this response, give it back to the PD
                 ocrFatGuid_t fatGuid;
                 fatGuid.guid = NULL_GUID;
@@ -274,14 +274,14 @@ static void workerLoopHcCommInternal(ocrWorker_t * worker, ocrPolicyDomain_t *pd
             } else {
                 ASSERT((message->type & PD_MSG_REQUEST) || ((message->type & PD_MSG_RESPONSE) && (handle->properties & ASYNC_MSG_PROP)));
                 // else it's a request or a response with ASYNC_MSG_PROP set (i.e. two-way but asynchronous handling of response).
-                DPRINTF(DEBUG_LVL_VVERB,"hc-comm-worker: Received message, msgId: %ld type:0x%x prop:0x%x\n",
+                DPRINTF(DEBUG_LVL_VVERB,"hc-comm-worker: Received message, msgId: %"PRId64" type:0x%"PRIx32" prop:0x%"PRIx64"\n",
                                         message->msgId, message->type, handle->properties);
                 // This is an outstanding request, delegate to PD for processing
                 u64 msgParamv = (u64) message;
             #ifdef HYBRID_COMM_COMP_WORKER // Experimental see documentation
                 // Execute selected 'sterile' messages on the spot
                 if ((message->type & PD_MSG_TYPE_ONLY) == PD_MSG_DB_ACQUIRE) {
-                    DPRINTF(DEBUG_LVL_VVERB,"hc-comm-worker: Execute message, msgId: %ld\n", pd->myLocation, message->msgId);
+                    DPRINTF(DEBUG_LVL_VVERB,"hc-comm-worker: Execute message, msgId: %"PRId64"\n", pd->myLocation, message->msgId);
                     processRequestEdt(1, &msgParamv, 0, NULL);
                 } else {
                     createProcessRequestEdt(pd, processRequestTemplate, &msgParamv);

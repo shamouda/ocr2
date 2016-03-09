@@ -59,8 +59,8 @@ static u8 resolveRemoteMetaData(ocrPolicyDomain_t * self, ocrFatGuid_t * fGuid, 
         //BUG #162 metadata cloning: Potentially multiple concurrent registerGuid on the same template
         self->guidProviders[0]->fcts.registerGuid(self->guidProviders[0], remoteGuid, (u64) metaDataPtr);
         val = (u64) metaDataPtr;
-        DPRINTF(DEBUG_LVL_VVERB,"Data @ 0x%lx registered for GUID 0x%lx for %ld\n",
-                metaDataPtr, remoteGuid, (u32)self->myLocation);
+        DPRINTF(DEBUG_LVL_VVERB,"Data @ %p registered for GUID "GUIDF" for %"PRIu32"\n",
+                metaDataPtr, GUIDA(remoteGuid), (u32)self->myLocation);
 #undef PD_MSG
 #undef PD_TYPE
         DPRINTF(DEBUG_LVL_VVERB,"resolveRemoteMetaData: Retrieved remote EDT template\n");
@@ -103,7 +103,8 @@ ocrPlatformModel_t * createPlatformModelAffinity(ocrPolicyDomain_t *pd) {
     model->pdLocAffinities[model->current] = fguid.guid;
 
     for(i=0; i < countAff; i++) {
-        DPRINTF(DEBUG_LVL_VVERB,"affinityGuid[%d]=0x%lx\n", (u32)i, model->pdLocAffinities[i]);
+        DPRINTF(DEBUG_LVL_VVERB,"affinityGuid[%"PRId32"]="GUIDF"\n",
+                (u32)i, GUIDA(model->pdLocAffinities[i]));
     }
 
     return (ocrPlatformModel_t *) model;

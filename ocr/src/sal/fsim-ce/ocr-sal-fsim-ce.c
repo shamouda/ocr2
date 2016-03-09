@@ -11,7 +11,7 @@
 
 void salPdDriver(void* pdVoid) {
     ocrPolicyDomain_t *pd = (ocrPolicyDomain_t*)pdVoid;
-    DPRINTF(DEBUG_LVL_INFO, "CE PD Driver for pd @ 0x%lx\n", pd);
+    DPRINTF(DEBUG_LVL_INFO, "CE PD Driver for pd @ %p\n", pd);
 
     RESULT_ASSERT(pd->fcts.switchRunlevel(pd, RL_CONFIG_PARSE, RL_REQUEST | RL_ASYNC
                                           | RL_BRING_UP | RL_NODE_MASTER), ==, 0);
@@ -73,7 +73,7 @@ void salResume(u32 flag) {
 u64 salGetTime(void){
     u64 cycles = 0;
 #if !defined(ENABLE_BUILDER_ONLY)
-    cycles = tg_ld64(AR_MSR_BASE + GLOBAL_TIME_STAMP_COUNTER * sizeof(u64));
+    cycles = tg_ld64((u64*)(AR_MSR_BASE + GLOBAL_TIME_STAMP_COUNTER * sizeof(u64)));
 #endif
     return cycles;
 }

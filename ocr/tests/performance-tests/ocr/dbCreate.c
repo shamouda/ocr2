@@ -30,7 +30,7 @@ ocrGuid_t wrapupEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
         t2 += timersPtr[i+2];
     }
 
-    PRINTF("Overall: DB Create %d\t DB Release %d\t DB Destroy %d\n", t0/DB_NBS, t1/DB_NBS, t2/DB_NBS);
+    PRINTF("Overall: DB Create %"PRId32"\t DB Release %"PRId32"\t DB Destroy %"PRId32"\n", t0/DB_NBS, t1/DB_NBS, t2/DB_NBS);
 
     ocrShutdown();
     return NULL_GUID;
@@ -88,7 +88,7 @@ ocrGuid_t edtCode(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
         timersPtr[index+1] /= i;
         timersPtr[index+2] /= i;
 
-        PRINTF("Thread %d: %d iterations; Times: %ld %ld %ld\n", paramv[0], i, timersPtr[index], timersPtr[index+1], timersPtr[index+2]);
+        PRINTF("Thread %"PRId32": %"PRId32" iterations; Times: %"PRId64" %"PRId64" %"PRId64"\n", paramv[0], i, timersPtr[index], timersPtr[index+1], timersPtr[index+2]);
     }
 
     return NULL_GUID;

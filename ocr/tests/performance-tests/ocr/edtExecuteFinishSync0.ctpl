@@ -25,7 +25,7 @@ ocrGuid_t finishEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     timestamp_t * dbPtr = (timestamp_t *) depv[0].ptr;
 
     get_time(&dbPtr[0]);
-    PRINTF("PARAMC_SZ %d\n", PARAMC_SZ);
+    PRINTF("PARAMC_SZ %"PRId32"\n", PARAMC_SZ);
     ocrGuid_t workEdtTemplateGuid;
     ocrEdtTemplateCreate(&workEdtTemplateGuid, workEdt, PARAMC_SZ, 0);
 

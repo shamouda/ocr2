@@ -136,7 +136,7 @@ u8 ocrSetHint(ocrGuid_t guid, ocrHint_t *hint) {
     PD_MSG_FIELD_I(hint) = *hint;
     u8 returnCode = pd->fcts.processMessage(pd, &msg, false);
     DPRINTF_COND_LVL(returnCode, DEBUG_LVL_WARN, DEBUG_LVL_INFO,
-                     "EXIT ocrSetHint(guid="GUIDF") -> %u\n", GUIDA(guid), returnCode);
+                     "EXIT ocrSetHint(guid="GUIDF") -> %"PRIu32"\n", GUIDA(guid), returnCode);
     RETURN_PROFILE(returnCode);
 #undef PD_MSG
 #undef PD_TYPE
@@ -173,7 +173,7 @@ u8 ocrGetHint(ocrGuid_t guid, ocrHint_t *hint) {
         }
     }
     DPRINTF_COND_LVL(returnCode, DEBUG_LVL_WARN, DEBUG_LVL_INFO,
-                     "EXIT ocrSetHint(guid="GUIDF") -> %u\n", GUIDA(guid), returnCode);
+                     "EXIT ocrSetHint(guid="GUIDF") -> %"PRIu32"\n", GUIDA(guid), returnCode);
     RETURN_PROFILE(returnCode);
 #undef PD_MSG
 #undef PD_TYPE

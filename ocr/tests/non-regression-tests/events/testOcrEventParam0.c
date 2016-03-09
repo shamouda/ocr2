@@ -11,7 +11,7 @@
 
 
 ocrGuid_t taskForEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
-    PRINTF("In the taskForEdt with value %d\n", (int) paramv[0]);
+    PRINTF("In the taskForEdt with value %"PRId32"\n", (int) paramv[0]);
     ASSERT(paramc == 1);
     ASSERT(paramv[0] == 32);
     ASSERT(*((u64*)depv[0].ptr) == 42);
