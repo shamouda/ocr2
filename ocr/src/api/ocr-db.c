@@ -69,7 +69,7 @@ u8 ocrDbCreate(ocrGuid_t *db, void** addr, u64 len, u16 flags,
 #undef PD_MSG
 #undef PD_TYPE
 
-    if(task && (returnCode == 0)) {
+    if((!(flags & DB_PROP_NO_ACQUIRE)) &&  task && (returnCode == 0)) {
         // Here we inform the task that we created a DB
         // This is most likely ALWAYS a local message but let's leave the
         // API as it is for now. It is possible that the EDTs move at some point so
@@ -91,7 +91,7 @@ u8 ocrDbCreate(ocrGuid_t *db, void** addr, u64 len, u16 flags,
 #undef PD_MSG
 #undef PD_TYPE
     } else {
-        if(!(flags & DB_PROP_IGNORE_WARN) && (returnCode == 0)) {
+        if(!(flags & (DB_PROP_IGNORE_WARN | DB_PROP_NO_ACQUIRE)) && (returnCode == 0)) {
             DPRINTF(DEBUG_LVL_WARN, "Acquiring DB (GUID: "GUIDSx") from outside an EDT ... auto-release will fail\n",
                     GUIDFS(*db));
         }
