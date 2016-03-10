@@ -121,7 +121,7 @@ u8 ocrAffinityGetAt(ocrAffinityKind kind, u64 idx, ocrGuid_t * affinity) {
         return OCR_EINVAL;
     }
     if (kind == AFFINITY_PD) {
-        if (idx <= (pd->neighborCount + 1)) {
+        if (idx > (pd->neighborCount + 1)) {
             ASSERT(false && "error: ocrAffinityGetAt index is out of bounds");
             return OCR_EINVAL;
         }
