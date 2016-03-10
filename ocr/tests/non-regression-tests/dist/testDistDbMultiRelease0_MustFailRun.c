@@ -31,8 +31,11 @@ ocrGuid_t remoteEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     PRINTF("Calling release 1\n");
     ocrDbRelease(dbCloneGuid);
     PRINTF("Calling release 2\n");
-    ocrDbRelease(dbCloneGuid);
-    ocrShutdown();
+    u8 res = ocrDbRelease(dbCloneGuid);
+    ASSERT(res == OCR_EACCES);
+    if(res != 0) {
+        ocrAbort(res);
+    }
     return NULL_GUID;
 }
 

@@ -1286,6 +1286,7 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
             if (proxyDb == NULL) {
                 // This is VERY likely an error in the user-code where the DB is released twice by the same EDT.
                 DPRINTF(DEBUG_LVL_WARN,"Detected multiple release for DB 0x%lx by EDT 0x%lx\n", PD_MSG_FIELD_IO(guid.guid), PD_MSG_FIELD_I(edt.guid));
+                // ASSERT(false);
                 msg->type &= ~PD_MSG_REQUEST;
                 msg->type &= ~PD_MSG_REQ_RESPONSE;
                 msg->type |= PD_MSG_RESPONSE;
