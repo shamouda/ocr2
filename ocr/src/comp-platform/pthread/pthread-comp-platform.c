@@ -28,13 +28,14 @@ extern void bindThread(u32 mask);
 /**
  * The key we use to be able to find which compPlatform we are on
  */
-pthread_key_t selfKey;
+static pthread_key_t selfKey;
+static bool selfKeyInit = false;
 
 #ifdef OCR_RUNTIME_PROFILER
 pthread_key_t _profilerThreadData;
 #endif
 
-pthread_once_t selfKeyInitialized = PTHREAD_ONCE_INIT;
+static pthread_once_t selfKeyInitialized = PTHREAD_ONCE_INIT;
 
 static void * pthreadRoutineExecute(ocrWorker_t * worker) {
     return worker->fcts.run(worker);
@@ -294,6 +295,7 @@ ocrCompPlatform_t* newCompPlatformPthread(ocrCompPlatformFactory_t *factory,
     // initializeKey is called once and it's always the master thread since
     // it is the thread bringing up the runtime.
     pthread_once(&selfKeyInitialized,  initializeKey);
+    selfKeyInit = true;
     ocrCompPlatformPthread_t * compPlatformPthread = (ocrCompPlatformPthread_t*)
             runtimeChunkAlloc(sizeof(ocrCompPlatformPthread_t), PERSISTENT_CHUNK);
 
@@ -326,9 +328,17 @@ void destructCompPlatformFactoryPthread(ocrCompPlatformFactory_t *factory) {
 void getCurrentEnv(ocrPolicyDomain_t** pd, ocrWorker_t** worker,
                    ocrTask_t **task, ocrPolicyMsg_t* msg) {
     START_PROFILE(cp_getCurrentEnv);
+    if (!selfKeyInit) {
+        // Key may not have been initialized at runtime boot
+        // but the logging facility may invoke getCurrentEnv
+        // We cannot rely on 'pthread_getspecific' as behavior
+        // is undefined when 'selfKey' hasn't been initialized yet.
+        RETURN_PROFILE();
+    }
     perThreadStorage_t *tls = pthread_getspecific(selfKey);
     if(tls == NULL) {
-        // TLS may be NULL when we start the runtime but are using the logging facility.
+        // TLS may be NULLat runtime boot but the logging facility
+        // may invoke getCurrentEnv
         RETURN_PROFILE();
     }
     if(pd)
