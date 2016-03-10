@@ -1,4 +1,6 @@
 testDbDestroy2.c
+# No PlatformModel on TG-X86
+testDistAffinity6.c
 testDistDbEw0.c
 testDistDbEw1.c
 testDistDbEw2.c
