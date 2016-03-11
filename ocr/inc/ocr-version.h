@@ -16,8 +16,8 @@
 /****************************************************************************/
 
 #define OCR_MAJOR_VERSION 1
-#define OCR_MINOR_VERSION 0
-#define OCR_PATCH_VERSION 1
+#define OCR_MINOR_VERSION 1
+#define OCR_PATCH_VERSION 0
 
 /* OCR version string */
 #define OCR_VERSION tostring(OCR_MAJOR_VERSION) \
