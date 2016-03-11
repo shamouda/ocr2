@@ -52,7 +52,7 @@ DEFAULT_CONFIG ?= jenkins-common-8w-lockableDB.cfg
 # All impl-specific for counted-map and labeled-guid providers
 
 # - Controls how many bits in the GUID are used for PD location
-# CFLAGS += -DGUID_PROVIDER_LOCID_SIZE=7
+CFLAGS += -DGUID_PROVIDER_LOCID_SIZE=10
 
 # Activate a different hashmap implementation
 # Warning: Necessitates an additional -D activating the alternate implementation
