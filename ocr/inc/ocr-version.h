@@ -58,6 +58,13 @@
 // Implementation of labeled GUIDs
 #define OCR_VERSION_LABELING_BIT          (1<<EXTENSION_LABELING_BITPOS)
 
+
+/****************************************************************************/
+/* Temporary helper macro to transition APIs from 1.0.* to 1.1.0. This will */
+/* be deprecated                                                            */
+/****************************************************************************/
+#define PICK_1_1(hint, affinity)   (affinity)
+
 /***************** Versioning internals below **************************/
 
 #define strmacro(s) #s

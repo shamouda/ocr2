@@ -360,6 +360,9 @@ typedef enum {
 
 typedef uint64_t ocrHintVal_t;
 
+/* Macro for 1.0.* versions. */
+#define NULL_HINT NULL_GUID
+
 /**
  * @brief OCR Hint structure
  *
