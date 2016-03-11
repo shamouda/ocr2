@@ -58,7 +58,7 @@ if sysworker == True and platform != 'X86':
     sys.exit(0)
 
 def GenerateVersion(output):
-    version = "1.0.1"
+    version = "1.0.2"
     output.write("[General]\n\tversion\t=\t%s\n\n" % (version))
     output.write("\n#======================================================\n")
 
