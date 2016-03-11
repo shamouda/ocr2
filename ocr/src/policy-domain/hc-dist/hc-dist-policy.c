@@ -79,6 +79,89 @@ static inline u8 guidLocationShort(struct _ocrPolicyDomain_t * pd, ocrFatGuid_t 
         return pdSelfDist->baseProcessMessage(self, msg, isBlocking); \
     }
 
+
+static void setReturnDetail(ocrPolicyMsg_t * msg, u8 returnDetail) {
+    // This is open for debate here #932
+    ASSERT(returnDetail == 0);
+    switch(msg->type & PD_MSG_TYPE_ONLY) {
+    case PD_MSG_EVT_DESTROY:
+    {
+#define PD_MSG (msg)
+#define PD_TYPE PD_MSG_EVT_DESTROY
+        PD_MSG_FIELD_O(returnDetail) = returnDetail;
+#undef PD_MSG
+#undef PD_TYPE
+    break;
+    }
+    case PD_MSG_DEP_SATISFY:
+    {
+#define PD_MSG (msg)
+#define PD_TYPE PD_MSG_DEP_SATISFY
+        PD_MSG_FIELD_O(returnDetail) = returnDetail;
+#undef PD_MSG
+#undef PD_TYPE
+    break;
+    }
+    case PD_MSG_EDTTEMP_DESTROY:
+    {
+#define PD_MSG (msg)
+#define PD_TYPE PD_MSG_EDTTEMP_DESTROY
+        PD_MSG_FIELD_O(returnDetail) = returnDetail;
+#undef PD_MSG
+#undef PD_TYPE
+    break;
+    }
+    case PD_MSG_WORK_CREATE:
+    {
+#define PD_MSG (msg)
+#define PD_TYPE PD_MSG_WORK_CREATE
+        PD_MSG_FIELD_O(returnDetail) = returnDetail;
+#undef PD_MSG
+#undef PD_TYPE
+    break;
+    }
+    case PD_MSG_WORK_DESTROY:
+    {
+#define PD_MSG (msg)
+#define PD_TYPE PD_MSG_WORK_DESTROY
+        PD_MSG_FIELD_O(returnDetail) = returnDetail;
+#undef PD_MSG
+#undef PD_TYPE
+    break;
+    }
+    case PD_MSG_DEP_ADD:
+    {
+#define PD_MSG (msg)
+#define PD_TYPE PD_MSG_DEP_ADD
+        PD_MSG_FIELD_O(returnDetail) = returnDetail;
+#undef PD_MSG
+#undef PD_TYPE
+    break;
+    }
+    case PD_MSG_DEP_DYNADD:
+    {
+#define PD_MSG (msg)
+#define PD_TYPE PD_MSG_DEP_DYNADD
+        PD_MSG_FIELD_O(returnDetail) = returnDetail;
+#undef PD_MSG
+#undef PD_TYPE
+    break;
+    }
+    case PD_MSG_DB_FREE:
+    {
+#define PD_MSG (msg)
+#define PD_TYPE PD_MSG_DB_FREE
+        PD_MSG_FIELD_O(returnDetail) = returnDetail;
+#undef PD_MSG
+#undef PD_TYPE
+    break;
+    }
+    default:
+    ASSERT("Unhandled message type in setReturnDetail");
+    break;
+    }
+}
+
 /****************************************************/
 /* PROXY TEMPLATE MANAGEMENT                        */
 /****************************************************/
@@ -1811,11 +1894,15 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
 #undef PD_MSG
 #undef PD_TYPE
             }
-
             // one-way request, several options:
             // - make a copy in sendMessage (current strategy)
             // - submit the message to be sent and wait for delivery
-            self->fcts.sendMessage(self, msg->destLocation, msg, NULL, sendProp);
+            u8 res = self->fcts.sendMessage(self, msg->destLocation, msg, NULL, sendProp);
+            // msg has been copied so we can update its returnDetail regardless
+            // This is open for debate here #932
+            if (sendProp == 0) {
+                setReturnDetail(msg, res);
+            }
 
             //NOTE: For PD_MSG_GUID_METADATA_CLONE we do not need to set OCR_EBUSY in the
             //      message's returnDetail field as being the PD issuing the call we can
