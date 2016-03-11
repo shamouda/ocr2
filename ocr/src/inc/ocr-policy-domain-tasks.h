@@ -48,7 +48,7 @@ typedef struct _slabObject_t {
     u32 userCount;
 } slabObject_t;
 
-typedef struct _pdTask_t pdTask_t;
+struct _pdTask_t;
 
 /***************************************/
 /********* pdEvent_t definition ********/
@@ -93,7 +93,7 @@ typedef struct _pdEventMsg_t {
 
     ocrPolicyMsg_t *msg;    /**< Payload for the event. These are the
                              * "arguments" when passed to a function. */
-    pdTask_t *continuation; /**< Current continuation to execute (cached version
+    struct _pdTask_t *continuation; /**< Current continuation to execute (cached version
                              * from the strands table) */
 } pdEventMsg_t;
 
