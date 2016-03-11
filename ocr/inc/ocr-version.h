@@ -77,4 +77,9 @@ extern u32 ocrVersionExtractPatch(u8 *verstr);
 #define EXTENSION_PAUSE_BITPOS         6
 #define EXTENSION_LABELING_BITPOS      7
 
+// Temporary helper macro.
+// Hack to pick “affinity” for 1.0.*, “hint” for 1.1as the arg in ocr*Create()
+// for v 1.1, pick the first arg
+#define PICK_1_1(hint, affinity)   (hint)
+
 #endif /* __OCR_VERSION_H__ */

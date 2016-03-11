@@ -32,9 +32,9 @@ ocrGuid_t spawn(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     for(i = 0; i < n; i++) {
         u64 args[] = { event.guid, tspawn.guid, tdec.guid, n-1 };
         ocrEventSatisfySlot(event, NULL_GUID, OCR_EVENT_LATCH_INCR_SLOT);
-        ocrEdtCreate(&edt, tspawn, 4, args, 0, NULL, EDT_PROP_NONE, NULL_GUID, NULL);
+        ocrEdtCreate(&edt, tspawn, 4, args, 0, NULL, EDT_PROP_NONE, NULL_HINT, NULL);
     }
-    ocrEdtCreate(&edt, tdec, 1, (u64*)&event, 0, NULL, EDT_PROP_NONE, NULL_GUID, NULL);
+    ocrEdtCreate(&edt, tdec, 1, (u64*)&event, 0, NULL, EDT_PROP_NONE, NULL_HINT, NULL);
     return NULL_GUID;
 }
 
@@ -50,8 +50,8 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrEdtTemplateCreate(&tdec  , dec  , 1, 0);
     ocrEdtTemplateCreate(&tdone , done , 0, 1);
     u64 args[] = { event.guid, tspawn.guid, tdec.guid, N };
-    ocrEdtCreate(&edt, tdone , 0, NULL, 1, &event, EDT_PROP_NONE, NULL_GUID, NULL);
-    ocrEdtCreate(&edt, tspawn, 4, args, 0, NULL  , EDT_PROP_NONE, NULL_GUID, NULL);
+    ocrEdtCreate(&edt, tdone , 0, NULL, 1, &event, EDT_PROP_NONE, NULL_HINT, NULL);
+    ocrEdtCreate(&edt, tspawn, 4, args, 0, NULL  , EDT_PROP_NONE, NULL_HINT, NULL);
 
     return NULL_GUID;
 }

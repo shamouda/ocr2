@@ -16,7 +16,7 @@ extern "C" {
 #endif
 
 #include "ocr-types.h"
-
+#include "ocr-version.h"
 
 /**
  * @defgroup OCRDataBlock Data-block management for OCR
@@ -77,9 +77,8 @@ extern "C" {
  * allocator's management overhead
  *
  **/
-u8 ocrDbCreate(ocrGuid_t *db, void** addr, u64 len, u16 flags,
-               ocrGuid_t affinity, ocrInDbAllocator_t allocator);
-
+u8 ocrDbCreate(ocrGuid_t *db, void** addr, u64 len, u16 flags, ocrHint_t *hint,
+               ocrInDbAllocator_t allocator);
 /**
  * @brief Request for the destruction of a data block
  *

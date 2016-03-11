@@ -11,6 +11,7 @@
 #include "debug.h"
 #include "ocr-errors.h"
 #include "ocr-db.h"
+#include "extensions/ocr-hints.h"
 #include "ocr-policy-domain.h"
 #include "ocr-policy-domain-tasks.h"
 #include "ocr-sysboot.h"
@@ -1005,10 +1006,23 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         ASSERT(PD_MSG_FIELD_I(dbType) == USER_DBTYPE || PD_MSG_FIELD_I(dbType) == RUNTIME_DBTYPE);
         ocrFatGuid_t tEdt = PD_MSG_FIELD_I(edt);
 #define PRESCRIPTION 0x10LL
+        ocrHint_t *hint = PD_MSG_FIELD_I(hint);
+        ocrFatGuid_t affinityGuid = {.guid = NULL_GUID, .metaDataPtr = NULL};
+        u64 hintValue = 0ULL;
+        if (hint != NULL_HINT && ocrGetHintValue(hint, OCR_HINT_DB_AFFINITY, &hintValue) == 0) {
+#ifdef GUID_64
+            affinityGuid.guid.guid = hintValue;
+#elif defined(GUID_128)
+            affinityGuid.guid.upper = 0ULL;
+            affinityGuid.guid.lower = hintValue;
+#else
+#error Unknown GUID type
+#endif
+        }
         PD_MSG_FIELD_O(returnDetail) = hcAllocateDb(self, &(PD_MSG_FIELD_IO(guid)),
                                   &(PD_MSG_FIELD_O(ptr)), PD_MSG_FIELD_IO(size),
                                   PD_MSG_FIELD_IO(properties),
-                                  PD_MSG_FIELD_I(affinity),
+                                  affinityGuid,
                                   PD_MSG_FIELD_I(allocator),
                                   PRESCRIPTION, PD_MSG_FIELD_I(dbType));
         if(PD_MSG_FIELD_O(returnDetail) == 0) {
@@ -1212,7 +1226,20 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         if(PD_MSG_FIELD_I(templateGuid.metaDataPtr) == NULL)
             DPRINTF(DEBUG_LVL_WARN, "Invalid template GUID "GUIDSx"\n", GUIDFS(PD_MSG_FIELD_I(templateGuid.guid)));
         ASSERT(PD_MSG_FIELD_I(templateGuid.metaDataPtr) != NULL);
-        localDeguidify(self, &(PD_MSG_FIELD_I(affinity)));
+        ocrHint_t *hint = PD_MSG_FIELD_I(hint);
+        ocrFatGuid_t affinityGuid = {.guid = NULL_GUID, .metaDataPtr = NULL };
+        u64 hintValue = 0ULL;
+        if (hint != NULL_HINT && ocrGetHintValue(hint, OCR_HINT_EDT_AFFINITY, &hintValue) == 0) {
+#ifdef GUID_64
+            affinityGuid.guid.guid = hintValue;
+#elif defined(GUID_128)
+            affinityGuid.guid.upper = 0ULL;
+            affinityGuid.guid.lower = hintValue;
+#else
+#error Unknown GUID type
+#endif
+        }
+        localDeguidify(self, &affinityGuid);
         localDeguidify(self, &(PD_MSG_FIELD_I(currentEdt)));
         localDeguidify(self, &(PD_MSG_FIELD_I(parentLatch)));
 
@@ -1232,7 +1259,7 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         u8 returnCode = createEdtHelper(
                 self, &(PD_MSG_FIELD_IO(guid)), PD_MSG_FIELD_I(templateGuid),
                 &(PD_MSG_FIELD_IO(paramc)), PD_MSG_FIELD_I(paramv), &(PD_MSG_FIELD_IO(depc)),
-                PD_MSG_FIELD_I(properties), PD_MSG_FIELD_I(affinity), outputEvent,
+                PD_MSG_FIELD_I(properties), affinityGuid, outputEvent,
                 (ocrTask_t*)(PD_MSG_FIELD_I(currentEdt).metaDataPtr), PD_MSG_FIELD_I(parentLatch),
                 PD_MSG_FIELD_I(workType));
         if (msg->type & PD_MSG_REQ_RESPONSE) {

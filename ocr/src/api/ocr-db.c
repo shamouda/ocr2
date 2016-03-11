@@ -26,11 +26,11 @@
 #define DEBUG_TYPE API
 
 u8 ocrDbCreate(ocrGuid_t *db, void** addr, u64 len, u16 flags,
-               ocrGuid_t affinity, ocrInDbAllocator_t allocator) {
+               ocrHint_t *hint, ocrInDbAllocator_t allocator) {
 
     START_PROFILE(api_DbCreate);
     DPRINTF(DEBUG_LVL_INFO, "ENTER ocrDbCreate(*guid="GUIDSx", len=%lu, flags=%u"
-            ", aff=0x%lx, alloc=%u)\n", GUIDFS(*db), len, (u32)flags, affinity, (u32)allocator);
+            ", hint=0x%lx, alloc=%u)\n", GUIDFS(*db), len, (u32)flags, hint, (u32)allocator);
     PD_MSG_STACK(msg);
     ocrPolicyDomain_t *policy = NULL;
     ocrTask_t *task = NULL;
@@ -46,11 +46,9 @@ u8 ocrDbCreate(ocrGuid_t *db, void** addr, u64 len, u16 flags,
     PD_MSG_FIELD_IO(size) = len;
     PD_MSG_FIELD_I(edt.guid) = task?task->guid:NULL_GUID; // Can happen when non EDT creates the DB
     PD_MSG_FIELD_I(edt.metaDataPtr) = task;
-    PD_MSG_FIELD_I(affinity.guid) = affinity;
-    PD_MSG_FIELD_I(affinity.metaDataPtr) = NULL;
+    PD_MSG_FIELD_I(hint) = hint;
     PD_MSG_FIELD_I(dbType) = USER_DBTYPE;
     PD_MSG_FIELD_I(allocator) = allocator;
-    PD_MSG_FIELD_I(hint) = NULL;
     returnCode = policy->fcts.processMessage(policy, &msg, true);
 
     if(returnCode == 0) {

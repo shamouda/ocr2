@@ -27,11 +27,11 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     // Create a DB
     ocrGuid_t * dbPtrArray;
     ocrGuid_t dbGuidArray;
-    ocrDbCreate(&dbGuidArray, (void **)&dbPtrArray, sizeof(ocrGuid_t), 0, NULL_GUID, NO_ALLOC);
+    ocrDbCreate(&dbGuidArray, (void **)&dbPtrArray, sizeof(ocrGuid_t), 0, NULL_HINT, NO_ALLOC);
     // Set the other db guid in the guid array
     ocrGuid_t dbGuid;
     void * dbPtr;
-    ocrDbCreate(&dbGuid, &dbPtr, sizeof(TYPE_ELEM_DB) * NB_ELEM_DB, 0, NULL_GUID, NO_ALLOC);
+    ocrDbCreate(&dbGuid, &dbPtr, sizeof(TYPE_ELEM_DB) * NB_ELEM_DB, 0, NULL_HINT, NO_ALLOC);
     dbPtrArray[0] = dbGuid;
     PRINTF("mainEdt: local DB guid is 0x%lx\n", dbPtrArray[0]);
     ocrDbRelease(dbGuidArray);
@@ -42,7 +42,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
 
     ocrGuid_t destroyEdtGuid;
     ocrEdtCreate(&destroyEdtGuid, destroyEdtTemplateGuid, 0, NULL, 1, NULL,
-                 EDT_PROP_NONE, NULL_GUID, NULL);
+                 EDT_PROP_NONE, NULL_HINT, NULL);
 
     ocrAddDependence(dbGuidArray, destroyEdtGuid, 0, DB_MODE_CONST);
     return NULL_GUID;

@@ -29,7 +29,7 @@ ocrGuid_t prodEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     while (i < PROD_SALVO) {
         ocrGuid_t dbGuid;
         u32 * dbPtr;
-        ocrDbCreate(&dbGuid, (void **)&dbPtr, sizeof(u32), 0, NULL_GUID, NO_ALLOC);
+        ocrDbCreate(&dbGuid, (void **)&dbPtr, sizeof(u32), 0, NULL_HINT, NO_ALLOC);
         dbPtr[0] = (countSalvo * PROD_SALVO) + i;
         PRINTF("Send=%d val=%d guid=0x%lx @ salvo=%d\n", i, dbPtr[0], dbGuid, countSalvo);
         ocrDbRelease(dbGuid);
@@ -49,8 +49,11 @@ ocrGuid_t prodEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
         pparamv[1] = (u64) evtToProdGuid.guid;
         pparamv[2] = (u64) countSalvo;
         ocrGuid_t edtProdGuid;
+        ocrHint_t edtHint;
+        ocrHintInit( &edtHint, OCR_HINT_EDT_T );
+        ocrSetHintValue( & edtHint, OCR_HINT_EDT_AFFINITY, ocrAffinityToHintValue( affGuid ) );
         ocrEdtCreate(&edtProdGuid, prodTpl, EDT_PARAM_DEF, pparamv,
-                     EDT_PARAM_DEF, NULL, EDT_PROP_NONE, affGuid, NULL);
+                     EDT_PARAM_DEF, NULL, EDT_PROP_NONE, &edtHint, NULL);
         ocrAddDependence(evtToProdGuid, edtProdGuid, 0, DB_MODE_RO);
         ocrEdtTemplateDestroy(prodTpl);
     } // else just die out and the consumers will shutdown the runtime
@@ -100,8 +103,11 @@ ocrGuid_t consEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     pparamv[3] = (u64) countSalvo;
     pparamv[4] = (u64) expVal+1;
     ocrGuid_t edtConsGuid;
+    ocrHint_t edtHint;
+    ocrHintInit( &edtHint, OCR_HINT_EDT_T );
+    ocrSetHintValue( & edtHint, OCR_HINT_EDT_AFFINITY, ocrAffinityToHintValue( affGuid ) );
     ocrEdtCreate(&edtConsGuid, consTpl, EDT_PARAM_DEF, pparamv,
-                 EDT_PARAM_DEF, NULL, EDT_PROP_NONE, affGuid, NULL);
+                 EDT_PARAM_DEF, NULL, EDT_PROP_NONE, &edtHint, NULL);
     ocrAddDependence(evtToConsGuid, edtConsGuid, 0, DB_MODE_RO);
     ocrEdtTemplateDestroy(consTpl);
     return NULL_GUID;
@@ -134,8 +140,11 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     pparamv[1] = (u64) evtToProdGuid.guid;
     pparamv[2] = 0;
     ocrGuid_t edtProdGuid;
+    ocrHint_t edtHint;
+    ocrHintInit( &edtHint, OCR_HINT_EDT_T );
+    ocrSetHintValue( & edtHint, OCR_HINT_EDT_AFFINITY, ocrAffinityToHintValue( prodAff ) );
     ocrEdtCreate(&edtProdGuid, prodTpl, EDT_PARAM_DEF, pparamv,
-                 EDT_PARAM_DEF, NULL, EDT_PROP_NONE, prodAff, NULL);
+                 EDT_PARAM_DEF, NULL, EDT_PROP_NONE, &edtHint, NULL);
 
     ocrGuid_t consTpl;
     ocrEdtTemplateCreate(&consTpl, consEdt, 5, 1);
@@ -146,8 +155,12 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     cparamv[3] = 0;
     cparamv[4] = 0; //expected value
     ocrGuid_t edtConsGuid;
+    ocrHint_t edtHint2;
+    ocrHintInit( &edtHint2, OCR_HINT_EDT_T );
+    ocrSetHintValue( & edtHint2, OCR_HINT_EDT_AFFINITY, ocrAffinityToHintValue( condAff ) );
+
     ocrEdtCreate(&edtConsGuid, consTpl, EDT_PARAM_DEF, cparamv,
-                 EDT_PARAM_DEF, NULL, EDT_PROP_NONE, condAff, NULL);
+                 EDT_PARAM_DEF, NULL, EDT_PROP_NONE, &edtHint2, NULL);
 
     ocrAddDependence(evtToConsGuid, edtConsGuid, 0, DB_MODE_RO);
     ocrAddDependence(NULL_GUID, edtProdGuid, 0, DB_MODE_RO);

@@ -48,7 +48,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrEventCreate(&event2Guid,OCR_EVENT_ONCE_T, EVT_PROP_NONE);
     ocrGuid_t dbGuid;
     ocrGuid_t * dbPtr;
-    ocrDbCreate(&dbGuid, (void **)&dbPtr, sizeof(ocrGuid_t) * 2, DB_PROP_SINGLE_ASSIGNMENT, NULL_GUID, NO_ALLOC);
+    ocrDbCreate(&dbGuid, (void **)&dbPtr, sizeof(ocrGuid_t) * 2, DB_PROP_SINGLE_ASSIGNMENT, NULL_HINT, NO_ALLOC);
     dbPtr[0] = event1Guid;
     dbPtr[1] = event2Guid;
     ocrDbRelease(dbGuid);
@@ -57,19 +57,22 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrGuid_t edtShutdownGuid;
     ocrGuid_t shutdownDepv[2] = {event1Guid, event2Guid};
     ocrEdtCreate(&edtShutdownGuid, shutdownEdtTemplateGuid, 0, NULL, 2, shutdownDepv,
-        EDT_PROP_NONE, NULL_GUID, NULL);
+        EDT_PROP_NONE, NULL_HINT, NULL);
 
     // Setup the test
     ocrGuid_t remoteEdtTemplateGuid;
     ocrEdtTemplateCreate(&remoteEdtTemplateGuid, remoteEdt, EDT_PARAM_UNK, 1);
+    ocrHint_t edtHint;
+    ocrHintInit( &edtHint, OCR_HINT_EDT_T );
+    ocrSetHintValue( & edtHint, OCR_HINT_EDT_AFFINITY, ocrAffinityToHintValue( edtAffinity) );
     ocrGuid_t edt1Guid;
     u64 edtParamv1[2] = {555,666};
     ocrEdtCreate(&edt1Guid, remoteEdtTemplateGuid, 2, (u64*) &edtParamv1, 1, &dbGuid,
-        EDT_PROP_NONE, edtAffinity, NULL);
+        EDT_PROP_NONE, &edtHint, NULL);
     ocrGuid_t edt2Guid;
     u64 edtParamv2[4] = {111,222,333,444};
     ocrEdtCreate(&edt2Guid, remoteEdtTemplateGuid, 4, (u64*) &edtParamv2, 1, &dbGuid,
-        EDT_PROP_NONE, edtAffinity, NULL);
+        EDT_PROP_NONE, &edtHint, NULL);
 
     return NULL_GUID;
 }

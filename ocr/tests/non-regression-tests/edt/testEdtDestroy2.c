@@ -27,9 +27,9 @@ ocrGuid_t finishEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrGuid_t edtTplGuid;
     ocrEdtTemplateCreate(&edtTplGuid, workEdt, 0, 1);
     ocrEdtCreate(&edtGuid, edtTplGuid, EDT_PARAM_DEF, NULL, EDT_PARAM_DEF, NULL,
-                 EDT_PROP_NONE, NULL_GUID, NULL);
+                 EDT_PROP_NONE, NULL_HINT, NULL);
     PRINTF("Created work EDT 0x%lx\n", edtGuid);
-    // If the child EDT is not properly destroyed and the finish counter 
+    // If the child EDT is not properly destroyed and the finish counter
     // is not updated the code should deadlock.
     ocrEdtDestroy(edtGuid);
     PRINTF("Destroyed work EDT 0x%lx\n", edtGuid);
@@ -42,7 +42,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrGuid_t outputEventGuid;
     ocrEdtTemplateCreate(&edtTplGuid,  finishEdt, 0, 1);
     ocrEdtCreate(&edtGuid, edtTplGuid, 0, NULL, 1, NULL,
-                 EDT_PROP_FINISH, NULL_GUID, &outputEventGuid);
+                 EDT_PROP_FINISH, NULL_HINT, &outputEventGuid);
     PRINTF("Created finish EDT 0x%lx with outputEvent 0x%lx\n", edtGuid, outputEventGuid);
     ocrGuid_t shutGuid;
     ocrGuid_t shutTplGuid;
@@ -50,7 +50,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     // Shutdown to be executed when finish EDT completes
 
     ocrEdtCreate(&shutGuid, shutTplGuid, 0, NULL, 1, NULL,
-                 EDT_PROP_NONE, NULL_GUID, NULL);
+                 EDT_PROP_NONE, NULL_HINT, NULL);
     ocrAddDependence(outputEventGuid, shutGuid, 0, DB_MODE_CONST);
     PRINTF("Created shutdown EDT 0x%lx\n", shutGuid);
 

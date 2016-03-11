@@ -33,6 +33,7 @@ typedef int64_t  s64; /**< 64-bit signed integer */
 typedef int32_t  s32; /**< 32-bit signed integer */
 typedef int8_t   s8;  /**< 8-bit signed integer */
 
+#define NULL_HINT ((ocrHint_t *)0x0)
 
 #ifdef ENABLE_128_BIT_GUID
 

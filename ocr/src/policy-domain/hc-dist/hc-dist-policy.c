@@ -99,15 +99,13 @@ static u8 createProcessRequestEdtDistPolicy(ocrPolicyDomain_t * pd, ocrGuid_t te
     PD_MSG_FIELD_IO(guid.metaDataPtr) = NULL;
     PD_MSG_FIELD_I(templateGuid.guid) = templateGuid;
     PD_MSG_FIELD_I(templateGuid.metaDataPtr) = NULL;
-    PD_MSG_FIELD_I(affinity.guid) = NULL_GUID;
-    PD_MSG_FIELD_I(affinity.metaDataPtr) = NULL;
     PD_MSG_FIELD_IO(outputEvent.guid) = NULL_GUID;
     PD_MSG_FIELD_IO(outputEvent.metaDataPtr) = NULL;
     PD_MSG_FIELD_I(paramv) = paramv;
     PD_MSG_FIELD_IO(paramc) = paramc;
     PD_MSG_FIELD_IO(depc) = depc;
     PD_MSG_FIELD_I(depv) = NULL;
-    PD_MSG_FIELD_I(hint) = NULL;
+    PD_MSG_FIELD_I(hint) = NULL_HINT;
     PD_MSG_FIELD_I(properties) = properties;
     PD_MSG_FIELD_I(workType) = workType;
     // This is a "fake" EDT so it has no "parent"

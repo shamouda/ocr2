@@ -98,7 +98,7 @@ u8 ocrLegacySpawnOCR(ocrGuid_t* handle, ocrGuid_t finishEdtTemplate, u64 paramc,
     depv0 = depv[0];
     depv[0] = UNINITIALIZED_GUID;
     ocrEdtCreate(&edtGuid, finishEdtTemplate, paramc, paramv,
-                 depc, depv, EDT_PROP_FINISH, NULL_GUID, &outputEventGuid);
+                 depc, depv, EDT_PROP_FINISH, NULL_HINT, &outputEventGuid);
     ocrAddDependence(outputEventGuid, stickyGuid, 0, DB_DEFAULT_MODE);
     // Actually start the OCR EDT
     ocrAddDependence(depv0, edtGuid, 0, DB_DEFAULT_MODE);

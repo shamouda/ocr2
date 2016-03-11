@@ -47,7 +47,7 @@ ocrGuid_t computeEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
         u64 nparamv = i;
         // Pass the guid we got fron depv to the updaterEdt through depv
         ocrGuid_t updaterEdtGuid;
-        ocrEdtCreate(&updaterEdtGuid, updaterEdtTemplateGuid, EDT_PARAM_DEF, &nparamv, EDT_PARAM_DEF, &(depv[0].guid), 0, NULL_GUID, NULL);
+        ocrEdtCreate(&updaterEdtGuid, updaterEdtTemplateGuid, EDT_PARAM_DEF, &nparamv, EDT_PARAM_DEF, &(depv[0].guid), 0, NULL_HINT, NULL);
         i++;
     }
     return depv[0].guid;
@@ -59,18 +59,18 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrGuid_t computeEdtTemplateGuid;
     ocrEdtTemplateCreate(&computeEdtTemplateGuid, computeEdt, 0 /*paramc*/, 1 /*depc*/);
     ocrEdtCreate(&computeEdtGuid, computeEdtTemplateGuid, EDT_PARAM_DEF, /*paramv=*/NULL, EDT_PARAM_DEF, /*depv=*/NULL,
-                 /*properties=*/ EDT_PROP_FINISH, NULL_GUID, /*outEvent=*/&finishEdtOutputEventGuid);
+                 /*properties=*/ EDT_PROP_FINISH, NULL_HINT, /*outEvent=*/&finishEdtOutputEventGuid);
 
     // Build a data-block to be shared with sub-edts
     u64 * array;
     ocrGuid_t dbGuid;
-    ocrDbCreate(&dbGuid,(void **) &array, sizeof(u64)*N, DB_PROP_NONE, NULL_GUID, NO_ALLOC);
+    ocrDbCreate(&dbGuid,(void **) &array, sizeof(u64)*N, DB_PROP_NONE, NULL_HINT, NO_ALLOC);
 
     ocrGuid_t terminateEdtGuid;
     ocrGuid_t terminateEdtTemplateGuid;
     ocrEdtTemplateCreate(&terminateEdtTemplateGuid, terminateEdt, 0 /*paramc*/, 2 /*depc*/);
     ocrEdtCreate(&terminateEdtGuid, terminateEdtTemplateGuid, EDT_PARAM_DEF, /*paramv=*/NULL, EDT_PARAM_DEF, /*depv=*/NULL,
-                 /*properties=*/0, NULL_GUID, /*outEvent=*/NULL);
+                 /*properties=*/0, NULL_HINT, /*outEvent=*/NULL);
     ocrAddDependence(dbGuid, terminateEdtGuid, 0, DB_MODE_CONST);
     ocrAddDependence(finishEdtOutputEventGuid, terminateEdtGuid, 1, DB_MODE_CONST);
 

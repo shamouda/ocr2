@@ -29,7 +29,7 @@ ocrGuid_t parallel_spawn(u32 paramc, u64 *paramv, u32 depc, ocrEdtDep_t *depv) {
     int       i               = paramv[2];
     ocrGuid_t finish_edt;
     u64 args[] = { done_edt.guid, i };
-    ocrEdtCreate(&finish_edt, finish_template, 2, args, 0, NULL, EDT_PROP_NONE, NULL_GUID, NULL);
+    ocrEdtCreate(&finish_edt, finish_template, 2, args, 0, NULL, EDT_PROP_NONE, NULL_HINT, NULL);
     return NULL_GUID;
 }
 
@@ -41,10 +41,10 @@ ocrGuid_t mainEdt(u32 paramc, u64 *paramv, u32 depc, ocrEdtDep_t *depv) {
     ocrEdtTemplateCreate(&done_template  , done           , 0, N);
     ocrEdtTemplateCreate(&finish_template, parallel_finish, 2, 0);
     ocrEdtTemplateCreate(&spawn_template , parallel_spawn , 3, 0);
-    ocrEdtCreate(&done_edt, done_template, 0, NULL, N, NULL, EDT_PROP_NONE, NULL_GUID, NULL);
+    ocrEdtCreate(&done_edt, done_template, 0, NULL, N, NULL, EDT_PROP_NONE, NULL_HINT, NULL);
     for(i = 0; i < N; i++) {
         u64 args[] = { done_edt.guid, finish_template.guid, i };
-        ocrEdtCreate(&spawn_edt, spawn_template, 3, args, 0, NULL, EDT_PROP_NONE, NULL_GUID, NULL);
+        ocrEdtCreate(&spawn_edt, spawn_template, 3, args, 0, NULL, EDT_PROP_NONE, NULL_HINT, NULL);
     }
     return NULL_GUID;
 }

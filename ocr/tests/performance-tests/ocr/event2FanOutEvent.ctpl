@@ -168,7 +168,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     driverParamv[1] = iteration;
     ocrGuid_t driverEdtGuid;
     ocrEdtCreate(&driverEdtGuid, driverEdtTemplateGuid,
-                 TPL_DRIVER_PARAMC, driverParamv, TPL_DRIVER_DEPV, NULL, TPL_DRIVER_PROP, NULL_GUID, NULL);
+                 TPL_DRIVER_PARAMC, driverParamv, TPL_DRIVER_DEPV, NULL, TPL_DRIVER_PROP, NULL_HINT, NULL);
     ocrEdtTemplateDestroy(driverEdtTemplateGuid);
 
     return NULL_GUID;

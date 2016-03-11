@@ -1357,10 +1357,24 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         ocrFatGuid_t edtFatGuid = {.guid = PD_MSG_FIELD_I(edt.guid), .metaDataPtr = PD_MSG_FIELD_I(edt.metaDataPtr)};
         u64 reqSize = PD_MSG_FIELD_IO(size);
 
+        ocrHint_t *hint = PD_MSG_FIELD_I(hint);
+        ocrFatGuid_t affinityGuid = {.guid = NULL_GUID, .metaDataPtr = NULL};
+        u64 hintValue = 0ULL;
+        if (hint != NULL_HINT && ocrGetHintValue(hint, OCR_HINT_DB_AFFINITY, &hintValue) == 0) {
+#ifdef GUID_64
+            affinityGuid.guid.guid = hintValue;
+#elif defined(GUID_128)
+            affinityGuid.guid.upper = 0ULL;
+            affinityGuid.guid.lower = hintValue;
+#else
+#error Unknown GUID type
+#endif
+        }
+
         PD_MSG_FIELD_O(returnDetail) = ceAllocateDb(
             self, &(PD_MSG_FIELD_IO(guid)), &(PD_MSG_FIELD_O(ptr)), reqSize,
             PD_MSG_FIELD_IO(properties), engineIndex,
-            PD_MSG_FIELD_I(affinity), PD_MSG_FIELD_I(allocator), PRESCRIPTION);
+            affinityGuid, PD_MSG_FIELD_I(allocator), PRESCRIPTION);
         if(PD_MSG_FIELD_O(returnDetail) == 0) {
             ocrDataBlock_t *db= PD_MSG_FIELD_IO(guid.metaDataPtr);
             ASSERT(db);
@@ -1526,8 +1540,21 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         START_PROFILE(pd_ce_WorkCreate);
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_WORK_CREATE
+        ocrHint_t *hint = PD_MSG_FIELD_I(hint);
+        ocrFatGuid_t affinityGuid = {.guid = NULL_GUID, .metaDataPtr = NULL };
+        u64 hintValue = 0ULL;
+        if (hint != NULL_HINT && ocrGetHintValue(hint, OCR_HINT_EDT_AFFINITY, &hintValue) == 0) {
+#ifdef GUID_64
+            affinityGuid.guid.guid = hintValue;
+#elif defined(GUID_128)
+            affinityGuid.guid.upper = 0ULL;
+            affinityGuid.guid.lower = hintValue;
+#else
+#error Unknown GUID type
+#endif
+        }
         localDeguidify(self, &(PD_MSG_FIELD_I(templateGuid)), NULL);
-        localDeguidify(self, &(PD_MSG_FIELD_I(affinity)), NULL);
+        localDeguidify(self, &affinityGuid, NULL);
         localDeguidify(self, &(PD_MSG_FIELD_I(currentEdt)), NULL);
         localDeguidify(self, &(PD_MSG_FIELD_I(parentLatch)), NULL);
         ocrFatGuid_t *outputEvent = NULL;
@@ -1539,7 +1566,7 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         PD_MSG_FIELD_O(returnDetail) = ceCreateEdt(
             self, &(PD_MSG_FIELD_IO(guid)), PD_MSG_FIELD_I(templateGuid),
             &PD_MSG_FIELD_IO(paramc), PD_MSG_FIELD_I(paramv), &PD_MSG_FIELD_IO(depc),
-            PD_MSG_FIELD_I(properties), PD_MSG_FIELD_I(affinity), outputEvent,
+            PD_MSG_FIELD_I(properties), affinityGuid, outputEvent,
             (ocrTask_t*)(PD_MSG_FIELD_I(currentEdt).metaDataPtr), PD_MSG_FIELD_I(parentLatch));
         DPRINTF(DEBUG_LVL_VERB, "WORK_CREATE response: GUID: "GUIDSx"\n",
                 GUIDFS(PD_MSG_FIELD_IO(guid.guid)));

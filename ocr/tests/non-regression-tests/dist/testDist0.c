@@ -27,10 +27,13 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     // create local edt that depends on the remote edt, the db is automatically cloned
     ocrGuid_t remoteEdtTemplateGuid;
     ocrEdtTemplateCreate(&remoteEdtTemplateGuid, remoteEdt, 0, 0);
+    ocrHint_t edtHint;
+    ocrHintInit( &edtHint, OCR_HINT_EDT_T );
+    ocrSetHintValue( & edtHint, OCR_HINT_EDT_AFFINITY, ocrAffinityToHintValue( edtAffinity) );
 
     ocrGuid_t edtGuid;
     ocrEdtCreate(&edtGuid, remoteEdtTemplateGuid, 0, NULL, 0, NULL,
-        EDT_PROP_NONE, edtAffinity, NULL);
+        EDT_PROP_NONE, &edtHint, NULL);
 
     return NULL_GUID;
 }

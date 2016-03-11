@@ -116,6 +116,10 @@ u8 ocrAffinityGetCurrent(ocrGuid_t * affinity);
  */
 u8 ocrAffinityQuery(ocrGuid_t guid, u64 * count, ocrGuid_t * affinities);
 
+/**
+ * @brief Converts an affinity to a value suitable for ocrSetHintValue()
+ */
+u64 ocrAffinityToHintValue(ocrGuid_t affinity);
 
 #ifdef __cplusplus
 }

@@ -142,4 +142,15 @@ u8 ocrAffinityGetCurrent(ocrGuid_t * affinity) {
     return ocrAffinityGet(AFFINITY_CURRENT, &count, affinity);
 }
 
+u64 ocrAffinityToHintValue(ocrGuid_t affinity) {
+#ifdef GUID_64
+    return affinity.guid;
+#elif defined(GUID_128)
+    return affinity.lower;
+#else
+#error Unknown GUID type
+#endif
+}
+
 #endif /* ENABLE_EXTENSION_AFFINITY */
+

@@ -48,7 +48,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     void * dbPtr;
     ocrGuid_t dbGuid;
     u64 nbElem = NB_ELEM_DB;
-    ocrDbCreate(&dbGuid, &dbPtr, sizeof(TYPE_ELEM_DB) * NB_ELEM_DB, 0, NULL_GUID, NO_ALLOC);
+    ocrDbCreate(&dbGuid, &dbPtr, sizeof(TYPE_ELEM_DB) * NB_ELEM_DB, 0, NULL_HINT, NO_ALLOC);
     int v = 1;
     int i = 0;
     int * data = (int *) dbPtr;
@@ -64,8 +64,11 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
 
     ocrGuid_t remoteEdtGuid;
     u64 nparamv = 222;
+    ocrHint_t edtHint;
+    ocrHintInit( &edtHint, OCR_HINT_EDT_T );
+    ocrSetHintValue( &edtHint, OCR_HINT_EDT_AFFINITY, ocrAffinityToHintValue(edtAffinity) );
     ocrEdtCreate(&remoteEdtGuid, remoteEdtTemplateGuid, 1, &nparamv, 1, &dbGuid,
-                 EDT_PROP_NONE, edtAffinity, NULL);
+                 EDT_PROP_NONE, &edtHint, NULL);
 
     return NULL_GUID;
 }

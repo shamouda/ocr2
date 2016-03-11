@@ -1,5 +1,5 @@
 /*
- * This file is subject to the license agreement located in the file LICENSE
+* This file is subject to the license agreement located in the file LICENSE
  * and cannot be distributed without it. This notice cannot be
  * removed or modified.
  *
@@ -16,6 +16,8 @@
 #include "ocr-workpile.h"
 #include "ocr-scheduler-object.h"
 #include "scheduler-heuristic/placement/placement-affinity-scheduler-heuristic.h"
+
+#include "extensions/ocr-hints.h"
 
 #define DEBUG_TYPE SCHEDULER_HEURISTIC
 
@@ -129,11 +131,25 @@ static u8 placerAffinitySchedHeuristicNotifyProcessMsgInvoke(ocrSchedulerHeurist
             {
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_WORK_CREATE
-                doAutoPlace = (PD_MSG_FIELD_I(workType) == EDT_USER_WORKTYPE) &&
-                    (IS_GUID_NULL(PD_MSG_FIELD_I(affinity.guid)));
-                if (!(IS_GUID_NULL(PD_MSG_FIELD_I(affinity.guid)))) {
-                    msg->destLocation = affinityToLocation(PD_MSG_FIELD_I(affinity.guid));
-                }
+                if (PD_MSG_FIELD_I(workType) == EDT_USER_WORKTYPE) {
+                    if (PD_MSG_FIELD_I(hint) != NULL_HINT) {
+                    // Don't auto-place and extract the affinity GUID from the hings
+                    ocrHint_t *hint = PD_MSG_FIELD_I(hint);
+                    u64 hintValue = 0ULL;
+                    if(ocrGetHintValue(hint, OCR_HINT_EDT_AFFINITY, &hintValue) == 0) {
+                        ocrGuid_t affGuid = NULL_GUID;
+#ifdef GUID_64
+                        affGuid.guid = hintValue;
+#elif defined(GUID_128)
+                        affGuid.upper = 0ULL;
+                        affGuid.lower = hintValue;
+#endif
+                        msg->destLocation = affinityToLocation(affGuid);
+                        }
+                    } else {
+                        doAutoPlace = true;
+                    }
+                } // never autoplace if not work type EDTs
 #undef PD_MSG
 #undef PD_TYPE
             break;
@@ -144,8 +160,19 @@ static u8 placerAffinitySchedHeuristicNotifyProcessMsgInvoke(ocrSchedulerHeurist
 #define PD_TYPE PD_MSG_DB_CREATE
                 // For now a DB is always created where the current EDT executes unless
                 // it has an affinity specified (i.e. no auto-placement)
-                if (!(IS_GUID_NULL(PD_MSG_FIELD_I(affinity.guid)))) {
-                    msg->destLocation = affinityToLocation(PD_MSG_FIELD_I(affinity.guid));
+                if (PD_MSG_FIELD_I(hint) != NULL_HINT) {
+                    ocrHint_t *hint = PD_MSG_FIELD_I(hint);
+                    u64 hintValue = 0ULL;
+                    if(ocrGetHintValue(hint, OCR_HINT_DB_AFFINITY, &hintValue) == 0) {
+                        ocrGuid_t affGuid = NULL_GUID;
+#ifdef GUID_64
+                        affGuid.guid = hintValue;
+#elif defined(GUID_128)
+                        affGuid.upper = 0ULL;
+                        affGuid.lower = hintValue;
+#endif
+                        msg->destLocation = affinityToLocation(affGuid);
+                    }
                 }
                 // When we do place DBs make sure we only place USER DBs
                 // doPlace = ((PD_MSG_FIELD_I(dbType) == USER_DBTYPE) &&

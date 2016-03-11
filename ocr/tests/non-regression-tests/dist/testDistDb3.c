@@ -63,7 +63,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     void * dbPtr;
     ocrGuid_t dbGuid;
     u64 nbElem = NB_ELEM_DB;
-    ocrDbCreate(&dbGuid, &dbPtr, sizeof(TYPE_ELEM_DB) * NB_ELEM_DB, 0, NULL_GUID, NO_ALLOC);
+    ocrDbCreate(&dbGuid, &dbPtr, sizeof(TYPE_ELEM_DB) * NB_ELEM_DB, 0, NULL_HINT, NO_ALLOC);
     int v = 1;
     int i = 0;
     int * data = (int *) dbPtr;
@@ -84,15 +84,20 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrEventCreate(&eventGuid, OCR_EVENT_STICKY_T, true);
     PRINTF("[local] mainEdt: Creating event with guid 0x%lx\n", eventGuid);
     // Create local EDT depending on event being satisfied
+    ocrHint_t edtHint;
+    ocrHintInit( &edtHint, OCR_HINT_EDT_T );
+    ocrSetHintValue( & edtHint, OCR_HINT_EDT_AFFINITY, ocrAffinityToHintValue( affinities[0]) );
     ocrGuid_t checkerEdtGuid;
     ocrEdtCreate(&checkerEdtGuid, checkerEdtTemplateGuid, 0, NULL, 1, &eventGuid,
-                 EDT_PROP_NONE, affinities[0], NULL);
+                 EDT_PROP_NONE, &edtHint, NULL);
 
     // create remote edt that depends the db which is automatically cloned
     u64 rparamv = (u64) eventGuid.guid; // NASTY cast: the event to satisfy later on
+    ocrHintInit( &edtHint, OCR_HINT_EDT_T );
+    ocrSetHintValue( & edtHint, OCR_HINT_EDT_AFFINITY, ocrAffinityToHintValue( affinities[affinityCount-1]) );
     ocrGuid_t addEdtGuid;
     ocrEdtCreate(&addEdtGuid, addEdtTemplateGuid, 1, &rparamv, 1, &dbGuid,
-                 EDT_PROP_NONE, affinities[affinityCount-1], NULL);
+                 EDT_PROP_NONE, &edtHint, NULL);
 
     return NULL_GUID;
 }

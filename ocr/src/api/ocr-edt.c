@@ -200,15 +200,15 @@ u8 ocrEdtTemplateDestroy(ocrGuid_t guid) {
 
 u8 ocrEdtCreate(ocrGuid_t* edtGuidPtr, ocrGuid_t templateGuid,
                 u32 paramc, u64* paramv, u32 depc, ocrGuid_t *depv,
-                u16 properties, ocrGuid_t affinity, ocrGuid_t *outputEvent) {
+                u16 properties, ocrHint_t *hint, ocrGuid_t *outputEvent) {
     ocrGuid_t edtGuid = (edtGuidPtr != NULL) ? *edtGuidPtr : NULL_GUID;
     START_PROFILE(api_EdtCreate);
 
     DPRINTF(DEBUG_LVL_INFO,
            "ENTER ocrEdtCreate(*guid="GUIDSx", template="GUIDSx", paramc=%d, paramv=0x%lx"
-           ", depc=%d, depv=0x%lx, prop=%u, aff="GUIDSx", outEvt="GUIDSx")\n",
+           ", depc=%d, depv=0x%lx, prop=%u, hint=%p, outEvt="GUIDSx")\n",
            GUIDFS(edtGuid), GUIDFS(templateGuid), (s32)paramc, paramv, (s32)depc, depv,
-           (u32)properties, GUIDFS(affinity),  GUIDFS(outputEvent?*outputEvent:NULL_GUID),
+           (u32)properties, hint,  GUIDFS(outputEvent?*outputEvent:NULL_GUID),
            true, OCR_TRACE_TYPE_EDT, OCR_ACTION_CREATE);
 
     PD_MSG_STACK(msg);
@@ -274,15 +274,13 @@ u8 ocrEdtCreate(ocrGuid_t* edtGuidPtr, ocrGuid_t templateGuid,
     PD_MSG_FIELD_IO(depc) = depc;
     PD_MSG_FIELD_I(templateGuid.guid) = templateGuid;
     PD_MSG_FIELD_I(templateGuid.metaDataPtr) = NULL;
-    PD_MSG_FIELD_I(affinity.guid) = affinity;
-    PD_MSG_FIELD_I(affinity.metaDataPtr) = NULL;
+    PD_MSG_FIELD_I(hint) = hint;
     PD_MSG_FIELD_I(parentLatch.guid) = curEdt ? (!(IS_GUID_NULL(curEdt->finishLatch)) ? curEdt->finishLatch : curEdt->parentLatch) : NULL_GUID;
     PD_MSG_FIELD_I(parentLatch.metaDataPtr) = NULL;
     PD_MSG_FIELD_I(currentEdt.guid) = curEdt ? curEdt->guid : NULL_GUID;
     PD_MSG_FIELD_I(currentEdt.metaDataPtr) = curEdt;
     PD_MSG_FIELD_I(paramv) = paramv;
     PD_MSG_FIELD_I(depv) = depvFatGuids;
-    PD_MSG_FIELD_I(hint) = NULL;
     PD_MSG_FIELD_I(workType) = EDT_USER_WORKTYPE;
     PD_MSG_FIELD_I(properties) = properties;
 

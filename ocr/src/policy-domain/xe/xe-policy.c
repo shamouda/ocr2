@@ -20,6 +20,7 @@
 #include "ocr-statistics.h"
 #endif
 
+#include "extensions/ocr-hints.h"
 #include "policy-domain/xe/xe-policy.h"
 
 #include "tg-bin-files.h"
@@ -744,10 +745,24 @@ u8 xePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         ocrFatGuid_t edtFatGuid = {.guid = PD_MSG_FIELD_I(edt.guid), .metaDataPtr = PD_MSG_FIELD_I(edt.metaDataPtr)};
         u64 reqSize = PD_MSG_FIELD_IO(size);
 
+        ocrHint_t *hint = PD_MSG_FIELD_I(hint);
+        ocrFatGuid_t affinityGuid = {.guid = NULL_GUID, .metaDataPtr = NULL};
+        u64 hintValue = 0ULL;
+        if (hint != NULL_HINT && ocrGetHintValue(hint, OCR_HINT_DB_AFFINITY, &hintValue) == 0) {
+#ifdef GUID_64
+            affinityGuid.guid.guid = hintValue;
+#elif defined(GUID_128)
+            affinityGuid.guid.upper = 0ULL;
+            affinityGuid.guid.lower = hintValue;
+#else
+#error Unknown GUID type
+#endif
+        }
+
         u8 ret = xeAllocateDb(
             self, &(PD_MSG_FIELD_IO(guid)), &(PD_MSG_FIELD_O(ptr)), reqSize,
             PD_MSG_FIELD_IO(properties), engineIndex,
-            PD_MSG_FIELD_I(affinity), PD_MSG_FIELD_I(allocator), 0 /*PRESCRIPTION*/);
+            affinityGuid, PD_MSG_FIELD_I(allocator), 0 /*PRESCRIPTION*/);
         if (ret == 0) {
             PD_MSG_FIELD_O(returnDetail) = ret;
             if(PD_MSG_FIELD_O(returnDetail) == 0) {

@@ -19,6 +19,7 @@
 // Load the affinities
 #include "experimental/ocr-platform-model.h"
 #include "extensions/ocr-affinity.h"
+#include "extensions/ocr-hints.h"
 
 #define DEBUG_TYPE WORKER
 
@@ -179,8 +180,7 @@ static u8 createProcessRequestEdt(ocrPolicyDomain_t * pd, ocrGuid_t templateGuid
     PD_MSG_FIELD_IO(depc) = depc;
     PD_MSG_FIELD_I(templateGuid.guid) = templateGuid;
     PD_MSG_FIELD_I(templateGuid.metaDataPtr) = NULL;
-    PD_MSG_FIELD_I(affinity.guid) = NULL_GUID;
-    PD_MSG_FIELD_I(affinity.metaDataPtr) = NULL;
+    PD_MSG_FIELD_I(hint) = NULL_HINT;
     // This is a "fake" EDT so it has no "parent"
     PD_MSG_FIELD_I(currentEdt.guid) = NULL_GUID;
     PD_MSG_FIELD_I(currentEdt.metaDataPtr) = NULL;
@@ -188,7 +188,6 @@ static u8 createProcessRequestEdt(ocrPolicyDomain_t * pd, ocrGuid_t templateGuid
     PD_MSG_FIELD_I(parentLatch.metaDataPtr) = NULL;
     PD_MSG_FIELD_I(paramv) = paramv;
     PD_MSG_FIELD_I(depv) = NULL;
-    PD_MSG_FIELD_I(hint) = NULL;
     PD_MSG_FIELD_I(workType) = workType;
     PD_MSG_FIELD_I(properties) = properties;
     returnCode = pd->fcts.processMessage(pd, &msg, true);
@@ -333,8 +332,20 @@ static void workerLoopHcComm(ocrWorker_t * worker) {
         packedUserArgv = (void *) (((u64)packedUserArgv) + sizeof(u64)); // skip first totalLength argument
         ocrGuid_t dbGuid;
         void* dbPtr;
+
+        ocrHint_t dbHint;
+        ocrHintInit( &dbHint, OCR_HINT_DB_T );
+#ifdef GUID_64
+            ocrSetHintValue( & dbHint, OCR_HINT_DB_AFFINITY, affinityMasterPD.guid );
+#elif defined(GUID_128)
+            ocrSetHintValue( & dbHint, OCR_HINT_DB_AFFINITY, affinityMasterPD.lower );
+#else
+#error Unknown GUID type
+#endif
+
         ocrDbCreate(&dbGuid, &dbPtr, totalLength,
-                    DB_PROP_IGNORE_WARN, affinityMasterPD, NO_ALLOC);
+                    DB_PROP_IGNORE_WARN, &dbHint, NO_ALLOC);
+
         // copy packed args to DB
         hal_memCopy(dbPtr, packedUserArgv, totalLength, 0);
         // Release the DB so that mainEdt can acquire it.
@@ -357,9 +368,19 @@ static void workerLoopHcComm(ocrWorker_t * worker) {
         // Prepare the mainEdt for scheduling
         ocrGuid_t edtTemplateGuid = NULL_GUID, edtGuid = NULL_GUID;
         ocrEdtTemplateCreate(&edtTemplateGuid, mainEdt, 0, 1);
+
+        ocrHint_t edtHint;
+        ocrHintInit( &edtHint, OCR_HINT_EDT_T );
+#ifdef GUID_64
+            ocrSetHintValue( & edtHint, OCR_HINT_EDT_AFFINITY, affinityMasterPD.guid );
+#elif defined(GUID_128)
+            ocrSetHintValue( & edtHint, OCR_HINT_EDT_AFFINITY, affinityMasterPD.lower );
+#else
+#error Unknown GUID type
+#endif
         ocrEdtCreate(&edtGuid, edtTemplateGuid, EDT_PARAM_DEF, /* paramv = */ NULL,
                      /* depc = */ EDT_PARAM_DEF, /* depv = */ &dbGuid,
-                     EDT_PROP_NONE, affinityMasterPD, NULL);
+                     EDT_PROP_NONE, &edtHint, NULL);
     }
 
     ASSERT(worker->curState == GET_STATE(RL_USER_OK, PHASE_RUN));

@@ -4,8 +4,6 @@
  * removed or modified.
  */
 
-
-
 #include "ocr.h"
 
 /**
@@ -24,7 +22,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrGuid_t outputEventGuid;
     ocrEdtTemplateCreate(&workEdtTplGuid, workEdt, 0, 1);
     ocrEdtCreate(&workEdtGuid, workEdtTplGuid, 0, NULL, 1, NULL,
-                 EDT_PROP_NONE, NULL_GUID, &outputEventGuid);
+                 EDT_PROP_NONE, NULL_HINT, &outputEventGuid);
     ocrEdtDestroy(workEdtGuid);
     ocrShutdown();
     return NULL_GUID;

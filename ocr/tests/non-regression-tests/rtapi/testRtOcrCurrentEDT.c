@@ -33,14 +33,14 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrGuid_t edtGuid;
     ocrGuid_t taskForEdtTemplateGuid;
     ocrEdtTemplateCreate(&taskForEdtTemplateGuid, taskForEdt, 0 /*paramc*/, 1 /*depc*/);
-    ocrEdtCreate(&edtGuid, taskForEdtTemplateGuid, EDT_PARAM_DEF, NULL, EDT_PARAM_DEF, NULL, 0, NULL_GUID, NULL);
+    ocrEdtCreate(&edtGuid, taskForEdtTemplateGuid, EDT_PARAM_DEF, NULL, EDT_PARAM_DEF, NULL, 0, NULL_HINT, NULL);
 
     // Build a data-block and pass down the edtGuid
     ocrGuid_t *k;
     ocrGuid_t dbGuid;
     ocrDbCreate(&dbGuid,(void **) &k,
                 sizeof(ocrGuid_t), /*flags=*/0,
-                /*location=*/NULL_GUID,
+                /*location=*/NULL_HINT,
                 NO_ALLOC);
     *k = edtGuid;
 

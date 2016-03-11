@@ -261,7 +261,7 @@ void* xeRunWorker(ocrWorker_t * worker) {
         ocrGuid_t dbGuid;
         void* dbPtr;
         ocrDbCreate(&dbGuid, &dbPtr, totalLength,
-                    DB_PROP_IGNORE_WARN, NULL_GUID, NO_ALLOC);
+                    DB_PROP_IGNORE_WARN, NULL_HINT, NO_ALLOC);
 
         // copy packed args to DB
         hal_memCopy(dbPtr, packedUserArgv, totalLength, 0);
@@ -288,7 +288,8 @@ void* xeRunWorker(ocrWorker_t * worker) {
         ocrGuid_t edtTemplateGuid = NULL_GUID, edtGuid = NULL_GUID;
         ocrEdtTemplateCreate(&edtTemplateGuid, mainEdt, 0, 1);
         ocrEdtCreate(&edtGuid, edtTemplateGuid, EDT_PARAM_DEF, /* paramv=*/ NULL,
-                     EDT_PARAM_DEF, /* depv=*/&dbGuid, EDT_PROP_NONE, NULL_GUID, NULL);
+                     EDT_PARAM_DEF, /* depv=*/&dbGuid, EDT_PROP_NONE,
+                     NULL_HINT, NULL);
         DPRINTF(DEBUG_LVL_INFO, "Launched mainEDT from worker %ld\n", getWorkerId(worker));
     }
 

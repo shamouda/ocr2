@@ -48,7 +48,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrEdtTemplateCreate(&tplSht, shtEdt, 0 , NB_EVT_COUNTED_DEPS);
     ocrGuid_t shtEdtGuid;
     ocrEdtCreate(&shtEdtGuid, tplSht, EDT_PARAM_DEF, NULL, EDT_PARAM_DEF, NULL,
-                 EDT_PROP_NONE, NULL_GUID, NULL);
+                 EDT_PROP_NONE, NULL_HINT, NULL);
 
     ocrGuid_t edtGuids[NB_EVT_COUNTED_DEPS];
     ocrGuid_t tplEdt;
@@ -57,7 +57,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     // add half the deps of the counted event
     for (i=0; i < NB_EVT_COUNTED_DEPS/2; i++) {
         ocrEdtCreate(&edtGuids[i], tplEdt, EDT_PARAM_DEF, (u64*) &evtGuids[i], EDT_PARAM_DEF, NULL,
-                     EDT_PROP_NONE, NULL_GUID, NULL);
+                     EDT_PROP_NONE, NULL_HINT, NULL);
         // Register a dependence between an event and an edt
         ocrAddDependence(evtGuid, edtGuids[i], 0, DB_MODE_CONST);
         ocrAddDependence(evtGuids[i], shtEdtGuid, i, DB_MODE_CONST);
@@ -69,7 +69,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     // add the rest of deps
     for (i=NB_EVT_COUNTED_DEPS/2; i < NB_EVT_COUNTED_DEPS; i++) {
         ocrEdtCreate(&edtGuids[i], tplEdt, EDT_PARAM_DEF, (u64*) &evtGuids[i], EDT_PARAM_DEF, NULL,
-                     EDT_PROP_NONE, NULL_GUID, NULL);
+                     EDT_PROP_NONE, NULL_HINT, NULL);
         // Register a dependence between an event and an edt
         ocrAddDependence(evtGuid, edtGuids[i], 0, DB_MODE_CONST);
         // In this test setup dependences before we do the satisfy similarly to once events

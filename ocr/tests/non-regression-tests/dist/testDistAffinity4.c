@@ -42,7 +42,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     // Create a data-block and store its affinity inside for future cross-check
     ocrGuid_t dbGuid;
     ocrGuid_t * dbPtr;
-    ocrDbCreate(&dbGuid, (void **)&dbPtr, sizeof(int) * affinityCount, DB_PROP_SINGLE_ASSIGNMENT, NULL_GUID, NO_ALLOC);
+    ocrDbCreate(&dbGuid, (void **)&dbPtr, sizeof(int) * affinityCount, DB_PROP_SINGLE_ASSIGNMENT, NULL_HINT, NO_ALLOC);
     dbPtr[0] = edtAffinity;
     ocrDbRelease(dbGuid);
 
@@ -54,9 +54,13 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     u64 count = 1;
     ocrAffinityQuery(dbGuid, &count, &queriedDbAffinityGuid);
     PRINTF("mainEdt: create remote EDT @ same affinity the DB was created\n");
+
+    ocrHint_t edtHint;
+    ocrHintInit( &edtHint, OCR_HINT_EDT_T );
+    ocrSetHintValue( & edtHint, OCR_HINT_EDT_AFFINITY, ocrAffinityToHintValue( queriedDbAffinityGuid) );
     ocrGuid_t edtGuid;
     ocrEdtCreate(&edtGuid, remoteEdtTemplateGuid, EDT_PARAM_DEF, NULL, EDT_PARAM_DEF, &dbGuid,
-        EDT_PROP_NONE, queriedDbAffinityGuid, NULL);
+        EDT_PROP_NONE, &edtHint, NULL);
 
     return NULL_GUID;
 }
