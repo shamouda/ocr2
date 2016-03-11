@@ -110,10 +110,33 @@ endif
 # x86 only
 #
 # Enable profiler
-# CFLAGS += -DOCR_RUNTIME_PROFILER -DPROFILE_KHZ=3400000
+# CFLAGS += -DOCR_RUNTIME_PROFILER -DPROFILER_KHZ=3400000
 #
-# (optional) Maximum number of scope
-# nesting for runtime profiler
+# Other options for the profiler. All are disabled by default
+# Enable this if you want to use the profiler in your app as well
+# CFLAGS += -DPROFILER_W_APPS
+#
+# Enable this if you want to set a symbol from which
+# to start profiling (typically: "enter into user code")
+# CFLAGS += -DPROFILER_FOCUS=userCode
+#
+# The following option is only relevant with PROFILER_FOCUS
+# Enable this if you want the profiler to stop giving details
+# after entering this many levels of profiler "stack". For example
+# if you have no profiler calls in your apps and want to determine
+# the overhead of the runtime from your user code, set this to 1 and
+# PROFILER_FOCUS to userCode. The profiler will report the time spent
+# in userCode as well as the time spent in each OCR API call but nothing
+# else
+# CFLAGS += -DPROFILER_FOCUS_DEPTH=1
+#
+# The following option is only relevant with PROFILER_FOCUS
+# Enable this if you want to stop profiling when a runtime function call
+# is made. This will override FOCUS_DEPTH (ie: if a runtime call is encountered
+# before FOCUS_DEPTH is reached, the profiler will stop giving details of sub-calls)
+# CFLAGS += -DPROFILER_IGNORE_RT
+#
+# (optional) Maximum number of scope nesting for runtime profiler
 # CFLAGS += -DMAX_PROFILER_LEVEL=512
 
 # Enables the collection of EDT R/W statistics
@@ -283,11 +306,17 @@ SRCS   := $(shell find -L $(OCR_ROOT)/src -name '*.[csS]' -print)
 VPATH  := $(shell find -L $(OCR_ROOT)/src -type d -print)
 
 ifneq (,$(findstring OCR_RUNTIME_PROFILER,$(CFLAGS)))
-SRCSORIG = $(SRCS)
-SRCS += $(OCR_BUILD)/src/profilerAutoGen.c
-PROFILER_FILE=$(OCR_BUILD)/src/profilerAutoGen.c
+SRCSORIG := $(SRCS)
+PROFILER_FILE_C=$(OCR_BUILD)/src/profilerAutoGen.c
+SRCS += $(PROFILER_FILE_C)
+PROFILER_FILE=$(OCR_BUILD)/src/profilerAutoGenRT.h
 CFLAGS += -I $(OCR_BUILD)/src
 VPATH += $(OCR_BUILD)/src
+ifneq (,$(findstring PROFILER_W_APPS, $(CFLAGS)))
+PROFILER_MODE := rtapp
+else
+PROFILER_MODE := rt
+endif
 else
 PROFILER_FILE=
 endif
@@ -383,7 +412,6 @@ info-static:
 	@printf "\033[32m>>>> Building a static library with\033[1;30m '$(AR) $(ARFLAGS)'\033[0m\n"
 
 $(OCRSTATIC): $(OBJS_STATIC)
-# Need this comment to make V=1 work (no idea why the first @ is causing so much issue)
 	@echo "Linking static library ${OCRSTATIC}"
 	$(AT)$(AR) $(ARFLAGS) $(OCRSTATIC) $^
 	$(AT)$(RANLIB) $(OCRSTATIC)
@@ -405,7 +433,6 @@ info-shared:
 	@printf "\033[32m>>>> Building a shared library with\033[1;30m '$(CC) $(LDFLAGS)'\033[0m\n"
 
 $(OCRSHARED): $(OBJS_SHARED)
-# Need this comment to make V=1 work (no idea why the first @ is causing so much issue)
 	@echo "Linking shared library ${OCRSHARED}"
 	$(AT)$(CC) $(LDFLAGS) -o $(OCRSHARED) $^
 
@@ -426,7 +453,6 @@ info-exec:
 	@printf "\033[32m>>>> Compile command for .c files is\033[1;30m '$(CC) $(CFLAGS_EXEC) -MMD -c <src> -o <obj>'\033[0m\n"
 
 $(OCREXEC): $(OBJS_EXEC)
-# Need this comment to make V=1 work (no idea why the first @ is causing so much issue)
 	@echo "Linking executable binary ${OCREXEC}"
 	$(AT)$(CC) -o $(OCREXEC) $^ $(EXEFLAGS)
 
@@ -436,10 +462,11 @@ $(OCREXEC): $(OBJS_EXEC)
 #
 
 $(PROFILER_FILE): $(SRCSORIG) | $(OCR_BUILD)/src
-# Need this comment to make V=1 work (no idea why the first @ is causing so much issue)
 	@echo "Generating profile file..."
-	$(AT)$(OCR_ROOT)/scripts/Profiler/generateProfilerFile.py $(OCR_ROOT)/src $(OCR_BUILD)/src/profilerAutoGen h,c .git profiler
+	$(AT)$(OCR_ROOT)/scripts/Profiler/generateProfilerFile.py -m $(PROFILER_MODE) -o $(OCR_BUILD)/src/profilerAutoGen --exclude .git --exclude profiler $(OCR_ROOT)/src
 	@echo "\tDone."
+
+$(PROFILER_FILE_C): $(PROFILER_FILE)
 
 # This does a more complicate dependency computation so all the prereqs listed
 # will also become command-less, prereq-less targets. This causes make
@@ -452,7 +479,6 @@ $(PROFILER_FILE): $(SRCSORIG) | $(OCR_BUILD)/src
 #   sed:    strip leading spaces
 #   sed:    add trailing colons
 $(OBJDIR)/static/%.o: %.c Makefile ../common.mk $(PROFILER_FILE) | $(OBJDIR)/static
-# Need this comment to make V=1 work (no idea why the first @ is causing so much issue)
 	@echo "Compiling $<"
 	$(AT)$(CC) $(CFLAGS_STATIC) -MMD -c $< -o $@
 	$(AT)cp -f $(@:.o=.d) $(@:.o=.d.tmp)
@@ -462,7 +488,6 @@ $(OBJDIR)/static/%.o: %.c Makefile ../common.mk $(PROFILER_FILE) | $(OBJDIR)/sta
 
 
 $(OBJDIR)/shared/%.o: %.c Makefile ../common.mk $(PROFILER_FILE) | $(OBJDIR)/shared
-# Need this comment to make V=1 work (no idea why the first @ is causing so much issue)
 	@echo "Compiling $<"
 	$(AT)$(CC) $(CFLAGS_SHARED) -MMD -c $< -o $@
 	$(AT)cp -f $(@:.o=.d) $(@:.o=.d.tmp)
@@ -471,7 +496,6 @@ $(OBJDIR)/shared/%.o: %.c Makefile ../common.mk $(PROFILER_FILE) | $(OBJDIR)/sha
 	$(AT)rm -f $(@:.o=.d.tmp)
 
 $(OBJDIR)/exec/%.o: %.c Makefile ../common.mk | $(OBJDIR)/exec
-# Need this comment to make V=1 work (no idea why the first @ is causing so much issue)
 	@echo "Compiling $<"
 	$(AT)$(CC) $(CFLAGS_EXEC) -MMD -c $< -o $@
 	$(AT)cp -f $(@:.o=.d) $(@:.o=.d.tmp)
@@ -480,7 +504,6 @@ $(OBJDIR)/exec/%.o: %.c Makefile ../common.mk | $(OBJDIR)/exec
 	$(AT)rm -f $(@:.o=.d.tmp)
 
 $(OBJDIR)/static/%.o: %.S Makefile ../common.mk | $(OBJDIR)/static
-# Need this comment to make V=1 work (no idea why the first @ is causing so much issue)
 	@echo "Assembling $<"
 	$(AT)$(CC) $(CFLAGS_STATIC) -MMD -c $< -o $@
 	$(AT)cp -f $(@:.o=.d) $(@:.o=.d.tmp)
@@ -489,7 +512,6 @@ $(OBJDIR)/static/%.o: %.S Makefile ../common.mk | $(OBJDIR)/static
 	$(AT)rm -f $(@:.o=.d.tmp)
 
 $(OBJDIR)/shared/%.o: %.S Makefile ../common.mk | $(OBJDIR)/shared
-# Need this comment to make V=1 work (no idea why the first @ is causing so much issue)
 	@echo "Assembling $<"
 	$(AT)$(CC) $(CFLAGS_SHARED) -MMD -c $< -o $@
 	$(AT)cp -f $(@:.o=.d) $(@:.o=.d.tmp)
@@ -528,8 +550,9 @@ INSTALL_TARGETS += exec
 INSTALL_EXES += $(OCREXEC)
 endif
 
-INC_FILES         := $(addprefix extensions/, $(notdir $(wildcard $(OCR_ROOT)/inc/extensions/*))) \
-                     $(notdir $(wildcard $(OCR_ROOT)/inc/*))
+INC_FILES         := $(addprefix extensions/, $(notdir $(wildcard $(OCR_ROOT)/inc/extensions/*.h))) \
+                     $(notdir $(wildcard $(OCR_ROOT)/inc/*.h))
+
 
 # WARNING: This next line actually generates the configurations. This will be cleaned
 # up in a later commit.

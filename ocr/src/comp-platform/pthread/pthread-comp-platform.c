@@ -17,7 +17,7 @@
 
 #include "pthread-comp-platform.h"
 
-#include "utils/profiler/profiler.h"
+#include "utils/profiler/profiler-internal.h"
 
 #define DEBUG_TYPE COMP_PLATFORM
 

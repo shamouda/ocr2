@@ -233,31 +233,33 @@ u8 hcSchedulerTakeEdt (ocrScheduler_t *self, u32 *count, ocrFatGuid_t *edts) {
 #ifdef ENABLE_EXTENSION_BLOCKING_SUPPORT
     ocrWorkerHc_t * hcWorker = (ocrWorkerHc_t *) worker;
     if (!hcWorker->stealFirst) {
-        {
 #endif
+        {
             START_PROFILE(sched_hc_Pop);
             // First try to pop
             ocrWorkpile_t * wpToPop = popMappingOneToOne(self, workerId);
             popped = wpToPop->fcts.pop(wpToPop, POP_WORKPOPTYPE, NULL);
             EXIT_PROFILE;
-#ifdef ENABLE_EXTENSION_BLOCKING_SUPPORT
         }
+#ifdef ENABLE_EXTENSION_BLOCKING_SUPPORT
     } else {
         hcWorker->stealFirst = false;
         popped.guid = NULL_GUID;
     }
 #endif
 
-    START_PROFILE(sched_hc_Steal);
-    if(ocrGuidIsNull(popped.guid)) {
-        // If popping failed, try to steal
-        hcWorkpileIterator_t* it = stealMappingOneToAllButSelf(self, workerId);
-        while(workpileIteratorHasNext(it) && (ocrGuidIsNull(popped.guid))) {
-            ocrWorkpile_t * next = workpileIteratorNext(it);
-            popped = next->fcts.pop(next, STEAL_WORKPOPTYPE, NULL);
+    {
+        START_PROFILE(sched_hc_Steal);
+        if(ocrGuidIsNull(popped.guid)) {
+            // If popping failed, try to steal
+            hcWorkpileIterator_t* it = stealMappingOneToAllButSelf(self, workerId);
+            while(workpileIteratorHasNext(it) && (ocrGuidIsNull(popped.guid))) {
+                ocrWorkpile_t * next = workpileIteratorNext(it);
+                popped = next->fcts.pop(next, STEAL_WORKPOPTYPE, NULL);
+            }
         }
+        EXIT_PROFILE;
     }
-    EXIT_PROFILE;
 
     // In this implementation we expect the caller to have
     // allocated memory for us since we can return at most one
