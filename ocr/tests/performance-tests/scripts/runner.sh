@@ -39,6 +39,7 @@ REPORT_ARG=""
 SWEEPFILE_OPT="no"
 SWEEPFILE_ARG=""
 TARGET_ARG="x86"
+TMPDIR_ARG=""
 NOCLEAN_OPT="no"
 
 # Default options are for micro-benchmarks
@@ -116,7 +117,7 @@ if [[ -z "$PROG_ARG" ]]; then
 fi
 
 if [[ -z "$LOGDIR_ARG" ]]; then
-    LOGDIR="."
+    LOGDIR=`mktemp -d rundir.XXXXXX`
 else
     LOGDIR=${LOGDIR_ARG}
 fi
@@ -297,11 +298,11 @@ function runApplication {
     # Compile the program with provided defines
     echo "Compiling OCR Application ${prog} ${runInfo}"
     echo "${progDefines} ${runInfo} make -f ${OCR_MAKEFILE}"
-    eval ${progDefines} ${runInfo} make -f ${OCR_MAKEFILE}
+    eval ${runInfo} make -f ${OCR_MAKEFILE}
 
     # Run the program with the appropriate OCR cfg file
     echo "Run OCR Application ${prog} ${runInfo}"
-    make -f ${OCR_MAKEFILE} OCR_CONFIG=${PWD}/${CFGARG_OUTPUT} run
+    eval ${progDefines} make -f ${OCR_MAKEFILE} OCR_CONFIG=${PWD}/${CFGARG_OUTPUT} run
     RES=$?
     eval $__resultvar="'$RES'"
 }
@@ -381,7 +382,7 @@ function runTest() {
 
     # Generate a report based on any filename matching ${RUNLOG_FILE}*
     reportGenOpt=""
-    if [[ "$NOCLEAN_OPT" = "no" ]]; then
+    if [[ "$NOCLEAN_OPT" = "yes" ]]; then
         reportGenOpt="-noclean"
     fi
     echo "${SCRIPT_ROOT}/reportGenerator.sh ${reportGenOpt} ${runlog} >> ${report}"
