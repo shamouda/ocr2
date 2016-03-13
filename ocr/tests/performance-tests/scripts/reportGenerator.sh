@@ -18,6 +18,7 @@ fi
 #
 
 NOCLEAN_OPT="no"
+TMPDIR_OPT="no"
 
 #
 # Option Parsing and Checking
@@ -29,20 +30,30 @@ if [[ -z "$RUNLOG_FILE" ]]; then
     echo "$0: Use default RUNLOG_FILE: $RUNLOG_FILE";
 fi
 
-TMPDIR=${SCRIPT_ROOT}/tmp
-
 while [[ $# -gt 0 ]]; do
     # for arg processing debug
     #echo "Processing argument $1"
     if [[ "$1" = "-noclean" ]]; then
         shift
         NOCLEAN_OPT="yes"
+    elif [[ "$1" = "-tmpdir" && $# -ge 2 ]]; then
+        shift
+        TMPDIR_OPT="yes"
+        TMPDIR_ARG=("$@")
+        shift
     else
         # Remaining is runlog file arguments
         RUNLOG_FILE=$1
         shift
     fi
 done
+
+if [[ "${TMPDIR_OPT}" = "no" ]]; then
+    TMPDIR=`mktemp -d -p ${SCRIPT_ROOT} tmpdir-report.XXXXXX`
+else
+    TMPDIR=${TMPDIR_ARG}
+fi
+
 
 function toLower() {
     local  input=$1
@@ -102,8 +113,6 @@ function deleteFiles() {
     fi
 }
 
-echo "RUNLOG_FILE=${RUNLOG_FILE}"
-
 #
 # Grep for a metric in each runlog file
 #
@@ -126,5 +135,5 @@ echo "${CORE_SCALING}" | tr ' ' '\n' > ${TMPDIR}/tmp-core-scaling
 paste ${TMPDIR}/tmp-core-scaling ${TMPDIR}/tmp-agg-results-throughput ${TMPDIR}/tmp-agg-results-spup ${TMPDIR}/tmp-agg-results-duration | column -t
 
 # delete left-over temporary file
-deleteFiles ${TMPDIR}/tmp-all-runlog-metric ${TMPDIR}/tmp-agg-results ${TMPDIR}/tmp-agg-results-spup
+deleteFiles ${TMPDIR}
 deleteFiles ${TMP_ALL_METRIC_FILES}

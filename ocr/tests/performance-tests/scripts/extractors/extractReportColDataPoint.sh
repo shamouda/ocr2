@@ -18,7 +18,7 @@ FILES=$4
 rm -f ${OUTFILE} 2>/dev/null
 touch ${OUTFILE}
 
-TMPDIR=${SCRIPT_ROOT}/tmp
+TMPDIR=`mktemp -d -p ${SCRIPT_ROOT} tmpdir.XXXXXX`
 
 for file in `echo $FILES`; do
     tail -n+${IGNORE_TOP_LINES} $file | tr -s ' ' | cut -d' ' -f${RESULT_COL}-${RESULT_COL} > ${TMPDIR}/aggcut1.tmp

@@ -8,10 +8,6 @@ if [[ -z "$SCRIPT_ROOT" ]]; then
     exit 1
 fi
 
-if [[ ! -d "$SCRIPT_ROOT/tmp" ]]; then
-    mkdir -p ${SCRIPT_ROOT}/tmp
-fi
-
 if [[ $# != 1 ]]; then
     echo "usage: $0 logfile"
     exit 1
@@ -24,7 +20,7 @@ FILENAME=${LOGFILE##*/}
 # Setting up temporary files
 #
 
-TMP_FOLDER=${SCRIPT_ROOT}/tmp
+TMPDIR=`mktemp -d -p ${SCRIPT_ROOT} tmpdir.XXXXXX`
 WU_FILE=${TMP_FOLDER}/tmp.wu
 DATA_FILE=${TMP_FOLDER}/tmp.data
 DATA_BUFFER_FILE=${TMP_FOLDER}/tmp.databuffer
@@ -45,7 +41,7 @@ echo "Workload" > ${WU_FILE}
 
 COL_THROUGHPUT_ID=1
 REPORT_FILES=${LOGFILE}
-${SCRIPT_ROOT}/extractors/extractReportColDataPoint.sh ${COL_THROUGHPUT_ID} ${IGNORE_TOP_LINES} ${XLABEL_FILE} "${REPORT_FILES}"
+${SCRIPT_ROOT}/extractors/extractReportColDataPoint.sh ${COL_THROUGHPUT_ID} ${IGNORE_TOP_LINES} ${TMPDIR} ${XLABEL_FILE} "${REPORT_FILES}"
 
 #
 # Extract data for throughput
@@ -53,7 +49,7 @@ ${SCRIPT_ROOT}/extractors/extractReportColDataPoint.sh ${COL_THROUGHPUT_ID} ${IG
 
 COL_THROUGHPUT_ID=2
 REPORT_FILES=${LOGFILE}
-${SCRIPT_ROOT}/extractors/extractReportColDataPoint.sh ${COL_THROUGHPUT_ID} ${IGNORE_TOP_LINES} ${DATA_BUFFER_FILE} "${REPORT_FILES}"
+${SCRIPT_ROOT}/extractors/extractReportColDataPoint.sh ${COL_THROUGHPUT_ID} ${IGNORE_TOP_LINES} ${TMPDIR} ${DATA_BUFFER_FILE} "${REPORT_FILES}"
 
 #
 # Append x-axis labels and throughput data
@@ -83,11 +79,7 @@ RES=$?
 
 if [[ $RES == 0 ]]; then
     echo "Plot generated ${IMG_NAME}"
-    rm -Rf ${WU_FILE}
-    rm -Rf ${DATA_FILE}
-    rm -Rf ${DATA_BUFFER_FILE}
-    rm -Rf ${XLABEL_FILE}
-    rm -Rf ${OUTPUT_PLOT_NAME}
+    rm -Rf ${TMPDIR}
 else
     echo "An error occured generating the plot ${IMG_NAME}"
 fi
