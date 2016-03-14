@@ -783,6 +783,8 @@ bmap_fallback:
 
 
 // start of simple alloc core part
+#if 0 // TODO: 4.1.0 - this test severely slows down FSim without any obvious benefit
+        // See bug #875
 static void quickTest(u64 start, u64 size)
 {
     // boundary check code for sanity check.
@@ -805,6 +807,7 @@ static void quickTest(u64 start, u64 size)
     } while(0);
     DPRINTF(DEBUG_LVL_VERB, "quickTest : simple boundary test passed\n");
 }
+#endif
 
 static void quickFinish(poolHdr_t *pool, u64 size)
 {
