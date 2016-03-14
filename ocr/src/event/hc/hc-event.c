@@ -1338,6 +1338,7 @@ u8 satisfyEventHcChannel(ocrEvent_t *base, ocrFatGuid_t db, u32 slot) {
 
 u8 unregisterWaiterEventHcChannel(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot, bool isDepRem) {
     ASSERT(false && "Not supported");
+    return 0;
 }
 
 #endif
