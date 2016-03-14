@@ -539,7 +539,7 @@ ifneq (,$(findstring $(OCR_TYPE),"tg-ce tg-xe builder-xe builder-ce"))
 SCRIPT_FILES      += $(addprefix Configs/, ce_config_fix.py combine-configs.py mem_config_fix.py tg-fsim_config_fix.py)
 SCRIPT_FILES      += $(patsubst $(OCR_ROOT)/scripts/%,%,$(wildcard $(OCR_ROOT)/scripts/Blob/*))
 endif
-ifneq (,$(findstring $(OCR_TYPE),"x86-phi"))
+ifeq ("x86-phi",$(findstring $(OCR_TYPE),"x86-phi"))
 SCRIPT_FILES      += Configs/combine-configs.py
 DEFAULT_CONFIG    := knl_mcdram.cfg
 endif
