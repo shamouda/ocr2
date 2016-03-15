@@ -261,7 +261,7 @@ u8 hcWorkerSwitchRunlevel(ocrWorker_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_
         if(PD->workers[(PD->workerCount)-1]->type == SYSTEM_WORKERTYPE){
             if(self->type == MASTER_WORKERTYPE || self->type == SLAVE_WORKERTYPE) {
                 if(((ocrWorkerHc_t *)self)->sysDeque == NULL){
-                    ((ocrWorkerHc_t*)self)->sysDeque = newDeque(self->pd, NULL, SEMI_CONCURRENT_DEQUE);
+                    ((ocrWorkerHc_t*)self)->sysDeque = newDeque(self->pd, NULL, NON_CONCURRENT_DEQUE);
                 }
             }
         }
