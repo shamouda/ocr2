@@ -36,21 +36,29 @@
 
 #define DEBUG_TYPE POLICY
 
+// This is in place of using the general purpose 'guidLocation' implementation that relies
+// on PD_MSG_GUID_INFO. Since 'guidLocationShort' is extensively called we directly call
+// the guid provider here
+static inline u8 guidLocationShort(struct _ocrPolicyDomain_t * pd, ocrFatGuid_t guid,
+                              ocrLocation_t* locationRes) {
+    return pd->guidProviders[0]->fcts.getLocation(pd->guidProviders[0], guid.guid, locationRes);
+}
+
 #define RETRIEVE_LOCATION_FROM_MSG(pd, fname, dstLoc, DIR) \
     ocrFatGuid_t fatGuid__ = PD_MSG_FIELD_##DIR(fname); \
-    u8 res = guidLocation(pd, fatGuid__, &dstLoc); \
+    u8 res = guidLocationShort(pd, fatGuid__, &dstLoc); \
     ASSERT(!res);
 
 #define RETRIEVE_LOCATION_FROM_GUID_MSG(pd, dstLoc, DIR) \
     ocrFatGuid_t fatGuid__ = PD_MSG_FIELD_##DIR(guid); \
-    u8 res = guidLocation(pd, fatGuid__, &dstLoc); \
+    u8 res = guidLocationShort(pd, fatGuid__, &dstLoc); \
     ASSERT(!res);
 
 #define RETRIEVE_LOCATION_FROM_GUID(pd, dstLoc, guid__) \
     ocrFatGuid_t fatGuid__; \
     fatGuid__.guid = guid__; \
     fatGuid__.metaDataPtr = NULL; \
-    u8 res = guidLocation(pd, fatGuid__, &dstLoc); \
+    u8 res = guidLocationShort(pd, fatGuid__, &dstLoc); \
     ASSERT(!res);
 
 #define PROCESS_MESSAGE_RETURN_NOW(pd, retCode) \
