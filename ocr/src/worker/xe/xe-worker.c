@@ -59,8 +59,8 @@ static void workerLoop(ocrWorker_t * worker) {
         if(pd->fcts.processMessage(pd, &msg, true) == 0) {
             // We got a response
             ocrFatGuid_t taskGuid = PD_MSG_FIELD_IO(schedArgs).OCR_SCHED_ARG_FIELD(OCR_SCHED_WORK_EDT_USER).edt;
-            if(!(IS_GUID_NULL(taskGuid.guid))) {
-                DPRINTF(DEBUG_LVL_VVERB, "XE %lx EXECUTING TASK %"GUIDSx"\n", pd->myLocation, GUIDFS(taskGuid.guid));
+            if(!(ocrGuidIsNull(taskGuid.guid))) {
+                DPRINTF(DEBUG_LVL_VVERB, "XE %lx EXECUTING TASK %"GUIDF"\n", pd->myLocation, GUIDA(taskGuid.guid));
                 // Task sanity checks
                 ASSERT(taskGuid.metaDataPtr != NULL);
                 worker->curTask = (ocrTask_t*)taskGuid.metaDataPtr;

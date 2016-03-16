@@ -145,11 +145,11 @@ u8 deqSchedulerObjectRemove(ocrSchedulerObjectFactory_t *fact, ocrSchedulerObjec
             return OCR_ENOTSUP;
         }
 
-        if (IS_GUID_NULL(retGuid))
+        if (ocrGuidIsNull(retGuid))
             break;
 
         if (IS_SCHEDULER_OBJECT_TYPE_SINGLETON(dst->kind)) {
-            ASSERT((IS_GUID_NULL(dst->guid.guid)) && count == 1);
+            ASSERT((ocrGuidIsNull(dst->guid.guid)) && count == 1);
             dst->guid.guid = retGuid;
         } else {
             ocrSchedulerObject_t taken;

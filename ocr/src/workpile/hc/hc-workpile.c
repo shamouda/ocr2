@@ -53,9 +53,9 @@ u8 hcWorkpileSwitchRunlevel(ocrWorkpile_t *self, ocrPolicyDomain_t *PD, ocrRunle
             // Does this need to move up in RL_MEMORY_OK?
             ocrWorkpileHc_t* derived = (ocrWorkpileHc_t*)self;
             // See BUG #928 on GUID issues
-#ifdef GUID_64
+#if GUID_BIT_COUNT == 64
             void * nullVal = (void *) NULL_GUID;
-#elif defined(GUID_128)
+#elif GUID_BIT_COUNT == 128
             void * nullVal =  (void *) NULL_GUID.lower;
 #endif
             // By convention we stash the deque type here else default
@@ -107,18 +107,18 @@ ocrFatGuid_t hcWorkpilePop(ocrWorkpile_t * base, ocrWorkPopType_t type,
     switch(type) {
     case POP_WORKPOPTYPE:
         // See BUG #928 on GUID issues
-#ifdef GUID_64
+#if GUID_BIT_COUNT == 64
         fguid.guid = (u64)derived->deque->popFromTail(derived->deque, 0);
-#elif defined(GUID_128)
+#elif GUID_BIT_COUNT == 128
         fguid.guid.lower = (u64)derived->deque->popFromTail(derived->deque, 0);
         fguid.guid.upper = 0x0;
 #endif
         break;
     case STEAL_WORKPOPTYPE:
         // See BUG #928 on GUID issues
-#ifdef GUID_64
+#if GUID_BIT_COUNT == 64
         fguid.guid = (u64)derived->deque->popFromHead(derived->deque, 1);
-#elif defined(GUID_128)
+#elif GUID_BIT_COUNT == 128
         fguid.guid.lower = (u64)derived->deque->popFromHead(derived->deque, 1);
         fguid.guid.upper = 0x0;
 #endif
@@ -134,9 +134,9 @@ void hcWorkpilePush(ocrWorkpile_t * base, ocrWorkPushType_t type,
                     ocrFatGuid_t g ) {
     ocrWorkpileHc_t* derived = (ocrWorkpileHc_t*) base;
     // See BUG #928 on GUID issues
-#ifdef GUID_64
+#if GUID_BIT_COUNT == 64
     void * pushVal = (void *)(g.guid);
-#elif defined(GUID_128)
+#elif GUID_BIT_COUNT == 128
     void * pushVal = (void *)(g.guid.lower);
 #endif
     if (type == PUSH_WORKPUSHTYPE) {

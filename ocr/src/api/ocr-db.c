@@ -29,8 +29,8 @@ u8 ocrDbCreate(ocrGuid_t *db, void** addr, u64 len, u16 flags,
                ocrGuid_t affinity, ocrInDbAllocator_t allocator) {
 
     START_PROFILE(api_DbCreate);
-    DPRINTF(DEBUG_LVL_INFO, "ENTER ocrDbCreate(*guid="GUIDSx", len=%lu, flags=%u"
-            ", aff=0x%lx, alloc=%u)\n", GUIDFS(*db), len, (u32)flags, affinity, (u32)allocator);
+    DPRINTF(DEBUG_LVL_INFO, "ENTER ocrDbCreate(*guid="GUIDF", len=%lu, flags=%u"
+            ", aff=0x%lx, alloc=%u)\n", GUIDA(*db), len, (u32)flags, affinity, (u32)allocator);
     PD_MSG_STACK(msg);
     ocrPolicyDomain_t *policy = NULL;
     ocrTask_t *task = NULL;
@@ -91,20 +91,20 @@ u8 ocrDbCreate(ocrGuid_t *db, void** addr, u64 len, u16 flags,
 #undef PD_TYPE
     } else {
         if(!(flags & (DB_PROP_IGNORE_WARN | DB_PROP_NO_ACQUIRE)) && (returnCode == 0)) {
-            DPRINTF(DEBUG_LVL_WARN, "Acquiring DB (GUID: "GUIDSx") from outside an EDT ... auto-release will fail\n",
-                    GUIDFS(*db));
+            DPRINTF(DEBUG_LVL_WARN, "Acquiring DB (GUID: "GUIDF") from outside an EDT ... auto-release will fail\n",
+                    GUIDA(*db));
         }
     }
     DPRINTF_COND_LVL(((returnCode != 0) && (returnCode != OCR_EGUIDEXISTS)), DEBUG_LVL_WARN, DEBUG_LVL_INFO,
-                     "EXIT ocrDbCreate -> %u; GUID: "GUIDSx"; ADDR: 0x%lx size: %lu\n",
-                     returnCode, GUIDFS(*db), *addr, len);
+                     "EXIT ocrDbCreate -> %u; GUID: "GUIDF"; ADDR: 0x%lx size: %lu\n",
+                     returnCode, GUIDA(*db), *addr, len);
     RETURN_PROFILE(returnCode);
 }
 
 u8 ocrDbDestroy(ocrGuid_t db) {
 
     START_PROFILE(api_DbDestroy);
-    DPRINTF(DEBUG_LVL_INFO, "ENTER ocrDbDestroy(guid="GUIDSx")\n", GUIDFS(db));
+    DPRINTF(DEBUG_LVL_INFO, "ENTER ocrDbDestroy(guid="GUIDF")\n", GUIDA(db));
     PD_MSG_STACK(msg);
     ocrPolicyDomain_t *policy = NULL;
     ocrTask_t *task = NULL;
@@ -129,7 +129,7 @@ u8 ocrDbDestroy(ocrGuid_t db) {
         PD_MSG_FIELD_I(properties) = 0;
         returnCode = policy->fcts.processMessage(policy, &msg, true);
         if(returnCode != 0) {
-            DPRINTF(DEBUG_LVL_WARN, "Destroying DB (GUID: "GUIDSx") -> %u; Issue unregistering the datablock\n", GUIDFS(db), returnCode);
+            DPRINTF(DEBUG_LVL_WARN, "Destroying DB (GUID: "GUIDF") -> %u; Issue unregistering the datablock\n", GUIDA(db), returnCode);
         }
         // If dynRemoved is true, it means the task was using the data-block and we will therefore
         // need to remove it automatically. Otherwise, we won't need to release it
@@ -137,7 +137,7 @@ u8 ocrDbDestroy(ocrGuid_t db) {
 #undef PD_MSG
 #undef PD_TYPE
     } else {
-        DPRINTF(DEBUG_LVL_WARN, "Destroying DB (GUID: "GUIDSx") from outside an EDT ... auto-release will fail\n", GUIDFS(db));
+        DPRINTF(DEBUG_LVL_WARN, "Destroying DB (GUID: "GUIDF") from outside an EDT ... auto-release will fail\n", GUIDA(db));
     }
     // !task is to allow the legacy interface to destroy a datablock outside of an EDT
     if ((!task) || (returnCode == 0)) {
@@ -158,18 +158,18 @@ u8 ocrDbDestroy(ocrGuid_t db) {
 #undef PD_MSG
 #undef PD_TYPE
     } else {
-        DPRINTF(DEBUG_LVL_WARN, "Destroying DB (GUID: "GUIDSx") Issue destroying the datablock\n", GUIDFS(db));
+        DPRINTF(DEBUG_LVL_WARN, "Destroying DB (GUID: "GUIDF") Issue destroying the datablock\n", GUIDA(db));
     }
 
     DPRINTF_COND_LVL(returnCode, DEBUG_LVL_WARN, DEBUG_LVL_INFO,
-                     "EXIT ocrDbDestroy(guid="GUIDSx") -> %u\n", GUIDFS(db), returnCode);
+                     "EXIT ocrDbDestroy(guid="GUIDF") -> %u\n", GUIDA(db), returnCode);
     RETURN_PROFILE(returnCode);
 }
 
 u8 ocrDbRelease(ocrGuid_t db) {
 
     START_PROFILE(api_DbRelease);
-    DPRINTF(DEBUG_LVL_INFO, "ENTER ocrDbRelease(guid="GUIDSx")\n", GUIDFS(db));
+    DPRINTF(DEBUG_LVL_INFO, "ENTER ocrDbRelease(guid="GUIDF")\n", GUIDA(db));
     PD_MSG_STACK(msg);
     ocrPolicyDomain_t *policy = NULL;
     ocrTask_t *task = NULL;
@@ -214,7 +214,7 @@ u8 ocrDbRelease(ocrGuid_t db) {
 #undef PD_TYPE
     } else {
         if (returnCode == 0) {
-            DPRINTF(DEBUG_LVL_WARN, "Releasing DB (GUID: "GUIDSx") from outside an EDT ... auto-release will fail\n", GUIDFS(db));
+            DPRINTF(DEBUG_LVL_WARN, "Releasing DB (GUID: "GUIDF") from outside an EDT ... auto-release will fail\n", GUIDA(db));
         }
     }
 

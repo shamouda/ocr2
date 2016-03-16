@@ -225,9 +225,9 @@ u8 listSchedulerObjectRemove(ocrSchedulerObjectFactory_t *fact, ocrSchedulerObje
             if (IS_SCHEDULER_OBJECT_TYPE_SINGLETON(dst->kind)) {
                 ASSERT(listObj->list->elSize == sizeof(ocrGuid_t));
                 // See BUG #928 on GUID issues
-#ifdef GUID_64
+#if GUID_BIT_COUNT == 64
                 dst->guid.guid = *((u64*)(node->data));
-#elif defined(GUID_128)
+#elif GUID_BIT_COUNT == 128
                 dst->guid.guid.lower = *((u64*)(node->data));
                 dst->guid.guid.upper = 0x0;
 #endif

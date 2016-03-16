@@ -165,8 +165,8 @@ void intStatsProcessRegisterFilter(ocrStatsProcess_t *self, u64 bitMask,
 }
 
 u8 intProcessOutgoingMessage(ocrStatsProcess_t *src, ocrStatsMessage_t* msg) {
-    DPRINTF(DEBUG_LVL_VERB, "Processing outgoing message 0x%lx for "GUIDSx"\n",
-            (u64)msg, GUIDFS(src->me));
+    DPRINTF(DEBUG_LVL_VERB, "Processing outgoing message 0x%lx for "GUIDF"\n",
+            (u64)msg, GUIDA(src->me));
 
 
     u64 type = fls64(msg->type);
@@ -192,8 +192,8 @@ u8 intProcessMessage(ocrStatsProcess_t *dst) {
                              dst->messages->fctPtrs->popHead(dst->messages);
 
     if(msg) {
-        DPRINTF(DEBUG_LVL_VERB, "Processing incoming message 0x%lx for "GUIDSx"\n",
-                (u64)msg, GUIDFS(dst->me));
+        DPRINTF(DEBUG_LVL_VERB, "Processing incoming message 0x%lx for "GUIDF"\n",
+                (u64)msg, GUIDA(dst->me));
         u64 newTick = msg->tick > (dst->tick + 1)?msg->tick:(dst->tick + 1);
         msg->tick = dst->tick = newTick;
 

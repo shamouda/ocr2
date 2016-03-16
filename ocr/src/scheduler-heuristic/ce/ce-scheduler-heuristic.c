@@ -207,7 +207,7 @@ ocrSchedulerHeuristicContext_t* ceSchedulerHeuristicGetContext(ocrSchedulerHeuri
 
 /* Find EDT for the worker to execute - This uses random workstealing to find work if no work is found owned deque */
 static u8 ceWorkStealingGet(ocrSchedulerHeuristic_t *self, ocrSchedulerHeuristicContext_t *context, ocrFatGuid_t *fguid) {
-    ASSERT(IS_GUID_NULL(fguid->guid));
+    ASSERT(ocrGuidIsNull(fguid->guid));
     ASSERT(fguid->metaDataPtr == NULL);
 
     ocrSchedulerHeuristicCe_t *derived = (ocrSchedulerHeuristicCe_t*)self;
@@ -234,7 +234,7 @@ static u8 ceWorkStealingGet(ocrSchedulerHeuristic_t *self, ocrSchedulerHeuristic
 
 #if 1 //Turn off to disable stealing (serialize execution)
     //If pop fails, then try to steal from other deques
-    if (IS_GUID_NULL(edtObj.guid.guid)) {
+    if (ocrGuidIsNull(edtObj.guid.guid)) {
         //First try to steal from the last deque that was visited (probably had a successful steal)
         ocrSchedulerObjectWst_t *wstSchedObj = (ocrSchedulerObjectWst_t*)rootObj;
         ocrSchedulerObject_t *stealSchedulerObject = wstSchedObj->deques[ceContext->stealSchedulerObjectIndex];
@@ -243,7 +243,7 @@ static u8 ceWorkStealingGet(ocrSchedulerHeuristic_t *self, ocrSchedulerHeuristic
 
         //If cached steal failed, then restart steal loop from starting index
         u32 i;
-        for (i = 1; IS_GUID_NULL(edtObj.guid.guid) && i < wstSchedObj->numDeques; i++) {
+        for (i = 1; ocrGuidIsNull(edtObj.guid.guid) && i < wstSchedObj->numDeques; i++) {
             ceContext->stealSchedulerObjectIndex = (context->id + i) % wstSchedObj->numDeques;
             stealSchedulerObject = wstSchedObj->deques[ceContext->stealSchedulerObjectIndex];
             ASSERT(stealSchedulerObject->fctId == schedObj->fctId);
@@ -252,7 +252,7 @@ static u8 ceWorkStealingGet(ocrSchedulerHeuristic_t *self, ocrSchedulerHeuristic
     }
 #endif
 
-    if (!(IS_GUID_NULL(edtObj.guid.guid))) {
+    if (!(ocrGuidIsNull(edtObj.guid.guid))) {
         ASSERT(retVal == 0);
         *fguid = edtObj.guid;
         derived->workCount--;
@@ -331,7 +331,7 @@ static u8 ceSchedulerHeuristicNotifyEdtReadyInvoke(ocrSchedulerHeuristic_t *self
     ocrPolicyDomain_t *pd = self->scheduler->pd;
     ocrFatGuid_t fguid = notifyArgs->OCR_SCHED_ARG_FIELD(OCR_SCHED_NOTIFY_EDT_READY).guid;
 
-    if (IS_GUID_NULL(fguid.guid)) {
+    if (ocrGuidIsNull(fguid.guid)) {
         return handleEmptyResponse(self, context);
     }
 

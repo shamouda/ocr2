@@ -61,8 +61,8 @@ u8 suggestLocationPlacement(ocrPolicyDomain_t *pd, ocrLocation_t curLoc, ocrPlat
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_WORK_CREATE
                 doAutoPlace = (PD_MSG_FIELD_I(workType) == EDT_USER_WORKTYPE) &&
-                    (IS_GUID_NULL(PD_MSG_FIELD_I(affinity.guid)));
-                if (!(IS_GUID_NULL(PD_MSG_FIELD_I(affinity.guid)))) {
+                    (ocrGuidIsNull(PD_MSG_FIELD_I(affinity.guid)));
+                if (!(ocrGuidIsNull(PD_MSG_FIELD_I(affinity.guid)))) {
                     msg->destLocation = affinityToLocation(PD_MSG_FIELD_I(affinity.guid));
                 }
 #undef PD_MSG
@@ -76,7 +76,7 @@ u8 suggestLocationPlacement(ocrPolicyDomain_t *pd, ocrLocation_t curLoc, ocrPlat
                 doAutoPlace = false;
                 // For now a DB is always created where the current EDT executes unless
                 // it has an affinity specified (i.e. no auto-placement)
-                if (!(IS_GUID_NULL(PD_MSG_FIELD_I(affinity.guid)))) {
+                if (!(ocrGuidIsNull(PD_MSG_FIELD_I(affinity.guid)))) {
                     msg->destLocation = affinityToLocation(PD_MSG_FIELD_I(affinity.guid));
                 }
                 // When we do place DBs make sure we only place USER DBs
