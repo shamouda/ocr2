@@ -142,4 +142,8 @@ u8 ocrAffinityGetCurrent(ocrGuid_t * affinity) {
     return ocrAffinityGet(AFFINITY_CURRENT, &count, affinity);
 }
 
+u64 ocrAffinityToHintValue(ocrGuid_t affinity) {
+    return (u64)affinity;
+}
+
 #endif /* ENABLE_EXTENSION_AFFINITY */
