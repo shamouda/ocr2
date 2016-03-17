@@ -579,6 +579,8 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
         // for a clone the cloning should actually be of an edt template
     }
 
+    bool destroyedMsg = false; // Temporary workaround: See Bug #936
+
     //BUG #604 msg setup: how to double check that: msg->srcLocation has been filled by getCurrentEnv(..., &msg) ?
 
     // Determine message's recipient and properties:
@@ -1879,11 +1881,14 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
                 // A copy of the original message had been made to accomodate
                 // the response that was larger. Free the request message.
                 self->fcts.pdFree(self, msgInCopy);
+                destroyedMsg = true;
             }
         }
     }
 
-    hcDistSchedNotifyPostProcessMessage(self, msg);
+    if (!destroyedMsg) { // Temporary workaround: See Bug #936
+        hcDistSchedNotifyPostProcessMessage(self, msg);
+    }
 
     return ret;
 }
