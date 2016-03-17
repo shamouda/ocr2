@@ -1095,7 +1095,7 @@ static u8 ceMemUnalloc(ocrPolicyDomain_t *self, ocrFatGuid_t* allocator,
 
 static u8 ceAllocateDb(ocrPolicyDomain_t *self, ocrFatGuid_t *guid, void** ptr, u64 size,
                        u32 properties, u64 engineIndex,
-                       ocrFatGuid_t affinity, ocrInDbAllocator_t allocator,
+                       ocrHint_t *hint, ocrInDbAllocator_t allocator,
                        u64 prescription) {
     // This function allocates a data block for the requestor, who is either this computing agent or a
     // different one that sent us a message.  After getting that data block, it "guidifies" the results
@@ -1109,6 +1109,20 @@ static u8 ceAllocateDb(ocrPolicyDomain_t *self, ocrFatGuid_t *guid, void** ptr, 
     u64 idx;
     int preferredLevel = 0;
     // See BUG #928 on GUID issues
+
+    ocrFatGuid_t affinity = {.guid = NULL_GUID, .metaDataPtr = NULL};
+    u64 hintValue = 0ULL;
+    if (hint != NULL_HINT && ocrGetHintValue(hint, OCR_HINT_DB_AFFINITY, &hintValue) == 0) {
+#ifdef GUID_64
+        affinity.guid.guid = hintValue;
+#elif defined(GUID_128)
+        affinity.guid.upper = 0ULL;
+        affinity.guid.lower = hintValue;
+#else
+#error Unknown GUID type
+#endif
+    }
+
 #ifdef GUID_64
     if ((u64)affinity.guid.guid > 0 && (u64)affinity.guid.guid <= NUM_MEM_LEVELS_SUPPORTED) {
         preferredLevel = (u64)affinity.guid.guid;
@@ -1133,7 +1147,7 @@ static u8 ceAllocateDb(ocrPolicyDomain_t *self, ocrFatGuid_t *guid, void** ptr, 
         u8 returnValue = 0;
         returnValue = self->dbFactories[0]->instantiate(
             self->dbFactories[0], guid, self->allocators[idx]->fguid, self->fguid,
-            size, *ptr, properties, NULL);
+            size, *ptr, hint, properties, NULL);
         if(returnValue != 0) {
             ceMemUnalloc(self, &(self->allocators[idx]->fguid), *ptr, DB_MEMTYPE);
         }
@@ -1357,24 +1371,10 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         ocrFatGuid_t edtFatGuid = {.guid = PD_MSG_FIELD_I(edt.guid), .metaDataPtr = PD_MSG_FIELD_I(edt.metaDataPtr)};
         u64 reqSize = PD_MSG_FIELD_IO(size);
 
-        ocrHint_t *hint = PD_MSG_FIELD_I(hint);
-        ocrFatGuid_t affinityGuid = {.guid = NULL_GUID, .metaDataPtr = NULL};
-        u64 hintValue = 0ULL;
-        if (hint != NULL_HINT && ocrGetHintValue(hint, OCR_HINT_DB_AFFINITY, &hintValue) == 0) {
-#ifdef GUID_64
-            affinityGuid.guid.guid = hintValue;
-#elif defined(GUID_128)
-            affinityGuid.guid.upper = 0ULL;
-            affinityGuid.guid.lower = hintValue;
-#else
-#error Unknown GUID type
-#endif
-        }
-
         PD_MSG_FIELD_O(returnDetail) = ceAllocateDb(
             self, &(PD_MSG_FIELD_IO(guid)), &(PD_MSG_FIELD_O(ptr)), reqSize,
             PD_MSG_FIELD_IO(properties), engineIndex,
-            affinityGuid, PD_MSG_FIELD_I(allocator), PRESCRIPTION);
+            PD_MSG_FIELD_I(hint), PD_MSG_FIELD_I(allocator), PRESCRIPTION);
         if(PD_MSG_FIELD_O(returnDetail) == 0) {
             ocrDataBlock_t *db= PD_MSG_FIELD_IO(guid.metaDataPtr);
             ASSERT(db);

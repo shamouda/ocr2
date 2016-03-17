@@ -751,13 +751,13 @@ static u8 hcMemUnAlloc(ocrPolicyDomain_t *self, ocrFatGuid_t* allocator,
                        void* ptr, ocrMemType_t memType);
 
 static u8 hcAllocateDb(ocrPolicyDomain_t *self, ocrFatGuid_t *guid, void** ptr, u64 size,
-                       u32 properties, ocrFatGuid_t affinity, ocrInDbAllocator_t allocator,
+                       u32 properties, ocrHint_t *hint, ocrInDbAllocator_t allocator,
                        u64 prescription, ocrDataBlockType_t dbType) {
     // This function allocates a data block for the requestor, who is either this computing agent or a
     // different one that sent us a message.  After getting that data block, it "guidifies" the results
     // which, by the way, ultimately causes hcMemAlloc (just below) to run.
     //
-    // Currently, the "affinity" and "allocator" arguments are ignored, and I expect that these will
+    // Currently, the "allocator" argument is ignored, and I expect that these will
     // eventually be eliminated here and instead, above this level, processed into the "prescription"
     // variable, which has been added to this argument list.  The prescription indicates an order in
     // which to attempt to allocate the block to a pool.
@@ -767,7 +767,7 @@ static u8 hcAllocateDb(ocrPolicyDomain_t *self, ocrFatGuid_t *guid, void** ptr, 
         u8 returnValue = 0;
         returnValue = self->dbFactories[0]->instantiate(
             self->dbFactories[0], guid, self->allocators[idx]->fguid, self->fguid,
-            size, result, properties, NULL);
+            size, result, hint, properties, NULL);
         if(returnValue == 0) {
             *ptr = result;
         } else {
@@ -1006,23 +1006,10 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         ASSERT(PD_MSG_FIELD_I(dbType) == USER_DBTYPE || PD_MSG_FIELD_I(dbType) == RUNTIME_DBTYPE);
         ocrFatGuid_t tEdt = PD_MSG_FIELD_I(edt);
 #define PRESCRIPTION 0x10LL
-        ocrHint_t *hint = PD_MSG_FIELD_I(hint);
-        ocrFatGuid_t affinityGuid = {.guid = NULL_GUID, .metaDataPtr = NULL};
-        u64 hintValue = 0ULL;
-        if (hint != NULL_HINT && ocrGetHintValue(hint, OCR_HINT_DB_AFFINITY, &hintValue) == 0) {
-#ifdef GUID_64
-            affinityGuid.guid.guid = hintValue;
-#elif defined(GUID_128)
-            affinityGuid.guid.upper = 0ULL;
-            affinityGuid.guid.lower = hintValue;
-#else
-#error Unknown GUID type
-#endif
-        }
         PD_MSG_FIELD_O(returnDetail) = hcAllocateDb(self, &(PD_MSG_FIELD_IO(guid)),
                                   &(PD_MSG_FIELD_O(ptr)), PD_MSG_FIELD_IO(size),
                                   PD_MSG_FIELD_IO(properties),
-                                  affinityGuid,
+                                  PD_MSG_FIELD_I(hint),
                                   PD_MSG_FIELD_I(allocator),
                                   PRESCRIPTION, PD_MSG_FIELD_I(dbType));
         if(PD_MSG_FIELD_O(returnDetail) == 0) {

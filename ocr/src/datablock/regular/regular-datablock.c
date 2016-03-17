@@ -222,7 +222,8 @@ u8 regularUnregisterWaiter(ocrDataBlock_t *self, ocrFatGuid_t waiter, u32 slot,
 }
 
 u8 newDataBlockRegular(ocrDataBlockFactory_t *factory, ocrFatGuid_t *guid, ocrFatGuid_t allocator,
-                       ocrFatGuid_t allocPD, u64 size, void* ptr, u32 flags, ocrParamList_t *perInstance) {
+                       ocrFatGuid_t allocPD, u64 size, void* ptr, ocrHint_t *hint, u32 flags,
+                       ocrParamList_t *perInstance) {
     ocrPolicyDomain_t *pd = NULL;
     ocrTask_t *task = NULL;
     ocrGuid_t resultGuid = NULL_GUID;
@@ -328,7 +329,7 @@ ocrDataBlockFactory_t *newDataBlockFactoryRegular(ocrParamList_t *perType, u32 f
 
     base->instantiate = FUNC_ADDR(u8 (*)
                                   (ocrDataBlockFactory_t*, ocrFatGuid_t *, ocrFatGuid_t, ocrFatGuid_t,
-                                   u64, void*, u32, ocrParamList_t*), newDataBlockRegular);
+                                   u64, void*, ocrHint_t*, u32, ocrParamList_t*), newDataBlockRegular);
     base->destruct = FUNC_ADDR(void (*)(ocrDataBlockFactory_t*), destructRegularFactory);
     base->fcts.destruct = FUNC_ADDR(u8 (*)(ocrDataBlock_t*), regularDestruct);
     base->fcts.acquire = FUNC_ADDR(u8 (*)(ocrDataBlock_t*, void**, ocrFatGuid_t, u32, ocrDbAccessMode_t, bool, u32), regularAcquire);

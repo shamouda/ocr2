@@ -1172,7 +1172,7 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
                             ocrFatGuid_t tGuid;
                             RESULT_ASSERT(self->dbFactories[0]->instantiate(
                                               self->dbFactories[0], &tGuid, self->allocators[0]->fguid, self->fguid,
-                                              proxyDb->size, proxyDb->ptr, DB_PROP_RT_PROXY, NULL), ==, 0);
+                                              proxyDb->size, proxyDb->ptr, NULL_HINT, DB_PROP_RT_PROXY, NULL), ==, 0);
                             proxyDb->db = (ocrDataBlock_t*)tGuid.metaDataPtr;
                             proxyDb->db->guid = dbGuid;
                         }
@@ -1579,7 +1579,7 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
                 ocrFatGuid_t tGuid;
                 RESULT_ASSERT(self->dbFactories[0]->instantiate(
                                   self->dbFactories[0], &tGuid, self->allocators[0]->fguid, self->fguid,
-                                  proxyDb->size, proxyDb->ptr, DB_PROP_RT_PROXY, NULL), ==, 0);
+                                  proxyDb->size, proxyDb->ptr, NULL_HINT, DB_PROP_RT_PROXY, NULL), ==, 0);
                 proxyDb->db = (ocrDataBlock_t*)tGuid.metaDataPtr;
                 proxyDb->db->guid = dbGuid;
 #undef PD_MSG
