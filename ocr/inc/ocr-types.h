@@ -383,6 +383,15 @@ typedef struct {
 } ocrHint_t;
 
 /**
+ * @brief Pre-defined OCR hint property values
+ *
+ */
+
+//EDT disperse hints
+#define OCR_HINT_EDT_DISPERSE_FAR   0
+#define OCR_HINT_EDT_DISPERSE_NEAR  1
+
+/**
  * @brief OCR query types
  *
  * Note: User facing options for queryable sections

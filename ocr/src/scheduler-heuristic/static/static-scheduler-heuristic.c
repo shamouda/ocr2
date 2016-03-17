@@ -20,6 +20,7 @@
 #include "scheduler-heuristic/static/static-scheduler-heuristic.h"
 #include "extensions/ocr-hints.h"
 #include "extensions/ocr-affinity.h"
+#include "worker/hc/hc-worker.h"
 
 #define DEBUG_TYPE SCHEDULER_HEURISTIC
 
@@ -30,6 +31,9 @@
 ocrSchedulerHeuristic_t* newSchedulerHeuristicStatic(ocrSchedulerHeuristicFactory_t * factory, ocrParamList_t *perInstance) {
     ocrSchedulerHeuristic_t* self = (ocrSchedulerHeuristic_t*) runtimeChunkAlloc(sizeof(ocrSchedulerHeuristicStatic_t), PERSISTENT_CHUNK);
     initializeSchedulerHeuristicOcr(factory, self, perInstance);
+    ocrSchedulerHeuristicStatic_t *dself = (ocrSchedulerHeuristicStatic_t*)self;
+    dself->rrCounter = 0;
+    dself->isDistributed = false;
     return self;
 }
 
@@ -111,15 +115,24 @@ u8 staticSchedulerHeuristicSwitchRunlevel(ocrSchedulerHeuristic_t *self, ocrPoli
                 staticContext->mySchedulerObject = rootFact->fcts.getSchedulerObjectForLocation(rootFact, rootObj, OCR_SCHEDULER_OBJECT_DEQUE, i, OCR_SCHEDULER_OBJECT_MAPPING_WORKER, 0);
                 ASSERT(staticContext->mySchedulerObject);
             }
-            if (PD->neighborCount > 0) {
-                //TODO: WARN: For distributed, we are making the assumption that worker 0 is comm worker.
+#ifdef ENABLE_WORKER_HC
+#ifdef ENABLE_WORKER_HC_COMM
+            ocrWorkerHc_t *w0 = (ocrWorkerHc_t*)PD->workers[0];
+            if (w0->hcType == HC_WORKER_COMM) {
+                //NOTE: For distributed, we are making the assumption that only worker 0 is comm worker.
                 ASSERT(self->contextCount > 1);
+                ocrSchedulerHeuristicStatic_t *dself = (ocrSchedulerHeuristicStatic_t*)self;
+                dself->isDistributed = true;
                 ocrSchedulerHeuristicContextStatic_t *commContext = (ocrSchedulerHeuristicContextStatic_t*)self->contexts[0];
                 for (i = 1; i < self->contextCount; i++) {
                     ocrSchedulerHeuristicContextStatic_t *staticContext = (ocrSchedulerHeuristicContextStatic_t*)self->contexts[i];
                     staticContext->commSchedulerObject = commContext->mySchedulerObject;
                 }
             }
+#endif
+#else
+#error
+#endif
         }
         break;
     }
@@ -260,7 +273,7 @@ static u8 staticSchedulerHeuristicNotifyPreProcessMsgInvoke(ocrSchedulerHeuristi
                     //Read the affinity hint if any
                     u64 userAffinity = ((u64)-1);
                     bool usesAffinity = (ocrGetHintValue(edtHint, OCR_HINT_EDT_AFFINITY, &userAffinity) == 0);
-                    if (usesAffinity && pd->neighborCount > 0) {
+                    if (usesAffinity && dself->isDistributed) {
                         ocrGuid_t affGuid = NULL_GUID;
 #ifdef GUID_64
                         affGuid.guid = userAffinity;
@@ -276,26 +289,27 @@ static u8 staticSchedulerHeuristicNotifyPreProcessMsgInvoke(ocrSchedulerHeuristi
                     u64 val = 0;
                     if (ocrGetHintValue(edtHint, OCR_HINT_EDT_DISPERSE, &val) == 0) {
                         u64 contextId = hal_xadd64(&dself->rrCounter, 1);
-                        if (pd->neighborCount == 0) {
-                            workerId = contextId % self->contextCount;
-                        } else {
-                            if (!usesAffinity) {
-                                ocrLocation_t dstLoc = (contextId / (self->contextCount - 1)) % pd->neighborCount;
+                        if (dself->isDistributed) {
+                            if (!usesAffinity && val != OCR_HINT_EDT_DISPERSE_NEAR) {
+                                //setup destination PD
                                 ocrPlatformModelAffinity_t * platformModel = ((ocrPlatformModelAffinity_t*)pd->platformModel);
+                                ocrLocation_t dstLoc = (contextId / (self->contextCount - 1)) % platformModel->pdLocAffinitiesSize; //Note: Assume worker 0 is comm worker
                                 ASSERT(dstLoc < platformModel->pdLocAffinitiesSize);
                                 ocrGuid_t affGuid = platformModel->pdLocAffinities[dstLoc];
                                 RESULT_ASSERT(ocrSetHintValue(edtHint, OCR_HINT_EDT_AFFINITY, ocrAffinityToHintValue(affGuid)), ==, 0);
                                 msg->destLocation = dstLoc;
                             }
-                            workerId = (contextId % (self->contextCount - 1)) + 1;
+                            workerId = (contextId % (self->contextCount - 1)) + 1; //Note: Assume worker 0 is comm worker
+                        } else {
+                            workerId = contextId % self->contextCount;
                         }
                     } else {
                         workerId = worker->id;
                     }
                 } else {
+                    workerId = worker->id;
                     edtHint = pd->fcts.pdMalloc(pd, sizeof(ocrHint_t));
                     ocrHintInit(edtHint, OCR_HINT_EDT_T);
-                    workerId = worker->id;
                     PD_MSG_FIELD_I(hint) = edtHint;
                     PD_MSG_FIELD_I(properties) |= EDT_PROP_RT_HINT_ALLOC;
                 }
@@ -312,7 +326,7 @@ static u8 staticSchedulerHeuristicNotifyPreProcessMsgInvoke(ocrSchedulerHeuristi
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_DB_CREATE
             // When we do place DBs make sure we only place USER DBs
-            if (PD_MSG_FIELD_I(dbType) == USER_DBTYPE && PD_MSG_FIELD_I(hint) != NULL_HINT && pd->neighborCount > 0) {
+            if (PD_MSG_FIELD_I(dbType) == USER_DBTYPE && PD_MSG_FIELD_I(hint) != NULL_HINT && dself->isDistributed) {
                 ASSERT(PD_MSG_FIELD_I(hint->type) == OCR_HINT_DB_T);
                 ocrHint_t *dbHint = PD_MSG_FIELD_I(hint);
                 //Read the affinity hint if any

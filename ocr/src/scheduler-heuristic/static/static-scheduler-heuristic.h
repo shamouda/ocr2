@@ -29,6 +29,7 @@ typedef struct _ocrSchedulerHeuristicContextStatic_t {
 typedef struct _ocrSchedulerHeuristicStatic_t {
     ocrSchedulerHeuristic_t base;
     volatile u64 rrCounter;                     // Counter for round-robin placement
+    bool isDistributed;                         // Keep a flag to check if distributed
 } ocrSchedulerHeuristicStatic_t;
 
 /****************************************************/
