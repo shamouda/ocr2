@@ -158,7 +158,8 @@ handled through the following functions.
 \item
   void \hyperlink{func_ocrShutdown}{\code{ocrShutdown}}(void)
     \begin{DoxyCompactList}
-      \small\item \emph{Called by an EDT to indicate the normal end of an OCR program.}
+      \small\item \emph{Called by an EDT to indicate the normal end of
+        an OCR program.}
     \end{DoxyCompactList}
 \item
   void \hyperlink{func_ocrAbort}{\code{ocrAbort}}(\hyperlink{type_u8}{u8} errorCode)
@@ -173,9 +174,9 @@ handled through the following functions.
     \end{DoxyCompactList}
 \item
   char $\ast$ \hyperlink{func_getArgv}{\code{getArgv}}(void $\ast$dbPtr,
-  \hyperlink{type_u64}{u64} count)
+  \hyperlink{type_u64}{u64} index)
     \begin{DoxyCompactList}
-      \small\item \emph{Retrieves the `count' argument from
+      \small\item \emph{Retrieves the $index^{th}$ argument from
         \hyperlink{func_mainEdt}{\code{mainEdt()}}'s input data block.}
     \end{DoxyCompactList}
 \item
@@ -196,7 +197,11 @@ handled through the following functions.
 The user is responsible for indicating the end of an OCR program using an explicit
 shutdown call (either this function or \hyperlink{func_ocrAbort}{\code{ocrAbort()}}).
 Any EDTs which have not reached the \emph{runnable} state will never be executed.
-EDTs in the \emph{runnable} or \emph{ready} state may or may not execute.
+EDTs in the \emph{runnable} or \emph{ready} state may or may not
+execute. Calling \code{ocrShutdown()} will properly terminate the
+runtime; all memory and computing resources will be
+released. Furthermore, a zero exit code will be returned to the
+caller of the OCR program indicating a normal termination.
 
 \begin{DoxyNote}{Note}
 Program behavior after this call is undefined. Specifically:
@@ -225,7 +230,9 @@ program can successfully complete even if all EDTs have not executed.
 \label{func_ocrAbort}
 
 This function is very similar to \hyperlink{func_ocrShutdown}{\code{ocrShutdown()}}
-except that it allows for the return of a non-zero value.
+except that it allows for the return of a non-zero value. This
+function also does not guarantee that the runtime will properly shut
+itself down. This call should only be used to indicate an abnormal termination.
 
 The abort error code is passed back to the runtime and its handling is
 implementation dependent
@@ -279,28 +286,28 @@ program:
   \subsection[{get\-Argv}]{\setlength{\rightskip}{0pt plus 5cm}{\bf char $\ast$} get\-Argv(
 \begin{DoxyParamCaption}
 \item[{void $\ast$}]{db\-Ptr}
-\item[{{\bf u64}}]{count}
+\item[{{\bf u64}}]{index}
 \end{DoxyParamCaption}
 )}}
 \label{func_getArgv}
 
-Returns the `count' argument passed to the OCR program.
+Returns the $index^{th}$ argument passed to the OCR program.
 The value is extracted from the unique data block passed to \hyperlink{func_mainEdt}{\code{mainEdt}}.
 
 \begin{DoxyParams}[1]{Parameters}
 \mbox{\tt in} & \code{dbPtr} & Pointer to the start of the argument data block\\
 \hline
-\mbox{\tt in} & \code{count} & Index of the argument to extract\\
+\mbox{\tt in} & \code{index} & Index of the argument to extract\\
 \hline
 \end{DoxyParams}
 
 \returns
-A NULL terminated string corresponding to \code{argv[count]}.
+A NULL terminated string corresponding to \code{argv[index]}.
 
 \descr
 See Section~\ref{func_getArgc} for details.
 \begin{DoxyNote}{Note}
-Attempting to extract an argument with \code{count} greater or equal to the value
+Attempting to extract an argument with \code{index} greater or equal to the value
 returned by \hyperlink{func_getArgc}{\code{getArgc}} will result in undefined
 behavior.
 \end{DoxyNote}
@@ -718,7 +725,8 @@ data block. Note that if a data block allocator is used, the user
 should not write directly to the data block as this may overwrite the
 meta data used by the allocator. The 'NO\_ALLOC' allocator is used to
 indicate that the data block is not used by any allocator and is
-therefore usable as POD. Supported values for this parameter are given
+therefore entirely usable for user data.
+Supported values for this parameter are given
 by \hyperlink{type_ocrInDbAllocator_t}{ocrInDbAllocator\_t}.\\
 \hline
 \end{DoxyParams}
@@ -811,6 +819,8 @@ release it (equivalent to calling \hyperlink{func_ocrDbRelease}{\code{ocrDbRelea
 Not all instances of the errors indicated by the error codes can be caught. In
 other words, attempting the destroy a data block multiple times may result in the
 return of an error code but may also result in undefined behavior.
+
+At the end of an OCR program, all data blocks are destroyed by the OCR runtime.
 \end{DoxyNote}
 
 %
