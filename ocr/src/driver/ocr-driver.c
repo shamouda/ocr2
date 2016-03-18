@@ -323,7 +323,7 @@ extern u64 dram_offset;
  * +--------------------------+
  * | header size (incl) (u64) | = (6)*sizeof(u64)
  * +--------------------------+
- * |  abs. location  (u64)    | = CeMemSize - 4K
+ * |  abs. location  (u64)    | = CeMemSize - 5K
  * +--------------------------+
  * |  abs.address of PD (u64) | = abs.location + PD offset
  * +--------------------------+

@@ -5,7 +5,7 @@ then
 echo "Usage: ${0} <CE struct file> <XE struct file> <Args> <Optional file> <Output bin file>"
 else
 
-LEAF_CE_STRUCT=4096
+LEAF_CE_STRUCT=5120
 XE_STRUCT=4096
 ARGS_STRUCT=4096
 
