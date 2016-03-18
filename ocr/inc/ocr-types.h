@@ -12,7 +12,7 @@
 #define __OCR_TYPES_H__
 
 #include <stddef.h>
-#include <stdint.h>
+#include <inttypes.h>
 
 /**
  * @defgroup OCRTypes Types and constants used in OCR
