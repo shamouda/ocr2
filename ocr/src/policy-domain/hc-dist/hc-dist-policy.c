@@ -919,6 +919,15 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
 #define PD_TYPE PD_MSG_EVT_DESTROY
         RETRIEVE_LOCATION_FROM_GUID_MSG(self, msg->destLocation, I);
         DPRINTF(DEBUG_LVL_VVERB, "EVT_DESTROY: target is %d\n", (u32)msg->destLocation);
+#ifdef ENABLE_EXTENSION_BLOCKING_SUPPORT
+        // For mpilite long running EDTs to handle blocking destroy of labeled events
+        ocrTask_t *curEdt = NULL;
+        getCurrentEnv(NULL, NULL, &curEdt, NULL);
+        if ((curEdt != NULL) && (curEdt->flags & OCR_TASK_FLAG_LONG)) {
+            msg->type |= PD_MSG_REQ_RESPONSE;
+            isBlocking = true;
+        }
+#endif
 #undef PD_MSG
 #undef PD_TYPE
         break;
