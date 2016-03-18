@@ -1422,6 +1422,11 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
 #undef PD_MSG
 #undef PD_TYPE
         msg->type &= (~PD_MSG_REQUEST);
+#ifdef ENABLE_EXTENSION_BLOCKING_SUPPORT
+        // For mpilite long running EDTs to handle blocking destroy of labeled events
+        if (msg->type & PD_MSG_REQ_RESPONSE)
+            msg->type |= PD_MSG_RESPONSE;
+#endif
         EXIT_PROFILE;
 
         break;
