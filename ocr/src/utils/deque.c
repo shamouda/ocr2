@@ -38,6 +38,17 @@ u32 nonSyncDequeSize(deque_t* self) {
 /*
  * Size of the deque (concurrent with other ops, may be inexact)
  */
+u32 nonSyncCircularDequeSize(deque_t* self) {
+    s32 size = (self->tail - self->head);
+    if (size < 0) {
+        size = INIT_DEQUE_CAPACITY + size;
+    }
+    return ((u32) size);
+}
+
+/*
+ * Size of the deque (concurrent with other ops, may be inexact)
+ */
 u32 wstDequeSize(deque_t* self) {
     s32 size = (self->tail - self->head);
     // Work-stealing deque's pop tail implementation optimistically
@@ -403,6 +414,7 @@ deque_t * newDeque(ocrPolicyDomain_t *pd, void * initValue, ocrDequeType_t type)
         break;
     case SEMI_CONCURRENT_DEQUE:
         self = newBaseDeque(pd, initValue, SINGLE_LOCK_BASE_DEQUE);
+        self->size = nonSyncCircularDequeSize;
         // Specialize push/pop implementations
         self->pushAtTail = lockedDequePushTailSemiConc;
         self->popFromTail = NULL;
