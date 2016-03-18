@@ -90,9 +90,6 @@ static void wstSchedulerObjectInitialize(ocrSchedulerObjectFactory_t *fact, ocrS
     paramListSchedulerObjectWst_t *paramsWst = (paramListSchedulerObjectWst_t*)perInstance;
     wstSchedObj->config = paramsWst->config;
     switch(paramsWst->config) {
-    case SCHEDULER_OBJECT_WST_CONFIG_NONE:
-        wstSchedObj->config = SCHEDULER_OBJECT_WST_CONFIG_REGULAR; //For now keep regular as default
-        break;
     case SCHEDULER_OBJECT_WST_CONFIG_REGULAR:
     case SCHEDULER_OBJECT_WST_CONFIG_STATIC:
         break;

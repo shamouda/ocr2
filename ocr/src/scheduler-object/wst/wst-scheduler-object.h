@@ -19,9 +19,8 @@
 /****************************************************/
 
 typedef enum {
-    SCHEDULER_OBJECT_WST_CONFIG_NONE,
-    SCHEDULER_OBJECT_WST_CONFIG_REGULAR,
-    SCHEDULER_OBJECT_WST_CONFIG_STATIC,
+    SCHEDULER_OBJECT_WST_CONFIG_REGULAR,    /* Configures scheduler object as an array of workstealing deques */
+    SCHEDULER_OBJECT_WST_CONFIG_STATIC,     /* Configures scheduler object as an array of semi-concurrent deques */
 } wstConfigType;
 typedef struct _paramListSchedulerObjectWst_t {
     paramListSchedulerObject_t base;

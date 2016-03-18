@@ -46,6 +46,7 @@ static void pdspaceSchedulerObjectStart(ocrSchedulerObject_t *self, ocrPolicyDom
     ocrScheduler_t *scheduler = PD->schedulers[0];
     ocrSchedulerHeuristic_t *masterSchedulerHeuristic = scheduler->schedulerHeuristics[scheduler->masterHeuristicId];
     paramWst.numDeques = masterSchedulerHeuristic->contextCount;
+    paramWst.config = SCHEDULER_OBJECT_WST_CONFIG_REGULAR;
     ocrSchedulerObjectFactory_t *wstFactory = PD->schedulerObjectFactories[schedulerObjectWst_id];
     pdspaceSchedObj->wst = wstFactory->fcts.create(wstFactory, (ocrParamList_t*)(&paramWst));
 #else
