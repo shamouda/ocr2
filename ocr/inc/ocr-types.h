@@ -252,19 +252,19 @@ typedef ocrGuid_t (*ocrEdt_t)(u32 paramc, u64* paramv,
  * - its behavior when satisfied multiple times
  */
 typedef enum {
-    OCR_EVENT_ONCE_T,    /**< A ONCE event simply passes along a satisfaction on its
+    OCR_EVENT_ONCE_T = 1,/**< A ONCE event simply passes along a satisfaction on its
                           * unique pre-slot to its post-slot. Once all OCR objects
                           * linked to its post-slot have been satisfied, the ONCE event
                           * is automatically destroyed. */
-    OCR_EVENT_IDEM_T,    /**< An IDEM event simply passes along a satisfaction on its
+    OCR_EVENT_IDEM_T = 2,/**< An IDEM event simply passes along a satisfaction on its
                           * unique pre-slot to its post-slot. The IDEM event persists
                           * until ocrEventDestroy() is explicitly called on it.
                           * It can only be satisfied once and susequent
                           * satisfactions are ignored (use case: BFS, B&B..) */
-    OCR_EVENT_STICKY_T,  /**< A STICKY event is identical to an IDEM event except that
+    OCR_EVENT_STICKY_T = 3,/**< A STICKY event is identical to an IDEM event except that
                           * multiple satisfactions result in an error
                           */
-    OCR_EVENT_LATCH_T,   /**< A LATCH event has two pre-slots: a INCR and a DECR.
+    OCR_EVENT_LATCH_T = 4,/**< A LATCH event has two pre-slots: a INCR and a DECR.
                           * Each slot is associated with an internal monotonically
                           * increasing counter that starts at 0. On each satisfaction
                           * of one of the pre-slots, the counter for that slot is
@@ -275,14 +275,14 @@ typedef enum {
                           * is automatically destroyed when its post-slot is triggered.
                           */
 #ifdef ENABLE_EXTENSION_COUNTED_EVT
-    OCR_EVENT_COUNTED_T, /**< A COUNTED event is a hybrid ONCE/STICKY events. It is
+    OCR_EVENT_COUNTED_T = 5,/**< A COUNTED event is a hybrid ONCE/STICKY events. It is
                           * initialized at creation time with a fixed number of expected
                           * dependences. The event can auto-destroy itself but only when
                           * both all dependences have been registered and satisfy has happened.
                           */
 #endif
 #ifdef ENABLE_EXTENSION_CHANNEL_EVT
-    OCR_EVENT_CHANNEL_T, /**< TODO
+    OCR_EVENT_CHANNEL_T = 6, /**< TODO
                           */
 #endif
     OCR_EVENT_T_MAX      /**< This is *NOT* an event and is only used to count
