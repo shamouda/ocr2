@@ -820,6 +820,7 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
             // Turn the call into a blocking call
             if (kind == OCR_GUID_EVENT_CHANNEL) {
                 msg->type |= PD_MSG_REQ_RESPONSE;
+                isBlocking = true;
             }
         }
 #endif
