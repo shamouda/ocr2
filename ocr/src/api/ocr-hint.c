@@ -61,8 +61,9 @@ u8 ocrHintInit(ocrHint_t *hint, ocrHintType_t hintType) {
         {
             OCR_HINT_FIELD(hint, OCR_HINT_DB_AFFINITY) = 0;
             OCR_HINT_FIELD(hint, OCR_HINT_DB_NEAR) = 0;
-            OCR_HINT_FIELD(hint, OCR_HINT_DB_MIDDLE) = 0;
+            OCR_HINT_FIELD(hint, OCR_HINT_DB_INTER) = 0;
             OCR_HINT_FIELD(hint, OCR_HINT_DB_FAR) = 0;
+            OCR_HINT_FIELD(hint, OCR_HINT_DB_HIGHBW) = 0;
         }
         break;
     case OCR_HINT_EVT_T:

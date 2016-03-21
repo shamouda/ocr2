@@ -1108,32 +1108,19 @@ static u8 ceAllocateDb(ocrPolicyDomain_t *self, ocrFatGuid_t *guid, void** ptr, 
 
     u64 idx;
     int preferredLevel = 0;
-    // See BUG #928 on GUID issues
-
-    ocrFatGuid_t affinity = {.guid = NULL_GUID, .metaDataPtr = NULL};
     u64 hintValue = 0ULL;
-    if (hint != NULL_HINT && ocrGetHintValue(hint, OCR_HINT_DB_AFFINITY, &hintValue) == 0) {
-#ifdef GUID_64
-        affinity.guid.guid = hintValue;
-#elif defined(GUID_128)
-        affinity.guid.upper = 0ULL;
-        affinity.guid.lower = hintValue;
-#else
-#error Unknown GUID type
-#endif
+    if (hint != NULL_HINT) {
+        if (ocrGetHintValue(hint, OCR_HINT_DB_NEAR, &hintValue) == 0 && hintValue) {
+            preferredLevel = 1;
+        } else if (ocrGetHintValue(hint, OCR_HINT_DB_INTER, &hintValue) == 0 && hintValue) {
+            preferredLevel = 2;
+        } else if (ocrGetHintValue(hint, OCR_HINT_DB_FAR, &hintValue) == 0 && hintValue) {
+            preferredLevel = 3;
+        }
+        DPRINTF(DEBUG_LVL_VERB, "ceAllocateDb preferredLevel set to %ld\n", preferredLevel);
     }
 
-#ifdef GUID_64
-    if ((u64)affinity.guid.guid > 0 && (u64)affinity.guid.guid <= NUM_MEM_LEVELS_SUPPORTED) {
-        preferredLevel = (u64)affinity.guid.guid;
-#elif defined GUID_128
-    if ((u64)affinity.guid.lower > 0 && (u64)affinity.guid.lower <= NUM_MEM_LEVELS_SUPPORTED) {
-        preferredLevel = (u64)affinity.guid.lower;
-#else
-#error Unknown GUID type
-#endif
-        DPRINTF(DEBUG_LVL_WARN, "ceAllocateDb affinity.guid "GUIDSx"  .metaDataPtr %p\n", GUIDFS(affinity.guid), affinity.metaDataPtr);
-        DPRINTF(DEBUG_LVL_WARN, "ceAllocateDb preferred %ld\n", preferredLevel);
+    if (preferredLevel > 0) {
         *ptr = allocateDatablock (self, size, engineIndex, prescription, preferredLevel, &idx);
         if (!*ptr) {
             DPRINTF(DEBUG_LVL_WARN, "ceAllocateDb ignores preferredLevel hint to be successful in alloc%ld\n", preferredLevel);
