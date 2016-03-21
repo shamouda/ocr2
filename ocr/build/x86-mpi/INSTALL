@@ -39,6 +39,8 @@ equal the number of hosts defined in the node file and vice versa.
 For debugging, one can set the following environment variables:
 
     OCRRUN_GDB              Starts mpi launcher through gdb (only tested with intel-mpi)
+    OCRRUN_ITAC             Invokes the Intel Trace Analyzer and Collector
+                            to trace MPI use in the application.
     OCRRUN_VALGRIND         Launch user program through valgrind.
 
 Valgrind note: To take advantage of valgrind, OCR must have been
