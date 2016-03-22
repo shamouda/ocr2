@@ -14,6 +14,16 @@ if [[ -z "${SCRIPT_ROOT}" ]]; then
     exit 1
 fi
 
+if [[ -z "${OCR_INSTALL}" ]]; then
+    # Check if this an OCR repo
+    export OCR_INSTALL="${SCRIPT_ROOT}/../../../install"
+    if [[ ! -d ${OCR_INSTALL} ]]; then
+        echo "OCR_INSTALL environment variable is not defined and cannot be deduced"
+        exit 1
+    fi
+fi
+
+
 #
 # Environment variables default values
 #
@@ -28,9 +38,7 @@ else
     export CORE_SCALING=${CORE_SCALING-"2 4 8 16"}
 fi
 
-
-# Number of nodes to use
-export OCR_NUM_NODES=${OCR_NUM_NODES-"1"}
+# Number of nodes is controlled by the caller
 
 # Default runlog and report naming
 export RUNLOG_FILENAME_BASE=${RUNLOG_FILENAME_BASE-"runlog"}

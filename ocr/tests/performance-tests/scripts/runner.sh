@@ -10,18 +10,22 @@ if [[ -z "${SCRIPT_ROOT}" ]]; then
     exit 1
 fi
 
+if [[ -z "${OCR_INSTALL}" ]]; then
+    # Check if this an OCR repo
+    export OCR_INSTALL="${SCRIPT_ROOT}/../../../install"
+    if [[ ! -d ${OCR_INSTALL} ]]; then
+        echo "OCR_INSTALL environment variable is not defined and cannot be deduced"
+        exit 1
+    fi
+fi
+
 #
 # OCR setup and run configuration
 #
 
-if [[ -z "$CORE_SCALING" ]]; then
-    export CORE_SCALING="1 2 4 8 16"
-fi
+export CORE_SCALING=${CORE_SCALING-"1 2 4 8 16"}
 
-if [[ -z "$NODE_SCALING" ]]; then
-    export NODE_SCALING="1"
-fi
-
+export NODE_SCALING=${NODE_SCALING-"1"}
 
 #
 # OCR test setup
@@ -122,9 +126,10 @@ else
     LOGDIR=${LOGDIR_ARG}
 fi
 
-echo "LOGDIR=$LOGDIR"
+echo "Results will be located under ${LOGDIR}"
+
 if [[ ! -e ${LOGDIR_ARG} ]]; then
-    echo "${SCRIPT_NAME} create log dir ${LOGDIR_ARG}"
+    echo "${SCRIPT_NAME} creating log dir ${LOGDIR_ARG}"
     mkdir -p ${LOGDIR}
 fi
 
@@ -366,19 +371,46 @@ function runTest() {
     local report=$4
     local defines=$5
     let i=0;
-
     #TODO if this is part of a sweep we should mangle the name
+    # A 'run' here is the full sweep across requested nodes/cores
+
+    # System information
+    env > ${LOGDIR}/info_env_all
+    lscpu > ${LOGDIR}/info_lscpu
+    w > ${LOGDIR}/info_machine_load
+
+    # OCR specific information
+    more ${LOGDIR}/info_env_all | grep -e "OCR" -e "CFGARG_" -e "SCALING" > ${LOGDIR}/info_ocr_env
+    FULLLOGDIR=$PWD/${LOGDIR}
+    cd ${OCR_INSTALL}
+    # test if we have an actual GIT repo checkout
+    git log -n 1 > /dev/null
+    RES=$?
+    if [[ $RES -eq 0 ]]; then
+        echo "### Repo HEAD ###" > ${FULLLOGDIR}/info_ocr_repo
+        git log -n 1 2>/dev/null >> ${FULLLOGDIR}/info_ocr_repo
+        echo "### Repot branch ###" >> ${FULLLOGDIR}/info_ocr_repo
+        git branch 2>/dev/null >> ${FULLLOGDIR}/info_ocr_repo
+        echo "### Repo status ###" >> ${FULLLOGDIR}/info_ocr_repo
+        git status 2>/dev/null >> ${FULLLOGDIR}/info_ocr_repo
+        git diff 2>/dev/null > ${FULLLOGDIR}/info_ocr_repo_diff
+    else
+        echo "error: OCR_INSTALL does not point to an OCR checkout from a GIT repository" > ${FULLLOGDIR}/info_ocr_repo
+        echo "error: OCR_INSTALL=${OCR_INSTALL}" >> ${FULLLOGDIR}/info_ocr_repo
+    fi
+    cd -
+    START_DATE=`date`
     while (( $i < ${nbRun} )); do
         scalingTest ${prog} "${defines}" | tee ${runlog}-$i
         let i=$i+1;
     done
-    echo "nbRun=${nbRun} OCR_NUM_NODES=${OCR_NUM_NODES}" > ${report}
     if [[ $defines = "" ]]; then
-        echo "defines: defaults.mk" >> ${report}
+        echo "start_date: ${START_DATE}" >> ${report}
+        echo "defines_set: defaults.mk" >> ${report}
     else
         echo "defines: ${defines}" >> ${report}
     fi
-    echo "== Results ==" >> ${report}
+    echo "== Scaling Report ==" >> ${report}
 
     # Generate a report based on any filename matching ${RUNLOG_FILE}*
     reportGenOpt=""

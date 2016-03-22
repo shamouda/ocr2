@@ -7,13 +7,16 @@
 # Build OCR and run programs
 #
 function buildOcr() {
+    SAVE=$PWD
     export RES=0
-    cd ../..; make squeaky; cd -
-    # cd ../../build/${OCR_TYPE}; make -j8 && make -j8 install; RES=$?; cd -
+    if [[ -z "${OCR_NOCLEAN}" ]]; then
+        cd ../..; make squeaky; cd -
+    fi
     cd ../../build/${OCR_TYPE}; make && make install; RES=$?; cd -
     if [[ $RES -ne 0 ]]; then
         exit 1
     fi
+    cd $SAVE
 }
 
 function runProg() {
