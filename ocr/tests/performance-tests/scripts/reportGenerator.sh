@@ -13,6 +13,8 @@ if [[ -z "$CORE_SCALING" ]]; then
     exit
 fi
 
+SCRIPT_NAME=`basename $0`
+
 #
 # Option setup
 #
@@ -27,7 +29,7 @@ RUNLOG_FILE=""
 
 if [[ -z "$RUNLOG_FILE" ]]; then
     RUNLOG_FILE="${RUNLOG_FILENAME_BASE}"
-    echo "$0: Use default RUNLOG_FILE: $RUNLOG_FILE";
+    #echo "${SCRIPT_NAME}: Use default RUNLOG_FILE: $RUNLOG_FILE";
 fi
 
 while [[ $# -gt 0 ]]; do
@@ -122,17 +124,51 @@ extractMetric "Duration"   9 "stddev"
 
 # Compute speed-up on the average column (first one)
 AVG=`cat ${TMPDIR}/tmp-agg-results-throughput | cut -d' ' -f 1-1`
+# set that on a single line
 AVG=`echo ${AVG} | sed -e "s/\n/ /g"`
-SPUP=`${SCRIPT_ROOT}/utils/speedup.sh "$AVG"`
+# Count how many core configurations
+w=`echo "${CORE_SCALING}" | wc -w | sed -e 's/ //g'`
+
+# This is going to put all of the average values into an array
+# and iterate over this array in chunk of 'core configurations'
+# to invoke the 'speedup' script on each chunk. The result is
+# the speed-up computed for each node configuration with the
+# baseline being the first core scaling configuration.
+SPUP=""
+IFS=' ' read -r -a array <<< "$AVG"
+let l=0
+let u=0
+
+for nodes in `echo "${NODE_SCALING}"`; do
+    let u=${l}+${w};
+    AVG=`echo "${array[@]:${l}:${u}}"`
+    SPUP+=`${SCRIPT_ROOT}/utils/speedup.sh "${AVG}"`
+    SPUP+=" "
+    let l=${u}
+done
 
 # Format speed-up information
 echo "$SPUP" | tr ' ' '\n' > ${TMPDIR}/tmp-agg-results-spup
 
-# Format core-scaling information
-echo "${CORE_SCALING}" | tr ' ' '\n' > ${TMPDIR}/tmp-core-scaling
+for nodes in `echo "${NODE_SCALING}"`; do
+    # Format core-scaling information
+    echo "${CORE_SCALING}" | tr ' ' '\n' >> ${TMPDIR}/tmp-core-scaling
+done
 
+# Pasting all results and analysis together. Can be used in the future to do
+# global processing without having to parse out comments and information.
 # final formatting: core-scaling | avg | stddev | count | speed-up | duration | stddev | count
-paste ${TMPDIR}/tmp-core-scaling ${TMPDIR}/tmp-agg-results-throughput ${TMPDIR}/tmp-agg-results-spup ${TMPDIR}/tmp-agg-results-duration | column -t
+paste ${TMPDIR}/tmp-core-scaling ${TMPDIR}/tmp-agg-results-throughput ${TMPDIR}/tmp-agg-results-spup ${TMPDIR}/tmp-agg-results-duration | column -t > ${TMPDIR}/tmp-results
+
+# This is going over the perf dump and chunk it up to inject text
+let l=0
+for nodes in `echo "${NODE_SCALING}"`; do
+    echo "#N=$nodes Nodes Scaling Results"
+    more +${l} ${TMPDIR}/tmp-results | head -n ${w}
+    let l=${l}+${w}
+    let l=${l}+1
+done
+
 
 # delete left-over temporary file
 deleteFiles ${TMPDIR}

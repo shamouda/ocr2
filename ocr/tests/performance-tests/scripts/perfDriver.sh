@@ -28,9 +28,7 @@ else
     export CORE_SCALING=${CORE_SCALING-"2 4 8 16"}
 fi
 
-
-# Number of nodes to use
-export OCR_NUM_NODES=${OCR_NUM_NODES-"1"}
+# Number of nodes is controlled by the caller
 
 # Default runlog and report naming
 export RUNLOG_FILENAME_BASE=${RUNLOG_FILENAME_BASE-"runlog"}
