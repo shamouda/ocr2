@@ -1,0 +1,2 @@
+module load /opt/rice/modulefiles/openmpi
+export MPI_ROOT=/opt/rice/openmpi/1.8.3

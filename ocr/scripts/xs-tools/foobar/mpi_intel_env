@@ -1,0 +1,7 @@
+
+# ocrrun reads this to properly build the mpi run command through aprun
+export OCRRUN_OPT_ENVKIND=impi
+
+export MPI_ROOT=/opt/intel/tools/impi/5.1.1.109/intel64
+export PATH=${MPI_ROOT}/bin:$PATH
+export LD_LIBRARY_PATH=${MPI_ROOT}/lib:$LD_LIBRARY_PATH
