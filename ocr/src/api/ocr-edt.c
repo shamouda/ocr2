@@ -18,7 +18,7 @@
 u8 ocrEventCreateParams(ocrGuid_t *guid, ocrEventTypes_t eventType, u16 properties, ocrEventParams_t * params) {
 
     START_PROFILE(api_EventCreate);
-    DPRINTF(DEBUG_LVL_INFO, "ENTER ocrEventCreate(*guid="GUIDSx", eventType=%u, properties=%u)\n", GUIDFS(*guid),
+    DPRINTF(DEBUG_LVL_INFO, "ENTER ocrEventCreate(*guid="GUIDF", eventType=%u, properties=%u)\n", GUIDA(*guid),
             (u32)eventType, (u32)properties);
 
     PD_MSG_STACK(msg);
@@ -53,7 +53,7 @@ u8 ocrEventCreateParams(ocrGuid_t *guid, ocrEventTypes_t eventType, u16 properti
 #undef PD_TYPE
 
     DPRINTF_COND_LVL(((returnCode != 0) && (returnCode != OCR_EGUIDEXISTS)), DEBUG_LVL_WARN, DEBUG_LVL_INFO,
-                     "EXIT ocrEventCreate -> %u; GUID: "GUIDSx"\n", returnCode, GUIDFS(*guid));
+                     "EXIT ocrEventCreate -> %u; GUID: "GUIDF"\n", returnCode, GUIDA(*guid));
     OCR_TOOL_TRACE(true, OCR_TRACE_TYPE_EVENT, OCR_ACTION_CREATE);
     RETURN_PROFILE(returnCode);
 
@@ -65,7 +65,7 @@ u8 ocrEventCreate(ocrGuid_t *guid, ocrEventTypes_t eventType, u16 properties) {
 
 u8 ocrEventDestroy(ocrGuid_t eventGuid) {
     START_PROFILE(api_EventDestroy);
-    DPRINTF(DEBUG_LVL_INFO, "ENTER ocrEventDestroy(guid="GUIDSx")\n", GUIDFS(eventGuid));
+    DPRINTF(DEBUG_LVL_INFO, "ENTER ocrEventDestroy(guid="GUIDF")\n", GUIDA(eventGuid));
     PD_MSG_STACK(msg);
     ocrPolicyDomain_t *pd = NULL;
     ocrTask_t * curEdt = NULL;
@@ -82,7 +82,7 @@ u8 ocrEventDestroy(ocrGuid_t eventGuid) {
 
     u8 returnCode = pd->fcts.processMessage(pd, &msg, false);
     DPRINTF_COND_LVL(returnCode, DEBUG_LVL_WARN, DEBUG_LVL_INFO,
-                     "EXIT ocrEventDestroy(guid="GUIDSx") -> %u\n", GUIDFS(eventGuid), returnCode);
+                     "EXIT ocrEventDestroy(guid="GUIDF") -> %u\n", GUIDA(eventGuid), returnCode);
     RETURN_PROFILE(returnCode);
 #undef PD_MSG
 #undef PD_TYPE
@@ -91,8 +91,8 @@ u8 ocrEventDestroy(ocrGuid_t eventGuid) {
 u8 ocrEventSatisfySlot(ocrGuid_t eventGuid, ocrGuid_t dataGuid /*= INVALID_GUID*/, u32 slot) {
 
     START_PROFILE(api_EventSatisfySlot);
-    DPRINTF(DEBUG_LVL_INFO, "ENTER ocrEventSatisfySlot(evt="GUIDSx", data="GUIDSx", slot=%u)\n",
-            GUIDFS(eventGuid), GUIDFS(dataGuid), slot);
+    DPRINTF(DEBUG_LVL_INFO, "ENTER ocrEventSatisfySlot(evt="GUIDF", data="GUIDF", slot=%u)\n",
+            GUIDA(eventGuid), GUIDA(dataGuid), slot);
     PD_MSG_STACK(msg);
     ocrPolicyDomain_t *pd = NULL;
 
@@ -113,7 +113,7 @@ u8 ocrEventSatisfySlot(ocrGuid_t eventGuid, ocrGuid_t dataGuid /*= INVALID_GUID*
     PD_MSG_FIELD_I(properties) = 0;
     u8 returnCode = pd->fcts.processMessage(pd, &msg, false);
     DPRINTF_COND_LVL(returnCode, DEBUG_LVL_WARN, DEBUG_LVL_INFO,
-                    "EXIT ocrEventSatisfySlot(evt="GUIDSx") -> %u\n", GUIDFS(eventGuid), returnCode);
+                    "EXIT ocrEventSatisfySlot(evt="GUIDF") -> %u\n", GUIDA(eventGuid), returnCode);
     OCR_TOOL_TRACE(true, OCR_TRACE_TYPE_EVENT, OCR_ACTION_SATISFY, dataGuid);
     RETURN_PROFILE(returnCode);
 #undef PD_MSG
@@ -127,8 +127,8 @@ u8 ocrEventSatisfy(ocrGuid_t eventGuid, ocrGuid_t dataGuid /*= INVALID_GUID*/) {
 u8 ocrEdtTemplateCreate_internal(ocrGuid_t *guid, ocrEdt_t funcPtr, u32 paramc, u32 depc, char* funcName) {
     START_PROFILE(api_EdtTemplateCreate);
 
-    DPRINTF(DEBUG_LVL_INFO, "ENTER ocrEdtTemplateCreate(*guid="GUIDSx", funcPtr=0x%lx, paramc=%d, depc=%d, name=%s)\n",
-            GUIDFS(*guid), funcPtr, (s32)paramc, (s32)depc, funcName?funcName:"");
+    DPRINTF(DEBUG_LVL_INFO, "ENTER ocrEdtTemplateCreate(*guid="GUIDF", funcPtr=0x%lx, paramc=%d, depc=%d, name=%s)\n",
+            GUIDA(*guid), funcPtr, (s32)paramc, (s32)depc, funcName?funcName:"");
 
 #ifdef OCR_ENABLE_EDT_NAMING
     // Please check that OCR_ENABLE_EDT_NAMING is defined in the app's makefile
@@ -172,13 +172,13 @@ u8 ocrEdtTemplateCreate_internal(ocrGuid_t *guid, ocrEdt_t funcPtr, u32 paramc, 
 #undef PD_MSG
 #undef PD_TYPE
     DPRINTF_COND_LVL(returnCode, DEBUG_LVL_WARN, DEBUG_LVL_INFO,
-                     "EXIT ocrEdtTemplateCreate -> %u; GUID: "GUIDSx"\n", returnCode, GUIDFS(*guid));
+                     "EXIT ocrEdtTemplateCreate -> %u; GUID: "GUIDF"\n", returnCode, GUIDA(*guid));
     RETURN_PROFILE(returnCode);
 }
 
 u8 ocrEdtTemplateDestroy(ocrGuid_t guid) {
     START_PROFILE(api_EdtTemplateDestroy);
-    DPRINTF(DEBUG_LVL_INFO, "ENTER ocrEdtTemplateDestroy(guid="GUIDSx")\n", GUIDFS(guid));
+    DPRINTF(DEBUG_LVL_INFO, "ENTER ocrEdtTemplateDestroy(guid="GUIDF")\n", GUIDA(guid));
     PD_MSG_STACK(msg);
     ocrPolicyDomain_t *pd = NULL;
     ocrTask_t * curEdt = NULL;
@@ -193,7 +193,7 @@ u8 ocrEdtTemplateDestroy(ocrGuid_t guid) {
     PD_MSG_FIELD_I(properties) = 0;
     u8 returnCode = pd->fcts.processMessage(pd, &msg, false);
     DPRINTF_COND_LVL(returnCode, DEBUG_LVL_WARN, DEBUG_LVL_INFO,
-                     "EXIT ocrEdtTemplateDestroy(guid="GUIDSx") -> %u\n", GUIDFS(guid), returnCode);
+                     "EXIT ocrEdtTemplateDestroy(guid="GUIDF") -> %u\n", GUIDA(guid), returnCode);
     RETURN_PROFILE(returnCode);
 #undef PD_MSG
 #undef PD_TYPE
@@ -206,10 +206,10 @@ u8 ocrEdtCreate(ocrGuid_t* edtGuidPtr, ocrGuid_t templateGuid,
     START_PROFILE(api_EdtCreate);
 
     DPRINTF(DEBUG_LVL_INFO,
-           "ENTER ocrEdtCreate(*guid="GUIDSx", template="GUIDSx", paramc=%d, paramv=0x%lx"
-           ", depc=%d, depv=0x%lx, prop=%u, hint=%p, outEvt="GUIDSx")\n",
-           GUIDFS(edtGuid), GUIDFS(templateGuid), (s32)paramc, paramv, (s32)depc, depv,
-            (u32)properties, hint,  GUIDFS(outputEvent?*outputEvent:NULL_GUID));
+           "ENTER ocrEdtCreate(*guid="GUIDF", template="GUIDF", paramc=%d, paramv=0x%lx"
+           ", depc=%d, depv=0x%lx, prop=%u, hint=%p, outEvt="GUIDF")\n",
+           GUIDA(edtGuid), GUIDA(templateGuid), (s32)paramc, paramv, (s32)depc, depv,
+            (u32)properties, hint,  GUIDA(outputEvent?*outputEvent:NULL_GUID));
     OCR_TOOL_TRACE(true, OCR_TRACE_TYPE_EDT, OCR_ACTION_CREATE);
 
     PD_MSG_STACK(msg);
@@ -276,7 +276,7 @@ u8 ocrEdtCreate(ocrGuid_t* edtGuidPtr, ocrGuid_t templateGuid,
     PD_MSG_FIELD_I(templateGuid.guid) = templateGuid;
     PD_MSG_FIELD_I(templateGuid.metaDataPtr) = NULL;
     PD_MSG_FIELD_I(hint) = hint;
-    PD_MSG_FIELD_I(parentLatch.guid) = curEdt ? (!(IS_GUID_NULL(curEdt->finishLatch)) ? curEdt->finishLatch : curEdt->parentLatch) : NULL_GUID;
+    PD_MSG_FIELD_I(parentLatch.guid) = curEdt ? (!(ocrGuidIsNull(curEdt->finishLatch)) ? curEdt->finishLatch : curEdt->parentLatch) : NULL_GUID;
     PD_MSG_FIELD_I(parentLatch.metaDataPtr) = NULL;
     PD_MSG_FIELD_I(currentEdt.guid) = curEdt ? curEdt->guid : NULL_GUID;
     PD_MSG_FIELD_I(currentEdt.metaDataPtr) = curEdt;
@@ -316,11 +316,11 @@ u8 ocrEdtCreate(ocrGuid_t* edtGuidPtr, ocrGuid_t templateGuid,
     if (depv != NULL) {
 #endif
         // Please check that # of dependences agrees with depv vector
-        ASSERT(!(IS_GUID_NULL(edtGuid)));
+        ASSERT(!(ocrGuidIsNull(edtGuid)));
         ASSERT(depc != 0);
         u32 i = 0;
         while(i < depc) {
-            if(!(IS_GUID_UNINITIALIZED(depv[i]))) {
+            if(!(ocrGuidIsUninitialized(depv[i]))) {
                 // We only add dependences that are not UNINITIALIZED_GUID
                 returnCode = ocrAddDependence(depv[i], edtGuid, i, DB_DEFAULT_MODE);
             } else {
@@ -334,9 +334,9 @@ u8 ocrEdtCreate(ocrGuid_t* edtGuidPtr, ocrGuid_t templateGuid,
     }
 
     if(outputEvent) {
-        DPRINTF(DEBUG_LVL_INFO, "EXIT ocrEdtCreate -> 0; GUID: "GUIDSx"; outEvt: "GUIDSx"\n", GUIDFS(edtGuid), GUIDFS(*outputEvent));
+        DPRINTF(DEBUG_LVL_INFO, "EXIT ocrEdtCreate -> 0; GUID: "GUIDF"; outEvt: "GUIDF"\n", GUIDA(edtGuid), GUIDA(*outputEvent));
     } else {
-        DPRINTF(DEBUG_LVL_INFO, "EXIT ocrEdtCreate -> 0; GUID: "GUIDSx"\n", GUIDFS(edtGuid));
+        DPRINTF(DEBUG_LVL_INFO, "EXIT ocrEdtCreate -> 0; GUID: "GUIDF"\n", GUIDA(edtGuid));
     }
     RETURN_PROFILE(0);
 #undef PD_MSG
@@ -360,7 +360,7 @@ u8 ocrEdtDestroy(ocrGuid_t edtGuid) {
     PD_MSG_FIELD_I(properties) = 0;
     u8 returnCode = pd->fcts.processMessage(pd, &msg, false);
     DPRINTF_COND_LVL(returnCode, DEBUG_LVL_WARN, DEBUG_LVL_INFO,
-                     "EXIT ocrEdtDestroy(guid="GUIDSx") -> %u\n", GUIDFS(edtGuid), returnCode);
+                     "EXIT ocrEdtDestroy(guid="GUIDF") -> %u\n", GUIDA(edtGuid), returnCode);
     RETURN_PROFILE(returnCode);
 #undef PD_MSG
 #undef PD_TYPE
@@ -369,14 +369,14 @@ u8 ocrEdtDestroy(ocrGuid_t edtGuid) {
 u8 ocrAddDependence(ocrGuid_t source, ocrGuid_t destination, u32 slot,
                     ocrDbAccessMode_t mode) {
     START_PROFILE(api_AddDependence);
-    DPRINTF(DEBUG_LVL_INFO, "ENTER ocrAddDependence(src="GUIDSx", dest="GUIDSx", slot=%u, mode=%d)\n",
-            GUIDFS(source), GUIDFS(destination), slot, (s32)mode);
+    DPRINTF(DEBUG_LVL_INFO, "ENTER ocrAddDependence(src="GUIDF", dest="GUIDF", slot=%u, mode=%d)\n",
+            GUIDA(source), GUIDA(destination), slot, (s32)mode);
     PD_MSG_STACK(msg);
     ocrPolicyDomain_t *pd = NULL;
     ocrTask_t * curEdt = NULL;
     getCurrentEnv(&pd, NULL, &curEdt, &msg);
     u8 returnCode = 0;
-    if(!(IS_GUID_NULL(source))) {
+    if(!(ocrGuidIsNull(source))) {
 #define PD_MSG (&msg)
 #define PD_TYPE PD_MSG_DEP_ADD
         msg.type = PD_MSG_DEP_ADD | PD_MSG_REQUEST;
@@ -390,7 +390,7 @@ u8 ocrAddDependence(ocrGuid_t source, ocrGuid_t destination, u32 slot,
         PD_MSG_FIELD_I(currentEdt.metaDataPtr) = curEdt;
         returnCode = pd->fcts.processMessage(pd, &msg, true);
         DPRINTF_COND_LVL(returnCode, DEBUG_LVL_WARN, DEBUG_LVL_INFO,
-                     "EXIT ocrAddDependence through PD_MSG_DEP_ADD(src=GUIDSx, dest=GUIDSx) -> %u\n", GUIDFS(source), GUIDFS(destination), returnCode);
+                     "EXIT ocrAddDependence through PD_MSG_DEP_ADD(src=GUIDF, dest=GUIDF) -> %u\n", GUIDA(source), GUIDA(destination), returnCode);
 #undef PD_MSG
 #undef PD_TYPE
     } else {
@@ -411,11 +411,11 @@ u8 ocrAddDependence(ocrGuid_t source, ocrGuid_t destination, u32 slot,
         PD_MSG_FIELD_I(properties) = 0;
         returnCode = pd->fcts.processMessage(pd, &msg, true);
         DPRINTF_COND_LVL(returnCode, DEBUG_LVL_WARN, DEBUG_LVL_INFO,
-                     "EXIT ocrAddDependence through PD_MSG_DEP_SATISFY(src="GUIDSx", dest="GUIDSx") -> %u\n", GUIDFS(source), GUIDFS(destination), returnCode);
+                     "EXIT ocrAddDependence through PD_MSG_DEP_SATISFY(src="GUIDF", dest="GUIDF") -> %u\n", GUIDA(source), GUIDA(destination), returnCode);
 #undef PD_MSG
 #undef PD_TYPE
     }
     DPRINTF_COND_LVL(returnCode, DEBUG_LVL_WARN, DEBUG_LVL_INFO,
-                     "EXIT ocrAddDependence(src="GUIDSx", dest="GUIDSx") -> %u\n", GUIDFS(source), GUIDFS(destination), returnCode);
+                     "EXIT ocrAddDependence(src="GUIDF", dest="GUIDF") -> %u\n", GUIDA(source), GUIDA(destination), returnCode);
     RETURN_PROFILE(returnCode);
 }

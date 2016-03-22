@@ -16,7 +16,7 @@
 // This edt is triggered when the output event of the other edt is satisfied by the runtime
 ocrGuid_t terminateEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     // TODO shouldn't be doing that... but need more support from output events to get a 'return' value from an edt
-    ASSERT(!(IS_GUID_NULL(depv[0].guid)));
+    ASSERT(!(ocrGuidIsNull(depv[0].guid)));
     u64 * array = (u64*)depv[0].ptr;
     u64 i = 0;
     while (i < N) {

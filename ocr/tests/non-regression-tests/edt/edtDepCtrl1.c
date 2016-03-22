@@ -13,7 +13,7 @@
 
 ocrGuid_t otherEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ASSERT(depc == 1);
-    ASSERT(IS_GUID_NULL(depv[0].guid));
+    ASSERT(ocrGuidIsNull(depv[0].guid));
     ocrShutdown();
     return NULL_GUID;
 }

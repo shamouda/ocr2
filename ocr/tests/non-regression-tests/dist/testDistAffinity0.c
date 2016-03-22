@@ -16,7 +16,7 @@
 ocrGuid_t shutdownEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrGuid_t currentAffinity;
     ocrAffinityGetCurrent(&currentAffinity);
-    PRINTF("shutdownEdt: executing at "GUIDSx"\n", GUIDFS(currentAffinity));
+    PRINTF("shutdownEdt: executing at "GUIDF"\n", GUIDA(currentAffinity));
     ASSERT((currentAffinity.guid) == paramv[0]);
     ocrShutdown();
     return NULL_GUID;
@@ -25,7 +25,7 @@ ocrGuid_t shutdownEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
 ocrGuid_t remoteEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrGuid_t currentAffinity;
     ocrAffinityGetCurrent(&currentAffinity);
-    PRINTF("remoteEdt: executing at affinity "GUIDSx"\n", GUIDFS(currentAffinity));
+    PRINTF("remoteEdt: executing at affinity "GUIDF"\n", GUIDA(currentAffinity));
     // Create a new EDT with affinity set to current EDT's affinity
     ocrGuid_t shutdownEdtTemplateGuid;
     ocrEdtTemplateCreate(&shutdownEdtTemplateGuid, shutdownEdt, 1, 0);

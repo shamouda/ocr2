@@ -297,8 +297,11 @@ ocrSchedulerObjectDbspace_t *createDbSpace(ocrSchedulerHeuristic_t *self, ocrSch
 
         //PD critical section to handle concurrent DB space object creates
         hal_lock32(&pdspaceObj->lock);
-
-        mapIt->data = (void*)GUIDFS(dbGuid);
+#if GUID_BIT_COUNT == 64
+        mapIt->data = (void*) dbGuid.guid;
+#elif GUID_BIT_COUNT == 128
+        mapIt->data = (void*) dbGuid.lower;
+#endif
         mapFact->fcts.iterate(mapFact, mapIt, SCHEDULER_OBJECT_ITERATE_SEARCH_KEY);
         dbspaceObj = (ocrSchedulerObjectDbspace_t*)mapIt->data;
         if (dbspaceObj == NULL) {
@@ -398,7 +401,11 @@ static void destructDbSpace(ocrSchedulerHeuristic_t *self, ocrSchedulerHeuristic
     ocrSchedulerHeuristicContextSt_t *stContext = (ocrSchedulerHeuristicContextSt_t*)context;
     ocrSchedulerObjectFactory_t *mapFact = pd->schedulerObjectFactories[stContext->mapIterator->fctId];
     ocrSchedulerObjectIterator_t *mapIt = stContext->mapIterator;
-    mapIt->data = (void*)GUIDFS(dbspaceObj->dbGuid);
+#if GUID_BIT_COUNT == 64
+        mapIt->data = (void*) dbspaceObj->dbGuid.guid;
+#elif GUID_BIT_COUNT == 128
+        mapIt->data = (void*) dbspaceObj->dbGuid.lower;
+#endif
     mapFact->fcts.iterate(mapFact, mapIt, SCHEDULER_OBJECT_ITERATE_SEARCH_KEY);
     ASSERT(dbspaceObj == (ocrSchedulerObjectDbspace_t*)mapIt->data);
     mapFact->fcts.remove(mapFact, NULL, OCR_SCHEDULER_OBJECT_VOIDPTR, 1, NULL, mapIt, SCHEDULER_OBJECT_REMOVE_ITERATOR);
@@ -454,10 +461,10 @@ static void scheduleEdtDeps(ocrSchedulerHeuristic_t *self, ocrSchedulerHeuristic
     bool asad = true; // :-) We start off assuming all DBs are local and current (all-singing-all-dancing)
 
     for (i = startIdx; i < depc && asad; i++) {
-        if (!IS_GUID_NULL(depv[i].guid) && depv[i].mode != DB_MODE_NULL) {
+        if (!ocrGuidIsNull(depv[i].guid) && depv[i].mode != DB_MODE_NULL) {
             bool uniq = true;
             for (j = 0; j < i; j++) {
-                if (IS_GUID_EQUAL(depv[j].guid, depv[i].guid)) {
+                if (ocrGuidIsEq(depv[j].guid, depv[i].guid)) {
                     uniq = false;
                     break;
                 }
@@ -489,7 +496,7 @@ static void processDbWaitlist(ocrPolicyDomain_t *pd, ocrSchedulerHeuristic_t *se
         u32 depc = task->depc;
         ocrEdtDep_t *depv = hcTask->resolvedDeps;
         for (i = 0; i < depc; i++) {
-            if (IS_GUID_EQUAL(depv[i].guid, dbspaceObj->dbGuid)) break;
+            if (ocrGuidIsEq(depv[i].guid, dbspaceObj->dbGuid)) break;
         }
         ASSERT(i < depc);
         scheduleEdtDeps(self, context, task, i+1);
@@ -611,11 +618,15 @@ static u8 processDbSMOP(ocrSchedulerHeuristic_t *self, ocrSchedulerHeuristicCont
     ocrSchedulerObjectFactory_t *listFact = pd->schedulerObjectFactories[stContext->listIterator->fctId];
 
     ocrSchedulerObjectDbspace_t *dbspaceObj = NULL;
-    if (!IS_GUID_NULL(dbGuid)) {
+    if (!ocrGuidIsNull(dbGuid)) {
         //Search for an existing Dbspace object with DB guid
         ocrSchedulerObjectFactory_t *mapFact = pd->schedulerObjectFactories[stContext->mapIterator->fctId];
         ocrSchedulerObjectIterator_t *mapIt = stContext->mapIterator;
-        mapIt->data = (void*)GUIDFS(dbGuid);
+#if GUID_BIT_COUNT == 64
+        mapIt->data = (void*) dbGuid.guid;
+#elif GUID_BIT_COUNT == 128
+        mapIt->data = (void*) dbGuid.lower;
+#endif
         mapFact->fcts.iterate(mapFact, mapIt, SCHEDULER_OBJECT_ITERATE_SEARCH_KEY);
         dbspaceObj = (ocrSchedulerObjectDbspace_t*)mapIt->data;
     } else {
@@ -1104,13 +1115,13 @@ static u8 analyzeEdtSpaceTime(ocrSchedulerHeuristic_t *self, ocrSchedulerHeurist
     //Get the dbspace objects for the depv guids
     //We reuse the depv[i].ptr field to hold the db objects
     for (i = startIdx; i < depc; i++) {
-        if (!IS_GUID_NULL(depv[i].guid) && (depv[i].mode != DB_MODE_NULL)) {
+        if (!ocrGuidIsNull(depv[i].guid) && (depv[i].mode != DB_MODE_NULL)) {
             ASSERT(depv[i].ptr == NULL);
             /* Ensure uniqueness to avoid double-locking */
             //TODO: optimize!
             bool uniq = true;
             for (j = 0; j < i; j++) {
-                if (IS_GUID_EQUAL(depv[j].guid, depv[i].guid)) {
+                if (ocrGuidIsEq(depv[j].guid, depv[i].guid)) {
                     uniq = false;
                     break;
                 }
@@ -1478,7 +1489,7 @@ static u8 stSchedulerHeuristicWorkEdtUserInvoke(ocrSchedulerHeuristic_t *self, o
     u8 retVal = fact->fcts.remove(fact, schedObj, OCR_SCHEDULER_OBJECT_EDT, 1, &edtObj, NULL, SCHEDULER_OBJECT_REMOVE_TAIL);
 
     //If pop fails, then try to steal from other deques
-    if (IS_GUID_NULL(edtObj.guid.guid)) {
+    if (ocrGuidIsNull(edtObj.guid.guid)) {
         //First try to steal from the last deque that was visited (probably had a successful steal)
         ocrSchedulerObject_t *stealSchedulerObject = ((ocrSchedulerHeuristicContextSt_t*)self->contexts[stContext->stealSchedulerObjectIndex])->mySchedulerObject;
         ASSERT(stealSchedulerObject);
@@ -1487,9 +1498,9 @@ static u8 stSchedulerHeuristicWorkEdtUserInvoke(ocrSchedulerHeuristic_t *self, o
         //If cached steal failed, then restart steal loop from starting index
         ocrSchedulerObject_t *rootObj = self->scheduler->rootObj;
         ocrSchedulerObjectFactory_t *sFact = self->scheduler->pd->schedulerObjectFactories[rootObj->fctId];
-        while (IS_GUID_NULL(edtObj.guid.guid) && sFact->fcts.count(sFact, rootObj, (SCHEDULER_OBJECT_COUNT_EDT | SCHEDULER_OBJECT_COUNT_RECURSIVE) ) != 0) {
+        while (ocrGuidIsNull(edtObj.guid.guid) && sFact->fcts.count(sFact, rootObj, (SCHEDULER_OBJECT_COUNT_EDT | SCHEDULER_OBJECT_COUNT_RECURSIVE) ) != 0) {
             u32 i;
-            for (i = 1; IS_GUID_NULL(edtObj.guid.guid) && i < self->contextCount; i++) {
+            for (i = 1; ocrGuidIsNull(edtObj.guid.guid) && i < self->contextCount; i++) {
                 stContext->stealSchedulerObjectIndex = (context->id + i) % self->contextCount; //simple round robin stealing
                 stealSchedulerObject = ((ocrSchedulerHeuristicContextSt_t*)self->contexts[stContext->stealSchedulerObjectIndex])->mySchedulerObject;
                 if (stealSchedulerObject)
@@ -1498,7 +1509,7 @@ static u8 stSchedulerHeuristicWorkEdtUserInvoke(ocrSchedulerHeuristic_t *self, o
         }
     }
 
-    if(!(IS_GUID_NULL(edtObj.guid.guid)))
+    if(!(ocrGuidIsNull(edtObj.guid.guid)))
         taskArgs->OCR_SCHED_ARG_FIELD(OCR_SCHED_WORK_EDT_USER).edt = edtObj.guid;
 
     return retVal;
@@ -1855,7 +1866,11 @@ static u8 stSchedulerHeuristicTransactDb(ocrSchedulerHeuristic_t *self, ocrSched
         ocrSchedulerObjectFactory_t *mapFact = pd->schedulerObjectFactories[stContext->mapIterator->fctId];
         //Search for an existing Dbspace object with DB guid
         ocrSchedulerObjectIterator_t *mapIt = stContext->mapIterator;
-        mapIt->data = (void*)GUIDFS(dbGuid);
+#if GUID_BIT_COUNT == 64
+        mapIt->data = (void*) dbGuid.guid;
+#elif GUID_BIT_COUNT == 128
+        mapIt->data = (void*) dbGuid.lower;
+#endif
         mapFact->fcts.iterate(mapFact, mapIt, SCHEDULER_OBJECT_ITERATE_SEARCH_KEY);
         dbspaceObj = (ocrSchedulerObjectDbspace_t*)mapIt->data;
         ASSERT(dbspaceObj && dbspaceObj->dbPtr == NULL && dbspaceObj->base.mapping == OCR_SCHEDULER_OBJECT_MAPPING_MAPPED);

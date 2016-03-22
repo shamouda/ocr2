@@ -53,7 +53,7 @@ static void hcWorkShift(ocrWorker_t * worker) {
     if(pd->fcts.processMessage(pd, &msg, true) == 0) {
         // We got a response
         ocrFatGuid_t taskGuid = PD_MSG_FIELD_IO(schedArgs).OCR_SCHED_ARG_FIELD(OCR_SCHED_WORK_EDT_USER).edt;
-        if(!(IS_GUID_NULL(taskGuid.guid))){
+        if(!(ocrGuidIsNull(taskGuid.guid))){
 #ifdef ENABLE_EXTENSION_BLOCKING_SUPPORT
             ocrTask_t * curTask = (ocrTask_t*)taskGuid.metaDataPtr;
             if (((curTask->flags & OCR_TASK_FLAG_LONG) != 0) && (((ocrWorkerHc_t *) worker)->isHelping)) {
@@ -65,7 +65,7 @@ static void hcWorkShift(ocrWorker_t * worker) {
                 // Task sanity checks
                 ASSERT(taskGuid.metaDataPtr != NULL);
                 worker->curTask = (ocrTask_t*)taskGuid.metaDataPtr;
-                DPRINTF(DEBUG_LVL_VERB, "Worker shifting to execute EDT GUID "GUIDSx"\n", GUIDFS(taskGuid.guid));
+                DPRINTF(DEBUG_LVL_VERB, "Worker shifting to execute EDT GUID "GUIDF"\n", GUIDA(taskGuid.guid));
                 u32 factoryId = PD_MSG_FIELD_O(factoryId);
                 pd->taskFactories[factoryId]->fcts.execute(worker->curTask);
                 //Store state at worker level to report most recent state on pause.
@@ -132,9 +132,9 @@ static void workerLoop(ocrWorker_t * worker) {
 
         ocrHint_t dbHint;
         ocrHintInit( &dbHint, OCR_HINT_DB_T );
-#ifdef GUID_64
+#if GUID_BIT_COUNT == 64
             ocrSetHintValue( & dbHint, OCR_HINT_DB_AFFINITY, affinityMasterPD.guid );
-#elif defined(GUID_128)
+#elif GUID_BIT_COUNT == 128
             ocrSetHintValue( & dbHint, OCR_HINT_DB_AFFINITY, affinityMasterPD.lower );
 #else
 #error Unknown GUID type
@@ -165,9 +165,9 @@ static void workerLoop(ocrWorker_t * worker) {
 
         ocrHint_t edtHint;
         ocrHintInit( &edtHint, OCR_HINT_EDT_T );
-#ifdef GUID_64
+#if GUID_BIT_COUNT == 64
             ocrSetHintValue( & edtHint, OCR_HINT_EDT_AFFINITY, affinityMasterPD.guid );
-#elif defined(GUID_128)
+#elif GUID_BIT_COUNT == 128
             ocrSetHintValue( & edtHint, OCR_HINT_EDT_AFFINITY, affinityMasterPD.lower );
 #else
 #error Unknown GUID type

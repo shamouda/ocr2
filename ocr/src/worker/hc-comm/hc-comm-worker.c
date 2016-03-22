@@ -219,7 +219,7 @@ static u8 createProcessRequestEdt(ocrPolicyDomain_t * pd, ocrGuid_t templateGuid
     returnCode = pd->fcts.processMessage(pd, &msg, true);
     if(returnCode) {
         edtGuid = PD_MSG_FIELD_IO(guid.guid);
-        DPRINTF(DEBUG_LVL_VVERB,"hc-comm-worker: Created processRequest EDT GUID "GUIDSx"\n", GUIDFS(edtGuid));
+        DPRINTF(DEBUG_LVL_VVERB,"hc-comm-worker: Created processRequest EDT GUID "GUIDF"\n", GUIDA(edtGuid));
         RETURN_PROFILE(returnCode);
     }
 
@@ -361,9 +361,9 @@ static void workerLoopHcComm(ocrWorker_t * worker) {
 
         ocrHint_t dbHint;
         ocrHintInit( &dbHint, OCR_HINT_DB_T );
-#ifdef GUID_64
+#if GUID_BIT_COUNT == 64
             ocrSetHintValue( & dbHint, OCR_HINT_DB_AFFINITY, affinityMasterPD.guid );
-#elif defined(GUID_128)
+#elif GUID_BIT_COUNT == 128
             ocrSetHintValue( & dbHint, OCR_HINT_DB_AFFINITY, affinityMasterPD.lower );
 #else
 #error Unknown GUID type
@@ -397,9 +397,9 @@ static void workerLoopHcComm(ocrWorker_t * worker) {
 
         ocrHint_t edtHint;
         ocrHintInit( &edtHint, OCR_HINT_EDT_T );
-#ifdef GUID_64
+#if GUID_BIT_COUNT == 64
             ocrSetHintValue( & edtHint, OCR_HINT_EDT_AFFINITY, affinityMasterPD.guid );
-#elif defined(GUID_128)
+#elif GUID_BIT_COUNT == 128
             ocrSetHintValue( & edtHint, OCR_HINT_EDT_AFFINITY, affinityMasterPD.lower );
 #else
 #error Unknown GUID type

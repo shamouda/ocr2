@@ -54,7 +54,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrGuid_t shutdownDepv[2] = {event1Guid, event2Guid};
     ocrEdtCreate(&edtShutdownGuid, shutdownEdtTemplateGuid, 0, NULL, 2, shutdownDepv,
         EDT_PROP_NONE, NULL_HINT, NULL);
-    PRINTF("[local] events guids are [0]="GUIDSx" [1]="GUIDSx"\n",GUIDFS(event1Guid), GUIDFS(event2Guid));
+    PRINTF("[local] events guids are [0]="GUIDF" [1]="GUIDF"\n",GUIDA(event1Guid), GUIDA(event2Guid));
     // Setup the test
     ocrGuid_t remoteEdt1TemplateGuid;
     ocrEdtTemplateCreate(&remoteEdt1TemplateGuid, remoteEdt1, 0, 1);

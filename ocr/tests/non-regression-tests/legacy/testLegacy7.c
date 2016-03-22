@@ -44,7 +44,7 @@ void ocrBlock(ocrConfig_t cfg) {
     ocrLegacySpawnOCR(&handle, template, 0, NULL, 1, &ctrlDep, legacyCtx);
 
     ocrLegacyBlockProgress(handle, &outputGuid, &result, &size, LEGACY_PROP_NONE);
-    ASSERT(!(IS_GUID_NULL(outputGuid)));
+    ASSERT(!(ocrGuidIsNull(outputGuid)));
     ASSERT(result != NULL);
     ASSERT(((u64 *) result)[0] == MARK);
     ASSERT(size == sizeof(u64));

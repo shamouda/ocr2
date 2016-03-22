@@ -37,7 +37,7 @@ typedef int8_t   s8;  /**< 8-bit signed integer */
 
 #ifdef ENABLE_128_BIT_GUID
 
-#define GUID_128
+#define GUID_BIT_COUNT 128
 typedef struct {
     intptr_t lower;
     intptr_t upper;
@@ -45,14 +45,15 @@ typedef struct {
 
 #else
 
-#define GUID_64
+#define GUID_BIT_COUNT 64
 typedef struct {
     intptr_t guid;
 } ocrGuid_t;
+
 #endif
 
 /* Defined vals for 64-bit GUIDs */
-#ifdef GUID_64
+#if GUID_BIT_COUNT == 64
 
 #define NULL_GUID ((ocrGuid_t){.guid = 0x0})
 
@@ -61,7 +62,7 @@ typedef struct {
 #define ERROR_GUID ((ocrGuid_t){.guid = -1})
 
 /* Defined vals for 128-bit GUIDs */
-#elif defined(GUID_128)
+#elif GUID_BIT_COUNT == 128
 
 #define NULL_GUID ((ocrGuid_t){.lower = 0x0, .upper = 0x0})
 

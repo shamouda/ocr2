@@ -230,7 +230,7 @@ u8 dbspaceSchedulerObjectOcrPolicyMsgUnMarshallMsg(ocrSchedulerObjectFactory_t *
 #undef PD_TYPE
 
     ASSERT(schedObj->kind == OCR_SCHEDULER_OBJECT_DBSPACE);
-    ASSERT(!IS_GUID_NULL(schedObj->guid.guid));
+    ASSERT(!ocrGuidIsNull(schedObj->guid.guid));
     ASSERT(schedObj->guid.metaDataPtr != NULL);
     schedObj->mapping = OCR_SCHEDULER_OBJECT_MAPPING_PINNED;
 
@@ -242,7 +242,11 @@ u8 dbspaceSchedulerObjectOcrPolicyMsgUnMarshallMsg(ocrSchedulerObjectFactory_t *
     ASSERT(dbMap);
     ocrSchedulerObjectFactory_t *mapFact = pd->schedulerObjectFactories[dbMap->fctId];
     ocrSchedulerObjectIterator_t *mapIt = mapFact->fcts.createIterator(mapFact, dbMap, 0);
-    mapIt->data = (void*)GUIDFS(schedObj->guid.guid);
+#if GUID_BIT_SIZE == 64
+    mapIt->data = (void*)(schedObj->guid.guid);
+#elif GUID_BIT_COUNT == 128
+    mapIt->data = (void*)(schedObj->guid.guid.lower);
+#endif
     mapFact->fcts.iterate(mapFact, mapIt, SCHEDULER_OBJECT_ITERATE_SEARCH_KEY);
     ocrSchedulerObjectDbspace_t *dbspaceObj = (ocrSchedulerObjectDbspace_t*)mapIt->data;
     ASSERT(dbspaceObj);

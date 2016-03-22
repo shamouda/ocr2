@@ -67,9 +67,9 @@ u8 suggestLocationPlacement(ocrPolicyDomain_t *pd, ocrLocation_t curLoc, ocrPlat
                     u64 hintValue = 0ULL;
                     if(ocrGetHintValue(hint, OCR_HINT_EDT_AFFINITY, &hintValue) == 0) {
                         ocrGuid_t affGuid = NULL_GUID;
-#ifdef GUID_64
+#if GUID_BIT_COUNT == 64
                         affGuid.guid = hintValue;
-#elif defined(GUID_128)
+#elif GUID_BIT_COUNT == 128
                         affGuid.upper = 0ULL;
                         affGuid.lower = hintValue;
 #endif
@@ -95,9 +95,9 @@ u8 suggestLocationPlacement(ocrPolicyDomain_t *pd, ocrLocation_t curLoc, ocrPlat
                     u64 hintValue = 0ULL;
                     if(ocrGetHintValue(hint, OCR_HINT_DB_AFFINITY, &hintValue) == 0) {
                         ocrGuid_t affGuid = NULL_GUID;
-#ifdef GUID_64
+#if GUID_BIT_COUNT == 64
                         affGuid.guid = hintValue;
-#elif defined(GUID_128)
+#elif GUID_BIT_COUNT == 128
                         affGuid.upper = 0ULL;
                         affGuid.lower = hintValue;
 #endif

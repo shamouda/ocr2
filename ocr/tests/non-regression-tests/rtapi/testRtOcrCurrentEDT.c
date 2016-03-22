@@ -19,7 +19,7 @@ ocrGuid_t taskForEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrGuid_t edtGuid = *((ocrGuid_t*)depv[0].ptr);
     ocrGuid_t currentEdt = currentEdtUserGet();
     // Compare edtGuid passed down and what's returned by the runtime
-    ASSERT(IS_GUID_EQUAL(currentEdt, edtGuid));
+    ASSERT(ocrGuidIsEq(currentEdt, edtGuid));
     ocrShutdown();
     return NULL_GUID;
 }

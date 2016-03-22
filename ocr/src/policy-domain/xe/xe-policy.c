@@ -588,7 +588,7 @@ void xePolicyDomainDestruct(ocrPolicyDomain_t * policy) {
 }
 
 static void localDeguidify(ocrPolicyDomain_t *self, ocrFatGuid_t *guid) {
-    if((!(IS_GUID_NULL(guid->guid))) && (!(IS_GUID_UNINITIALIZED(guid->guid)))) {
+    if((!(ocrGuidIsNull(guid->guid))) && (!(ocrGuidIsUninitialized(guid->guid)))) {
         // The XE cannot deguidify since it does not really have a GUID
         // provider and relies on the CE for that. It used to be OK
         // when we used the PTR GUID provider since deguidification was
@@ -616,7 +616,7 @@ static u8 xeAllocateDb(ocrPolicyDomain_t *self, ocrFatGuid_t *guid, void** ptr, 
     // variable, which has been added to this argument list.  The prescription indicates an order in
     // which to attempt to allocate the block to a pool.
     u64 idx = 0;
-//    void* result = allocateDatablock (self, size, engineIndex, prescription, &idx);
+//    void* result = allocateDddatablock (self, size, engineIndex, prescription, &idx);
 
     int preferredLevel = 0;
     u64 hintValue = 0ULL;
@@ -768,8 +768,8 @@ u8 xePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
                 // Cannot acquire
                 PD_MSG_FIELD_O(ptr) = NULL;
             }
-            DPRINTF(DEBUG_LVL_VVERB, "DB_CREATE response for size %lu: GUID: "GUIDSx"; PTR: 0x%lx)\n",
-                    reqSize, GUIDFS(PD_MSG_FIELD_IO(guid.guid)), PD_MSG_FIELD_O(ptr));
+            DPRINTF(DEBUG_LVL_VVERB, "DB_CREATE response for size %lu: GUID: "GUIDF"; PTR: 0x%lx)\n",
+                    reqSize, GUIDA(PD_MSG_FIELD_IO(guid.guid)), PD_MSG_FIELD_O(ptr));
             returnCode = xeProcessResponse(self, msg, 0);
 #undef PD_MSG
 #undef PD_TYPE
@@ -841,11 +841,11 @@ u8 xePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_COMM_TAKE
             if (PD_MSG_FIELD_IO(guidCount) > 0) {
-                DPRINTF(DEBUG_LVL_VVERB, "Received EDT with GUID "GUIDSx" (@ 0x%lx)\n",
-                        GUIDFS(PD_MSG_FIELD_IO(guids[0].guid)), &(PD_MSG_FIELD_IO(guids[0].guid)));
+                DPRINTF(DEBUG_LVL_VVERB, "Received EDT with GUID "GUIDF" (@ 0x%lx)\n",
+                        GUIDA(PD_MSG_FIELD_IO(guids[0].guid)), &(PD_MSG_FIELD_IO(guids[0].guid)));
                 localDeguidify(self, (PD_MSG_FIELD_IO(guids)));
-                DPRINTF(DEBUG_LVL_VVERB, "Received EDT ("GUIDSx"; 0x%lx)\n",
-                        GUIDFS((PD_MSG_FIELD_IO(guids))->guid), (PD_MSG_FIELD_IO(guids))->metaDataPtr);
+                DPRINTF(DEBUG_LVL_VVERB, "Received EDT ("GUIDF"; 0x%lx)\n",
+                        GUIDA((PD_MSG_FIELD_IO(guids))->guid), (PD_MSG_FIELD_IO(guids))->metaDataPtr);
                 // For now, we return the execute function for EDTs
                 PD_MSG_FIELD_IO(extra) = (u64)(self->taskFactories[0]->fcts.execute);
             }
@@ -857,11 +857,11 @@ u8 xePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
 #define PD_TYPE PD_MSG_SCHED_GET_WORK
             ASSERT(PD_MSG_FIELD_IO(schedArgs).kind == OCR_SCHED_WORK_EDT_USER);
             ocrFatGuid_t *fguid = &PD_MSG_FIELD_IO(schedArgs).OCR_SCHED_ARG_FIELD(OCR_SCHED_WORK_EDT_USER).edt;
-            if (!(IS_GUID_NULL(fguid->guid))) {
-                DPRINTF(DEBUG_LVL_VVERB, "Received EDT with GUID "GUIDSx"\n", GUIDFS(fguid->guid));
+            if (!(ocrGuidIsNull(fguid->guid))) {
+                DPRINTF(DEBUG_LVL_VVERB, "Received EDT with GUID "GUIDF"\n", GUIDA(fguid->guid));
                 localDeguidify(self, fguid);
-                DPRINTF(DEBUG_LVL_VVERB, "Received EDT ("GUIDSx"; 0x%lx)\n",
-                        GUIDFS(fguid->guid), fguid->metaDataPtr);
+                DPRINTF(DEBUG_LVL_VVERB, "Received EDT ("GUIDF"; 0x%lx)\n",
+                        GUIDA(fguid->guid), fguid->metaDataPtr);
                 PD_MSG_FIELD_O(factoryId) = 0;
             }
 #undef PD_MSG
@@ -897,10 +897,10 @@ u8 xePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         // itself
         // Also, this should only happen when there is an actual EDT
         ASSERT(curTask &&
-               IS_GUID_EQUAL(curTask->guid, PD_MSG_FIELD_I(edt.guid)));
+               ocrGuidIsEq(curTask->guid, PD_MSG_FIELD_I(edt.guid)));
 
-        DPRINTF(DEBUG_LVL_VVERB, "DEP_DYNADD req/resp for GUID "GUIDSx"\n",
-                GUIDFS(PD_MSG_FIELD_I(db.guid)));
+        DPRINTF(DEBUG_LVL_VVERB, "DEP_DYNADD req/resp for GUID "GUIDF"\n",
+                GUIDA(PD_MSG_FIELD_I(db.guid)));
         ASSERT(curTask->fctId == self->taskFactories[0]->factoryId);
         PD_MSG_FIELD_O(returnDetail) = self->taskFactories[0]->fcts.notifyDbAcquire(curTask, PD_MSG_FIELD_I(db));
 #undef PD_MSG
@@ -919,9 +919,9 @@ u8 xePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         // itself
         // Also, this should only happen when there is an actual EDT
         ASSERT(curTask &&
-               IS_GUID_EQUAL(curTask->guid, PD_MSG_FIELD_I(edt.guid)));
-        DPRINTF(DEBUG_LVL_VVERB, "DEP_DYNREMOVE req/resp for GUID "GUIDSx"\n",
-                GUIDFS(PD_MSG_FIELD_I(db.guid)));
+               ocrGuidIsEq(curTask->guid, PD_MSG_FIELD_I(edt.guid)));
+        DPRINTF(DEBUG_LVL_VVERB, "DEP_DYNREMOVE req/resp for GUID "GUIDF"\n",
+                GUIDA(PD_MSG_FIELD_I(db.guid)));
         ASSERT(curTask->fctId == self->taskFactories[0]->factoryId);
         PD_MSG_FIELD_O(returnDetail) = self->taskFactories[0]->fcts.notifyDbRelease(curTask, PD_MSG_FIELD_I(db));
 #undef PD_MSG

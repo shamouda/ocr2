@@ -25,7 +25,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
         ocrGuid_t readAff;
         res = ocrAffinityGetAt(AFFINITY_PD, i, &readAff);
         ASSERT(res == 0);
-        ASSERT(IS_GUID_EQUAL(readAff, affinities[i]));
+        ASSERT(ocrGuidIsEq(readAff, affinities[i]));
         i++;
     }
     ocrShutdown();

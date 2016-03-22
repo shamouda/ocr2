@@ -24,7 +24,7 @@ ocrGuid_t shutEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     int i = 0;
     while (i < NB_EDT) {
         if (depv[i].guid != NULL_GUID) {
-            ASSERT(IS_GUID_NULL(db));
+            ASSERT(ocrGuidIsNull(db));
             db = depv[i].guid;
         }
         i++;

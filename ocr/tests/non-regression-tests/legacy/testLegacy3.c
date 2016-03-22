@@ -19,7 +19,7 @@
 
 // This edt is triggered when the output event of the other edt is satisfied by the runtime
 ocrGuid_t terminateEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
-    ASSERT(!(IS_GUID_NULL(depv[1].guid)));
+    ASSERT(!(ocrGuidIsNull(depv[1].guid)));
     u64 * array = (u64*)depv[1].ptr;
     u64 i = 0;
     while (i < N) {

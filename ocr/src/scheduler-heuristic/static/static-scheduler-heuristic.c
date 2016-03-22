@@ -178,16 +178,16 @@ static u8 staticSchedulerHeuristicWorkEdtUserInvoke(ocrSchedulerHeuristic_t *sel
     ocrSchedulerObjectFactory_t *fact = self->scheduler->pd->schedulerObjectFactories[schedObj->fctId];
     ocrSchedulerObject_t *rootObj = self->scheduler->rootObj;
     ocrSchedulerObjectFactory_t *rootFact = self->scheduler->pd->schedulerObjectFactories[rootObj->fctId];
-    while (IS_GUID_NULL(edtObj.guid.guid) && rootFact->fcts.count(rootFact, rootObj, (SCHEDULER_OBJECT_COUNT_EDT | SCHEDULER_OBJECT_COUNT_RECURSIVE)) != 0) {
+    while (ocrGuidIsNull(edtObj.guid.guid) && rootFact->fcts.count(rootFact, rootObj, (SCHEDULER_OBJECT_COUNT_EDT | SCHEDULER_OBJECT_COUNT_RECURSIVE)) != 0) {
         retVal = fact->fcts.remove(fact, schedObj, OCR_SCHEDULER_OBJECT_EDT, 1, &edtObj, NULL, SCHEDULER_OBJECT_REMOVE_HEAD);
-        if (commObj && IS_GUID_NULL(edtObj.guid.guid)) {
+        if (commObj && ocrGuidIsNull(edtObj.guid.guid)) {
             //For distributed scheduling, we need to pick up comm tasks from the comm worker
             ocrSchedulerObjectFactory_t *commFact = self->scheduler->pd->schedulerObjectFactories[commObj->fctId];
             retVal = commFact->fcts.remove(commFact, commObj, OCR_SCHEDULER_OBJECT_EDT, 1, &edtObj, NULL, SCHEDULER_OBJECT_REMOVE_HEAD);
         }
     }
 
-    if (!IS_GUID_NULL(edtObj.guid.guid))
+    if (!ocrGuidIsNull(edtObj.guid.guid))
         taskArgs->OCR_SCHED_ARG_FIELD(OCR_SCHED_WORK_EDT_USER).edt = edtObj.guid;
 
     return retVal;
@@ -275,9 +275,9 @@ static u8 staticSchedulerHeuristicNotifyPreProcessMsgInvoke(ocrSchedulerHeuristi
                     bool usesAffinity = (ocrGetHintValue(edtHint, OCR_HINT_EDT_AFFINITY, &userAffinity) == 0);
                     if (usesAffinity && dself->isDistributed) {
                         ocrGuid_t affGuid = NULL_GUID;
-#ifdef GUID_64
+#if GUID_BIT_COUNT == 64
                         affGuid.guid = userAffinity;
-#elif defined(GUID_128)
+#elif GUID_BIT_COUNT == 128
                         affGuid.upper = 0ULL;
                         affGuid.lower = userAffinity;
 #endif
@@ -333,9 +333,9 @@ static u8 staticSchedulerHeuristicNotifyPreProcessMsgInvoke(ocrSchedulerHeuristi
                 u64 userAffinity = (u64)(-1);
                 if (ocrGetHintValue(dbHint, OCR_HINT_DB_AFFINITY, &userAffinity) == 0) {
                     ocrGuid_t affGuid = NULL_GUID;
-#ifdef GUID_64
+#if GUID_BIT_COUNT == 64
                     affGuid.guid = userAffinity;
-#elif defined(GUID_128)
+#elif GUID_BIT_COUNT == 128
                     affGuid.upper = 0ULL;
                     affGuid.lower = userAffinity;
 #endif

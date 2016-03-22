@@ -254,7 +254,7 @@ u8 ocrPolicyMsgGetMsgSize(ocrPolicyMsg_t *msg, u64 *baseSize,
     case PD_MSG_COMM_TAKE:
 #define PD_TYPE PD_MSG_COMM_TAKE
         if(isIn) {
-            if(PD_MSG_FIELD_IO(guids) != NULL && !(IS_GUID_NULL(PD_MSG_FIELD_IO(guids[0].guid)))) {
+            if(PD_MSG_FIELD_IO(guids) != NULL && !(ocrGuidIsNull(PD_MSG_FIELD_IO(guids[0].guid)))) {
                 // Specific GUIDs have been requested so we need
                 // to marshall those. Otherwise, we do not need to marshall
                 // anything
@@ -658,7 +658,7 @@ u8 ocrPolicyMsgMarshallMsg(ocrPolicyMsg_t* msg, u64 baseSize, u8* buffer, u32 mo
         u64 s = sizeof(ocrFatGuid_t)*PD_MSG_FIELD_IO(guidCount);
         if(isIn) {
             if(PD_MSG_FIELD_IO(guids) != NULL &&
-               !(IS_GUID_NULL(PD_MSG_FIELD_IO(guids[0].guid))) && s != 0) {
+               !(ocrGuidIsNull(PD_MSG_FIELD_IO(guids[0].guid))) && s != 0) {
                 hal_memCopy(curPtr, PD_MSG_FIELD_IO(guids), s, false);
                 // Now fixup the pointer
                 if(fixupPtrs) {
@@ -1220,7 +1220,7 @@ u8 ocrPolicyMsgUnMarshallMsg(u8* mainBuffer, u8* addlBuffer,
             ocrPolicyDomain_t *pd = NULL;
             getCurrentEnv(&pd, NULL, NULL, NULL);
             while(count) {
-                if (!(IS_GUID_NULL(guids->guid))) {
+                if (!(ocrGuidIsNull(guids->guid))) {
                     // Determine if GUID is local
                     //BUG #581: what we should really do is compare the PD location and the guid's one
                     // but the overhead going through the current api sounds unreasonnable.
@@ -1277,7 +1277,7 @@ u8 ocrPolicyMsgUnMarshallMsg(u8* mainBuffer, u8* addlBuffer,
             }
 
             while(count) {
-                if (!(IS_GUID_NULL(guids->guid))) {
+                if (!(ocrGuidIsNull(guids->guid))) {
                     // Determine if GUID is local
                     //BUG #581: what we should really do is compare the PD location and the guid's one
                     // but the overhead going through the current api sounds unreasonnable.

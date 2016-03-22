@@ -63,7 +63,7 @@ u8 ocrAffinityQuery(ocrGuid_t guid, u64 * count, ocrGuid_t * affinities) {
             ASSERT(*count > 0);
             *count = 1;
         }
-        if (IS_GUID_NULL(guid)) {
+        if (ocrGuidIsNull(guid)) {
             affinities[0] = platformModel->pdLocAffinities[platformModel->current];
             return 0;
         }
@@ -143,9 +143,9 @@ u8 ocrAffinityGetCurrent(ocrGuid_t * affinity) {
 }
 
 u64 ocrAffinityToHintValue(ocrGuid_t affinity) {
-#ifdef GUID_64
+#if GUID_BIT_COUNT == 64
     return affinity.guid;
-#elif defined(GUID_128)
+#elif GUID_BIT_COUNT == 128
     return affinity.lower;
 #else
 #error Unknown GUID type

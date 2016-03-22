@@ -100,9 +100,9 @@ u8 binHeapSchedulerObjectInsert(ocrSchedulerObjectFactory_t *fact, ocrSchedulerO
     }
 
     // See BUG #928 on GUID issues
-#ifdef GUID_64
+#if GUID_BIT_COUNT == 64
     heap->push(heap, (void *)edtGuid.guid, priority, 0);
-#elif defined(GUID_128)
+#elif GUID_BIT_COUNT == 128
     heap->push(heap, (void *)edtGuid.lower, priority, 0);
 #endif
 
@@ -142,11 +142,11 @@ u8 binHeapSchedulerObjectRemove(ocrSchedulerObjectFactory_t *fact, ocrSchedulerO
             return OCR_ENOTSUP;
         }
 
-        if(IS_GUID_NULL(retGuid))
+        if(ocrGuidIsNull(retGuid))
             break;
 
         if (IS_SCHEDULER_OBJECT_TYPE_SINGLETON(dst->kind)) {
-            ASSERT(IS_GUID_NULL(dst->guid.guid) && count == 1);
+            ASSERT(ocrGuidIsNull(dst->guid.guid) && count == 1);
             dst->guid.guid = retGuid;
         } else {
             ocrSchedulerObject_t taken;

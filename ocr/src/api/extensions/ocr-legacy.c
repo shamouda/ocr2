@@ -91,7 +91,7 @@ u8 ocrLegacySpawnOCR(ocrGuid_t* handle, ocrGuid_t finishEdtTemplate, u64 paramc,
 
     for(i=0; i < depc; ++i) {
         // Verify that all dependences are known
-        ASSERT(!(IS_GUID_UNINITIALIZED(depv[i])));
+        ASSERT(!(ocrGuidIsUninitialized(depv[i])));
     }
 
     // Hold off the start by saying that one dependence is not satisfied
@@ -200,7 +200,7 @@ u8 ocrLegacyBlockProgress(ocrGuid_t evtHandle, ocrGuid_t* guid, void** result, u
         // Everytime there's a busy wait loop like this we need to
         // call into the PD to try and make progress on other work
         // For instance: might have to unlock some incoming label create here
-        if (IS_GUID_ERROR(dbResult.guid)) {
+        if (ocrGuidIsError(dbResult.guid)) {
             ocrPolicyDomain_t * pd;
             PD_MSG_STACK(msg);
             getCurrentEnv(&pd, NULL, NULL, &msg);
@@ -215,9 +215,9 @@ u8 ocrLegacyBlockProgress(ocrGuid_t evtHandle, ocrGuid_t* guid, void** result, u
 #undef PD_MSG
 #undef PD_TYPE
         }
-    } while(IS_GUID_ERROR(dbResult.guid));
+    } while(ocrGuidIsError(dbResult.guid));
 
-    if(!(IS_GUID_NULL(dbResult.guid))) {
+    if(!(ocrGuidIsNull(dbResult.guid))) {
         if(dbResult.metaDataPtr == NULL) {
             // We now need to acquire the DB
             PD_MSG_STACK(msg);

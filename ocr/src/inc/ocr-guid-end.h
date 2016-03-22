@@ -21,7 +21,7 @@
 #include "ocr-policy-domain.h"
 
 #include "ocr-types.h"
-#include "ocr-guid-macros.h"
+#include "ocr-guid-functions.h"
 
 /**
  *@brief utility function to get the location of a GUID
@@ -77,7 +77,7 @@ static inline u8 guidify(struct _ocrPolicyDomain_t * pd, u64 val,
     PD_MSG_STACK(msg);
     getCurrentEnv(NULL, NULL, NULL, &msg);
 
-    ASSERT(IS_GUID_NULL(guidRes->guid) || IS_GUID_UNINITIALIZED(guidRes->guid));
+    ASSERT(ocrGuidIsNull(guidRes->guid) || ocrGuidIsUninitialized(guidRes->guid));
 
 #define PD_MSG (&msg)
 #define PD_TYPE PD_MSG_GUID_CREATE
@@ -139,7 +139,7 @@ static inline u8 deguidify(struct _ocrPolicyDomain_t * pd, ocrFatGuid_t *res,
 }
 
 static inline bool isDatablockGuid(ocrPolicyDomain_t *pd, ocrFatGuid_t guid) {
-    if (IS_GUID_NULL(guid.guid)) {
+    if (ocrGuidIsNull(guid.guid)) {
         return false;
     }
 
@@ -150,7 +150,7 @@ static inline bool isDatablockGuid(ocrPolicyDomain_t *pd, ocrFatGuid_t guid) {
 }
 
 static inline bool isEventGuid(ocrPolicyDomain_t *pd, ocrFatGuid_t guid) {
-    if (IS_GUID_NULL(guid.guid)) {
+    if (ocrGuidIsNull(guid.guid)) {
         return false;
     }
 
@@ -161,7 +161,7 @@ static inline bool isEventGuid(ocrPolicyDomain_t *pd, ocrFatGuid_t guid) {
 }
 
 static inline bool isEdtGuid(ocrPolicyDomain_t *pd, ocrFatGuid_t guid) {
-    if (IS_GUID_NULL(guid.guid)) {
+    if (ocrGuidIsNull(guid.guid)) {
         return false;
     }
 

@@ -417,10 +417,10 @@ extern void doTrace(u64 location, u64 wrkr, ocrGuid_t taskGuid, ...);
         struct _ocrPolicyDomain_t *_pd = NULL;                          \
         getCurrentEnv(&_pd, &_worker, &_task, NULL);                    \
         PRINTF(OCR_DEBUG_##type##_STR "(" OCR_DEBUG_##level##_STR       \
-               ") [PD:0x%lx W:0x%lx EDT:"GUIDSx"] " format,             \
+               ") [PD:0x%lx W:0x%lx EDT:"GUIDF"] " format,              \
                _pd?(u64)_pd->myLocation:0,                              \
                _worker?(u64)_worker->location:0,                        \
-               _task?GUIDFS(_task->guid):0, ## __VA_ARGS__);            \
+               GUIDA(_task?_task->guid:NULL_GUID), ## __VA_ARGS__);     \
     } } while(0)
 
 #endif /*OCR_TRACE_BINARY*/
