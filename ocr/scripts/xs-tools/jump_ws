@@ -1,6 +1,10 @@
 REPO=$1
 CMD=$2
 
+if [[ $# -lt 1 ]]; then
+   echo "jump_ws: usage is ${SCRIPT_NAME} ocrRepoPath [command]"
+fi
+
 ARCH=x86
 BUILD_DIR=$REPO/ocr/build/${ARCH}
 
@@ -10,7 +14,6 @@ INSTALL_DIR=${PWD}/../../install/${ARCH}
 
 export OCR_INSTALL=${PWD}/../../install/x86
 export LD_LIBRARY_PATH=${OCR_INSTALL}/lib:$LD_LIBRARY_PATH
-export OCR_CONFIG=${OCR_INSTALL}/config/mach-hc-4w.cfg
 
 cd ../../tests
 
