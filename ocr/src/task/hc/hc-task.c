@@ -535,8 +535,8 @@ static u8 taskAllDepvSatisfied(ocrTask_t *self) {
 u8 destructTaskHc(ocrTask_t* base) {
 
     DPRINTF(DEBUG_LVL_INFO,
-            "Destroy "GUIDSx"\n", GUIDFS(base->guid),
-            false, OCR_TRACE_TYPE_EDT, OCR_ACTION_DESTROY);
+            "Destroy "GUIDSx"\n", GUIDFS(base->guid));
+    OCR_TOOL_TRACE(false, OCR_TRACE_TYPE_EDT, OCR_ACTION_DESTROY);
 
 
     ocrPolicyDomain_t *pd = NULL;
@@ -813,8 +813,8 @@ u8 newTaskHc(ocrTaskFactory_t* factory, ocrFatGuid_t * edtGuid, ocrFatGuid_t edt
     if(base->depc == edt->slotSatisfiedCount) {
 
         DPRINTF(DEBUG_LVL_INFO,
-                "Scheduling task "GUIDSx" due to initial satisfactions\n", GUIDFS(base->guid),
-                false, OCR_TRACE_TYPE_EDT, OCR_ACTION_RUNNABLE);
+                "Scheduling task "GUIDSx" due to initial satisfactions\n", GUIDFS(base->guid));
+        OCR_TOOL_TRACE(false, OCR_TRACE_TYPE_EDT, OCR_ACTION_RUNNABLE);
 
         RESULT_PROPAGATE2(taskAllDepvSatisfied(base), 1);
     }
@@ -871,8 +871,8 @@ u8 satisfyTaskHc(ocrTask_t * base, ocrFatGuid_t data, u32 slot) {
 
     DPRINTF(DEBUG_LVL_INFO,
             "Satisfy on task "GUIDSx" slot %d with "GUIDSx" slotSatisfiedCount=%u frontierSlot=%u depc=%u\n",
-            GUIDFS(self->base.guid), slot, GUIDFS(data.guid), self->slotSatisfiedCount, self->frontierSlot, base->depc,
-            false, OCR_TRACE_TYPE_EDT, OCR_ACTION_SATISFY, data.guid);
+            GUIDFS(self->base.guid), slot, GUIDFS(data.guid), self->slotSatisfiedCount, self->frontierSlot, base->depc);
+    OCR_TOOL_TRACE(false, OCR_TRACE_TYPE_EDT, OCR_ACTION_SATISFY, data.guid);
 
     // Check to see if not already satisfied
     ASSERT_BLOCK_BEGIN(self->signalers[slot].slot != SLOT_SATISFIED_EVT)
@@ -891,8 +891,8 @@ u8 satisfyTaskHc(ocrTask_t * base, ocrFatGuid_t data, u32 slot) {
 
     if(self->slotSatisfiedCount == base->depc) {
         DPRINTF(DEBUG_LVL_VERB, "Scheduling task "GUIDSx", satisfied dependences %d/%d\n",
-                GUIDFS(self->base.guid), self->slotSatisfiedCount , base->depc,
-                false, OCR_TRACE_TYPE_EDT, OCR_ACTION_RUNNABLE);
+                GUIDFS(self->base.guid), self->slotSatisfiedCount , base->depc);
+        OCR_TOOL_TRACE(false, OCR_TRACE_TYPE_EDT, OCR_ACTION_RUNNABLE);
 
         hal_unlock32(&(self->lock));
         // All dependences have been satisfied, schedule the edt
@@ -1160,9 +1160,10 @@ u8 notifyDbReleaseTaskHc(ocrTask_t *base, ocrFatGuid_t db) {
 
 u8 taskExecute(ocrTask_t* base) {
     base->state = RUNNING_EDTSTATE;
-    //TODO Execute can be considered user on x86, but need to differentiate processRequestEdts in x86-mpi
-    DPRINTF(DEBUG_LVL_INFO, "Execute "GUIDSx" paramc:%d depc:%d\n", GUIDFS(base->guid), base->paramc, base->depc,
-                            true, OCR_TRACE_TYPE_EDT, OCR_ACTION_EXECUTE, base->funcPtr);
+
+    DPRINTF(DEBUG_LVL_INFO, "Execute "GUIDSx" paramc:%d depc:%d\n", GUIDFS(base->guid), base->paramc, base->depc);
+    OCR_TOOL_TRACE(true, OCR_TRACE_TYPE_EDT, OCR_ACTION_EXECUTE, base->funcPtr);
+
     ocrTaskHc_t* derived = (ocrTaskHc_t*)base;
     // In this implementation each time a signaler has been satisfied, its guid
     // has been replaced by the db guid it has been satisfied with.
@@ -1231,9 +1232,8 @@ u8 taskExecute(ocrTask_t* base) {
     // We now say that the worker is done executing the EDT
     statsEDT_END(pd, ctx->sourceObj, curWorker, base->guid, base);
 #endif /* OCR_ENABLE_STATISTICS */
-    DPRINTF(DEBUG_LVL_INFO, "End_Execution "GUIDSx"\n", GUIDFS(base->guid),
-            true, OCR_TRACE_TYPE_EDT, OCR_ACTION_FINISH);
-
+    DPRINTF(DEBUG_LVL_INFO, "End_Execution "GUIDSx"\n", GUIDFS(base->guid));
+    OCR_TOOL_TRACE(true, OCR_TRACE_TYPE_EDT, OCR_ACTION_FINISH);
     // edt user code is done, if any deps, release data-blocks
     if(depc != 0) {
         START_PROFILE(ta_hc_dbRel);

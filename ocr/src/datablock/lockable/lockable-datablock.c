@@ -629,8 +629,8 @@ u8 newDataBlockLockable(ocrDataBlockFactory_t *factory, ocrFatGuid_t *guid, ocrF
 #endif /* OCR_ENABLE_STATISTICS */
 
     DPRINTF(DEBUG_LVL_VERB, "Creating a datablock of size %lu, @ 0x%lx (GUID: "GUIDSx")\n",
-            size, (u64)result->base.ptr, GUIDFS(result->base.guid),
-            false, OCR_TRACE_TYPE_DATABLOCK, OCR_ACTION_CREATE, size);
+            size, (u64)result->base.ptr, GUIDFS(result->base.guid));
+    OCR_TOOL_TRACE(false, OCR_TRACE_TYPE_DATABLOCK, OCR_ACTION_CREATE, size);
 
     // Do this at the very end; it indicates that the object
     // is actually valid

@@ -183,6 +183,6 @@ typedef struct {
 }ocrTraceObj_t;
 
 #endif /* ENABLE_WORKER_SYSTEM */
-void doTrace(u64 location, u64 wrkr, ocrGuid_t taskGuid, char *str, ...);
+void doTrace(u64 location, u64 wrkr, ocrGuid_t taskGuid, ...);
 
 #endif

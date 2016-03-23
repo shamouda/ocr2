@@ -1018,8 +1018,8 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
 
             } else{
                 DPRINTF(DEBUG_LVL_VERB, "Creating a datablock of size %lu @ 0x%lx (GUID: "GUIDSx")\n",
-                        db->size, db->ptr, GUIDFS(db->guid),
-                        /*srcFlag*/ (PD_MSG_FIELD_I(dbType) == USER_DBTYPE), OCR_TRACE_TYPE_DATABLOCK, OCR_ACTION_CREATE, db->size);
+                        db->size, db->ptr, GUIDFS(db->guid));
+                OCR_TOOL_TRACE(true, OCR_TRACE_TYPE_DATABLOCK, OCR_ACTION_CREATE, db->size);
             }
             ASSERT(db);
             // We do not acquire a data-block in two cases:
@@ -1088,8 +1088,9 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
                     DPRINTF(DEBUG_LVL_WARN, "DB Acquire failed for guid "GUIDSx"\n", GUIDFS(PD_MSG_FIELD_IO(guid.guid)));
                 ASSERT(PD_MSG_FIELD_O(returnDetail) == 0);
                 DPRINTF(DEBUG_LVL_INFO, "DB guid "GUIDSx" of size %lu acquired by EDT "GUIDSx"\n",
-                        GUIDFS(db->guid), db->size, GUIDFS(PD_MSG_FIELD_IO(edt.guid)),
-                        false, OCR_TRACE_TYPE_EDT, OCR_ACTION_DATA_ACQUIRE, PD_MSG_FIELD_IO(edt.guid), db->guid, db->size);
+                        GUIDFS(db->guid), db->size, GUIDFS(PD_MSG_FIELD_IO(edt.guid)));
+                OCR_TOOL_TRACE(false, OCR_TRACE_TYPE_EDT, OCR_ACTION_DATA_ACQUIRE, PD_MSG_FIELD_IO(edt.guid),
+                                db->guid, db->size);
                 msg->type &= ~PD_MSG_REQUEST;
                 msg->type |= PD_MSG_RESPONSE;
             }
@@ -1129,8 +1130,8 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         PD_MSG_FIELD_O(returnDetail) = self->dbFactories[0]->fcts.release(
             db, PD_MSG_FIELD_I(edt), !!(PD_MSG_FIELD_I(properties) & DB_PROP_RT_ACQUIRE));
         DPRINTF(DEBUG_LVL_INFO, "DB guid "GUIDSx" of size %lu released by EDT "GUIDSx"\n",
-                GUIDFS(db->guid), db->size, GUIDFS(edtGuid),
-                false, OCR_TRACE_TYPE_EDT, OCR_ACTION_DATA_RELEASE, edtGuid, db->guid, db->size);
+                GUIDFS(db->guid), db->size, GUIDFS(edtGuid));
+        OCR_TOOL_TRACE(false, OCR_TRACE_TYPE_EDT, OCR_ACTION_DATA_RELEASE, edtGuid, db->guid, db->size);
 #undef PD_MSG
 #undef PD_TYPE
         msg->type &= ~PD_MSG_REQUEST;
@@ -1155,8 +1156,8 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             DPRINTF(DEBUG_LVL_WARN, "DB Free failed for guid "GUIDSx"\n", GUIDFS(PD_MSG_FIELD_I(guid.guid)));
         else{
             DPRINTF(DEBUG_LVL_INFO,
-                    "DB guid: "GUIDSx" Destroyed\n", GUIDFS(PD_MSG_FIELD_I(guid).guid),
-                    false, OCR_TRACE_TYPE_DATABLOCK, OCR_ACTION_DESTROY);
+                    "DB guid: "GUIDSx" Destroyed\n", GUIDFS(PD_MSG_FIELD_I(guid).guid));
+            OCR_TOOL_TRACE(false, OCR_TRACE_TYPE_DATABLOCK, OCR_ACTION_DESTROY);
 
         }
 #undef PD_MSG
@@ -1818,8 +1819,9 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
                 u8 returnDetail = (returnCode == 0) ? PD_MSG_FIELD_O(returnDetail) : returnCode;
 
                 DPRINTF(DEBUG_LVL_INFO,
-                        "Dependence added (src: "GUIDSx", dest: "GUIDSx") -> %u\n", GUIDFS(src.guid), GUIDFS(dest.guid), returnCode,
-                        false, OCR_TRACE_TYPE_EVENT, OCR_ACTION_ADD_DEP, src.guid);
+                        "Dependence added (src: "GUIDSx", dest: "GUIDSx") -> %u\n", GUIDFS(src.guid),
+                        GUIDFS(dest.guid), returnCode);
+                OCR_TOOL_TRACE(false, OCR_TRACE_TYPE_EVENT, OCR_ACTION_ADD_DEP, src.guid);
 
             #undef PD_MSG
             #undef PD_TYPE
@@ -1881,8 +1883,9 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
 #endif
 
         DPRINTF(DEBUG_LVL_INFO,
-                "Dependence added (src: "GUIDSx", dest: "GUIDSx") -> %u\n", GUIDFS(signaler.guid), GUIDFS(dest.guid), returnCode,
-                false, OCR_TRACE_TYPE_EDT, OCR_ACTION_ADD_DEP, signaler.guid);
+                "Dependence added (src: "GUIDSx", dest: "GUIDSx") -> %u\n", GUIDFS(signaler.guid),
+                GUIDFS(dest.guid), returnCode);
+        OCR_TOOL_TRACE(false, OCR_TRACE_TYPE_EDT, OCR_ACTION_ADD_DEP, signaler.guid);
 
 
 #undef PD_MSG

@@ -53,7 +53,8 @@ u8 ocrEventCreateParams(ocrGuid_t *guid, ocrEventTypes_t eventType, u16 properti
 #undef PD_TYPE
 
     DPRINTF_COND_LVL(((returnCode != 0) && (returnCode != OCR_EGUIDEXISTS)), DEBUG_LVL_WARN, DEBUG_LVL_INFO,
-                     "EXIT ocrEventCreate -> %u; GUID: "GUIDSx"\n", returnCode, GUIDFS(*guid), true, OCR_TRACE_TYPE_EVENT, OCR_ACTION_CREATE);
+                     "EXIT ocrEventCreate -> %u; GUID: "GUIDSx"\n", returnCode, GUIDFS(*guid));
+    OCR_TOOL_TRACE(true, OCR_TRACE_TYPE_EVENT, OCR_ACTION_CREATE);
     RETURN_PROFILE(returnCode);
 
 }
@@ -112,8 +113,8 @@ u8 ocrEventSatisfySlot(ocrGuid_t eventGuid, ocrGuid_t dataGuid /*= INVALID_GUID*
     PD_MSG_FIELD_I(properties) = 0;
     u8 returnCode = pd->fcts.processMessage(pd, &msg, false);
     DPRINTF_COND_LVL(returnCode, DEBUG_LVL_WARN, DEBUG_LVL_INFO,
-                    "EXIT ocrEventSatisfySlot(evt="GUIDSx") -> %u\n", GUIDFS(eventGuid), returnCode, true, OCR_TRACE_TYPE_EVENT,
-                    OCR_ACTION_SATISFY, dataGuid);
+                    "EXIT ocrEventSatisfySlot(evt="GUIDSx") -> %u\n", GUIDFS(eventGuid), returnCode);
+    OCR_TOOL_TRACE(true, OCR_TRACE_TYPE_EVENT, OCR_ACTION_SATISFY, dataGuid);
     RETURN_PROFILE(returnCode);
 #undef PD_MSG
 #undef PD_TYPE
@@ -208,8 +209,8 @@ u8 ocrEdtCreate(ocrGuid_t* edtGuidPtr, ocrGuid_t templateGuid,
            "ENTER ocrEdtCreate(*guid="GUIDSx", template="GUIDSx", paramc=%d, paramv=0x%lx"
            ", depc=%d, depv=0x%lx, prop=%u, aff="GUIDSx", outEvt="GUIDSx")\n",
            GUIDFS(edtGuid), GUIDFS(templateGuid), (s32)paramc, paramv, (s32)depc, depv,
-           (u32)properties, GUIDFS(affinity),  GUIDFS(outputEvent?*outputEvent:NULL_GUID),
-           true, OCR_TRACE_TYPE_EDT, OCR_ACTION_CREATE);
+           (u32)properties, GUIDFS(affinity),  GUIDFS(outputEvent?*outputEvent:NULL_GUID));
+    OCR_TOOL_TRACE(true, OCR_TRACE_TYPE_EDT, OCR_ACTION_CREATE);
 
     PD_MSG_STACK(msg);
     ocrPolicyDomain_t * pd = NULL;
