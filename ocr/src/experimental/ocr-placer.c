@@ -65,14 +65,15 @@ u8 suggestLocationPlacement(ocrPolicyDomain_t *pd, ocrLocation_t curLoc, ocrPlat
                     // Don't auto-place and extract the affinity GUID from the hings
                     ocrHint_t *hint = PD_MSG_FIELD_I(hint);
                     u64 hintValue = 0ULL;
-                    if(ocrGetHintValue(hint, OCR_HINT_EDT_AFFINITY, &hintValue) == 0) {
-                        ocrGuid_t affGuid = NULL_GUID;
+                    if ((ocrGetHintValue(hint, OCR_HINT_EDT_AFFINITY, &hintValue) == 0) && (hintValue != 0)) {
+                        ocrGuid_t affGuid;
 #if GUID_BIT_COUNT == 64
                         affGuid.guid = hintValue;
 #elif GUID_BIT_COUNT == 128
                         affGuid.upper = 0ULL;
                         affGuid.lower = hintValue;
 #endif
+                        ASSERT(!ocrGuidIsNull(affGuid));
                         msg->destLocation = affinityToLocation(affGuid);
                         }
                     } else {
@@ -93,14 +94,15 @@ u8 suggestLocationPlacement(ocrPolicyDomain_t *pd, ocrLocation_t curLoc, ocrPlat
                 if (PD_MSG_FIELD_I(hint) != NULL_HINT) {
                     ocrHint_t *hint = PD_MSG_FIELD_I(hint);
                     u64 hintValue = 0ULL;
-                    if(ocrGetHintValue(hint, OCR_HINT_DB_AFFINITY, &hintValue) == 0) {
-                        ocrGuid_t affGuid = NULL_GUID;
+                    if ((ocrGetHintValue(hint, OCR_HINT_DB_AFFINITY, &hintValue) == 0) && (hintValue != 0)) {
+                        ocrGuid_t affGuid;
 #if GUID_BIT_COUNT == 64
                         affGuid.guid = hintValue;
 #elif GUID_BIT_COUNT == 128
                         affGuid.upper = 0ULL;
                         affGuid.lower = hintValue;
 #endif
+                        ASSERT(!ocrGuidIsNull(affGuid));
                         msg->destLocation = affinityToLocation(affGuid);
                     }
                 }
