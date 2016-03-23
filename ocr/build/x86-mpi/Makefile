@@ -39,7 +39,7 @@ LDFLAGS += -shared -fpic -lpthread
 # -lrt needed only for < glibc-2.17 in Linux systems (not needed for OS X)
 UNAME := $(shell uname -s)
 ifeq ($(UNAME),Linux)
-ret := $(shell echo "`ldd --version | awk '/ldd/{print $$NF}'` < 2.17" | bc)
+ret := $(shell echo "`ldd --version | awk '/ldd/{print $$NF}' | cut -d'.' -f1-2` < 2.17" | bc)
 ifeq ($(ret), 1)
 LDFLAGS += -lrt
 endif
