@@ -343,6 +343,8 @@ def GenerateComp(output, pdtype, threads, binding, sysworker, schedtype):
             output.write("\tconfig\t=\tcomp0:plc0:comm1\n")
             output.write("\tschedulerHeuristic\t=\t0-1\n")
         else:
+            # default:
+            output.write("\tconfig\t=\tcomp0:plc0:comm0\n")
             output.write("\tschedulerHeuristic\t=\t0\n")
     output.write("\n#======================================================\n")
 
