@@ -575,6 +575,40 @@ $(OCR_INSTALL)/include/tg-bin-files.h: $(OCR_BUILD)/tg-bin-files.h
 	$(AT)$(CP) $(OCR_BUILD)/tg-bin-files.h $(OCR_INSTALL)/include/
 endif
 
+UNAME := $(shell uname -s)
+ifeq ($(UNAME),Darwin)
+
+$(OCR_INSTALL)/lib/%: $(BASE_LIBS)% | $(OCR_INSTALL)/lib
+	$(AT)$(RM) -f $@
+	$(AT)install -m 0644 $< $@
+
+$(OCR_INSTALL)/bin/%: $(BASE_EXES)% | $(OCR_INSTALL)/bin
+	$(AT)$(RM) -f $@
+	$(AT)install -m 0755 $< $@
+
+$(OCR_INSTALL)/include/%: $(OCR_ROOT)/inc/% | $(OCR_INSTALL)/include $(OCR_INSTALL)/include/extensions
+	$(AT)$(RM) -f $@
+	$(AT)install -m 0644 $< $@
+
+$(OCR_INSTALL)/share/ocr/config/$(OCR_TYPE)/%: $(OCR_ROOT)/machine-configs/$(OCR_TYPE)/% | $(OCR_INSTALL)/share/ocr/config/$(OCR_TYPE)
+	$(AT)$(RM) -f $@
+	$(AT)install -m 0644 $< $@
+
+$(OCR_INSTALL)/share/ocr/scripts/%: $(OCR_ROOT)/scripts/% | $(OCR_INSTALL)/share/ocr/scripts $(OCR_INSTALL)/share/ocr/scripts/Configs
+	$(AT)$(RM) -f $@
+	$(AT)install -m 0755 $< $@
+
+.PHONY: $(OCR_INSTALL)/lib $(OCR_INSTALL)/bin $(OCR_INSTALL)/share/ocr/config/$(OCR_TYPE) \
+$(OCR_INSTALL)/include $(OCR_INSTALL)/include/extensions $(OCR_INSTALL)/share/ocr/scripts\
+$(OCR_INSTALL)/share/ocr/scripts/Configs
+
+$(OCR_INSTALL)/lib $(OCR_INSTALL)/bin $(OCR_INSTALL)/share/ocr/config/$(OCR_TYPE) \
+$(OCR_INSTALL)/include $(OCR_INSTALL)/include/extensions $(OCR_INSTALL)/share/ocr/scripts\
+$(OCR_INSTALL)/share/ocr/scripts/Configs:
+	$(AT)$(MKDIR) -p $@
+
+else
+
 $(OCR_INSTALL)/lib/%: $(BASE_LIBS)%
 	$(AT)install -D -m 0644 $< $@
 
@@ -590,6 +624,7 @@ $(OCR_INSTALL)/share/ocr/config/$(OCR_TYPE)/%: $(OCR_ROOT)/machine-configs/$(OCR
 $(OCR_INSTALL)/share/ocr/scripts/%: $(OCR_ROOT)/scripts/%
 	$(AT)install -D -m 0755 $< $@
 
+endif # End of Darwin ifeq
 
 .PHONY: install
 install: ${INSTALL_TARGETS} ${INSTALLED_LIBS} ${INSTALLED_EXES} ${INSTALLED_INCS} \
