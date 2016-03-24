@@ -528,8 +528,8 @@ INSTALL_TARGETS += exec
 INSTALL_EXES += $(OCREXEC)
 endif
 
-INC_FILES         := $(addprefix extensions/, $(notdir $(wildcard $(OCR_ROOT)/inc/extensions/*))) \
-                     $(notdir $(wildcard $(OCR_ROOT)/inc/*))
+INC_FILES         := $(addprefix extensions/, $(notdir $(wildcard $(OCR_ROOT)/inc/extensions/*.h))) \
+                     $(notdir $(wildcard $(OCR_ROOT)/inc/*.h))
 
 # WARNING: This next line actually generates the configurations. This will be cleaned
 # up in a later commit.
