@@ -136,6 +136,11 @@ endif
 # before FOCUS_DEPTH is reached, the profiler will stop giving details of sub-calls)
 # CFLAGS += -DPROFILER_IGNORE_RT
 #
+# The following option is only relevant with PROFILER_FOCUS
+# Enable this if you want to gather everything that happens outside of the
+# focus function into an EVENT_OTHER bucket.
+# CFLAGS += -DPROFILER_COUNT_OTHER
+#
 # (optional) Maximum number of scope nesting for runtime profiler
 # CFLAGS += -DMAX_PROFILER_LEVEL=512
 
@@ -312,13 +317,22 @@ SRCS += $(PROFILER_FILE_C)
 PROFILER_FILE=$(OCR_BUILD)/src/profilerAutoGenRT.h
 CFLAGS += -I $(OCR_BUILD)/src
 VPATH += $(OCR_BUILD)/src
+
 ifneq (,$(findstring PROFILER_W_APPS, $(CFLAGS)))
 PROFILER_MODE := rtapp
 else
 PROFILER_MODE := rt
 endif
+
+ifneq (,$(findstring PROFILER_COUNT_OTHER, $(CFLAGS)))
+PROFILER_EXTRA_OPTS := --otherbucket
 else
-PROFILER_FILE=
+PROFILER_EXTRA_OPTS :=
+endif
+
+else
+PROFILER_FILE   :=
+PROFILER_FILE_C :=
 endif
 
 OBJS_STATIC   := $(addprefix $(OBJDIR)/static/, $(addsuffix .o, $(basename $(notdir $(SRCS)))))
@@ -463,7 +477,7 @@ $(OCREXEC): $(OBJS_EXEC)
 
 $(PROFILER_FILE): $(SRCSORIG) | $(OCR_BUILD)/src
 	@echo "Generating profile file..."
-	$(AT)$(OCR_ROOT)/scripts/Profiler/generateProfilerFile.py -m $(PROFILER_MODE) -o $(OCR_BUILD)/src/profilerAutoGen --exclude .git --exclude profiler $(OCR_ROOT)/src
+	$(AT)$(OCR_ROOT)/scripts/Profiler/generateProfilerFile.py -m $(PROFILER_MODE) -o $(OCR_BUILD)/src/profilerAutoGen --exclude .git --exclude profiler $(PROFILER_EXTRA_OPTS) $(OCR_ROOT)/src
 	@echo "\tDone."
 
 $(PROFILER_FILE_C): $(PROFILER_FILE)

@@ -53,10 +53,12 @@ def main(argv=None):
     rtFile = None     # Runtime file
     rootDir = None    # Directory to scan
     quietMode = False # Set to true if you want no output
+    createOtherBucket = False
 
     try:
         try:
-            opts, args = getopt.getopt(argv[1:], "hm:o:", ["help", "mode=", "out=", "rtfile=", "ext=", "exclude=", "quiet"])
+            opts, args = getopt.getopt(argv[1:], "hm:o:", ["help", "mode=", "out=", "rtfile=", "ext=", "exclude=", "quiet",
+                                                           "otherbucket"])
         except getopt.error, err:
             raise Usage(err)
         for o, a in opts:
@@ -86,6 +88,8 @@ def main(argv=None):
     --rtfile:       Only when in 'app' mode: path to the base name of the generated file
                     for the runtime (generated in 'rtapp' mode). This file must already exist
                     and have properly processed the runtime source code
+    --otherbucket   Create a "EVENT_OTHER" bucket that will be used to collect stuff that is not
+                    the focus of the profiling
     --quiet:        Do not print anything
 """ % (argv[0]))
             elif o in ('-m', '--mode'):
@@ -109,6 +113,8 @@ def main(argv=None):
                 if rtFile is not None:
                     raise Usage("Rtfile specified multiple times")
                 rtFile = a
+            elif o in ('--otherbucket'):
+                createOtherBucket = True
             elif o in ('--quiet'):
                 quietMode = True
             else:
@@ -154,6 +160,7 @@ def main(argv=None):
     profileLine_re = re.compile(r"\s*START_PROFILE\(([0-9A-Za-z_]+)\)");
     maxRtEvent_re = re.compile(r"\s*MAX_EVENTS_RT = ([0-9]+)")
     endCStruct_re = re.compile(r"^};$")
+    eventOther_re = re.compile(r"^    \"EVENT_OTHER\"")
 
     for root, subDirs, files in os.walk(rootDir):
         if not quietMode:
@@ -206,6 +213,9 @@ def main(argv=None):
             if opMode == MODE_RTAPP:
                 fileHandle.write('MAX_EVENTS_RT = %d,\n} profilerEventRT_t;\n' % (counter))
             else:
+                if createOtherBucket:
+                    fileHandle.write('EVENT_OTHER = %d,\n    ' % (counter))
+                    counter += 1
                 fileHandle.write('MAX_EVENTS = %d,\n} profilerEventRT_t;\n' % (counter))
 
 
@@ -223,7 +233,11 @@ def main(argv=None):
 #error "OCR_RUNTIME_PROFILER should be defined if including the auto-generated profile file"
 #endif
 typedef enum {
-    MAX_EVENTS = %d
+""")
+                if createOtherBucket:
+                    fileHandle.write('    EVENT_OTHER = %d,\n    ' % (counter))
+                    counter += 1
+                fileHandle.write("""MAX_EVENTS = %d
 } profilerEventApp_t;
 #endif
                 """ % (counter))
@@ -241,6 +255,8 @@ typedef enum {
                     isFirst = False
                 else:
                     fileHandle.write(',\n    "%s"' % (function))
+            if createOtherBucket:
+                fileHandle.write(',\n    "EVENT_OTHER"')
 
             fileHandle.write('\n};\n#endif')
         # End of with statement writing the .c file
@@ -270,6 +286,9 @@ typedef enum {
             for function in allFunctions:
                 destFile.write('%s = %d,\n    ' % (function, maxRtCount))
                 maxRtCount += 1
+            if createOtherBucket:
+                destFile.write('EVENT_OTHER = %d,\n    ' % (maxRtCount))
+                maxRtCount += 1
             destFile.write('MAX_EVENTS = %d\n} profilerEventApp_t;\n' % (maxRtCount))
             # Close off the file
             destFile.write('extern const char* _profilerEventNames[];\n')
@@ -284,13 +303,20 @@ typedef enum {
                     # We found the last interesting line of the file
                     break
                 else:
-                    # Just copy to the new file
+                    matchOb = eventOther_re.match(line)
+                    if matchOb is not None:
+                        # We will re-print this line (if we are in the extra bucket mode)
+                        # otherwise, we should definitely not copy it
+                        break
+                    # Just copy things over to the new file
                     destFile.write(line)
             # End for line
             # At this stage, we add the other entries
             for function in allFunctions:
                 destFile.write(',\n    "%s"' % (function))
             # Close off the file
+            if createOtherBucket:
+                destFile.write('    "EVENT_OTHER"')
             destFile.write('\n};\n#endif')
         # End of open for the c file
     # End of apps mode

@@ -42,7 +42,8 @@ typedef struct __profilerFlags {
     u8 active    :1;
     u8 isPaused  :1;
     u8 isRecurse :1;
-    u8 _pad      :5;
+    u8 hasAddLevel :1;
+    u8 _pad      :4;
 } _profilerFlags;
 
 typedef struct __profiler {

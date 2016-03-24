@@ -57,13 +57,23 @@ void _profilerInit(_profiler *self, u32 event, u64 prevTicks) {
 #ifdef PROFILER_FOCUS
 
         if(self->myData->level > 0) {
+#ifdef PROFILER_COUNT_OTHER
+            if(self->myData->stack[self->myData->level-1]->myEvent == EVENT_OTHER) {
+                if(event != PROFILER_FOCUS) {
+                    // We don't track under the "other" bucket except if it is what we are supposed to focus on
+                    return;
+                } else {
+                    self->flags.hasAddLevel = true;
+                }
+            }
+#endif
 
 #ifdef PROFILER_FOCUS_DEPTH
             // We are already tracking so we just check to make sure we still
             // should be tracking
             // +1 because focus function is 0 and we want to track up to FOCUS_DEPTH
             // included
-            if(self->myData->level == PROFILER_FOCUS_DEPTH + 1) {
+            if(self->myData->level == (PROFILER_FOCUS_DEPTH + 1 + self.flags.hasAddLevel)) {
                 // We don't track
                 // active flag is already false, just return
                 return;
@@ -87,8 +97,15 @@ void _profilerInit(_profiler *self, u32 event, u64 prevTicks) {
 #endif /* PROFILER_IGNORE_RT */
 
         } else if ((u32)event != (u32)PROFILER_FOCUS) {
+#ifdef PROFILER_COUNT_OTHER
+            // We will bucket everything else under another event
+            // and count it all in one lump
+            event = EVENT_OTHER;
+            self->myEvent = event;
+#else
             // Not the right event, we return
             return;
+#endif
         }
 #endif /* PROFILER_FOCUS */
 
