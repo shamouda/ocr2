@@ -6,12 +6,12 @@
 # Author: Ivan Ganev <ivan.b.ganev@intel.com>
 #
 
-ifndef ARCH
-OCR_TYPE=tg-xe
+ifndef OCR_TYPE
+  OCR_TYPE=tg-xe
 else
-ifneq (${OCR_TYPE}, tg-xe)
-$(error OCR_TYPE is set to ${OCR_TYPE} but expected tg-xe)
-endif
+  ifneq (${OCR_TYPE}, tg-xe)
+    $(error OCR_TYPE is set to ${OCR_TYPE} but expected tg-xe)
+  endif
 endif
 #
 # Tool-chain to be used for the build
