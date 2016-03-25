@@ -381,6 +381,8 @@ u8 labeledGuidCreateGuid(ocrGuidProvider_t* self, ocrFatGuid_t *fguid, u64 size,
                                     // This is used to determine if a GUID metadata is "ready". See bug #627
     hal_fence(); // Make sure the ptr update is visible before we update the hash table
     if(properties & GUID_PROP_IS_LABELED) {
+        // Bug #865: Warning if ordering is important, first GUID_PROP_CHECK then GUID_PROP_BLOCK
+        // because we want the first branch to intercept (GUID_PROP_CHECK | GUID_PROP_BLOCK)
         if((properties & GUID_PROP_CHECK) == GUID_PROP_CHECK) {
             // We need to actually check things
             DPRINTF(DEBUG_LVL_VERB, "LabeledGUID: try insert into hash table "GUIDF" -> 0x%lx\n", GUIDA(fguid->guid), ptr);
@@ -413,15 +415,19 @@ u8 labeledGuidCreateGuid(ocrGuidProvider_t* self, ocrFatGuid_t *fguid, u64 size,
                 // Bug #627: We do not return OCR_EGUIDEXISTS until the GUID is valid. We test this
                 // by looking at the first field of ptr and waiting for it to be the GUID value (meaning the
                 // object has been initialized
+
+                // Bug #865: When both GUID_PROP_BLOCK and GUID_PROP_CHECK are set it indicates the caller
+                // wants to try to create the object but should retry asynchronously. In that case
+                // we can't enter the blocking loop as the value pointer may become invalid if
+                // there's an interleaved destroy call on the GUID.
+                if ((properties & GUID_PROP_BLOCK) != GUID_PROP_BLOCK) {
                 // See BUG #928 on GUID issues
 #if GUID_BIT_COUNT == 64
-                while(!(ocrGuidIsEq((*(volatile ocrGuid_t*)value), fguid->guid)));
+                    while((*(volatile u64*)value) != fguid->guid);
 #elif GUID_BIT_COUNT == 128
-                //TODO The below workaround is to get things working. Should use the ocrGuidIsEq macro but right
-                //     now only the lower 64 bits are coming back from the hash table PUT in <value>, due to 64 bit
-                //     assumptions.
-                while((*(volatile u64*)value) != fguid->guid.lower);
+                    while((*(volatile u64*)value) != fguid->guid.lower);
 #endif
+                }
                 hal_fence(); // May be overkill but there is a race that I don't get
                 return OCR_EGUIDEXISTS;
             }
