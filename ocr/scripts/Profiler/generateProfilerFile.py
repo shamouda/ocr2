@@ -297,16 +297,18 @@ typedef enum {
         # Take care of the C file
         with open(rtFile + '.c.orig', 'r') as sourceFile, open(rtFile + '.c', 'w') as destFile:
             maxRtCount = 0
+            missingComma = False
             for line in sourceFile:
                 matchOb = endCStruct_re.match(line)
                 if matchOb is not None:
                     # We found the last interesting line of the file
+                    # If we reach here, it means we did not have a comma on the last line that
+                    # we printed
+                    missingComma = True
                     break
                 else:
                     matchOb = eventOther_re.match(line)
                     if matchOb is not None:
-                        # We will re-print this line (if we are in the extra bucket mode)
-                        # otherwise, we should definitely not copy it
                         break
                     # Just copy things over to the new file
                     destFile.write(line)
@@ -314,8 +316,11 @@ typedef enum {
             # At this stage, we add the other entries
             for function in allFunctions:
                 destFile.write(',\n    "%s"' % (function))
+                missingComma = True
             # Close off the file
             if createOtherBucket:
+                if missingComma:
+                    destFile.write(',\n')
                 destFile.write('    "EVENT_OTHER"')
             destFile.write('\n};\n#endif')
         # End of open for the c file
