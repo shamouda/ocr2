@@ -75,9 +75,8 @@ class EnsembleStatistics(object):
             self.gatheringThread = ThreadStatistics(thread)
             self.gatheringThread.fileName = "_gatherthread_node_%s" % (self.nodeName)
             self.gatheringThread.threadName = "Node %s" % (self.nodeName)
-        else:
-            self.gatheringThread.addInstance(thread)
-            self.allThreads.append(thread)
+        self.gatheringThread.addInstance(thread)
+        self.allThreads.append(thread)
 
     def calculateStatistics(self):
         self.gatheringThread.calculateStatistics()
