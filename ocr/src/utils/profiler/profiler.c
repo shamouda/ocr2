@@ -131,8 +131,8 @@ _profiler* _profilerDestroy(_profiler *self, u64 end) {
         self->accumulatorTicks -= (1+self->countResume)*self->myData->overheadTimer;
     }
 
-    u64 accumulatorMs = self->accumulatorTicks/PROFILE_KHZ;
-    u32 accumulatorNs = (u32)(1000000.0*((double)self->accumulatorTicks/PROFILE_KHZ - (double)accumulatorMs));
+    u64 accumulatorMs = self->accumulatorTicks/PROFILER_KHZ;
+    u32 accumulatorNs = (u32)(1000000.0*((double)self->accumulatorTicks/PROFILER_KHZ - (double)accumulatorMs));
 
     if(removedFromStack) {
         // First the self counter
@@ -142,10 +142,10 @@ _profiler* _profilerDestroy(_profiler *self, u64 end) {
             // type and once inside the execution time of the parent).
             ASSERT(self->accumulatorTicks > self->recurseAccumulate);
             u64 t = self->accumulatorTicks - self->recurseAccumulate;
-            u64 tt = t/PROFILE_KHZ;
+            u64 tt = t/PROFILER_KHZ;
 
             _profilerSelfEntryAddTime(&(self->myData->selfEvents[self->myEvent]), tt,
-                                      (u32)(1000000.0*((double)t/PROFILE_KHZ - tt)));
+                                      (u32)(1000000.0*((double)t/PROFILER_KHZ - tt)));
         } else {
             _profilerSelfEntryAddTime(&(self->myData->selfEvents[self->myEvent]), accumulatorMs, accumulatorNs);
         }
@@ -162,10 +162,10 @@ _profiler* _profilerDestroy(_profiler *self, u64 end) {
 
             if(parentEventPtr->currentRecurseAccumulate != 0.0) {
                 u64 t = parentEventPtr->currentRecurseAccumulate;
-                u64 tt = t/PROFILE_KHZ;
+                u64 tt = t/PROFILER_KHZ;
                 _profilerChildEntryAddRecurseTime(
                     &(self->myData->childrenEvents[parentEvent][self->myEvent<parentEvent?self->myEvent:(self->myEvent-1)]),
-                    tt, (u32)(1000000.0*((double)t/PROFILE_KHZ - tt)));
+                    tt, (u32)(1000000.0*((double)t/PROFILER_KHZ - tt)));
                 _profilerSwapRecurse(parentEventPtr);
             }
 

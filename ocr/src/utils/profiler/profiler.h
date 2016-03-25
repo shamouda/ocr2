@@ -52,8 +52,12 @@
 #define MAX_PROFILER_LEVEL 512
 #endif
 
-//timeMs = a/PROFILE_KHZ;
-//timeNs = (unsigned int)(1000000.0*((double)a/PROFILE_KHZ - (double)timeMs));
+#ifndef PROFILER_KHZ
+#define PROFILER_KHZ 3400000
+#endif
+
+//timeMs = a/PROFILER_KHZ;
+//timeNs = (unsigned int)(1000000.0*((double)a/PROFILER_KHZ - (double)timeMs));
 
 #define _gettime(ticks)                          \
     do {                                         \
