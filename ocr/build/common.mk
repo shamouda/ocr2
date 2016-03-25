@@ -101,9 +101,9 @@ CFLAGS += -DGUID_PROVIDER_LOCID_SIZE=10
 # Declare flags for AddressSanitizer
 # Warning: Applications must use the same flags else it will crash.
 ifeq (${OCR_ASAN}, yes)
-ASAN_FLAGS := -g -fsanitize=address -fno-omit-frame-pointer
-CFLAGS += $(ASAN_FLAGS)
-LDFLAGS += $(ASAN_FLAGS) $(LDFLAGS)
+  ASAN_FLAGS := -g -fsanitize=address -fno-omit-frame-pointer
+  CFLAGS += $(ASAN_FLAGS)
+  LDFLAGS += $(ASAN_FLAGS) $(LDFLAGS)
 endif
 
 # Runtime overhead profiler
@@ -153,13 +153,13 @@ endif
 
 # Debugging support
 ifneq (${NO_DEBUG}, yes)
-	# Enable assertions
-	CFLAGS += -DOCR_ASSERT
-	# Enable debug
-	CFLAGS += -DOCR_DEBUG
-	OPT_LEVEL=-O2
+  # Enable assertions
+  CFLAGS += -DOCR_ASSERT
+  # Enable debug
+  CFLAGS += -DOCR_DEBUG
+  OPT_LEVEL=-O2
 else
-	OPT_LEVEL=-O3
+  OPT_LEVEL=-O3
 endif
 
 # Define level
@@ -283,13 +283,13 @@ SRCS   := $(shell find -L $(OCR_ROOT)/src -name '*.[csS]' -print)
 VPATH  := $(shell find -L $(OCR_ROOT)/src -type d -print)
 
 ifneq (,$(findstring OCR_RUNTIME_PROFILER,$(CFLAGS)))
-SRCSORIG = $(SRCS)
-SRCS += $(OCR_BUILD)/src/profilerAutoGen.c
-PROFILER_FILE=$(OCR_BUILD)/src/profilerAutoGen.c
-CFLAGS += -I $(OCR_BUILD)/src
-VPATH += $(OCR_BUILD)/src
+  SRCSORIG = $(SRCS)
+  SRCS += $(OCR_BUILD)/src/profilerAutoGen.c
+  PROFILER_FILE=$(OCR_BUILD)/src/profilerAutoGen.c
+  CFLAGS += -I $(OCR_BUILD)/src
+  VPATH += $(OCR_BUILD)/src
 else
-PROFILER_FILE=
+  PROFILER_FILE=
 endif
 
 OBJS_STATIC   := $(addprefix $(OBJDIR)/static/, $(addsuffix .o, $(basename $(notdir $(SRCS)))))
@@ -302,24 +302,24 @@ CFLAGS := -I . -I $(OCR_ROOT)/inc -I $(OCR_ROOT)/src -I $(OCR_ROOT)/src/inc $(CF
 
 # Static library name (only set if not set in OCR_TYPE specific file)
 ifeq (${SUPPORTS_STATIC}, yes)
-OCRSTATIC ?= libocr_${OCR_TYPE}.a
-OCRSTATIC := $(OCR_BUILD)/$(OCRSTATIC)
-CFLAGS_STATIC ?=
-CFLAGS_STATIC := ${CFLAGS} ${CFLAGS_STATIC}
+  OCRSTATIC ?= libocr_${OCR_TYPE}.a
+  OCRSTATIC := $(OCR_BUILD)/$(OCRSTATIC)
+  CFLAGS_STATIC ?=
+  CFLAGS_STATIC := ${CFLAGS} ${CFLAGS_STATIC}
 endif
 # Shared library name (only set if not set in OCR_TYPE specific file)
 ifeq (${SUPPORTS_SHARED}, yes)
-CFLAGS_SHARED ?=
-CFLAGS_SHARED := ${CFLAGS} ${CFLAGS_SHARED}
-OCRSHARED ?= libocr_${OCR_TYPE}.so
-OCRSHARED := $(OCR_BUILD)/$(OCRSHARED)
+  CFLAGS_SHARED ?=
+  CFLAGS_SHARED := ${CFLAGS} ${CFLAGS_SHARED}
+  OCRSHARED ?= libocr_${OCR_TYPE}.so
+  OCRSHARED := $(OCR_BUILD)/$(OCRSHARED)
 endif
 # Executable name (only set if not set in OCR_TYPE specific file)
 ifeq (${SUPPORTS_EXEC}, yes)
-CFLAGS_EXEC ?=
-CFLAGS_EXEC := ${CFLAGS} ${CFLAGS_EXEC}
-OCREXEC ?= ocrBuilder_$(OCR_TYPE).exe
-OCREXEC := $(OCR_BUILD)/$(OCREXEC)
+  CFLAGS_EXEC ?=
+  CFLAGS_EXEC := ${CFLAGS} ${CFLAGS_EXEC}
+  OCREXEC ?= ocrBuilder_$(OCR_TYPE).exe
+  OCREXEC := $(OCR_BUILD)/$(OCREXEC)
 endif
 
 #
@@ -329,8 +329,8 @@ endif
 # versions of Apple's ranlib
 # This is to remove the warnings when building the library
 #ifeq ($(shell $(RANLIB) -V 2>/dev/null | head -1 | cut -f 1 -d ' '), Apple)
-#RANLIB := $(RANLIB) -no_warning_for_no_symbols
-#ARFLAGS := cruS
+#  RANLIB := $(RANLIB) -no_warning_for_no_symbols
+#  ARFLAGS := cruS
 #endif
 
 #
@@ -502,13 +502,13 @@ $(OBJDIR)/shared/%.o: %.S Makefile ../common.mk | $(OBJDIR)/shared
 # We only include the ones for the .o that we need to generate
 #
 ifeq (${SUPPORTS_STATIC}, yes)
--include $(OBJS_STATIC:.o=.d)
+  -include $(OBJS_STATIC:.o=.d)
 endif
 ifeq (${SUPPORTS_SHARED}, yes)
--include $(OBJS_SHARED:.o=.d)
+  -include $(OBJS_SHARED:.o=.d)
 endif
 ifeq (${SUPPORTS_EXEC}, yes)
--include $(OBJS_EXEC:.o=.d)
+  -include $(OBJS_EXEC:.o=.d)
 endif
 
 # Install
@@ -516,16 +516,16 @@ INSTALL_TARGETS :=
 INSTALL_LIBS    :=
 INSTALL_EXES    := $(OCRRUNNER)
 ifeq (${SUPPORTS_STATIC}, yes)
-INSTALL_TARGETS += static
-INSTALL_LIBS += $(OCRSTATIC)
+  INSTALL_TARGETS += static
+  INSTALL_LIBS += $(OCRSTATIC)
 endif
 ifeq (${SUPPORTS_SHARED}, yes)
-INSTALL_TARGETS += shared
-INSTALL_LIBS += $(OCRSHARED)
+  INSTALL_TARGETS += shared
+  INSTALL_LIBS += $(OCRSHARED)
 endif
 ifeq (${SUPPORTS_EXEC}, yes)
-INSTALL_TARGETS += exec
-INSTALL_EXES += $(OCREXEC)
+  INSTALL_TARGETS += exec
+  INSTALL_EXES += $(OCREXEC)
 endif
 
 INC_FILES         := $(addprefix extensions/, $(notdir $(wildcard $(OCR_ROOT)/inc/extensions/*.h))) \
@@ -540,12 +540,12 @@ MACHINE_CONFIGS   := $(notdir $(wildcard $(OCR_ROOT)/machine-configs/$(OCR_TYPE)
 SCRIPT_FILES      := Configs/config-generator.py
 
 ifneq (,$(findstring $(OCR_TYPE),"tg-ce tg-xe builder-xe builder-ce"))
-SCRIPT_FILES      += $(addprefix Configs/, ce_config_fix.py combine-configs.py mem_config_fix.py tg-fsim_config_fix.py)
-SCRIPT_FILES      += $(patsubst $(OCR_ROOT)/scripts/%,%,$(wildcard $(OCR_ROOT)/scripts/Blob/*))
+  SCRIPT_FILES      += $(addprefix Configs/, ce_config_fix.py combine-configs.py mem_config_fix.py tg-fsim_config_fix.py)
+  SCRIPT_FILES      += $(patsubst $(OCR_ROOT)/scripts/%,%,$(wildcard $(OCR_ROOT)/scripts/Blob/*))
 endif
 ifeq (x86-phi,$(findstring $(OCR_TYPE),x86-phi))
-SCRIPT_FILES      += Configs/combine-configs.py
-DEFAULT_CONFIG    := knl_mcdram.cfg
+  SCRIPT_FILES      += Configs/combine-configs.py
+  DEFAULT_CONFIG    := knl_mcdram.cfg
 endif
 
 INSTALLED_LIBS    := $(addprefix $(OCR_INSTALL)/lib/, $(notdir $(INSTALL_LIBS)))
@@ -562,15 +562,15 @@ INSTALLED_SCRIPTS := $(addprefix $(OCR_INSTALL)/share/ocr/scripts/, $(SCRIPT_FIL
 # as the build directory is no longer available when the app
 # is building but TGKRNL still needs tg-bin-files.h
 ifeq ($(OCR_TYPE), tg-xe)
-INSTALLED_INCS    += $(OCR_INSTALL)/include/tg-bin-files.h
-$(OCR_INSTALL)/include/tg-bin-files.h: $(OCR_BUILD)/tg-bin-files.h
+  INSTALLED_INCS    += $(OCR_INSTALL)/include/tg-bin-files.h
+  $(OCR_INSTALL)/include/tg-bin-files.h: $(OCR_BUILD)/tg-bin-files.h
 	$(AT)$(RM) -f $(OCR_INSTALL)/include/tg-bin-files.h
 	$(AT)$(CP) $(OCR_BUILD)/tg-bin-files.h $(OCR_INSTALL)/include/
 endif
 
 ifeq ($(OCR_TYPE), tg-ce)
-INSTALLED_INCS    += $(OCR_INSTALL)/include/tg-bin-files.h
-$(OCR_INSTALL)/include/tg-bin-files.h: $(OCR_BUILD)/tg-bin-files.h
+  INSTALLED_INCS    += $(OCR_INSTALL)/include/tg-bin-files.h
+  $(OCR_INSTALL)/include/tg-bin-files.h: $(OCR_BUILD)/tg-bin-files.h
 	$(AT)$(RM) -f $(OCR_INSTALL)/include/tg-bin-files.h
 	$(AT)$(CP) $(OCR_BUILD)/tg-bin-files.h $(OCR_INSTALL)/include/
 endif
@@ -578,50 +578,50 @@ endif
 UNAME := $(shell uname -s)
 ifeq ($(UNAME),Darwin)
 
-$(OCR_INSTALL)/lib/%: $(BASE_LIBS)% | $(OCR_INSTALL)/lib
+  $(OCR_INSTALL)/lib/%: $(BASE_LIBS)% | $(OCR_INSTALL)/lib
 	$(AT)$(RM) -f $@
 	$(AT)install -m 0644 $< $@
 
-$(OCR_INSTALL)/bin/%: $(BASE_EXES)% | $(OCR_INSTALL)/bin
+  $(OCR_INSTALL)/bin/%: $(BASE_EXES)% | $(OCR_INSTALL)/bin
 	$(AT)$(RM) -f $@
 	$(AT)install -m 0755 $< $@
 
-$(OCR_INSTALL)/include/%: $(OCR_ROOT)/inc/% | $(OCR_INSTALL)/include $(OCR_INSTALL)/include/extensions
+  $(OCR_INSTALL)/include/%: $(OCR_ROOT)/inc/% | $(OCR_INSTALL)/include $(OCR_INSTALL)/include/extensions
 	$(AT)$(RM) -f $@
 	$(AT)install -m 0644 $< $@
 
-$(OCR_INSTALL)/share/ocr/config/$(OCR_TYPE)/%: $(OCR_ROOT)/machine-configs/$(OCR_TYPE)/% | $(OCR_INSTALL)/share/ocr/config/$(OCR_TYPE)
+  $(OCR_INSTALL)/share/ocr/config/$(OCR_TYPE)/%: $(OCR_ROOT)/machine-configs/$(OCR_TYPE)/% | $(OCR_INSTALL)/share/ocr/config/$(OCR_TYPE)
 	$(AT)$(RM) -f $@
 	$(AT)install -m 0644 $< $@
 
-$(OCR_INSTALL)/share/ocr/scripts/%: $(OCR_ROOT)/scripts/% | $(OCR_INSTALL)/share/ocr/scripts $(OCR_INSTALL)/share/ocr/scripts/Configs
+  $(OCR_INSTALL)/share/ocr/scripts/%: $(OCR_ROOT)/scripts/% | $(OCR_INSTALL)/share/ocr/scripts $(OCR_INSTALL)/share/ocr/scripts/Configs
 	$(AT)$(RM) -f $@
 	$(AT)install -m 0755 $< $@
 
-.PHONY: $(OCR_INSTALL)/lib $(OCR_INSTALL)/bin $(OCR_INSTALL)/share/ocr/config/$(OCR_TYPE) \
-$(OCR_INSTALL)/include $(OCR_INSTALL)/include/extensions $(OCR_INSTALL)/share/ocr/scripts\
-$(OCR_INSTALL)/share/ocr/scripts/Configs
+  .PHONY: $(OCR_INSTALL)/lib $(OCR_INSTALL)/bin $(OCR_INSTALL)/share/ocr/config/$(OCR_TYPE) \
+  $(OCR_INSTALL)/include $(OCR_INSTALL)/include/extensions $(OCR_INSTALL)/share/ocr/scripts\
+  $(OCR_INSTALL)/share/ocr/scripts/Configs
 
-$(OCR_INSTALL)/lib $(OCR_INSTALL)/bin $(OCR_INSTALL)/share/ocr/config/$(OCR_TYPE) \
-$(OCR_INSTALL)/include $(OCR_INSTALL)/include/extensions $(OCR_INSTALL)/share/ocr/scripts\
-$(OCR_INSTALL)/share/ocr/scripts/Configs:
+  $(OCR_INSTALL)/lib $(OCR_INSTALL)/bin $(OCR_INSTALL)/share/ocr/config/$(OCR_TYPE) \
+  $(OCR_INSTALL)/include $(OCR_INSTALL)/include/extensions $(OCR_INSTALL)/share/ocr/scripts\
+  $(OCR_INSTALL)/share/ocr/scripts/Configs:
 	$(AT)$(MKDIR) -p $@
 
 else
 
-$(OCR_INSTALL)/lib/%: $(BASE_LIBS)%
+  $(OCR_INSTALL)/lib/%: $(BASE_LIBS)%
 	$(AT)install -D -m 0644 $< $@
 
-$(OCR_INSTALL)/bin/%: $(BASE_EXES)%
+  $(OCR_INSTALL)/bin/%: $(BASE_EXES)%
 	$(AT)install -D -m 0755 $< $@
 
-$(OCR_INSTALL)/include/%: $(OCR_ROOT)/inc/%
+  $(OCR_INSTALL)/include/%: $(OCR_ROOT)/inc/%
 	$(AT)install -D -m 0644 $< $@
 
-$(OCR_INSTALL)/share/ocr/config/$(OCR_TYPE)/%: $(OCR_ROOT)/machine-configs/$(OCR_TYPE)/%
+  $(OCR_INSTALL)/share/ocr/config/$(OCR_TYPE)/%: $(OCR_ROOT)/machine-configs/$(OCR_TYPE)/%
 	$(AT)install -D -m 0644 $< $@
 
-$(OCR_INSTALL)/share/ocr/scripts/%: $(OCR_ROOT)/scripts/%
+  $(OCR_INSTALL)/share/ocr/scripts/%: $(OCR_ROOT)/scripts/%
 	$(AT)install -D -m 0755 $< $@
 
 endif # End of Darwin ifeq

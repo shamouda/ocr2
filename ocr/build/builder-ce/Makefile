@@ -7,11 +7,11 @@
 #
 
 ifndef OCR_TYPE
-OCR_TYPE=builder-ce
+  OCR_TYPE=builder-ce
 else
-ifneq (${OCR_TYPE}, builder-ce)
-$(error OCR_TYPE is set to ${OCR_TYPE} but expected builder-ce)
-endif
+  ifneq (${OCR_TYPE}, builder-ce)
+    $(error OCR_TYPE is set to ${OCR_TYPE} but expected builder-ce)
+  endif
 endif
 #
 # Tool-chain to be used for the build

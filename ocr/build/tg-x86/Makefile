@@ -7,11 +7,11 @@
 #
 
 ifndef OCR_TYPE
-OCR_TYPE=tg-x86
+  OCR_TYPE=tg-x86
 else
-ifneq (${OCR_TYPE}, tg-x86)
-$(error OCR_TYPE is set to ${OCR_TYPE} but expected tg-x86)
-endif
+  ifneq (${OCR_TYPE}, tg-x86)
+    $(error OCR_TYPE is set to ${OCR_TYPE} but expected tg-x86)
+  endif
 endif
 
 DEFAULT_CONFIG=mach-1block.cfg
@@ -39,10 +39,10 @@ LDFLAGS := -shared -fpic -lpthread
 # -lrt needed only for < glibc-2.17 in Linux systems (not needed for OS X)
 UNAME := $(shell uname -s)
 ifeq ($(UNAME),Linux)
-ret := $(shell echo "`ldd --version | awk '/ldd/{print $$NF}' | cut -d'.' -f1-2` < 2.17" | bc)
-ifeq ($(ret), 1)
-LDFLAGS += -lrt
-endif
+  ret := $(shell echo "`ldd --version | awk '/ldd/{print $$NF}' | cut -d'.' -f1-2` < 2.17" | bc)
+  ifeq ($(ret), 1)
+    LDFLAGS += -lrt
+  endif
 endif
 
 # CFLAGS_SHARED will be concatenated with any
