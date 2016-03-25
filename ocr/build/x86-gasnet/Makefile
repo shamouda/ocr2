@@ -20,7 +20,13 @@ DEFAULT_CONFIG=mach-hc-dist-gasnet-clone-8w.cfg
 # Tool-chain to be used for the build
 #
 
-CC      ?= gcc
+FORCE_CC ?= no
+ifeq ($(FORCE_CC), no)
+  ifeq ($(CC), cc)
+    CC = gcc
+  endif
+endif # End of ifeq force_cc
+
 CFLAGS  :=
 
 RM      := rm

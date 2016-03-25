@@ -296,9 +296,18 @@ OBJS_STATIC   := $(addprefix $(OBJDIR)/static/, $(addsuffix .o, $(basename $(not
 OBJS_SHARED   := $(addprefix $(OBJDIR)/shared/, $(addsuffix .o, $(basename $(notdir $(SRCS)))))
 OBJS_EXEC     := $(addprefix $(OBJDIR)/exec/, $(addsuffix .o, $(basename $(notdir $(SRCS)))))
 
-
 # Update include paths
 CFLAGS := -I . -I $(OCR_ROOT)/inc -I $(OCR_ROOT)/src -I $(OCR_ROOT)/src/inc $(CFLAGS)
+
+ifeq (, $(filter-out gcc mpicc, $(CC)))
+  # For gcc/mpicc versions < 4.4 disable warning as error as message pragmas are not supported
+  ret := $(shell echo "`$(CC) -dumpversion | cut -d'.' -f1-2` < 4.4" | bc)
+  ifeq ($(ret), 0)
+    CFLAGS += -Werror
+  endif
+else
+  CFLAGS += -Werror
+endif
 
 # Static library name (only set if not set in OCR_TYPE specific file)
 ifeq (${SUPPORTS_STATIC}, yes)

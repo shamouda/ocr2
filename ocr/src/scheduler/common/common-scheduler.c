@@ -50,7 +50,7 @@ static void parseConfigStr(ocrSchedulerHeuristic_t ** pdSchedulerHeuristics, ocr
         while (!ocrIsDigit((u8) cfgStr[r])) {
             r++;
         }
-        u8 id;
+        u8 id = 0;
         if (ocrStrncmp((u8*)"comp", (u8*)&cfgStr[l], (r-l)) == 0) {
             DPRINTF(DEBUG_LVL_INFO, "Assigning heuristic %d to slot COMP_HEURISTIC_ID\n", sglAtoi(cfgStr[r]));
             id = COMP_HEURISTIC_ID;

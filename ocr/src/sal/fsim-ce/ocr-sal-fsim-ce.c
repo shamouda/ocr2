@@ -73,7 +73,7 @@ void salResume(u32 flag) {
 u64 salGetTime(void){
     u64 cycles = 0;
 #if !defined(ENABLE_BUILDER_ONLY)
-    cycles = tg_ld64(AR_MSR_BASE + GLOBAL_TIME_STAMP_COUNTER * sizeof(u64));
+    cycles = tg_ld64((u64*)(AR_MSR_BASE + GLOBAL_TIME_STAMP_COUNTER * sizeof(u64)));
 #endif
     return cycles;
 }
