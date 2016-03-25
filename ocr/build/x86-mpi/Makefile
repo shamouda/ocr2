@@ -20,7 +20,12 @@ DEFAULT_CONFIG=mach-hc-dist-mpi-clone-8w-lockableDB.cfg
 # Tool-chain to be used for the build
 #
 
-CC      := mpicc
+FORCE_CC ?= no
+ifeq ($(FORCE_CC), no)
+  ifeq ($(CC), cc)
+    CC = mpicc
+  endif
+endif # End of ifeq force_cc
 
 # Conserve CFLAGS and LDFLAGS defined in environment
 CFLAGS  := ${CFLAGS}

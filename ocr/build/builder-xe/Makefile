@@ -19,7 +19,13 @@ endif
 
 TG_INSTALL ?= ../../../../tg/tg/install
 
-CC      := gcc
+FORCE_CC ?= no
+ifeq ($(FORCE_CC), no)
+  ifeq ($(CC), cc)
+    CC = gcc
+  endif
+endif # End of ifeq force_cc
+
 CFLAGS  := -fno-builtin -fno-stack-protector -I ${TG_INSTALL}/include
 
 RM      := rm

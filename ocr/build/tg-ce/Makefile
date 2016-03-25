@@ -22,7 +22,13 @@ TG_INSTALL ?= ../../../../tg/tg/install
 DEFAULT_CONFIG = ce-default.cfg
 
 
-CC      := gcc
+FORCE_CC ?= no
+ifeq ($(FORCE_CC), no)
+  ifeq ($(CC), cc)
+    CC = gcc
+  endif
+endif # End of ifeq force_cc
+
 CFLAGS  := -m64 -mcmodel=large -fno-builtin -fno-stack-protector -Wno-unused-local-typedefs \
 		-I${TG_INSTALL}/include
 
