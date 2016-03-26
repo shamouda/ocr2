@@ -85,7 +85,13 @@ static u64 guidCounter = 0;
 static ocrGuidKind getKindFromGuid(ocrGuid_t guid);
 
 void countedMapHashmapEntryDestructChecker(void * key, void * value, void * deallocParam) {
-    ocrGuid_t guid = (ocrGuid_t) key;
+    ocrGuid_t guid;
+#if GUID_BIT_COUNT == 64
+    guid.guid = (u64) key;
+#elif GUID_BIT_COUNT == 128
+    guid.upper = 0x0;
+    guid.lower = (u64) key;
+#endif
     ((u32*)deallocParam)[getKindFromGuid(guid)]++;
 #ifdef GUID_PROVIDER_DESTRUCT_CHECK_VERBOSE
     DPRINTF(DEBUG_LVL_WARN, "Remnant GUID "GUIDF" of kind %s still registered on GUID provider\n", GUIDA(guid),  ocrGuidKindToChar(getKindFromGuid(guid)));

@@ -60,10 +60,14 @@ u8 suggestLocationPlacement(ocrPolicyDomain_t *pd, ocrLocation_t curLoc, ocrPlat
             {
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_WORK_CREATE
-                doAutoPlace = (PD_MSG_FIELD_I(workType) == EDT_USER_WORKTYPE) &&
-                    (ocrGuidIsNull(PD_MSG_FIELD_I(affinity.guid)));
-                if (!(ocrGuidIsNull(PD_MSG_FIELD_I(affinity.guid)))) {
-                    msg->destLocation = affinityToLocation(PD_MSG_FIELD_I(affinity.guid));
+                if (PD_MSG_FIELD_I(workType) == EDT_USER_WORKTYPE) {
+                    doAutoPlace = true;
+                    if (!(ocrGuidIsNull(PD_MSG_FIELD_I(affinity.guid)))) {
+                        msg->destLocation = affinityToLocation(PD_MSG_FIELD_I(affinity.guid));
+                        doAutoPlace = false;
+                    }
+                } else { // For runtime EDTs, always local
+                    doAutoPlace = false;
                 }
 #undef PD_MSG
 #undef PD_TYPE
@@ -73,15 +77,12 @@ u8 suggestLocationPlacement(ocrPolicyDomain_t *pd, ocrLocation_t curLoc, ocrPlat
             {
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_DB_CREATE
-                doAutoPlace = false;
                 // For now a DB is always created where the current EDT executes unless
                 // it has an affinity specified (i.e. no auto-placement)
                 if (!(ocrGuidIsNull(PD_MSG_FIELD_I(affinity.guid)))) {
                     msg->destLocation = affinityToLocation(PD_MSG_FIELD_I(affinity.guid));
+                    return 0;
                 }
-                // When we do place DBs make sure we only place USER DBs
-                // doPlace = ((PD_MSG_FIELD_I(dbType) == USER_DBTYPE) &&
-                //             (PD_MSG_FIELD_I(affinity.guid) == NULL_GUID));
 #undef PD_MSG
 #undef PD_TYPE
             break;
@@ -90,7 +91,7 @@ u8 suggestLocationPlacement(ocrPolicyDomain_t *pd, ocrLocation_t curLoc, ocrPlat
                 // Fall-through
             break;
         }
-
+        // Auto placement
         if (doAutoPlace) {
             hal_lock32(&(placer->lock));
             u32 placementIndex = placer->edtLastPlacementIndex;

@@ -56,6 +56,9 @@
 #define ENABLE_GUID_COUNTED_MAP
 #define ENABLE_GUID_LABELED
 
+// Hints
+#define ENABLE_HINTS
+
 // HAL layer to use
 #define HAL_X86_64
 
@@ -98,6 +101,11 @@
 #define ENABLE_SCHEDULER_OBJECT_PR_WSH
 #define ENABLE_SCHEDULER_OBJECT_BIN_HEAP
 
+// Support for MPIlite blocking operations
+#ifndef DISABLE_EXTENSION_BLOCKING_SUPPORT
+#define ENABLE_EXTENSION_BLOCKING_SUPPORT
+#endif
+
 // Sysboot layer to use
 #define ENABLE_SYSBOOT_LINUX
 
@@ -110,6 +118,7 @@
 // Worker
 #define ENABLE_WORKER_HC
 #define ENABLE_WORKER_HC_COMM
+#define ENABLE_WORKER_SYSTEM
 
 // Workpile
 #define ENABLE_WORKPILE_HC
@@ -117,17 +126,17 @@
 // Event creation with parameter
 #define ENABLE_EXTENSION_PARAMS_EVT
 
-//Counted Events support
+// Counted Events support
 #define ENABLE_EXTENSION_COUNTED_EVT
+
+// Channel Events support
+#define ENABLE_EXTENSION_CHANNEL_EVT
 
 // OCR legacy support
 #define ENABLE_EXTENSION_LEGACY
 
 // Affinity support
 #define ENABLE_EXTENSION_AFFINITY
-
-//GUID Labeling
-#define ENABLE_EXTENSION_LABELING
 
 //GUID Labeling
 #define ENABLE_EXTENSION_LABELING
@@ -139,3 +148,4 @@
 #define ENABLE_EXTENSION_RTITF
 
 #endif /* __OCR_CONFIG_H__ */
+
