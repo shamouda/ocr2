@@ -18,6 +18,7 @@
 // are only created but not satisfied in this test.
 #define CLEAN_UP_ITERATION 1
 
-#define EVENT_TYPE OCR_EVENT_LATCH_T
 
-#include "event0.ctpl"
+#define EVENT_TYPE OCR_EVENT_COUNTED_T
+
+#include "event0Counted.ctpl"

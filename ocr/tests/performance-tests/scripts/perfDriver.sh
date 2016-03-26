@@ -65,7 +65,7 @@ if [[ ! -d ${SCRIPT_ROOT} ]]; then
     exit 1
 fi
 
-if [[ ! -d ${SCRIPT_ROOT} ]]; then
+if [[ ! -d ${TEST_FOLDER} ]]; then
     echo "error: ${SCRIPT_NAME} cannot find test folder ${TEST_FOLDER}"
     exit 1
 fi

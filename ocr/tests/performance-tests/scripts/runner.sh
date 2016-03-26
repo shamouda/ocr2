@@ -210,14 +210,14 @@ function generateMachineFile {
                 echo "Error: USER envkind requires OCRRUN_OPT_TPL_NODEFILE does not point to a file"
                 VALUE=""
             fi
-            head -n ${nodes} > $VALUE
-            local nb= `more $VALUE | wc -l`;
+            head -n ${nodes} "${OCRRUN_OPT_TPL_NODEFILE}" > $VALUE
+            local nb=`more $VALUE | wc -l`;
             if [[ "$nb" != "${nodes}" ]]; then
                 nb= `more ${OCRRUN_OPT_TPL_NODEFILE} | wc -l`;
                 echo "Error: not enough nodes (${nodes})/${nb}) declared in ${OCRRUN_OPT_TPL_NODEFILE}"
                 VALUE=""
             else
-                echo "Generated node file: ${OCR_NODEFILE} for ${OCR_NUM_NODES} number of nodes from ${OCRRUN_OPT_TPL_NODEFILE}"
+                echo "Generated node file: ${VALUE} for ${OCR_NUM_NODES} number of nodes from ${OCRRUN_OPT_TPL_NODEFILE}"
             fi
         else
             VALUE=""
@@ -404,8 +404,12 @@ function runTest() {
         scalingTest ${prog} "${defines}" | tee ${runlog}-$i
         let i=$i+1;
     done
+
+    # WARNING WARNING WARNING
+    # Whenever an additional porint line is added here, the post-processing
+    # scripts must be updated to correctly strip out those additional lines.
+    echo "start_date: ${START_DATE}" >> ${report}
     if [[ $defines = "" ]]; then
-        echo "start_date: ${START_DATE}" >> ${report}
         echo "defines_set: defaults.mk" >> ${report}
     else
         echo "defines: ${defines}" >> ${report}

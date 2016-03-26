@@ -30,6 +30,7 @@
 #define PHASE_COMM_QUIESCE ((u8) 1)
 #define PHASE_DONE ((u8) 0)
 
+
 /******************************************************/
 /* OCR-HC COMMUNICATION WORKER                        */
 /* Extends regular HC workers                         */
@@ -317,7 +318,16 @@ static void workerLoopHcCommInternal(ocrWorker_t * worker, ocrPolicyDomain_t *pd
                         handle->destruct(handle);
                     }
                 } else {
+#ifdef COMMWRK_PROCESS_SATISFY // This is for benchmarking purpose to measure overhead of delegating processing
+                    if ((message->type & PD_MSG_TYPE_ONLY) == PD_MSG_DEP_SATISFY) {
+                        DPRINTF(DEBUG_LVL_VVERB,"hc-comm-worker: Process PD_MSG_DEP_SATISFY message, type=%lx msgId: %ld\n",  message->type, message->msgId);
+                        processRequestEdt(1, &msgParamv, 0, NULL);
+                    } else {
+#endif
                     createProcessRequestEdt(pd, processRequestTemplate, &msgParamv);
+#ifdef COMMWRK_PROCESS_SATISFY
+                    }
+#endif
                     // We do not need the handle anymore
                     handle->destruct(handle);
                 }

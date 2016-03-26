@@ -20,8 +20,13 @@ function buildOcr() {
 }
 
 function runProg() {
-    rm build/*
-    ./scripts/perfDriver.sh -target ${OCR_TYPE} ${NAME}
+    local OPTS=""
+    if [[ -n "${LOGDIR}" ]]; then
+        echo "GENERATING LOG DIR OPTIONS"
+        OPTS+="-logdir ${LOGDIR}"
+    fi
+    rm -Rf build/*
+    ./scripts/perfDriver.sh ${OPTS} -target ${OCR_TYPE} ${NAME}
 }
 
 

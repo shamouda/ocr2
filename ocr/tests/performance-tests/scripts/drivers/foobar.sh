@@ -40,10 +40,13 @@ buildOcr
 # Common Definitions
 #
 
-LOGDIR=logs_foobar
+# - Generates reports under LOGDIR
+# - Generates digest report in current folder
+LOGDIR=`mktemp -d logs_foobar.XXXXXX`
 
 # Fan-out for event related tests
-VAL_FAN_OUT=4
+VAL_FAN_OUT=1
+
 
 #
 # EDT benchmarking

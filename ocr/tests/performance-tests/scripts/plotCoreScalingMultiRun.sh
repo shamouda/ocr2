@@ -52,7 +52,7 @@ ${SCRIPT_ROOT}/extractors/extractReportColDataPoint.sh ${COL_THROUGHPUT_ID} ${IG
 #
 
 COL_NB_CORE_ID=1
-${SCRIPT_ROOT}/extractors/extractReportColDataPoint.sh ${COL_NB_CORE_ID} ${IGNORE_TOP_LINES} ${TMPDIR}  ${XLABEL_FILE} ${REPORT_FILENAME}
+${SCRIPT_ROOT}/extractors/extractReportColDataPoint.sh ${COL_NB_CORE_ID} ${IGNORE_TOP_LINES} ${TMPDIR} ${XLABEL_FILE} ${REPORT_FILENAME}
 paste -d ' ' ${XLABEL_FILE} ${DATA_BUFFER_FILE} > ${DATA_FILE}
 
 
