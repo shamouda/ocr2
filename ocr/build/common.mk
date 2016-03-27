@@ -4,20 +4,7 @@
 OCR_ROOT ?= ../..
 OCR_INSTALL ?= ../../install
 
-OCR_BUILD := .
-
-#
-# Make sure we have absolute paths
-#
-OCR_ROOT := $(shell cd "${OCR_ROOT}" && pwd)
-OCR_INSTALL := $(shell mkdir -p "${OCR_INSTALL}" && cd "${OCR_INSTALL}" && pwd)
-OCR_BUILD := $(shell cd "${OCR_BUILD}" && pwd)
-
-
-#
-# Object & dependence file subdirectory
-#
-OBJDIR := $(OCR_BUILD)/objs
+OCR_BUILD ?= .
 
 #
 # Default machine configuration
@@ -163,7 +150,7 @@ else
 endif
 
 # Define level
- CFLAGS += -DOCR_DEBUG_LVL=DEBUG_LVL_WARN
+CFLAGS += -DOCR_DEBUG_LVL=DEBUG_LVL_WARN
 # CFLAGS += -DOCR_DEBUG_LVL=DEBUG_LVL_INFO
 # CFLAGS += -DOCR_DEBUG_LVL=DEBUG_LVL_VERB
 # CFLAGS += -DOCR_DEBUG_LVL=DEBUG_LVL_VVERB
@@ -266,11 +253,59 @@ CFLAGS := -g -Wall $(CFLAGS) $(CFLAGS_USER)
 # END OF USER CONFIGURABLE OPTIONS                             #
 ################################################################
 
+
+#
+# Make sure we have absolute paths
+#
+ifeq (,$(OCR_ROOT))
+  $(error OCR_ROOT needs to be defined)
+else
+  _T := $(OCR_ROOT)
+  OCR_ROOT := $(realpath $(_T))
+  ifeq (,$(OCR_ROOT))
+    $(error OCR_ROOT is not a valid path: $(_T))
+  endif
+endif
+
+ifeq (,$(OCR_BUILD))
+  $(error OCR_BUILD needs to be defined)
+else
+  _T := $(OCR_BUILD)
+  OCR_BUILD := $(realpath $(_T))
+  ifeq (,$(OCR_BUILD))
+    $(info Creating OCR_BUILD: $(_T))
+    $(shell mkdir -p "$(_T)")
+    OCR_BUILD := $(realpath $(_T))
+  endif
+endif
+
+ifeq (,$(OCR_INSTALL))
+  $(error OCR_INSTALL needs to be defined)
+else
+  _T := $(OCR_INSTALL)
+  OCR_INSTALL := $(realpath $(_T))
+  ifeq (,$(OCR_INSTALL))
+    $(info Creating OCR_INSTALL: $(_T))
+    $(shell mkdir -p "$(_T)")
+    OCR_INSTALL := $(realpath $(_T))
+  endif
+endif
+
 # Verbosity of make
 V ?= 0
 AT_0 := @
 AT_1 :=
 AT = $(AT_$(V))
+
+I ?= 0
+ATI_0 := @
+ATI_1 :=
+ATI = $(ATI_$(I))
+
+#
+# Object & dependence file subdirectory
+#
+OBJDIR := $(OCR_BUILD)/objs
 
 #
 # Generate a list of all source files and the respective objects
@@ -288,8 +323,17 @@ ifneq (,$(findstring OCR_RUNTIME_PROFILER,$(CFLAGS)))
   PROFILER_FILE=$(OCR_BUILD)/src/profilerAutoGen.c
   CFLAGS += -I $(OCR_BUILD)/src
   VPATH += $(OCR_BUILD)/src
+  ifeq ($(I), 1)
+    $(info Profiler support turned on)
+  endif
 else
   PROFILER_FILE=
+endif
+
+ifeq ($(I), 1)
+  $(info OCR_BUILD   is: $(OCR_BUILD))
+  $(info OCR_ROOT    is: $(OCR_ROOT))
+  $(info OCR_INSTALL is: $(OCR_INSTALL))
 endif
 
 OBJS_STATIC   := $(addprefix $(OBJDIR)/static/, $(addsuffix .o, $(basename $(notdir $(SRCS)))))
@@ -445,7 +489,6 @@ $(OCREXEC): $(OBJS_EXEC)
 #
 
 $(PROFILER_FILE): $(SRCSORIG) | $(OCR_BUILD)/src
-# Need this comment to make V=1 work (no idea why the first @ is causing so much issue)
 	@echo "Generating profile file..."
 	$(AT)$(OCR_ROOT)/scripts/Profiler/generateProfilerFile.py $(OCR_ROOT)/src $(OCR_BUILD)/src/profilerAutoGen h,c .git profiler
 	@echo "\tDone."
@@ -455,55 +498,65 @@ $(PROFILER_FILE): $(SRCSORIG) | $(OCR_BUILD)/src
 # to remake anything that depends on that file which is
 # exactly what we want. This is adapted from:
 # http://scottmcpeak.com/autodepend/autodepend.html
+# Other information on some of the other rules for dependences can be found
+# here: http://make.mad-scientist.net/papers/advanced-auto-dependency-generation/
 #   sed:    strip the target (everything before colon)
 #   sed:    remove any continuation backslashes
 #   fmt -1: list words one per line
 #   sed:    strip leading spaces
-#   sed:    add trailing colons
-$(OBJDIR)/static/%.o: %.c Makefile ../common.mk $(PROFILER_FILE) | $(OBJDIR)/static
-# Need this comment to make V=1 work (no idea why the first @ is causing so much issue)
+#   sed:    add trailing colon
+#   touch:  sets the time to the same as the .o to avoid
+#           erroneous detection next time around
+
+# Delete default rules so it makes sure to use ours
+%.o: %.c
+
+$(OBJDIR)/static/%.o: %.c Makefile ../common.mk $(PROFILER_FILE) $(OBJDIR)/static/%.d | $(OBJDIR)/static
 	@echo "Compiling $<"
 	$(AT)$(CC) $(CFLAGS_STATIC) -MMD -c $< -o $@
 	$(AT)cp -f $(@:.o=.d) $(@:.o=.d.tmp)
 	$(AT)sed -e 's/.*://' -e 's/\\$$//' < $(@:.o=.d.tmp) | fmt -1 | \
-	sed -e 's/^ *//' -e 's/$$/:/' >> $(@:.o=.d)
+	sed -e 's/^ *//' -e 's/$$/: /' >> $(@:.o=.d)
+	$(AT)touch -r $@ $(@:.o=.d)
 	$(AT)rm -f $(@:.o=.d.tmp)
 
 
-$(OBJDIR)/shared/%.o: %.c Makefile ../common.mk $(PROFILER_FILE) | $(OBJDIR)/shared
-# Need this comment to make V=1 work (no idea why the first @ is causing so much issue)
+$(OBJDIR)/shared/%.o: %.c Makefile ../common.mk $(PROFILER_FILE) $(OBJDIR)/shared/%.d | $(OBJDIR)/shared
 	@echo "Compiling $<"
 	$(AT)$(CC) $(CFLAGS_SHARED) -MMD -c $< -o $@
 	$(AT)cp -f $(@:.o=.d) $(@:.o=.d.tmp)
 	$(AT)sed -e 's/.*://' -e 's/\\$$//' < $(@:.o=.d.tmp) | fmt -1 | \
-	sed -e 's/^ *//' -e 's/$$/:/' >> $(@:.o=.d)
+	sed -e 's/^ *//' -e 's/$$/: /' >> $(@:.o=.d)
+	$(AT)touch -r $@ $(@:.o=.d)
 	$(AT)rm -f $(@:.o=.d.tmp)
 
-$(OBJDIR)/exec/%.o: %.c Makefile ../common.mk | $(OBJDIR)/exec
-# Need this comment to make V=1 work (no idea why the first @ is causing so much issue)
+$(OBJDIR)/exec/%.o: %.c Makefile ../common.mk $(OBJDIR)/exec/%.d | $(OBJDIR)/exec
 	@echo "Compiling $<"
 	$(AT)$(CC) $(CFLAGS_EXEC) -MMD -c $< -o $@
 	$(AT)cp -f $(@:.o=.d) $(@:.o=.d.tmp)
 	$(AT)sed -e 's/.*://' -e 's/\\$$//' < $(@:.o=.d.tmp) | fmt -1 | \
-	sed -e 's/^ *//' -e 's/$$/:/' >> $(@:.o=.d)
+	sed -e 's/^ *//' -e 's/$$/: /' >> $(@:.o=.d)
+	$(AT)touch -r $@ $(@:.o=.d)
 	$(AT)rm -f $(@:.o=.d.tmp)
 
-$(OBJDIR)/static/%.o: %.S Makefile ../common.mk | $(OBJDIR)/static
-# Need this comment to make V=1 work (no idea why the first @ is causing so much issue)
+%.o : %.S
+
+$(OBJDIR)/static/%.o: %.S Makefile ../common.mk $(OBJDIR)/static/%.d | $(OBJDIR)/static
 	@echo "Assembling $<"
 	$(AT)$(CC) $(CFLAGS_STATIC) -MMD -c $< -o $@
 	$(AT)cp -f $(@:.o=.d) $(@:.o=.d.tmp)
 	$(AT)sed -e 's/.*://' -e 's/\\$$//' < $(@:.o=.d.tmp) | fmt -1 | \
-	sed -e 's/^ *//' -e 's/$$/:/' >> $(@:.o=.d)
+	sed -e 's/^ *//' -e 's/$$/: /' >> $(@:.o=.d)
+	$(AT)touch -r $@ $(@:.o=.d)
 	$(AT)rm -f $(@:.o=.d.tmp)
 
-$(OBJDIR)/shared/%.o: %.S Makefile ../common.mk | $(OBJDIR)/shared
-# Need this comment to make V=1 work (no idea why the first @ is causing so much issue)
+$(OBJDIR)/shared/%.o: %.S Makefile ../common.mk $(OBJDIR)/shared/%.d | $(OBJDIR)/shared
 	@echo "Assembling $<"
 	$(AT)$(CC) $(CFLAGS_SHARED) -MMD -c $< -o $@
 	$(AT)cp -f $(@:.o=.d) $(@:.o=.d.tmp)
 	$(AT)sed -e 's/.*://' -e 's/\\$$//' < $(@:.o=.d.tmp) | fmt -1 | \
-	sed -e 's/^ *//' -e 's/$$/:/' >> $(@:.o=.d)
+	sed -e 's/^ *//' -e 's/$$/: /' >> $(@:.o=.d)
+	$(AT)touch -r $@ $(@:.o=.d)
 	$(AT)rm -f $(@:.o=.d.tmp)
 
 #
@@ -511,12 +564,18 @@ $(OBJDIR)/shared/%.o: %.S Makefile ../common.mk | $(OBJDIR)/shared
 # We only include the ones for the .o that we need to generate
 #
 ifeq (${SUPPORTS_STATIC}, yes)
+  $(OBJDIR)/static/%.d: ;
+  .PRECIOUS: $(OBJDIR)/static/%.d
   -include $(OBJS_STATIC:.o=.d)
 endif
 ifeq (${SUPPORTS_SHARED}, yes)
+  $(OBJDIR)/shared/%.d: ;
+  .PRECIOUS: $(OBJDIR)/shared/%.d
   -include $(OBJS_SHARED:.o=.d)
 endif
 ifeq (${SUPPORTS_EXEC}, yes)
+  $(OBJDIR)/exec/%.d: ;
+  .PRECIOUS: $(OBJDIR)/exec/%.d
   -include $(OBJS_EXEC:.o=.d)
 endif
 
