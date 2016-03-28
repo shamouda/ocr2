@@ -109,6 +109,19 @@ u8 binHeapSchedulerObjectInsert(ocrSchedulerObjectFactory_t *fact, ocrSchedulerO
     return 0;
 }
 
+static inline ocrGuid_t _popGuid(binHeap_t *binHeap, int flag) {
+    // See BUG #928 on GUID issues
+    void *data = binHeap->pop(binHeap, flag);
+    ocrGuid_t retGuid = NULL_GUID;
+#if GUID_BIT_COUNT == 64
+    if (data) retGuid = (ocrGuid_t)data;
+#elif GUID_BIT_COUNT == 128
+    if (data) retGuid.lower = (intptr_t)data;
+#endif
+    return retGuid;
+}
+
+
 u8 binHeapSchedulerObjectRemove(ocrSchedulerObjectFactory_t *fact, ocrSchedulerObject_t *self, ocrSchedulerObjectKind kind, u32 count, ocrSchedulerObject_t *dst, ocrSchedulerObjectIterator_t *iterator, u32 properties) {
     u32 i;
     ocrSchedulerObjectBinHeap_t *schedObj = (ocrSchedulerObjectBinHeap_t*)self;
@@ -122,26 +135,14 @@ u8 binHeapSchedulerObjectRemove(ocrSchedulerObjectFactory_t *fact, ocrSchedulerO
         case SCHEDULER_OBJECT_REMOVE_TAIL:
             {
                 START_PROFILE(sched_binHeap_Pop);
-                // See BUG #928 on GUID issues
-#if GUID_BIT_COUNT == 64
-                retGuid = (ocrGuid_t)binHeap->pop(binHeap, 0);
-#elif GUID_BIT_COUNT == 128
-                ocrGuid_t *myGuid = (ocrGuid_t *)binHeap->pop(binHeap, 0);
-                retGuid = *myGuid;
-#endif
+                retGuid = _popGuid(binHeap, 0);
                 EXIT_PROFILE;
             }
             break;
         case SCHEDULER_OBJECT_REMOVE_HEAD:
             {
                 START_PROFILE(sched_binHeap_Steal);
-                // See BUG #928 on GUID issues
-#if GUID_BIT_COUNT == 64
-                retGuid = (ocrGuid_t)binHeap->pop(binHeap, 1);
-#elif GUID_BIT_COUNT == 128
-                ocrGuid_t *myGuid = (ocrGuid_t *)binHeap->pop(binHeap, 1);
-                retGuid = *myGuid;
-#endif
+                retGuid = _popGuid(binHeap, 1);
                 EXIT_PROFILE;
             }
             break;
