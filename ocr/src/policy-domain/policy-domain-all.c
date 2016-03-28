@@ -507,7 +507,7 @@ u8 ocrPolicyMsgMarshallMsg(ocrPolicyMsg_t* msg, u64 baseSize, u8* buffer, u32 mo
                             (u64)PD_MSG_FIELD_I(funcName), ((u64)(curPtr - startPtr)<<1) + isAddl);
                     PD_MSG_FIELD_I(funcName) = (char*)(((u64)(curPtr - startPtr)<<1) + isAddl);
                 } else {
-                    DPRINTF(DEBUG_LVL_VVERB, "Copying funcName (0x%"PRIx64") to 0x%"PRIx64"\n",
+                    DPRINTF(DEBUG_LVL_VVERB, "Copying funcName (0x%"PRIx64") to %p\n",
                             (u64)PD_MSG_FIELD_I(funcName), curPtr);
                     PD_MSG_FIELD_I(funcName) = (char*)curPtr;
                 }
