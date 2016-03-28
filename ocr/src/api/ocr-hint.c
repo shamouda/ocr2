@@ -35,7 +35,8 @@ do {                                                                            
     if (hint->type == OCR_HINT_UNDEF_T ||                                       \
         property <= ocrHintPropIndexStart[hint->type] ||                        \
         property >= ocrHintPropIndexEnd[hint->type]) {                          \
-        DPRINTF(DEBUG_LVL_WARN, "EXIT: Unsupported hint type or property\n");	\
+        DPRINTF(DEBUG_LVL_WARN, "EXIT: Unsupported hint type or property\n");   \
+        abort(); \
         return OCR_EINVAL;                                                      \
     }                                                                           \
 } while(0);

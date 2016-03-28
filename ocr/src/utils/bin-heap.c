@@ -34,7 +34,7 @@ void binHeapDestroy(ocrPolicyDomain_t *pd, binHeap_t* heap) {
  * where the function pointers to push and pop are set by the derived
  * implementation.
  */
-static void baseBinHeapInit(binHeap_t* heap, ocrPolicyDomain_t *pd) {
+static void _baseBinHeapInit(binHeap_t* heap, ocrPolicyDomain_t *pd) {
     heap->count = 0;
     heap->data = NULL;
     heap->data = pd->fcts.pdMalloc(pd, sizeof(void*)*INIT_BIN_HEAP_CAPACITY);
@@ -45,22 +45,22 @@ static void baseBinHeapInit(binHeap_t* heap, ocrPolicyDomain_t *pd) {
     heap->pop = NULL;
 }
 
-static void lockedBinHeapInit(binHeapLocked_t* heap, ocrPolicyDomain_t *pd) {
-    baseBinHeapInit((binHeap_t*)heap, pd);
+static void _lockedBinHeapInit(binHeapLocked_t* heap, ocrPolicyDomain_t *pd) {
+    _baseBinHeapInit((binHeap_t*)heap, pd);
     heap->lock = 0;
 }
 
-static binHeap_t * newBaseBinHeap(ocrPolicyDomain_t *pd, ocrBinHeapType_t type) {
+static binHeap_t * _newBaseBinHeap(ocrPolicyDomain_t *pd, ocrBinHeapType_t type) {
     binHeap_t* heap = NULL;
     switch(type) {
         case NO_LOCK_BASE_BIN_HEAP:
             heap = (binHeap_t*) pd->fcts.pdMalloc(pd, sizeof(binHeap_t));
-            baseBinHeapInit(heap, pd);
+            _baseBinHeapInit(heap, pd);
             // Warning: function pointers must be specialized in caller
             break;
         case LOCK_BASE_BIN_HEAP:
             heap = (binHeap_t*) pd->fcts.pdMalloc(pd, sizeof(binHeapLocked_t));
-            lockedBinHeapInit((binHeapLocked_t*)heap, pd);
+            _lockedBinHeapInit((binHeapLocked_t*)heap, pd);
             // Warning: function pointers must be specialized in caller
             break;
     default:
@@ -75,62 +75,62 @@ static binHeap_t * newBaseBinHeap(ocrPolicyDomain_t *pd, ocrBinHeapType_t type) 
 /* NON CONCURRENT BIN_HEAP BASED OPERATIONS         */
 /****************************************************/
 
-static inline u32 left(u32 i) { return 2*i + 1; }
-static inline u32 right(u32 i) { return 2*i + 2; }
-static inline u32 parent(u32 i) { return (i-1)/2; }
+static inline u32 _left(u32 i) { return 2*i + 1; }
+static inline u32 _right(u32 i) { return 2*i + 2; }
+static inline u32 _parent(u32 i) { return (i-1)/2; }
 
-static inline bool heapOK(binHeap_t *heap, u32 p, u32 c) {
+static inline bool _heapOK(binHeap_t *heap, u32 p, u32 c) {
     return heap->data[p].priority > heap->data[c].priority;
 }
 
-static inline void swap(binHeap_t *heap, s64 i, s64 j) {
+static inline void _swap(binHeap_t *heap, s64 i, s64 j) {
     const ocrBinHeapEntry_t tmp = heap->data[i];
     heap->data[i] = heap->data[j];
     heap->data[j] = tmp;
 }
 
-void bubbleUp(binHeap_t *heap, u32 i) {
-    u32 p = parent(i);
-    while (i > 0 && !heapOK(heap, p, i)) {
-        swap(heap, p, i);
+static void _bubbleUp(binHeap_t *heap, u32 i) {
+    u32 p = _parent(i);
+    while (i > 0 && !_heapOK(heap, p, i)) {
+        _swap(heap, p, i);
         i = p;
-        p = parent(i);
+        p = _parent(i);
     }
 }
 
-void trickleDown(binHeap_t *heap, u32 ii) {
+static void _trickleDown(binHeap_t *heap, u32 ii) {
     const u32 n = heap->count;
     s64 i = ii;
     do {
         s64 j = -1;
-        u32 r = right(i);
-        if (r < n && !heapOK(heap, i, r)) {
-            u32 l = left(i);
-            if (!heapOK(heap, r, l)) {
+        u32 r = _right(i);
+        if (r < n && !_heapOK(heap, i, r)) {
+            u32 l = _left(i);
+            if (!_heapOK(heap, r, l)) {
                 j = l;
             } else {
                 j = r;
             }
         } else {
-            u32 l = left(i);
-            if (l < n && !heapOK(heap, i, l)) {
+            u32 l = _left(i);
+            if (l < n && !_heapOK(heap, i, l)) {
                 j = l;
             }
         }
-        if (j >= 0) swap(heap, i, j);
+        if (j >= 0) _swap(heap, i, j);
         i = j;
     } while (i >= 0);
 }
 
-void checkHeap(binHeap_t *heap) {
+static void _checkHeap(binHeap_t *heap) {
 #if _OCR_BIN_HEAP_DEBUG
     const u32 n = heap->count;
     u32 i;
     for (i=0;;i++) {
-        if (left(i) > n) break;
-        ASSERT(heap->data[i].priority >= heap->data[left(i)].priority);
-        if (right(i) > n) break;
-        ASSERT(heap->data[i].priority >= heap->data[right(i)].priority);
+        if (_left(i) > n) break;
+        ASSERT(heap->data[i].priority >= heap->data[_left(i)].priority);
+        if (_right(i) > n) break;
+        ASSERT(heap->data[i].priority >= heap->data[_right(i)].priority);
     }
 #endif /* _OCR_BIN_HEAP_DEBUG */
 }
@@ -146,8 +146,8 @@ void nonConcBinHeapPush(binHeap_t *heap, void *entry, s64 priority, u8 doTry) {
     heap->count++;
     ocrBinHeapEntry_t node = { priority, entry };
     heap->data[n] = node;
-    bubbleUp(heap, n);
-    checkHeap(heap);
+    _bubbleUp(heap, n);
+    _checkHeap(heap);
 }
 
 /*
@@ -158,8 +158,8 @@ void *nonConcBinHeapPop(binHeap_t *heap, u8 doTry) {
     const u32 n = --heap->count;
     void *rt = heap->data[0].entry;
     heap->data[0] = heap->data[n];
-    trickleDown(heap, 0);
-    checkHeap(heap);
+    _trickleDown(heap, 0);
+    _checkHeap(heap);
     return rt;
 }
 
@@ -204,13 +204,13 @@ binHeap_t * newBinHeap(ocrPolicyDomain_t *pd, ocrBinHeapType_t type) {
     binHeap_t* heap = NULL;
     switch(type) {
     case NON_CONCURRENT_BIN_HEAP:
-        heap = newBaseBinHeap(pd, NO_LOCK_BASE_BIN_HEAP);
+        heap = _newBaseBinHeap(pd, NO_LOCK_BASE_BIN_HEAP);
         // Specialize push/pop implementations
         heap->push = nonConcBinHeapPush;
         heap->pop = nonConcBinHeapPop;
         break;
     case LOCKED_BIN_HEAP:
-        heap = newBaseBinHeap(pd, LOCK_BASE_BIN_HEAP);
+        heap = _newBaseBinHeap(pd, LOCK_BASE_BIN_HEAP);
         // Specialize push/pop implementations
         heap->push =  lockedBinHeapPush;
         heap->pop = lockedBinHeapPop;
