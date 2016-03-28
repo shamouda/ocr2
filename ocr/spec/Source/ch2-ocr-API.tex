@@ -59,12 +59,21 @@ The OCR error codes are derived from standard error codes. They are defined
 internally to limit OCR's dependence on standard libraries. Most functions in the
 OCR API will return a status code where 0 signifies successful completion. A non-zero
 return code will be one of the following error codes. These codes are found
-in the \code{ocr-errors.h} include file and described in Table~\ref{tab:errorcodes}.
-Since OCR aims to be as asynchronous as possible, it is not always
-possible or advisable to return an error code as soon as called
-function returns. A compliant implementation may therefore not detect
-all possible errors. Future revisions of this specification will
-provide a more robust mechanism for more accurately checking for error conditions.
+in the \code{ocr-errors.h} include file and described in
+Table~\ref{tab:errorcodes}.
+
+Since OCR aims to be as asynchronous as possible, it may not always be
+possible to immediately identify an error and return the appropriate
+error code. In general, providing incorrect parameters to an OCR API
+call results in undefined behavior. If, however, the OCR
+implementation returns an error code, it will correctly reflect the
+cause of the error. In other words, if an API call returns an error
+code, that error code will accurately describe the error that happened
+(for example, OCR\_ENOMEM will always indicate that the runtime ran out
+of memory). Future revisions of this specification will detail OCR
+runtime modes which will either {\bf a)} guarantee a certain level of
+error detection (potentially at a cost) or {\bf b)} immediately abort
+upon the detection of an error.
 \tablefirsthead{%
 \hline
 \textsf{\textbf{Error code}} & \textsf{\textbf{Generic Interpretation}}\\
