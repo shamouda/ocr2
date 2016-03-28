@@ -261,6 +261,15 @@ u8 ocrEdtCreate(ocrGuid_t* edtGuidPtr, ocrGuid_t templateGuid,
         depvArray[i].metaDataPtr = NULL;
     }
 #endif
+
+    //Copy the hints so that the runtime modifications
+    //are not reflected back to the user
+    ocrHint_t userHint;
+    if (hint != NULL_HINT) {
+        userHint = *hint;
+        hint = &userHint;
+    }
+
     PD_MSG_FIELD_IO(guid.guid) = NULL_GUID; // to be set by callee
     PD_MSG_FIELD_IO(guid.metaDataPtr) = NULL;
     if(outputEvent) {
@@ -287,6 +296,7 @@ u8 ocrEdtCreate(ocrGuid_t* edtGuidPtr, ocrGuid_t templateGuid,
     if ((returnCode == 0) && (reqResponse)) {
         returnCode = PD_MSG_FIELD_O(returnDetail);
     }
+
     if(returnCode) {
         DPRINTF(DEBUG_LVL_WARN, "EXIT ocrEdtCreate -> %"PRIu32"\n", returnCode);
         RETURN_PROFILE(returnCode);

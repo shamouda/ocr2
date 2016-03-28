@@ -2466,16 +2466,16 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
 #define PD_TYPE PD_MSG_HINT_SET
         ocrGuidKind kind = OCR_GUID_NONE;
         localDeguidify(self, &(PD_MSG_FIELD_I(guid)), &kind);
-        switch(PD_MSG_FIELD_I(hint.type)) {
+        switch(PD_MSG_FIELD_I(hint->type)) {
         case OCR_HINT_EDT_T:
             {
                 if (kind == OCR_GUID_EDT_TEMPLATE) {
                     ocrTaskTemplate_t* taskTemplate = (ocrTaskTemplate_t*)(PD_MSG_FIELD_I(guid.metaDataPtr));
-                    PD_MSG_FIELD_O(returnDetail) = self->taskTemplateFactories[0]->fcts.setHint(taskTemplate, &(PD_MSG_FIELD_I(hint)));
+                    PD_MSG_FIELD_O(returnDetail) = self->taskTemplateFactories[0]->fcts.setHint(taskTemplate, PD_MSG_FIELD_I(hint));
                 } else {
                     ASSERT(kind == OCR_GUID_EDT);
                     ocrTask_t *task = (ocrTask_t*)(PD_MSG_FIELD_I(guid.metaDataPtr));
-                    PD_MSG_FIELD_O(returnDetail) = self->taskFactories[0]->fcts.setHint(task, &(PD_MSG_FIELD_I(hint)));
+                    PD_MSG_FIELD_O(returnDetail) = self->taskFactories[0]->fcts.setHint(task, PD_MSG_FIELD_I(hint));
                 }
             }
             break;
@@ -2483,14 +2483,14 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             {
                 ASSERT(kind == OCR_GUID_DB);
                 ocrDataBlock_t *db = (ocrDataBlock_t*)(PD_MSG_FIELD_I(guid.metaDataPtr));
-                PD_MSG_FIELD_O(returnDetail) = self->dbFactories[0]->fcts.setHint(db, &(PD_MSG_FIELD_I(hint)));
+                PD_MSG_FIELD_O(returnDetail) = self->dbFactories[0]->fcts.setHint(db, PD_MSG_FIELD_I(hint));
             }
             break;
         case OCR_HINT_EVT_T:
             {
                 ASSERT(kind & OCR_GUID_EVENT);
                 ocrEvent_t *evt = (ocrEvent_t*)(PD_MSG_FIELD_I(guid.metaDataPtr));
-                PD_MSG_FIELD_O(returnDetail) = self->eventFactories[0]->commonFcts.setHint(evt, &(PD_MSG_FIELD_I(hint)));
+                PD_MSG_FIELD_O(returnDetail) = self->eventFactories[0]->commonFcts.setHint(evt, PD_MSG_FIELD_I(hint));
             }
             break;
         case OCR_HINT_GROUP_T:
@@ -2512,16 +2512,16 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
 #define PD_TYPE PD_MSG_HINT_GET
         ocrGuidKind kind = OCR_GUID_NONE;
         localDeguidify(self, &(PD_MSG_FIELD_I(guid)), &kind);
-        switch(PD_MSG_FIELD_IO(hint.type)) {
+        switch(PD_MSG_FIELD_IO(hint->type)) {
         case OCR_HINT_EDT_T:
             {
                 if (kind == OCR_GUID_EDT_TEMPLATE) {
                     ocrTaskTemplate_t* taskTemplate = (ocrTaskTemplate_t*)(PD_MSG_FIELD_I(guid.metaDataPtr));
-                    PD_MSG_FIELD_O(returnDetail) = self->taskTemplateFactories[0]->fcts.getHint(taskTemplate, &(PD_MSG_FIELD_IO(hint)));
+                    PD_MSG_FIELD_O(returnDetail) = self->taskTemplateFactories[0]->fcts.getHint(taskTemplate, PD_MSG_FIELD_IO(hint));
                 } else {
                     ASSERT(kind == OCR_GUID_EDT);
                     ocrTask_t *task = (ocrTask_t*)(PD_MSG_FIELD_I(guid.metaDataPtr));
-                    PD_MSG_FIELD_O(returnDetail) = self->taskFactories[0]->fcts.getHint(task, &(PD_MSG_FIELD_IO(hint)));
+                    PD_MSG_FIELD_O(returnDetail) = self->taskFactories[0]->fcts.getHint(task, PD_MSG_FIELD_IO(hint));
                 }
             }
             break;
@@ -2529,14 +2529,14 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             {
                 ASSERT(kind == OCR_GUID_DB);
                 ocrDataBlock_t *db = (ocrDataBlock_t*)(PD_MSG_FIELD_I(guid.metaDataPtr));
-                PD_MSG_FIELD_O(returnDetail) = self->dbFactories[0]->fcts.getHint(db, &(PD_MSG_FIELD_IO(hint)));
+                PD_MSG_FIELD_O(returnDetail) = self->dbFactories[0]->fcts.getHint(db, PD_MSG_FIELD_IO(hint));
             }
             break;
         case OCR_HINT_EVT_T:
             {
                 ASSERT(kind & OCR_GUID_EVENT);
                 ocrEvent_t *evt = (ocrEvent_t*)(PD_MSG_FIELD_I(guid.metaDataPtr));
-                PD_MSG_FIELD_O(returnDetail) = self->eventFactories[0]->commonFcts.getHint(evt, &(PD_MSG_FIELD_IO(hint)));
+                PD_MSG_FIELD_O(returnDetail) = self->eventFactories[0]->commonFcts.getHint(evt, PD_MSG_FIELD_IO(hint));
             }
             break;
         case OCR_HINT_GROUP_T:

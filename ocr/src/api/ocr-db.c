@@ -37,6 +37,14 @@ u8 ocrDbCreate(ocrGuid_t *db, void** addr, u64 len, u16 flags,
     u8 returnCode = 0;
     getCurrentEnv(&policy, NULL, &task, &msg);
 
+    //Copy the hints so that the runtime modifications
+    //are not reflected back to the user
+    ocrHint_t userHint;
+    if (hint != NULL_HINT) {
+        userHint = *hint;
+        hint = &userHint;
+    }
+
 #define PD_MSG (&msg)
 #define PD_TYPE PD_MSG_DB_CREATE
     msg.type = PD_MSG_DB_CREATE | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;

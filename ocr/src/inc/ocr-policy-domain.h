@@ -1103,7 +1103,7 @@ typedef struct _ocrPolicyMsg_t {
             union {
                 struct {
                     ocrFatGuid_t guid;      /**< In: Target guid to set hints on */
-                    ocrHint_t hint;         /**< In: Hint to set */
+                    ocrHint_t *hint;        /**< In: Hint to set */
                 } in;
                 struct {
                     u32 returnDetail;       /**< Out: Success or error code */
@@ -1112,7 +1112,7 @@ typedef struct _ocrPolicyMsg_t {
         } PD_MSG_STRUCT_NAME(PD_MSG_HINT_SET);
 
         struct {
-            ocrHint_t hint;                 /**< InOut: Hints retrieved from guid */
+            ocrHint_t *hint;                /**< InOut: Hints retrieved from guid */
             union {
                 struct {
                     ocrFatGuid_t guid;      /**< In: Guid from which hints are retrieved */

@@ -117,6 +117,7 @@ u8 ocrGetHintValue(ocrHint_t *hint, ocrHintProp_t hintProp, u64 *value) {
 
 u8 ocrSetHint(ocrGuid_t guid, ocrHint_t *hint) {
 #ifdef ENABLE_HINTS
+    ASSERT(hint != NULL_HINT);
     if (hint->type == OCR_HINT_UNDEF_T) {
         DPRINTF(DEBUG_LVL_WARN, "EXIT ocrSetHint: Invalid hint type\n");
         return OCR_EINVAL;
@@ -128,12 +129,17 @@ u8 ocrSetHint(ocrGuid_t guid, ocrHint_t *hint) {
     ocrPolicyDomain_t *pd = NULL;
     ocrTask_t * curEdt = NULL;
     getCurrentEnv(&pd, NULL, &curEdt, &msg);
+
+    //Copy the hints so that the runtime modifications
+    //are not reflected back to the user
+    ocrHint_t userHint = *hint;
+
 #define PD_MSG (&msg)
 #define PD_TYPE PD_MSG_HINT_SET
     msg.type = PD_MSG_HINT_SET | PD_MSG_REQUEST;
     PD_MSG_FIELD_I(guid.guid) = guid;
     PD_MSG_FIELD_I(guid.metaDataPtr) = NULL;
-    PD_MSG_FIELD_I(hint) = *hint;
+    PD_MSG_FIELD_I(hint) = &userHint;
     u8 returnCode = pd->fcts.processMessage(pd, &msg, false);
     DPRINTF_COND_LVL(returnCode, DEBUG_LVL_WARN, DEBUG_LVL_INFO,
                      "EXIT ocrSetHint(guid="GUIDF") -> %"PRIu32"\n", GUIDA(guid), returnCode);
@@ -148,6 +154,7 @@ u8 ocrSetHint(ocrGuid_t guid, ocrHint_t *hint) {
 
 u8 ocrGetHint(ocrGuid_t guid, ocrHint_t *hint) {
 #ifdef ENABLE_HINTS
+    ASSERT(hint != NULL_HINT);
     if (hint->type == OCR_HINT_UNDEF_T) {
         DPRINTF(DEBUG_LVL_WARN, "EXIT ocrGetHint: Invalid hint type\n");
         return OCR_EINVAL;
@@ -164,12 +171,12 @@ u8 ocrGetHint(ocrGuid_t guid, ocrHint_t *hint) {
     msg.type = PD_MSG_HINT_GET | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
     PD_MSG_FIELD_I(guid.guid) = guid;
     PD_MSG_FIELD_I(guid.metaDataPtr) = NULL;
-    PD_MSG_FIELD_IO(hint) = *hint;
+    PD_MSG_FIELD_IO(hint) = hint;
     u8 returnCode = pd->fcts.processMessage(pd, &msg, true);
     if (returnCode == 0) {
         returnCode = PD_MSG_FIELD_O(returnDetail);
         if (returnCode == 0) {
-            *hint = PD_MSG_FIELD_IO(hint);
+            *hint = *PD_MSG_FIELD_IO(hint);
         }
     }
     DPRINTF_COND_LVL(returnCode, DEBUG_LVL_WARN, DEBUG_LVL_INFO,

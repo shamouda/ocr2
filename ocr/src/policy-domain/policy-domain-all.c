@@ -311,6 +311,24 @@ u8 ocrPolicyMsgGetMsgSize(ocrPolicyMsg_t *msg, u64 *baseSize,
         }
         break;
 
+    case PD_MSG_HINT_SET:
+#define PD_TYPE PD_MSG_HINT_SET
+        if(isIn) {
+            ASSERT(MAX_ALIGN % sizeof(u64) == 0);
+            ASSERT(PD_MSG_FIELD_I(hint) != NULL_HINT);
+            *marshalledSize = sizeof(ocrHint_t);
+        }
+        break;
+#undef PD_TYPE
+
+    case PD_MSG_HINT_GET:
+#define PD_TYPE PD_MSG_HINT_GET
+        ASSERT(MAX_ALIGN % sizeof(u64) == 0);
+        ASSERT(PD_MSG_FIELD_IO(hint) != NULL_HINT);
+        *marshalledSize = sizeof(ocrHint_t);
+        break;
+#undef PD_TYPE
+
     default:
         // Nothing to do
         ;
@@ -832,6 +850,54 @@ u8 ocrPolicyMsgMarshallMsg(ocrPolicyMsg_t* msg, u64 baseSize, u8* buffer, u32 mo
         break;
     }
 
+    case PD_MSG_HINT_SET: {
+#define PD_TYPE PD_MSG_HINT_SET
+        if(isIn) {
+            // marshall hints if passed by user
+            ASSERT(PD_MSG_FIELD_I(hint) != NULL_HINT);
+            u64 s = sizeof(ocrHint_t);
+            if(s) {
+                hal_memCopy(curPtr, PD_MSG_FIELD_I(hint), s, false);
+                // Now fixup the pointer
+                if(fixupPtrs) {
+                    DPRINTF(DEBUG_LVL_VVERB, "Converting hint (%p) to 0x%"PRIx64"\n",
+                            PD_MSG_FIELD_I(hint), ((u64)(curPtr - startPtr)<<1) + isAddl);
+                    PD_MSG_FIELD_I(hint) = (ocrHint_t*)((((u64)(curPtr - startPtr))<<1) + isAddl);
+                } else {
+                    DPRINTF(DEBUG_LVL_VVERB, "Copying hint (%p) to %p\n",
+                            PD_MSG_FIELD_I(hint), curPtr);
+                    PD_MSG_FIELD_I(hint) = (ocrHint_t*)curPtr;
+                }
+                curPtr += s;
+            }
+        }
+        break;
+#undef PD_TYPE
+    }
+
+    case PD_MSG_HINT_GET: {
+#define PD_TYPE PD_MSG_HINT_GET
+        // marshall hints if passed by user
+        ASSERT(PD_MSG_FIELD_IO(hint) != NULL_HINT);
+        u64 s = sizeof(ocrHint_t);
+        if(s) {
+            hal_memCopy(curPtr, PD_MSG_FIELD_IO(hint), s, false);
+            // Now fixup the pointer
+            if(fixupPtrs) {
+                DPRINTF(DEBUG_LVL_VVERB, "Converting hint (%p) to 0x%"PRIx64"\n",
+                        PD_MSG_FIELD_IO(hint), ((u64)(curPtr - startPtr)<<1) + isAddl);
+                PD_MSG_FIELD_IO(hint) = (ocrHint_t*)((((u64)(curPtr - startPtr))<<1) + isAddl);
+            } else {
+                DPRINTF(DEBUG_LVL_VVERB, "Copying hint (%p) to %p\n",
+                        PD_MSG_FIELD_IO(hint), curPtr);
+                PD_MSG_FIELD_IO(hint) = (ocrHint_t*)curPtr;
+            }
+            curPtr += s;
+        }
+        break;
+#undef PD_TYPE
+    }
+
     default:
         // Nothing to do
         ;
@@ -1187,6 +1253,30 @@ u8 ocrPolicyMsgUnMarshallMsg(u8* mainBuffer, u8* addlBuffer,
             DPRINTF(DEBUG_LVL_VVERB, "Converted DB release ptr from 0x%"PRIx64" to 0x%"PRIx64"\n",
                     t, (u64)PD_MSG_FIELD_I(ptr));
         }
+        break;
+#undef PD_TYPE
+    }
+
+    case PD_MSG_HINT_SET: {
+#define PD_TYPE PD_MSG_HINT_SET
+        if(isIn) {
+            ASSERT(PD_MSG_FIELD_I(hint) != NULL_HINT);
+            u64 t = (u64)(PD_MSG_FIELD_I(hint));
+            PD_MSG_FIELD_I(hint) = (ocrHint_t*)((t&1?localAddlPtr:localMainPtr) + (t>>1));
+            DPRINTF(DEBUG_LVL_VVERB, "Converted field hint from 0x%"PRIx64" to 0x%"PRIx64"\n",
+                    t, (u64)PD_MSG_FIELD_I(hint));
+        }
+        break;
+#undef PD_TYPE
+    }
+
+    case PD_MSG_HINT_GET: {
+#define PD_TYPE PD_MSG_HINT_GET
+        ASSERT(PD_MSG_FIELD_IO(hint) != NULL_HINT);
+        u64 t = (u64)(PD_MSG_FIELD_IO(hint));
+        PD_MSG_FIELD_IO(hint) = (ocrHint_t*)((t&1?localAddlPtr:localMainPtr) + (t>>1));
+        DPRINTF(DEBUG_LVL_VVERB, "Converted field hint from 0x%"PRIx64" to 0x%"PRIx64"\n",
+                t, (u64)PD_MSG_FIELD_IO(hint));
         break;
 #undef PD_TYPE
     }
