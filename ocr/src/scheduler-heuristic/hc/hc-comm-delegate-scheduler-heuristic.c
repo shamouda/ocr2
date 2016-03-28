@@ -325,7 +325,7 @@ static inline u8 hcCommDelegateNotifyCommReadyInvoke(ocrSchedulerHeuristic_t *se
     ocrFatGuid_t * fatHandlers = &(notifyArgs->OCR_SCHED_ARG_FIELD(OCR_SCHED_NOTIFY_COMM_READY).guid);
     u32 count = 1;
 
-    ocrPolicyDomain_t * pd = self->scheduler->pd;
+    ocrPolicyDomain_t * pd __attribute__((unused)) = self->scheduler->pd;
     ocrSchedulerHeuristicHcCommDelegate_t * commSched = (ocrSchedulerHeuristicHcCommDelegate_t *) self;
     ocrWorker_t *worker = NULL;
     getCurrentEnv(NULL, &worker, NULL, NULL);

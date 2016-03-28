@@ -352,7 +352,7 @@ u8 hcSchedulerNotifyInvoke(ocrScheduler_t *self, ocrSchedulerOpArgs_t *opArgs, o
             return self->fcts.giveEdt(self, &count, &notifyArgs->OCR_SCHED_ARG_FIELD(OCR_SCHED_NOTIFY_EDT_READY).guid);
         }
     case OCR_SCHED_NOTIFY_EDT_DONE: {
-            ocrTask_t * curTask = (ocrTask_t *) notifyArgs->OCR_SCHED_ARG_FIELD(OCR_SCHED_NOTIFY_EDT_DONE).guid.metaDataPtr;
+            ocrTask_t * curTask __attribute__((unused)) = (ocrTask_t *) notifyArgs->OCR_SCHED_ARG_FIELD(OCR_SCHED_NOTIFY_EDT_DONE).guid.metaDataPtr;
 #ifdef ENABLE_EXTENSION_BLOCKING_SUPPORT
             //TODO move to common scheduler ?
             if (curTask->state == RESCHED_EDTSTATE) {

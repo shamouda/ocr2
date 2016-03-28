@@ -142,8 +142,8 @@ u8 pollMessageSimpleCommApi(ocrCommApi_t *self, ocrMsgHandle_t **handle) {
                 *handle = createMsgHandler(self, msg);
                 (*handle)->properties = ASYNC_MSG_PROP;
             } else {
-                bool found = hashtableNonConcRemove(commApiSimple->handleMap, (void *) msg->msgId, (void **)handle);
-                ASSERT(found && (*handle != NULL));
+                RESULT_ASSERT(hashtableNonConcRemove(commApiSimple->handleMap, (void *) msg->msgId, (void **)handle), !=, 0);
+                ASSERT(*handle != NULL);
             }
             (*handle)->response = msg;
             (*handle)->status = HDL_RESPONSE_OK;

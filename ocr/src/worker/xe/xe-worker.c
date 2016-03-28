@@ -34,6 +34,7 @@
 /******************************************************/
 
 // Convenient to have an id to index workers in pools
+static inline u64 getWorkerId(ocrWorker_t * worker) __attribute__((unused));
 static inline u64 getWorkerId(ocrWorker_t * worker) {
     ocrWorkerXe_t * xeWorker = (ocrWorkerXe_t *) worker;
     return xeWorker->id;

@@ -43,16 +43,14 @@
  * @brief Initialize the MPI library.
  */
 void platformInitMPIComm(int * argc, char *** argv) {
-    int res = MPI_Init(argc, argv);
-    ASSERT(res == MPI_SUCCESS);
+    RESULT_ASSERT(MPI_Init(argc, argv), ==, MPI_SUCCESS);
 }
 
 /**
  * @brief Finalize the MPI library (no more remote calls after that).
  */
 void platformFinalizeMPIComm() {
-    int res = MPI_Finalize();
-    ASSERT(res == MPI_SUCCESS);
+    RESULT_ASSERT(MPI_Finalize(), ==, MPI_SUCCESS);
 }
 
 
@@ -307,8 +305,7 @@ u8 probeIncoming(ocrCommPlatform_t *self, int src, int tag, ocrPolicyMsg_t ** ms
     //variable size message on the fly).
     MPI_Status status;
     int available = 0;
-    int success = MPI_Iprobe(src, tag, MPI_COMM_WORLD, &available, &status);
-    ASSERT(success == MPI_SUCCESS);
+    RESULT_ASSERT(MPI_Iprobe(src, tag, MPI_COMM_WORLD, &available, &status), ==, MPI_SUCCESS);
     if (available) {
         ASSERT(msg != NULL);
         ASSERT((bufferSize == 0) ? ((tag == RECV_ANY_ID) && (*msg == NULL)) : 1);
@@ -316,8 +313,7 @@ u8 probeIncoming(ocrCommPlatform_t *self, int src, int tag, ocrPolicyMsg_t ** ms
         // Look at the size of incoming message
         MPI_Datatype datatype = MPI_BYTE;
         int count;
-        success = MPI_Get_count(&status, datatype, &count);
-        ASSERT(success == MPI_SUCCESS);
+        RESULT_ASSERT(MPI_Get_count(&status, datatype, &count), ==, MPI_SUCCESS);
         ASSERT(count != 0);
         // Reuse request's or allocate a new message if incoming size is greater.
         if (count > bufferSize) {
@@ -325,11 +321,10 @@ u8 probeIncoming(ocrCommPlatform_t *self, int src, int tag, ocrPolicyMsg_t ** ms
         }
         ASSERT(*msg != NULL);
         MPI_Comm comm = MPI_COMM_WORLD;
-        success = MPI_Recv(*msg, count, datatype, src, tag, comm, MPI_STATUS_IGNORE);
+        RESULT_ASSERT(MPI_Recv(*msg, count, datatype, src, tag, comm, MPI_STATUS_IGNORE), ==, MPI_SUCCESS);
         // After recv, the message size must be updated since it has just been overwritten.
         (*msg)->usefulSize = count;
         (*msg)->bufferSize = count;
-        ASSERT(success == MPI_SUCCESS);
 
         // This check usually fails in the 'ocrPolicyMsgGetMsgSize' when there
         // has been an issue in MPI. It manifest as a received buffer being complete
@@ -379,8 +374,7 @@ u8 MPICommPollMessageInternal(ocrCommPlatform_t *self, ocrPolicyMsg_t **msg,
     while (outgoingIt->hasNext(outgoingIt)) {
         mpiCommHandle_t * mpiHandle = (mpiCommHandle_t *) outgoingIt->next(outgoingIt);
         int completed = 0;
-        int ret = MPI_Test(&(mpiHandle->status), &completed, MPI_STATUS_IGNORE);
-        ASSERT(ret == MPI_SUCCESS);
+        RESULT_ASSERT(MPI_Test(&(mpiHandle->status), &completed, MPI_STATUS_IGNORE), ==, MPI_SUCCESS);
         if(completed) {
             DPRINTF(DEBUG_LVL_VVERB,"[MPI %"PRId32"] sent msg=%p src=%"PRId32", dst=%"PRId32", msgId=%"PRIu64", type=0x%"PRIx32", usefulSize=%"PRIu64"\n",
                     locationToMpiRank(self->pd->myLocation), mpiHandle->msg,
@@ -499,7 +493,7 @@ u8 MPICommPollMessageInternal(ocrCommPlatform_t *self, ocrPolicyMsg_t **msg,
 
 u8 MPICommPollMessage(ocrCommPlatform_t *self, ocrPolicyMsg_t **msg,
                       u32 properties, u32 *mask) {
-    ocrCommPlatformMPI_t * mpiComm = ((ocrCommPlatformMPI_t *) self);
+    ocrCommPlatformMPI_t * mpiComm __attribute__((unused)) = ((ocrCommPlatformMPI_t *) self);
     // Not supposed to be polled outside RL_USER_OK
     ASSERT_BLOCK_BEGIN(((mpiComm->curState >> 4) == RL_USER_OK))
     DPRINTF(DEBUG_LVL_WARN,"[MPI %"PRIu64"] Illegal runlevel[%"PRId32"] reached in MPI-comm-platform pollMessage\n",

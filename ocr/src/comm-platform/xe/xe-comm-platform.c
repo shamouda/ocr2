@@ -186,8 +186,7 @@ u8 xeCommSendMessage(ocrCommPlatform_t *self, ocrLocation_t target,
     DPRINTF(DEBUG_LVL_VERB, "ALARM CE\n");
     // - Atomically test & set remote stage to Full. Error otherwise (Empty/Busy.)
     {
-        u64 tmp = hal_swap64(cp->rq, (u64)2);
-        ASSERT(tmp == 1);
+        RESULT_ASSERT(hal_swap64(cp->rq, (u64)2), ==, 1);
     }
 
     // - Alarm remote to tell the CE it has something from us. The message will
@@ -286,8 +285,7 @@ u8 xeCommDestructMessage(ocrCommPlatform_t *self, ocrPolicyMsg_t *msg) {
     volatile u64 * lq = (u64*)(AR_L1_BASE + MSG_QUEUE_OFFT);
     // - Atomically test & set local stage to Empty. Error if prev not Full.
     {
-        u64 old = hal_swap64(lq, 0);
-        ASSERT(old == 2);
+        RESULT_ASSERT(hal_swap64(lq, 0), ==, 2);
     }
 #endif
 

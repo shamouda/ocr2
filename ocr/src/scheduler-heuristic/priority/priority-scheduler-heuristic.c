@@ -62,8 +62,7 @@ u8 prioritySchedulerHeuristicSwitchRunlevel(ocrSchedulerHeuristic_t *self, ocrPo
         break;
     case RL_PD_OK:
     {
-        ocrScheduler_t *scheduler = self->scheduler;
-        ASSERT(scheduler);
+        ASSERT(self->scheduler);
         self->contextCount = PD->workerCount; //Shared mem heuristic
         ASSERT(self->contextCount > 0);
         break;

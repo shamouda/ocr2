@@ -117,7 +117,6 @@ ocrGuid_t ocrWait(ocrGuid_t outputEvent) {
 
 u8 ocrLegacyBlockProgress(ocrGuid_t evtHandle, ocrGuid_t* guid, void** result, u64* size, u16 properties) {
     ocrPolicyDomain_t *pd = NULL;
-    ocrEvent_t *eventToYieldFor;
     ocrFatGuid_t dbResult = {.guid = ERROR_GUID, .metaDataPtr = NULL};
     ocrFatGuid_t currentEdt;
     ocrTask_t *curTask = NULL;
@@ -173,9 +172,12 @@ u8 ocrLegacyBlockProgress(ocrGuid_t evtHandle, ocrGuid_t* guid, void** result, u
                 }
             }
             else {
-                eventToYieldFor = (ocrEvent_t *)PD_MSG_FIELD_IO(guid.metaDataPtr);
+#ifdef OCR_ASSERT
+
+                ocrEvent_t* eventToYieldFor = (ocrEvent_t *)PD_MSG_FIELD_IO(guid.metaDataPtr);
                 ASSERT(eventToYieldFor->kind == OCR_EVENT_STICKY_T ||
                        eventToYieldFor->kind == OCR_EVENT_IDEM_T);
+#endif
                 break;
             }
         } while(true);

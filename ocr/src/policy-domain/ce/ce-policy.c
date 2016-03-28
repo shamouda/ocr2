@@ -408,7 +408,7 @@ static void findNeighborsPd(ocrPolicyDomain_t *policy) {
     // (all CEs and XEs). We extract from there just the ones that are of interest to us (our XEs
     // and the CEs we are supposed to communicate with)
     for(i=0; i < rself->xeCount; ++i) {
-        ocrLocation_t curNeighbor = MAKE_CORE_ID(0, 0, 0, myCluster, myBlock, (ID_AGENT_XE0 + i));
+        ocrLocation_t curNeighbor __attribute__((unused)) = MAKE_CORE_ID(0, 0, 0, myCluster, myBlock, (ID_AGENT_XE0 + i));
         policy->neighborPDs[i] = neighborsAll[myCluster*MAX_NUM_BLOCK + myBlock*(MAX_NUM_XE + MAX_NUM_CE) + i + MAX_NUM_CE];
         ASSERT(curNeighbor == policy->neighborPDs[i]->myLocation);
         DPRINTF(DEBUG_LVL_VERB, "PD %p (loc: 0x%"PRIx64") found XE neighbor %"PRIu32" at %p (loc: 0x%"PRIx64")\n",
@@ -459,7 +459,7 @@ u8 cePdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
     u32 amNodeMaster = (properties & RL_NODE_MASTER) == RL_NODE_MASTER;
     u32 amPDMaster = properties & RL_PD_MASTER;
 
-    u32 fromPDMsg = properties & RL_FROM_MSG;
+    u32 fromPDMsg __attribute__((unused)) = properties & RL_FROM_MSG;
     properties &= ~RL_FROM_MSG; // Strip this out from the rest; only valuable for the PD
     masterWorkerProperties = properties;
     properties &= ~RL_NODE_MASTER;
@@ -1211,11 +1211,9 @@ static u8 ceCreateEdt(ocrPolicyDomain_t *self, ocrFatGuid_t *guid,
         return OCR_EINVAL;
     }
 
-    u8 res = self->taskFactories[0]->instantiate(
+    RESULT_ASSERT(self->taskFactories[0]->instantiate(
         self->taskFactories[0], guid, edtTemplate, *paramc, paramv,
-        *depc, properties, hint, outputEvent, currentEdt, parentLatch, NULL);
-
-    ASSERT(!res);
+        *depc, properties, hint, outputEvent, currentEdt, parentLatch, NULL), ==, 0);
 
     return 0;
 }

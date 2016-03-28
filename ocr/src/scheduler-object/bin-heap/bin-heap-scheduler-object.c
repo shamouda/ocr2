@@ -48,7 +48,7 @@ static void binHeapSchedulerObjectInitialize(ocrSchedulerObjectFactory_t *fact, 
 }
 
 ocrSchedulerObject_t* newSchedulerObjectBinHeap(ocrSchedulerObjectFactory_t *factory, ocrParamList_t *perInstance) {
-    paramListSchedulerObject_t *paramSchedObj = (paramListSchedulerObject_t*)perInstance;
+    paramListSchedulerObject_t *paramSchedObj __attribute__((unused)) = (paramListSchedulerObject_t*)perInstance;
     ASSERT(paramSchedObj->config);
     ASSERT(!paramSchedObj->guidRequired);
     ocrSchedulerObject_t* schedObj = (ocrSchedulerObject_t*)runtimeChunkAlloc(sizeof(ocrSchedulerObjectBinHeap_t), PERSISTENT_CHUNK);
@@ -58,7 +58,7 @@ ocrSchedulerObject_t* newSchedulerObjectBinHeap(ocrSchedulerObjectFactory_t *fac
 }
 
 ocrSchedulerObject_t* binHeapSchedulerObjectCreate(ocrSchedulerObjectFactory_t *factory, ocrParamList_t *perInstance) {
-    paramListSchedulerObject_t *paramSchedObj = (paramListSchedulerObject_t*)perInstance;
+    paramListSchedulerObject_t *paramSchedObj __attribute__((unused)) = (paramListSchedulerObject_t*)perInstance;
     ASSERT(!paramSchedObj->config);
     ASSERT(!paramSchedObj->guidRequired);
     ocrPolicyDomain_t *pd = NULL;

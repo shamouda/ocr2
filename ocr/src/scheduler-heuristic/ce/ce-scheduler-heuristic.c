@@ -96,8 +96,7 @@ u8 ceSchedulerHeuristicSwitchRunlevel(ocrSchedulerHeuristic_t *self, ocrPolicyDo
     case RL_MEMORY_OK:
     {
         DPRINTF(DEBUG_LVL_VVERB, "Runlevel: RL_MEMORY_OK\n");
-        ocrScheduler_t *scheduler = self->scheduler;
-        ASSERT(scheduler);
+        ASSERT(self->scheduler);
         self->contextCount = ((ocrPolicyDomainCe_t*)PD)->xeCount + PD->neighborCount;
         ASSERT(self->contextCount > 0);
         DPRINTF(DEBUG_LVL_INFO, "ContextCount: %"PRIu64" (XE: %"PRIu32" + Neighbors: %"PRIu32")\n", self->contextCount, ((ocrPolicyDomainCe_t*)PD)->xeCount, PD->neighborCount);
@@ -368,7 +367,7 @@ static u8 ceSchedulerHeuristicNotifyEdtReadyInvoke(ocrSchedulerHeuristic_t *self
                 affinityLoc = MAKE_CORE_ID(0, 0, 0, dbLocCluster, dbLocBlk, ID_AGENT_CE); //Map it to dbLocBlk of current unit
             }
             u32 i;
-            bool found = false;
+            bool found __attribute__((unused)) = false;
             for (i = 0; i < self->contextCount; i++) {
                 ocrSchedulerHeuristicContext_t *ctxt = self->contexts[i];
                 if (ctxt->location == affinityLoc) {
@@ -507,7 +506,6 @@ static u8 respondWorkRequest(ocrSchedulerHeuristic_t *self, ocrSchedulerHeuristi
     ocrSchedulerHeuristicContextCe_t *ceContext = (ocrSchedulerHeuristicContextCe_t*)context;
     ASSERT(ceContext->inWorkRequestPending);
     ASSERT(fguid);
-    u8 returnCode = 0;
     bool ceMessage = false;
 
     // If the receiver is an XE, wake it up
@@ -540,8 +538,7 @@ static u8 respondWorkRequest(ocrSchedulerHeuristic_t *self, ocrSchedulerHeuristi
     PD_MSG_FIELD_IO(schedArgs).OCR_SCHED_ARG_FIELD(OCR_SCHED_WORK_EDT_USER).edt = *fguid;
     PD_MSG_FIELD_I(properties) = 0;
     if (ceMessage) {
-        returnCode = pd->fcts.sendMessage(pd, msg.destLocation, &msg, NULL, 0);
-        ASSERT(returnCode == 0);
+        RESULT_ASSERT(pd->fcts.sendMessage(pd, msg.destLocation, &msg, NULL, 0), ==, 0);
     } else {
         RESULT_ASSERT(pd->fcts.sendMessage(pd, msg.destLocation, &msg, NULL, 0), ==, 0);
     }

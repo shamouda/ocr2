@@ -47,7 +47,7 @@ ocrGuid_t processRequestEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[
     // Important to read this before calling processMessage. If the message requires
     // a response, the runtime reuses the request's message to post the response.
     // Hence there's a race between this code and the code posting the response.
-    bool processResponse = !!(msg->type & PD_MSG_RESPONSE); // mainly for debug
+    bool processResponse __attribute__((unused)) = !!(msg->type & PD_MSG_RESPONSE); // mainly for debug
     bool syncProcess = !((msg->type & PD_MSG_TYPE_ONLY) == PD_MSG_DB_ACQUIRE);
     // Here we need to read because on EPEND, by the time we get to check 'res'
     // the callback my have completed and deallocated the message.
@@ -183,7 +183,6 @@ static u8 takeFromSchedulerAndSend(ocrWorker_t * worker, ocrPolicyDomain_t * pd)
 
 static u8 createProcessRequestEdt(ocrPolicyDomain_t * pd, ocrGuid_t templateGuid, u64 * paramv) {
 
-    ocrGuid_t edtGuid;
     u32 paramc = 1;
     u32 depc = 0;
     u32 properties = 0;
@@ -218,8 +217,7 @@ static u8 createProcessRequestEdt(ocrPolicyDomain_t * pd, ocrGuid_t templateGuid
     PD_MSG_FIELD_I(properties) = properties;
     returnCode = pd->fcts.processMessage(pd, &msg, true);
     if(returnCode) {
-        edtGuid = PD_MSG_FIELD_IO(guid.guid);
-        DPRINTF(DEBUG_LVL_VVERB,"hc-comm-worker: Created processRequest EDT GUID "GUIDF"\n", GUIDA(edtGuid));
+        DPRINTF(DEBUG_LVL_VVERB,"hc-comm-worker: Created processRequest EDT GUID "GUIDF"\n", GUIDA(PD_MSG_FIELD_IO(guid.guid)));
         RETURN_PROFILE(returnCode);
     }
 

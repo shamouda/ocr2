@@ -86,11 +86,10 @@ u32 XeIrqReq[8];
 
 static void releaseXE(u32 i) {
     DPRINTF(DEBUG_LVL_VERB, "Ungating XE %"PRIu32"\n", i);
-    u64 state = 0;
     // Bug #820: This was a MMIO LD call and should be replaced by one when they become available
-    state = *((volatile u64*)(BR_MSR_BASE((i+ID_AGENT_XE0)) + (POWER_GATE_RESET * sizeof(u64))));
     // The XE should be clock-gated already because we don't process its message before it is
-    ASSERT(state & 0x1ULL);
+    ASSERT(*((volatile u64*)(BR_MSR_BASE((i+ID_AGENT_XE0)) + (POWER_GATE_RESET * sizeof(u64)))) & 0x1ULL);
+
     // Bug #820: Further, this was a MMIO operation
     *((u64*)(BR_MSR_BASE((i+ID_AGENT_XE0)) + (POWER_GATE_RESET * sizeof(u64)))) &= ~(0x1ULL);
     DPRINTF(DEBUG_LVL_VERB, "XE %"PRIu32" ungated\n", i);
@@ -404,8 +403,7 @@ u8 ceCommSendMessage(ocrCommPlatform_t *self, ocrLocation_t target,
         DPRINTF(DEBUG_LVL_VVERB, "Past fence\n");
         // - Atomically test & set remote stage to Full. Error if already non-Empty.
         {
-            u64 tmp = hal_swap64(rq, 2);
-            ASSERT(tmp == 0);
+            RESULT_ASSERT(hal_swap64(rq, 2), ==, 0);
         }
         DPRINTF(DEBUG_LVL_VVERB, "DMA done and set %p to 2 (full)\n", &(rq[0]));
 

@@ -1185,10 +1185,6 @@ u8 newEventHc(ocrEventFactory_t * factory, ocrFatGuid_t *guid,
         u32 sizeSat = (sizeof(ocrGuid_t) * devt->satBufSz);
         devt->satBuffer = (ocrGuid_t *)((u64)base + baseSize);
         devt->waiters = (regNode_t *)((u64)base + baseSize + sizeSat);
-        regNode_t regnode;
-        regnode.guid = NULL_GUID;
-        regnode.slot = 0;
-        regnode.mode = -1;
         devt->headSat = 0;
         devt->tailSat = 0;
         devt->headWaiter = 0;
@@ -1198,6 +1194,10 @@ u8 newEventHc(ocrEventFactory_t * factory, ocrFatGuid_t *guid,
             devt->satBuffer[i] = UNINITIALIZED_GUID;
         }
 #ifdef OCR_ASSERT
+        regNode_t regnode;
+        regnode.guid = NULL_GUID;
+        regnode.slot = 0;
+        regnode.mode = -1;
         // This is not really necessary outside of debug mode
         for (i=0; i<devt->waitBufSz; i++) {
             devt->waiters[i] = regnode;

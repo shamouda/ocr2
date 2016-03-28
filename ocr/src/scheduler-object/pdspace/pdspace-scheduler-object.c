@@ -412,9 +412,8 @@ u8 pdspaceSchedulerObjectOcrPolicyMsgGetMsgSize(ocrSchedulerObjectFactory_t *fac
     switch(schedObj->kind) {
     case OCR_SCHEDULER_OBJECT_EDT:
         {
-            ocrGuid_t taskGuid = schedObj->guid.guid;
             ocrTask_t *task = (ocrTask_t*)schedObj->guid.metaDataPtr;
-            ASSERT(task && ocrGuidIsEq(taskGuid, task->guid));
+            ASSERT(task && ocrGuidIsEq(schedObj->guid.guid, task->guid));
             ocrPolicyMsgGetMsgSizeTransactEdt(task, marshalledSize, properties);
         }
         break;
@@ -437,9 +436,8 @@ u8 pdspaceSchedulerObjectOcrPolicyMsgMarshallMsg(ocrSchedulerObjectFactory_t *fa
     switch(schedObj->kind) {
     case OCR_SCHEDULER_OBJECT_EDT:
         {
-            ocrGuid_t taskGuid = schedObj->guid.guid;
             ocrTask_t *task = (ocrTask_t*)schedObj->guid.metaDataPtr;
-            ASSERT(task && ocrGuidIsEq(taskGuid, task->guid));
+            ASSERT(task && ocrGuidIsEq(schedObj->guid.guid, task->guid));
             return ocrPolicyMsgMarshallMsgTransactEdt(task, buffer, properties);
         }
     default:
@@ -463,9 +461,8 @@ u8 pdspaceSchedulerObjectOcrPolicyMsgUnMarshallMsg(ocrSchedulerObjectFactory_t *
     switch(schedObj->kind) {
     case OCR_SCHEDULER_OBJECT_EDT:
         {
-            ocrGuid_t taskGuid = schedObj->guid.guid;
             ocrTask_t *task = (ocrTask_t*)schedObj->guid.metaDataPtr;
-            ASSERT(task && ocrGuidIsEq(taskGuid, task->guid));
+            ASSERT(task && ocrGuidIsEq(schedObj->guid.guid, task->guid));
             fact->fcts.ocrPolicyMsgGetMsgSize(fact, msg, &marshalledSize, 0);
             ocrTask_t *taskBuffer = pd->fcts.pdMalloc(pd, marshalledSize);
             hal_memCopy(taskBuffer, task, marshalledSize, false);
