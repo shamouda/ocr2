@@ -1546,6 +1546,22 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
 #undef PD_TYPE
         break;
     }
+    case PD_MSG_HINT_GET: {
+#define PD_MSG (msg)
+#define PD_TYPE PD_MSG_HINT_GET
+        RETRIEVE_LOCATION_FROM_GUID_MSG(self, msg->destLocation, I);
+#undef PD_MSG
+#undef PD_TYPE
+        break;
+    }
+    case PD_MSG_HINT_SET: {
+#define PD_MSG (msg)
+#define PD_TYPE PD_MSG_HINT_SET
+        RETRIEVE_LOCATION_FROM_GUID_MSG(self, msg->destLocation, I);
+#undef PD_MSG
+#undef PD_TYPE
+        break;
+    }
     case PD_MSG_DEP_UNREGSIGNALER: {
         //Not implemented: see #521, #522
         ASSERT(false && "Not implemented PD_MSG_DEP_UNREGSIGNALER");
