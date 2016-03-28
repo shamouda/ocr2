@@ -483,7 +483,7 @@ u8 ocrPolicyMsgMarshallMsg(ocrPolicyMsg_t* msg, u64 baseSize, u8* buffer, u32 mo
                             (u64)PD_MSG_FIELD_I(params), ((u64)(curPtr - startPtr)<<1) + isAddl);
                     PD_MSG_FIELD_I(params) = (void*)((((u64)(curPtr - startPtr))<<1) + isAddl);
                 } else {
-                    DPRINTF(DEBUG_LVL_VVERB, "Copying params (0x%lx) to 0x%lx\n",
+                    DPRINTF(DEBUG_LVL_VVERB, "Copying params (0x%lx) to %p\n",
                             (u64)PD_MSG_FIELD_I(params), curPtr);
                     PD_MSG_FIELD_I(params) = (void*)curPtr;
                 }

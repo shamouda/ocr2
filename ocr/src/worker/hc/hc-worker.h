@@ -41,7 +41,7 @@ typedef struct {
     ocrGuid_t edtGuid;
     ocrEdt_t fctPtr;
 #ifdef OCR_ENABLE_EDT_NAMING
-    char * name;
+    const char * name;
 #endif
     hcWorkerType_t hcType;
     u8 legacySecondStart;
