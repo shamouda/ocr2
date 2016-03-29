@@ -120,4 +120,23 @@ OCR is currently a research runtime system, developed as an
 open-source community project. It does not as yet have the level of
 investment needed to develop a production system that can be used for
 serious application deployment.
+%%%%%
+\section{Version numbers}
+As OCR is evolving, newer versions of the API may break
+backward compatibility with older versions of the API. To help the
+programmer navigate these incompatibilities, the version number for
+the OCR API will follow the following rules:
+\begin{itemize}
+\item{An OCR version number is composed of three integers $X$, $Y$ and
+  $Z$ and represented as $X.Y.Z$.}
+\item{API compatibility is guaranteed between any versions that only
+  vary on the last digit. For example, $1.0.1$ is compatible with
+  $1.0.5$.}
+\item{A change in any of the other digits indicates that an API
+  incompatibility exists. The magnitude of this incompatibility is
+  indicated by whether the middle digit changed (smaller change) or
+  the first digit changed (big change).}
+\item{OCR provides macros to check the API version implemented as
+  well as any extensions that are supported.}
+\end{itemize}
 % This is the end of ch1-intro.tex of the OCR specification.

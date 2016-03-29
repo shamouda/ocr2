@@ -37,6 +37,26 @@ reference all OCR objects. An \code{ocrGuid\_t} is truly opaque and
 the user cannot assume that it is of a given size;
 \end{itemize}
 %%
+\paragraph*{OCR version utilities}
+OCR provides macros to determine the API implemented and the
+extensions that are enabled:
+\begin{itemize}
+\item \code{OCR\_VERSION}: A string representing the API version
+  implemented.
+\item \code{OCR\_VERSION\_GET\_MAJOR(vers)}: Extract the unsigned
+  integer representing the major revision of the OCR API. This is the
+  first digit of the version string.
+\item \code{OCR\_VERSION\_GET\_MINOR(vers)}: Extract the unsigned
+  integer representing the minor revision of the OCR API. This is the
+  middle digit of the version string.
+\item \code{OCR\_VERSION\_GET\_PATCH(vers)}: Extract the unsigned
+  integer representing the patch number of the OCR API. This is the
+  last digit of the version string.
+\item \code{OCR\_VERSION\_EXTENSION\_BITMAP}: A bitmap representing
+  the extensions enabled. The file ``ocr-version.h'' defines the
+  possible extensions that are encoded in this bitmap.
+\end{itemize}
+%%
 \paragraph*{Other constants}
 The C API for OCR makes use of a set of basic macros defined
 inside \code{ocr.h}:
@@ -48,8 +68,7 @@ inside \code{ocr.h}:
 \item \code{\#define NULL\_HINT}: A NULL pointer to ocrHint\_t. This value cannot
   be assumed to be equal to zero.
 \item \code{\#define NULL\_GUID}: A NULL ocrGuid\_t. This value cannot
-  be assumed to be equal to zero. In other words, a programmer should
-  explicitly test for equality to NULL\_GUID.
+  be assumed to be equal to zero.
 \item \code{\#define UNINITIALIZED\_GUID}: An Unitialized GUID (ie: never set);
 \item \code{\#define ERROR\_GUID}: An invalid GUID.
 \end{itemize}
