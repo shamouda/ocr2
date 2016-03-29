@@ -329,7 +329,7 @@ ocrScheduler_t* newSchedulerCommon(ocrSchedulerFactory_t * factory, ocrParamList
     u32 heuristicIdLow = params->heuristicIdLow;
     u32 heuristicIdHigh = params->heuristicIdHigh;
     if (config == NULL) {
-        DPRINTF(DEBUG_LVL_WARN, "Warning: No config option specified for COMMON scheduler heuristics. Assume order is comp/plc/comm \n");
+        DPRINTF(DEBUG_LVL_INFO, "Warning: No config option specified for COMMON scheduler heuristics. Assume order is comp/plc/comm \n");
         // Do best effort here for backward compatibility
         // - Assume heuristics are given in order.
         // - If not all specified, assume default is the master heuristic or heuristic '0'.
