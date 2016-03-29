@@ -258,8 +258,7 @@ u8 ocrEdtTemplateDestroy(ocrGuid_t guid);
  * @param[in] properties        Used to indicate if this is a finish EDT
  *                              (see #EDT_PROP_FINISH). Use #EDT_PROP_NONE as
  *                              a default value.
- * @param[in] affinity          Affinity container for this EDT. Can be NULL_GUID. This
- *                              is currently an experimental feature
+ * @param[in] hint              Hints that apply to this EDT. Can be NULL_HINT.
  * @param[in,out] outputEvent   If not NULL on input, on successful return
  *                              of this call, this will return the GUID of the
  *                              event associated with the post-slot of the EDT.
