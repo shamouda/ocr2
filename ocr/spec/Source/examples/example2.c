@@ -40,7 +40,7 @@ ocrGuid_t shutdownEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     PRINTF("Got a DB (GUID "GUIDF") containing %"PRId32" on slot 0\n", GUIDA(depv[0].guid), *data0);
     PRINTF("Got a DB (GUID "GUIDF") containing %"PRId32" on slot 1\n", GUIDA(depv[1].guid), *data1);
 
-    // Free the data-blocks that were passed in
+    // Free the data blocks that were passed in
     ocrDbDestroy(depv[0].guid);
     ocrDbDestroy(depv[1].guid);
 
@@ -57,20 +57,20 @@ ocrGuid_t stage1a(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     // paramv contains the event that the child EDT has to satisfy
     // when it is done
 
-    // We create a data-block for one u64 and put data in it
+    // We create a data block for one u64 and put data in it
     ocrGuid_t dbGuid = NULL_GUID, stage2aTemplateGuid = NULL_GUID,
         stage2aEdtGuid = NULL_GUID;
     u64* dbPtr = NULL;
     ocrDbCreate(&dbGuid, (void**)&dbPtr, sizeof(u64), 0, NULL_HINT, NO_ALLOC);
     *dbPtr = 1ULL;
 
-    // Create an EDT and pass it the data-block we just created
+    // Create an EDT and pass it the data block we just created
     // The EDT is immediately ready to execute
     ocrEdtTemplateCreate(&stage2aTemplateGuid, stage2a, PARAM_SIZE, 1);
     ocrEdtCreate(&stage2aEdtGuid, stage2aTemplateGuid, EDT_PARAM_DEF,
                  paramv, EDT_PARAM_DEF, &dbGuid, EDT_PROP_NONE, NULL_HINT, NULL);
 
-    // Pass the same data-block created to stage2b (links setup in mainEdt)
+    // Pass the same data block created to stage2b (links setup in mainEdt)
     return dbGuid;
 }
 
@@ -78,13 +78,13 @@ ocrGuid_t stage1b(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ASSERT(depc == 1);
     ASSERT(paramc == 0);
 
-    // We create a data-block for one u64 and put data in it
+    // We create a data block for one u64 and put data in it
     ocrGuid_t dbGuid = NULL_GUID;
     u64* dbPtr = NULL;
     ocrDbCreate(&dbGuid, (void**)&dbPtr, sizeof(u64), 0, NULL_HINT, NO_ALLOC);
     *dbPtr = 2ULL;
 
-    // Pass the created data-block created to stage2b (links setup in mainEdt)
+    // Pass the created data block created to stage2b (links setup in mainEdt)
     return dbGuid;
 }
 
@@ -99,7 +99,7 @@ ocrGuid_t stage2a(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
 
     *dbPtr = 3ULL; // Update the value
 
-    // Pass the modified data-block to shutdown
+    // Pass the modified data block to shutdown
     ocrEventSatisfy(params->evtGuid, depv[0].guid);
 
     return NULL_GUID;

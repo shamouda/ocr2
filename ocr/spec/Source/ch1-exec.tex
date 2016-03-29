@@ -128,19 +128,19 @@ the source event will trigger the destination event.
 
 \item \emph{Event to EDT}: One of the destination EDT’s pre-slot is chained
 directly to the source event’s post-slot. When the source event is
-triggered, this will satisfy the EDT’s pre-slot. If a data-block was
-associated with the triggering of the source event, that data-block
+triggered, this will satisfy the EDT’s pre-slot. If a data block was
+associated with the triggering of the source event, that data block
 will be made available to the EDT in the dependence array in the
 position of the pre-slot. This is a “control + data” dependence. In
-the other case, no data-block will be made available and the
+the other case, no data block will be made available and the
 dependence is akin to a pure control dependence.
 
-\item \emph{Data Block to Event}: Adding a dependence between a data-block and an
-event is equivalent to satisfying the event with the data-block.
+\item \emph{Data Block to Event}: Adding a dependence between a data block and an
+event is equivalent to satisfying the event with the data block.
 
-\item \emph{Data Block to EDT}: Directly adding a dependence between a data-block and
+\item \emph{Data Block to EDT}: Directly adding a dependence between a data block and
 an EDT (a pure data-dependence) immediately satisfies the EDT’s
-pre-slot and makes the data-block available to the EDT in the
+pre-slot and makes the data block available to the EDT in the
 dependence array in the position of the pre-slot.
 \end{itemize}
 

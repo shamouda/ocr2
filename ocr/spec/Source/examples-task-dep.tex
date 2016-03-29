@@ -4,9 +4,9 @@ This example illustrates several aspect of the OCR API with regards to
 the creation of an irregular task graph. Specifically, it illustrates:
 \begin{enumerate}
 \item{Adding dependences between {\bf a)} events and EDTs, {\bf b)}
-    data-blocks and EDTs, and {\bf c)} the NULL\_GUID and EDTs;}
+    data blocks and EDTs, and {\bf c)} the NULL\_GUID and EDTs;}
 \item{The use of an EDT's post-slot and how a ``producer'' EDT can
-    pass a data-block to a ``consumer'' EDT using this post-slot;}
+    pass a data block to a ``consumer'' EDT using this post-slot;}
 \item{Several methods of satisfying an EDT's pre-slot: {\bf a)}
     through the use of an explicit dependence array at creation time,
     {\bf b)} through the use of another EDT's post-slot and {\bf c)}
@@ -50,7 +50,7 @@ ocrGuid_t shutdownEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     PRINTF("Got a DB (GUID "GUIDF") containing %"PRId32" on slot 0\n", GUIDA(depv[0].guid), *data0);
     PRINTF("Got a DB (GUID "GUIDF") containing %"PRId32" on slot 1\n", GUIDA(depv[1].guid), *data1);
 
-    // Free the data-blocks that were passed in
+    // Free the data blocks that were passed in
     ocrDbDestroy(depv[0].guid);
     ocrDbDestroy(depv[1].guid);
 
@@ -67,20 +67,20 @@ ocrGuid_t stage1a(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     // paramv contains the event that the child EDT has to satisfy
     // when it is done
 
-    // We create a data-block for one u64 and put data in it
+    // We create a data block for one u64 and put data in it
     ocrGuid_t dbGuid = NULL_GUID, stage2aTemplateGuid = NULL_GUID,
         stage2aEdtGuid = NULL_GUID;
     u64* dbPtr = NULL;
     ocrDbCreate(&dbGuid, (void**)&dbPtr, sizeof(u64), 0, NULL_HINT, NO_ALLOC);
     *dbPtr = 1ULL;
 
-    // Create an EDT and pass it the data-block we just created
+    // Create an EDT and pass it the data block we just created
     // The EDT is immediately ready to execute
     ocrEdtTemplateCreate(&stage2aTemplateGuid, stage2a, PARAM_SIZE, 1);
     ocrEdtCreate(&stage2aEdtGuid, stage2aTemplateGuid, EDT_PARAM_DEF, (@ \label{line:expDep} @)
                  paramv, EDT_PARAM_DEF, &dbGuid, EDT_PROP_NONE, NULL_HINT, NULL);
 
-    // Pass the same data-block created to stage2b (links setup in mainEdt)
+    // Pass the same data block created to stage2b (links setup in mainEdt)
     return dbGuid; (@ \label{line:EdtGuidReturn} @)
 }
 
@@ -88,13 +88,13 @@ ocrGuid_t stage1b(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ASSERT(depc == 1);
     ASSERT(paramc == 0);
 
-    // We create a data-block for one u64 and put data in it
+    // We create a data block for one u64 and put data in it
     ocrGuid_t dbGuid = NULL_GUID;
     u64* dbPtr = NULL;
     ocrDbCreate(&dbGuid, (void**)&dbPtr, sizeof(u64), 0, NULL_HINT, NO_ALLOC);
     *dbPtr = 2ULL;
 
-    // Pass the created data-block created to stage2b (links setup in mainEdt)
+    // Pass the created data block created to stage2b (links setup in mainEdt)
     return dbGuid;
 }
 
@@ -109,7 +109,7 @@ ocrGuid_t stage2a(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
 
     *dbPtr = 3ULL; // Update the value
 
-    // Pass the modified data-block to shutdown
+    // Pass the modified data block to shutdown
     ocrEventSatisfy(params->evtGuid, depv[0].guid); (@ \label{line:expSatisfy} @)
 
     return NULL_GUID;
@@ -196,12 +196,12 @@ task-graph shown starting on
 Line~\ref{line:task-dep-graph}. \texttt{mainEdt} will create {\bf a)}
 \texttt{stage1a} and \texttt{stage1b} as they are the next things that
 need to execute but also {\bf b)} \texttt{stage2b} and
-\texttt{shutdownEdt} because it is the immediate dominator of those
+\texttt{shutdownEdt} because they are the immediate dominators of those
 EDTs. In general, it is easiest to create an EDT in its immediate
 dominator because that allows any other EDTs who need to feed it
 information (necessarily between its dominator and the EDT in
 question) to be able to know the value of the opaque GUID created for
-hte EDT. \texttt{stage2a}, on the other hand, can be created by
+the EDT. \texttt{stage2a}, on the other hand, can be created by
 \texttt{stage1a} as no-one else needs to feed information to it.
 
 Most of the ``edges'' in the dependence graph are also created in
@@ -230,8 +230,8 @@ This example shows three methods of satisfying an EDT's pre-slots:
 \item{Through an output event as shown on
     Line~\ref{line:EdtGuidReturn}. The GUID passed as a return value
     of the EDT function will be passed to the EDT's output event (in
-    this case \texttt{stage1aOut}). If the GUID is a data-block's
-    GUID, the output event will be satisfied with that data-block. If
+    this case \texttt{stage1aOut}). If the GUID is a data block's
+    GUID, the output event will be satisfied with that data block. If
     it is an event's GUID, the two events will become linked;}
 \item{Through an explicit satisfaction as shown on
     Line~\ref{line:expSatisfy}).}

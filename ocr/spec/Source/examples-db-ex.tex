@@ -1,12 +1,23 @@
-The {\tt Exclusive-Write (EW)} mode allows for an easy implementation of mutual exclusion of EDTs execution. When an EDT depend on one or several DBs in {\tt EW} mode, the runtime guarantees it is the only EDT throught the system to currently writing to those DBs.
-Hence, the {\tt EW} mode is useful when one wants to guarantee there's no race condition writing to a Data-Block or when ordering among EDTs do not matter for as long as the execution is in mutual exclusion. The following examples shows how two EDTs may share access to a DB in {\tt RW} mode, while one EDT requires {\tt EW} access. In this situation the programmer cannot assume in which order the EDTs are executed. It might be that EDT1 and EDT2 are executed simultaneously or independently, while EDT3 happens either before, after or in between the others.
+The {\tt Exclusive-Write (EW)} mode allows for an easy implementation
+of mutual exclusion of EDTs. When an EDT depends on one or several
+data blocks in {\tt EW} mode, the runtime guarantees that only one EDT
+in the entire system will have write access to the data block Hence,
+the {\tt EW} mode is useful when one wants to guarantee there is no
+race condition writing to a data block or when ordering among EDTs
+does not matter as long as the execution is in mutual exclusion. The
+following example shows how two EDTs may share access to a data block
+in {\tt RW} mode, while one EDT requires {\tt EW} access. In this
+situation the programmer cannot assume the order in which the EDTs are
+executed. It might be that EDT1 and EDT2 are executed simultaneously
+or independently, while EDT3 happens either before, after or in
+between the others.
 
 %%%%
 
 \subsection{Code example}
 \begin{ocrsnip}
 /* Example usage of EW (Exclusive-Write)
- * datablock access mode in OCR
+ * data block access mode in OCR
  *
  * Implements the following dependence graph:
  *
@@ -116,4 +127,3 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
 }
 \end{ocrsnip}
 %%%
-\subsubsection{Details}

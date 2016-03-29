@@ -633,7 +633,7 @@ The following macros and enums are used with OCR data blocks.
   \end{itemize}
 \item \hypertarget{type_ocrDbAccessMode_t}{\code{enum ocrDbAccessMode\_t}}
   containing the four access modes. The
-  meaning of the access modes is given in Section~\ref{sec:datablocks}:
+  meaning of the access modes is given in Section~\ref{sec:data blocks}:
   \begin{itemize}
     \item \code{DB\_MODE\_RW}
     \item \code{DB\_MODE\_EW}
@@ -646,7 +646,7 @@ The following macros and enums are used with OCR data blocks.
   not be acquired on creation
 \end{itemize}
 
-%% This is a repeat of sec:datablocks. Keeping for now commented.
+%% This is a repeat of sec:data blocks. Keeping for now commented.
 
 %% These are the modes with which an EDT can access a data block.
 %% OCR currently supports four modes:
@@ -731,7 +731,7 @@ If DB\_PROP\_NO\_ACQUIRE is specified in \code{flags}, the
 value returned will be NULL. If the call fails, the returned value is
 undefined \\
 \hline
-\mbox{\tt in}  & \code{len} & Size, in bytes, of the datablock to create \\
+\mbox{\tt in}  & \code{len} & Size, in bytes, of the data block to create \\
 \hline
 \mbox{\tt in}  & \code{flags} & Flags controlling the behavior of the
 data block creation. The supported flags are:
@@ -763,7 +763,7 @@ by \hyperlink{type_ocrInDbAllocator_t}{ocrInDbAllocator\_t}.\\
 A status code:
 \begin{DoxyItemize}
 \item 0: Successful
-\item OCR\_ENOMEM: The runtime could not provide a data-block of size
+\item OCR\_ENOMEM: The runtime could not provide a data block of size
   'len' due to insufficient memory
 \item OCR\_EINVAL: The arguments passed (flags, allocator, etc.) were
   not valid
@@ -793,7 +793,7 @@ The created data block:
   data blocks. Not specifying this flag may result in a sub-optimal
   memory placement for the created data block.
 \item When DB\_PROP\_NO\_ACQUIRE is specified, a conformant
-  implementation may choose not to create the data-block immediately
+  implementation may choose not to create the data block immediately
   and instead create it lazily before the using EDT runs.
 \item Like all GUIDs, the uniqueness of a data block's GUID is not
   necessarily unique throughout the entire program. A data block's

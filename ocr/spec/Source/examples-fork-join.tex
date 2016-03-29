@@ -105,10 +105,10 @@ are satisfied. Finally, the EDTs \texttt{edt1} and \texttt{edt2} are
 spawned in Lines~\ref{line:FJ_edt1start} and ~\ref{line:FJ_edt2start} respectively.
 As they do not have any dependencies, they execute the associated EDT functions
 in parallel. These functions (\texttt{fun1} and \texttt{fun2}) creates
-data-blocks using the API \texttt{ocrDbCreate} (Lines~\ref{line:FJ_db1} and ~\ref{line:FJ_db2}).
-The data is written to the data-blocks and the GUID is returned (Lines~\ref{line:FJ_retDB1}
+data blocks using the API \texttt{ocrDbCreate} (Lines~\ref{line:FJ_db1} and ~\ref{line:FJ_db2}).
+The data is written to the data blocks and the GUID is returned (Lines~\ref{line:FJ_retDB1}
 and ~\ref{line:FJ_retDB2}). This will satisfy the events on which the \texttt{edt3}
 is waiting. The EDT function \texttt{shutdownEdt} executes
-and calls \texttt{ocrShutdown} after reading and destroying the two data-blocks.
+and calls \texttt{ocrShutdown} after reading and destroying the two data blocks.
 
 %%%%

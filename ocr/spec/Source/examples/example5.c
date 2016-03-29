@@ -5,7 +5,7 @@
  */
 
 /* Example usage of EW (Exclusive-Write)
- * datablock access mode in OCR
+ * data block access mode in OCR
  *
  * Implements the following dependence graph:
  *

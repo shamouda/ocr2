@@ -1,14 +1,17 @@
 %%%%
-This example illustrates the usage model for datablocks accessed with the {\tt Read-Write (RW)} mode.
-The {\tt RW} mode ensures that only one master copy of the datablock exists at any time inside a shared address space.
-Parallel EDTs can concurrently access a datablock under this mode if they execute inside the same address space.
-It is the programmer's responsibility to avoid data races. For example, two parallel EDTs can concurrently update
-separate memory regions of the same datablock with the {\tt RW} mode.
+This example illustrates the usage model for data blocks accessed with
+the {\tt Read-Write (RW)} mode. The {\tt RW} mode ensures that only
+one master copy of the data block exists at any time inside a shared
+address space. Parallel EDTs can concurrently access a data block
+under this mode if they execute inside the same address space. It is
+the programmer's responsibility to avoid data races. For example, two
+parallel EDTs can concurrently update separate memory regions of the
+same data block with the {\tt RW} mode.
 
 \subsection{Code example}
 \begin{ocrsnip}
 /* Example usage of RW (Read-Write)
- * datablock access mode in OCR
+ * data block access mode in OCR
  *
  * Implements the following dependence graph:
  *
@@ -108,21 +111,30 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
 
 %%%
 \subsubsection{Details}
-The mainEdt creates a datablock ({\tt dbGuid}) that may be concurrently updated by two children EDTs
-({\tt exampleEdtGuid1} and {\tt exampleEdtGuid2}) using the {\tt RW} mode.
-{\tt exampleEdtGuid1} and {\tt exampleEdtGuid2} are each created with one dependence on each of them,
-while after execution, each of them will satisfy an output event ({\tt exampleEventGuid1} and {\tt exampleEventGuid2}).
-The satisfaction of these output events will trigger the execution of an awaiting EDT ({\tt awaitingEdtGuid})
-that will verify the correctness of the computation performed by the concurrent EDTs.
-{\tt awaitingEdtGuid} has three input dependences.
-{\tt dbGuid} is passed into the first input, while the other two would be satisfied by {\tt exampleEventGuid1} and {\tt exampleEventGuid2}.
-Once {\tt awaitingEdtGuid}'s dependences have been setup,
-the {\tt mainEdt} satisfies the dependences on {\tt exampleEdtGuid1} and {\tt exampleEdtGuid2} with the datablock {\tt dbGuid}.
+The mainEdt creates a data block ({\tt dbGuid}) that may be
+concurrently updated by two children EDTs ({\tt exampleEdtGuid1} and
+{\tt exampleEdtGuid2}) using the {\tt RW} mode. {\tt exampleEdtGuid1}
+and {\tt exampleEdtGuid2} are each created with one dependence,
+while after execution, each of them will satisfy an output
+event ({\tt exampleEventGuid1} and {\tt exampleEventGuid2}). The
+satisfaction of these output events will trigger the execution of an
+awaiting EDT ({\tt awaitingEdtGuid}) that will verify the correctness
+of the computation performed by the concurrent EDTs. {\tt
+awaitingEdtGuid} has three input dependences. {\tt dbGuid} is passed
+into the first input, while the other two would be satisfied by {\tt
+exampleEventGuid1} and {\tt exampleEventGuid2}. Once {\tt
+awaitingEdtGuid}'s dependences have been setup, the {\tt mainEdt}
+satisfies the dependences on {\tt exampleEdtGuid1} and {\tt
+exampleEdtGuid2} with the data block {\tt dbGuid}.
 
-Both {\tt exampleEdtGuid1} and {\tt exampleEdtGuid2} execute the task function called \textit{exampleEdt}.
-This function accesses the contents of the datablock passed in through the dependence slot {\tt 0}.
-Based on the parameters passed in, the function updates a range of values on that datablock.
-After the datablock has been updated, the EDT returns and in turn satisfies the output event.
-Once both EDTs have executed and satisfied their ouput events, the {\tt awaitingEdtGuid} executes function \textit{awaitingEdt}.
-This function verifies if the updates done on the datablock by the concurrent EDTs are correct.
-Finally, it prints the result of its verification and calls {\tt ocrShutdown}.
+Both {\tt exampleEdtGuid1} and {\tt exampleEdtGuid2} execute the task
+function called \textit{exampleEdt}. This function accesses the
+contents of the data block passed in through the dependence slot {\tt
+0}. Based on the parameters passed in, the function updates a range
+of values on that data block. After the data block has been updated,
+the EDT returns and in turn satisfies the output event. Once both
+EDTs have executed and satisfied their ouput events, the {\tt
+awaitingEdtGuid} executes function \textit{awaitingEdt}. This
+function verifies if the updates done on the data block by the
+concurrent EDTs are correct. Finally, it prints the result of its
+verification and calls {\tt ocrShutdown}.

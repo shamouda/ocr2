@@ -195,10 +195,10 @@ data sizes till the entire array has undergone the operation. When this is avail
 a final EDT termed \texttt{endEdt()} in Line~\ref{line:HW_EndEdt} is called to
 optionally output the value of the
 computed FFT, and terminate the program by calling \texttt{ocrShutdown()}. All the
-FFT operations are performed on a single datablock created in Line~\ref{line:HW_DBCreate}.
+FFT operations are performed on a single data block created in Line~\ref{line:HW_DBCreate}.
 This shortcut is taken for the sake of didactic simplicity. While this is
 programmatically correct, a user who desires reducing contention on the single array
-may want to break down the datablock into smaller units for each of the EDTs to operate
+may want to break down the data block into smaller units for each of the EDTs to operate
 upon.
 
 For this program to execute correctly, it is apparent that each of the

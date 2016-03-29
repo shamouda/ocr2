@@ -187,7 +187,7 @@ asynchronously and without blocking. The implied event associated with
 the post-slot of a finish EDT is a \emph{latch event}, i.e.\ it is
 connected to the post-slots of all EDTs created within its scope and
 does not trigger until they have all finished. Currently, the returned
-value of finish EDTs is ignored and no data-block can be passed
+value of finish EDTs is ignored and no data block can be passed
 through the post-slot of a finish EDT.
 
 For both normal and finish EDTs, the EDT is created as an
@@ -268,7 +268,7 @@ triggers a pre-slot is ignored.
 
 \subsection{Data blocks}
 \index{Data block}
-\label{sec:datablocks}
+\label{sec:data blocks}
 Data blocks are OCR objects used to hold data in an OCR program. A
 data block is the only way to store data that persists outside of the
 scope of a collection of EDTs. Hence, data blocks are the only way to
