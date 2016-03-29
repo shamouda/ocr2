@@ -187,7 +187,7 @@ asynchronously and without blocking. The implied event associated with
 the post-slot of a finish EDT is a \emph{latch event}, i.e.\ it is
 connected to the post-slots of all EDTs created within its scope and
 does not trigger until they have all finished. Currently, the returned
-value of finish EDTs is ignored and no data-block can be passed
+value of finish EDTs is ignored and no data block can be passed
 through the post-slot of a finish EDT.
 
 For both normal and finish EDTs, the EDT is created as an
@@ -251,9 +251,9 @@ triggers; in this regard, it is similar to a \emph{once event}.
 \subsubsection{Event trigger rules}
 Events ``trigger'' when the appropriate \emph{trigger
 rule}\index{Trigger rule} is met. The default trigger rule for events
-is to trigger their post-slot when their pre-slot becomes
-satisfied. Any data block associated with the pre slot is also passed
-to the post slot.
+is to trigger their post-slot when ``any'' of their pre-slot becomes
+satisfied. Any data block associated with the pre-slot is also passed
+to the post-slot.
 
 The trigger rule for a latch event is somewhat more complicated. The
 latch event has two pre-slots; an increment slot and a decrement
@@ -268,7 +268,7 @@ triggers a pre-slot is ignored.
 
 \subsection{Data blocks}
 \index{Data block}
-\label{sec:datablocks}
+\label{sec:data blocks}
 Data blocks are OCR objects used to hold data in an OCR program. A
 data block is the only way to store data that persists outside of the
 scope of a collection of EDTs. Hence, data blocks are the only way to
@@ -317,30 +317,32 @@ EDT. Currently, OCR supports four modes:
   and write to the data block, but the system will not enforce exclusive
   access. Multiple EDTs may write to the same data bock at the same
   time. It is the responsibility of the programmer to
-  assure that when multiple writers are writing to a read-write data block,
+  ensure that when multiple writers are writing to a \emph{read-write} data block,
   appropriate synchronization
   is included to assure that the writes do not conflict.  Note: it is
   legal for an OCR program to contain data
   races. Section~\ref{sec:MemoryModel} contains more information.
 
 \item \emph{Exclusive write}\index{Data block, exclusive write}: The
-  EDT requires that it is the only EDT writing to a data block at a
-  given time. If multiple EDTs are runnable and want to access the same
-  data block in \emph{exclusive write} mode, the runtime will serialize
-  the execution of these EDTs.
+  EDT may read and write to the data block and the system will enforce
+  that, at a given time, it is the only EDT writing to the data
+  block. When the writing EDT releases the data block, another EDT may
+  acquire it and write to it. Given the memory model described in
+  Section~\ref{sec:MemoryModel}, the writes of multiple EDTs all
+  acquiring a data block in exclusive write will be sequential.
 
 \item \emph{Read only}\index{Data block, read only}: The EDT
   will only read from the Data block. OCR does
   not restrict the ability of other EDTs to write to the data block,
   even if the writes from one EDT might overlap with reads by the EDT
-  with read only access. If an EDT writes to a data block
-  it has acquired in read only mode, the results of those writes are
+  with \emph{read only} access. If an EDT writes to a data block
+  it has acquired in \emph{read only} mode, the results of those writes are
   undefined should other EDTs later acquire the same data block.
 
 \item \emph{Constant}\index{Data block, constant}: The EDT will only
   read from the data block and OCR runtime will assure that once the
   data block is acquired, writes from other EDTs will not be visible.
-  If an EDT writes to a data block it has acquired in constant mode,
+  If an EDT writes to a data block it has acquired in \emph{constant} mode,
   the results of those writes are undefined should other EDT's later
   acquire the same data block.
 \end{enumerate}

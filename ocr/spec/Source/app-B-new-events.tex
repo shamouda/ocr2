@@ -1,0 +1,208 @@
+\section{Parameterized event creation}
+\label{sec:paramEvents}
+This extension allows the user to provide an additional parameter at
+the creation of an event to customize its behavior. For example, with
+latch events, the user may specify an initial count for the latch.
+
+\subsection{Usage scenarios}
+This extension makes the initialization of latch events
+simpler. Previously the programmer had to write a loop to increment or
+decrement the counter to reach a certain value. The same is now
+achieved by passing the counter value as part of the extra parameter.
+
+\subsection{API}
+A new API call named
+\hyperlink{func_ocrEventCreateParams}{\code{ocrEventCreateParams}}
+is added. It has the same signature as
+\hyperlink{func_ocrEventCreate}{\code{ocrEventCreate}} with an
+additional argument of type \code{ocrEventParams\_t*}. The later is
+a struct composed of a union of sub-structure declarations that are
+referenced by name, one for each type of event that can be
+configured. Note a runtime implementation can make no assumptions
+about the lifetime of the passed pointer and must ensure that the
+parameter can be safely destroyed by the user after returning from the call.
+
+The following parameters are available for latch events:
+\begin{itemize}
+\item \code{EVENT\_LATCH}:
+\begin{itemize}
+\item \code{counter}: Initial value of the latch counter.
+\end{itemize}
+\end{itemize}
+
+\subsection*{Functions}
+\begin{DoxyCompactItemize}
+\item
+\hyperlink{type_u8}{u8} \hyperlink{func_ocrGuidMapCreate}
+{\code{ocrEventCreateParams}}(\hyperlink{type_ocrGuid_t}{ocr\-Guid\-\_\-t}
+$\ast$ guid,
+\hyperlink{type_ocrEventTypes_t}{ocrEventTypes\_t} eventType,
+\hyperlink{type_u16}{u16} properties,
+\hyperlink{type_ocrEventParams_t}{ocrEventParams\_t} params)
+\begin{DoxyCompactList}
+  \small \item \emph{DOC TODO}
+\end{DoxyCompactList}
+\end{DoxyCompactItemize}
+
+%
+% ocrEventCreateParams
+%
+\hypertarget{func_ocrEventCreateParams}{
+  \index{Event management@{Event management}!ocr\-Event\-Create@{ocr\-Event\-Create\-Params}}
+  \subsection[{ocr\-Event\-Create\-Params}]{\setlength{\rightskip}{0pt plus 5cm}{\bf u8} ocr\-Event\-Create\-Params(
+\begin{DoxyParamCaption}
+\item[{{\bf ocr\-Guid\-\_\-t} $\ast$}]{guid, }
+\item[{{\bf ocr\-Event\-Types\-\_\-t}}]{event\-Type, }
+\item[{\bf u16}]{flags, }
+\item[{{\bf ocr\-Event\-Params\-\_\-t $\ast$}}]{params}
+\end{DoxyParamCaption}
+)}}
+\label{func_ocrEventCreateParams}
+
+Requests the creation of an event of the specified type, initialized
+with the provided parameters. After a successful call, the runtime
+will return the GUID for the newly created event. The returned GUID is
+immediately usable.
+
+\begin{DoxyParams}[1]{Parameters}
+\mbox{\tt out}  & \code{guid} & On successful creation, contains the GUID of the
+event. If the call fails, the returned value is undefined.\\
+\hline
+\mbox{\tt in}  & \code{eventType} & The type of event to create.
+See \hyperlink{type_ocrEventTypes_t}.\\
+\hline
+\mbox{\tt in}  & {\em flags} & Flags impacting the creation of the event. Currently,
+the following flags are supported:
+\begin{DoxyItemize}
+\item EVT\_PROP\_NONE: Default behavior
+\item EVT\_PROP\_TAKES\_ARG: The created event will potentially
+  carry a data block on satisfaction.
+\end{DoxyItemize}\\
+\hline
+\mbox{\tt in}  & \code{params$\ast$} & Parameters to initialized the event with.\\
+\hline
+
+\end{DoxyParams}
+
+\returns
+A status code:
+\begin{DoxyItemize}
+\item 0\-: successful
+\item OCR\_ENOMEM: The runtime could not create the event due to insufficient memory
+\item OCR\_EINVAL: The \code{eventType} argument is invalid or incompatible
+  with \code{flags}
+\end{DoxyItemize}
+
+\descr
+This function is used to create the basic synchronization mechanism is
+OCR: the event. The lifetime of the created event is dependent on its
+type. See Section~\ref{sec:Event} for more details.
+
+\section{Counted events}
+\label{sec:countedEvents}
+A \emph{counted event}\index{Event, counted} will destroy itself
+automatically after both of the following conditions are true: {\bf
+  a)} it has been satisfied and {\bf b)} a pre-determined number of
+OCR objects have a dependence on the event. In other words, a counted
+event is like a once event in the sense that it auto-destroys once
+satisfied but is safer than a once event because it will expect to
+have a certain number of dependences waiting on it and will ensure
+that those dependences are satisfied before destroying itself. This
+eliminates the necessity for programmers to ensure that all add
+dependences that have the once event as a source happen before
+satisfying the event.
+
+Counted events trigger immediately when satisfied. Precisely, a
+satisfy call triggers the event immediately which will, in turn,
+satisfy any dependence already registered at that time. Calls to
+\hyperlink{func_ocrAddDependence}{\code{ocrAddDependence}} that happen
+after the satisfy call, immediately turn into satisfy calls
+themselves. The event is destroyed when it has been satisfied and the
+count of expected dependences is reached.
+
+\subsection{API}
+
+Counted events extend the
+\hypertarget{type_ocrEventTypes_t}{\code{enum ocrEventTypes\_t}} type
+with a OCR\_EVENT\_COUNTED\_T declaration. Counted events rely on the
+parameterized event creation extension (see
+Section~\ref{sec:paramEvents} to allow the programmer to
+specify the number of dependences the counted event will have. A
+counted event's parameters are accessible under the EVENT\_COUNTED field
+of the ocrEventParams\_t type.
+
+The following parameters are available for counted events:
+\begin{itemize}
+\item \code{EVENT\_COUNTED}:
+\begin{itemize}
+\item \code{nbDeps}: Expected number of dependences to be added to the event.
+\end{itemize}
+\end{itemize}
+
+Note it is an error to create a counted event with zero dependences.
+
+\section{Channel events}
+Channel events represent a whole new class of OCR events that can
+trigger multiple times. We define a \emph{generation} as the time
+between consecutive triggers of the event (the first generation is
+defined as the time between the event creation and its first trigger).
+
+Channel events have a different triggering rule; a channel event will
+trigger when both the following conditions are met: {\bf a)} the event
+has been satisfied a certain number of times and {\bf b)} a certain
+number of dependences has been added to the event. Once a channel
+event triggers, the event is reset and a new generation starts.
+
+Channel events also preserve FIFO ordering when
+there is a sequenced-before or happen-before relationship between two
+satisfy calls made on the same channel event GUID. Note that the ordering
+is only guaranteed when using the GUID of the channel event; any
+indirection through other types of events may break the ordering.
+
+\subsection{Usage scenarios}
+The current implementation is restricted and defines a generation as
+one satisfy paired with one dependence being added. This extension
+is meant to explore the usefulness of channel events before a more
+general model is defined and implemented. The
+implementation provides a `window' of generations in the form of an
+internal bounded buffer for which the size is known at the creation of
+the channel event. This essentially translates into the implementation
+being able to buffer a number of satisfy calls that do not yet have a
+matching dependence registered (and vice-versa) up to the bound
+value. In order to not exceed the bound, the programmer must enforce
+proper synchronization.
+
+The current implementation is geared toward use-cases found in
+domain-decomposition applications where each domain communicates its
+halo to its neighbor at each iteration of the algorithm. A typical
+implementation is to represent each sub-domain and iteration as an EDT
+that depends on a set of data blocks for its own domain as well as
+data blocks corresponding to
+contributions from its neighbor domains. In such situations, where the
+communication pattern is static, it
+is beneficial to setup a topology of channel events once during the
+startup of the application and keep reusing the same event GUIDs to
+satisfy the neighbors' upcoming EDT iteration instances.
+
+\subsection{API}
+
+Channel events extend the
+\hypertarget{type_ocrEventTypes_t}{\code{enum ocrEventTypes\_t}} type
+with an OCR\_EVENT\_CHANNEL\_T declaration. Channel events also rely
+on the parameterized event creation extension to allow the programmer
+to customize the type of channel event. A channel event's parameters are
+accessible under the EVENT\_CHANNEL field of the ocrEventParams\_t
+type. Note the actual parameters and their semantic are still under
+active development.
+
+The following parameters are available for channel events:
+\begin{itemize}
+\item \code{EVENT\_CHANNEL}:
+\begin{itemize}
+\item \code{maxGen}: The maximum number of generations the event can buffer.
+\item \code{nbSat}: The number of satisfy required to trigger. This
+  must currently be set to 1.
+\item \code{nbDeps}: The number of dependences required to
+  trigger. This must currently be set to 1.
+\end{itemize}
+\end{itemize}
