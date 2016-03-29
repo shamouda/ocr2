@@ -31,7 +31,7 @@ ocrGuid_t shutdownEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     u64 * data = (u64 *) depv[3].ptr;
     u32 i = 0;
     while (i < NB_ELEM_DB) {
-        PRINTF("%d ",data[i]);
+        PRINTF("%"PRId32" ",data[i]);
         i++;
     }
     PRINTF("\n");

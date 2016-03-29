@@ -104,7 +104,6 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
 
     return NULL_GUID;
 }
-
 \end{ocrsnip}
 
 %%%
@@ -127,4 +126,3 @@ After the datablock has been updated, the EDT returns and in turn satisfies the 
 Once both EDTs have executed and satisfied their ouput events, the {\tt awaitingEdtGuid} executes function \textit{awaitingEdt}.
 This function verifies if the updates done on the datablock by the concurrent EDTs are correct.
 Finally, it prints the result of its verification and calls {\tt ocrShutdown}.
-

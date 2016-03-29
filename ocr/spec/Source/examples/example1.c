@@ -23,7 +23,7 @@ ocrGuid_t fun1(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrGuid_t db_guid;
     ocrDbCreate(&db_guid,(void **) &k, sizeof(int), 0, NULL_HINT, NO_ALLOC);
     k[0]=1;
-    PRINTF("Hello from fun1, sending k = %lu\n",*k);
+    PRINTF("Hello from fun1, sending k = %"PRId32"\n",*k);
     return db_guid;
 }
 
@@ -32,7 +32,7 @@ ocrGuid_t fun2(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrGuid_t db_guid;
     ocrDbCreate(&db_guid,(void **) &k, sizeof(int), 0, NULL_HINT, NO_ALLOC);
     k[0]=2;
-    PRINTF("Hello from fun2, sending k = %lu\n",*k);
+    PRINTF("Hello from fun2, sending k = %"PRId32"\n",*k);
     return db_guid;
 }
 
@@ -40,7 +40,7 @@ ocrGuid_t shutdownEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     PRINTF("Hello from shutdownEdt\n");
     int* data1 = (int*) depv[0].ptr;
     int* data2 = (int*) depv[1].ptr;
-    PRINTF("Received data1 = %lu, data2 = %lu\n", *data1, *data2);
+    PRINTF("Received data1 = %"PRId32", data2 = %"PRId32"\n", *data1, *data2);
     ocrDbDestroy(depv[0].guid);
     ocrDbDestroy(depv[1].guid);
     ocrShutdown();

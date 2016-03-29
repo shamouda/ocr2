@@ -23,6 +23,13 @@
 
 #define NB_ELEM_DB 20
 
+typedef struct {
+    ocrGuid_t evtGuid;
+} guidPRM_t;
+
+// How many parameters does it take to encode a GUID
+#define PARAM_SIZE (sizeof(guidPRM_t) + sizeof(u64) - 1)/sizeof(u64)
+
 ocrGuid_t shutdownEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ASSERT(depc == 2);
     u64* data0 = (u64*)depv[0].ptr;
@@ -30,8 +37,8 @@ ocrGuid_t shutdownEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
 
     ASSERT(*data0 == 3ULL);
     ASSERT(*data1 == 4ULL);
-    PRINTF("Got a DB (GUID 0x%lx) containing %lu on slot 0\n", depv[0].guid, *data0);
-    PRINTF("Got a DB (GUID 0x%lx) containing %lu on slot 1\n", depv[1].guid, *data1);
+    PRINTF("Got a DB (GUID "GUIDF") containing %"PRId32" on slot 0\n", GUIDA(depv[0].guid), *data0);
+    PRINTF("Got a DB (GUID "GUIDF") containing %"PRId32" on slot 1\n", GUIDA(depv[1].guid), *data1);
 
     // Free the data-blocks that were passed in
     ocrDbDestroy(depv[0].guid);
@@ -46,8 +53,8 @@ ocrGuid_t stage2a(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]);
 
 ocrGuid_t stage1a(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ASSERT(depc == 1);
-    ASSERT(paramc == 1);
-    // paramv[0] is the event that the child EDT has to satisfy
+    ASSERT(paramc == PARAM_SIZE);
+    // paramv contains the event that the child EDT has to satisfy
     // when it is done
 
     // We create a data-block for one u64 and put data in it
@@ -59,7 +66,7 @@ ocrGuid_t stage1a(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
 
     // Create an EDT and pass it the data-block we just created
     // The EDT is immediately ready to execute
-    ocrEdtTemplateCreate(&stage2aTemplateGuid, stage2a, 1, 1);
+    ocrEdtTemplateCreate(&stage2aTemplateGuid, stage2a, PARAM_SIZE, 1);
     ocrEdtCreate(&stage2aEdtGuid, stage2aTemplateGuid, EDT_PARAM_DEF,
                  paramv, EDT_PARAM_DEF, &dbGuid, EDT_PROP_NONE, NULL_HINT, NULL);
 
@@ -83,7 +90,9 @@ ocrGuid_t stage1b(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
 
 ocrGuid_t stage2a(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ASSERT(depc == 1);
-    ASSERT(paramc == 1);
+    ASSERT(paramc == PARAM_SIZE);
+
+    guidPRM_t *params = (guidPRM_t*)paramv;
 
     u64 *dbPtr = (u64*)depv[0].ptr;
     ASSERT(*dbPtr == 1ULL); // We got this from stage1a
@@ -91,7 +100,7 @@ ocrGuid_t stage2a(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     *dbPtr = 3ULL; // Update the value
 
     // Pass the modified data-block to shutdown
-    ocrEventSatisfy((ocrGuid_t)paramv[0], depv[0].guid);
+    ocrEventSatisfy(params->evtGuid, depv[0].guid);
 
     return NULL_GUID;
 }
@@ -132,11 +141,13 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     // (stage 2a is created by 1a)
     ocrEventCreate(&evtGuid, OCR_EVENT_ONCE_T, true);
 
+    guidPRM_t tmp;
+    tmp.evtGuid = evtGuid;
     // Create stages 1a, 1b and 2b
     // For 1a and 1b, add a "fake" dependence to avoid races between
     // setting up the event links and running the EDT
-    ocrEdtTemplateCreate(&stage1aTemplateGuid, stage1a, 1, 1);
-    ocrEdtCreate(&stage1aEdtGuid, stage1aTemplateGuid, EDT_PARAM_DEF, &evtGuid,
+    ocrEdtTemplateCreate(&stage1aTemplateGuid, stage1a, PARAM_SIZE, 1);
+    ocrEdtCreate(&stage1aEdtGuid, stage1aTemplateGuid, EDT_PARAM_DEF, (u64*)(&tmp),
                  EDT_PARAM_DEF, NULL, EDT_PROP_NONE, NULL_HINT, &stage1aOut);
 
     ocrEdtTemplateCreate(&stage1bTemplateGuid, stage1b, 0, 1);
@@ -165,3 +176,5 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
 
     return NULL_GUID;
 }
+
+
