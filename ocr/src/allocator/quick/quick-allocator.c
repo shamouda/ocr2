@@ -257,9 +257,9 @@ struct bmapOp {
 #define CACHE_POOL(ID)          (&_cache_pool)
 #define _CACHE_POOL(ID)         (_cache_pool)
 #else
-// x86
-#define PER_AGENT_KEYWORD
-#define MAX_THREAD              16
+// x86 or standalone
+#define PER_AGENT_CACHE
+#define PER_AGENT_KEYWORD       __thread
 #define CACHE_POOL(ID)          (&_cache_pool)
 #define _CACHE_POOL(ID)         (_cache_pool)
 #endif
@@ -497,6 +497,43 @@ static void quickPrintCache(void)
     DPRINTF(DEBUG_LVL_INFO, "====== END OF REPORT (cache %p) =======\n", CACHE_POOL(myid));
 #endif
 }
+static void quickFreeInternal(blkPayload_t *p);
+
+
+// this detects empty slabs and free. So, slab allocator data structures is invalidated
+static void quickCleanPool(poolHdr_t *pool)
+{
+#ifdef PER_AGENT_CACHE
+    u64 end   = (u64)pool->glebeEnd;
+    u64 *p = pool->glebeStart;
+    u64 size, flag;
+    u64 *prev = p;
+    for(;;) {
+        size = GET_SIZE(HEAD(p));
+        flag = GET_FLAG(HEAD(p));
+        if (flag != FLAG_FREE) {
+            if (flag == FLAG_INUSE) {
+            } else if (flag == FLAG_INUSE_SLAB) {
+                struct slab_header *head = (struct slab_header *)HEAD_TO_USER(p);
+                ASSERT(head->mark == SLAB_MARK);
+                if (head->bitmap == ((1UL << MAX_OBJ_PER_SLAB)-1UL) /* empty slab? */) {
+                    quickFreeInternal(head);
+                    p = prev;
+                    continue;
+                } else {
+                    DPRINTF(DEBUG_LVL_INFO, "quickCleanPool: leak? found a slab in use.\n");
+                }
+            } else {
+            }
+        }
+        prev = p;
+        p = &PEER_RIGHT(p, size);
+        if ( (u64)p >= end )
+            break;
+    }
+#endif
+}
+
 
 static void quickWalkPool(poolHdr_t *pool)
 {
@@ -829,11 +866,14 @@ DPRINTF(DEBUG_LVL_WARN, "bmap_count: %"PRId32"\n", dobmap_count_case3);
     hal_lock32(&(pool->lock));
     pool->init_count--;
     if (!(pool->init_count)) {
+        hal_unlock32(&(pool->lock));
+        // no more user for this pool -- no need to lock
+        quickCleanPool(pool);
         quickPrintCounters(pool);
     } else {
+        hal_unlock32(&(pool->lock));
         DPRINTF(DEBUG_LVL_INFO, "shutdown skip for pool %p\n", pool);
     }
-    hal_unlock32(&(pool->lock));
 }
 
 static void quickInit(poolHdr_t *pool, u64 size)
