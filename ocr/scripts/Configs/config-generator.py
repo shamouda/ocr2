@@ -352,7 +352,7 @@ def GenerateComp(output, pdtype, threads, binding, sysworker, schedtype):
         if (pdtype == 'HCDist') and (scheduler in ['PLACEMENT_AFFINITY', 'PRIORITY']):
             output.write("\tconfig\t=\tcomp0:plc1:comm2\n")
             output.write("\tschedulerHeuristic\t=\t0-2\n")
-        elif (scheduler == 'ST') or (scheduler == 'STATIC'):
+        elif (pdtype == 'HCDist') and (scheduler in ['ST', 'STATIC']):
             output.write("\tconfig\t=\tcomp0:plc0:comm1\n")
             output.write("\tschedulerHeuristic\t=\t0-1\n")
         else:
