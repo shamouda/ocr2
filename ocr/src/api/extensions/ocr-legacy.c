@@ -15,6 +15,8 @@
 #include "ocr-types.h"
 #include "ocr-worker.h"
 
+#include "utils/profiler/profiler.h"
+
 #pragma message "LEGACY extension is experimental and may not be supported on all platforms"
 
 #define DEBUG_TYPE API
@@ -23,6 +25,7 @@ extern void freeUpRuntime(bool, u8*);
 extern void bringUpRuntime(ocrConfig_t *ocrConfig);
 
 void ocrLegacyInit(ocrGuid_t *legacyContext, ocrConfig_t * ocrConfig) {
+    START_PROFILE(api_ocrLegacyInit);
     // Bug #492: legacyContext is ignored
     ASSERT(ocrConfig);
     if(ocrConfig->iniFile == NULL)
@@ -40,9 +43,11 @@ void ocrLegacyInit(ocrGuid_t *legacyContext, ocrConfig_t * ocrConfig) {
         pd->fcts.switchRunlevel(pd, RL_USER_OK, RL_REQUEST | RL_ASYNC | RL_BRING_UP | RL_NODE_MASTER | RL_LEGACY),
         ==, 0);
     DPRINTF(DEBUG_LVL_INFO, "ocrLegacyInit switchRunlevel RL_USER_OK | RL_BRING_UP returned\n");
+    RETURN_PROFILE();
 }
 
 u8 ocrLegacyFinalize(ocrGuid_t legacyContext, bool runUntilShutdown) {
+    START_PROFILE(api_ocrLegacyFinalize);
     // Bug #492: legacyContext is ignored
     ocrPolicyDomain_t *pd = NULL;
     u8 returnCode, otherReturnCode;
@@ -70,12 +75,13 @@ u8 ocrLegacyFinalize(ocrGuid_t legacyContext, bool runUntilShutdown) {
         returnCode = pd->shutdownCode;
         freeUpRuntime(false, &otherReturnCode);
     }
-    return returnCode;
+    RETURN_PROFILE(returnCode);
 }
 
 u8 ocrLegacySpawnOCR(ocrGuid_t* handle, ocrGuid_t finishEdtTemplate, u64 paramc, u64* paramv,
                      u64 depc, ocrGuid_t* depv, ocrGuid_t legacyContext) {
 
+    START_PROFILE(api_ocrLegacySpawnOCR);
     // Bug #492: legacyContext is ignored
     // Bug #494: a thread is lost since this function spins
     ocrGuid_t edtGuid;
@@ -103,19 +109,21 @@ u8 ocrLegacySpawnOCR(ocrGuid_t* handle, ocrGuid_t finishEdtTemplate, u64 paramc,
     // Actually start the OCR EDT
     ocrAddDependence(depv0, edtGuid, 0, DB_DEFAULT_MODE);
     *handle = stickyGuid;
-    return 0;
+    RETURN_PROFILE(0);
 }
 
 ocrGuid_t ocrWait(ocrGuid_t outputEvent) {
+    START_PROFILE(api_ocrWait);
     //DPRINTF(DEBUG_LVL_WARN, "ocrWait is deprecated -- use ocrLegacyBlockProgress instead\n");
     ocrGuid_t outputGuid;
     if(ocrLegacyBlockProgress(outputEvent, &outputGuid, NULL, NULL, LEGACY_PROP_NONE) == 0) {
-        return outputGuid;
+        RETURN_PROFILE(outputGuid);
     }
-    return ERROR_GUID;
+    RETURN_PROFILE(ERROR_GUID);
 }
 
 u8 ocrLegacyBlockProgress(ocrGuid_t evtHandle, ocrGuid_t* guid, void** result, u64* size, u16 properties) {
+    START_PROFILE(api_ocrLegacyBlockProgress);
     ocrPolicyDomain_t *pd = NULL;
     ocrEvent_t *eventToYieldFor;
     ocrFatGuid_t dbResult = {.guid = ERROR_GUID, .metaDataPtr = NULL};
@@ -141,12 +149,12 @@ u8 ocrLegacyBlockProgress(ocrGuid_t evtHandle, ocrGuid_t* guid, void** result, u
             u8 returnCode = pd->fcts.processMessage(pd, &msg, true);
             //Warning PD_MSG_GUID_INFO returns GUID properties as 'returnDetail', not error code
             if(returnCode != 0) {
-                return returnCode;
+                RETURN_PROFILE(returnCode);
             }
 
             if(PD_MSG_FIELD_IO(guid.metaDataPtr) == NULL) {
                 if(properties == LEGACY_PROP_NONE) {
-                    return OCR_EINVAL;
+                    RETURN_PROFILE(OCR_EINVAL);
                 }
                 // Everytime there's a busy wait loop like this we need to
                 // call into the PD to try and make progress on other work
@@ -231,7 +239,7 @@ u8 ocrLegacyBlockProgress(ocrGuid_t evtHandle, ocrGuid_t* guid, void** result, u
             PD_MSG_FIELD_IO(properties) = DB_MODE_RW;
             u8 returnCode = pd->fcts.processMessage(pd, &msg, true);
             if(!((returnCode == 0) && ((returnCode = PD_MSG_FIELD_O(returnDetail)) == 0))) {
-                return returnCode;
+                RETURN_PROFILE(returnCode);
             }
             if(result != NULL)
                 *result = PD_MSG_FIELD_O(ptr);
@@ -262,7 +270,7 @@ u8 ocrLegacyBlockProgress(ocrGuid_t evtHandle, ocrGuid_t* guid, void** result, u
 
     if(guid != NULL)
         *guid = dbResult.guid;
-    return 0;
+    RETURN_PROFILE(0);
 }
 
 #endif /* ENABLE_EXTENSION_LEGAGY */

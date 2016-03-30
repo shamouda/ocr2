@@ -15,6 +15,8 @@
 #include "ocr-policy-domain.h"
 #include "ocr-types.h"
 
+#include "utils/profiler/profiler.h"
+
 #pragma message "GUID labeling extension is experimental and may not be supported on all platforms"
 
 // Related to GUIDs
@@ -24,7 +26,7 @@ u8 ocrGuidMapCreate(ocrGuid_t *mapGuid, u32 numParams,
                     ocrGuid_t (*mapFunc)(ocrGuid_t startGuid, u64 skipGuid,
                                          s64* params, s64* tuple),
                     s64* params, u64 numberGuid, ocrGuidUserKind kind) {
-
+    START_PROFILE(api_ocrGuidMapCreate);
     ocrPolicyDomain_t *pd = NULL;
     ocrGuidMap_t *myMap = NULL;
     PD_MSG_STACK(msg);
@@ -40,7 +42,7 @@ u8 ocrGuidMapCreate(ocrGuid_t *mapGuid, u32 numParams,
     PD_MSG_FIELD_I(properties) = 0;
     u8 returnCode = pd->fcts.processMessage(pd, &msg, true);
     if(!((returnCode == 0) && ((returnCode = PD_MSG_FIELD_O(returnDetail)) == 0))) {
-        return returnCode;
+        RETURN_PROFILE(returnCode);
     }
     myMap = PD_MSG_FIELD_IO(guid.metaDataPtr);
     *mapGuid = PD_MSG_FIELD_IO(guid.guid);
@@ -61,19 +63,20 @@ u8 ocrGuidMapCreate(ocrGuid_t *mapGuid, u32 numParams,
     //BUG #527: memory reclaim: There is a leak if this fails
     returnCode = pd->fcts.processMessage(pd, &msg, true);
     if(!((returnCode == 0) && ((returnCode = PD_MSG_FIELD_O(returnDetail)) == 0))) {
-        return returnCode;
+        RETURN_PROFILE(returnCode);
     }
 
     myMap->startGuid = PD_MSG_FIELD_O(startGuid);
     myMap->skipGuid = PD_MSG_FIELD_O(skipGuid);
 #undef PD_TYPE
 #undef PD_MSG
-    return 0;
+    RETURN_PROFILE(0);
 }
 
 u8 ocrGuidRangeCreate(ocrGuid_t *mapGuid,
                       u64 numberGuid, ocrGuidUserKind kind) {
 
+    START_PROFILE(api_ocrGuidRangeCreate);
     ocrPolicyDomain_t *pd = NULL;
     ocrGuidMap_t *myMap = NULL;
     PD_MSG_STACK(msg);
@@ -89,7 +92,7 @@ u8 ocrGuidRangeCreate(ocrGuid_t *mapGuid,
     PD_MSG_FIELD_I(properties) = 0;
     u8 returnCode = pd->fcts.processMessage(pd, &msg, true);
     if(!((returnCode == 0) && ((returnCode = PD_MSG_FIELD_O(returnDetail)) == 0))) {
-        return returnCode;
+        RETURN_PROFILE(returnCode);
     }
 
     myMap = PD_MSG_FIELD_IO(guid.metaDataPtr);
@@ -110,18 +113,19 @@ u8 ocrGuidRangeCreate(ocrGuid_t *mapGuid,
     //BUG #527: memory reclaim: There is a leak if this fails
     returnCode = pd->fcts.processMessage(pd, &msg, true);
     if(!((returnCode == 0) && ((returnCode = PD_MSG_FIELD_O(returnDetail)) == 0))) {
-        return returnCode;
+        RETURN_PROFILE(returnCode);
     }
     myMap->startGuid = PD_MSG_FIELD_O(startGuid);
     myMap->skipGuid = PD_MSG_FIELD_O(skipGuid);
 #undef PD_TYPE
 #undef PD_MSG
-    return 0;
+    RETURN_PROFILE(0);
 }
 
 u8 ocrGuidMapDestroy(ocrGuid_t mapGuid) {
     // Reverse of the map create: unreserve the space and destroy our GUID
 
+    START_PROFILE(api_ocrGuidMapDestroy);
     ocrPolicyDomain_t *pd = NULL;
     ocrGuidMap_t *myMap = NULL;
     PD_MSG_STACK(msg);
@@ -144,7 +148,7 @@ u8 ocrGuidMapDestroy(ocrGuid_t mapGuid) {
     PD_MSG_FIELD_I(numberGuids) = myMap->numGuids;
     u8 returnCode = pd->fcts.processMessage(pd, &msg, true);
     if(!((returnCode == 0) && ((returnCode = PD_MSG_FIELD_O(returnDetail)) == 0))) {
-        return returnCode;
+        RETURN_PROFILE(returnCode);
     }
 #undef PD_TYPE
 
@@ -158,7 +162,7 @@ u8 ocrGuidMapDestroy(ocrGuid_t mapGuid) {
     RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, true));
 #undef PD_TYPE
 #undef PD_MSG
-    return 0;
+    RETURN_PROFILE(0);
 }
 
 u8 ocrGuidMapSetDefaultMap(u32 numParams, ocrGuid_t (*mapFunc)(
@@ -171,6 +175,7 @@ u8 ocrGuidMapSetDefaultMap(u32 numParams, ocrGuid_t (*mapFunc)(
 }
 
 u8 ocrGuidFromLabel(ocrGuid_t *outGuid, ocrGuid_t mapGuid, s64* tuple) {
+    START_PROFILE(api_ocrGuidFromLabel);
     ASSERT(!(ocrGuidIsNull(mapGuid)));  // Default map unsupported for now
     ocrPolicyDomain_t *pd = NULL;
     ocrGuidMap_t *myMap = NULL;
@@ -185,7 +190,7 @@ u8 ocrGuidFromLabel(ocrGuid_t *outGuid, ocrGuid_t mapGuid, s64* tuple) {
     u8 returnCode = pd->fcts.processMessage(pd, &msg, true);
     //Warning PD_MSG_GUID_INFO returns GUID properties as 'returnDetail', not error code
     if(returnCode != 0) {
-        return returnCode;
+        RETURN_PROFILE(returnCode);
     }
     myMap = (ocrGuidMap_t*)PD_MSG_FIELD_IO(guid.metaDataPtr);
 #undef PD_TYPE
@@ -195,16 +200,17 @@ u8 ocrGuidFromLabel(ocrGuid_t *outGuid, ocrGuid_t mapGuid, s64* tuple) {
             GUIDA(mapGuid), GUIDA(myMap->startGuid), myMap->skipGuid);
     if(myMap->mapFunc == NULL) {
         DPRINTF(DEBUG_LVL_WARN, "ocrGuidFromLabel requires a map created with ocrGuidMapCreate (not a range)\n");
-        return OCR_EINVAL;
+        RETURN_PROFILE(OCR_EINVAL);
     }
     *outGuid = myMap->mapFunc(myMap->startGuid, myMap->skipGuid, myMap->params, tuple);
     DPRINTF(DEBUG_LVL_VERB, "Returning GUID "GUIDF"\n", GUIDA(*outGuid));
-    return 0;
+    RETURN_PROFILE(0);
 }
 
 u8 ocrGuidFromIndex(ocrGuid_t *outGuid, ocrGuid_t rangeGuid, u64 idx) {
+    START_PROFILE(api_ocrGuidFromIndex);
     if(ocrGuidIsNull(rangeGuid)){
-        return OCR_EINVAL;
+        RETURN_PROFILE(OCR_EINVAL);
     }
 
     ocrPolicyDomain_t *pd = NULL;
@@ -220,7 +226,7 @@ u8 ocrGuidFromIndex(ocrGuid_t *outGuid, ocrGuid_t rangeGuid, u64 idx) {
     u8 returnCode = pd->fcts.processMessage(pd, &msg, true);
     //Warning PD_MSG_GUID_INFO returns GUID properties as 'returnDetail', not error code
     if(returnCode != 0) {
-        return returnCode;
+        RETURN_PROFILE(returnCode);
     }
     myMap = (ocrGuidMap_t*)PD_MSG_FIELD_IO(guid.metaDataPtr);
 #undef PD_TYPE
@@ -230,12 +236,12 @@ u8 ocrGuidFromIndex(ocrGuid_t *outGuid, ocrGuid_t rangeGuid, u64 idx) {
             GUIDA(rangeGuid), GUIDA(myMap->startGuid), myMap->skipGuid);
     if(myMap->mapFunc != NULL) {
         DPRINTF(DEBUG_LVL_WARN, "ocrGuidFromLabel requires a map created with ocrGuidRangeCreate (not a map)\n");
-        return OCR_EINVAL;
+        RETURN_PROFILE(OCR_EINVAL);
     }
     if(idx >= myMap->numGuids) {
         DPRINTF(DEBUG_LVL_WARN, "Invalid index value in ocrGuidFromIndex. Got %lu, expected 0..%lu\n",
                 idx, myMap->numGuids-1);
-        return OCR_EINVAL;
+        RETURN_PROFILE(OCR_EINVAL);
     }
 
     // See BUG #928 on GUID issues
@@ -246,7 +252,7 @@ u8 ocrGuidFromIndex(ocrGuid_t *outGuid, ocrGuid_t rangeGuid, u64 idx) {
     outGuid->upper = 0x0;
 #endif
     DPRINTF(DEBUG_LVL_VERB, "Returning GUID "GUIDF"\n", GUIDA(*outGuid));
-    return 0;
+    RETURN_PROFILE(0);
 }
 
 u8 ocrGetGuidKind(ocrGuidUserKind *outKind, ocrGuid_t guid) {

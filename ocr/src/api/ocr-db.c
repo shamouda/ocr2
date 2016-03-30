@@ -28,7 +28,7 @@
 u8 ocrDbCreate(ocrGuid_t *db, void** addr, u64 len, u16 flags,
                ocrGuid_t affinity, ocrInDbAllocator_t allocator) {
 
-    START_PROFILE(api_DbCreate);
+    START_PROFILE(api_ocrDbCreate);
     DPRINTF(DEBUG_LVL_INFO, "ENTER ocrDbCreate(*guid="GUIDF", len=%lu, flags=%u"
             ", aff=0x%lx, alloc=%u)\n", GUIDA(*db), len, (u32)flags, affinity, (u32)allocator);
     PD_MSG_STACK(msg);
@@ -103,7 +103,7 @@ u8 ocrDbCreate(ocrGuid_t *db, void** addr, u64 len, u16 flags,
 
 u8 ocrDbDestroy(ocrGuid_t db) {
 
-    START_PROFILE(api_DbDestroy);
+    START_PROFILE(api_ocrDbDestroy);
     DPRINTF(DEBUG_LVL_INFO, "ENTER ocrDbDestroy(guid="GUIDF")\n", GUIDA(db));
     PD_MSG_STACK(msg);
     ocrPolicyDomain_t *policy = NULL;
@@ -168,7 +168,7 @@ u8 ocrDbDestroy(ocrGuid_t db) {
 
 u8 ocrDbRelease(ocrGuid_t db) {
 
-    START_PROFILE(api_DbRelease);
+    START_PROFILE(api_ocrDbRelease);
     DPRINTF(DEBUG_LVL_INFO, "ENTER ocrDbRelease(guid="GUIDF")\n", GUIDA(db));
     PD_MSG_STACK(msg);
     ocrPolicyDomain_t *policy = NULL;

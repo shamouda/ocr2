@@ -12,6 +12,8 @@
 #include "experimental/ocr-platform-model.h"
 #include "ocr-errors.h"
 
+#include "utils/profiler/profiler.h"
+
 #pragma message "AFFINITY extension is experimental and may not be supported on all platforms"
 
 //Part of policy-domain debug messages
@@ -26,12 +28,13 @@
 // and data to each guid.
 
 u8 ocrAffinityCount(ocrAffinityKind kind, u64 * count) {
+    START_PROFILE(api_ocrAffinityCount)
     ocrPolicyDomain_t * pd = NULL;
     getCurrentEnv(&pd, NULL, NULL, NULL);
     // If no platformModel, we know nothing so just say that we are the only one
     if(pd->platformModel == NULL) {
         *count = 1;
-        return 0;
+        RETURN_PROFILE(0);
     }
 
     if (kind == AFFINITY_PD) {
@@ -44,10 +47,11 @@ u8 ocrAffinityCount(ocrAffinityKind kind, u64 * count) {
     } else {
         ASSERT(false && "Unknown affinity kind");
     }
-    return 0;
+    RETURN_PROFILE(0);
 }
 
 u8 ocrAffinityQuery(ocrGuid_t guid, u64 * count, ocrGuid_t * affinities) {
+    START_PROFILE(api_ocrAffinityQuery);
     ocrPolicyDomain_t * pd = NULL;
     getCurrentEnv(&pd, NULL, NULL, NULL);
     ocrPlatformModelAffinity_t * platformModel = ((ocrPlatformModelAffinity_t*)pd->platformModel);
@@ -57,7 +61,7 @@ u8 ocrAffinityQuery(ocrGuid_t guid, u64 * count, ocrGuid_t * affinities) {
             *count = 1;
         }
         affinities[0] = NULL_GUID;
-        return 0;
+        RETURN_PROFILE(0);
     } else {
         if (count != NULL) {
             ASSERT(*count > 0);
@@ -65,7 +69,7 @@ u8 ocrAffinityQuery(ocrGuid_t guid, u64 * count, ocrGuid_t * affinities) {
         }
         if (ocrGuidIsNull(guid)) {
             affinities[0] = platformModel->pdLocAffinities[platformModel->current];
-            return 0;
+            RETURN_PROFILE(0);
         }
         ocrLocation_t loc = 0;
         ocrFatGuid_t fatGuid = {.guid=guid, .metaDataPtr=NULL};
@@ -77,12 +81,13 @@ u8 ocrAffinityQuery(ocrGuid_t guid, u64 * count, ocrGuid_t * affinities) {
         ASSERT(((u32)loc) < platformModel->pdLocAffinitiesSize);
         affinities[0] = platformModel->pdLocAffinities[(u32)loc];
     }
-    return 0;
+    RETURN_PROFILE(0);
 }
 
 
 //BUG #606/#VV4 Neighbors/affinities:  This call returns affinities with identical mapping across PDs.
 u8 ocrAffinityGet(ocrAffinityKind kind, u64 * count, ocrGuid_t * affinities) {
+    START_PROFILE(api_ocrAffinityGet);
     ocrPolicyDomain_t * pd = NULL;
     getCurrentEnv(&pd, NULL, NULL, NULL);
     ocrPlatformModelAffinity_t * platformModel = ((ocrPlatformModelAffinity_t*)pd->platformModel);
@@ -90,7 +95,7 @@ u8 ocrAffinityGet(ocrAffinityKind kind, u64 * count, ocrGuid_t * affinities) {
         ASSERT(*count > 0);
         *count = 1;
         affinities[0] = NULL_GUID;
-        return 0;
+        RETURN_PROFILE(0);
     }
 
     if (kind == AFFINITY_PD) {
@@ -108,22 +113,23 @@ u8 ocrAffinityGet(ocrAffinityKind kind, u64 * count, ocrGuid_t * affinities) {
     } else {
         ASSERT(false && "Unknown affinity kind");
     }
-    return 0;
+    RETURN_PROFILE(0);
 }
 
 u8 ocrAffinityGetAt(ocrAffinityKind kind, u64 idx, ocrGuid_t * affinity) {
+    START_PROFILE(api_ocrAffinityGetAt);
     ocrPolicyDomain_t * pd = NULL;
     getCurrentEnv(&pd, NULL, NULL, NULL);
     ocrPlatformModelAffinity_t * platformModel = ((ocrPlatformModelAffinity_t*)pd->platformModel);
     if(platformModel == NULL) {
         ASSERT(idx > 0);
         affinity[0] = NULL_GUID;
-        return OCR_EINVAL;
+        RETURN_PROFILE(OCR_EINVAL);
     }
     if (kind == AFFINITY_PD) {
         if (idx > (pd->neighborCount + 1)) {
             ASSERT(false && "error: ocrAffinityGetAt index is out of bounds");
-            return OCR_EINVAL;
+            RETURN_PROFILE(OCR_EINVAL);
         }
         affinity[0] = platformModel->pdLocAffinities[idx];
     } else if (kind == AFFINITY_PD_MASTER) {
@@ -134,7 +140,7 @@ u8 ocrAffinityGetAt(ocrAffinityKind kind, u64 idx, ocrGuid_t * affinity) {
     } else {
         ASSERT(false && "Unknown affinity kind");
     }
-    return 0;
+    RETURN_PROFILE(0);
 }
 
 u8 ocrAffinityGetCurrent(ocrGuid_t * affinity) {
