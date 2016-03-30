@@ -26,8 +26,8 @@ parser.add_argument('--sysworker', dest='sysworker', action='store_true',
                    help='use 1 worker exclusively for system activities (e.g., tracing) (default: no)')
 parser.add_argument('--alloc', dest='alloc', default='32',
                    help='size (in MB) of memory available for app use (default: 32)')
-parser.add_argument('--alloctype', dest='alloctype', default='mallocproxy', choices=['mallocproxy', 'tlsf', 'simple'],
-                   help='type of allocator to use (default: mallocproxy)')
+parser.add_argument('--alloctype', dest='alloctype', default='quick', choices=['quick', 'mallocproxy', 'tlsf', 'simple'],
+                   help='type of allocator to use (default: quick)')
 parser.add_argument('--dbtype', dest='dbtype', default='Lockable', choices=['Lockable', 'Regular'],
                    help='type of datablocks to use (default: Lockable)')
 parser.add_argument('--scheduler', dest='scheduler', default='HC', choices=['HC', 'PRIORITY', 'PLACEMENT_AFFINITY', 'LEGACY', 'ST', 'STATIC'],
