@@ -52,20 +52,26 @@ typedef intptr_t ocrGuid_t; /**< GUID type */
 /* Defined vals for 64-bit GUIDs */
 #if GUID_BIT_COUNT == 64
 
-#define NULL_GUID ((ocrGuid_t)0x0)
+#define NULL_GUID_INITIALIZER 0x0
+#define NULL_GUID ((ocrGuid_t)NULL_GUID_INITIALIZER)
 
-#define UNINITIALIZED_GUID ((ocrGuid_t)-2)
+#define UNINITIALIZED_GUID_INITIALIZER -2
+#define UNINITIALIZED_GUID ((ocrGuid_t)UNINITIALIZED_GUID_INITIALIZER)
 
-#define ERROR_GUID ((ocrGuid_t)-1)
+#define ERROR_GUID_INITIALIZER -1
+#define ERROR_GUID ((ocrGuid_t)ERROR_GUID_INITIALIZER)
 
 /* Defined vals for 128-bit GUIDs */
 #elif GUID_BIT_COUNT == 128
 
-#define NULL_GUID ((ocrGuid_t){.lower = 0x0, .upper = 0x0})
+#define NULL_GUID_INITIALIZER {.lower = 0x0, .upper = 0x0}
+#define NULL_GUID ((ocrGuid_t)NULL_GUID_INITIALIZER)
 
-#define UNINITIALIZED_GUID ((ocrGuid_t){.lower = -2, .upper = -2})
+#define UNINITIALIZED_GUID_INITIALIZER {.lower = -2, .upper = -2}
+#define UNINITIALIZED_GUID ((ocrGuid_t)UNINITIALIZED_GUID_INITIALIZER)
 
-#define ERROR_GUID ((ocrGuid_t){.lower = -1, .upper = -1})
+#define ERROR_GUID_INITIALIZER {.lower = -1, .upper = -1}
+#define ERROR_GUID ((ocrGuid_t)ERROR_GUID_INITIALIZER)
 
 #endif
 
