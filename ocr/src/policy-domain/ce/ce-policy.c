@@ -1139,10 +1139,6 @@ static u8 ceAllocateDb(ocrPolicyDomain_t *self, ocrFatGuid_t *guid, void** ptr, 
         }
         return returnValue;
     } else {
-        DPRINTF(DEBUG_LVL_WARN, "ceAllocateDb returning NULL for size %ld\n", (u64) size);
-        DPRINTF(DEBUG_LVL_WARN, "*** WARNING : OUT-OF-MEMORY ***\n");
-        DPRINTF(DEBUG_LVL_WARN, "*** Please increase sizes in *ALL* MemPlatformInst, MemTargetInst, AllocatorInst sections.\n");
-        DPRINTF(DEBUG_LVL_WARN, "*** Same amount increasing is recommended.\n");
         return OCR_ENOMEM;
     }
 }
@@ -1389,6 +1385,12 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         } else {
             // Cannot acquire
             PD_MSG_FIELD_O(ptr) = NULL;
+        }
+        if (PD_MSG_FIELD_O(ptr) == NULL) {
+            DPRINTF(DEBUG_LVL_WARN, "PD_MSG_DB_CREATE returning NULL for size %lx\n", (u64) reqSize);
+            DPRINTF(DEBUG_LVL_WARN, "*** WARNING : OUT-OF-MEMORY ***\n");
+            DPRINTF(DEBUG_LVL_WARN, "*** Please increase sizes in *ALL* MemPlatformInst, MemTargetInst, AllocatorInst sections.\n");
+            DPRINTF(DEBUG_LVL_WARN, "*** Same amount increasing is recommended.\n");
         }
         DPRINTF(DEBUG_LVL_VERB, "DB_CREATE response for size %lu: GUID: "GUIDF"; PTR: 0x%lx)\n",
                 reqSize, GUIDA(PD_MSG_FIELD_IO(guid.guid)), PD_MSG_FIELD_O(ptr));

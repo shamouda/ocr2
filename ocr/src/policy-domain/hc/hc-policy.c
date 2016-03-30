@@ -776,10 +776,6 @@ static u8 hcAllocateDb(ocrPolicyDomain_t *self, ocrFatGuid_t *guid, void** ptr, 
         // This could be OCR_EGUIDEXISTS
         return returnValue;
     } else {
-        DPRINTF(DEBUG_LVL_WARN, "hcAllocateDb returning NULL for size %ld\n", (u64) size);
-        DPRINTF(DEBUG_LVL_WARN, "*** WARNING : OUT-OF-MEMORY ***\n");
-        DPRINTF(DEBUG_LVL_WARN, "*** Please increase sizes in *ALL* MemPlatformInst, MemTargetInst, AllocatorInst sections.\n");
-        DPRINTF(DEBUG_LVL_WARN, "*** Same amount increasing is recommended.\n");
         return OCR_ENOMEM;
     }
 }
@@ -1047,6 +1043,13 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         }
         msg->type &= ~PD_MSG_REQUEST;
         msg->type |= PD_MSG_RESPONSE;
+
+        if (PD_MSG_FIELD_O(ptr) == NULL) {
+            DPRINTF(DEBUG_LVL_WARN, "PD_MSG_DB_CREATE returning NULL for size %lx\n", (u64) PD_MSG_FIELD_IO(size));
+            DPRINTF(DEBUG_LVL_WARN, "*** WARNING : OUT-OF-MEMORY ***\n");
+            DPRINTF(DEBUG_LVL_WARN, "*** Please increase sizes in *ALL* MemPlatformInst, MemTargetInst, AllocatorInst sections.\n");
+            DPRINTF(DEBUG_LVL_WARN, "*** Same amount increasing is recommended.\n");
+        }
 #undef PD_MSG
 #undef PD_TYPE
         EXIT_PROFILE;

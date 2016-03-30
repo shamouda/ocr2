@@ -650,10 +650,6 @@ static u8 xeAllocateDb(ocrPolicyDomain_t *self, ocrFatGuid_t *guid, void** ptr, 
         }
         return returnValue;
     } else {
-        DPRINTF(DEBUG_LVL_VERB, "xeAllocateDb returning NULL for size %ld\n", (u64) size);
-        DPRINTF(DEBUG_LVL_WARN, "*** WARNING : OUT-OF-MEMORY ***\n");
-        DPRINTF(DEBUG_LVL_WARN, "*** Please increase sizes in *ALL* MemPlatformInst, MemTargetInst, AllocatorInst sections.\n");
-        DPRINTF(DEBUG_LVL_WARN, "*** Same amount increasing is recommended.\n");
         return OCR_ENOMEM;
     }
 }
