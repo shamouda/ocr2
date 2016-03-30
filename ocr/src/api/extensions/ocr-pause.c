@@ -12,17 +12,24 @@
 #include "ocr-types.h"
 #include "ocr-sal.h"
 
+#include "utils/profiler/profiler.h"
+
 u32 ocrPause(bool isBlocking){
-    return salPause(isBlocking);
+    START_PROFILE(api_ocrPause);
+    u32 t = salPause(isBlocking);
+    RETURN_PROFILE(t);
 }
 
 ocrGuid_t ocrQuery(ocrQueryType_t query, ocrGuid_t guid, void **result, u32 *size, u8 flags){
+    START_PROFILE(api_ocrQuery);
     ocrGuid_t ret = salQuery(query, guid, result, size, flags);
-    return ret;
+    RETURN_PROFILE(ret);
 }
 
 void ocrResume(u32 flag){
+    START_PROFILE(api_ocrResume);
     salResume(flag);
+    RETURN_PROFILE()
 }
 
 #endif /* ENABLE_EXTENSION_PAUSE */
