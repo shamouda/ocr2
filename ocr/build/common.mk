@@ -99,8 +99,36 @@ endif
 # Enable profiler
 # CFLAGS += -DOCR_RUNTIME_PROFILER -DPROFILER_KHZ=3400000
 #
-# (optional) Maximum number of scope
-# nesting for runtime profiler
+# Other options for the profiler. All are disabled by default
+# Enable this if you want to use the profiler in your app as well
+# CFLAGS += -DPROFILER_W_APPS
+#
+# Enable this if you want to set a symbol from which
+# to start profiling (typically: "enter into user code")
+# CFLAGS += -DPROFILER_FOCUS=userCode
+#
+# The following option is only relevant with PROFILER_FOCUS
+# Enable this if you want the profiler to stop giving details
+# after entering this many levels of profiler "stack". For example
+# if you have no profiler calls in your apps and want to determine
+# the overhead of the runtime from your user code, set this to 1 and
+# PROFILER_FOCUS to userCode. The profiler will report the time spent
+# in userCode as well as the time spent in each OCR API call but nothing
+# else
+# CFLAGS += -DPROFILER_FOCUS_DEPTH=1
+#
+# The following option is only relevant with PROFILER_FOCUS
+# Enable this if you want to stop profiling when a runtime function call
+# is made. This will override FOCUS_DEPTH (ie: if a runtime call is encountered
+# before FOCUS_DEPTH is reached, the profiler will stop giving details of sub-calls)
+# CFLAGS += -DPROFILER_IGNORE_RT
+#
+# The following option is only relevant with PROFILER_FOCUS
+# Enable this if you want to gather everything that happens outside of the
+# focus function into an EVENT_OTHER bucket.
+# CFLAGS += -DPROFILER_COUNT_OTHER
+#
+# (optional) Maximum number of scope nesting for runtime profiler
 # CFLAGS += -DMAX_PROFILER_LEVEL=512
 
 # Enables the collection of EDT R/W statistics
@@ -318,16 +346,31 @@ SRCS   := $(shell find -L $(OCR_ROOT)/src -name '*.[csS]' -print)
 VPATH  := $(shell find -L $(OCR_ROOT)/src -type d -print)
 
 ifneq (,$(findstring OCR_RUNTIME_PROFILER,$(CFLAGS)))
-  SRCSORIG = $(SRCS)
-  SRCS += $(OCR_BUILD)/src/profilerAutoGen.c
-  PROFILER_FILE=$(OCR_BUILD)/src/profilerAutoGen.c
+  SRCSORIG := $(SRCS)
+  PROFILER_FILE_C=$(OCR_BUILD)/src/profilerAutoGen.c
+  SRCS += $(PROFILER_FILE_C)
+  PROFILER_FILE=$(OCR_BUILD)/src/profilerAutoGenRT.h
   CFLAGS += -I $(OCR_BUILD)/src
   VPATH += $(OCR_BUILD)/src
+
+  ifneq (,$(findstring PROFILER_W_APPS, $(CFLAGS)))
+    PROFILER_MODE := rtapp
+  else
+    PROFILER_MODE := rt
+  endif
+
+  ifneq (,$(findstring PROFILER_COUNT_OTHER, $(CFLAGS)))
+    PROFILER_EXTRA_OPTS := --otherbucket
+  else
+    PROFILER_EXTRA_OPTS :=
+  endif
+
   ifeq ($(I), 1)
-    $(info Profiler support turned on)
+    $(info Profiler support turned on in mode $(PROFILER_MODE) with options "$(PROFILER_EXTRA_OPTS)")
   endif
 else
-  PROFILER_FILE=
+  PROFILER_FILE   :=
+  PROFILER_FILE_C :=
 endif
 
 ifeq ($(I), 1)
@@ -492,8 +535,10 @@ $(OCREXEC): $(OBJS_EXEC)
 
 $(PROFILER_FILE): $(SRCSORIG) | $(OCR_BUILD)/src
 	@echo "Generating profile file..."
-	$(AT)$(OCR_ROOT)/scripts/Profiler/generateProfilerFile.py $(OCR_ROOT)/src $(OCR_BUILD)/src/profilerAutoGen h,c .git profiler
+	$(AT)$(OCR_ROOT)/scripts/Profiler/generateProfilerFile.py -m $(PROFILER_MODE) -o $(OCR_BUILD)/src/profilerAutoGen --exclude .git --exclude profiler $(PROFILER_EXTRA_OPTS) $(OCR_ROOT)/src
 	@echo "\tDone."
+
+$(PROFILER_FILE_C): $(PROFILER_FILE)
 
 # This does a more complicate dependency computation so all the prereqs listed
 # will also become command-less, prereq-less targets. This causes make
