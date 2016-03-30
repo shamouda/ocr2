@@ -157,7 +157,7 @@ def main(argv=None):
     allFunctions = set()
     allWarnings = set()
 
-    profileLine_re = re.compile(r"\s*START_PROFILE\(([0-9A-Za-z_]+)\)");
+    profileLine_re = re.compile(r"\s*START_PROFILE\(\s*([0-9A-Za-z_]+)\s*\)");
     maxRtEvent_re = re.compile(r"\s*MAX_EVENTS_RT = ([0-9]+)")
     endCStruct_re = re.compile(r"^};$")
     eventOther_re = re.compile(r"^    \"EVENT_OTHER\"")
@@ -315,7 +315,10 @@ typedef enum {
             # End for line
             # At this stage, we add the other entries
             for function in allFunctions:
-                destFile.write(',\n    "%s"' % (function))
+                if missingComma:
+                    destFile.write(',\n    "%s"' % (function))
+                else:
+                    destFile.write('    "%s"' % (function))
                 missingComma = True
             # Close off the file
             if createOtherBucket:

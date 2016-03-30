@@ -65,7 +65,7 @@ typedef struct __profiler {
 #define _gettime(ticks)                         \
     do {                                        \
         u64 d;                                  \
-        asm volatile (                          \
+        __asm__ __volatile__ (                  \
             "rdtscp \n\t"                       \
             : "=a" (ticks), "=d" (d)            \
             : /* no input */                    \
