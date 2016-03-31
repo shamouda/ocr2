@@ -126,9 +126,9 @@ u8 prioritySchedulerHeuristicUpdate(ocrSchedulerHeuristic_t *self, ocrSchedulerO
 }
 
 ocrSchedulerHeuristicContext_t* prioritySchedulerHeuristicGetContext(ocrSchedulerHeuristic_t *self, ocrLocation_t loc) {
-    ASSERT(loc == self->scheduler->pd->myLocation);
     ocrWorker_t * worker = NULL;
     getCurrentEnv(NULL, &worker, NULL, NULL);
+    if (worker == NULL) return NULL;
     return self->contexts[worker->id];
 }
 
@@ -213,7 +213,6 @@ u8 prioritySchedulerHeuristicNotifyInvoke(ocrSchedulerHeuristic_t *self, ocrSche
         return OCR_ENOP;
     // Unknown ops
     default:
-        ASSERT(0);
         return OCR_ENOTSUP;
     }
     return 0;
