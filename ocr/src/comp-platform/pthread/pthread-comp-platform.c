@@ -50,6 +50,7 @@ static void pthreadRoutineInitializer(ocrCompPlatformPthread_t * pthreadCompPlat
 #ifdef OCR_RUNTIME_PROFILER
     {
         _profilerData *d = (_profilerData*) runtimeChunkAlloc(sizeof(_profilerData), PERSISTENT_CHUNK);
+        _profilerDataInit(d);
         char buffer[50];
         snprintf(buffer, 50, "profiler_%"PRIx64"-%"PRIx64"",
                      ((ocrPolicyDomain_t *)(pthreadCompPlatform->base.pd))->myLocation, (u64)pthreadCompPlatform);
