@@ -303,7 +303,7 @@ void _profilerDataInit(_profilerData *self) {
     _gettime(start);
     u32 i;
     for(i=0; i<999; ++i) {
-        asm volatile (
+        __asm__ __volatile__ (
             "rdtscp"
             : "=a" (temp1), "=d" (temp2)
             :
@@ -315,7 +315,10 @@ void _profilerDataInit(_profilerData *self) {
     self->overheadTimer = (end - start)/1000;
     //fprintf(stderr, "Got RDTSCP overhead of %lu ticks\n", self->overheadTimer);
 
+    memset(&(self->selfEvents[0]), 0, sizeof(_profilerSelfEntry)*MAX_EVENTS);
+    memset(&(self->childrenEvents[0][0]), 0, sizeof(_profilerChildEntry)*MAX_EVENTS*(MAX_EVENTS-1));
     memset(&(self->stackPosition[0]), 0, sizeof(u32)*MAX_EVENTS);
+
 }
 
 void _profilerDataDestroy(void* _self) {
