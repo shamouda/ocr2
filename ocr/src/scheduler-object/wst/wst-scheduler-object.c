@@ -15,6 +15,7 @@
 #include "ocr-task.h"
 #include "scheduler-object/wst/wst-scheduler-object.h"
 #include "scheduler-object/scheduler-object-all.h"
+#include "worker/hc/hc-worker.h"
 
 #define DEBUG_TYPE SCHEDULER_OBJECT
 
@@ -45,7 +46,13 @@ static void wstSchedulerObjectStart(ocrSchedulerObject_t *self, ocrPolicyDomain_
     ocrSchedulerObjectFactory_t *dequeFactory = pd->schedulerObjectFactories[schedulerObjectDeq_id];
     for (i = 0, w = 0; i < numDeques; i++) {
         if (wstSchedObj->config == SCHEDULER_OBJECT_WST_CONFIG_STATIC) {
-            params.type = (i == 0) ? WORK_STEALING_DEQUE : SEMI_CONCURRENT_DEQUE;
+            params.type = SEMI_CONCURRENT_DEQUE;
+#ifdef ENABLE_WORKER_HC
+            ocrWorkerHc_t *w0 = (ocrWorkerHc_t*)pd->workers[0];
+            if (w0->hcType == HC_WORKER_COMM && i == 0) {
+                params.type = WORK_STEALING_DEQUE;
+            }
+#endif
         }
         ocrSchedulerObject_t *deque = dequeFactory->fcts.create(dequeFactory, (ocrParamList_t*)(&params));
         wstSchedObj->deques[i] = deque;

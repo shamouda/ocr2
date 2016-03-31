@@ -43,6 +43,7 @@ u32 nonSyncCircularDequeSize(deque_t* self) {
     if (size < 0) {
         size = INIT_DEQUE_CAPACITY + size;
     }
+    ASSERT(size >= 0 && size <= INIT_DEQUE_CAPACITY);
     return ((u32) size);
 }
 
@@ -379,6 +380,7 @@ void * nonConcDequePopHeadSemiConc(deque_t * self, u8 doTry) {
     ASSERT(rt != NULL);
 #ifdef OCR_ASSERT
     self->data[head] = NULL; // DEBUG
+    hal_fence();
 #endif
     self->head = ((head == (INIT_DEQUE_CAPACITY-1)) ? 0 : head+1);
     return rt;

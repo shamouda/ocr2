@@ -187,8 +187,10 @@ static u8 staticSchedulerHeuristicWorkEdtUserInvoke(ocrSchedulerHeuristic_t *sel
         }
     }
 
-    if (!ocrGuidIsNull(edtObj.guid.guid))
+    if (!ocrGuidIsNull(edtObj.guid.guid)) {
+        ASSERT(retVal == 0);
         taskArgs->OCR_SCHED_ARG_FIELD(OCR_SCHED_WORK_EDT_USER).edt = edtObj.guid;
+    }
 
     return retVal;
 }
