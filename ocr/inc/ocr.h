@@ -15,6 +15,12 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+/* Include options that are needed based on RT configuration */
+#define OCR_OPTIONS_STR(x) #x
+#define OCR_OPTIONS_FILE_CONC(x) OCR_OPTIONS_STR(ocr-options_##x)
+#define OCR_OPTIONS_FILE(x) OCR_OPTIONS_FILE_CONC(x)
+#include OCR_OPTIONS_FILE(OCR_TYPE_H)
 #include "ocr-db.h"
 #include "ocr-edt.h"
 #include "ocr-errors.h"

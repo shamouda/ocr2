@@ -56,7 +56,7 @@ ocrGuid_t edtCode(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
         get_time(&t0);
         ocrDbCreate(&dbGuid, (void **)&dbPtr, DB_SZ, 0, NULL_GUID, NO_ALLOC);
         // Check that the DB creates succeeded
-        ASSERT(dbGuid != NULL_GUID);
+        ASSERT(!ocrGuidIsNull(dbGuid));
         ASSERT(dbPtr != NULL);
 
         get_time(&t1);
