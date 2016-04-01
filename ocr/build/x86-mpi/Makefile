@@ -14,7 +14,7 @@ else
   endif
 endif
 
-DEFAULT_CONFIG=mach-hc-dist-mpi-clone-8w-lockableDB.cfg
+DEFAULT_CONFIG=mach-x86-mpi-affinity-8w-lockableDB.cfg
 
 #
 # Tool-chain to be used for the build
