@@ -14,7 +14,7 @@ else
   endif
 endif
 
-DEFAULT_CONFIG=mach-hc-dist-gasnet-clone-8w.cfg
+DEFAULT_CONFIG=mach-x86-gasnet-affinity-8w-lockableDB.cfg
 
 #
 # Tool-chain to be used for the build
