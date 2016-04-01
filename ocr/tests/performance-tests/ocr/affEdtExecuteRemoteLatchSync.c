@@ -121,7 +121,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrGuid_t curAffinity;
     ocrAffinityGetCurrent(&curAffinity);
 
-    ASSERT(curAffinity == affinities[0]);
+    ASSERT(ocrGuidIsEq(curAffinity,affinities[0]));
 
     // Create DB containing to contain the guid latch
     ocrGuid_t * dbLchPtr;

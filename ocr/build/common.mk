@@ -607,6 +607,34 @@ $(OBJDIR)/shared/%.o: %.S Makefile ../common.mk $(OBJDIR)/shared/%.d | $(OBJDIR)
 	$(AT)rm -f $(@:.o=.d.tmp)
 
 #
+# Auto-generated config file containing options that
+# need to be enabled for the app if enabled in the runtime
+#
+# We always re-generate this file
+.PHONY: $(OCR_INSTALL)/include/ocr-options_$(OCR_TYPE).h
+$(OCR_INSTALL)/include/ocr-options_$(OCR_TYPE).h: | $(OCR_INSTALL)/include
+	@echo "Generating OCR build option file: $@"
+	$(AT)$(shell echo "" > $@)
+	$(AT)$(shell echo "#ifndef __OCR_OPTIONS_"$(subst -,_,$(OCR_TYPE))"_H__" >> $@)
+	$(AT)$(shell echo "#define __OCR_OPTIONS_"$(subst -,_,$(OCR_TYPE))"_H__" >> $@)
+	$(AT)$(shell echo "/* Generated based on RT CFLAGS: $(CFLAGS) */" >> $@)
+  ifneq (,$(findstring -DENABLE_EDT_NAMING, $(CLAGS)))
+	$(AT)$(shell echo "#ifndef ENABLE_EDT_NAMING" >> $@)
+	$(AT)$(shell echo "#define ENABLE_EDT_NAMING" >> $@)
+	$(AT)$(shell echo "#endif" >> $@)
+  endif
+  ifneq (,$(findstring -DENABLE_128_BIT_GUID, $(CFLAGS)))
+	$(AT)$(shell echo "#ifndef ENABLE_128_BIT_GUID" >> $@)
+	$(AT)$(shell echo "#define ENABLE_128_BIT_GUID" >> $@)
+	$(AT)$(shell echo "#endif" >> $@)
+  endif
+  ifneq (,$(findstring -DOCR_ASSERT, $(CFLAGS)))
+	$(AT)$(shell echo "#ifndef OCR_ASSERT" >> $@)
+	$(AT)$(shell echo "#define OCR_ASSERT" >> $@)
+	$(AT)$(shell echo "#endif" >> $@)
+  endif
+	$(AT)$(shell echo "#endif /* __OCR_OPTIONS_"$(OCR_TYPE)"_H__ */" >> $@)
+#
 # Include auto-generated dependence files
 # We only include the ones for the .o that we need to generate
 #
@@ -668,7 +696,7 @@ INSTALLED_LIBS    := $(addprefix $(OCR_INSTALL)/lib/, $(notdir $(INSTALL_LIBS)))
 BASE_LIBS         := $(firstword $(dir $(INSTALL_LIBS)))
 INSTALLED_EXES    := $(addprefix $(OCR_INSTALL)/bin/, $(notdir $(INSTALL_EXES)))
 BASE_EXES         := $(firstword $(dir $(INSTALL_EXES)))
-INSTALLED_INCS    := $(addprefix $(OCR_INSTALL)/include/, $(INC_FILES))
+INSTALLED_INCS    := $(addprefix $(OCR_INSTALL)/include/, $(INC_FILES)) $(OCR_INSTALL)/include/ocr-options_$(OCR_TYPE).h
 INSTALLED_CONFIGS := $(addprefix $(OCR_INSTALL)/share/ocr/config/$(OCR_TYPE)/, $(MACHINE_CONFIGS))
 INSTALLED_SCRIPTS := $(addprefix $(OCR_INSTALL)/share/ocr/scripts/, $(SCRIPT_FILES))
 
@@ -739,6 +767,11 @@ else
 
   $(OCR_INSTALL)/share/ocr/scripts/%: $(OCR_ROOT)/scripts/%
 	$(AT)install -D -m 0755 $< $@
+
+  # Need this for the auto-generated .h file
+  .PHONY: $(OCR_INSTALL)/include
+  $(OCR_INSTALL)/include:
+	$(AT)$(MKDIR) -p $@
 
 endif # Darwin ifeq
 
