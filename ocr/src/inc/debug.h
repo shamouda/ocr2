@@ -419,7 +419,7 @@ extern void doTrace(u64 location, u64 wrkr, ocrGuid_t taskGuid, ...);
         PRINTF(OCR_DEBUG_##type##_STR "(" OCR_DEBUG_##level##_STR       \
                ") [PD:0x%lx W:0x%lx EDT:"GUIDF"] " format,              \
                _pd?(u64)_pd->myLocation:0,                              \
-               _worker?(u64)_worker->location:0,                        \
+               _worker?(u64)_worker->id:0,                              \
                _task?GUIDA(_task->guid):0, ## __VA_ARGS__);             \
     } } while(0)
 
@@ -601,7 +601,7 @@ extern void doTrace(u64 location, u64 wrkr, ocrGuid_t taskGuid, ...);
             PRINTF(OCR_DEBUG_##type##_STR "(TRACE) "                    \
                    "[PD:0x%lx W:0x%lx EDT:0x%lx] " format,              \
                    _pd?(u64)_pd->myLocation:0,                          \
-                   _worker?(u64)_worker->location:0,                    \
+                   _worker?(u64)_worker->id:0,                          \
                    _task?_task->guid:0, ## __VA_ARGS__);                \
         }} while(0)
 
