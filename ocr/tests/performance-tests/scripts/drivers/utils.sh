@@ -7,18 +7,26 @@
 # Build OCR and run programs
 #
 function buildOcr() {
+    SAVE=$PWD
     export RES=0
-    cd ../..; make squeaky; cd -
-    # cd ../../build/${OCR_TYPE}; make -j8 && make -j8 install; RES=$?; cd -
+    if [[ -z "${OCR_NOCLEAN}" ]]; then
+        cd ../..; make squeaky; cd -
+    fi
     cd ../../build/${OCR_TYPE}; make && make install; RES=$?; cd -
     if [[ $RES -ne 0 ]]; then
         exit 1
     fi
+    cd $SAVE
 }
 
 function runProg() {
-    rm build/*
-    ./scripts/perfDriver.sh -target ${OCR_TYPE} ${NAME}
+    local OPTS=""
+    if [[ -n "${LOGDIR}" ]]; then
+        echo "GENERATING LOG DIR OPTIONS"
+        OPTS+="-logdir ${LOGDIR}"
+    fi
+    rm -Rf build/*
+    ./scripts/perfDriver.sh ${OPTS} -target ${OCR_TYPE} ${NAME}
 }
 
 

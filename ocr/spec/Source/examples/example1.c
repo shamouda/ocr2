@@ -21,18 +21,18 @@
 ocrGuid_t fun1(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     int* k;
     ocrGuid_t db_guid;
-    ocrDbCreate(&db_guid,(void **) &k, sizeof(int), 0, NULL_GUID, NO_ALLOC);
+    ocrDbCreate(&db_guid,(void **) &k, sizeof(int), 0, NULL_HINT, NO_ALLOC);
     k[0]=1;
-    PRINTF("Hello from fun1, sending k = %lu\n",*k);
+    PRINTF("Hello from fun1, sending k = %"PRId32"\n",*k);
     return db_guid;
 }
 
 ocrGuid_t fun2(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     int* k;
     ocrGuid_t db_guid;
-    ocrDbCreate(&db_guid,(void **) &k, sizeof(int), 0, NULL_GUID, NO_ALLOC);
+    ocrDbCreate(&db_guid,(void **) &k, sizeof(int), 0, NULL_HINT, NO_ALLOC);
     k[0]=2;
-    PRINTF("Hello from fun2, sending k = %lu\n",*k);
+    PRINTF("Hello from fun2, sending k = %"PRId32"\n",*k);
     return db_guid;
 }
 
@@ -40,7 +40,7 @@ ocrGuid_t shutdownEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     PRINTF("Hello from shutdownEdt\n");
     int* data1 = (int*) depv[0].ptr;
     int* data2 = (int*) depv[1].ptr;
-    PRINTF("Received data1 = %lu, data2 = %lu\n", *data1, *data2);
+    PRINTF("Received data1 = %"PRId32", data2 = %"PRId32"\n", *data1, *data2);
     ocrDbDestroy(depv[0].guid);
     ocrDbDestroy(depv[1].guid);
     ocrShutdown();
@@ -58,9 +58,9 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrEdtTemplateCreate(&edt3_template, shutdownEdt, 0, 2);
 
     //Create the EDTs
-    ocrEdtCreate(&edt1, edt1_template, EDT_PARAM_DEF, NULL, EDT_PARAM_DEF, NULL, EDT_PROP_NONE, NULL_GUID, &outputEvent1);
-    ocrEdtCreate(&edt2, edt2_template, EDT_PARAM_DEF, NULL, EDT_PARAM_DEF, NULL, EDT_PROP_NONE, NULL_GUID, &outputEvent2);
-    ocrEdtCreate(&edt3, edt3_template, EDT_PARAM_DEF, NULL, 2, NULL, EDT_PROP_NONE, NULL_GUID, NULL);
+    ocrEdtCreate(&edt1, edt1_template, EDT_PARAM_DEF, NULL, EDT_PARAM_DEF, NULL, EDT_PROP_NONE, NULL_HINT, &outputEvent1);
+    ocrEdtCreate(&edt2, edt2_template, EDT_PARAM_DEF, NULL, EDT_PARAM_DEF, NULL, EDT_PROP_NONE, NULL_HINT, &outputEvent2);
+    ocrEdtCreate(&edt3, edt3_template, EDT_PARAM_DEF, NULL, 2, NULL, EDT_PROP_NONE, NULL_HINT, NULL);
 
     //Setup dependences for the shutdown EDT
     ocrAddDependence(outputEvent1, edt3, 0, DB_MODE_CONST);

@@ -20,6 +20,7 @@
 
 #include "experimental/ocr-platform-model.h"
 #include "extensions/ocr-affinity.h"
+#include "extensions/ocr-hints.h"
 
 #ifdef OCR_ENABLE_STATISTICS
 #include "ocr-statistics.h"
@@ -52,23 +53,32 @@ static void hcWorkShift(ocrWorker_t * worker) {
     if(pd->fcts.processMessage(pd, &msg, true) == 0) {
         // We got a response
         ocrFatGuid_t taskGuid = PD_MSG_FIELD_IO(schedArgs).OCR_SCHED_ARG_FIELD(OCR_SCHED_WORK_EDT_USER).edt;
-        if(!(IS_GUID_NULL(taskGuid.guid))){
-            // Task sanity checks
-            ASSERT(taskGuid.metaDataPtr != NULL);
-            worker->curTask = (ocrTask_t*)taskGuid.metaDataPtr;
-            DPRINTF(DEBUG_LVL_VERB, "Worker shifting to execute EDT GUID "GUIDSx"\n", GUIDFS(taskGuid.guid));
-            u32 factoryId = PD_MSG_FIELD_O(factoryId);
-            pd->taskFactories[factoryId]->fcts.execute(worker->curTask);
-
-            //Store state at worker level to report most recent state on pause.
-            hcWorker->templateGuid = worker->curTask->templateGuid;
-            hcWorker->edtGuid = worker->curTask->guid;
-            hcWorker->fctPtr  = worker->curTask->funcPtr;
-#ifdef OCR_ENABLE_EDT_NAMING
-            hcWorker->name = worker->curTask->name;
+        if(!(ocrGuidIsNull(taskGuid.guid))){
+#ifdef ENABLE_EXTENSION_BLOCKING_SUPPORT
+            ocrTask_t * curTask = (ocrTask_t*)taskGuid.metaDataPtr;
+            if (((curTask->flags & OCR_TASK_FLAG_LONG) != 0) && (((ocrWorkerHc_t *) worker)->isHelping)) {
+                // Illegal to pick up a LONG EDT in that case to avoid creating a deadlock
+                curTask->state = RESCHED_EDTSTATE;
+                hcWorker->stealFirst = true;
+            } else {
 #endif
-
+                // Task sanity checks
+                ASSERT(taskGuid.metaDataPtr != NULL);
+                worker->curTask = (ocrTask_t*)taskGuid.metaDataPtr;
+                DPRINTF(DEBUG_LVL_VERB, "Worker shifting to execute EDT GUID "GUIDF"\n", GUIDA(taskGuid.guid));
+                u32 factoryId = PD_MSG_FIELD_O(factoryId);
+                pd->taskFactories[factoryId]->fcts.execute(worker->curTask);
+                //Store state at worker level to report most recent state on pause.
+                hcWorker->templateGuid = worker->curTask->templateGuid;
+                hcWorker->edtGuid = worker->curTask->guid;
+                hcWorker->fctPtr  = worker->curTask->funcPtr;
+#ifdef OCR_ENABLE_EDT_NAMING
+                hcWorker->name = worker->curTask->name;
+#endif
 #undef PD_TYPE
+#ifdef ENABLE_EXTENSION_BLOCKING_SUPPORT
+            }
+#endif
 #define PD_TYPE PD_MSG_SCHED_NOTIFY
             getCurrentEnv(NULL, NULL, NULL, &msg);
             msg.type = PD_MSG_SCHED_NOTIFY | PD_MSG_REQUEST;
@@ -119,8 +129,18 @@ static void workerLoop(ocrWorker_t * worker) {
         packedUserArgv = (void *) (((u64)packedUserArgv) + sizeof(u64)); // skip first totalLength argument
         ocrGuid_t dbGuid;
         void* dbPtr;
+
+        ocrHint_t dbHint;
+        ocrHintInit( &dbHint, OCR_HINT_DB_T );
+#if GUID_BIT_COUNT == 64
+            ocrSetHintValue( & dbHint, OCR_HINT_DB_AFFINITY, affinityMasterPD.guid );
+#elif GUID_BIT_COUNT == 128
+            ocrSetHintValue( & dbHint, OCR_HINT_DB_AFFINITY, affinityMasterPD.lower );
+#else
+#error Unknown GUID type
+#endif
         ocrDbCreate(&dbGuid, &dbPtr, totalLength,
-                    DB_PROP_IGNORE_WARN, affinityMasterPD, NO_ALLOC);
+                    DB_PROP_IGNORE_WARN, &dbHint, NO_ALLOC);
         // copy packed args to DB
         hal_memCopy(dbPtr, packedUserArgv, totalLength, 0);
         PD_MSG_STACK(msg);
@@ -142,9 +162,19 @@ static void workerLoop(ocrWorker_t * worker) {
         // Prepare the mainEdt for scheduling
         ocrGuid_t edtTemplateGuid = NULL_GUID, edtGuid = NULL_GUID;
         ocrEdtTemplateCreate(&edtTemplateGuid, mainEdt, 0, 1);
+
+        ocrHint_t edtHint;
+        ocrHintInit( &edtHint, OCR_HINT_EDT_T );
+#if GUID_BIT_COUNT == 64
+            ocrSetHintValue( & edtHint, OCR_HINT_EDT_AFFINITY, affinityMasterPD.guid );
+#elif GUID_BIT_COUNT == 128
+            ocrSetHintValue( & edtHint, OCR_HINT_EDT_AFFINITY, affinityMasterPD.lower );
+#else
+#error Unknown GUID type
+#endif
         ocrEdtCreate(&edtGuid, edtTemplateGuid, EDT_PARAM_DEF, /* paramv = */ NULL,
                      /* depc = */ EDT_PARAM_DEF, /* depv = */ &dbGuid,
-                     EDT_PROP_NONE, affinityMasterPD, NULL);
+                     EDT_PROP_NONE, &edtHint, NULL);
         // Once mainEdt is created, its template is no longer needed
         ocrEdtTemplateDestroy(edtTemplateGuid);
     }
@@ -156,7 +186,7 @@ static void workerLoop(ocrWorker_t * worker) {
             worker->fcts.workShift(worker);
             EXIT_PROFILE;
         }
-        DPRINTF(DEBUG_LVL_VERB, "Dropped out of curState(%u,%u) going to desiredState(%u,%u)\n", worker->id,
+        DPRINTF(DEBUG_LVL_VERB, "Worker %"PRIu64" dropped out of curState(%"PRIu32",%"PRIu32") going to desiredState(%"PRIu32",%"PRIu32")\n", worker->id,
                                 GET_STATE_RL(worker->curState), GET_STATE_PHASE(worker->curState),
                                 GET_STATE_RL(worker->desiredState), GET_STATE_PHASE(worker->desiredState));
 
@@ -314,7 +344,7 @@ u8 hcWorkerSwitchRunlevel(ocrWorker_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_
 #undef PD_TYPE
                 // At this stage, only the RL_PD_MASTER should be actually
                 // capable
-                DPRINTF(DEBUG_LVL_VERB, "Last phase in RL_COMPUTE_OK DOWN for 0x%llx (am PD master: %d)\n",
+                DPRINTF(DEBUG_LVL_VERB, "Last phase in RL_COMPUTE_OK DOWN for %p (am PD master: %"PRId32")\n",
                     self, properties & RL_PD_MASTER);
                 self->desiredState = self->curState = GET_STATE(RL_COMPUTE_OK, phase);
             } else if(RL_IS_FIRST_PHASE_DOWN(PD, RL_COMPUTE_OK, phase)) {
@@ -417,7 +447,7 @@ bool hcIsRunningWorker(ocrWorker_t * base) {
 }
 
 void hcPrintLocation(ocrWorker_t *base, char* location) {
-    SNPRINTF(location, 32, "Worker 0x%lx", base->location);
+    SNPRINTF(location, 32, "Worker 0x%"PRIx64"", base->location);
 }
 
 /**
@@ -450,6 +480,10 @@ void initializeWorkerHc(ocrWorkerFactory_t * factory, ocrWorker_t* self, ocrPara
         workerHc->hcType = HC_WORKER_COMP;
     }
     workerHc->legacySecondStart = false;
+#ifdef ENABLE_EXTENSION_BLOCKING_SUPPORT
+    workerHc->isHelping = 0;
+    workerHc->stealFirst = 0;
+#endif
 }
 
 /******************************************************/

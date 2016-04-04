@@ -11,10 +11,8 @@ if [[ "$VALUES" == "" ]]; then
     exit 1
 fi
 
-SCALE=3
-
 # Computing Speed-up
-
+SCALE=3
 base=`echo $VALUES | cut -d' ' -f1-1`
 acc=""
 for datum in `echo $VALUES`; do

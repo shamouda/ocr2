@@ -65,7 +65,7 @@ gasnetCommBlockSender_t* gasnetReserveSegmentBlock() {
     for(i=0; i< GASNET_MAX_SEGMENT_BLOCK; i++) {
         if (segmentBlock[i].reserved == 0) {
             segmentBlock[i].reserved = 1;   // flip the flag
-            DPRINTF(DEBUG_LVL_VVERB,"[GASNET] gasnetReserveSegmentBlock %p  size: %d bytes\n",
+            DPRINTF(DEBUG_LVL_VVERB,"[GASNET] gasnetReserveSegmentBlock %p  size: %"PRId32" bytes\n",
                                     segmentBlock[i].block.addr, segmentBlock[i].block.size);
             return &segmentBlock[i];  // return the reserved block
         }
@@ -83,7 +83,7 @@ void gasnetReleaseSegmentBlock(void *addr) {
     for (i=0; i<GASNET_MAX_SEGMENT_BLOCK; i++) {
         if (segmentBlock[i].block.addr == addr) {
             segmentBlock[i].reserved = 0;
-            DPRINTF(DEBUG_LVL_VVERB,"[GASNET] gasnetReleaseSegmentBlock %p  size: %d bytes\n",
+            DPRINTF(DEBUG_LVL_VVERB,"[GASNET] gasnetReleaseSegmentBlock %p  size: %"PRId32" bytes\n",
                                     addr, segmentBlock[i].block.size);
             return;
         }

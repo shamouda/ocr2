@@ -50,6 +50,8 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ASSERT(affinityCount >= 1);
     ocrGuid_t affinities[affinityCount];
     ocrAffinityGet(AFFINITY_PD, &affinityCount, affinities);
+    ocrHint_t dbHint;
+    ocrHintInit( &dbHint, OCR_HINT_DB_T );
 
     // Create DB @ affinity
     ocrGuid_t dbGuid[NB_DBS];
@@ -57,7 +59,8 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     while (db < NB_DBS) {
         void * dbPtr;
         u32 nbElem = NB_ELEM_DB;
-        ocrDbCreate(&dbGuid[db], &dbPtr, sizeof(TYPE_ELEM_DB) * NB_ELEM_DB, 0, affinities[db%affinityCount], NO_ALLOC);
+        ocrSetHintValue( & dbHint, OCR_HINT_DB_AFFINITY, ocrAffinityToHintValue( affinities[db%affinityCount] ) );
+        ocrDbCreate(&dbGuid[db], &dbPtr, sizeof(TYPE_ELEM_DB) * NB_ELEM_DB, 0, &dbHint, NO_ALLOC);
         u64 i = 0;
         int * data = (int *) dbPtr;
         while (i < nbElem) {
@@ -72,18 +75,21 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrEdtTemplateCreate(&shutdownEdtTemplateGuid, shutdownEdt, 0, NB_WRITERS);
     ocrGuid_t shutdownGuid;
     ocrEdtCreate(&shutdownGuid, shutdownEdtTemplateGuid, 0, NULL, NB_WRITERS, NULL,
-                 EDT_PROP_NONE, NULL_GUID, NULL);
+                 EDT_PROP_NONE, NULL_HINT, NULL);
 
     // create writer EDT for the DB in EW mode @ affinity
     ocrGuid_t eWriteEdtTemplateGuid;
     ocrEdtTemplateCreate(&eWriteEdtTemplateGuid, eWriteEdt, 1, NB_DBS_PER_EDT);
+    ocrHint_t edtHint;
+    ocrHintInit( &edtHint, OCR_HINT_EDT_T );
 
     u64 i = 0;
     while (i < NB_WRITERS) {
         ocrGuid_t outputEventGuid;
         ocrGuid_t eWriteEdtGuid;
+        ocrSetHintValue( & edtHint, OCR_HINT_EDT_AFFINITY, ocrAffinityToHintValue( affinities[i%affinityCount]) );
         ocrEdtCreate(&eWriteEdtGuid, eWriteEdtTemplateGuid, 1, &i, NB_DBS_PER_EDT, NULL,
-                     EDT_PROP_NONE, affinities[i%affinityCount], &outputEventGuid);
+                     EDT_PROP_NONE, &edtHint, &outputEventGuid);
         ocrAddDependence(outputEventGuid, shutdownGuid, i, false);
         u32 j = 0;
         while (j < NB_DBS_PER_EDT) {

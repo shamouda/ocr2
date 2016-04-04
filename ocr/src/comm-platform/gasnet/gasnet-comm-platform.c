@@ -75,7 +75,7 @@ static void gasnetMessageIncoming(ocrCommPlatformGasnet_t *platform , ocrPolicyM
     // once we finished copying the message into a local buffer,
     // other nodes are free to write this share segment
 
-    DPRINTF(DEBUG_LVL_VERB,"[GASNET] Received a message type %lx with msgId %lu size: %lu\n",
+    DPRINTF(DEBUG_LVL_VERB,"[GASNET] Received a message type 0x%"PRIx32" with msgId 0x%"PRIu64" size: 0x%"PRIu64"\n",
                            msg->type, msg->msgId, size);
     hal_lock32(&platform->queueLock);
     platform->incoming->pushFront(platform->incoming, msgCopy);
@@ -102,7 +102,7 @@ static void gasnetMessageIncoming(ocrCommPlatformGasnet_t *platform , ocrPolicyM
         block->size = seg_size;
         int src = locationToGasnetRank( msg->srcLocation );
         gasnetSegmentBlockPush(pd, src, block);
-        DPRINTF(DEBUG_LVL_VVERB, "[GASNET] pushing %p ( %p | %p) \n", src, addr, seg_addr_hi, seg_addr_lo);
+        DPRINTF(DEBUG_LVL_VVERB, "[GASNET] pushing %p from 0x%"PRIx32" ( 0x%"PRIx32" | 0x%"PRIx32") \n", addr, src, (u32)seg_addr_hi, (u32)seg_addr_lo);
     }
 }
 
@@ -121,7 +121,7 @@ static void gasnetAMMessageMedium(gasnet_token_t token, void *buf, size_t nbytes
 
   ocrCommPlatformGasnet_t *platform = getCommPlatform();
 
-  DPRINTF(DEBUG_LVL_VVERB,"[GASNET] %s: pd=%p from %d, size: %d\n",
+  DPRINTF(DEBUG_LVL_VVERB,"[GASNET] %s: pd=%p from %"PRId32", size: %"PRId64"\n",
                           __func__, platform->base.pd, src, nbytes);
 
   gasnetMessageIncoming(platform, (ocrPolicyMsg_t *)buf, nbytes, seg_addr_hi,
@@ -282,7 +282,7 @@ static u8 GasnetCommSendMessage(ocrCommPlatform_t * self,
     // Prepare GASNET call arguments
     int targetRank = locationToGasnetRank(target);
     ASSERT(targetRank > -1);
-    DPRINTF(DEBUG_LVL_VVERB,"GasnetCommSendMessage self=%p, to %d (%d) %ld bytes\n",
+    DPRINTF(DEBUG_LVL_VVERB,"GasnetCommSendMessage self=%p, to %"PRId64" (%"PRId32") %"PRId64" bytes\n",
                             self, target, targetRank, fullMsgSize);
 
     void * segment_addr = NULL;
@@ -303,7 +303,7 @@ static u8 GasnetCommSendMessage(ocrCommPlatform_t * self,
           segment_addr = block->block.addr;
           segment_size = block->block.size;
       }
-      DPRINTF(DEBUG_LVL_VVERB,"[%d] msg type: %x   s: %p\n", gasnet_mynode(),
+      DPRINTF(DEBUG_LVL_VVERB,"[%"PRId32"] msg type: %"PRIx32"   s: %p\n", gasnet_mynode(),
                               message->type, segment_addr);
     }
     gasnet_handlerarg_t addr_hi = (gasnet_handlerarg_t) BITS64_HIGH(segment_addr);
@@ -358,7 +358,7 @@ static u8 GasnetCommSendMessage(ocrCommPlatform_t * self,
         self->pd->fcts.pdFree(self->pd, message);
     }
 
-    DPRINTF(DEBUG_LVL_VERB,"[GASNET] AM for msgId %ld type %x to rank %d\n",
+    DPRINTF(DEBUG_LVL_VERB,"[GASNET] AM for msgId %"PRId64" type %"PRIx32" to rank %"PRId32"\n",
                            message->msgId, message->type, targetRank);
     *id = gasnetId;
     return 0;
@@ -457,7 +457,7 @@ u8 GasnetCommSwitchRunlevel(ocrCommPlatform_t *self, ocrPolicyDomain_t *PD, ocrR
             int i = 0;
             while(i < (nbRanks-1)) {
                 PD->neighbors[i] = (((myRank+i+1)%nbRanks));
-                DPRINTF(DEBUG_LVL_VERB,"[%d] neighbors[%d] is %d\n", myRank, i, PD->neighbors[i]);
+                DPRINTF(DEBUG_LVL_VERB,"[%"PRId32"] neighbors[%"PRId32"] is %"PRId64"\n", myRank, i, PD->neighbors[i]);
                 i++;
             }
             // Runlevel barrier across policy-domains

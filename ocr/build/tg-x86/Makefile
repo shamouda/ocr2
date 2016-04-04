@@ -7,11 +7,11 @@
 #
 
 ifndef OCR_TYPE
-OCR_TYPE=tg-x86
+  OCR_TYPE=tg-x86
 else
-ifneq (${OCR_TYPE}, tg-x86)
-$(error OCR_TYPE is set to ${OCR_TYPE} but expected tg-x86)
-endif
+  ifneq (${OCR_TYPE}, tg-x86)
+    $(error OCR_TYPE is set to ${OCR_TYPE} but expected tg-x86)
+  endif
 endif
 
 DEFAULT_CONFIG=mach-1block.cfg
@@ -22,7 +22,13 @@ DEFAULT_CONFIG=mach-1block.cfg
 
 TG_INSTALL ?= ../../../../tg/tg/install
 
-CC      := gcc
+FORCE_CC ?= no
+ifeq ($(FORCE_CC), no)
+  ifeq ($(CC), cc)
+    CC = gcc
+  endif
+endif # End of ifeq force_cc
+
 # TG_INSTALL/include is for rm-map.h
 CFLAGS  := -fno-stack-protector -I $(TG_INSTALL)/include
 
@@ -39,10 +45,10 @@ LDFLAGS := -shared -fpic -lpthread
 # -lrt needed only for < glibc-2.17 in Linux systems (not needed for OS X)
 UNAME := $(shell uname -s)
 ifeq ($(UNAME),Linux)
-ret := $(shell echo "`ldd --version | awk '/ldd/{print $$NF}'` < 2.17" | bc)
-ifeq ($(ret), 1)
-LDFLAGS += -lrt
-endif
+  ret := $(shell echo "`ldd --version | awk '/ldd/{print $$NF}' | cut -d'.' -f1-2` < 2.17" | bc)
+  ifeq ($(ret), 1)
+    LDFLAGS += -lrt
+  endif
 endif
 
 # CFLAGS_SHARED will be concatenated with any
@@ -71,7 +77,7 @@ OCRRUNNER=ocrrun_$(OCR_TYPE)
 # x86 only
 #
 # Enable profiler
-# CFLAGS += -DOCR_RUNTIME_PROFILER -DPROFILE_KHZ=3400000
+# CFLAGS += -DOCR_RUNTIME_PROFILER -DPROFILER_KHZ=3400000
 #
 # (optional) Maximum number of scope
 # nesting for runtime profiler

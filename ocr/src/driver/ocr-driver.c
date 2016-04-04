@@ -323,7 +323,7 @@ extern u64 dram_offset;
  * +--------------------------+
  * | header size (incl) (u64) | = (6)*sizeof(u64)
  * +--------------------------+
- * |  abs. location  (u64)    | = CeMemSize - 4K
+ * |  abs. location  (u64)    | = CeMemSize - 5K
  * +--------------------------+
  * |  abs.address of PD (u64) | = abs.location + PD offset
  * +--------------------------+
@@ -352,34 +352,34 @@ void dumpStructs(void *pd, const char* output_binary, u64 start_address) {
         // Header size
         value = 6*sizeof(u64);
         fwrite(&value, sizeof(u64), 1, fp);
-        DPRINTF(DEBUG_LVL_VERB, "Wrote header size: 0x%llx\n", value);
+        DPRINTF(DEBUG_LVL_VERB, "Wrote header size: 0x%"PRIx64"\n", value);
         totu64++;
 
         // Absolute location - currently read from config file
         fwrite(&start_address, sizeof(u64), 1, fp);
-        DPRINTF(DEBUG_LVL_VERB, "Wrote abs location: 0x%llx\n", start_address);
+        DPRINTF(DEBUG_LVL_VERB, "Wrote abs location: 0x%"PRIx64"\n", start_address);
         totu64++;
 
         // PD address
         offset = (u64)pd - (u64)&persistent_chunk + (u64)start_address;
         fwrite(&offset, sizeof(u64), 1, fp);
-        DPRINTF(DEBUG_LVL_VERB, "Wrote PD address: 0x%llx\n", offset);
+        DPRINTF(DEBUG_LVL_VERB, "Wrote PD address: 0x%"PRIx64"\n", offset);
         totu64++;
 
         value = (u64)getAddress("salPdDriver");
         fwrite(&value, sizeof(u64), 1, fp);
-        DPRINTF(DEBUG_LVL_VERB, "Wrote salPdDriver address: 0x%llx\n", value);
+        DPRINTF(DEBUG_LVL_VERB, "Wrote salPdDriver address: 0x%"PRIx64"\n", value);
         totu64++;
 
         // Size of all structs
         fwrite(&persistent_pointer, sizeof(u64), 1, fp);
-        DPRINTF(DEBUG_LVL_VERB, "Wrote size of all structs: 0x%llx\n", persistent_pointer);
+        DPRINTF(DEBUG_LVL_VERB, "Wrote size of all structs: 0x%"PRIx64"\n", persistent_pointer);
         totu64++;
 
         // myLocation
         offset = (u64)(&((ocrPolicyDomain_t *)pd)->myLocation) - (u64)&persistent_chunk + (u64)start_address;
         fwrite(&offset, sizeof(u64), 1, fp);
-        DPRINTF(DEBUG_LVL_VERB, "Wrote my location: 0x%llx\n", offset);
+        DPRINTF(DEBUG_LVL_VERB, "Wrote my location: 0x%"PRIx64"\n", offset);
         totu64++;
 
         // Fix up all the pointers
@@ -389,10 +389,10 @@ void dumpStructs(void *pd, const char* output_binary, u64 start_address) {
                 ptrs[i] -= (u64)ptrs;
                 ptrs[i] += start_address;
             }
-            DPRINTF(DEBUG_LVL_VVERB, "ptrs[%d]: 0x%llx\n", i, ptrs[i]);
+            DPRINTF(DEBUG_LVL_VVERB, "ptrs[%"PRId64"]: 0x%"PRIx64"\n", i, ptrs[i]);
         }
         fwrite(&persistent_chunk, sizeof(char), persistent_pointer, fp);
-        DPRINTF(DEBUG_LVL_INFO, "Wrote %ld bytes to %s\n", persistent_pointer+totu64*8, output_binary);
+        DPRINTF(DEBUG_LVL_INFO, "Wrote %"PRId64" bytes to %s\n", persistent_pointer+totu64*8, output_binary);
     }
     fclose(fp);
 }
@@ -404,7 +404,7 @@ void dumpArgs(const char* args_binary) {
     if(fp == NULL) printf("Unable to open file %s for writing\n", args_binary);
     else {
         fwrite(userArgs, sizeof(u8), args_pointer, fp);
-        DPRINTF(DEBUG_LVL_INFO, "Wrote %ld bytes to %s\n", args_pointer, args_binary);
+        DPRINTF(DEBUG_LVL_INFO, "Wrote %"PRId64" bytes to %s\n", args_pointer, args_binary);
     }
     fclose(fp);
 }
@@ -551,7 +551,7 @@ void bringUpRuntime(ocrConfig_t *ocrConfig) {
         for (j = total_types-1; j >= 0; j--) {
             if (strncasecmp(inst_str[j], secname, strlen(inst_str[j]))==0) {
                 if(inst_counts[j] && inst_params[j] == NULL) {
-                    DPRINTF(DEBUG_LVL_INFO, "Create %d instances of %s\n", inst_counts[j], inst_str[j]);
+                    DPRINTF(DEBUG_LVL_INFO, "Create %"PRId32" instances of %s\n", inst_counts[j], inst_str[j]);
                     inst_params[j] = (ocrParamList_t **)runtimeChunkAlloc(inst_counts[j] * sizeof(ocrParamList_t *), NONPERSISTENT_CHUNK);
                     all_instances[j] = (void **)runtimeChunkAlloc((inst_counts[j]+1) * sizeof(void *), NONPERSISTENT_CHUNK); // We create an "end of instances" marker
                     all_instances[j][inst_counts[j]] = NULL;
@@ -662,13 +662,13 @@ void bringUpRuntime(ocrConfig_t *ocrConfig) {
  // #ifndef ENABLE_BUILDER_ONLY
  //                 pd->neighborPDs = (ocrPolicyDomain_t**)runtimeChunkAlloc(sizeof(ocrPolicyDomain_t*) * neighbors_count, NONPERSISTENT_CHUNK);
  //                 int idx = 0;
- //                 DPRINTF(DEBUG_LVL_VERB, "PD%lu neighbors (%d): ", (u64)pd->myLocation, neighbors_count);
+ //                 DPRINTF(DEBUG_LVL_VERB, "PD%"PRIu64" neighbors (%"PRId32"): ", (u64)pd->myLocation, neighbors_count);
  //                 for (j = neighbors_low; j <= neighbors_high; j++) {
  //                     if (j != low) {
  //                         ocrPolicyDomain_t *neighborPd = (ocrPolicyDomain_t*)all_instances[policydomain_type][j];
  //                         pd->neighborPDs[idx] = neighborPd;
  //                         pd->neighbors[idx++] = neighborPd->myLocation;
- //                         DPRINTF(DEBUG_LVL_VERB, "%lu ", (u64)neighborPd->myLocation);
+ //                         DPRINTF(DEBUG_LVL_VERB, "%"PRIu64" ", (u64)neighborPd->myLocation);
  //                     }
  //                 }
  //                 DPRINTF(DEBUG_LVL_VERB, "\n");

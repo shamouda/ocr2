@@ -4,7 +4,7 @@ an extension of the standard API. The motivation of the hints API is to enable
 the transfer of knowledge, which is usually lost when expressing an program
 using the standard OCR API. Hints never impact the correctness of a program but
 are instead “extra” information that the runtime can use, for example, to
-improve the allocation of datablocks and scheduling of EDTs. Note that an OCR
+improve the allocation of data blocks and scheduling of EDTs. Note that an OCR
 implementation can ignore all hints or selectively choose the ones to respect.
 %%%%
 
@@ -21,7 +21,7 @@ types of hints:
 used for EDT specific hints. EDT specific hints can also be used for EDT
 templates. When an EDT is created, it is initialized with the hints that are
 set on the EDT template.
-\item \code{OCR\_HINT\_DB\_T} is used for datablock specific hints.
+\item \code{OCR\_HINT\_DB\_T} is used for data block specific hints.
 \item \code{OCR\_HINT\_EVT\_T} is used for event specific hints.
 \item \code{OCR\_HINT\_GROUP\_T} is used for group specific hints.
 OCR groups are logical entities to which multiple OCR objects can be associated.

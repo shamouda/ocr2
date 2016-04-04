@@ -1,6 +1,11 @@
 NAME=$1
 BRANCH=$2
 
+if [[ $# -ne 2 ]]; then
+   echo "usage: co_xstack checkoutName branchToCheckout"
+   exit 1
+fi
+
 if [[ -z ${XST_ROOT} ]]; then
    export XST_ROOT=${HOME}/xs-tools
 fi

@@ -50,19 +50,19 @@ static void parseConfigStr(ocrSchedulerHeuristic_t ** pdSchedulerHeuristics, ocr
         while (!ocrIsDigit((u8) cfgStr[r])) {
             r++;
         }
-        u8 id;
+        u8 id = 0;
         if (ocrStrncmp((u8*)"comp", (u8*)&cfgStr[l], (r-l)) == 0) {
-            DPRINTF(DEBUG_LVL_INFO, "Assigning heuristic %d to slot COMP_HEURISTIC_ID\n", sglAtoi(cfgStr[r]));
+            DPRINTF(DEBUG_LVL_INFO, "Assigning heuristic %"PRId32" to slot COMP_HEURISTIC_ID\n", sglAtoi(cfgStr[r]));
             id = COMP_HEURISTIC_ID;
         } else if (ocrStrncmp((u8*)"comm", (u8*)&cfgStr[l], (r-l)) == 0) {
-            DPRINTF(DEBUG_LVL_INFO, "Assigning heuristic %d to slot COMM_HEURISTIC_ID\n", sglAtoi(cfgStr[r]));
+            DPRINTF(DEBUG_LVL_INFO, "Assigning heuristic %"PRId32" to slot COMM_HEURISTIC_ID\n", sglAtoi(cfgStr[r]));
             id = COMM_HEURISTIC_ID;
         } else if (ocrStrncmp((u8*)"plc", (u8*)&cfgStr[l], (r-l)) == 0) {
-            DPRINTF(DEBUG_LVL_INFO, "Assigning heuristic %d to slot PLACEMENT_HEURISTIC_ID\n", sglAtoi(cfgStr[r]));
+            DPRINTF(DEBUG_LVL_INFO, "Assigning heuristic %"PRId32" to slot PLACEMENT_HEURISTIC_ID\n", sglAtoi(cfgStr[r]));
             id = PLACEMENT_HEURISTIC_ID;
         } else {
             cfgStr[r] = '\0';
-            DPRINTF(DEBUG_LVL_WARN, "error: Unrecognized heuristic %s\n", cfgStr[l]);
+            DPRINTF(DEBUG_LVL_WARN, "error: Unrecognized heuristic %"PRId32"\n", (s32)cfgStr[l]);
             ASSERT(false);
         }
         schedulerHeuristics[id] = pdSchedulerHeuristics[sglAtoi(cfgStr[r])];
@@ -329,7 +329,7 @@ ocrScheduler_t* newSchedulerCommon(ocrSchedulerFactory_t * factory, ocrParamList
     u32 heuristicIdLow = params->heuristicIdLow;
     u32 heuristicIdHigh = params->heuristicIdHigh;
     if (config == NULL) {
-        DPRINTF(DEBUG_LVL_WARN, "Warning: No config option specified for COMMON scheduler heuristics. Assume order is comp/plc/comm \n");
+        DPRINTF(DEBUG_LVL_INFO, "Warning: No config option specified for COMMON scheduler heuristics. Assume order is comp/plc/comm \n");
         // Do best effort here for backward compatibility
         // - Assume heuristics are given in order.
         // - If not all specified, assume default is the master heuristic or heuristic '0'.

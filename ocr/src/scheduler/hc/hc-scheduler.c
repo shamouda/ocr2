@@ -16,6 +16,10 @@
 #include "scheduler/hc/hc-scheduler.h"
 #include "scheduler/hc/scheduler-blocking-support.h"
 
+#ifdef ENABLE_EXTENSION_BLOCKING_SUPPORT
+#include "worker/hc/hc-worker.h"
+#endif
+
 /******************************************************/
 /* Support structures                                 */
 /******************************************************/
@@ -224,34 +228,43 @@ u8 hcSchedulerTakeEdt (ocrScheduler_t *self, u32 *count, ocrFatGuid_t *edts) {
     ocrWorker_t *worker = NULL;
     getCurrentEnv(NULL, &worker, NULL, NULL);
     ocrFatGuid_t popped;
-    u64 workerId;
-
+    u64 workerId = worker->id;
     ASSERT(edts != NULL); // Array should be allocated at least
+#ifdef ENABLE_EXTENSION_BLOCKING_SUPPORT
+    ocrWorkerHc_t * hcWorker = (ocrWorkerHc_t *) worker;
+    if (!hcWorker->stealFirst) {
+#endif
+        {
+            START_PROFILE(sched_hc_Pop);
+            // First try to pop
+            ocrWorkpile_t * wpToPop = popMappingOneToOne(self, workerId);
+            popped = wpToPop->fcts.pop(wpToPop, POP_WORKPOPTYPE, NULL);
+            EXIT_PROFILE;
+        }
+#ifdef ENABLE_EXTENSION_BLOCKING_SUPPORT
+    } else {
+        hcWorker->stealFirst = false;
+        popped.guid = NULL_GUID;
+    }
+#endif
 
     {
-        START_PROFILE(sched_hc_Pop);
-        workerId = worker->id;
-        // First try to pop
-        ocrWorkpile_t * wpToPop = popMappingOneToOne(self, workerId);
-        popped = wpToPop->fcts.pop(wpToPop, POP_WORKPOPTYPE, NULL);
+        START_PROFILE(sched_hc_Steal);
+        if(ocrGuidIsNull(popped.guid)) {
+            // If popping failed, try to steal
+            hcWorkpileIterator_t* it = stealMappingOneToAllButSelf(self, workerId);
+            while(workpileIteratorHasNext(it) && (ocrGuidIsNull(popped.guid))) {
+                ocrWorkpile_t * next = workpileIteratorNext(it);
+                popped = next->fcts.pop(next, STEAL_WORKPOPTYPE, NULL);
+            }
+        }
         EXIT_PROFILE;
     }
-
-    START_PROFILE(sched_hc_Steal);
-    if(IS_GUID_NULL(popped.guid)) {
-        // If popping failed, try to steal
-        hcWorkpileIterator_t* it = stealMappingOneToAllButSelf(self, workerId);
-        while(workpileIteratorHasNext(it) && (IS_GUID_NULL(popped.guid))) {
-            ocrWorkpile_t * next = workpileIteratorNext(it);
-            popped = next->fcts.pop(next, STEAL_WORKPOPTYPE, NULL);
-        }
-    }
-    EXIT_PROFILE;
 
     // In this implementation we expect the caller to have
     // allocated memory for us since we can return at most one
     // guid (most likely store using the address of a local)
-    if(!(IS_GUID_NULL(popped.guid))) {
+    if(!(ocrGuidIsNull(popped.guid))) {
         *count = 1;
         edts[0] = popped;
     } else {
@@ -323,27 +336,61 @@ u8 hcSchedulerNotifyInvoke(ocrScheduler_t *self, ocrSchedulerOpArgs_t *opArgs, o
     ocrSchedulerOpNotifyArgs_t *notifyArgs = (ocrSchedulerOpNotifyArgs_t*)opArgs;
     switch(notifyArgs->kind) {
     case OCR_SCHED_NOTIFY_PRE_PROCESS_MSG: {
-        return OCR_ENOP;
+#ifndef PLACER_LEGACY //BUG #476 - This code is being deprecated
+    // Try to automatically place datablocks and edts. Only support naive PD-based placement for now.
+    ocrPolicyDomain_t * pd = self->pd;
+    ocrPolicyMsg_t * msg = notifyArgs->OCR_SCHED_ARG_FIELD(OCR_SCHED_NOTIFY_PRE_PROCESS_MSG).msg;
+    suggestLocationPlacement(pd, pd->myLocation, (ocrPlatformModelAffinity_t *) pd->platformModel,
+                             (ocrLocationPlacer_t *) pd->placer, msg);
+    return 0;
+#else
+    return OCR_ENOP;
+#endif
     }
     case OCR_SCHED_NOTIFY_EDT_READY: {
             u32 count = 1;
             return self->fcts.giveEdt(self, &count, &notifyArgs->OCR_SCHED_ARG_FIELD(OCR_SCHED_NOTIFY_EDT_READY).guid);
         }
     case OCR_SCHED_NOTIFY_EDT_DONE: {
-            // Destroy the work
-            ocrPolicyDomain_t *pd;
-            PD_MSG_STACK(msg);
-            getCurrentEnv(&pd, NULL, NULL, &msg);
+            ocrTask_t * curTask __attribute__((unused)) = (ocrTask_t *) notifyArgs->OCR_SCHED_ARG_FIELD(OCR_SCHED_NOTIFY_EDT_DONE).guid.metaDataPtr;
+#ifdef ENABLE_EXTENSION_BLOCKING_SUPPORT
+            //TODO move to common scheduler ?
+            if (curTask->state == RESCHED_EDTSTATE) {
+                // We push the EDT at the back
+                ocrWorker_t *worker = NULL;
+                getCurrentEnv(NULL, &worker, NULL, NULL);
+                ocrWorkerHc_t * hcWorker = (ocrWorkerHc_t *) worker;
+                hcWorker->stealFirst = true;
+                curTask->state = ALLACQ_EDTSTATE;
+                // Source must be a worker guid
+                ocrWorkpile_t * wpToPush = pushMappingOneToOne(self, worker->id);
+                // TODO: in common scheduler this is going through scheduler-objects, don't know if they support that :/
+                wpToPush->fcts.push(wpToPush, PUSH_WORKPUSHBACKTYPE, notifyArgs->OCR_SCHED_ARG_FIELD(OCR_SCHED_NOTIFY_EDT_DONE).guid);
+                // Address deadlock cycle for mpilite
+                // Additionally record the next time we'll do a steal instead of a pop
+                // In theory another worker can do the steal and break the cycle without
+                // the scheduler implementation to do anything. Doing a steal explicitly
+                // ensure more fairness.
+            } else {
+#endif
+                ASSERT(curTask->state == REAPING_EDTSTATE);
+                // Destroy the work
+                ocrPolicyDomain_t *pd;
+                PD_MSG_STACK(msg);
+                getCurrentEnv(&pd, NULL, NULL, &msg);
 #define PD_MSG (&msg)
 #define PD_TYPE PD_MSG_WORK_DESTROY
-            getCurrentEnv(NULL, NULL, NULL, &msg);
-            msg.type = PD_MSG_WORK_DESTROY | PD_MSG_REQUEST;
-            PD_MSG_FIELD_I(guid) = notifyArgs->OCR_SCHED_ARG_FIELD(OCR_SCHED_NOTIFY_EDT_DONE).guid;
-            PD_MSG_FIELD_I(currentEdt) = notifyArgs->OCR_SCHED_ARG_FIELD(OCR_SCHED_NOTIFY_EDT_DONE).guid;
-            PD_MSG_FIELD_I(properties) = 0;
-            RESULT_ASSERT(pd->fcts.processMessage(pd, &msg, false), ==, 0);
+                getCurrentEnv(NULL, NULL, NULL, &msg);
+                msg.type = PD_MSG_WORK_DESTROY | PD_MSG_REQUEST;
+                PD_MSG_FIELD_I(guid) = notifyArgs->OCR_SCHED_ARG_FIELD(OCR_SCHED_NOTIFY_EDT_DONE).guid;
+                PD_MSG_FIELD_I(currentEdt) = notifyArgs->OCR_SCHED_ARG_FIELD(OCR_SCHED_NOTIFY_EDT_DONE).guid;
+                PD_MSG_FIELD_I(properties) = 0;
+                RESULT_ASSERT(pd->fcts.processMessage(pd, &msg, false), ==, 0);
 #undef PD_MSG
 #undef PD_TYPE
+#ifdef ENABLE_EXTENSION_BLOCKING_SUPPORT
+            }
+#endif
         break;
         }
     case OCR_SCHED_NOTIFY_COMM_READY: {

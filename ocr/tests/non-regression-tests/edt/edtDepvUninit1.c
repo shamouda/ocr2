@@ -26,23 +26,23 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrGuid_t ndepv[2];
     ndepv[0] = UNINITIALIZED_GUID;
     ndepv[1] = UNINITIALIZED_GUID;
-    ocrEdtCreate(&edtGuid, tplGuid, 0, NULL, 2, ndepv, EDT_PROP_NONE, NULL_GUID, NULL);
+    ocrEdtCreate(&edtGuid, tplGuid, 0, NULL, 2, ndepv, EDT_PROP_NONE, NULL_HINT, NULL);
     ocrEdtTemplateDestroy(tplGuid);
 
     ocrGuid_t db1Guid;
     u64 * db1Ptr;
-    ocrDbCreate(&db1Guid, (void**) &db1Ptr, sizeof(u64), DB_PROP_NONE, NULL_GUID, NO_ALLOC);
+    ocrDbCreate(&db1Guid, (void**) &db1Ptr, sizeof(u64), DB_PROP_NONE, NULL_HINT, NO_ALLOC);
     db1Ptr[0] = 1;
     ocrDbRelease(db1Guid);
 
     ocrGuid_t db2Guid;
     u64 * db2Ptr;
-    ocrDbCreate(&db2Guid, (void**) &db2Ptr, sizeof(u64), DB_PROP_NONE, NULL_GUID, NO_ALLOC);
+    ocrDbCreate(&db2Guid, (void**) &db2Ptr, sizeof(u64), DB_PROP_NONE, NULL_HINT, NO_ALLOC);
     db2Ptr[0] = 2;
     ocrDbRelease(db2Guid);
 
     ocrAddDependence(db1Guid, edtGuid, 0, DB_MODE_RO);
     ocrAddDependence(db2Guid, edtGuid, 1, DB_MODE_RO);
 
-    return 0;
+    return NULL_GUID;
 }

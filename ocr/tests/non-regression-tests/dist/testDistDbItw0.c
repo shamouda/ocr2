@@ -58,12 +58,15 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrGuid_t affinities[affinityCount];
     ocrAffinityGet(AFFINITY_PD, &affinityCount, affinities);
     ocrGuid_t affinity = affinities[0];
+    ocrHint_t dbHint;
+    ocrHintInit( &dbHint, OCR_HINT_DB_T );
+    ocrSetHintValue( & dbHint, OCR_HINT_DB_AFFINITY, ocrAffinityToHintValue( affinity) );
 
     // Create DB @ affinity
     void * dbPtr;
     ocrGuid_t dbGuid;
     u32 nbElem = NB_ELEM_DB;
-    ocrDbCreate(&dbGuid, &dbPtr, sizeof(TYPE_ELEM_DB) * NB_ELEM_DB, 0, affinity, NO_ALLOC);
+    ocrDbCreate(&dbGuid, &dbPtr, sizeof(TYPE_ELEM_DB) * NB_ELEM_DB, 0, &dbHint, NO_ALLOC);
     u64 i = 0;
     int * data = (int *) dbPtr;
     while (i < nbElem) {
@@ -74,11 +77,14 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
 
     ocrGuid_t shutdownEdtTemplateGuid;
     ocrEdtTemplateCreate(&shutdownEdtTemplateGuid, shutdownEdt, 0, NB_WRITERS+1);
+    ocrHint_t edtHint;
+    ocrHintInit( &edtHint, OCR_HINT_EDT_T );
+    ocrSetHintValue( & edtHint, OCR_HINT_EDT_AFFINITY, ocrAffinityToHintValue( affinity) );
 
     // shutdown EDT will check the DB content
     ocrGuid_t shutdownGuid;
     ocrEdtCreate(&shutdownGuid, shutdownEdtTemplateGuid, 0, NULL, NB_WRITERS+1, NULL,
-                 EDT_PROP_NONE, affinity, NULL);
+                 EDT_PROP_NONE, &edtHint, NULL);
     ocrAddDependence(dbGuid, shutdownGuid, 0, DB_MODE_CONST);
     // ocrAddDependence(NULL_GUID, shutdownGuid, 0, DB_MODE_CONST);
 
@@ -90,8 +96,10 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     while (i < NB_WRITERS) {
         ocrGuid_t outputEventGuid;
         ocrGuid_t writerEdtGuid;
+        ocrHintInit( &edtHint, OCR_HINT_EDT_T );
+        ocrSetHintValue( & edtHint, OCR_HINT_EDT_AFFINITY, ocrAffinityToHintValue( affinities[i % affinityCount]) );
         ocrEdtCreate(&writerEdtGuid, writerEdtTemplateGuid, 1, &i, 1, NULL,
-                     EDT_PROP_NONE, affinities[i % affinityCount], &outputEventGuid);
+                     EDT_PROP_NONE, &edtHint, &outputEventGuid);
         ocrAddDependence(outputEventGuid, shutdownGuid, i+1, DB_MODE_CONST);
         ocrAddDependence(dbGuid, writerEdtGuid, 0, DB_MODE_RW);
         // ocrAddDependence(NULL_GUID, writerEdtGuid, 0, DB_MODE_RW);

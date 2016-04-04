@@ -15,6 +15,7 @@
 extern "C" {
 #endif
 #include "ocr-types.h"
+#include "ocr-version.h"
 
 /**
    @defgroup OCREvents Event Management for OCR
@@ -257,8 +258,7 @@ u8 ocrEdtTemplateDestroy(ocrGuid_t guid);
  * @param[in] properties        Used to indicate if this is a finish EDT
  *                              (see #EDT_PROP_FINISH). Use #EDT_PROP_NONE as
  *                              a default value.
- * @param[in] affinity          Affinity container for this EDT. Can be NULL_GUID. This
- *                              is currently an experimental feature
+ * @param[in] hint              Hints that apply to this EDT. Can be NULL_HINT.
  * @param[in,out] outputEvent   If not NULL on input, on successful return
  *                              of this call, this will return the GUID of the
  *                              event associated with the post-slot of the EDT.
@@ -276,7 +276,7 @@ u8 ocrEdtTemplateDestroy(ocrGuid_t guid);
  **/
 u8 ocrEdtCreate(ocrGuid_t * guid, ocrGuid_t templateGuid,
                 u32 paramc, u64* paramv, u32 depc, ocrGuid_t *depv,
-                u16 properties, ocrGuid_t affinity, ocrGuid_t *outputEvent);
+                u16 properties, ocrHint_t *hint, ocrGuid_t *outputEvent);
 
 /**
  * @brief Destroy an EDT

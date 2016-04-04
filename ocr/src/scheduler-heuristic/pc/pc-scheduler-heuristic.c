@@ -319,7 +319,7 @@ static u8 pcSchedulerHeuristicNotifyDbCreateInvoke(ocrSchedulerHeuristic_t *self
     ocrSchedulerObjectFactory_t *tablFact = self->scheduler->pd->schedulerObjectFactories[domainObj->dbMap->fctId];
     it->ITERATOR_ARG_FIELD(OCR_SCHEDULER_OBJECT_MAP).key = (void*)db->guid;
     it->ITERATOR_ARG_FIELD(OCR_SCHEDULER_OBJECT_MAP).value = (void*)dbNode;
-    DPRINTF(DEBUG_LVL_VERB, "DB node. Key: "GUIDSx" Value: %lu\n", GUIDFS(db->guid), dbNode);
+    DPRINTF(DEBUG_LVL_VERB, "DB node. Key: "GUIDF" Value: %"PRIu64"\n", GUIDA(db->guid), dbNode);
     RESULT_ASSERT(tablFact->fcts.insert(tablFact, domainObj->dbMap, (ocrSchedulerObject_t*)it, SCHEDULER_OBJECT_INSERT_MAP_CONC_PUT), ==, 0);
     return 0;
 }
@@ -367,7 +367,7 @@ static u8 sendPhaseResponse(ocrSchedulerHeuristic_t *self, ocrSchedulerHeuristic
     ocrEdtDep_t *depv = analyzeArgs->OCR_SCHED_ARG_FIELD(OCR_SCHED_ANALYZE_PHASE).req.depv;
     for (i = 0; i < depc; i++) depv[i].ptr = NULL;
 
-    DPRINTF(DEBUG_LVL_VERB, "EDT Phase Response: Task: "GUIDSx" Phase: %lu Location: %lu Affinity: %lu\n", GUIDFS(analyzeArgs->srcObj->guid.guid), phase, loc, affinity);
+    DPRINTF(DEBUG_LVL_VERB, "EDT Phase Response: Task: "GUIDF" Phase: %"PRIu64" Location: %"PRIu64" Affinity: %"PRIu64"\n", GUIDA(analyzeArgs->srcObj->guid.guid), phase, loc, affinity);
     //Respond with phase, location and affinity
     ocrPolicyDomain_t *pd;
     PD_MSG_STACK(msg);
@@ -481,7 +481,7 @@ static u8 pcSchedulerHeuristicAnalyzePhaseResponseInvoke(ocrSchedulerHeuristic_t
     }
 
     //EDT is READY. Time to schedule for execution.
-	DPRINTF(DEBUG_LVL_VERB, "EDT Ready: Task: "GUIDSx"\n", GUIDFS(task->guid));
+	DPRINTF(DEBUG_LVL_VERB, "EDT Ready: Task: "GUIDF"\n", GUIDA(task->guid));
     task->state = ALLACQ_EDTSTATE;
     ocrPolicyDomain_t *pd = self->scheduler->pd;
     PD_MSG_STACK(msg);

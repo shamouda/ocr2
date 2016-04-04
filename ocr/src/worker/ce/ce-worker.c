@@ -47,7 +47,7 @@ static void workerLoop(ocrWorker_t * worker) {
     PD_MSG_STACK(umsg);
     getCurrentEnv(NULL, NULL, NULL, &umsg);
 
-    DPRINTF(DEBUG_LVL_VERB, "Starting scheduler routine of CE worker %ld\n", getWorkerId(worker));
+    DPRINTF(DEBUG_LVL_VERB, "Starting scheduler routine of CE worker %"PRId64"\n", getWorkerId(worker));
     ocrMsgHandle_t handle;
     ocrMsgHandle_t *pHandle = &handle;
     while(worker->fcts.isRunning(worker)) {
@@ -213,7 +213,7 @@ void cePrintLocation(ocrWorker_t *base, char* location) {
     // BUG #605: Make the notion of location more robust. This should be made
     // more platform agnostic
 #ifdef HAL_FSIM_CE
-    SNPRINTF(location, 32, "CE %d Block %d Cluster %d", AGENT_FROM_ID(base->location),
+    SNPRINTF(location, 32, "CE %"PRId64" Block %"PRId64" Cluster %"PRId64"", AGENT_FROM_ID(base->location),
              BLOCK_FROM_ID(base->location), CLUSTER_FROM_ID(base->location));
 #else
     SNPRINTF(location, 32, "CE");

@@ -27,7 +27,7 @@ ocrGuid_t keyEdt ( u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrEdtTemplateCreate(&templateGuid, workerEdt, 0, 0);
 
     ocrGuid_t edtGuid;
-    ocrEdtCreate(&edtGuid, templateGuid, 0, NULL, 0, NULL_GUID, EDT_PROP_FINISH, NULL_GUID, NULL);
+    ocrEdtCreate(&edtGuid, templateGuid, 0, NULL, 0, NULL, EDT_PROP_FINISH, NULL_HINT, NULL);
     return NULL_GUID;
 }
 
@@ -48,7 +48,7 @@ void ocrBlock(ocrConfig_t cfg) {
     ocrLegacySpawnOCR(&handle, template, 0, NULL, 1, &ctrlDep, legacyCtx);
 
     ocrLegacyBlockProgress(handle, &outputGuid, &result, &size, LEGACY_PROP_NONE);
-    ASSERT(outputGuid == NULL_GUID);
+    ASSERT(ocrGuidIsNull(outputGuid));
     ASSERT(result == NULL);
     ASSERT(size == 0);
     ocrEventDestroy(handle);
@@ -59,7 +59,7 @@ void ocrBlock(ocrConfig_t cfg) {
     ocrLegacySpawnOCR(&handle, template, 0, NULL, 1, &ctrlDep, legacyCtx);
 
     ocrLegacyBlockProgress(handle, &outputGuid, &result, &size, LEGACY_PROP_NONE);
-    ASSERT(outputGuid == NULL_GUID);
+    ASSERT(ocrGuidIsNull(outputGuid));
     ASSERT(result == NULL);
     ASSERT(size == 0);
     ocrEventDestroy(handle);

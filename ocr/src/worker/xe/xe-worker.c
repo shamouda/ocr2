@@ -34,6 +34,7 @@
 /******************************************************/
 
 // Convenient to have an id to index workers in pools
+static inline u64 getWorkerId(ocrWorker_t * worker) __attribute__((unused));
 static inline u64 getWorkerId(ocrWorker_t * worker) {
     ocrWorkerXe_t * xeWorker = (ocrWorkerXe_t *) worker;
     return xeWorker->id;
@@ -47,7 +48,7 @@ static void workerLoop(ocrWorker_t * worker) {
     PD_MSG_STACK(msg);
     getCurrentEnv(NULL, NULL, NULL, &msg);
     while(worker->fcts.isRunning(worker)) {
-    DPRINTF(DEBUG_LVL_VVERB, "XE %lx REQUESTING WORK\n", pd->myLocation);
+    DPRINTF(DEBUG_LVL_VVERB, "XE %"PRIx64" REQUESTING WORK\n", pd->myLocation);
 #if 1 //This is disabled until we move TAKE heuristic in CE policy domain to inside scheduler
 #define PD_MSG (&msg)
 #define PD_TYPE PD_MSG_SCHED_GET_WORK
@@ -59,8 +60,8 @@ static void workerLoop(ocrWorker_t * worker) {
         if(pd->fcts.processMessage(pd, &msg, true) == 0) {
             // We got a response
             ocrFatGuid_t taskGuid = PD_MSG_FIELD_IO(schedArgs).OCR_SCHED_ARG_FIELD(OCR_SCHED_WORK_EDT_USER).edt;
-            if(!(IS_GUID_NULL(taskGuid.guid))) {
-                DPRINTF(DEBUG_LVL_VVERB, "XE %lx EXECUTING TASK %"GUIDSx"\n", pd->myLocation, GUIDFS(taskGuid.guid));
+            if(!(ocrGuidIsNull(taskGuid.guid))) {
+                DPRINTF(DEBUG_LVL_VVERB, "XE %"PRIx64" EXECUTING TASK "GUIDF"\n", pd->myLocation, GUIDA(taskGuid.guid));
                 // Task sanity checks
                 ASSERT(taskGuid.metaDataPtr != NULL);
                 worker->curTask = (ocrTask_t*)taskGuid.metaDataPtr;
@@ -78,7 +79,7 @@ static void workerLoop(ocrWorker_t * worker) {
                 // Important for this to be the last
                 worker->curTask = NULL;
             } else {
-                DPRINTF(DEBUG_LVL_VVERB, "XE %lx NULL RESPONSE from CE\n", pd->myLocation);
+                DPRINTF(DEBUG_LVL_VVERB, "XE %"PRIx64" NULL RESPONSE from CE\n", pd->myLocation);
             }
         }
 #undef PD_MSG
@@ -194,13 +195,13 @@ u8 xeWorkerSwitchRunlevel(ocrWorker_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_
     case RL_USER_OK:
         if((properties & RL_BRING_UP) && RL_IS_LAST_PHASE_UP(PD, RL_USER_OK, phase)) {
             self->curState = GET_STATE(RL_USER_OK, 0); // We don't use the phase here
-            DPRINTF(DEBUG_LVL_INFO, "XE %lx Started\n", self->location);
+            DPRINTF(DEBUG_LVL_INFO, "XE %"PRIx64" Started\n", self->location);
             if(properties & RL_PD_MASTER) {
                 self->fcts.run(self);
             }
         } else if((properties & RL_TEAR_DOWN) && RL_IS_FIRST_PHASE_DOWN(PD, RL_USER_OK, phase)) {
             self->curState = GET_STATE(RL_COMPUTE_OK, 0); // We don't use the phase here
-            DPRINTF(DEBUG_LVL_INFO, "XE %lx Stopped\n", self->location);
+            DPRINTF(DEBUG_LVL_INFO, "XE %"PRIx64" Stopped\n", self->location);
         }
         break;
     default:
@@ -261,7 +262,7 @@ void* xeRunWorker(ocrWorker_t * worker) {
         ocrGuid_t dbGuid;
         void* dbPtr;
         ocrDbCreate(&dbGuid, &dbPtr, totalLength,
-                    DB_PROP_IGNORE_WARN, NULL_GUID, NO_ALLOC);
+                    DB_PROP_IGNORE_WARN, NULL_HINT, NO_ALLOC);
 
         // copy packed args to DB
         hal_memCopy(dbPtr, packedUserArgv, totalLength, 0);
@@ -288,11 +289,12 @@ void* xeRunWorker(ocrWorker_t * worker) {
         ocrGuid_t edtTemplateGuid = NULL_GUID, edtGuid = NULL_GUID;
         ocrEdtTemplateCreate(&edtTemplateGuid, mainEdt, 0, 1);
         ocrEdtCreate(&edtGuid, edtTemplateGuid, EDT_PARAM_DEF, /* paramv=*/ NULL,
-                     EDT_PARAM_DEF, /* depv=*/&dbGuid, EDT_PROP_NONE, NULL_GUID, NULL);
-        DPRINTF(DEBUG_LVL_INFO, "Launched mainEDT from worker %ld\n", getWorkerId(worker));
+                     EDT_PARAM_DEF, /* depv=*/&dbGuid, EDT_PROP_NONE,
+                     NULL_HINT, NULL);
+        DPRINTF(DEBUG_LVL_INFO, "Launched mainEDT from worker %"PRId64"\n", getWorkerId(worker));
     }
 
-    DPRINTF(DEBUG_LVL_INFO, "Starting scheduler routine of worker %ld\n", getWorkerId(worker));
+    DPRINTF(DEBUG_LVL_INFO, "Starting scheduler routine of worker %"PRId64"\n", getWorkerId(worker));
     workerLoop(worker);
     return NULL;
 }
@@ -308,7 +310,7 @@ bool xeIsRunningWorker(ocrWorker_t * base) {
 
 void xePrintLocation(ocrWorker_t *base, char* location) {
 #ifdef HAL_FSIM_XE
-    SNPRINTF(location, 32, "XE %d Block %d Cluster %d", AGENT_FROM_ID(base->location),
+    SNPRINTF(location, 32, "XE %"PRId64" Block %"PRId64" Cluster %"PRId64"", AGENT_FROM_ID(base->location),
              BLOCK_FROM_ID(base->location), CLUSTER_FROM_ID(base->location));
 #else
     SNPRINTF(location, 32, "XE");

@@ -197,19 +197,7 @@ static void populateTraceObject(u64 location, bool evtType, ocrTraceType_t objTy
 
 }
 
-//Returns number of va_args expected by format string.
-//TODO: Possible bug if DPRINTF escapes to actually print a '%'.
-//      Currently none do.  Will devise a more robust method.
-//      See bug #823
-static u32 numVarsInString(char *fmt){
-    u32 i;
-    for(i = 0; fmt[i]; fmt[i]=='%' ? i++ : *fmt++);
-    return i;
-}
-
-
-void doTrace(u64 location, u64 wrkr, ocrGuid_t parent, char *str, ...){
-
+void doTrace(u64 location, u64 wrkr, ocrGuid_t parent, ...){
     ocrPolicyDomain_t *pd = NULL;
     getCurrentEnv(&pd, NULL, NULL, NULL);
 
@@ -219,17 +207,9 @@ void doTrace(u64 location, u64 wrkr, ocrGuid_t parent, char *str, ...){
     u64 timestamp = salGetTime();
 
     va_list ap;
-    va_start(ap, str);
+    va_start(ap, parent);
 
-    //Find number of variable for non-trace format string.
-    u32 numV = numVarsInString(str);
-    u32 i;
-
-    //Skip over non trace string vairables
-    for(i = 0; i < numV; i++){
-        va_arg(ap, void *);
-    }
-
+    //Retrieve event type and action of trace. By convention in the order below.
     bool evtType = va_arg(ap, u32);
     ocrTraceType_t objType = va_arg(ap, ocrTraceType_t);
     ocrTraceAction_t actionType = va_arg(ap, ocrTraceAction_t);
@@ -242,12 +222,5 @@ void doTrace(u64 location, u64 wrkr, ocrGuid_t parent, char *str, ...){
     populateTraceObject(location, evtType, objType, actionType, wrkr, timestamp, parent, ap);
     va_end(ap);
 
-}
-
-#else  /*Do a no-op trace function if no System worker enabled*/
-
-#include "utils/tracer/tracer.h"
-void doTrace(u64 location, u64 wrkr, ocrGuid_t taskGuid, char *str, ...){
-    return;
 }
 #endif /* ENABLE_WORKER_SYSTEM */

@@ -12,7 +12,7 @@
 #define __OCR_TYPES_H__
 
 #include <stddef.h>
-#include <stdint.h>
+#include <inttypes.h>
 
 /**
  * @defgroup OCRTypes Types and constants used in OCR
@@ -33,10 +33,11 @@ typedef int64_t  s64; /**< 64-bit signed integer */
 typedef int32_t  s32; /**< 32-bit signed integer */
 typedef int8_t   s8;  /**< 8-bit signed integer */
 
+#define NULL_HINT ((ocrHint_t *)0x0)
 
 #ifdef ENABLE_128_BIT_GUID
 
-#define GUID_128
+#define GUID_BIT_COUNT 128
 typedef struct {
     intptr_t lower;
     intptr_t upper;
@@ -44,28 +45,36 @@ typedef struct {
 
 #else
 
-#define GUID_64
-typedef intptr_t ocrGuid_t; /**< GUID type */
+#define GUID_BIT_COUNT 64
+typedef struct {
+    intptr_t guid;
+} ocrGuid_t;
 
 #endif
 
 /* Defined vals for 64-bit GUIDs */
-#ifdef GUID_64
+#if GUID_BIT_COUNT == 64
 
-#define NULL_GUID ((ocrGuid_t)0x0)
+#define NULL_GUID_INITIALIZER {.guid = 0x0}
+#define NULL_GUID ((ocrGuid_t)NULL_GUID_INITIALIZER)
 
-#define UNINITIALIZED_GUID ((ocrGuid_t)-2)
+#define UNINITIALIZED_GUID_INITIALIZER {.guid = -2}
+#define UNINITIALIZED_GUID ((ocrGuid_t)UNINITIALIZED_GUID_INITIALIZER)
 
-#define ERROR_GUID ((ocrGuid_t)-1)
+#define ERROR_GUID_INITIALIZER {.guid = -1}
+#define ERROR_GUID ((ocrGuid_t)ERROR_GUID_INITIALIZER)
 
 /* Defined vals for 128-bit GUIDs */
-#elif defined(GUID_128)
+#elif GUID_BIT_COUNT == 128
 
-#define NULL_GUID ((ocrGuid_t){.lower = 0x0, .upper = 0x0})
+#define NULL_GUID_INITIALIZER {.lower = 0x0, .upper = 0x0}
+#define NULL_GUID ((ocrGuid_t)NULL_GUID_INITIALIZER)
 
-#define UNINITIALIZED_GUID ((ocrGuid_t){.lower = -2, .upper = -2})
+#define UNINITIALIZED_GUID_INITIALIZER {.lower = -2, .upper = -2}
+#define UNINITIALIZED_GUID ((ocrGuid_t)UNINITIALIZED_GUID_INITIALIZER)
 
-#define ERROR_GUID ((ocrGuid_t){.lower = -1, .upper = -1})
+#define ERROR_GUID_INITIALIZER {.lower = -1, .upper = -1}
+#define ERROR_GUID ((ocrGuid_t)ERROR_GUID_INITIALIZER)
 
 #endif
 
@@ -191,6 +200,7 @@ typedef struct {
 #define EDT_PROP_NONE    ((u16) 0x0) /**< Property bits indicating a regular EDT */
 #define EDT_PROP_FINISH  ((u16) 0x1) /**< Property bits indicating a FINISH EDT */
 #define EDT_PROP_NO_HINT ((u16) 0x2) /**< Property bits indicating the EDT does not take hints */
+#define EDT_PROP_LONG    ((u16) 0x4) /**< Property bits indicating a long running EDT */
 
 /**
  * @brief Constant indicating that the number of parameters or dependences
@@ -251,19 +261,19 @@ typedef ocrGuid_t (*ocrEdt_t)(u32 paramc, u64* paramv,
  * - its behavior when satisfied multiple times
  */
 typedef enum {
-    OCR_EVENT_ONCE_T,    /**< A ONCE event simply passes along a satisfaction on its
+    OCR_EVENT_ONCE_T = 1,/**< A ONCE event simply passes along a satisfaction on its
                           * unique pre-slot to its post-slot. Once all OCR objects
                           * linked to its post-slot have been satisfied, the ONCE event
                           * is automatically destroyed. */
-    OCR_EVENT_IDEM_T,    /**< An IDEM event simply passes along a satisfaction on its
+    OCR_EVENT_IDEM_T = 2,/**< An IDEM event simply passes along a satisfaction on its
                           * unique pre-slot to its post-slot. The IDEM event persists
                           * until ocrEventDestroy() is explicitly called on it.
                           * It can only be satisfied once and susequent
                           * satisfactions are ignored (use case: BFS, B&B..) */
-    OCR_EVENT_STICKY_T,  /**< A STICKY event is identical to an IDEM event except that
+    OCR_EVENT_STICKY_T = 3,/**< A STICKY event is identical to an IDEM event except that
                           * multiple satisfactions result in an error
                           */
-    OCR_EVENT_LATCH_T,   /**< A LATCH event has two pre-slots: a INCR and a DECR.
+    OCR_EVENT_LATCH_T = 4,/**< A LATCH event has two pre-slots: a INCR and a DECR.
                           * Each slot is associated with an internal monotonically
                           * increasing counter that starts at 0. On each satisfaction
                           * of one of the pre-slots, the counter for that slot is
@@ -274,14 +284,14 @@ typedef enum {
                           * is automatically destroyed when its post-slot is triggered.
                           */
 #ifdef ENABLE_EXTENSION_COUNTED_EVT
-    OCR_EVENT_COUNTED_T, /**< A COUNTED event is a hybrid ONCE/STICKY events. It is
+    OCR_EVENT_COUNTED_T = 5,/**< A COUNTED event is a hybrid ONCE/STICKY events. It is
                           * initialized at creation time with a fixed number of expected
                           * dependences. The event can auto-destroy itself but only when
                           * both all dependences have been registered and satisfy has happened.
                           */
 #endif
 #ifdef ENABLE_EXTENSION_CHANNEL_EVT
-    OCR_EVENT_CHANNEL_T, /**< TODO
+    OCR_EVENT_CHANNEL_T = 6, /**< TODO
                           */
 #endif
     OCR_EVENT_T_MAX      /**< This is *NOT* an event and is only used to count
@@ -336,6 +346,7 @@ typedef enum {
     OCR_HINT_EDT_PRIORITY,                  /* [u64] : Global priority number of EDT. Higher value is greater priority. */
     OCR_HINT_EDT_SLOT_MAX_ACCESS,           /* [u64] : EDT slot number that contains the DB which is accessed most by the EDT. */
     OCR_HINT_EDT_AFFINITY,                  /* [u64] : Affinitizes an EDT to a guid */
+    OCR_HINT_EDT_DISPERSE,                  /* [xxx] : Tells scheduler to schedule EDT away from current location */
     OCR_HINT_EDT_SPACE,                     /* [u64] : Used internally by the runtime for spatial locality of EDTs */
     OCR_HINT_EDT_TIME,                      /* [u64] : Used internally by the runtime for temporal locality of EDTs */
     OCR_HINT_EDT_PROP_END,                  /* This is NOT a hint. Its use is reserved for the runtime */
@@ -343,9 +354,10 @@ typedef enum {
     //DB Hint Properties                    (OCR_HINT_DB_T)
     OCR_HINT_DB_PROP_START,                 /* This is NOT a hint. Its use is reserved for the runtime */
     OCR_HINT_DB_AFFINITY,                   /* [u64] : DB affinity to a mem level */
-    OCR_HINT_DB_MIDDLE,                     /* [u64] : Prefer middle memory if possible */
     OCR_HINT_DB_NEAR,                       /* [u64] : Prefer near memory if possible */
+    OCR_HINT_DB_INTER,                      /* [u64] : Prefer intermediate memory if possible */
     OCR_HINT_DB_FAR,                        /* [u64] : Prefer far memory if possible */
+    OCR_HINT_DB_HIGHBW,                     /* [u64] : Prefer high bandwidth memory if possible */
     OCR_HINT_DB_PROP_END,                   /* This is NOT a hint. Its use is reserved for the runtime */
 
     //EVT Hint Properties                   (OCR_HINT_EVT_T)
@@ -377,6 +389,15 @@ typedef struct {
         u64 propGROUP[OCR_HINT_GROUP_PROP_END - OCR_HINT_GROUP_PROP_START - 1];
     } args;
 } ocrHint_t;
+
+/**
+ * @brief Pre-defined OCR hint property values
+ *
+ */
+
+//EDT disperse hints
+#define OCR_HINT_EDT_DISPERSE_FAR   0
+#define OCR_HINT_EDT_DISPERSE_NEAR  1
 
 /**
  * @brief OCR query types

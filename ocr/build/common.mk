@@ -4,20 +4,10 @@
 OCR_ROOT ?= ../..
 OCR_INSTALL ?= ../../install
 
-OCR_BUILD := .
-
-#
-# Make sure we have absolute paths
-#
-OCR_ROOT := $(shell cd "${OCR_ROOT}" && pwd)
-OCR_INSTALL := $(shell mkdir -p "${OCR_INSTALL}" && cd "${OCR_INSTALL}" && pwd)
-OCR_BUILD := $(shell cd "${OCR_BUILD}" && pwd)
-
-
+OCR_BUILD ?= .
 #
 # Object & dependence file subdirectory
 #
-OBJDIR := $(OCR_BUILD)/objs
 
 #
 # Default machine configuration
@@ -52,10 +42,14 @@ DEFAULT_CONFIG ?= jenkins-common-8w-lockableDB.cfg
 # All impl-specific for counted-map and labeled-guid providers
 
 # - Controls how many bits in the GUID are used for PD location
-# CFLAGS += -DGUID_PROVIDER_LOCID_SIZE=7
+CFLAGS += -DGUID_PROVIDER_LOCID_SIZE=10
 
-# Activate a different hashmap implementation
-# Warning: Necessitates an additional -D activating the alternate implementation
+# - Per worker GUID generation: GUID_WID_SIZE is the maximum
+#   number of workers supported per PD
+# CFLAGS += -DGUID_PROVIDER_WID_INGUID += -DGUID_WID_SIZE=4
+
+# - Activate a different hashmap implementation
+#   Warning: Necessitates an additional -D activating the alternate implementation
 # CFLAGS += -DGUID_PROVIDER_CUSTOM_MAP -D_TODO_FILL_ME_IN
 
 # **** EDTs parameters ****
@@ -97,19 +91,47 @@ DEFAULT_CONFIG ?= jenkins-common-8w-lockableDB.cfg
 # Declare flags for AddressSanitizer
 # Warning: Applications must use the same flags else it will crash.
 ifeq (${OCR_ASAN}, yes)
-ASAN_FLAGS := -g -fsanitize=address -fno-omit-frame-pointer
-CFLAGS += $(ASAN_FLAGS)
-LDFLAGS += $(ASAN_FLAGS) $(LDFLAGS)
+  ASAN_FLAGS := -g -fsanitize=address -fno-omit-frame-pointer
+  CFLAGS += $(ASAN_FLAGS)
+  LDFLAGS += $(ASAN_FLAGS) $(LDFLAGS)
 endif
 
 # Runtime overhead profiler
 # x86 only
 #
 # Enable profiler
-# CFLAGS += -DOCR_RUNTIME_PROFILER -DPROFILE_KHZ=3400000
+# CFLAGS += -DOCR_RUNTIME_PROFILER -DPROFILER_KHZ=3400000
 #
-# (optional) Maximum number of scope
-# nesting for runtime profiler
+# Other options for the profiler. All are disabled by default
+# Enable this if you want to use the profiler in your app as well
+# CFLAGS += -DPROFILER_W_APPS
+#
+# Enable this if you want to set a symbol from which
+# to start profiling (typically: "enter into user code")
+# CFLAGS += -DPROFILER_FOCUS=userCode
+#
+# The following option is only relevant with PROFILER_FOCUS
+# Enable this if you want the profiler to stop giving details
+# after entering this many levels of profiler "stack". For example
+# if you have no profiler calls in your apps and want to determine
+# the overhead of the runtime from your user code, set this to 1 and
+# PROFILER_FOCUS to userCode. The profiler will report the time spent
+# in userCode as well as the time spent in each OCR API call but nothing
+# else
+# CFLAGS += -DPROFILER_FOCUS_DEPTH=1
+#
+# The following option is only relevant with PROFILER_FOCUS
+# Enable this if you want to stop profiling when a runtime function call
+# is made. This will override FOCUS_DEPTH (ie: if a runtime call is encountered
+# before FOCUS_DEPTH is reached, the profiler will stop giving details of sub-calls)
+# CFLAGS += -DPROFILER_IGNORE_RT
+#
+# The following option is only relevant with PROFILER_FOCUS
+# Enable this if you want to gather everything that happens outside of the
+# focus function into an EVENT_OTHER bucket.
+# CFLAGS += -DPROFILER_COUNT_OTHER
+#
+# (optional) Maximum number of scope nesting for runtime profiler
 # CFLAGS += -DMAX_PROFILER_LEVEL=512
 
 # Enables the collection of EDT R/W statistics
@@ -149,17 +171,17 @@ endif
 
 # Debugging support
 ifneq (${NO_DEBUG}, yes)
-	# Enable assertions
-	CFLAGS += -DOCR_ASSERT
-	# Enable debug
-	CFLAGS += -DOCR_DEBUG
-	OPT_LEVEL=-O2
+  # Enable assertions
+  CFLAGS += -DOCR_ASSERT
+  # Enable debug
+  CFLAGS += -DOCR_DEBUG
+  OPT_LEVEL=-O2
 else
-	OPT_LEVEL=-O3
+  OPT_LEVEL=-O3
 endif
 
 # Define level
- CFLAGS += -DOCR_DEBUG_LVL=DEBUG_LVL_WARN
+CFLAGS += -DOCR_DEBUG_LVL=DEBUG_LVL_WARN
 # CFLAGS += -DOCR_DEBUG_LVL=DEBUG_LVL_INFO
 # CFLAGS += -DOCR_DEBUG_LVL=DEBUG_LVL_VERB
 # CFLAGS += -DOCR_DEBUG_LVL=DEBUG_LVL_VVERB
@@ -262,11 +284,59 @@ CFLAGS := -g -Wall $(CFLAGS) $(CFLAGS_USER)
 # END OF USER CONFIGURABLE OPTIONS                             #
 ################################################################
 
+
+#
+# Make sure we have absolute paths
+#
+ifeq (,$(OCR_ROOT))
+  $(error OCR_ROOT needs to be defined)
+else
+  _T := $(OCR_ROOT)
+  OCR_ROOT := $(realpath $(_T))
+  ifeq (,$(OCR_ROOT))
+    $(error OCR_ROOT is not a valid path: $(_T))
+  endif
+endif
+
+ifeq (,$(OCR_BUILD))
+  $(error OCR_BUILD needs to be defined)
+else
+  _T := $(OCR_BUILD)
+  OCR_BUILD := $(realpath $(_T))
+  ifeq (,$(OCR_BUILD))
+    $(info Creating OCR_BUILD: $(_T))
+    $(shell mkdir -p "$(_T)")
+    OCR_BUILD := $(realpath $(_T))
+  endif
+endif
+
+ifeq (,$(OCR_INSTALL))
+  $(error OCR_INSTALL needs to be defined)
+else
+  _T := $(OCR_INSTALL)
+  OCR_INSTALL := $(realpath $(_T))
+  ifeq (,$(OCR_INSTALL))
+    $(info Creating OCR_INSTALL: $(_T))
+    $(shell mkdir -p "$(_T)")
+    OCR_INSTALL := $(realpath $(_T))
+  endif
+endif
+
 # Verbosity of make
 V ?= 0
 AT_0 := @
 AT_1 :=
 AT = $(AT_$(V))
+
+I ?= 0
+ATI_0 := @
+ATI_1 :=
+ATI = $(ATI_$(I))
+
+#
+# Object & dependence file subdirectory
+#
+OBJDIR := $(OCR_BUILD)/objs
 
 #
 # Generate a list of all source files and the respective objects
@@ -279,43 +349,78 @@ SRCS   := $(shell find -L $(OCR_ROOT)/src -name '*.[csS]' -print)
 VPATH  := $(shell find -L $(OCR_ROOT)/src -type d -print)
 
 ifneq (,$(findstring OCR_RUNTIME_PROFILER,$(CFLAGS)))
-SRCSORIG = $(SRCS)
-SRCS += $(OCR_BUILD)/src/profilerAutoGen.c
-PROFILER_FILE=$(OCR_BUILD)/src/profilerAutoGen.c
-CFLAGS += -I $(OCR_BUILD)/src
-VPATH += $(OCR_BUILD)/src
+  SRCSORIG := $(SRCS)
+  PROFILER_FILE_C=$(OCR_BUILD)/src/profilerAutoGen.c
+  SRCS += $(PROFILER_FILE_C)
+  PROFILER_FILE=$(OCR_BUILD)/src/profilerAutoGenRT.h
+  CFLAGS += -I $(OCR_BUILD)/src
+  VPATH += $(OCR_BUILD)/src
+
+  ifneq (,$(findstring PROFILER_W_APPS, $(CFLAGS)))
+    PROFILER_MODE := rtapp
+  else
+    PROFILER_MODE := rt
+  endif
+
+  ifneq (,$(findstring PROFILER_COUNT_OTHER, $(CFLAGS)))
+    PROFILER_EXTRA_OPTS := --otherbucket
+  else
+    PROFILER_EXTRA_OPTS :=
+  endif
+
+  ifeq ($(I), 1)
+    $(info Profiler support turned on in mode $(PROFILER_MODE) with options "$(PROFILER_EXTRA_OPTS)")
+  endif
 else
-PROFILER_FILE=
+  PROFILER_FILE   :=
+  PROFILER_FILE_C :=
+endif
+
+ifeq ($(I), 1)
+  $(info OCR_BUILD   is: $(OCR_BUILD))
+  $(info OCR_ROOT    is: $(OCR_ROOT))
+  $(info OCR_INSTALL is: $(OCR_INSTALL))
 endif
 
 OBJS_STATIC   := $(addprefix $(OBJDIR)/static/, $(addsuffix .o, $(basename $(notdir $(SRCS)))))
 OBJS_SHARED   := $(addprefix $(OBJDIR)/shared/, $(addsuffix .o, $(basename $(notdir $(SRCS)))))
 OBJS_EXEC     := $(addprefix $(OBJDIR)/exec/, $(addsuffix .o, $(basename $(notdir $(SRCS)))))
 
-
 # Update include paths
 CFLAGS := -I . -I $(OCR_ROOT)/inc -I $(OCR_ROOT)/src -I $(OCR_ROOT)/src/inc $(CFLAGS)
 
+ifeq (${NO_DEBUG},"")
+  ifeq (, $(filter-out gcc mpicc, $(CC)))
+    # For gcc/mpicc versions < 4.4 disable warning as error as message pragmas are not supported
+    ret := $(shell echo "`$(CC) -dumpversion | cut -d'.' -f1-2` < 4.4" | bc)
+    ifeq ($(ret), 0)
+      CFLAGS += -Werror
+    endif
+  else
+    CFLAGS += -Werror
+  endif
+endif
+
 # Static library name (only set if not set in OCR_TYPE specific file)
 ifeq (${SUPPORTS_STATIC}, yes)
-OCRSTATIC ?= libocr_${OCR_TYPE}.a
-OCRSTATIC := $(OCR_BUILD)/$(OCRSTATIC)
-CFLAGS_STATIC ?=
-CFLAGS_STATIC := ${CFLAGS} ${CFLAGS_STATIC}
+  OCRSTATIC ?= libocr_${OCR_TYPE}.a
+  OCRSTATIC := $(OCR_BUILD)/$(OCRSTATIC)
+  CFLAGS_STATIC ?=
+  CFLAGS_STATIC := ${CFLAGS} ${CFLAGS_STATIC}
 endif
 # Shared library name (only set if not set in OCR_TYPE specific file)
 ifeq (${SUPPORTS_SHARED}, yes)
-CFLAGS_SHARED ?=
-CFLAGS_SHARED := ${CFLAGS} ${CFLAGS_SHARED}
-OCRSHARED ?= libocr_${OCR_TYPE}.so
-OCRSHARED := $(OCR_BUILD)/$(OCRSHARED)
+  CFLAGS_SHARED ?=
+  CFLAGS_SHARED := ${CFLAGS} ${CFLAGS_SHARED}
+  OCRSHARED ?= libocr_${OCR_TYPE}.so
+  OCRSHARED := $(OCR_BUILD)/$(OCRSHARED)
 endif
 # Executable name (only set if not set in OCR_TYPE specific file)
 ifeq (${SUPPORTS_EXEC}, yes)
-CFLAGS_EXEC ?=
-CFLAGS_EXEC := ${CFLAGS} ${CFLAGS_EXEC}
-OCREXEC ?= ocrBuilder_$(OCR_TYPE).exe
-OCREXEC := $(OCR_BUILD)/$(OCREXEC)
+  CFLAGS_EXEC ?=
+  CFLAGS_EXEC := ${CFLAGS} ${CFLAGS_EXEC}
+  OCREXEC ?= ocrBuilder_$(OCR_TYPE).exe
+  OCREXEC := $(OCR_BUILD)/$(OCREXEC)
 endif
 
 #
@@ -325,8 +430,8 @@ endif
 # versions of Apple's ranlib
 # This is to remove the warnings when building the library
 #ifeq ($(shell $(RANLIB) -V 2>/dev/null | head -1 | cut -f 1 -d ' '), Apple)
-#RANLIB := $(RANLIB) -no_warning_for_no_symbols
-#ARFLAGS := cruS
+#  RANLIB := $(RANLIB) -no_warning_for_no_symbols
+#  ARFLAGS := cruS
 #endif
 
 #
@@ -379,7 +484,6 @@ info-static:
 	@printf "\033[32m>>>> Building a static library with\033[1;30m '$(AR) $(ARFLAGS)'\033[0m\n"
 
 $(OCRSTATIC): $(OBJS_STATIC)
-# Need this comment to make V=1 work (no idea why the first @ is causing so much issue)
 	@echo "Linking static library ${OCRSTATIC}"
 	$(AT)$(AR) $(ARFLAGS) $(OCRSTATIC) $^
 	$(AT)$(RANLIB) $(OCRSTATIC)
@@ -401,7 +505,6 @@ info-shared:
 	@printf "\033[32m>>>> Building a shared library with\033[1;30m '$(CC) $(LDFLAGS)'\033[0m\n"
 
 $(OCRSHARED): $(OBJS_SHARED)
-# Need this comment to make V=1 work (no idea why the first @ is causing so much issue)
 	@echo "Linking shared library ${OCRSHARED}"
 	$(AT)$(CC) $(LDFLAGS) -o $(OCRSHARED) $^
 
@@ -422,7 +525,6 @@ info-exec:
 	@printf "\033[32m>>>> Compile command for .c files is\033[1;30m '$(CC) $(CFLAGS_EXEC) -MMD -c <src> -o <obj>'\033[0m\n"
 
 $(OCREXEC): $(OBJS_EXEC)
-# Need this comment to make V=1 work (no idea why the first @ is causing so much issue)
 	@echo "Linking executable binary ${OCREXEC}"
 	$(AT)$(CC) -o $(OCREXEC) $^ $(EXEFLAGS)
 
@@ -432,79 +534,124 @@ $(OCREXEC): $(OBJS_EXEC)
 #
 
 $(PROFILER_FILE): $(SRCSORIG) | $(OCR_BUILD)/src
-# Need this comment to make V=1 work (no idea why the first @ is causing so much issue)
 	@echo "Generating profile file..."
-	$(AT)$(OCR_ROOT)/scripts/Profiler/generateProfilerFile.py $(OCR_ROOT)/src $(OCR_BUILD)/src/profilerAutoGen h,c .git profiler
+	$(AT)$(OCR_ROOT)/scripts/Profiler/generateProfilerFile.py -m $(PROFILER_MODE) -o $(OCR_BUILD)/src/profilerAutoGen --exclude .git --exclude profiler $(PROFILER_EXTRA_OPTS) $(OCR_ROOT)/src
 	@echo "\tDone."
+
+$(PROFILER_FILE_C): $(PROFILER_FILE)
 
 # This does a more complicate dependency computation so all the prereqs listed
 # will also become command-less, prereq-less targets. This causes make
 # to remake anything that depends on that file which is
 # exactly what we want. This is adapted from:
 # http://scottmcpeak.com/autodepend/autodepend.html
+# Other information on some of the other rules for dependences can be found
+# here: http://make.mad-scientist.net/papers/advanced-auto-dependency-generation/
 #   sed:    strip the target (everything before colon)
 #   sed:    remove any continuation backslashes
 #   fmt -1: list words one per line
 #   sed:    strip leading spaces
-#   sed:    add trailing colons
-$(OBJDIR)/static/%.o: %.c Makefile ../common.mk $(PROFILER_FILE) | $(OBJDIR)/static
-# Need this comment to make V=1 work (no idea why the first @ is causing so much issue)
+#   sed:    add trailing colon
+#   touch:  sets the time to the same as the .o to avoid
+#           erroneous detection next time around
+
+# Delete default rules so it makes sure to use ours
+%.o: %.c
+
+$(OBJDIR)/static/%.o: %.c Makefile ../common.mk $(PROFILER_FILE) $(OBJDIR)/static/%.d | $(OBJDIR)/static
 	@echo "Compiling $<"
 	$(AT)$(CC) $(CFLAGS_STATIC) -MMD -c $< -o $@
 	$(AT)cp -f $(@:.o=.d) $(@:.o=.d.tmp)
 	$(AT)sed -e 's/.*://' -e 's/\\$$//' < $(@:.o=.d.tmp) | fmt -1 | \
-	sed -e 's/^ *//' -e 's/$$/:/' >> $(@:.o=.d)
+	sed -e 's/^ *//' -e 's/$$/: /' >> $(@:.o=.d)
+	$(AT)touch -r $@ $(@:.o=.d)
 	$(AT)rm -f $(@:.o=.d.tmp)
 
 
-$(OBJDIR)/shared/%.o: %.c Makefile ../common.mk $(PROFILER_FILE) | $(OBJDIR)/shared
-# Need this comment to make V=1 work (no idea why the first @ is causing so much issue)
+$(OBJDIR)/shared/%.o: %.c Makefile ../common.mk $(PROFILER_FILE) $(OBJDIR)/shared/%.d | $(OBJDIR)/shared
 	@echo "Compiling $<"
 	$(AT)$(CC) $(CFLAGS_SHARED) -MMD -c $< -o $@
 	$(AT)cp -f $(@:.o=.d) $(@:.o=.d.tmp)
 	$(AT)sed -e 's/.*://' -e 's/\\$$//' < $(@:.o=.d.tmp) | fmt -1 | \
-	sed -e 's/^ *//' -e 's/$$/:/' >> $(@:.o=.d)
+	sed -e 's/^ *//' -e 's/$$/: /' >> $(@:.o=.d)
+	$(AT)touch -r $@ $(@:.o=.d)
 	$(AT)rm -f $(@:.o=.d.tmp)
 
-$(OBJDIR)/exec/%.o: %.c Makefile ../common.mk | $(OBJDIR)/exec
-# Need this comment to make V=1 work (no idea why the first @ is causing so much issue)
+$(OBJDIR)/exec/%.o: %.c Makefile ../common.mk $(OBJDIR)/exec/%.d | $(OBJDIR)/exec
 	@echo "Compiling $<"
 	$(AT)$(CC) $(CFLAGS_EXEC) -MMD -c $< -o $@
 	$(AT)cp -f $(@:.o=.d) $(@:.o=.d.tmp)
 	$(AT)sed -e 's/.*://' -e 's/\\$$//' < $(@:.o=.d.tmp) | fmt -1 | \
-	sed -e 's/^ *//' -e 's/$$/:/' >> $(@:.o=.d)
+	sed -e 's/^ *//' -e 's/$$/: /' >> $(@:.o=.d)
+	$(AT)touch -r $@ $(@:.o=.d)
 	$(AT)rm -f $(@:.o=.d.tmp)
 
-$(OBJDIR)/static/%.o: %.S Makefile ../common.mk | $(OBJDIR)/static
-# Need this comment to make V=1 work (no idea why the first @ is causing so much issue)
+%.o : %.S
+
+$(OBJDIR)/static/%.o: %.S Makefile ../common.mk $(OBJDIR)/static/%.d | $(OBJDIR)/static
 	@echo "Assembling $<"
 	$(AT)$(CC) $(CFLAGS_STATIC) -MMD -c $< -o $@
 	$(AT)cp -f $(@:.o=.d) $(@:.o=.d.tmp)
 	$(AT)sed -e 's/.*://' -e 's/\\$$//' < $(@:.o=.d.tmp) | fmt -1 | \
-	sed -e 's/^ *//' -e 's/$$/:/' >> $(@:.o=.d)
+	sed -e 's/^ *//' -e 's/$$/: /' >> $(@:.o=.d)
+	$(AT)touch -r $@ $(@:.o=.d)
 	$(AT)rm -f $(@:.o=.d.tmp)
 
-$(OBJDIR)/shared/%.o: %.S Makefile ../common.mk | $(OBJDIR)/shared
-# Need this comment to make V=1 work (no idea why the first @ is causing so much issue)
+$(OBJDIR)/shared/%.o: %.S Makefile ../common.mk $(OBJDIR)/shared/%.d | $(OBJDIR)/shared
 	@echo "Assembling $<"
 	$(AT)$(CC) $(CFLAGS_SHARED) -MMD -c $< -o $@
 	$(AT)cp -f $(@:.o=.d) $(@:.o=.d.tmp)
 	$(AT)sed -e 's/.*://' -e 's/\\$$//' < $(@:.o=.d.tmp) | fmt -1 | \
-	sed -e 's/^ *//' -e 's/$$/:/' >> $(@:.o=.d)
+	sed -e 's/^ *//' -e 's/$$/: /' >> $(@:.o=.d)
+	$(AT)touch -r $@ $(@:.o=.d)
 	$(AT)rm -f $(@:.o=.d.tmp)
 
+#
+# Auto-generated config file containing options that
+# need to be enabled for the app if enabled in the runtime
+#
+# We always re-generate this file
+.PHONY: $(OCR_INSTALL)/include/ocr-options_$(OCR_TYPE).h
+$(OCR_INSTALL)/include/ocr-options_$(OCR_TYPE).h: | $(OCR_INSTALL)/include
+	@echo "Generating OCR build option file: $@"
+	$(AT)$(shell echo "" > $@)
+	$(AT)$(shell echo "#ifndef __OCR_OPTIONS_"$(subst -,_,$(OCR_TYPE))"_H__" >> $@)
+	$(AT)$(shell echo "#define __OCR_OPTIONS_"$(subst -,_,$(OCR_TYPE))"_H__" >> $@)
+	$(AT)$(shell echo "/* Generated based on RT CFLAGS: $(CFLAGS) */" >> $@)
+  ifneq (,$(findstring -DENABLE_EDT_NAMING, $(CLAGS)))
+	$(AT)$(shell echo "#ifndef ENABLE_EDT_NAMING" >> $@)
+	$(AT)$(shell echo "#define ENABLE_EDT_NAMING" >> $@)
+	$(AT)$(shell echo "#endif" >> $@)
+  endif
+  ifneq (,$(findstring -DENABLE_128_BIT_GUID, $(CFLAGS)))
+	$(AT)$(shell echo "#ifndef ENABLE_128_BIT_GUID" >> $@)
+	$(AT)$(shell echo "#define ENABLE_128_BIT_GUID" >> $@)
+	$(AT)$(shell echo "#endif" >> $@)
+  endif
+  ifneq (,$(findstring -DOCR_ASSERT, $(CFLAGS)))
+	$(AT)$(shell echo "#ifndef OCR_ASSERT" >> $@)
+	$(AT)$(shell echo "#define OCR_ASSERT" >> $@)
+	$(AT)$(shell echo "#endif" >> $@)
+  endif
+	$(AT)$(shell echo "#endif /* __OCR_OPTIONS_"$(OCR_TYPE)"_H__ */" >> $@)
 #
 # Include auto-generated dependence files
 # We only include the ones for the .o that we need to generate
 #
 ifeq (${SUPPORTS_STATIC}, yes)
--include $(OBJS_STATIC:.o=.d)
+  $(OBJDIR)/static/%.d: ;
+  .PRECIOUS: $(OBJDIR)/static/%.d
+  -include $(OBJS_STATIC:.o=.d)
 endif
 ifeq (${SUPPORTS_SHARED}, yes)
--include $(OBJS_SHARED:.o=.d)
+  $(OBJDIR)/shared/%.d: ;
+  .PRECIOUS: $(OBJDIR)/shared/%.d
+  -include $(OBJS_SHARED:.o=.d)
 endif
 ifeq (${SUPPORTS_EXEC}, yes)
--include $(OBJS_EXEC:.o=.d)
+  $(OBJDIR)/exec/%.d: ;
+  .PRECIOUS: $(OBJDIR)/exec/%.d
+  -include $(OBJS_EXEC:.o=.d)
 endif
 
 # Install
@@ -512,20 +659,21 @@ INSTALL_TARGETS :=
 INSTALL_LIBS    :=
 INSTALL_EXES    := $(OCRRUNNER)
 ifeq (${SUPPORTS_STATIC}, yes)
-INSTALL_TARGETS += static
-INSTALL_LIBS += $(OCRSTATIC)
+  INSTALL_TARGETS += static
+  INSTALL_LIBS += $(OCRSTATIC)
 endif
 ifeq (${SUPPORTS_SHARED}, yes)
-INSTALL_TARGETS += shared
-INSTALL_LIBS += $(OCRSHARED)
+  INSTALL_TARGETS += shared
+  INSTALL_LIBS += $(OCRSHARED)
 endif
 ifeq (${SUPPORTS_EXEC}, yes)
-INSTALL_TARGETS += exec
-INSTALL_EXES += $(OCREXEC)
+  INSTALL_TARGETS += exec
+  INSTALL_EXES += $(OCREXEC)
 endif
 
-INC_FILES         := $(addprefix extensions/, $(notdir $(wildcard $(OCR_ROOT)/inc/extensions/*))) \
-                     $(notdir $(wildcard $(OCR_ROOT)/inc/*))
+INC_FILES         := $(addprefix extensions/, $(notdir $(wildcard $(OCR_ROOT)/inc/extensions/*.h))) \
+                     $(notdir $(wildcard $(OCR_ROOT)/inc/*.h))
+
 
 # WARNING: This next line actually generates the configurations. This will be cleaned
 # up in a later commit.
@@ -536,19 +684,19 @@ MACHINE_CONFIGS   := $(notdir $(wildcard $(OCR_ROOT)/machine-configs/$(OCR_TYPE)
 SCRIPT_FILES      := Configs/config-generator.py
 
 ifneq (,$(findstring $(OCR_TYPE),"tg-ce tg-xe builder-xe builder-ce"))
-SCRIPT_FILES      += $(addprefix Configs/, ce_config_fix.py combine-configs.py mem_config_fix.py tg-fsim_config_fix.py)
-SCRIPT_FILES      += $(patsubst $(OCR_ROOT)/scripts/%,%,$(wildcard $(OCR_ROOT)/scripts/Blob/*))
+  SCRIPT_FILES      += $(addprefix Configs/, ce_config_fix.py combine-configs.py mem_config_fix.py tg-fsim_config_fix.py)
+  SCRIPT_FILES      += $(patsubst $(OCR_ROOT)/scripts/%,%,$(wildcard $(OCR_ROOT)/scripts/Blob/*))
 endif
-ifeq ("x86-phi",$(findstring $(OCR_TYPE),"x86-phi"))
-SCRIPT_FILES      += Configs/combine-configs.py
-DEFAULT_CONFIG    := knl_mcdram.cfg
+ifeq (x86-phi,$(findstring $(OCR_TYPE),x86-phi))
+  SCRIPT_FILES      += Configs/combine-configs.py
+  DEFAULT_CONFIG    := knl_mcdram.cfg
 endif
 
 INSTALLED_LIBS    := $(addprefix $(OCR_INSTALL)/lib/, $(notdir $(INSTALL_LIBS)))
 BASE_LIBS         := $(firstword $(dir $(INSTALL_LIBS)))
 INSTALLED_EXES    := $(addprefix $(OCR_INSTALL)/bin/, $(notdir $(INSTALL_EXES)))
 BASE_EXES         := $(firstword $(dir $(INSTALL_EXES)))
-INSTALLED_INCS    := $(addprefix $(OCR_INSTALL)/include/, $(INC_FILES))
+INSTALLED_INCS    := $(addprefix $(OCR_INSTALL)/include/, $(INC_FILES)) $(OCR_INSTALL)/include/ocr-options_$(OCR_TYPE).h
 INSTALLED_CONFIGS := $(addprefix $(OCR_INSTALL)/share/ocr/config/$(OCR_TYPE)/, $(MACHINE_CONFIGS))
 INSTALLED_SCRIPTS := $(addprefix $(OCR_INSTALL)/share/ocr/scripts/, $(SCRIPT_FILES))
 
@@ -558,34 +706,74 @@ INSTALLED_SCRIPTS := $(addprefix $(OCR_INSTALL)/share/ocr/scripts/, $(SCRIPT_FIL
 # as the build directory is no longer available when the app
 # is building but TGKRNL still needs tg-bin-files.h
 ifeq ($(OCR_TYPE), tg-xe)
-INSTALLED_INCS    += $(OCR_INSTALL)/include/tg-bin-files.h
-$(OCR_INSTALL)/include/tg-bin-files.h: $(OCR_BUILD)/tg-bin-files.h
+  INSTALLED_INCS    += $(OCR_INSTALL)/include/tg-bin-files.h
+  $(OCR_INSTALL)/include/tg-bin-files.h: $(OCR_BUILD)/tg-bin-files.h
 	$(AT)$(RM) -f $(OCR_INSTALL)/include/tg-bin-files.h
 	$(AT)$(CP) $(OCR_BUILD)/tg-bin-files.h $(OCR_INSTALL)/include/
 endif
 
 ifeq ($(OCR_TYPE), tg-ce)
-INSTALLED_INCS    += $(OCR_INSTALL)/include/tg-bin-files.h
-$(OCR_INSTALL)/include/tg-bin-files.h: $(OCR_BUILD)/tg-bin-files.h
+  INSTALLED_INCS    += $(OCR_INSTALL)/include/tg-bin-files.h
+  $(OCR_INSTALL)/include/tg-bin-files.h: $(OCR_BUILD)/tg-bin-files.h
 	$(AT)$(RM) -f $(OCR_INSTALL)/include/tg-bin-files.h
 	$(AT)$(CP) $(OCR_BUILD)/tg-bin-files.h $(OCR_INSTALL)/include/
 endif
 
-$(OCR_INSTALL)/lib/%: $(BASE_LIBS)%
+UNAME := $(shell uname -s)
+ifeq ($(UNAME),Darwin)
+
+  $(OCR_INSTALL)/lib/%: $(BASE_LIBS)% | $(OCR_INSTALL)/lib
+	$(AT)$(RM) -f $@
+	$(AT)install -m 0644 $< $@
+
+  $(OCR_INSTALL)/bin/%: $(BASE_EXES)% | $(OCR_INSTALL)/bin
+	$(AT)$(RM) -f $@
+	$(AT)install -m 0755 $< $@
+
+  $(OCR_INSTALL)/include/%: $(OCR_ROOT)/inc/% | $(OCR_INSTALL)/include $(OCR_INSTALL)/include/extensions
+	$(AT)$(RM) -f $@
+	$(AT)install -m 0644 $< $@
+
+  $(OCR_INSTALL)/share/ocr/config/$(OCR_TYPE)/%: $(OCR_ROOT)/machine-configs/$(OCR_TYPE)/% | $(OCR_INSTALL)/share/ocr/config/$(OCR_TYPE)
+	$(AT)$(RM) -f $@
+	$(AT)install -m 0644 $< $@
+
+  $(OCR_INSTALL)/share/ocr/scripts/%: $(OCR_ROOT)/scripts/% | $(OCR_INSTALL)/share/ocr/scripts $(OCR_INSTALL)/share/ocr/scripts/Configs
+	$(AT)$(RM) -f $@
+	$(AT)install -m 0755 $< $@
+
+  .PHONY: $(OCR_INSTALL)/lib $(OCR_INSTALL)/bin $(OCR_INSTALL)/share/ocr/config/$(OCR_TYPE) \
+  $(OCR_INSTALL)/include $(OCR_INSTALL)/include/extensions $(OCR_INSTALL)/share/ocr/scripts\
+  $(OCR_INSTALL)/share/ocr/scripts/Configs
+
+  $(OCR_INSTALL)/lib $(OCR_INSTALL)/bin $(OCR_INSTALL)/share/ocr/config/$(OCR_TYPE) \
+  $(OCR_INSTALL)/include $(OCR_INSTALL)/include/extensions $(OCR_INSTALL)/share/ocr/scripts\
+  $(OCR_INSTALL)/share/ocr/scripts/Configs:
+	$(AT)$(MKDIR) -p $@
+
+else
+
+  $(OCR_INSTALL)/lib/%: $(BASE_LIBS)%
 	$(AT)install -D -m 0644 $< $@
 
-$(OCR_INSTALL)/bin/%: $(BASE_EXES)%
+  $(OCR_INSTALL)/bin/%: $(BASE_EXES)%
 	$(AT)install -D -m 0755 $< $@
 
-$(OCR_INSTALL)/include/%: $(OCR_ROOT)/inc/%
+  $(OCR_INSTALL)/include/%: $(OCR_ROOT)/inc/%
 	$(AT)install -D -m 0644 $< $@
 
-$(OCR_INSTALL)/share/ocr/config/$(OCR_TYPE)/%: $(OCR_ROOT)/machine-configs/$(OCR_TYPE)/%
+  $(OCR_INSTALL)/share/ocr/config/$(OCR_TYPE)/%: $(OCR_ROOT)/machine-configs/$(OCR_TYPE)/%
 	$(AT)install -D -m 0644 $< $@
 
-$(OCR_INSTALL)/share/ocr/scripts/%: $(OCR_ROOT)/scripts/%
+  $(OCR_INSTALL)/share/ocr/scripts/%: $(OCR_ROOT)/scripts/%
 	$(AT)install -D -m 0755 $< $@
 
+  # Need this for the auto-generated .h file
+  .PHONY: $(OCR_INSTALL)/include
+  $(OCR_INSTALL)/include:
+	$(AT)$(MKDIR) -p $@
+
+endif # Darwin ifeq
 
 .PHONY: install
 install: ${INSTALL_TARGETS} ${INSTALLED_LIBS} ${INSTALLED_EXES} ${INSTALLED_INCS} \

@@ -15,6 +15,7 @@
 #include "ocr-task.h"
 #include "scheduler-object/wst/wst-scheduler-object.h"
 #include "scheduler-object/scheduler-object-all.h"
+#include "worker/hc/hc-worker.h"
 
 #define DEBUG_TYPE SCHEDULER_OBJECT
 
@@ -44,6 +45,15 @@ static void wstSchedulerObjectStart(ocrSchedulerObject_t *self, ocrPolicyDomain_
     params.type = WORK_STEALING_DEQUE;
     ocrSchedulerObjectFactory_t *dequeFactory = pd->schedulerObjectFactories[schedulerObjectDeq_id];
     for (i = 0, w = 0; i < numDeques; i++) {
+        if (wstSchedObj->config == SCHEDULER_OBJECT_WST_CONFIG_STATIC) {
+            params.type = SEMI_CONCURRENT_DEQUE;
+#ifdef ENABLE_WORKER_HC
+            ocrWorkerHc_t *w0 = (ocrWorkerHc_t*)pd->workers[0];
+            if (w0->hcType == HC_WORKER_COMM && i == 0) {
+                params.type = WORK_STEALING_DEQUE;
+            }
+#endif
+        }
         ocrSchedulerObject_t *deque = dequeFactory->fcts.create(dequeFactory, (ocrParamList_t*)(&params));
         wstSchedObj->deques[i] = deque;
         //BUG #920 cleanup - Should not be referencing master heuristic
@@ -74,7 +84,7 @@ static void wstSchedulerObjectFinish(ocrSchedulerObject_t *self, ocrPolicyDomain
     pd->fcts.pdFree(pd, wstSchedObj->deques);
 }
 
-static void wstSchedulerObjectInitialize(ocrSchedulerObjectFactory_t *fact, ocrSchedulerObject_t *self) {
+static void wstSchedulerObjectInitialize(ocrSchedulerObjectFactory_t *fact, ocrSchedulerObject_t *self, ocrParamList_t *perInstance) {
     self->guid.guid = NULL_GUID;
     self->guid.metaDataPtr = self;
     self->kind = OCR_SCHEDULER_OBJECT_WST;
@@ -84,6 +94,16 @@ static void wstSchedulerObjectInitialize(ocrSchedulerObjectFactory_t *fact, ocrS
     ocrSchedulerObjectWst_t* wstSchedObj = (ocrSchedulerObjectWst_t*)self;
     wstSchedObj->numDeques = 0;
     wstSchedObj->deques = NULL;
+    paramListSchedulerObjectWst_t *paramsWst = (paramListSchedulerObjectWst_t*)perInstance;
+    wstSchedObj->config = paramsWst->config;
+    switch(paramsWst->config) {
+    case SCHEDULER_OBJECT_WST_CONFIG_REGULAR:
+    case SCHEDULER_OBJECT_WST_CONFIG_STATIC:
+        break;
+    default:
+        ASSERT(0);
+        break;
+    }
 }
 
 ocrSchedulerObject_t* newSchedulerObjectWst(ocrSchedulerObjectFactory_t *factory, ocrParamList_t *perInstance) {
@@ -93,7 +113,7 @@ ocrSchedulerObject_t* newSchedulerObjectWst(ocrSchedulerObjectFactory_t *factory
     ASSERT(!paramSchedObj->guidRequired);
 #endif
     ocrSchedulerObject_t* schedObj = (ocrSchedulerObject_t*)runtimeChunkAlloc(sizeof(ocrSchedulerObjectWst_t), PERSISTENT_CHUNK);
-    wstSchedulerObjectInitialize(factory, schedObj);
+    wstSchedulerObjectInitialize(factory, schedObj, perInstance);
     schedObj->kind |= OCR_SCHEDULER_OBJECT_ALLOC_CONFIG;
     return schedObj;
 }
@@ -107,7 +127,7 @@ ocrSchedulerObject_t* wstSchedulerObjectCreate(ocrSchedulerObjectFactory_t *fact
     ocrPolicyDomain_t *pd = NULL;
     getCurrentEnv(&pd, NULL, NULL, NULL);
     ocrSchedulerObject_t* schedObj = (ocrSchedulerObject_t*)pd->fcts.pdMalloc(pd, sizeof(ocrSchedulerObjectWst_t));
-    wstSchedulerObjectInitialize(factory, schedObj);
+    wstSchedulerObjectInitialize(factory, schedObj, perInstance);
     paramListSchedulerObjectWst_t *paramsWst = (paramListSchedulerObjectWst_t*)perInstance;
     wstSchedulerObjectStart(schedObj, pd, paramsWst->numDeques);
     schedObj->kind |= OCR_SCHEDULER_OBJECT_ALLOC_PD;

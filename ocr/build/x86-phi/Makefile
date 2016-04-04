@@ -7,11 +7,11 @@
 #
 
 ifndef OCR_TYPE
-OCR_TYPE=x86-phi
+  OCR_TYPE=x86-phi
 else
-ifneq (${OCR_TYPE}, x86-phi)
-$(error OCR_TYPE is set to ${OCR_TYPE} but expected x86)
-endif
+  ifneq (${OCR_TYPE}, x86-phi)
+    $(error OCR_TYPE is set to ${OCR_TYPE} but expected x86)
+  endif
 endif
 
 DEFAULT_CONFIG=jenkins-common-8w-lockableDB.cfg
@@ -43,10 +43,10 @@ LDFLAGS += -shared -fpic -lpthread -lnuma
 # -lrt needed only for < glibc-2.17 in Linux systems (not needed for OS X)
 UNAME := $(shell uname -s)
 ifeq ($(UNAME),Linux)
-ret := $(shell echo "`ldd --version | awk '/ldd/{print $$NF}'` < 2.17" | bc)
-ifeq ($(ret), 1)
-LDFLAGS += -lrt
-endif
+  ret := $(shell echo "`ldd --version | awk '/ldd/{print $$NF}' | cut -d'.' -f1-2` < 2.17" | bc)
+  ifeq ($(ret), 1)
+    LDFLAGS += -lrt
+  endif
 endif
 
 # CFLAGS_SHARED will be concatenated with any common CFLAGS options
@@ -75,7 +75,7 @@ OCRRUNNER=ocrrun_$(OCR_TYPE)
 # x86 only
 #
 # Enable profiler
-# CFLAGS += -DOCR_RUNTIME_PROFILER -DPROFILE_KHZ=3400000
+# CFLAGS += -DOCR_RUNTIME_PROFILER -DPROFILER_KHZ=3400000
 #
 # (optional) Maximum number of scope
 # nesting for runtime profiler

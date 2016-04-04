@@ -62,8 +62,7 @@ u8 prioritySchedulerHeuristicSwitchRunlevel(ocrSchedulerHeuristic_t *self, ocrPo
         break;
     case RL_PD_OK:
     {
-        ocrScheduler_t *scheduler = self->scheduler;
-        ASSERT(scheduler);
+        ASSERT(self->scheduler);
         self->contextCount = PD->workerCount; //Shared mem heuristic
         ASSERT(self->contextCount > 0);
         break;
@@ -147,7 +146,7 @@ static u8 prioritySchedulerHeuristicWorkEdtUserInvoke(ocrSchedulerHeuristic_t *s
     ocrSchedulerObjectFactory_t *fact = self->scheduler->pd->schedulerObjectFactories[schedObj->fctId];
     u8 retVal = fact->fcts.remove(fact, schedObj, OCR_SCHEDULER_OBJECT_EDT, 1, &edtObj, NULL, SCHEDULER_OBJECT_REMOVE_TAIL);
 
-    if(!(IS_GUID_NULL(edtObj.guid.guid)))
+    if(!(ocrGuidIsNull(edtObj.guid.guid)))
         taskArgs->OCR_SCHED_ARG_FIELD(OCR_SCHED_WORK_EDT_USER).edt = edtObj.guid;
 
     return retVal;

@@ -10,6 +10,7 @@
 
 #include "debug.h"
 
+#include "extensions/ocr-hints.h"
 #include "ocr-policy-domain.h"
 #include "ocr-types.h"
 #include "experimental/ocr-platform-model.h"
@@ -32,7 +33,6 @@
 // - neighbors are locations described as ranks [0:N[
 // - neighbors contains all ranks but self
 // - placer's affinities array represents all the PD locations and is sorted by rank id
-
 
 ocrPlacer_t * createLocationPlacer(ocrPolicyDomain_t *pd) {
     ocrLocationPlacer_t * placer = pd->fcts.pdMalloc(pd, sizeof(ocrLocationPlacer_t));
@@ -60,10 +60,27 @@ u8 suggestLocationPlacement(ocrPolicyDomain_t *pd, ocrLocation_t curLoc, ocrPlat
             {
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_WORK_CREATE
-                doAutoPlace = (PD_MSG_FIELD_I(workType) == EDT_USER_WORKTYPE) &&
-                    (IS_GUID_NULL(PD_MSG_FIELD_I(affinity.guid)));
-                if (!(IS_GUID_NULL(PD_MSG_FIELD_I(affinity.guid)))) {
-                    msg->destLocation = affinityToLocation(PD_MSG_FIELD_I(affinity.guid));
+                if (PD_MSG_FIELD_I(workType) == EDT_USER_WORKTYPE) {
+                    doAutoPlace = true;
+                    if (PD_MSG_FIELD_I(hint) != NULL_HINT) {
+                        // Don't auto-place and extract the affinity GUID from the hings
+                        ocrHint_t *hint = PD_MSG_FIELD_I(hint);
+                        u64 hintValue = 0ULL;
+                        if ((ocrGetHintValue(hint, OCR_HINT_EDT_AFFINITY, &hintValue) == 0) && (hintValue != 0)) {
+                            ocrGuid_t affGuid;
+    #if GUID_BIT_COUNT == 64
+                            affGuid.guid = hintValue;
+    #elif GUID_BIT_COUNT == 128
+                            affGuid.upper = 0ULL;
+                            affGuid.lower = hintValue;
+    #endif
+                            ASSERT(!ocrGuidIsNull(affGuid));
+                            msg->destLocation = affinityToLocation(affGuid);
+                            doAutoPlace = false;
+                        }
+                    }
+                } else { // For runtime EDTs, always local
+                    doAutoPlace = false;
                 }
 #undef PD_MSG
 #undef PD_TYPE
@@ -73,15 +90,24 @@ u8 suggestLocationPlacement(ocrPolicyDomain_t *pd, ocrLocation_t curLoc, ocrPlat
             {
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_DB_CREATE
-                doAutoPlace = false;
                 // For now a DB is always created where the current EDT executes unless
                 // it has an affinity specified (i.e. no auto-placement)
-                if (!(IS_GUID_NULL(PD_MSG_FIELD_I(affinity.guid)))) {
-                    msg->destLocation = affinityToLocation(PD_MSG_FIELD_I(affinity.guid));
+                if (PD_MSG_FIELD_I(hint) != NULL_HINT) {
+                    ocrHint_t *hint = PD_MSG_FIELD_I(hint);
+                    u64 hintValue = 0ULL;
+                    if ((ocrGetHintValue(hint, OCR_HINT_DB_AFFINITY, &hintValue) == 0) && (hintValue != 0)) {
+                        ocrGuid_t affGuid;
+#if GUID_BIT_COUNT == 64
+                        affGuid.guid = hintValue;
+#elif GUID_BIT_COUNT == 128
+                        affGuid.upper = 0ULL;
+                        affGuid.lower = hintValue;
+#endif
+                        ASSERT(!ocrGuidIsNull(affGuid));
+                        msg->destLocation = affinityToLocation(affGuid);
+                        return 0;
+                    }
                 }
-                // When we do place DBs make sure we only place USER DBs
-                // doPlace = ((PD_MSG_FIELD_I(dbType) == USER_DBTYPE) &&
-                //             (PD_MSG_FIELD_I(affinity.guid) == NULL_GUID));
 #undef PD_MSG
 #undef PD_TYPE
             break;
@@ -90,7 +116,7 @@ u8 suggestLocationPlacement(ocrPolicyDomain_t *pd, ocrLocation_t curLoc, ocrPlat
                 // Fall-through
             break;
         }
-
+        // Auto placement
         if (doAutoPlace) {
             hal_lock32(&(placer->lock));
             u32 placementIndex = placer->edtLastPlacementIndex;
@@ -101,7 +127,7 @@ u8 suggestLocationPlacement(ocrPolicyDomain_t *pd, ocrLocation_t curLoc, ocrPlat
             }
             hal_unlock32(&(placer->lock));
             msg->destLocation = affinityToLocation(pdLocAffinity);
-            DPRINTF(DEBUG_LVL_VVERB,"Auto-Placement for msg %p, type 0x%x, at location %d\n",
+            DPRINTF(DEBUG_LVL_VVERB,"Auto-Placement for msg %p, type 0x%"PRIx64", at location %"PRId32"\n",
                     msg, msgType, (u32)placementIndex);
         }
     }

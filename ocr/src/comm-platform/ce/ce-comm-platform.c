@@ -85,15 +85,14 @@ u32 XeIrqReq[8];
 #define RESERVED_SLOT 0x1ULL
 
 static void releaseXE(u32 i) {
-    DPRINTF(DEBUG_LVL_VERB, "Ungating XE %u\n", i);
-    u64 state = 0;
+    DPRINTF(DEBUG_LVL_VERB, "Ungating XE %"PRIu32"\n", i);
     // Bug #820: This was a MMIO LD call and should be replaced by one when they become available
-    state = *((volatile u64*)(BR_MSR_BASE((i+ID_AGENT_XE0)) + (POWER_GATE_RESET * sizeof(u64))));
     // The XE should be clock-gated already because we don't process its message before it is
-    ASSERT(state & 0x1ULL);
+    ASSERT(*((volatile u64*)(BR_MSR_BASE((i+ID_AGENT_XE0)) + (POWER_GATE_RESET * sizeof(u64)))) & 0x1ULL);
+
     // Bug #820: Further, this was a MMIO operation
     *((u64*)(BR_MSR_BASE((i+ID_AGENT_XE0)) + (POWER_GATE_RESET * sizeof(u64)))) &= ~(0x1ULL);
-    DPRINTF(DEBUG_LVL_VERB, "XE %u ungated\n", i);
+    DPRINTF(DEBUG_LVL_VERB, "XE %"PRIu32" ungated\n", i);
 }
 
 static u8 ceCommSendMessageToCE(ocrCommPlatform_t *self, ocrLocation_t target,
@@ -114,7 +113,7 @@ static u8 ceCommSendMessageToCE(ocrCommPlatform_t *self, ocrLocation_t target,
         if(buffers->type == 0) {
             // Found one
             sendBuf = buffers;
-            DPRINTF(DEBUG_LVL_VERB, "Using local buffer %u @ 0x%lx\n", i, sendBuf);
+            DPRINTF(DEBUG_LVL_VERB, "Using local buffer %"PRIu32" @ %p\n", i, sendBuf);
             break;
         }
     }
@@ -122,7 +121,7 @@ static u8 ceCommSendMessageToCE(ocrCommPlatform_t *self, ocrLocation_t target,
         // This means that the buffer for a previous send is
         // still in use. We need to wait until we can send a
         // message to another CE for now
-        DPRINTF(DEBUG_LVL_VERB, "Local buffers all busy for CE->CE message 0x%lx ID 0x%lx (type 0x%lx) from 0x%x to 0x%x\n",
+        DPRINTF(DEBUG_LVL_VERB, "Local buffers all busy for CE->CE message %p ID 0x%"PRIx64" (type 0x%"PRIx32") from 0x%"PRIx64" to 0x%"PRIx64"\n",
                 message, message->msgId, message->type, self->location, target);
         return OCR_EBUSY;
     }
@@ -133,7 +132,7 @@ static u8 ceCommSendMessageToCE(ocrCommPlatform_t *self, ocrLocation_t target,
     ocrPolicyMsgGetMsgSize(message, &baseSize, &marshalledSize, 0);
     if(baseSize + marshalledSize > sendBuf->bufferSize) {
 
-        DPRINTF(DEBUG_LVL_WARN, "Comm platform only handles messages up to size %lu (0x%lx)\n",
+        DPRINTF(DEBUG_LVL_WARN, "Comm platform only handles messages up to size %"PRIu64" (%p)\n",
                 sendBuf->bufferSize, sendBuf);
         ASSERT(0);
     }
@@ -160,7 +159,7 @@ static u8 ceCommSendMessageToCE(ocrCommPlatform_t *self, ocrLocation_t target,
                 break;
         }
         if(retval == EMPTY_SLOT) {
-            DPRINTF(DEBUG_LVL_VERB, "Message requires a response, reserved slot %u on local queue for 0x%lx\n", i, self->location);
+            DPRINTF(DEBUG_LVL_VERB, "Message requires a response, reserved slot %"PRIu32" on local queue for 0x%"PRIx64"\n", i, self->location);
             message->msgId = (self->location << 8) + i;
         } else {
             DPRINTF(DEBUG_LVL_VERB, "Message requires a response but local return queue is busy\n");
@@ -176,12 +175,12 @@ static u8 ceCommSendMessageToCE(ocrCommPlatform_t *self, ocrLocation_t target,
 
         // Make sure we are sending back to the right CE
         if((message->msgId &= ~0xFFULL) != (target << 8)) {
-            DPRINTF(DEBUG_LVL_WARN, "Expected to send response to 0x%lx but read msgId 0x%lx (location: 0x%lx)\n",
+            DPRINTF(DEBUG_LVL_WARN, "Expected to send response to 0x%"PRIx64" but read msgId 0x%"PRIx64" (location: 0x%"PRIx64")\n",
                     target, message->msgId, message->msgId >> 8);
             ASSERT(0);
         }
 
-        DPRINTF(DEBUG_LVL_VERB, "Using pre-reserved slot %u to send to 0x%lx\n", message->msgId & 0xFF,
+        DPRINTF(DEBUG_LVL_VERB, "Using pre-reserved slot %"PRIu64" to send to 0x%"PRIx64"\n", message->msgId & 0xFF,
                 target);
 
         // Actually marshall the message
@@ -196,7 +195,7 @@ static u8 ceCommSendMessageToCE(ocrCommPlatform_t *self, ocrLocation_t target,
                 break; // Send successful
         }
         if(retval != EMPTY_SLOT) {
-            DPRINTF(DEBUG_LVL_VERB, "Target CE busy for CE->CE message 0x%lx (type 0x%lx) from 0x%lx to 0x%lx\n",
+            DPRINTF(DEBUG_LVL_VERB, "Target CE busy for CE->CE message %p (type 0x%"PRIx32") from 0x%"PRIx64" to 0x%"PRIx64"\n",
                     message, message->type, self->location, target);
             if(reservedSlot) {
                 // We free the slot we had reserved
@@ -210,7 +209,7 @@ static u8 ceCommSendMessageToCE(ocrCommPlatform_t *self, ocrLocation_t target,
             RESULT_ASSERT(hal_cmpswap64(&(rmbox[i]), RESERVED_SLOT, msgAbsAddr), ==, RESERVED_SLOT);
         }
     }
-    DPRINTF(DEBUG_LVL_VERB, "Sent CE->CE message 0x%lx ID 0x%lx (type 0x%lx) from 0x%x to 0x%x slot %u using buffer 0x%lx\n",
+    DPRINTF(DEBUG_LVL_VERB, "Sent CE->CE message %p ID 0x%"PRIx64" (type 0x%"PRIx32") from 0x%"PRIx64" to 0x%"PRIx64" slot %"PRIu32" using buffer %p\n",
             message, message->msgId, message->type, self->location, target, i, sendBuf);
     return 0;
 }
@@ -218,7 +217,7 @@ static u8 ceCommSendMessageToCE(ocrCommPlatform_t *self, ocrLocation_t target,
 static u8 ceCommDestructCEMessage(ocrCommPlatform_t *self, u32 idx) {
 
     ASSERT(idx < OUTSTANDING_CE_MSGS);
-    DPRINTF(DEBUG_LVL_VERB, "Destructing message index %u (0x%lx)\n", idx, *(u64*)(AR_L1_BASE + MSG_CE_ADDR_OFFT + sizeof(u64)*idx));
+    DPRINTF(DEBUG_LVL_VERB, "Destructing message index %"PRIu32" (0x%"PRIx64")\n", idx, *(u64*)(AR_L1_BASE + MSG_CE_ADDR_OFFT + sizeof(u64)*idx));
 
     ocrPolicyMsg_t *msg = (ocrPolicyMsg_t*)(*(u64*)(AR_L1_BASE + MSG_CE_ADDR_OFFT + sizeof(u64)*idx));
     *(u64*)(AR_L1_BASE + MSG_CE_ADDR_OFFT + sizeof(u64)*idx) = EMPTY_SLOT;
@@ -235,24 +234,24 @@ static u8 ceCommCheckCEMessage(ocrCommPlatform_t *self, ocrPolicyMsg_t **msg) {
     // Go through our mbox to check for valid messages
     if(recvBuf->type) {
         // Receive buffer is busy
-        DPRINTF(DEBUG_LVL_VERB, "Receive buffer @ 0x%lx is busy, cannot receive CE messages\n");
+        DPRINTF(DEBUG_LVL_VERB, "Receive buffer @ %p is busy, cannot receive CE messages\n", recvBuf);
         return POLL_NO_MESSAGE;
     }
     for(j=0; j<OUTSTANDING_CE_MSGS; ++j) {
         u64 addr = *(u64*)(AR_L1_BASE + MSG_CE_ADDR_OFFT + sizeof(u64)*j);
         if((addr != EMPTY_SLOT) &&
            (addr != RESERVED_SLOT)) {
-            DPRINTF(DEBUG_LVL_VERB, "Found an incoming CE message (0x%lx) @ idx %u\n", addr, j);
+            DPRINTF(DEBUG_LVL_VERB, "Found an incoming CE message (0x%"PRIx64") @ idx %"PRIu32"\n", addr, j);
             // We fixup pointers
             u64 baseSize = 0, marshalledSize = 0;
             ocrPolicyMsgGetMsgSize((ocrPolicyMsg_t*)addr, &baseSize, &marshalledSize, 0);
             if(baseSize + marshalledSize > recvBuf->bufferSize) {
-                DPRINTF(DEBUG_LVL_WARN, "Comm platform only handles messages up to size %ld\n",
+                DPRINTF(DEBUG_LVL_WARN, "Comm platform only handles messages up to size %"PRId64"\n",
                                          recvBuf->bufferSize);
                 ASSERT(0);
             }
             ocrPolicyMsgUnMarshallMsg((u8*)addr, NULL, recvBuf, MARSHALL_FULL_COPY);
-            DPRINTF(DEBUG_LVL_VERB, "Copied message from 0x%x of type 0x%x to receive buffer @ 0x%lx\n",
+            DPRINTF(DEBUG_LVL_VERB, "Copied message from 0x%"PRIx64" of type 0x%"PRIx32" to receive buffer @ %p\n",
                     recvBuf->srcLocation, recvBuf->type, recvBuf);
             ceCommDestructCEMessage(self, j);
             *msg = recvBuf;
@@ -371,7 +370,7 @@ u8 ceCommSendMessage(ocrCommPlatform_t *self, ocrLocation_t target,
             // Bug #820: This was an MMIO gate
             volatile u64 tmp = *((u64*)rq);
             if(tmp) {
-                DPRINTF(DEBUG_LVL_VERB, "Sending to 0x%x failed (busy) because 0x%lx reads %d\n",
+                DPRINTF(DEBUG_LVL_VERB, "Sending to 0x%"PRIx64" failed (busy) because %p reads %"PRId64"\n",
                         target, rq, tmp);
                 return OCR_EBUSY;
             }
@@ -385,17 +384,17 @@ u8 ceCommSendMessage(ocrCommPlatform_t *self, ocrLocation_t target,
         ocrPolicyMsgGetMsgSize(message, &baseSize, &marshalledSize, 0);
         // We can only deal with the case where everything fits in the message
         if(baseSize + marshalledSize > message->bufferSize) {
-            DPRINTF(DEBUG_LVL_WARN, "Comm platform only handles messages up to size %ld\n",
+            DPRINTF(DEBUG_LVL_WARN, "Comm platform only handles messages up to size %"PRId64"\n",
                     message->bufferSize);
             ASSERT(0);
         }
         ocrPolicyMsgMarshallMsg(message, baseSize, (u8*)message, MARSHALL_APPEND);
         if(message->usefulSize > MSG_QUEUE_SIZE - sizeof(u64))
-            DPRINTF(DEBUG_LVL_WARN, "Message of type %x is too large (%lx) for buffer (%lx)\n",
+            DPRINTF(DEBUG_LVL_WARN, "Message of type %"PRIx32" is too large (%"PRIx64") for buffer (%"PRIx64")\n",
                                     message->type, message->usefulSize, MSG_QUEUE_SIZE-sizeof(u64));
         ASSERT(message->usefulSize <= MSG_QUEUE_SIZE - sizeof(u64));
         // - DMA to remote stage, with fence
-        DPRINTF(DEBUG_LVL_VVERB, "DMA-ing out message to 0x%lx of size %d\n",
+        DPRINTF(DEBUG_LVL_VVERB, "DMA-ing out message to 0x%"PRIx64" of size %"PRId64"\n",
                 (u64)&rq[1], message->usefulSize);
         hal_memCopy(&(rq[1]), message, message->usefulSize, true);
         DPRINTF(DEBUG_LVL_VVERB, "DMA done (async)\n");
@@ -404,16 +403,15 @@ u8 ceCommSendMessage(ocrCommPlatform_t *self, ocrLocation_t target,
         DPRINTF(DEBUG_LVL_VVERB, "Past fence\n");
         // - Atomically test & set remote stage to Full. Error if already non-Empty.
         {
-            u64 tmp = hal_swap64(rq, 2);
-            ASSERT(tmp == 0);
+            RESULT_ASSERT(hal_swap64(rq, 2), ==, 0);
         }
-        DPRINTF(DEBUG_LVL_VVERB, "DMA done and set 0x%lx to 2 (full)\n", &(rq[0]));
+        DPRINTF(DEBUG_LVL_VVERB, "DMA done and set %p to 2 (full)\n", &(rq[0]));
 
         if(message->type & (PD_MSG_RESPONSE | PD_MSG_RESPONSE_OVERRIDE)) {
             // Release the XE now that it has a response to see
             // WARNING: we only release if this is a response. If this is an initial message
             // (happens to release from barriers), we do not release (the XE is already released)
-            DPRINTF(DEBUG_LVL_VERB, "Releasing XE 0x%x after sending it a response of type 0x%lx\n",
+            DPRINTF(DEBUG_LVL_VERB, "Releasing XE 0x%"PRIx64" after sending it a response of type 0x%"PRIx32"\n",
                     (AGENT_FROM_ID((u64)target)) - ID_AGENT_XE0, message->type);
             releaseXE((AGENT_FROM_ID((u64)target)) - ID_AGENT_XE0);
         }
@@ -425,13 +423,13 @@ u8 ceCommSendMessage(ocrCommPlatform_t *self, ocrLocation_t target,
 static u8 extractXEMessage(ocrCommPlatformCe_t *cp, ocrPolicyMsg_t **msg, u32 queueIdx) {
     // We have a message
     *msg = (ocrPolicyMsg_t *)&((cp->lq[queueIdx])[1]);
-    DPRINTF(DEBUG_LVL_VERB, "Found message from XE 0x%x @ 0x%lx of type 0x%x\n",
+    DPRINTF(DEBUG_LVL_VERB, "Found message from XE 0x%"PRIx32" @ %p of type 0x%"PRIx32"\n",
             queueIdx, *msg, (*msg)->type);
     // We fixup pointers
     u64 baseSize = 0, marshalledSize = 0;
     ocrPolicyMsgGetMsgSize(*msg, &baseSize, &marshalledSize, 0);
     if(baseSize + marshalledSize > (*msg)->bufferSize) {
-        DPRINTF(DEBUG_LVL_WARN, "Comm platform only handles messages up to size %ld\n",
+        DPRINTF(DEBUG_LVL_WARN, "Comm platform only handles messages up to size %"PRId64"\n",
                 (*msg)->bufferSize);
         ASSERT(0);
     }
@@ -442,7 +440,7 @@ static u8 extractXEMessage(ocrCommPlatformCe_t *cp, ocrPolicyMsg_t **msg, u32 qu
     // We also un-clockgate the XE if no response is expected
     hal_fence();
     if(!((*msg)->type & PD_MSG_REQ_RESPONSE)) {
-        DPRINTF(DEBUG_LVL_VERB, "Message type 0x%lx does not require a response -- un-clockgating XE 0x%x\n",
+        DPRINTF(DEBUG_LVL_VERB, "Message type 0x%"PRIx32" does not require a response -- un-clockgating XE 0x%"PRIx32"\n",
                 (*msg)->type, queueIdx);
         releaseXE(queueIdx);
     }
@@ -509,7 +507,7 @@ u8 ceCommWaitMessage(ocrCommPlatform_t *self,  ocrPolicyMsg_t **msg,
     // Local stage is at well-known 0x0
     u32 i, j;
 
-    DPRINTF(DEBUG_LVL_VVERB, "Going to wait for message (starting at %d)\n",
+    DPRINTF(DEBUG_LVL_VVERB, "Going to wait for message (starting at %"PRId64")\n",
             cp->pollq);
     // Loop through the stages till we receive something
     for(i = cp->pollq, j=(cp->pollq - 1 + ((ocrPolicyDomainCe_t*)self->pd)->xeCount) % ((ocrPolicyDomainCe_t*)self->pd)->xeCount;
@@ -546,7 +544,7 @@ u8 ceCommDestructMessage(ocrCommPlatform_t *self, ocrPolicyMsg_t *msg) {
     if(msg == recvBuf) {
         // This is an incomming message from a CE, we say that we
         // are done with it so we can receive the next message
-        DPRINTF(DEBUG_LVL_VVERB, "Destroying recvBuf @ 0x%lx\n", recvBuf);
+        DPRINTF(DEBUG_LVL_VVERB, "Destroying recvBuf @ %p\n", recvBuf);
         recvBuf->type = 0;
         return 0;
     } else {
@@ -560,7 +558,7 @@ u8 ceCommDestructMessage(ocrCommPlatform_t *self, ocrPolicyMsg_t *msg) {
             }
         }
         // If we get here, this means that we have no idea what this message is
-        DPRINTF(DEBUG_LVL_WARN, "Unknown message to destroy: 0x%lx\n", msg);
+        DPRINTF(DEBUG_LVL_WARN, "Unknown message to destroy: %p\n", msg);
         ASSERT(0);
         return OCR_EINVAL;
     }

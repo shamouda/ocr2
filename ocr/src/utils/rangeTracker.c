@@ -179,7 +179,7 @@ static u32 height(avlBinaryNode_t *node) {
 
 static avlBinaryNode_t *newTree(u64 startChunk) {
     avlBinaryNode_t *tree = (avlBinaryNode_t*)MALLOC(startChunk, sizeof(avlBinaryNode_t));
-    DPRINTF(DEBUG_LVL_INFO, "Created AVL tree/node @ 0x%lx\n", (u64)tree);
+    DPRINTF(DEBUG_LVL_INFO, "Created AVL tree/node @ 0x%"PRIx64"\n", (u64)tree);
     ASSERT(tree);
     tree->key = 0;
     tree->value = 0;
@@ -224,7 +224,7 @@ static avlBinaryNode_t* rotateWithRight(avlBinaryNode_t *root) {
 
 // Find the minimum in a tree
 static avlBinaryNode_t* avlFindMin(avlBinaryNode_t *root) {
-    DPRINTF(DEBUG_LVL_VVERB, "Looking for minimum in tree rooted at 0x%lx\n",
+    DPRINTF(DEBUG_LVL_VVERB, "Looking for minimum in tree rooted at 0x%"PRIx64"\n",
             (u64)root);
 
 #ifdef OCR_DEBUG
@@ -235,14 +235,14 @@ static avlBinaryNode_t* avlFindMin(avlBinaryNode_t *root) {
         parent = root;
         root = root->left;
     }
-    DPRINTF(DEBUG_LVL_VVERB, "Tree @ 0x%lx: Found minimum node 0x%lx (key: 0x%lx)\n",
+    DPRINTF(DEBUG_LVL_VVERB, "Tree @ 0x%"PRIx64": Found minimum node 0x%"PRIx64" (key: 0x%"PRIx64")\n",
             (u64)oldRoot, (u64)parent, (u64)(parent?parent->key:0));
     return parent;
 }
 
 // Find the maximum in a tree
 static avlBinaryNode_t* avlFindMax(avlBinaryNode_t *root) {
-    DPRINTF(DEBUG_LVL_VVERB, "Looking for maximum in tree rooted at 0x%lx\n",
+    DPRINTF(DEBUG_LVL_VVERB, "Looking for maximum in tree rooted at 0x%"PRIx64"\n",
             (u64)root);
 
 #ifdef OCR_DEBUG
@@ -253,7 +253,7 @@ static avlBinaryNode_t* avlFindMax(avlBinaryNode_t *root) {
         parent = root;
         root = root->right;
     }
-    DPRINTF(DEBUG_LVL_VVERB, "Tree @ 0x%lx: Found maximum node 0x%lx (key: 0x%lx)\n",
+    DPRINTF(DEBUG_LVL_VVERB, "Tree @ 0x%"PRIx64": Found maximum node 0x%"PRIx64" (key: 0x%"PRIx64")\n",
             (u64)oldRoot, (u64)parent, (u64)(parent?parent->key:0));
     return parent;
 }
@@ -261,11 +261,11 @@ static avlBinaryNode_t* avlFindMax(avlBinaryNode_t *root) {
 // Helper function for the search
 static avlBinaryNode_t* avlSearchSub(avlBinaryNode_t *root, avlBinaryNode_t *upperBoundParent, u64 key, s8 mode) {
     ASSERT(root);
-    DPRINTF(DEBUG_LVL_VERB, "Going to search for 0x%lx (mode %d) in root 0x%lx\n",
+    DPRINTF(DEBUG_LVL_VERB, "Going to search for 0x%"PRIx64" (mode %"PRId32") in root 0x%"PRIx64"\n",
             key, mode, (u64)root);
     if(key == root->key) {
         // Ah-ha, we found the node
-        DPRINTF(DEBUG_LVL_VVERB, "Found node for 0x%lx @ 0x%lx\n",
+        DPRINTF(DEBUG_LVL_VVERB, "Found node for 0x%"PRIx64" @ 0x%"PRIx64"\n",
                 key, (u64)root);
         switch(mode) {
         case 0:
@@ -298,11 +298,11 @@ static avlBinaryNode_t* avlSearchSub(avlBinaryNode_t *root, avlBinaryNode_t *upp
             upperBoundParent = root;
         // We need to go search on the left of the tree
         if(root->left) {
-            DPRINTF(DEBUG_LVL_VVERB, "Going to search for 0x%lx to the left: from 0x%lx to 0x%lx\n",
+            DPRINTF(DEBUG_LVL_VVERB, "Going to search for 0x%"PRIx64" to the left: from 0x%"PRIx64" to 0x%"PRIx64"\n",
                     key, (u64)root, (u64)(root->left));
             return avlSearchSub(root->left, upperBoundParent, key, mode);
         }
-        DPRINTF(DEBUG_LVL_VVERB, "Cannot search further for 0x%lx (going left)\n", key);
+        DPRINTF(DEBUG_LVL_VVERB, "Cannot search further for 0x%"PRIx64" (going left)\n", key);
         // Here, there is no left
         switch(mode) {
         case 0:
@@ -320,11 +320,11 @@ static avlBinaryNode_t* avlSearchSub(avlBinaryNode_t *root, avlBinaryNode_t *upp
     if(key > root->key) {
         // We need to go search on the right of the tree
         if(root->right) {
-            DPRINTF(DEBUG_LVL_VVERB, "Going to search for 0x%lx to the right: from 0x%lx to 0x%lx\n",
+            DPRINTF(DEBUG_LVL_VVERB, "Going to search for 0x%"PRIx64" to the right: from 0x%"PRIx64" to 0x%"PRIx64"\n",
                     key, (u64)root, (u64)(root->right));
             return avlSearchSub(root->right, upperBoundParent, key, mode);
         }
-        DPRINTF(DEBUG_LVL_VVERB, "Cannot search further for 0x%lx (going right)\n", key);
+        DPRINTF(DEBUG_LVL_VVERB, "Cannot search further for 0x%"PRIx64" (going right)\n", key);
         // Here there is no right
         switch(mode) {
         case 0:
@@ -354,7 +354,7 @@ static void unlinkTag(rangeTracker_t *range, u64 idx) {
     ASSERT(idx < range->nextTag);
     tagNode_t *tag = &(range->tags[idx]);
     u64 keyToRemove = tag->node->key;
-    DPRINTF(DEBUG_LVL_VERB, "Range 0x%lx: unlinking node IDX %ld for tag %d and key 0x%lx\n",
+    DPRINTF(DEBUG_LVL_VERB, "Range 0x%"PRIx64": unlinking node IDX %"PRId64" for tag %"PRId32" and key 0x%"PRIx64"\n",
             (u64)range, idx, (u32)tag->tag, keyToRemove);
 
     // Relink the "linked-list"
@@ -421,7 +421,7 @@ static void linkTag(rangeTracker_t *range, u64 addr, ocrMemoryTag_t tag) {
  ********************************************/
 static avlBinaryNode_t* avlInsert(u64 startChunk, avlBinaryNode_t *root,
                                   u64 key, u64 value, avlBinaryNode_t **node) {
-    DPRINTF(DEBUG_LVL_VERB, "Inserting (0x%lx, %ld) into tree @ 0x%lx\n",
+    DPRINTF(DEBUG_LVL_VERB, "Inserting (0x%"PRIx64", %"PRId64") into tree @ 0x%"PRIx64"\n",
             key, value, (u64)root);
     if(!root) {
         DPRINTF(DEBUG_LVL_VVERB, "Creating new node\n");
@@ -433,7 +433,7 @@ static avlBinaryNode_t* avlInsert(u64 startChunk, avlBinaryNode_t *root,
     }
     // Here we already have a tree so we need to figure out where to insert things
     if(key == root->key) {
-        DPRINTF(DEBUG_LVL_VVERB, "Replacing value of existing node (from %ld to %ld)\n",
+        DPRINTF(DEBUG_LVL_VVERB, "Replacing value of existing node (from %"PRId64" to %"PRId64")\n",
                 root->value, value);
         // Well, we got lucky, the key is in the tree, update value and return
         root->value = value;
@@ -443,10 +443,10 @@ static avlBinaryNode_t* avlInsert(u64 startChunk, avlBinaryNode_t *root,
 
     if(key < root->key) {
         // Go insert to the left
-        DPRINTF(DEBUG_LVL_VVERB, "Inserting to the left (from 0x%lx to 0x%lx)\n",
+        DPRINTF(DEBUG_LVL_VVERB, "Inserting to the left (from 0x%"PRIx64" to 0x%"PRIx64")\n",
                 (u64)root, (u64)root->left);
         root->left = avlInsert(startChunk, root->left, key, value, node);
-        DPRINTF(DEBUG_LVL_VVERB, "New left sub-tree is 0x%lx (root 0x%lx)\n",
+        DPRINTF(DEBUG_LVL_VVERB, "New left sub-tree is 0x%"PRIx64" (root 0x%"PRIx64")\n",
                 (u64)root->left, (u64)root);
 
         // Check if we need to rebalance, only rebalance if we are not in -1:+1 range
@@ -464,10 +464,10 @@ static avlBinaryNode_t* avlInsert(u64 startChunk, avlBinaryNode_t *root,
     } else {
         ASSERT(key > root->key);
         // Got insert on the right
-        DPRINTF(DEBUG_LVL_VVERB, "Inserting to the right (from 0x%lx to 0x%lx)\n",
+        DPRINTF(DEBUG_LVL_VVERB, "Inserting to the right (from 0x%"PRIx64" to 0x%"PRIx64")\n",
                 (u64)root, (u64)root->right);
         root->right = avlInsert(startChunk, root->right, key, value, node);
-        DPRINTF(DEBUG_LVL_VVERB, "New right sub-tree is 0x%lx (root 0x%lx)\n",
+        DPRINTF(DEBUG_LVL_VVERB, "New right sub-tree is 0x%"PRIx64" (root 0x%"PRIx64")\n",
                 (u64)root->right, (u64)root);
 
         // Again, check for rebalance
@@ -568,7 +568,7 @@ rangeTracker_t *initializeRange(u32 maxSplits,
     LOCK(&(dest->lock));           // pool->lock is already 0 at startup (for x86, it's done at mallocBegin())
     if (dest->startBKHeap) {       // already init'ed? use startBKHeap as a initialization flag
         ASSERT(dest->count);
-        DPRINTF(DEBUG_LVL_INFO, "Initializing a range @ 0x%lx from 0x%lx to 0x%lx -- SKIP\n",
+        DPRINTF(DEBUG_LVL_INFO, "Initializing a range @ 0x%"PRIx64" from 0x%"PRIx64" to 0x%"PRIx64" -- SKIP\n",
             (u64)dest, minRange, maxRange);
         goto init_range_skip;
     }
@@ -586,7 +586,7 @@ rangeTracker_t *initializeRange(u32 maxSplits,
     INIT_MALLOC(dest->startBKHeap, sizeof(u64) +
                 dest->maxSplits*sizeof(avlBinaryNode_t)); // We allocate at most the number of maxsplits
 
-    DPRINTF(DEBUG_LVL_INFO, "Initializing a range @ 0x%lx from 0x%lx to 0x%lx with tag %d\n",
+    DPRINTF(DEBUG_LVL_INFO, "Initializing a range @ 0x%"PRIx64" from 0x%"PRIx64" to 0x%"PRIx64" with tag %"PRId32"\n",
             (u64)dest, minRange, maxRange, initTag);
 
     dest->rangeSplits = NULL;
@@ -630,7 +630,7 @@ init_range_skip:
 
 void destroyRange(rangeTracker_t *self) {
 
-    DPRINTF(DEBUG_LVL_INFO, "Destroying range @ 0x%lx", (u64)self);
+    DPRINTF(DEBUG_LVL_INFO, "Destroying range @ 0x%"PRIx64"", (u64)self);
     LOCK(&self->lock);
     avlDestroy(self->startBKHeap, self->rangeSplits);
     UNLOCK(&self->lock);
@@ -667,7 +667,7 @@ u8 splitRange(rangeTracker_t *range, u64 startAddr, u64 size, ocrMemoryTag_t tag
     if (!skipLock)
         LOCK(&(range->lock)); // Enter critical section to search the tree
 
-    DPRINTF(DEBUG_LVL_VERB, "Splitting range 0x%lx: adding %d for [0x%lx; 0x%lx[\n",
+    DPRINTF(DEBUG_LVL_VERB, "Splitting range 0x%"PRIx64": adding %"PRId32" for [0x%"PRIx64"; 0x%"PRIx64"[\n",
             (u64)range, (u32)tag, startAddr, startAddr + size);
     // Start by removing all old values between start and end (lookupKey)
     do {
@@ -675,7 +675,7 @@ u8 splitRange(rangeTracker_t *range, u64 startAddr, u64 size, ocrMemoryTag_t tag
         if(v) {
             if(oldLastTag > MAX_TAG) {
                 oldLastTag = range->tags[v->value].tag;
-                DPRINTF(DEBUG_LVL_VVERB, "Range 0x%lx: Tag post split will be %d\n",
+                DPRINTF(DEBUG_LVL_VVERB, "Range 0x%"PRIx64": Tag post split will be %"PRId32"\n",
                         (u64)range, oldLastTag);
             }
             if(v->key >= startAddr)

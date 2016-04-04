@@ -11,15 +11,15 @@
  */
 
 ocrGuid_t remoteEdt1(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
-    PRINTF("[remote] RemoteEdt1 will satisfy [0] 0x%lx \n", ((u64 *) depv[0].ptr)[0]);
-    PRINTF("[remote] RemoteEdt1 will satisfy [1] 0x%lx \n", ((u64 *) depv[0].ptr)[1]);
+    PRINTF("[remote] RemoteEdt1 will satisfy [0] 0x%"PRIx64" \n", ((u64 *) depv[0].ptr)[0]);
+    PRINTF("[remote] RemoteEdt1 will satisfy [1] 0x%"PRIx64" \n", ((u64 *) depv[0].ptr)[1]);
     ocrEventSatisfy(((ocrGuid_t *) depv[0].ptr)[0], NULL_GUID);
     return NULL_GUID;
 }
 
 ocrGuid_t remoteEdt2(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
-    PRINTF("[remote] RemoteEdt2 will satisfy [0] 0x%lx \n", ((u64 *) depv[0].ptr)[0]);
-    PRINTF("[remote] RemoteEdt2 will satisfy [1] 0x%lx \n", ((u64 *) depv[0].ptr)[1]);
+    PRINTF("[remote] RemoteEdt2 will satisfy [0] 0x%"PRIx64" \n", ((u64 *) depv[0].ptr)[0]);
+    PRINTF("[remote] RemoteEdt2 will satisfy [1] 0x%"PRIx64" \n", ((u64 *) depv[0].ptr)[1]);
     ocrEventSatisfy(((ocrGuid_t *) depv[0].ptr)[1], NULL_GUID);
     return NULL_GUID;
 }
@@ -44,7 +44,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrEventCreate(&event2Guid,OCR_EVENT_ONCE_T, EVT_PROP_NONE);
     ocrGuid_t dbGuid;
     ocrGuid_t * dbPtr;
-    ocrDbCreate(&dbGuid, (void **)&dbPtr, sizeof(ocrGuid_t) * 2, DB_PROP_SINGLE_ASSIGNMENT, NULL_GUID, NO_ALLOC);
+    ocrDbCreate(&dbGuid, (void **)&dbPtr, sizeof(ocrGuid_t) * 2, DB_PROP_SINGLE_ASSIGNMENT, NULL_HINT, NO_ALLOC);
     dbPtr[0] = event1Guid;
     dbPtr[1] = event2Guid;
     ocrDbRelease(dbGuid);
@@ -53,19 +53,22 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrGuid_t edtShutdownGuid;
     ocrGuid_t shutdownDepv[2] = {event1Guid, event2Guid};
     ocrEdtCreate(&edtShutdownGuid, shutdownEdtTemplateGuid, 0, NULL, 2, shutdownDepv,
-        EDT_PROP_NONE, NULL_GUID, NULL);
-    PRINTF("[local] events guids are [0]=0x%lx [1]=0x%lx\n",(u64)event1Guid, (u64)event2Guid);
+        EDT_PROP_NONE, NULL_HINT, NULL);
+    PRINTF("[local] events guids are [0]="GUIDF" [1]="GUIDF"\n",GUIDA(event1Guid), GUIDA(event2Guid));
     // Setup the test
     ocrGuid_t remoteEdt1TemplateGuid;
     ocrEdtTemplateCreate(&remoteEdt1TemplateGuid, remoteEdt1, 0, 1);
+    ocrHint_t edtHint;
+    ocrHintInit( &edtHint, OCR_HINT_EDT_T );
+    ocrSetHintValue( & edtHint, OCR_HINT_EDT_AFFINITY, ocrAffinityToHintValue( edtAffinity) );
     ocrGuid_t edt1Guid;
     ocrEdtCreate(&edt1Guid, remoteEdt1TemplateGuid, 0, NULL, 1, &dbGuid,
-        EDT_PROP_NONE, edtAffinity, NULL);
+        EDT_PROP_NONE, &edtHint, NULL);
     ocrGuid_t remoteEdt2TemplateGuid;
     ocrEdtTemplateCreate(&remoteEdt2TemplateGuid, remoteEdt2, 0, 1);
     ocrGuid_t edt2Guid;
     ocrEdtCreate(&edt2Guid, remoteEdt2TemplateGuid, 0, NULL, 1, &dbGuid,
-        EDT_PROP_NONE, edtAffinity, NULL);
+        EDT_PROP_NONE, &edtHint, NULL);
 
     return NULL_GUID;
 }

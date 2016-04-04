@@ -7,20 +7,26 @@
 #
 
 ifndef OCR_TYPE
-OCR_TYPE=x86-gasnet
+  OCR_TYPE=x86-gasnet
 else
-ifneq (${OCR_TYPE}, x86-gasnet)
-$(error OCR_TYPE is set to ${OCR_TYPE} but expected x86-gasnet)
-endif
+  ifneq (${OCR_TYPE}, x86-gasnet)
+    $(error OCR_TYPE is set to ${OCR_TYPE} but expected x86-gasnet)
+  endif
 endif
 
-DEFAULT_CONFIG=mach-hc-dist-gasnet-clone-8w.cfg
+DEFAULT_CONFIG=mach-x86-gasnet-affinity-8w-lockableDB.cfg
 
 #
 # Tool-chain to be used for the build
 #
 
-CC      ?= gcc
+FORCE_CC ?= no
+ifeq ($(FORCE_CC), no)
+  ifeq ($(CC), cc)
+    CC = gcc
+  endif
+endif # End of ifeq force_cc
+
 CFLAGS  :=
 
 RM      := rm
@@ -36,10 +42,10 @@ LDFLAGS := -shared -fpic -lpthread
 # -lrt needed only for < glibc-2.17 in Linux systems (not needed for OS X)
 UNAME := $(shell uname -s)
 ifeq ($(UNAME),Linux)
-ret := $(shell echo "`ldd --version | awk '/ldd/{print $$NF}'` < 2.17" | bc)
-ifeq ($(ret), 1)
-LDFLAGS += -lrt
-endif
+  ret := $(shell echo "`ldd --version | awk '/ldd/{print $$NF}' | cut -d'.' -f1-2` < 2.17" | bc)
+  ifeq ($(ret), 1)
+    LDFLAGS += -lrt
+  endif
 endif
 
 # CFLAGS_SHARED will be concatenated with any
@@ -68,7 +74,7 @@ OCRRUNNER=ocrrun_$(OCR_TYPE)
 # x86 only
 #
 # Enable profiler
-# CFLAGS += -DOCR_RUNTIME_PROFILER -DPROFILE_KHZ=3400000
+# CFLAGS += -DOCR_RUNTIME_PROFILER -DPROFILER_KHZ=3400000
 #
 # (optional) Maximum number of scope
 # nesting for runtime profiler
@@ -85,13 +91,13 @@ OCRRUNNER=ocrrun_$(OCR_TYPE)
 # CFLAGS += -DOCR_ENABLE_VISUALIZER -DOCR_ENABLE_EDT_NAMING
 
 ifndef GASNET_ROOT
-$(error GASNET_ROOT not specified)
+  $(error GASNET_ROOT not specified)
 endif
 ifndef GASNET_CONDUIT
-$(error GASNET_CONDUIT not specified)
+  $(error GASNET_CONDUIT not specified)
 endif
 ifndef GASNET_TYPE
-$(error GASNET_TYPE not specified)
+  $(error GASNET_TYPE not specified)
 endif
 
 ########################################################################
@@ -111,13 +117,13 @@ endif
 # ocrTests will pick 'OCR_LDFLAGS' if defined
 
 ifeq ($(GASNET_TYPE),seq)
-GASNET_CFLAGS += -DGASNET_SEQ
+  GASNET_CFLAGS += -DGASNET_SEQ
 else
-ifeq ($(GASNET_TYPE),par)
-GASNET_CFLAGS += -DGASNET_PAR
-else
-GASNET_CFLAGS += GASNET_PARSYNC
-endif
+  ifeq ($(GASNET_TYPE),par)
+    GASNET_CFLAGS += -DGASNET_PAR
+  else
+    GASNET_CFLAGS += GASNET_PARSYNC
+  endif
 endif
 
 #

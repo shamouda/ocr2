@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "ocr.h"
 #include "utils/tracer/tracer.h"
 #include "utils/tracer/trace-events.h"
 
@@ -34,7 +35,7 @@ int main(int argc, char *argv[]){
         binaryPath = "";
     }
 
-    ocrTraceObj_t trace;
+    ocrTraceObj_t *trace = malloc(sizeof(ocrTraceObj_t));
     //Attempt to open trace binary
     FILE *f = fopen(fname, "r");
     if(f == NULL){
@@ -71,8 +72,8 @@ int main(int argc, char *argv[]){
     }
 
     //Read each trace record, and decode
-    while(fread(&trace, sizeof(ocrTraceObj_t), 1, f)){
-        translateObject(&trace, lineCount, fctPtrs);
+    while(fread(trace, sizeof(ocrTraceObj_t), 1, f)){
+        translateObject(trace, lineCount, fctPtrs);
     }
 
     fclose(f);
@@ -82,9 +83,9 @@ int main(int argc, char *argv[]){
 void genericPrint(bool evtType, ocrTraceType_t ttype, ocrTraceAction_t action,
                   u64 location, u64 workerId, u64 timestamp, ocrGuid_t parent){
 
-    if(parent != NULL_GUID){
-        printf("[TRACE] U/R: %s | PD: 0x%lx | WORKER_ID: %lu | TIMESTAMP: %lu | TYPE: %s | ACTION: %s | PARENT: 0x%lx\n",
-                evt_type[evtType], location, workerId, timestamp, obj_type[ttype-IDX_OFFSET], action_type[action], parent);
+    if(!(ocrGuidIsNull(parent))){
+        printf("[TRACE] U/R: %s | PD: 0x%lx | WORKER_ID: %lu | TIMESTAMP: %lu | TYPE: %s | ACTION: %s | PARENT: "GUIDF"\n",
+                evt_type[evtType], location, workerId, timestamp, obj_type[ttype-IDX_OFFSET], action_type[action], GUIDA(parent));
     }else{
 
         printf("[TRACE] U/R: %s | PD: 0x%lx | WORKER_ID: %lu | TIMESTAMP: %lu | TYPE: %s | ACTION: %s\n",
@@ -125,15 +126,15 @@ void translateObject(ocrTraceObj_t *trace, int lineCount, long *fctPtrs){
             {
                 ocrGuid_t src = TRACE_FIELD(TASK, taskDepSatisfy, trace, depID);
 
-                printf("[TRACE] U/R: %s | PD: 0x%lx | WORKER_ID: %lu | TIMESTAMP: %lu | TYPE: EDT | ACTION: DEP_SATISFY | DEP_GUID: 0x%lx\n",
-                        evt_type[evtType], location, workerId, timestamp, (u64)src);
+                printf("[TRACE] U/R: %s | PD: 0x%lx | WORKER_ID: %lu | TIMESTAMP: %lu | TYPE: EDT | ACTION: DEP_SATISFY | DEP_GUID: "GUIDF"\n",
+                        evt_type[evtType], location, workerId, timestamp, GUIDA(src));
                 break;
             }
             case OCR_ACTION_ADD_DEP:
             {
                 ocrGuid_t dest = TRACE_FIELD(TASK, taskDepReady, trace, depID);
-                printf("[TRACE] U/R: %s | PD: 0x%lx | WORKER_ID: %lu | TIMESTAMP: %lu | TYPE: EDT | ACTION: ADD_DEP | DEP_GUID: 0x%lx\n",
-                        evt_type[evtType], location, workerId, timestamp, dest);
+                printf("[TRACE] U/R: %s | PD: 0x%lx | WORKER_ID: %lu | TIMESTAMP: %lu | TYPE: EDT | ACTION: ADD_DEP | DEP_GUID: "GUIDF"\n",
+                        evt_type[evtType], location, workerId, timestamp, GUIDA(dest));
                 break;
             }
             case OCR_ACTION_EXECUTE:
@@ -164,8 +165,8 @@ void translateObject(ocrTraceObj_t *trace, int lineCount, long *fctPtrs){
                 ocrGuid_t edtGuid = TRACE_FIELD(TASK, taskDataAcquire, trace, taskGuid);
                 ocrGuid_t dbGuid = TRACE_FIELD(TASK, taskDataAcquire, trace, dbGuid);
                 u64 size = TRACE_FIELD(TASK, taskDataAcquire, trace, size);
-                printf("[TRACE] U/R: %s | PD: 0x%lx | WORKER_ID: %lu | TIMESTAMP: %lu | TYPE: EDT | ACTION: DB_ACQUIRE | EDT_GUID: 0x%lx | DB_GUID: 0x%lx | DB_SIZE: %lu\n",
-                        evt_type[evtType], location, workerId, timestamp, edtGuid, dbGuid, size);
+                printf("[TRACE] U/R: %s | PD: 0x%lx | WORKER_ID: %lu | TIMESTAMP: %lu | TYPE: EDT | ACTION: DB_ACQUIRE | EDT_GUID: "GUIDF" | DB_GUID: "GUIDF" | DB_SIZE: %lu\n",
+                        evt_type[evtType], location, workerId, timestamp, GUIDA(edtGuid), GUIDA(dbGuid), size);
 
                 break;
             }
@@ -175,8 +176,8 @@ void translateObject(ocrTraceObj_t *trace, int lineCount, long *fctPtrs){
                 ocrGuid_t edtGuid = TRACE_FIELD(TASK, taskDataRelease, trace, taskGuid);
                 ocrGuid_t dbGuid = TRACE_FIELD(TASK, taskDataRelease, trace, dbGuid);
                 u64 size = TRACE_FIELD(TASK, taskDataRelease, trace, size);
-                printf("[TRACE] U/R: %s | PD: 0x%lx | WORKER_ID: %lu | TIMESTAMP: %lu | TYPE: EDT | ACTION: DB_RELEASE | EDT_GUID: 0x%lx | DB_GUID: 0x%lx | DB_SIZE: %lu\n",
-                        evt_type[evtType], location, workerId, timestamp, edtGuid, dbGuid, size);
+                printf("[TRACE] U/R: %s | PD: 0x%lx | WORKER_ID: %lu | TIMESTAMP: %lu | TYPE: EDT | ACTION: DB_RELEASE | EDT_GUID: "GUIDF" | DB_GUID: "GUIDF" | DB_SIZE: %lu\n",
+                        evt_type[evtType], location, workerId, timestamp, GUIDA(edtGuid), GUIDA(dbGuid), size);
 
                 break;
             }
@@ -202,8 +203,8 @@ void translateObject(ocrTraceObj_t *trace, int lineCount, long *fctPtrs){
             case OCR_ACTION_SATISFY:
             {
                 ocrGuid_t src = TRACE_FIELD(EVENT, eventDepSatisfy, trace, depID);
-                printf("[TRACE] U/R: %s | PD: 0x%lx | WORKER_ID: %lu | TIMESTAMP: %lu | TYPE: EVENT | ACTION: DEP_SATISFY | DEP_GUID: 0x%lx\n",
-                       evt_type[evtType], location, workerId, timestamp, (u64)src);
+                printf("[TRACE] U/R: %s | PD: 0x%lx | WORKER_ID: %lu | TIMESTAMP: %lu | TYPE: EVENT | ACTION: DEP_SATISFY | DEP_GUID: "GUIDF"\n",
+                       evt_type[evtType], location, workerId, timestamp, GUIDA(src));
                 break;
             }
 
@@ -211,8 +212,8 @@ void translateObject(ocrTraceObj_t *trace, int lineCount, long *fctPtrs){
             {
                 ocrGuid_t dest = TRACE_FIELD(EVENT, eventDepAdd, trace, depID);
                 ocrGuid_t parent = TRACE_FIELD(EVENT, eventDepAdd, trace, parentID);
-                printf("[TRACE] U/R: %s | PD: 0x%lx | WORKER_ID: %lu | TIMESTAMP: %lu | TYPE: EVENT | ACTION: ADD_DEP | DEP_GUID: 0x%lx | PARENT: 0x%lx\n",
-                        evt_type[evtType], location, workerId, timestamp, dest, parent);
+                printf("[TRACE] U/R: %s | PD: 0x%lx | WORKER_ID: %lu | TIMESTAMP: %lu | TYPE: EVENT | ACTION: ADD_DEP | DEP_GUID: "GUIDF" | PARENT: "GUIDF"\n",
+                        evt_type[evtType], location, workerId, timestamp, GUIDA(dest), GUIDA(parent));
             }
                 break;
 
@@ -229,8 +230,8 @@ void translateObject(ocrTraceObj_t *trace, int lineCount, long *fctPtrs){
             {
                 ocrGuid_t parent = TRACE_FIELD(DATA, dataCreate, trace, parentID);
                 u64 size = TRACE_FIELD(DATA, dataCreate, trace, size);
-                printf("[TRACE] U/R: %s | PD: 0x%lx | WORKER_ID: %lu | TIMESTAMP: %lu | TYPE: DATABLOCK | ACTION: CREATE | SIZE: %lu | PARENT:     0x%lx\n",
-                        evt_type[evtType], location, workerId, timestamp, size, parent);
+                printf("[TRACE] U/R: %s | PD: 0x%lx | WORKER_ID: %lu | TIMESTAMP: %lu | TYPE: DATABLOCK | ACTION: CREATE | SIZE: %lu | PARENT: "GUIDF"\n",
+                        evt_type[evtType], location, workerId, timestamp, size, GUIDA(parent));
                 break;
             }
             case OCR_ACTION_DESTROY:

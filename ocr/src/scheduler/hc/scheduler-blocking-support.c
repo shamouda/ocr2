@@ -12,6 +12,7 @@
 #include "ocr-runtime-types.h"
 #include "ocr-sysboot.h"
 #include "ocr-workpile.h"
+#include "worker/hc/hc-worker.h"
 
 #define DEBUG_TYPE SCHEDULER
 //BUG #476 this should be set by configure or something
@@ -19,22 +20,26 @@
 
 #ifdef HELPER_MODE
 static u8 masterHelper(ocrWorker_t * worker) {
+#ifdef ENABLE_EXTENSION_BLOCKING_SUPPORT
+    ((ocrWorkerHc_t *) worker)->isHelping = 1;
+#endif
     // Save current worker context
     //BUG #204 this should be implemented in the worker
     ocrTask_t * suspendedTask = worker->curTask;
-    DPRINTF(DEBUG_LVL_VERB, "Shifting worker from EDT GUID "GUIDSx"\n",
-            GUIDFS(suspendedTask->guid));
-    // printf("MARKER2 MASTER HELPER invoked\n");
+    DPRINTF(DEBUG_LVL_VERB, "Shifting worker from EDT GUID "GUIDF"\n",
+            GUIDA(suspendedTask->guid));
     // In helper mode, just try to execute another task
     // on top of the currently executing task's stack.
     worker->fcts.workShift(worker);
 
     // restore worker context
     //BUG #204 this should be implemented in the worker
-    DPRINTF(DEBUG_LVL_VERB, "Worker shifting back to EDT GUID "GUIDSx"\n",
-            GUIDFS(suspendedTask->guid));
+    DPRINTF(DEBUG_LVL_VERB, "Worker shifting back to EDT GUID "GUIDF"\n",
+            GUIDA(suspendedTask->guid));
     worker->curTask = suspendedTask;
-
+#ifdef ENABLE_EXTENSION_BLOCKING_SUPPORT
+    ((ocrWorkerHc_t *) worker)->isHelping = 0;
+#endif
     return 0;
 }
 #endif

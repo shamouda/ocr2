@@ -18,7 +18,7 @@
 
 ocrGuid_t consumerEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrGuid_t dbCloneGuid = (ocrGuid_t) depv[0].guid;
-    PRINTF("consumerEdt: executing, depends on DB guid 0x%lx \n", dbCloneGuid);
+    PRINTF("consumerEdt: executing, depends on DB guid "GUIDF" \n", GUIDA(dbCloneGuid));
     TYPE_ELEM_DB v = 1;
     int i = 0;
     TYPE_ELEM_DB * data = (TYPE_ELEM_DB *) depv[0].ptr;
@@ -43,7 +43,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     void * dbPtr;
     ocrGuid_t dbGuid;
     u64 nbElem = NB_ELEM_DB;
-    ocrDbCreate(&dbGuid, &dbPtr, sizeof(TYPE_ELEM_DB) * NB_ELEM_DB, 0, NULL_GUID, NO_ALLOC);
+    ocrDbCreate(&dbGuid, &dbPtr, sizeof(TYPE_ELEM_DB) * NB_ELEM_DB, 0, NULL_HINT, NO_ALLOC);
     int v = 1;
     int i = 0;
     int * data = (int *) dbPtr;
@@ -52,15 +52,18 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
         i++;
     }
     ocrDbRelease(dbGuid);
-    PRINTF("mainEdt: local DB guid is 0x%lx, dbPtr=%p\n",dbGuid, dbPtr);
+    PRINTF("mainEdt: local DB guid is "GUIDF", dbPtr=%p\n", GUIDA(dbGuid), dbPtr);
 
     // create local edt that depends on the remote edt, the db is automatically cloned
     ocrGuid_t edtTemplateGuid;
     ocrEdtTemplateCreate(&edtTemplateGuid, consumerEdt, 0, 1);
+    ocrHint_t edtHint;
+    ocrHintInit( &edtHint, OCR_HINT_EDT_T );
+    ocrSetHintValue( & edtHint, OCR_HINT_EDT_AFFINITY, ocrAffinityToHintValue( edtAffinity) );
 
     ocrGuid_t edtGuid;
     ocrEdtCreate(&edtGuid, edtTemplateGuid, 0, NULL, 1, NULL,
-                 EDT_PROP_NONE, edtAffinity, NULL);
+                 EDT_PROP_NONE, &edtHint, NULL);
     ocrAddDependence(dbGuid, edtGuid, 0, DB_MODE_CONST);
 
     return NULL_GUID;

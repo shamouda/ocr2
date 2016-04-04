@@ -66,7 +66,7 @@ u8 lockableDestruct(ocrDataBlock_t *self);
 // simple helper function to resolve the location of a guid
 static ocrLocation_t fatGuidToLocation(ocrPolicyDomain_t * pd, ocrFatGuid_t fatGuid) {
     // at startup this code may be run outside of an EDT
-    if (IS_GUID_NULL(fatGuid.guid)) {
+    if (ocrGuidIsNull(fatGuid.guid)) {
         return pd->myLocation;
     } else {
         ocrLocation_t edtLoc = INVALID_LOCATION;
@@ -79,7 +79,7 @@ static ocrLocation_t fatGuidToLocation(ocrPolicyDomain_t * pd, ocrFatGuid_t fatG
 
 static ocrLocation_t guidToLocation(ocrPolicyDomain_t * pd, ocrGuid_t edtGuid) {
     // at startup this code may be run outside of an EDT
-    if (IS_GUID_NULL(edtGuid)) {
+    if (ocrGuidIsNull(edtGuid)) {
         return pd->myLocation;
     } else {
         ocrFatGuid_t fatGuid;
@@ -238,8 +238,8 @@ static u8 lockableAcquireInternal(ocrDataBlock_t *self, void** ptr, ocrFatGuid_t
     }
 
     rself->attributes.numUsers += 1;
-    DPRINTF(DEBUG_LVL_VERB, "Acquiring DB @ 0x%lx (GUID: "GUIDSx") from EDT (GUID: "GUIDSx") (runtime acquire: %d) (mode: %d) (numUsers: %d) (modeLock: %d)\n",
-            (u64)self->ptr, GUIDFS(rself->base.guid), GUIDFS(edt.guid), (u32)isInternal, (int) mode,
+    DPRINTF(DEBUG_LVL_VERB, "Acquiring DB @ 0x%"PRIx64" (GUID: "GUIDF") from EDT (GUID: "GUIDF") (runtime acquire: %"PRId32") (mode: %"PRId32") (numUsers: %"PRId32") (modeLock: %"PRId32")\n",
+            (u64)self->ptr, GUIDA(rself->base.guid), GUIDA(edt.guid), (u32)isInternal, (int) mode,
             rself->attributes.numUsers, rself->attributes.modeLock);
 
 #ifdef OCR_ENABLE_STATISTICS
@@ -298,8 +298,8 @@ u8 lockableAcquire(ocrDataBlock_t *self, void** ptr, ocrFatGuid_t edt, u32 edtSl
 u8 lockableRelease(ocrDataBlock_t *self, ocrFatGuid_t edt, bool isInternal) {
     ocrDataBlockLockable_t *rself = (ocrDataBlockLockable_t*)self;
     dbWaiter_t * waiter = NULL;
-    DPRINTF(DEBUG_LVL_VERB, "Releasing DB @ 0x%lx (GUID "GUIDSx") from EDT "GUIDSx" (runtime release: %d)\n",
-            (u64)self->ptr, GUIDFS(rself->base.guid), GUIDFS(edt.guid), (u32)isInternal);
+    DPRINTF(DEBUG_LVL_VERB, "Releasing DB @ 0x%"PRIx64" (GUID "GUIDF") from EDT "GUIDF" (runtime release: %"PRId32")\n",
+            (u64)self->ptr, GUIDA(rself->base.guid), GUIDA(edt.guid), (u32)isInternal);
     // Start critical section
     hal_lock32(&(rself->lock));
     ocrWorker_t * worker;
@@ -434,8 +434,8 @@ u8 lockableRelease(ocrDataBlock_t *self, ocrFatGuid_t edt, bool isInternal) {
             }
         }
     }
-    DPRINTF(DEBUG_LVL_VVERB, "DB (GUID: "GUIDSx") attributes: numUsers %d (including %d runtime users); freeRequested %d\n",
-            GUIDFS(self->guid), rself->attributes.numUsers, rself->attributes.internalUsers, rself->attributes.freeRequested);
+    DPRINTF(DEBUG_LVL_VVERB, "DB (GUID: "GUIDF") attributes: numUsers %"PRId32" (including %"PRId32" runtime users); freeRequested %"PRId32"\n",
+            GUIDA(self->guid), rself->attributes.numUsers, rself->attributes.internalUsers, rself->attributes.freeRequested);
 
 #ifdef OCR_ENABLE_STATISTICS
     {
@@ -456,7 +456,7 @@ u8 lockableRelease(ocrDataBlock_t *self, ocrFatGuid_t edt, bool isInternal) {
 }
 
 u8 lockableDestruct(ocrDataBlock_t *self) {
-    DPRINTF(DEBUG_LVL_VERB, "Freeing DB (GUID: "GUIDSx")\n", GUIDFS(self->guid));
+    DPRINTF(DEBUG_LVL_VERB, "Freeing DB (GUID: "GUIDF")\n", GUIDA(self->guid));
     ocrPolicyDomain_t *pd = NULL;
     PD_MSG_STACK(msg);
     getCurrentEnv(&pd, NULL, NULL, &msg);
@@ -517,8 +517,8 @@ u8 lockableFree(ocrDataBlock_t *self, ocrFatGuid_t edt, u32 properties) {
     bool isInternal = ((properties & DB_PROP_RT_ACQUIRE) != 0);
     bool reqRelease = ((properties & DB_PROP_NO_RELEASE) == 0);
     ocrDataBlockLockable_t *rself = (ocrDataBlockLockable_t*)self;
-    DPRINTF(DEBUG_LVL_VERB, "Requesting a free for DB @ 0x%lx (GUID: "GUIDSx"); props: 0x%x\n",
-            (u64)self->ptr, GUIDFS(rself->base.guid), properties);
+    DPRINTF(DEBUG_LVL_VERB, "Requesting a free for DB @ 0x%"PRIx64" (GUID: "GUIDF"); props: 0x%"PRIx32"\n",
+            (u64)self->ptr, GUIDA(rself->base.guid), properties);
 
     hal_lock32(&(rself->lock));
     if(rself->attributes.freeRequested) {
@@ -536,8 +536,8 @@ u8 lockableFree(ocrDataBlock_t *self, ocrFatGuid_t edt, u32 properties) {
         // The datablock may not have been acquired by the current EDT hence
         // we do not need to account for a release.
         if (reqRelease) {
-            DPRINTF(DEBUG_LVL_VVERB, "Free triggering release for DB @ 0x%lx (GUID: 0x%lx)\n",
-                    (u64)self->ptr, rself->base.guid);
+            DPRINTF(DEBUG_LVL_VVERB, "Free triggering release for DB @ 0x%"PRIx64" (GUID: "GUIDF")\n",
+                    (u64)self->ptr, GUIDA(rself->base.guid));
             lockableRelease(self, edt, isInternal);
         }
     }
@@ -557,7 +557,8 @@ u8 lockableUnregisterWaiter(ocrDataBlock_t *self, ocrFatGuid_t waiter, u32 slot,
 }
 
 u8 newDataBlockLockable(ocrDataBlockFactory_t *factory, ocrFatGuid_t *guid, ocrFatGuid_t allocator,
-                        ocrFatGuid_t allocPD, u64 size, void* ptr, u32 flags, ocrParamList_t *perInstance) {
+                        ocrFatGuid_t allocPD, u64 size, void* ptr, ocrHint_t *hint, u32 flags,
+                        ocrParamList_t *perInstance) {
     ocrPolicyDomain_t *pd = NULL;
     u8 returnValue = 0;
     ocrGuid_t resultGuid = NULL_GUID;
@@ -628,9 +629,9 @@ u8 newDataBlockLockable(ocrDataBlockFactory_t *factory, ocrFatGuid_t *guid, ocrF
                    &(result->base));
 #endif /* OCR_ENABLE_STATISTICS */
 
-    DPRINTF(DEBUG_LVL_VERB, "Creating a datablock of size %lu, @ 0x%lx (GUID: "GUIDSx")\n",
-            size, (u64)result->base.ptr, GUIDFS(result->base.guid),
-            false, OCR_TRACE_TYPE_DATABLOCK, OCR_ACTION_CREATE, size);
+    DPRINTF(DEBUG_LVL_VERB, "Creating a datablock of size %"PRIu64", @ 0x%"PRIx64" (GUID: "GUIDF")\n",
+            size, (u64)result->base.ptr, GUIDA(result->base.guid));
+    OCR_TOOL_TRACE(false, OCR_TRACE_TYPE_DATABLOCK, OCR_ACTION_CREATE, size);
 
     // Do this at the very end; it indicates that the object
     // is actually valid
@@ -676,7 +677,7 @@ ocrDataBlockFactory_t *newDataBlockFactoryLockable(ocrParamList_t *perType, u32 
 
     base->instantiate = FUNC_ADDR(u8 (*)
                                   (ocrDataBlockFactory_t*, ocrFatGuid_t*, ocrFatGuid_t, ocrFatGuid_t,
-                                   u64, void*, u32, ocrParamList_t*), newDataBlockLockable);
+                                   u64, void*, ocrHint_t*, u32, ocrParamList_t*), newDataBlockLockable);
     base->destruct = FUNC_ADDR(void (*)(ocrDataBlockFactory_t*), destructLockableFactory);
     base->fcts.destruct = FUNC_ADDR(u8 (*)(ocrDataBlock_t*), lockableDestruct);
     base->fcts.acquire = FUNC_ADDR(u8 (*)(ocrDataBlock_t*, void**, ocrFatGuid_t, u32, ocrDbAccessMode_t, bool, u32), lockableAcquire);

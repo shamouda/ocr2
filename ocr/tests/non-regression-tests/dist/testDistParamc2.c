@@ -32,10 +32,13 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     // Setup the test
     ocrGuid_t remoteEdtTemplateGuid;
     ocrEdtTemplateCreate(&remoteEdtTemplateGuid, remoteEdt, EDT_PARAM_UNK, 0);
+    ocrHint_t edtHint;
+    ocrHintInit( &edtHint, OCR_HINT_EDT_T );
+    ocrSetHintValue( & edtHint, OCR_HINT_EDT_AFFINITY, ocrAffinityToHintValue( edtAffinity) );
     ocrGuid_t edtGuid;
     u64 edtParamv[4] = {111,222,333,444};
     ocrEdtCreate(&edtGuid, remoteEdtTemplateGuid, 4, (u64*) &edtParamv, 0, NULL,
-        EDT_PROP_NONE, edtAffinity, NULL);
+        EDT_PROP_NONE, &edtHint, NULL);
 
     return NULL_GUID;
 }

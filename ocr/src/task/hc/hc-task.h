@@ -22,7 +22,7 @@
 #ifdef ENABLE_HINTS
 /**< The number of hint properties supported by this implementation
  * The properties supported are specified in the hc-task.c file. */
-#define OCR_HINT_COUNT_EDT_HC   5
+#define OCR_HINT_COUNT_EDT_HC   6
 #else
 #define OCR_HINT_COUNT_EDT_HC   0
 #endif

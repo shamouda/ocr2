@@ -401,10 +401,10 @@ static inline void setChecksum (void * addr, u32 len) {
 
 static inline void checkChecksum (void * addr, u32 len, u32 linenum, char * structType) {
     if (calcChecksum(addr, len) != *((u64 *) addr)) {
-        DPRINTF (DEBUG_LVL_WARN, "Checksum failure in pool data structure %s, detected at %s line %d\n", structType, __FILE__, linenum);
+        DPRINTF (DEBUG_LVL_WARN, "Checksum failure in pool data structure %s, detected at %s line %"PRId32"\n", structType, __FILE__, linenum);
         u32 i;
         for (i = 0; i < len; i += sizeof(u64)) {
-            DPRINTF(DEBUG_LVL_WARN, "    0x%lx = 0x%lx\n", (((u64) addr) + i), *((u64 *) (((u64) addr) + i)));
+            DPRINTF(DEBUG_LVL_WARN, "    0x%"PRIx64" = 0x%"PRIx64"\n", (((u64) addr) + i), *((u64 *) (((u64) addr) + i)));
         }
         ASSERT(0);
     }
@@ -1098,12 +1098,12 @@ static u32 tlsfInit(poolHdr_t * pPool, u64 size) {
     // Now we have a poolHeaderSize that is big enough to contain the pool and right after it, we can start the glebe.
     sizeRemainingAfterPoolHeader = size - poolHeaderSize;
     if(sizeRemainingAfterPoolHeader < GminBlockSizeIncludingHdr) {
-        DPRINTF(DEBUG_LVL_WARN, "Not enough space provided to make a meaningful TLSF pool at pPool=0x%lx.", (u64)pPool);
-        DPRINTF(DEBUG_LVL_WARN, "Provision of %ld bytes nets a glebe (net pool size, after pool overhead) of %ld bytes\n",
+        DPRINTF(DEBUG_LVL_WARN, "Not enough space provided to make a meaningful TLSF pool at pPool=0x%"PRIx64".", (u64)pPool);
+        DPRINTF(DEBUG_LVL_WARN, "Provision of %"PRId64" bytes nets a glebe (net pool size, after pool overhead) of %"PRId64" bytes\n",
             (u64) size, (u64)sizeRemainingAfterPoolHeader);
         return -1; // Can't allocate pool
     }
-    DPRINTF(DEBUG_LVL_INFO,"Allocating a TLSF pool at 0x%lx of %ld bytes (glebe size, i.e. net size after pool overhead)\n",
+    DPRINTF(DEBUG_LVL_INFO,"Allocating a TLSF pool at 0x%"PRIx64" of %"PRId64" bytes (glebe size, i.e. net size after pool overhead)\n",
         (u64)pPool, (u64)sizeRemainingAfterPoolHeader);
 
     blkHdr_t * pGlebe = GET_glebeAsInitialBlock(pPool);
@@ -1170,24 +1170,24 @@ static blkPayload_t * tlsfMalloc(poolHdr_t * pPool, u64 size)
 
     payloadSize = getRealSizeOfRequest(size);
     if(size > 0 && payloadSize == 0) {
-        DPRINTF(DEBUG_LVL_INFO, "tlsfMalloc returning NULL for request size too large (%ld bytes) on pool at 0x%lx\n",
+        DPRINTF(DEBUG_LVL_INFO, "tlsfMalloc returning NULL for request size too large (%"PRId64" bytes) on pool at 0x%"PRIx64"\n",
                size, (u64) pPool);
         return _NULL;
     }
 
     pAvailableBlock = findFreeBlockForRealSize(pPool, payloadSize, &flIndex, &slIndex);
     if (pAvailableBlock == NULL) {
-        DPRINTF(DEBUG_LVL_INFO, "tlsfMalloc @0x%lx could not accomodate a block of size 0x%lx / %ld\n",
+        DPRINTF(DEBUG_LVL_INFO, "tlsfMalloc @0x%"PRIx64" could not accomodate a block of size 0x%"PRIx64" / %"PRId64"\n",
             (u64) pPool, (u64) payloadSize, (u64) payloadSize);
     } else {
-        DPRINTF(DEBUG_LVL_INFO, "tlsfMalloc @0x%lx found a free block at 0x%lx for block of size 0x%lx / %ld\n",
+        DPRINTF(DEBUG_LVL_INFO, "tlsfMalloc @0x%"PRIx64" found a free block at 0x%"PRIx64" for block of size 0x%"PRIx64" / %"PRId64"\n",
             (u64) pPool, (u64) pAvailableBlock, (u64) payloadSize, (u64) payloadSize);
     }
 
     if (pAvailableBlock == _NULL) {
         // No longer print this warning here.  It is on the caller's head to decide if it should generate the
         // warning.  The other possibility is that the caller might try allocating the block in a different pool.
-        //DPRINTF(DEBUG_LVL_WARN, "tlsfMalloc @ 0x%lx returning NULL for size %ld\n",
+        //DPRINTF(DEBUG_LVL_WARN, "tlsfMalloc @ 0x%"PRIx64" returning NULL for size %"PRId64"\n",
         //        (u64) pPool, size);
         return _NULL;
     }
@@ -1197,25 +1197,25 @@ static blkPayload_t * tlsfMalloc(poolHdr_t * pPool, u64 size)
     if(returnedSize > payloadSize + GminBlockSizeIncludingHdr) {
         pRemainingBlock = splitBlock(pPool, pAvailableBlock, payloadSize);
         VALGRIND_DEFINED1(pRemainingBlock);
-        DPRINTF(DEBUG_LVL_VVERB, "tlsfMalloc @0x%lx split block and re-added to free list 0x%lx\n",
+        DPRINTF(DEBUG_LVL_VVERB, "tlsfMalloc @0x%"PRIx64" split block and re-added to free list 0x%"PRIx64"\n",
             (u64) pPool, (u64) (pRemainingBlock));
         addFreeBlock(pPool, pRemainingBlock);
         VALGRIND_NOACCESS1(pRemainingBlock);
     } else {
-        DPRINTF(DEBUG_LVL_VVERB, "tlsfMalloc. Widow, too small to utilize.  Payload size ask: %ld, getting %ld.  Contents:\n",
+        DPRINTF(DEBUG_LVL_VVERB, "tlsfMalloc. Widow, too small to utilize.  Payload size ask: %"PRId64", getting %"PRId64".  Contents:\n",
             (u64) payloadSize, (u64) returnedSize);
         u32 i;
         pResult = payloadAddressForBlock(pAvailableBlock);
         for (i = payloadSize; i < returnedSize; i += sizeof(u64)) {
-            DPRINTF(DEBUG_LVL_VVERB, "    0x%lx = \n", ((u64) pResult) + i);
-            DPRINTF(DEBUG_LVL_VVERB, "                    0x%lx\n", *((u64 *) (((u64) pResult) + i)));
+            DPRINTF(DEBUG_LVL_VVERB, "    0x%"PRIx64" = \n", ((u64) pResult) + i);
+            DPRINTF(DEBUG_LVL_VVERB, "                    0x%"PRIx64"\n", *((u64 *) (((u64) pResult) + i)));
         }
     }
     markBlockUsed(pPool, pAvailableBlock);
     VALGRIND_NOACCESS1(pAvailableBlock);
     pResult = payloadAddressForBlock(pAvailableBlock);
     returnedSize = GET_payloadSize(pAvailableBlock);
-    DPRINTF(DEBUG_LVL_INFO, "tlsfMalloc @ 0x%lx returning 0x%lx for size %ld, returnedSize = 0x%lx, pResult=0x%lx\n",
+    DPRINTF(DEBUG_LVL_INFO, "tlsfMalloc @ 0x%"PRIx64" returning 0x%"PRIx64" for size %"PRId64", returnedSize = 0x%"PRIx64", pResult=0x%"PRIx64"\n",
         (u64) pPool, (u64) pResult, (u64) size, (u64) returnedSize, (u64) pResult);
 #ifdef ENABLE_ALLOCATOR_INIT_NEW_DB_PAYLOAD
     u32 i;
@@ -1240,7 +1240,7 @@ static void tlsfFree(poolHdr_t * pPool, blkPayload_t * pPayload) {
 #else
 #define detail2 " "
 #endif
-    DPRINTF(DEBUG_LVL_INFO, "tlsfFree         pool @ 0x%lx: free 0x%lx to 0x%lx, payloadSize=%ld/0x%lx, %s %s\n",
+    DPRINTF(DEBUG_LVL_INFO, "tlsfFree         pool @ 0x%"PRIx64": free 0x%"PRIx64" to 0x%"PRIx64", payloadSize=%"PRId64"/0x%"PRIx64", %s %s\n",
             (u64) pPool, (u64) pBlk, ((u64) pPayload)+payloadSize, (u64) payloadSize, (u64) payloadSize, detail1, detail2);
 #undef detail1
 #undef detail2
@@ -1274,7 +1274,7 @@ static void tlsfFree(poolHdr_t * pPool, blkPayload_t * pPayload) {
     addFreeBlock(pPool, pBlk);
 #endif // valgrind conditional
 #endif // leakage conditional
-    DPRINTF(DEBUG_LVL_INFO, "tlsfFree done on pool @ 0x%lx: free 0x%lx to 0x%lx, payloadSize=%ld/0x%lx\n",
+    DPRINTF(DEBUG_LVL_INFO, "tlsfFree done on pool @ 0x%"PRIx64": free 0x%"PRIx64" to 0x%"PRIx64", payloadSize=%"PRId64"/0x%"PRIx64"\n",
             (u64) pPool, (u64) pBlk, ((u64) pPayload)+payloadSize, (u64) payloadSize, (u64) payloadSize);
 }
 
@@ -1412,13 +1412,13 @@ static ocrAllocator_t * getAnchorCE (ocrAllocator_t * self) {
 }
 
 void tlsfDestruct(ocrAllocator_t *self) {
-    DPRINTF(DEBUG_LVL_INFO, "Entered tlsfDesctruct on allocator 0x%lx\n", (u64) self);
+    DPRINTF(DEBUG_LVL_INFO, "Entered tlsfDesctruct on allocator 0x%"PRIx64"\n", (u64) self);
     ASSERT(self->memoryCount == 1);
     self->memories[0]->fcts.destruct(self->memories[0]);
     runtimeChunkFree((u64)self->memories, PERSISTENT_CHUNK);
 
     runtimeChunkFree((u64)self, PERSISTENT_CHUNK);
-    DPRINTF(DEBUG_LVL_INFO, "Leaving tlsfDesctruct on allocator 0x%lx\n", (u64) self);
+    DPRINTF(DEBUG_LVL_INFO, "Leaving tlsfDesctruct on allocator 0x%"PRIx64"\n", (u64) self);
 }
 
 static bool isAnchor (ocrAllocatorTlsf_t * rself, ocrAllocatorTlsf_t * rAnchorCE) {
@@ -1451,8 +1451,8 @@ static void tlsfInitPool(ocrAllocatorTlsf_t *rself) {
     rself->poolStorageSuffix = rself->poolSize & (ALIGNMENT-1LL);
     rself->poolSize &= ~(ALIGNMENT-1LL);
     DPRINTF(DEBUG_LVL_VERB,
-            "TLSF Allocator @ 0x%llx got pool at address 0x%llx of size %lld, offset from storage addr by %lld\n",
-            (u64) rself, (u64) (rself->poolAddr), (u64) (rself->poolSize), (u64) (rself->poolStorageOffset));
+            "TLSF Allocator @ %p got pool at address 0x%"PRIx64" of size %"PRId64", offset from storage addr by %"PRId64"\n",
+            rself, rself->poolAddr, (u64) (rself->poolSize), (u64) (rself->poolStorageOffset));
 #ifdef OCR_ENABLE_STATISTICS
     statsALLOCATOR_START(PD, self->guid, anchorCE, self->memories[0]->guid, self->memories[0]);
 #endif
@@ -1461,8 +1461,8 @@ static void tlsfInitPool(ocrAllocatorTlsf_t *rself) {
     ASSERT(((rself->sliceCount+2)*rself->sliceSize)<=rself->poolSize);
 
     for (i = 0; i < rself->sliceCount; i++) {
-        DPRINTF(DEBUG_LVL_VVERB, "TLSF Allocator at 0x%llx initializing slice %d"
-                " at address 0x%llx of size %lld", rself, i, rself->poolAddr, rself->sliceSize);
+        DPRINTF(DEBUG_LVL_VVERB, "TLSF Allocator at %p initializing slice %"PRId32""
+                " at address 0x%"PRIx64" of size %"PRId64"", rself, i, rself->poolAddr, rself->sliceSize);
         RESULT_ASSERT(tlsfInit(((poolHdr_t *) (rself->poolAddr)), rself->sliceSize), ==, 0);
 #ifdef ENABLE_VALGRIND
         VALGRIND_CREATE_MEMPOOL(((poolHdr_t *) (rself->poolAddr)), 0, false);
@@ -1674,7 +1674,7 @@ void* tlsfAllocate(
     VALGRIND_MAKE_MEM_DEFINED((u64) pPool, sizeOfPoolHdr);
 #endif
     hal_lock32(&(pPool->lock));
-    DPRINTF(DEBUG_LVL_INFO, "TLSF Allocate called with allocator 0x%llx, pool 0x%llx, for size %lld and useRemnant %d\n",
+    DPRINTF(DEBUG_LVL_INFO, "TLSF Allocate called with allocator %p, pool %p, for size %"PRId64" and useRemnant %"PRId32"\n",
             self, pPool, size, useRemnant);
     checkChecksum(&pPool->checksum,      sizeof(poolHdr_t)-sizeof(u64), __LINE__, "poolHdr_t");
     checkChecksum(&pPool->annexChecksum, GET_offsetToGlebe(pPool),      __LINE__, "poolHdr_t");
@@ -1686,7 +1686,7 @@ void* tlsfAllocate(
         u64 addr = ((u64) toReturn) - sizeof(blkHdr_t);
         u32 i;
         for (i = 0; i < sizeof(blkHdr_t); i += sizeof(u64)) {
-            DPRINTF(DEBUG_LVL_WARN, "    0x%lx = 0x%lx\n", (((u64) addr) + i), *((u64 *) (((u64) addr) + i)));
+            DPRINTF(DEBUG_LVL_WARN, "    0x%"PRIx64" = 0x%"PRIx64"\n", (((u64) addr) + i), *((u64 *) (((u64) addr) + i)));
         }
     }
 #endif
@@ -1848,8 +1848,8 @@ void initializeAllocatorTlsf(ocrAllocatorFactory_t * factory, ocrAllocator_t * s
     derived->poolStorageSuffix = 0;
     derived->lockForInit       = 0;
     derived->initAttributed    = 0ULL;
-    DPRINTF(DEBUG_LVL_INFO, "TLSF Allocator instance @ 0x%llx initialized with "
-            "sliceCount: %lld, sliceSize: %lld, poolSize: %lld",
+    DPRINTF(DEBUG_LVL_INFO, "TLSF Allocator instance @ %p initialized with "
+            "sliceCount: %"PRId32", sliceSize: %"PRId64", poolSize: %"PRId64"",
             self, derived->sliceCount, derived->sliceSize, derived->poolSize);
 }
 
@@ -1884,7 +1884,7 @@ ocrAllocatorFactory_t * newAllocatorFactoryTlsf(ocrParamList_t *perType) {
 static void printBlock(void *block_, void* extra) {
     blkHdr_t *bl = (blkHdr_t*)block_;
     u32 *count = (u32*)extra;
-    fprintf(stderr, "\tBlock %d starts at 0x%lx (user: 0x%lx) of size %d (user: %d) %s\n",
+    fprintf(stderr, "\tBlock %"PRId32" starts at 0x%"PRIx64" (user: 0x%"PRIx64") of size %"PRId32" (user: %"PRId32") %s\n",
             *count, bl, (char*)bl + (GusedBlockOverhead << ELEMENT_SIZE_LOG2),
             bl->payloadSize, (bl->payloadSize << ELEMENT_SIZE_LOG2),
             GET_isThisBlkFree(bl)?"free":"used");
@@ -1903,12 +1903,12 @@ static void verifyFlags(void *block_, void* extra) {
 
     if(GET_isPrevNbrBlkFree(bl) != verif->isPrevFree) {
         verif->countErrors += 1;
-        fprintf(stderr, "Mismatch in free flag for block 0x%x\n", bl);
+        fprintf(stderr, "Mismatch in free flag for block 0x%"PRIx32"\n", bl);
     }
     if(GET_isThisBlkFree(bl)) {
         verif->countConsecutiveFrees += 1;
         if(verif->countConsecutiveFrees > 1) {
-            fprintf(stderr, "Blocks did not coalesce (count of %d at 0x%x)\n",
+            fprintf(stderr, "Blocks did not coalesce (count of %"PRId32" at 0x%"PRIx32")\n",
                     verif->countConsecutiveFrees, bl);
             verif->countErrors += 1;
         }
@@ -1961,45 +1961,45 @@ u32 tlsf_check_heap(u64 pgStart, unsigned u32 *freeRemaining) {
 
             if(!hasFlAvail && hasSlAvail) {
                 ++errCount;
-                fprintf(stderr, "FL and SL lists do not match for (%d, %d)\n", i, j);
+                fprintf(stderr, "FL and SL lists do not match for (%"PRId32", %"PRId32")\n", i, j);
             }
 
             if(!hasSlAvail && (GET_ADDRESS(blockHead) != &(poolToUse->nullBlock))) {
                 ++errCount;
-                fprintf(stderr, "Empty list does not start with nullBLock for (%d, %d)\n", i, j);
+                fprintf(stderr, "Empty list does not start with nullBLock for (%"PRId32", %"PRId32")\n", i, j);
             }
             if(hasSlAvail) {
                 // We now check all the blocks
                 blkHdr_t *blockHeadPtr = GET_ADDRESS(blockHead);
                 while(blockHeadPtr != &(poolToUse->nullBlock)) {
                     if(!GET_isThisBlkFree(blockHeadPtr)) {
-                        fprintf(stderr, "Block 0x%x should be free for (%d, %d)\n", blockHeadPtr, i, j);
+                        fprintf(stderr, "Block 0x%"PRIx32" should be free for (%"PRId32", %"PRId32")\n", blockHeadPtr, i, j);
                         ++errCount;
                     }
                     if(GET_isThisBlkFree(GET_ADDRESS(getNextNbrBlock(blockHeadPtr)))) {
-                        fprintf(stderr, "Block 0x%x should have coalesced with next for (%d, %d)\n", blockHeadPtr, i, j);
+                        fprintf(stderr, "Block 0x%"PRIx32" should have coalesced with next for (%"PRId32", %"PRId32")\n", blockHeadPtr, i, j);
                         ++errCount;
                     }
                     if(!GET_isPrevNbrBlkFree(GET_ADDRESS(getNextNbrBlock(blockHeadPtr)))) {
-                        fprintf(stderr, "Block 0x%x is not prevFree for (%d, %d)\n", blockHeadPtr, i, j);
+                        fprintf(stderr, "Block 0x%"PRIx32" is not prevFree for (%"PRId32", %"PRId32")\n", blockHeadPtr, i, j);
                         ++errCount;
                     }
                     if(blockHeadPtr != GET_ADDRESS(getPrevNbrBlock(GET_ADDRESS(getNextNbrBlock(blockHeadPtr))))) {
 
-                        fprintf(stderr, "Block 0x%x cannot be back-reached for (%d, %d)\n", blockHeadPtr, i, j);
+                        fprintf(stderr, "Block 0x%"PRIx32" cannot be back-reached for (%"PRId32", %"PRId32")\n", blockHeadPtr, i, j);
                         ++errCount;
                     }
                     if(blockHeadPtr->payloadSize < (GminBlockRealSize - GusedBlockOverhead)
                             || blockHeadPtr->payloadSize > GmaxBlockRealSize) {
 
-                        fprintf(stderr, "Block 0x%x has illegal size for (%d, %d)\n", blockHeadPtr, i, j);
+                        fprintf(stderr, "Block 0x%"PRIx32" has illegal size for (%"PRId32", %"PRId32")\n", blockHeadPtr, i, j);
                         ++errCount;
                     }
 
                     u32 tf, ts;
                     mappingInsert(blockHeadPtr->payloadSize, &tf, &ts);
                     if(tf != i || ts != j) {
-                        fprintf(stderr, "Block 0x%x is in wrong bucket for (%d, %d)\n", blockHeadPtr, i, j);
+                        fprintf(stderr, "Block 0x%"PRIx32" is in wrong bucket for (%"PRId32", %"PRId32")\n", blockHeadPtr, i, j);
                         ++errCount;
                     }
                     countFree += blockHeadPtr->payloadSize;

@@ -97,7 +97,7 @@ typedef struct _paramListPolicyDomainInst_t {
  */
 #define PD_MSG_DB_OP            0x001
 /**< Create a memory area (allocate) */
-#define PD_MSG_DB_CREATE        0x00091001
+#define PD_MSG_DB_CREATE        0x00051001
 /**< Destroy a DB (orginates from PD<->PD) */
 #define PD_MSG_DB_DESTROY       0x00082001
 /**< Acquires a DB */
@@ -120,7 +120,7 @@ typedef struct _paramListPolicyDomainInst_t {
  */
 #define PD_MSG_WORK_OP          0x004
 /**< Create an EDT */
-#define PD_MSG_WORK_CREATE      0x00121004
+#define PD_MSG_WORK_CREATE      0x000E1004
 /**< Execute this EDT (originates from PD<->PD) */
 #define PD_MSG_WORK_EXECUTE     0x00042004
 /**< Destroy an EDT (originates from PD<->PD) */
@@ -267,18 +267,18 @@ typedef struct _paramListPolicyDomainInst_t {
 /**< And this to just get the type of the message (note that the number
  * of ocrFatGuid_t is part of the type as for a given type, this won't change)
  */
-#define PD_MSG_TYPE_ONLY        0x00FFFFFFULL
+#define PD_MSG_TYPE_ONLY        0x00FFFFFFUL
 
 /**< Get just the flags */
-#define PD_MSG_META_ONLY        0xFF000000ULL
+#define PD_MSG_META_ONLY        0xFF000000UL
 
 /**< Get just the number of ocrFatGuid_t in the in/out part */
-#define PD_MSG_FG_IO_COUNT_ONLY    0x00030000ULL
+#define PD_MSG_FG_IO_COUNT_ONLY    0x00030000UL
 
 /**< Get just the number of ocrFatGuid_t in the in part */
-#define PD_MSG_FG_I_COUNT_ONLY     0x001C0000ULL
+#define PD_MSG_FG_I_COUNT_ONLY     0x001C0000UL
 
-#define PD_MSG_FG_O_COUNT_ONLY     0x00E00000ULL
+#define PD_MSG_FG_O_COUNT_ONLY     0x00E00000UL
 
 #define PD_MSG_FG_IO_COUNT_ONLY_GET(__msgtype) ((u32) (__msgtype & PD_MSG_FG_IO_COUNT_ONLY) >> 16)
 #define PD_MSG_FG_I_COUNT_ONLY_GET(__msgtype) ((u32) (__msgtype & PD_MSG_FG_I_COUNT_ONLY) >> 18)
@@ -423,9 +423,9 @@ typedef struct _ocrPolicyMsg_t {
             union {
                 struct {
                     ocrFatGuid_t edt;             /** In: EDT doing the creation */
-                    ocrFatGuid_t affinity;        /**< In: Affinity group for the DB */
                     ocrDataBlockType_t dbType;    /**< In: Type of memory requested */
                     ocrInDbAllocator_t allocator; /**< In: In-DB allocator */
+                    ocrHint_t * hint;             /**< In: Hints passed by the user at DB creation time */
                 } in;
                 struct {
                     void* ptr;                    /**< Out: Address of created DB */
@@ -541,11 +541,11 @@ typedef struct _ocrPolicyMsg_t {
             union {
                 struct {
                     ocrFatGuid_t templateGuid; /**< In: GUID of the template to use */
-                    ocrFatGuid_t affinity;     /**< In: Affinity for this EDT */
                     ocrFatGuid_t parentLatch;  /**< In: Parent latch for EDT */
                     ocrFatGuid_t currentEdt;   /**< In: EDT that is creating work */
                     u64 *paramv;               /**< In: Parameters for this EDT */
                     ocrFatGuid_t * depv;       /**< In: Dependences for this EDT */
+                    ocrHint_t * hint;          /**< In: Hints passed by the user at EDT creation time */
                     ocrWorkType_t workType;    /**< In: Type of work to create */
                     u32 properties;            /**< In: properties for the creation */
                 } in;
@@ -1103,7 +1103,7 @@ typedef struct _ocrPolicyMsg_t {
             union {
                 struct {
                     ocrFatGuid_t guid;      /**< In: Target guid to set hints on */
-                    ocrHint_t hint;         /**< In: Hint to set */
+                    ocrHint_t *hint;        /**< In: Hint to set */
                 } in;
                 struct {
                     u32 returnDetail;       /**< Out: Success or error code */
@@ -1112,7 +1112,7 @@ typedef struct _ocrPolicyMsg_t {
         } PD_MSG_STRUCT_NAME(PD_MSG_HINT_SET);
 
         struct {
-            ocrHint_t hint;                 /**< InOut: Hints retrieved from guid */
+            ocrHint_t *hint;                /**< InOut: Hints retrieved from guid */
             union {
                 struct {
                     ocrFatGuid_t guid;      /**< In: Guid from which hints are retrieved */

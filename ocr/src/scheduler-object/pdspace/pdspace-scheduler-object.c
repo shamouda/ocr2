@@ -46,6 +46,7 @@ static void pdspaceSchedulerObjectStart(ocrSchedulerObject_t *self, ocrPolicyDom
     ocrScheduler_t *scheduler = PD->schedulers[0];
     ocrSchedulerHeuristic_t *masterSchedulerHeuristic = scheduler->schedulerHeuristics[scheduler->masterHeuristicId];
     paramWst.numDeques = masterSchedulerHeuristic->contextCount;
+    paramWst.config = SCHEDULER_OBJECT_WST_CONFIG_REGULAR;
     ocrSchedulerObjectFactory_t *wstFactory = PD->schedulerObjectFactories[schedulerObjectWst_id];
     pdspaceSchedObj->wst = wstFactory->fcts.create(wstFactory, (ocrParamList_t*)(&paramWst));
 #else
@@ -273,8 +274,8 @@ static u8 ocrPolicyMsgGetMsgSizeTransactEdt(ocrTask_t *task, u64 *marshalledSize
     *marshalledSize = sizeof(ocrTaskHc_t) + (task->paramc * sizeof(u64)) + (task->depc * sizeof(ocrEdtDep_t));
     if (task->flags & OCR_TASK_FLAG_USES_HINTS)
         *marshalledSize += (OCR_HINT_COUNT_EDT_HC * sizeof(ocrHintVal_t));
-    DPRINTF(DEBUG_LVL_VVERB, "Marshalled Size for EDT 0x%lx: base %u + params %u (%u) + deps %u (%u) + hints %u (%u) = %lu\n",
-                task->guid, sizeof(ocrTaskHc_t), (task->paramc * sizeof(u64)), task->paramc,
+    DPRINTF(DEBUG_LVL_VVERB, "Marshalled Size for EDT "GUIDF": base %zu + params %zu (%"PRIu32") + deps %zu (%"PRIu32") + hints %zu (%"PRId32") = %"PRIu64"\n",
+                GUIDA(task->guid), sizeof(ocrTaskHc_t), (task->paramc * sizeof(u64)), task->paramc,
                 (task->depc * sizeof(ocrEdtDep_t)), task->depc,
                 (OCR_HINT_COUNT_EDT_HC * sizeof(ocrHintVal_t)), OCR_HINT_COUNT_EDT_HC, *marshalledSize);
     return 0;
@@ -335,7 +336,7 @@ static u8 ocrPolicyMsgMarshallMsgTransactEdt(ocrTask_t *task, u8* buffer, u32 mo
             } else {
                 mHcTask->hint.hintVal = (ocrHintVal_t*)buffer;
             }
-            DPRINTF(DEBUG_LVL_VVERB, "Marshalled hints for task %p hints %p (buffer: 0x%lx bufferStart: 0x%lx t: 0x%lx)\n",
+            DPRINTF(DEBUG_LVL_VVERB, "Marshalled hints for task %p hints %p (buffer: 0x%"PRIx64" bufferStart: 0x%"PRIx64" t: 0x%"PRIx64")\n",
                         task, hcTask->hint.hintVal, (u64)buffer, (u64)bufferStart, (u64)(mHcTask->hint.hintVal));
         } else {
             mHcTask->hint.hintVal = NULL;
@@ -358,7 +359,7 @@ static u8 ocrPolicyMsgUnMarshallMsgTransactEdt(ocrTask_t *task, u32 mode) {
 
     //TODO: Without introspection support, we assume task to be a HC task
     u8* localPtr = (u8*)task;
-    DPRINTF(DEBUG_LVL_VVERB, "Unmarshalled task 0x%lx\n", (u64)localPtr);
+    DPRINTF(DEBUG_LVL_VVERB, "Unmarshalled task 0x%"PRIx64"\n", (u64)localPtr);
     if (task->paramc != 0) {
         u64 t = (u64)(task->paramv);
         task->paramv = (u64*)(localPtr + (t>>1));
@@ -388,9 +389,9 @@ static u8 ocrPolicyMsgUnMarshallMsgTransactEdt(ocrTask_t *task, u32 mode) {
     if (task->flags & OCR_TASK_FLAG_USES_HINTS) {
         u64 t = (u64)(hcTask->hint.hintVal);
         hcTask->hint.hintVal = (u64*)((u64)localPtr + (t>>1));
-        DPRINTF(DEBUG_LVL_VVERB, "Unmarshalled hints for task %p hints %p (t: %lu)\n", task, hcTask->hint.hintVal, t);
+        DPRINTF(DEBUG_LVL_VVERB, "Unmarshalled hints for task %p hints %p (t: %"PRIu64")\n", task, hcTask->hint.hintVal, t);
         for (i=0; i<OCR_HINT_COUNT_EDT_HC; i++) {
-            DPRINTF(DEBUG_LVL_VVERB, "Unmarshalled hint[%u]: %u\n", i, hcTask->hint.hintVal[i]);
+            DPRINTF(DEBUG_LVL_VVERB, "Unmarshalled hint[%"PRIu32"]: %"PRIu64"\n", i, hcTask->hint.hintVal[i]);
         }
     }
 
@@ -411,9 +412,8 @@ u8 pdspaceSchedulerObjectOcrPolicyMsgGetMsgSize(ocrSchedulerObjectFactory_t *fac
     switch(schedObj->kind) {
     case OCR_SCHEDULER_OBJECT_EDT:
         {
-            ocrGuid_t taskGuid = schedObj->guid.guid;
             ocrTask_t *task = (ocrTask_t*)schedObj->guid.metaDataPtr;
-            ASSERT(task && IS_GUID_EQUAL(taskGuid, task->guid));
+            ASSERT(task && ocrGuidIsEq(schedObj->guid.guid, task->guid));
             ocrPolicyMsgGetMsgSizeTransactEdt(task, marshalledSize, properties);
         }
         break;
@@ -421,7 +421,7 @@ u8 pdspaceSchedulerObjectOcrPolicyMsgGetMsgSize(ocrSchedulerObjectFactory_t *fac
         ASSERT(0);
         return OCR_ENOTSUP;
     }
-    DPRINTF(DEBUG_LVL_VERB, "Marshalled Size for object 0x%lx: %lu\n", schedObj->guid.guid, *marshalledSize);
+    DPRINTF(DEBUG_LVL_VERB, "Marshalled Size for object "GUIDF": %"PRIu64"\n", GUIDA(schedObj->guid.guid), *marshalledSize);
     PD_MSG_FIELD_IO(size) = *marshalledSize;
 #undef PD_MSG
 #undef PD_TYPE
@@ -436,9 +436,8 @@ u8 pdspaceSchedulerObjectOcrPolicyMsgMarshallMsg(ocrSchedulerObjectFactory_t *fa
     switch(schedObj->kind) {
     case OCR_SCHEDULER_OBJECT_EDT:
         {
-            ocrGuid_t taskGuid = schedObj->guid.guid;
             ocrTask_t *task = (ocrTask_t*)schedObj->guid.metaDataPtr;
-            ASSERT(task && IS_GUID_EQUAL(taskGuid, task->guid));
+            ASSERT(task && ocrGuidIsEq(schedObj->guid.guid, task->guid));
             return ocrPolicyMsgMarshallMsgTransactEdt(task, buffer, properties);
         }
     default:
@@ -462,9 +461,8 @@ u8 pdspaceSchedulerObjectOcrPolicyMsgUnMarshallMsg(ocrSchedulerObjectFactory_t *
     switch(schedObj->kind) {
     case OCR_SCHEDULER_OBJECT_EDT:
         {
-            ocrGuid_t taskGuid = schedObj->guid.guid;
             ocrTask_t *task = (ocrTask_t*)schedObj->guid.metaDataPtr;
-            ASSERT(task && IS_GUID_EQUAL(taskGuid, task->guid));
+            ASSERT(task && ocrGuidIsEq(schedObj->guid.guid, task->guid));
             fact->fcts.ocrPolicyMsgGetMsgSize(fact, msg, &marshalledSize, 0);
             ocrTask_t *taskBuffer = pd->fcts.pdMalloc(pd, marshalledSize);
             hal_memCopy(taskBuffer, task, marshalledSize, false);

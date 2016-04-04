@@ -162,7 +162,7 @@ static void simpleTest(u64 start, u64 size)
     // boundary check code for sanity check.
     // This helps early detection of malformed addresses.
     do {
-        DPRINTF(DEBUG_LVL_INFO, "simpleBegin : pool range [%p - %p)\n", start, start+size);
+        DPRINTF(DEBUG_LVL_INFO, "simpleBegin : pool range [0x%"PRIx64" - 0x%"PRIx64")\n", start, start+size);
 
         u8 *p = (u8 *)((start + size - 128)&(~0x7UL));      // at least 128 bytes
         u8 *q = (u8 *)(start + size);
@@ -212,7 +212,7 @@ static void simpleInit(pool_t *pool, u64 size)
         pool->pool_start = (u64 *)q;
         pool->pool_end = (u64 *)(p+size+sizeof(pool_t));
         pool->freelist = (u64 *)q;
-        DPRINTF(DEBUG_LVL_INFO, "init'ed pool %p, avail %ld bytes , sizeof(pool_t) = %ld\n", pool, size, sizeof(pool_t));
+        DPRINTF(DEBUG_LVL_INFO, "init'ed pool %p, avail %"PRId64" bytes , sizeof(pool_t) = %zd\n", pool, size, sizeof(pool_t));
         pool->inited = 1;
 #ifdef ENABLE_VALGRIND
         VALGRIND_CREATE_MEMPOOL(p, 0, 1);  // BUG #600: Mempool needs to be destroyed
@@ -251,13 +251,13 @@ static void simplePrint(pool_t *pool)
         count++;
         size += GET_SIZE(HEAD(p));
         ASSERT(GET_BIT0(HEAD(p)) == 0);
-        //printf("%p [%d]: size %d next %d prev %d \n", p, p-(pool->pool_start) , HEAD(p), NEXT(p), PREV(p) );
+        //printf("%p [%"PRId32"]: size %"PRId32" next %"PRId32" prev %"PRId32" \n", p, p-(pool->pool_start) , HEAD(p), NEXT(p), PREV(p) );
         next = NEXT(p) + pool->pool_start;
         if (next == pool->freelist)
             break;
         p = next;
     } while(1);
-    DPRINTF(DEBUG_LVL_VERB, "[free list] count %ld  size %ld (%lx)\n", count, size, size);
+    DPRINTF(DEBUG_LVL_VERB, "[free list] count %"PRId64"  size %"PRId64" (%"PRIx64")\n", count, size, size);
 }
 
 static void simpleWalk(pool_t *pool)
@@ -275,7 +275,7 @@ static void simpleWalk(pool_t *pool)
         size = GET_SIZE(HEAD(p));
         ASSERT((size & ALIGNMENT_MASK) == 0);
         if (TAIL(p, size) != size) {
-            DPRINTF(DEBUG_LVL_WARN, "[walk] two sizes doesn't match. p=%p  size=%ld , tail=%ld\n", p, size, TAIL(p,size));
+            DPRINTF(DEBUG_LVL_WARN, "[walk] two sizes doesn't match. p=%p  size=%"PRId64" , tail=%"PRId64"\n", p, size, TAIL(p,size));
             break;
         }
 
@@ -288,7 +288,7 @@ static void simpleWalk(pool_t *pool)
             break;
         }
     } while(1);
-    DPRINTF(DEBUG_LVL_VERB, "[walk] count %ld\n", count);
+    DPRINTF(DEBUG_LVL_VERB, "[walk] count %"PRId64"\n", count);
 }
 #endif
 
@@ -377,7 +377,7 @@ static void *simpleMalloc(pool_t *pool,u64 size, struct _ocrPolicyDomain_t *pd)
 #ifdef ENABLE_VALGRIND
     u64 size_orig = size;
 #endif
-    DPRINTF(DEBUG_LVL_VERB, "before malloc size %ld:\n", size);
+    DPRINTF(DEBUG_LVL_VERB, "before malloc size %"PRId64":\n", size);
     //simplePrint(pool);
     if (p == NULL)
         goto exit_fail;
@@ -533,12 +533,12 @@ void simpleFree(void *p)
 // end of simple_alloc core part
 
 void simpleDestruct(ocrAllocator_t *self) {
-    DPRINTF(DEBUG_LVL_VERB, "Entered simpleDesctruct (This is x86 only?) on allocator 0x%lx\n", (u64) self);
+    DPRINTF(DEBUG_LVL_VERB, "Entered simpleDesctruct (This is x86 only?) on allocator 0x%"PRIx64"\n", (u64) self);
     ASSERT(self->memoryCount == 1);
     self->memories[0]->fcts.destruct(self->memories[0]);
     runtimeChunkFree((u64)self->memories, PERSISTENT_CHUNK);
     runtimeChunkFree((u64)self, PERSISTENT_CHUNK);
-    DPRINTF(DEBUG_LVL_INFO, "Leaving simpleDestruct on allocator 0x%lx (free)\n", (u64) self);
+    DPRINTF(DEBUG_LVL_INFO, "Leaving simpleDestruct on allocator 0x%"PRIx64" (free)\n", (u64) self);
 }
 
 u8 simpleSwitchRunlevel(ocrAllocator_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
@@ -580,13 +580,13 @@ u8 simpleSwitchRunlevel(ocrAllocator_t *self, ocrPolicyDomain_t *PD, ocrRunlevel
         if((properties & RL_BRING_UP) && RL_IS_FIRST_PHASE_UP(PD, RL_MEMORY_OK, phase)) {
             ocrAllocatorSimple_t *rself = (ocrAllocatorSimple_t*)self;
             u64 poolAddr = 0;
-            DPRINTF(DEBUG_LVL_INFO, "simple bring up: poolsize 0x%llx, level %d\n",
+            DPRINTF(DEBUG_LVL_INFO, "simple bring up: poolsize 0x%"PRIx64", level %"PRIu64"\n",
                     rself->poolSize, self->memories[0]->level);
             RESULT_ASSERT(self->memories[0]->fcts.chunkAndTag(
                               self->memories[0], &poolAddr, rself->poolSize,
                               USER_FREE_TAG, USER_USED_TAG), ==, 0);
             rself->poolAddr = poolAddr;
-            DPRINTF(DEBUG_LVL_INFO, "simple bring up : %p\n", poolAddr);
+            DPRINTF(DEBUG_LVL_INFO, "simple bring up : 0x%"PRIx64"\n", poolAddr);
 
             // Adjust alignment if required
             u64 fiddlyBits = ((u64) rself->poolAddr) & (ALIGNMENT - 1LL);
@@ -601,8 +601,8 @@ u8 simpleSwitchRunlevel(ocrAllocator_t *self, ocrPolicyDomain_t *PD, ocrRunlevel
             rself->poolSize &= ~(ALIGNMENT-1LL);
 
             DPRINTF(DEBUG_LVL_VERB,
-                    "SIMPLE Allocator @ 0x%llx got pool at address 0x%llx of size 0x%llx(%lld), offset from storage addr by %lld\n",
-                    (u64) rself, (u64) (rself->poolAddr), (u64) (rself->poolSize),
+                    "SIMPLE Allocator @ %p got pool at address 0x%"PRIx64" of size 0x%"PRIx64" (%"PRId64"), offset from storage addr by %"PRId64"\n",
+                    rself, rself->poolAddr, (u64) (rself->poolSize),
                     (u64)(rself->poolSize), (u64) (rself->poolStorageOffset));
 
             ASSERT(self->memories[0]->memories[0]->startAddr /* startAddr of the memory that memplatform allocated. (for x86, at mallocBegin()) */
@@ -662,7 +662,7 @@ void* simpleAllocate(
 
     ocrAllocatorSimple_t * rself = (ocrAllocatorSimple_t *) self;
     void *ret = simpleMalloc((pool_t *)rself->poolAddr, size, self->pd);
-    DPRINTF(DEBUG_LVL_VERB, "simpleAllocate called, ret %p from PoolAddr %p\n", ret, rself->poolAddr);
+    DPRINTF(DEBUG_LVL_VERB, "simpleAllocate called, ret %p from PoolAddr 0x%"PRIx64"\n", ret, rself->poolAddr);
     return ret;
 }
 void simpleDeallocate(void* address) {

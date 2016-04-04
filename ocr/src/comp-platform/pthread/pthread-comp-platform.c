@@ -17,7 +17,7 @@
 
 #include "pthread-comp-platform.h"
 
-#include "utils/profiler/profiler.h"
+#include "utils/profiler/profiler-internal.h"
 
 #define DEBUG_TYPE COMP_PLATFORM
 
@@ -44,14 +44,15 @@ static void * pthreadRoutineExecute(ocrWorker_t * worker) {
 static void pthreadRoutineInitializer(ocrCompPlatformPthread_t * pthreadCompPlatform) {
     s32 cpuBind = pthreadCompPlatform->binding;
     if(cpuBind != -1) {
-        DPRINTF(DEBUG_LVL_INFO, "Binding comp-platform to cpu_id %d\n", cpuBind);
+        DPRINTF(DEBUG_LVL_INFO, "Binding comp-platform to cpu_id %"PRId32"\n", cpuBind);
         bindThread(cpuBind);
     }
 #ifdef OCR_RUNTIME_PROFILER
     {
         _profilerData *d = (_profilerData*) runtimeChunkAlloc(sizeof(_profilerData), PERSISTENT_CHUNK);
+        _profilerDataInit(d);
         char buffer[50];
-        snprintf(buffer, 50, "profiler_%lx-%lx",
+        snprintf(buffer, 50, "profiler_%"PRIx64"-%"PRIx64"",
                      ((ocrPolicyDomain_t *)(pthreadCompPlatform->base.pd))->myLocation, (u64)pthreadCompPlatform);
         d->output = fopen(buffer, "w");
         ASSERT(d->output);
@@ -283,7 +284,7 @@ u8 pthreadSetThrottle(ocrCompPlatform_t *self, u64 value) {
 u8 pthreadSetCurrentEnv(ocrCompPlatform_t *self, ocrPolicyDomain_t *pd,
                         ocrWorker_t *worker) {
 
-    ASSERT(IS_GUID_EQUAL(pd->fguid.guid, self->pd->fguid.guid));
+    ASSERT(ocrGuidIsEq(pd->fguid.guid, self->pd->fguid.guid));
     perThreadStorage_t *tls = pthread_getspecific(selfKey);
     tls->pd = pd;
     tls->worker = worker;

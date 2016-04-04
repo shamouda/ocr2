@@ -46,7 +46,7 @@ ocrGuid_t pqrTaskA(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]){
         ocrGuid_t curResult = resultEdts[i];
         //At this point it is up to the user to decide
         //what to do with each EDT guid... here we just print
-        PRINTF("Next workiple EDT on worker %d: 0x%lx", i, curResult);
+        PRINTF("Next workiple EDT on worker %"PRId32": "GUIDF"\n", i, GUIDA(curResult));
     }
 
     //Destroy the datablock - Must be done by user
@@ -81,7 +81,7 @@ ocrGuid_t pqrTaskB(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]){
 
     for(i = 0; i < numEdts; i++){
         ocrGuid_t curResult = resultEdts[i];
-        PRINTF("Next workiple EDT on worker %d: 0x%lx", i, curResult);
+        PRINTF("Next workiple EDT on worker %"PRId32": "GUIDF"\n", i, GUIDA(curResult));
     }
 
     //Destroy the datablock
@@ -113,10 +113,10 @@ ocrGuid_t spawnerTask(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]){
         u64 paramsB[1] = {i};
 
         ocrEdtCreate(&edtA, templateA, EDT_PARAM_DEF, paramsA, EDT_PARAM_DEF,
-            NULL, EDT_PROP_NONE, NULL_GUID, NULL);
+            NULL, EDT_PROP_NONE, NULL_HINT, NULL);
 
         ocrEdtCreate(&edtB, templateB, EDT_PARAM_DEF, paramsB, EDT_PARAM_DEF,
-            NULL, EDT_PROP_NONE, NULL_GUID, NULL);
+            NULL, EDT_PROP_NONE, NULL_HINT, NULL);
     }
 
     return NULL_GUID;
@@ -134,14 +134,14 @@ ocrGuid_t mainEdt( u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]){
     u64 spawnerParamv[1] = {(u32) EDT_COUNT};
 
     ocrEdtCreate(&spawnerEdt, spawnerTemplate, EDT_PARAM_DEF, spawnerParamv,
-        EDT_PARAM_DEF, NULL, EDT_PROP_FINISH, NULL_GUID, &finishEvent);
+        EDT_PARAM_DEF, NULL, EDT_PROP_FINISH, NULL_HINT, &finishEvent);
 
     ocrGuid_t finishTemplate;
     ocrGuid_t finishEdt;
 
     ocrEdtTemplateCreate(&finishTemplate, finishTask, 0, 1);
     ocrEdtCreate(&finishEdt, finishTemplate, EDT_PARAM_DEF, NULL,
-        EDT_PARAM_DEF, &finishEvent, EDT_PROP_NONE, NULL_GUID, NULL);
+        EDT_PARAM_DEF, &finishEvent, EDT_PROP_NONE, NULL_HINT, NULL);
 
     ocrAddDependence(NULL_GUID, spawnerEdt, 0, DB_DEFAULT_MODE);
 

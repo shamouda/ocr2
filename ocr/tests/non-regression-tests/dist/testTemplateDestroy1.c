@@ -17,7 +17,7 @@ ocrGuid_t shutdownEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
 
 ocrGuid_t remoteEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     PRINTF("[remote] RemoteEdt: executing\n");
-    ocrGuid_t edtTemplateGuid = (ocrGuid_t) paramv[0];
+    ocrGuid_t edtTemplateGuid = {.guid=paramv[0]};
     ocrEdtTemplateDestroy(edtTemplateGuid);
 
     // shutdown
@@ -25,7 +25,7 @@ ocrGuid_t remoteEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrEdtTemplateCreate(&templ, shutdownEdt, 0, 0);
     ocrGuid_t edtGuid;
     ocrEdtCreate(&edtGuid, templ, 0, NULL, 0, NULL,
-        EDT_PROP_NONE, NULL_GUID, NULL);
+        EDT_PROP_NONE, NULL_HINT, NULL);
 
     return NULL_GUID;
 }
@@ -41,10 +41,14 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     // create local edt that depends on the remote edt, the db is automatically cloned
     ocrGuid_t edtTemplateGuid;
     ocrEdtTemplateCreate(&edtTemplateGuid, remoteEdt, 1, 0);
+    ocrHint_t edtHint;
+    ocrHintInit( &edtHint, OCR_HINT_EDT_T );
+    ocrSetHintValue( & edtHint, OCR_HINT_EDT_AFFINITY, ocrAffinityToHintValue( edtAffinity) );
 
+    u64 args[] = {edtTemplateGuid.guid};
     ocrGuid_t edtGuid;
-    ocrEdtCreate(&edtGuid, edtTemplateGuid, 1, (u64*) &edtTemplateGuid, 0, NULL,
-        EDT_PROP_NONE, edtAffinity, NULL);
+    ocrEdtCreate(&edtGuid, edtTemplateGuid, 1, args, 0, NULL,
+        EDT_PROP_NONE, &edtHint, NULL);
 
     return NULL_GUID;
 }

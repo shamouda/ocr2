@@ -23,10 +23,10 @@ ocrGuid_t shtEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
 
 
 ocrGuid_t taskForEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
-    ocrGuid_t shtGuid = (ocrGuid_t) (paramv[0]);
+    ocrGuid_t shtGuid = {.guid=paramv[0]};
     if (paramc == 2) {
         // shtGuid is the edt
-        ocrGuid_t evtGuid = (ocrGuid_t) (paramv[1]);
+        ocrGuid_t evtGuid = {.guid=paramv[1]};
         ocrGuid_t tplEdt;
         ocrEdtTemplateCreate(&tplEdt, taskForEdt, 1 , 1);
         u32 i;
@@ -38,7 +38,7 @@ ocrGuid_t taskForEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
             ocrEventCreateParams(&shtEvtGuid, OCR_EVENT_COUNTED_T, false, &params);
             ocrGuid_t edtGuid;
             ocrEdtCreate(&edtGuid, tplEdt, EDT_PARAM_DEF, (u64*) &shtEvtGuid, EDT_PARAM_DEF, NULL,
-                         EDT_PROP_NONE, NULL_GUID, NULL);
+                         EDT_PROP_NONE, NULL_HINT, NULL);
             // The EDT will be immediately eligible for scheduling since evtGuid has
             // already been satisfied by the parent EDT
             ocrAddDependence(evtGuid, edtGuid, 0, DB_MODE_RO);
@@ -65,16 +65,16 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrEdtTemplateCreate(&tplSht, shtEdt, 0 , NB_EVT_COUNTED_DEPS);
     ocrGuid_t shtEdtGuid;
     ocrEdtCreate(&shtEdtGuid, tplSht, EDT_PARAM_DEF, NULL, EDT_PARAM_DEF, NULL,
-                 EDT_PROP_NONE, NULL_GUID, NULL);
+                 EDT_PROP_NONE, NULL_HINT, NULL);
 
     ocrGuid_t tplEdt;
     ocrEdtTemplateCreate(&tplEdt, taskForEdt, 2 , 1);
     u64 nparamv[2];
-    nparamv[0] = (u64) shtEdtGuid;
-    nparamv[1] = (u64) evtGuid;
+    nparamv[0] = (u64) shtEdtGuid.guid;
+    nparamv[1] = (u64) evtGuid.guid;
     ocrGuid_t edtGuid;
     ocrEdtCreate(&edtGuid, tplEdt, EDT_PARAM_DEF, nparamv, EDT_PARAM_DEF, NULL,
-                 EDT_PROP_NONE, NULL_GUID, NULL);
+                 EDT_PROP_NONE, NULL_HINT, NULL);
 
     // Register a dependence between the counted event and the edt
     ocrAddDependence(evtGuid, edtGuid, 0, DB_MODE_RO);

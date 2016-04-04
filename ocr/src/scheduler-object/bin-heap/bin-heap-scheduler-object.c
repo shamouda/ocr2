@@ -48,7 +48,7 @@ static void binHeapSchedulerObjectInitialize(ocrSchedulerObjectFactory_t *fact, 
 }
 
 ocrSchedulerObject_t* newSchedulerObjectBinHeap(ocrSchedulerObjectFactory_t *factory, ocrParamList_t *perInstance) {
-    paramListSchedulerObject_t *paramSchedObj = (paramListSchedulerObject_t*)perInstance;
+    paramListSchedulerObject_t *paramSchedObj __attribute__((unused)) = (paramListSchedulerObject_t*)perInstance;
     ASSERT(paramSchedObj->config);
     ASSERT(!paramSchedObj->guidRequired);
     ocrSchedulerObject_t* schedObj = (ocrSchedulerObject_t*)runtimeChunkAlloc(sizeof(ocrSchedulerObjectBinHeap_t), PERSISTENT_CHUNK);
@@ -58,7 +58,7 @@ ocrSchedulerObject_t* newSchedulerObjectBinHeap(ocrSchedulerObjectFactory_t *fac
 }
 
 ocrSchedulerObject_t* binHeapSchedulerObjectCreate(ocrSchedulerObjectFactory_t *factory, ocrParamList_t *perInstance) {
-    paramListSchedulerObject_t *paramSchedObj = (paramListSchedulerObject_t*)perInstance;
+    paramListSchedulerObject_t *paramSchedObj __attribute__((unused)) = (paramListSchedulerObject_t*)perInstance;
     ASSERT(!paramSchedObj->config);
     ASSERT(!paramSchedObj->guidRequired);
     ocrPolicyDomain_t *pd = NULL;
@@ -100,14 +100,27 @@ u8 binHeapSchedulerObjectInsert(ocrSchedulerObjectFactory_t *fact, ocrSchedulerO
     }
 
     // See BUG #928 on GUID issues
-#ifdef GUID_64
-    heap->push(heap, (void *)edtGuid, priority, 0);
-#elif defined(GUID_128)
+#if GUID_BIT_COUNT == 64
+    heap->push(heap, (void *)edtGuid.guid, priority, 0);
+#elif GUID_BIT_COUNT == 128
     heap->push(heap, (void *)edtGuid.lower, priority, 0);
 #endif
 
     return 0;
 }
+
+static inline ocrGuid_t _popGuid(binHeap_t *binHeap, int flag) {
+    // See BUG #928 on GUID issues
+    void *data = binHeap->pop(binHeap, flag);
+    ocrGuid_t retGuid = NULL_GUID;
+#if GUID_BIT_COUNT == 64
+    if (data) retGuid.guid = (intptr_t)data;
+#elif GUID_BIT_COUNT == 128
+    if (data) retGuid.lower = (intptr_t)data;
+#endif
+    return retGuid;
+}
+
 
 u8 binHeapSchedulerObjectRemove(ocrSchedulerObjectFactory_t *fact, ocrSchedulerObject_t *self, ocrSchedulerObjectKind kind, u32 count, ocrSchedulerObject_t *dst, ocrSchedulerObjectIterator_t *iterator, u32 properties) {
     u32 i;
@@ -122,26 +135,14 @@ u8 binHeapSchedulerObjectRemove(ocrSchedulerObjectFactory_t *fact, ocrSchedulerO
         case SCHEDULER_OBJECT_REMOVE_TAIL:
             {
                 START_PROFILE(sched_binHeap_Pop);
-                // See BUG #928 on GUID issues
-#ifdef GUID_64
-                retGuid = (ocrGuid_t)binHeap->pop(binHeap, 0);
-#elif defined(GUID_128)
-                ocrGuid_t *myGuid = (ocrGuid_t *)binHeap->pop(binHeap, 0);
-                retGuid = *myGuid;
-#endif
+                retGuid = _popGuid(binHeap, 0);
                 EXIT_PROFILE;
             }
             break;
         case SCHEDULER_OBJECT_REMOVE_HEAD:
             {
                 START_PROFILE(sched_binHeap_Steal);
-                // See BUG #928 on GUID issues
-#ifdef GUID_64
-                retGuid = (ocrGuid_t)binHeap->pop(binHeap, 1);
-#elif defined(GUID_128)
-                ocrGuid_t *myGuid = (ocrGuid_t *)binHeap->pop(binHeap, 1);
-                retGuid = *myGuid;
-#endif
+                retGuid = _popGuid(binHeap, 1);
                 EXIT_PROFILE;
             }
             break;
@@ -150,11 +151,11 @@ u8 binHeapSchedulerObjectRemove(ocrSchedulerObjectFactory_t *fact, ocrSchedulerO
             return OCR_ENOTSUP;
         }
 
-        if(IS_GUID_NULL(retGuid))
+        if(ocrGuidIsNull(retGuid))
             break;
 
         if (IS_SCHEDULER_OBJECT_TYPE_SINGLETON(dst->kind)) {
-            ASSERT(IS_GUID_NULL(dst->guid.guid) && count == 1);
+            ASSERT(ocrGuidIsNull(dst->guid.guid) && count == 1);
             dst->guid.guid = retGuid;
         } else {
             ocrSchedulerObject_t taken;

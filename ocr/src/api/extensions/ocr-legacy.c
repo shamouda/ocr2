@@ -15,6 +15,8 @@
 #include "ocr-types.h"
 #include "ocr-worker.h"
 
+#include "utils/profiler/profiler.h"
+
 #pragma message "LEGACY extension is experimental and may not be supported on all platforms"
 
 #define DEBUG_TYPE API
@@ -23,6 +25,7 @@ extern void freeUpRuntime(bool, u8*);
 extern void bringUpRuntime(ocrConfig_t *ocrConfig);
 
 void ocrLegacyInit(ocrGuid_t *legacyContext, ocrConfig_t * ocrConfig) {
+    START_PROFILE(api_ocrLegacyInit);
     // Bug #492: legacyContext is ignored
     ASSERT(ocrConfig);
     if(ocrConfig->iniFile == NULL)
@@ -40,9 +43,11 @@ void ocrLegacyInit(ocrGuid_t *legacyContext, ocrConfig_t * ocrConfig) {
         pd->fcts.switchRunlevel(pd, RL_USER_OK, RL_REQUEST | RL_ASYNC | RL_BRING_UP | RL_NODE_MASTER | RL_LEGACY),
         ==, 0);
     DPRINTF(DEBUG_LVL_INFO, "ocrLegacyInit switchRunlevel RL_USER_OK | RL_BRING_UP returned\n");
+    RETURN_PROFILE();
 }
 
 u8 ocrLegacyFinalize(ocrGuid_t legacyContext, bool runUntilShutdown) {
+    START_PROFILE(api_ocrLegacyFinalize);
     // Bug #492: legacyContext is ignored
     ocrPolicyDomain_t *pd = NULL;
     u8 returnCode, otherReturnCode;
@@ -70,12 +75,13 @@ u8 ocrLegacyFinalize(ocrGuid_t legacyContext, bool runUntilShutdown) {
         returnCode = pd->shutdownCode;
         freeUpRuntime(false, &otherReturnCode);
     }
-    return returnCode;
+    RETURN_PROFILE(returnCode);
 }
 
 u8 ocrLegacySpawnOCR(ocrGuid_t* handle, ocrGuid_t finishEdtTemplate, u64 paramc, u64* paramv,
                      u64 depc, ocrGuid_t* depv, ocrGuid_t legacyContext) {
 
+    START_PROFILE(api_ocrLegacySpawnOCR);
     // Bug #492: legacyContext is ignored
     // Bug #494: a thread is lost since this function spins
     ocrGuid_t edtGuid;
@@ -91,33 +97,34 @@ u8 ocrLegacySpawnOCR(ocrGuid_t* handle, ocrGuid_t finishEdtTemplate, u64 paramc,
 
     for(i=0; i < depc; ++i) {
         // Verify that all dependences are known
-        ASSERT(!(IS_GUID_UNINITIALIZED(depv[i])));
+        ASSERT(!(ocrGuidIsUninitialized(depv[i])));
     }
 
     // Hold off the start by saying that one dependence is not satisfied
     depv0 = depv[0];
     depv[0] = UNINITIALIZED_GUID;
     ocrEdtCreate(&edtGuid, finishEdtTemplate, paramc, paramv,
-                 depc, depv, EDT_PROP_FINISH, NULL_GUID, &outputEventGuid);
+                 depc, depv, EDT_PROP_FINISH, NULL_HINT, &outputEventGuid);
     ocrAddDependence(outputEventGuid, stickyGuid, 0, DB_DEFAULT_MODE);
     // Actually start the OCR EDT
     ocrAddDependence(depv0, edtGuid, 0, DB_DEFAULT_MODE);
     *handle = stickyGuid;
-    return 0;
+    RETURN_PROFILE(0);
 }
 
 ocrGuid_t ocrWait(ocrGuid_t outputEvent) {
+    START_PROFILE(api_ocrWait);
     //DPRINTF(DEBUG_LVL_WARN, "ocrWait is deprecated -- use ocrLegacyBlockProgress instead\n");
     ocrGuid_t outputGuid;
     if(ocrLegacyBlockProgress(outputEvent, &outputGuid, NULL, NULL, LEGACY_PROP_NONE) == 0) {
-        return outputGuid;
+        RETURN_PROFILE(outputGuid);
     }
-    return ERROR_GUID;
+    RETURN_PROFILE(ERROR_GUID);
 }
 
 u8 ocrLegacyBlockProgress(ocrGuid_t evtHandle, ocrGuid_t* guid, void** result, u64* size, u16 properties) {
+    START_PROFILE(api_ocrLegacyBlockProgress);
     ocrPolicyDomain_t *pd = NULL;
-    ocrEvent_t *eventToYieldFor;
     ocrFatGuid_t dbResult = {.guid = ERROR_GUID, .metaDataPtr = NULL};
     ocrFatGuid_t currentEdt;
     ocrTask_t *curTask = NULL;
@@ -141,19 +148,44 @@ u8 ocrLegacyBlockProgress(ocrGuid_t evtHandle, ocrGuid_t* guid, void** result, u
             u8 returnCode = pd->fcts.processMessage(pd, &msg, true);
             //Warning PD_MSG_GUID_INFO returns GUID properties as 'returnDetail', not error code
             if(returnCode != 0) {
-                return returnCode;
+                RETURN_PROFILE(returnCode);
             }
 
             if(PD_MSG_FIELD_IO(guid.metaDataPtr) == NULL) {
                 if(properties == LEGACY_PROP_NONE) {
-                    return OCR_EINVAL;
-                } else if(properties == LEGACY_PROP_WAIT_FOR_CREATE) {
+                    RETURN_PROFILE(OCR_EINVAL);
+                }
+                // Everytime there's a busy wait loop like this we need to
+                // call into the PD to try and make progress on other work
+                // For instance: might have to unlock some incoming label create here
+                else if(properties == LEGACY_PROP_WAIT_FOR_CREATE) {
+                    ocrPolicyDomain_t * pd;
+                    PD_MSG_STACK(msg);
+                    getCurrentEnv(&pd, NULL, NULL, &msg);
+                #undef PD_MSG
+                #undef PD_TYPE
+                #define PD_MSG (&msg)
+                #define PD_TYPE PD_MSG_MGT_MONITOR_PROGRESS
+                    msg.type = PD_MSG_MGT_MONITOR_PROGRESS | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
+                    //BUG #131 helper-mode: not sure if the caller should register a progress function or if the
+                    //scheduler should know what to do for each type of monitor progress
+                    PD_MSG_FIELD_IO(properties) = 0;
+                    PD_MSG_FIELD_I(monitoree) = NULL;
+                    RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, true));
+                #undef PD_MSG
+                #undef PD_TYPE
+#define PD_MSG (&msg)
+#define PD_TYPE PD_MSG_GUID_INFO
                     continue; // Tightest loop to see how this goes
                 }
-            } else {
-                eventToYieldFor = (ocrEvent_t *)PD_MSG_FIELD_IO(guid.metaDataPtr);
+            }
+            else {
+#ifdef OCR_ASSERT
+
+                ocrEvent_t* eventToYieldFor = (ocrEvent_t *)PD_MSG_FIELD_IO(guid.metaDataPtr);
                 ASSERT(eventToYieldFor->kind == OCR_EVENT_STICKY_T ||
                        eventToYieldFor->kind == OCR_EVENT_IDEM_T);
+#endif
                 break;
             }
         } while(true);
@@ -175,9 +207,27 @@ u8 ocrLegacyBlockProgress(ocrGuid_t evtHandle, ocrGuid_t* guid, void** result, u
         dbResult = PD_MSG_FIELD_O(data);
 #undef PD_TYPE
 #undef PD_MSG
-    } while(IS_GUID_ERROR(dbResult.guid));
+        // Everytime there's a busy wait loop like this we need to
+        // call into the PD to try and make progress on other work
+        // For instance: might have to unlock some incoming label create here
+        if (ocrGuidIsError(dbResult.guid)) {
+            ocrPolicyDomain_t * pd;
+            PD_MSG_STACK(msg);
+            getCurrentEnv(&pd, NULL, NULL, &msg);
+#define PD_MSG (&msg)
+#define PD_TYPE PD_MSG_MGT_MONITOR_PROGRESS
+            msg.type = PD_MSG_MGT_MONITOR_PROGRESS | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
+            //BUG #131 helper-mode: not sure if the caller should register a progress function or if the
+            //scheduler should know what to do for each type of monitor progress
+            PD_MSG_FIELD_IO(properties) = 0;
+            PD_MSG_FIELD_I(monitoree) = NULL;
+            RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, true));
+#undef PD_MSG
+#undef PD_TYPE
+        }
+    } while(ocrGuidIsError(dbResult.guid));
 
-    if(!(IS_GUID_NULL(dbResult.guid))) {
+    if(!(ocrGuidIsNull(dbResult.guid))) {
         if(dbResult.metaDataPtr == NULL) {
             // We now need to acquire the DB
             PD_MSG_STACK(msg);
@@ -191,7 +241,7 @@ u8 ocrLegacyBlockProgress(ocrGuid_t evtHandle, ocrGuid_t* guid, void** result, u
             PD_MSG_FIELD_IO(properties) = DB_MODE_RW;
             u8 returnCode = pd->fcts.processMessage(pd, &msg, true);
             if(!((returnCode == 0) && ((returnCode = PD_MSG_FIELD_O(returnDetail)) == 0))) {
-                return returnCode;
+                RETURN_PROFILE(returnCode);
             }
             if(result != NULL)
                 *result = PD_MSG_FIELD_O(ptr);
@@ -222,7 +272,7 @@ u8 ocrLegacyBlockProgress(ocrGuid_t evtHandle, ocrGuid_t* guid, void** result, u
 
     if(guid != NULL)
         *guid = dbResult.guid;
-    return 0;
+    RETURN_PROFILE(0);
 }
 
 #endif /* ENABLE_EXTENSION_LEGAGY */

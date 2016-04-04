@@ -235,6 +235,7 @@ typedef struct _ocrDataBlockFactory_t {
      * @param[in] allocPD       Policy-domain of the allocator
      * @param[in] size          data-block size
      * @param[in] ptr           Pointer to the memory to use (created through an allocator)
+     * @param[in] hint          Hints provided at time of creation
      * @param[in] properties    Properties for the data-block creation (GUID_PROP_* or DB_PROP_*)
      * @param[in] instanceArg   Arguments specific for this instance
      * @return 0 on success or an error code on failure:
@@ -242,7 +243,7 @@ typedef struct _ocrDataBlockFactory_t {
      **/
     u8 (*instantiate)(struct _ocrDataBlockFactory_t *factory, ocrFatGuid_t *guid,
                       ocrFatGuid_t allocator, ocrFatGuid_t allocPD, u64 size,
-                      void* ptr, u32 properties, ocrParamList_t *instanceArg);
+                      void* ptr, ocrHint_t *hint, u32 properties, ocrParamList_t *instanceArg);
     /**
      * @brief Factory destructor
      * @param factory       Pointer to the factory to destroy.

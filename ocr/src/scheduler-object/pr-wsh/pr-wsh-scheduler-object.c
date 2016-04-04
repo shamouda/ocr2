@@ -61,7 +61,7 @@ static void prWshSchedulerObjectInitialize(ocrSchedulerObjectFactory_t *fact, oc
 }
 
 ocrSchedulerObject_t* newSchedulerObjectPrWsh(ocrSchedulerObjectFactory_t *factory, ocrParamList_t *perInstance) {
-    paramListSchedulerObject_t *paramSchedObj = (paramListSchedulerObject_t*)perInstance;
+    paramListSchedulerObject_t *paramSchedObj __attribute__((unused)) = (paramListSchedulerObject_t*)perInstance;
     ASSERT(paramSchedObj->config);
     ASSERT(!paramSchedObj->guidRequired);
     ocrSchedulerObject_t* schedObj = (ocrSchedulerObject_t*)runtimeChunkAlloc(sizeof(ocrSchedulerObjectPrWsh_t), PERSISTENT_CHUNK);
@@ -71,7 +71,7 @@ ocrSchedulerObject_t* newSchedulerObjectPrWsh(ocrSchedulerObjectFactory_t *facto
 }
 
 ocrSchedulerObject_t* prWshSchedulerObjectCreate(ocrSchedulerObjectFactory_t *factory, ocrParamList_t *perInstance) {
-    paramListSchedulerObject_t *paramSchedObj = (paramListSchedulerObject_t*)perInstance;
+    paramListSchedulerObject_t *paramSchedObj __attribute__((unused)) = (paramListSchedulerObject_t*)perInstance;
     ASSERT(!paramSchedObj->config);
     ASSERT(!paramSchedObj->guidRequired);
     ocrPolicyDomain_t *pd = NULL;

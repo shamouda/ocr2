@@ -51,11 +51,14 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrAffinityGet(AFFINITY_PD, &affinityCount, affinities);
     ocrGuid_t affinity = affinities[affinityCount-1];
 
+    ocrHint_t dbHint;
+    ocrHintInit( &dbHint, OCR_HINT_DB_T );
+    ocrSetHintValue( & dbHint, OCR_HINT_DB_AFFINITY, ocrAffinityToHintValue( affinity) );
     // Create DB @ affinity
     void * dbPtr;
     ocrGuid_t dbGuid;
     u32 nbElem = NB_ELEM_DB;
-    ocrDbCreate(&dbGuid, &dbPtr, sizeof(TYPE_ELEM_DB) * NB_ELEM_DB, 0, affinity, NO_ALLOC);
+    ocrDbCreate(&dbGuid, &dbPtr, sizeof(TYPE_ELEM_DB) * NB_ELEM_DB, 0, &dbHint, NO_ALLOC);
     u64 i = 0;
     int * data = (int *) dbPtr;
     while (i < nbElem) {
@@ -68,18 +71,21 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrEdtTemplateCreate(&shutdownEdtTemplateGuid, shutdownEdt, 0, NB_WRITERS);
     ocrGuid_t shutdownGuid;
     ocrEdtCreate(&shutdownGuid, shutdownEdtTemplateGuid, 0, NULL, NB_WRITERS, NULL,
-                 EDT_PROP_NONE, NULL_GUID, NULL);
+                 EDT_PROP_NONE, NULL_HINT, NULL);
 
     // create writer EDT for the DB in EW mode @ affinity
     ocrGuid_t eWriteEdtTemplateGuid;
     ocrEdtTemplateCreate(&eWriteEdtTemplateGuid, eWriteEdt, 1, 1);
+    ocrHint_t edtHint;
+    ocrHintInit( &edtHint, OCR_HINT_EDT_T );
+    ocrSetHintValue( & edtHint, OCR_HINT_EDT_AFFINITY, ocrAffinityToHintValue( affinity) );
 
     i = 0;
     while (i < NB_WRITERS) {
         ocrGuid_t outputEventGuid;
         ocrGuid_t eWriteEdtGuid;
         ocrEdtCreate(&eWriteEdtGuid, eWriteEdtTemplateGuid, 1, &i, 1, NULL,
-                     EDT_PROP_NONE, affinity, &outputEventGuid);
+                     EDT_PROP_NONE, &edtHint, &outputEventGuid);
         ocrAddDependence(outputEventGuid, shutdownGuid, i, false);
         ocrAddDependence(dbGuid, eWriteEdtGuid, 0, DB_MODE_EW);
         i++;

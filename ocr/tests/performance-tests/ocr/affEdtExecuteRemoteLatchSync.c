@@ -44,13 +44,17 @@ ocrGuid_t headEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     timestamp_t ts_start;
     timestamp_t ts_stop;
 
+    ocrHint_t edtHint;
+    ocrHintInit( &edtHint, OCR_HINT_EDT_T );
+    ocrSetHintValue( & edtHint, OCR_HINT_EDT_AFFINITY, ocrAffinityToHintValue( affinities[count-1]) );
+
     // Spawn all of these on another PD
     int k = 0;
     while (k < NB_INSTANCES) {
         get_time(&ts_start);
         ocrGuid_t workEdtGuid;
         ocrEdtCreate(&workEdtGuid, workEdtTemplateGuid,
-                     1, (u64 *) &evtGuid, 0, NULL_GUID, EDT_PROP_NONE, affinities[count-1], NULL);
+                     1, (u64 *) &evtGuid, 0, NULL, EDT_PROP_NONE, &edtHint, NULL);
         get_time(&ts_stop);
         timings[k] = elapsed_usec(&ts_start, &ts_stop);
         k++;
@@ -82,7 +86,7 @@ ocrGuid_t lchCreatorEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
 
     ocrGuid_t terminateEdtGuid;
     ocrEdtCreate(&terminateEdtGuid, terminateEdtTemplateGuid,
-                 0, NULL, 1, &evGuid, EDT_PROP_NONE, NULL_GUID, NULL);
+                 0, NULL, 1, &evGuid, EDT_PROP_NONE, NULL_HINT, NULL);
 
 
     ocrGuid_t headEdtTemplateGuid;
@@ -96,9 +100,13 @@ ocrGuid_t lchCreatorEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrGuid_t affinities[count];
     ocrAffinityGet(AFFINITY_PD, &count, affinities);
 
+    ocrHint_t edtHint;
+    ocrHintInit( &edtHint, OCR_HINT_EDT_T );
+    ocrSetHintValue( & edtHint, OCR_HINT_EDT_AFFINITY, ocrAffinityToHintValue( affinities[0] ));
+
     ocrGuid_t headEdtGuid;
     ocrEdtCreate(&headEdtGuid, headEdtTemplateGuid,
-                 0, NULL, 1, &(depv[0].guid), EDT_PROP_NONE, affinities[0], NULL);
+                 0, NULL, 1, &(depv[0].guid), EDT_PROP_NONE, &edtHint, NULL);
 
     return NULL_GUID;
 }
@@ -113,20 +121,23 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrGuid_t curAffinity;
     ocrAffinityGetCurrent(&curAffinity);
 
-    ASSERT(curAffinity == affinities[0]);
+    ASSERT(ocrGuidIsEq(curAffinity,affinities[0]));
 
     // Create DB containing to contain the guid latch
     ocrGuid_t * dbLchPtr;
     ocrGuid_t dbLchGuid;
-    ocrDbCreate(&dbLchGuid, (void **)&dbLchPtr, sizeof(ocrGuid_t), 0, NULL_GUID, NO_ALLOC);
+    ocrDbCreate(&dbLchGuid, (void **)&dbLchPtr, sizeof(ocrGuid_t), 0, NULL_HINT, NO_ALLOC);
     ocrDbRelease(dbLchGuid);
 
     ocrGuid_t lchCreatorTemplateGuid;
     // Nb of tasks events to synchronize + timer DB
     ocrEdtTemplateCreate(&lchCreatorTemplateGuid, lchCreatorEdt, 0, 1);
+    ocrHint_t edtHint;
+    ocrHintInit( &edtHint, OCR_HINT_EDT_T );
+    ocrSetHintValue( & edtHint, OCR_HINT_EDT_AFFINITY, ocrAffinityToHintValue( affinities[count-1]) );
 
     ocrGuid_t lchCreatorEdtGuid;
     ocrEdtCreate(&lchCreatorEdtGuid, lchCreatorTemplateGuid,
-                 0, NULL, 1, &dbLchGuid, EDT_PROP_NONE, affinities[count-1], NULL);
+                 0, NULL, 1, &dbLchGuid, EDT_PROP_NONE, &edtHint, NULL);
     return NULL_GUID;
 }

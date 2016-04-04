@@ -13,11 +13,14 @@ if [[ -z "$CORE_SCALING" ]]; then
     exit
 fi
 
+SCRIPT_NAME=`basename $0`
+
 #
 # Option setup
 #
 
 NOCLEAN_OPT="no"
+TMPDIR_OPT="no"
 
 #
 # Option Parsing and Checking
@@ -26,10 +29,8 @@ RUNLOG_FILE=""
 
 if [[ -z "$RUNLOG_FILE" ]]; then
     RUNLOG_FILE="${RUNLOG_FILENAME_BASE}"
-    echo "$0: Use default RUNLOG_FILE: $RUNLOG_FILE";
+    #echo "${SCRIPT_NAME}: Use default RUNLOG_FILE: $RUNLOG_FILE";
 fi
-
-TMPDIR=${SCRIPT_ROOT}/tmp
 
 while [[ $# -gt 0 ]]; do
     # for arg processing debug
@@ -37,12 +38,24 @@ while [[ $# -gt 0 ]]; do
     if [[ "$1" = "-noclean" ]]; then
         shift
         NOCLEAN_OPT="yes"
+    elif [[ "$1" = "-tmpdir" && $# -ge 2 ]]; then
+        shift
+        TMPDIR_OPT="yes"
+        TMPDIR_ARG=("$@")
+        shift
     else
         # Remaining is runlog file arguments
         RUNLOG_FILE=$1
         shift
     fi
 done
+
+if [[ "${TMPDIR_OPT}" = "no" ]]; then
+    TMPDIR=`mktemp -d -p ${SCRIPT_ROOT} tmpdir-report.XXXXXX`
+else
+    TMPDIR=${TMPDIR_ARG}
+fi
+
 
 function toLower() {
     local  input=$1
@@ -102,8 +115,6 @@ function deleteFiles() {
     fi
 }
 
-echo "RUNLOG_FILE=${RUNLOG_FILE}"
-
 #
 # Grep for a metric in each runlog file
 #
@@ -113,18 +124,52 @@ extractMetric "Duration"   9 "stddev"
 
 # Compute speed-up on the average column (first one)
 AVG=`cat ${TMPDIR}/tmp-agg-results-throughput | cut -d' ' -f 1-1`
+# set that on a single line
 AVG=`echo ${AVG} | sed -e "s/\n/ /g"`
-SPUP=`${SCRIPT_ROOT}/utils/speedup.sh "$AVG"`
+# Count how many core configurations
+w=`echo "${CORE_SCALING}" | wc -w | sed -e 's/ //g'`
+
+# This is going to put all of the average values into an array
+# and iterate over this array in chunk of 'core configurations'
+# to invoke the 'speedup' script on each chunk. The result is
+# the speed-up computed for each node configuration with the
+# baseline being the first core scaling configuration.
+SPUP=""
+IFS=' ' read -r -a array <<< "$AVG"
+let l=0
+let u=0
+
+for nodes in `echo "${NODE_SCALING}"`; do
+    let u=${l}+${w};
+    AVG=`echo "${array[@]:${l}:${u}}"`
+    SPUP+=`${SCRIPT_ROOT}/utils/speedup.sh "${AVG}"`
+    SPUP+=" "
+    let l=${u}
+done
 
 # Format speed-up information
 echo "$SPUP" | tr ' ' '\n' > ${TMPDIR}/tmp-agg-results-spup
 
-# Format core-scaling information
-echo "${CORE_SCALING}" | tr ' ' '\n' > ${TMPDIR}/tmp-core-scaling
+for nodes in `echo "${NODE_SCALING}"`; do
+    # Format core-scaling information
+    echo "${CORE_SCALING}" | tr ' ' '\n' >> ${TMPDIR}/tmp-core-scaling
+done
 
+# Pasting all results and analysis together. Can be used in the future to do
+# global processing without having to parse out comments and information.
 # final formatting: core-scaling | avg | stddev | count | speed-up | duration | stddev | count
-paste ${TMPDIR}/tmp-core-scaling ${TMPDIR}/tmp-agg-results-throughput ${TMPDIR}/tmp-agg-results-spup ${TMPDIR}/tmp-agg-results-duration | column -t
+paste ${TMPDIR}/tmp-core-scaling ${TMPDIR}/tmp-agg-results-throughput ${TMPDIR}/tmp-agg-results-spup ${TMPDIR}/tmp-agg-results-duration | column -t > ${TMPDIR}/tmp-results
+
+# This is going over the perf dump and chunk it up to inject text
+let l=0
+for nodes in `echo "${NODE_SCALING}"`; do
+    echo "#N=$nodes Nodes Scaling Results"
+    more +${l} ${TMPDIR}/tmp-results | head -n ${w}
+    let l=${l}+${w}
+    let l=${l}+1
+done
+
 
 # delete left-over temporary file
-deleteFiles ${TMPDIR}/tmp-all-runlog-metric ${TMPDIR}/tmp-agg-results ${TMPDIR}/tmp-agg-results-spup
+deleteFiles ${TMPDIR}
 deleteFiles ${TMP_ALL_METRIC_FILES}

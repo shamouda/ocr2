@@ -101,7 +101,7 @@ u32 type_max[] = {
     strstr((char *) iniparser_getstring(dict, KEY, ""), ",")
 
 #define INI_GET_RANGE(KEY, LOW, HIGH) \
-    sscanf(iniparser_getstring(dict, KEY, ""), "%d-%d", &LOW, &HIGH)
+    sscanf(iniparser_getstring(dict, KEY, ""), "%"PRId32"-%"PRId32"", &LOW, &HIGH)
 
 typedef enum value_type_t {
     TYPE_UNKNOWN,
@@ -134,11 +134,11 @@ s32 read_values(dictionary *dict, char *sec, char *field, s32 *values_array) {
     values = iniparser_getstring(dict, key, NULL);
     do {
         if(strstr(values, "-")) {
-            sscanf(values, "%d-%d", &low, &high);
+            sscanf(values, "%"PRId32"-%"PRId32"", &low, &high);
             for(i=count; i<=count+high-low; i++) values_array[i] = low+i-count;
             count += high-low+1;
         } else {  // Assume integer
-            sscanf(values, "%d", &low);
+            sscanf(values, "%"PRId32"", &low);
             values_array[count] = low;
             count++;
         }
@@ -308,7 +308,7 @@ char* populate_type(ocrParamList_t **type_param, type_enum index, dictionary *di
         ALLOC_PARAM_LIST(*type_param, paramListSchedulerHeuristicFact_t);
         break;
     default:
-        DPRINTF(DEBUG_LVL_WARN, "Error: %d index unexpected\n", index);
+        DPRINTF(DEBUG_LVL_WARN, "Error: %"PRId32" index unexpected\n", index);
         break;
     }
 
@@ -323,7 +323,7 @@ ocrCommApiFactory_t *create_factory_commapi (char *name, ocrParamList_t *paramli
         DPRINTF(DEBUG_LVL_WARN, "Unrecognized type %s. Check name and ocr-config header\n", name);
         return NULL;
     } else {
-        DPRINTF(DEBUG_LVL_INFO, "Creating a commapi factory of type %d\n", mytype);
+        DPRINTF(DEBUG_LVL_INFO, "Creating a commapi factory of type %"PRId32"\n", mytype);
         return newCommApiFactory(mytype, paramlist);
     }
 }
@@ -336,7 +336,7 @@ ocrCommPlatformFactory_t *create_factory_commplatform (char *name, ocrParamList_
         DPRINTF(DEBUG_LVL_WARN, "Unrecognized type %s. Check name and ocr-config header\n", name);
         return NULL;
     } else {
-        DPRINTF(DEBUG_LVL_INFO, "Creating a commplatform factory of type %d\n", mytype);
+        DPRINTF(DEBUG_LVL_INFO, "Creating a commplatform factory of type %"PRId32"\n", mytype);
         return newCommPlatformFactory(mytype, paramlist);
     }
 }
@@ -348,7 +348,7 @@ ocrCompPlatformFactory_t *create_factory_compplatform (char *name, ocrParamList_
         DPRINTF(DEBUG_LVL_WARN, "Unrecognized type %s. Check name and ocr-config header\n", name);
         return NULL;
     } else {
-        DPRINTF(DEBUG_LVL_INFO, "Creating a compplatform factory of type %d\n", mytype);
+        DPRINTF(DEBUG_LVL_INFO, "Creating a compplatform factory of type %"PRId32"\n", mytype);
         return newCompPlatformFactory(mytype, paramlist);
     }
 }
@@ -361,7 +361,7 @@ ocrMemPlatformFactory_t *create_factory_memplatform (char *name, ocrParamList_t 
         DPRINTF(DEBUG_LVL_WARN, "Unrecognized type %s. Check name and ocr-config header\n", name);
         return NULL;
     } else {
-        DPRINTF(DEBUG_LVL_INFO, "Creating a memplatform factory of type %d\n", mytype);
+        DPRINTF(DEBUG_LVL_INFO, "Creating a memplatform factory of type %"PRId32"\n", mytype);
         return newMemPlatformFactory(mytype, paramlist);
     }
 }
@@ -373,7 +373,7 @@ ocrMemPlatformFactory_t *create_factory_memtarget(char *name, ocrParamList_t *pa
         DPRINTF(DEBUG_LVL_WARN, "Unrecognized type %s. Check name and ocr-config header\n", name);
         return NULL;
     } else {
-        DPRINTF(DEBUG_LVL_INFO, "Creating a memtarget factory of type %d\n", mytype);
+        DPRINTF(DEBUG_LVL_INFO, "Creating a memtarget factory of type %"PRId32"\n", mytype);
         return (ocrMemPlatformFactory_t *)newMemTargetFactory(mytype, paramlist);
     }
 }
@@ -385,7 +385,7 @@ ocrAllocatorFactory_t *create_factory_allocator(char *name, ocrParamList_t *para
         DPRINTF(DEBUG_LVL_WARN, "Unrecognized type %s. Check name and ocr-config header\n", name);
         return NULL;
     } else {
-        DPRINTF(DEBUG_LVL_INFO, "Creating an allocator factory of type %d\n", mytype);
+        DPRINTF(DEBUG_LVL_INFO, "Creating an allocator factory of type %"PRId32"\n", mytype);
         return (ocrAllocatorFactory_t *)newAllocatorFactory(mytype, paramlist);
     }
 }
@@ -397,7 +397,7 @@ ocrCompTargetFactory_t *create_factory_comptarget(char *name, ocrParamList_t *pa
         DPRINTF(DEBUG_LVL_WARN, "Unrecognized type %s. Check name and ocr-config header\n", name);
         return NULL;
     } else {
-        DPRINTF(DEBUG_LVL_INFO, "Creating a comptarget factory of type %d\n", mytype);
+        DPRINTF(DEBUG_LVL_INFO, "Creating a comptarget factory of type %"PRId32"\n", mytype);
         return (ocrCompTargetFactory_t *)newCompTargetFactory(mytype, paramlist);
     }
 }
@@ -409,7 +409,7 @@ ocrWorkpileFactory_t *create_factory_workpile(char *name, ocrParamList_t *paraml
         DPRINTF(DEBUG_LVL_WARN, "Unrecognized type %s. Check name and ocr-config header\n", name);
         return NULL;
     } else {
-        DPRINTF(DEBUG_LVL_INFO, "Creating a workpile factory of type %d\n", mytype);
+        DPRINTF(DEBUG_LVL_INFO, "Creating a workpile factory of type %"PRId32"\n", mytype);
         return (ocrWorkpileFactory_t *)newWorkpileFactory(mytype, paramlist);
     }
 }
@@ -421,7 +421,7 @@ ocrSchedulerObjectFactory_t *create_factory_schedulerObject(char *name, ocrParam
         DPRINTF(DEBUG_LVL_WARN, "Unrecognized type %s. Check name and ocr-config header\n", name);
         return NULL;
     } else {
-        DPRINTF(DEBUG_LVL_INFO, "Creating a schedulerObject factory of type %d\n", mytype);
+        DPRINTF(DEBUG_LVL_INFO, "Creating a schedulerObject factory of type %"PRId32"\n", mytype);
         return (ocrSchedulerObjectFactory_t *)newSchedulerObjectFactory(mytype, paramlist);
     }
 }
@@ -433,7 +433,7 @@ ocrSchedulerHeuristicFactory_t *create_factory_schedulerHeuristic(char *name, oc
         DPRINTF(DEBUG_LVL_WARN, "Unrecognized type %s. Check name and ocr-config header\n", name);
         return NULL;
     } else {
-        DPRINTF(DEBUG_LVL_INFO, "Creating a schedulerHeuristic factory of type %d\n", mytype);
+        DPRINTF(DEBUG_LVL_INFO, "Creating a schedulerHeuristic factory of type %"PRId32"\n", mytype);
         return (ocrSchedulerHeuristicFactory_t *)newSchedulerHeuristicFactory(mytype, paramlist);
     }
 }
@@ -445,7 +445,7 @@ ocrWorkerFactory_t *create_factory_worker(char *name, ocrParamList_t *paramlist)
         DPRINTF(DEBUG_LVL_WARN, "Unrecognized type %s. Check name and ocr-config header\n", name);
         return NULL;
     } else {
-        DPRINTF(DEBUG_LVL_INFO, "Creating a worker factory of type %d\n", mytype);
+        DPRINTF(DEBUG_LVL_INFO, "Creating a worker factory of type %"PRId32"\n", mytype);
         return (ocrWorkerFactory_t *)newWorkerFactory(mytype, paramlist);
     }
 }
@@ -457,7 +457,7 @@ ocrSchedulerFactory_t *create_factory_scheduler(char *name, ocrParamList_t *para
         DPRINTF(DEBUG_LVL_WARN, "Unrecognized type %s. Check name and ocr-config header\n", name);
         return NULL;
     } else {
-        DPRINTF(DEBUG_LVL_INFO, "Creating a scheduler factory of type %d\n", mytype);
+        DPRINTF(DEBUG_LVL_INFO, "Creating a scheduler factory of type %"PRId32"\n", mytype);
         return (ocrSchedulerFactory_t *)newSchedulerFactory(mytype, paramlist);
     }
 }
@@ -469,7 +469,7 @@ ocrPolicyDomainFactory_t *create_factory_policydomain(char *name, ocrParamList_t
         DPRINTF(DEBUG_LVL_WARN, "Unrecognized type %s. Check name and ocr-config header\n", name);
         return NULL;
     } else {
-        DPRINTF(DEBUG_LVL_INFO, "Creating a policy domain factory of type %d\n", mytype);
+        DPRINTF(DEBUG_LVL_INFO, "Creating a policy domain factory of type %"PRId32"\n", mytype);
         return (ocrPolicyDomainFactory_t *)newPolicyDomainFactory(mytype, paramlist);
     }
 }
@@ -481,7 +481,7 @@ ocrTaskFactory_t *create_factory_task(char *name, ocrParamList_t *paramlist) {
         DPRINTF(DEBUG_LVL_INFO, "Unrecognized type %s. Check name and ocr-config header\n", name);
         return NULL;
     } else {
-        DPRINTF(DEBUG_LVL_INFO, "Creating a task factory of type %d\n", mytype);
+        DPRINTF(DEBUG_LVL_INFO, "Creating a task factory of type %"PRId32"\n", mytype);
         return (ocrTaskFactory_t *)newTaskFactory(mytype, paramlist);
     }
 }
@@ -493,7 +493,7 @@ ocrTaskTemplateFactory_t *create_factory_tasktemplate(char *name, ocrParamList_t
         DPRINTF(DEBUG_LVL_WARN, "Unrecognized type %s. Check name and ocr-config header\n", name);
         return NULL;
     } else {
-        DPRINTF(DEBUG_LVL_INFO, "Creating a task template factory of type %d\n", mytype);
+        DPRINTF(DEBUG_LVL_INFO, "Creating a task template factory of type %"PRId32"\n", mytype);
         return (ocrTaskTemplateFactory_t *)newTaskTemplateFactory(mytype, paramlist);
     }
 }
@@ -505,7 +505,7 @@ ocrDataBlockFactory_t *create_factory_datablock(char *name, ocrParamList_t *para
         DPRINTF(DEBUG_LVL_WARN, "Unrecognized type %s. Check name and ocr-config header\n", name);
         return NULL;
     } else {
-        DPRINTF(DEBUG_LVL_INFO, "Creating a datablock factory of type %d\n", mytype);
+        DPRINTF(DEBUG_LVL_INFO, "Creating a datablock factory of type %"PRId32"\n", mytype);
         return (ocrDataBlockFactory_t *)newDataBlockFactory(mytype, paramlist);
     }
 }
@@ -517,7 +517,7 @@ ocrEventFactory_t *create_factory_event(char *name, ocrParamList_t *paramlist) {
         DPRINTF(DEBUG_LVL_WARN, "Unrecognized type %s. Check name and ocr-config header\n", name);
         return NULL;
     } else {
-        DPRINTF(DEBUG_LVL_INFO, "Creating an event factory of type %d\n", mytype);
+        DPRINTF(DEBUG_LVL_INFO, "Creating an event factory of type %"PRId32"\n", mytype);
         return (ocrEventFactory_t *)newEventFactory(mytype, paramlist);
     }
 }
@@ -529,7 +529,7 @@ ocrGuidProviderFactory_t *create_factory_guid(char *name, ocrParamList_t *paraml
         DPRINTF(DEBUG_LVL_WARN, "Unrecognized type %s. Check name and ocr-config header\n", name);
         return NULL;
     } else {
-        DPRINTF(DEBUG_LVL_INFO, "Creating a guid factory of type %d\n", mytype);
+        DPRINTF(DEBUG_LVL_INFO, "Creating a guid factory of type %"PRId32"\n", mytype);
         return (ocrGuidProviderFactory_t *)newGuidProviderFactory(mytype, paramlist);
     }
 }
@@ -593,7 +593,7 @@ void *create_factory (type_enum index, char *factory_name, ocrParamList_t *param
         new_factory = (void *)create_factory_event(factory_name, paramlist);
         break;
     default:
-        DPRINTF(DEBUG_LVL_WARN, "Error: %d index unexpected\n", index);
+        DPRINTF(DEBUG_LVL_WARN, "Error: %"PRId32" index unexpected\n", index);
         break;
     }
     return new_factory;
@@ -640,7 +640,7 @@ s32 populate_inst(ocrParamList_t **inst_param, int inst_param_size, void **insta
             ALLOC_PARAM_LIST(inst_param[j], paramListGuidProviderInst_t);
             instance[j] = (void *)((ocrGuidProviderFactory_t *)factory)->instantiate(factory, inst_param[j]);
             if (instance[j])
-                DPRINTF(DEBUG_LVL_INFO, "Created guid provider of type %s, index %d\n", inststr, j);
+                DPRINTF(DEBUG_LVL_INFO, "Created guid provider of type %s, index %"PRId32"\n", inststr, j);
         }
         break;
     case memplatform_type:
@@ -672,7 +672,7 @@ s32 populate_inst(ocrParamList_t **inst_param, int inst_param_size, void **insta
 
             instance[j] = (void *)((ocrMemPlatformFactory_t *)factory)->instantiate(factory, inst_param[j]);
             if (instance[j])
-                DPRINTF(DEBUG_LVL_INFO, "Created memplatform of type %s, index %d\n", inststr, j);
+                DPRINTF(DEBUG_LVL_INFO, "Created memplatform of type %s, index %"PRId32"\n", inststr, j);
         }
         break;
     case memtarget_type:
@@ -688,7 +688,7 @@ s32 populate_inst(ocrParamList_t **inst_param, int inst_param_size, void **insta
             }
             instance[j] = (void *)((ocrMemTargetFactory_t *)factory)->instantiate(factory, inst_param[j]);
             if (instance[j])
-                DPRINTF(DEBUG_LVL_INFO, "Created memtarget of type %s, index %d\n", inststr, j);
+                DPRINTF(DEBUG_LVL_INFO, "Created memtarget of type %s, index %"PRId32"\n", inststr, j);
         }
         break;
     case allocator_type:
@@ -735,7 +735,7 @@ s32 populate_inst(ocrParamList_t **inst_param, int inst_param_size, void **insta
             ((paramListAllocatorInst_t *)inst_param[j])->size = (u64)iniparser_getlonglong(dict, key, 0);
             instance[j] = (void *)((ocrAllocatorFactory_t *)factory)->instantiate(factory, inst_param[j]);
             if (instance[j])
-                DPRINTF(DEBUG_LVL_INFO, "Created allocator of type %s, index %d\n", inststr, j);
+                DPRINTF(DEBUG_LVL_INFO, "Created allocator of type %s, index %"PRId32"\n", inststr, j);
         }
         break;
 
@@ -745,7 +745,7 @@ s32 populate_inst(ocrParamList_t **inst_param, int inst_param_size, void **insta
             ALLOC_PARAM_LIST(inst_param[j], paramListCommApiInst_t);
             instance[j] = (void *)((ocrCommPlatformFactory_t *)factory)->instantiate(factory, inst_param[j]);
             if (instance[j])
-                DPRINTF(DEBUG_LVL_INFO, "Created commapi of type %s, index %d\n", inststr, j);
+                DPRINTF(DEBUG_LVL_INFO, "Created commapi of type %s, index %"PRId32"\n", inststr, j);
         }
         break;
     case commplatform_type:
@@ -755,7 +755,7 @@ s32 populate_inst(ocrParamList_t **inst_param, int inst_param_size, void **insta
             // Currently location field is auto-populated. To be deprecated.
             instance[j] = (void *)((ocrCommPlatformFactory_t *)factory)->instantiate(factory, inst_param[j]);
             if (instance[j])
-                DPRINTF(DEBUG_LVL_INFO, "Created commplatform of type %s, index %d\n", inststr, j);
+                DPRINTF(DEBUG_LVL_INFO, "Created commplatform of type %s, index %"PRId32"\n", inststr, j);
         }
         break;
     case compplatform_type:
@@ -788,7 +788,7 @@ s32 populate_inst(ocrParamList_t **inst_param, int inst_param_size, void **insta
 
             instance[j] = (void *)((ocrCompPlatformFactory_t *)factory)->instantiate(factory, inst_param[j]);
             if (instance[j])
-                DPRINTF(DEBUG_LVL_INFO, "Created compplatform of type %s, index %d\n", inststr, j);
+                DPRINTF(DEBUG_LVL_INFO, "Created compplatform of type %s, index %"PRId32"\n", inststr, j);
         }
         break;
     case comptarget_type:
@@ -796,15 +796,33 @@ s32 populate_inst(ocrParamList_t **inst_param, int inst_param_size, void **insta
             ALLOC_PARAM_LIST(inst_param[j], paramListCompTargetInst_t);
             instance[j] = (void *)((ocrCompTargetFactory_t *)factory)->instantiate(factory, inst_param[j]);
             if (instance[j])
-                DPRINTF(DEBUG_LVL_INFO, "Created comptarget of type %s, index %d\n", inststr, j);
+                DPRINTF(DEBUG_LVL_INFO, "Created comptarget of type %s, index %"PRId32"\n", inststr, j);
         }
         break;
     case workpile_type:
         for (j = low; j<=high; j++) {
+#ifdef ENABLE_WORKPILE_HC
+            ALLOC_PARAM_LIST(inst_param[j], paramListWorkpileHcInst_t);
+            char *valuestr = "WORK_STEALING_DEQUE";
+            if (key_exists(dict, secname, "dequetype")) {
+                snprintf(key, MAX_KEY_SZ, "%s:%s", secname, "dequetype");
+                INI_GET_STR (key, valuestr, "");
+            }
+            ocrDequeType_t value = WORK_STEALING_DEQUE;
+            if (strcmp("LOCKED_DEQUE",valuestr) == 0) {
+                value = LOCKED_DEQUE;
+            } else {
+                if (strcmp("WORK_STEALING_DEQUE",valuestr) != 0) {
+                    DPRINTF(DEBUG_LVL_WARN, "Error: Unsupported dequetype %s\n", valuestr);
+                }
+            }
+            ((paramListWorkpileHcInst_t *)inst_param[j])->dequeType = value;
+#else
             ALLOC_PARAM_LIST(inst_param[j], paramListWorkpileInst_t);
+#endif
             instance[j] = (void *)((ocrWorkpileFactory_t *)factory)->instantiate(factory, inst_param[j]);
             if (instance[j])
-                DPRINTF(DEBUG_LVL_INFO, "Created workpile of type %s, index %d\n", inststr, j);
+                DPRINTF(DEBUG_LVL_INFO, "Created workpile of type %s, index %"PRId32"\n", inststr, j);
         }
         break;
     case schedulerObject_type:
@@ -812,9 +830,34 @@ s32 populate_inst(ocrParamList_t **inst_param, int inst_param_size, void **insta
             ALLOC_PARAM_LIST(inst_param[j], paramListSchedulerObject_t);
             ((paramListSchedulerObject_t*)inst_param[j])->config = true;
             ((paramListSchedulerObject_t*)inst_param[j])->guidRequired = false;
+            schedulerObjectType_t mytype = schedulerObjectMax_id;
+            TO_ENUM (mytype, inststr, schedulerObjectType_t, schedulerObject_types, schedulerObjectMax_id);
+            switch(mytype) {
+#ifdef ENABLE_SCHEDULER_OBJECT_WST
+            case schedulerObjectWst_id:
+                {
+                    if (key_exists(dict, secname, "config")) {
+                        char *valuestr = NULL;
+                        snprintf(key, MAX_KEY_SZ, "%s:%s", secname, "config");
+                        INI_GET_STR (key, valuestr, "");
+                        if (strcmp(valuestr, "STATIC") == 0) {
+                            ((paramListSchedulerObjectWst_t*)inst_param[j])->config = SCHEDULER_OBJECT_WST_CONFIG_STATIC;
+                        } else {
+                            ((paramListSchedulerObjectWst_t*)inst_param[j])->config = SCHEDULER_OBJECT_WST_CONFIG_REGULAR;
+                        }
+                    }
+                }
+                break;
+#endif
+            case schedulerObjectMax_id:
+                ASSERT (0); // Unimplemented scheduler object type
+                break;
+            default:
+                break;
+            }
             instance[j] = (void *)((ocrSchedulerObjectFactory_t *)factory)->instantiate(factory, inst_param[j]);
             if (instance[j]) {
-                DPRINTF(DEBUG_LVL_INFO, "Created schedulerObject of type %s, index %d\n", inststr, j);
+                DPRINTF(DEBUG_LVL_INFO, "Created schedulerObject of type %s, index %"PRId32"\n", inststr, j);
             }
         }
         break;
@@ -831,7 +874,7 @@ s32 populate_inst(ocrParamList_t **inst_param, int inst_param_size, void **insta
             }
             instance[j] = (void *)((ocrSchedulerHeuristicFactory_t *)factory)->instantiate(factory, inst_param[j]);
             if (instance[j])
-                DPRINTF(DEBUG_LVL_INFO, "Created schedulerHeuristic of type %s, index %d\n", inststr, j);
+                DPRINTF(DEBUG_LVL_INFO, "Created schedulerHeuristic of type %s, index %"PRId32"\n", inststr, j);
         }
         break;
     case worker_type:
@@ -920,7 +963,7 @@ s32 populate_inst(ocrParamList_t **inst_param, int inst_param_size, void **insta
 
             instance[j] = (void *)((ocrWorkerFactory_t *)factory)->instantiate(factory, inst_param[j]);
             if (instance[j])
-                DPRINTF(DEBUG_LVL_INFO, "Created worker of type %s, index %d\n", inststr, j);
+                DPRINTF(DEBUG_LVL_INFO, "Created worker of type %s, index %"PRId32"\n", inststr, j);
         }
         break;
     case scheduler_type:
@@ -976,7 +1019,7 @@ s32 populate_inst(ocrParamList_t **inst_param, int inst_param_size, void **insta
             ASSERT(inst_param[j]);
             instance[j] = (void *)((ocrSchedulerFactory_t *)factory)->instantiate(factory, inst_param[j]);
             if (instance[j])
-                DPRINTF(DEBUG_LVL_INFO, "Created scheduler of type %s, index %d\n", inststr, j);
+                DPRINTF(DEBUG_LVL_INFO, "Created scheduler of type %s, index %"PRId32"\n", inststr, j);
         }
         break;
     case policydomain_type:
@@ -1041,12 +1084,12 @@ s32 populate_inst(ocrParamList_t **inst_param, int inst_param_size, void **insta
                               factory, inst_param[j]);
 
             if (instance[j])
-                DPRINTF(DEBUG_LVL_INFO, "Created policy domain of index %d\n", j);
+                DPRINTF(DEBUG_LVL_INFO, "Created policy domain of index %"PRId32"\n", j);
 
         }
         break;
     default:
-        DPRINTF(DEBUG_LVL_WARN, "Error: %d index unexpected\n", index);
+        DPRINTF(DEBUG_LVL_WARN, "Error: %"PRId32" index unexpected\n", index);
         break;
     }
     return 0;
@@ -1064,18 +1107,18 @@ void add_dependence (type_enum fromtype, type_enum totype, char *refstr,
     case workpile_type:
     case schedulerObject_type:
     case schedulerHeuristic_type:
-        DPRINTF(DEBUG_LVL_WARN, "Unexpected: this type should have no dependences! (incorrect dependence: %d to %d)\n", fromtype, totype);
+        DPRINTF(DEBUG_LVL_WARN, "Unexpected: this type should have no dependences! (incorrect dependence: %"PRId32" to %"PRId32")\n", fromtype, totype);
         break;
 
     case commapi_type: {
         ocrCommApi_t *f = (ocrCommApi_t *)frominstance;
-        DPRINTF(DEBUG_LVL_INFO, "CommApi %d to %d\n", fromtype, totype);
+        DPRINTF(DEBUG_LVL_INFO, "CommApi %"PRId32" to %"PRId32"\n", fromtype, totype);
         f->commPlatform = (ocrCommPlatform_t *)toinstance;
         break;
     }
     case memtarget_type: {
         ocrMemTarget_t *f = (ocrMemTarget_t *)frominstance;
-        DPRINTF(DEBUG_LVL_INFO, "Memtarget %d to %d\n", fromtype, totype);
+        DPRINTF(DEBUG_LVL_INFO, "Memtarget %"PRId32" to %"PRId32"\n", fromtype, totype);
 
         if (f->memoryCount == 0) {
             f->memoryCount = dependence_count;
@@ -1086,7 +1129,7 @@ void add_dependence (type_enum fromtype, type_enum totype, char *refstr,
     }
     case allocator_type: {
         ocrAllocator_t *f = (ocrAllocator_t *)frominstance;
-        DPRINTF(DEBUG_LVL_INFO, "Allocator %d to %d\n", fromtype, totype);
+        DPRINTF(DEBUG_LVL_INFO, "Allocator %"PRId32" to %"PRId32"\n", fromtype, totype);
         if (f->memoryCount == 0) {
             f->memoryCount = dependence_count;
             f->memories = (ocrMemTarget_t **)runtimeChunkAlloc(dependence_count * sizeof(ocrMemTarget_t *), PERSISTENT_CHUNK);
@@ -1096,7 +1139,7 @@ void add_dependence (type_enum fromtype, type_enum totype, char *refstr,
     }
     case comptarget_type: {
         ocrCompTarget_t *f = (ocrCompTarget_t *)frominstance;
-        DPRINTF(DEBUG_LVL_INFO, "CompTarget %d to %d\n", fromtype, totype);
+        DPRINTF(DEBUG_LVL_INFO, "CompTarget %"PRId32" to %"PRId32"\n", fromtype, totype);
 
         if (f->platformCount == 0) {
             f->platformCount = dependence_count;
@@ -1107,7 +1150,7 @@ void add_dependence (type_enum fromtype, type_enum totype, char *refstr,
     }
     case worker_type: {
         ocrWorker_t *f = (ocrWorker_t *)frominstance;
-        DPRINTF(DEBUG_LVL_INFO, "Worker %d to %d\n", fromtype, totype);
+        DPRINTF(DEBUG_LVL_INFO, "Worker %"PRId32" to %"PRId32"\n", fromtype, totype);
 
         if (f->computeCount == 0) {
             f->computeCount = dependence_count;
@@ -1118,7 +1161,7 @@ void add_dependence (type_enum fromtype, type_enum totype, char *refstr,
     }
     case scheduler_type: {
         ocrScheduler_t *f = (ocrScheduler_t *)frominstance;
-        DPRINTF(DEBUG_LVL_INFO, "Scheduler %d to %d\n", fromtype, totype);
+        DPRINTF(DEBUG_LVL_INFO, "Scheduler %"PRId32" to %"PRId32"\n", fromtype, totype);
         switch (totype) {
         case workpile_type: {
             if (f->workpileCount == 0) {
@@ -1151,7 +1194,7 @@ void add_dependence (type_enum fromtype, type_enum totype, char *refstr,
     }
     case policydomain_type: {
         ocrPolicyDomain_t *f = (ocrPolicyDomain_t *)frominstance;
-        DPRINTF(DEBUG_LVL_INFO, "PD %d to %d\n", fromtype, totype);
+        DPRINTF(DEBUG_LVL_INFO, "PD %"PRId32" to %"PRId32"\n", fromtype, totype);
         switch (totype) {
         case guid_type: {
             ASSERT(dependence_count==1);

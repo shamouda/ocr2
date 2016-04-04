@@ -38,6 +38,18 @@ u32 nonSyncDequeSize(deque_t* self) {
 /*
  * Size of the deque (concurrent with other ops, may be inexact)
  */
+u32 nonSyncCircularDequeSize(deque_t* self) {
+    s32 size = (self->tail - self->head);
+    if (size < 0) {
+        size = INIT_DEQUE_CAPACITY + size;
+    }
+    ASSERT(size >= 0 && size <= INIT_DEQUE_CAPACITY);
+    return ((u32) size);
+}
+
+/*
+ * Size of the deque (concurrent with other ops, may be inexact)
+ */
 u32 wstDequeSize(deque_t* self) {
     s32 size = (self->tail - self->head);
     // Work-stealing deque's pop tail implementation optimistically
@@ -170,8 +182,8 @@ void wstDequePushTail(deque_t* self, void* entry, u8 doTry) {
     }
     s32 n = (self->tail) % INIT_DEQUE_CAPACITY;
     self->data[n] = entry;
-    DPRINTF(DEBUG_LVL_VERB, "Pushing h:%d t:%d deq[%d] elt:0x%lx into conc deque @ 0x%lx\n",
-            head, self->tail, n, (u64)entry, (u64)self);
+    DPRINTF(DEBUG_LVL_VERB, "Pushing h:%"PRId32" t:%"PRId32" deq[%"PRId32"] elt:0x%p into conc deque @ 0x%p\n",
+            head, self->tail, n, entry, self);
     hal_fence();
     ++(self->tail);
 }
@@ -194,7 +206,7 @@ void * wstDequePopTail(deque_t * self, u8 doTry) {
     void * rt = (void*) self->data[(tail) % INIT_DEQUE_CAPACITY];
 
     if (tail > head) {
-        DPRINTF(DEBUG_LVL_VERB, "Popping (tail) h:%d t:%d deq[%d] elt:0x%lx from conc deque @ 0x%lx\n",
+        DPRINTF(DEBUG_LVL_VERB, "Popping (tail) h:%"PRId32" t:%"PRId32" deq[%"PRId32"] elt:0x%"PRIx64" from conc deque @ 0x%"PRIx64"\n",
                 head, tail, tail % INIT_DEQUE_CAPACITY, (u64)rt, (u64)self);
         return rt;
     }
@@ -205,7 +217,7 @@ void * wstDequePopTail(deque_t * self, u8 doTry) {
 
     /* now the deque is empty */
     self->tail = self->head;
-    DPRINTF(DEBUG_LVL_VERB, "Popping (tail 2) h:%d t:%d deq[%d] elt:0x%lx from conc deque @ 0x%lx\n",
+    DPRINTF(DEBUG_LVL_VERB, "Popping (tail 2) h:%"PRId32" t:%"PRId32" deq[%"PRId32"] elt:0x%"PRIx64" from conc deque @ 0x%"PRIx64"\n",
             head, tail, tail % INIT_DEQUE_CAPACITY, (u64)rt, (u64)self);
     return rt;
 }
@@ -232,7 +244,7 @@ void * wstDequePopHead(deque_t * self, u8 doTry) {
 
         /* compete with other thieves and possibly the owner (if the size == 1) */
         if (hal_cmpswap32(&self->head, head, head + 1) == head) { /* competing */
-            DPRINTF(DEBUG_LVL_VERB, "Popping (head) h:%d t:%d deq[%d] elt:0x%lx from conc deque @ 0x%lx\n",
+            DPRINTF(DEBUG_LVL_VERB, "Popping (head) h:%"PRId32" t:%"PRId32" deq[%"PRId32"] elt:0x%"PRIx64" from conc deque @ 0x%"PRIx64"\n",
                      head, tail, head % INIT_DEQUE_CAPACITY, (u64)rt, (u64)self);
             return rt;
         }
@@ -280,6 +292,39 @@ void * lockedDequePopTail(deque_t * self, u8 doTry) {
     hal_unlock32(&dself->lock);
     return rt;
 }
+
+/*
+ * Push an entry onto the tail of the deque
+ * This operation locks the whole deque.
+ */
+void lockedDequePushHead(deque_t* self, void* entry, u8 doTry) {
+    dequeSingleLocked_t* dself = (dequeSingleLocked_t*)self;
+    hal_lock32(&dself->lock);
+    u32 head = self->head;
+    u32 tail = self->tail;
+    if (tail == INIT_DEQUE_CAPACITY + head) { /* deque looks full */
+        /* may not grow the deque if some interleaving steal occur */
+        ASSERT("DEQUE full, increase deque's size" && 0);
+    }
+    // Not full so I must be able to write
+    u32 n;
+    if (head == tail) { // empty
+        // PRINTF("PUSH_HEAD empty\n");
+        ++(self->tail);
+        n = head % INIT_DEQUE_CAPACITY;
+    } else if (head == 0) { // no space at head, need to shift
+        hal_memMove(&self->data[1], self->data, (tail-head) * sizeof(void *), false);
+        self->tail++;
+        n = 0;
+    } else { // ok to just prepend
+        // PRINTF("PUSH_HEAD prepend\n");
+        --(self->head);
+        n = (head-1) % INIT_DEQUE_CAPACITY;
+    }
+    self->data[n] = entry;
+    hal_unlock32(&dself->lock);
+}
+
 
 /*
  * Pop the task out of the deque from the head
@@ -335,6 +380,7 @@ void * nonConcDequePopHeadSemiConc(deque_t * self, u8 doTry) {
     ASSERT(rt != NULL);
 #ifdef OCR_ASSERT
     self->data[head] = NULL; // DEBUG
+    hal_fence();
 #endif
     self->head = ((head == (INIT_DEQUE_CAPACITY-1)) ? 0 : head+1);
     return rt;
@@ -370,6 +416,7 @@ deque_t * newDeque(ocrPolicyDomain_t *pd, void * initValue, ocrDequeType_t type)
         break;
     case SEMI_CONCURRENT_DEQUE:
         self = newBaseDeque(pd, initValue, SINGLE_LOCK_BASE_DEQUE);
+        self->size = nonSyncCircularDequeSize;
         // Specialize push/pop implementations
         self->pushAtTail = lockedDequePushTailSemiConc;
         self->popFromTail = NULL;
@@ -381,7 +428,7 @@ deque_t * newDeque(ocrPolicyDomain_t *pd, void * initValue, ocrDequeType_t type)
         // Specialize push/pop implementations
         self->pushAtTail =  lockedDequePushTail;
         self->popFromTail = lockedDequePopTail;
-        self->pushAtHead = NULL;
+        self->pushAtHead = lockedDequePushHead;
         self->popFromHead = lockedDequePopHead;
         break;
     default:

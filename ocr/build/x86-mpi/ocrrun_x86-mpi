@@ -30,6 +30,7 @@ else
     OCRRUN_OPT_NUM_NODES=${OCRRUN_OPT_NUM_NODES-"-np"}
     OCRRUN_OPT_NODEFILE=${OCRRUN_OPT_NODEFILE-"-machinefile"}
     OCRRUN_OPT_GDB=${OCRRUN_OPT_GDB-"--gdb"}
+    OCRRUN_OPT_ITAC=${OCRRUN_OPT_ITAC-"-trace"}
 fi
 
 #
@@ -116,6 +117,14 @@ if [[ "$RES" != "" ]]; then
 
     if [[ "${OCRRUN_VALGRIND}" == "yes" ]]; then
         PROGRAM_BIN="valgrind ${OCRRUN_VALGRIND_OPTS} ${PROGRAM_BIN}"
+    fi
+
+    if [[ "${OCRRUN_ITAC}" == "yes" ]]; then
+        if [[ -z "${VT_MPI}" ]]; then
+            echo "Error: The ITAC environment must be defined."
+            exit 1
+        fi
+        OCR_MPI_OPTS+=" ${OCRRUN_OPT_ITAC}"
     fi
 
     if [[ "${OCRRUN_HPCTOOLKIT}" == "yes" ]]; then

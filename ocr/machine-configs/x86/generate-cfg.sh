@@ -9,4 +9,5 @@ $CFG_SCRIPT --threads 4 --dbtype Regular --output mach-hc-4w.cfg --remove-destin
 $CFG_SCRIPT --threads 8 --dbtype Regular --output mach-hc-8w.cfg --remove-destination
 $CFG_SCRIPT --threads 8 --dbtype Regular --binding spread --output mach-hc-8w-binding.cfg --remove-destination
 $CFG_SCRIPT --threads 16 --dbtype Regular --output mach-hc-16w.cfg --remove-destination
+$CFG_SCRIPT --threads 8 --scheduler STATIC --output static-8w-lockableDB.cfg --remove-destination
 unset CFG_SCRIPT

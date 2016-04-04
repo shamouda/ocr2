@@ -1,0 +1,2 @@
+module load /opt/rice/modulefiles/mvapich2.2.2
+export MPI_ROOT=/opt/rice/mvapich2.2.2

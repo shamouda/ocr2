@@ -52,7 +52,7 @@ u8 xePthreadCommSwitchRunlevel(ocrCommPlatform_t *self, ocrPolicyDomain_t *PD, o
                 ocrCommPlatformXePthread_t *rself = (ocrCommPlatformXePthread_t*)self;
                 comQueueInit(&(rself->inQueue), 1,
                              (comQueueSlot_t*)runtimeChunkAlloc(sizeof(comQueueSlot_t), PERSISTENT_CHUNK));
-                DPRINTF(DEBUG_LVL_VERB, "Initialized inQueue @ 0x%lx of size 1\n",
+                DPRINTF(DEBUG_LVL_VERB, "Initialized inQueue @ %p of size 1\n",
                         &(rself->inQueue));
             }
         } else {
@@ -78,7 +78,7 @@ u8 xePthreadCommSwitchRunlevel(ocrCommPlatform_t *self, ocrPolicyDomain_t *PD, o
                 (ocrCommPlatformCePthread_t *) cePD->commApis[0]->commPlatform;
             rself->outQueue.neighborLocation = cePD->myLocation;
             rself->outQueue.outQueue = &(parent->inQueueXE);
-            DPRINTF(DEBUG_LVL_VERB, "Outqueue for CE 0x%lx is @ 0x%lx\n",
+            DPRINTF(DEBUG_LVL_VERB, "Outqueue for CE 0x%"PRIx64" is @ %p\n",
                     cePD->myLocation, &(parent->inQueueXE));
         }
         break;
@@ -113,7 +113,7 @@ u8 xePthreadCommSendMessage(ocrCommPlatform_t *self, ocrLocation_t target, ocrPo
     ocrCommPlatformXePthread_t *rself = (ocrCommPlatformXePthread_t*)self;
 
     if(target != rself->outQueue.neighborLocation) {
-        DPRINTF(DEBUG_LVL_WARN, "Destination for message @ 0x%lx to 0x%lx not found\n",
+        DPRINTF(DEBUG_LVL_WARN, "Destination for message @ %p to 0x%"PRIx64" not found\n",
                 msg, target);
         ASSERT(0);
     }
@@ -123,7 +123,7 @@ u8 xePthreadCommSendMessage(ocrCommPlatform_t *self, ocrLocation_t target, ocrPo
     comQueue_t *queue = rself->outQueue.outQueue;
     comQueue_t *returnQueue = NULL;
 
-    DPRINTF(DEBUG_LVL_VERB, "Sending msg 0x%lx (type: 0x%x) to 0x%lx; using out queue @ 0x%lx\n",
+    DPRINTF(DEBUG_LVL_VERB, "Sending msg %p (type: 0x%"PRIx32") to 0x%"PRIx64"; using out queue @ %p\n",
             msg, msg->type, target, queue);
 
     if((msg->type & (PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE)) == (PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE)) {
@@ -138,7 +138,7 @@ u8 xePthreadCommSendMessage(ocrCommPlatform_t *self, ocrLocation_t target, ocrPo
             // We encode the queue address and slot to be able to make sure
             // things are OK on the way back
             msg->msgId = ((u64)returnQueue << 8) + inSlot;
-            DPRINTF(DEBUG_LVL_VERB, "Message requires a response. Reserved answer slot %u on queue @ 0x%lx\n",
+            DPRINTF(DEBUG_LVL_VERB, "Message requires a response. Reserved answer slot %"PRIu32" on queue @ %p\n",
                     inSlot, returnQueue);
         } else if(status == OCR_ENOMEM) {
             // Permanent error
@@ -146,7 +146,7 @@ u8 xePthreadCommSendMessage(ocrCommPlatform_t *self, ocrLocation_t target, ocrPo
             return OCR_ENOMEM;
         } else {
             // Could not grab a slot
-            DPRINTF(DEBUG_LVL_VVERB, "Message requires a response but local return queue @ 0x%lx busy\n",
+            DPRINTF(DEBUG_LVL_VVERB, "Message requires a response but local return queue @ %p busy\n",
                     returnQueue);
             return OCR_EBUSY;
         }
@@ -158,33 +158,33 @@ u8 xePthreadCommSendMessage(ocrCommPlatform_t *self, ocrLocation_t target, ocrPo
 
         // Check if the queue matches (ie: we are sending back where we reserved)
         if(((u64)queue << 8) != (msg->msgId & 0xFFFFFFFFFFFFFF00ULL)) {
-            DPRINTF(DEBUG_LVL_WARN, "Expected to send response to queue 0x%lx but found queue 0x%lx\n",
+            DPRINTF(DEBUG_LVL_WARN, "Expected to send response to queue 0x%"PRIx64" but found queue %p\n",
                     msg->msgId >> 8, queue);
             ASSERT(0);
         }
         outSlot = (u32)(msg->msgId & 0xFFULL);
         status = 0;
-        DPRINTF(DEBUG_LVL_VVERB, "Using pre-reserved slot %u on queue @ 0x%lx\n",
+        DPRINTF(DEBUG_LVL_VVERB, "Using pre-reserved slot %"PRIu32" on queue @ %p\n",
                 outSlot, queue);
     } else {
         // Try to grab a slot on the destination queue to send
         status = comQueueReserveSlot(queue, &outSlot);
     }
     if(status == 0) {
-        DPRINTF(DEBUG_LVL_VVERB, "Grabbed slot %u on queue @ 0x%lx to send to 0x%lx\n",
+        DPRINTF(DEBUG_LVL_VVERB, "Grabbed slot %"PRIu32" on queue @ %p to send to 0x%"PRIx64"\n",
                 outSlot, queue, target);
         queue->slots[outSlot].properties = 0;
         // Check the properties flag to figure out if we need to copy the message
         if(properties & PERSIST_MSG_PROP) {
             // We just need to use the pointer
-            DPRINTF(DEBUG_LVL_VVERB, "Sending pointer 0x%lx (no marshalling)\n", msg);
+            DPRINTF(DEBUG_LVL_VVERB, "Sending pointer %p (no marshalling)\n", msg);
             queue->slots[outSlot].msgPtr = msg;
             if(!(properties & TWOWAY_MSG_PROP)) {
                 // We need to free the pointer when we are done with it
                 queue->slots[outSlot].properties |= COMQUEUE_FREE_PTR;
             }
         } else {
-            DPRINTF(DEBUG_LVL_VERB, "Marshalling msg 0x%lx into 0x%lx\n",
+            DPRINTF(DEBUG_LVL_VERB, "Marshalling msg %p into %p\n",
                     msg, &(queue->slots[outSlot].msgBuffer));
             u64 baseSize = 0, marshalledSize = 0;
             ocrPolicyMsgGetMsgSize(msg, &baseSize, &marshalledSize, 0);
@@ -212,7 +212,7 @@ u8 xePthreadCommSendMessage(ocrCommPlatform_t *self, ocrLocation_t target, ocrPo
             comQueueUnreserveSlot(returnQueue, inSlot);
         }
         // Could not grab a slot
-        DPRINTF(DEBUG_LVL_VVERB, "Queue @ 0x%lx busy\n", queue);
+        DPRINTF(DEBUG_LVL_VVERB, "Queue @ %p busy\n", queue);
         return OCR_EBUSY;
     }
     return 0;
@@ -234,19 +234,19 @@ u8 xePthreadCommPollMessage(ocrCommPlatform_t *self, ocrPolicyMsg_t **msg,
         if(rself->inQueue.slots[slot].msgPtr == NULL) {
             // We have to use the buffer
             curMsg = &(rself->inQueue.slots[slot].msgBuffer);
-            DPRINTF(DEBUG_LVL_VERB, "Found a message (in buffer) @ 0x%lx (type: 0x%x)\n",
+            DPRINTF(DEBUG_LVL_VERB, "Found a message (in buffer) @ %p (type: 0x%"PRIx32")\n",
                     curMsg, curMsg->type);
             fixupPtrs = 1;
         } else {
             curMsg = rself->inQueue.slots[slot].msgPtr;
-            DPRINTF(DEBUG_LVL_VERB, "Found a message as ptr @ 0x%lx (type: 0x%x)\n",
+            DPRINTF(DEBUG_LVL_VERB, "Found a message as ptr @ %p (type: 0x%"PRIx32")\n",
                     curMsg, curMsg->type);
         }
         ocrPolicyMsgGetMsgSize(curMsg, &baseSize, &marshalledSize, 0);
         if(*msg && (*msg)->bufferSize >= baseSize + marshalledSize) {
             // We can copy things into here
             if(*msg != curMsg) {
-                DPRINTF(DEBUG_LVL_VERB, "Going to copy message into hinted buffer (@ 0x%lx)\n",
+                DPRINTF(DEBUG_LVL_VERB, "Going to copy message into hinted buffer (@ %p)\n",
                         *msg);
                 ocrPolicyMsgUnMarshallMsg((u8*)curMsg, NULL, *msg, MARSHALL_FULL_COPY);
             } else {
@@ -261,14 +261,14 @@ u8 xePthreadCommPollMessage(ocrCommPlatform_t *self, ocrPolicyMsg_t **msg,
             if(rself->inQueue.slots[slot].properties & COMQUEUE_FREE_PTR) {
                 self->pd->fcts.pdFree(self->pd, curMsg);
             }
-            DPRINTF(DEBUG_LVL_VERB, "Freeing slot %u of queue @ 0x%lx (at poll)\n",
+            DPRINTF(DEBUG_LVL_VERB, "Freeing slot %"PRIu32" of queue @ %p (at poll)\n",
                     slot, &(rself->inQueue));
             rself->inQueue.slots[slot].properties = 0;
             comQueueEmptySlot(&(rself->inQueue), slot);
         } else {
             // Can't use it
             // We return the pointer that we do have
-            DPRINTF(DEBUG_LVL_VERB, "Not using hint... returning 0x%lx\n", curMsg);
+            DPRINTF(DEBUG_LVL_VERB, "Not using hint... returning %p\n", curMsg);
             if(fixupPtrs) {
                 ocrPolicyMsgUnMarshallMsg((u8*)curMsg, NULL, curMsg, MARSHALL_APPEND);
             }
@@ -308,14 +308,14 @@ u8 xePthreadDestructMessage(ocrCommPlatform_t *self, ocrPolicyMsg_t *msg) {
             if(rself->inQueue.slots[i].properties & COMQUEUE_FREE_PTR) {
                 self->pd->fcts.pdFree(self->pd, rself->inQueue.slots[i].msgPtr);
             }
-            DPRINTF(DEBUG_LVL_VERB, "Freeing slot %u of queue @ 0x%lx\n",
+            DPRINTF(DEBUG_LVL_VERB, "Freeing slot %"PRIu32" of queue @ %p\n",
                     i, &(rself->inQueue));
             rself->inQueue.slots[i].properties = 0;
             comQueueEmptySlot(&(rself->inQueue), i);
             return 0;
         }
     }
-    DPRINTF(DEBUG_LVL_WARN, "Could not find message 0x%lx to destroy\n",
+    DPRINTF(DEBUG_LVL_WARN, "Could not find message %p to destroy\n",
             msg);
     return OCR_EINVAL;
 }

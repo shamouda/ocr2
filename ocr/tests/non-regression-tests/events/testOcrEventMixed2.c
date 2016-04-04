@@ -35,22 +35,22 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
 
     u32 *db0Ptr;
     ocrGuid_t db0Guid;
-    ocrDbCreate(&db0Guid,(void **)&db0Ptr, sizeof(u32), 0, NULL_GUID, NO_ALLOC);
+    ocrDbCreate(&db0Guid,(void **)&db0Ptr, sizeof(u32), 0, NULL_HINT, NO_ALLOC);
     db0Ptr[0] = 11;
     ocrDbRelease(db0Guid);
     u32 *db1Ptr;
     ocrGuid_t db1Guid;
-    ocrDbCreate(&db1Guid,(void **)&db1Ptr, sizeof(u32), 0, NULL_GUID, NO_ALLOC);
+    ocrDbCreate(&db1Guid,(void **)&db1Ptr, sizeof(u32), 0, NULL_HINT, NO_ALLOC);
     db1Ptr[0] = 22;
     ocrDbRelease(db1Guid);
     u32 *db2Ptr;
     ocrGuid_t db2Guid;
-    ocrDbCreate(&db2Guid,(void **)&db2Ptr, sizeof(u32), 0, NULL_GUID, NO_ALLOC);
+    ocrDbCreate(&db2Guid,(void **)&db2Ptr, sizeof(u32), 0, NULL_HINT, NO_ALLOC);
     db2Ptr[0] = 33;
     ocrDbRelease(db2Guid);
     u32 *db3Ptr;
     ocrGuid_t db3Guid;
-    ocrDbCreate(&db3Guid,(void **)&db3Ptr, sizeof(u32), 0, NULL_GUID, NO_ALLOC);
+    ocrDbCreate(&db3Guid,(void **)&db3Ptr, sizeof(u32), 0, NULL_HINT, NO_ALLOC);
     db3Ptr[0] = 44;
     ocrDbRelease(db3Guid);
 
@@ -59,7 +59,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrGuid_t taskForEdtTemplateGuid;
     ocrEdtTemplateCreate(&taskForEdtTemplateGuid, taskForEdt, 0 /*paramc*/, 4 /*depc*/);
     ocrEdtCreate(&edtGuid, taskForEdtTemplateGuid, EDT_PARAM_DEF, /*paramv=*/NULL, EDT_PARAM_DEF, /*depv=*/NULL,
-                 /*properties=*/0, NULL_GUID, /*outEvent=*/NULL);
+                 /*properties=*/0, NULL_HINT, /*outEvent=*/NULL);
 
     // Register a dependence between an event and an edt
     ocrAddDependence(sticky0, edtGuid, 0, DB_MODE_CONST);
