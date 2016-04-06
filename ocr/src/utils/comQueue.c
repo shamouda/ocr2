@@ -68,7 +68,7 @@ u8 comQueueReserveSlot(comQueue_t *queue, u32 *slot) {
                 if(oldValue == COMQUEUE_WRITEABLE) {
                     // Definitely got the slot this time
                     *slot = oldIdxValue;
-                    //DPRINTF(DEBUG_LVL_WARN, "0x%x: G %u\n", queue, oldIdxValue);
+                    //DPRINTF(DEBUG_LVL_WARN, "0x%"PRIx32": G %"PRIu32"\n", queue, oldIdxValue);
                     return 0;
                 } // else, we can just try again (no harm done, someone got the slot
             } // Else fall-through to try again
@@ -117,7 +117,7 @@ u8 comQueueReadSlot(comQueue_t *queue, u32 *slot) {
     // We look up to writeIdx (including writeIdx)
     u32 lastIdx = queue->writeIdx; // We read now; it does not matter if we miss
                                    // some; we will catch them next time
-    u32 firstIdx, curIdx, firstWriteable = (u32)-1, lastWriteable;
+    u32 firstIdx, curIdx, firstWriteable = (u32)-1, lastWriteable = 0;
     curIdx = queue->readIdx;
     firstIdx = curIdx;
     u8 allEmpty = true;
@@ -136,7 +136,7 @@ u8 comQueueReadSlot(comQueue_t *queue, u32 *slot) {
                     // We had updates to readIdx so we fence to make sure all
                     // the status updates are visible and then we update readIdx
                     hal_fence();
-                    //DPRINTF(DEBUG_LVL_WARN, "0x%lx: R: %u 3\n", queue, updatedReadIdx);
+                    //DPRINTF(DEBUG_LVL_WARN, "0x%"PRIx64": R: %"PRIu32" 3\n", queue, updatedReadIdx);
                     // We never wait on what we just set as writeable. Wait on the next
                     // "real" thing
                     queue->readIdx = (lastWriteable + 1) % queue->size;
@@ -167,7 +167,7 @@ u8 comQueueReadSlot(comQueue_t *queue, u32 *slot) {
                 // We had updates to readIdx so we fence to make sure all
                 // the status updates are visible and then we update readIdx
                 hal_fence();
-                //DPRINTF(DEBUG_LVL_WARN, "0x%lx: R: %u 3\n", queue, updatedReadIdx);
+                //DPRINTF(DEBUG_LVL_WARN, "0x%"PRIx64": R: %"PRIu32" 3\n", queue, updatedReadIdx);
                 // We never wait on what we just set as writeable. Wait on the next
                 // "real" thing
                 queue->readIdx = (lastWriteable + 1) % queue->size;
@@ -190,7 +190,7 @@ u8 comQueueReadSlot(comQueue_t *queue, u32 *slot) {
         // We had updates to readIdx so we fence to make sure all
         // the status updates are visible and then we update readIdx
         hal_fence();
-        //DPRINTF(DEBUG_LVL_WARN, "0x%lx: R: %u 3\n", queue, updatedReadIdx);
+        //DPRINTF(DEBUG_LVL_WARN, "0x%"PRIx64": R: %"PRIu32" 3\n", queue, updatedReadIdx);
         // We never wait on what we just set as writeable. Wait on the next
         // "real" thing
         queue->readIdx = (lastWriteable + 1) % queue->size;
@@ -223,7 +223,7 @@ u8 comQueueEmptySlot(comQueue_t *queue, u32 slot) {
         nextReadIdx = queue->readIdx;
     }
 
-    //DPRINTF(DEBUG_LVL_WARN, "0x%lx: S: %u NR: %u 0\n", queue, slot, nextReadIdx);
+    //DPRINTF(DEBUG_LVL_WARN, "0x%"PRIx64": S: %"PRIu32" NR: %"PRIu32" 0\n", queue, slot, nextReadIdx);
     queue->readIdx = nextReadIdx;
     return 0;
 }

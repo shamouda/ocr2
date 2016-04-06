@@ -78,6 +78,20 @@ typedef struct _ocrCommApiFcts_t {
     u8 (*switchRunlevel)(struct _ocrCommApi_t* self, struct _ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
                          phase_t phase, u32 properties, void (*callback)(struct _ocrPolicyDomain_t*, u64), u64 val);
 
+
+    /**
+     * @brief Initialize a handle
+     *
+     * Initializes a handle to make sure none of the values are
+     * illegal. This is useful for handles that are stack allocated
+     *
+     * @param[in] self         Pointer to this object
+     * @param[in/out] handle   Handle to initialize
+     *
+     * @return 0 on success and a non-zero error code
+     */
+    u8 (*initHandle)(struct _ocrCommApi_t* self, struct _ocrMsgHandle_t *handle);
+
     /**
      * @brief Send a message to another target
      *

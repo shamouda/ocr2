@@ -9,9 +9,9 @@ CFLAGS     := -w -DOCR_DEBUG -DELS_USER_SIZE=0 -I../../inc -I../../src -I../../s
 CE_CC      := gcc
 CE_CFLAGS  := $(CFLAGS) -fno-builtin -I ../../../ss/common/include -I../../build/fsim-null-fsim-ce
 
-PREFIX  := ../../../ss/install/bin/rmd-linux-elf-
+PREFIX  := ../../../ss/install/bin/xstg-linux-elf-
 XE_CC      := $(PREFIX)clang
-XE_CFLAGS  := $(CFLAGS) -frmd-extensions -fno-builtin -I ../../../ss/common/include -I../../build/fsim-null-fsim-xe
+XE_CFLAGS  := $(CFLAGS) -fxstg-extensions -fno-builtin -I ../../../ss/common/include -I../../build/fsim-null-fsim-xe
 
 OBJDIR     := objs
 

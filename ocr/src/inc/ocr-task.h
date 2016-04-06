@@ -28,6 +28,9 @@
 #endif
 #endif
 
+//Runtime defined properties for EDT create (upper 16 bits)
+#define EDT_PROP_RT_HINT_ALLOC  0x10000 //Hint variable is runtime allocated
+
 struct _ocrTask_t;
 struct _ocrTaskTemplate_t;
 
@@ -43,7 +46,11 @@ typedef struct _paramListTaskTemplateFact_t {
     ocrParamList_t base;
 } paramListTaskTemplateFact_t;
 
-struct _ocrTaskTemplate_t;
+typedef struct _paramListTask_t {
+    ocrParamList_t base;
+    ocrWorkType_t workType;
+} paramListTask_t;
+
 
 /****************************************************/
 /* OCR TASK TEMPLATE                                */
@@ -343,8 +350,13 @@ typedef struct _ocrTask_t {
     u32 fctId;
 } ocrTask_t;
 
-#define OCR_TASK_FLAG_USES_HINTS            0x1
-#define OCR_TASK_FLAG_USES_SCHEDULER_OBJECT 0x2
+#define OCR_TASK_FLAG_USES_HINTS            0x1 /* Identifies if the task has user hints set */
+#define OCR_TASK_FLAG_RUNTIME_EDT           0x2 /* Identifies if the task is a runtime EDT as opposed to a user EDT */
+#define OCR_TASK_FLAG_USES_SCHEDULER_OBJECT 0x4 /* BUG #920 Cleanup */
+#define OCR_TASK_FLAG_USES_AFFINITY         0x8 /* BUG #921: This should go away once affinity is folded into hints */
+#ifdef ENABLE_EXTENSION_BLOCKING_SUPPORT
+#define OCR_TASK_FLAG_LONG                  0x10
+#endif
 
 /****************************************************/
 /* OCR TASK FACTORY                                 */
@@ -368,7 +380,7 @@ typedef struct _ocrTaskFactory_t {
      */
     u8  (*instantiate)(struct _ocrTaskFactory_t * factory, ocrFatGuid_t * edtGuid, ocrFatGuid_t edtTemplate,
                               u32 paramc, u64* paramv, u32 depc, u32 properties,
-                              ocrFatGuid_t affinity, ocrFatGuid_t *outputEvent,
+                              ocrHint_t *hint, ocrFatGuid_t *outputEvent,
                               ocrTask_t *curEdt, ocrFatGuid_t parentLatch,
                               ocrParamList_t *perInstance);
 

@@ -24,32 +24,39 @@ static void ocrShutdownInternal(u8 errorCode) {
     PD_MSG_FIELD_I(runlevel) = RL_COMPUTE_OK;
     PD_MSG_FIELD_I(properties) = RL_REQUEST | RL_BARRIER | RL_TEAR_DOWN;
     PD_MSG_FIELD_I(errorCode) = errorCode;
-    u8 returnCode = pd->fcts.processMessage(pd, msgPtr, true);
+    u8 returnCode __attribute__((unused)) = pd->fcts.processMessage(pd, msgPtr, true);
     ASSERT((returnCode == 0));
 #undef PD_MSG
 #undef PD_TYPE
 }
 
 void ocrShutdown() {
+    START_PROFILE(api_ocrShutdown);
     ocrShutdownInternal(0);
+    RETURN_PROFILE();
 }
 
 void ocrAbort(u8 errorCode) {
+    START_PROFILE(api_ocrAbort);
     ocrShutdownInternal(errorCode);
+    RETURN_PROFILE();
 }
 
 u64 getArgc(void* dbPtr) {
-    DPRINTF(DEBUG_LVL_INFO, "ENTER getArgc(dbPtr=0x%lx)\n", dbPtr);
-    DPRINTF(DEBUG_LVL_INFO, "EXIT getArgc -> %lu\n", ((u64*)dbPtr)[0]);
-    return ((u64*)dbPtr)[0];
+    START_PROFILE(api_getArgc);
+    DPRINTF(DEBUG_LVL_INFO, "ENTER getArgc(dbPtr=%p)\n", dbPtr);
+    DPRINTF(DEBUG_LVL_INFO, "EXIT getArgc -> %"PRIu64"\n", ((u64*)dbPtr)[0]);
+    RETURN_PROFILE(((u64*)dbPtr)[0]);
 
 }
 
 char* getArgv(void* dbPtr, u64 count) {
-    DPRINTF(DEBUG_LVL_INFO, "ENTER getArgv(dbPtr=0x%lx, count=%lu)\n", dbPtr, count);
+    START_PROFILE(api_getArgv);
+    DPRINTF(DEBUG_LVL_INFO, "ENTER getArgv(dbPtr=%p, count=%"PRIu64")\n", dbPtr, count);
     u64* dbPtrAsU64 = (u64*)dbPtr;
     ASSERT(count < dbPtrAsU64[0]); // We can't ask for more args than total
     u64 offset = dbPtrAsU64[1 + count];
     DPRINTF(DEBUG_LVL_INFO, "EXIT getArgv -> %s\n", ((char*)dbPtr) + offset);
-    return ((char*)dbPtr) + offset;
+    RETURN_PROFILE(((char*)dbPtr) + offset);
 }
+

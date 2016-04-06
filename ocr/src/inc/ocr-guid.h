@@ -204,6 +204,19 @@ typedef struct _ocrGuidProviderFcts_t {
     u8 (*registerGuid)(struct _ocrGuidProvider_t* self, ocrGuid_t guid, u64 val);
 
     /**
+     * @brief Unregister a GUID with the GUID provider.
+     *
+     * This function is meant to unregister GUIDs created by other providers of the
+     * same type 'self' is. This call does not deallocate the GUID and its associated metadata.
+     *
+     * \param[in] self          Pointer to this GUID provider
+     * \param[in] guid          GUID to register
+     * \param[out] val           The GUID's associated value
+     * @return 0 on success or an error code
+     */
+    u8 (*unregisterGuid)(struct _ocrGuidProvider_t* self, ocrGuid_t guid, u64 ** val);
+
+    /**
      * @brief Releases the GUID
      *
      * Whether the GUID provider will re-issue this same GUID for a different

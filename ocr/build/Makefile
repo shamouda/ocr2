@@ -15,6 +15,10 @@ default:
 	@echo "Valid version are:"
 	@echo ""
 	@echo "   x86          -- OCR for X86 Linux machines"
+	@echo "   x86-mpi      -- OCR for distributed X86 Linux machines using MPI comms"
+	@echo "   x86-gasnet   -- OCR for distributed X86 Linux machines using GASNet comms"
+	@echo "   x86-phi      -- OCR for X86 Xeon Phi (KNL) Linux machines"
+	@echo "   x86-newlib   -- OCR for X86 with newlib to support legacy codes"
 	@echo "   tg-x86       -- OCR for Traleika Glacier but emulated on X86 (WIP)"
 	@echo "   tg-ce        -- CE parts of OCR for Traleika Glacier"
 	@echo "   tg-xe        -- XE parts of OCR for Traleika Glacier"
@@ -68,13 +72,13 @@ clean:
 
 .PHONY: squeaky
 squeaky:
-	OCR_TYPE=x86 $(MAKE) -C x86 clean uninstall
-#	OCR_TYPE=tg-x86 $(MAKE) -C tg-x86 clean uninstall
-	OCR_TYPE=tg-ce $(MAKE) -C tg-ce clean uninstall
-	OCR_TYPE=tg-xe $(MAKE) -C tg-xe clean uninstall
-	OCR_TYPE=builder-ce $(MAKE) -C builder-ce clean uninstall
-	OCR_TYPE=builder-xe $(MAKE) -C builder-xe clean uninstall
-	OCR_TYPE=x86-mpi $(MAKE) -C x86-mpi clean uninstall
-#	OCR_TYPE=x86-gasnet $(MAKE) -C x86-gasnet clean uninstall
-
-
+	OCR_TYPE=x86 $(MAKE) -C x86 squeaky
+	OCR_TYPE=tg-x86 $(MAKE) -C tg-x86 squeaky
+	OCR_TYPE=tg-ce $(MAKE) -C tg-ce squeaky
+	OCR_TYPE=tg-xe $(MAKE) -C tg-xe squeaky
+	OCR_TYPE=builder-ce $(MAKE) -C builder-ce squeaky
+	OCR_TYPE=builder-xe $(MAKE) -C builder-xe squeaky
+	OCR_TYPE=x86-mpi $(MAKE) -C x86-mpi squeaky
+	OCR_TYPE=x86-phi $(MAKE) -C x86-phi squeaky
+	OCR_TYPE=x86-newlib $(MAKE) -C x86-newlib squeaky
+#	OCR_TYPE=x86-gasnet $(MAKE) -C x86-gasnet squeaky

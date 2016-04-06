@@ -17,13 +17,13 @@ ocrGuid_t done(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
 /* Recursively call spawn(N-1) N times */
 ocrGuid_t spawn(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrGuid_t edt;
-    ocrGuid_t tspawn = paramv[0];
+    ocrGuid_t tspawn = {.guid = paramv[0]};
     int n            = paramv[1];
     int i;
     for(i = 0; i < n; i++) {
-        u64 args[] = {tspawn, n-1 };
+        u64 args[] = {tspawn.guid, n-1 };
         ocrGuid_t noGuid = NULL_GUID;
-        ocrEdtCreate(&edt, tspawn, 2, args, 1, &noGuid, EDT_PROP_NONE, NULL_GUID, NULL);
+        ocrEdtCreate(&edt, tspawn, 2, args, 1, &noGuid, EDT_PROP_NONE, NULL_HINT, NULL);
     }
     return NULL_GUID;
 }
@@ -35,10 +35,10 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrGuid_t edtHead;
     ocrEdtTemplateCreate(&tspawn, spawn, 2, 1);
     ocrEdtTemplateCreate(&tdone , done , 0, 1);
-    u64 args[] = {tspawn, N};
+    u64 args[] = {tspawn.guid, N};
     ocrGuid_t eventDone;
-    ocrEdtCreate(&edtHead, tspawn, 2, args, 1, NULL, EDT_PROP_FINISH, NULL_GUID, &eventDone);
-    ocrEdtCreate(&edtDone, tdone , 0, NULL, 1, &eventDone, EDT_PROP_NONE, NULL_GUID, NULL);
+    ocrEdtCreate(&edtHead, tspawn, 2, args, 1, NULL, EDT_PROP_FINISH, NULL_HINT, &eventDone);
+    ocrEdtCreate(&edtDone, tdone , 0, NULL, 1, &eventDone, EDT_PROP_NONE, NULL_HINT, NULL);
     // Triggers the head spawn edt
     ocrAddDependence(NULL_GUID, edtHead, 0, DB_MODE_CONST);
     return NULL_GUID;

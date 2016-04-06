@@ -27,7 +27,7 @@
 ocrGuid_t exampleEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrGuid_t *dbPtr = (ocrGuid_t*)depv[0].ptr;
     ocrGuid_t passedDb = dbPtr[0];
-    PRINTF("Passing DB: 0x%lx\n", passedDb);
+    PRINTF("Passing DB: "GUIDF"\n", GUIDA(passedDb));
     ocrDbDestroy(depv[0].guid);
     return passedDb;
 }
@@ -35,7 +35,7 @@ ocrGuid_t exampleEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
 ocrGuid_t awaitingEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     u64 i;
     u32 *dbPtr = (u32*)depv[0].ptr;
-    PRINTF("Received: %u\n", dbPtr[0]);
+    PRINTF("Received: %"PRIu32"\n", dbPtr[0]);
     ocrDbDestroy(depv[0].guid);
     ocrShutdown();
     return NULL_GUID;
@@ -48,11 +48,11 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     u32* ptr0;
     ocrGuid_t* ptr1;
     ocrGuid_t db0Guid, db1Guid;
-    ocrDbCreate(&db0Guid, (void**)&ptr0, sizeof(u32), DB_PROP_NONE, NULL_GUID, NO_ALLOC);
-    ocrDbCreate(&db1Guid, (void**)&ptr1, sizeof(ocrGuid_t), DB_PROP_NONE, NULL_GUID, NO_ALLOC);
+    ocrDbCreate(&db0Guid, (void**)&ptr0, sizeof(u32), DB_PROP_NONE, NULL_HINT, NO_ALLOC);
+    ocrDbCreate(&db1Guid, (void**)&ptr1, sizeof(ocrGuid_t), DB_PROP_NONE, NULL_HINT, NO_ALLOC);
     ptr0[0] = VAL;
     ptr1[0] = db0Guid;
-    PRINTF("Sending: %u in DB: 0x%lx\n", ptr0[0], db0Guid);
+    PRINTF("Sending: %"PRIu32" in DB: "GUIDF"\n", ptr0[0], GUIDA(db0Guid));
     ocrDbRelease(db0Guid);
     ocrDbRelease(db1Guid);
 
@@ -60,13 +60,13 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrGuid_t exampleTemplGuid, exampleEdtGuid, exampleEventGuid;
     ocrEdtTemplateCreate(&exampleTemplGuid, exampleEdt, 0 /*paramc*/, 1 /*depc*/);
     ocrEdtCreate(&exampleEdtGuid, exampleTemplGuid, EDT_PARAM_DEF, NULL, EDT_PARAM_DEF, NULL,
-        EDT_PROP_NONE, NULL_GUID, &exampleEventGuid);
+        EDT_PROP_NONE, NULL_HINT, &exampleEventGuid);
 
     // Create AWAIT EDT
     ocrGuid_t awaitingTemplGuid, awaitingEdtGuid;
     ocrEdtTemplateCreate(&awaitingTemplGuid, awaitingEdt, 0 /*paramc*/, 1 /*depc*/);
     ocrEdtCreate(&awaitingEdtGuid, awaitingTemplGuid, EDT_PARAM_DEF, NULL, EDT_PARAM_DEF, NULL,
-        EDT_PROP_NONE, NULL_GUID, NULL);
+        EDT_PROP_NONE, NULL_HINT, NULL);
     ocrAddDependence(exampleEventGuid, awaitingEdtGuid, 0, DB_DEFAULT_MODE);
 
     // START Middle EDT
@@ -74,4 +74,3 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
 
     return NULL_GUID;
 }
-

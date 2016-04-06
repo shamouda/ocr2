@@ -44,6 +44,7 @@ typedef struct {
     perThreadStorage_t tls;
     u64 stackSize;
     s32 binding;
+    u32 threadStatus; // RL_NODE_MASTER or RL_PD_MASTER or 0
 } ocrCompPlatformPthread_t;
 
 typedef struct {

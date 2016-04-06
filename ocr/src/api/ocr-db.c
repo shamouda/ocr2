@@ -26,16 +26,24 @@
 #define DEBUG_TYPE API
 
 u8 ocrDbCreate(ocrGuid_t *db, void** addr, u64 len, u16 flags,
-               ocrGuid_t affinity, ocrInDbAllocator_t allocator) {
+               ocrHint_t *hint, ocrInDbAllocator_t allocator) {
 
-    START_PROFILE(api_DbCreate);
-    DPRINTF(DEBUG_LVL_INFO, "ENTER ocrDbCreate(*guid=0x%lx, len=%lu, flags=%u"
-            ", aff=0x%lx, alloc=%u)\n", *db, len, (u32)flags, affinity, (u32)allocator);
+    START_PROFILE(api_ocrDbCreate);
+    DPRINTF(DEBUG_LVL_INFO, "ENTER ocrDbCreate(*guid="GUIDF", len=%"PRIu64", flags=%"PRIu32""
+            ", hint=%p, alloc=%"PRIu32")\n", GUIDA(*db), len, (u32)flags, hint, (u32)allocator);
     PD_MSG_STACK(msg);
     ocrPolicyDomain_t *policy = NULL;
     ocrTask_t *task = NULL;
     u8 returnCode = 0;
     getCurrentEnv(&policy, NULL, &task, &msg);
+
+    //Copy the hints so that the runtime modifications
+    //are not reflected back to the user
+    ocrHint_t userHint;
+    if (hint != NULL_HINT) {
+        userHint = *hint;
+        hint = &userHint;
+    }
 
 #define PD_MSG (&msg)
 #define PD_TYPE PD_MSG_DB_CREATE
@@ -46,22 +54,28 @@ u8 ocrDbCreate(ocrGuid_t *db, void** addr, u64 len, u16 flags,
     PD_MSG_FIELD_IO(size) = len;
     PD_MSG_FIELD_I(edt.guid) = task?task->guid:NULL_GUID; // Can happen when non EDT creates the DB
     PD_MSG_FIELD_I(edt.metaDataPtr) = task;
-    PD_MSG_FIELD_I(affinity.guid) = affinity;
-    PD_MSG_FIELD_I(affinity.metaDataPtr) = NULL;
+    PD_MSG_FIELD_I(hint) = hint;
     PD_MSG_FIELD_I(dbType) = USER_DBTYPE;
     PD_MSG_FIELD_I(allocator) = allocator;
     returnCode = policy->fcts.processMessage(policy, &msg, true);
-    if((returnCode == 0) && ((returnCode = PD_MSG_FIELD_O(returnDetail)) == 0)) {
-        *db = PD_MSG_FIELD_IO(guid.guid);
-        *addr = PD_MSG_FIELD_O(ptr);
-    } else {
-        *db = NULL_GUID;
-        *addr = NULL;
+
+    if(returnCode == 0) {
+        returnCode = PD_MSG_FIELD_O(returnDetail);
+        if(returnCode == 0) {
+            *db = PD_MSG_FIELD_IO(guid.guid);
+            *addr = PD_MSG_FIELD_O(ptr);
+        } else {
+            if(returnCode != OCR_EGUIDEXISTS) {
+                *db = NULL_GUID;
+            }
+            // Addr is always NULL unless we were successful in creating it
+            *addr = NULL;
+        }
     }
 #undef PD_MSG
 #undef PD_TYPE
 
-    if(task && (returnCode == 0)) {
+    if((!(flags & DB_PROP_NO_ACQUIRE)) &&  task && (returnCode == 0)) {
         // Here we inform the task that we created a DB
         // This is most likely ALWAYS a local message but let's leave the
         // API as it is for now. It is possible that the EDTs move at some point so
@@ -77,25 +91,27 @@ u8 ocrDbCreate(ocrGuid_t *db, void** addr, u64 len, u16 flags,
         PD_MSG_FIELD_I(properties) = 0;
         returnCode = policy->fcts.processMessage(policy, &msg, false);
         if(returnCode != 0) {
-            DPRINTF(DEBUG_LVL_WARN, "EXIT ocrDbCreate -> %u; Issue registering datablock\n", returnCode);
+            DPRINTF(DEBUG_LVL_WARN, "EXIT ocrDbCreate -> %"PRIu32"; Issue registering datablock\n", returnCode);
             RETURN_PROFILE(returnCode);
         }
 #undef PD_MSG
 #undef PD_TYPE
     } else {
-        if(!(flags & DB_PROP_IGNORE_WARN) && (returnCode == 0)) {
-            DPRINTF(DEBUG_LVL_WARN, "Acquiring DB (GUID: 0x%lx) from outside an EDT ... auto-release will fail\n",
-                    *db);
+        if(!(flags & (DB_PROP_IGNORE_WARN | DB_PROP_NO_ACQUIRE)) && (returnCode == 0)) {
+            DPRINTF(DEBUG_LVL_WARN, "Acquiring DB (GUID: "GUIDF") from outside an EDT ... auto-release will fail\n",
+                    GUIDA(*db));
         }
     }
-    DPRINTF(DEBUG_LVL_INFO, "EXIT ocrDbCreate -> 0; GUID: 0x%lx; ADDR: 0x%lx size: %lu\n", *db, *addr, len);
-    RETURN_PROFILE(0);
+    DPRINTF_COND_LVL(((returnCode != 0) && (returnCode != OCR_EGUIDEXISTS)), DEBUG_LVL_WARN, DEBUG_LVL_INFO,
+                     "EXIT ocrDbCreate -> %"PRIu32"; GUID: "GUIDF"; ADDR: %p size: %"PRIu64"\n",
+                     returnCode, GUIDA(*db), *addr, len);
+    RETURN_PROFILE(returnCode);
 }
 
 u8 ocrDbDestroy(ocrGuid_t db) {
 
-    START_PROFILE(api_DbDestroy);
-    DPRINTF(DEBUG_LVL_INFO, "ENTER ocrDbDestroy(guid=0x%lx)\n", db);
+    START_PROFILE(api_ocrDbDestroy);
+    DPRINTF(DEBUG_LVL_INFO, "ENTER ocrDbDestroy(guid="GUIDF")\n", GUIDA(db));
     PD_MSG_STACK(msg);
     ocrPolicyDomain_t *policy = NULL;
     ocrTask_t *task = NULL;
@@ -120,13 +136,15 @@ u8 ocrDbDestroy(ocrGuid_t db) {
         PD_MSG_FIELD_I(properties) = 0;
         returnCode = policy->fcts.processMessage(policy, &msg, true);
         if(returnCode != 0) {
-            DPRINTF(DEBUG_LVL_WARN, "Destroying DB (GUID: 0x%lx) -> %u; Issue unregistering the datablock\n", db, returnCode);
+            DPRINTF(DEBUG_LVL_WARN, "Destroying DB (GUID: "GUIDF") -> %"PRIu32"; Issue unregistering the datablock\n", GUIDA(db), returnCode);
         }
+        // If dynRemoved is true, it means the task was using the data-block and we will therefore
+        // need to remove it automatically. Otherwise, we won't need to release it
         dynRemoved = (PD_MSG_FIELD_O(returnDetail)==0);
 #undef PD_MSG
 #undef PD_TYPE
     } else {
-        DPRINTF(DEBUG_LVL_WARN, "Destroying DB (GUID: 0x%lx) from outside an EDT ... auto-release will fail\n", db);
+        DPRINTF(DEBUG_LVL_WARN, "Destroying DB (GUID: "GUIDF") from outside an EDT ... auto-release will fail\n", GUIDA(db));
     }
     // !task is to allow the legacy interface to destroy a datablock outside of an EDT
     if ((!task) || (returnCode == 0)) {
@@ -139,23 +157,26 @@ u8 ocrDbDestroy(ocrGuid_t db) {
         PD_MSG_FIELD_I(edt.metaDataPtr) = task;
         // Tell whether or not the task was using the DB. This is useful
         // to know if the DB actually needs to be released or not.
+        // If dynRemoved is true, we will release the data-block. Otherwise, we won't
         PD_MSG_FIELD_I(properties) = dynRemoved ? 0 : DB_PROP_NO_RELEASE;
         returnCode = policy->fcts.processMessage(policy, &msg, false);
+        if(returnCode == 0)
+            returnCode = PD_MSG_FIELD_O(returnDetail);
 #undef PD_MSG
 #undef PD_TYPE
     } else {
-        DPRINTF(DEBUG_LVL_WARN, "Destroying DB (GUID: 0x%lx) Issue destroying the datablock\n", db);
+        DPRINTF(DEBUG_LVL_WARN, "Destroying DB (GUID: "GUIDF") Issue destroying the datablock\n", GUIDA(db));
     }
 
     DPRINTF_COND_LVL(returnCode, DEBUG_LVL_WARN, DEBUG_LVL_INFO,
-                     "EXIT ocrDbDestroy(guid=0x%lx) -> %u\n", db, returnCode);
+                     "EXIT ocrDbDestroy(guid="GUIDF") -> %"PRIu32"\n", GUIDA(db), returnCode);
     RETURN_PROFILE(returnCode);
 }
 
 u8 ocrDbRelease(ocrGuid_t db) {
 
-    START_PROFILE(api_DbRelease);
-    DPRINTF(DEBUG_LVL_INFO, "ENTER ocrDbRelease(guid=0x%lx)\n", db);
+    START_PROFILE(api_ocrDbRelease);
+    DPRINTF(DEBUG_LVL_INFO, "ENTER ocrDbRelease(guid="GUIDF")\n", GUIDA(db));
     PD_MSG_STACK(msg);
     ocrPolicyDomain_t *policy = NULL;
     ocrTask_t *task = NULL;
@@ -194,18 +215,18 @@ u8 ocrDbRelease(ocrGuid_t db) {
         PD_MSG_FIELD_I(properties) = 0;
         returnCode = policy->fcts.processMessage(policy, &msg, true);
         if (returnCode != 0) {
-            DPRINTF(DEBUG_LVL_WARN, "Releasing DB  -> %u; Issue unregistering DB datablock\n", returnCode);
+            DPRINTF(DEBUG_LVL_WARN, "Releasing DB  -> %"PRIu32"; Issue unregistering DB datablock\n", returnCode);
         }
 #undef PD_MSG
 #undef PD_TYPE
     } else {
         if (returnCode == 0) {
-            DPRINTF(DEBUG_LVL_WARN, "Releasing DB (GUID: 0x%lx) from outside an EDT ... auto-release will fail\n", db);
+            DPRINTF(DEBUG_LVL_WARN, "Releasing DB (GUID: "GUIDF") from outside an EDT ... auto-release will fail\n", GUIDA(db));
         }
     }
 
     DPRINTF_COND_LVL(returnCode, DEBUG_LVL_WARN, DEBUG_LVL_INFO,
-                     "EXIT ocrDbRelease(guid=0x%lx) -> %u\n", db, returnCode);
+                     "EXIT ocrDbRelease(guid="GUIDF") -> %"PRIu32"\n", GUIDA(db), returnCode);
     RETURN_PROFILE(returnCode);
 }
 

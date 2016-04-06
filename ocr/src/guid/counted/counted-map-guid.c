@@ -12,41 +12,97 @@
 #include "ocr-policy-domain.h"
 #include "ocr-sysboot.h"
 #include "ocr-types.h"
+#include "ocr-errors.h"
 
 #define DEBUG_TYPE GUID
 
 // Default hashtable's number of buckets
 //PERF: This parameter heavily impacts the GUID provider scalability !
-#define DEFAULT_NB_BUCKETS 10000
+#ifndef GUID_PROVIDER_NB_BUCKETS
+#define GUID_PROVIDER_NB_BUCKETS 10000
+#endif
 
 // Guid is composed of : (LOCID KIND COUNTER)
 #define GUID_BIT_SIZE 64
+#ifndef GUID_PROVIDER_LOCID_SIZE
 #define GUID_LOCID_SIZE 7 // Warning! 2^7 locId max, bump that up for more.
+#else
+#define GUID_LOCID_SIZE GUID_PROVIDER_LOCID_SIZE
+#endif
 #define GUID_KIND_SIZE 5 // Warning! check ocrGuidKind struct definition for correct size
 
-#define GUID_COUNTER_SIZE (GUID_BIT_SIZE-(GUID_KIND_SIZE+GUID_LOCID_SIZE))
+#ifdef GUID_PROVIDER_WID_INGUID
+#ifndef GUID_WID_SIZE
+#define GUID_WID_SIZE 4
+#else
+#define GUID_WID_SIZE GUID_PROVIDER_WID_SIZE
+#endif
 
+// Here Guid is composed of : (LOCID KIND WID COUNTER)
+#define GUID_COUNTER_SIZE (GUID_BIT_SIZE-(GUID_LOCID_SIZE+GUID_KIND_SIZE+GUID_WID_SIZE))
+#define GUID_WID_MASK (((((u64)1)<<GUID_WID_SIZE)-1)<<(GUID_COUNTER_SIZE))
+#define GUID_COUNTER_MASK ((((u64)1)<<(GUID_COUNTER_SIZE))-1)
+#define GUID_LOCID_MASK (((((u64)1)<<GUID_LOCID_SIZE)-1)<<(GUID_COUNTER_SIZE+GUID_WID_SIZE+GUID_KIND_SIZE))
+#define GUID_LOCID_SHIFT_RIGHT (GUID_BIT_SIZE-GUID_LOCID_SIZE)
+#define GUID_KIND_MASK (((((u64)1)<<GUID_KIND_SIZE)-1)<<(GUID_COUNTER_SIZE+GUID_WID_SIZE))
+#define GUID_KIND_SHIFT_RIGHT (GUID_LOCID_SHIFT_RIGHT-GUID_KIND_SIZE)
+#define GUID_WID_SHIFT_RIGHT (GUID_KIND_SHIFT_RIGHT-GUID_WID_SIZE)
+#define WID_LOCATION (0)
+#define KIND_LOCATION (GUID_WID_SIZE)
+#define LOCID_LOCATION (KIND_LOCATION+GUID_KIND_SIZE)
+#else
+#define GUID_COUNTER_SIZE (GUID_BIT_SIZE-(GUID_KIND_SIZE+GUID_LOCID_SIZE))
+#define GUID_COUNTER_MASK ((((u64)1)<<(GUID_COUNTER_SIZE))-1)
 #define GUID_LOCID_MASK (((((u64)1)<<GUID_LOCID_SIZE)-1)<<(GUID_COUNTER_SIZE+GUID_KIND_SIZE))
 #define GUID_LOCID_SHIFT_RIGHT (GUID_BIT_SIZE-GUID_LOCID_SIZE)
-
-#define GUID_KIND_MASK (((((u64)1)<<GUID_KIND_SIZE)-1)<< GUID_COUNTER_SIZE)
+#define GUID_KIND_MASK (((((u64)1)<<GUID_KIND_SIZE)-1)<<GUID_COUNTER_SIZE)
 #define GUID_KIND_SHIFT_RIGHT (GUID_LOCID_SHIFT_RIGHT-GUID_KIND_SIZE)
-
-#define KIND_LOCATION 0
+#define KIND_LOCATION (0)
 #define LOCID_LOCATION GUID_KIND_SIZE
+#endif
 
+#ifdef GUID_PROVIDER_CUSTOM_MAP
+// Set -DGUID_PROVIDER_CUSTOM_MAP and put other #ifdef for alternate implementation here
+#else
+#define GP_RESOLVE_HASHTABLE(hashtable, key) hashtable
+#define GP_HASHTABLE_CREATE_MODULO newHashtableBucketLocked
+#define GP_HASHTABLE_DESTRUCT(hashtable, key, entryDealloc, deallocParam) destructHashtableBucketLocked(hashtable, entryDealloc, deallocParam)
+#define GP_HASHTABLE_GET(hashtable, key) hashtableConcBucketLockedGet(GP_RESOLVE_HASHTABLE(hashtable,key), key)
+#define GP_HASHTABLE_PUT(hashtable, key, value) hashtableConcBucketLockedPut(GP_RESOLVE_HASHTABLE(hashtable,key), key, value)
+#define GP_HASHTABLE_DEL(hashtable, key, valueBack) hashtableConcBucketLockedRemove(GP_RESOLVE_HASHTABLE(hashtable,key), key, valueBack)
+#endif
+
+#ifdef GUID_PROVIDER_WID_INGUID
+#define CACHE_SIZE 8
+static u64 guidCounters[(((u64)1)<<GUID_WID_SIZE)*CACHE_SIZE];
+#else
 // GUID 'id' counter, atomically incr when a new GUID is requested
 static u64 guidCounter = 0;
+#endif
 
-#ifdef COUNTED_MAP_DESTRUCT_CHECK
+#ifdef GUID_PROVIDER_DESTRUCT_CHECK
 // Fwd declaration
 static ocrGuidKind getKindFromGuid(ocrGuid_t guid);
 
-void countedMapHashmapEntryDestructChecker(void * key, void * value) {
-    ocrGuid_t guid = (ocrGuid_t) key;
-    DPRINTF(DEBUG_LVL_WARN, "Remnant GUID 0x%x of kind %d still registered on GUID provider\n", guid, getKindFromGuid(guid));
+void countedMapHashmapEntryDestructChecker(void * key, void * value, void * deallocParam) {
+    ocrGuid_t guid;
+#if GUID_BIT_COUNT == 64
+    guid.guid = (u64) key;
+#elif GUID_BIT_COUNT == 128
+    guid.upper = 0x0;
+    guid.lower = (u64) key;
+#endif
+    ((u32*)deallocParam)[getKindFromGuid(guid)]++;
+#ifdef GUID_PROVIDER_DESTRUCT_CHECK_VERBOSE
+    DPRINTF(DEBUG_LVL_WARN, "Remnant GUID "GUIDF" of kind %s still registered on GUID provider\n", GUIDA(guid),  ocrGuidKindToChar(getKindFromGuid(guid)));
+#endif
 }
 #endif
+
+static u32 hashGuidCounterModulo(void * ptr, u32 nbBuckets) {
+    u64 guid = (u64) ptr;
+    return ((guid & GUID_COUNTER_MASK) % nbBuckets);
+}
 
 u8 countedMapSwitchRunlevel(ocrGuidProvider_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_t runlevel,
                       phase_t phase, u32 properties, void (*callback)(ocrPolicyDomain_t*, u64), u64 val) {
@@ -72,6 +128,17 @@ u8 countedMapSwitchRunlevel(ocrGuidProvider_t *self, ocrPolicyDomain_t *PD, ocrR
     case RL_PD_OK:
         if ((properties & RL_BRING_UP) && RL_IS_FIRST_PHASE_UP(PD, RL_PD_OK, phase)) {
             self->pd = PD;
+#ifdef GUID_PROVIDER_WID_INGUID
+        u32 i = 0, ub = PD->workerCount;
+        u64 max = ((u64)1<<GUID_COUNTER_SIZE);
+        u64 incr = (max/ub);
+        while (i < ub) {
+            // Initialize to 'i' to distribute the count over the buckets. Helps with scalability.
+            // This is knowing we use a modulo hash but is not hurting generally speaking...
+            guidCounters[i*CACHE_SIZE] = incr*i;
+            i++;
+        }
+#endif
         }
         break;
     case RL_MEMORY_OK:
@@ -86,12 +153,29 @@ u8 countedMapSwitchRunlevel(ocrGuidProvider_t *self, ocrPolicyDomain_t *PD, ocrR
             //       call their specific destructors which may not work in MEM_OK ?
             //       - If there are any runtime GUID not deallocated then they should
             //       be considered as leaking memory.
-#ifdef COUNTED_MAP_DESTRUCT_CHECK
+#ifdef GUID_PROVIDER_DESTRUCT_CHECK
             deallocFct entryDeallocator = countedMapHashmapEntryDestructChecker;
+            u32 guidTypeCounters[OCR_GUID_MAX];
+            u32 i;
+            for(i=0; i < OCR_GUID_MAX; i++) {
+                guidTypeCounters[i] = 0;
+            }
+            void * deallocParam = (void *) guidTypeCounters;
 #else
             deallocFct entryDeallocator = NULL;
+            void * deallocParam = NULL;
 #endif
-            destructHashtableBucketLocked(((ocrGuidProviderCountedMap_t *) self)->guidImplTable, entryDeallocator);
+            GP_HASHTABLE_DESTRUCT(((ocrGuidProviderCountedMap_t *) self)->guidImplTable, NULL, entryDeallocator, deallocParam);
+#ifdef GUID_PROVIDER_DESTRUCT_CHECK
+            PRINTF("=========================\n");
+            PRINTF("Remnant GUIDs summary:\n");
+            for(i=0; i < OCR_GUID_MAX; i++) {
+                if (guidTypeCounters[i] != 0) {
+                    PRINTF("%s => %"PRIu32" instances\n", ocrGuidKindToChar(i), guidTypeCounters[i]);
+                }
+            }
+            PRINTF("=========================\n");
+#endif
         }
         break;
     case RL_GUID_OK:
@@ -99,7 +183,10 @@ u8 countedMapSwitchRunlevel(ocrGuidProvider_t *self, ocrPolicyDomain_t *PD, ocrR
         if((properties & RL_BRING_UP) && RL_IS_LAST_PHASE_UP(PD, RL_GUID_OK, phase)) {
             //Initialize the map now that we have an assigned policy domain
             ocrGuidProviderCountedMap_t * derived = (ocrGuidProviderCountedMap_t *) self;
-            derived->guidImplTable = newHashtableBucketLockedModulo(PD, DEFAULT_NB_BUCKETS);
+            derived->guidImplTable = GP_HASHTABLE_CREATE_MODULO(PD, GUID_PROVIDER_NB_BUCKETS, hashGuidCounterModulo);
+#ifdef GUID_PROVIDER_WID_INGUID
+            ASSERT(((PD->workerCount-1) < ((u64)1 << GUID_WID_SIZE)) && "GUID worker count overflows");
+#endif
         }
         break;
     case RL_COMPUTE_OK:
@@ -122,14 +209,25 @@ void countedMapDestruct(ocrGuidProvider_t* self) {
  * @brief Utility function to extract a kind from a GUID.
  */
 static ocrGuidKind getKindFromGuid(ocrGuid_t guid) {
-    return (ocrGuidKind) ((guid & GUID_KIND_MASK) >> GUID_COUNTER_SIZE);
+    // See BUG #928 on GUID issues
+#if GUID_BIT_COUNT == 64
+    return (ocrGuidKind) ((guid.guid & GUID_KIND_MASK) >> GUID_KIND_SHIFT_RIGHT);
+#elif GUID_BIT_COUNT == 128
+    return (ocrGuidKind) ((guid.lower & GUID_KIND_MASK) >> GUID_KIND_SHIFT_RIGHT);
+#endif
 }
 
 /**
  * @brief Utility function to extract a kind from a GUID.
  */
 static u64 extractLocIdFromGuid(ocrGuid_t guid) {
-    return (u64) ((guid & GUID_LOCID_MASK) >> GUID_LOCID_SHIFT_RIGHT);
+// See BUG #928 on GUID issues
+
+#if GUID_BIT_COUNT == 64
+    return (u64) ((guid.guid & GUID_LOCID_MASK) >> GUID_LOCID_SHIFT_RIGHT);
+#elif GUID_BIT_COUNT == 128
+    return (u64) ((guid.lower & GUID_LOCID_MASK) >> GUID_LOCID_SHIFT_RIGHT);
+#endif
 }
 
 static ocrLocation_t locIdtoLocation(u64 locId) {
@@ -154,25 +252,39 @@ static u64 generateNextGuid(ocrGuidProvider_t* self, ocrGuidKind kind) {
     u64 locId = (u64) locationToLocId(self->pd->myLocation);
     u64 locIdShifted = locId << LOCID_LOCATION;
     u64 kindShifted = kind << KIND_LOCATION;
+#ifdef GUID_PROVIDER_WID_INGUID
+    ocrWorker_t * worker = NULL;
+    getCurrentEnv(NULL, &worker, NULL, NULL);
+    // ASSERT((worker != NULL) && "GUID-Provider Cannot identify currently executing worker");
+    // GUIDs are generated before the current worker is setup.
+    u64 wid = (worker == NULL) ? 0 : worker->id;
+    u64 widShifted = (wid << WID_LOCATION);
+    u64 guid = (locIdShifted | kindShifted | widShifted) << GUID_COUNTER_SIZE;
+    u64 newCount = guidCounters[wid*CACHE_SIZE]++;
+#else
     u64 guid = (locIdShifted | kindShifted) << GUID_COUNTER_SIZE;
-    //PERF: Can privatize the counter by working out something with thread-id
     u64 newCount = hal_xadd64(&guidCounter, 1);
+#endif
     // double check if we overflow the guid's counter size
-    ASSERT((newCount < ((u64)1<<GUID_COUNTER_SIZE)) && "GUID counter overflows");
+    ASSERT((newCount + 1 < ((u64)1<<GUID_COUNTER_SIZE)) && "GUID counter overflows");
     guid |= newCount;
     return guid;
 }
 
 u8 countedMapGuidReserve(ocrGuidProvider_t *self, ocrGuid_t* startGuid, u64* skipGuid,
                          u64 numberGuids, ocrGuidKind guidType) {
-    // Non supported; use labeled provider
-    ASSERT(0);
+    // Not supported; use labeled provider
+    DPRINTF(DEBUG_LVL_WARN, "error: Must use labeled GUID provider for labeled GUID support, current is counted-map\n");
+    ASSERT(false);
+    return OCR_ENOTSUP;
 }
 
 u8 countedMapGuidUnreserve(ocrGuidProvider_t *self, ocrGuid_t startGuid, u64 skipGuid,
                            u64 numberGuids) {
-    // Non supported; use labeled provider
-    ASSERT(0);
+    // Not supported; use labeled provider
+    DPRINTF(DEBUG_LVL_WARN, "error: Must use labeled GUID provider for labeled GUID support, current is counted-map\n");
+    ASSERT(false);
+    return OCR_ENOTSUP;
 }
 
 /**
@@ -181,8 +293,19 @@ u8 countedMapGuidUnreserve(ocrGuidProvider_t *self, ocrGuid_t startGuid, u64 ski
 static u8 countedMapGetGuid(ocrGuidProvider_t* self, ocrGuid_t* guid, u64 val, ocrGuidKind kind) {
     // Here no need to allocate
     u64 newGuid = generateNextGuid(self, kind);
-    hashtableConcBucketLockedPut(((ocrGuidProviderCountedMap_t *) self)->guidImplTable, (void *) newGuid, (void *) val);
-    *guid = (ocrGuid_t) newGuid;
+
+    GP_HASHTABLE_PUT(((ocrGuidProviderCountedMap_t *) self)->guidImplTable, (void *) newGuid, (void *) val);
+    // See BUG #928 on GUID issues
+
+#if GUID_BIT_COUNT == 64
+    ocrGuid_t tempGuid = {.guid = newGuid};
+    *guid = tempGuid;
+#elif GUID_BIT_COUNT == 128
+    ocrGuid_t tempGuid = {.lower = (u64)newGuid, .upper = 0x0};
+    *guid = tempGuid;
+#else
+#error Unknown type of GUID
+#endif
     return 0;
 }
 
@@ -194,7 +317,8 @@ static u8 countedMapGetGuid(ocrGuidProvider_t* self, ocrGuid_t* guid, u64 val, o
 u8 countedMapCreateGuid(ocrGuidProvider_t* self, ocrFatGuid_t *fguid, u64 size, ocrGuidKind kind, u32 properties) {
     if(properties & GUID_PROP_IS_LABELED) {
         // Not supported; use labeled provider
-        ASSERT(0);
+        DPRINTF(DEBUG_LVL_WARN, "error: Must use labeled GUID provider for labeled GUID support, current is counted-map\n");
+        ASSERT(false);
     }
 
     PD_MSG_STACK(msg);
@@ -224,7 +348,15 @@ u8 countedMapCreateGuid(ocrGuidProvider_t* self, ocrFatGuid_t *fguid, u64 size, 
  * @brief Returns the value associated with a guid and its kind if requested.
  */
 static u8 countedMapGetVal(ocrGuidProvider_t* self, ocrGuid_t guid, u64* val, ocrGuidKind* kind) {
-    *val = (u64) hashtableConcBucketLockedGet(((ocrGuidProviderCountedMap_t *) self)->guidImplTable, (void *) guid);
+    // See BUG #928 on GUID issues
+#if GUID_BIT_COUNT == 64
+    *val = (u64) GP_HASHTABLE_GET(((ocrGuidProviderCountedMap_t *) self)->guidImplTable, (void *) guid.guid);
+#elif GUID_BIT_COUNT == 128
+    *val = (u64) GP_HASHTABLE_GET(((ocrGuidProviderCountedMap_t *) self)->guidImplTable, (void *) guid.lower);
+#else
+#error Unknown type of GUID
+#endif
+
     if(kind) {
         *kind = getKindFromGuid(guid);
     }
@@ -254,7 +386,29 @@ u8 countedMapGetLocation(ocrGuidProvider_t* self, ocrGuid_t guid, ocrLocation_t*
  * a local metadata represent for a foreign GUID.
  */
 u8 countedMapRegisterGuid(ocrGuidProvider_t* self, ocrGuid_t guid, u64 val) {
-    hashtableConcBucketLockedPut(((ocrGuidProviderCountedMap_t *) self)->guidImplTable, (void *) guid, (void *) val);
+    // See BUG #928 on GUID issues
+#if GUID_BIT_COUNT == 64
+    GP_HASHTABLE_PUT(((ocrGuidProviderCountedMap_t *) self)->guidImplTable, (void *) guid.guid, (void *) val);
+#elif GUID_BIT_COUNT == 128
+    GP_HASHTABLE_PUT(((ocrGuidProviderCountedMap_t *) self)->guidImplTable, (void *) guid.lower, (void *) val);
+#else
+#error Unknown type of GUID
+#endif
+    return 0;
+}
+
+/**
+ * @brief Remove an already existing GUID and its associated value from the provider
+ */
+u8 countedMapUnregisterGuid(ocrGuidProvider_t* self, ocrGuid_t guid, u64 ** val) {
+    // See BUG #928 on GUID issues
+#if GUID_BIT_COUNT == 64
+    GP_HASHTABLE_DEL(((ocrGuidProviderCountedMap_t *) self)->guidImplTable, (void *) guid.guid, (void **) val);
+#elif GUID_BIT_COUNT == 128
+    GP_HASHTABLE_DEL(((ocrGuidProviderCountedMap_t *) self)->guidImplTable, (void *) guid.lower, (void **) val);
+#else
+#error Unknown type of GUID
+#endif
     return 0;
 }
 
@@ -281,7 +435,14 @@ u8 countedMapReleaseGuid(ocrGuidProvider_t *self, ocrFatGuid_t fatGuid, bool rel
     }
     // In any case, we need to recycle the guid
     ocrGuidProviderCountedMap_t * derived = (ocrGuidProviderCountedMap_t *) self;
-    hashtableConcBucketLockedRemove(derived->guidImplTable, (void *)guid, NULL);
+    // See BUG #928 on GUID issues
+#if GUID_BIT_COUNT == 64
+    GP_HASHTABLE_DEL(derived->guidImplTable, (void *)guid.guid, NULL);
+#elif GUID_BIT_COUNT == 128
+    GP_HASHTABLE_DEL(derived->guidImplTable, (void *) guid.lower, NULL);
+#else
+#error Unknown type of GUID
+#endif
     return 0;
 }
 
@@ -321,6 +482,7 @@ ocrGuidProviderFactory_t *newGuidProviderFactoryCountedMap(ocrParamList_t *typeA
     base->providerFcts.getKind = FUNC_ADDR(u8 (*)(ocrGuidProvider_t*, ocrGuid_t, ocrGuidKind*), countedMapGetKind);
     base->providerFcts.getLocation = FUNC_ADDR(u8 (*)(ocrGuidProvider_t*, ocrGuid_t, ocrLocation_t*), countedMapGetLocation);
     base->providerFcts.registerGuid = FUNC_ADDR(u8 (*)(ocrGuidProvider_t*, ocrGuid_t, u64), countedMapRegisterGuid);
+    base->providerFcts.unregisterGuid = FUNC_ADDR(u8 (*)(ocrGuidProvider_t*, ocrGuid_t, u64**), countedMapUnregisterGuid);
     base->providerFcts.releaseGuid = FUNC_ADDR(u8 (*)(ocrGuidProvider_t*, ocrFatGuid_t, bool), countedMapReleaseGuid);
     return base;
 }

@@ -15,7 +15,7 @@
 
 #define TIME_SATISFY 1
 #define TIME_ADD_DEP 0
-#define TIME_CONSUMER_CREATE 1
-#define TIME_CONSUMER_DESTRUCT 1
+#define TIME_CONSUMER_CREATE 0
+#define TIME_CONSUMER_DESTRUCT 0
 
 #include "event2FanOutEvent.ctpl"

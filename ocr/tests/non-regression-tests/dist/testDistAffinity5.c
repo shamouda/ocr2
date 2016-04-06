@@ -19,7 +19,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrGuid_t queriedDbAffinityGuid;
     u64 count = 1;
     ocrAffinityQuery(NULL_GUID, &count, &queriedDbAffinityGuid);
-    ASSERT(queriedDbAffinityGuid == currentAffinity);
+    ASSERT(ocrGuidIsEq(queriedDbAffinityGuid, currentAffinity));
     ocrShutdown();
     return NULL_GUID;
 }

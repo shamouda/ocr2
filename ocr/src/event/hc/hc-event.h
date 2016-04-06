@@ -42,7 +42,7 @@ typedef struct ocrEventHc_t {
                                               allocated waiter list is stored in waitersDb */
     ocrFatGuid_t waitersDb; /**< DB containing an array of regNode_t listing the
                              * events/EDTs depending on this event */
-    u32 waitersCount; /**< Number of waiters in waitersDb */
+    volatile u32 waitersCount; /**< Number of waiters in waitersDb */
     u32 waitersMax; /**< Maximum number of waiters in waitersDb */
     volatile u32 waitersLock;
     ocrRuntimeHint_t hint;
@@ -53,10 +53,33 @@ typedef struct _ocrEventHcPersist_t {
     ocrGuid_t data;
 } ocrEventHcPersist_t;
 
-typedef struct ocrEventHcLatch_t {
+typedef struct _ocrEventHcCounted_t {
+    ocrEventHcPersist_t base;
+    u64 nbDeps; // this is only updated inside a lock
+} ocrEventHcCounted_t;
+
+typedef struct _ocrEventHcLatch_t {
     ocrEventHc_t base;
     volatile s32 counter;
 } ocrEventHcLatch_t;
+
+typedef struct _ocrEventHcChannel_t {
+    ocrEventHc_t base;
+    u32 maxGen; // Maximum number of generations simultaneously in flight
+    u32 nbSat;  // Number of Satisfy per generation
+    u32 nbDeps; // Number of dependences per generation
+    // Data-Structure to hold satisfy values
+    u32 headSat;
+    u32 tailSat;
+    u32 satBufSz; // = maxGen * nbSat
+    ocrGuid_t * satBuffer; // An array of GUID values, possibly multi-dimensional and linearized
+    // Data-Structure to hold dependence registrations
+    u32 headWaiter;
+    u32 tailWaiter;
+    u32 waitBufSz; // = maxGen * nbDeps
+    regNode_t * waiters; // An array of registration node, possibly multi-dimensional and linearized
+} ocrEventHcChannel_t;
+
 
 ocrEventFactory_t* newEventFactoryHc(ocrParamList_t *perType, u32 factoryId);
 

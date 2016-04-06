@@ -35,13 +35,6 @@
 // Comp-target
 #define ENABLE_COMP_TARGET_PASSTHROUGH
 
-// Scheduler Objects
-#define ENABLE_SCHEDULER_OBJECT_WST
-#define ENABLE_SCHEDULER_OBJECT_DEQ
-
-// Scheduler Heuristic
-#define ENABLE_SCHEDULER_HEURISTIC_CE
-
 // Datablock
 #define ENABLE_DATABLOCK_REGULAR
 #define ENABLE_DATABLOCK_LOCKABLE
@@ -60,7 +53,7 @@
 #define ENABLE_HINTS
 
 // HAL layer to use
-#define HAL_FSIM_CE
+#define HAL_X86_64
 
 // SAL layer to use
 #define SAL_LINUX
@@ -77,6 +70,13 @@
 
 // Scheduler
 #define ENABLE_SCHEDULER_COMMON
+
+// Scheduler Heuristic
+#define ENABLE_SCHEDULER_HEURISTIC_CE
+
+// Scheduler Objects
+#define ENABLE_SCHEDULER_OBJECT_WST
+#define ENABLE_SCHEDULER_OBJECT_DEQ
 
 // Sysboot layer to use
 // None - this is a builder

@@ -31,8 +31,8 @@ void ocrStatsAsyncMessage(ocrStatsProcess_t *src, ocrStatsProcess_t *dst,
         return;
     }
     u64 tickVal = (src->tick += 1);
-    DPRINTF(DEBUG_LVL_VERB, "ASYNC Message 0x%lx src:0x%lx dst:0x%lx ts:%ld type:0x%x\n",
-            (u64)msg, src->me, dst->me, tickVal, (int)msg->type);
+    DPRINTF(DEBUG_LVL_VERB, "ASYNC Message 0x%"PRIx64" src:"GUIDF" dst:0"GUIDF" ts:%"PRId64" type:0x%"PRIx32"\n",
+            (u64)msg, GUIDA(src->me), GUIDA(dst->me), tickVal, (int)msg->type);
     msg->tick = tickVal;
     msg->state = 0;
     ASSERT(msg->src == src->me);
@@ -47,14 +47,14 @@ void ocrStatsAsyncMessage(ocrStatsProcess_t *src, ocrStatsProcess_t *dst,
     // Now try to get the lock on processing
     if(dst->processing->fctPtrs->trylock(dst->processing)) {
         // We grabbed the lock
-        DPRINTF(DEBUG_LVL_VERB, "Message 0x%lx: grabbing processing lock for 0x%lx\n",
-                (u64)msg, dst->me);
+        DPRINTF(DEBUG_LVL_VERB, "Message 0x%"PRIx64": grabbing processing lock for 0x"GUIDF"\n",
+                (u64)msg, GUIDA(dst->me));
         u32 count = 5;
         while(count-- > 0) {
             if(!intProcessMessage(dst))
                 break;
         }
-        DPRINTF(DEBUG_LVL_VERB, "Finished processing messages for 0x%lx\n", dst->me);
+        DPRINTF(DEBUG_LVL_VERB, "Finished processing messages for 0x"GUIDF"\n", GUIDA(dst->me));
         // Unlock
         dst->processing->fctPtrs->unlock(dst->processing);
     }
@@ -68,8 +68,8 @@ void ocrStatsSyncMessage(ocrStatsProcess_t *src, ocrStatsProcess_t *dst,
         return;
     }
     u64 tickVal = (src->tick += 1);
-    DPRINTF(DEBUG_LVL_VERB, "SYNC Message 0x%lx src:0x%lx dst:0x%lx ts:%ld type:0x%x\n",
-            (u64)msg, src->me, dst->me, tickVal, (int)msg->type);
+    DPRINTF(DEBUG_LVL_VERB, "SYNC Message 0x%"PRIx64" src:"GUIDF" dst:"GUIDF" ts:%"PRId64" type:0x%"PRIx32"\n",
+            (u64)msg, GUIDA(src->me), GUIDA(dst->me), tickVal, (int)msg->type);
     msg->tick = tickVal;
     msg->state = 1;
     ASSERT(msg->src == src->me);
@@ -88,8 +88,8 @@ void ocrStatsSyncMessage(ocrStatsProcess_t *src, ocrStatsProcess_t *dst,
     while(1) {
         if(dst->processing->fctPtrs->trylock(dst->processing)) {
             // We grabbed the lock
-            DPRINTF(DEBUG_LVL_VERB, "Message 0x%lx: grabbing processing lock for 0x%lx\n",
-                    (u64)msg, dst->me);
+            DPRINTF(DEBUG_LVL_VERB, "Message 0x%"PRIx64": grabbing processing lock for "GUIDF"\n",
+                    (u64)msg, GUIDA(dst->me));
             s32 count = 5;
             // Process at least count and at least until we get to our message
             // EXTREMELY RARE PROBLEM of count running over for REALLY deep queues
@@ -97,7 +97,7 @@ void ocrStatsSyncMessage(ocrStatsProcess_t *src, ocrStatsProcess_t *dst,
                 if(!intProcessMessage(dst) && (msg->state == 2))
                     break;
             }
-            DPRINTF(DEBUG_LVL_VERB, "Finished processing messages for 0x%lx\n", dst->me);
+            DPRINTF(DEBUG_LVL_VERB, "Finished processing messages for "GUIDF"\n", GUIDA(dst->me));
             // Unlock
             dst->processing->fctPtrs->unlock(dst->processing);
 
@@ -112,7 +112,7 @@ void ocrStatsSyncMessage(ocrStatsProcess_t *src, ocrStatsProcess_t *dst,
     // We may have had another message being processed at the same
     // time
     src->tick = msg->tick>src->tick?msg->tick:src->tick;
-    DPRINTF(DEBUG_LVL_VVERB, "Message 0x%lx src tick out: %ld\n", (u64)msg, src->tick);
+    DPRINTF(DEBUG_LVL_VVERB, "Message 0x%"PRIx64" src tick out: %"PRId64"\n", (u64)msg, src->tick);
     // Inform the sender of the message
     intProcessOutgoingMessage(src, msg);
     msg->fcts.destruct(msg);

@@ -37,6 +37,26 @@ reference all OCR objects. An \code{ocrGuid\_t} is truly opaque and
 the user cannot assume that it is of a given size;
 \end{itemize}
 %%
+\paragraph*{OCR version utilities}
+OCR provides macros to determine the API implemented and the
+extensions that are enabled:
+\begin{itemize}
+\item \code{OCR\_VERSION}: A string representing the API version
+  implemented.
+\item \code{OCR\_VERSION\_GET\_MAJOR(vers)}: Extract the unsigned
+  integer representing the major revision of the OCR API. This is the
+  first digit of the version string.
+\item \code{OCR\_VERSION\_GET\_MINOR(vers)}: Extract the unsigned
+  integer representing the minor revision of the OCR API. This is the
+  middle digit of the version string.
+\item \code{OCR\_VERSION\_GET\_PATCH(vers)}: Extract the unsigned
+  integer representing the patch number of the OCR API. This is the
+  last digit of the version string.
+\item \code{OCR\_VERSION\_EXTENSION\_BITMAP}: A bitmap representing
+  the extensions enabled. The file ``ocr-version.h'' defines the
+  possible extensions that are encoded in this bitmap.
+\end{itemize}
+%%
 \paragraph*{Other constants}
 The C API for OCR makes use of a set of basic macros defined
 inside \code{ocr.h}:
@@ -45,9 +65,10 @@ inside \code{ocr.h}:
 \item \code{\#define TRUE 1};
 \item \code{\#define false 0};
 \item \code{\#define FALSE 0};
+\item \code{\#define NULL\_HINT}: A NULL pointer to ocrHint\_t. This value cannot
+  be assumed to be equal to zero.
 \item \code{\#define NULL\_GUID}: A NULL ocrGuid\_t. This value cannot
-  be assumed to be equal to zero. In other words, a programmer should
-  explicitly test for equality to NULL\_GUID.
+  be assumed to be equal to zero.
 \item \code{\#define UNINITIALIZED\_GUID}: An Unitialized GUID (ie: never set);
 \item \code{\#define ERROR\_GUID}: An invalid GUID.
 \end{itemize}
@@ -57,12 +78,21 @@ The OCR error codes are derived from standard error codes. They are defined
 internally to limit OCR's dependence on standard libraries. Most functions in the
 OCR API will return a status code where 0 signifies successful completion. A non-zero
 return code will be one of the following error codes. These codes are found
-in the \code{ocr-errors.h} include file and described in Table~\ref{tab:errorcodes}.
-Since OCR aims to be as asynchronous as possible, it is not always
-possible or advisable to return an error code as soon as called
-function returns. A compliant implementation may therefore not detect
-all possible errors. Future revisions of this specification will
-provide a more robust mechanism for more accurately checking for error conditions.
+in the \code{ocr-errors.h} include file and described in
+Table~\ref{tab:errorcodes}.
+
+Since OCR aims to be as asynchronous as possible, it may not always be
+possible to immediately identify an error and return the appropriate
+error code. In general, providing incorrect parameters to an OCR API
+call results in undefined behavior. If, however, the OCR
+implementation returns an error code, it will correctly reflect the
+cause of the error. In other words, if an API call returns an error
+code, that error code will accurately describe the error that happened
+(for example, OCR\_ENOMEM will always indicate that the runtime ran out
+of memory). Future revisions of this specification will detail OCR
+runtime modes which will either {\bf a)} guarantee a certain level of
+error detection (potentially at a cost) or {\bf b)} immediately abort
+upon the detection of an error.
 \tablefirsthead{%
 \hline
 \textsf{\textbf{Error code}} & \textsf{\textbf{Generic Interpretation}}\\
@@ -156,7 +186,8 @@ handled through the following functions.
 \item
   void \hyperlink{func_ocrShutdown}{\code{ocrShutdown}}(void)
     \begin{DoxyCompactList}
-      \small\item \emph{Called by an EDT to indicate the normal end of an OCR program.}
+      \small\item \emph{Called by an EDT to indicate the normal end of
+        an OCR program.}
     \end{DoxyCompactList}
 \item
   void \hyperlink{func_ocrAbort}{\code{ocrAbort}}(\hyperlink{type_u8}{u8} errorCode)
@@ -171,9 +202,9 @@ handled through the following functions.
     \end{DoxyCompactList}
 \item
   char $\ast$ \hyperlink{func_getArgv}{\code{getArgv}}(void $\ast$dbPtr,
-  \hyperlink{type_u64}{u64} count)
+  \hyperlink{type_u64}{u64} index)
     \begin{DoxyCompactList}
-      \small\item \emph{Retrieves the `count' argument from
+      \small\item \emph{Retrieves the $index^{th}$ argument from
         \hyperlink{func_mainEdt}{\code{mainEdt()}}'s input data block.}
     \end{DoxyCompactList}
 \item
@@ -194,7 +225,11 @@ handled through the following functions.
 The user is responsible for indicating the end of an OCR program using an explicit
 shutdown call (either this function or \hyperlink{func_ocrAbort}{\code{ocrAbort()}}).
 Any EDTs which have not reached the \emph{runnable} state will never be executed.
-EDTs in the \emph{runnable} or \emph{ready} state may or may not execute.
+EDTs in the \emph{runnable} or \emph{ready} state may or may not
+execute. Calling \code{ocrShutdown()} will properly terminate the
+runtime; all memory and computing resources will be
+released. Furthermore, a zero exit code will be returned to the
+caller of the OCR program indicating a normal termination.
 
 \begin{DoxyNote}{Note}
 Program behavior after this call is undefined. Specifically:
@@ -223,7 +258,9 @@ program can successfully complete even if all EDTs have not executed.
 \label{func_ocrAbort}
 
 This function is very similar to \hyperlink{func_ocrShutdown}{\code{ocrShutdown()}}
-except that it allows for the return of a non-zero value.
+except that it allows for the return of a non-zero value. This
+function also does not guarantee that the runtime will properly shut
+itself down. This call should only be used to indicate an abnormal termination.
 
 The abort error code is passed back to the runtime and its handling is
 implementation dependent
@@ -277,28 +314,28 @@ program:
   \subsection[{get\-Argv}]{\setlength{\rightskip}{0pt plus 5cm}{\bf char $\ast$} get\-Argv(
 \begin{DoxyParamCaption}
 \item[{void $\ast$}]{db\-Ptr}
-\item[{{\bf u64}}]{count}
+\item[{{\bf u64}}]{index}
 \end{DoxyParamCaption}
 )}}
 \label{func_getArgv}
 
-Returns the `count' argument passed to the OCR program.
+Returns the $index^{th}$ argument passed to the OCR program.
 The value is extracted from the unique data block passed to \hyperlink{func_mainEdt}{\code{mainEdt}}.
 
 \begin{DoxyParams}[1]{Parameters}
 \mbox{\tt in} & \code{dbPtr} & Pointer to the start of the argument data block\\
 \hline
-\mbox{\tt in} & \code{count} & Index of the argument to extract\\
+\mbox{\tt in} & \code{index} & Index of the argument to extract\\
 \hline
 \end{DoxyParams}
 
 \returns
-A NULL terminated string corresponding to \code{argv[count]}.
+A NULL terminated string corresponding to \code{argv[index]}.
 
 \descr
 See Section~\ref{func_getArgc} for details.
 \begin{DoxyNote}{Note}
-Attempting to extract an argument with \code{count} greater or equal to the value
+Attempting to extract an argument with \code{index} greater or equal to the value
 returned by \hyperlink{func_getArgc}{\code{getArgc}} will result in undefined
 behavior.
 \end{DoxyNote}
@@ -353,6 +390,221 @@ A conformant implementation may limit the number of characters in the
 output string.
 \end{DoxyNote}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% GUID MANAGEMENT API
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{GUID management}
+\index{GUID management API}
+\label{sec:OCRGuidManagement}
+
+GUIDs are opaque values used to uniquely identify OCR objects. In
+previous versions of OCR, GUID values could be safely cast to 64-bit
+values. To preserve the runtime's freedom in encoding information into
+GUIDs, users can no longer rely on the ability to convert GUIDs to
+64-bit values and must instead use the provided functions to
+manipulate GUIDs.
+
+\subsection*{Functions}
+\begin{DoxyCompactItemize}
+\item
+  \hyperlink{type_bool}{bool} \hyperlink{func_ocrGuidIsNull}
+            {\code{ocrGuidIsNull}}(\hyperlink{type_ocrGuid_t}{ocr\-Guid\-\_\-t} guid)
+    \begin{DoxyCompactList}
+      \small\item \emph{Checks if the GUID provided is equivalent to NULL\_GUID.}
+    \end{DoxyCompactList}
+\item
+  \hyperlink{type_bool}{bool} \hyperlink{func_ocrGuidIsUninitialized}
+            {\code{ocrGuidIsUninitialized}}(\hyperlink{type_ocrGuid_t}{ocr\-Guid\-\_\-t} guid)
+    \begin{DoxyCompactList}
+      \small\item \emph{Checks if the GUID provided is equivalent to UNINITIALIZED\_GUID.}
+    \end{DoxyCompactList}
+\item
+  \hyperlink{type_bool}{bool} \hyperlink{func_ocrGuidIsError}
+            {\code{ocrGuidIsError}}(\hyperlink{type_ocrGuid_t}{ocr\-Guid\-\_\-t} guid)
+    \begin{DoxyCompactList}
+      \small\item \emph{Checks if the GUID provided is equivalent to ERROR\_GUID.}
+    \end{DoxyCompactList}
+\item
+  \hyperlink{type_bool}{bool} \hyperlink{func_ocrGuidIsEq}
+            {\code{ocrGuidIsEq}}(\hyperlink{type_ocrGuid_t}{ocr\-Guid\-\_\-t} guid1,
+    \hyperlink{type_ocrGuid_t}{ocr\-Guid\-\_\-t} guid2)
+    \begin{DoxyCompactList}
+      \small\item \emph{Checks if the two GUIDs provided are equivalent.}
+    \end{DoxyCompactList}
+\item
+  \hyperlink{type_bool}{bool} \hyperlink{func_ocrGuidIsLt}
+            {\code{ocrGuidIsLt}}(\hyperlink{type_ocrGuid_t}{ocr\-Guid\-\_\-t} guid1,
+    \hyperlink{type_ocrGuid_t}{ocr\-Guid\-\_\-t} guid2)
+    \begin{DoxyCompactList}
+      \small\item \emph{Checks if guid1 is less than guid2.}
+    \end{DoxyCompactList}
+\end{DoxyCompactItemize}
+
+%
+%  ocrGuidIsNull
+%
+\hypertarget{func_ocrGuidIsNull}{
+  \index{GUID management@{GUID management}!ocr\-Guid\-Is\-Null@{ocr\-Guid\-Is\-Null}}
+  \subsection[{ocr\-Guid\-Is\-Null}]{\setlength{\rightskip}{0pt plus 5cm}{\bf bool} ocr\-Guid\-Is\-Null(
+\begin{DoxyParamCaption}
+\item[{{\bf ocr\-Guid\-\_\-t}}]{guid }
+\end{DoxyParamCaption}
+)}}
+\label{func_ocrGuidIsNull}
+
+NULL\_GUID is a special value representing a NULL ocrGuid\_t. This
+returns true if \code{guid} is equivalent to NULL\_GUID.
+
+\begin{DoxyParams}[1]{Parameters}
+\mbox{\tt in}  & \code{guid} & GUID to be evaluated.\\
+\hline
+\end{DoxyParams}
+
+\returns
+A boolean:
+\begin{DoxyItemize}
+\item true: guid is equivalent to NULL\_GUID
+\item false: guid is not equivalent to NULL\_GUID
+\end{DoxyItemize}
+
+%
+%  ocrGuidIsUninitialized
+%
+\hypertarget{func_ocrGuidIsUninitialized}{
+  \index{GUID management@{GUID management}!ocr\-Guid\-Is\-Uninitialized@{ocr\-Guid\-Is\-Uninitialized}}
+  \subsection[{ocr\-Guid\-Is\-Uninitialized}]{\setlength{\rightskip}{0pt plus 5cm}{\bf bool} ocr\-Guid\-Is\-Uninitialized(
+\begin{DoxyParamCaption}
+\item[{{\bf ocr\-Guid\-\_\-t}}]{guid }
+\end{DoxyParamCaption}
+)}}
+\label{func_ocrGuidIsUninitialized}
+
+UNINITIALIZED\_GUID is a special value representing an uninitialized ocrGuid\_t.
+This function checks if the GUID provided is equivalent to UNINITIALIZED\_GUID.
+
+\begin{DoxyParams}[1]{Parameters}
+\mbox{\tt in}  & \code{guid} & GUID to be evaluated.\\
+\hline
+\end{DoxyParams}
+
+\returns
+A boolean:
+\begin{DoxyItemize}
+\item true: guid is equivalent to UNINITIALIZED\_GUID
+\item false: guid is not equivalent to UNINITIALIZED\_GUID
+\end{DoxyItemize}
+
+%
+%  ocrGuidIsError
+%
+\hypertarget{func_ocrGuidIsError}{
+  \index{GUID management@{GUID management}!ocr\-Guid\-Is\-Error@{ocr\-Guid\-Is\-Error}}
+  \subsection[{ocr\-Guid\-Is\-Error}]{\setlength{\rightskip}{0pt plus 5cm}{\bf bool} ocr\-Guid\-Is\-Error(
+\begin{DoxyParamCaption}
+\item[{{\bf ocr\-Guid\-\_\-t}}]{guid }
+\end{DoxyParamCaption}
+)}}
+\label{func_ocrGuidIsError}
+
+ERROR\_GUID is a special value representing a invalid ocrGuid\_t. This
+function checks if the GUID provided is equivalent to ERROR\_GUID.
+
+\begin{DoxyParams}[1]{Parameters}
+\mbox{\tt in}  & \code{guid} & GUID to be evaluated.\\
+\hline
+\end{DoxyParams}
+
+\returns
+A boolean:
+\begin{DoxyItemize}
+\item true: guid value is equivalent to ERROR\_GUID
+\item false: guid value is not equivalent to ERROR\_GUID
+\end{DoxyItemize}
+
+%
+%  ocrGuidIsEq
+%
+\hypertarget{func_ocrGuidIsEq}{
+  \index{GUID management@{GUID management}!ocr\-Guid\-Is\-Eq@{ocr\-Guid\-Is\-Eq}}
+  \subsection[{ocr\-Guid\-Is\-Eq}]{\setlength{\rightskip}{0pt plus 5cm}{\bf bool} ocr\-Guid\-Is\-Eq(
+\begin{DoxyParamCaption}
+\item[{{\bf ocr\-Guid\-\_\-t}}]{guid1, }
+\item[{{\bf ocr\-Guid\-\_\-t}}]{guid2  }
+\end{DoxyParamCaption}
+)}}
+\label{func_ocrGuidIsEq}
+
+This function checks if guid1 and guid2 are equivalent.
+
+\begin{DoxyParams}[1]{Parameters}
+\mbox{\tt in}  & \code{guid1} & GUID to be evaluated.\\
+\hline
+\mbox{\tt in}  & \code{guid2} & GUID to be evaluated.\\
+\hline
+\end{DoxyParams}
+
+\returns
+A boolean:
+\begin{DoxyItemize}
+\item true: guid1 and guid2 are equivalent
+\item false: guid1 and guid2 are not equivalent
+\end{DoxyItemize}
+
+%
+%  ocrGuidIsLt
+%
+\hypertarget{func_ocrGuidIsLt}{
+  \index{GUID management@{GUID management}!ocr\-Guid\-Is\-Lt@{ocr\-Guid\-Is\-Lt}}
+  \subsection[{ocr\-Guid\-Is\-Lt}]{\setlength{\rightskip}{0pt plus 5cm}{\bf bool} ocr\-Guid\-Is\-Lt(
+\begin{DoxyParamCaption}
+\item[{{\bf ocr\-Guid\-\_\-t}}]{guid1, }
+\item[{{\bf ocr\-Guid\-\_\-t}}]{guid2  }
+\end{DoxyParamCaption}
+)}}
+\label{func_ocrGuidIsLt}
+
+This function checks if guid1 is less than guid2.
+
+\begin{DoxyParams}[1]{Parameters}
+\mbox{\tt in}  & \code{guid1} & GUID to be evaluated.\\
+\hline
+\mbox{\tt in}  & \code{guid2} & GUID to be evaluated.\\
+\hline
+\end{DoxyParams}
+
+\returns
+A boolean:
+\begin{DoxyItemize}
+\item true: guid1 is less than guid2
+\item false: guid1 is greater than or equal to guid2
+\end{DoxyItemize}
+
+\subsection{Macros for printing GUIDs}
+It is often desirable in both applications and runtime to
+print the value of a GUID for debugging purposes. Under previous
+assumptions that GUIDs were \code{unsigned long} values, they were printed using
+the \code{"\%PRIx64"} placeholder. Since GUIDs are opaque, their size
+cannot be assumed and format specifiers are therefore provided to
+properly print GUIDs.
+
+\begin{itemize}
+\item \code{GUIDF}
+  \small \emph{Format placeholder representing a GUID.}
+\item \code{GUIDA(guid)}
+  \small \emph{Expands guid value into format arguments
+  corresponding to the GUIDF format placeholder.}
+\end{itemize}
+
+The following snippet shows how to print a GUID:
+\begin{ocrsnip}
+PRINTF("DB Guid "GUIDF" acquired by "GUIDF"\n", GUIDA(db.guid), GUIDA(edt.guid));
+\end{ocrsnip}
+
+Note that the \code{GUIDF} format placeholder macro may actually expand into
+multiple concrete format placeholders. Likewise, the \code{GUIDA} macro may
+expand its single GUID argument into multiple arguments for a format function's
+argument list, corresponding to the number of concrete placeholders included
+by the \code{GUIDF} macro.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Data Block Management
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Data block management}
@@ -381,7 +633,7 @@ The following macros and enums are used with OCR data blocks.
   \end{itemize}
 \item \hypertarget{type_ocrDbAccessMode_t}{\code{enum ocrDbAccessMode\_t}}
   containing the four access modes. The
-  meaning of the access modes is given in Section~\ref{sec:datablocks}:
+  meaning of the access modes is given in Section~\ref{sec:data blocks}:
   \begin{itemize}
     \item \code{DB\_MODE\_RW}
     \item \code{DB\_MODE\_EW}
@@ -394,7 +646,7 @@ The following macros and enums are used with OCR data blocks.
   not be acquired on creation
 \end{itemize}
 
-%% This is a repeat of sec:datablocks. Keeping for now commented.
+%% This is a repeat of sec:data blocks. Keeping for now commented.
 
 %% These are the modes with which an EDT can access a data block.
 %% OCR currently supports four modes:
@@ -427,7 +679,7 @@ The following macros and enums are used with OCR data blocks.
   \hyperlink{type_u8}{u8} \hyperlink{func_ocrDbCreate}
             {\code{ocrDbCreate}}(\hyperlink{type_ocrGuid_t}{ocr\-Guid\-\_\-t} $\ast$db,
     void $\ast$$\ast$addr, \hyperlink{type_u64}{u64} len, \hyperlink{type_u16}{u16} flags,
-    \hyperlink{type_ocrGuid_t}{ocr\-Guid\-\_\-t} affinity,
+    \hyperlink{type_ocrHint_t}{ocr\-Hint\-\_\-t} $\ast$hint,
     \hyperlink{type_ocrInDbAllocator_t}{ocr\-In\-Db\-Allocator\-\_\-t} allocator)
     \begin{DoxyCompactList}
       \small\item \emph{Request the creation of a data block.}
@@ -457,7 +709,7 @@ The following macros and enums are used with OCR data blocks.
 \item[{void $\ast$$\ast$}]{addr, }
 \item[{{\bf u64}}]{len, }
 \item[{{\bf u16}}]{flags, }
-\item[{{\bf ocr\-Guid\-\_\-t}}]{affinity, }
+\item[{{\bf ocr\-Hint\-\_\-t} $\ast$}]{hint, }
 \item[{{\bf ocr\-In\-Db\-Allocator\-\_\-t}}]{allocator}
 \end{DoxyParamCaption}
 )}}
@@ -479,7 +731,7 @@ If DB\_PROP\_NO\_ACQUIRE is specified in \code{flags}, the
 value returned will be NULL. If the call fails, the returned value is
 undefined \\
 \hline
-\mbox{\tt in}  & \code{len} & Size, in bytes, of the datablock to create \\
+\mbox{\tt in}  & \code{len} & Size, in bytes, of the data block to create \\
 \hline
 \mbox{\tt in}  & \code{flags} & Flags controlling the behavior of the
 data block creation. The supported flags are:
@@ -491,8 +743,8 @@ data block creation. The supported flags are:
   acquired by another EDT.
 \end{DoxyItemize}\\
 \hline
-\mbox{\tt in,out}  & \code{affinity} & Reserved for future use. This parameter
-should be NULL\_GUID \\
+\mbox{\tt in}  & \code{hint} & Reserved for future use. This parameter
+should be NULL\_HINT \\
 \hline
 \mbox{\tt in}  & \code{allocator} & A data block can be used as the
 backing memory for malloc/free-like operations. This parameter
@@ -501,7 +753,8 @@ data block. Note that if a data block allocator is used, the user
 should not write directly to the data block as this may overwrite the
 meta data used by the allocator. The 'NO\_ALLOC' allocator is used to
 indicate that the data block is not used by any allocator and is
-therefore usable as POD. Supported values for this parameter are given
+therefore entirely usable for user data.
+Supported values for this parameter are given
 by \hyperlink{type_ocrInDbAllocator_t}{ocrInDbAllocator\_t}.\\
 \hline
 \end{DoxyParams}
@@ -510,7 +763,7 @@ by \hyperlink{type_ocrInDbAllocator_t}{ocrInDbAllocator\_t}.\\
 A status code:
 \begin{DoxyItemize}
 \item 0: Successful
-\item OCR\_ENOMEM: The runtime could not provide a data-block of size
+\item OCR\_ENOMEM: The runtime could not provide a data block of size
   'len' due to insufficient memory
 \item OCR\_EINVAL: The arguments passed (flags, allocator, etc.) were
   not valid
@@ -540,7 +793,7 @@ The created data block:
   data blocks. Not specifying this flag may result in a sub-optimal
   memory placement for the created data block.
 \item When DB\_PROP\_NO\_ACQUIRE is specified, a conformant
-  implementation may choose not to create the data-block immediately
+  implementation may choose not to create the data block immediately
   and instead create it lazily before the using EDT runs.
 \item Like all GUIDs, the uniqueness of a data block's GUID is not
   necessarily unique throughout the entire program. A data block's
@@ -594,6 +847,8 @@ release it (equivalent to calling \hyperlink{func_ocrDbRelease}{\code{ocrDbRelea
 Not all instances of the errors indicated by the error codes can be caught. In
 other words, attempting the destroy a data block multiple times may result in the
 return of an error code but may also result in undefined behavior.
+
+At the end of an OCR program, all data blocks are destroyed by the OCR runtime.
 \end{DoxyNote}
 
 %
@@ -972,7 +1227,7 @@ The prototype of an EDT function is given by
     \hyperlink{type_ocrGuid_t}{ocr\-Guid\-\_\-t} template\-Guid,
     \hyperlink{type_u32}{u32} paramc, \hyperlink{type_u64}{u64} $\ast$paramv,
     \hyperlink{type_u32}{u32} depc, \hyperlink{type_ocrGuid_t}{ocr\-Guid\-\_\-t} $\ast$depv,
-    \hyperlink{type_u16}{u16} flags, \hyperlink{type_ocrGuid_t}{ocr\-Guid\-\_\-t} affinity,
+    \hyperlink{type_u16}{u16} flags, \hyperlink{type_ocrHint_t}{ocr\-Hint\-\_\-t} $\ast$hint,
     \hyperlink{type_ocrGuid_t}{ocr\-Guid\-\_\-t} $\ast$output\-Event)
     \begin{DoxyCompactList}
       \small\item \emph{Request the creation of an EDT instance using
@@ -1087,7 +1342,7 @@ however, be used to create new EDTs once it has been destroyed.
 \item[{{\bf u32}}]{depc, }
 \item[{{\bf ocr\-Guid\-\_\-t} $\ast$}]{depv, }
 \item[{{\bf u16}}]{flags, }
-\item[{{\bf ocr\-Guid\-\_\-t}}]{affinity, }
+\item[{{\bf ocr\-Hint\-\_\-t} $\ast$}]{hint, }
 \item[{{\bf ocr\-Guid\-\_\-t} $\ast$}]{output\-Event}
 \end{DoxyParamCaption}
 )}}
@@ -1130,8 +1385,8 @@ The supported flags are:
 \item EDT\_PROP\_FINISH: Create a \emph{finish} EDT
 \end{DoxyItemize}\\
 \hline
-\mbox{\tt in}  & \code{affinity} & Unsupported and reserved for future use. Set
-to NULL\_GUID.\\
+\mbox{\tt in}  & \code{hint} & Reserved for future use. Set
+to NULL\_HINT.\\
 \hline
 \mbox{\tt in,out}  & \code{outputEvent} & If non-NULL on input, on successful creation,
 contains the GUID of the event associated with the post-slot of the EDT. For a
@@ -1297,4 +1552,12 @@ The following dependences can be added:
 \item NULL\_GUID to event or EDT: This is equivalent to ``data block to event''
   or ``data block to EDT'' where the data is non-existent.
 \end{DoxyItemize}
+
+Note that an EDT instance may legally have multiple pre-slots satisfied with the same
+data block if those dependences have the same access mode. An EDT instance acquiring the
+same data block through multiple pre-slots, but with differing access modes, results in
+undefined behavior. The user is always responsible for ensuring that each data block is
+explicitly released (via \hyperlink{func_ocrDbRelease}{\code{ocrDbRelease}}) at most once
+per EDT instance.
+
 % This is the end of ch2-ocrAPI.tex of the OCR specification.

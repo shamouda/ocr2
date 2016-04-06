@@ -8,15 +8,14 @@ fi
 INPUT_FOLDER=$1
 NB_SAMPLES=$2
 
-SCRIPT_FOLDER=${JJOB_SHARED_HOME}/xstack/ocr/jenkins/scripts
-APPS_SCRIPT_FOLDER=${JJOB_SHARED_HOME}/xstack/apps/jenkins/scripts
+SCRIPT_FOLDER=${JJOB_SHARED_HOME}/ocr/ocr/jenkins/scripts
 
-RESULTS_DIR=performanceResults/NightlyPerformanceStat
-STATS_FILE=NightlyPerformanceStat.txt
-PLOT_FILE=PerformanceTrendlineplot.png
+RESULTS_DIR=performanceResults/NightlyPerfStatMicroBench
+STATS_FILE=NightlyPerfStatMicroBench.txt
+PLOT_FILE=perfStatMicroBenchTrend.png
 
 # Create archive dirs if the framework is being run manually ( i.e. local run and not by jenkins)
-if [ -z $WORKSPACE ]; then
+if [ -z $WORKSPACE ]; then # debug
     echo "---- Local execution of Regression Framework. Creating Archive dirs ----"
     mkdir -p ${JJOB_SHARED_HOME}/../${RESULTS_DIR}
     OUT_FILE="${JJOB_SHARED_HOME}/../${RESULTS_DIR}/${BUILD_NUMBER}.csv"
@@ -52,19 +51,18 @@ else
     exit $RET_VAL
 fi
 
-if [ -z $WORKSPACE ]; then # debug
-    cp ${JJOB_SHARED_HOME}/../${STATS_FILE} /home/vincentc/jenkins-tests-ubench
-fi
+
+YMIN=0.6
+YMAX=1.4
 
 # Plot these stat files
-if [ -z $WORKSPACE ]; then
+if [ -z $WORKSPACE ]; then # debug
     #  Manual execution of framework (i.e. local run and not by jenkins)
     cat ${JJOB_SHARED_HOME}/../${STATS_FILE}
-    python ${APPS_SCRIPT_FOLDER}/plotGraph.py ${JJOB_SHARED_HOME}/../${STATS_FILE} "Performance Trend Line" "Build" "Normalized Execution Time" "${JJOB_SHARED_HOME}/../${PLOT_FILE}"
-    cp ${JJOB_SHARED_HOME}/../${PLOT_FILE} /home/vincentc/jenkins-tests-ubench
+    python ${SCRIPT_FOLDER}/plotGraph.py ${JJOB_SHARED_HOME}/../${STATS_FILE} "Performance Trend Line" "Build" "Normalized Execution Time" ${YMIN} ${YMAX} "${JJOB_SHARED_HOME}/../${PLOT_FILE}"
 else
     cat ${WORKSPACE}/${STATS_FILE}
-    python ${APPS_SCRIPT_FOLDER}/plotGraph.py ${WORKSPACE}/${STATS_FILE} "Performance Trend Line" "Build" "Normalized Execution Time" "${WORKSPACE}/${PLOT_FILE}"
+    python ${SCRIPT_FOLDER}/plotGraph.py ${WORKSPACE}/${STATS_FILE} "Performance Trend Line" "Build" "Normalized Execution Time" ${YMIN} ${YMAX} "${WORKSPACE}/${PLOT_FILE}"
 fi
 RET_VAL=$?
 if [ $RET_VAL -eq 0 ]; then

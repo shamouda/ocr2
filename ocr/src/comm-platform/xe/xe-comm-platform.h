@@ -26,7 +26,6 @@ typedef struct {
 typedef struct {
     ocrCommPlatform_t base;
 
-    ocrPolicyDomain_t * pdPtr;  // Our PD
     u64 N;                      // Agent bits from our tuple
     u64 * rq;                   // CE stage for this XE
 } ocrCommPlatformXe_t;

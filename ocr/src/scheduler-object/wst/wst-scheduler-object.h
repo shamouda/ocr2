@@ -15,31 +15,33 @@
 #include "utils/ocr-utils.h"
 
 /****************************************************/
-/* OCR WST SCHEDULER_OBJECT                                */
+/* OCR WST SCHEDULER_OBJECT                         */
 /****************************************************/
 
+typedef enum {
+    SCHEDULER_OBJECT_WST_CONFIG_REGULAR,    /* Configures scheduler object as an array of workstealing deques */
+    SCHEDULER_OBJECT_WST_CONFIG_STATIC,     /* Configures scheduler object as an array of semi-concurrent deques */
+} wstConfigType;
 typedef struct _paramListSchedulerObjectWst_t {
     paramListSchedulerObject_t base;
     u32 numDeques;                    /* Number of deques */
+    wstConfigType config;             /* Config option for wst object */
 } paramListSchedulerObjectWst_t;
 
 typedef struct _ocrSchedulerObjectWst_t {
     ocrSchedulerObject_t base;
     ocrSchedulerObject_t **deques;    /* Array of deques */
     u32 numDeques;                    /* Number of deques */
+    wstConfigType config;             /* Config option for wst object */
 } ocrSchedulerObjectWst_t;
 
 /****************************************************/
-/* OCR WST SCHEDULER_OBJECT FACTORY                        */
+/* OCR WST SCHEDULER_OBJECT FACTORY                 */
 /****************************************************/
 
 typedef struct _ocrSchedulerObjectFactoryWst_t {
     ocrSchedulerObjectFactory_t base;
 } ocrSchedulerObjectFactoryWst_t;
-
-typedef struct _ocrSchedulerObjectRootFactoryWst_t {
-    ocrSchedulerObjectRootFactory_t base;
-} ocrSchedulerObjectRootFactoryWst_t;
 
 typedef struct _paramListSchedulerObjectFactWst_t {
     paramListSchedulerObjectFact_t base;

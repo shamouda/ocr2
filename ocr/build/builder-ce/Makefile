@@ -7,19 +7,25 @@
 #
 
 ifndef OCR_TYPE
-OCR_TYPE=builder-ce
+  OCR_TYPE=builder-ce
 else
-ifneq (${OCR_TYPE}, builder-ce)
-$(error OCR_TYPE is set to ${OCR_TYPE} but expected builder-ce)
-endif
+  ifneq (${OCR_TYPE}, builder-ce)
+    $(error OCR_TYPE is set to ${OCR_TYPE} but expected builder-ce)
+  endif
 endif
 #
 # Tool-chain to be used for the build
 #
 
-TG_INSTALL ?= ../../../../intel/ss/install
+TG_INSTALL ?= ../../../../tg/tg/install
 
-CC      := gcc
+FORCE_CC ?= no
+ifeq ($(FORCE_CC), no)
+  ifeq ($(CC), cc)
+    CC = gcc
+  endif
+endif # End of ifeq force_cc
+
 CFLAGS  := -fno-builtin -fno-stack-protector -Wno-unused-local-typedefs -I ${TG_INSTALL}/include
 
 RM      := rm

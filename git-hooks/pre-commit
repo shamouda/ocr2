@@ -78,7 +78,7 @@ done
 # Now go back and see if the only stuff left over is the white-space errors
 # This may be left in an unmerged state and confuse people. We check if the only
 # differences left are whitespace and if so, we dump them
-git diff --numstat --ignore-space-at-eol -- $files_to_check | grep $'^0\t0\t' | cut -d$'\t' -f3- | sed 's/\(.*\)/"\1"/g' | git checkout-index -n -f --stdin
+git diff --numstat --ignore-space-at-eol -- $files_to_check | grep $'^0\t0\t' | cut -f3- | sed 's/\(.*\)/"\1"/g' | git checkout-index -n -f --stdin
 
 exit
 

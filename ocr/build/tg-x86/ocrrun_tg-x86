@@ -1,0 +1,58 @@
+#!/bin/bash
+
+
+# User-provided or generated
+PROGRAM_BIN=
+
+#
+# Handling options
+#
+
+while [ $# -gt 0 ]; do
+    if [[ "$1" = "-ocr:cfg" && $# -ge 2 ]]; then
+        shift
+        OCR_CONFIG=("$@")
+        shift
+   else
+        # stacking unknown arguments
+        ARGS="${ARGS} $1"
+        shift
+    fi
+done
+
+NB_ARGS=`echo $ARGS | wc -w`
+
+if [ ${NB_ARGS} -eq 0 ]; then
+    echo "error: missing program name argument"
+    exit 1
+elif [ ${NB_ARGS} -lt 1 ]; then
+    echo "error: unexpected number of arguments"
+    exit 2
+else
+    PROGRAM_BIN=${ARGS}
+fi
+
+if [ "${OCR_CONFIG}" = "" ]; then
+    echo "error: ocrrun cannot call config-generator for tg-x86 (not supported - set OCR_CONFIG)"
+    exit 1
+fi
+
+if [[ "${OCRRUN_GDB}" == "yes" ]]; then
+    PROGRAM_BIN="gdb --args ${PROGRAM_BIN}"
+fi
+
+if [[ "${OCRRUN_VALGRIND_OPTS}" != "" ]]; then
+    OCRRUN_VALGRIND="yes";
+fi
+
+if [[ "${OCRRUN_VALGRIND}" == "yes" ]]; then
+    PROGRAM_BIN="valgrind ${OCRRUN_VALGRIND_OPTS} ${PROGRAM_BIN}"
+fi
+
+# Default is regular X86-backend
+${PROGRAM_BIN} -ocr:cfg ${OCR_CONFIG}
+
+RET_CODE=$?
+exit ${RET_CODE}
+
+

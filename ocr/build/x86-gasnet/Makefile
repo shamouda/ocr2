@@ -7,20 +7,26 @@
 #
 
 ifndef OCR_TYPE
-OCR_TYPE=x86-gasnet
+  OCR_TYPE=x86-gasnet
 else
-ifneq (${OCR_TYPE}, x86-gasnet)
-$(error OCR_TYPE is set to ${OCR_TYPE} but expected x86-gasnet)
-endif
+  ifneq (${OCR_TYPE}, x86-gasnet)
+    $(error OCR_TYPE is set to ${OCR_TYPE} but expected x86-gasnet)
+  endif
 endif
 
-DEFAULT_CONFIG=mach-hc-dist-gasnet-clone-8w.cfg
+DEFAULT_CONFIG=mach-x86-gasnet-affinity-8w-lockableDB.cfg
 
 #
 # Tool-chain to be used for the build
 #
 
-CC      := gcc
+FORCE_CC ?= no
+ifeq ($(FORCE_CC), no)
+  ifeq ($(CC), cc)
+    CC = gcc
+  endif
+endif # End of ifeq force_cc
+
 CFLAGS  :=
 
 RM      := rm
@@ -31,7 +37,16 @@ MKDIR   := mkdir
 LN      := ln
 
 # Shared libraries specific builds
-LDFLAGS := -shared -fpic -lpthread -lrt
+LDFLAGS := -shared -fpic -lpthread
+
+# -lrt needed only for < glibc-2.17 in Linux systems (not needed for OS X)
+UNAME := $(shell uname -s)
+ifeq ($(UNAME),Linux)
+  ret := $(shell echo "`ldd --version | awk '/ldd/{print $$NF}' | cut -d'.' -f1-2` < 2.17" | bc)
+  ifeq ($(ret), 1)
+    LDFLAGS += -lrt
+  endif
+endif
 
 # CFLAGS_SHARED will be concatenated with any
 # common CFLAGS options
@@ -48,7 +63,7 @@ RANLIB := ranlib
 # Library supported
 SUPPORTS_SHARED=no
 SUPPORTS_STATIC=yes
-OCRRUNNER=ocrrun
+OCRRUNNER=ocrrun_$(OCR_TYPE)
 
 # Valgrind compatibility for internal allocators
 # x86 only
@@ -59,7 +74,7 @@ OCRRUNNER=ocrrun
 # x86 only
 #
 # Enable profiler
-# CFLAGS += -DOCR_RUNTIME_PROFILER -DPROFILE_KHZ=3400000
+# CFLAGS += -DOCR_RUNTIME_PROFILER -DPROFILER_KHZ=3400000
 #
 # (optional) Maximum number of scope
 # nesting for runtime profiler
@@ -76,13 +91,13 @@ OCRRUNNER=ocrrun
 # CFLAGS += -DOCR_ENABLE_VISUALIZER -DOCR_ENABLE_EDT_NAMING
 
 ifndef GASNET_ROOT
-$(error GASNET_ROOT not specified)
+  $(error GASNET_ROOT not specified)
 endif
 ifndef GASNET_CONDUIT
-$(error GASNET_CONDUIT not specified)
+  $(error GASNET_CONDUIT not specified)
 endif
 ifndef GASNET_TYPE
-$(error GASNET_TYPE not specified)
+  $(error GASNET_TYPE not specified)
 endif
 
 ########################################################################
@@ -99,10 +114,17 @@ endif
 # GASNET_CONDUIT=ibv
 # GASNET_EXTRA_LIBS=-libverbs
 
-# ocrTests will pick that up if defined
-#ifndef OCR_LDFLAGS
-#	$(error OCR_LDFLAGS not specified)
-#endif
+# ocrTests will pick 'OCR_LDFLAGS' if defined
+
+ifeq ($(GASNET_TYPE),seq)
+  GASNET_CFLAGS += -DGASNET_SEQ
+else
+  ifeq ($(GASNET_TYPE),par)
+    GASNET_CFLAGS += -DGASNET_PAR
+  else
+    GASNET_CFLAGS += GASNET_PARSYNC
+  endif
+endif
 
 #
 # Gasnet setup
@@ -110,14 +132,13 @@ endif
 
 ## Gasnet includes
 
-CFLAGS += ${GASNET_CFLAGS}
-GASNET_TYPE=GASNET_PAR
 GASNET_INCL=${GASNET_ROOT}/include/${GASNET_CONDUIT}-conduit
-GASNET_CFLAGS += -D${GASNET_TYPE} -I${GASNET_ROOT}/include -I${GASNET_INCL}
+# -isystem instead of -I to avoid 'defined but not used' warnings from gasnet includes
+GASNET_CFLAGS += -D${GASNET_TYPE} -isystem ${GASNET_ROOT}/include -I${GASNET_INCL}
 
 ## Gasnet linking
 
-GASNET_LIB=gasnet-$(GASNET_CONDUIT)-par
+GASNET_LIB=gasnet-$(GASNET_CONDUIT)-$(GASNET_TYPE)
 # Gasnet dynamic linking
 GASNET_LDFLAGS = -L${GASNET_ROOT}/lib -L/usr/lib64 -lrt -l${GASNET_LIB} $(GASNET_EXTRA_LIBS)
 # Gasnet static linking

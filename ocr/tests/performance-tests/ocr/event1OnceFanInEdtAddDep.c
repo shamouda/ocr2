@@ -2,7 +2,7 @@
 #include "ocr.h"
 
 // DESC: Create FAN_OUT producer ONCE events and one consumer EDT depending on all of them
-// TIME: Setting up the dependence between the producer event and consumer EDTs
+// TIME: Setting up the dependence between the producer events and consumer EDT
 // FREQ: Done 'NB_ITERS' times
 // NOTE: The driver EDT is a finish EDT to collect created EDTs
 //

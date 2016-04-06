@@ -18,8 +18,19 @@
 #include "mpi-comm-platform.h"
 #include <mpi.h>
 
+ #ifdef DEBUG_MPI_HOSTNAMES
+// For gethostname
+#include <unistd.h>
+#endif
+
 //BUG #609 system header: replace this with some INT_MAX from sal header
 #include "limits.h"
+
+//
+// Compile-time constants
+//
+
+// DEBUG_MPI_HOSTNAMES: Dumps hostname MPI processes are started on
 
 #define DEBUG_TYPE COMM_PLATFORM
 
@@ -32,16 +43,14 @@
  * @brief Initialize the MPI library.
  */
 void platformInitMPIComm(int * argc, char *** argv) {
-    int res = MPI_Init(argc, argv);
-    ASSERT(res == MPI_SUCCESS);
+    RESULT_ASSERT(MPI_Init(argc, argv), ==, MPI_SUCCESS);
 }
 
 /**
  * @brief Finalize the MPI library (no more remote calls after that).
  */
 void platformFinalizeMPIComm() {
-    int res = MPI_Finalize();
-    ASSERT(res == MPI_SUCCESS);
+    RESULT_ASSERT(MPI_Finalize(), ==, MPI_SUCCESS);
 }
 
 
@@ -123,7 +132,7 @@ static void postRecvAny(ocrCommPlatform_t * self) {
 #endif
     int tag = RECV_ANY_ID;
     MPI_Comm comm = MPI_COMM_WORLD;
-    DPRINTF(DEBUG_LVL_VERB,"[MPI %d] posting irecv ANY\n", mpiRankToLocation(self->pd->myLocation));
+    DPRINTF(DEBUG_LVL_VERB,"[MPI %"PRId32"] posting irecv ANY\n", mpiRankToLocation(self->pd->myLocation));
     int res = MPI_Irecv(buf, count, datatype, src, tag, comm, &(handle->status));
     ASSERT(res == MPI_SUCCESS);
     mpiComm->incoming->pushFront(mpiComm->incoming, handle);
@@ -240,7 +249,7 @@ u8 MPICommSendMessage(ocrCommPlatform_t * self,
         MPI_Request * status = &(respHandle->status);
         //Post a receive matching the request's msgId.
         //The other end will post a send using msgId as tag
-        DPRINTF(DEBUG_LVL_VERB,"[MPI %d] posting irecv for msgId %lu\n", mpiRankToLocation(self->pd->myLocation), respTag);
+        DPRINTF(DEBUG_LVL_VERB,"[MPI %"PRId32"] posting irecv for msgId %"PRIu64"\n", mpiRankToLocation(self->pd->myLocation), respTag);
         int res = MPI_Irecv(respMsg, respCount, datatype, targetRank, respTag, comm, status);
         if (res != MPI_SUCCESS) {
             //BUG #603 define error for comm-api
@@ -264,15 +273,17 @@ u8 MPICommSendMessage(ocrCommPlatform_t * self,
 
     MPI_Request * status = &(handle->status);
 
-    DPRINTF(DEBUG_LVL_VVERB,"[MPI %d] posting isend for msgId=%lu msg=%p type=%x "
-            "fullMsgSize=%lu marshalledSize=%lu to MPI rank %d\n",
+    DPRINTF(DEBUG_LVL_VVERB,"[MPI %"PRId32"] posting isend for msgId=%"PRIu64" msg=%p type=%"PRIx32" "
+            "fullMsgSize=%"PRIu64" marshalledSize=%"PRIu64" to MPI rank %"PRId32"\n",
             locationToMpiRank(self->pd->myLocation), messageBuffer->msgId,
             messageBuffer, messageBuffer->type, fullMsgSize, marshalledSize, targetRank);
 
     //If this assert bombs, we need to implement message chunking
     //or use a larger MPI datatype to send the message.
     ASSERT((fullMsgSize < INT_MAX) && "Outgoing message is too large");
-
+    ASSERT((messageBuffer->srcLocation == self->pd->myLocation) &&
+        (messageBuffer->destLocation != self->pd->myLocation) &&
+        (targetRank == messageBuffer->destLocation));
     int res = MPI_Isend(messageBuffer, (int) fullMsgSize, datatype, targetRank, tag, comm, status);
 
     if (res == MPI_SUCCESS) {
@@ -294,8 +305,7 @@ u8 probeIncoming(ocrCommPlatform_t *self, int src, int tag, ocrPolicyMsg_t ** ms
     //variable size message on the fly).
     MPI_Status status;
     int available = 0;
-    int success = MPI_Iprobe(src, tag, MPI_COMM_WORLD, &available, &status);
-    ASSERT(success == MPI_SUCCESS);
+    RESULT_ASSERT(MPI_Iprobe(src, tag, MPI_COMM_WORLD, &available, &status), ==, MPI_SUCCESS);
     if (available) {
         ASSERT(msg != NULL);
         ASSERT((bufferSize == 0) ? ((tag == RECV_ANY_ID) && (*msg == NULL)) : 1);
@@ -303,8 +313,7 @@ u8 probeIncoming(ocrCommPlatform_t *self, int src, int tag, ocrPolicyMsg_t ** ms
         // Look at the size of incoming message
         MPI_Datatype datatype = MPI_BYTE;
         int count;
-        success = MPI_Get_count(&status, datatype, &count);
-        ASSERT(success == MPI_SUCCESS);
+        RESULT_ASSERT(MPI_Get_count(&status, datatype, &count), ==, MPI_SUCCESS);
         ASSERT(count != 0);
         // Reuse request's or allocate a new message if incoming size is greater.
         if (count > bufferSize) {
@@ -312,11 +321,19 @@ u8 probeIncoming(ocrCommPlatform_t *self, int src, int tag, ocrPolicyMsg_t ** ms
         }
         ASSERT(*msg != NULL);
         MPI_Comm comm = MPI_COMM_WORLD;
-        success = MPI_Recv(*msg, count, datatype, src, tag, comm, MPI_STATUS_IGNORE);
+        RESULT_ASSERT(MPI_Recv(*msg, count, datatype, src, tag, comm, MPI_STATUS_IGNORE), ==, MPI_SUCCESS);
         // After recv, the message size must be updated since it has just been overwritten.
         (*msg)->usefulSize = count;
         (*msg)->bufferSize = count;
-        ASSERT(success == MPI_SUCCESS);
+
+        // This check usually fails in the 'ocrPolicyMsgGetMsgSize' when there
+        // has been an issue in MPI. It manifest as a received buffer being complete
+        // garbage whereas the sender doesn't detect any corruption of the message when
+        // it is recycled. Tinkering with multiple MPI implementation it sounds the issue
+        // is with the MPI library not being able to register a hook for malloc calls.
+        ASSERT((((*msg)->type & (PD_MSG_REQUEST | PD_MSG_RESPONSE)) != (PD_MSG_REQUEST | PD_MSG_RESPONSE)) &&
+           (((*msg)->type & PD_MSG_REQUEST) || ((*msg)->type & PD_MSG_RESPONSE)) &&
+           "error: Try to link the MPI library first when compiling your OCR program");
 
         // Unmarshall the message. We check to make sure the size is OK
         // This should be true since MPI seems to make sure to send the whole message
@@ -357,10 +374,9 @@ u8 MPICommPollMessageInternal(ocrCommPlatform_t *self, ocrPolicyMsg_t **msg,
     while (outgoingIt->hasNext(outgoingIt)) {
         mpiCommHandle_t * mpiHandle = (mpiCommHandle_t *) outgoingIt->next(outgoingIt);
         int completed = 0;
-        int ret = MPI_Test(&(mpiHandle->status), &completed, MPI_STATUS_IGNORE);
-        ASSERT(ret == MPI_SUCCESS);
+        RESULT_ASSERT(MPI_Test(&(mpiHandle->status), &completed, MPI_STATUS_IGNORE), ==, MPI_SUCCESS);
         if(completed) {
-            DPRINTF(DEBUG_LVL_VVERB,"[MPI %d] sent msg=%p src=%d, dst=%d, msgId=%lu, type=0x%x, usefulSize=%lu\n",
+            DPRINTF(DEBUG_LVL_VVERB,"[MPI %"PRId32"] sent msg=%p src=%"PRId32", dst=%"PRId32", msgId=%"PRIu64", type=0x%"PRIx32", usefulSize=%"PRIu64"\n",
                     locationToMpiRank(self->pd->myLocation), mpiHandle->msg,
                     locationToMpiRank(mpiHandle->msg->srcLocation), locationToMpiRank(mpiHandle->msg->destLocation),
                     mpiHandle->msg->msgId, mpiHandle->msg->type, mpiHandle->msg->usefulSize);
@@ -399,16 +415,27 @@ u8 MPICommPollMessageInternal(ocrCommPlatform_t *self, ocrPolicyMsg_t **msg,
         u8 res = probeIncoming(self, mpiHandle->src, (int) mpiHandle->msgId, &mpiHandle->msg, mpiHandle->msg->bufferSize);
         // The message is properly unmarshalled at this point
         if (res == POLL_MORE_MESSAGE) {
+#ifdef OCR_ASSERT
+            if (reqMsg != mpiHandle->msg) {
+                // Original request hasn't changed
+                ASSERT((reqMsg->srcLocation == pd->myLocation) && (reqMsg->destLocation != pd->myLocation));
+                // Newly received response
+                ASSERT((mpiHandle->msg->srcLocation != pd->myLocation) && (mpiHandle->msg->destLocation == pd->myLocation));
+            } else {
+                // Reused, so it is the response
+                ASSERT((reqMsg->srcLocation != pd->myLocation) && (reqMsg->destLocation == pd->myLocation));
+            }
+#endif
             if ((reqMsg != mpiHandle->msg) && mpiHandle->deleteSendMsg) {
                 // we did allocate a new message to store the response
                 // and the request message was already an internal copy
                 // made by the comm-platform, hence the pointer is only
                 // known here and must be deallocated. The sendMessage
                 // caller still has a pointer to the original message.
-                pd->fcts.pdFree(pd, mpiHandle->msg);
+                pd->fcts.pdFree(pd, reqMsg);
             }
-            ASSERT(reqMsg->msgId == mpiHandle->msgId);
-            *msg = reqMsg;
+            ASSERT(mpiHandle->msg->msgId == mpiHandle->msgId);
+            *msg = mpiHandle->msg;
             pd->fcts.pdFree(pd, mpiHandle);
             incomingIt->removeCurrent(incomingIt);
             return res;
@@ -422,7 +449,7 @@ u8 MPICommPollMessageInternal(ocrCommPlatform_t *self, ocrPolicyMsg_t **msg,
         if (completed) {
             ocrPolicyMsg_t * receivedMsg = mpiHandle->msg;
             u32 needRecvAny = (receivedMsg->type & PD_MSG_REQUEST);
-            DPRINTF(DEBUG_LVL_VERB,"[MPI %d] Received a message of type %x with msgId %d \n",
+            DPRINTF(DEBUG_LVL_VERB,"[MPI %"PRId32"] Received a message of type %"PRIx32" with msgId %"PRId32" \n",
                     locationToMpiRank(self->pd->myLocation), receivedMsg->type, (int) receivedMsg->msgId);
             // if request : msg may be reused for the response
             // if response: upper-layer must process and deallocate
@@ -466,10 +493,10 @@ u8 MPICommPollMessageInternal(ocrCommPlatform_t *self, ocrPolicyMsg_t **msg,
 
 u8 MPICommPollMessage(ocrCommPlatform_t *self, ocrPolicyMsg_t **msg,
                       u32 properties, u32 *mask) {
-    ocrCommPlatformMPI_t * mpiComm = ((ocrCommPlatformMPI_t *) self);
+    ocrCommPlatformMPI_t * mpiComm __attribute__((unused)) = ((ocrCommPlatformMPI_t *) self);
     // Not supposed to be polled outside RL_USER_OK
     ASSERT_BLOCK_BEGIN(((mpiComm->curState >> 4) == RL_USER_OK))
-    DPRINTF(DEBUG_LVL_WARN,"[MPI %d] Illegal runlevel[%d] reached in MPI-comm-platform pollMessage\n",
+    DPRINTF(DEBUG_LVL_WARN,"[MPI %"PRIu64"] Illegal runlevel[%"PRId32"] reached in MPI-comm-platform pollMessage\n",
             mpiRankToLocation(self->pd->myLocation), (mpiComm->curState >> 4));
     ASSERT_BLOCK_END
     return MPICommPollMessageInternal(self, msg, properties, mask);
@@ -506,7 +533,7 @@ u8 MPICommSwitchRunlevel(ocrCommPlatform_t *self, ocrPolicyDomain_t *PD, ocrRunl
             //BUG #605 Locations spec: commPlatform and worker have a location, are the supposed to be the same ?
             int rank=0;
             MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-            DPRINTF(DEBUG_LVL_VERB,"[MPI %d] comm-platform starts\n", rank);
+            DPRINTF(DEBUG_LVL_VERB,"[MPI %"PRId32"] comm-platform starts\n", rank);
             PD->myLocation = locationToMpiRank(rank);
         }
         break;
@@ -543,9 +570,14 @@ u8 MPICommSwitchRunlevel(ocrCommPlatform_t *self, ocrPolicyDomain_t *PD, ocrRunl
             int i = 0;
             while(i < (nbRanks-1)) {
                 PD->neighbors[i] = mpiRankToLocation((myRank+i+1)%nbRanks);
-                DPRINTF(DEBUG_LVL_VERB,"[MPI %d] Neighbors[%d] is %d\n", myRank, i, PD->neighbors[i]);
+                DPRINTF(DEBUG_LVL_VERB,"[MPI %"PRId32"] Neighbors[%"PRId32"] is %"PRIu64"\n", myRank, i, PD->neighbors[i]);
                 i++;
             }
+#ifdef DEBUG_MPI_HOSTNAMES
+            char hostname[256];
+            gethostname(hostname,255);
+            PRINTF("MPI rank %"PRId32" on host %s\n", myRank, hostname);
+#endif
             // Runlevel barrier across policy-domains
             MPI_Barrier(MPI_COMM_WORLD);
 

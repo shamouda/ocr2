@@ -23,13 +23,13 @@ ocrGuid_t endEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
 ocrGuid_t computeEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     void * dbPtr;
     ocrGuid_t dbGuid;
-    ocrDbCreate(&dbGuid, &dbPtr, sizeof(TYPE_ELEM_DB) * NB_ELEM_DB, 0, NULL_GUID, NO_ALLOC);
-    PRINTF("Created 0x%lx\n", dbGuid);
+    ocrDbCreate(&dbGuid, &dbPtr, sizeof(TYPE_ELEM_DB) * NB_ELEM_DB, 0, NULL_HINT, NO_ALLOC);
+    PRINTF("Created "GUIDF"\n", GUIDA(dbGuid));
     ocrDbDestroy(dbGuid);
     ocrGuid_t tplGuid;
     ocrEdtTemplateCreate(&tplGuid, endEdt, 0, 0);
     ocrGuid_t edtGuid;
-    ocrEdtCreate(&edtGuid, tplGuid, 0, NULL, 0, NULL, EDT_PROP_NONE, NULL_GUID, NULL);
+    ocrEdtCreate(&edtGuid, tplGuid, 0, NULL, 0, NULL, EDT_PROP_NONE, NULL_HINT, NULL);
     return NULL_GUID;
 }
 
@@ -37,7 +37,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrGuid_t tplGuid;
     ocrEdtTemplateCreate(&tplGuid, computeEdt, 0, 0);
     ocrGuid_t edtGuid;
-    ocrEdtCreate(&edtGuid, tplGuid, 0, NULL, 0, NULL, EDT_PROP_NONE, NULL_GUID, NULL);
+    ocrEdtCreate(&edtGuid, tplGuid, 0, NULL, 0, NULL, EDT_PROP_NONE, NULL_HINT, NULL);
 
     return NULL_GUID;
 }

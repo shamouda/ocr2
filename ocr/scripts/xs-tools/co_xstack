@@ -1,0 +1,37 @@
+NAME=$1
+BRANCH=$2
+
+if [[ $# -ne 2 ]]; then
+   echo "usage: co_xstack checkoutName branchToCheckout"
+   exit 1
+fi
+
+if [[ -z ${XST_ROOT} ]]; then
+   export XST_ROOT=${HOME}/xs-tools
+fi
+
+. ${XST_ROOT}/env.sh
+
+function clone() {
+NAME=$1
+BRANCH=$2
+REPOTYPE=$3
+REPO=https://${XST_GITUSER}@xstack.exascale-tech.com/gerrit/${REPOTYPE}
+
+PTH=${NAME}/${REPOTYPE}
+echo "   => git clone $REPO $NAME"
+git clone $REPO ${PTH}
+cd ${PTH}/.git
+. ${XST_ROOT}/setup_git
+cd ..
+echo "   => Git hook setup"
+git branch ${BRANCH} --track origin/${BRANCH}
+echo "   => Switched to branch ${BRANCH}"
+git checkout ${BRANCH}
+echo "   => Done"
+}
+
+CUR=${PWD}
+clone ${NAME} ${BRANCH} ocr
+cd ${CUR}
+clone ${NAME} ${BRANCH} apps

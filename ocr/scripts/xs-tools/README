@@ -1,0 +1,49 @@
+#
+# Description
+#
+
+Experimental scripts aimed at simplifying development on various systems
+Use them as templates to develop your own.
+
+Provided scripts:
+    - co_xstack:       Checkout the OCR runtime and applications
+    - jump_xxx_ws:     Configure an environment and build OCR on a given system
+
+#
+# XS-tools script setup
+#
+
+1) Copy this folder into your home directory
+2) Copy and adapt 'xst.conf-sample' to your home folder as 'xst.conf'
+2.a) XST_GITNAME: Set git user name
+2.b) XST_SYS    : Set the targeted system name (must have a corresponding folder xs-tools/${XST_SYS})
+2.c) XST_MPI    : Set targeted MPI implementation (must have a corresponding mpi_${XST_MPI}_env under xs-tools/${XST_SYS})
+
+
+#
+# OCR reposititory checkout helper
+#
+
+- co_xstack: Fetch the OCR repository using the username specified in ${XST_GITNAME}
+- setup_git: Invoked automatically by 'co_xstack' to setup git hook for the gerrit code review system.
+
+
+#
+# Building and using OCR
+#
+
+The set of scripts jump_xxx_ws where xxx is a platform can be used to build an OCR repository checkout.
+The build recipe is based on the environment variables defined in '~/xst.conf' or currently overriden
+in the shell environment.
+
+To build an OCR repository:
+
+   . jump_mpi_ws repoRootPath build
+
+To setup the environment without building the OCR repository:
+
+   . jump_mpi_ws repoRootPath
+
+
+Note the '.' is important here since it allows to populate the current shell
+environment with additional variables required to subsequently run OCR applications.

@@ -1,2 +1,3 @@
 fsim    - FSIM memory used by higher layers for allocation & management
 malloc  - malloc based memory used by higher layers for allocation & management
+numa_alloc - numa-aware allocations, requires libnuma to be present

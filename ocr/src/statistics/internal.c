@@ -96,7 +96,7 @@ void intDestructStatsProcess(ocrStatsProcess_t *process) {
 void intStatsProcessRegisterFilter(ocrStatsProcess_t *self, u64 bitMask,
                                    ocrStatsFilter_t *filter, u8 out) {
 
-    DPRINTF(DEBUG_LVL_VERB, "Registering %s filter 0x%lx with process 0x%lx for mask 0x%lx\n",
+    DPRINTF(DEBUG_LVL_VERB, "Registering %s filter 0x%"PRIx64" with process 0x%"PRIx64" for mask 0x%"PRIx64"\n",
             out?"OUT":"IN", (u64)filter, (u64)self, bitMask);
     u32 countAlloc, countPresent;
 
@@ -121,7 +121,7 @@ void intStatsProcessRegisterFilter(ocrStatsProcess_t *self, u64 bitMask,
         // Check to make sure we have enough room to add this filter
         countPresent = (u32)((*countVar)[bitSet] & 0xFFFFFFFF);
         countAlloc = (u32)((*countVar)[bitSet] >> 32);
-        //DPRINTF(DEBUG_LVL_VVERB, "For type %ld, have %d present and %d allocated (from 0x%lx)\n",
+        //DPRINTF(DEBUG_LVL_VVERB, "For type %"PRId64", have %"PRId32" present and %"PRId32" allocated (from 0x%"PRIx64")\n",
         //        bitSet, countPresent, countAlloc, (*countVar)[bitSet]);
         if(countAlloc <= countPresent) {
             // Allocate using an exponential model
@@ -139,7 +139,7 @@ void intStatsProcessRegisterFilter(ocrStatsProcess_t *self, u64 bitMask,
 
         // Set the counter properly again
         (*countVar)[bitSet] = ((u64)countAlloc << 32) | (countPresent);
-        //DPRINTF(DEBUG_LVL_VVERB, "Setting final counter for %ld to 0x%lx\n",
+        //DPRINTF(DEBUG_LVL_VVERB, "Setting final counter for %"PRId64" to 0x%"PRIx64"\n",
         //        bitSet, (*countVar)[bitSet]);
     }
     // Do the same thing for bit 0. Only do it once so we only free things once
@@ -165,8 +165,8 @@ void intStatsProcessRegisterFilter(ocrStatsProcess_t *self, u64 bitMask,
 }
 
 u8 intProcessOutgoingMessage(ocrStatsProcess_t *src, ocrStatsMessage_t* msg) {
-    DPRINTF(DEBUG_LVL_VERB, "Processing outgoing message 0x%lx for 0x%lx\n",
-            (u64)msg, src->me);
+    DPRINTF(DEBUG_LVL_VERB, "Processing outgoing message 0x%"PRIx64" for "GUIDF"\n",
+            (u64)msg, GUIDA(src->me));
 
 
     u64 type = fls64(msg->type);
@@ -178,7 +178,7 @@ u8 intProcessOutgoingMessage(ocrStatsProcess_t *src, ocrStatsMessage_t* msg) {
         // this message type
         ocrStatsFilter_t **myFilters =  src->outFilters[type];
         while(countFilter-- > 0) {
-            DPRINTF(DEBUG_LVL_VVERB, "Sending message 0x%lx to filter 0x%lx\n",
+            DPRINTF(DEBUG_LVL_VVERB, "Sending message 0x%"PRIx64" to filter 0x%"PRIx64"\n",
                     (u64)msg, (u64)myFilters[countFilter]);
             myFilters[countFilter]->fcts.notify(myFilters[countFilter], msg);
         }
@@ -192,8 +192,8 @@ u8 intProcessMessage(ocrStatsProcess_t *dst) {
                              dst->messages->fctPtrs->popHead(dst->messages);
 
     if(msg) {
-        DPRINTF(DEBUG_LVL_VERB, "Processing incoming message 0x%lx for 0x%lx\n",
-                (u64)msg, dst->me);
+        DPRINTF(DEBUG_LVL_VERB, "Processing incoming message 0x%"PRIx64" for "GUIDF"\n",
+                (u64)msg, GUIDA(dst->me));
         u64 newTick = msg->tick > (dst->tick + 1)?msg->tick:(dst->tick + 1);
         msg->tick = dst->tick = newTick;
 
@@ -206,7 +206,7 @@ u8 intProcessMessage(ocrStatsProcess_t *dst) {
             // this message type
             ocrStatsFilter_t **myFilters =  dst->filters[type];
             while(countFilter-- > 0) {
-                DPRINTF(DEBUG_LVL_VVERB, "Sending message 0x%lx to filter 0x%lx\n",
+                DPRINTF(DEBUG_LVL_VVERB, "Sending message 0x%"PRIx64" to filter 0x%"PRIx64"\n",
                         (u64)msg, (u64)myFilters[countFilter]);
                 myFilters[countFilter]->fcts.notify(myFilters[countFilter], msg);
             }

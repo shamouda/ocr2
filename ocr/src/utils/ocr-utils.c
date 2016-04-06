@@ -25,6 +25,16 @@ void ocr_exit() {
     hal_exit(1);
 }
 
+// These operations could be replaced by hardware versions of them. Keeping general
+// for now
+// FLS: Find last set:
+//  - returns the MSB that is set.
+//  - WARNING: returns 0 for both input of 0 and 1
+// CTZ: Count trailing zeros:
+//  - returns the number of trailing zeros, so for 100b, returns 2 which is the bit
+//    position of the LSB set
+//  - If If the input value is 0, returns the number of bits -1 of the size of the input
+//    (so 15, 31 or 63)
 
 u32 fls16(u16 val) {
     u32 bit = 15;
@@ -107,6 +117,84 @@ u32 fls64(u64 val) {
     return bit;
 }
 
+u32 ctz16(u16 val) {
+    // Fast path for odd numbers
+    if (val & 0x1) {
+        return 0;
+    }
+    u32 bit = 1;
+    if ((val & 0xff) == 0) {
+        val >>= 8;
+        bit += 8;
+    }
+    if ((val & 0xf) == 0) {
+        val >>= 4;
+        bit += 4;
+    }
+    if ((val & 0x3) == 0) {
+        val >>= 2;
+        bit += 2;
+    }
+    bit -= val & 0x1;
+    return bit;
+}
+
+u32 ctz32(u32 val) {
+    // Fast path for odd numbers
+    if (val & 0x1) {
+        return 0;
+    }
+    u32 bit = 1;
+    if ((val & 0xffff) == 0) {
+        val >>= 16;
+        bit += 16;
+    }
+    if ((val & 0xff) == 0) {
+        val >>= 8;
+        bit += 8;
+    }
+    if ((val & 0xf) == 0) {
+        val >>= 4;
+        bit += 4;
+    }
+    if ((val & 0x3) == 0) {
+        val >>= 2;
+        bit += 2;
+    }
+    bit -= val & 0x1;
+    return bit;
+}
+
+u32 ctz64(u64 val) {
+    // Fast path for odd numbers
+    if (val & 0x1) {
+        return 0;
+    }
+    u32 bit = 1;
+    if ((val & 0xffffffff) == 0) {
+        val >>= 32;
+        bit += 32;
+    }
+    if ((val & 0xffff) == 0) {
+        val >>= 16;
+        bit += 16;
+    }
+    if ((val & 0xff) == 0) {
+        val >>= 8;
+        bit += 8;
+    }
+    if ((val & 0xf) == 0) {
+        val >>= 4;
+        bit += 4;
+    }
+    if ((val & 0x3) == 0) {
+        val >>= 2;
+        bit += 2;
+    }
+    bit -= val & 0x1;
+    return bit;
+}
+
 void ocrGuidTrackerInit(ocrGuidTracker_t *self) {
     self->slotsStatus = 0xFFFFFFFFFFFFFFFFULL;
 }
@@ -123,7 +211,7 @@ u32 ocrGuidTrackerTrack(ocrGuidTracker_t *self, ocrGuid_t toTrack) {
 
 bool ocrGuidTrackerRemove(ocrGuidTracker_t *self, ocrGuid_t toTrack, u32 id) {
     if(id > 63) return false;
-    if(self->slots[id] != toTrack) return false;
+    if(!(ocrGuidIsEq(self->slots[id], toTrack))) return false;
 
     self->slotsStatus |= (1ULL<<(id));
     return true;
@@ -144,7 +232,7 @@ u32 ocrGuidTrackerFind(ocrGuidTracker_t *self, ocrGuid_t toFind) {
     while(rstatus) {
         slot = fls64(rstatus);
         rstatus &= ~(1ULL << slot);
-        if(self->slots[slot] == toFind) {
+        if(ocrGuidIsEq(self->slots[slot], toFind)) {
             result = slot;
             break;
         }
@@ -161,12 +249,28 @@ s32 ocrStrcmp(u8 *str1, u8 *str2) {
     return(str1[index]-str2[index]);
 }
 
+s32 ocrStrncmp(u8 *str1, u8 *str2, u32 n) {
+    if (n == 0) { return 0; }
+    u32 index = 0;
+    while((index < (n-1)) && (str1[index] != '\0') && (str2[index] != '\0')) {
+        if(str1[index] == str2[index]) index++;
+        else break;
+    }
+    return(str1[index]-str2[index]);
+}
+
 u64 ocrStrlen(const char* str) {
     u64 res = 0;
     if(str == NULL) return res;
     while(*str++ != '\0') ++res;
     return res;
 }
+
+bool ocrIsDigit(u8 c) {
+    return ((c >= '0') && (c <= '9'));
+}
+
+
 
 /* This is not currently used. What to do with it?
 void ocrPlaceTrackerAllocate ( ocrPlaceTracker_t** toFill ) {

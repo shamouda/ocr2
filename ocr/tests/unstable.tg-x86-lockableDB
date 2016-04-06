@@ -1,4 +1,13 @@
-edtForkBomb.c
+testDbDestroy2.c
+# No PlatformModel on TG-X86
+testDistAffinity6.c
 testEdtDestroy0.c
+testDistEdtNullGuid0.c
+testDistEdtNullGuid1.c
+testDistEdtNullGuid2.c
+testDistEdtNullGuid3.c
+testDistEdtNullGuid4.c
+testDistEdtNullGuid5.c
 guidlabel.c
 dbNoAcquire0.c
+pqr.c

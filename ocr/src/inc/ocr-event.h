@@ -214,7 +214,7 @@ typedef struct _ocrEventFactory_t {
      *                              GUID_PROP_* and EVT_PROP_*
      *  @param[in] instanceArg      Arguments specific for this instance
      *  @return 0 on success or an error code on failure:
-     *      - OCR_EGUIDEXISTS if the object exists (if GUID_PROP_IS_LABELED)
+     *      - OCR_EGUIDEXISTS if the object exists (if GUID_PROP_IS_LABELED and GUID_PROP_CHECK)
      */
     u8 (*instantiate)(struct _ocrEventFactory_t* factory, ocrFatGuid_t *guid,
                       ocrEventTypes_t eventType, u32 properties,

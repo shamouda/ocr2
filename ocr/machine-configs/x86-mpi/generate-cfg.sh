@@ -1,8 +1,37 @@
 #!/bin/bash
 
 export CFG_SCRIPT=../../scripts/Configs/config-generator.py
-$CFG_SCRIPT --guid COUNTED_MAP --target mpi --threads 8 --output jenkins-hc-dist-mpi-clone-8w-lockableDB.cfg --remove-destination
-$CFG_SCRIPT --guid COUNTED_MAP --target mpi --threads 2 --output mach-hc-dist-mpi-clone-2w-lockableDB.cfg --remove-destination
-$CFG_SCRIPT --guid COUNTED_MAP --target mpi --threads 4 --output mach-hc-dist-mpi-clone-4w-lockableDB.cfg --remove-destination
-$CFG_SCRIPT --guid COUNTED_MAP --target mpi --threads 8 --output mach-hc-dist-mpi-clone-8w-lockableDB.cfg --remove-destination
+
+echo "$PWD/../../scripts/Configs/config-generator.py"
+
+PLATFORM=mpi
+
+# Placement Affinity
+ARGS="--guid COUNTED_MAP --target ${PLATFORM} --scheduler PLACEMENT_AFFINITY  --remove-destination"
+for c in `echo "2 4 8"`; do
+    $CFG_SCRIPT ${ARGS} --threads ${c} --output mach-x86-${PLATFORM}-affinity-${c}w-lockableDB.cfg
+done
+
+# ST
+ARGS="--guid COUNTED_MAP --target ${PLATFORM} --scheduler ST  --remove-destination"
+for c in `echo "2 4 8"`; do
+    $CFG_SCRIPT ${ARGS} --threads ${c} --output mach-x86-${PLATFORM}-st-${c}w-lockableDB.cfg
+done
+
+# STATIC
+ARGS="--guid COUNTED_MAP --target ${PLATFORM} --scheduler STATIC  --remove-destination"
+for c in `echo "2 4 8"`; do
+    $CFG_SCRIPT ${ARGS} --threads ${c} --output mach-x86-${PLATFORM}-static-${c}w-lockableDB.cfg
+done
+
+# Legacy
+ARGS="--guid COUNTED_MAP --target ${PLATFORM} --scheduler PLACEMENT_AFFINITY  --remove-destination"
+for c in `echo "8"`; do
+    $CFG_SCRIPT ${ARGS} --threads ${c} --output mach-x86-${PLATFORM}-legacy-${c}w-lockableDB.cfg
+done
+
+# Jenkins config
+ARGS="--guid COUNTED_MAP --target ${PLATFORM} --scheduler PLACEMENT_AFFINITY --threads 8 --remove-destination"
+$CFG_SCRIPT ${ARGS} --output jenkins-x86-${PLATFORM}.cfg
+
 unset CFG_SCRIPT

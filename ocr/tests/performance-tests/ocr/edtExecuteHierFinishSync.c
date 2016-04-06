@@ -12,6 +12,12 @@
 // - NODE_FANOUT
 // - LEAF_FANOUT
 
+#ifdef REC_SPAWN_FINISH
+#define EDT_SPAWN_PROPS EDT_PROP_FINISH
+#else
+#define EDT_SPAWN_PROPS EDT_PROP_NONE
+#endif
+
 ocrGuid_t terminateEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     timestamp_t * timers = (timestamp_t *) depv[1].ptr;
     get_time(&timers[1]);
@@ -39,7 +45,7 @@ ocrGuid_t spawnerEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
         while (i < LEAF_FANOUT) {
             ocrGuid_t workEdtGuid;
             ocrEdtCreate(&workEdtGuid, workEdtTemplateGuid,
-                         0, NULL, 0, NULL_GUID, EDT_PROP_NONE, NULL_GUID, NULL);
+                         0, NULL, 0, NULL, EDT_PROP_NONE, NULL_HINT, NULL);
             i++;
         }
         ocrEdtTemplateDestroy(workEdtTemplateGuid);
@@ -50,7 +56,7 @@ ocrGuid_t spawnerEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
         while (i < NODE_FANOUT) {
             ocrGuid_t spawnerEdtGuid;
             ocrEdtCreate(&spawnerEdtGuid, spawnerEdtTemplateGuid,
-                         1, &depth, 0, NULL_GUID, EDT_PROP_NONE, NULL_GUID, NULL);
+                         1, &depth, 0, NULL, EDT_SPAWN_PROPS, NULL_HINT, NULL);
             i++;
         }
         ocrEdtTemplateDestroy(spawnerEdtTemplateGuid);
@@ -71,7 +77,7 @@ ocrGuid_t finishEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     u64 depth = 1;
     ocrGuid_t spawnerEdtGuid;
     ocrEdtCreate(&spawnerEdtGuid, spawnerEdtTemplateGuid,
-                 1, &depth, 0, NULL_GUID, EDT_PROP_NONE, NULL_GUID, NULL);
+                 1, &depth, 0, NULL, EDT_SPAWN_PROPS, NULL_HINT, NULL);
 
     ocrEdtTemplateDestroy(spawnerEdtTemplateGuid);
     return NULL_GUID;
@@ -84,11 +90,11 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
 
     ocrGuid_t terminateEdtGuid;
     ocrEdtCreate(&terminateEdtGuid, terminateEdtTemplateGuid,
-                 0, NULL, 2, NULL_GUID, EDT_PROP_NONE, NULL_GUID, NULL);
+                 0, NULL, 2, NULL, EDT_PROP_NONE, NULL_HINT, NULL);
 
     timestamp_t * dbPtr;
     ocrGuid_t dbGuid;
-    ocrDbCreate(&dbGuid, (void **)&dbPtr, (sizeof(timestamp_t)*2), 0, NULL_GUID, NO_ALLOC);
+    ocrDbCreate(&dbGuid, (void **)&dbPtr, (sizeof(timestamp_t)*2), 0, NULL_HINT, NO_ALLOC);
     ocrDbRelease(dbGuid);
     ocrAddDependence(dbGuid, terminateEdtGuid, 1, DB_MODE_RW);
 
@@ -97,7 +103,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrEdtTemplateCreate(&finishEdtTemplateGuid, finishEdt, 0, 1);
     ocrGuid_t finishEdtGuid;
     ocrEdtCreate(&finishEdtGuid, finishEdtTemplateGuid,
-                 0, NULL, 1, NULL_GUID,  EDT_PROP_FINISH, NULL_GUID, &oEvtGuid);
+                 0, NULL, 1, NULL,  EDT_PROP_FINISH, NULL_HINT, &oEvtGuid);
 
     ocrAddDependence(oEvtGuid, terminateEdtGuid, 0, DB_MODE_CONST);
     ocrAddDependence(dbGuid, finishEdtGuid, 0, DB_MODE_RW);

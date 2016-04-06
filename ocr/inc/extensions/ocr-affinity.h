@@ -82,6 +82,19 @@ u8 ocrAffinityCount(ocrAffinityKind kind, u64 * count);
 u8 ocrAffinityGet(ocrAffinityKind kind, u64 * count, ocrGuid_t * affinities);
 
 /**
+ * @brief Gets the affinity GUIDs of a particular kind using an index.
+ *
+ * @param[in] kind             The affinity kind to query for. See #ocrAffinityKind
+ * @param[in] idx              The index of the GUID to query the 'i-th' elements of
+ *                              the array that would be returned by 'ocrAffinityGet'
+ * @param[out] affinities      Requested Affinity GUID (single value)
+ * @return a status code
+ *      - 0: successful
+ *      - OCR_EINVAL if the index parameter is out of bounds
+ */
+u8 ocrAffinityGetAt(ocrAffinityKind kind, u64 idx, ocrGuid_t * affinity);
+
+/**
  * @brief Returns an affinity the currently executing EDT is affinitized to
  *
  * An EDT may have multiple affinities. The programmer should rely on
@@ -103,6 +116,10 @@ u8 ocrAffinityGetCurrent(ocrGuid_t * affinity);
  */
 u8 ocrAffinityQuery(ocrGuid_t guid, u64 * count, ocrGuid_t * affinities);
 
+/**
+ * @brief Converts an affinity to a value suitable for ocrSetHintValue()
+ */
+u64 ocrAffinityToHintValue(ocrGuid_t affinity);
 
 #ifdef __cplusplus
 }

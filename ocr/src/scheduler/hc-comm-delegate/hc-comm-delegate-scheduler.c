@@ -244,14 +244,14 @@ u8 hcCommSchedulerGiveComm(ocrScheduler_t *self, u32* count, ocrFatGuid_t* fatHa
                 // In that case, the comm-worker should only be able to give outgoing responses to the scheduler
                 ASSERT(message->type & PD_MSG_RESPONSE);
                 // Push to the comm worker outbox
-                DPRINTF(DEBUG_LVL_VVERB,"[%d] hc-comm-delegate-scheduler:: Comm-worker pushes outgoing to own outbox %d\n",
+                DPRINTF(DEBUG_LVL_VVERB,"[%"PRId32"] hc-comm-delegate-scheduler:: Comm-worker pushes outgoing to own outbox %"PRId32"\n",
                     (int) self->pd->myLocation, worker->id);
                 deque_t * outbox = commSched->outboxes[worker->id];
                 outbox->pushAtTail(outbox, handle, 0);
             } else {
         #endif
                 // Comm-worker giving back to a worker's inbox
-                DPRINTF(DEBUG_LVL_VVERB,"[%d] hc-comm-delegate-scheduler:: Comm-worker pushes at tail of box %d\n",
+                DPRINTF(DEBUG_LVL_VVERB,"[%"PRId32"] hc-comm-delegate-scheduler:: Comm-worker pushes at tail of box %"PRIu64"\n",
                     (int) self->pd->myLocation, handle->boxId);
                 // Push is concurrent because the comp-worker may pushing/poping from inbox in parallel
                 deque_t * inbox = commSched->inboxes[handle->boxId];
@@ -268,9 +268,13 @@ u8 hcCommSchedulerGiveComm(ocrScheduler_t *self, u32* count, ocrFatGuid_t* fatHa
         while (i < *count) {
             // Set delegate handle's box id.
             delegateMsgHandle_t* delHandle = (delegateMsgHandle_t *) fatHandlers[i].metaDataPtr;
+#ifdef OCR_ASSERT
+            ocrPolicyMsg_t * message = (delHandle->handle.status == HDL_RESPONSE_OK) ? delHandle->handle.response : delHandle->handle.msg;
+            ASSERT((message->srcLocation == self->pd->myLocation) && (message->destLocation != self->pd->myLocation));
+#endif
             //BUG #587: boxId is defined in del-handle however only the scheduler is using it
             delHandle->boxId = worker->id;
-            DPRINTF(DEBUG_LVL_VVERB,"[%d] hc-comm-delegate-scheduler:: Comp-worker pushes at tail of box %d\n",
+            DPRINTF(DEBUG_LVL_VVERB,"[%"PRId32"] hc-comm-delegate-scheduler:: Comp-worker pushes at tail of box %"PRIu64"\n",
                 (int) self->pd->myLocation, delHandle->boxId);
             ASSERT((delHandle->boxId >= 0) && (delHandle->boxId < self->pd->workerCount));
             // Put handle to worker's outbox

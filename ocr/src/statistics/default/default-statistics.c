@@ -72,17 +72,17 @@ static ocrStatsProcess_t* defaultCreateStatsProcess(ocrStats_t *self, ocrGuid_t 
     intStatsProcessRegisterFilter(result, STATS_ALL, t, 0);
     intStatsProcessRegisterFilter(result, STATS_ALL, t2, 1);
 
-    DPRINTF(DEBUG_LVL_INFO, "Stats 0x%lx: Created a StatsProcess 0x%lx for parent object GUID 0x%lx\n",
-            (u64)self, (u64)result, processGuid);
+    DPRINTF(DEBUG_LVL_INFO, "Stats 0x%"PRIx64": Created a StatsProcess 0x%"PRIx64" for parent object GUID "GUIDF"\n",
+            (u64)self, (u64)result, GUIDA(processGuid));
 
-    DPRINTF(DEBUG_LVL_WARN, "Stats 0x%lx: StatsProcess 0x%lx associated with IN filter 0x%lx and OUT filter 0x%lx\n",
+    DPRINTF(DEBUG_LVL_WARN, "Stats 0x%"PRIx64": StatsProcess 0x%"PRIx64" associated with IN filter 0x%"PRIx64" and OUT filter 0x%"PRIx64"\n",
             (u64)self, (u64)result, (u64)t, (u64)t2);
     return result;
 }
 
 static void defaultDestructStatsProcess(ocrStats_t *self, ocrStatsProcess_t *process) {
-    DPRINTF(DEBUG_LVL_INFO, "Stats 0x%lx: Destroying StatsProcess 0x%lx (parent object GUID: 0x%lx)\n",
-            (u64)self, (u64)process, process->me);
+    DPRINTF(DEBUG_LVL_INFO, "Stats 0x%"PRIx64": Destroying StatsProcess 0x%"PRIx64" (parent object GUID: "GUIDF")\n",
+            (u64)self, (u64)process, GUIDA(process->me));
     intDestructStatsProcess(process);
 }
 

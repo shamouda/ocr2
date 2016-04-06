@@ -28,11 +28,11 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrEdtTemplateCreate(&terminateEdtTemplateGuid, terminateEdt, 0, NB_INSTANCES+1);
     ocrGuid_t * dbEvtPtr;
     ocrGuid_t dbEvtGuid;
-    ocrDbCreate(&dbEvtGuid, (void **)&dbEvtPtr, (sizeof(ocrGuid_t)*NB_INSTANCES), 0, NULL_GUID, NO_ALLOC);
+    ocrDbCreate(&dbEvtGuid, (void **)&dbEvtPtr, (sizeof(ocrGuid_t)*NB_INSTANCES), 0, NULL_HINT, NO_ALLOC);
 
     ocrGuid_t terminateEdtGuid;
     ocrEdtCreate(&terminateEdtGuid, terminateEdtTemplateGuid,
-                 0, NULL, NB_INSTANCES+1, NULL_GUID, EDT_PROP_NONE, NULL_GUID, NULL);
+                 0, NULL, NB_INSTANCES+1, NULL, EDT_PROP_NONE, NULL_HINT, NULL);
 
     int k = 0;
     while (k < NB_INSTANCES) {
@@ -43,7 +43,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
 
     timestamp_t * dbPtr;
     ocrGuid_t dbGuid;
-    ocrDbCreate(&dbGuid, (void **)&dbPtr, (sizeof(timestamp_t)*2), 0, NULL_GUID, NO_ALLOC);
+    ocrDbCreate(&dbGuid, (void **)&dbPtr, (sizeof(timestamp_t)*2), 0, NULL_HINT, NO_ALLOC);
 
     get_time(&dbPtr[0]);
 
@@ -54,7 +54,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     while (i < NB_INSTANCES) {
         ocrGuid_t workEdtGuid;
         ocrEdtCreate(&workEdtGuid, workEdtTemplateGuid,
-                     1, (u64 *) &dbEvtPtr[i], 0, NULL_GUID, EDT_PROP_NONE, NULL_GUID, NULL);
+                     1, (u64 *) &dbEvtPtr[i], 0, NULL, EDT_PROP_NONE, NULL_HINT, NULL);
         i++;
     }
     ocrEdtTemplateDestroy(workEdtTemplateGuid);

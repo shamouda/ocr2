@@ -8,38 +8,66 @@
 #include "debug.h"
 
 const char * schedulerHeuristic_types[] = {
+#ifdef ENABLE_SCHEDULER_HEURISTIC_NULL
+    "NULL",
+#endif
 #ifdef ENABLE_SCHEDULER_HEURISTIC_HC
     "HC",
 #endif
-#ifdef ENABLE_SCHEDULER_HEURISTIC_PC
-    "PC",
+#ifdef ENABLE_SCHEDULER_HEURISTIC_HC_COMM_DELEGATE
+    "HC_COMM_DELEGATE",
+#endif
+#ifdef ENABLE_SCHEDULER_HEURISTIC_PLACEMENT_AFFINITY
+    "PLACEMENT_AFFINITY",
+#endif
+#ifdef ENABLE_SCHEDULER_HEURISTIC_ST
+    "ST",
 #endif
 #ifdef ENABLE_SCHEDULER_HEURISTIC_CE
     "CE",
 #endif
-#ifdef ENABLE_SCHEDULER_HEURISTIC_NULL
-    "NULL",
+#ifdef ENABLE_SCHEDULER_HEURISTIC_PRIORITY
+    "PRIORITY",
+#endif
+#ifdef ENABLE_SCHEDULER_HEURISTIC_STATIC
+    "STATIC",
 #endif
     NULL
 };
 
 ocrSchedulerHeuristicFactory_t * newSchedulerHeuristicFactory(schedulerHeuristicType_t type, ocrParamList_t *perType) {
     switch(type) {
+#ifdef ENABLE_SCHEDULER_HEURISTIC_NULL
+    case schedulerHeuristicNull_id:
+        return newOcrSchedulerHeuristicFactoryNull(perType, type);
+#endif
 #ifdef ENABLE_SCHEDULER_HEURISTIC_HC
     case schedulerHeuristicHc_id:
         return newOcrSchedulerHeuristicFactoryHc(perType, type);
 #endif
-#ifdef ENABLE_SCHEDULER_HEURISTIC_PC
-    case schedulerHeuristicPc_id:
-        return newOcrSchedulerHeuristicFactoryPc(perType, type);
+#ifdef ENABLE_SCHEDULER_HEURISTIC_HC_COMM_DELEGATE
+    case schedulerHeuristicHcCommDelegate_id:
+        return newOcrSchedulerHeuristicFactoryHcCommDelegate(perType, type);
+#endif
+#ifdef ENABLE_SCHEDULER_HEURISTIC_PLACEMENT_AFFINITY
+    case schedulerHeuristicPlacementAffinity_id:
+        return newOcrSchedulerHeuristicFactoryPlacementAffinity(perType, type);
+#endif
+#ifdef ENABLE_SCHEDULER_HEURISTIC_ST
+    case schedulerHeuristicSt_id:
+        return newOcrSchedulerHeuristicFactorySt(perType, type);
 #endif
 #ifdef ENABLE_SCHEDULER_HEURISTIC_CE
     case schedulerHeuristicCe_id:
         return newOcrSchedulerHeuristicFactoryCe(perType, type);
 #endif
-#ifdef ENABLE_SCHEDULER_HEURISTIC_NULL
-    case schedulerHeuristicNull_id:
-        return newOcrSchedulerHeuristicFactoryNull(perType, type);
+#ifdef ENABLE_SCHEDULER_HEURISTIC_PRIORITY
+    case schedulerHeuristicPriority_id:
+        return newOcrSchedulerHeuristicFactoryPriority(perType, type);
+#endif
+#ifdef ENABLE_SCHEDULER_HEURISTIC_STATIC
+    case schedulerHeuristicStatic_id:
+        return newOcrSchedulerHeuristicFactoryStatic(perType, type);
 #endif
     default:
         break;

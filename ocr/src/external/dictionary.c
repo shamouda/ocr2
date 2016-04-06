@@ -386,12 +386,12 @@ int main(int argc, char *argv[]) {
     d = dictionary_new(0);
 
     /* Set values in dictionary */
-    printf("setting %d values...\n", NVALS);
+    printf("setting %"PRId32" values...\n", NVALS);
     for (i=0 ; i<NVALS ; i++) {
         sprintf(cval, "%04d", i);
         dictionary_set(d, cval, "salut");
     }
-    printf("getting %d values...\n", NVALS);
+    printf("getting %"PRId32" values...\n", NVALS);
     for (i=0 ; i<NVALS ; i++) {
         sprintf(cval, "%04d", i);
         val = dictionary_get(d, cval, DICT_INVALID_KEY);
@@ -399,7 +399,7 @@ int main(int argc, char *argv[]) {
             printf("cannot get value for key [%s]\n", cval);
         }
     }
-    printf("unsetting %d values...\n", NVALS);
+    printf("unsetting %"PRId32" values...\n", NVALS);
     for (i=0 ; i<NVALS ; i++) {
         sprintf(cval, "%04d", i);
         dictionary_unset(d, cval);

@@ -19,7 +19,7 @@
 #include "policy-domain/ce/ce-policy.h"
 
 #ifdef HAL_FSIM_CE
-#include "rmd-map.h"
+#include "xstg-map.h"
 #endif
 
 #ifdef OCR_ENABLE_STATISTICS
@@ -44,41 +44,39 @@ static inline u64 getWorkerId(ocrWorker_t * worker) {
  */
 static void workerLoop(ocrWorker_t * worker) {
     ocrPolicyDomain_t *pd = worker->pd;
-    ocrPolicyDomainCe_t * cePolicy = (ocrPolicyDomainCe_t *)pd;
-    PD_MSG_STACK(msg);
-    getCurrentEnv(NULL, NULL, NULL, &msg);
+    PD_MSG_STACK(umsg);
+    getCurrentEnv(NULL, NULL, NULL, &umsg);
 
-    DPRINTF(DEBUG_LVL_VERB, "Starting scheduler routine of CE worker %ld\n", getWorkerId(worker));
-    pd->fcts.switchRunlevel(pd, RL_COMPUTE_OK, 0);
+    DPRINTF(DEBUG_LVL_VERB, "Starting scheduler routine of CE worker %"PRId64"\n", getWorkerId(worker));
+    ocrMsgHandle_t handle;
+    ocrMsgHandle_t *pHandle = &handle;
     while(worker->fcts.isRunning(worker)) {
-        if (cePolicy->shutdownMode) {
-            DPRINTF(DEBUG_LVL_VVERB, "UPDATE SHUTDOWN\n");
-        } else {
-            DPRINTF(DEBUG_LVL_VVERB, "UPDATE IDLE\n");
-        }
-#define PD_MSG (&msg)
+        DPRINTF(DEBUG_LVL_VVERB, "UPDATE IDLE\n");
+#define PD_MSG (&umsg)
 #define PD_TYPE PD_MSG_SCHED_UPDATE
-        msg.type = PD_MSG_SCHED_UPDATE | PD_MSG_REQUEST;
-        PD_MSG_FIELD_I(properties) = cePolicy->shutdownMode ? OCR_SCHEDULER_UPDATE_PROP_SHUTDOWN : OCR_SCHEDULER_UPDATE_PROP_IDLE;
-        ASSERT(pd->fcts.processMessage(pd, &msg, false) == 0);
+        umsg.type = PD_MSG_SCHED_UPDATE | PD_MSG_REQUEST;
+        PD_MSG_FIELD_I(properties) = OCR_SCHEDULER_UPDATE_PROP_IDLE;
+        RESULT_ASSERT(pd->fcts.processMessage(pd, &umsg, false), ==, 0);
         ASSERT(PD_MSG_FIELD_O(returnDetail) == 0);
 #undef PD_MSG
 #undef PD_TYPE
 
         DPRINTF(DEBUG_LVL_VVERB, "WAIT\n");
-        ocrMsgHandle_t *handle = NULL;
-        RESULT_ASSERT(pd->fcts.waitMessage(pd, &handle), ==, 0);
-        ASSERT(handle);
-        ocrPolicyMsg_t *msg = handle->response;
-        DPRINTF(DEBUG_LVL_VVERB, "PROCESSING: %lx from %lx\n", (msg->type & PD_MSG_TYPE_ONLY), msg->srcLocation);
+        pd->commApis[0]->fcts.initHandle(pd->commApis[0], pHandle);
+        RESULT_ASSERT(pd->fcts.waitMessage(pd, &pHandle), ==, 0);
+        ASSERT(pHandle);
+        ocrPolicyMsg_t *msg = pHandle->response;
         RESULT_ASSERT(pd->fcts.processMessage(pd, msg, true), ==, 0);
-        handle->destruct(handle);
+        pHandle->destruct(pHandle);
     } /* End of while loop */
-
+    // At this stage, when we drop out, we should be
+    // out of USER_OK
 }
 
 void destructWorkerCe(ocrWorker_t * base) {
     u64 i = 0;
+    // There is only one compute for now but we
+    // keep the generality
     while(i < base->computeCount) {
         base->computes[i]->fcts.destruct(base->computes[i]);
         ++i;
@@ -99,10 +97,8 @@ ocrWorker_t* newWorkerCe (ocrWorkerFactory_t * factory, ocrParamList_t * perInst
 void initializeWorkerCe(ocrWorkerFactory_t * factory, ocrWorker_t* base, ocrParamList_t * perInstance) {
     initializeWorkerOcr(factory, base, perInstance);
     base->type = ((paramListWorkerCeInst_t*)perInstance)->workerType;
-
     ocrWorkerCe_t * workerCe = (ocrWorkerCe_t *) base;
     workerCe->id = ((paramListWorkerInst_t*)perInstance)->workerId;
-    workerCe->running = false;
 }
 
 
@@ -115,29 +111,78 @@ u8 ceWorkerSwitchRunlevel(ocrWorker_t *self, ocrPolicyDomain_t *PD, ocrRunlevel_
     ASSERT((properties & RL_REQUEST) && !(properties & RL_RESPONSE)
            && !(properties & RL_RELEASE));
     ASSERT(!(properties & RL_FROM_MSG));
+    ASSERT(properties & RL_PD_MASTER); // One worker per PD.
+    ASSERT(callback == NULL); // This worker does not support callbacks
 
     // Call the runlevel change on the underlying platform
     switch (runlevel) {
-        case RL_PD_OK:
+    case RL_CONFIG_PARSE:
+        break;
+    case RL_NETWORK_OK:
+        break;
+    case RL_PD_OK:
+        if(properties & RL_BRING_UP) {
             // Set the worker properly the first time
             ASSERT(self->computeCount == 1);
             self->computes[0]->worker = self;
             self->pd = PD;
-            break;
-        case RL_COMPUTE_OK:
             self->location = PD->myLocation;
-            self->pd = PD;
-            ((ocrWorkerCe_t *) self)->running = true;
+        }
+        break;
+    case RL_MEMORY_OK:
+        break;
+    case RL_GUID_OK:
+        break;
+    case RL_COMPUTE_OK:
+        if((properties & RL_BRING_UP) && RL_IS_FIRST_PHASE_UP(PD, RL_COMPUTE_OK, phase)) {
+            // Guidify ourself
+            guidify(self->pd, (u64)self, &(self->fguid), OCR_GUID_WORKER);
+            // Set that we want to run. We only use the RL and consider RL_USER_OK to be running and
+            // anything else to be not running
+            self->curState = GET_STATE(RL_USER_OK, 0);
+            if(properties & RL_PD_MASTER) {
+                // We need to set our environment
+                self->computes[0]->fcts.setCurrentEnv(self->computes[0], self->pd, self);
+            }
             break;
-        case RL_USER_OK:
-            ((ocrWorkerCe_t *) self)->running = false;
-            break;
-        default:
-            break;
+        }
+        if(properties & RL_TEAR_DOWN) {
+            if(RL_IS_LAST_PHASE_DOWN(PD, RL_COMPUTE_OK, phase)) {
+                // Destroy GUID
+                PD_MSG_STACK(msg);
+                getCurrentEnv(NULL, NULL, NULL, &msg);
+#define PD_MSG (&msg)
+#define PD_TYPE PD_MSG_GUID_DESTROY
+                msg.type = PD_MSG_GUID_DESTROY | PD_MSG_REQUEST;
+                PD_MSG_FIELD_I(guid) = self->fguid;
+                PD_MSG_FIELD_I(properties) = 0;
+                toReturn |= self->pd->fcts.processMessage(self->pd, &msg, false);
+                self->fguid.guid = NULL_GUID;
+#undef PD_MSG
+#undef PD_TYPE
+            }
+        }
+        break;
+    case RL_USER_OK:
+        if((properties & RL_BRING_UP) && (RL_IS_LAST_PHASE_UP(PD, RL_USER_OK, phase))) {
+            if(properties & RL_PD_MASTER) {
+                // We start ourself
+                self->fcts.run(self);
+            }
+        } else if((properties & RL_TEAR_DOWN) && (RL_IS_LAST_PHASE_DOWN(PD, RL_USER_OK, phase))) {
+            // Break out of the loop. This will return us to the RL_USER_OK RL switch
+            // code in the PD so that we can continue shutdown. This works because there is
+            // only one worker per PD
+            self->curState = GET_STATE(RL_COMPUTE_OK, 0);
+        }
+        break;
+    default:
+        // Unknown runlevel
+        ASSERT(0);
     }
 
     toReturn |= self->computes[0]->fcts.switchRunlevel(self->computes[0], PD, runlevel, phase, properties,
-                                                           callback, val);
+                                                       callback, val);
     return toReturn;
 }
 
@@ -161,16 +206,15 @@ void* ceWorkShift(ocrWorker_t * worker) {
 }
 
 bool ceIsRunningWorker(ocrWorker_t * base) {
-    ocrWorkerCe_t * ceWorker = (ocrWorkerCe_t *) base;
-    return ceWorker->running;
+    return GET_STATE_RL(base->curState) == RL_USER_OK;
 }
 
 void cePrintLocation(ocrWorker_t *base, char* location) {
     // BUG #605: Make the notion of location more robust. This should be made
     // more platform agnostic
 #ifdef HAL_FSIM_CE
-    SNPRINTF(location, 32, "CE %d Block %d Unit %d", AGENT_FROM_ID(base->location),
-             BLOCK_FROM_ID(base->location), UNIT_FROM_ID(base->location));
+    SNPRINTF(location, 32, "CE %"PRId64" Block %"PRId64" Cluster %"PRId64"", AGENT_FROM_ID(base->location),
+             BLOCK_FROM_ID(base->location), CLUSTER_FROM_ID(base->location));
 #else
     SNPRINTF(location, 32, "CE");
 #endif

@@ -29,7 +29,6 @@ typedef struct {
 
 typedef struct {
     ocrCommApi_t base;
-    ocrMsgHandle_t handle; //default handle
 } ocrCommApiHandleless_t;
 
 typedef struct {

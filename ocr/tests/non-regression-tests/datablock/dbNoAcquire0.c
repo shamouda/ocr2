@@ -39,7 +39,7 @@ ocrGuid_t writeEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrGuid_t terminateEdtTemplateGuid;
     ocrEdtTemplateCreate(&terminateEdtTemplateGuid, terminateEdt, 0 /*paramc*/, 1 /*depc*/);
     ocrEdtCreate(&terminateEdtGuid, terminateEdtTemplateGuid, 0, NULL, 1, &dbGuid,
-                 EDT_PROP_NONE, NULL_GUID, NULL);
+                 EDT_PROP_NONE, NULL_HINT, NULL);
     ocrEdtTemplateDestroy(terminateEdtTemplateGuid);
     return NULL_GUID;
 }
@@ -48,13 +48,13 @@ ocrGuid_t writeEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
 ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrGuid_t dbGuid;
     void * dbPtr;
-    ocrDbCreate(&dbGuid, &dbPtr, sizeof(u64)*NB_ELEM, DB_PROP_NO_ACQUIRE, NULL_GUID, NO_ALLOC);
+    ocrDbCreate(&dbGuid, &dbPtr, sizeof(u64)*NB_ELEM, DB_PROP_NO_ACQUIRE, NULL_HINT, NO_ALLOC);
     ASSERT(dbPtr == NULL);
     ocrDbRelease(dbGuid); // Do I need to release that or not ?
     ocrGuid_t edtGuid;
     ocrGuid_t edtTplGuid;
     ocrEdtTemplateCreate(&edtTplGuid, writeEdt, 0 /*paramc*/, 1 /*depc*/);
     ocrEdtCreate(&edtGuid, edtTplGuid, EDT_PARAM_DEF, NULL, 1, &dbGuid,
-                 EDT_PROP_NONE, NULL_GUID, NULL);
+                 EDT_PROP_NONE, NULL_HINT, NULL);
     return NULL_GUID;
 }

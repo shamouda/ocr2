@@ -10,13 +10,22 @@ if [[ -z "${SCRIPT_ROOT}" ]]; then
     exit 1
 fi
 
+if [[ -z "${OCR_INSTALL}" ]]; then
+    # Check if this an OCR repo
+    export OCR_INSTALL="${SCRIPT_ROOT}/../../../install"
+    if [[ ! -d ${OCR_INSTALL} ]]; then
+        echo "OCR_INSTALL environment variable is not defined and cannot be deduced"
+        exit 1
+    fi
+fi
+
 #
 # OCR setup and run configuration
 #
 
-if [[ -z "$CORE_SCALING" ]]; then
-    export CORE_SCALING="1 2 4 8 16"
-fi
+export CORE_SCALING=${CORE_SCALING-"1 2 4 8 16"}
+
+export NODE_SCALING=${NODE_SCALING-"1"}
 
 #
 # OCR test setup
@@ -34,9 +43,12 @@ REPORT_ARG=""
 SWEEPFILE_OPT="no"
 SWEEPFILE_ARG=""
 TARGET_ARG="x86"
+TMPDIR_ARG=""
 NOCLEAN_OPT="no"
 
-OCR_MAKEFILE="Makefile"
+# Default options are for micro-benchmarks
+RUNNER_TYPE=${RUNNER_TYPE-"MicroBenchmark"}
+OCR_MAKEFILE=${OCR_MAKEFILE-"Makefile"}
 
 #
 # Option Parsing and Checking
@@ -58,6 +70,7 @@ while [[ $# -gt 0 ]]; do
         shift
         LOGDIR_OPT="yes"
         LOGDIR_ARG=("$@")
+    echo "LOGDIR_ARG=$LOGDIR_ARG"
         shift
     elif [[ "$1" = "-nbrun" && $# -ge 2 ]]; then
         shift
@@ -88,7 +101,7 @@ while [[ $# -gt 0 ]]; do
         echo "       -nbrun  integer    : Number of runs per program"
         echo "       -runlog name       : Naming for run logs"
         echo "       -report name       : Naming for run reports"
-        echo "       -target name       : Target to run on (x86|mpi)"
+        echo "       -target name       : Target to run on (x86|x86-mpi|x86-gasnet)"
         echo "       -noclean           : Do not cleanup temporary files"
         echo "Environment variables:"
         echo "       - CUSTOM_BOUNDS: defines to use when compiling the program"
@@ -108,13 +121,15 @@ if [[ -z "$PROG_ARG" ]]; then
 fi
 
 if [[ -z "$LOGDIR_ARG" ]]; then
-    LOGDIR="."
+    LOGDIR=`mktemp -d rundir.XXXXXX`
 else
     LOGDIR=${LOGDIR_ARG}
 fi
 
+echo "Results will be located under ${LOGDIR}"
+
 if [[ ! -e ${LOGDIR_ARG} ]]; then
-    echo "${SCRIPT_NAME} create log dir ${LOGDIR}"
+    echo "${SCRIPT_NAME} creating log dir ${LOGDIR_ARG}"
     mkdir -p ${LOGDIR}
 fi
 
@@ -143,6 +158,7 @@ function deleteFiles() {
 #
 function defaultConfigTarget() {
     local target=$1
+    echo "defaultConfigTarget $target"
     case "$target" in
         x86)
             export CFGARG_GUID=${CFGARG_GUID-"PTR"}
@@ -152,10 +168,18 @@ function defaultConfigTarget() {
             export CFGARG_ALLOC=${CFGARG_ALLOC-"32"}
             export CFGARG_ALLOCTYPE=${CFGARG_ALLOCTYPE-"mallocproxy"}
         ;;
-        mpi)
+        x86-mpi)
             export CFGARG_GUID=${CFGARG_GUID-"COUNTED_MAP"}
             export CFGARG_PLATFORM=${CFGARG_PLATFORM-"X86"}
             export CFGARG_TARGET=${CFGARG_TARGET-"mpi"}
+            export CFGARG_BINDING=${CFGARG_BINDING-"seq"}
+            export CFGARG_ALLOC=${CFGARG_ALLOC-"32"}
+            export CFGARG_ALLOCTYPE=${CFGARG_ALLOCTYPE-"mallocproxy"}
+        ;;
+        x86-gasnet)
+            export CFGARG_GUID=${CFGARG_GUID-"COUNTED_MAP"}
+            export CFGARG_PLATFORM=${CFGARG_PLATFORM-"X86"}
+            export CFGARG_TARGET=${CFGARG_TARGET-"gasnet"}
             export CFGARG_BINDING=${CFGARG_BINDING-"seq"}
             export CFGARG_ALLOC=${CFGARG_ALLOC-"32"}
             export CFGARG_ALLOCTYPE=${CFGARG_ALLOCTYPE-"mallocproxy"}
@@ -166,20 +190,74 @@ function defaultConfigTarget() {
     esac
 }
 
+function generateMachineFile {
+    local  __resultvar=$1
+
+    VALUE="$PWD/mf${nodes}"
+
+    if [[ ${OCRRUN_OPT_ENVKIND} == "CLE" ]]; then
+        more $PBS_NODEFILE | sort | uniq | head -n ${nodes} > ${VALUE}
+        echo "Generated node file: ${OCR_NODEFILE} for ${OCR_NUM_NODES} number of nodes"
+    elif [[ ${OCRRUN_OPT_ENVKIND} == "SLURM" ]]; then
+        #Just rely on srun to do the mapping
+        echo "No node file has been generated - Slurm's srun does the mapping"
+        VALUE=""
+    else
+        # Check if user provided a node file template
+        # It should contain at least the number of nodes requested. If there are more, the list is truncated.
+        if [[ -n "${OCRRUN_OPT_TPL_NODEFILE}" ]]; then
+            if [[ ! -f "${OCRRUN_OPT_TPL_NODEFILE}" ]]; then
+                echo "Error: USER envkind requires OCRRUN_OPT_TPL_NODEFILE does not point to a file"
+                VALUE=""
+            fi
+            head -n ${nodes} "${OCRRUN_OPT_TPL_NODEFILE}" > $VALUE
+            local nb=`more $VALUE | wc -l`;
+            if [[ "$nb" != "${nodes}" ]]; then
+                nb= `more ${OCRRUN_OPT_TPL_NODEFILE} | wc -l`;
+                echo "Error: not enough nodes (${nodes})/${nb}) declared in ${OCRRUN_OPT_TPL_NODEFILE}"
+                VALUE=""
+            else
+                echo "Generated node file: ${VALUE} for ${OCR_NUM_NODES} number of nodes from ${OCRRUN_OPT_TPL_NODEFILE}"
+            fi
+        else
+            VALUE=""
+            echo "No node file has been generated - default when OCRRUN_OPT_ENVKIND is not specified"
+        fi
+    fi
+
+    eval $__resultvar="'$VALUE'"
+}
+
+function toLower() {
+    local  input=$1
+    local  __resultvar=$2
+    BASH_VER=`echo "$BASH_VERSION" | cut -b1-1`
+    if [[ ${BASH_VER} -eq 4 ]]; then
+        input=${input,,}
+    else
+        input=`echo ${input} | tr '[:upper:]' '[:lower:]'`
+    fi
+    eval $__resultvar="'$input'"
+}
+
 # Generates an OCR configuration file
 #
 # Any CFGARG_* env variables set are transformed into program
 # arguments to the configuration generator, else the generator's
 # default values are used.
 function generateCfgFile {
-
     # Read all CFGARG_ environment variables and transform
     # them into config generator's arguments
     for cfgarg in `env | grep CFGARG_`; do
         #Extract argument name and value
         parsed=(${cfgarg//=/ })
         argNameU=${parsed[0]#CFGARG_}
-        argNameL=${argNameU,,}
+        toLower ${argNameU} argNameL
+        # if [[ ${BASH_VER} -eq 4 ]]; then
+        #     argNameL=${argNameU,,}
+        # else
+        #     argNameL=`echo ${argNameU} | tr '[:upper:]' '[:lower:]'`
+        # fi
         argValue=${parsed[1]}
         #Append to generator argument list
         arg="--${argNameL} ${argValue}"
@@ -191,53 +269,98 @@ function generateCfgFile {
     fi
 
     # Invoke the cfg file generator
-    ${SCRIPT_ROOT}/../../../scripts/Configs/config-generator.py --remove-destination ${CFG_ARGS}
+    ${OCR_INSTALL}/share/ocr/scripts/Configs/config-generator.py --remove-destination ${CFG_ARGS}
 }
 
 #
 # Compile and Run Function
 #
 
+function runMicroBenchmark {
+    local  __resultvar=$1
+
+    # Compile the program with provided defines
+    echo "Compiling for OCR ${prog} ${runInfo}"
+    echo "${progDefines} ${runInfo} make -f ${OCR_MAKEFILE} benchmark build/${prog} PROG=ocr/${prog}.c"
+    eval ${progDefines} ${runInfo} make -f ${OCR_MAKEFILE} benchmark build/${prog} PROG=ocr/${prog}.c
+
+    # Run the program with the appropriate OCR cfg file
+    if [[ -z "${RUN_HPCTOOLKIT}" ]]; then
+        echo "Run with OCR ${prog} ${runInfo}"
+        make -f ${OCR_MAKEFILE} OCR_CONFIG=${PWD}/${CFGARG_OUTPUT} run build/${prog}
+        RES=$?
+    else
+        echo "Run HPCToolkit with OCR ${prog} ${runInfo}"
+        make -f ${OCR_MAKEFILE} OCR_CONFIG=${PWD}/${CFGARG_OUTPUT} hpcrun build/${prog}
+        RES=$?
+    fi
+    eval $__resultvar="'$RES'"
+}
+
+function runApplication {
+    local  __resultvar=$1
+
+    # Compile the program with provided defines
+    echo "Compiling OCR Application ${prog} ${runInfo}"
+    echo "${progDefines} ${runInfo} make -f ${OCR_MAKEFILE}"
+    eval ${runInfo} make -f ${OCR_MAKEFILE}
+
+    # Run the program with the appropriate OCR cfg file
+    echo "Run OCR Application ${prog} ${runInfo}"
+    eval ${progDefines} make -f ${OCR_MAKEFILE} OCR_CONFIG=${PWD}/${CFGARG_OUTPUT} run
+    RES=$?
+    eval $__resultvar="'$RES'"
+}
+
+
 function scalingTest {
     prog=$1
     progDefines="$2"
-    for cores in `echo "${CORE_SCALING}"`; do
-        runInfo="NB_WORKERS=${cores} NB_NODES=${OCR_NUM_NODES}"
+    for nodes in `echo "${NODE_SCALING}"`; do
+        for cores in `echo "${CORE_SCALING}"`; do
+            runInfo="NB_WORKERS=${cores} NB_NODES=${nodes}"
 
-        # Generate the OCR CFG file
-        export CFGARG_THREADS=${cores}
-        export CFGARG_OUTPUT="${prog}-${cores}c.cfg"
-        generateCfgFile
+            if [[ -z "${OCR_NODEFILE}" ]]; then
+                export OCR_NUM_NODES=$nodes
+                export OCR_NODEFILE=
+                # Generate the machine file list, can be none
+                generateMachineFile OCR_NODEFILE
+                if [[ "${OCR_NODEFILE}" == "" ]]; then
+                    unset OCR_NODEFILE
+                fi
+            fi
 
-        if [[ ! -f ${CFGARG_OUTPUT} ]]; then
-            echo "error: ${SCRIPT_NAME} Cannot find generated OCR config file ${CFGARG_OUTPUT}"
-            exit 1
-        fi
+            # Generate the OCR CFG file
+            export CFGARG_THREADS=${cores}
+            export CFGARG_OUTPUT="${prog}-${cores}c.cfg"
+            generateCfgFile
 
-        if [[ -z "${BIN_GEN_DIR}" ]]; then
-            BIN_GEN_DIR=build
-        fi
-        if [[ ! -d ${BIN_GEN_DIR} ]]; then
-            mkdir -p ${BIN_GEN_DIR}
-        fi
+            if [[ "${RUNNER_TYPE}" == "Application" ]]; then
+                runApplication RES
+            else
+                # Default is micro-benchmark
+                runMicroBenchmark RES
+            fi
 
-        # Compile the program with provided defines
-        echo "Compiling for OCR ${prog} ${runInfo}"
-        echo "${progDefines} ${runInfo} make -f ${OCR_MAKEFILE} benchmark ${BIN_GEN_DIR}/${prog} PROG=ocr/${prog}.c"
-        eval ${progDefines} ${runInfo} BUILD_GEN_DIR=${BIN_GEN_DIR} make -f ${OCR_MAKEFILE} benchmark ${BIN_GEN_DIR}/${prog} PROG=ocr/${prog}.c
 
-        # Run the program with the appropriate OCR cfg file
-        echo "Run with OCR ${prog} ${runInfo}"
-        make -f ${OCR_MAKEFILE} OCR_CONFIG=${CFGARG_OUTPUT} run ${BIN_GEN_DIR}/${prog}
-        RES=$?
+            if [[ ! -f ${CFGARG_OUTPUT} ]]; then
+                echo "error: ${SCRIPT_NAME} Cannot find generated OCR config file ${CFGARG_OUTPUT}"
+                exit 1
+            fi
 
-        if [[ $RES -ne 0 ]]; then
-            echo "error: run failed !"
-            exit 1
-        fi
-        # Everything went fine, delete the generated cfg file
-        # unless instructed otherwise by NOCLEAN_OPT
-        deleteFiles ${CFGARG_OUTPUT}
+
+            if [[ $RES -ne 0 ]]; then
+                if [[ "${TARGET_ARG}" != "gasnet" ]]; then
+                    echo "error: run failed !"
+                else
+                    echo "Warning, gasnet returns an error"
+                fi
+                exit 1
+            fi
+            # Everything went fine, delete the generated cfg file
+            # unless instructed otherwise by NOCLEAN_OPT
+            deleteFiles ${CFGARG_OUTPUT}
+        done
     done
 }
 
@@ -248,25 +371,57 @@ function runTest() {
     local report=$4
     local defines=$5
     let i=0;
-
     #TODO if this is part of a sweep we should mangle the name
+    # A 'run' here is the full sweep across requested nodes/cores
+
+    # System information
+    env > ${LOGDIR}/info_env_all
+    lscpu > ${LOGDIR}/info_lscpu
+    w > ${LOGDIR}/info_machine_load
+
+    # OCR specific information
+    more ${LOGDIR}/info_env_all | grep -e "OCR" -e "CFGARG_" -e "SCALING" > ${LOGDIR}/info_ocr_env
+    FULLLOGDIR=$PWD/${LOGDIR}
+    cd ${OCR_INSTALL}
+    # test if we have an actual GIT repo checkout
+    git log -n 1 > /dev/null
+    RES=$?
+    if [[ $RES -eq 0 ]]; then
+        echo "### Repo HEAD ###" > ${FULLLOGDIR}/info_ocr_repo
+        git log -n 1 2>/dev/null >> ${FULLLOGDIR}/info_ocr_repo
+        echo "### Repot branch ###" >> ${FULLLOGDIR}/info_ocr_repo
+        git branch 2>/dev/null >> ${FULLLOGDIR}/info_ocr_repo
+        echo "### Repo status ###" >> ${FULLLOGDIR}/info_ocr_repo
+        git status 2>/dev/null >> ${FULLLOGDIR}/info_ocr_repo
+        git diff 2>/dev/null > ${FULLLOGDIR}/info_ocr_repo_diff
+    else
+        echo "error: OCR_INSTALL does not point to an OCR checkout from a GIT repository" > ${FULLLOGDIR}/info_ocr_repo
+        echo "error: OCR_INSTALL=${OCR_INSTALL}" >> ${FULLLOGDIR}/info_ocr_repo
+    fi
+    cd -
+    START_DATE=`date`
     while (( $i < ${nbRun} )); do
         scalingTest ${prog} "${defines}" | tee ${runlog}-$i
         let i=$i+1;
     done
-    echo "nbRun=${nbRun} OCR_NUM_NODES=${OCR_NUM_NODES}" > ${report}
+
+    # WARNING WARNING WARNING
+    # Whenever an additional porint line is added here, the post-processing
+    # scripts must be updated to correctly strip out those additional lines.
+    echo "start_date: ${START_DATE}" >> ${report}
     if [[ $defines = "" ]]; then
-        echo "defines: defaults.mk" >> ${report}
+        echo "defines_set: defaults.mk" >> ${report}
     else
         echo "defines: ${defines}" >> ${report}
     fi
-    echo "== Results ==" >> ${report}
+    echo "== Scaling Report ==" >> ${report}
 
     # Generate a report based on any filename matching ${RUNLOG_FILE}*
     reportGenOpt=""
-    if [[ "$NOCLEAN_OPT" = "no" ]]; then
+    if [[ "$NOCLEAN_OPT" = "yes" ]]; then
         reportGenOpt="-noclean"
     fi
+    echo "${SCRIPT_ROOT}/reportGenerator.sh ${reportGenOpt} ${runlog} >> ${report}"
     ${SCRIPT_ROOT}/reportGenerator.sh ${reportGenOpt} ${runlog} >> ${report}
 }
 

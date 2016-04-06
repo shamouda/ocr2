@@ -38,6 +38,7 @@ typedef struct _paramListMemPlatformFact_t {
 typedef struct _paramListMemPlatformInst_t {
     ocrParamList_t base;
     u64 size;
+    u32 numa_node;
 } paramListMemPlatformInst_t;
 
 

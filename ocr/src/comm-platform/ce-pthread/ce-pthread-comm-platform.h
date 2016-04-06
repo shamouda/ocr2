@@ -17,47 +17,29 @@
 #include "ocr-policy-domain.h"
 #include "ocr-types.h"
 #include "utils/ocr-utils.h"
-#include "utils/deque.h"
+#include "utils/comQueue.h"
 
+typedef struct {
+    ocrLocation_t neighborLocation;  /**< Location of the neigbhor */
+    comQueue_t *outQueue;            /**< Queue to send to for this neighbor */
+} neighborQueue_t;
 
 typedef struct {
     ocrCommPlatformFactory_t base;
 } ocrCommPlatformFactoryCePthread_t;
 
-/**
- * A comm-platform maintains a local index for every neighbor
- * it communicates with. This local index is embedded into the
- * policy message and is extracted by the policy message processing
- * function. The local index can either be embedded by the sender
- * or by the comm platform of the receiver is it is not set.
+/* Note that we have two incoming queues because otherwise
+ * a livelock could happen if two CEs were trying to get work from
+ * one another due to an XE asking for work. That XE request would
+ * block the inQueueXE (potentially) and a livelock would ensue
  */
-typedef struct _ocrNeighbor_t {
-    ocrLocation_t loc;  /**< Global location ID of the neighbor */
-    u64 seqId;          /**< Index of this policy domain at neighbor loc policy domain */
-} ocrNeighbor_t;
-
-typedef struct {
-    volatile ocrPolicyMsg_t * message; //typically used for 2-way messages that require response
-    ocrPolicyMsg_t messageBuffer;      //typically used for 1-way messages that do not require response
-    ocrPolicyMsg_t overwriteBuffer;    //used for overriding messages such as shutdown
-    volatile u64 remoteCounter;        //counter used by remote agent
-    volatile u64 localCounter;         //counter used by channel owner
-    ocrLocation_t remoteLocation;      //location of remote agent
-    volatile bool msgCancel;           //cancel flag
-    char padding[64];
-} ocrCommChannel_t;
-
 typedef struct {
     ocrCommPlatform_t base;
-    u32 startIdx;                         //start of next poll loop (to avoid starvation)
-    u32 numChannels;                      //number of channels owned by me
-    u32 numNeighborChannels;              //number of channels I access as a remote agent
-    ocrCommChannel_t * channels;          //array of comm channels owned by me
-    ocrCommChannel_t ** neighborChannels; //comm channels in other CEs I access as a remote agent
-    u32 channelIdx;                       //used to setup the channels
-    ocrNeighbor_t *locationTT;            //Neighbor translation table for translating global location to local index
-    u64 countTT;                          //The number entries in the translation table
-    u64 parentIdx;                        //Index in locationTT for the parent
+    comQueue_t inQueueXE;        /**< Incoming queue for XEs (the one I poll) */
+    comQueue_t inQueueCE;        /**< Incoming queue for CEs (the one I poll) */
+    u32 curPollCount;            /**< Current poll count */
+    u32 numOutQueues;            /**< Number of outgoing queues */
+    neighborQueue_t *outQueues;  /**< Outgoing queues for my location */
 } ocrCommPlatformCePthread_t;
 
 typedef struct {

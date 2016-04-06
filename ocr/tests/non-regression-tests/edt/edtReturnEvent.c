@@ -21,7 +21,7 @@ ocrGuid_t producer2(u32 paramc, u64 *paramv, u32 depc, ocrEdtDep_t *depv) {
     ocrGuid_t db_guid;
     int i, *ptr;
     ocrDbCreate(&db_guid, (void **)&ptr, sizeof(*ptr)*N,
-                /*flags=*/DB_PROP_NONE, /*location=*/NULL_GUID, NO_ALLOC);
+                /*flags=*/DB_PROP_NONE, /*location=*/NULL_HINT, NO_ALLOC);
     for(i = 0; i < N; i++) ptr[i] = N - i;
     return db_guid;
 }
@@ -34,7 +34,7 @@ ocrGuid_t producer1(u32 paramc, u64 *paramv, u32 depc, ocrEdtDep_t *depv) {
     ocrGuid_t complete_event;
     ocrEventCreate(&complete_event,OCR_EVENT_ONCE_T, EVT_PROP_NONE);
     ocrEdtCreate(&producer_edt, producer_template, 0, NULL, 1, NULL,
-                 EDT_PROP_NONE, NULL_GUID, &producer_done_event);
+                 EDT_PROP_NONE, NULL_HINT, &producer_done_event);
     ocrAddDependence(producer_done_event, complete_event, 0, DB_MODE_CONST);
     ocrAddDependence(NULL_GUID, producer_edt, 0, DB_MODE_CONST);
     return complete_event;
@@ -51,9 +51,9 @@ ocrGuid_t mainEdt(u32 paramc, u64 *paramv, u32 depc, ocrEdtDep_t *depv) {
     ocrEdtTemplateCreate(&producer_template, producer1, 0, 1);
     ocrEdtTemplateCreate(&consumer_template, consumer , 0, 1);
     ocrEdtCreate(&producer_edt, producer_template, 0, NULL, 1, &ready_event,
-                 EDT_PROP_NONE, NULL_GUID, &producer_done_event);
+                 EDT_PROP_NONE, NULL_HINT, &producer_done_event);
     ocrEdtCreate(&consumer_edt, consumer_template, 0, NULL, 1, NULL,
-                 EDT_PROP_NONE, NULL_GUID, NULL);
+                 EDT_PROP_NONE, NULL_HINT, NULL);
     // create consumer dependency on producer output
     ocrAddDependence(producer_done_event,consumer_edt,0,DB_MODE_CONST);
     ocrEventSatisfy(ready_event, NULL_GUID);

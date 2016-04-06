@@ -7,8 +7,6 @@ array contents and sizes are hardcoded, however, the code can be used as a start
 point for adding more functionality.
 
 \begin{ocrsnip}
-
-
 /* Example usage of Finish EDT in FFT.
  *
  * Implements the following dependence graph:
@@ -99,15 +97,15 @@ ocrGuid_t fftComputeEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
         ocrGuid_t edtGuid, edtGuid2, twiddleEdtGuid, finishEventGuid, finishEventGuid2;
 
         ocrEdtCreate(&edtGuid, computeGuid, EDT_PARAM_DEF, childParamv,
-                     EDT_PARAM_DEF, NULL, EDT_PROP_FINISH, NULL_GUID,
+                     EDT_PARAM_DEF, NULL, EDT_PROP_FINISH, NULL_HINT,
                      &finishEventGuid); (@ \label{line:HW_FinishEdt1} @)
         ocrEdtCreate(&edtGuid2, computeGuid, EDT_PARAM_DEF, childParamv2,
-                     EDT_PARAM_DEF, NULL, EDT_PROP_FINISH, NULL_GUID,
+                     EDT_PARAM_DEF, NULL, EDT_PROP_FINISH, NULL_HINT,
                      &finishEventGuid2); (@ \label{line:HW_FinishEdt2} @)
 
         ocrGuid_t twiddleDependencies[3] = { dataGuid, finishEventGuid, finishEventGuid2 };
         ocrEdtCreate(&twiddleEdtGuid, twiddleGuid, EDT_PARAM_DEF, paramv, 3,
-                     twiddleDependencies, EDT_PROP_FINISH, NULL_GUID, NULL); (@ \label{line:HW_FinishEdt3} @)
+                     twiddleDependencies, EDT_PROP_FINISH, NULL_HINT, NULL); (@ \label{line:HW_FinishEdt3} @)
 
         ocrAddDependence(dataGuid, edtGuid, 0, DB_MODE_RW);
         ocrAddDependence(dataGuid, edtGuid2, 0, DB_MODE_RW);
@@ -149,7 +147,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     double *x;
 
     ocrGuid_t dataGuid;
-    ocrDbCreate(&dataGuid, (void **) &x, sizeof(double) * N * 3, DB_PROP_NONE, NULL_GUID, NO_ALLOC); (@ \label{line:HW_DBCreate} @)
+    ocrDbCreate(&dataGuid, (void **) &x, sizeof(double) * N * 3, DB_PROP_NONE, NULL_HINT, NO_ALLOC); (@ \label{line:HW_DBCreate} @)
 
     // Cook up some arbitrary data
     for(i=0;i<N;i++) {
@@ -162,12 +160,12 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
 
     // Launch compute EDT
     ocrEdtCreate(&edtGuid, computeTempGuid, EDT_PARAM_DEF, edtParamv,
-                 EDT_PARAM_DEF, NULL, EDT_PROP_FINISH, NULL_GUID,
+                 EDT_PARAM_DEF, NULL, EDT_PROP_FINISH, NULL_HINT,
                  &eventGuid); (@ \label{line:HW_FinishEdt4} @)
 
     // Launch finish EDT
     ocrEdtCreate(&endGuid, endTempGuid, EDT_PARAM_DEF, &dataGuid,
-                 EDT_PARAM_DEF, NULL, EDT_PROP_FINISH, NULL_GUID,
+                 EDT_PARAM_DEF, NULL, EDT_PROP_FINISH, NULL_HINT,
                  NULL); (@ \label{line:HW_FinishEdt5} @)
 
     ocrAddDependence(dataGuid, edtGuid, 0, DB_MODE_RW); (@ \label{line:HW_DBDep} @)
@@ -197,10 +195,10 @@ data sizes till the entire array has undergone the operation. When this is avail
 a final EDT termed \texttt{endEdt()} in Line~\ref{line:HW_EndEdt} is called to
 optionally output the value of the
 computed FFT, and terminate the program by calling \texttt{ocrShutdown()}. All the
-FFT operations are performed on a single datablock created in Line~\ref{line:HW_DBCreate}.
+FFT operations are performed on a single data block created in Line~\ref{line:HW_DBCreate}.
 This shortcut is taken for the sake of didactic simplicity. While this is
 programmatically correct, a user who desires reducing contention on the single array
-may want to break down the datablock into smaller units for each of the EDTs to operate
+may want to break down the data block into smaller units for each of the EDTs to operate
 upon.
 
 For this program to execute correctly, it is apparent that each of the

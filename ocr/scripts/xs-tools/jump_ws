@@ -1,0 +1,31 @@
+#!/bin/bash
+
+REPO=$1
+CMD=$2
+
+if [[ $# -lt 1 ]]; then
+   echo "jump_ws: usage is ${SCRIPT_NAME} ocrRepoPath [command]"
+fi
+
+if [[ -z ${XST_ROOT} ]]; then
+   export XST_ROOT=${HOME}/xs-tools
+fi
+
+# Source default environment
+. ${XST_ROOT}/env.sh
+
+unset OCR_TYPE
+export OCR_TYPE=x86
+
+BUILD_DIR=$REPO/ocr/ocr/build/${OCR_TYPE}
+
+cd ${BUILD_DIR}
+
+MAKE_THREADS=${MAKE_THREADS-1}
+
+if [ -n "$CMD" -a "${CMD}" = "build" ]; then
+   make -j${MAKE_THREADS} clean && make -j${MAKE_THREADS} && make -j${MAKE_THREADS} install
+fi
+
+# Drops in OCR's test folder by default
+cd ../../tests

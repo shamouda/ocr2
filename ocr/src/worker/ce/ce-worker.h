@@ -28,11 +28,6 @@ typedef struct {
     // The CE implementation relies on integer ids to
     // map workers, schedulers and workpiles together
     u64 id;
-    // Flag the worker checksto now if he's running
-    bool running;
-    // Master workers need to be started twice (once by the PD and once
-    // when they actually start running. This helps keep track of this
-    bool secondStart;
 } ocrWorkerCe_t;
 
 ocrWorkerFactory_t* newOcrWorkerFactoryCe(ocrParamList_t *perType);

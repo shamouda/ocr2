@@ -24,6 +24,11 @@ typedef struct {
     deque_t * deque;
 } ocrWorkpileHc_t;
 
+typedef struct _paramListWorkpileHcInst_t {
+    paramListSchedulerInst_t base;
+    ocrDequeType_t dequeType;
+} paramListWorkpileHcInst_t;
+
 ocrWorkpileFactory_t* newOcrWorkpileFactoryHc(ocrParamList_t *perType);
 
 

@@ -18,7 +18,7 @@
 
 ocrGuid_t checkerEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrGuid_t dbGuid = (ocrGuid_t) depv[0].guid;
-    PRINTF("[remote] checkerEdt: executing, depends on remote DB guid 0x%lx \n", dbGuid);
+    PRINTF("[remote] checkerEdt: executing, depends on remote DB guid "GUIDF" \n", GUIDA(dbGuid));
     TYPE_ELEM_DB v = 1;
     int i = 0;
     TYPE_ELEM_DB * data = (TYPE_ELEM_DB *) depv[0].ptr;
@@ -33,7 +33,7 @@ ocrGuid_t checkerEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
 
 ocrGuid_t saViolationEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrGuid_t dbGuid = (ocrGuid_t) depv[0].guid;
-    PRINTF("[remote] saViolationEdt: executing, depends on remote DB guid 0x%lx \n", dbGuid);
+    PRINTF("[remote] saViolationEdt: executing, depends on remote DB guid "GUIDF" \n", GUIDA(dbGuid));
     TYPE_ELEM_DB v = 1;
     int i = 0;
     TYPE_ELEM_DB * data = (TYPE_ELEM_DB *) depv[0].ptr;
@@ -63,11 +63,14 @@ ocrGuid_t saViolationEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) 
 
     ocrGuid_t checkerTemplateGuid;
     ocrEdtTemplateCreate(&checkerTemplateGuid, checkerEdt, 0, 1);
+    ocrHint_t edtHint;
+    ocrHintInit( &edtHint, OCR_HINT_EDT_T );
+    ocrSetHintValue( & edtHint, OCR_HINT_EDT_AFFINITY, ocrAffinityToHintValue( edtAffinity) );
 
     PRINTF("[remote] saViolationEdt: create checker EDT at DB/SA home node\n");
     ocrGuid_t checkerEdtGuid;
     ocrEdtCreate(&checkerEdtGuid, checkerTemplateGuid, 0, NULL, 1, &dbGuid,
-                 EDT_PROP_NONE, edtAffinity, NULL);
+                 EDT_PROP_NONE, &edtHint, NULL);
     return NULL_GUID;
 }
 
@@ -83,7 +86,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     void * dbPtr;
     ocrGuid_t dbGuid;
     u64 nbElem = NB_ELEM_DB;
-    ocrDbCreate(&dbGuid, &dbPtr, sizeof(TYPE_ELEM_DB) * NB_ELEM_DB, 0, NULL_GUID, NO_ALLOC);
+    ocrDbCreate(&dbGuid, &dbPtr, sizeof(TYPE_ELEM_DB) * NB_ELEM_DB, 0, NULL_HINT, NO_ALLOC);
     int v = 1;
     int i = 0;
     int * data = (int *) dbPtr;
@@ -92,15 +95,18 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
         i++;
     }
     ocrDbRelease(dbGuid);
-    PRINTF("[local] mainEdt: local DB guid is 0x%lx, dbPtr=%p\n",dbGuid, dbPtr);
+    PRINTF("[local] mainEdt: local DB guid is "GUIDF", dbPtr=%p\n",GUIDA(dbGuid), dbPtr);
 
     // create local edt that depends on the remote edt, the db is automatically cloned
     ocrGuid_t saViolationTemplateGuid;
     ocrEdtTemplateCreate(&saViolationTemplateGuid, saViolationEdt, 0, 1);
+    ocrHint_t edtHint;
+    ocrHintInit( &edtHint, OCR_HINT_EDT_T );
+    ocrSetHintValue( & edtHint, OCR_HINT_EDT_AFFINITY, ocrAffinityToHintValue( edtAffinity) );
 
     ocrGuid_t saViolationEdtGuid;
     ocrEdtCreate(&saViolationEdtGuid, saViolationTemplateGuid, 0, NULL, 1, &dbGuid,
-                 EDT_PROP_NONE, edtAffinity, NULL);
+                 EDT_PROP_NONE, &edtHint, NULL);
 
 
     return NULL_GUID;

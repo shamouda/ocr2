@@ -30,15 +30,24 @@ typedef struct _paramListSchedulerObjectMap_t {
     u32 nbBuckets;
 } paramListSchedulerObjectMap_t;
 
+typedef struct _ocrSchedulerObjectMapFcts_t {
+    void* (*get)(hashtable_t * hashtable, void * key);
+    bool  (*put)(hashtable_t * hashtable, void * key, void * value);
+    void* (*tryPut)(hashtable_t * hashtable, void * key, void * value);
+    bool  (*remove)(hashtable_t * hashtable, void * key, void ** value);
+} ocrSchedulerObjectMapFcts_t;
+
 typedef struct _ocrSchedulerObjectMap_t {
     ocrSchedulerObject_t base;
     ocrMapType type;
     hashtable_t *map;
+    ocrSchedulerObjectMapFcts_t mapFcts;
 } ocrSchedulerObjectMap_t;
 
 typedef struct _ocrSchedulerObjectMapIterator_t {
     ocrSchedulerObjectIterator_t base;
-    hashtable_t *map;
+    ocrSchedulerObject_t *internal;                 /* Internal scheduler object for sanity checking */
+    void *key;
 } ocrSchedulerObjectMapIterator_t;
 
 /****************************************************/

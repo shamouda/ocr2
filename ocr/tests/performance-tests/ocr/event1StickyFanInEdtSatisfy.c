@@ -2,7 +2,7 @@
 #include "ocr.h"
 
 // DESC: Create FAN_OUT producer STICKY events and one consumer EDT depending on all of them
-// TIME: Satisfy the producer event
+// TIME: Satisfy all producer events
 // FREQ: Done 'NB_ITERS' times
 // NOTE: The driver EDT is a finish EDT to collect created EDTs
 

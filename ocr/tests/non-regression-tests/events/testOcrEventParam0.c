@@ -11,7 +11,7 @@
 
 
 ocrGuid_t taskForEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
-    PRINTF("In the taskForEdt with value %d\n", (int) paramv[0]);
+    PRINTF("In the taskForEdt with value %"PRId32"\n", (int) paramv[0]);
     ASSERT(paramc == 1);
     ASSERT(paramv[0] == 32);
     ASSERT(*((u64*)depv[0].ptr) == 42);
@@ -33,7 +33,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrGuid_t taskForEdtTemplateGuid;
     ocrEdtTemplateCreate(&taskForEdtTemplateGuid, taskForEdt, nparamc, 1 /*depc*/);
     ocrEdtCreate(&edtGuid, taskForEdtTemplateGuid, EDT_PARAM_DEF, &nparamv, EDT_PARAM_DEF, /*depv=*/NULL,
-                 /*properties=*/0, NULL_GUID, /*outEvent=*/NULL);
+                 /*properties=*/0, NULL_HINT, /*outEvent=*/NULL);
 
     // Register a dependence between an event and an edt
     ocrAddDependence(eventGuid, edtGuid, 0, DB_MODE_CONST);
@@ -42,7 +42,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrGuid_t dbGuid;
     ocrDbCreate(&dbGuid,(void **) &k,
                 sizeof(u64), /*flags=*/DB_PROP_NONE,
-                /*location=*/NULL_GUID,
+                /*location=*/NULL_HINT,
                 NO_ALLOC);
     *k = 42;
 

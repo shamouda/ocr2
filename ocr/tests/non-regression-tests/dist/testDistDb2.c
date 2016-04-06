@@ -16,7 +16,7 @@
 
 ocrGuid_t addEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrGuid_t dbCloneGuid = (ocrGuid_t) depv[0].guid;
-    PRINTF("[remote] addEdt: executing, depends on remote DB guid 0x%lx \n", dbCloneGuid);
+    PRINTF("[remote] addEdt: executing, depends on remote DB guid "GUIDF" \n", GUIDA(dbCloneGuid));
     TYPE_ELEM_DB v = 1;
     int i = 0;
     TYPE_ELEM_DB * data = (TYPE_ELEM_DB *) depv[0].ptr;
@@ -28,15 +28,15 @@ ocrGuid_t addEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     PRINTF("[remote] addEdt: DB written to, releasing...\n");
     ocrDbRelease(dbCloneGuid); // Forces writeback
     ASSERT(paramc == 1);
-    ocrGuid_t eventGuid = (ocrGuid_t) paramv[0];
-    PRINTF("[remote] addEdt: Satisfy checkerEdt's event guid 0x%lx\n", eventGuid);
+    ocrGuid_t eventGuid = {.guid=paramv[0]};
+    PRINTF("[remote] addEdt: Satisfy checkerEdt's event guid "GUIDF"\n", GUIDA(eventGuid));
     ocrEventSatisfy(eventGuid, dbCloneGuid);
     return NULL_GUID;
 }
 
 ocrGuid_t checkerEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrGuid_t dbCloneGuid = (ocrGuid_t) depv[0].guid;
-    PRINTF("[local] CheckerEdt: executing, depends on remote DB guid 0x%lx \n", dbCloneGuid);
+    PRINTF("[local] CheckerEdt: executing, depends on remote DB guid "GUIDF" \n", GUIDA(dbCloneGuid));
     TYPE_ELEM_DB v = 101;
     int i = 0;
     TYPE_ELEM_DB * data = (TYPE_ELEM_DB *) depv[0].ptr;
@@ -64,7 +64,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     void * dbPtr;
     ocrGuid_t dbGuid;
     u64 nbElem = NB_ELEM_DB;
-    ocrDbCreate(&dbGuid, &dbPtr, sizeof(TYPE_ELEM_DB) * NB_ELEM_DB, 0, NULL_GUID, NO_ALLOC);
+    ocrDbCreate(&dbGuid, &dbPtr, sizeof(TYPE_ELEM_DB) * NB_ELEM_DB, 0, NULL_HINT, NO_ALLOC);
     int v = 1;
     int i = 0;
     int * data = (int *) dbPtr;
@@ -73,7 +73,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
         i++;
     }
     ocrDbRelease(dbGuid);
-    PRINTF("[local] mainEdt: DB guid is 0x%lx, dbPtr=%p\n",dbGuid, dbPtr);
+    PRINTF("[local] mainEdt: DB guid is "GUIDF", dbPtr=%p\n",GUIDA(dbGuid), dbPtr);
 
     ocrGuid_t addEdtTemplateGuid;
     ocrEdtTemplateCreate(&addEdtTemplateGuid, addEdt, 1, 1);
@@ -83,17 +83,20 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     // Create local event
     ocrGuid_t eventGuid;
     ocrEventCreate(&eventGuid, OCR_EVENT_STICKY_T, true);
-    PRINTF("[local] mainEdt: Creating event with guid 0x%lx\n", eventGuid);
+    PRINTF("[local] mainEdt: Creating event with guid "GUIDF"\n", GUIDA(eventGuid));
     // Create local EDT depending on event being satisfied
     ocrGuid_t checkerEdtGuid;
     ocrEdtCreate(&checkerEdtGuid, checkerEdtTemplateGuid, 0, NULL, 1, &eventGuid,
-                 EDT_PROP_NONE, NULL_GUID, NULL);
+                 EDT_PROP_NONE, NULL_HINT, NULL);
 
     // create remote edt that depends the db which is automatically cloned
-    u64 rparamv = (u64) eventGuid; // NASTY cast: the event to satisfy later on
+    u64 rparamv = (u64) eventGuid.guid; // NASTY cast: the event to satisfy later on
     ocrGuid_t addEdtGuid;
+    ocrHint_t edtHint;
+    ocrHintInit( &edtHint, OCR_HINT_EDT_T );
+    ocrSetHintValue( & edtHint, OCR_HINT_EDT_AFFINITY, ocrAffinityToHintValue( edtAffinity) );
     ocrEdtCreate(&addEdtGuid, addEdtTemplateGuid, 1, &rparamv, 1, &dbGuid,
-                 EDT_PROP_NONE, edtAffinity, NULL);
+                 EDT_PROP_NONE, &edtHint, NULL);
 
     return NULL_GUID;
 }

@@ -16,6 +16,11 @@
 #define TPL_DRIVER_DEPV 1
 #define TPL_DRIVER_PROP EDT_PROP_FINISH
 
+#ifndef ENABLE_EXTENSION_COUNTED_EVT
+#define PRODUCER_EVENT_TYPE OCR_EVENT_STICKY_T
+#warning ENABLE_EXTENSION_COUNTED_EVT is not enabled, defaulting to OCR_EVENT_STICKY_T
+#endif
+
 ocrGuid_t cleanupEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrGuid_t * consGuids = (ocrGuid_t *) paramv;
     u32 i = 0;
@@ -61,9 +66,15 @@ ocrGuid_t driverEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
         // Setting up producer
         //
 
+#if PRODUCER_EVENT_TYPE == OCR_EVENT_COUNTED_T
+        ocrEventParams_t params;
+        params.EVENT_COUNTED.nbDeps = FAN_OUT;
+        ocrGuid_t prodGuid;
+        ocrEventCreateParams(&prodGuid, PRODUCER_EVENT_TYPE, false, &params);
+#else
         ocrGuid_t prodGuid;
         ocrEventCreate(&prodGuid, PRODUCER_EVENT_TYPE, false);
-
+#endif
         //
         // Setting up consumers
         //
@@ -79,14 +90,21 @@ ocrGuid_t driverEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
 #endif
         int i = 0;
         while (i < FAN_OUT) {
+#if PRODUCER_EVENT_TYPE == OCR_EVENT_COUNTED_T
+            ocrEventParams_t params;
+            params.EVENT_COUNTED.nbDeps = 1;
+            ocrGuid_t prodGuid;
+            ocrEventCreateParams(&consGuids[i], PRODUCER_EVENT_TYPE, false, &params);
+#else
             ocrEventCreate(&consGuids[i], PRODUCER_EVENT_TYPE, false);
+#endif
             i++;
         }
 
         // Create the consumer edt
         ocrGuid_t doneOnceConsEdtGuid;
         ocrEdtCreate(&consEdtGuid, consEdtTemplateGuid,
-                     0, NULL, FAN_OUT, NULL, EDT_PROP_NONE, NULL_GUID, &doneOnceConsEdtGuid);
+                     0, NULL, FAN_OUT, NULL, EDT_PROP_NONE, NULL_HINT, &doneOnceConsEdtGuid);
 
         // Setup EDT cleanup completion to be ran after consumer EDT
         ocrGuid_t cleanupDone;
@@ -94,7 +112,7 @@ ocrGuid_t driverEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
         ocrGuid_t cleanUpEdtTemplateGuid;
         ocrEdtTemplateCreate(&cleanUpEdtTemplateGuid, cleanupEdt, FAN_OUT, 1);
         ocrEdtCreate(&cleanUpEdtGuid, cleanUpEdtTemplateGuid,
-                     FAN_OUT, (u64*) consGuids, 1, &doneOnceConsEdtGuid, EDT_PROP_NONE, NULL_GUID, &cleanupDone);
+                     FAN_OUT, (u64*) consGuids, 1, &doneOnceConsEdtGuid, EDT_PROP_NONE, NULL_HINT, &cleanupDone);
         ocrEdtTemplateDestroy(cleanUpEdtTemplateGuid);
 
         // Because we're going to satisfy the consumer event before spawning the next iteration
@@ -124,15 +142,22 @@ ocrGuid_t driverEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
         ocrGuid_t consEdtGuid;
         ocrGuid_t doneOnceConsEdtGuid;
         ocrEdtCreate(&consEdtGuid, consEdtTemplateGuid,
-                     0, NULL, FAN_OUT, NULL, EDT_PROP_NONE, NULL_GUID, &doneOnceConsEdtGuid);
+                     0, NULL, FAN_OUT, NULL, EDT_PROP_NONE, NULL_HINT, &doneOnceConsEdtGuid);
         ocrAddDependence(doneOnceConsEdtGuid, nextIterEvt, 0, DB_MODE_CONST);
         int i = 0;
         while (i < FAN_OUT) {
 #if TIME_CONSUMER_CREATE
             get_time(&start);
 #endif
+#if PRODUCER_EVENT_TYPE == OCR_EVENT_COUNTED_T
+            ocrEventParams_t params;
+            params.EVENT_COUNTED.nbDeps = 1;
+            ocrGuid_t consGuid;
+            ocrEventCreateParams(&consGuid, PRODUCER_EVENT_TYPE, false, &params);
+#else
             ocrGuid_t consGuid;
             ocrEventCreate(&consGuid, PRODUCER_EVENT_TYPE, false);
+#endif
 #if TIME_CONSUMER_CREATE
             get_time(&stop);
             accTimerConsCreate += elapsed_usec(&start, &stop);
@@ -184,7 +209,7 @@ ocrGuid_t driverEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
 #endif
         ocrGuid_t driverEdtGuid;
         ocrEdtCreate(&driverEdtGuid, driverEdtTemplateGuid,
-                     TPL_DRIVER_PARAMC, driverParamv, TPL_DRIVER_DEPV, &nextIterEvt, EDT_PROP_NONE, NULL_GUID, NULL);
+                     TPL_DRIVER_PARAMC, driverParamv, TPL_DRIVER_DEPV, &nextIterEvt, EDT_PROP_NONE, NULL_HINT, NULL);
         ocrEdtTemplateDestroy(driverEdtTemplateGuid);
     }
 }
@@ -202,7 +227,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrGuid_t ndepv[1];
     ndepv[0] = NULL_GUID;
     ocrEdtCreate(&driverEdtGuid, driverEdtTemplateGuid,
-                 TPL_DRIVER_PARAMC, driverParamv, TPL_DRIVER_DEPV, ndepv, TPL_DRIVER_PROP, NULL_GUID, NULL);
+                 TPL_DRIVER_PARAMC, driverParamv, TPL_DRIVER_DEPV, ndepv, TPL_DRIVER_PROP, NULL_HINT, NULL);
     ocrEdtTemplateDestroy(driverEdtTemplateGuid);
     return NULL_GUID;
 }

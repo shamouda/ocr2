@@ -22,7 +22,7 @@
 ocrGuid_t keyEdt ( u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     u64 * array;
     ocrGuid_t dbGuid;
-    ocrDbCreate(&dbGuid,(void **) &array, sizeof(u64), 0, NULL_GUID, NO_ALLOC);
+    ocrDbCreate(&dbGuid,(void **) &array, sizeof(u64), 0, NULL_HINT, NO_ALLOC);
     array[0] = MARK;
     ocrDbRelease(dbGuid);
     return dbGuid;
@@ -44,7 +44,7 @@ void ocrBlock(ocrConfig_t cfg) {
     ocrLegacySpawnOCR(&handle, template, 0, NULL, 1, &ctrlDep, legacyCtx);
 
     ocrLegacyBlockProgress(handle, &outputGuid, &result, &size, LEGACY_PROP_NONE);
-    ASSERT(outputGuid != NULL_GUID);
+    ASSERT(!(ocrGuidIsNull(outputGuid)));
     ASSERT(result != NULL);
     ASSERT(((u64 *) result)[0] == MARK);
     ASSERT(size == sizeof(u64));

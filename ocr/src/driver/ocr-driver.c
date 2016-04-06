@@ -16,6 +16,7 @@
 #include "ocr-runtime.h"
 #include "ocr-types.h"
 #include "ocr-sysboot.h"
+#include "ocr-version.h"
 #include "extensions/ocr-legacy.h"
 #include "machine-description/ocr-machine.h"
 #include "utils/ocr-utils.h"
@@ -28,6 +29,12 @@
 // For platform-specific finalizer
 #ifdef ENABLE_COMM_PLATFORM_GASNET
 #include <gasnet.h>
+#endif
+
+// For TG specific location functions
+#ifdef TG_X86_TARGET
+#include "xstg-map.h"
+#include "tg-bin-files.h"
 #endif
 
 #define DEBUG_TYPE INIPARSING
@@ -268,7 +275,7 @@ static dep_t typeDeps[] = {
 };
 
 extern char* populate_type(ocrParamList_t **type_param, type_enum index, dictionary *dict, char *secname);
-int populate_inst(ocrParamList_t **inst_param, void **instance, int *type_counts, char ***factory_names, void ***all_factories, void ***all_instances, type_enum index, dictionary *dict, char *secname);
+int populate_inst(ocrParamList_t **inst_param, int inst_param_size, void **instance, int *type_counts, char ***factory_names, void ***all_factories, void ***all_instances, type_enum index, dictionary *dict, char *secname);
 extern int build_deps (dictionary *dict, int A, int B, char *refstr, void ***all_instances, ocrParamList_t ***inst_params);
 extern int build_deps_types (int A, int B, char *refstr, void **pdinst, int pdcount, int type_counts, void ***all_factories, ocrParamList_t ***type_params);
 extern void *create_factory (type_enum index, char *factory_name, ocrParamList_t *paramlist);
@@ -305,7 +312,8 @@ char *args_binary;
 
 extern int extract_functions(const char *);
 extern void free_functions(void);
-extern char *persistent_chunk;
+extern void *getAddress(const char *fname);
+extern char persistent_chunk[];
 extern u64 persistent_pointer;
 extern u64 args_pointer;
 extern u64 dram_offset;
@@ -313,11 +321,13 @@ extern u64 dram_offset;
 /* Format of this file:
  *
  * +--------------------------+
- * | header size (incl) (u64) | = (5)*sizeof(u64)
+ * | header size (incl) (u64) | = (6)*sizeof(u64)
  * +--------------------------+
- * |  abs. location  (u64)    | = CeMemSize - 4K
+ * |  abs. location  (u64)    | = CeMemSize - 5K
  * +--------------------------+
  * |  abs.address of PD (u64) | = abs.location + PD offset
+ * +--------------------------+
+ * |ptr to salPdDriver() (u64)| = pointer to salPdDriver
  * +--------------------------+
  * |  size (of structs) (u64) | = persistent_pointer
  * +--------------------------+
@@ -340,31 +350,36 @@ void dumpStructs(void *pd, const char* output_binary, u64 start_address) {
 
         // Write the header
         // Header size
-        value = 5*sizeof(u64);
+        value = 6*sizeof(u64);
         fwrite(&value, sizeof(u64), 1, fp);
-        DPRINTF(DEBUG_LVL_VERB, "Wrote header size: 0x%llx\n", value);
+        DPRINTF(DEBUG_LVL_VERB, "Wrote header size: 0x%"PRIx64"\n", value);
         totu64++;
 
         // Absolute location - currently read from config file
         fwrite(&start_address, sizeof(u64), 1, fp);
-        DPRINTF(DEBUG_LVL_VERB, "Wrote abs location: 0x%llx\n", start_address);
+        DPRINTF(DEBUG_LVL_VERB, "Wrote abs location: 0x%"PRIx64"\n", start_address);
         totu64++;
 
         // PD address
         offset = (u64)pd - (u64)&persistent_chunk + (u64)start_address;
         fwrite(&offset, sizeof(u64), 1, fp);
-        DPRINTF(DEBUG_LVL_VERB, "Wrote PD address: 0x%llx\n", offset);
+        DPRINTF(DEBUG_LVL_VERB, "Wrote PD address: 0x%"PRIx64"\n", offset);
+        totu64++;
+
+        value = (u64)getAddress("salPdDriver");
+        fwrite(&value, sizeof(u64), 1, fp);
+        DPRINTF(DEBUG_LVL_VERB, "Wrote salPdDriver address: 0x%"PRIx64"\n", value);
         totu64++;
 
         // Size of all structs
         fwrite(&persistent_pointer, sizeof(u64), 1, fp);
-        DPRINTF(DEBUG_LVL_VERB, "Wrote size of all structs: 0x%llx\n", persistent_pointer);
+        DPRINTF(DEBUG_LVL_VERB, "Wrote size of all structs: 0x%"PRIx64"\n", persistent_pointer);
         totu64++;
 
         // myLocation
         offset = (u64)(&((ocrPolicyDomain_t *)pd)->myLocation) - (u64)&persistent_chunk + (u64)start_address;
         fwrite(&offset, sizeof(u64), 1, fp);
-        DPRINTF(DEBUG_LVL_VERB, "Wrote my location: 0x%llx\n", offset);
+        DPRINTF(DEBUG_LVL_VERB, "Wrote my location: 0x%"PRIx64"\n", offset);
         totu64++;
 
         // Fix up all the pointers
@@ -374,10 +389,10 @@ void dumpStructs(void *pd, const char* output_binary, u64 start_address) {
                 ptrs[i] -= (u64)ptrs;
                 ptrs[i] += start_address;
             }
-            DPRINTF(DEBUG_LVL_VVERB, "ptrs[%d]: 0x%llx\n", i, ptrs[i]);
+            DPRINTF(DEBUG_LVL_VVERB, "ptrs[%"PRId64"]: 0x%"PRIx64"\n", i, ptrs[i]);
         }
         fwrite(&persistent_chunk, sizeof(char), persistent_pointer, fp);
-        DPRINTF(DEBUG_LVL_INFO, "Wrote %ld bytes to %s\n", persistent_pointer+totu64*8, output_binary);
+        DPRINTF(DEBUG_LVL_INFO, "Wrote %"PRId64" bytes to %s\n", persistent_pointer+totu64*8, output_binary);
     }
     fclose(fp);
 }
@@ -389,7 +404,7 @@ void dumpArgs(const char* args_binary) {
     if(fp == NULL) printf("Unable to open file %s for writing\n", args_binary);
     else {
         fwrite(userArgs, sizeof(u8), args_pointer, fp);
-        DPRINTF(DEBUG_LVL_INFO, "Wrote %ld bytes to %s\n", args_pointer, args_binary);
+        DPRINTF(DEBUG_LVL_INFO, "Wrote %"PRId64" bytes to %s\n", args_pointer, args_binary);
     }
     fclose(fp);
 }
@@ -500,10 +515,14 @@ void bringUpRuntime(ocrConfig_t *ocrConfig) {
                     } else {
                         all_factories[j] = (void **)runtimeChunkAlloc(type_counts[j] * sizeof(void *), PERSISTENT_CHUNK);
                     }
-                    count = 0;
                 }
+
+                // Find next empty spot
+                for(count = 0; count < type_counts[j]; count++) if(all_factories[j][count] == NULL) break;
+                // And fill it
                 factory_names[j][count] = populate_type(&type_params[j][count], j, dict, secname);
                 all_factories[j][count] = create_factory(j, factory_names[j][count], type_params[j][count]);
+
                 if (all_factories[j][count] == NULL) {
                     runtimeChunkFree((u64)factory_names[j][count], NONPERSISTENT_CHUNK);
                     factory_names[j][count] = NULL;
@@ -532,12 +551,13 @@ void bringUpRuntime(ocrConfig_t *ocrConfig) {
         for (j = total_types-1; j >= 0; j--) {
             if (strncasecmp(inst_str[j], secname, strlen(inst_str[j]))==0) {
                 if(inst_counts[j] && inst_params[j] == NULL) {
-                    DPRINTF(DEBUG_LVL_INFO, "Create %d instances of %s\n", inst_counts[j], inst_str[j]);
+                    DPRINTF(DEBUG_LVL_INFO, "Create %"PRId32" instances of %s\n", inst_counts[j], inst_str[j]);
                     inst_params[j] = (ocrParamList_t **)runtimeChunkAlloc(inst_counts[j] * sizeof(ocrParamList_t *), NONPERSISTENT_CHUNK);
-                    all_instances[j] = (void **)runtimeChunkAlloc(inst_counts[j] * sizeof(void *), NONPERSISTENT_CHUNK);
+                    all_instances[j] = (void **)runtimeChunkAlloc((inst_counts[j]+1) * sizeof(void *), NONPERSISTENT_CHUNK); // We create an "end of instances" marker
+                    all_instances[j][inst_counts[j]] = NULL;
                     count = 0;
                 }
-                populate_inst(inst_params[j], all_instances[j], type_counts, factory_names, all_factories, all_instances, j, dict, secname);
+                populate_inst(inst_params[j], inst_counts[j], all_instances[j], type_counts, factory_names, all_factories, all_instances, j, dict, secname);
             }
         }
     }
@@ -557,38 +577,106 @@ void bringUpRuntime(ocrConfig_t *ocrConfig) {
                          type_counts[typeDeps[i].to], all_factories, type_params);
     }
 
-    // SETUP NEIGHBORS
-    for (i = 0; i < nsec; i++) {
-        char *secname = iniparser_getsecname(dict, i);
-        if (strncasecmp("PolicyDomainInst", secname, strlen("PolicyDomainInst"))==0) {
-          if (key_exists(dict, secname, "neighbors")) {
-            int neighbors_low, neighbors_high, neighbors_count;
-            neighbors_count = read_range(dict, secname, "neighbors", &neighbors_low, &neighbors_high);
-            if (neighbors_count > 0) {
-                int low, high, count;
-                count = read_range(dict, secname, "id", &low, &high);
-                ASSERT(count == 1 && low == high);
-                ocrPolicyDomain_t *pd = (ocrPolicyDomain_t*)all_instances[policydomain_type][low];
-                ASSERT(neighbors_count == pd->neighborCount);
-                pd->neighbors = (ocrLocation_t*)runtimeChunkAlloc(sizeof(ocrLocation_t) * neighbors_count, PERSISTENT_CHUNK);
-#ifndef ENABLE_BUILDER_ONLY
-                pd->neighborPDs = (ocrPolicyDomain_t**)runtimeChunkAlloc(sizeof(ocrPolicyDomain_t*) * neighbors_count, NONPERSISTENT_CHUNK);
-                int idx = 0;
-                DPRINTF(DEBUG_LVL_VERB, "PD%lu neighbors (%d): ", (u64)pd->myLocation, neighbors_count);
-                for (j = neighbors_low; j <= neighbors_high; j++) {
-                    if (j != low) {
-                        ocrPolicyDomain_t *neighborPd = (ocrPolicyDomain_t*)all_instances[policydomain_type][j];
-                        pd->neighborPDs[idx] = neighborPd;
-                        pd->neighbors[idx++] = neighborPd->myLocation;
-                        DPRINTF(DEBUG_LVL_VERB, "%lu ", (u64)neighborPd->myLocation);
-                    }
-                }
-                DPRINTF(DEBUG_LVL_VERB, "\n");
+#ifdef ENABLE_BUILDER_ONLY
+    // If we are doing the builder, we set this up here because we can't do runtimeChunkAlloc in ce-policy.c like
+    // we do for everything but TG
+    for(i=0; i < inst_counts[policydomain_type]; ++i) {
+        ocrPolicyDomain_t *policy = (ocrPolicyDomain_t*)all_instances[policydomain_type][i];
+        policy->neighbors = (ocrLocation_t*)runtimeChunkAlloc(policy->neighborCount*sizeof(ocrLocation_t), PERSISTENT_CHUNK);
+    }
+#else
+    // We point each PD to all other PDs if needed for neighbor discovery.
+    // Note that at this point neighborsPDs points to *everyone*. If needed, when the
+    // PD starts, it will update its copy of neighborsPDs to match exactly what it needs
+    for(i=0; i < inst_counts[policydomain_type]; ++i) {
+        ((ocrPolicyDomain_t*)all_instances[policydomain_type][i])->neighborPDs = (ocrPolicyDomain_t**)all_instances[policydomain_type];
+    }
 #endif
-            }
-          }
+#ifdef TG_X86_TARGET
+    // Bug #694 Really fugly!!
+    // In TG-x86, we are going to create an array to contain all the policy domains so that we
+    // can deguidify things that are "owned" by other PDs.
+    // WARNING: This code assumes that if you have more than 1 block, you have MAX_NUM_XE and MAX_NUM_CE
+    // and that if you have more than one cluster, each cluster has MAX_NUM_BLOCK. This is similar to the restriction
+    // made by the neighbor discovery but adds the restriction on the number of XE/CE
+
+    // Since we already have all_instances, we can just reuse that but we will re-order things
+    // so that it is indiceable using cluster*MAX_NUM_BLOCK + block*(MAX_NUM_XE+MAX_NUM_CE) + agent
+    for(i=0; i < inst_counts[policydomain_type]; ++i) {
+        // We figure out myLocation based on its current value which is just an index (based on xeCount = 8)
+        // Assumptions:
+        //    - same number of XEs per block
+        //    - if multiple units, all have MAX_NUM_BLOCK blocks in them
+        // 0: CE of block 0
+        // 1-8: XEs of block 0
+        // 9: CE of block 1
+        // 10-17: XEs of block 1
+        // 18: CE of block 2
+        // 19-26: XEs of block 2
+        // ...
+        // This scheme assumes that ID_AGENT_CE is 0 and that the XEs follow
+        COMPILE_ASSERT(0 == ID_AGENT_CE);
+        COMPILE_ASSERT(MAX_NUM_CE == ID_AGENT_XE0);
+        ocrPolicyDomain_t *policy = (ocrPolicyDomain_t*)(all_instances[policydomain_type][i]);
+        u32 myCluster = (policy->myLocation) / ((MAX_NUM_XE + MAX_NUM_CE)*MAX_NUM_BLOCK);
+        u32 myBlock = (policy->myLocation - myCluster*((MAX_NUM_XE + MAX_NUM_CE)*MAX_NUM_BLOCK)) / (MAX_NUM_XE + MAX_NUM_CE);
+        policy->myLocation = MAKE_CORE_ID(0, 0, 0, myCluster, myBlock, (policy->myLocation - myCluster*MAX_NUM_BLOCK - myBlock*(MAX_NUM_XE+MAX_NUM_CE)));
+    }
+
+    ocrPolicyDomain_t* tpd = (ocrPolicyDomain_t*)(all_instances[policydomain_type][0]);
+    ASSERT(inst_counts[policydomain_type] > 0);
+    i = 0;
+    while(true) {
+        u32 tpdIdx = CLUSTER_FROM_ID(tpd->myLocation)*MAX_NUM_BLOCK +
+            BLOCK_FROM_ID(tpd->myLocation)*(MAX_NUM_XE+MAX_NUM_CE) +
+            AGENT_FROM_ID(tpd->myLocation);
+        if(tpdIdx != i) {
+            // We move this one to the proper location and continue to
+            // do so until we have the proper domain at i
+            ocrPolicyDomain_t *tt = (ocrPolicyDomain_t*)(all_instances[policydomain_type][tpdIdx]);
+            all_instances[policydomain_type][tpdIdx] = (void*)tpd;
+            tpd = tt;
+        } else {
+            all_instances[policydomain_type][i] = (void*)tpd;
+            if(++i < inst_counts[policydomain_type])
+                tpd = (ocrPolicyDomain_t*)(all_instances[policydomain_type][i]);
+            else
+                break;
         }
     }
+#endif
+
+ //     for (i = 0; i < nsec; i++) {
+ //         char *secname = iniparser_getsecname(dict, i);
+ //         if (strncasecmp("PolicyDomainInst", secname, strlen("PolicyDomainInst"))==0) {
+ //           if (key_exists(dict, secname, "neighbors")) {
+ //             int neighbors_low, neighbors_high, neighbors_count;
+ //             neighbors_count = read_range(dict, secname, "neighbors", &neighbors_low, &neighbors_high);
+ //             if (neighbors_count > 0) {
+ //                 int low, high, count;
+ //                 count = read_range(dict, secname, "id", &low, &high);
+ //                 ASSERT(count == 1 && low == high);
+ //                 ocrPolicyDomain_t *pd = (ocrPolicyDomain_t*)all_instances[policydomain_type][low];
+ //                 ASSERT(neighbors_count == pd->neighborCount);
+ //                 pd->neighbors = (ocrLocation_t*)runtimeChunkAlloc(sizeof(ocrLocation_t) * neighbors_count, PERSISTENT_CHUNK);
+ // #ifndef ENABLE_BUILDER_ONLY
+ //                 pd->neighborPDs = (ocrPolicyDomain_t**)runtimeChunkAlloc(sizeof(ocrPolicyDomain_t*) * neighbors_count, NONPERSISTENT_CHUNK);
+ //                 int idx = 0;
+ //                 DPRINTF(DEBUG_LVL_VERB, "PD%"PRIu64" neighbors (%"PRId32"): ", (u64)pd->myLocation, neighbors_count);
+ //                 for (j = neighbors_low; j <= neighbors_high; j++) {
+ //                     if (j != low) {
+ //                         ocrPolicyDomain_t *neighborPd = (ocrPolicyDomain_t*)all_instances[policydomain_type][j];
+ //                         pd->neighborPDs[idx] = neighborPd;
+ //                         pd->neighbors[idx++] = neighborPd->myLocation;
+ //                         DPRINTF(DEBUG_LVL_VERB, "%"PRIu64" ", (u64)neighborPd->myLocation);
+ //                     }
+ //                 }
+ //                 DPRINTF(DEBUG_LVL_VERB, "\n");
+ // #endif
+ //             }
+ //           }
+ //         }
+ //     }
 
     // START EXECUTION
     DPRINTF(DEBUG_LVL_INFO, "========= Start execution ==========\n");
@@ -603,16 +691,22 @@ void bringUpRuntime(ocrConfig_t *ocrConfig) {
     }
 #else
     ocrPolicyDomain_t *rootPolicy;
-    rootPolicy = (ocrPolicyDomain_t *) all_instances[policydomain_type][0];
+    u32 rootPolicyID = 0;
+#ifdef TG_X86_TARGET
+    rootPolicyID = ID_AGENT_CE;
+#endif
+    rootPolicy = (ocrPolicyDomain_t *)all_instances[policydomain_type][rootPolicyID]; // This is Unit 0, Block 0 CE
     ocrPolicyDomain_t *otherPolicyDomains = NULL;
     // Runlevel switch. Everything is initialized at this point and so we switch
     // to the first runlevel (CONFIG_PARSE). This will, in particular, enable all
     // modules within a PD to become aware of each other's runaction requirements
     // Transition all PDs to CONFIG_PARSE
-    for(i = 1; i < inst_counts[policydomain_type]; ++i) {
+
+    for(i = 0; i < inst_counts[policydomain_type]; ++i) {
+        if(i == rootPolicyID) continue;
         otherPolicyDomains = (ocrPolicyDomain_t*)all_instances[policydomain_type][i];
         RESULT_ASSERT(otherPolicyDomains->fcts.switchRunlevel(otherPolicyDomains, RL_CONFIG_PARSE,
-                                                              RL_REQUEST | RL_ASYNC | RL_BRING_UP),
+                                                              RL_REQUEST | RL_ASYNC | RL_BRING_UP | RL_PD_MASTER),
                       ==, 0);
     }
     RESULT_ASSERT(rootPolicy->fcts.switchRunlevel(rootPolicy, RL_CONFIG_PARSE, RL_REQUEST |
@@ -628,10 +722,11 @@ void bringUpRuntime(ocrConfig_t *ocrConfig) {
 
     // Transition all PDs to NETWORK_OK
     // At this stage, everything is inert so all operations are synchronous
-    for(i = 1; i < inst_counts[policydomain_type]; ++i) {
+    for(i = 0; i < inst_counts[policydomain_type]; ++i) {
+        if(i == rootPolicyID) continue;
         otherPolicyDomains = (ocrPolicyDomain_t*)all_instances[policydomain_type][i];
         RESULT_ASSERT(otherPolicyDomains->fcts.switchRunlevel(otherPolicyDomains, RL_NETWORK_OK,
-                                                              RL_REQUEST | RL_ASYNC | RL_BRING_UP),
+                                                              RL_REQUEST | RL_ASYNC | RL_BRING_UP | RL_PD_MASTER),
                       ==, 0);
     }
     RESULT_ASSERT(rootPolicy->fcts.switchRunlevel(rootPolicy, RL_NETWORK_OK,
@@ -642,10 +737,11 @@ void bringUpRuntime(ocrConfig_t *ocrConfig) {
     // This creates a capable module for each PD. The worker/thread executing
     // this code is the capable thread in the rootPolicy. We then continue executing
     // with just rootPolicy
-    for(i = 1; i < inst_counts[policydomain_type]; ++i) {
+    for(i = 0; i < inst_counts[policydomain_type]; ++i) {
+        if(i == rootPolicyID) continue;
         otherPolicyDomains = (ocrPolicyDomain_t*)all_instances[policydomain_type][i];
         RESULT_ASSERT(otherPolicyDomains->fcts.switchRunlevel(otherPolicyDomains, RL_PD_OK,
-                                                              RL_REQUEST | RL_ASYNC | RL_BRING_UP),
+                                                              RL_REQUEST | RL_ASYNC | RL_BRING_UP | RL_PD_MASTER),
                       ==, 0);
     }
     RESULT_ASSERT(rootPolicy->fcts.switchRunlevel(rootPolicy, RL_PD_OK,
@@ -675,11 +771,15 @@ void bringUpRuntime(ocrConfig_t *ocrConfig) {
 #endif
 }
 
-void freeUpRuntime (bool doTeardown) {
+void freeUpRuntime (bool doTeardown, u8 *returnCode) {
     u32 i, j;
     ocrPolicyDomain_t *pd = NULL;
     getCurrentEnv(&pd, NULL, NULL, NULL);
     ocrPolicyDomain_t *otherPolicyDomains = NULL;
+    u32 rootPolicyID = 0;
+#ifdef TG_X86_TARGET
+    rootPolicyID = ID_AGENT_CE;
+#endif
     if(doTeardown) {
         // When we need to do the tear-down, we need to continue from RL_GUID_OK all the way down to CONFIG_PARSE
         // Bug #597 Need to ensure that only NODE_MASTER comes out of here. Other PD_MASTER need to stay in their PDs
@@ -691,25 +791,32 @@ void freeUpRuntime (bool doTeardown) {
         // Bug #597 The switch of other PD's runlevels needs to happen with ocrPdMessages_t
         RESULT_ASSERT(pd->fcts.switchRunlevel(pd, RL_PD_OK, RL_REQUEST | RL_ASYNC | RL_TEAR_DOWN | RL_NODE_MASTER),
                       ==, 0);
+
         // Here everyone is down except NODE_MASTER
-        for(i = 1; i < inst_counts[policydomain_type]; ++i) {
+        for(i = 0; i < inst_counts[policydomain_type]; ++i) {
+            if(i == rootPolicyID) continue;
             otherPolicyDomains = (ocrPolicyDomain_t*)all_instances[policydomain_type][i];
             RESULT_ASSERT(otherPolicyDomains->fcts.switchRunlevel(otherPolicyDomains, RL_NETWORK_OK,
-                                                                  RL_REQUEST | RL_ASYNC | RL_TEAR_DOWN), ==, 0);
+                                                                  RL_REQUEST | RL_ASYNC | RL_TEAR_DOWN | RL_PD_MASTER), ==, 0);
         }
         RESULT_ASSERT(pd->fcts.switchRunlevel(pd, RL_NETWORK_OK, RL_REQUEST | RL_ASYNC | RL_TEAR_DOWN | RL_NODE_MASTER),
                       ==, 0);
 
-        for(i = 1; i < inst_counts[policydomain_type]; ++i) {
+        for(i = 0; i < inst_counts[policydomain_type]; ++i) {
+            if(i == rootPolicyID) continue;
             otherPolicyDomains = (ocrPolicyDomain_t*)all_instances[policydomain_type][i];
             RESULT_ASSERT(otherPolicyDomains->fcts.switchRunlevel(otherPolicyDomains, RL_CONFIG_PARSE,
-                                                                  RL_REQUEST | RL_ASYNC | RL_TEAR_DOWN), ==, 0);
+                                                                  RL_REQUEST | RL_ASYNC | RL_TEAR_DOWN | RL_PD_MASTER), ==, 0);
         }
         RESULT_ASSERT(pd->fcts.switchRunlevel(pd, RL_CONFIG_PARSE, RL_REQUEST | RL_ASYNC | RL_TEAR_DOWN | RL_NODE_MASTER),
                       ==, 0);
     }
 
-    for(i = 1; i < inst_counts[policydomain_type]; ++i) {
+    // Read the return code
+    *returnCode = pd->shutdownCode;
+
+    for(i = 0; i < inst_counts[policydomain_type]; ++i) {
+        if(i == rootPolicyID) continue;
         otherPolicyDomains = (ocrPolicyDomain_t*)all_instances[policydomain_type][i];
         otherPolicyDomains->fcts.destruct(otherPolicyDomains);
     }
@@ -852,14 +959,14 @@ int __attribute__ ((weak)) main(int argc, const char* argv[]) {
         pd->fcts.switchRunlevel(pd, RL_USER_OK, RL_REQUEST | RL_ASYNC | RL_BRING_UP | RL_NODE_MASTER),
         ==, 0);
 
-    u8 returnCode = pd->shutdownCode;
+    u8 returnCode = 0;
 
-    freeUpRuntime(true);
+    freeUpRuntime(true, &returnCode);
 
     // Warning: Finalizer specific to platforms may call exit
     platformSpecificFinalizer(returnCode);
 
-    return returnCode;
+    return (int)returnCode;
 }
 
 #endif

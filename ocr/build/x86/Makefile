@@ -7,11 +7,11 @@
 #
 
 ifndef OCR_TYPE
-OCR_TYPE=x86
+  OCR_TYPE=x86
 else
-ifneq (${OCR_TYPE}, x86)
-$(error OCR_TYPE is set to ${OCR_TYPE} but expected x86)
-endif
+  ifneq (${OCR_TYPE}, x86)
+    $(error OCR_TYPE is set to ${OCR_TYPE} but expected x86)
+  endif
 endif
 
 DEFAULT_CONFIG=jenkins-common-8w-lockableDB.cfg
@@ -20,8 +20,20 @@ DEFAULT_CONFIG=jenkins-common-8w-lockableDB.cfg
 # Tool-chain to be used for the build
 #
 
-CC      := gcc
-CFLAGS  :=
+# Careful with variables that are implicitely defined by make
+# They may have a default value (CC, AR, ARFLAGS, RM).
+# See make doc "Variables Used by Implicit Rules"
+
+FORCE_CC ?= no
+ifeq ($(FORCE_CC), no)
+  ifeq ($(CC), cc)
+    CC = gcc
+  endif
+endif # End of ifeq force_cc
+
+# Conserve CFLAGS and LDFLAGS defined in environment
+CFLAGS  := ${CFLAGS}
+LDFLAGS := ${LDFLAGS}
 
 RM      := rm
 RMFLAGS := -rf
@@ -31,15 +43,24 @@ MKDIR   := mkdir
 LN      := ln
 
 # Shared libraries specific builds
-LDFLAGS := -shared -fpic -lpthread -lrt
+LDFLAGS += -shared -fpic -lpthread
 
-# CFLAGS_SHARED will be concatenated with any
-# common CFLAGS options
-CFLAGS_SHARED := -fpic
+# -lrt needed only for < glibc-2.17 in Linux systems (not needed for OS X)
+UNAME := $(shell uname -s)
+ifeq ($(UNAME),Linux)
+  ret := $(shell echo "`ldd --version | awk '/ldd/{print $$NF}' | cut -d'.' -f1-2` < 2.17" | bc)
+  ifeq ($(ret), 1)
+    LDFLAGS += -lrt
+  endif
+endif
+
+# CFLAGS_SHARED will be concatenated with any common CFLAGS options
+CFLAGS_SHARED := ${CFLAGS_SHARED} -fpic
 
 # Static libraries specific builds
 # Same as for CFLAGS_SHARED
-CFLAGS_STATIC :=
+CFLAGS_STATIC := ${CFLAGS_STATIC}
+
 AR := ar
 ARFLAGS := cru
 
@@ -48,7 +69,7 @@ RANLIB := ranlib
 # Library supported
 SUPPORTS_SHARED=yes
 SUPPORTS_STATIC=yes
-OCRRUNNER=ocrrun
+OCRRUNNER=ocrrun_$(OCR_TYPE)
 
 # Valgrind compatibility for internal allocators
 # x86 only
@@ -59,7 +80,7 @@ OCRRUNNER=ocrrun
 # x86 only
 #
 # Enable profiler
-# CFLAGS += -DOCR_RUNTIME_PROFILER -DPROFILE_KHZ=3400000
+# CFLAGS += -DOCR_RUNTIME_PROFILER -DPROFILER_KHZ=3400000
 #
 # (optional) Maximum number of scope
 # nesting for runtime profiler

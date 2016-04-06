@@ -11,7 +11,7 @@
 
 ocrGuid_t taskForEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     int* res = (int*)depv[0].ptr;
-    PRINTF("In the taskForEdt with value %d\n", (*res));
+    PRINTF("In the taskForEdt with value %"PRId32"\n", (*res));
     ASSERT(*res == 42);
     // This is the last EDT to execute, terminate
     ocrShutdown();
@@ -24,7 +24,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrGuid_t dbGuid;
     ocrDbCreate(&dbGuid,(void **) &k,
                 sizeof(int), /*flags=*/0,
-                /*location=*/NULL_GUID,
+                /*location=*/NULL_HINT,
                 NO_ALLOC);
     *k = 42;
 
@@ -35,7 +35,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrEdtCreate(&edtGuid, taskForEdtTemplateGuid,
                  EDT_PARAM_DEF, /*paramv=*/NULL,
                  EDT_PARAM_DEF, /*depv=*/&dbGuid,
-                 /*properties=*/0, NULL_GUID, /*outEvent=*/NULL);
+                 /*properties=*/0, NULL_HINT, /*outEvent=*/NULL);
 
     return NULL_GUID;
 }

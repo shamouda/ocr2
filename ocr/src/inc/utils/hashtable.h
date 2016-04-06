@@ -27,7 +27,7 @@ typedef u32 (*hashFct)(void * key, u32 nbBuckets);
  * @param key       the key of the entry to destroy
  * @param value     the value of the entry to destroy
  */
-typedef void (*deallocFct)(void * key, void * value);
+typedef void (*deallocFct)(void * key, void * value, void * deallocParam);
 
 typedef struct _hashtable {
     ocrPolicyDomain_t * pd;
@@ -54,10 +54,10 @@ void * hashtableConcBucketLockedTryPut(hashtable_t * hashtable, void * key, void
 bool hashtableConcBucketLockedRemove(hashtable_t * hashtable, void * key, void ** value);
 
 hashtable_t * newHashtable(ocrPolicyDomain_t * pd, u32 nbBuckets, hashFct hashing);
-void destructHashtable(hashtable_t * hashtable, deallocFct entryDeallocator);
+void destructHashtable(hashtable_t * hashtable, deallocFct entryDeallocator, void * deallocatorParam);
 
 hashtable_t * newHashtableBucketLocked(ocrPolicyDomain_t * pd, u32 nbBuckets, hashFct hashing);
-void destructHashtableBucketLocked(hashtable_t * hashtable, deallocFct entryDeallocator);
+void destructHashtableBucketLocked(hashtable_t * hashtable, deallocFct entryDeallocator, void * deallocatorParam);
 
 
 //

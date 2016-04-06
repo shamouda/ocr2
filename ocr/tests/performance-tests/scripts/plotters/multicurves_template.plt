@@ -21,7 +21,7 @@ set output 'OUTPUT_NAME_VAR'
 
 set title 'TITLE_VAR'
 set ylabel 'YLABEL_VAR'
-set xtics (XTICKS_VAR)
+#set xtics (XTICKS_VAR)
 set xlabel 'XLABEL_VAR'
 # set size 1, 0.75
 # set lmargin at screen 0.5

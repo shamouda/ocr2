@@ -149,7 +149,7 @@ u8 mallocChunkAndTag(ocrMemPlatform_t *self, u64 *startAddr, u64 size,
                                   &endRange, &iterate);
         if(result == 0 && endRange - startRange >= size) {
             *startAddr = startRange;
-//            printf("ChunkAndTag returning (existing) start of 0x%llx for size %lld (0x%llx) Tag %d\n",
+//            printf("ChunkAndTag returning (existing) start of 0x%"PRIx64" for size %"PRId64" (0x%"PRIx64") Tag %"PRId32"\n",
 //                    *startAddr, size, size, newTag);
             // exit.
             UNLOCK(&(rself->pRangeTracker->lockChunkAndTag));
@@ -167,14 +167,14 @@ u8 mallocChunkAndTag(ocrMemPlatform_t *self, u64 *startAddr, u64 size,
         if(result == 0 && endRange - startRange >= size) {
             // This is a fit, we do not look for "best" fit for now
             *startAddr = startRange;
-//            printf("ChunkAndTag returning start of 0x%llx for size %lld (0x%llx) and newTag %d\n",
+//            printf("ChunkAndTag returning start of 0x%"PRIx64" for size %"PRId64" (0x%"PRIx64") and newTag %"PRId32"\n",
 //                    *startAddr, size, size, newTag);
             RESULT_ASSERT(splitRange(rself->pRangeTracker,
                                      startRange, size, newTag, 0), ==, 0);
             break;
         } else {
             if(result == 0) {
-//                printf("ChunkAndTag, found [0x%llx; 0x%llx[ but too small for size %lld (0xllx)\n",
+//                printf("ChunkAndTag, found [0x%"PRIx64"; 0x%"PRIx64"[ but too small for size %"PRId64" (0xllx)\n",
 //                        startRange, endRange, size, size);
             }
         }

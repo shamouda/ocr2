@@ -14,7 +14,13 @@
 #include "ocr-types.h"
 #include "utils/profiler/profiler.h"
 
-#define INVALID_LOCATION (u64)(-1)
+#define INVALID_LOCATION ((u64)(-1))
+
+/* Summary of property flags visible to the user */
+#define EDT_PROP_ALL  ((u16) 0x3)
+#define EVT_PROP_ALL  ((u16) 0x1)
+#define DB_PROP_ALL   ((u16) 0x70)
+#define GUID_PROP_ALL ((u16) 0x700)
 
 /* Run-level support */
 typedef enum _ocrRunlevels_t {
@@ -220,7 +226,10 @@ typedef enum {
     ALLSAT_EDTSTATE     = 0x4, /**< EDT has all dependences satisfied */
     ALLACQ_EDTSTATE     = 0x5, /**< EDT has DB dependences acquired */
     RUNNING_EDTSTATE    = 0x6, /**< EDT is executing */
-    REAPING_EDTSTATE    = 0x7  /**< EDT finished executing and is cleaning up */
+#ifdef ENABLE_EXTENSION_BLOCKING_SUPPORT
+    RESCHED_EDTSTATE    = 0x7, /**< EDT needs to be rescheduled */
+#endif
+    REAPING_EDTSTATE    = 0x8  /**< EDT finished executing and is cleaning up */
 } ocrEdtState_t;
 
 
@@ -248,8 +257,9 @@ typedef enum {
  * @see ocrWorkPopType_t
  */
 typedef enum {
-    PUSH_WORKPUSHTYPE   = 0x1,
-    MAX_WORKPUSHTYPE    = 0x2
+    PUSH_WORKPUSHTYPE       = 0x1,
+    PUSH_WORKPUSHBACKTYPE   = 0x2,
+    MAX_WORKPUSHTYPE        = 0x3
 } ocrWorkPushType_t;
 
 /**
@@ -349,6 +359,7 @@ typedef u64 ocrLocation_t;
         u8 __result = (expression);                     \
         if(__result) RETURN_PROFILE(returnValue);       \
     } while(0);
+
 
 /**
  * @brief Static assertion check macro

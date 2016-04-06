@@ -1,0 +1,12 @@
+The following utils are available at this location:
+- traceDecode: convert binary trace format to a human readable text format.
+    Usage:
+        -make:       Builds decoder executable with default guids
+
+        -make 128:   Builds decoder executable with 128-bit guids defined.
+                     Use if and only if your application was compiled/ran with
+                     The ENABLE_128_BIT_GUID option enabled.
+
+        -make clean: Remove executable
+
+    To run: ./traceDecode <path_to_trace_binary>

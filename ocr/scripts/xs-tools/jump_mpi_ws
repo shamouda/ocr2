@@ -1,0 +1,42 @@
+#!/bin/bash
+
+REPO=$1
+CMD=$2
+
+if [[ $# -lt 1 ]]; then
+   echo "jump_mpi_ws: usage is ${SCRIPT_NAME} ocrRepoPath [command]"
+fi
+
+if [[ -z ${XST_ROOT} ]]; then
+   export XST_ROOT=${HOME}/xs-tools
+fi
+
+# Source default environment
+. ${XST_ROOT}/env.sh
+
+unset OCR_TYPE
+export OCR_TYPE=x86-mpi
+
+BUILD_DIR=$REPO/ocr/ocr/build/${OCR_TYPE}
+
+cd ${BUILD_DIR}
+
+# Use environment info to select mpi implementation
+MPI_ENV_FILE="${XST_ROOT}/${XST_SYS}/mpi_${XST_MPI}_env"
+
+if [[ ! -e ${MPI_ENV_FILE} ]]; then
+    echo "error: Cannot file an environment file ${XST_MPI} MPI for system ${XST_SYS}"
+    exit 1
+fi
+
+# Load mpi environment
+. ${MPI_ENV_FILE}
+
+MAKE_THREADS=${MAKE_THREADS-1}
+
+if [ -n "$CMD" -a "${CMD}" = "build" ]; then
+   make -j${MAKE_THREADS} clean && make -j${MAKE_THREADS} && make -j${MAKE_THREADS} install
+fi
+
+# Drops in OCR's test folder by default
+cd ../../tests

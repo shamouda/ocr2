@@ -30,7 +30,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "profiler.h"
+#include "profiler-internal.h"
 #include "debug.h"
 
 #ifdef OCR_RUNTIME_PROFILER
@@ -43,7 +43,7 @@
 extern pthread_key_t _profilerThreadData;
 
 /* _profiler functions */
-void _profilerInit(_profiler *self, profilerEvent_t event, u64 prevTicks) {
+void _profilerInit(_profiler *self, u32 event, u64 prevTicks) {
     self->accumulatorTicks = self->accumulatedChildrenTicks = self->startTicks = self->endTicks =
         self->recurseAccumulate = self->currentRecurseAccumulate = 0UL;
     self->countResume = 0;
@@ -54,6 +54,62 @@ void _profilerInit(_profiler *self, profilerEvent_t event, u64 prevTicks) {
 
     self->myData = (_profilerData*)pthread_getspecific(_profilerThreadData);
     if(self->myData) {
+#ifdef PROFILER_FOCUS
+
+        if(self->myData->level > 0) {
+#ifdef PROFILER_COUNT_OTHER
+            if(self->myData->stack[self->myData->level-1]->myEvent == EVENT_OTHER) {
+                if(event != PROFILER_FOCUS) {
+                    // We don't track under the "other" bucket except if it is what we are supposed to focus on
+                    return;
+                } else {
+                    self->flags.hasAddLevel = true;
+                }
+            }
+#endif
+
+#ifdef PROFILER_FOCUS_DEPTH
+            // We are already tracking so we just check to make sure we still
+            // should be tracking
+            // +1 because focus function is 0 and we want to track up to FOCUS_DEPTH
+            // included
+            if(self->myData->level == (PROFILER_FOCUS_DEPTH + 1 + self.flags.hasAddLevel)) {
+                // We don't track
+                // active flag is already false, just return
+                return;
+            }
+#endif /* PROFILER_FOCUS_DEPTH */
+
+#ifdef PROFILER_IGNORE_RT
+            if(event != PROFILER_FOCUS && self->myData->stack[self->myData->level-1]->myEvent != PROFILER_FOCUS &&
+               self->myData->stack[self->myData->level-1]->myEvent <
+#ifdef PROFILER_W_APPS
+               MAX_EVENTS_RT
+#else
+               MAX_EVENTS
+#endif
+               ) {
+                // We already saw a call to the runtime, we return
+                // Make sure we skip the FOCUS function though (which could
+                // be 'userCode' which is < MAX_EVENTS_RT)
+                return;
+            }
+#endif /* PROFILER_IGNORE_RT */
+
+        } else if ((u32)event != (u32)PROFILER_FOCUS) {
+#ifdef PROFILER_COUNT_OTHER
+            // We will bucket everything else under another event
+            // and count it all in one lump
+            event = EVENT_OTHER;
+            self->myEvent = event;
+#else
+            // Not the right event, we return
+            return;
+#endif
+        }
+#endif /* PROFILER_FOCUS */
+
+        // If we are here, we need to track this
         self->flags.active = true;
         if(self->myData->level >= 1) {
             ASSERT(prevTicks != 0);
@@ -131,8 +187,8 @@ _profiler* _profilerDestroy(_profiler *self, u64 end) {
         self->accumulatorTicks -= (1+self->countResume)*self->myData->overheadTimer;
     }
 
-    u64 accumulatorMs = self->accumulatorTicks/PROFILE_KHZ;
-    u32 accumulatorNs = (u32)(1000000.0*((double)self->accumulatorTicks/PROFILE_KHZ - (double)accumulatorMs));
+    u64 accumulatorMs = self->accumulatorTicks/PROFILER_KHZ;
+    u32 accumulatorNs = (u32)(1000000.0*((double)self->accumulatorTicks/PROFILER_KHZ - (double)accumulatorMs));
 
     if(removedFromStack) {
         // First the self counter
@@ -142,10 +198,10 @@ _profiler* _profilerDestroy(_profiler *self, u64 end) {
             // type and once inside the execution time of the parent).
             ASSERT(self->accumulatorTicks > self->recurseAccumulate);
             u64 t = self->accumulatorTicks - self->recurseAccumulate;
-            u64 tt = t/PROFILE_KHZ;
+            u64 tt = t/PROFILER_KHZ;
 
             _profilerSelfEntryAddTime(&(self->myData->selfEvents[self->myEvent]), tt,
-                                      (u32)(1000000.0*((double)t/PROFILE_KHZ - tt)));
+                                      (u32)(1000000.0*((double)t/PROFILER_KHZ - tt)));
         } else {
             _profilerSelfEntryAddTime(&(self->myData->selfEvents[self->myEvent]), accumulatorMs, accumulatorNs);
         }
@@ -162,10 +218,10 @@ _profiler* _profilerDestroy(_profiler *self, u64 end) {
 
             if(parentEventPtr->currentRecurseAccumulate != 0.0) {
                 u64 t = parentEventPtr->currentRecurseAccumulate;
-                u64 tt = t/PROFILE_KHZ;
+                u64 tt = t/PROFILER_KHZ;
                 _profilerChildEntryAddRecurseTime(
                     &(self->myData->childrenEvents[parentEvent][self->myEvent<parentEvent?self->myEvent:(self->myEvent-1)]),
-                    tt, (u32)(1000000.0*((double)t/PROFILE_KHZ - tt)));
+                    tt, (u32)(1000000.0*((double)t/PROFILER_KHZ - tt)));
                 _profilerSwapRecurse(parentEventPtr);
             }
 
@@ -210,6 +266,26 @@ _profiler* _profilerDestroy(_profiler *self, u64 end) {
     return NULL;
 }
 
+void _profilerResumeInternal(_profiler *self) {
+    self->myData->stack[self->myData->level] = self; // Put ourself back on the stack
+    self->previousLastLevel = self->myData->stackPosition[self->myEvent];
+    self->flags.isRecurse = (self->previousLastLevel &&
+                             self->myData->stack[self->previousLastLevel-1]->flags.active);
+    ++(self->myData->level);
+    self->myData->stackPosition[self->myEvent] = self->myData->level; // +1 taken care of above
+}
+
+void _profilerPauseInternal(_profiler *self) {
+    // Remove ourself from the stack
+    --(self->myData->level);
+    self->myData->stack[self->myData->level] = NULL;
+    self->myData->stackPosition[self->myEvent] = self->previousLastLevel;
+
+    // Here: self->endTicks > self->startTicks
+    self->accumulatorTicks += self->endTicks - self->startTicks;
+    self->flags.isPaused = 1;
+}
+
 // This returns ns for 1000 tries!!
 #define DO_OVERHEAD_DIFF(start, end, res) \
     if(end.tv_nsec < start.tv_nsec) { \
@@ -227,7 +303,7 @@ void _profilerDataInit(_profilerData *self) {
     _gettime(start);
     u32 i;
     for(i=0; i<999; ++i) {
-        asm volatile (
+        __asm__ __volatile__ (
             "rdtscp"
             : "=a" (temp1), "=d" (temp2)
             :
@@ -237,8 +313,10 @@ void _profilerDataInit(_profilerData *self) {
     _gettime(end);
     ASSERT(end > start);
     self->overheadTimer = (end - start)/1000;
-    //fprintf(stderr, "Got RDTSCP overhead of %lu ticks\n", self->overheadTimer);
+    //fprintf(stderr, "Got RDTSCP overhead of %"PRIu64" ticks\n", self->overheadTimer);
 
+    memset(&(self->selfEvents[0]), 0, sizeof(_profilerSelfEntry)*MAX_EVENTS);
+    memset(&(self->childrenEvents[0][0]), 0, sizeof(_profilerChildEntry)*(MAX_EVENTS)*(MAX_EVENTS-1));
     memset(&(self->stackPosition[0]), 0, sizeof(u32)*MAX_EVENTS);
 }
 
@@ -249,7 +327,7 @@ void _profilerDataDestroy(void* _self) {
     // when the thread is exiting (and the TLS is destroyed)
     u32 i;
     for(i=0; i<(u32)MAX_EVENTS; ++i) {
-        fprintf(self->output, "DEF %s %u\n", _profilerEventNames[i], i);
+        fprintf(self->output, "DEF %s %"PRIu32"\n", _profilerEventNames[i], i);
     }
 
     // Print out the entries
@@ -259,14 +337,14 @@ void _profilerDataDestroy(void* _self) {
             if(j == i) {
                 _profilerSelfEntry *entry = &(self->selfEvents[i]);
                 if(entry->count == 0) continue; // Skip entries with no content
-                fprintf(self->output, "ENTRY %u:%u = count(%lu), sum(%lu.%06u), sumSq(%lu.%012lu)\n",
+                fprintf(self->output, "ENTRY %"PRIu32":%"PRIu32" = count(%"PRIu64"), sum(%"PRIu64".%06"PRIu32"), sumSq(%"PRIu64".%012"PRIu64")\n",
                         i, j, entry->count, entry->sumMs, entry->sumNs, entry->sumSqMs, entry->sumSqNs);
             } else {
                 // Child entry
                 _profilerChildEntry *entry = &(self->childrenEvents[i][j<i?j:(j-1)]);
                 if(entry->count == 0) continue;
                 fprintf(self->output,
-                        "ENTRY %u:%u = count(%lu), sum(%lu.%06u), sumSq(%lu.%012lu), sumChild(%lu.%06u), sumSqChild(%lu.%012lu), sumRecurse(%lu.%06u), sumSqRecurse(%lu.%012lu)\n",
+                        "ENTRY %"PRIu32":%"PRIu32" = count(%"PRIu64"), sum(%"PRIu64".%06"PRIu32"), sumSq(%"PRIu64".%012"PRIu64"), sumChild(%"PRIu64".%06"PRIu32"), sumSqChild(%"PRIu64".%012"PRIu64"), sumRecurse(%"PRIu64".%06"PRIu32"), sumSqRecurse(%"PRIu64".%012"PRIu64")\n",
                         i, j, entry->count, entry->sumMs, entry->sumNs, entry->sumSqMs,
                         entry->sumSqNs, entry->sumInChildrenMs, entry->sumInChildrenNs,
                         entry->sumSqInChildrenMs, entry->sumSqInChildrenNs,

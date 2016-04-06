@@ -32,8 +32,8 @@ typedef struct _ocrSchedulerObjectList_t {
 
 typedef struct _ocrSchedulerObjectListIterator_t {
     ocrSchedulerObjectIterator_t base;
-    arrayList_t *list;                  /* List used by the iterator */
-    slistNode_t *current;				/* List node currently pointed to by the iterator */
+    ocrSchedulerObject_t *internal;     /* Internal scheduler object for sanity checking. BUG #190 OCR_ASSERT ? */
+    slistNode_t *current;               /* List node currently pointed to by the iterator */
 } ocrSchedulerObjectListIterator_t;
 
 /****************************************************/
@@ -49,6 +49,14 @@ typedef struct _paramListSchedulerObjectFactList_t {
 } paramListSchedulerObjectFactList_t;
 
 ocrSchedulerObjectFactory_t * newOcrSchedulerObjectFactoryList(ocrParamList_t *perType, u32 factoryId);
+
+/****************************************************/
+/* OCR LIST SCHEDULER_OBJECT UTILS                  */
+/****************************************************/
+
+void* ocrSchedulerObjectListHead(ocrSchedulerObject_t *self);
+void* ocrSchedulerObjectListHeadNext(ocrSchedulerObject_t *self);
+void* ocrSchedulerObjectListHeadPlus(ocrSchedulerObject_t *self, u32 index);
 
 #endif /* ENABLE_SCHEDULER_OBJECT_LIST */
 #endif /* __LIST_SCHEDULER_OBJECT_H__ */

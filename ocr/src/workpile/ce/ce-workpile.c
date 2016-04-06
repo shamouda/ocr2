@@ -19,8 +19,6 @@
 /******************************************************/
 
 void ceWorkpileDestruct ( ocrWorkpile_t * base ) {
-    ocrWorkpileCe_t* derived = (ocrWorkpileCe_t*) base;
-    derived->deque->destruct(base->pd, derived->deque);
     runtimeChunkFree((u64)base, NULL);
 }
 
@@ -49,12 +47,17 @@ u8 ceWorkpileSwitchRunlevel(ocrWorkpile_t *self, ocrPolicyDomain_t *PD, ocrRunle
         if(properties & RL_BRING_UP)
             self->pd = PD;
         break;
-    case RL_MEMORY_OK: {
-            ocrWorkpileCe_t* derived = (ocrWorkpileCe_t*)self;
-            derived->deque = newDeque(self->pd, (void *) NULL_GUID, WORK_STEALING_DEQUE);
-        }
+    case RL_MEMORY_OK:
         break;
     case RL_GUID_OK:
+        // We have memory, we can now allocate a deque
+        if((properties & RL_BRING_UP) && RL_IS_FIRST_PHASE_UP(PD, RL_GUID_OK, phase)) {
+            ocrWorkpileCe_t* derived = (ocrWorkpileCe_t*)self;
+            derived->deque = newDeque(self->pd, (void *) NULL, WORK_STEALING_DEQUE);
+        } else if((properties & RL_TEAR_DOWN) && RL_IS_LAST_PHASE_DOWN(PD, RL_GUID_OK, phase)) {
+            ocrWorkpileCe_t* derived = (ocrWorkpileCe_t*)self;
+            derived->deque->destruct(PD, derived->deque);
+        }
         break;
     case RL_COMPUTE_OK:
         if(properties & RL_BRING_UP) {
@@ -95,19 +98,34 @@ ocrFatGuid_t ceWorkpilePop(ocrWorkpile_t * base, ocrWorkPopType_t type,
     ocrFatGuid_t fguid;
     switch(type) {
     case POP_WORKPOPTYPE:
-        fguid.guid = (ocrGuid_t)derived->deque->popFromHead(derived->deque, 0);
+        // See BUG #928 on GUIDs
+#if GUID_BIT_COUNT == 64
+        fguid.guid.guid = (u64)derived->deque->popFromHead(derived->deque, 0);
+#elif GUID_BIT_COUNT == 128
+        fguid.guid.lower = (u64)derived->deque->popFromHead(derived->deque, 0);
+        fguid.guid.upper = 0ULL;
+#else
+#error Unknown GUID type
+#endif
         break;
     default:
         ASSERT(0);
     }
-    fguid.metaDataPtr = NULL_GUID;
+    fguid.metaDataPtr = NULL;
     return fguid;
 }
 
 void ceWorkpilePush(ocrWorkpile_t * base, ocrWorkPushType_t type,
                     ocrFatGuid_t g ) {
     ocrWorkpileCe_t* derived = (ocrWorkpileCe_t*) base;
-    derived->deque->pushAtTail(derived->deque, (void *)(g.guid), 0);
+    // See BUG #928 on GUIDs
+#if GUID_BIT_COUNT == 64
+    derived->deque->pushAtTail(derived->deque, (void *)(g.guid.guid), 0);
+#elif GUID_BIT_COUNT == 128
+    derived->deque->pushAtTail(derived->deque, (void *)(g.guid.lower), 0);
+#else
+#error Unknown GUID type
+#endif
 }
 
 ocrWorkpile_t * newWorkpileCe(ocrWorkpileFactory_t * factory, ocrParamList_t *perInstance) {

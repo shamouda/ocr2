@@ -11,7 +11,9 @@
 #include "debug.h"
 #include "ocr-errors.h"
 #include "ocr-db.h"
+#include "extensions/ocr-hints.h"
 #include "ocr-policy-domain.h"
+#include "ocr-policy-domain-tasks.h"
 #include "ocr-sysboot.h"
 #include "ocr-runtime-hints.h"
 
@@ -73,7 +75,7 @@ static u8 helperSwitchInert(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, p
 // val contains worker id on lower 16 bits and RL on next 16 bits
 void hcWorkerCallback(ocrPolicyDomain_t *self, u64 val) {
     ocrPolicyDomainHc_t *rself = (ocrPolicyDomainHc_t*)self;
-    DPRINTF(DEBUG_LVL_VERB, "Got check-in from worker %u for RL %lu\n", val & 0xFFFF, (u64)(val >> 16));
+    DPRINTF(DEBUG_LVL_VERB, "Got check-in from worker %"PRIu64" for RL %"PRIu64"\n", val & 0xFFFF, (u64)(val >> 16));
     // Read these now and fence because on TEAR_DOWN as soon
     // as checkedIn reaches zero the master thread falls-through
     // and write to rlSwitch.
@@ -81,14 +83,15 @@ void hcWorkerCallback(ocrPolicyDomain_t *self, u64 val) {
     s8 nextPhase = rself->rlSwitch.nextPhase;
     u32 properties = rself->rlSwitch.properties;
     hal_fence();
-    u32 oldVal, newVal;
+
+    u64 oldVal, newVal;
     do {
         oldVal = rself->rlSwitch.checkedIn;
-        newVal = hal_cmpswap32(&(rself->rlSwitch.checkedIn), oldVal, oldVal - 1);
+        newVal = hal_cmpswap64(&(rself->rlSwitch.checkedIn), oldVal, oldVal - 1);
     } while(oldVal != newVal);
     if(oldVal == 1) {
         // This means we managed to set it to 0
-        DPRINTF(DEBUG_LVL_VVERB, "All workers checked in, moving to the next stage: RL %u; phase %d\n",
+        DPRINTF(DEBUG_LVL_VVERB, "All workers checked in, moving to the next stage: RL %"PRIu32"; phase %"PRId32"\n",
                 runlevel, nextPhase);
         if(properties & RL_FROM_MSG) {
             // We need to re-enter switchRunlevel
@@ -111,7 +114,7 @@ void hcWorkerCallback(ocrPolicyDomain_t *self, u64 val) {
                 // will drop out of its computation (at some point) and take over
                 DPRINTF(DEBUG_LVL_VVERB, "PD_MASTER thread will pick up for switch to RL_COMPUTE_OK\n");
             } else {
-                DPRINTF(DEBUG_LVL_VVERB, "Re-entering switchRunlevel with RL %u; phase %u; prop 0x%x\n",
+                DPRINTF(DEBUG_LVL_VVERB, "Re-entering switchRunlevel with RL %"PRIu32"; phase %"PRIu32"; prop 0x%"PRIx32"\n",
                         rself->rlSwitch.runlevel, rself->rlSwitch.nextPhase, rself->rlSwitch.properties);
                 RESULT_ASSERT(self->fcts.switchRunlevel(self, rself->rlSwitch.runlevel, rself->rlSwitch.properties), ==, 0);
             }
@@ -123,29 +126,26 @@ void hcWorkerCallback(ocrPolicyDomain_t *self, u64 val) {
 
 // Function to cause run-level switches in this PD
 u8 hcPdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 properties) {
-    s32 j;
+    s32 j, k=0;
     phase_t i=0, curPhase, phaseCount;
-    u32 maxCount;
+    u64 maxCount;
 
     u8 toReturn = 0;
     u32 origProperties = properties;
-    u32 propertiesPreComputes = properties;
+    u32 masterWorkerProperties = 0;
 
 #define GET_PHASE(counter) curPhase = (properties & RL_BRING_UP)?counter:(phaseCount - counter - 1)
 
     ocrPolicyDomainHc_t* rself = (ocrPolicyDomainHc_t*)policy;
     // Check properties
-    u32 amNodeMaster = properties & RL_NODE_MASTER;
+    u32 amNodeMaster = (properties & RL_NODE_MASTER) == RL_NODE_MASTER;
+#ifdef OCR_ASSERT
     u32 amPDMaster = properties & RL_PD_MASTER;
-    properties &= ~(RL_NODE_MASTER); // Strip out this from the rest; only valuable for the PD and some
-                                     // specific workers
-
+#endif
     u32 fromPDMsg = properties & RL_FROM_MSG;
     properties &= ~RL_FROM_MSG; // Strip this out from the rest; only valuable for the PD
-
-    // This is important before computes (some modules may do something different for the first thread)
-    propertiesPreComputes = properties;
-    if(amPDMaster) propertiesPreComputes |= RL_PD_MASTER;
+    masterWorkerProperties = properties;
+    properties &= ~RL_NODE_MASTER;
 
     if(!(fromPDMsg)) {
         // RL changes called directly through switchRunlevel should
@@ -167,6 +167,11 @@ u8 hcPdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
                     policy->phasesPerRunlevel[i][j] = (1<<4) + 1;
                 }
             }
+            // For RL_CONFIG_PARSE, we set it to 2 on bring up because on the first
+            // phase, modules can register their desire for the number of phases per runlevel
+            // and, on the second phase, they can make sure they got what they wanted (or
+            // adapt to what they did get)
+            policy->phasesPerRunlevel[RL_CONFIG_PARSE][0] = (1<<4) + 2;
             phaseCount = 2;
         } else {
             // Tear down
@@ -177,33 +182,34 @@ u8 hcPdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
         for(i = 0; i < phaseCount; ++i) {
             if(toReturn) break;
             GET_PHASE(i);
-            toReturn |= helperSwitchInert(policy, runlevel, curPhase, propertiesPreComputes);
+            toReturn |= helperSwitchInert(policy, runlevel, curPhase, masterWorkerProperties);
             for(j = 0; j < maxCount; ++j) {
                 toReturn |= policy->workers[j]->fcts.switchRunlevel(
-                    policy->workers[j], policy, runlevel, curPhase, propertiesPreComputes, NULL, 0);
+                    policy->workers[j], policy, runlevel, curPhase, j==0?masterWorkerProperties:properties, NULL, 0);
+            }
+            if(!(toReturn) && i == 0 && (properties & RL_BRING_UP)) {
+                // After the first phase, we update the counts
+                // Coalesce the phasesPerRunLevel by taking the maximum
+                for(k = 0; k < RL_MAX; ++k) {
+                    u32 finalCount = policy->phasesPerRunlevel[k][0];
+                    for(j = 1; j < RL_PHASE_MAX; ++j) {
+                        // Deal with UP phase count
+                        u32 newCount = 0;
+                        newCount = (policy->phasesPerRunlevel[k][j] & 0xF) > (finalCount & 0xF)?
+                            (policy->phasesPerRunlevel[k][j] & 0xF):(finalCount & 0xF);
+                        // And now the DOWN phase count
+                        newCount |= ((policy->phasesPerRunlevel[k][j] >> 4) > (finalCount >> 4)?
+                                     (policy->phasesPerRunlevel[k][j] >> 4):(finalCount >> 4)) << 4;
+                        finalCount = newCount;
+                    }
+                    policy->phasesPerRunlevel[k][0] = finalCount;
+                }
             }
         }
         if(toReturn) {
-            DPRINTF(DEBUG_LVL_WARN, "RL_CONFIG_PARSE(%d) phase %d failed: %d\n", propertiesPreComputes, curPhase, toReturn);
+            DPRINTF(DEBUG_LVL_WARN, "RL_CONFIG_PARSE(%"PRId32") phase %"PRId32" failed: %"PRId32"\n", origProperties, curPhase, toReturn);
         }
 
-        if((!toReturn) && (properties & RL_BRING_UP)) {
-            // Coalesce the phasesPerRunLevel by taking the maximum
-            for(i = 0; i < RL_MAX; ++i) {
-                u32 finalCount = policy->phasesPerRunlevel[i][0];
-                for(j = 1; j < RL_PHASE_MAX; ++j) {
-                    // Deal with UP phase count
-                    u32 newCount = 0;
-                    newCount = (policy->phasesPerRunlevel[i][j] & 0xF) > (finalCount & 0xF)?
-                        (policy->phasesPerRunlevel[i][j] & 0xF):(finalCount & 0xF);
-                    // And now the DOWN phase count
-                    newCount |= ((policy->phasesPerRunlevel[i][j] >> 4) > (finalCount >> 4)?
-                        (policy->phasesPerRunlevel[i][j] >> 4):(finalCount >> 4)) << 4;
-                    finalCount = newCount;
-                }
-                policy->phasesPerRunlevel[i][0] = finalCount;
-            }
-        }
         break;
     }
     case RL_NETWORK_OK:
@@ -215,14 +221,14 @@ u8 hcPdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
         for(i = 0; i < phaseCount; ++i) {
             if(toReturn) break;
             GET_PHASE(i);
-            toReturn |= helperSwitchInert(policy, runlevel, curPhase, propertiesPreComputes);
+            toReturn |= helperSwitchInert(policy, runlevel, curPhase, masterWorkerProperties);
             for(j = 0; j < maxCount; ++j) {
                 toReturn |= policy->workers[j]->fcts.switchRunlevel(
-                    policy->workers[j], policy, runlevel, curPhase, propertiesPreComputes, NULL, 0);
+                    policy->workers[j], policy, runlevel, curPhase, j==0?masterWorkerProperties:properties, NULL, 0);
             }
         }
         if(toReturn) {
-            DPRINTF(DEBUG_LVL_WARN, "RL_NETWORK_OK(%d) phase %d failed: %d\n", propertiesPreComputes, curPhase, toReturn);
+            DPRINTF(DEBUG_LVL_WARN, "RL_NETWORK_OK(%"PRId32") phase %"PRId32" failed: %"PRId32"\n", origProperties, curPhase, toReturn);
         }
         break;
     }
@@ -238,10 +244,10 @@ u8 hcPdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
         for(i = 0; i < phaseCount; ++i) {
             if(toReturn) break;
             GET_PHASE(i);
-            toReturn |= helperSwitchInert(policy, runlevel, curPhase, propertiesPreComputes);
+            toReturn |= helperSwitchInert(policy, runlevel, curPhase, masterWorkerProperties);
             for(j = 0; j < maxCount; ++j) {
                 toReturn |= policy->workers[j]->fcts.switchRunlevel(
-                    policy->workers[j], policy, runlevel, curPhase, propertiesPreComputes, NULL, 0);
+                    policy->workers[j], policy, runlevel, curPhase, j==0?masterWorkerProperties:properties, NULL, 0);
             }
         }
 
@@ -259,7 +265,7 @@ u8 hcPdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
         }
 
         if(toReturn) {
-            DPRINTF(DEBUG_LVL_WARN, "RL_PD_OK(%d) phase %d failed: %d\n", propertiesPreComputes, curPhase, toReturn);
+            DPRINTF(DEBUG_LVL_WARN, "RL_PD_OK(%"PRId32") phase %"PRId32" failed: %"PRId32"\n", origProperties, curPhase, toReturn);
         }
         break;
     }
@@ -270,14 +276,14 @@ u8 hcPdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
         for(i = 0; i < phaseCount; ++i) {
             if(toReturn) break;
             GET_PHASE(i);
-            toReturn |= helperSwitchInert(policy, runlevel, curPhase, propertiesPreComputes);
+            toReturn |= helperSwitchInert(policy, runlevel, curPhase, masterWorkerProperties);
             for(j = 0; j < maxCount; ++j) {
                 toReturn |= policy->workers[j]->fcts.switchRunlevel(
-                    policy->workers[j], policy, runlevel, curPhase, propertiesPreComputes, NULL, 0);
+                    policy->workers[j], policy, runlevel, curPhase, j==0?masterWorkerProperties:properties, NULL, 0);
             }
         }
         if(toReturn) {
-            DPRINTF(DEBUG_LVL_WARN, "RL_MEMORY_OK(%d) phase %d failed: %d\n", propertiesPreComputes, curPhase, toReturn);
+            DPRINTF(DEBUG_LVL_WARN, "RL_MEMORY_OK(%"PRId32") phase %"PRId32" failed: %"PRId32"\n", origProperties, curPhase, toReturn);
         }
         break;
     }
@@ -293,6 +299,10 @@ u8 hcPdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
         // don't actually "wait" but rather re-enter this function on incomming
         // messages from neighbors. If not RL_FROM_MSG, you do block.
 
+        // This is also the first stage at which we can allocate the microtask tables
+        // Memory has been brought up so we have all allocators up and running (including
+        // the forthcoming slab allocator)
+
         if(properties & RL_BRING_UP) {
             // On BRING_UP, bring up GUID provider
             // We assert that there are two phases. The first phase is mostly to bring
@@ -301,12 +311,34 @@ u8 hcPdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
             phaseCount = policy->phasesPerRunlevel[RL_GUID_OK][0] & 0xF;
             maxCount = policy->workerCount;
 
+            // Before we switch any of the inert components, set up the tables
+            COMPILE_ASSERT(PDSTT_COMM <= 2);
+
+            policy->strandTables[PDSTT_EVT - 1] = policy->fcts.pdMalloc(policy, sizeof(pdStrandTable_t));
+            policy->strandTables[PDSTT_COMM - 1] = policy->fcts.pdMalloc(policy, sizeof(pdStrandTable_t));
+
+            // We need to make sure we have our micro tables up and running
+            toReturn = (policy->strandTables[PDSTT_EVT-1] == NULL) ||
+            (policy->strandTables[PDSTT_COMM-1] == NULL);
+
+            if (toReturn) {
+                DPRINTF(DEBUG_LVL_WARN, "Cannot allocate strand tables\n");
+                ASSERT(0);
+            } else {
+                DPRINTF(DEBUG_LVL_VERB, "Created EVT strand table @ %p\n",
+                        policy->strandTables[PDSTT_EVT-1]);
+                toReturn |= pdInitializeStrandTable(policy, policy->strandTables[PDSTT_EVT-1], 0);
+                DPRINTF(DEBUG_LVL_VERB, "Created COMM strand table @ %p\n",
+                        policy->strandTables[PDSTT_COMM-1]);
+                toReturn |= pdInitializeStrandTable(policy, policy->strandTables[PDSTT_COMM-1], 0);
+            }
+
             for(i = 0; i < phaseCount; ++i) {
                 if(toReturn) break;
-                toReturn |= helperSwitchInert(policy, runlevel, i, propertiesPreComputes);
+                toReturn |= helperSwitchInert(policy, runlevel, i, masterWorkerProperties);
                 for(j = 0; j < maxCount; ++j) {
                     toReturn |= policy->workers[j]->fcts.switchRunlevel(
-                        policy->workers[j], policy, runlevel, i, propertiesPreComputes, NULL, 0);
+                        policy->workers[j], policy, runlevel, i, j==0?masterWorkerProperties:properties, NULL, 0);
                 }
 
             }
@@ -315,16 +347,27 @@ u8 hcPdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
             maxCount = policy->workerCount;
             for(i = 0; i < phaseCount; ++i) {
                 if(toReturn) break;
-                toReturn |= helperSwitchInert(policy, runlevel, i, propertiesPreComputes);
+                toReturn |= helperSwitchInert(policy, runlevel, i, masterWorkerProperties);
                 for(j = 0; j < maxCount; ++j) {
                     toReturn |= policy->workers[j]->fcts.switchRunlevel(
-                        policy->workers[j], policy, runlevel, i, propertiesPreComputes, NULL, 0);
+                        policy->workers[j], policy, runlevel, i, j==0?masterWorkerProperties:properties, NULL, 0);
                 }
             }
+            // At the end, we clear out the strand tables and free them.
+            DPRINTF(DEBUG_LVL_VERB, "Emptying strand tables\n");
+            RESULT_ASSERT(pdProcessStrands(policy, PDSTT_EMPTYTABLES), ==, 0);
+            // Free the tables
+            DPRINTF(DEBUG_LVL_VERB, "Freeing EVT strand table: %p\n", policy->strandTables[PDSTT_EVT-1]);
+            policy->fcts.pdFree(policy, policy->strandTables[PDSTT_EVT-1]);
+            policy->strandTables[PDSTT_EVT-1] = NULL;
+
+            DPRINTF(DEBUG_LVL_VERB, "Freeing COMM strand table: %p\n", policy->strandTables[PDSTT_COMM-1]);
+            policy->fcts.pdFree(policy, policy->strandTables[PDSTT_COMM-1]);
+            policy->strandTables[PDSTT_COMM-1] = NULL;
         }
 
         if(toReturn) {
-            DPRINTF(DEBUG_LVL_WARN, "RL_GUID_OK(%d) phase %d failed: %d\n", propertiesPreComputes, i-1, toReturn);
+            DPRINTF(DEBUG_LVL_WARN, "RL_GUID_OK(%"PRId32") phase %"PRId32" failed: %"PRId32"\n", origProperties, i-1, toReturn);
         }
         break;
     }
@@ -339,10 +382,12 @@ u8 hcPdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
             for(i = rself->rlSwitch.nextPhase; i < phaseCount; ++i) {
                 if(RL_IS_FIRST_PHASE_UP(policy, RL_COMPUTE_OK, i)) {
                     guidify(policy, (u64)policy, &(policy->fguid), OCR_GUID_POLICY);
-                    // Create and initialize the placer (work in progress)
+                    // To be deprecated
                     policy->placer = createLocationPlacer(policy);
+                    // Create and initialize the platform model (work in progress)
+                    policy->platformModel = createPlatformModelAffinity(policy);
                 }
-                toReturn |= helperSwitchInert(policy, runlevel, i, properties);
+                toReturn |= helperSwitchInert(policy, runlevel, i, masterWorkerProperties);
 
                 // Setup the resume RL switch structure (in the synchronous case, used as
                 // the counter we wait on)
@@ -361,7 +406,7 @@ u8 hcPdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
                 ocrAffinityGet(AFFINITY_PD_MASTER, &count, &affinityMasterPD);
                 u16 blessed = ((policy->myLocation == affinityToLocation(affinityMasterPD)) ? RL_BLESSED : 0);
                 toReturn |= policy->workers[0]->fcts.switchRunlevel(
-                    policy->workers[0], policy, runlevel, i, properties | RL_PD_MASTER | blessed,
+                    policy->workers[0], policy, runlevel, i, masterWorkerProperties | blessed,
                     &hcWorkerCallback, RL_COMPUTE_OK << 16);
 
                 for(j = 1; j < maxCount; ++j) {
@@ -371,11 +416,12 @@ u8 hcPdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
                 if(!fromPDMsg) {
                     // Here we need to block because when we return from the function, we need to have
                     // transitioned
-                    DPRINTF(DEBUG_LVL_VVERB, "switchRunlevel: synchronous switch to RL_COMPUTE_OK phase %d ... will block\n", i);
-                    while(rself->rlSwitch.checkedIn) ;
+                    DPRINTF(DEBUG_LVL_VVERB, "switchRunlevel: synchronous switch to RL_COMPUTE_OK phase %"PRId32" ... will block\n", i);
+                    while(rself->rlSwitch.checkedIn)
+                        ;
                     ASSERT(rself->rlSwitch.checkedIn == 0);
                 } else {
-                    DPRINTF(DEBUG_LVL_VVERB, "switchRunlevel: asynchronous switch to RL_COMPUTE_OK phase %d\n", i);
+                    DPRINTF(DEBUG_LVL_VVERB, "switchRunlevel: asynchronous switch to RL_COMPUTE_OK phase %"PRId32"\n", i);
                     // We'll continue this from hcWorkerCallback
                     break; // Break out of the loop
                 }
@@ -394,16 +440,18 @@ u8 hcPdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
             if(RL_IS_LAST_PHASE_DOWN(policy, RL_COMPUTE_OK, rself->rlSwitch.nextPhase)) {
                 ASSERT(!fromPDMsg); // This last phase is done synchronously
                 ASSERT(amPDMaster); // Only master worker should be here
-                toReturn |= helperSwitchInert(policy, runlevel, rself->rlSwitch.nextPhase, properties);
+                toReturn |= helperSwitchInert(policy, runlevel, rself->rlSwitch.nextPhase, masterWorkerProperties);
                 toReturn |= policy->workers[0]->fcts.switchRunlevel(
                     policy->workers[0], policy, runlevel, rself->rlSwitch.nextPhase,
-                    properties | RL_PD_MASTER | RL_BLESSED, NULL, 0);
+                    masterWorkerProperties | RL_BLESSED, NULL, 0);
                 for(j = 1; j < maxCount; ++j) {
                     toReturn |= policy->workers[j]->fcts.switchRunlevel(
                         policy->workers[j], policy, runlevel, rself->rlSwitch.nextPhase, properties, NULL, 0);
                 }
 
+                //to be deprecated
                 destroyLocationPlacer(policy);
+                destroyPlatformModelAffinity(policy);
 
                 PD_MSG_STACK(msg);
                 getCurrentEnv(NULL, NULL, NULL, &msg);
@@ -419,7 +467,7 @@ u8 hcPdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
             } else { // Tear-down RL_USER_OK not last phase
 
                 for(i = rself->rlSwitch.nextPhase; i > 0; --i) {
-                    toReturn |= helperSwitchInert(policy, runlevel, i, properties);
+                    toReturn |= helperSwitchInert(policy, runlevel, i, masterWorkerProperties);
 
                     // Setup the resume RL switch structure (in the synchronous case, used as
                     // the counter we wait on)
@@ -431,7 +479,7 @@ u8 hcPdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
 
                     // Worker 0 is considered the capable one by convention
                     toReturn |= policy->workers[0]->fcts.switchRunlevel(
-                        policy->workers[0], policy, runlevel, i, properties | RL_PD_MASTER | RL_BLESSED,
+                        policy->workers[0], policy, runlevel, i, masterWorkerProperties | RL_BLESSED,
                         &hcWorkerCallback, RL_COMPUTE_OK << 16);
 
                     for(j = 1; j < maxCount; ++j) {
@@ -441,7 +489,7 @@ u8 hcPdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
                     if(!fromPDMsg) {
                         ASSERT(0); // Always from a PD message since it is from a shutdown message
                     } else {
-                        DPRINTF(DEBUG_LVL_VVERB, "switchRunlevel: asynchronous switch from RL_COMPUTE_OK phase %d\n", i);
+                        DPRINTF(DEBUG_LVL_VVERB, "switchRunlevel: asynchronous switch from RL_COMPUTE_OK phase %"PRId32"\n", i);
                         // We'll continue this from hcWorkerCallback
                         break;
                     }
@@ -449,7 +497,7 @@ u8 hcPdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
             }
         }
         if(toReturn) {
-            DPRINTF(DEBUG_LVL_WARN, "RL_COMPUTE_OK(%d) phase %d failed: %d\n", properties, i-1, toReturn);
+            DPRINTF(DEBUG_LVL_WARN, "RL_COMPUTE_OK(%"PRId32") phase %"PRId32" failed: %"PRId32"\n", origProperties, i-1, toReturn);
         }
         break;
     }
@@ -459,7 +507,7 @@ u8 hcPdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
             // This branch is only taken in legacy mode the second time RL_USER_OK is entered
             if (rself->rlSwitch.legacySecondStart) {
                 toReturn |= policy->workers[0]->fcts.switchRunlevel(
-                    policy->workers[0], policy, runlevel, i, properties | RL_PD_MASTER | RL_BLESSED, NULL, 0);
+                    policy->workers[0], policy, runlevel, i, masterWorkerProperties | RL_BLESSED, NULL, 0);
                 // When I drop out of this, I should be in RL_COMPUTE_OK at phase 0
                 // wait for everyone to check in so that I can continue shutting down
                 DPRINTF(DEBUG_LVL_VVERB, "PD_MASTER worker LEGACY mode, dropped out... waiting for others to complete RL\n");
@@ -467,7 +515,8 @@ u8 hcPdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
                 //Warning: here make sure the code in hcWorkerCallback reads all the rlSwitch
                 //info BEFORE decrementing checkedIn. Otherwise there's a race on rlSwitch
                 //between the following code and hcWorkerCallback.
-                while(rself->rlSwitch.checkedIn != 0);
+                while(rself->rlSwitch.checkedIn != 0)
+                    ;
 
                 ASSERT(rself->rlSwitch.runlevel == RL_COMPUTE_OK && rself->rlSwitch.nextPhase == 0);
                 DPRINTF(DEBUG_LVL_VVERB, "PD_MASTER worker LEGACY mode, wrapping up shutdown\n");
@@ -475,7 +524,7 @@ u8 hcPdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
                 // get wrapped up by the outside code
                 rself->rlSwitch.properties &= ~RL_FROM_MSG;
                 toReturn |= policy->fcts.switchRunlevel(policy, rself->rlSwitch.runlevel,
-                                                        rself->rlSwitch.properties | RL_PD_MASTER);
+                                                        rself->rlSwitch.properties | RL_NODE_MASTER | RL_PD_MASTER);
                 return toReturn;
             }
             // BRING_UP is called twice in RL_LEGACY mode, record we've seen the first call.
@@ -486,9 +535,9 @@ u8 hcPdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
             maxCount = policy->workerCount;
             for(i = 0; i < phaseCount - 1; ++i) {
                 if(toReturn) break;
-                toReturn |= helperSwitchInert(policy, runlevel, i, properties);
+                toReturn |= helperSwitchInert(policy, runlevel, i, masterWorkerProperties);
                 toReturn |= policy->workers[0]->fcts.switchRunlevel(
-                    policy->workers[0], policy, runlevel, i, properties | RL_PD_MASTER | RL_BLESSED, NULL, 0);
+                    policy->workers[0], policy, runlevel, i, masterWorkerProperties | RL_BLESSED, NULL, 0);
                 for(j = 1; j < maxCount; ++j) {
                     // We start them in an async manner but don't need any callback (ie: we
                     // don't care if they have really started) since there is no bring-up barrier)
@@ -497,7 +546,7 @@ u8 hcPdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
                 }
             }
             if(i == phaseCount - 1) { // Tests if we did not break out earlier with if(toReturn)
-                toReturn |= helperSwitchInert(policy, runlevel, i, properties);
+                toReturn |= helperSwitchInert(policy, runlevel, i, masterWorkerProperties);
                 for(j = 1; j < maxCount; ++j) {
                     // We start them in an async manner but don't need any callback (ie: we
                     // don't care if they have really started) since there is no bring-up barrier)
@@ -511,10 +560,10 @@ u8 hcPdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
                     // In legacy mode the master worker just do its setup and falls-through
                     DPRINTF(DEBUG_LVL_VVERB, "Starting PD_MASTER worker in LEGACY mode\n");
                     toReturn |= policy->workers[0]->fcts.switchRunlevel(
-                        policy->workers[0], policy, runlevel, i, properties | RL_PD_MASTER | RL_BLESSED, NULL, 0);
+                        policy->workers[0], policy, runlevel, i, masterWorkerProperties | RL_BLESSED, NULL, 0);
                 } else {
                     toReturn |= policy->workers[0]->fcts.switchRunlevel(
-                        policy->workers[0], policy, runlevel, i, properties | RL_PD_MASTER | RL_BLESSED, NULL, 0);
+                        policy->workers[0], policy, runlevel, i, masterWorkerProperties | RL_BLESSED, NULL, 0);
                     // When I drop out of this, I should be in RL_COMPUTE_OK at phase 0
                     // wait for everyone to check in so that I can continue shutting down
                     DPRINTF(DEBUG_LVL_VVERB, "PD_MASTER worker dropped out... waiting for others to complete RL\n");
@@ -522,7 +571,8 @@ u8 hcPdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
                     //Warning: here make sure the code in hcWorkerCallback reads all the rlSwitch
                     //info BEFORE decrementing checkedIn. Otherwise there's a race on rlSwitch
                     //between the following code and hcWorkerCallback.
-                    while(rself->rlSwitch.checkedIn != 0);
+                    while(rself->rlSwitch.checkedIn != 0)
+                        ;
 
                     ASSERT(rself->rlSwitch.runlevel == RL_COMPUTE_OK && rself->rlSwitch.nextPhase == 0);
                     DPRINTF(DEBUG_LVL_VVERB, "PD_MASTER worker wrapping up shutdown\n");
@@ -530,14 +580,14 @@ u8 hcPdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
                     // get wrapped up by the outside code
                     rself->rlSwitch.properties &= ~RL_FROM_MSG;
                     toReturn |= policy->fcts.switchRunlevel(policy, rself->rlSwitch.runlevel,
-                                                            rself->rlSwitch.properties | RL_PD_MASTER);
+                                                            rself->rlSwitch.properties | (amNodeMaster?RL_NODE_MASTER:RL_PD_MASTER));
                 }
             }
         } else { // Tear down
             phaseCount = RL_GET_PHASE_COUNT_DOWN(policy, RL_USER_OK);
             maxCount = policy->workerCount;
             for(i = rself->rlSwitch.nextPhase; i >= 0; --i) {
-                toReturn |= helperSwitchInert(policy, runlevel, i, properties);
+                toReturn |= helperSwitchInert(policy, runlevel, i, masterWorkerProperties);
 
                 // Setup the resume RL switch structure (in the synchronous case, used as
                 // the counter we wait on)
@@ -549,7 +599,7 @@ u8 hcPdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
 
                 // Worker 0 is considered the capable one by convention
                 toReturn |= policy->workers[0]->fcts.switchRunlevel(
-                    policy->workers[0], policy, runlevel, i, properties | RL_PD_MASTER | RL_BLESSED,
+                    policy->workers[0], policy, runlevel, i, masterWorkerProperties | RL_BLESSED,
                     &hcWorkerCallback, RL_USER_OK << 16);
 
                 for(j = 1; j < maxCount; ++j) {
@@ -559,14 +609,14 @@ u8 hcPdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
                 if(!fromPDMsg) {
                     ASSERT(0); // It should always be from a PD MSG since it is an asynchronous shutdown
                 } else {
-                    DPRINTF(DEBUG_LVL_VVERB, "switchRunlevel: asynchronous switch from RL_USER_OK phase %d\n", i);
+                    DPRINTF(DEBUG_LVL_VVERB, "switchRunlevel: asynchronous switch from RL_USER_OK phase %"PRId32"\n", i);
                     // We'll continue this from hcWorkerCallback
                     break;
                 }
             }
         }
         if(toReturn) {
-            DPRINTF(DEBUG_LVL_WARN, "RL_USER_OK(%d) phase %d failed: %d\n", properties, i-1, toReturn);
+            DPRINTF(DEBUG_LVL_WARN, "RL_USER_OK(%"PRId32") phase %"PRId32" failed: %"PRId32"\n", origProperties, i-1, toReturn);
         }
         break;
     }
@@ -630,9 +680,6 @@ void hcPolicyDomainDestruct(ocrPolicyDomain_t * policy) {
             policy->dbFactories[i]->destruct(policy->dbFactories[i]);
     }
 
-    //Anticipate those to be null-impl for some time
-    ASSERT(policy->costFunction == NULL);
-
     // Destroy these last in case some of the other destructs make use of them
     maxCount = policy->guidProviderCount;
     for(i = 0; i < maxCount; ++i) {
@@ -661,7 +708,7 @@ void hcPolicyDomainDestruct(ocrPolicyDomain_t * policy) {
 static void localDeguidify(ocrPolicyDomain_t *self, ocrFatGuid_t *guid) {
     START_PROFILE(pd_hc_localDeguidify);
     ASSERT(self->guidProviderCount == 1);
-    if(guid->guid != NULL_GUID && guid->guid != UNINITIALIZED_GUID) {
+    if(!(ocrGuidIsNull(guid->guid)) && !(ocrGuidIsUninitialized(guid->guid))) {
         if(guid->metaDataPtr == NULL) {
             self->guidProviders[0]->fcts.getVal(self->guidProviders[0], guid->guid,
                                                 (u64*)(&(guid->metaDataPtr)), NULL);
@@ -700,48 +747,36 @@ static void* allocateDatablock (ocrPolicyDomain_t *self,
     return NULL;
 }
 
+static u8 hcMemUnAlloc(ocrPolicyDomain_t *self, ocrFatGuid_t* allocator,
+                       void* ptr, ocrMemType_t memType);
+
 static u8 hcAllocateDb(ocrPolicyDomain_t *self, ocrFatGuid_t *guid, void** ptr, u64 size,
-                       u32 properties, ocrFatGuid_t affinity, ocrInDbAllocator_t allocator,
+                       u32 properties, ocrHint_t *hint, ocrInDbAllocator_t allocator,
                        u64 prescription, ocrDataBlockType_t dbType) {
     // This function allocates a data block for the requestor, who is either this computing agent or a
     // different one that sent us a message.  After getting that data block, it "guidifies" the results
     // which, by the way, ultimately causes hcMemAlloc (just below) to run.
     //
-    // Currently, the "affinity" and "allocator" arguments are ignored, and I expect that these will
+    // Currently, the "allocator" argument is ignored, and I expect that these will
     // eventually be eliminated here and instead, above this level, processed into the "prescription"
     // variable, which has been added to this argument list.  The prescription indicates an order in
     // which to attempt to allocate the block to a pool.
     u64 idx;
-    void* result = allocateDatablock (self, size, prescription, &idx);
+    void *result = allocateDatablock (self, size, prescription, &idx);
     if (result) {
-        ocrDataBlock_t *block = self->dbFactories[0]->instantiate(
-            self->dbFactories[0], self->allocators[idx]->fguid, self->fguid,
-            size, result, properties, NULL);
-        *ptr = result;
-        (*guid).guid = block->guid;
-        (*guid).metaDataPtr = block;
-
-        // Notify scheduler of DB CREATE
-        if (result != NULL && block != NULL) {
-            ocrWorker_t *worker = NULL;
-            PD_MSG_STACK(msg);
-            getCurrentEnv(NULL, &worker, NULL, &msg);
-
-#define PD_MSG (&msg)
-#define PD_TYPE PD_MSG_SCHED_NOTIFY
-            msg.type = PD_MSG_SCHED_NOTIFY | PD_MSG_REQUEST;
-            PD_MSG_FIELD_IO(schedArgs).kind = OCR_SCHED_NOTIFY_DB_CREATE;
-            PD_MSG_FIELD_IO(schedArgs).OCR_SCHED_ARG_FIELD(OCR_SCHED_NOTIFY_DB_CREATE).guid.guid = block->guid;
-            PD_MSG_FIELD_IO(schedArgs).OCR_SCHED_ARG_FIELD(OCR_SCHED_NOTIFY_DB_CREATE).guid.metaDataPtr = block;
-            PD_MSG_FIELD_IO(schedArgs).OCR_SCHED_ARG_FIELD(OCR_SCHED_NOTIFY_DB_CREATE).dbType = dbType;
-            RESULT_PROPAGATE(self->fcts.processMessage(self, &msg, false));
-            ASSERT(PD_MSG_FIELD_O(returnDetail) != OCR_ENOTSUP);
-#undef PD_MSG
-#undef PD_TYPE
+        u8 returnValue = 0;
+        returnValue = self->dbFactories[0]->instantiate(
+            self->dbFactories[0], guid, self->allocators[idx]->fguid, self->fguid,
+            size, result, hint, properties, NULL);
+        if(returnValue == 0) {
+            *ptr = result;
+        } else {
+            // We need to free the memory that was allocated
+            hcMemUnAlloc(self, &(self->allocators[idx]->fguid), *ptr, DB_MEMTYPE);
         }
-        return 0;
+        // This could be OCR_EGUIDEXISTS
+        return returnValue;
     } else {
-        DPRINTF(DEBUG_LVL_WARN, "hcAllocateDb returning NULL for size %ld\n", (u64) size);
         return OCR_ENOMEM;
     }
 }
@@ -763,7 +798,7 @@ static u8 hcMemAlloc(ocrPolicyDomain_t *self, ocrFatGuid_t* allocator, u64 size,
         *allocator = self->allocators[idx]->fguid;
         return 0;
     } else {
-        DPRINTF(DEBUG_LVL_WARN, "hcMemAlloc returning NULL for size %ld\n", (u64) size);
+        DPRINTF(DEBUG_LVL_WARN, "hcMemAlloc returning NULL for size %"PRId64"\n", (u64) size);
         return OCR_ENOMEM;
     }
 }
@@ -801,12 +836,12 @@ static u8 hcMemUnAlloc(ocrPolicyDomain_t *self, ocrFatGuid_t* allocator,
  */
 static u8 createEdtHelper(ocrPolicyDomain_t *self, ocrFatGuid_t *guid,
                       ocrFatGuid_t  edtTemplate, u32 *paramc, u64* paramv,
-                      u32 *depc, u32 properties, ocrFatGuid_t affinity,
+                      u32 *depc, u32 properties, ocrHint_t *hint,
                       ocrFatGuid_t * outputEvent, ocrTask_t * currentEdt,
-                      ocrFatGuid_t parentLatch) {
+                      ocrFatGuid_t parentLatch, ocrWorkType_t workType) {
     ocrTaskTemplate_t *taskTemplate = (ocrTaskTemplate_t*)edtTemplate.metaDataPtr;
-    DPRINTF(DEBUG_LVL_VVERB, "Creating EDT with template GUID 0x%lx (0x%lx) (paramc=%d; depc=%d)"
-            " and have paramc=%d; depc=%d\n", edtTemplate.guid, edtTemplate.metaDataPtr,
+    DPRINTF(DEBUG_LVL_VVERB, "Creating EDT with template GUID "GUIDF" (%p) (paramc=%"PRId32"; depc=%"PRId32")"
+            " and have paramc=%"PRId32"; depc=%"PRId32"\n", GUIDA(edtTemplate.guid), edtTemplate.metaDataPtr,
             taskTemplate->paramc, taskTemplate->depc, *paramc, *depc);
     // Check that
     // 1. EDT doesn't have "default" as parameter count if the template
@@ -836,7 +871,7 @@ static u8 createEdtHelper(ocrPolicyDomain_t *self, ocrFatGuid_t *guid,
 
     // Check paramc/paramv combination validity
     if((*paramc > 0) && (paramv == NULL)) {
-        DPRINTF(DEBUG_LVL_WARN,"error: EDT paramc set to %d but paramv is NULL\n", *paramc);
+        DPRINTF(DEBUG_LVL_WARN,"error: EDT paramc set to %"PRId32" but paramv is NULL\n", *paramc);
         ASSERT(false);
         return OCR_EINVAL;
     }
@@ -845,12 +880,17 @@ static u8 createEdtHelper(ocrPolicyDomain_t *self, ocrFatGuid_t *guid,
         ASSERT(false);
         return OCR_EINVAL;
     }
+
+    //Setup task parameters
+    paramListTask_t taskparams;
+    taskparams.workType = workType;
+
     u8 returnCode = self->taskFactories[0]->instantiate(
                            self->taskFactories[0], guid, edtTemplate, *paramc, paramv,
-                           *depc, properties, affinity, outputEvent, currentEdt,
-                           parentLatch, NULL);
+                           *depc, properties, hint, outputEvent, currentEdt,
+                           parentLatch, (ocrParamList_t*)(&taskparams));
     if(returnCode) {
-        DPRINTF(DEBUG_LVL_WARN, "unable to create EDT, instantiate returnCode is %x\n", returnCode);
+        DPRINTF(DEBUG_LVL_WARN, "unable to create EDT, instantiate returnCode is %"PRIx32"\n", returnCode);
         ASSERT(false);
     }
 
@@ -868,10 +908,9 @@ static u8 createEdtTemplateHelper(ocrPolicyDomain_t *self, ocrFatGuid_t *guid,
 }
 
 static u8 createEventHelper(ocrPolicyDomain_t *self, ocrFatGuid_t *guid,
-                        ocrEventTypes_t type, u32 properties) {
-
+                        ocrEventTypes_t type, u32 properties, ocrParamList_t * paramList) {
     return self->eventFactories[0]->instantiate(
-        self->eventFactories[0], guid, type, properties, NULL);
+        self->eventFactories[0], guid, type, properties, paramList);
 }
 
 static u8 convertDepAddToSatisfy(ocrPolicyDomain_t *self, ocrFatGuid_t dbGuid,
@@ -905,8 +944,34 @@ static ocrStats_t* hcGetStats(ocrPolicyDomain_t *self) {
 }
 #endif
 
-u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlocking) {
+//Notify scheduler of policy message before it is processed
+static inline void hcSchedNotifyPreProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg) {
+    if (msg->type & PD_MSG_IGNORE_PRE_PROCESS_SCHEDULER)
+        return;
+    ocrSchedulerOpNotifyArgs_t notifyArgs;
+    notifyArgs.base.location = msg->srcLocation;
+    notifyArgs.kind = OCR_SCHED_NOTIFY_PRE_PROCESS_MSG;
+    notifyArgs.OCR_SCHED_ARG_FIELD(OCR_SCHED_NOTIFY_PRE_PROCESS_MSG).msg = msg;
+    //Ignore the return code here
+    self->schedulers[0]->fcts.op[OCR_SCHEDULER_OP_NOTIFY].invoke(
+            self->schedulers[0], (ocrSchedulerOpArgs_t*) &notifyArgs, NULL);
+    msg->type |= PD_MSG_IGNORE_PRE_PROCESS_SCHEDULER;
+}
 
+//Notify scheduler of policy message after it is processed
+static inline void hcSchedNotifyPostProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg) {
+    if (!(msg->type & PD_MSG_REQ_POST_PROCESS_SCHEDULER))
+        return;
+    ocrSchedulerOpNotifyArgs_t notifyArgs;
+    notifyArgs.base.location = msg->srcLocation;
+    notifyArgs.kind = OCR_SCHED_NOTIFY_POST_PROCESS_MSG;
+    notifyArgs.OCR_SCHED_ARG_FIELD(OCR_SCHED_NOTIFY_POST_PROCESS_MSG).msg = msg;
+    RESULT_ASSERT(self->schedulers[0]->fcts.op[OCR_SCHEDULER_OP_NOTIFY].invoke(
+                    self->schedulers[0], (ocrSchedulerOpArgs_t*) &notifyArgs, NULL), ==, 0);
+    msg->type &= ~PD_MSG_REQ_POST_PROCESS_SCHEDULER;
+}
+
+u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlocking) {
     START_PROFILE(pd_hc_ProcessMessage);
     u8 returnCode = 0;
 
@@ -915,14 +980,18 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
     // - Asynchronous message processing allows for certain type of message
     //   to have a RESPONSE processed.
     ASSERT(((msg->type & PD_MSG_REQUEST) && !(msg->type & PD_MSG_RESPONSE))
-        || ((msg->type & PD_MSG_RESPONSE) && ((msg->type & PD_MSG_TYPE_ONLY) == PD_MSG_DB_ACQUIRE)))
+        || ((msg->type & PD_MSG_RESPONSE) && ((msg->type & PD_MSG_TYPE_ONLY) == PD_MSG_DB_ACQUIRE)));
 
     // The message buffer size should always be greater or equal to the
     // max of the message in and out sizes, otherwise a write on the message
     // as a response overflows.
+#ifdef OCR_ASSERT
     u64 baseSizeIn = ocrPolicyMsgGetMsgBaseSize(msg, true);
     u64 baseSizeOut = ocrPolicyMsgGetMsgBaseSize(msg, false);
     ASSERT(((baseSizeIn < baseSizeOut) && (msg->bufferSize >= baseSizeOut)) || (baseSizeIn >= baseSizeOut));
+#endif
+
+    hcSchedNotifyPreProcessMessage(self, msg);
 
     switch(msg->type & PD_MSG_TYPE_ONLY) {
     case PD_MSG_DB_CREATE: {
@@ -938,40 +1007,50 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         PD_MSG_FIELD_O(returnDetail) = hcAllocateDb(self, &(PD_MSG_FIELD_IO(guid)),
                                   &(PD_MSG_FIELD_O(ptr)), PD_MSG_FIELD_IO(size),
                                   PD_MSG_FIELD_IO(properties),
-                                  PD_MSG_FIELD_I(affinity),
+                                  PD_MSG_FIELD_I(hint),
                                   PD_MSG_FIELD_I(allocator),
                                   PRESCRIPTION, PD_MSG_FIELD_I(dbType));
         if(PD_MSG_FIELD_O(returnDetail) == 0) {
             ocrDataBlock_t *db = PD_MSG_FIELD_IO(guid.metaDataPtr);
-            if(db==NULL){
-                DPRINTF(DEBUG_LVL_WARN, "DB Create failed for size %lx\n", PD_MSG_FIELD_IO(size));
-            }else{
+            if(db == NULL) {
+                DPRINTF(DEBUG_LVL_WARN, "DB Create failed for size %"PRIx64"\n", PD_MSG_FIELD_IO(size));
 
-                bool srcFlag;
-                if(PD_MSG_FIELD_I(dbType) == USER_DBTYPE)
-                    srcFlag = true;
-                else
-                    srcFlag = false;
-                DPRINTF(DEBUG_LVL_VERB, "Creating a datablock of size %lu @ 0x%lx (GUID: 0x%lx)\n",
-                        db->size, db->ptr, db->guid,
-                        srcFlag, OCR_TRACE_TYPE_DATABLOCK, OCR_ACTION_CREATE, db->size);
-
-
+            } else{
+                DPRINTF(DEBUG_LVL_VERB, "Creating a datablock of size %"PRIu64" @ 0x%p (GUID: "GUIDF")\n",
+                        db->size, db->ptr, GUIDA(db->guid));
+                OCR_TOOL_TRACE(true, OCR_TRACE_TYPE_DATABLOCK, OCR_ACTION_CREATE, db->size);
             }
             ASSERT(db);
-            // BUG #584: Check if properties want DB acquired
-            ASSERT(db->fctId == self->dbFactories[0]->factoryId);
-            PD_MSG_FIELD_O(returnDetail) = self->dbFactories[0]->fcts.acquire(
-                db, &(PD_MSG_FIELD_O(ptr)), tEdt, EDT_SLOT_NONE, DB_MODE_RW, !!(PD_MSG_FIELD_IO(properties) & DB_PROP_RT_ACQUIRE),
-                (u32) DB_MODE_RW);
-            // Set the default mode in the response message for the caller
-            PD_MSG_FIELD_IO(properties) |= DB_MODE_RW;
+            // We do not acquire a data-block in two cases:
+            //  - it was created with a labeled-GUID. This is because it would be difficult
+            //    to handle cases where both EDTs create it but only one acquires it (particularly
+            //    in distributed case
+            //  - if the user does not want to acquire the data-block (DB_PROP_NO_ACQUIRE)
+            if((PD_MSG_FIELD_IO(properties) & GUID_PROP_IS_LABELED) ||
+               (PD_MSG_FIELD_IO(properties) & DB_PROP_NO_ACQUIRE)) {
+                DPRINTF(DEBUG_LVL_INFO, "Not acquiring DB since disabled by property flags");
+                PD_MSG_FIELD_O(ptr) = NULL;
+            } else {
+                ASSERT(db->fctId == self->dbFactories[0]->factoryId);
+                PD_MSG_FIELD_O(returnDetail) = self->dbFactories[0]->fcts.acquire(
+                    db, &(PD_MSG_FIELD_O(ptr)), tEdt, EDT_SLOT_NONE, DB_MODE_RW, !!(PD_MSG_FIELD_IO(properties) & DB_PROP_RT_ACQUIRE),
+                    (u32) DB_MODE_RW);
+                // Set the default mode in the response message for the caller
+                PD_MSG_FIELD_IO(properties) |= DB_MODE_RW;
+            }
         } else {
             // Cannot acquire
             PD_MSG_FIELD_O(ptr) = NULL;
         }
         msg->type &= ~PD_MSG_REQUEST;
         msg->type |= PD_MSG_RESPONSE;
+
+        if (PD_MSG_FIELD_O(ptr) == NULL) {
+            DPRINTF(DEBUG_LVL_WARN, "PD_MSG_DB_CREATE returning NULL for size %"PRId64"\n", (u64) PD_MSG_FIELD_IO(size));
+            DPRINTF(DEBUG_LVL_WARN, "*** WARNING : OUT-OF-MEMORY ***\n");
+            DPRINTF(DEBUG_LVL_WARN, "*** Please increase sizes in *ALL* MemPlatformInst, MemTargetInst, AllocatorInst sections.\n");
+            DPRINTF(DEBUG_LVL_WARN, "*** Same amount increasing is recommended.\n");
+        }
 #undef PD_MSG
 #undef PD_TYPE
         EXIT_PROFILE;
@@ -1012,11 +1091,16 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             } else {
                 // Something went wrong in dbAcquire
                 if(PD_MSG_FIELD_O(returnDetail)!=0)
-                    DPRINTF(DEBUG_LVL_WARN, "DB Acquire failed for guid %lx\n", PD_MSG_FIELD_IO(guid));
+                    DPRINTF(DEBUG_LVL_WARN, "DB Acquire failed for guid "GUIDF"\n", GUIDA(PD_MSG_FIELD_IO(guid.guid)));
                 ASSERT(PD_MSG_FIELD_O(returnDetail) == 0);
+                DPRINTF(DEBUG_LVL_INFO, "DB guid "GUIDF" of size %"PRIu64" acquired by EDT "GUIDF"\n",
+                        GUIDA(db->guid), db->size, GUIDA(PD_MSG_FIELD_IO(edt.guid)));
+                OCR_TOOL_TRACE(false, OCR_TRACE_TYPE_EDT, OCR_ACTION_DATA_ACQUIRE, PD_MSG_FIELD_IO(edt.guid),
+                                db->guid, db->size);
                 msg->type &= ~PD_MSG_REQUEST;
                 msg->type |= PD_MSG_RESPONSE;
             }
+
         #undef PD_MSG
         #undef PD_TYPE
         } else {
@@ -1048,8 +1132,13 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         localDeguidify(self, &(PD_MSG_FIELD_I(edt)));
         ocrDataBlock_t *db = (ocrDataBlock_t*)(PD_MSG_FIELD_IO(guid.metaDataPtr));
         ASSERT(db->fctId == self->dbFactories[0]->factoryId);
+        ocrGuid_t edtGuid __attribute__((unused)) =  PD_MSG_FIELD_I(edt.guid);
         PD_MSG_FIELD_O(returnDetail) = self->dbFactories[0]->fcts.release(
             db, PD_MSG_FIELD_I(edt), !!(PD_MSG_FIELD_I(properties) & DB_PROP_RT_ACQUIRE));
+        DPRINTF(DEBUG_LVL_INFO, "DB guid "GUIDF" of size %"PRIu64" released by EDT "GUIDF"\n",
+                GUIDA(db->guid), db->size, GUIDA(edtGuid));
+        OCR_TOOL_TRACE(false, OCR_TRACE_TYPE_EDT, OCR_ACTION_DATA_RELEASE, edtGuid, db->guid, db->size);
+
 #undef PD_MSG
 #undef PD_TYPE
         msg->type &= ~PD_MSG_REQUEST;
@@ -1071,11 +1160,11 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         PD_MSG_FIELD_O(returnDetail) = self->dbFactories[0]->fcts.free(
             db, PD_MSG_FIELD_I(edt), PD_MSG_FIELD_I(properties));
         if(PD_MSG_FIELD_O(returnDetail)!=0)
-            DPRINTF(DEBUG_LVL_WARN, "DB Free failed for guid %lx\n", PD_MSG_FIELD_I(guid));
+            DPRINTF(DEBUG_LVL_WARN, "DB Free failed for guid "GUIDF"\n", GUIDA(PD_MSG_FIELD_I(guid.guid)));
         else{
             DPRINTF(DEBUG_LVL_INFO,
-                    "DB guid: %lx Destroyed\n", PD_MSG_FIELD_I(guid).guid,
-                    false, OCR_TRACE_TYPE_DATABLOCK, OCR_ACTION_DESTROY);
+                    "DB guid: "GUIDF" Destroyed\n", GUIDA(PD_MSG_FIELD_I(guid).guid));
+            OCR_TOOL_TRACE(false, OCR_TRACE_TYPE_DATABLOCK, OCR_ACTION_DESTROY);
 
         }
 #undef PD_MSG
@@ -1129,30 +1218,34 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
 #define PD_TYPE PD_MSG_WORK_CREATE
         localDeguidify(self, &(PD_MSG_FIELD_I(templateGuid)));
         if(PD_MSG_FIELD_I(templateGuid.metaDataPtr) == NULL)
-            DPRINTF(DEBUG_LVL_WARN, "Invalid template GUID %lx\n", PD_MSG_FIELD_I(templateGuid));
+            DPRINTF(DEBUG_LVL_WARN, "Invalid template GUID "GUIDF"\n", GUIDA(PD_MSG_FIELD_I(templateGuid.guid)));
         ASSERT(PD_MSG_FIELD_I(templateGuid.metaDataPtr) != NULL);
-        localDeguidify(self, &(PD_MSG_FIELD_I(affinity)));
         localDeguidify(self, &(PD_MSG_FIELD_I(currentEdt)));
         localDeguidify(self, &(PD_MSG_FIELD_I(parentLatch)));
 
         ocrFatGuid_t *outputEvent = NULL;
-        if(PD_MSG_FIELD_IO(outputEvent.guid) == UNINITIALIZED_GUID) {
+        if(ocrGuidIsUninitialized(PD_MSG_FIELD_IO(outputEvent.guid))) {
             outputEvent = &(PD_MSG_FIELD_IO(outputEvent));
         }
 
         if((PD_MSG_FIELD_I(workType) != EDT_USER_WORKTYPE) && (PD_MSG_FIELD_I(workType) != EDT_RT_WORKTYPE)) {
             // This is a runtime error and should be reported as such
-            DPRINTF(DEBUG_LVL_WARN, "Invalid worktype %x\n", PD_MSG_FIELD_I(workType));
+            DPRINTF(DEBUG_LVL_WARN, "Invalid worktype %"PRIx32"\n", PD_MSG_FIELD_I(workType));
         }
 
         ASSERT((PD_MSG_FIELD_I(workType) == EDT_USER_WORKTYPE) || (PD_MSG_FIELD_I(workType) == EDT_RT_WORKTYPE));
         u32 depc = PD_MSG_FIELD_IO(depc); // intentionally read before processing
         ocrFatGuid_t * depv = PD_MSG_FIELD_I(depv);
+        ocrHint_t *hint = PD_MSG_FIELD_I(hint);
+        u32 properties = PD_MSG_FIELD_I(properties);
         u8 returnCode = createEdtHelper(
                 self, &(PD_MSG_FIELD_IO(guid)), PD_MSG_FIELD_I(templateGuid),
                 &(PD_MSG_FIELD_IO(paramc)), PD_MSG_FIELD_I(paramv), &(PD_MSG_FIELD_IO(depc)),
-                PD_MSG_FIELD_I(properties), PD_MSG_FIELD_I(affinity), outputEvent,
-                (ocrTask_t*)(PD_MSG_FIELD_I(currentEdt).metaDataPtr), PD_MSG_FIELD_I(parentLatch));
+                properties, hint, outputEvent, (ocrTask_t*)(PD_MSG_FIELD_I(currentEdt).metaDataPtr),
+                PD_MSG_FIELD_I(parentLatch), PD_MSG_FIELD_I(workType));
+        if ((properties & EDT_PROP_RT_HINT_ALLOC) && (msg->srcLocation == self->myLocation)) {
+            self->fcts.pdFree(self, hint);
+        }
         if (msg->type & PD_MSG_REQ_RESPONSE) {
             PD_MSG_FIELD_O(returnDetail) = returnCode;
         }
@@ -1166,7 +1259,7 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             getCurrentEnv(NULL, NULL, &curEdt, NULL);
             ocrFatGuid_t curEdtFatGuid = {.guid = curEdt ? curEdt->guid : NULL_GUID, .metaDataPtr = curEdt};
             while(i < depc) {
-                if(depv[i].guid != UNINITIALIZED_GUID) {
+                if(!(ocrGuidIsUninitialized(depv[i].guid))) {
                     // We only add dependences that are not UNINITIALIZED_GUID
                     PD_MSG_STACK(msgAddDep);
                     getCurrentEnv(NULL, NULL, NULL, &msgAddDep);
@@ -1174,7 +1267,7 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
                 #undef PD_TYPE
                     //NOTE: Could systematically call DEP_ADD but it's faster to disambiguate
                     //      NULL_GUID here instead of having DEP_ADD find out and do a satisfy.
-                    if(depv[i].guid != NULL_GUID) {
+                    if(!(ocrGuidIsNull(depv[i].guid))) {
                 #define PD_MSG (&msgAddDep)
                 #define PD_TYPE PD_MSG_DEP_ADD
                         msgAddDep.type = PD_MSG_DEP_ADD | PD_MSG_REQUEST;
@@ -1206,7 +1299,7 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
                     }
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_WORK_CREATE
-                    u8 toReturn = self->fcts.processMessage(self, &msgAddDep, true);
+                    u8 toReturn __attribute__((unused)) = self->fcts.processMessage(self, &msgAddDep, true);
                     ASSERT(!toReturn);
                 }
                 ++i;
@@ -1236,7 +1329,7 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         localDeguidify(self, &(PD_MSG_FIELD_I(guid)));
         ocrTask_t *task = (ocrTask_t*)PD_MSG_FIELD_I(guid.metaDataPtr);
         if(task == NULL)
-            DPRINTF(DEBUG_LVL_WARN, "Invalid task, guid %lx\n", PD_MSG_FIELD_I(guid));
+            DPRINTF(DEBUG_LVL_WARN, "Invalid task, guid "GUIDF"\n", GUIDA(PD_MSG_FIELD_I(guid.guid)));
         ASSERT(task);
         ASSERT(task->fctId == self->taskFactories[0]->factoryId);
         PD_MSG_FIELD_O(returnDetail) = self->taskFactories[0]->fcts.destruct(task);
@@ -1289,13 +1382,38 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         START_PROFILE(pd_hc_EvtCreate);
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_EVT_CREATE
+        ocrParamList_t * paramList = NULL;
+#ifdef ENABLE_EXTENSION_PARAMS_EVT
+        if (PD_MSG_FIELD_I(params) != NULL) {
+            // Forcefully convert ocrEventParams_t to ocrParamList_t
+            paramList = (ocrParamList_t *) PD_MSG_FIELD_I(params);
+        }
+#endif
+#ifdef ENABLE_EXTENSION_BLOCKING_SUPPORT
+        if (isBlocking == false) {
+            u32 returnDetail = createEventHelper(
+                self, &(PD_MSG_FIELD_IO(guid)),
+                PD_MSG_FIELD_I(type), PD_MSG_FIELD_I(properties), paramList);
+            if (returnDetail == OCR_EGUIDEXISTS) {
+                RETURN_PROFILE(OCR_EPEND);
+            } else {
+                PD_MSG_FIELD_O(returnDetail) = returnDetail;
+                msg->type &= ~PD_MSG_REQUEST;
+                msg->type |= PD_MSG_RESPONSE;
+            }
+        } else {
+#endif
         PD_MSG_FIELD_O(returnDetail) = createEventHelper(
             self, &(PD_MSG_FIELD_IO(guid)),
-            PD_MSG_FIELD_I(type), PD_MSG_FIELD_I(properties));
+            PD_MSG_FIELD_I(type), PD_MSG_FIELD_I(properties), paramList);
+            msg->type &= ~PD_MSG_REQUEST;
+            msg->type |= PD_MSG_RESPONSE;
+#ifdef ENABLE_EXTENSION_BLOCKING_SUPPORT
+        }
+#endif
+
 #undef PD_MSG
 #undef PD_TYPE
-        msg->type &= ~PD_MSG_REQUEST;
-        msg->type |= PD_MSG_RESPONSE;
         EXIT_PROFILE;
         break;
     }
@@ -1311,6 +1429,11 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
 #undef PD_MSG
 #undef PD_TYPE
         msg->type &= (~PD_MSG_REQUEST);
+#ifdef ENABLE_EXTENSION_BLOCKING_SUPPORT
+        // For mpilite long running EDTs to handle blocking destroy of labeled events
+        if (msg->type & PD_MSG_REQ_RESPONSE)
+            msg->type |= PD_MSG_RESPONSE;
+#endif
         EXIT_PROFILE;
 
         break;
@@ -1321,12 +1444,20 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_EVT_GET
         localDeguidify(self, &(PD_MSG_FIELD_I(guid)));
-        ocrEvent_t *evt = (ocrEvent_t*)PD_MSG_FIELD_I(guid.metaDataPtr);
-        ASSERT(evt->fctId == self->eventFactories[0]->factoryId);
-        PD_MSG_FIELD_O(data) = self->eventFactories[0]->fcts[evt->kind].get(evt);
-        // There's no way to check if this call has been
-        // successful without changing the 'get' signature
-        PD_MSG_FIELD_O(returnDetail) = 0;
+        if (PD_MSG_FIELD_I(guid.metaDataPtr) != NULL) {
+            ocrEvent_t * evt = (ocrEvent_t*)PD_MSG_FIELD_I(guid.metaDataPtr);
+            ASSERT(evt->fctId == self->eventFactories[0]->factoryId);
+            PD_MSG_FIELD_O(data) = self->eventFactories[0]->fcts[evt->kind].get(evt);
+            // There's no way to check if this call has been
+            // successful without changing the 'get' signature
+            PD_MSG_FIELD_O(returnDetail) = 0;
+        } else {
+            // Hack for BUG #865 This is for labeled GUIDs that are remote.
+            // If they are not created yet, return ERROR_GUID.
+            PD_MSG_FIELD_O(data.guid) = ERROR_GUID;
+            PD_MSG_FIELD_O(data.metaDataPtr) = NULL;
+            PD_MSG_FIELD_O(returnDetail) = 0;
+        }
 #undef PD_MSG
 #undef PD_TYPE
         msg->type &= ~PD_MSG_REQUEST;
@@ -1344,6 +1475,7 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             PD_MSG_FIELD_O(returnDetail) = self->guidProviders[0]->fcts.createGuid(
                 self->guidProviders[0], &(PD_MSG_FIELD_IO(guid)), PD_MSG_FIELD_I(size),
                 PD_MSG_FIELD_I(kind), PD_MSG_FIELD_I(properties));
+            // This returnDetail is OCR_EGUIDEXISTS
         } else {
             // Here we just need to associate a GUID
             ocrGuid_t temp;
@@ -1448,9 +1580,9 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
     case PD_MSG_GUID_UNRESERVE:
     {
 #define PD_MSG msg
-#define PD_TYPE PD_MSG_GUID_RESERVE
+#define PD_TYPE PD_MSG_GUID_UNRESERVE
         PD_MSG_FIELD_O(returnDetail) = self->guidProviders[0]->fcts.guidUnreserve(
-            self->guidProviders[0], PD_MSG_FIELD_O(startGuid), PD_MSG_FIELD_O(skipGuid),
+            self->guidProviders[0], PD_MSG_FIELD_I(startGuid), PD_MSG_FIELD_I(skipGuid),
             PD_MSG_FIELD_I(numberGuids));
 #undef PD_MSG
 #undef PD_TYPE
@@ -1513,8 +1645,26 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         break;
     }
 
+    case PD_MSG_SCHED_TRANSACT: {
+        START_PROFILE(pd_hc_Sched_Transact);
+#define PD_MSG msg
+#define PD_TYPE PD_MSG_SCHED_TRANSACT
+        ocrSchedulerOpTransactArgs_t *transactArgs = &PD_MSG_FIELD_IO(schedArgs);
+        transactArgs->base.location = msg->srcLocation;
+        PD_MSG_FIELD_O(returnDetail) =
+            self->schedulers[0]->fcts.op[OCR_SCHEDULER_OP_TRANSACT].invoke(
+                self->schedulers[0], (ocrSchedulerOpArgs_t*)transactArgs, NULL);
+#undef PD_MSG
+#undef PD_TYPE
+        msg->type &= ~PD_MSG_REQUEST;
+        if (msg->type & PD_MSG_REQ_RESPONSE)
+            msg->type |= PD_MSG_RESPONSE;
+        EXIT_PROFILE;
+        break;
+    }
+
     case PD_MSG_SCHED_ANALYZE: {
-        START_PROFILE(pd_hc_Sched_Notify);
+        START_PROFILE(pd_hc_Sched_Analyze);
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_SCHED_ANALYZE
         ocrSchedulerOpAnalyzeArgs_t *analyzeArgs = &PD_MSG_FIELD_IO(schedArgs);
@@ -1525,7 +1675,8 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
 #undef PD_MSG
 #undef PD_TYPE
         msg->type &= ~PD_MSG_REQUEST;
-        msg->type |= PD_MSG_RESPONSE;
+        if (msg->type & PD_MSG_REQ_RESPONSE)
+            msg->type |= PD_MSG_RESPONSE;
         EXIT_PROFILE;
         break;
     }
@@ -1541,7 +1692,7 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         //(but fragile) because the HC event/task does not try to use it
         //Querying the kind through the PD's interface should be ok as it's
         //the problem of the guid provider to give this information
-        if (PD_MSG_FIELD_I(source.guid) == NULL_GUID) {
+        if (ocrGuidIsNull(PD_MSG_FIELD_I(source.guid))) {
             srcKind = OCR_GUID_NONE;
         } else {
             self->guidProviders[0]->fcts.getVal(
@@ -1572,7 +1723,7 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
                 // is equivalent to satisfy. However, we want to go through the register
                 // function to make sure the access mode is recorded.
                 if(dstKind != OCR_GUID_EDT)
-                    DPRINTF(DEBUG_LVL_WARN, "Attempting to add a DB dependence to dest of kind %x "
+                    DPRINTF(DEBUG_LVL_WARN, "Attempting to add a DB dependence to dest of kind %"PRIx32" "
                                             "that's neither EDT nor Event\n", dstKind);
                 ASSERT(dstKind == OCR_GUID_EDT);
                 PD_MSG_STACK(registerMsg);
@@ -1601,7 +1752,7 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             }
         } else {
             if(!(srcKind & OCR_GUID_EVENT)) {
-                DPRINTF(DEBUG_LVL_WARN, "Attempting to add a dependence with a GUID of type 0x%x, "
+                DPRINTF(DEBUG_LVL_WARN, "Attempting to add a dependence with a GUID of type 0x%"PRIx32", "
                                         "expected Event\n", srcKind);
             }
             ASSERT(srcKind & OCR_GUID_EVENT);
@@ -1613,6 +1764,7 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             //
             // Are we revealing too much of the underlying implementation here ?
             //
+            // We omit counted events here since it won't be destroyed until the addDependence happens.
             bool srcIsNonPersistent = ((srcKind == OCR_GUID_EVENT_ONCE) ||
                                         (srcKind == OCR_GUID_EVENT_LATCH));
             // 'Push' registration when source is non-persistent and/or destination is another event.
@@ -1644,11 +1796,9 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
                 PD_MSG_FIELD_I(properties) = true; // Specify context is add-dependence
                 u8 returnCode = self->fcts.processMessage(self, &registerMsg, true);
                 u8 returnDetail = (returnCode == 0) ? PD_MSG_FIELD_O(returnDetail) : returnCode;
-
                 DPRINTF(DEBUG_LVL_INFO,
-                        "Dependence added (src: 0x%lx, dest: 0x%lx) -> %u\n", src.guid, dest.guid, returnCode,
-                        false, OCR_TRACE_TYPE_EDT, OCR_ACTION_ADD_DEP, src.guid);
-
+                        "Dependence added (src: "GUIDF", dest: "GUIDF") -> %"PRIu32"\n", GUIDA(src.guid), GUIDA(dest.guid), returnCode);
+                OCR_TOOL_TRACE(false, OCR_TRACE_TYPE_EDT, OCR_ACTION_ADD_DEP, src.guid);
             #undef PD_MSG
             #undef PD_TYPE
             #define PD_MSG msg
@@ -1675,11 +1825,10 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
                 PD_MSG_FIELD_I(properties) = true; // Specify context is add-dependence
                 u8 returnCode = self->fcts.processMessage(self, &registerMsg, true);
                 u8 returnDetail = (returnCode == 0) ? PD_MSG_FIELD_O(returnDetail) : returnCode;
-
                 DPRINTF(DEBUG_LVL_INFO,
-                        "Dependence added (src: 0x%lx, dest: 0x%lx) -> %u\n", src.guid, dest.guid, returnCode,
-                        false, OCR_TRACE_TYPE_EVENT, OCR_ACTION_ADD_DEP, src.guid);
-
+                        "Dependence added (src: "GUIDF", dest: "GUIDF") -> %"PRIu32"\n", GUIDA(src.guid),
+                        GUIDA(dest.guid), returnCode);
+                OCR_TOOL_TRACE(false, OCR_TRACE_TYPE_EVENT, OCR_ACTION_ADD_DEP, src.guid);
             #undef PD_MSG
             #undef PD_TYPE
             #define PD_MSG msg
@@ -1732,17 +1881,16 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             PD_MSG_FIELD_O(returnDetail) = self->taskFactories[0]->fcts.registerSignaler(
                 edt, signaler, PD_MSG_FIELD_I(slot), PD_MSG_FIELD_I(mode), isAddDep);
         } else {
-            DPRINTF(DEBUG_LVL_WARN, "Attempt to register signaler on %x which is not of type EDT or Event\n", dstKind);
+            DPRINTF(DEBUG_LVL_WARN, "Attempt to register signaler on %"PRIx32" which is not of type EDT or Event\n", dstKind);
             ASSERT(0); // No other things we can register signalers on
         }
 #ifdef OCR_ENABLE_STATISTICS
         statsDEP_ADD(pd, getCurrentEDT(), NULL, signalerGuid, waiterGuid, NULL, slot);
 #endif
-
         DPRINTF(DEBUG_LVL_INFO,
-                "Dependence added (src: 0x%lx, dest: 0x%lx) -> %u\n", signaler.guid, dest.guid, returnCode,
-                false, OCR_TRACE_TYPE_EDT, OCR_ACTION_ADD_DEP, signaler.guid);
-
+                "Dependence added (src: "GUIDF", dest: "GUIDF") -> %"PRIu32"\n", GUIDA(signaler.guid),
+                GUIDA(dest.guid), returnCode);
+        OCR_TOOL_TRACE(false, OCR_TRACE_TYPE_EDT, OCR_ACTION_ADD_DEP, signaler.guid);
 
 #undef PD_MSG
 #undef PD_TYPE
@@ -1767,15 +1915,17 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         if (dstKind & OCR_GUID_EVENT) {
             ocrEvent_t *evt = (ocrEvent_t*)(dest.metaDataPtr);
             ASSERT(evt->fctId == self->eventFactories[0]->factoryId);
+            // Warning: A counted-event can be destroyed by this call
             PD_MSG_FIELD_O(returnDetail) = self->eventFactories[0]->fcts[evt->kind].registerWaiter(
                 evt, waiter, PD_MSG_FIELD_I(slot), isAddDep);
         } else {
             if((dstKind & OCR_GUID_DB) == 0)
-                DPRINTF(DEBUG_LVL_WARN, "Attempting to add a dependence to a GUID of type %x, expected DB\n", dstKind);
+                DPRINTF(DEBUG_LVL_WARN, "Attempting to add a dependence to a GUID of type %"PRIx32", expected DB\n", dstKind);
             ASSERT(dstKind & OCR_GUID_DB);
             // When an EDT want to register to a DB, for instance to get EW access.
             ocrDataBlock_t *db = (ocrDataBlock_t*)(dest.metaDataPtr);
             ASSERT(db->fctId == self->dbFactories[0]->factoryId);
+            // Warning: A counted-event can be destroyed by this call
             PD_MSG_FIELD_O(returnDetail) = self->dbFactories[0]->fcts.registerWaiter(
                 db, waiter, PD_MSG_FIELD_I(slot), isAddDep);
         }
@@ -1795,10 +1945,30 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         START_PROFILE(pd_hc_Satisfy);
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_DEP_SATISFY
+#ifdef ENABLE_EXTENSION_CHANNEL_EVT
+#ifdef OCR_ASSERT
+        // In theory we should always make satisfy synchronous for channel-event
+        // but because it's only relevant to distributed for now we only set the
+        // flags in the distributed policy domain. Hence, discriminate on the
+        // location to see whether or not we should do the check.
+        if (msg->srcLocation != msg->destLocation) {
+            ocrGuidKind kind;
+            u8 ret = self->guidProviders[0]->fcts.getKind(
+                self->guidProviders[0], PD_MSG_FIELD_I(guid.guid), &kind);
+            ASSERT(ret == 0);
+            if (kind == OCR_GUID_EVENT_CHANNEL) {
+                ASSERT((kind == OCR_GUID_EVENT_CHANNEL) ? (msg->type & PD_MSG_REQ_RESPONSE) : !(msg->type & PD_MSG_REQ_RESPONSE));
+            }
+        }
+#endif
+#else
         // make sure this is one-way
         ASSERT(!(msg->type & PD_MSG_REQ_RESPONSE));
+#endif
         ocrGuidKind dstKind;
+#ifdef ENABLE_EXTENSION_PAUSE
         ocrPolicyDomainHc_t *rself = (ocrPolicyDomainHc_t *)self;
+#endif
         self->guidProviders[0]->fcts.getVal(
             self->guidProviders[0], PD_MSG_FIELD_I(guid.guid),
             (u64*)(&(PD_MSG_FIELD_I(guid.metaDataPtr))), &dstKind);
@@ -1809,16 +1979,20 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             ASSERT(evt->fctId == self->eventFactories[0]->factoryId);
             PD_MSG_FIELD_O(returnDetail) = self->eventFactories[0]->fcts[evt->kind].satisfy(
                 evt, PD_MSG_FIELD_I(payload), PD_MSG_FIELD_I(slot));
+#ifdef ENABLE_EXTENSION_PAUSE
             rself->pqrFlags.prevDb = PD_MSG_FIELD_I(payload).guid;
+#endif
         } else {
             if(dstKind == OCR_GUID_EDT) {
                 ocrTask_t *edt = (ocrTask_t*)(dst.metaDataPtr);
                 ASSERT(edt->fctId == self->taskFactories[0]->factoryId);
                 PD_MSG_FIELD_O(returnDetail) = self->taskFactories[0]->fcts.satisfy(
                     edt, PD_MSG_FIELD_I(payload), PD_MSG_FIELD_I(slot));
+#ifdef ENABLE_EXTENSION_PAUSE
                 rself->pqrFlags.prevDb = PD_MSG_FIELD_I(payload).guid;
+#endif
             } else {
-                DPRINTF(DEBUG_LVL_WARN, "Attempting to satisfy a GUID of type %x, expected EDT\n", dstKind);
+                DPRINTF(DEBUG_LVL_WARN, "Attempting to satisfy a GUID of type %"PRIx32", expected EDT\n", dstKind);
                 PD_MSG_FIELD_O(returnDetail) = OCR_ENOTSUP;
                 ASSERT(0); // We can't satisfy anything else
             }
@@ -1828,6 +2002,9 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
 #endif
 #undef PD_MSG
 #undef PD_TYPE
+#ifdef ENABLE_EXTENSION_CHANNEL_EVT
+        msg->type |= PD_MSG_RESPONSE;
+#endif
         msg->type &= ~PD_MSG_REQUEST;
         EXIT_PROFILE;
         break;
@@ -1854,10 +2031,10 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         // Check to make sure that the EDT is only doing this to
         // itself
         // Also, this should only happen when there is an actual EDT
-        if((curTask==NULL) || (curTask->guid != PD_MSG_FIELD_I(edt.guid)))
-            DPRINTF(DEBUG_LVL_WARN, "Attempting to notify a missing/different EDT, GUID=%lx\n", PD_MSG_FIELD_I(edt.guid));
+        if((curTask==NULL) || (!(ocrGuidIsEq(curTask->guid, PD_MSG_FIELD_I(edt.guid)))))
+            DPRINTF(DEBUG_LVL_WARN, "Attempting to notify a missing/different EDT, GUID="GUIDF"\n", GUIDA(PD_MSG_FIELD_I(edt.guid)));
         ASSERT(curTask &&
-               curTask->guid == PD_MSG_FIELD_I(edt.guid));
+               (ocrGuidIsEq(curTask->guid, PD_MSG_FIELD_I(edt.guid))));
 
         ASSERT(curTask->fctId == self->taskFactories[0]->factoryId);
         PD_MSG_FIELD_O(returnDetail) = self->taskFactories[0]->fcts.notifyDbAcquire(curTask, PD_MSG_FIELD_I(db));
@@ -1877,9 +2054,9 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
 #define PD_TYPE PD_MSG_DEP_DYNREMOVE
         // Check to make sure that the EDT is only doing this to itself
         // Also, this should only happen when there is an actual EDT
-        if ((curTask==NULL) || (curTask->guid != PD_MSG_FIELD_I(edt.guid)))
-            DPRINTF(DEBUG_LVL_WARN, "Attempting to notify a missing/different EDT, GUID=%lx\n", PD_MSG_FIELD_I(edt.guid));
-        ASSERT(curTask && curTask->guid == PD_MSG_FIELD_I(edt.guid));
+        if ((curTask==NULL) || (!(ocrGuidIsEq(curTask->guid, PD_MSG_FIELD_I(edt.guid)))))
+            DPRINTF(DEBUG_LVL_WARN, "Attempting to notify a missing/different EDT, GUID="GUIDF"\n", GUIDA(PD_MSG_FIELD_I(edt.guid)));
+        ASSERT(curTask && (ocrGuidIsEq(curTask->guid, PD_MSG_FIELD_I(edt.guid))));
         ASSERT(curTask->fctId == self->taskFactories[0]->factoryId);
         PD_MSG_FIELD_O(returnDetail) = self->taskFactories[0]->fcts.notifyDbRelease(curTask, PD_MSG_FIELD_I(db));
 #undef PD_MSG
@@ -1937,7 +2114,7 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             ASSERT(PD_MSG_FIELD_I(properties) & RL_TEAR_DOWN);
             ASSERT(PD_MSG_FIELD_I(runlevel) & RL_COMPUTE_OK);
             self->shutdownCode = PD_MSG_FIELD_I(errorCode);
-            u8 returnCode = self->fcts.switchRunlevel(
+            u8 returnCode __attribute__((unused)) = self->fcts.switchRunlevel(
                               self, RL_USER_OK, RL_TEAR_DOWN | RL_ASYNC | RL_REQUEST | RL_FROM_MSG);
             ASSERT(returnCode == 0);
         }
@@ -1968,16 +2145,16 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         ocrFatGuid_t fatGuid = PD_MSG_FIELD_I(guid);
         ocrGuidKind kind = OCR_GUID_NONE;
         guidKind(self, fatGuid, &kind);
-        switch(PD_MSG_FIELD_I(hint.type)) {
+        switch(PD_MSG_FIELD_I(hint->type)) {
         case OCR_HINT_EDT_T:
             {
                 if (kind == OCR_GUID_EDT_TEMPLATE) {
                     ocrTaskTemplate_t* taskTemplate = (ocrTaskTemplate_t*)(PD_MSG_FIELD_I(guid.metaDataPtr));
-                    PD_MSG_FIELD_O(returnDetail) = self->taskTemplateFactories[0]->fcts.setHint(taskTemplate, &(PD_MSG_FIELD_I(hint)));
+                    PD_MSG_FIELD_O(returnDetail) = self->taskTemplateFactories[0]->fcts.setHint(taskTemplate, PD_MSG_FIELD_I(hint));
                 } else {
                     ASSERT(kind == OCR_GUID_EDT);
                     ocrTask_t *task = (ocrTask_t*)(PD_MSG_FIELD_I(guid.metaDataPtr));
-                    PD_MSG_FIELD_O(returnDetail) = self->taskFactories[0]->fcts.setHint(task, &(PD_MSG_FIELD_I(hint)));
+                    PD_MSG_FIELD_O(returnDetail) = self->taskFactories[0]->fcts.setHint(task, PD_MSG_FIELD_I(hint));
                 }
             }
             break;
@@ -1985,14 +2162,14 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             {
                 ASSERT(kind == OCR_GUID_DB);
                 ocrDataBlock_t *db = (ocrDataBlock_t*)(PD_MSG_FIELD_I(guid.metaDataPtr));
-                PD_MSG_FIELD_O(returnDetail) = self->dbFactories[0]->fcts.setHint(db, &(PD_MSG_FIELD_I(hint)));
+                PD_MSG_FIELD_O(returnDetail) = self->dbFactories[0]->fcts.setHint(db, PD_MSG_FIELD_I(hint));
             }
             break;
         case OCR_HINT_EVT_T:
             {
                 ASSERT(kind & OCR_GUID_EVENT);
                 ocrEvent_t *evt = (ocrEvent_t*)(PD_MSG_FIELD_I(guid.metaDataPtr));
-                PD_MSG_FIELD_O(returnDetail) = self->eventFactories[0]->commonFcts.setHint(evt, &(PD_MSG_FIELD_I(hint)));
+                PD_MSG_FIELD_O(returnDetail) = self->eventFactories[0]->commonFcts.setHint(evt, PD_MSG_FIELD_I(hint));
             }
             break;
         case OCR_HINT_GROUP_T:
@@ -2017,16 +2194,16 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         ocrFatGuid_t fatGuid = PD_MSG_FIELD_I(guid);
         ocrGuidKind kind = OCR_GUID_NONE;
         guidKind(self, fatGuid, &kind);
-        switch(PD_MSG_FIELD_IO(hint.type)) {
+        switch(PD_MSG_FIELD_IO(hint->type)) {
         case OCR_HINT_EDT_T:
             {
                 if (kind == OCR_GUID_EDT_TEMPLATE) {
                     ocrTaskTemplate_t* taskTemplate = (ocrTaskTemplate_t*)(PD_MSG_FIELD_I(guid.metaDataPtr));
-                    PD_MSG_FIELD_O(returnDetail) = self->taskTemplateFactories[0]->fcts.getHint(taskTemplate, &(PD_MSG_FIELD_IO(hint)));
+                    PD_MSG_FIELD_O(returnDetail) = self->taskTemplateFactories[0]->fcts.getHint(taskTemplate, PD_MSG_FIELD_IO(hint));
                 } else {
                     ASSERT(kind == OCR_GUID_EDT);
                     ocrTask_t *task = (ocrTask_t*)(PD_MSG_FIELD_I(guid.metaDataPtr));
-                    PD_MSG_FIELD_O(returnDetail) = self->taskFactories[0]->fcts.getHint(task, &(PD_MSG_FIELD_IO(hint)));
+                    PD_MSG_FIELD_O(returnDetail) = self->taskFactories[0]->fcts.getHint(task, PD_MSG_FIELD_IO(hint));
                 }
             }
             break;
@@ -2034,14 +2211,14 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             {
                 ASSERT(kind == OCR_GUID_DB);
                 ocrDataBlock_t *db = (ocrDataBlock_t*)(PD_MSG_FIELD_I(guid.metaDataPtr));
-                PD_MSG_FIELD_O(returnDetail) = self->dbFactories[0]->fcts.getHint(db, &(PD_MSG_FIELD_IO(hint)));
+                PD_MSG_FIELD_O(returnDetail) = self->dbFactories[0]->fcts.getHint(db, PD_MSG_FIELD_IO(hint));
             }
             break;
         case OCR_HINT_EVT_T:
             {
                 ASSERT(kind & OCR_GUID_EVENT);
                 ocrEvent_t *evt = (ocrEvent_t*)(PD_MSG_FIELD_I(guid.metaDataPtr));
-                PD_MSG_FIELD_O(returnDetail) = self->eventFactories[0]->commonFcts.getHint(evt, &(PD_MSG_FIELD_IO(hint)));
+                PD_MSG_FIELD_O(returnDetail) = self->eventFactories[0]->commonFcts.getHint(evt, PD_MSG_FIELD_IO(hint));
             }
             break;
         case OCR_HINT_GROUP_T:
@@ -2063,6 +2240,8 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         ASSERT(0);
     }
 
+    hcSchedNotifyPostProcessMessage(self, msg);
+
     if ((msg->type & PD_MSG_RESPONSE) && (msg->type & PD_MSG_REQ_RESPONSE)) {
         // response is issued:
         // flip required response bit
@@ -2083,6 +2262,16 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
     RETURN_PROFILE(returnCode);
 }
 
+pdEvent_t* hcPdProcessMessageMT(ocrPolicyDomain_t* self, pdEvent_t *evt, u32 idx) {
+    // Simple version to test out micro tasks for now. This just executes a blocking
+    // call to the regular process message and returns NULL
+    ASSERT(idx == 0);
+    ASSERT((evt->properties & PDEVT_TYPE_MASK) == PDEVT_TYPE_MSG);
+    pdEventMsg_t *evtMsg = (pdEventMsg_t*)evt;
+    hcPolicyDomainProcessMessage(self, evtMsg->msg, true);
+    return NULL;
+}
+
 u8 hcPdSendMessage(ocrPolicyDomain_t* self, ocrLocation_t target, ocrPolicyMsg_t *message,
                    ocrMsgHandle_t **handle, u32 properties) {
     ASSERT(0);
@@ -2101,21 +2290,30 @@ u8 hcPdWaitMessage(ocrPolicyDomain_t *self,  ocrMsgHandle_t **handle) {
 
 void* hcPdMalloc(ocrPolicyDomain_t *self, u64 size) {
     START_PROFILE(pd_hc_PdMalloc);
+#ifdef NANNYMODE_SYSALLOC
+    // Just try in the first allocator
+    void* toReturn = malloc(size);
+    ASSERT(toReturn != NULL);
+#else
     // Just try in the first allocator
     void* toReturn = NULL;
     toReturn = self->allocators[0]->fcts.allocate(self->allocators[0], size, 0);
     if(toReturn == NULL)
-        DPRINTF(DEBUG_LVL_WARN, "Failed PDMalloc for size %lx\n", size);
+        DPRINTF(DEBUG_LVL_WARN, "Failed PDMalloc for size %"PRIx64"\n", size);
     ASSERT(toReturn != NULL);
+#endif
     RETURN_PROFILE(toReturn);
 }
 
 void hcPdFree(ocrPolicyDomain_t *self, void* addr) {
     START_PROFILE(pd_hc_PdFree);
+#ifdef NANNYMODE_SYSALLOC
+    // Just try in the first allocator
+    free(addr);
+#else
     // May result in leaks but better than the alternative...
-
     allocatorFreeFunction(addr);
-
+#endif
     RETURN_PROFILE();
 }
 
@@ -2123,15 +2321,15 @@ ocrPolicyDomain_t * newPolicyDomainHc(ocrPolicyDomainFactory_t * factory,
 #ifdef OCR_ENABLE_STATISTICS
                                       ocrStats_t *statsObject,
 #endif
-                                      ocrCost_t *costFunction, ocrParamList_t *perInstance) {
+                                      ocrParamList_t *perInstance) {
 
     ocrPolicyDomainHc_t * derived = (ocrPolicyDomainHc_t *) runtimeChunkAlloc(sizeof(ocrPolicyDomainHc_t), PERSISTENT_CHUNK);
     ocrPolicyDomain_t * base = (ocrPolicyDomain_t *) derived;
     ASSERT(base);
 #ifdef OCR_ENABLE_STATISTICS
-    factory->initialize(factory, base, statsObject, costFunction, perInstance);
+    factory->initialize(factory, base, statsObject, perInstance);
 #else
-    factory->initialize(factory, base, costFunction, perInstance);
+    factory->initialize(factory, base, perInstance);
 #endif
 
     return base;
@@ -2141,7 +2339,7 @@ void initializePolicyDomainHc(ocrPolicyDomainFactory_t * factory, ocrPolicyDomai
 #ifdef OCR_ENABLE_STATISTICS
                               ocrStats_t *statsObject,
 #endif
-                              ocrCost_t *costFunction, ocrParamList_t *perInstance) {
+                              ocrParamList_t *perInstance) {
 #ifdef OCR_ENABLE_STATISTICS
     self->statsObject = statsObject;
 #endif
@@ -2174,6 +2372,7 @@ ocrPolicyDomainFactory_t * newPolicyDomainFactoryHc(ocrParamList_t *perType) {
     base->policyDomainFcts.destruct = FUNC_ADDR(void(*)(ocrPolicyDomain_t*), hcPolicyDomainDestruct);
     base->policyDomainFcts.switchRunlevel = FUNC_ADDR(u8 (*)(ocrPolicyDomain_t*, ocrRunlevel_t, u32), hcPdSwitchRunlevel);
     base->policyDomainFcts.processMessage = FUNC_ADDR(u8(*)(ocrPolicyDomain_t*,ocrPolicyMsg_t*,u8), hcPolicyDomainProcessMessage);
+    base->policyDomainFcts.processMessageMT = FUNC_ADDR(pdEvent_t* (*)(ocrPolicyDomain_t*, pdEvent_t*, u32), hcPdProcessMessageMT);
 
     base->policyDomainFcts.sendMessage = FUNC_ADDR(u8 (*)(ocrPolicyDomain_t*, ocrLocation_t, ocrPolicyMsg_t *, ocrMsgHandle_t**, u32),
                                          hcPdSendMessage);

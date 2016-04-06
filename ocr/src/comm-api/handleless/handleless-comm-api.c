@@ -17,6 +17,7 @@
 #include "handleless-comm-api.h"
 
 #define DEBUG_TYPE COMM_API
+void handlelessCommDestructHandle(ocrMsgHandle_t *handle);
 
 void handlelessCommDestruct (ocrCommApi_t * base) {
     // call destruct on child
@@ -36,8 +37,6 @@ u8 handlelessCommSwitchRunlevel(ocrCommApi_t *self, ocrPolicyDomain_t *PD, ocrRu
     ASSERT(callback == NULL);
 
     // Verify properties for this call
-    ASSERT((properties & RL_REQUEST) && !(properties & RL_RESPONSE)
-           && !(properties & RL_RELEASE));
     ASSERT(!(properties & RL_FROM_MSG));
 
     if(properties & RL_BRING_UP) {
@@ -76,95 +75,130 @@ u8 handlelessCommSwitchRunlevel(ocrCommApi_t *self, ocrPolicyDomain_t *PD, ocrRu
     return toReturn;
 }
 
+u8 handlelessInitHandle(ocrCommApi_t *self, ocrMsgHandle_t* handle) {
+    handle->msg = handle->response = NULL;
+    handle->status = HDL_NORMAL;
+    handle->destruct = FUNC_ADDR(
+        void (*)(ocrMsgHandle_t*), handlelessCommDestructHandle);
+    handle->properties = 0;
+    handle->commApi = self;
+    return 0;
+}
+
 u8 handlelessCommSendMessage(ocrCommApi_t *self, ocrLocation_t target, ocrPolicyMsg_t *message,
                              ocrMsgHandle_t **handle, u32 properties) {
     u64 id;
-    // Asserts in this function are sanity checks; any violation points to memory corruption
-    if (message->type & PD_MSG_REQUEST) {
-        ASSERT(!(message->type & PD_MSG_RESPONSE));
-        if(handle) {
-            ASSERT(message->type & PD_MSG_REQ_RESPONSE);
-            ocrCommApiHandleless_t * commApiHandleless = (ocrCommApiHandleless_t*)self;
+    u8 retval;
 
-            if(commApiHandleless->handle.status != 0) {
-                commApiHandleless->handle.status = 0;
-                return OCR_ECANCELED;
-            }
-
-            ASSERT(commApiHandleless->handle.status == 0);
-            *handle = &(commApiHandleless->handle);
+    // If we have a handle, currently it should be a two way message
+    // This may change in the future when we want to support queries on whether
+    // a one way message was properly sent
+    if(handle) {
+        ASSERT(properties & TWOWAY_MSG_PROP);
+        ASSERT(*handle); // We need to have a handle that is already allocated
+        (*handle)->destruct = FUNC_ADDR(
+            void (*)(ocrMsgHandle_t*), handlelessCommDestructHandle);
+        // If persistent, remember where the message was
+        if(properties & PERSIST_MSG_PROP)
             (*handle)->msg = message;
-            (*handle)->response = NULL;
-            (*handle)->status = HDL_NORMAL;
-        }
-    } else {
-        ASSERT(message->type & PD_MSG_RESPONSE);
-        ASSERT(!handle);
+
+        // This needs to be here because the handle is initialized only
+        // when polling directly. If it is used to send a message, it may
+        // not be always initialized
+        (*handle)->response = NULL;
+        (*handle)->status = HDL_NORMAL;
+        (*handle)->properties = 0;
+        (*handle)->commApi = self;
     }
-    return self->commPlatform->fcts.sendMessage(self->commPlatform, target, message, &id, properties, 0);
+
+    retval = self->commPlatform->fcts.sendMessage(self->commPlatform, target, message, &id, properties, 0);
+    if(retval != 0 && handle) {
+        // We need the handle to actually exist
+        ASSERT(*handle);
+        (*handle)->status = HDL_SEND_ERR;
+    }
+    return retval;
 }
 
 u8 handlelessCommPollMessage(ocrCommApi_t *self, ocrMsgHandle_t **handle) {
     u8 retval;
-    ASSERT(handle);
-    ocrCommApiHandleless_t * commApiHandleless = (ocrCommApiHandleless_t*)self;
-    if (!(*handle)) {
-        *handle = &(commApiHandleless->handle);
-        (*handle)->status = HDL_NORMAL;
-    } else {
-        ASSERT((*handle)->msg);
+    // Only works if handle is allocated. We only support
+    // an allocated handle and currently return ANY message (ie: not the one
+    // specifically for the handle). This is just because this Comm-API
+    // implementation does not internally handle handles
+    ASSERT(handle && *handle);
+
+    // The handle should be valid
+    ASSERT((*handle)->status == HDL_NORMAL);
+
+    // If the in message was persistent, we can always re-use it
+    // Pass that as a hint
+    if((*handle)->msg) {
+        (*handle)->response = (*handle)->msg;
     }
-    // Pass a "hint" saying that the the buffer is available
-    (*handle)->response = (*handle)->msg;
+
     retval = self->commPlatform->fcts.pollMessage(
-                      self->commPlatform, &((*handle)->response), PD_CE_CE_MESSAGE,
-                      NULL);
-    if((*handle)->response == (*handle)->msg) {
-        // This means that the comm platform did *not* allocate the buffer itself
-        (*handle)->properties = 0; // Indicates "do not free"
+                      self->commPlatform, &((*handle)->response), 0, NULL);
+    if(retval == 0) {
+        if((*handle)->response == (*handle)->msg) {
+            // This means that the comm platform did *not* allocate the buffer itself
+            (*handle)->properties = 0; // Indicates "do not free"
+        } else {
+            // This means that the comm platform did allocate the buffer itself
+            (*handle)->properties = 1; // Indicates "do free"
+        }
+        (*handle)->status = HDL_RESPONSE_OK;
     } else {
-        // This means that the comm platform did allocate the buffer itself
-        (*handle)->properties = 1; // Indicates "do free"
+        (*handle)->status = HDL_RECV_ERR;
     }
     return retval;
 }
 
 u8 handlelessCommWaitMessage(ocrCommApi_t *self, ocrMsgHandle_t **handle) {
-    ASSERT(handle);
-    ocrCommApiHandleless_t * commApiHandleless = (ocrCommApiHandleless_t*)self;
-    // Asserts in this function are sanity checks; any violation points to memory corruption
-    if (!(*handle)) {
-        *handle = &(commApiHandleless->handle);
-        ASSERT((*handle)->status == 0);
-        (*handle)->status = HDL_NORMAL;
-    } else {
-        ASSERT((*handle)->msg);
+    u8 retval;
+    // Only works if handle is allocated
+    ASSERT(handle && *handle);
+
+    // The handle should be valid
+    ASSERT((*handle)->status == HDL_NORMAL);
+
+    // If the in message was persistent, we can always re-use it
+    // Pass that as a hint
+    if((*handle)->msg) {
+        (*handle)->response = (*handle)->msg;
     }
-    ASSERT((*handle)->status == HDL_NORMAL &&
-           (*handle) == (&(commApiHandleless->handle)));
-    // Pass a "hint" saying that the the buffer is available
-    (*handle)->response = (*handle)->msg;
-    RESULT_ASSERT(self->commPlatform->fcts.waitMessage(
-                      self->commPlatform, &((*handle)->response), 0,
-                      NULL), ==, 0);
-    if((*handle)->response == (*handle)->msg) {
-        // This means that the comm platform did *not* allocate the buffer itself
-        (*handle)->properties = 0; // Indicates "do not free"
+
+    retval = self->commPlatform->fcts.waitMessage(
+        self->commPlatform, &((*handle)->response), 0, NULL);
+    if(retval == 0) {
+        if((*handle)->response == (*handle)->msg) {
+            // This means that the comm platform did *not* allocate the buffer itself
+            (*handle)->properties = 0; // Indicates "do not free"
+        } else {
+            // This means that the comm platform did allocate the buffer itself
+            (*handle)->properties = 1; // Indicates "do free"
+        }
+        (*handle)->status = HDL_RESPONSE_OK;
     } else {
-        // This means that the comm platform did allocate the buffer itself
-        (*handle)->properties = 1; // Indicates "do free"
+        (*handle)->status = HDL_RECV_ERR;
     }
-    return 0;
+    return retval;
 }
 
 void handlelessCommDestructHandle(ocrMsgHandle_t *handle) {
+    // We should have a handle
+    ASSERT(handle);
+    // We should have received a proper response
+    ASSERT(handle->status == HDL_RESPONSE_OK);
     if(handle->properties == 1) {
+        // Should have something to free
+        ASSERT(handle->response);
         RESULT_ASSERT(handle->commApi->commPlatform->fcts.destructMessage(
                           handle->commApi->commPlatform, handle->response), ==, 0);
     }
     handle->msg = NULL;
     handle->response = NULL;
-    handle->status = 0;
+    handle->status = HDL_ERR;
     handle->properties = 0;
 }
 
@@ -174,12 +208,6 @@ ocrCommApi_t* newCommApiHandleless(ocrCommApiFactory_t *factory,
     ocrCommApiHandleless_t * commApiHandleless = (ocrCommApiHandleless_t*)
         runtimeChunkAlloc(sizeof(ocrCommApiHandleless_t), PERSISTENT_CHUNK);
     factory->initialize(factory, (ocrCommApi_t*) commApiHandleless, perInstance);
-    commApiHandleless->handle.msg = NULL;
-    commApiHandleless->handle.response = NULL;
-    commApiHandleless->handle.status = 0;
-    commApiHandleless->handle.properties = 0;
-    commApiHandleless->handle.commApi = (ocrCommApi_t*)commApiHandleless;
-    commApiHandleless->handle.destruct = FUNC_ADDR(void (*)(ocrMsgHandle_t*), handlelessCommDestructHandle);
 
     return (ocrCommApi_t*)commApiHandleless;
 }
@@ -209,6 +237,7 @@ ocrCommApiFactory_t *newCommApiFactoryHandleless(ocrParamList_t *perType) {
     base->apiFcts.destruct = FUNC_ADDR(void (*)(ocrCommApi_t*), handlelessCommDestruct);
     base->apiFcts.switchRunlevel = FUNC_ADDR(u8 (*)(ocrCommApi_t*, ocrPolicyDomain_t*, ocrRunlevel_t,
                                                     phase_t, u32, void (*)(ocrPolicyDomain_t*, u64), u64), handlelessCommSwitchRunlevel);
+    base->apiFcts.initHandle = FUNC_ADDR(u8 (*)(ocrCommApi_t*, ocrMsgHandle_t*), handlelessInitHandle);
     base->apiFcts.sendMessage = FUNC_ADDR(u8 (*)(ocrCommApi_t*, ocrLocation_t, ocrPolicyMsg_t *, ocrMsgHandle_t**, u32),
                                           handlelessCommSendMessage);
     base->apiFcts.pollMessage = FUNC_ADDR(u8 (*)(ocrCommApi_t*, ocrMsgHandle_t**),

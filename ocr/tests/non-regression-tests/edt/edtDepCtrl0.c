@@ -12,7 +12,7 @@
 
 ocrGuid_t otherEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ASSERT(depc == 1);
-    ASSERT(depv[0].guid == NULL_GUID);
+    ASSERT(ocrGuidIsNull(depv[0].guid));
     ocrShutdown();
     return NULL_GUID;
 }
@@ -22,7 +22,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrEdtTemplateCreate(&tplGuid, otherEdt, 0 /*paramc*/, 1 /*depc*/);
     ocrGuid_t edtGuid;
     ocrEdtCreate(&edtGuid, tplGuid, 0, NULL, 1, NULL,
-                 EDT_PROP_NONE, NULL_GUID, NULL);
+                 EDT_PROP_NONE, NULL_HINT, NULL);
     ocrAddDependence(NULL_GUID, edtGuid, 0, DB_MODE_NULL);
-    return 0;
+    return NULL_GUID;
 }

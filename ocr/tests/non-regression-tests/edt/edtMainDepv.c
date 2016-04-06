@@ -18,9 +18,9 @@ ocrGuid_t mainEdt ( u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     u64 offset = dbAsU64[2];
     char *dbAsChar = (char*)programArg;
     int res = atoi(dbAsChar+offset);
-    PRINTF("In mainEdt with value %d\n", res);
+    PRINTF("In mainEdt with value %"PRId32"\n", res);
     ASSERT(res == 42);
 
     ocrShutdown();
-    return 0;
+    return NULL_GUID;
 }

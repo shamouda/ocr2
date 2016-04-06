@@ -14,6 +14,16 @@ if [[ -z "${SCRIPT_ROOT}" ]]; then
     exit 1
 fi
 
+if [[ -z "${OCR_INSTALL}" ]]; then
+    # Check if this an OCR repo
+    export OCR_INSTALL="${SCRIPT_ROOT}/../../../install"
+    if [[ ! -d ${OCR_INSTALL} ]]; then
+        echo "OCR_INSTALL environment variable is not defined and cannot be deduced"
+        exit 1
+    fi
+fi
+
+
 #
 # Environment variables default values
 #
@@ -22,17 +32,18 @@ fi
 export NB_RUN=${NB_RUN-"3"}
 
 # Core scaling sweep
-export CORE_SCALING=${CORE_SCALING-"2 4 8 16"}
+if [[ "${OCR_TYPE}" = "x86" ]]; then
+    export CORE_SCALING=${CORE_SCALING-"1 2 4 8 16"}
+else
+    export CORE_SCALING=${CORE_SCALING-"2 4 8 16"}
+fi
 
-# Number of nodes to use
-export OCR_NUM_NODES=${OCR_NUM_NODES-"1"}
+# Number of nodes is controlled by the caller
 
 # Default runlog and report naming
-export LOG_DIR=${LOG_DIR-${PWD}}
 export RUNLOG_FILENAME_BASE=${RUNLOG_FILENAME_BASE-"runlog"}
 export REPORT_FILENAME_BASE=${REPORT_FILENAME_BASE-"report"}
 
-echo "LOG_DIR=${LOG_DIR}"
 #
 # Option Parsing and Checking
 #
@@ -46,10 +57,10 @@ TARGET_OPT="no"
 TARGET_ARG="x86"
 PROGRAMS=""
 
-SWEEP_FOLDER="configSweep"
-TEST_FOLDER="ocr"
+SWEEP_FOLDER="${SCRIPT_ROOT}/../configSweep"
+TEST_FOLDER="${SCRIPT_ROOT}/../ocr"
 
-if [[ ! -d ${SWEEP_FOLDER} ]]; then
+if [[ ! -d ${SCRIPT_ROOT} ]]; then
     echo "error: ${SCRIPT_NAME} cannot find sweep config folder ${SWEEP_FOLDER}"
     exit 1
 fi
@@ -76,6 +87,11 @@ while [[ $# -gt 0 ]]; do
             echo "error: ${SCRIPT_NAME} cannot find sweepfile ${SWEEPFILE_ARG}"
             exit 1
         fi
+        shift
+    elif [[ "$1" = "-logdir" && $# -ge 2 ]]; then
+        shift
+        LOGDIR_OPT="yes"
+        LOGDIR_ARG=("$@")
         shift
     elif [[ "$1" = "-defaultfile" && $# -ge 2 ]]; then
         shift
@@ -156,6 +172,11 @@ function matchDefaultFile() {
 }
 
 function run() {
+    ARGS=
+    if [[ -n "${LOGDIR_ARG}" ]]; then
+        ARGS+="-logdir ${LOGDIR_ARG}"
+    fi
+
     for prog in `echo "$PROGRAMS"`; do
         local found=""
         local runnerArgs=""
@@ -185,10 +206,9 @@ function run() {
         if [ -z "$found" ]; then
             echo ">>> ${prog}: Use defines from defaults.mk"
         fi
-
         runlogFilename=${RUNLOG_FILENAME_BASE}-${prog}
-        reportFilename=${REPORT_FILENAME_BASE}-${prog}
-        ${SCRIPT_ROOT}/runner.sh -nbrun ${NB_RUN} -target ${TARGET_ARG} -logdir ${LOG_DIR} -runlog ${runlogFilename} -report ${reportFilename} ${runnerArgs} ${prog}
+        reportFilename=${REPORT_FILENAME_BASE}-${prog}${REPORT_FILENAME_EXT}
+        ${SCRIPT_ROOT}/runner.sh ${ARGS} -nbrun ${NB_RUN} -target ${TARGET_ARG} -runlog ${runlogFilename} -report ${reportFilename} ${runnerArgs} ${prog}
     done
 }
 

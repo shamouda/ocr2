@@ -40,12 +40,6 @@
 // Comp-target
 #define ENABLE_COMP_TARGET_PASSTHROUGH
 
-// Scheduler Objects
-#define ENABLE_SCHEDULER_OBJECT_NULL
-
-// Scheduler Heuristic
-#define ENABLE_SCHEDULER_HEURISTIC_NULL
-
 // Datablock
 #define ENABLE_DATABLOCK_REGULAR
 #define ENABLE_DATABLOCK_LOCKABLE
@@ -61,6 +55,9 @@
 #define ENABLE_GUID_PTR
 #define ENABLE_GUID_COUNTED_MAP
 #define ENABLE_GUID_LABELED
+
+// Hints
+#define ENABLE_HINTS
 
 // HAL layer to use
 #define HAL_X86_64
@@ -82,6 +79,33 @@
 #define ENABLE_SCHEDULER_HC
 #define ENABLE_SCHEDULER_HC_COMM_DELEGATE
 #define ENABLE_SCHEDULER_BLOCKING_SUPPORT
+#define ENABLE_SCHEDULER_COMMON
+
+// Scheduler Heuristic
+#define ENABLE_SCHEDULER_HEURISTIC_NULL
+#define ENABLE_SCHEDULER_HEURISTIC_HC
+#define ENABLE_SCHEDULER_HEURISTIC_HC_COMM_DELEGATE
+#define ENABLE_SCHEDULER_HEURISTIC_PLACEMENT_AFFINITY
+#define ENABLE_SCHEDULER_HEURISTIC_ST
+#define ENABLE_SCHEDULER_HEURISTIC_PRIORITY
+#define ENABLE_SCHEDULER_HEURISTIC_STATIC
+
+// Scheduler Objects
+#define ENABLE_SCHEDULER_OBJECT_NULL
+#define ENABLE_SCHEDULER_OBJECT_WST
+#define ENABLE_SCHEDULER_OBJECT_DEQ
+#define ENABLE_SCHEDULER_OBJECT_LIST
+#define ENABLE_SCHEDULER_OBJECT_MAP
+#define ENABLE_SCHEDULER_OBJECT_PDSPACE
+#define ENABLE_SCHEDULER_OBJECT_DBSPACE
+#define ENABLE_SCHEDULER_OBJECT_DBTIME
+#define ENABLE_SCHEDULER_OBJECT_PR_WSH
+#define ENABLE_SCHEDULER_OBJECT_BIN_HEAP
+
+// Support for MPIlite blocking operations
+#ifndef DISABLE_EXTENSION_BLOCKING_SUPPORT
+#define ENABLE_EXTENSION_BLOCKING_SUPPORT
+#endif
 
 // Sysboot layer to use
 #define ENABLE_SYSBOOT_LINUX
@@ -95,11 +119,21 @@
 // Worker
 #define ENABLE_WORKER_HC
 #define ENABLE_WORKER_HC_COMM
+#define ENABLE_WORKER_SYSTEM
 
 // Workpile
 #define ENABLE_WORKPILE_HC
 
-// Build the OCR-legacy support
+// Event creation with parameter
+#define ENABLE_EXTENSION_PARAMS_EVT
+
+// Counted Events support
+#define ENABLE_EXTENSION_COUNTED_EVT
+
+// Channel Events support
+#define ENABLE_EXTENSION_CHANNEL_EVT
+
+// OCR legacy support
 #define ENABLE_EXTENSION_LEGACY
 
 // Affinity support
@@ -108,7 +142,11 @@
 //GUID Labeling
 #define ENABLE_EXTENSION_LABELING
 
-// Build pause/resume support
-// #define ENABLE_EXTENSION_PAUSE
+// Build pause support
+//#define ENABLE_EXTENSION_PAUSE
+
+// Runtime extension support
+#define ENABLE_EXTENSION_RTITF
 
 #endif /* __OCR_CONFIG_H__ */
+

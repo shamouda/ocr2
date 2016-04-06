@@ -1,0 +1,82 @@
+#!/bin/bash
+
+
+# User-provided or generated
+PROGRAM_BIN=
+
+#
+# Handling options
+#
+
+while [ $# -gt 0 ]; do
+    if [[ "$1" = "-ocr:cfg" && $# -ge 2 ]]; then
+        shift
+        OCR_CONFIG=("$@")
+        shift
+   else
+        # stacking unknown arguments
+        ARGS="${ARGS} $1"
+        shift
+    fi
+done
+
+NB_ARGS=`echo $ARGS | wc -w`
+
+if [ ${NB_ARGS} -eq 0 ]; then
+    echo "error: missing program name argument"
+    exit 1
+elif [ ${NB_ARGS} -lt 1 ]; then
+    echo "error: unexpected number of arguments"
+    exit 2
+else
+    PROGRAM_BIN=${ARGS}
+fi
+
+if [ "${OCR_CONFIG}" = "" ]; then
+    #Call the config generator
+    python ${OCR_INSTALL}/share/ocr/scripts/Configs/config-generator.py --output ${PWD}/generated_ocrrun.cfg
+    OCR_CONFIG=${PWD}/generated_ocrrun.cfg
+fi
+
+if [[ "${OCRRUN_GDB}" == "yes" ]]; then
+    PROGRAM_BIN="gdb --args ${PROGRAM_BIN}"
+fi
+
+if [[ "${OCRRUN_VALGRIND_OPTS}" != "" ]]; then
+    OCRRUN_VALGRIND="yes";
+fi
+
+if [[ "${OCRRUN_VALGRIND}" == "yes" ]]; then
+    PROGRAM_BIN="valgrind ${OCRRUN_VALGRIND_OPTS} ${PROGRAM_BIN}"
+fi
+
+if [[ "${OCRRUN_HPCTOOLKIT}" == "yes" ]]; then
+    PROGPATH=`echo "${PROGRAM_BIN%/*}" | sed 's/^ *//'`
+    PROGNAME=`echo "${PROGRAM_BIN##*/}" | cut -d' ' -f1-1`
+    if [[ -z "${OCR_INSTALL}" ]]; then
+        echo "error: ocrrun support for hpctoolkit needs OCR_INSTALL to be defined"
+        exit 1
+    fi
+    rm -Rf ${PROGPATH}/${PROGNAME}.db
+    rm -Rf ${PROGPATH}/${PROGNAME}_meas
+    rm -Rf ${PROGPATH}/*.hpcstruct
+    hpcstruct ${OCR_INSTALL}/lib/libocr_x86.so
+    hpcstruct "${PROGPATH}/${PROGNAME}"
+    PROGRAM_BIN="hpcrun -t -o ${PROGPATH}/${PROGNAME}_meas ${OCRRUN_HPCTOOLKIT_OPTS} ${PROGRAM_BIN}"
+fi
+
+# Default is regular X86-backend
+${PROGRAM_BIN} -ocr:cfg ${OCR_CONFIG}
+RET_CODE=$?
+
+if [[ ${RET_CODE} -eq 0 ]]; then
+    if [[ "${OCRRUN_HPCTOOLKIT}" == "yes" ]]; then
+        HPCSTRUCT="-S ${PROGPATH}/libocr_x86.so.hpcstruct -S ${PROGPATH}/${PROGNAME}.hpcstruct"
+        hpcprof-mpi -I . ${HPCSTRUCT} -o ${PROGPATH}/${PROGNAME}.db ${PROGPATH}/${PROGNAME}_meas
+
+    fi
+fi
+
+exit ${RET_CODE}
+
+

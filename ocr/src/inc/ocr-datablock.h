@@ -207,12 +207,14 @@ typedef struct _ocrDataBlock_t {
 #define DB_ACCESS_MODE_MASK 0xF /**< Bits encoding the access modes (see inc/ocr-types.h) */
 
 // Runtime DB properties (upper 16 bits of a u32)
-#define DB_PROP_RT_ACQUIRE     0x10000 // DB acquired by runtime
-#define DB_PROP_RT_OBLIVIOUS   0x20000 //BUG #607 DB RO mode: (Flag is for runtime use)
-#define DB_PROP_NO_RELEASE     0x40000 // Indicate a release is not required
+#define DB_PROP_RT_ACQUIRE          0x10000 // DB acquired by runtime
+#define DB_PROP_RT_OBLIVIOUS        0x20000 // BUG #607 DB RO mode: (Flag is for runtime use)
+#define DB_PROP_NO_RELEASE          0x40000 // Indicate a release is not required
+#define DB_PROP_RT_PD_ACQUIRE       0x80000 // DB acquired by scheduler for whole PD
+#define DB_PROP_RT_PROXY            0x100000// DB metadata instantiated as proxy (workaround for BUG #162)
 
-#define DB_FLAG_RT_FETCH       0x100000
-#define DB_FLAG_RT_WRITE_BACK  0x200000
+#define DB_FLAG_RT_FETCH            0x1000000
+#define DB_FLAG_RT_WRITE_BACK       0x2000000
 
 /****************************************************/
 /* OCR DATABLOCK FACTORY                            */
@@ -225,18 +227,23 @@ typedef struct _ocrDataBlockFactory_t {
     /**
      * @brief Creates a data-block to represent a chunk of memory
      *
-     * @param factory       Pointer to this factory
-     * @param allocator     Allocator guid used to allocate memory
-     * @param allocPD       Policy-domain of the allocator
-     * @param size          data-block size
-     * @param ptr           Pointer to the memory to use (created through an allocator)
-     * @param properties    Properties for the data-block
-     * @param instanceArg   Arguments specific for this instance
+     * @param[in] factory       Pointer to this factory
+     * @param[in/out] guid      GUID for the object. If GUID_PROP_IS_LABELED is specified in
+     *                          properties, guid.guid contains the GUID to use. guid.metaDataPtr will
+     *                          contain the pointer to the object (an ocrDataBlock_t)
+     * @param[in] allocator     Allocator guid used to allocate memory
+     * @param[in] allocPD       Policy-domain of the allocator
+     * @param[in] size          data-block size
+     * @param[in] ptr           Pointer to the memory to use (created through an allocator)
+     * @param[in] hint          Hints provided at time of creation
+     * @param[in] properties    Properties for the data-block creation (GUID_PROP_* or DB_PROP_*)
+     * @param[in] instanceArg   Arguments specific for this instance
+     * @return 0 on success or an error code on failure:
+     *    - OCR_EGUIDEXISTS if the object exists (if GUID_PROP_IS_LABELED and GUID_PROP_CHECK)
      **/
-    ocrDataBlock_t* (*instantiate)(struct _ocrDataBlockFactory_t *factory,
-                                   ocrFatGuid_t allocator, ocrFatGuid_t allocPD,
-                                   u64 size, void* ptr, u32 properties,
-                                   ocrParamList_t *instanceArg);
+    u8 (*instantiate)(struct _ocrDataBlockFactory_t *factory, ocrFatGuid_t *guid,
+                      ocrFatGuid_t allocator, ocrFatGuid_t allocPD, u64 size,
+                      void* ptr, ocrHint_t *hint, u32 properties, ocrParamList_t *instanceArg);
     /**
      * @brief Factory destructor
      * @param factory       Pointer to the factory to destroy.

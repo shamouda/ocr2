@@ -15,6 +15,7 @@
 extern "C" {
 #endif
 #include "ocr-types.h"
+#include "ocr-version.h"
 
 /**
    @defgroup OCREvents Event Management for OCR
@@ -22,6 +23,51 @@ extern "C" {
 
    @{
 **/
+
+
+#ifdef ENABLE_EXTENSION_PARAMS_EVT
+
+typedef struct {
+    u64 counter;
+} ocrEventLatchParams_t;
+
+#ifdef ENABLE_EXTENSION_COUNTED_EVT
+typedef struct {
+    u64 nbDeps;
+} ocrEventCounterParams_t;
+#endif
+
+// Special unbounded value for 'bound' parameter of channel events
+#define EVENT_CHANNEL_UNBOUNDED ((u32) -1)
+
+#ifdef ENABLE_EXTENSION_CHANNEL_EVT
+typedef struct {
+    u32 maxGen;
+    u32 nbSat; // Upper bound on how many satisfy calls are expected to be simultaneously present in the channel
+    u32 nbDeps; // How many dependences must be added before triggering on a single satisfy.
+} ocrEventChannelParams_t;
+#endif
+
+typedef struct {
+    union {
+        ocrEventLatchParams_t EVENT_LATCH;
+#ifdef ENABLE_EXTENSION_COUNTED_EVT
+        ocrEventCounterParams_t EVENT_COUNTED;
+#endif
+#ifdef ENABLE_EXTENSION_CHANNEL_EVT
+        ocrEventChannelParams_t EVENT_CHANNEL;
+#endif
+    };
+} ocrEventParams_t;
+
+u8 ocrEventCreateParams(ocrGuid_t *guid, ocrEventTypes_t eventType, u16 properties, ocrEventParams_t * params);
+
+#else
+
+typedef struct {
+} ocrEventParams_t;
+
+#endif
 
 /**
  * @brief Creates an event
@@ -48,7 +94,7 @@ u8 ocrEventCreate(ocrGuid_t *guid, ocrEventTypes_t eventType, u16 properties);
  * by the programmer. This call enables this.
  *
  * @param[in] guid     The GUID of the event to destroy
- * @return a statuc code
+ * @return a status code
  *     - 0: successful
  *     - EINVAL: If guid does not refer to a valid event to destroy
  **/
@@ -212,8 +258,7 @@ u8 ocrEdtTemplateDestroy(ocrGuid_t guid);
  * @param[in] properties        Used to indicate if this is a finish EDT
  *                              (see #EDT_PROP_FINISH). Use #EDT_PROP_NONE as
  *                              a default value.
- * @param[in] affinity          Affinity container for this EDT. Can be NULL_GUID. This
- *                              is currently an experimental feature
+ * @param[in] hint              Hints that apply to this EDT. Can be NULL_HINT.
  * @param[in,out] outputEvent   If not NULL on input, on successful return
  *                              of this call, this will return the GUID of the
  *                              event associated with the post-slot of the EDT.
@@ -231,7 +276,7 @@ u8 ocrEdtTemplateDestroy(ocrGuid_t guid);
  **/
 u8 ocrEdtCreate(ocrGuid_t * guid, ocrGuid_t templateGuid,
                 u32 paramc, u64* paramv, u32 depc, ocrGuid_t *depv,
-                u16 properties, ocrGuid_t affinity, ocrGuid_t *outputEvent);
+                u16 properties, ocrHint_t *hint, ocrGuid_t *outputEvent);
 
 /**
  * @brief Destroy an EDT

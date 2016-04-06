@@ -43,8 +43,8 @@ See the 'INSTALL.make' file
 ******************************
 
 This section's instructions requires you have set the
-OCR_INSTALL environment variable as described in the
-INSTALL.make file.
+OCR_INSTALL and OCR_TYPE environment variables as described
+in the INSTALL.make file.
 
 
 *** Compiling code
@@ -56,7 +56,7 @@ The following command line can be used on a typical Linux X86
 distribution with gcc. It generates a binary named 'helloworld'
 that links with the OCR library.
 
-	$> gcc -L${OCR_INSTALL}/lib -I${OCR_INSTALL}/include -locr -o helloworld helloworld.c
+	$> gcc -L${OCR_INSTALL}/lib -I${OCR_INSTALL}/include -locr_${OCR_TYPE} -o helloworld helloworld.c
 
 
 *** Running code

@@ -22,19 +22,19 @@
 
 #define ELS_OFFSET 0
 
-void someUserFunction() {
-    int * k = (int *) ocrElsUserGet(ELS_OFFSET);
-    ASSERT(*((int *)k) == 42);
+void someUserFunction(ocrGuid_t dbGuid) {
+    ocrGuid_t elsGuid = ocrElsUserGet(ELS_OFFSET);
+    ASSERT(ocrGuidIsEq(dbGuid, elsGuid));
 }
 
 ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     int *k;
     ocrGuid_t dbGuid;
-    ocrDbCreate(&dbGuid,(void **) &k, sizeof(int), DB_PROP_NONE, NULL_GUID, NO_ALLOC);
+    ocrDbCreate(&dbGuid,(void **) &k, sizeof(int), DB_PROP_NONE, NULL_HINT, NO_ALLOC);
     *k = 42;
     if (TEST_OCR_ELS) {
-        ocrElsUserSet(ELS_OFFSET, (u64) k);
-        someUserFunction();
+        ocrElsUserSet(ELS_OFFSET, dbGuid);
+        someUserFunction(dbGuid);
     }
     ocrShutdown();
     return NULL_GUID;

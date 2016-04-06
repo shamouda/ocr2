@@ -30,7 +30,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
 
     ocrGuid_t db1Guid;
     u32 * db1Ptr;
-    ocrDbCreate(&db1Guid, (void**) &db1Ptr, sizeof(u32)*10, 0, NULL_GUID, NO_ALLOC);
+    ocrDbCreate(&db1Guid, (void**) &db1Ptr, sizeof(u32)*10, 0, NULL_HINT, NO_ALLOC);
     u32 i = 0;
     while (i < 10) {
         db1Ptr[i] = i;
@@ -40,9 +40,12 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
 
     ocrGuid_t terminateEdtTemplateGuid;
     ocrEdtTemplateCreate(&terminateEdtTemplateGuid, terminateEdt, 0 /*paramc*/, 2 /*depc*/);
+    ocrHint_t edtHint;
+    ocrHintInit( &edtHint, OCR_HINT_EDT_T );
+    ocrSetHintValue( & edtHint, OCR_HINT_EDT_AFFINITY, ocrAffinityToHintValue( edtAffinity) );
     ocrGuid_t ndepv[] = {db1Guid, event1Guid};
     ocrGuid_t outputEvent;
-    ocrEdtCreate(NULL, terminateEdtTemplateGuid, 0, NULL, 2, ndepv, EDT_PROP_NONE, edtAffinity, &outputEvent);
+    ocrEdtCreate(NULL, terminateEdtTemplateGuid, 0, NULL, 2, ndepv, EDT_PROP_NONE, &edtHint, &outputEvent);
 
     ocrEventSatisfy(event1Guid, NULL_GUID);
     return NULL_GUID;

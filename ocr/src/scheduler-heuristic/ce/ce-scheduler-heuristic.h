@@ -15,8 +15,6 @@
 #include "utils/ocr-utils.h"
 #include "ocr-scheduler-object.h"
 
-#include "rmd-map.h"
-
 /****************************************************/
 /* CE SCHEDULER_HEURISTIC                           */
 /****************************************************/
@@ -25,7 +23,8 @@
 typedef struct _ocrSchedulerHeuristicContextCe_t {
     ocrSchedulerHeuristicContext_t base;
     ocrSchedulerObject_t *mySchedulerObject;    // The deque owned by a specific worker (context)
-    u64 stealSchedulerObjectIndex;              // Cached index of the deque lasted visited during steal attempts
+    u64 msgId;
+    u32 stealSchedulerObjectIndex;              // Cached index of the deque lasted visited during steal attempts
     bool inWorkRequestPending;                  // Work request coming in from remote location (remote loc is out of work)
     bool outWorkRequestPending;                 // Work request sent out to this context's remote location (current loc is out of work)
     bool canAcceptWorkRequest;                  // Identifies a context that can accept a work request from current CE
@@ -38,6 +37,7 @@ typedef struct _ocrSchedulerHeuristicCe_t {
     u32 inPendingCount;                         // Number of pending agents (XEs + CEs)
     u32 pendingXeCount;                         // Number of pending XEs (sleeping)
     u32 outWorkVictimsAvailable;                // The remaining number of work requests that can be made
+    bool shutdownMode;                          // This indicates whether PD is shutting down or not
 } ocrSchedulerHeuristicCe_t;
 
 /****************************************************/

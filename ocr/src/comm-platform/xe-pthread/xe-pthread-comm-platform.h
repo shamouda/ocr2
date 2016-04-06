@@ -17,7 +17,8 @@
 #include "ocr-policy-domain.h"
 #include "ocr-types.h"
 #include "utils/ocr-utils.h"
-#include "utils/deque.h"
+#include "utils/comQueue.h"
+
 #include "../ce-pthread/ce-pthread-comm-platform.h"
 
 typedef struct {
@@ -26,8 +27,8 @@ typedef struct {
 
 typedef struct {
     ocrCommPlatform_t base;
-    ocrCommChannel_t * channel; // comm channels between this XE and CE
-    u64 seqIdAtCe;
+    comQueue_t inQueue;        /**< Unique incoming queue (the one I poll) */
+    neighborQueue_t outQueue;  /**< Single outgoing queue to CE */
 } ocrCommPlatformXePthread_t;
 
 typedef struct {

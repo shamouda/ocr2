@@ -1,10 +1,22 @@
+testDbDestroy2.c
+# No PlatformModel on TG-X86
+testDistAffinity6.c
 testDistDbEw0.c
 testDistDbEw1.c
 testDistDbEw2.c
+testDistDbEw3.c
 testDistDbEw4.c
 testDistDbEwRo2.c
 testDistDbEwRo3.c
-edtForkBomb.c
+testDistDbItw0.c
+testDistDbItw1.c
 testEdtDestroy0.c
+testDistEdtNullGuid0.c
+testDistEdtNullGuid1.c
+testDistEdtNullGuid2.c
+testDistEdtNullGuid3.c
+testDistEdtNullGuid4.c
+testDistEdtNullGuid5.c
 guidlabel.c
 dbNoAcquire0.c
+pqr.c

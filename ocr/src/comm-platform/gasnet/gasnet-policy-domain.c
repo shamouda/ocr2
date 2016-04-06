@@ -89,10 +89,8 @@ void addCommPlatform(ocrCommPlatform_t * self) {
     item->platform = (ocrCommPlatformGasnet_t*)self;
     item->counter  = 0;
 
-    PDQueue_t *current = (struct PDQueue_s*) SPLAY_FIND(PDQueueHead_s, &root, item);
-
     // make sure the PD is not in the database, otherwise it must be a bug
-    ASSERT(current == NULL);
+    RESULT_ASSERT((struct PDQueue_s*) SPLAY_FIND(PDQueueHead_s, &root, item), ==, NULL);
 
     // insert the current pd in the database
     SPLAY_INSERT(PDQueueHead_s, &root, item);

@@ -16,7 +16,7 @@ extern "C" {
 #endif
 
 #include "ocr-types.h"
-
+#include "ocr-version.h"
 
 /**
  * @defgroup OCRDataBlock Data-block management for OCR
@@ -58,15 +58,13 @@ extern "C" {
  *                       - #DB_PROP_NONE, indicates no specific properties
  *                       - #DB_PROP_NO_ACQUIRE, the DB will be created but not
  *                         acquired (addr will be NULL).
-  * @param[in,out] affinity  GUID to indicate the affinity container of this DB.
- *                          This is currently unsupported and NULL_GUID should be
- *                          passed
+ * @param[in,out] hint   The hint value passed to the datablock, can be NULL_HINT
  * @param[in] allocator  Allocator to use to allocate within the data block. Supported
  *                       values are given by #ocrInDbAllocator_t
  *
  * @return a status code:
  *      - -     : successful
- *      - ENXIO : affinity is invalid
+ *      - ENXIO : hint is invalid
  *      - ENOMEM: allocation failed because of insufficient memory
  *      - EINVAL: invalid arguments (flags or something else)
  *      - EBUSY : the agent that is needed to process this request is busy. Retry is possible.
@@ -77,9 +75,8 @@ extern "C" {
  * allocator's management overhead
  *
  **/
-u8 ocrDbCreate(ocrGuid_t *db, void** addr, u64 len, u16 flags,
-               ocrGuid_t affinity, ocrInDbAllocator_t allocator);
-
+u8 ocrDbCreate(ocrGuid_t *db, void** addr, u64 len, u16 flags, ocrHint_t *hint,
+               ocrInDbAllocator_t allocator);
 /**
  * @brief Request for the destruction of a data block
  *

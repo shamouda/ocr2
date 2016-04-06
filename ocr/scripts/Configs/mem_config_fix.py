@@ -16,14 +16,19 @@ import tempfile
 
 parser = argparse.ArgumentParser(description='Generate a modified OCR config \
         file for XE from original config file & binary file.')
-parser.add_argument('--binsize', dest='binsize', default='0x0',
-                   help='XE binary file size to use (default: 0x0)')
+parser.add_argument('--binstart', dest='binstart', default='0x0',
+                   help='Binary file start address (default: 0x0)')
+parser.add_argument('--binend', dest='binend', default='0x0',
+                   help='Binary file end address (default: 0x0)')
 parser.add_argument('--ocrcfg', dest='ocrcfg', default='default.cfg',
                    help='OCR config file to use (will be overwritten)')
 
 args = parser.parse_args()
-binsize = args.binsize
+binstart = args.binstart
+binend = args.binend
+binsize = long(binend, 16) - long(binstart, 16)
 ocrcfg = args.ocrcfg
+print "Size is 0x%lx" % (binsize,)
 
 def ExtractValues(infilename):
     config = ConfigParser.SafeConfigParser(allow_no_value=True)
@@ -46,25 +51,25 @@ def RewriteConfig(cfg):
         lines = fp.readlines()
         fp.seek(0)
         fp.truncate()
-        found = 0
+        section = 0    # Keeps track of section being parsed
         for line in lines:
             if 'MemPlatformInst0' in line:
-                found = 1
+                section = 1
             if 'MemTargetInst0' in line:
-                found = 2
+                section = 2
             if 'AllocatorInst0' in line:
-                found = 3
-            if found == 1 and 'start' in line:
-                line = '   start = \t' + hex(int(platstart,16)+int(binsize,16)) + '\n'
-            if found == 1 and 'size' in line:
-                line = '   size =\t' + hex(int(platsize,16)-int(binsize,16)) + '\n'
-                found = 0
-            if found == 2 and 'size' in line:
-                line = '   size =\t' + hex(int(tgtsize,16)-int(binsize,16)) + '\n'
-                found = 0
-            if found == 3 and 'size' in line:
-                line = '   size =\t' + hex(int(allocsize,16)-int(binsize,16)) + '\n'
-                found = 0
+                section = 3
+            if section == 1 and 'start' in line:
+                line = '   start = \t' + hex(long(platstart,16)+binsize) + '\n'
+            if section == 1 and 'size' in line:
+                line = '   size =\t' + hex(long(platsize,16)-binsize) + '\n'
+                section = 0
+            if section == 2 and 'size' in line:
+                line = '   size =\t' + hex(long(tgtsize,16)-binsize) + '\n'
+                section = 0
+            if section == 3 and 'size' in line:
+                line = '   size =\t' + hex(long(allocsize,16)-binsize) + '\n'
+                section = 0
 
             fp.write(line)
 

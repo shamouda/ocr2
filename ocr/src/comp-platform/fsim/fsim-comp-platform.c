@@ -31,9 +31,7 @@
 // only -- hence this placement.
 //
 int memcpy(void * dst, void * src, u64 len) {
-    __asm__ __volatile__("dma.copyregion %1, %0, %2\n\t"
-                         "fence 0xF\n\t"
-                         : : "r" (dst), "r" (src), "r" (len));
+    hal_memCopy(dst, src, len, 0);
     return len;
 }
 #endif
@@ -44,7 +42,8 @@ ocrPolicyDomain_t *myPD = NULL;
 ocrWorker_t *myWorker = NULL;
 
 static void * fsimRoutineExecute(ocrWorker_t * worker) {
-    return worker->fcts.run(worker);
+    // This is actually started directly in the worker on fsim
+    return NULL;
 }
 
 void fsimCompDestruct (ocrCompPlatform_t * base) {
@@ -64,21 +63,19 @@ u8 fsimCompSwitchRunlevel(ocrCompPlatform_t *self, ocrPolicyDomain_t *PD, ocrRun
     ASSERT((properties & RL_REQUEST) && !(properties & RL_RESPONSE)
            && !(properties & RL_RELEASE));
     ASSERT(!(properties & RL_FROM_MSG));
+    // FIXME: This is not true for XEs ASSERT((properties & RL_NODE_MASTER) == RL_NODE_MASTER);
 
     switch(runlevel) {
     case RL_CONFIG_PARSE:
         // On bring-up: Update PD->phasesPerRunlevel on phase 0
         // and check compatibility on phase 1
-        if((properties & RL_BRING_UP) && RL_IS_FIRST_PHASE_UP(PD, RL_CONFIG_PARSE, phase)) {
-            ASSERT(self->worker != NULL);
-        }
         break;
     case RL_NETWORK_OK:
         break;
     case RL_PD_OK:
-        if(properties & RL_BRING_UP) {
+        if((properties & RL_BRING_UP) && RL_IS_FIRST_PHASE_UP(PD, RL_PD_OK, phase)) {
             self->pd = PD;
-            self->fcts.setCurrentEnv(self, self->pd, self->worker);
+            self->fcts.setCurrentEnv(self, self->pd, NULL);
         }
         break;
     case RL_MEMORY_OK:
@@ -86,7 +83,10 @@ u8 fsimCompSwitchRunlevel(ocrCompPlatform_t *self, ocrPolicyDomain_t *PD, ocrRun
     case RL_GUID_OK:
         break;
     case RL_COMPUTE_OK:
-        fsimRoutineExecute(self->worker);
+        if((properties & RL_BRING_UP) && RL_IS_FIRST_PHASE_UP(PD, RL_COMPUTE_OK, phase)) {
+            self->fcts.setCurrentEnv(self, self->pd, self->worker);
+            fsimRoutineExecute(self->worker);
+        }
         break;
     case RL_USER_OK:
         break;
@@ -144,6 +144,7 @@ void getCurrentEnv(ocrPolicyDomain_t** pd, ocrWorker_t** worker,
         *task = myWorker->curTask;
     if(msg) {
         msg->srcLocation = myPD->myLocation;
+        msg->destLocation = msg->srcLocation;
         msg->usefulSize = 0;
     }
 }

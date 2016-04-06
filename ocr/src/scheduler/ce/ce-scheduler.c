@@ -15,7 +15,6 @@
 #include "ocr-workpile.h"
 #include "policy-domain/ce/ce-policy.h"
 #include "scheduler/ce/ce-scheduler.h"
-#include "rmd-map.h"
 
 // BUG #619: This relies on data in ce-worker (its ID to do the mapping)
 // This is non-portable (CE scheduler does not work with non
@@ -114,15 +113,9 @@ u8 ceSchedulerSwitchRunlevel(ocrScheduler_t *self, ocrPolicyDomain_t *PD, ocrRun
         toReturn |= self->workpiles[i]->fcts.switchRunlevel(
             self->workpiles[i], PD, runlevel, phase, properties, NULL, 0);
     }
-    for(i = 0; i < PD->schedulerObjectFactoryCount; ++i) {
-        ocrSchedulerObjectFactory_t *fact = PD->schedulerObjectFactories[i];
-        if (IS_SCHEDULER_OBJECT_TYPE_ROOT(fact->kind)) {
-            ocrSchedulerObjectRootFactory_t *rootFact = (ocrSchedulerObjectRootFactory_t*)fact;
-            toReturn |= rootFact->fcts.switchRunlevel(self->rootObj, PD, runlevel, phase,
-                                                      properties, NULL, 0);
-            break;
-        }
-    }
+
+    ocrSchedulerObjectFactory_t *rootFact = (ocrSchedulerObjectFactory_t*)PD->schedulerObjectFactories[self->rootObj->fctId];
+    toReturn |= rootFact->fcts.switchRunlevel(self->rootObj, PD, runlevel, phase, properties, NULL, 0);
     // Do not re-order: Scheduler object root should be brought up before heuristics
     for(i = 0; i < self->schedulerHeuristicCount; ++i) {
         toReturn |= self->schedulerHeuristics[i]->fcts.switchRunlevel(
@@ -146,7 +139,10 @@ u8 ceSchedulerSwitchRunlevel(ocrScheduler_t *self, ocrPolicyDomain_t *PD, ocrRun
         }
         break;
     case RL_MEMORY_OK:
-        if((properties & RL_BRING_UP) && RL_IS_LAST_PHASE_UP(PD, RL_MEMORY_OK, phase)) {
+        break;
+    case RL_GUID_OK:
+        // We have memory, allocate all our structures
+        if((properties & RL_BRING_UP) && RL_IS_FIRST_PHASE_UP(PD, RL_GUID_OK, phase)) {
             // allocate steal iterator cache. Use pdMalloc since this is something
             // local to the policy domain and that will never be shared
             ceWorkpileIterator_t * stealIteratorsCache = self->pd->fcts.pdMalloc(
@@ -162,12 +158,10 @@ u8 ceSchedulerSwitchRunlevel(ocrScheduler_t *self, ocrPolicyDomain_t *PD, ocrRun
             derived->stealIterators = stealIteratorsCache;
         }
 
-        if((properties & RL_TEAR_DOWN) && RL_IS_FIRST_PHASE_DOWN(PD, RL_MEMORY_OK, phase)) {
+        if((properties & RL_TEAR_DOWN) && RL_IS_LAST_PHASE_DOWN(PD, RL_GUID_OK, phase)) {
             ocrSchedulerCe_t *derived = (ocrSchedulerCe_t*)self;
             self->pd->fcts.pdFree(self->pd, derived->stealIterators);
         }
-        break;
-    case RL_GUID_OK:
         break;
     case RL_COMPUTE_OK:
         if(properties & RL_BRING_UP) {
@@ -316,7 +310,7 @@ u8 ceSchedulerNotifyInvoke(ocrScheduler_t *self, ocrSchedulerOpArgs_t *opArgs, o
             PD_MSG_FIELD_I(guid) = notifyArgs->OCR_SCHED_ARG_FIELD(OCR_SCHED_NOTIFY_EDT_DONE).guid;
             PD_MSG_FIELD_I(currentEdt) = notifyArgs->OCR_SCHED_ARG_FIELD(OCR_SCHED_NOTIFY_EDT_DONE).guid;
             PD_MSG_FIELD_I(properties) = 0;
-            ASSERT(pd->fcts.processMessage(pd, &msg, false) == 0);
+            RESULT_ASSERT(pd->fcts.processMessage(pd, &msg, false), ==, 0);
 #undef PD_MSG
 #undef PD_TYPE
 #endif

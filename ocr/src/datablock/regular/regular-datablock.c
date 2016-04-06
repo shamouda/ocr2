@@ -36,7 +36,7 @@
 
 u64 ocrHintPropDbRegular[] = {
 #ifdef ENABLE_HINTS
-    OCR_HINT_DB_MEM_AFFINITY
+    OCR_HINT_DB_AFFINITY
 #endif
 };
 
@@ -57,8 +57,8 @@ u8 regularAcquire(ocrDataBlock_t *self, void** ptr, ocrFatGuid_t edt, u32 edtSlo
     ocrDataBlockRegular_t *rself = (ocrDataBlockRegular_t*)self;
     *ptr = NULL;
 
-    DPRINTF(DEBUG_LVL_VERB, "Acquiring DB @ 0x%lx (GUID: 0x%lx) from EDT (GUID: 0x%lx) (runtime acquire: %d) size: %lu\n",
-            (u64)self->ptr, rself->base.guid, edt.guid, (u32)isInternal, self->size);
+    DPRINTF(DEBUG_LVL_VERB, "Acquiring DB @ 0x%"PRIx64" (GUID: "GUIDF") from EDT (GUID: "GUIDF") (runtime acquire: %"PRId32") size: %"PRIu64"\n",
+            (u64)self->ptr, GUIDA(rself->base.guid), GUIDA(edt.guid), (u32)isInternal, self->size);
 
     // Critical section
     hal_lock32(&(rself->lock));
@@ -72,8 +72,8 @@ u8 regularAcquire(ocrDataBlock_t *self, void** ptr, ocrFatGuid_t edt, u32 edtSlo
 
     hal_unlock32(&(rself->lock));
     // End critical section
-    DPRINTF(DEBUG_LVL_VERB, "DB (GUID: 0x%lx) added EDT (GUID: 0x%lx). Have %d users (of which %d runtime)\n",
-            self->guid, (u64)edt.guid, rself->attributes.numUsers, rself->attributes.internalUsers);
+    DPRINTF(DEBUG_LVL_VERB, "DB (GUID: "GUIDF") added EDT (GUID: "GUIDF"). Have %"PRId32" users (of which %"PRId32" runtime)\n",
+            GUIDA(self->guid), GUIDA(edt.guid), rself->attributes.numUsers, rself->attributes.internalUsers);
 
 #ifdef OCR_ENABLE_STATISTICS
     {
@@ -89,8 +89,8 @@ u8 regularRelease(ocrDataBlock_t *self, ocrFatGuid_t edt,
 
     ocrDataBlockRegular_t *rself = (ocrDataBlockRegular_t*)self;
 
-    DPRINTF(DEBUG_LVL_VERB, "Releasing DB @ 0x%lx (GUID 0x%lx) from EDT 0x%lx (runtime release: %d)\n",
-            (u64)self->ptr, rself->base.guid, edt.guid, (u32)isInternal);
+    DPRINTF(DEBUG_LVL_VERB, "Releasing DB @ 0x%"PRIx64" (GUID "GUIDF") from EDT "GUIDF" (runtime release: %"PRId32")\n",
+            (u64)self->ptr, GUIDA(rself->base.guid), GUIDA(edt.guid), (u32)isInternal);
 
     // Start critical section
     hal_lock32(&(rself->lock));
@@ -99,8 +99,8 @@ u8 regularRelease(ocrDataBlock_t *self, ocrFatGuid_t edt,
     if(isInternal)
         rself->attributes.internalUsers -= 1;
 
-    DPRINTF(DEBUG_LVL_VVERB, "DB (GUID: 0x%lx) attributes: numUsers %d (including %d runtime users); freeRequested %d\n",
-            self->guid, rself->attributes.numUsers, rself->attributes.internalUsers, rself->attributes.freeRequested);
+    DPRINTF(DEBUG_LVL_VVERB, "DB (GUID: "GUIDF") attributes: numUsers %"PRId32" (including %"PRId32" runtime users); freeRequested %"PRId32"\n",
+            GUIDA(self->guid), rself->attributes.numUsers, rself->attributes.internalUsers, rself->attributes.freeRequested);
     // Check if we need to free the block
 #ifdef OCR_ENABLE_STATISTICS
     {
@@ -124,14 +124,16 @@ u8 regularRelease(ocrDataBlock_t *self, ocrFatGuid_t edt,
 
 u8 regularDestruct(ocrDataBlock_t *self) {
     // We don't use a lock here. Maybe we should
+#ifdef OCR_ASSERT
     ocrDataBlockRegular_t *rself = (ocrDataBlockRegular_t*)self;
     // Check that no other EDT has acquired this datablock
     ASSERT(rself->attributes.numUsers == 0);
     ASSERT(rself->attributes.internalUsers == 0);
     ASSERT(rself->attributes.freeRequested == 1);
     ASSERT(rself->lock == 0);
+#endif
 
-    DPRINTF(DEBUG_LVL_VERB, "Really freeing DB (GUID: 0x%lx)\n", self->guid);
+    DPRINTF(DEBUG_LVL_VERB, "Really freeing DB (GUID: "GUIDF")\n", GUIDA(self->guid));
     ocrPolicyDomain_t *pd = NULL;
     ocrTask_t *task = NULL;
     PD_MSG_STACK(msg);
@@ -173,11 +175,11 @@ u8 regularDestruct(ocrDataBlock_t *self) {
 
 u8 regularFree(ocrDataBlock_t *self, ocrFatGuid_t edt, u32 properties) {
     bool isInternal = ((properties & DB_PROP_RT_ACQUIRE) != 0);
-    bool reqRelease = !(properties & DB_PROP_NO_RELEASE);
+    bool reqRelease = ((properties & DB_PROP_NO_RELEASE) == 0);
     ocrDataBlockRegular_t *rself = (ocrDataBlockRegular_t*)self;
 
-    DPRINTF(DEBUG_LVL_VERB, "Requesting a free for DB @ 0x%lx (GUID: 0x%lx)\n",
-            (u64)self->ptr, rself->base.guid);
+    DPRINTF(DEBUG_LVL_VERB, "Requesting a free for DB @ 0x%"PRIx64" (GUID: "GUIDF")\n",
+            (u64)self->ptr, GUIDA(rself->base.guid));
     // Begin critical section
     hal_lock32(&(rself->lock));
     if(rself->attributes.freeRequested) {
@@ -219,11 +221,13 @@ u8 regularUnregisterWaiter(ocrDataBlock_t *self, ocrFatGuid_t waiter, u32 slot,
     return OCR_ENOSYS;
 }
 
-ocrDataBlock_t* newDataBlockRegular(ocrDataBlockFactory_t *factory, ocrFatGuid_t allocator,
-                                    ocrFatGuid_t allocPD, u64 size, void* ptr,
-                                    u32 flags, ocrParamList_t *perInstance) {
+u8 newDataBlockRegular(ocrDataBlockFactory_t *factory, ocrFatGuid_t *guid, ocrFatGuid_t allocator,
+                       ocrFatGuid_t allocPD, u64 size, void* ptr, ocrHint_t *hint, u32 flags,
+                       ocrParamList_t *perInstance) {
     ocrPolicyDomain_t *pd = NULL;
     ocrTask_t *task = NULL;
+    ocrGuid_t resultGuid = NULL_GUID;
+    u8 returnValue = 0;
     PD_MSG_STACK(msg);
 
     getCurrentEnv(&pd, NULL, &task, &msg);
@@ -232,18 +236,22 @@ ocrDataBlock_t* newDataBlockRegular(ocrDataBlockFactory_t *factory, ocrFatGuid_t
 #define PD_MSG (&msg)
 #define PD_TYPE PD_MSG_GUID_CREATE
     msg.type = PD_MSG_GUID_CREATE | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
-    PD_MSG_FIELD_IO(guid.guid) = NULL_GUID;
-    PD_MSG_FIELD_IO(guid.metaDataPtr) = NULL;
+    PD_MSG_FIELD_IO(guid) = *guid;
     PD_MSG_FIELD_I(size) = sizeof(ocrDataBlockRegular_t) + hintc*sizeof(u64);
     PD_MSG_FIELD_I(kind) = OCR_GUID_DB;
-    PD_MSG_FIELD_I(properties) = 0;
+    PD_MSG_FIELD_I(properties) = (flags & GUID_PROP_ALL);
 
-    RESULT_PROPAGATE2(pd->fcts.processMessage(pd, &msg, true), NULL);
+    RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, true));
 
     ocrDataBlockRegular_t *result = (ocrDataBlockRegular_t*)PD_MSG_FIELD_IO(guid.metaDataPtr);
-    result->base.guid = PD_MSG_FIELD_IO(guid.guid);
+    resultGuid = PD_MSG_FIELD_IO(guid.guid);
+    returnValue = PD_MSG_FIELD_O(returnDetail);
 #undef PD_MSG
 #undef PD_TYPE
+
+    if(returnValue != 0) {
+        return returnValue;
+    }
 
     ASSERT(result);
     result->base.allocator = allocator.guid;
@@ -272,13 +280,18 @@ ocrDataBlock_t* newDataBlockRegular(ocrDataBlockFactory_t *factory, ocrFatGuid_t
                    (ocrAllocator_t*)allocator.metaDataPtr, result->base.guid,
                    &(result->base));
 #endif /* OCR_ENABLE_STATISTICS */
+    DPRINTF(DEBUG_LVL_VERB, "Creating a datablock of size %"PRIu64", @ 0x%"PRIx64" (GUID: "GUIDF")\n",
+            size, (u64)result->base.ptr, GUIDA(result->base.guid));
+    OCR_TOOL_TRACE(false, OCR_TRACE_TYPE_DATABLOCK, OCR_ACTION_CREATE, size);
 
-    DPRINTF(DEBUG_LVL_VERB, "Creating a datablock of size %lu, @ 0x%lx (GUID: 0x%lx)\n",
-            size, (u64)result->base.ptr, result->base.guid,
-            false, OCR_TRACE_TYPE_DATABLOCK, OCR_ACTION_CREATE, size);
+    // Do this at the very end; it indicates that the object
+    // is actually valid
+    hal_fence();
+    result->base.guid = resultGuid;
 
-
-    return (ocrDataBlock_t*)result;
+    guid->guid = resultGuid;
+    guid->metaDataPtr = result;
+    return 0;
 }
 
 u8 regularSetHint(ocrDataBlock_t* self, ocrHint_t *hint) {
@@ -313,9 +326,9 @@ ocrDataBlockFactory_t *newDataBlockFactoryRegular(ocrParamList_t *perType, u32 f
     ocrDataBlockFactory_t *base = (ocrDataBlockFactory_t*)
                                   runtimeChunkAlloc(sizeof(ocrDataBlockFactoryRegular_t), PERSISTENT_CHUNK);
 
-    base->instantiate = FUNC_ADDR(ocrDataBlock_t* (*)
-                                  (ocrDataBlockFactory_t*, ocrFatGuid_t, ocrFatGuid_t,
-                                   u64, void*, u32, ocrParamList_t*), newDataBlockRegular);
+    base->instantiate = FUNC_ADDR(u8 (*)
+                                  (ocrDataBlockFactory_t*, ocrFatGuid_t *, ocrFatGuid_t, ocrFatGuid_t,
+                                   u64, void*, ocrHint_t*, u32, ocrParamList_t*), newDataBlockRegular);
     base->destruct = FUNC_ADDR(void (*)(ocrDataBlockFactory_t*), destructRegularFactory);
     base->fcts.destruct = FUNC_ADDR(u8 (*)(ocrDataBlock_t*), regularDestruct);
     base->fcts.acquire = FUNC_ADDR(u8 (*)(ocrDataBlock_t*, void**, ocrFatGuid_t, u32, ocrDbAccessMode_t, bool, u32), regularAcquire);

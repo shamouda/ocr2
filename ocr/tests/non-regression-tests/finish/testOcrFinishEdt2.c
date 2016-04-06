@@ -21,7 +21,7 @@ ocrGuid_t terminateEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
 }
 
 ocrGuid_t updaterEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
-    // PRINTF("Run updaterEdt %d\n", (int)paramv[0]);
+    // PRINTF("Run updaterEdt %"PRId32"\n", (int)paramv[0]);
     return NULL_GUID;
 }
 
@@ -32,7 +32,7 @@ ocrGuid_t computeEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     while (i < N) {
         ocrGuid_t updaterEdtGuid;
         u64 nparamv = i;
-        ocrEdtCreate(&updaterEdtGuid, updaterEdtTemplateGuid, EDT_PARAM_DEF, &nparamv, EDT_PARAM_DEF, NULL, 0, NULL_GUID, NULL);
+        ocrEdtCreate(&updaterEdtGuid, updaterEdtTemplateGuid, EDT_PARAM_DEF, &nparamv, EDT_PARAM_DEF, NULL, 0, NULL_HINT, NULL);
         i++;
     }
     return NULL_GUID;
@@ -44,13 +44,13 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrGuid_t computeEdtTemplateGuid;
     ocrEdtTemplateCreate(&computeEdtTemplateGuid, computeEdt, 0 /*paramc*/, 1 /*depc*/);
     ocrEdtCreate(&computeEdtGuid, computeEdtTemplateGuid, EDT_PARAM_DEF, /*paramv=*/NULL, EDT_PARAM_DEF, /*depv=*/NULL,
-                 /*properties=*/ EDT_PROP_FINISH, NULL_GUID, /*outEvent=*/&finishEdtOutputEventGuid);
+                 /*properties=*/ EDT_PROP_FINISH, NULL_HINT, /*outEvent=*/&finishEdtOutputEventGuid);
 
     ocrGuid_t terminateEdtGuid;
     ocrGuid_t terminateEdtTemplateGuid;
     ocrEdtTemplateCreate(&terminateEdtTemplateGuid, terminateEdt, 0 /*paramc*/, 1 /*depc*/);
     ocrEdtCreate(&terminateEdtGuid, terminateEdtTemplateGuid, EDT_PARAM_DEF, /*paramv=*/NULL, EDT_PARAM_DEF, /*depv=*/NULL,
-                 /*properties=*/0, NULL_GUID, /*outEvent=*/NULL);
+                 /*properties=*/0, NULL_HINT, /*outEvent=*/NULL);
     ocrAddDependence(finishEdtOutputEventGuid, terminateEdtGuid, 0, DB_MODE_CONST);
     // Triggers the finish EDT
     ocrAddDependence(NULL_GUID, computeEdtGuid, 0, DB_MODE_CONST);

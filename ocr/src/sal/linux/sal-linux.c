@@ -5,6 +5,7 @@
  */
 
 #include "ocr-config.h"
+#include "ocr-std.h"
 #ifdef SAL_LINUX
 
 #include "ocr-types.h"

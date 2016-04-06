@@ -7,22 +7,30 @@
 #
 
 ifndef OCR_TYPE
-OCR_TYPE=tg-x86
+  OCR_TYPE=tg-x86
 else
-ifneq (${OCR_TYPE}, tg-x86)
-$(error OCR_TYPE is set to ${OCR_TYPE} but expected tg-x86)
+  ifneq (${OCR_TYPE}, tg-x86)
+    $(error OCR_TYPE is set to ${OCR_TYPE} but expected tg-x86)
+  endif
 endif
-endif
-$(error tg-x86 support is not available for OCR v1.0)
 
-#DEFAULT_CONFIG=mach-1block.cfg
-DEFAULT_CONFIG=mach-2block.cfg
+DEFAULT_CONFIG=mach-1block.cfg
+#DEFAULT_CONFIG=mach-2block.cfg
 #
 # Tool-chain to be used for the build
 #
 
-CC      := gcc
-CFLAGS  := -fno-stack-protector
+TG_INSTALL ?= ../../../../tg/tg/install
+
+FORCE_CC ?= no
+ifeq ($(FORCE_CC), no)
+  ifeq ($(CC), cc)
+    CC = gcc
+  endif
+endif # End of ifeq force_cc
+
+# TG_INSTALL/include is for rm-map.h
+CFLAGS  := -fno-stack-protector -I $(TG_INSTALL)/include
 
 RM      := rm
 RMFLAGS := -rf
@@ -32,7 +40,16 @@ MKDIR   := mkdir
 LN      := ln
 
 # Shared libraries specific builds
-LDFLAGS := -shared -fpic -lpthread -lrt
+LDFLAGS := -shared -fpic -lpthread
+
+# -lrt needed only for < glibc-2.17 in Linux systems (not needed for OS X)
+UNAME := $(shell uname -s)
+ifeq ($(UNAME),Linux)
+  ret := $(shell echo "`ldd --version | awk '/ldd/{print $$NF}' | cut -d'.' -f1-2` < 2.17" | bc)
+  ifeq ($(ret), 1)
+    LDFLAGS += -lrt
+  endif
+endif
 
 # CFLAGS_SHARED will be concatenated with any
 # common CFLAGS options
@@ -49,7 +66,7 @@ RANLIB := ranlib
 # Library supported
 SUPPORTS_SHARED=yes
 SUPPORTS_STATIC=yes
-OCRRUNNER=ocrrun
+OCRRUNNER=ocrrun_$(OCR_TYPE)
 
 # Valgrind compatibility for internal allocators
 # x86 only
@@ -60,7 +77,7 @@ OCRRUNNER=ocrrun
 # x86 only
 #
 # Enable profiler
-# CFLAGS += -DOCR_RUNTIME_PROFILER -DPROFILE_KHZ=3400000
+# CFLAGS += -DOCR_RUNTIME_PROFILER -DPROFILER_KHZ=3400000
 #
 # (optional) Maximum number of scope
 # nesting for runtime profiler

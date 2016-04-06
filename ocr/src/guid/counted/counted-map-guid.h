@@ -20,7 +20,7 @@
  * Encodes in the GUID the rank of the node it has been generated on.
  * !! Performance Warning !!
  * - Hashtable implementation is backed by a simplistic hash function.
- * - The number of hashtable's buckets can be customize through 'DEFAULT_NB_BUCKETS'.
+ * - The number of hashtable's buckets can be customize through 'GUID_PROVIDER_NB_BUCKETS'.
  * - GUID generation relies on an atomic incr shared by ALL the workers of the PD.
  */
 

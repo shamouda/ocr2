@@ -36,7 +36,7 @@ typedef struct {
 #ifdef OCR_ENABLE_STATISTICS
          ocrStats_t *statsObject,
 #endif
-         ocrCost_t *costFunction, ocrParamList_t *perInstance);
+         ocrParamList_t *perInstance);
     u8 (*baseProcessMessage)(struct _ocrPolicyDomain_t *self, struct _ocrPolicyMsg_t *msg,
                          u8 isBlocking);
     u8 (*baseSwitchRunlevel)(struct _ocrPolicyDomain_t *self, ocrRunlevel_t, u32);

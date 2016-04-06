@@ -1,4 +1,5 @@
 #include "helper.h"
+#include <inttypes.h>
 
 double usec_to_sec (long usec) {
     double res = ((double)usec) / 1000000;
@@ -21,9 +22,9 @@ double elapsed_sec(struct timeval * t_start, struct timeval * t_stop) {
     return (((double)elapsed)/1000000);
 }
 
-void print_throughput(char * timer_name, long nb_instances, double time_sec) {
+void print_throughput(char * timer_name, unsigned long long nb_instances, double time_sec) {
     printf("Timer Name        : %s\n", timer_name);
-    printf("Workload    (unit): %ld\n", nb_instances);
+    printf("Workload    (unit): %"PRIu64"\n", nb_instances);
     printf("Duration    (s)   : %f\n", time_sec);
     printf("Throughput  (op/s): %f\n", nb_instances/time_sec);
 }
@@ -33,15 +34,15 @@ void print_elapsed(double time_sec) {
 }
 
 void print_elapsed_usec(long time_usec) {
-    printf("Elapsed       (us): %ld\n", time_usec);
+    printf("Elapsed       (us): %"PRId64"\n", time_usec);
 }
 
-void summary_throughput_timer(timestamp_t * start_t, timestamp_t * stop_t, int instances) {
+void summary_throughput_timer(timestamp_t * start_t, timestamp_t * stop_t, unsigned long long instances) {
     double secs = elapsed_sec(start_t, stop_t);
     summary_throughput_dbl(secs, instances);
 }
 
-void summary_throughput_dbl(double secs, int instances) {
+void summary_throughput_dbl(double secs, unsigned long long instances) {
     print_elapsed(secs);
     print_throughput("Summary", instances, secs);
 }

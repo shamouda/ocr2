@@ -11,6 +11,9 @@
 #include "experimental/ocr-labeling-runtime.h"
 #endif
 
+// This is to resolve sizeof ocrTaskTemplateHc_t and set the hints pointers.
+#include "task/hc/hc-task.h"
+
 #define DEBUG_TYPE POLICY
 
 // Everything in the marshalling code will be
@@ -93,13 +96,13 @@ void initializePolicyDomainOcr(ocrPolicyDomainFactory_t * factory, ocrPolicyDoma
     self->eventFactories = NULL;
     self->schedulerObjectFactories = NULL;
     self->placer = NULL;
+    self->platformModel = NULL;
     u32 i = 0, j = 0;
     for(i = 0; i < RL_MAX; ++i) {
         for(j = 0; j < RL_PHASE_MAX; ++j) {
             self->phasesPerRunlevel[i][j] = 0;
         }
     }
-    self->costFunction = NULL;
     self->myLocation = ((paramListPolicyDomainInst_t*)perInstance)->location;
     self->parentLocation = 0;
     self->neighbors = NULL;
@@ -126,7 +129,7 @@ u64 ocrPolicyMsgGetMsgBaseSize(ocrPolicyMsg_t *msg, bool isIn) {
 #include "ocr-policy-msg-list.h"
 #undef PER_TYPE
     default:
-        DPRINTF(DEBUG_LVL_WARN, "Error: Message type 0x%x not handled in getMsgSize\n", msg->type & PD_MSG_TYPE_ONLY);
+        DPRINTF(DEBUG_LVL_WARN, "Error: Message type 0x%"PRIx64" not handled in getMsgSize\n", (u64)(msg->type & PD_MSG_TYPE_ONLY));
         ASSERT(false);
     }
     // Align baseSize
@@ -149,12 +152,22 @@ u8 ocrPolicyMsgGetMsgSize(ocrPolicyMsg_t *msg, u64 *baseSize,
 
 #define PD_MSG msg
     switch(msg->type & PD_MSG_TYPE_ONLY) {
+    case PD_MSG_DB_CREATE:
+#define PD_TYPE PD_MSG_DB_CREATE
+        if(isIn) {
+            ASSERT(MAX_ALIGN % sizeof(u64) == 0);
+            *marshalledSize = ((PD_MSG_FIELD_I(hint) != NULL_HINT)?sizeof(ocrHint_t):0ULL);
+        }
+        break;
+#undef PD_TYPE
+
     case PD_MSG_WORK_CREATE:
 #define PD_TYPE PD_MSG_WORK_CREATE
         if(isIn) {
             ASSERT(MAX_ALIGN % sizeof(u64) == 0);
             *marshalledSize = (PD_MSG_FIELD_I(paramv)?sizeof(u64)*PD_MSG_FIELD_IO(paramc):0ULL) +
-                              (PD_MSG_FIELD_I(depv)?sizeof(ocrFatGuid_t)*PD_MSG_FIELD_IO(depc):0ULL);
+                (PD_MSG_FIELD_I(depv)?sizeof(ocrFatGuid_t)*PD_MSG_FIELD_IO(depc):0ULL) +
+                ((PD_MSG_FIELD_I(hint) != NULL_HINT)?sizeof(ocrHint_t):0ULL);
         }
         break;
 #undef PD_TYPE
@@ -171,7 +184,17 @@ u8 ocrPolicyMsgGetMsgSize(ocrPolicyMsg_t *msg, u64 *baseSize,
 #endif
         break;
 #undef PD_TYPE
-
+#ifdef ENABLE_EXTENSION_PARAMS_EVT
+    case PD_MSG_EVT_CREATE:
+#define PD_TYPE PD_MSG_EVT_CREATE
+        {
+            if(isIn) {
+                *marshalledSize = (PD_MSG_FIELD_I(params)?sizeof(ocrEventParams_t):0ULL);
+            }
+        }
+        break;
+#undef PD_TYPE
+#endif
     case PD_MSG_SCHED_GET_WORK:
 #define PD_TYPE PD_MSG_SCHED_GET_WORK
         switch(PD_MSG_FIELD_IO(schedArgs).kind) {
@@ -185,10 +208,53 @@ u8 ocrPolicyMsgGetMsgSize(ocrPolicyMsg_t *msg, u64 *baseSize,
         break;
 #undef PD_TYPE
 
+    case PD_MSG_SCHED_TRANSACT:
+#define PD_TYPE PD_MSG_SCHED_TRANSACT
+        {
+            ocrPolicyDomain_t *pd = NULL;
+            getCurrentEnv(&pd, NULL, NULL, NULL);
+            ocrSchedulerObjectFactory_t *fact = (ocrSchedulerObjectFactory_t*)pd->schedulerObjectFactories[PD_MSG_FIELD_IO(schedArgs).schedObj.fctId];
+            fact->fcts.ocrPolicyMsgGetMsgSize(fact, msg, marshalledSize, mode);
+        }
+        break;
+#undef PD_TYPE
+
+    case PD_MSG_SCHED_ANALYZE:
+#define PD_TYPE PD_MSG_SCHED_ANALYZE
+        {
+            //BUG #920 - Move implementation specific details to the factories
+            ocrSchedulerOpAnalyzeArgs_t *analyzeArgs = &PD_MSG_FIELD_IO(schedArgs);
+            switch(analyzeArgs->kind) {
+            case OCR_SCHED_ANALYZE_SPACETIME_EDT:
+                {
+                    switch(analyzeArgs->properties) {
+                    case OCR_SCHED_ANALYZE_REQUEST:
+                        *marshalledSize = sizeof(ocrEdtDep_t) * analyzeArgs->OCR_SCHED_ARG_FIELD(OCR_SCHED_ANALYZE_SPACETIME_EDT).req.depc;
+                        break;
+                    //Nothing to marshall
+                    case OCR_SCHED_ANALYZE_RESPONSE:
+                        break;
+                    default:
+                        ASSERT(0);
+                        break;
+                    }
+                }
+                break;
+            //Nothing to marshall
+            case OCR_SCHED_ANALYZE_SPACETIME_DB:
+                break;
+            default:
+                ASSERT(0);
+                break;
+            }
+        }
+        break;
+#undef PD_TYPE
+
     case PD_MSG_COMM_TAKE:
 #define PD_TYPE PD_MSG_COMM_TAKE
         if(isIn) {
-            if(PD_MSG_FIELD_IO(guids) != NULL && PD_MSG_FIELD_IO(guids[0].guid) != NULL_GUID) {
+            if(PD_MSG_FIELD_IO(guids) != NULL && !(ocrGuidIsNull(PD_MSG_FIELD_IO(guids[0].guid)))) {
                 // Specific GUIDs have been requested so we need
                 // to marshall those. Otherwise, we do not need to marshall
                 // anything
@@ -245,6 +311,24 @@ u8 ocrPolicyMsgGetMsgSize(ocrPolicyMsg_t *msg, u64 *baseSize,
         }
         break;
 
+    case PD_MSG_HINT_SET:
+#define PD_TYPE PD_MSG_HINT_SET
+        if(isIn) {
+            ASSERT(MAX_ALIGN % sizeof(u64) == 0);
+            ASSERT(PD_MSG_FIELD_I(hint) != NULL_HINT);
+            *marshalledSize = sizeof(ocrHint_t);
+        }
+        break;
+#undef PD_TYPE
+
+    case PD_MSG_HINT_GET:
+#define PD_TYPE PD_MSG_HINT_GET
+        ASSERT(MAX_ALIGN % sizeof(u64) == 0);
+        ASSERT(PD_MSG_FIELD_IO(hint) != NULL_HINT);
+        *marshalledSize = sizeof(ocrHint_t);
+        break;
+#undef PD_TYPE
+
     default:
         // Nothing to do
         ;
@@ -254,8 +338,8 @@ u8 ocrPolicyMsgGetMsgSize(ocrPolicyMsg_t *msg, u64 *baseSize,
     // This is not stricly required as what matters is really baseSize
     *marshalledSize = (*marshalledSize + MAX_ALIGN - 1)&(~(MAX_ALIGN-1));
 
-    DPRINTF(DEBUG_LVL_VVERB, "Msg 0x%lx of type 0x%x: baseSize %ld; addlSize %ld\n",
-            msg, msg->type & PD_MSG_TYPE_ONLY, *baseSize, *marshalledSize);
+    DPRINTF(DEBUG_LVL_VVERB, "Msg %p of type 0x%"PRIx32": baseSize %"PRId64"; addlSize %"PRId64"\n",
+            msg, msg->type, *baseSize, *marshalledSize);
 #undef PD_MSG
     return 0;
 }
@@ -272,10 +356,9 @@ u8 ocrPolicyMsgMarshallMsg(ocrPolicyMsg_t* msg, u64 baseSize, u8* buffer, u32 mo
     u8 isIn = (msg->type & PD_MSG_REQUEST) != 0ULL;
 
     if(baseSize % MAX_ALIGN != 0) {
-        u64 t = baseSize;
+        DPRINTF(DEBUG_LVL_WARN, "Adjusted base size in ocrPolicyMsgMarshallMsg to be %"PRId32" aligned (from %"PRIu64" to %"PRIu64")\n",
+                MAX_ALIGN, baseSize, (baseSize + MAX_ALIGN -1)&(~(MAX_ALIGN-1)));
         baseSize = (baseSize + MAX_ALIGN -1)&(~(MAX_ALIGN-1));
-        DPRINTF(DEBUG_LVL_WARN, "Adjusted base size in ocrPolicyMsgMarshallMsg to be %d aligned (from %u to %u)\n",
-                MAX_ALIGN, t, baseSize);
     }
 
     ASSERT(((msg->type & (PD_MSG_REQUEST | PD_MSG_RESPONSE)) != (PD_MSG_REQUEST | PD_MSG_RESPONSE)) &&
@@ -322,8 +405,8 @@ u8 ocrPolicyMsgMarshallMsg(ocrPolicyMsg_t* msg, u64 baseSize, u8* buffer, u32 mo
         ASSERT(0);
     }
 
-    DPRINTF(DEBUG_LVL_VERB, "Got message 0x%lx to marshall into 0x%lx mode %d: "
-            "startPtr: 0x%lx, curPtr: 0x%lx, outputMsg: 0x%lx\n",
+    DPRINTF(DEBUG_LVL_VERB, "Got message 0x%"PRIx64" to marshall into 0x%"PRIx64" mode %"PRId32": "
+            "startPtr: 0x%"PRIx64", curPtr: 0x%"PRIx64", outputMsg: 0x%"PRIx64"\n",
             (u64)msg, (u64)buffer, mode, (u64)startPtr, (u64)curPtr, (u64)outputMsg);
 
     // At this point, we can replace all "pointers" inside
@@ -331,6 +414,32 @@ u8 ocrPolicyMsgMarshallMsg(ocrPolicyMsg_t* msg, u64 baseSize, u8* buffer, u32 mo
 
 #define PD_MSG outputMsg
     switch(outputMsg->type & PD_MSG_TYPE_ONLY) {
+    case PD_MSG_DB_CREATE: {
+#define PD_TYPE PD_MSG_DB_CREATE
+        if(isIn) {
+            // marshall hints if passed by user
+            u64 s = ((PD_MSG_FIELD_I(hint) != NULL_HINT) ? sizeof(ocrHint_t) : 0);
+            if(s) {
+                hal_memCopy(curPtr, PD_MSG_FIELD_I(hint), s, false);
+                // Now fixup the pointer
+                if(fixupPtrs) {
+                    DPRINTF(DEBUG_LVL_VVERB, "Converting hint (%p) to 0x%"PRIx64"\n",
+                            PD_MSG_FIELD_I(hint), ((u64)(curPtr - startPtr)<<1) + isAddl);
+                    PD_MSG_FIELD_I(hint) = (ocrHint_t*)((((u64)(curPtr - startPtr))<<1) + isAddl);
+                } else {
+                    DPRINTF(DEBUG_LVL_VVERB, "Copying hint (%p) to %p\n",
+                            PD_MSG_FIELD_I(hint), curPtr);
+                    PD_MSG_FIELD_I(hint) = (ocrHint_t*)curPtr;
+                }
+                curPtr += s;
+            } else {
+                PD_MSG_FIELD_I(hint) = NULL_HINT;
+            }
+        }
+        break;
+#undef PD_TYPE
+    }
+
     case PD_MSG_WORK_CREATE: {
 #define PD_TYPE PD_MSG_WORK_CREATE
         if(isIn) {
@@ -345,11 +454,11 @@ u8 ocrPolicyMsgMarshallMsg(ocrPolicyMsg_t* msg, u64 baseSize, u8* buffer, u32 mo
 
                 // Now fixup the pointer
                 if(fixupPtrs) {
-                    DPRINTF(DEBUG_LVL_VVERB, "Converting paramv (0x%lx) to 0x%lx\n",
+                    DPRINTF(DEBUG_LVL_VVERB, "Converting paramv (0x%"PRIx64") to 0x%"PRIx64"\n",
                             (u64)PD_MSG_FIELD_I(paramv), ((u64)(curPtr - startPtr)<<1) + isAddl);
                     PD_MSG_FIELD_I(paramv) = (void*)((((u64)(curPtr - startPtr))<<1) + isAddl);
                 } else {
-                    DPRINTF(DEBUG_LVL_VVERB, "Copying paramv (0x%lx) to 0x%lx\n",
+                    DPRINTF(DEBUG_LVL_VVERB, "Copying paramv (0x%"PRIx64") to %p\n",
                             (u64)PD_MSG_FIELD_I(paramv), curPtr);
                     PD_MSG_FIELD_I(paramv) = (void*)curPtr;
                 }
@@ -366,17 +475,36 @@ u8 ocrPolicyMsgMarshallMsg(ocrPolicyMsg_t* msg, u64 baseSize, u8* buffer, u32 mo
                 hal_memCopy(curPtr, PD_MSG_FIELD_I(depv), s, false);
                 // Now fixup the pointer
                 if(fixupPtrs) {
-                    DPRINTF(DEBUG_LVL_VVERB, "Converting depv (0x%lx) to 0x%lx\n",
+                    DPRINTF(DEBUG_LVL_VVERB, "Converting depv (0x%"PRIx64") to 0x%"PRIx64"\n",
                             (u64)PD_MSG_FIELD_I(depv), ((u64)(curPtr - startPtr)<<1) + isAddl);
                     PD_MSG_FIELD_I(depv) = (void*)((((u64)(curPtr - startPtr))<<1) + isAddl);
                 } else {
-                    DPRINTF(DEBUG_LVL_VVERB, "Copying depv (0x%lx) to 0x%lx\n",
+                    DPRINTF(DEBUG_LVL_VVERB, "Copying depv (0x%"PRIx64") to %p\n",
                             (u64)PD_MSG_FIELD_I(depv), curPtr);
                     PD_MSG_FIELD_I(depv) = (void*)curPtr;
                 }
                 curPtr += s;
             } else {
                 PD_MSG_FIELD_I(depv) = NULL;
+            }
+
+            // marshall hints if passed by user
+            s = ((PD_MSG_FIELD_I(hint) != NULL_HINT) ? sizeof(ocrHint_t) : 0);
+            if(s) {
+                hal_memCopy(curPtr, PD_MSG_FIELD_I(hint), s, false);
+                // Now fixup the pointer
+                if(fixupPtrs) {
+                    DPRINTF(DEBUG_LVL_VVERB, "Converting hint (0x%"PRIx64") to 0x%"PRIx64"\n",
+                            (u64)PD_MSG_FIELD_I(hint), ((u64)(curPtr - startPtr)<<1) + isAddl);
+                    PD_MSG_FIELD_I(hint) = (ocrHint_t*)((((u64)(curPtr - startPtr))<<1) + isAddl);
+                } else {
+                    DPRINTF(DEBUG_LVL_VVERB, "Copying hint (0x%"PRIx64") to %p\n",
+                            (u64)PD_MSG_FIELD_I(hint), curPtr);
+                    PD_MSG_FIELD_I(hint) = (ocrHint_t*)curPtr;
+                }
+                curPtr += s;
+            } else {
+                PD_MSG_FIELD_I(hint) = NULL_HINT;
             }
         }
         break;
@@ -393,11 +521,11 @@ u8 ocrPolicyMsgMarshallMsg(ocrPolicyMsg_t* msg, u64 baseSize, u8* buffer, u32 mo
                 hal_memCopy(curPtr, PD_MSG_FIELD_I(funcName), s, false);
                 // Now fixup the pointer
                 if(fixupPtrs) {
-                    DPRINTF(DEBUG_LVL_VVERB, "Converting funcName (0x%lx) to 0x%lx\n",
+                    DPRINTF(DEBUG_LVL_VVERB, "Converting funcName (0x%"PRIx64") to 0x%"PRIx64"\n",
                             (u64)PD_MSG_FIELD_I(funcName), ((u64)(curPtr - startPtr)<<1) + isAddl);
                     PD_MSG_FIELD_I(funcName) = (char*)(((u64)(curPtr - startPtr)<<1) + isAddl);
                 } else {
-                    DPRINTF(DEBUG_LVL_VVERB, "Copying funcName (0x%lx) to 0x%lx\n",
+                    DPRINTF(DEBUG_LVL_VVERB, "Copying funcName (0x%"PRIx64") to %p\n",
                             (u64)PD_MSG_FIELD_I(funcName), curPtr);
                     PD_MSG_FIELD_I(funcName) = (char*)curPtr;
                 }
@@ -412,6 +540,36 @@ u8 ocrPolicyMsgMarshallMsg(ocrPolicyMsg_t* msg, u64 baseSize, u8* buffer, u32 mo
 #undef PD_TYPE
     }
 
+#ifdef ENABLE_EXTENSION_PARAMS_EVT
+    case PD_MSG_EVT_CREATE:
+#define PD_TYPE PD_MSG_EVT_CREATE
+    {
+        if(isIn) {
+            // First copy things over
+            u64 s = (PD_MSG_FIELD_I(params) != NULL) ? sizeof(ocrEventParams_t) : 0;
+            if(s) {
+                hal_memCopy(curPtr, PD_MSG_FIELD_I(params), s, false);
+
+                // Now fixup the pointer
+                if(fixupPtrs) {
+                    DPRINTF(DEBUG_LVL_VVERB, "Converting params (0x%"PRIx64") to 0x%"PRIx64"\n",
+                            (u64)PD_MSG_FIELD_I(params), ((u64)(curPtr - startPtr)<<1) + isAddl);
+                    PD_MSG_FIELD_I(params) = (void*)((((u64)(curPtr - startPtr))<<1) + isAddl);
+                } else {
+                    DPRINTF(DEBUG_LVL_VVERB, "Copying params (0x%"PRIx64") to %p\n",
+                            (u64)PD_MSG_FIELD_I(params), curPtr);
+                    PD_MSG_FIELD_I(params) = (void*)curPtr;
+                }
+                // Finally move the curPtr for the next object
+                curPtr += s;
+            }
+        }
+    }
+        break;
+#undef PD_TYPE
+#endif
+
+
     case PD_MSG_SCHED_GET_WORK:
 #define PD_TYPE PD_MSG_SCHED_GET_WORK
         switch(PD_MSG_FIELD_IO(schedArgs).kind) {
@@ -421,11 +579,11 @@ u8 ocrPolicyMsgMarshallMsg(ocrPolicyMsg_t* msg, u64 baseSize, u8* buffer, u32 mo
                     hal_memCopy(curPtr, PD_MSG_FIELD_IO(schedArgs).OCR_SCHED_ARG_FIELD(OCR_SCHED_WORK_COMM).guids, s, false);
                     // Now fixup the pointer
                     if(fixupPtrs) {
-                        DPRINTF(DEBUG_LVL_VVERB, "Converting guids (0x%lx) to 0x%lx\n",
+                        DPRINTF(DEBUG_LVL_VVERB, "Converting guids (0x%"PRIx64") to 0x%"PRIx64"\n",
                                 (u64)PD_MSG_FIELD_IO(schedArgs).OCR_SCHED_ARG_FIELD(OCR_SCHED_WORK_COMM).guids, ((u64)(curPtr - startPtr)<<1) + isAddl);
                         PD_MSG_FIELD_IO(schedArgs).OCR_SCHED_ARG_FIELD(OCR_SCHED_WORK_COMM).guids = (ocrFatGuid_t*)(((u64)(curPtr - startPtr)<<1) + isAddl);
                     } else {
-                        DPRINTF(DEBUG_LVL_VVERB, "Copying guids (0x%lx) to 0x%lx\n",
+                        DPRINTF(DEBUG_LVL_VVERB, "Copying guids (0x%"PRIx64") to %p\n",
                                 (u64)PD_MSG_FIELD_IO(schedArgs).OCR_SCHED_ARG_FIELD(OCR_SCHED_WORK_COMM).guids, curPtr);
                         PD_MSG_FIELD_IO(schedArgs).OCR_SCHED_ARG_FIELD(OCR_SCHED_WORK_COMM).guids = (ocrFatGuid_t*)curPtr;
                     }
@@ -442,21 +600,91 @@ u8 ocrPolicyMsgMarshallMsg(ocrPolicyMsg_t* msg, u64 baseSize, u8* buffer, u32 mo
         break;
 #undef PD_TYPE
 
+    case PD_MSG_SCHED_TRANSACT:
+#define PD_TYPE PD_MSG_SCHED_TRANSACT
+        {
+            u64 s = 0;
+            ocrPolicyDomain_t *pd = NULL;
+            getCurrentEnv(&pd, NULL, NULL, NULL);
+            ocrSchedulerObjectFactory_t *fact = (ocrSchedulerObjectFactory_t*)pd->schedulerObjectFactories[PD_MSG_FIELD_IO(schedArgs).schedObj.fctId];
+            if (PD_MSG_FIELD_IO(schedArgs).schedObj.guid.metaDataPtr != NULL)
+                fact->fcts.ocrPolicyMsgGetMsgSize(fact, msg, &s, mode);
+            if (s) {
+                if (fact->fcts.ocrPolicyMsgMarshallMsg(fact, PD_MSG, curPtr, mode) == 0) {
+                    if(fixupPtrs) {
+                        PD_MSG_FIELD_IO(schedArgs).schedObj.guid.metaDataPtr = (void*)((((u64)(curPtr - startPtr))<<1) + isAddl);
+                    } else {
+                        PD_MSG_FIELD_IO(schedArgs).schedObj.guid.metaDataPtr = (void*)curPtr;
+                    }
+                    curPtr += s;
+                } else {
+                    PD_MSG_FIELD_IO(schedArgs).schedObj.guid.metaDataPtr = NULL;
+                }
+            } else {
+                PD_MSG_FIELD_IO(schedArgs).schedObj.guid.metaDataPtr = NULL;
+            }
+        }
+        break;
+#undef PD_TYPE
+
+    case PD_MSG_SCHED_ANALYZE:
+#define PD_TYPE PD_MSG_SCHED_ANALYZE
+        {
+            //BUG #920 - Move implementation specific details to the factories
+            ocrSchedulerOpAnalyzeArgs_t *analyzeArgs = &PD_MSG_FIELD_IO(schedArgs);
+            switch(analyzeArgs->kind) {
+            case OCR_SCHED_ANALYZE_SPACETIME_EDT:
+                {
+                    switch(analyzeArgs->properties) {
+                    case OCR_SCHED_ANALYZE_REQUEST:
+                        {
+                            u64 s = sizeof(ocrEdtDep_t) * analyzeArgs->OCR_SCHED_ARG_FIELD(OCR_SCHED_ANALYZE_SPACETIME_EDT).req.depc;
+                            if (s) {
+                                hal_memCopy(curPtr, analyzeArgs->OCR_SCHED_ARG_FIELD(OCR_SCHED_ANALYZE_SPACETIME_EDT).req.depv, s, false);
+                                if(fixupPtrs) {
+                                    analyzeArgs->OCR_SCHED_ARG_FIELD(OCR_SCHED_ANALYZE_SPACETIME_EDT).req.depv = (ocrEdtDep_t*)((((u64)(curPtr - startPtr))<<1) + isAddl);
+                                } else {
+                                    analyzeArgs->OCR_SCHED_ARG_FIELD(OCR_SCHED_ANALYZE_SPACETIME_EDT).req.depv = (ocrEdtDep_t*)curPtr;
+                                }
+                                curPtr += s;
+                            }
+                        }
+                        break;
+                    //Nothing to marshall
+                    case OCR_SCHED_ANALYZE_RESPONSE:
+                        break;
+                    default:
+                        ASSERT(0);
+                        break;
+                    }
+                }
+                break;
+            //Nothing to marshall
+            case OCR_SCHED_ANALYZE_SPACETIME_DB:
+                break;
+            default:
+                ASSERT(0);
+                break;
+            }
+        }
+        break;
+#undef PD_TYPE
+
     case PD_MSG_COMM_TAKE: {
 #define PD_TYPE PD_MSG_COMM_TAKE
         // First copy things over
         u64 s = sizeof(ocrFatGuid_t)*PD_MSG_FIELD_IO(guidCount);
         if(isIn) {
             if(PD_MSG_FIELD_IO(guids) != NULL &&
-               PD_MSG_FIELD_IO(guids[0].guid) != NULL_GUID && s != 0) {
+               !(ocrGuidIsNull(PD_MSG_FIELD_IO(guids[0].guid))) && s != 0) {
                 hal_memCopy(curPtr, PD_MSG_FIELD_IO(guids), s, false);
                 // Now fixup the pointer
                 if(fixupPtrs) {
-                    DPRINTF(DEBUG_LVL_VVERB, "Converting guids (0x%lx) to 0x%lx\n",
+                    DPRINTF(DEBUG_LVL_VVERB, "Converting guids (0x%"PRIx64") to 0x%"PRIx64"\n",
                             (u64)PD_MSG_FIELD_IO(guids), ((u64)(curPtr - startPtr)<<1) + isAddl);
                     PD_MSG_FIELD_IO(guids) = (ocrFatGuid_t*)(((u64)(curPtr - startPtr)<<1) + isAddl);
                 } else {
-                    DPRINTF(DEBUG_LVL_VVERB, "Copying guids (0x%lx) to 0x%lx\n",
+                    DPRINTF(DEBUG_LVL_VVERB, "Copying guids (0x%"PRIx64") to %p\n",
                             (u64)PD_MSG_FIELD_IO(guids), curPtr);
                     PD_MSG_FIELD_IO(guids) = (ocrFatGuid_t*)curPtr;
                 }
@@ -470,11 +698,11 @@ u8 ocrPolicyMsgMarshallMsg(ocrPolicyMsg_t* msg, u64 baseSize, u8* buffer, u32 mo
                 hal_memCopy(curPtr, PD_MSG_FIELD_IO(guids), s, false);
                 // Now fixup the pointer
                 if(fixupPtrs) {
-                    DPRINTF(DEBUG_LVL_VVERB, "Converting guids (0x%lx) to 0x%lx\n",
+                    DPRINTF(DEBUG_LVL_VVERB, "Converting guids (0x%"PRIx64") to 0x%"PRIx64"\n",
                             (u64)PD_MSG_FIELD_IO(guids), ((u64)(curPtr - startPtr)<<1) + isAddl);
                     PD_MSG_FIELD_IO(guids) = (ocrFatGuid_t*)(((u64)(curPtr - startPtr)<<1) + isAddl);
                 } else {
-                    DPRINTF(DEBUG_LVL_VVERB, "Copying guids (0x%lx) to 0x%lx\n",
+                    DPRINTF(DEBUG_LVL_VVERB, "Copying guids (0x%"PRIx64") to %p\n",
                             (u64)PD_MSG_FIELD_IO(guids), curPtr);
                     PD_MSG_FIELD_IO(guids) = (ocrFatGuid_t*)curPtr;
                 }
@@ -496,11 +724,11 @@ u8 ocrPolicyMsgMarshallMsg(ocrPolicyMsg_t* msg, u64 baseSize, u8* buffer, u32 mo
             hal_memCopy(curPtr, PD_MSG_FIELD_IO(guids), s, false);
             // Now fixup the pointer
             if(fixupPtrs) {
-                DPRINTF(DEBUG_LVL_VVERB, "Converting guids (0x%lx) to 0x%lx\n",
+                DPRINTF(DEBUG_LVL_VVERB, "Converting guids (0x%"PRIx64") to 0x%"PRIx64"\n",
                         (u64)PD_MSG_FIELD_IO(guids), ((u64)(curPtr - startPtr)<<1) + isAddl);
                 PD_MSG_FIELD_IO(guids) = (ocrFatGuid_t*)(((u64)(curPtr - startPtr)<<1) + isAddl);
             } else {
-                DPRINTF(DEBUG_LVL_VVERB, "Copying guids (0x%lx) to 0x%lx\n",
+                DPRINTF(DEBUG_LVL_VVERB, "Copying guids (0x%"PRIx64") to %p\n",
                         (u64)PD_MSG_FIELD_IO(guids), curPtr);
                 PD_MSG_FIELD_IO(guids) = (ocrFatGuid_t*)curPtr;
             }
@@ -528,11 +756,11 @@ u8 ocrPolicyMsgMarshallMsg(ocrPolicyMsg_t* msg, u64 baseSize, u8* buffer, u32 mo
 
             // Now fixup the pointer
             if(fixupPtrs) {
-                DPRINTF(DEBUG_LVL_VVERB, "Converting hints (0x%lx) to 0x%lx\n",
+                DPRINTF(DEBUG_LVL_VVERB, "Converting hints (0x%"PRIx64") to 0x%"PRIx64"\n",
                         (u64)PD_MSG_FIELD_IO(hints), ((u64)(curPtr - startPtr)<<1) + isAddl);
                 PD_MSG_FIELD_IO(hints) = (u64**)(((u64)(curPtr - startPtr)<<1) + isAddl);
             } else {
-                DPRINTF(DEBUG_LVL_VVERB, "Copying hints (0x%lx) to 0x%lx\n",
+                DPRINTF(DEBUG_LVL_VVERB, "Copying hints (0x%"PRIx64") to %p\n",
                         (u64)PD_MSG_FIELD_IO(hints), curPtr);
                 PD_MSG_FIELD_IO(hints) = (u64**)curPtr;
             }
@@ -557,11 +785,11 @@ u8 ocrPolicyMsgMarshallMsg(ocrPolicyMsg_t* msg, u64 baseSize, u8* buffer, u32 mo
                 hal_memCopy(curPtr, PD_MSG_FIELD_IO(guid.metaDataPtr), s, false);
                 // Now fixup the pointer
                 if(fixupPtrs) {
-                    DPRINTF(DEBUG_LVL_VVERB, "Converting metadata clone (0x%lx) to 0x%lx\n",
+                    DPRINTF(DEBUG_LVL_VVERB, "Converting metadata clone (0x%"PRIx64") to 0x%"PRIx64"\n",
                             (u64)PD_MSG_FIELD_IO(guid.metaDataPtr), ((u64)(curPtr - startPtr)<<1) + isAddl);
                     PD_MSG_FIELD_IO(guid.metaDataPtr) = (void*)(((u64)(curPtr - startPtr)<<1) + isAddl);
                 } else {
-                    DPRINTF(DEBUG_LVL_VVERB, "Copying metadata clone (0x%lx) to 0x%lx\n",
+                    DPRINTF(DEBUG_LVL_VVERB, "Copying metadata clone (0x%"PRIx64") to %p\n",
                             (u64)PD_MSG_FIELD_IO(guid.metaDataPtr), curPtr);
                     PD_MSG_FIELD_IO(guid.metaDataPtr) = (void*)curPtr;
                 }
@@ -585,11 +813,11 @@ u8 ocrPolicyMsgMarshallMsg(ocrPolicyMsg_t* msg, u64 baseSize, u8* buffer, u32 mo
             hal_memCopy(curPtr, PD_MSG_FIELD_O(ptr), s, false);
             // Now fixup the pointer
             if(fixupPtrs) {
-                DPRINTF(DEBUG_LVL_VVERB, "Converting DB acquire ptr (0x%lx) to 0x%lx\n",
+                DPRINTF(DEBUG_LVL_VVERB, "Converting DB acquire ptr (0x%"PRIx64") to 0x%"PRIx64"\n",
                         (u64)PD_MSG_FIELD_O(ptr), ((u64)(curPtr - startPtr)<<1) + isAddl);
                 PD_MSG_FIELD_O(ptr) = (void*)(((u64)(curPtr - startPtr)<<1) + isAddl);
             } else {
-                DPRINTF(DEBUG_LVL_VVERB, "Copying DB acquire ptr (0x%lx) to 0x%lx\n",
+                DPRINTF(DEBUG_LVL_VVERB, "Copying DB acquire ptr (0x%"PRIx64") to %p\n",
                         (u64)PD_MSG_FIELD_O(ptr), curPtr);
                 PD_MSG_FIELD_O(ptr) = (void*)curPtr;
             }
@@ -607,11 +835,11 @@ u8 ocrPolicyMsgMarshallMsg(ocrPolicyMsg_t* msg, u64 baseSize, u8* buffer, u32 mo
             hal_memCopy(curPtr, PD_MSG_FIELD_I(ptr), s, false);
             // Now fixup the pointer
             if(fixupPtrs) {
-                DPRINTF(DEBUG_LVL_VVERB, "Converting DB release ptr (0x%lx) to 0x%lx\n",
+                DPRINTF(DEBUG_LVL_VVERB, "Converting DB release ptr (0x%"PRIx64") to 0x%"PRIx64"\n",
                         (u64)PD_MSG_FIELD_I(ptr), ((u64)(curPtr - startPtr)<<1) + isAddl);
                 PD_MSG_FIELD_I(ptr) = (void*)(((u64)(curPtr - startPtr)<<1) + isAddl);
             } else {
-                DPRINTF(DEBUG_LVL_VVERB, "Copying DB release ptr (0x%lx) to 0x%lx\n",
+                DPRINTF(DEBUG_LVL_VVERB, "Copying DB release ptr (0x%"PRIx64") to %p\n",
                         (u64)PD_MSG_FIELD_I(ptr), curPtr);
                 PD_MSG_FIELD_I(ptr) = (void*)curPtr;
             }
@@ -620,6 +848,54 @@ u8 ocrPolicyMsgMarshallMsg(ocrPolicyMsg_t* msg, u64 baseSize, u8* buffer, u32 mo
         }
 #undef PD_TYPE
         break;
+    }
+
+    case PD_MSG_HINT_SET: {
+#define PD_TYPE PD_MSG_HINT_SET
+        if(isIn) {
+            // marshall hints if passed by user
+            ASSERT(PD_MSG_FIELD_I(hint) != NULL_HINT);
+            u64 s = sizeof(ocrHint_t);
+            if(s) {
+                hal_memCopy(curPtr, PD_MSG_FIELD_I(hint), s, false);
+                // Now fixup the pointer
+                if(fixupPtrs) {
+                    DPRINTF(DEBUG_LVL_VVERB, "Converting hint (%p) to 0x%"PRIx64"\n",
+                            PD_MSG_FIELD_I(hint), ((u64)(curPtr - startPtr)<<1) + isAddl);
+                    PD_MSG_FIELD_I(hint) = (ocrHint_t*)((((u64)(curPtr - startPtr))<<1) + isAddl);
+                } else {
+                    DPRINTF(DEBUG_LVL_VVERB, "Copying hint (%p) to %p\n",
+                            PD_MSG_FIELD_I(hint), curPtr);
+                    PD_MSG_FIELD_I(hint) = (ocrHint_t*)curPtr;
+                }
+                curPtr += s;
+            }
+        }
+        break;
+#undef PD_TYPE
+    }
+
+    case PD_MSG_HINT_GET: {
+#define PD_TYPE PD_MSG_HINT_GET
+        // marshall hints if passed by user
+        ASSERT(PD_MSG_FIELD_IO(hint) != NULL_HINT);
+        u64 s = sizeof(ocrHint_t);
+        if(s) {
+            hal_memCopy(curPtr, PD_MSG_FIELD_IO(hint), s, false);
+            // Now fixup the pointer
+            if(fixupPtrs) {
+                DPRINTF(DEBUG_LVL_VVERB, "Converting hint (%p) to 0x%"PRIx64"\n",
+                        PD_MSG_FIELD_IO(hint), ((u64)(curPtr - startPtr)<<1) + isAddl);
+                PD_MSG_FIELD_IO(hint) = (ocrHint_t*)((((u64)(curPtr - startPtr))<<1) + isAddl);
+            } else {
+                DPRINTF(DEBUG_LVL_VVERB, "Copying hint (%p) to %p\n",
+                        PD_MSG_FIELD_IO(hint), curPtr);
+                PD_MSG_FIELD_IO(hint) = (ocrHint_t*)curPtr;
+            }
+            curPtr += s;
+        }
+        break;
+#undef PD_TYPE
     }
 
     default:
@@ -638,7 +914,7 @@ u8 ocrPolicyMsgMarshallMsg(ocrPolicyMsg_t* msg, u64 baseSize, u8* buffer, u32 mo
         outputMsg->usefulSize = baseSize;
     }
 
-    DPRINTF(DEBUG_LVL_VVERB, "Useful size of message set to %u\n", outputMsg->usefulSize);
+    DPRINTF(DEBUG_LVL_VVERB, "Useful size of message set to %"PRIu64"\n", outputMsg->usefulSize);
     return 0;
 }
 
@@ -663,7 +939,7 @@ u8 ocrPolicyMsgUnMarshallMsg(u8* mainBuffer, u8* addlBuffer,
         ASSERT(((ocrPolicyMsg_t*)mainBuffer)->usefulSize <= baseSize + marshalledSize);
         ASSERT(((ocrPolicyMsg_t*)mainBuffer)->usefulSize >= baseSize);
 
-        DPRINTF(DEBUG_LVL_VVERB, "Unmarshall full-copy: 0x%lx -> 0x%lx of useful size %ld\n",
+        DPRINTF(DEBUG_LVL_VVERB, "Unmarshall full-copy: 0x%"PRIx64" -> 0x%"PRIx64" of useful size %"PRId64"\n",
                 (u64)mainBuffer, (u64)msg, ((ocrPolicyMsg_t*)mainBuffer)->usefulSize);
         hal_memCopy(msg, mainBuffer, ((ocrPolicyMsg_t*)mainBuffer)->usefulSize, false);
 
@@ -719,32 +995,68 @@ u8 ocrPolicyMsgUnMarshallMsg(u8* mainBuffer, u8* addlBuffer,
         ASSERT(localAddlPtr != NULL && marshalledSize != 0);
         hal_memCopy(localAddlPtr, addlBuffer, marshalledSize, false);
     }
-    DPRINTF(DEBUG_LVL_VERB, "Unmarshalling message with mainAddr 0x%lx and addlAddr 0x%lx\n",
+    DPRINTF(DEBUG_LVL_VERB, "Unmarshalling message with mainAddr 0x%"PRIx64" and addlAddr 0x%"PRIx64"\n",
             (u64)localMainPtr, (u64)localAddlPtr);
 
     // At this point, we go over the pointers that we care about and
     // fix them up
 #define PD_MSG msg
     switch(msg->type & PD_MSG_TYPE_ONLY) {
+    case PD_MSG_DB_CREATE: {
+#define PD_TYPE PD_MSG_DB_CREATE
+        if(isIn) {
+            if(PD_MSG_FIELD_I(hint) != NULL_HINT) {
+                u64 t = (u64)(PD_MSG_FIELD_I(hint));
+                PD_MSG_FIELD_I(hint) = (ocrHint_t*)((t&1?localAddlPtr:localMainPtr) + (t>>1));
+                DPRINTF(DEBUG_LVL_VVERB, "Converted field hint from 0x%"PRIx64" to 0x%"PRIx64"\n",
+                        t, (u64)PD_MSG_FIELD_I(hint));
+            }
+        }
+        break;
+#undef PD_TYPE
+    }
+
     case PD_MSG_WORK_CREATE: {
 #define PD_TYPE PD_MSG_WORK_CREATE
         if(isIn) {
             if(PD_MSG_FIELD_IO(paramc) > 0) {
                 u64 t = (u64)(PD_MSG_FIELD_I(paramv));
                 PD_MSG_FIELD_I(paramv) = (void*)((t&1?localAddlPtr:localMainPtr) + (t>>1));
-                DPRINTF(DEBUG_LVL_VVERB, "Converted field paramv from 0x%lx to 0x%lx\n",
+                DPRINTF(DEBUG_LVL_VVERB, "Converted field paramv from 0x%"PRIx64" to 0x%"PRIx64"\n",
                         t, (u64)PD_MSG_FIELD_I(paramv));
             }
             if(((PD_MSG_FIELD_I(depv) != NULL) && PD_MSG_FIELD_IO(depc) > 0)) {
                 u64 t = (u64)(PD_MSG_FIELD_I(depv));
                 PD_MSG_FIELD_I(depv) = (void*)((t&1?localAddlPtr:localMainPtr) + (t>>1));
-                DPRINTF(DEBUG_LVL_VVERB, "Converted field depv from 0x%lx to 0x%lx\n",
+                DPRINTF(DEBUG_LVL_VVERB, "Converted field depv from 0x%"PRIx64" to 0x%"PRIx64"\n",
                         t, (u64)PD_MSG_FIELD_I(depv));
+            }
+            if(PD_MSG_FIELD_I(hint) != NULL_HINT) {
+                u64 t = (u64)(PD_MSG_FIELD_I(hint));
+                PD_MSG_FIELD_I(hint) = (ocrHint_t*)((t&1?localAddlPtr:localMainPtr) + (t>>1));
+                DPRINTF(DEBUG_LVL_VVERB, "Converted field hint from 0x%"PRIx64" to 0x%"PRIx64"\n",
+                        t, (u64)PD_MSG_FIELD_I(hint));
             }
         }
         break;
 #undef PD_TYPE
     }
+
+#ifdef ENABLE_EXTENSION_PARAMS_EVT
+    case PD_MSG_EVT_CREATE: {
+#define PD_TYPE PD_MSG_EVT_CREATE
+        if(isIn) {
+            if(PD_MSG_FIELD_I(params) != NULL) {
+                u64 t = (u64)(PD_MSG_FIELD_I(params));
+                PD_MSG_FIELD_I(params) = (void*)((t&1?localAddlPtr:localMainPtr) + (t>>1));
+                DPRINTF(DEBUG_LVL_VVERB, "Converted field params from 0x%"PRIx64" to 0x%"PRIx64"\n",
+                        t, (u64)PD_MSG_FIELD_I(params));
+            }
+        }
+        break;
+#undef PD_TYPE
+    }
+#endif
 
     case PD_MSG_EDTTEMP_CREATE: {
 #define PD_TYPE PD_MSG_EDTTEMP_CREATE
@@ -753,7 +1065,7 @@ u8 ocrPolicyMsgUnMarshallMsg(u8* mainBuffer, u8* addlBuffer,
             if(PD_MSG_FIELD_I(funcNameLen) > 0) {
                 u64 t = (u64)(PD_MSG_FIELD_I(funcName));
                 PD_MSG_FIELD_I(funcName) = (char*)((t&1?localAddlPtr:localMainPtr) + (t>>1));
-                DPRINTF(DEBUG_LVL_VVERB, "Converted field funcName from 0x%lx to 0x%lx\n",
+                DPRINTF(DEBUG_LVL_VVERB, "Converted field funcName from 0x%"PRIx64" to 0x%"PRIx64"\n",
                         t, (u64)PD_MSG_FIELD_I(funcName));
             }
         }
@@ -770,13 +1082,66 @@ u8 ocrPolicyMsgUnMarshallMsg(u8* mainBuffer, u8* addlBuffer,
                     u64 t = (u64)(PD_MSG_FIELD_IO(schedArgs).OCR_SCHED_ARG_FIELD(OCR_SCHED_WORK_COMM).guids);
                     ASSERT(t);
                     PD_MSG_FIELD_IO(schedArgs).OCR_SCHED_ARG_FIELD(OCR_SCHED_WORK_COMM).guids = (ocrFatGuid_t*)((t&1?localAddlPtr:localMainPtr) + (t>>1));
-                    DPRINTF(DEBUG_LVL_VVERB, "Converted field guids from 0x%lx to 0x%lx\n",
+                    DPRINTF(DEBUG_LVL_VVERB, "Converted field guids from 0x%"PRIx64" to 0x%"PRIx64"\n",
                         t, (u64)PD_MSG_FIELD_IO(schedArgs).OCR_SCHED_ARG_FIELD(OCR_SCHED_WORK_COMM).guids);
                 }
                 break;
             }
         default:
             break;
+        }
+        break;
+#undef PD_TYPE
+
+    case PD_MSG_SCHED_TRANSACT:
+#define PD_TYPE PD_MSG_SCHED_TRANSACT
+        {
+            if (PD_MSG_FIELD_IO(schedArgs).schedObj.guid.metaDataPtr != NULL) {
+                u64 t = (u64)(PD_MSG_FIELD_IO(schedArgs).schedObj.guid.metaDataPtr);
+                PD_MSG_FIELD_IO(schedArgs).schedObj.guid.metaDataPtr = (void*)((t&1?localAddlPtr:localMainPtr) + (t>>1));
+
+                ocrPolicyDomain_t *pd = NULL;
+                getCurrentEnv(&pd, NULL, NULL, NULL);
+                ocrSchedulerObjectFactory_t *fact = (ocrSchedulerObjectFactory_t*)pd->schedulerObjectFactories[PD_MSG_FIELD_IO(schedArgs).schedObj.fctId];
+                fact->fcts.ocrPolicyMsgUnMarshallMsg(fact, msg, localMainPtr, localAddlPtr, mode);
+            }
+        }
+        break;
+#undef PD_TYPE
+
+    case PD_MSG_SCHED_ANALYZE:
+#define PD_TYPE PD_MSG_SCHED_ANALYZE
+        {
+            //BUG #920 - Move implementation specific details to the factories
+            ocrSchedulerOpAnalyzeArgs_t *analyzeArgs = &PD_MSG_FIELD_IO(schedArgs);
+            switch(analyzeArgs->kind) {
+            case OCR_SCHED_ANALYZE_SPACETIME_EDT:
+                {
+                    switch(analyzeArgs->properties) {
+                    case OCR_SCHED_ANALYZE_REQUEST:
+                        {
+                            if (analyzeArgs->OCR_SCHED_ARG_FIELD(OCR_SCHED_ANALYZE_SPACETIME_EDT).req.depc > 0) {
+                                u64 t = (u64)(analyzeArgs->OCR_SCHED_ARG_FIELD(OCR_SCHED_ANALYZE_SPACETIME_EDT).req.depv);
+                                analyzeArgs->OCR_SCHED_ARG_FIELD(OCR_SCHED_ANALYZE_SPACETIME_EDT).req.depv = (ocrEdtDep_t*)((t&1?localAddlPtr:localMainPtr) + (t>>1));
+                            }
+                        }
+                        break;
+                    //Nothing to unmarshall
+                    case OCR_SCHED_ANALYZE_RESPONSE:
+                        break;
+                    default:
+                        ASSERT(0);
+                        break;
+                    }
+                }
+                break;
+            //Nothing to unmarshall
+            case OCR_SCHED_ANALYZE_SPACETIME_DB:
+                break;
+            default:
+                ASSERT(0);
+                break;
+            }
         }
         break;
 #undef PD_TYPE
@@ -788,7 +1153,7 @@ u8 ocrPolicyMsgUnMarshallMsg(u8* mainBuffer, u8* addlBuffer,
                 u64 t = (u64)(PD_MSG_FIELD_IO(guids));
                 if(t) {
                     PD_MSG_FIELD_IO(guids) = (ocrFatGuid_t*)((t&1?localAddlPtr:localMainPtr) + (t>>1));
-                    DPRINTF(DEBUG_LVL_VVERB, "Converted field guids from 0x%lx to 0x%lx\n",
+                    DPRINTF(DEBUG_LVL_VVERB, "Converted field guids from 0x%"PRIx64" to 0x%"PRIx64"\n",
                             t, (u64)PD_MSG_FIELD_IO(guids));
                 }
             }
@@ -797,7 +1162,7 @@ u8 ocrPolicyMsgUnMarshallMsg(u8* mainBuffer, u8* addlBuffer,
                 u64 t = (u64)(PD_MSG_FIELD_IO(guids));
                 ASSERT(t);
                 PD_MSG_FIELD_IO(guids) = (ocrFatGuid_t*)((t&1?localAddlPtr:localMainPtr) + (t>>1));
-                DPRINTF(DEBUG_LVL_VVERB, "Converted field guids from 0x%lx to 0x%lx\n",
+                DPRINTF(DEBUG_LVL_VVERB, "Converted field guids from 0x%"PRIx64" to 0x%"PRIx64"\n",
                         t, (u64)PD_MSG_FIELD_IO(guids));
             }
         }
@@ -810,13 +1175,13 @@ u8 ocrPolicyMsgUnMarshallMsg(u8* mainBuffer, u8* addlBuffer,
         if(PD_MSG_FIELD_IO(guidCount) > 0) {
             u64 t = (u64)(PD_MSG_FIELD_IO(guids));
             PD_MSG_FIELD_IO(guids) = (ocrFatGuid_t*)((t&1?localAddlPtr:localMainPtr) + (t>>1));
-            DPRINTF(DEBUG_LVL_VVERB, "Converted field guids from 0x%lx to 0x%lx\n",
+            DPRINTF(DEBUG_LVL_VVERB, "Converted field guids from 0x%"PRIx64" to 0x%"PRIx64"\n",
                     t, (u64)PD_MSG_FIELD_IO(guids));
 
 #ifdef ENABLE_HINTS
             u64 h = (u64)(PD_MSG_FIELD_IO(hints));
             PD_MSG_FIELD_IO(hints) = (u64**)((h&1?localAddlPtr:localMainPtr) + (h>>1));
-            DPRINTF(DEBUG_LVL_VVERB, "Converted field hints from 0x%lx to 0x%lx\n",
+            DPRINTF(DEBUG_LVL_VVERB, "Converted field hints from 0x%"PRIx64" to 0x%"PRIx64"\n",
                     h, (u64)PD_MSG_FIELD_IO(hints));
             u32 i;
             for (i = 0; i < PD_MSG_FIELD_IO(guidCount); i++) {
@@ -838,15 +1203,23 @@ u8 ocrPolicyMsgUnMarshallMsg(u8* mainBuffer, u8* addlBuffer,
             ASSERT(PD_MSG_FIELD_O(size) > 0);
             u64 t = (u64)(PD_MSG_FIELD_IO(guid.metaDataPtr));
             PD_MSG_FIELD_IO(guid.metaDataPtr) = (void*)((t&1?localAddlPtr:localMainPtr) + (t>>1));
-            DPRINTF(DEBUG_LVL_VVERB, "Converted metadata ptr from 0x%lx to 0x%lx\n",
+            DPRINTF(DEBUG_LVL_VVERB, "Converted metadata ptr from 0x%"PRIx64" to 0x%"PRIx64"\n",
                     t, (u64)PD_MSG_FIELD_IO(guid.metaDataPtr));
-#ifdef ENABLE_EXTENSION_LABELING
             u64 val;
             ocrGuidKind kind;
             ocrPolicyDomain_t * pd;
             getCurrentEnv(&pd, NULL, NULL, NULL);
             pd->guidProviders[0]->fcts.getVal(pd->guidProviders[0], PD_MSG_FIELD_IO(guid.guid), &val, &kind);
-            if (kind == OCR_GUID_GUIDMAP) {
+            if (kind == OCR_GUID_EDT_TEMPLATE) {
+                // Handle unmarshalling formatted as: ocrTaskTemplateHc_t + hints
+                void * base = PD_MSG_FIELD_IO(guid.metaDataPtr);
+                ocrTaskTemplateHc_t * tpl = (ocrTaskTemplateHc_t *) base;
+                if (tpl->hint.hintVal != NULL) {
+                    tpl->hint.hintVal  = (u64*)((u64)base + sizeof(ocrTaskTemplateHc_t));
+                }
+            }
+#ifdef ENABLE_EXTENSION_LABELING
+            else if (kind == OCR_GUID_GUIDMAP) {
                 // Handle unmarshalling formatted as: map data-structure + serialized params array
                 void * orgMdPtr = PD_MSG_FIELD_IO(guid.metaDataPtr);
                 ocrGuidMap_t * orgMap = (ocrGuidMap_t *) orgMdPtr;
@@ -864,7 +1237,7 @@ u8 ocrPolicyMsgUnMarshallMsg(u8* mainBuffer, u8* addlBuffer,
             ASSERT(PD_MSG_FIELD_O(size) > 0);
             u64 t = (u64)(PD_MSG_FIELD_O(ptr));
             PD_MSG_FIELD_O(ptr) = (void*)((t&1?localAddlPtr:localMainPtr) + (t>>1));
-            DPRINTF(DEBUG_LVL_VVERB, "Converted DB acquire ptr from 0x%lx to 0x%lx\n",
+            DPRINTF(DEBUG_LVL_VVERB, "Converted DB acquire ptr from 0x%"PRIx64" to 0x%"PRIx64"\n",
                     t, (u64)PD_MSG_FIELD_O(ptr));
 #undef PD_TYPE
         }
@@ -877,9 +1250,33 @@ u8 ocrPolicyMsgUnMarshallMsg(u8* mainBuffer, u8* addlBuffer,
         if((flags & MARSHALL_DBPTR) && (isIn) && (PD_MSG_FIELD_I(size) > 0)) {
             u64 t = (u64)(PD_MSG_FIELD_I(ptr));
             PD_MSG_FIELD_I(ptr) = (void*)((t&1?localAddlPtr:localMainPtr) + (t>>1));
-            DPRINTF(DEBUG_LVL_VVERB, "Converted DB release ptr from 0x%lx to 0x%lx\n",
+            DPRINTF(DEBUG_LVL_VVERB, "Converted DB release ptr from 0x%"PRIx64" to 0x%"PRIx64"\n",
                     t, (u64)PD_MSG_FIELD_I(ptr));
         }
+        break;
+#undef PD_TYPE
+    }
+
+    case PD_MSG_HINT_SET: {
+#define PD_TYPE PD_MSG_HINT_SET
+        if(isIn) {
+            ASSERT(PD_MSG_FIELD_I(hint) != NULL_HINT);
+            u64 t = (u64)(PD_MSG_FIELD_I(hint));
+            PD_MSG_FIELD_I(hint) = (ocrHint_t*)((t&1?localAddlPtr:localMainPtr) + (t>>1));
+            DPRINTF(DEBUG_LVL_VVERB, "Converted field hint from 0x%"PRIx64" to 0x%"PRIx64"\n",
+                    t, (u64)PD_MSG_FIELD_I(hint));
+        }
+        break;
+#undef PD_TYPE
+    }
+
+    case PD_MSG_HINT_GET: {
+#define PD_TYPE PD_MSG_HINT_GET
+        ASSERT(PD_MSG_FIELD_IO(hint) != NULL_HINT);
+        u64 t = (u64)(PD_MSG_FIELD_IO(hint));
+        PD_MSG_FIELD_IO(hint) = (ocrHint_t*)((t&1?localAddlPtr:localMainPtr) + (t>>1));
+        DPRINTF(DEBUG_LVL_VVERB, "Converted field hint from 0x%"PRIx64" to 0x%"PRIx64"\n",
+                t, (u64)PD_MSG_FIELD_IO(hint));
         break;
 #undef PD_TYPE
     }
@@ -906,14 +1303,14 @@ u8 ocrPolicyMsgUnMarshallMsg(u8* mainBuffer, u8* addlBuffer,
             u32 count = PD_MSG_FG_IO_COUNT_ONLY_GET(msg->type);
 
             // Nullify foreign GUID's metadataPtr, resolve local ones that are NULL
-            DPRINTF(DEBUG_LVL_VVERB, "Invalidating %d ocrFatGuid_t I/O pointers for 0x%lx starting at 0x%lx\n",
+            DPRINTF(DEBUG_LVL_VVERB, "Invalidating %"PRId32" ocrFatGuid_t I/O pointers for %p starting at %p\n",
                     count, msg, (&(msg->args)));
             // Process InOut GUIDS
             ocrFatGuid_t *guids = (ocrFatGuid_t*)(&(msg->args));
             ocrPolicyDomain_t *pd = NULL;
             getCurrentEnv(&pd, NULL, NULL, NULL);
             while(count) {
-                if (guids->guid != NULL_GUID) {
+                if (!(ocrGuidIsNull(guids->guid))) {
                     // Determine if GUID is local
                     //BUG #581: what we should really do is compare the PD location and the guid's one
                     // but the overhead going through the current api sounds unreasonnable.
@@ -949,13 +1346,13 @@ u8 ocrPolicyMsgUnMarshallMsg(u8* mainBuffer, u8* addlBuffer,
             // Now do the in or out
             if(isIn) {
                 count = PD_MSG_FG_I_COUNT_ONLY_GET(msg->type);
-                DPRINTF(DEBUG_LVL_VVERB, "Invalidating %d ocrFatGuid_t I pointers\n", count);
+                DPRINTF(DEBUG_LVL_VVERB, "Invalidating %"PRId32" ocrFatGuid_t I pointers\n", count);
                 // Here we should invalidate PD_MSG_WORK_CREATE's depv. However, in the current
                 // implementation the GUIDs metaDataPtr should always be NULL. Avoid this
                 // overhead for now.
             } else {
                 count = PD_MSG_FG_O_COUNT_ONLY_GET(msg->type);
-                DPRINTF(DEBUG_LVL_VVERB, "Invalidating %d ocrFatGuid_t O pointers\n", count);
+                DPRINTF(DEBUG_LVL_VVERB, "Invalidating %"PRId32" ocrFatGuid_t O pointers\n", count);
             }
             // BUG #581: I really don't like this...
             switch(msg->type & PD_MSG_TYPE_ONLY) {
@@ -970,7 +1367,7 @@ u8 ocrPolicyMsgUnMarshallMsg(u8* mainBuffer, u8* addlBuffer,
             }
 
             while(count) {
-                if (guids->guid != NULL_GUID) {
+                if (!(ocrGuidIsNull(guids->guid))) {
                     // Determine if GUID is local
                     //BUG #581: what we should really do is compare the PD location and the guid's one
                     // but the overhead going through the current api sounds unreasonnable.
@@ -1000,7 +1397,7 @@ u8 ocrPolicyMsgUnMarshallMsg(u8* mainBuffer, u8* addlBuffer,
     } else {
         msg->usefulSize = baseSize;
     }
-    DPRINTF(DEBUG_LVL_VVERB, "Done unmarshalling and have size of message %ld\n", msg->usefulSize);
+    DPRINTF(DEBUG_LVL_VVERB, "Done unmarshalling and have size of message %"PRId64"\n", msg->usefulSize);
     return 0;
 }
 

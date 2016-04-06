@@ -18,7 +18,23 @@
 #include "ocr-types.h"
 #include "utils/ocr-utils.h"
 
-#include "rmd-arch.h"
+/* CE-XE communication buffers */
+#define MAX_NUM_XE 8
+#define MSG_QUEUE_OFFT  (0x0)
+#define MSG_QUEUE_SIZE  (0x100)
+
+/* CE-CE communication buffers */
+/* Number of messages that other CEs can send to me */
+#define OUTSTANDING_CE_MSGS   16
+/* Number of messages I can send at once (to other CEs). We need
+ * a few because when we need to deal with barriers, it is debilitating to not be
+ * able to quickly send out all requests for barriers */
+#define OUTSTANDING_CE_SEND   4
+#define MSG_CE_ADDR_OFFT      ((u64)(MSG_QUEUE_OFFT + MAX_NUM_XE*MSG_QUEUE_SIZE))
+#define MSG_CE_RECV_BUF_OFFT  ((u64)(MSG_CE_ADDR_OFFT + OUTSTANDING_CE_MSGS*sizeof(u64)))
+// Bit twidling to ensure sizeof(ocrPolicyMsg_t) does not make things unaligned
+#define MSG_CE_SEND_BUF_OFFT  ((u64)((MSG_CE_RECV_BUF_OFFT + sizeof(ocrPolicyMsg_t) + 7) & ~0x7ULL))
+
 
 typedef struct {
     ocrCommPlatformFactory_t base;
@@ -26,10 +42,9 @@ typedef struct {
 
 typedef struct {
     ocrCommPlatform_t base;
-    ocrPolicyDomain_t * pdPtr;  // Our PD
     u64 * rq[MAX_NUM_XE];       // Remote stages for this block's XEs
     u64 * lq[MAX_NUM_XE];       // Local stages for this block's XEs
-    u64 pollq;                  // Round-robing queue to poll next
+    u64 pollq;                  // Round-robin queue to poll next
 } ocrCommPlatformCe_t;
 
 typedef struct {

@@ -39,6 +39,5 @@ typedef struct {
 
 ocrWorkerFactory_t* newOcrWorkerFactorySystem(ocrParamList_t *perType);
 
-
 #endif /* ENABLE_WORKER_SYSTEM */
 #endif /* __SYSTEM_WORKER_H__ */

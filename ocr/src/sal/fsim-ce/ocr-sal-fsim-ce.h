@@ -9,6 +9,16 @@
 
 #include "ocr-hal.h"
 
+/**
+ * @brief Function to drive the runlevel changes on boot-up as well
+ * as the runlevel changes on tear-down
+ *
+ * This function will be called by tgkrnl to start the PD for the CE
+ *
+ * @param[in] pd    Pointer to the policy domain to start
+ */
+void salPdDriver(void* pd);
+
 extern u32 salPause(bool isBlocking);
 
 extern ocrGuid_t salQuery(ocrQueryType_t query, ocrGuid_t guid, void **result, u32 *size, u8 flags);
@@ -20,7 +30,7 @@ extern void salResume(u32 flag);
 #define sal_exit(x)   hal_exit(x)
 
 #define sal_assert(x, fn, ln)   do { if(!(x)) {                         \
-            PRINTF("ASSERT FAILURE: CE at line %d in '%s'\n", (int)(ln), fn); \
+            PRINTF("ASSERT FAILURE: CE at line %"PRId32" in '%s'\n", (int)(ln), fn); \
             hal_abort();                                                \
         } } while(0)
 

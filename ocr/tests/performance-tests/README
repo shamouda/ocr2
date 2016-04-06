@@ -342,3 +342,13 @@ printing must be done through the timer interface defined by the framework.
 The timer declarations can be found are defined under 'performance-tests/inc/helper.h'.
 In your micro-benchmark code we recommend to only include 'perfs.h' which in turn
 includes any other framework headers.
+
+
+******************************
+* Distributed runs - Work in progress
+******************************
+
+Environment variables:
+- OCRRUN_OPT_TPL_NODEFILE: Optional, to specify a template node file that contains a number of hostnames.
+                           The run script extract the number of hostnames it needs for a particular run.
+

@@ -17,7 +17,7 @@
 
 ocrGuid_t readerEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     ocrGuid_t dbGuid = (ocrGuid_t) depv[0].guid;
-    PRINTF("[remote] readerEdt: executing, depends on DB guid 0x%lx \n", dbGuid);
+    PRINTF("[remote] readerEdt: executing, depends on DB guid "GUIDF" \n", GUIDA(dbGuid));
     ocrDbRelease(dbGuid);
     ocrDbDestroy(dbGuid);
     ocrShutdown();
@@ -29,7 +29,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
     void * dbPtr;
     ocrGuid_t dbGuid;
     u64 nbElem = NB_ELEM_DB;
-    ocrDbCreate(&dbGuid, &dbPtr, sizeof(TYPE_ELEM_DB) * NB_ELEM_DB, 0, NULL_GUID, NO_ALLOC);
+    ocrDbCreate(&dbGuid, &dbPtr, sizeof(TYPE_ELEM_DB) * NB_ELEM_DB, 0, NULL_HINT, NO_ALLOC);
     int v = 1;
     int i = 0;
     int * data = (int *) dbPtr;
@@ -38,7 +38,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
         i++;
     }
     ocrDbRelease(dbGuid);
-    PRINTF("[local] mainEdt: local DB guid is 0x%lx, dbPtr=%p\n", dbGuid, dbPtr);
+    PRINTF("[local] mainEdt: local DB guid is "GUIDF", dbPtr=%p\n", GUIDA(dbGuid), dbPtr);
 
     // create local edt that depends on the remote edt, the db is automatically cloned
     ocrGuid_t readerEdtTemplateGuid;
@@ -46,7 +46,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
 
     ocrGuid_t readerEdtGuid;
     ocrEdtCreate(&readerEdtGuid, readerEdtTemplateGuid, 0, NULL, 1, NULL,
-                 EDT_PROP_NONE, NULL_GUID, NULL);
+                 EDT_PROP_NONE, NULL_HINT, NULL);
     ocrAddDependence(dbGuid, readerEdtGuid, 0, DB_MODE_CONST);
     return NULL_GUID;
 }

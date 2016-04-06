@@ -201,8 +201,11 @@ the sequential consistency rule), but the relaxed consistency model
 will almost assuredly always be supported by OCR.
 
 Any memory in OCR that can be accessed by multiple EDTs resides in data blocks.  As
-discussed in Section~\ref{sec:datablocks} there
-are four access modes for the data blocks in OCR. The modes and how they
+discussed in Section~\ref{sec:data blocks} there
+are four access modes for the data blocks in OCR, namely \emph{Read-Write},
+\emph{Exclusive write}, \emph{Read only}, and \emph{Constant}.
+\begin{comment}
+The modes and how they
 interact with the OCR memory model are listed as follows.
 \begin{itemize}
 
@@ -232,6 +235,6 @@ interact with the OCR memory model are listed as follows.
   will not be visible.
 
 \end{itemize}
-
+\end{comment}
 
 % This is the end of ch1-memory.tex of the OCR specification.

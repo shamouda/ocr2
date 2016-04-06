@@ -16,7 +16,7 @@
 
 #define ARRAY_CHUNK 64
 
-// Implementation of single and double linked list with fixed sized elements.
+// Implementation of single and double priority linked list with fixed sized elements.
 // Nodes are allocated within array chunks and the node pool is managed by the implementation.
 // NOTE: This is *NOT* a concurrent list
 
@@ -37,7 +37,7 @@ static void newArrayChunkSingle(arrayList_t *list) {
     slistNode_t *curNode = headNode;
     for (i = 0; i < list->arrayChunkSize; i++) {
         curNode = (slistNode_t*)ptr;
-        curNode->data = (void*)(ptr + sizeof(slistNode_t));
+        curNode->data = list->elSize ? (void*)(ptr + sizeof(slistNode_t)) : NULL;
         ptr += sizeof(slistNode_t) + list->elSize;
         curNode->next = (slistNode_t*)ptr;
     }
@@ -58,7 +58,7 @@ static void newArrayChunkDouble(arrayList_t *list) {
     slistNode_t *curNode = headNode;
     for (i = 0; i < list->arrayChunkSize; i++) {
         curNode = (slistNode_t*)ptr;
-        curNode->data = (void*)(ptr + sizeof(dlistNode_t));
+        curNode->data = list->elSize ? (void*)(ptr + sizeof(dlistNode_t)) : NULL;
         ((dlistNode_t*)curNode)->prev = NULL;
         ptr += sizeof(dlistNode_t) + list->elSize;
         curNode->next = (slistNode_t*)ptr;
@@ -82,8 +82,10 @@ static void newArrayChunk(arrayList_t *list) {
 /*****************************************************************************/
 /* INSERT (BEFORE)                                                           */
 /*****************************************************************************/
-static void insertArrayListNodeBeforeSingle(arrayList_t *list, slistNode_t *node, slistNode_t *newNode) {
+static void insertArrayListNodeBeforeSingle(arrayList_t *list, slistNode_t *node, slistNode_t *newNode, u64 key) {
+    ASSERT(newNode);
     newNode->next = node;
+    if (node) ASSERT(node->key >= key);
     if (list->head == node) {
         list->head = newNode;
         if (node == NULL) {
@@ -93,16 +95,19 @@ static void insertArrayListNodeBeforeSingle(arrayList_t *list, slistNode_t *node
     } else {
         slistNode_t *last = list->head;
         while (last && last->next != node) last = last->next;
-        ASSERT(last);
+        ASSERT(last && (last->key <= key));
         last->next = newNode;
     }
-    list->count++;
+    newNode->key = key;
 }
 
-static void insertArrayListNodeBeforeDouble(arrayList_t *list, slistNode_t *node, slistNode_t *newNode) {
+static void insertArrayListNodeBeforeDouble(arrayList_t *list, slistNode_t *node, slistNode_t *newNode, u64 key) {
+    ASSERT(newNode);
     dlistNode_t *dNode = (dlistNode_t*)node;
     dlistNode_t *dNewNode = (dlistNode_t*)newNode;
     if (node) {
+        if (dNode->prev) ASSERT(dNode->prev->key <= key);
+        if (node->next) ASSERT(node->next->key >= key);
         newNode->next = node;
         dNewNode->prev = dNode->prev;
         dNode->prev = newNode;
@@ -116,14 +121,17 @@ static void insertArrayListNodeBeforeDouble(arrayList_t *list, slistNode_t *node
     }
     if (list->head == node)
         list->head = newNode;
-    list->count++;
+    newNode->key = key;
 }
 
 /*****************************************************************************/
 /* INSERT (AFTER)                                                            */
 /*****************************************************************************/
-static void insertArrayListNodeAfterSingle(arrayList_t *list, slistNode_t *node, slistNode_t *newNode) {
+static void insertArrayListNodeAfterSingle(arrayList_t *list, slistNode_t *node, slistNode_t *newNode, u64 key) {
+    ASSERT(newNode);
     if (node) {
+        ASSERT(node->key <= key);
+        if (node->next) ASSERT(node->next->key >= key);
         newNode->next = node->next;
         node->next = newNode;
     } else {
@@ -134,12 +142,15 @@ static void insertArrayListNodeAfterSingle(arrayList_t *list, slistNode_t *node,
     }
     if (list->tail == node)
         list->tail = newNode;
-    list->count++;
+    newNode->key = key;
 }
 
-static void insertArrayListNodeAfterDouble(arrayList_t *list, slistNode_t *node, slistNode_t *newNode) {
+static void insertArrayListNodeAfterDouble(arrayList_t *list, slistNode_t *node, slistNode_t *newNode, u64 key) {
+    ASSERT(newNode);
     dlistNode_t *dNewNode = (dlistNode_t*)newNode;
     if (node) {
+        ASSERT(node->key <= key);
+        if (node->next) ASSERT(node->next->key >= key);
         newNode->next = node->next;
         dNewNode->prev = node;
         node->next = newNode;
@@ -153,7 +164,7 @@ static void insertArrayListNodeAfterDouble(arrayList_t *list, slistNode_t *node,
     }
     if (list->tail == node)
         list->tail = newNode;
-    list->count++;
+    newNode->key = key;
 }
 
 /*****************************************************************************/
@@ -174,8 +185,8 @@ static void removeArrayListNodeSingle(arrayList_t *list, slistNode_t *node) {
         last->next = node->next;
         if (list->tail == node) list->tail = last;
     }
+    node->key = 0;
     node->next = NULL;
-    list->count--;
 }
 
 static void removeArrayListNodeDouble(arrayList_t *list, slistNode_t *node) {
@@ -185,9 +196,9 @@ static void removeArrayListNodeDouble(arrayList_t *list, slistNode_t *node) {
     if (node->next) ((dlistNode_t*)(node->next))->prev = dNode->prev;
     if (list->head == node) list->head = node->next;
     if (list->tail == node) list->tail = dNode->prev;
+    node->key = 0;
     node->next = NULL;
     dNode->prev = NULL;
-    list->count--;
 }
 
 /*****************************************************************************/
@@ -196,13 +207,13 @@ static void removeArrayListNodeDouble(arrayList_t *list, slistNode_t *node) {
 static void moveArrayListNodeBeforeSingle(arrayList_t *list, slistNode_t *src, slistNode_t *dst) {
     ASSERT(src && dst);
     removeArrayListNodeSingle(list, src);
-    insertArrayListNodeBeforeSingle(list, dst, src);
+    insertArrayListNodeBeforeSingle(list, dst, src, 0);
 }
 
 static void moveArrayListNodeBeforeDouble(arrayList_t *list, slistNode_t *src, slistNode_t *dst) {
     ASSERT(src && dst);
     removeArrayListNodeDouble(list, src);
-    insertArrayListNodeBeforeDouble(list, dst, src);
+    insertArrayListNodeBeforeDouble(list, dst, src, 0);
 }
 
 void moveArrayListNodeBefore(arrayList_t *list, slistNode_t *src, slistNode_t *dst) {
@@ -225,13 +236,13 @@ void moveArrayListNodeBefore(arrayList_t *list, slistNode_t *src, slistNode_t *d
 static void moveArrayListNodeAfterSingle(arrayList_t *list, slistNode_t *src, slistNode_t *dst) {
     ASSERT(src && dst);
     removeArrayListNodeSingle(list, src);
-    insertArrayListNodeAfterSingle(list, dst, src);
+    insertArrayListNodeAfterSingle(list, dst, src, 0);
 }
 
 static void moveArrayListNodeAfterDouble(arrayList_t *list, slistNode_t *src, slistNode_t *dst) {
     ASSERT(src && dst);
     removeArrayListNodeDouble(list, src);
-    insertArrayListNodeAfterDouble(list, dst, src);
+    insertArrayListNodeAfterDouble(list, dst, src, 0);
 }
 
 void moveArrayListNodeAfter(arrayList_t *list, slistNode_t *src, slistNode_t *dst) {
@@ -249,19 +260,81 @@ void moveArrayListNodeAfter(arrayList_t *list, slistNode_t *src, slistNode_t *ds
 }
 
 /*****************************************************************************/
+/* UPDATE KEY                                                                */
+/*****************************************************************************/
+static void updatePriorityArrayListNodeSingle(arrayList_t *list, slistNode_t *node, u64 newKey) {
+    slistNode_t *ptr = NULL;
+    if (newKey <= node->key) {
+        ptr = list->head;
+        while((ptr != NULL) && (ptr->key < newKey)) ptr = ptr->next;
+        ASSERT(ptr != NULL);
+    } else {
+        ptr = node;
+        while((ptr != NULL) && (ptr->key < newKey)) ptr = ptr->next;
+    }
+    while((ptr != NULL) && (ptr->key == newKey) && ((u64)(ptr->data) < (u64)(node->data))) ptr = ptr->next;
+    if (ptr != node) {
+        removeArrayListNodeSingle(list, node);
+        if (ptr == NULL) {
+            insertArrayListNodeAfterSingle(list, list->tail, node, newKey);
+        } else {
+            insertArrayListNodeBeforeSingle(list, ptr, node, newKey);
+        }
+    } else {
+        node->key = newKey;
+    }
+}
+
+static void updatePriorityArrayListNodeDouble(arrayList_t *list, slistNode_t *node, u64 newKey) {
+    slistNode_t *ptr = node;
+    if (newKey <= node->key) {
+        while((ptr != list->head) && (ptr->key >= newKey)) ptr = ((dlistNode_t*)ptr)->prev;
+        ASSERT(ptr != NULL);
+    } else {
+        while((ptr != NULL) && (ptr->key < newKey)) ptr = ptr->next;
+    }
+    while((ptr != NULL) && (ptr->key == newKey) && ((u64)(ptr->data) < (u64)(node->data))) ptr = ptr->next;
+    if (ptr != node) {
+        removeArrayListNodeDouble(list, node);
+        if (ptr == NULL) {
+            insertArrayListNodeAfterDouble(list, list->tail, node, newKey);
+        } else {
+            insertArrayListNodeBeforeDouble(list, ptr, node, newKey);
+        }
+    } else {
+        node->key = newKey;
+    }
+}
+
+void updatePriorityArrayListNode(arrayList_t *list, slistNode_t *node, u64 newKey) {
+    switch(list->type) {
+    case OCR_LIST_TYPE_SINGLE:
+        updatePriorityArrayListNodeSingle(list, node, newKey);
+        break;
+    case OCR_LIST_TYPE_DOUBLE:
+        updatePriorityArrayListNodeDouble(list, node, newKey);
+        break;
+    default:
+        ASSERT(0);
+        break;
+    }
+}
+
+/*****************************************************************************/
 /* NEW                                                                       */
 /*****************************************************************************/
-slistNode_t* newArrayListNodeBefore(arrayList_t *list, slistNode_t *node) {
+slistNode_t* newPriorityArrayListNodeBefore(arrayList_t *list, slistNode_t *node, u64 key) {
     ASSERT(list->freeHead);
     slistNode_t *newNode = list->freeHead;
     list->freeHead = list->freeHead->next;
+    list->count++;
 
     switch(list->type) {
     case OCR_LIST_TYPE_SINGLE:
-        insertArrayListNodeBeforeSingle(list, node, newNode);
+        insertArrayListNodeBeforeSingle(list, node, newNode, key);
         break;
     case OCR_LIST_TYPE_DOUBLE:
-        insertArrayListNodeBeforeDouble(list, node, newNode);
+        insertArrayListNodeBeforeDouble(list, node, newNode, key);
         break;
     default:
         ASSERT(0);
@@ -273,17 +346,18 @@ slistNode_t* newArrayListNodeBefore(arrayList_t *list, slistNode_t *node) {
     return newNode;
 }
 
-slistNode_t* newArrayListNodeAfter(arrayList_t *list, slistNode_t *node) {
+slistNode_t* newPriorityArrayListNodeAfter(arrayList_t *list, slistNode_t *node, u64 key) {
     ASSERT(list->freeHead);
     slistNode_t *newNode = list->freeHead;
     list->freeHead = list->freeHead->next;
+    list->count++;
 
     switch(list->type) {
     case OCR_LIST_TYPE_SINGLE:
-        insertArrayListNodeAfterSingle(list, node, newNode);
+        insertArrayListNodeAfterSingle(list, node, newNode, key);
         break;
     case OCR_LIST_TYPE_DOUBLE:
-        insertArrayListNodeAfterDouble(list, node, newNode);
+        insertArrayListNodeAfterDouble(list, node, newNode, key);
         break;
     default:
         ASSERT(0);
@@ -293,25 +367,37 @@ slistNode_t* newArrayListNodeAfter(arrayList_t *list, slistNode_t *node) {
     if (list->freeHead == NULL)
         newArrayChunk(list);
     return newNode;
+}
+
+slistNode_t* newArrayListNodeBefore(arrayList_t *list, slistNode_t *node) {
+    return newPriorityArrayListNodeBefore(list, node, 0);
+}
+
+slistNode_t* newArrayListNodeAfter(arrayList_t *list, slistNode_t *node) {
+    return newPriorityArrayListNodeAfter(list, node, 0);
 }
 
 /*****************************************************************************/
 /* FREE                                                                      */
 /*****************************************************************************/
-void freeArrayListNodeSingle(arrayList_t *list, slistNode_t *node) {
+static void freeArrayListNodeSingle(arrayList_t *list, slistNode_t *node) {
     ASSERT(node);
     removeArrayListNodeSingle(list, node);
+    if (list->elSize == 0) node->data = NULL;
     node->next = list->freeHead;
     list->freeHead = node;
+    list->count--;
     return;
 }
 
-void freeArrayListNodeDouble(arrayList_t *list, slistNode_t *node) {
+static void freeArrayListNodeDouble(arrayList_t *list, slistNode_t *node) {
     ASSERT(node);
     removeArrayListNodeDouble(list, node);
-    ((dlistNode_t*)node)->prev = NULL;
+    if (list->elSize == 0) node->data = NULL;
     node->next = list->freeHead;
+    ((dlistNode_t*)node)->prev = NULL;
     list->freeHead = node;
+    list->count--;
     return;
 }
 
@@ -367,13 +453,25 @@ arrayList_t* newArrayList(u32 elSize, u32 arrayChunkSize, ocrListType type) {
 /*****************************************************************************/
 void* pushFrontArrayList(arrayList_t *list, void *data) {
     slistNode_t *newnode = newArrayListNodeBefore(list, list->head);
-    if (data) hal_memCopy(newnode->data, data, list->elSize, 0);
+    if (data) {
+        if (list->elSize) {
+            hal_memCopy(newnode->data, data, list->elSize, 0);
+        } else {
+            newnode->data = data;
+        }
+    }
     return newnode->data;
 }
 
 void* pushBackArrayList(arrayList_t *list, void *data) {
     slistNode_t *newnode = newArrayListNodeAfter(list, list->tail);
-    if (data) hal_memCopy(newnode->data, data, list->elSize, 0);
+    if (data) {
+        if (list->elSize) {
+            hal_memCopy(newnode->data, data, list->elSize, 0);
+        } else {
+            newnode->data = data;
+        }
+    }
     return newnode->data;
 }
 

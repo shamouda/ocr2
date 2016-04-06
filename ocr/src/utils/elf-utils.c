@@ -85,7 +85,7 @@ static u32 extract_functions_internal (const char *str, func_entry *func_list) {
                     func_list[func_count++].func_name = strdup(elf_strptr(e, shdr.sh_link, sym.st_name));
 
                     if(func_count >= MAXFNS) {
-                        printf("Func limit (%d) reached, please increase MAXFNS & rebuild\n", MAXFNS);
+                        printf("Func limit (%"PRId32") reached, please increase MAXFNS & rebuild\n", MAXFNS);
                         raise(SIGABRT);
                     }
                     //                    printf("%08x %08x\t%s\n", sym.st_value, sym.st_size, elf_strptr(e, shdr.sh_link, sym.st_name));

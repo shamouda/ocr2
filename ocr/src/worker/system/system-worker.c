@@ -17,6 +17,7 @@
 #include "worker/system/system-worker.h"
 #include "utils/deque.h"
 #include "utils/tracer/tracer.h"
+#include "utils/tracer/trace-events.h"
 
 #define DEBUG_TYPE WORKER
 
@@ -29,29 +30,6 @@
 /*********************************************************/
 
 #define IDX_OFFSET OCR_TRACE_TYPE_EDT
-
-//Strings to identify user/runtime created objects
-const char *evt_type[] = {
-    "RUNTIME",
-    "USER",
-};
-//Strings for traced OCR objects
-const char *obj_type[] = {
-    "EDT",
-    "EVENT",
-    "DATABLOCK"
-};
-
-//Strings for traced OCR events
-const char *action_type[] = {
-    "CREATE",
-    "DESTROY",
-    "RUNNABLE",
-    "ADD_DEP",
-    "SATISFY",
-    "EXECUTE",
-    "FINISH",
-};
 
 //Utility functions
 bool allDequesEmpty(ocrPolicyDomain_t *pd){
@@ -66,138 +44,16 @@ bool allDequesEmpty(ocrPolicyDomain_t *pd){
     return true;
 }
 
-void genericPrint(bool evtType, ocrTraceType_t ttype, ocrTraceAction_t action, u64 location, u64 timestamp, ocrGuid_t parent){
-
-    if(parent != NULL_GUID){
-        PRINTF("[TRACE] U/R: %s | LOCATION: 0x%lx | TIMESTAMP: %lu | TYPE: %s | ACTION: %s | PARENT: 0x%lx\n",
-                evt_type[evtType], location, timestamp, obj_type[ttype-IDX_OFFSET], action_type[action], parent);
-    }else{
-
-        PRINTF("[TRACE] U/R: %s | LOCATION: 0x%lx | TIMESTAMP: %lu | TYPE: %s | ACTION: %s\n",
-                evt_type[evtType], location, timestamp, obj_type[ttype-IDX_OFFSET], action_type[action]);
-    }
-
-
-}
 //Do custom processing for trace objects if provided by DPRINTF.
-//NOTE:  Does an extra PRINTF per trace record for now.  Could be easily
-//       adapted to write to file.
-void processTraceObject(ocrTraceObj_t *trace){
+#ifdef OCR_TRACE_BINARY
+void processTraceObject(ocrTraceObj_t *trace, FILE *f){
 
-
-    //Common vars
-    ocrTraceType_t  ttype = trace->typeSwitch;
-    ocrTraceAction_t action =  trace->actionSwitch;
-    u64 timestamp = trace->time;
-    u64 location = trace->location;
-    bool evtType = trace->eventType;
-
-    switch(trace->typeSwitch){
-
-    case OCR_TRACE_TYPE_EDT:
-
-        switch(trace->actionSwitch){
-
-            case OCR_ACTION_CREATE:
-            {
-                ocrGuid_t parent = TRACE_FIELD(TASK, taskCreate, trace, parentID);
-                genericPrint(evtType, ttype, action, location, timestamp, parent);
-                break;
-            }
-            case OCR_ACTION_DESTROY:
-                //No need to grab value from trace object for this trace action yet. Currently only hold no-op placeholders.
-                genericPrint(evtType, ttype, action, location, timestamp, NULL_GUID);
-                break;
-            case OCR_ACTION_RUNNABLE:
-                //No need to grab value from trace object for this trace action yet. Currently only hold no-op placeholders.
-                genericPrint(evtType, ttype, action, location, timestamp, NULL_GUID);
-                break;
-            case OCR_ACTION_SATISFY:
-            {
-                ocrGuid_t src = TRACE_FIELD(TASK, taskDepSatisfy, trace, depID);
-                PRINTF("[TRACE] U/R: %s | LOCATION: 0x%lx | TIMESTAMP: %lu | TYPE: EDT | ACTION: DEP_SATISFY | DEP_GUID: 0x%llx\n",
-                        evt_type[evtType], location, timestamp, src);
-                break;
-            }
-            case OCR_ACTION_ADD_DEP:
-            {
-                ocrGuid_t dest = TRACE_FIELD(TASK, taskDepReady, trace, depID);
-                PRINTF("[TRACE] U/R: %s | LOCATION: 0x%lx | TIMESTAMP: %lu | TYPE: EDT | ACTION: ADD_DEP | DEP_GUID: 0x%lx\n",
-                        evt_type[evtType], location, timestamp, dest);
-                break;
-            }
-            case OCR_ACTION_EXECUTE:
-            {
-                ocrEdt_t funcPtr = TRACE_FIELD(TASK, taskExeBegin, trace, funcPtr);
-                PRINTF("[TRACE] U/R: %s | LOCATION: 0x%lx | TIMESTAMP: %lu | TYPE: EDT | ACTION: EXECUTE | FUNC_PTR: 0x%llx\n",
-                        evt_type[evtType], location, timestamp, funcPtr);
-                break;
-            }
-            case OCR_ACTION_FINISH:
-                //No need to grab value from trace object for this trace action yet. Currently only hold no-op placeholders.
-                genericPrint(evtType, ttype, action, location, timestamp, NULL_GUID);
-                break;
-
-
-        }
-        break;
-
-    case OCR_TRACE_TYPE_EVENT:
-
-        switch(trace->actionSwitch){
-
-            case OCR_ACTION_CREATE:
-            {
-                ocrGuid_t parent = TRACE_FIELD(EVENT, eventCreate, trace, parentID);
-                genericPrint(evtType, ttype, action, location, timestamp, parent);
-                break;
-            }
-            case OCR_ACTION_DESTROY:
-                //No need to grab value from trace object for this trace action yet. Currently only hold no-op placeholders.
-                genericPrint(evtType, ttype, action, location, timestamp, NULL_GUID);
-                break;
-            case OCR_ACTION_ADD_DEP:
-            {
-                ocrGuid_t dest = TRACE_FIELD(EVENT, eventDepAdd, trace, depID);
-                ocrGuid_t parent = TRACE_FIELD(EVENT, eventDepAdd, trace, parentID);
-                PRINTF("[TRACE] U/R: %s | LOCATION: 0x%lx | TIMESTAMP: %lu | TYPE: EVENT | ACTION: ADD_DEP | DEP_GUID: 0x%lx | PARENT: 0x%lx\n",
-                        evt_type[evtType], location, timestamp, dest, parent);
-            }
-                break;
-
-            default:
-                break;
-        }
-        break;
-
-    case OCR_TRACE_TYPE_DATABLOCK:
-
-        switch(trace->actionSwitch){
-
-            case OCR_ACTION_CREATE:
-            {
-                ocrGuid_t parent = TRACE_FIELD(DATA, dataCreate, trace, parentID);
-                u64 size = TRACE_FIELD(DATA, dataCreate, trace, size);
-                PRINTF("[TRACE] U/R: %s | LOCATION: 0x%lx | TIMESTAMP: %lu | TYPE: DATABLOCK | ACTION: CREATE | SIZE: %lu | PARENT:     0x%lx\n",
-                        evt_type[evtType], location, timestamp, size, parent);
-                break;
-            }
-            case OCR_ACTION_DESTROY:
-                //No need to grab value from trace object for this trace action yet. Currently only hold no-op placeholders.
-                genericPrint(evtType, ttype, action, location, timestamp, NULL_GUID);
-                break;
-
-            default:
-                break;
-        }
-        break;
-
-    }
-
+    fwrite(trace, sizeof(ocrTraceObj_t), 1, f);
+    return;
 }
+#endif
 
-//Drain remaining deque records if execution ends before all deque records have been popped off.
-void drainAllDeques(){
+void drainAllDeques(FILE *f){
     ocrPolicyDomain_t *pd;
     getCurrentEnv(&pd, NULL, NULL, NULL);
     u32 i;
@@ -211,7 +67,11 @@ void drainAllDeques(){
         for(j = 0; j < remaining; j++){
             //Pop and process all remaining records
             ocrTraceObj_t *tr = (ocrTraceObj_t *)(deq->popFromHead(deq,0));
-            processTraceObject(tr);
+            ASSERT(tr != NULL);
+
+#ifdef OCR_TRACE_BINARY
+            processTraceObject(tr, f);
+#endif
             pd->fcts.pdFree(pd, tr);
         }
     }
@@ -221,6 +81,11 @@ void drainAllDeques(){
 void workerLoopSystem(ocrWorker_t *worker){
 
     ASSERT(worker->curState == GET_STATE(RL_USER_OK, (RL_GET_PHASE_COUNT_DOWN(worker->pd, RL_USER_OK))));
+
+#ifdef OCR_TRACE_BINARY
+    //NP open file for binary writing
+    FILE *f = fopen("trace.bin", "a");
+#endif
 
     u8 continueLoop = true;
     bool toDrain = false;
@@ -238,7 +103,9 @@ void workerLoopSystem(ocrWorker_t *worker){
                 if(tail-head > 0){
                     //Trace record in deque. Pop
                     ocrTraceObj_t *tr = (ocrTraceObj_t *)(deq->popFromHead(deq, 0));
-                    processTraceObject(tr);
+#ifdef OCR_TRACE_BINARY
+                    processTraceObject(tr, f);
+#endif
                     worker->pd->fcts.pdFree(worker->pd, tr);
                 }
             }
@@ -284,8 +151,15 @@ void workerLoopSystem(ocrWorker_t *worker){
     } while(continueLoop);
 
     if(toDrain){
-        drainAllDeques();
+
+#ifdef OCR_TRACE_BINARY
+        drainAllDeques(f);
+        fclose(f);
+#endif
+
     }
+
+
 }
 
 

@@ -37,13 +37,13 @@ extern u8 intProcessMessage(ocrStatsProcess_t *dst);
             sizeof(u64)*(STATS_EVT_MAX+1));             \
         for(i = 0; i < (u64)(STATS_EVT_MAX) + 1; ++i)   \
             PROCESS->filterCounts[i] = 0ULL;            \
-        DPRINTF(DEBUG_LVL_INFO, "Created a StatsProcess (0x%lx) for GUID 0x%lx\n", (u64)PROCESS, GUID); \
+        DPRINTF(DEBUG_LVL_INFO, "Created a StatsProcess (0x%"PRIx64") for GUID "GUIDF"\n", (u64)PROCESS, GUIDA(GUID)); \
     } while(0);
 
 #define STATS_DESTRUCT(PROCESS)                         \
     do {                                                \
         u64 i, j;                                       \
-        DPRINTF(DEBUG_LVL_INFO, "Destroying StatsProcess 0x%lx (GUID: 0x%lx)\n", (u64)PROCESS, PROCESS->me); \
+        DPRINTF(DEBUG_LVL_INFO, "Destroying StatsProcess 0x%"PRIx64" (GUID: "GUIDF")\n", (u64)PROCESS, GUIDA(PROCESS->me)); \
         while(!PROCESS->processing->fctPtrs->trylock(   \
                   PROCESS->processing))                 \
         while(intProcessMessage(PROCESS)) ;             \

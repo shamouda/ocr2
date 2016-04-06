@@ -16,7 +16,9 @@
 #include "ocr-task.h"
 #include "ocr-worker.h"
 
-extern void doTrace(u64 location, u64 wrkr, ocrGuid_t taskGuid, char *str, ...);
+#ifdef OCR_TRACE_BINARY
+extern void doTrace(u64 location, u64 wrkr, ocrGuid_t taskGuid, ...);
+#endif
 
 #ifdef OCR_DEBUG
 /**
@@ -245,6 +247,17 @@ extern void doTrace(u64 location, u64 wrkr, ocrGuid_t taskGuid, char *str, ...);
 #define DEBUG_LVL_POLICY OCR_DEBUG_LVL
 #endif
 
+#ifdef OCR_DEBUG_MICROTASKS
+#define OCR_DEBUG_MICROTASKS 1
+#else
+#define OCR_DEBUG_MICROTASKS 0
+#endif
+
+#define OCR_DEBUG_MICROTASKS_STR "MICROTASKS"
+#ifndef DEBUG_LVL_MICROTASKS
+#define DEBUG_LVL_MICROTASKS OCR_DEBUG_LVL
+#endif
+
 #ifdef OCR_DEBUG_SAL
 #define OCR_DEBUG_SAL 1
 #else
@@ -374,27 +387,45 @@ extern void doTrace(u64 location, u64 wrkr, ocrGuid_t taskGuid, char *str, ...);
 #endif
 
 
-// Imply ASSERTs
-#define OCR_ASSERT
+// Build system must define 'OCR_ASSERT' for assertions to work
 
 #define DO_DEBUG_TYPE(type, level) \
     if(OCR_DEBUG_##type  && level <= DEBUG_LVL_##type) {
 
-#define DPRINTF_TYPE(type, level, format, ...)   do {                       \
-    if(OCR_DEBUG_##type && level <= DEBUG_LVL_##type) {                     \
-        ocrTask_t *_task = NULL; ocrWorker_t *_worker = NULL;               \
-        struct _ocrPolicyDomain_t *_pd = NULL;                              \
-        getCurrentEnv(&_pd, &_worker, &_task, NULL);                        \
-        doTrace(_pd?(u64)_pd->myLocation:0,                                 \
-                _worker?(u64)_worker->location:0,                           \
-                _task?_task->guid:0,                                        \
-                format, ## __VA_ARGS__);                                    \
-        PRINTF(OCR_DEBUG_##type##_STR "(" OCR_DEBUG_##level##_STR           \
-               ") [PD:0x%lx W:0x%lx EDT:0x%lx] " format,                    \
-               _pd?(u64)_pd->myLocation:0,                                  \
-               _worker?(u64)_worker->location:0,                            \
-               _task?_task->guid:0, ## __VA_ARGS__);                        \
+#ifdef OCR_TRACE_BINARY
+
+#undef OCR_DEBUG_INIPARSING
+#define OCR_DEBUG_INIPARSING DEBUG_LVL_NONE
+#undef OCR_DEBUG_MACHINE
+#define OCR_DEBUG_MACHINE DEBUG_LVL_NONE
+//Binary trace enabled, suppressing INIPARSING and MACHINE
+//DPRINTFs until bug #829 is addressed.
+
+#if (OCR_DEBUG_LVL==DEBUG_LVL_WARN)
+#undef OCR_DEBUG_LVL
+#define OCR_DEBUG_LVL DEBUG_LVL_INFO
+//Binary trace enabled, overriding debug verbosity to DEBUG_LVL_INFO
+#endif
+
+#define DPRINTF_TYPE(type, level, format, ...)
+//NO-OP... Suppress DPRINTF console output if tracing is active
+
+#else
+
+#define DPRINTF_TYPE(type, level, format, ...)   do {                   \
+    if(OCR_DEBUG_##type && level <= DEBUG_LVL_##type) {                 \
+        ocrTask_t *__task = NULL; ocrWorker_t *__worker = NULL;         \
+        struct _ocrPolicyDomain_t *__pd = NULL;                         \
+        getCurrentEnv(&__pd, &__worker, &__task, NULL);                 \
+        ocrGuid_t __taskGuid = __task ? __task->guid : NULL_GUID;       \
+        PRINTF(OCR_DEBUG_##type##_STR "(" OCR_DEBUG_##level##_STR       \
+               ") [PD:0x%"PRIx64" W:0x%"PRIx64" EDT:"GUIDF"] " format,  \
+               __pd?(u64)__pd->myLocation:0,                            \
+               __worker?(u64)__worker->id:0,                            \
+               GUIDA(__taskGuid), ## __VA_ARGS__);                      \
     } } while(0)
+
+#endif /*OCR_TRACE_BINARY*/
 
 #define DPRINTF_TYPE_COND_LVL(type, cond, levelT, levelF, format, ...)  \
     do {                                                                \
@@ -566,14 +597,15 @@ extern void doTrace(u64 location, u64 wrkr, ocrGuid_t taskGuid, char *str, ...);
 
 #define TPRINTF_TYPE(type, format, ...) do {                            \
         if(OCR_TRACE_##type) {                                          \
-            ocrTask_t *_task = NULL; ocrWorker_t *_worker = NULL;       \
-            struct _ocrPolicyDomain_t *_pd = NULL;                      \
-            getCurrentEnv(&_pd, &_worker, &_task, NULL);                \
+            ocrTask_t *__task = NULL; ocrWorker_t *__worker = NULL;     \
+            struct _ocrPolicyDomain_t *__pd = NULL;                     \
+            getCurrentEnv(&__pd, &__worker, &__task, NULL);             \
+            ocrGuid_t __taskGuid = __task ? __task->guid : NULL_GUID;   \
             PRINTF(OCR_DEBUG_##type##_STR "(TRACE) "                    \
-                   "[PD:0x%lx W:0x%lx EDT:0x%lx] " format,              \
-                   _pd?(u64)_pd->myLocation:0,                          \
-                   _worker?(u64)_worker->location:0,                    \
-                   _task?_task->guid:0, ## __VA_ARGS__);                \
+                   "[PD:0x%"PRIx64" W:0x%"PRIx64" EDT:0x"GUIDF"] " format, \
+                   __pd?(u64)__pd->myLocation:0,                        \
+                   __worker?(u64)__worker->id:0,                        \
+                   GUIDA(__taskGuid), ## __VA_ARGS__);                  \
         }} while(0)
 
 #else
@@ -612,12 +644,31 @@ extern void doTrace(u64 location, u64 wrkr, ocrGuid_t taskGuid, char *str, ...);
 #define VERIFY(cond, format, ...)                                       \
     do {                                                                \
         if(!(cond)) {                                                   \
-            PRINTF("FAILURE @ '%s:%d' " format, __FILE__, __LINE__, ## __VA_ARGS__); \
+            PRINTF("FAILURE @ '%s:%"PRId32"' " format, __FILE__, __LINE__, ## __VA_ARGS__); \
         } else {                                                        \
-            PRINTF("PASSED @ '%s:%d' " format, __FILE__, __LINE__, ## __VA_ARGS__); \
+            PRINTF("PASSED @ '%s:%"PRId32"' " format, __FILE__, __LINE__, ## __VA_ARGS__); \
         }                                                               \
     } while(0);
 #endif
+
+#ifdef OCR_TRACE_BINARY
+//Call Tracing Function
+#define OCR_TOOL_TRACE(...) do {             \
+    ocrTask_t *_task = NULL; ocrWorker_t *_worker = NULL;               \
+    struct _ocrPolicyDomain_t *_pd = NULL;                              \
+    getCurrentEnv(&_pd, &_worker, &_task, NULL);                        \
+    doTrace(_pd?(u64)_pd->myLocation:0,                                 \
+            _worker?(u64)_worker->id:0,                                 \
+            _task?_task->guid:NULL_GUID,                                \
+            ## __VA_ARGS__);                                            \
+    } while(0)
+
+#else
+//NO-OP
+#define OCR_TOOL_TRACE(...)
+
+#endif /* OCR_TRACE_BINARY */
+
 
 // Support for compile time asserts
 #define COMPILE_ASSERT(e) extern char (*COMPILE_ASSERT(void))[sizeof(char[1-2*!(e)])]

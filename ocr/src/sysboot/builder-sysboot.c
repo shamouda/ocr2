@@ -47,7 +47,7 @@ u64 FsimRuntimeChunkAlloc(u64 size, u64 *extra) {
     ASSERT((nonpersistent_pointer < CHUNKSZ) && "Non-persistent allocation needs more than CHUNKSZ bytes of memory");
     ASSERT((args_pointer < CHUNKSZ) && "Non-persistent allocation needs more than CHUNKSZ bytes of memory");
 
-    DPRINTF(DEBUG_LVL_VVERB, "Runtime chunk alloc(%lld, %lld) => 0x%llx\n", size, (u64)extra, (u64)returnValue);
+    DPRINTF(DEBUG_LVL_VVERB, "Runtime chunk alloc(%"PRId64", %"PRId64") => 0x%"PRIx64"\n", size, (u64)extra, (u64)returnValue);
 
     return (u64)returnValue;
 }

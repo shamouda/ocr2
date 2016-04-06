@@ -5,7 +5,7 @@ then
 echo "Usage: ${0} <CE struct file> <XE struct file> <Args> <Optional file> <Output bin file>"
 else
 
-LEAF_CE_STRUCT=4096
+LEAF_CE_STRUCT=5120
 XE_STRUCT=4096
 ARGS_STRUCT=4096
 
@@ -21,12 +21,20 @@ cat $1 > tmpfile
 # Zero pad it
 size=`stat -c%s $1`
 let size=${LEAF_CE_STRUCT}-$size
+if test $size -lt 0 ; then
+    echo "CE size is greater than ${LEAF_CE_STRUCT} (overflow: ${size}) -- aborting"
+    exit 1
+fi
 dd if=/dev/zero ibs=1 count=$size status=none >> tmpfile
 
 # Do the same with XE struct file
 cat $2 >> tmpfile
 size=`stat -c%s $2`
 let size=${XE_STRUCT}-$size
+if test $size -lt 0 ; then
+    echo "XE size is greater than ${XE_STRUCT} (overflow: ${size}) -- aborting"
+    exit 1
+fi
 dd if=/dev/zero ibs=1 count=$size status=none >> tmpfile
 
 # Do the same with args file
@@ -42,6 +50,10 @@ then
 if [ -e $1 ]
 then
 let size=${ARGS_STRUCT}-$size
+if test $size -lt 0 ; then
+    echo "Argument size is greater than ${ARGS_STRUCT} (overflow: ${size}) -- aborting"
+    exit 1
+fi
 dd if=/dev/zero ibs=1 count=$size status=none >> tmpfile
 cat $1 >> tmpfile
 fi

@@ -11,6 +11,9 @@
 #include "ocr-hal.h"
 #endif
 
+#if defined(HAL_FSIM_CE) || defined(HAL_FSIM_XE)
+#include "xstg-map.h"
+#endif
 #define DEBUG_TYPE ALLOCATOR
 
 const char * allocator_types[] = {
@@ -73,7 +76,7 @@ void initializeAllocatorOcr(ocrAllocatorFactory_t * factory, ocrAllocator_t * se
 
 void allocatorFreeFunction(void* blockPayloadAddr) {
     u8 * pPoolHeaderDescr = ((u8 *)(((u64) blockPayloadAddr)-sizeof(u64)));
-    DPRINTF(DEBUG_LVL_VERB, "allocatorFreeFunction:  PoolHeaderDescr at 0x%lx is 0x%x\n",
+    DPRINTF(DEBUG_LVL_VERB, "allocatorFreeFunction:  PoolHeaderDescr at 0x%"PRIx64" is 0x%"PRIx32"\n",
         (u64) pPoolHeaderDescr, *pPoolHeaderDescr);
 #ifdef ENABLE_VALGRIND
     VALGRIND_MAKE_MEM_DEFINED((u64) pPoolHeaderDescr, sizeof(u64));
@@ -110,4 +113,19 @@ void allocatorFreeFunction(void* blockPayloadAddr) {
         ASSERT(0); // Invalid allocator in configuration file
         return;
     };
+}
+
+// This is for only TG. It's no-op for other arch.
+// On TG, this canonicalize the given address. This ensures correct memory deallocations when
+// EDTs are scheduled to other blocks and the address is passed to free() on that other block.
+void *addrGlobalizeOnTG(void *result, ocrPolicyDomain_t *self) {
+    u64 res = hal_globalizeAddr((u64)result);
+
+#if defined(HAL_FSIM_CE) || defined(HAL_FSIM_XE)
+    // We bring it back down to "my socket" because that's all we
+    // support for now. Plus, regular LD/ST can only access this much
+    // on the CE
+    res = (_SR_LEAD_ONE) | ( res & ((_SR_LEAD_ONE) - 1));
+#endif
+    return (void*)res;
 }
