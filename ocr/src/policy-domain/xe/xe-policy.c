@@ -752,7 +752,7 @@ u8 xePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
                 ASSERT(db);
                 if((PD_MSG_FIELD_IO(properties) & GUID_PROP_IS_LABELED) ||
                    (PD_MSG_FIELD_IO(properties) & DB_PROP_NO_ACQUIRE)) {
-                    DPRINTF(DEBUG_LVL_INFO, "Not acquiring DB since disabled by property flags");
+                    DPRINTF(DEBUG_LVL_INFO, "Not acquiring DB since disabled by property flags\n");
                     PD_MSG_FIELD_O(ptr) = NULL;
                 } else {
                     ASSERT(db->fctId == self->dbFactories[0]->factoryId);

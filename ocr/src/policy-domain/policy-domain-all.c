@@ -516,9 +516,13 @@ u8 ocrPolicyMsgMarshallMsg(ocrPolicyMsg_t* msg, u64 baseSize, u8* buffer, u32 mo
 #ifdef OCR_ENABLE_EDT_NAMING
         if(isIn) {
             // First copy things over
-            u64 s = sizeof(char)*(PD_MSG_FIELD_I(funcNameLen)+1);
+            // NOTE: don't assume the name is null-terminated
+            // (the funcNameLen value may have been truncated)
+            const u64 s = sizeof(char) * PD_MSG_FIELD_I(funcNameLen);
             if(s) {
+                const char nullTerminator = '\0';
                 hal_memCopy(curPtr, PD_MSG_FIELD_I(funcName), s, false);
+                *(char*)(curPtr+s) = nullTerminator;
                 // Now fixup the pointer
                 if(fixupPtrs) {
                     DPRINTF(DEBUG_LVL_VVERB, "Converting funcName (0x%"PRIx64") to 0x%"PRIx64"\n",
@@ -530,7 +534,7 @@ u8 ocrPolicyMsgMarshallMsg(ocrPolicyMsg_t* msg, u64 baseSize, u8* buffer, u32 mo
                     PD_MSG_FIELD_I(funcName) = (char*)curPtr;
                 }
                 // Finally move the curPtr for the next object (none as of now)
-                curPtr += s;
+                curPtr += s + sizeof(nullTerminator);
             } else {
                 PD_MSG_FIELD_I(funcName) = NULL;
             }

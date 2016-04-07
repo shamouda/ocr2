@@ -153,7 +153,6 @@ u8 ocrEdtTemplateCreate_internal(ocrGuid_t *guid, ocrEdt_t funcPtr, u32 paramc, 
     {
         u32 t = ocrStrlen(funcName);
         if(t >= OCR_EDT_NAME_SIZE) {
-            funcName[OCR_EDT_NAME_SIZE-1] = '\0';
             t = OCR_EDT_NAME_SIZE-1;
         }
         PD_MSG_FIELD_I(funcName) = funcName;

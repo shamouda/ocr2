@@ -120,7 +120,16 @@ ocrTaskTemplate_t * newTaskTemplateHc(ocrTaskTemplateFactory_t* factory, ocrEdt_
     base->depc = depc;
     base->executePtr = executePtr;
 #ifdef OCR_ENABLE_EDT_NAMING
-    hal_memCopy(&(base->name[0]), fctName, ocrStrlen(fctName) + 1, false);
+    {
+        // NOTE: don't assume the name fits in the buffer!
+        u32 t = ocrStrlen(fctName);
+        if(t*sizeof(char) >= sizeof(base->name)) {
+            t = sizeof(base->name)/sizeof(char) - 1;
+        }
+        // copy and null-terminate the (possibly truncated) function name
+        hal_memCopy(&(base->name[0]), fctName, t, false);
+        *(char*)(base->name+t) = '\0';
+    }
 #endif
     base->fctId = factory->factoryId;
 
