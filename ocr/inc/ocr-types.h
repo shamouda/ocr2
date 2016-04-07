@@ -35,7 +35,7 @@ typedef int8_t   s8;  /**< 8-bit signed integer */
 
 #define NULL_HINT ((ocrHint_t *)0x0)
 
-#ifdef ENABLE_128_BIT_GUID
+#ifdef OCR_ENABLE_128_BIT_GUID
 
 #define GUID_BIT_COUNT 128
 typedef struct {

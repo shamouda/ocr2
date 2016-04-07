@@ -178,7 +178,7 @@ endif
 #CFLAGS += -DOCR_ENABLE_EDT_PROFILING -DOCR_ENABLE_EDT_NAMING
 
 # Flag to test 128-bit guids.
-# CFLAGS += -DENABLE_128_BIT_GUID
+# CFLAGS += -DOCR_ENABLE_128_BIT_GUID
 
 ####################################################
 # Debug flags
@@ -633,22 +633,22 @@ $(OCR_INSTALL)/include/ocr-options_$(OCR_TYPE).h: | $(OCR_INSTALL)/include
 	$(AT)$(shell echo "#ifndef __OCR_OPTIONS_"$(subst -,_,$(OCR_TYPE))"_H__" >> $@)
 	$(AT)$(shell echo "#define __OCR_OPTIONS_"$(subst -,_,$(OCR_TYPE))"_H__" >> $@)
 	$(AT)$(shell echo "/* Generated based on RT CFLAGS: $(CFLAGS) */" >> $@)
-  ifneq (,$(findstring -DENABLE_EDT_NAMING, $(CLAGS)))
-	$(AT)$(shell echo "#ifndef ENABLE_EDT_NAMING" >> $@)
-	$(AT)$(shell echo "#define ENABLE_EDT_NAMING" >> $@)
+ifneq (,$(findstring -DOCR_ENABLE_EDT_NAMING, $(CFLAGS)))
+	$(AT)$(shell echo "#ifndef OCR_ENABLE_EDT_NAMING" >> $@)
+	$(AT)$(shell echo "#define OCR_ENABLE_EDT_NAMING" >> $@)
 	$(AT)$(shell echo "#endif" >> $@)
-  endif
-  ifneq (,$(findstring -DENABLE_128_BIT_GUID, $(CFLAGS)))
-	$(AT)$(shell echo "#ifndef ENABLE_128_BIT_GUID" >> $@)
-	$(AT)$(shell echo "#define ENABLE_128_BIT_GUID" >> $@)
+endif
+ifneq (,$(findstring -DOCR_ENABLE_128_BIT_GUID, $(CFLAGS)))
+	$(AT)$(shell echo "#ifndef OCR_ENABLE_128_BIT_GUID" >> $@)
+	$(AT)$(shell echo "#define OCR_ENABLE_128_BIT_GUID" >> $@)
 	$(AT)$(shell echo "#endif" >> $@)
-  endif
-  ifneq (,$(findstring -DOCR_ASSERT, $(CFLAGS)))
+endif
+ifneq (,$(findstring -DOCR_ASSERT, $(CFLAGS)))
 	$(AT)$(shell echo "#ifndef OCR_ASSERT" >> $@)
 	$(AT)$(shell echo "#define OCR_ASSERT" >> $@)
 	$(AT)$(shell echo "#endif" >> $@)
-  endif
-	$(AT)$(shell echo "#endif /* __OCR_OPTIONS_"$(OCR_TYPE)"_H__ */" >> $@)
+endif
+	$(AT)$(shell echo "#endif /* __OCR_OPTIONS_"$(subst -,_,$(OCR_TYPE))"_H__ */" >> $@)
 #
 # Include auto-generated dependence files
 # We only include the ones for the .o that we need to generate
