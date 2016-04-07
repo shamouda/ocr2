@@ -11,6 +11,7 @@
 #include "ocr-policy-domain.h"
 #include "ocr-types.h"
 #include "utils/deque.h"
+#include "utils/arrayDeque.h"
 
 #define DEBUG_TYPE UTIL
 
@@ -430,6 +431,9 @@ deque_t * newDeque(ocrPolicyDomain_t *pd, void * initValue, ocrDequeType_t type)
         self->popFromTail = lockedDequePopTail;
         self->pushAtHead = lockedDequePushHead;
         self->popFromHead = lockedDequePopHead;
+        break;
+    case ARRAY_DEQUE:
+        self = newArrayQueue(pd, initValue);
         break;
     default:
         ASSERT(0);

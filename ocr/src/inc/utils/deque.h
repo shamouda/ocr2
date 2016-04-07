@@ -33,7 +33,9 @@ typedef enum {
     NON_CONCURRENT_DEQUE     = 0x5,
     SEMI_CONCURRENT_DEQUE    = 0x6,
     LOCKED_DEQUE             = 0x7,
-    MAX_DEQUETYPE            = 0x8
+    // Other implementations (not based on virtual impl)
+    ARRAY_DEQUE              = 0x8,
+    MAX_DEQUETYPE            = 0x9
 } ocrDequeType_t;
 
 /****************************************************/
