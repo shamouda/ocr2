@@ -404,7 +404,7 @@ OBJS_EXEC     := $(addprefix $(OBJDIR)/exec/, $(addsuffix .o, $(basename $(notdi
 # Update include paths
 CFLAGS := -I . -I $(OCR_ROOT)/inc -I $(OCR_ROOT)/src -I $(OCR_ROOT)/src/inc $(CFLAGS)
 
-ifeq (${NO_DEBUG},"")
+ifneq (${NO_DEBUG}, yes)
   ifeq (, $(filter-out gcc mpicc, $(CC)))
     # For gcc/mpicc versions < 4.4 disable warning as error as message pragmas are not supported
     ret := $(shell echo "`$(CC) -dumpversion | cut -d'.' -f1-2` < 4.4" | bc)
