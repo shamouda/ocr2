@@ -48,6 +48,7 @@ export REPORT_FILENAME_BASE=${REPORT_FILENAME_BASE-"report"}
 # Option Parsing and Checking
 #
 
+NOCLEAN_OPT="no"
 SWEEP_OPT="no"
 SWEEPFILE_OPT="no"
 SWEEPFILE_ARG=""
@@ -70,8 +71,18 @@ if [[ ! -d ${TEST_FOLDER} ]]; then
     exit 1
 fi
 
+# Environment override
+if [[ -n "${LOGDIR}" ]]; then
+    LOGDIR_OPT="yes"
+    LOGDIR_ARG="${LOGDIR}"
+fi
+
+# Environment is superceded by command line
 while [[ $# -gt 0 ]]; do
-    if [[ "$1" = "-sweep" ]]; then
+    if [[ "$1" = "-noclean" ]]; then
+        shift
+        NOCLEAN_OPT="yes"
+    elif [[ "$1" = "-sweep" ]]; then
         shift
         SWEEP_OPT="yes"
     elif [[ "$1" = "-target" && $# -ge 2 ]]; then
@@ -181,6 +192,9 @@ function run() {
         local found=""
         local runnerArgs=""
         # Try to match a sweep file for the program
+        if [ "${NOCLEAN_OPT}" = "yes" ]; then
+            runnerArgs="-noclean"
+        fi
         if [ "${SWEEP_OPT}" = "yes" ]; then
             matchDefaultSweepFile found $prog
             if [ -n "$found" ]; then

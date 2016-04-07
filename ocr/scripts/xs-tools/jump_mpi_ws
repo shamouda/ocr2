@@ -1,11 +1,19 @@
 #!/bin/bash
 
 REPO=$1
-CMD=$2
 
 if [[ $# -lt 1 ]]; then
-   echo "jump_mpi_ws: usage is ${SCRIPT_NAME} ocrRepoPath [command]"
+   echo "jump_mpi_ws: usage is ${SCRIPT_NAME} ocrRepoPath [command] [path_to_jump]"
 fi
+
+if [[ $# -ge 2 ]]; then
+    CMD=$2
+fi
+
+if [[ $# -ge 3 ]]; then
+    JUMP_PATH=$3
+fi
+
 
 if [[ -z ${XST_ROOT} ]]; then
    export XST_ROOT=${HOME}/xs-tools
@@ -34,9 +42,16 @@ fi
 
 MAKE_THREADS=${MAKE_THREADS-1}
 
+
 if [ -n "$CMD" -a "${CMD}" = "build" ]; then
    make -j${MAKE_THREADS} clean && make -j${MAKE_THREADS} && make -j${MAKE_THREADS} install
 fi
 
+JUMP_PATH=${JUMP_PATH-../../tests}
 # Drops in OCR's test folder by default
-cd ../../tests
+cd ${JUMP_PATH}
+
+# This is to clean up the environment
+unset REPO
+unset CMD
+unset JUMP_PATH
