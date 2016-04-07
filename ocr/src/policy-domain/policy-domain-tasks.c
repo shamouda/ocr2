@@ -308,42 +308,65 @@ u8 pdCreateEvent(ocrPolicyDomain_t *pd, pdEvent_t **event, u32 type, u8 reserveI
     // Initialize base aspect
     (*event)->slabObj.userCount = 1;
     (*event)->properties = type;
+    (*event)->strand = NULL;
 
     // TODO: Type specific initialization here
     switch (type) {
-        case PDEVT_TYPE_BASIC:
-            break;
-        case PDEVT_TYPE_LIST:
-            break;
-        case PDEVT_TYPE_MERGE:
-            break;
-        case PDEVT_TYPE_MSG:
-            break;
-        default:
-            break;
+    case PDEVT_TYPE_BASIC:
+        break;
+    case PDEVT_TYPE_MSG: {
+        pdEventMsg_t *t = (pdEventMsg_t*)(*event);
+        t->returnCode = 0;
+        t->msg = NULL;
+        t->continuation = NULL;
+        break;
+    }
+    case PDEVT_TYPE_LIST: {
+        pdEventList_t *t = (pdEventList_t*)(*event);
+        u32 i = 0;
+        for( ; i < PDEVT_LIST_SIZE; ++i) {
+            t->events[i] = NULL;
+        }
+        t->others = NULL;
+        break;
+    }
+    case PDEVT_TYPE_MERGE: {
+        pdEventMerge_t *t = (pdEventMerge_t*)(*event);
+        u32 i = 0;
+        t->count = t->countReady = 0;
+        for( ; i < PDEVT_MERGE_SIZE; ++i) {
+            t->events[i] = NULL;
+        }
+        t->others = NULL;
+        break;
+    }
+    default:
+        break;
     }
 
     // Deal with insertion into the strands table if needed
     pdStrandTable_t *stTable = NULL;
-    if(reserveInTable  && reserveInTable <= PDSTT_COMM) {
-        DPRINTF(DEBUG_LVL_VERB, "Reserving slot in table %"PRIu32"\n", reserveInTable);
-        // This means it is PDSTT_COMM or PDSTT_EVT so we look for the proper table
-        stTable = pd->strandTables[reserveInTable - 1];
-        pdStrand_t* myStrand = NULL;
-        CHECK_RESULT(
-            toReturn |= pdGetNewStrand(pd, &myStrand, stTable, *event, PDST_UHOLD),
-            pd->fcts.pdFree(pd, *event),);
-        DPRINTF(DEBUG_LVL_VERB, "Event %p has index %"PRIu64"\n", *event, (*event)->strand->index);
-        // This assert failure indicates a coding issue in the runtime
-        RESULT_ASSERT(pdUnlockStrand(myStrand), ==, 0);
-    } else {
-        DPRINTF(DEBUG_LVL_WARN, "Invalid value for reserveInTable: %"PRIu32"\n", reserveInTable);
-        return OCR_EINVAL;
+    if(reserveInTable) {
+        if(reserveInTable <= PDSTT_LAST) {
+            DPRINTF(DEBUG_LVL_VERB, "Reserving slot in table %"PRIu32"\n", reserveInTable);
+            // This means it is PDSTT_COMM or PDSTT_EVT so we look for the proper table
+            stTable = pd->strandTables[reserveInTable - 1];
+            pdStrand_t* myStrand = NULL;
+            CHECK_RESULT(
+                toReturn |= pdGetNewStrand(pd, &myStrand, stTable, *event, PDST_UHOLD),
+                pd->fcts.pdFree(pd, *event),);
+            DPRINTF(DEBUG_LVL_VERB, "Event %p has index %"PRIu64"\n", *event, (*event)->strand->index);
+            // This assert failure indicates a coding issue in the runtime
+            RESULT_ASSERT(pdUnlockStrand(myStrand), ==, 0);
+        } else {
+            DPRINTF(DEBUG_LVL_WARN, "Invalid value for reserveInTable: %"PRIu32"\n", reserveInTable);
+            return OCR_EINVAL;
+        }
     }
 
 END_LABEL(createEventEnd)
     DPRINTF(DEBUG_LVL_INFO, "EXIT pdCreateEvent -> %"PRIu32"; event: %p; event->strand->index: %"PRIu64"\n",
-            toReturn, *event, (*event)->strand->index);
+            toReturn, *event, (*event)->strand?(*event)->strand->index:(u64)-1);
     return toReturn;
 #undef _END_FUNC
 }
@@ -363,7 +386,7 @@ u8 pdResolveEvent(ocrPolicyDomain_t *pd, u64 *evtValue, u8 clearFwdHold) {
                 stTableIdx, EVT_DECODE_ST_IDX(*evtValue));
         // This is a pointer in a strands table
         pdStrandTable_t *stTable = NULL;
-        if(stTableIdx < PDSTT_COMM) {
+        if(stTableIdx < PDSTT_LAST) {
             stTable = pd->strandTables[stTableIdx-1];
         } else {
             DPRINTF(DEBUG_LVL_WARN, "Invalid event value: %"PRIu32" does not represent "
@@ -999,11 +1022,12 @@ u8 pdEnqueueActions(ocrPolicyDomain_t *pd, pdStrand_t* strand, u32 actionCount,
     // fails, most likely an internal runtime error
     ASSERT(strand->properties & PDST_LOCK);
 
-    // Create the deque if it doesn't exist
-    if (strand->actions == NULL) {
-        // We only need a non-locked queue since we are taking care of the lock
-        // ourself
-        CHECK_MALLOC(strand->actions = newDeque(pd, NULL, NON_CONCURRENT_DEQUE), );
+    if(strand->actions == NULL) {
+        // Create and initialize the actions strand
+        CHECK_MALLOC(strand->actions = (arrayDeque_t*)pd->fcts.pdMalloc(pd, sizeof(arrayDeque_t)), );
+        CHECK_RESULT(arrayDequeInit(strand->actions, PDST_ACTION_COUNT),
+                     pd->fcts.pdFree(pd, strand->actions), toReturn = OCR_EFAULT);
+        DPRINTF(DEBUG_LVL_VERB, "Created actions structure @ %p\n", strand->actions);
     }
 
     DPRINTF(DEBUG_LVL_VERB, "Going to enqueue %"PRIu32" actions on %p\n",
@@ -1012,10 +1036,10 @@ u8 pdEnqueueActions(ocrPolicyDomain_t *pd, pdStrand_t* strand, u32 actionCount,
     u32 i;
     for (i = 0; i < actionCount; ++i, ++actions) {
         DPRINTF(DEBUG_LVL_VVERB, "Pushing action %p\n", *actions);
-        strand->actions->pushAtTail(strand->actions, *actions, 1);
+        arrayDequePushAtTail(strand->actions, (void*)*actions);
     }
 
-    if (strand->actions->size(strand->actions) == actionCount) {
+    if (arrayDequeSize(strand->actions) == actionCount) {
         // This means that no actions were pending
         DPRINTF(DEBUG_LVL_VVERB, "Strand %p had no actions [props: 0x%"PRIx32"] -> setting WAIT_ACT\n",
                 strand, strand->properties);
@@ -1146,7 +1170,7 @@ u8 pdProcessStrands(ocrPolicyDomain_t *pd, u32 properties) {
     u32 i = 0;
     u32 processCount = 0;
     u32 curLevel = 1;
-    for (; i < PDSTT_COMM; ++i) {
+    for (; i < PDSTT_LAST; ++i) {
         pdStrandTable_t *table = pd->strandTables[i];
         DPRINTF(DEBUG_LVL_VERB, "Looking at table %p [idx: %"PRIu32"]\n", table, i);
         processCount = 0;
@@ -1223,8 +1247,9 @@ u8 pdProcessStrands(ocrPolicyDomain_t *pd, u32 properties) {
                 // Note that the actions may make the event not ready thus the importance
                 // of checking every time
                 while (((toProcess->properties & PDST_WAIT_EVT) == 0) &&
-                       toProcess->actions->size(toProcess->actions)) {
-                    pdAction_t *curAction = (pdAction_t*)(toProcess->actions->popFromHead(toProcess->actions, false));
+                       arrayDequeSize(toProcess->actions)) {
+                    pdAction_t *curAction = NULL;
+                    RESULT_ASSERT(arrayDequePopFromHead(toProcess->actions, (void**)&curAction), ==, 0);
                     ASSERT(curAction);
                     DPRINTF(DEBUG_LVL_VERB, "Processing action %p\n", curAction);
                     RESULT_ASSERT(_pdProcessAction(pd, toProcess, curAction, 0), ==, 0);
@@ -1234,7 +1259,7 @@ u8 pdProcessStrands(ocrPolicyDomain_t *pd, u32 properties) {
                 // Update properties
                 hal_lock32(&(curNode->lock));
                 bool propagateReady = false, propagateNP = false, didFree = false;
-                if(toProcess->actions->size(toProcess->actions) == 0) {
+                if(arrayDequeSize(toProcess->actions) == 0) {
                     toProcess->properties &= ~(PDST_WAIT_ACT);
                     if((toProcess->properties & PDST_WAIT_EVT) == 0) {
                         DPRINTF(DEBUG_LVL_VERB, "Strand %p now ready\n", toProcess);
@@ -1705,7 +1730,7 @@ static u8 _pdFreeStrand(ocrPolicyDomain_t* pd, pdStrand_t *strand) {
     // of sanity check here
     CHECK_RESULT(strand->properties & PDST_WAIT, , toReturn = OCR_EINVAL);
     if (strand->actions) {
-        CHECK_RESULT_T(strand->actions->size(strand->actions) != 0, , toReturn = OCR_EINVAL);
+        CHECK_RESULT_T(arrayDequeSize(strand->actions) == 0, , toReturn = OCR_EINVAL);
     }
 
     // At this stage, we can free the strand

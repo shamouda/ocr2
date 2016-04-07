@@ -10,7 +10,7 @@
 #include "debug.h"
 #include "ocr-config.h"
 #include "ocr-policy-domain.h"
-#include "utils/deque.h"
+#include "utils/arrayDeque.h"
 
 #ifndef PDEVT_SCRATCH_BYTES
 #define PDEVT_SCRATCH_BYTES 1024 /**< Default number of bytes in a continuation's scratch area */
@@ -30,6 +30,10 @@
 
 #ifndef PDPROCESS_MAX_COUNT
 #define PDPROCESS_MAX_COUNT 32 /**< Process at most this many strands per table and call to pdProcessStrands */
+#endif
+
+#ifndef PDST_ACTION_COUNT
+#define PDST_ACTION_COUNT 4 /**< Number of actions per arrayDeque chunk */
 #endif
 
 // We use a 64-bit bitvector to keep track of status so this needs to be properly sized
@@ -217,9 +221,8 @@ struct _pdStrandTableNode_t;
  */
 typedef struct _pdStrand_t {
     pdEvent_t* curEvent;    /**< Event currently pointed to by this slot */
-    deque_t* actions;       /**< Deque of actions to perform once event is ready
-                             * @warn This is of fixed size. It should be changed to
-                             * a more flexible data-structure */
+    arrayDeque_t *actions;  /**< Deque of actions to perform once event is ready. This
+                             * implementation is a variable size array */
     struct _pdStrandTableNode_t *parent; /**< Parent of this strand. Note that the slot
                                           number is index & ((1ULL<<6)-1) */
     u64 index;              /**< Index into the table */
@@ -251,9 +254,13 @@ typedef struct _pdStrandTableNode_t {
     u32 lock;      /**< Lock on the status bits */
 } pdStrandTableNode_t;
 
+/* The following constants are used as the last 3 bits of an event "pointer".
+ * An event is only a true event if those bits are 0, otherwise, it encodes an
+ * index (in the upper bits) in a table (indicated by these three bits
+ */
 #define PDSTT_EVT  0b1      /**< ID of the event strands table */
-#define PDSTT_COMM 0b10     /**< ID of the communication strands table. Should
-                                 ALWAYS be last type of strand table */
+#define PDSTT_COMM 0b10     /**< ID of the communication strands table */
+#define PDSTT_LAST 0b10     /**< Should be equal to last strands table */
 
 /**< A strand table. This is where all events that are being waited on will
  be stored */
@@ -496,6 +503,7 @@ u8 pdGetStrandForIndex(ocrPolicyDomain_t* pd, pdStrand_t **strand, pdStrandTable
  *          - 0: successful addition
  *          - OCR_EINVAL: actionCount is 0, actions are invalid
  *          - OCR_ENOMEM: not enough memory
+ *          - OCR_EFAULT: Runtime error
  */
 u8 pdEnqueueActions(ocrPolicyDomain_t *pd, pdStrand_t* strand, u32 actionCount,
                     pdAction_t** actions, u8 clearFwdHold);
