@@ -1,4 +1,5 @@
-#
+#!/usr/bin/env python
+
 # This file is subject to the license agreement located in the file
 # LICENSE and cannot be distributed without it.  This notice
 # cannot be removed or modified
@@ -13,6 +14,7 @@ import time
 import glob
 import math
 from operator import itemgetter
+import itertools
 
 
 #Line split indices for each line from logs
@@ -352,23 +354,23 @@ def getSub(log, flag, pageNum):
 
 #======== get color per Unique Function ========
 def getColor(fctName, colorMap):
-    for i in range(len(colorMap)):
-        if colorMap[i][0] == fctName:
-            return colorMap[i][1]
-    print 'error, no color value.'
-    sys.exit(0)
+    try:
+        return colorMap[fctName]
+    except KeyError, e:
+        sys.exit("Error: no color value for " + fctName)
 
 #======= key-val pair up: Functions to aesthetically pleasing colors =======
-def assignColors(uniqFunctions):
-    #TODO Expand this color list if need be.
-    cssColors = ['Blue', 'Red', 'DarkSeaGreen', 'Coral', 'Yellow', 'DarkOrange', 'DarkOrchid', 'HotPink', 'Gold', 'PaleGreen', 'Tan', 'Thistle', 'Tomato', 'Cadet Blue', 'Salmon', 'MediumTurquoise', 'DeepPink', 'Indigo', 'Khaki', 'LightBlue', 'Maroon', 'LimeGreen', 'BurlyWood', 'Brown', 'Crimson', 'LawnGreen', 'LightCyan', 'MediumOrchid', 'Linen', 'LightCoral', 'MediumSpringGreen', 'LightSteelBlue', 'Blue', 'Red', 'DarkSeaGreen', 'Coral', 'Yellow', 'DarkOrange', 'DarkOrchid', 'HotPink', 'Gold', 'PaleGreen', 'Tan', 'Thistle', 'Tomato', 'Cadet Blue', 'Salmon', 'MediumTurquoise', 'DeepPink', 'Indigo', 'Khaki', 'LightBlue', 'Maroon', 'LimeGreen', 'BurlyWood', 'Brown', 'Crimson', 'LawnGreen', 'LightCyan', 'MediumOrchid', 'Linen', 'LightCoral', 'MediumSpringGreen', 'LightSteelBlue']
-    fctList = list(uniqFunctions)
-    tempColors = []
-    for i in range(len(fctList)):
-        tempColors.append(cssColors[i])
+def assignColors(uniqNames, existingMap=None):
+    colorMap = {} if existingMap is None else existingMap
+    existingNames = set(colorMap.keys())
+    newNames = uniqNames - existingNames
+    # cycles through colors on successive calls
+    # (this function leverages the global state of the cssColors iterator)
+    for f, c in zip(newNames, cssColors):
+        colorMap[f] = c
+    return colorMap
 
-    mappedColors = zip(fctList, tempColors)
-    return mappedColors
+cssColors = itertools.cycle(['Blue', 'Red', 'DarkSeaGreen', 'Coral', 'Yellow', 'DarkOrange', 'DarkOrchid', 'HotPink', 'Gold', 'PaleGreen', 'Tan', 'Thistle', 'Tomato', 'Cadet Blue', 'Salmon', 'MediumTurquoise', 'DeepPink', 'Indigo', 'Khaki', 'LightBlue', 'Maroon', 'LimeGreen', 'BurlyWood', 'Brown', 'Crimson', 'LawnGreen', 'LightCyan', 'MediumOrchid', 'Linen', 'LightCoral', 'MediumSpringGreen', 'LightSteelBlue', 'Blue', 'Red', 'DarkSeaGreen', 'Coral', 'Yellow', 'DarkOrange', 'DarkOrchid', 'HotPink', 'Gold', 'PaleGreen', 'Tan', 'Thistle', 'Tomato', 'Cadet Blue', 'Salmon', 'MediumTurquoise', 'DeepPink', 'Indigo', 'Khaki', 'LightBlue', 'Maroon', 'LimeGreen', 'BurlyWood', 'Brown', 'Crimson', 'LawnGreen', 'LightCyan', 'MediumOrchid', 'Linen', 'LightCoral', 'MediumSpringGreen', 'LightSteelBlue'])
 
 #======= Getter for Minumum start time among subset of EDTs ========
 def getMinStart(data):
@@ -580,21 +582,19 @@ def createDistributedTimeline(nodes, dbgLog, exeTime):
     global max_edts_per_page
     numNodes = len(nodes)
     pdCount = 0
-    mappedColors = []
+    mappedColors = {}
     for curPd in nodes:
         pdCount += 1
         with open(str(curPd), 'r') as inFile:
             lines = inFile.readlines()
             if(len(lines) == 0):
-                print "Error: No EDT Names found in debug log.  Be sure proper flags are set and OCR has been rebuilt"
-                cleanup(1)
-                sys.exit(0)
+                cleanup(nodes)
+                sys.exit("Error: No EDT Names found in debug log.  Be sure proper flags are set and OCR has been rebuilt")
 
             sortedLines = sortAscendingStartTime(lines)
             uniqWorkers = getUniqueWorkers(sortedLines)
             uniqNames = getUniqueFctNames(sortedLines)
-            if len(mappedColors) == 0:
-                mappedColors = assignColors(uniqNames)
+            mappedColors = assignColors(uniqNames, mappedColors)
             numThreads = len(uniqWorkers)
             sortedWrkrs = sortByWorker(sortedLines, uniqWorkers)
 
@@ -656,8 +656,7 @@ def createSingleNodeTimeline(dbgLog):
 
         lines = inFile.readlines()
         if len(lines) == 0:
-            print "Error: No EDT Names found in debug log.  Be sure proper flags are set and OCR has been rebuilt"
-            sys.exit(0)
+            sys.exit("Error: No EDT Names found in debug log.  Be sure proper flags are set and OCR has been rebuilt")
 
         sortedLines = sortAscendingStartTime(lines)
 
@@ -716,17 +715,13 @@ def createSingleNodeTimeline(dbgLog):
         #Check for overlap, write to file
         preCheckEdtLengthAndWrite(toHtml, exeTime, numThreads, numEDTs, totalTime, uniqWorkers, timeOffset, 0, None)
 
-    cleanup(0)
     inFile.close()
-    sys.exit(0)
 
 #======== cleanup temporary files =========
-def cleanup(flag):
+def cleanup(extraFiles=[]):
     os.remove(STRIPPED_RECORDS)
-    if flag == 1:
-        for f in os.listdir(os.getcwd()):
-            if(re.search("0x", f)):
-                os.remove(os.path.join(os.getcwd(), f))
+    for f in extraFiles:
+        os.remove(os.path.join(os.getcwd(), f))
 
 #========USAGE========
 def usage():
@@ -736,7 +731,7 @@ def usage():
     print '\t -s  :  Display distributed system generated EDTs (off by default)'
     print '\t -c  :  Combine subsequent EDTs of equal type (off by default)'
     print '\t -f  :  Force All EDTs to display on a single page (off by default)\n\n'
-    sys.exit(0)
+    sys.exit(1)
 
 #=========MAIN==========
 def main():
@@ -770,7 +765,7 @@ def main():
     #Get Number of Policy Domains present in logfile
     nodes = getNodes(STRIPPED_RECORDS)
 
-    if(len(nodes) > 1):
+    if(len(nodes) > 1): # Multi-node trace
         if user_flag_force_single == False:
             max_edts_per_page = (max_edts_per_page/(len(nodes)))
         nodeList = list(nodes)
@@ -779,9 +774,8 @@ def main():
         allFP = open(STRIPPED_RECORDS, 'r')
         lines = allFP.readlines()
         if len(lines) == 0:
-            print "Error: No EDT Names found in debug log.  Be sure proper flags are set and OCR has been rebuilt"
-            cleanup(0)
-            sys.exit(0)
+            cleanup()
+            sys.exit("Error: No EDT Names found in debug log.  Be sure proper flags are set and OCR has been rebuilt")
         sortedLines = sortAscendingStartTime(lines)
         if user_flag_force_single == True:
             print '\nWarning: Forcing single page may cause timeline to load slowly in browser\n'
@@ -791,14 +785,13 @@ def main():
         createFilePerPD(nodes, STRIPPED_RECORDS)
         createDistributedTimeline(nodeList, dbgLog, exeTime)
         print '\nDone!'
-        cleanup(1)
-        sys.exit(0)
+        cleanup(nodes)
 
-    else:
+    else: # Single-node trace
         createSingleNodeTimeline(dbgLog)
-        cleanup(0);
-        sys.exit(0)
+        cleanup()
 
-main();
+if __name__ == "__main__":
+    main()
 
 
