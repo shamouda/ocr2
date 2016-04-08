@@ -189,27 +189,21 @@ static u8 _pdProcessAction(ocrPolicyDomain_t *pd, ocrWorker_t *worker, pdStrand_
 static u8 _pdDestroyStrandTableNode(ocrPolicyDomain_t *pd, pdStrandTableNode_t *node);
 
 
-#define HAS_EXPECTED_VALUE  0x1
-#define BLOCK               0x2
+#define BLOCK               0x1
 /**
- * @brief Attempts to grab a lock on a strand by switching its properties value
+ * @brief Attempts to grab a lock on a strand
  *
  * If 'BLOCK' is set, this call will block until the lock can be acquired.
  * Otherwise, the call will attempt once to grab the lock (if it is free) and return
  * if it cannot
  *
  * @param[in] strand        Strand to grab the lock on
- * @param[in] expectedValue (optional) The expected value of the properties field
- *                          to lock
- * @param[in] properties    Combination of HAS_EXPECTED_VALUE and BLOCK
+ * @param[in] properties    0 or BLOCK
  * @return a status code:
  *     - 0: the lock was acquired
  *     - OCR_EBUSY: the lock could not be acquired (properties does not have BLOCK)
- *     - OCR_EINVAL: Invalid expectedValue (properties has HAS_EXPECTED_VALUE)
- * @warning If you use an expected value and pass a value that has PDST_LOCK in it,
- * this call will return OCR_EBUSY if you do not have BLOCK and OCR_EINVAL if you do
  */
-static u8 _pdLockStrand(pdStrand_t *strand, u32 expectedValue, u32 properties);
+static u8 _pdLockStrand(pdStrand_t *strand, u32 properties);
 
 static inline u8 _pdUnlockStrand(pdStrand_t *strand) {
     if(strand->processingWorker) {
@@ -217,7 +211,8 @@ static inline u8 _pdUnlockStrand(pdStrand_t *strand) {
         getCurrentEnv(NULL, &worker, NULL, NULL);
         if(worker == strand->processingWorker) return 0;
     }
-    strand->properties &= ~PDST_LOCK;
+    ASSERT(strand->lock == 1);
+    strand->lock = 0;
     return 0;
 }
 
@@ -435,7 +430,7 @@ u8 pdDestroyEvent(ocrPolicyDomain_t *pd, pdEvent_t *event) {
 
     if(event->strand) {
         DPRINTF(DEBUG_LVL_VERB, "Strand associated with event is %p\n", event->strand);
-        RESULT_ASSERT(_pdLockStrand(event->strand, 0, BLOCK), ==, 0);
+        RESULT_ASSERT(_pdLockStrand(event->strand, BLOCK), ==, 0);
         CHECK_RESULT_T((event->strand->properties & PDST_WAIT) != PDST_WAIT_ACT,
                        pdUnlockStrand(event->strand), toReturn = OCR_EINVAL);
         event->strand->curEvent = NULL;
@@ -509,7 +504,7 @@ u8 pdResolveEvent(ocrPolicyDomain_t *pd, u64 *evtValue, u8 clearFwdHold) {
         // observe the state freely
         DPRINTF(DEBUG_LVL_VVERB, "Event 0x%"PRIx64" -> strand %p (props: 0x%"PRIx32")\n",
                 *evtValue, myStrand, myStrand->properties);
-        ASSERT(myStrand->properties & PDST_LOCK);
+        ASSERT(myStrand->lock == 1);
         if((myStrand->properties & PDST_WAIT) == 0) {
             // Event is ready
             // The following assert ensures that the event in the slot has
@@ -560,10 +555,10 @@ u8 pdResolveEvent(ocrPolicyDomain_t *pd, u64 *evtValue, u8 clearFwdHold) {
                     // Here we check if there is a strand; if so, we check to make sure it
                     // is ready
                     // Lock the strand to check its status properly
-                    RESULT_ASSERT(_pdLockStrand(evt->strand, 0, BLOCK), ==, 0);
+                    RESULT_ASSERT(_pdLockStrand(evt->strand, BLOCK), ==, 0);
                     DPRINTF(DEBUG_LVL_VVERB, "Event %p has strand %p (props: 0x%"PRIx32")\n",
                             evt, evt->strand, evt->strand->properties);
-                    ASSERT(evt->strand->properties & PDST_LOCK);
+                    ASSERT(evt->strand->lock == 1);
                     if((evt->strand->properties & PDST_WAIT) != 0) {
                         // Event is not fully ready, there is some stuff left to process
                         DPRINTF(DEBUG_LVL_VERB, "Event %p is ready but strand is not\n", evt);
@@ -613,7 +608,7 @@ u8 pdMarkReadyEvent(ocrPolicyDomain_t *pd, pdEvent_t *evt) {
         ASSERT(curNode);
 
         // Lock the strand
-        RESULT_ASSERT(_pdLockStrand(strand, 0, BLOCK), ==, 0);
+        RESULT_ASSERT(_pdLockStrand(strand, BLOCK), ==, 0);
 
         // This should be the case since the event was not ready yet
         ASSERT((strand->properties & PDST_WAIT_EVT) != 0);
@@ -730,7 +725,7 @@ u8 pdMarkWaitEvent(ocrPolicyDomain_t *pd, pdEvent_t *evt) {
         ASSERT(curNode);
 
         // Lock the strand
-        RESULT_ASSERT(_pdLockStrand(strand, 0, BLOCK), ==, 0);
+        RESULT_ASSERT(_pdLockStrand(strand, BLOCK), ==, 0);
 
         // This should be the case since the event was ready prior to this
         ASSERT((strand->properties & PDST_WAIT_EVT) == 0);
@@ -1081,7 +1076,7 @@ u8 pdGetNewStrand(ocrPolicyDomain_t *pd, pdStrand_t **returnStrand, pdStrandTabl
     ASSERT(strand);
 
     // The strand should be free
-    RESULT_ASSERT(_pdLockStrand(strand, PDST_FREE, HAS_EXPECTED_VALUE | BLOCK), ==, 0);
+    RESULT_ASSERT(_pdLockStrand(strand, 0), ==, 0);
     strand->curEvent = event;
     strand->actions = NULL;
     strand->properties |= PDST_RHOLD |
@@ -1089,6 +1084,7 @@ u8 pdGetNewStrand(ocrPolicyDomain_t *pd, pdStrand_t **returnStrand, pdStrandTabl
     strand->properties |= properties;
     DPRINTF(DEBUG_LVL_VVERB, "Strand %p: event: %p | actions: %p | props: 0x%"PRIx32"\n",
             strand, strand->curEvent, strand->actions, strand->properties);
+    ASSERT(strand->lock == 1);
 
     // Now set the value for the event
     event->strand = strand;
@@ -1106,8 +1102,8 @@ u8 pdGetNewStrand(ocrPolicyDomain_t *pd, pdStrand_t **returnStrand, pdStrandTabl
 
     // It can be ready though
     if((strand->properties & PDST_WAIT) == 0) {
+        propagateReady = leafToUse->nodeReady == 0ULL;
         leafToUse->nodeReady |= (1ULL<<freeSlot);
-        propagateReady = true;
     }
 
     pdStrandTableNode_t *curNode = leafToUse;
@@ -1128,6 +1124,7 @@ u8 pdGetNewStrand(ocrPolicyDomain_t *pd, pdStrand_t **returnStrand, pdStrandTabl
                 parent->nodeReady |= (1ULL << curNode->parentSlot);
             }
         });
+    ASSERT(strand->lock == 1);
 END_LABEL(getNewStrandEnd)
     DPRINTF(DEBUG_LVL_INFO, "EXIT pdGetNewStrand -> %"PRIu32" [strand: %p]\n",
             toReturn, *returnStrand);
@@ -1205,7 +1202,7 @@ u8 pdEnqueueActions(ocrPolicyDomain_t *pd, pdStrand_t* strand, u32 actionCount,
 
     // A lock should be held while we enqueue actions. Make sure it is. If this
     // fails, most likely an internal runtime error
-    ASSERT(strand->properties & PDST_LOCK);
+    ASSERT(strand->lock == 1);
 
     u32 npIdx = _pdActionToNP(actions[0]);
     if(strand->actions == NULL) {
@@ -1293,7 +1290,7 @@ u8 pdLockStrand(pdStrand_t *strand, bool doTry) {
 #define _END_FUNC lockStrandEnd
 
     u8 toReturn = 0;
-    toReturn = _pdLockStrand(strand, 0, doTry?0:BLOCK);
+    toReturn = _pdLockStrand(strand, doTry?0:BLOCK);
 
 END_LABEL(lockStrandEnd)
     DPRINTF(DEBUG_LVL_INFO, "EXIT pdLockStrand -> %"PRIu32"\n", toReturn);
@@ -1307,7 +1304,7 @@ u8 pdUnlockStrand(pdStrand_t *strand) {
 #define _END_FUNC unlockStrandEnd
 
     u8 toReturn = 0;
-    CHECK_RESULT_T(((strand->properties & PDST_LOCK)), , toReturn = OCR_EINVAL);
+    CHECK_RESULT_T(((strand->lock == 1)), , toReturn = OCR_EINVAL);
 
     _pdUnlockStrand(strand);
 
@@ -1445,7 +1442,7 @@ u32 _pdProcessStrandsCount(ocrPolicyDomain_t *pd, u32 processType, u32 count, u3
 
                 // Grab the lock on it and then we are going to release all the other "locks"
                 // to free-up parallelism if needed.
-                RESULT_ASSERT(_pdLockStrand(toProcess, 0, BLOCK), ==, 0);
+                RESULT_ASSERT(_pdLockStrand(toProcess, BLOCK), ==, 0);
 
                 // At this point, we need to re-jigger the nodeNeedsProcess bits
                 // back up to the top of the chain. We need to re-jigger all the
@@ -1565,7 +1562,8 @@ u32 _pdProcessStrandsCount(ocrPolicyDomain_t *pd, u32 processType, u32 count, u3
                 }
 
                 // Holding curNode->lock (except if didFree) and strand lock
-                _pdUnlockStrand(toProcess);
+                if(!didFree)
+                    _pdUnlockStrand(toProcess);
 
                 // Holding lock on curNode->lock EXCEPT if freed strand
                 // (in that case, the following if statement is false)
@@ -1721,7 +1719,7 @@ u8 pdProcessResolveEvents(ocrPolicyDomain_t *pd, u32 processType, u32 count, pdE
                         // Reset curNode properly
                         curNode = toProcess->parent;
                         // At this point, we have a strand that we can process
-                        RESULT_ASSERT(pdLockStrand(toProcess, false), ==, 0);
+                        RESULT_ASSERT(_pdLockStrand(toProcess, BLOCK), ==, 0);
 
                         toProcess->processingWorker = worker;
                         // It should be in this state if we are ready to process it.
@@ -2020,7 +2018,7 @@ END_LABEL(destroyStrandTableNodeEnd)
 #undef _END_FUNC
 }
 
-static u8 _pdLockStrand(pdStrand_t *strand, u32 expectedValue, u32 properties) {
+static u8 _pdLockStrand(pdStrand_t *strand, u32 properties) {
 
     // If the strand has a processing worker and we are that worker
     // there is no need to lock because the lock was already grabbed when
@@ -2032,52 +2030,21 @@ static u8 _pdLockStrand(pdStrand_t *strand, u32 expectedValue, u32 properties) {
             return 0;
     }
 
-    u32 initialValue;
-    if (properties & HAS_EXPECTED_VALUE) {
-        initialValue = expectedValue;
-        if ((initialValue & PDST_LOCK) == PDST_LOCK) {
-            // The expected value is already locked, this is an error however you look
-            // at it
-            return ((properties & BLOCK) == BLOCK)?OCR_EINVAL:OCR_EBUSY;
-        }
-    } else {
-        initialValue = strand->properties;
-        if(((properties & BLOCK) == 0) && ((initialValue & PDST_LOCK) != 0)) {
-            return OCR_EBUSY; // Already locked so no point trying
-        }
+    u32 initialValue = strand->lock;
+    if(((properties & BLOCK) == 0) && (initialValue == 1)) {
+        return OCR_EBUSY; // Already locked so no point trying
     }
-
     // Try once
-    u32 t, oldValue = initialValue;
-    while ((oldValue & PDST_LOCK) == PDST_LOCK) {
-        // We re-read the value
-        // Note that in this case, we never have HAS_EXPECTED_VALUE set
-        ASSERT((properties & HAS_EXPECTED_VALUE) == 0);
-        oldValue = strand->properties;
-    }
-    t = oldValue;
-    ASSERT((t & PDST_LOCK) == 0);
-    oldValue = hal_cmpswap32(&(strand->properties), t, t | PDST_LOCK);
+    u32 oldValue = hal_cmpswap32(&(strand->lock), 0, 1);
 
-    if ((oldValue != t) && ((properties & BLOCK) == 0))
+    if ((oldValue != 0) && ((properties & BLOCK) == 0))
         return OCR_EBUSY;
-    if (t == oldValue)
+    if (oldValue == 0) {
         return 0; // Successful
-
-    // Go in a tighter loop now
-    do {
-        while ((oldValue & PDST_LOCK) == PDST_LOCK) {
-            oldValue = strand->properties;
-        }
-        t = oldValue;
-        ASSERT((t & PDST_LOCK) == 0);
-        oldValue = hal_cmpswap32(&(strand->properties), t, t | PDST_LOCK);
-    } while (t != oldValue);
-
-    if (((properties & HAS_EXPECTED_VALUE) == HAS_EXPECTED_VALUE) && (initialValue != oldValue)) {
-        strand->properties &= ~PDST_LOCK;
-        return OCR_EINVAL;
     }
+
+    // Do a proper lock here
+    hal_lock32(&(strand->lock));
     return 0;
 }
 
@@ -2142,6 +2109,7 @@ static u8 _pdInitializeStrandTableNode(ocrPolicyDomain_t *pd, pdStrandTableNode_
             slab->actions = NULL;
             slab->parent = node;
             slab->properties = PDST_FREE;
+            slab->lock = 0;
             slab->index = (node->lmIndex>>1) + (u64)i;
             slab->processingWorker = NULL;
             node->data.slots[i] = slab;
@@ -2304,7 +2272,7 @@ static u8 _pdDestroyStrand(ocrPolicyDomain_t* pd, pdStrand_t *strand) {
     ASSERT(pd);
 
     // The lock must be held on the strand
-    CHECK_RESULT_T((strand->properties & PDST_LOCK), , toReturn = OCR_EINVAL);
+    CHECK_RESULT_T((strand->lock == 1), , toReturn = OCR_EINVAL);
 
     // We should not be freeing strands that are still going to be used, so a bit
     // of sanity check here
@@ -2329,9 +2297,7 @@ static u8 _pdDestroyStrand(ocrPolicyDomain_t* pd, pdStrand_t *strand) {
     ASSERT(curNode);
     hal_lock32(&(curNode->lock));
 
-    // This should not fail since we have a lock. This is basically an unlock but
-    // we make sure that no one else did something.
-    RESULT_ASSERT(hal_cmpswap32(&(strand->properties), PDST_LOCK, PDST_FREE), ==, PDST_LOCK);
+    strand->lock = 0;
 
     // Propgate things up. We free a node and it may remove the
     // "ready" flag from it. It can't be NP because none of the

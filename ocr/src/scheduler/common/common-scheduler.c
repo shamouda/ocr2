@@ -16,6 +16,8 @@
 // BUG #793 Probably need to make this not HC-specific
 #include "scheduler/hc/scheduler-blocking-support.h"
 
+#include "ocr-policy-domain-tasks.h"
+
 #define DEBUG_TYPE SCHEDULER
 
 // This scheduler is expecting at least two heuristics to be present

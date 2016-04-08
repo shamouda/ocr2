@@ -2265,6 +2265,7 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
 u8 hcPdProcessEvent(ocrPolicyDomain_t* self, pdEvent_t **evt, u32 idx) {
     // Simple version to test out micro tasks for now. This just executes a blocking
     // call to the regular process message and returns NULL
+
     ASSERT(idx == 0);
     ASSERT(((*evt)->properties & PDEVT_TYPE_MASK) == PDEVT_TYPE_MSG);
     pdEventMsg_t *evtMsg = (pdEventMsg_t*)*evt;

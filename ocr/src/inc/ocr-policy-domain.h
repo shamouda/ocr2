@@ -1219,9 +1219,11 @@ typedef struct _ocrPolicyDomainFcts_t {
      *
      * @param[in]     self       This policy domain
      * @param[in/out] evt        Input event which contains the message
-     *                           to process.
+     *                           to process. On output, will contain the
+     *                           response in an event. This event may not be ready
      * @param[in]     idx        Position in the code to resume at (if the code
-     *                           was interrupted due to a blocking call
+     *                           was interrupted due to a blocking call. Should be
+     *                           0 for a direct initial call.
      * @return 0 on success and a non-zero value on failure
      */
     u8 (*processEvent)(struct _ocrPolicyDomain_t *self,
@@ -1267,6 +1269,61 @@ typedef struct _ocrPolicyDomainFcts_t {
      * @return 0 on success and a non-zero error code
      */
     u8 (*waitMessage)(struct _ocrPolicyDomain_t *self, ocrMsgHandle_t **handle);
+
+    /**
+     * @brief MT compatible send a message outside of the policy domain.
+     *
+     * This API can be used by any client of the policy domain and
+     * will call into the correct comm-platform sendMessage to actually
+     * send the message.
+     *
+     * See ocr-comm-platform.h for a detailed description
+     * @param[in] self          This policy-domain
+     * @param[in/out] inOutEvent Event to send; if the message requires a
+     *                          response, the response will be contained in
+     *                          the resulting event (the event may not be ready
+     *                          on return)
+     * @param[out] statusEvent  If needed, will return an event to poll on the status
+     *                          of the send of the message
+     * @param[in] idx           Position in the code to resume at (should be
+     *                          0 for an initial direct call)
+     * @return 0 on success and a non-zero error code
+     */
+    u8 (*sendMessageMT)(struct _ocrPolicyDomain_t* self, struct _pdEvent_t **inOutEvent,
+                        struct _pdEvent_t *statusEvent, u32 idx);
+
+    /**
+     * @brief MT Non-blocking check for incoming messages that are
+     * not responses to previously sent queries
+     *
+     * This API can be used by any client of the policy domain and
+     * will call into the correct comm-platform pollMessage to actually
+     * poll for a message.
+     *
+     * See ocr-comm-platform.h for a detailed description
+     * @param[in] self          This policy-domain
+     * @param[in/out] outEvent  Event containing message
+     * @param[in] idx           Should always be 0
+     * @return 0 on success and a non-zero error code
+     */
+    u8 (*pollMessageMT)(struct _ocrPolicyDomain_t *self, struct _pdEvent_t **outEvent, u32 idx);
+
+    /**
+     * @brief MT Blocking check for incoming messages that are
+     * not responses to previously sent queries
+     *
+     * This API can be used by any client of the policy domain and
+     * will call into the correct comm-platform pollMessage to actually
+     * poll for a message.
+     *
+     * See ocr-comm-platform.h for a detailed description
+     * @param[in] self          This policy-domain
+     * @param[in/out] outEvent  Event containing message
+     * @param[in] idx           Should always be 0
+     * @return 0 on success and a non-zero error code
+     */
+    u8 (*waitMessageMT)(struct _ocrPolicyDomain_t *self, struct _pdEvent_t **outEvent, u32 idx);
+
 
     /**
      * @brief Policy-domain only allocation.

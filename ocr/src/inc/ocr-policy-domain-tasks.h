@@ -249,7 +249,6 @@ typedef struct _pdTask_t {
 
 #define PDST_TYPE_MASK      0xFF     /**< Type of strand */
 #define PDST_FREE           0x0      /**< Slot is free to use */
-#define PDST_LOCK           0x100    /**< Slot is locked (transitioning to another state) */
 #define PDST_WAIT           0x3000   /**< The strand is not ready */
 #define PDST_WAIT_EVT       0x1000   /**< Slot is occupied and the event is not ready */
 #define PDST_WAIT_ACT       0x2000   /**< Slot is occupied, the event is satisfied and has
@@ -284,7 +283,8 @@ typedef struct _pdStrand_t {
     u64 index;              /**< Index into the table */
     ocrWorker_t* processingWorker;  /**< Worker that is processing this strand
                                          This has implications on locking among other things */
-    u32 properties;         /**< Properties and status of this slot. See PDST_* */
+    u32 properties;/**< Properties and status of this slot. */
+    u32 lock;
 } pdStrand_t;
 
 

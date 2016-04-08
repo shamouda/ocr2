@@ -33,6 +33,10 @@
 
 #define DEBUG_TYPE WORKER
 
+#if defined(UTASK_COMM) || defined(UTASK_COMM2)
+#include "ocr-policy-domain-tasks.h"
+#endif
+
 /******************************************************/
 /* OCR-HC WORKER                                      */
 /******************************************************/
@@ -44,7 +48,9 @@ static void hcWorkShift(ocrWorker_t * worker) {
     getCurrentEnv(&pd, NULL, NULL, &msg);
 
     ocrWorkerHc_t *hcWorker = (ocrWorkerHc_t *) worker;
-
+#if defined(UTASK_COMM) || defined(UTASK_COMM2)
+    RESULT_ASSERT(pdProcessStrands(pd, NP_WORK, 0), ==, 0);
+#endif
     u8 retCode = 0;
     {
         START_PROFILE(wo_hc_getWork);
@@ -191,7 +197,6 @@ static void workerLoop(ocrWorker_t * worker) {
         // Once mainEdt is created, its template is no longer needed
         ocrEdtTemplateDestroy(edtTemplateGuid);
     }
-
     // Actual loop
     do {
         while(worker->curState == worker->desiredState) {
