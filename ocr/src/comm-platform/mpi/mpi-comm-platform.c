@@ -304,8 +304,17 @@ u8 probeIncoming(ocrCommPlatform_t *self, int src, int tag, ocrPolicyMsg_t ** ms
     //Sound we should get a pool of small messages (let say sizeof(ocrPolicyMsg_t) and allocate
     //variable size message on the fly).
     MPI_Status status;
+
+#ifdef MPI_MSG
+    MPI_Message mpiMsg;
+#endif
+
     int available = 0;
+#ifdef MPI_MSG
+    RESULT_ASSERT(MPI_Improbe(src, tag, MPI_COMM_WORLD, &available, &mpiMsg, &status), ==, MPI_SUCCESS);
+#else
     RESULT_ASSERT(MPI_Iprobe(src, tag, MPI_COMM_WORLD, &available, &status), ==, MPI_SUCCESS);
+#endif
     if (available) {
         ASSERT(msg != NULL);
         ASSERT((bufferSize == 0) ? ((tag == RECV_ANY_ID) && (*msg == NULL)) : 1);
@@ -321,7 +330,11 @@ u8 probeIncoming(ocrCommPlatform_t *self, int src, int tag, ocrPolicyMsg_t ** ms
         }
         ASSERT(*msg != NULL);
         MPI_Comm comm = MPI_COMM_WORLD;
+#ifdef MPI_MSG
+        RESULT_ASSERT(MPI_Mrecv(*msg, count, datatype, &mpiMsg, MPI_STATUS_IGNORE), ==, MPI_SUCCESS);
+#else
         RESULT_ASSERT(MPI_Recv(*msg, count, datatype, src, tag, comm, MPI_STATUS_IGNORE), ==, MPI_SUCCESS);
+#endif
         // After recv, the message size must be updated since it has just been overwritten.
         (*msg)->usefulSize = count;
         (*msg)->bufferSize = count;
