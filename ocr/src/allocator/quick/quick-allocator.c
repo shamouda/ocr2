@@ -258,7 +258,7 @@ struct bmapOp {
 #define _CACHE_POOL(ID)         (_cache_pool)
 #else
 // x86 or standalone
-#define PER_AGENT_CACHE
+//#define PER_AGENT_CACHE
 #define PER_AGENT_KEYWORD       __thread
 #define CACHE_POOL(ID)          (&_cache_pool)
 #define _CACHE_POOL(ID)         (_cache_pool)
