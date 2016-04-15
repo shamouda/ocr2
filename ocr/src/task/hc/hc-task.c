@@ -209,6 +209,9 @@ static u8 finishLatchCheckin(ocrPolicyDomain_t *pd, ocrPolicyMsg_t *msg,
     //BUG #207 This is a long shot but if the latchEvent is not local (which it shouldn't)
     //then this could be in-flight and child EDT incr/decr is seen before completion,
     //leading to the finish scope being considered completed.
+    //TODO => Really need to make this blocking I think
+
+    // Account for this EDT as being part of its parent finish scope
     msg->type = PD_MSG_DEP_SATISFY | PD_MSG_REQUEST;
     PD_MSG_FIELD_I(satisfierGuid) = edtCheckin;
     PD_MSG_FIELD_I(guid) = latchEvent;
@@ -220,6 +223,9 @@ static u8 finishLatchCheckin(ocrPolicyDomain_t *pd, ocrPolicyMsg_t *msg,
     PD_MSG_FIELD_I(properties) = 0;
     RESULT_PROPAGATE(pd->fcts.processMessage(pd, msg, false));
 #undef PD_TYPE
+    // Tie the local latch event for this EDT's finish scope to its parent finish scope.
+    // All of the current EDT children will report to the local finish scope and when the
+    // local finish scope completes, it will notify the parent finish scope.
 #define PD_TYPE PD_MSG_DEP_ADD
     msg->type = PD_MSG_DEP_ADD | PD_MSG_REQUEST;
     PD_MSG_FIELD_IO(properties) = DB_MODE_CONST; // not called from add-dependence
@@ -242,6 +248,7 @@ static inline bool hasProperty(u32 properties, u32 property) {
     return properties & property;
 }
 
+#ifndef REG_ASYNC
 static u8 registerOnFrontier(ocrTaskHc_t *self, ocrPolicyDomain_t *pd,
                              ocrPolicyMsg_t *msg, u32 slot) {
 #define PD_MSG (msg)
@@ -258,6 +265,8 @@ static u8 registerOnFrontier(ocrTaskHc_t *self, ocrPolicyDomain_t *pd,
 #undef PD_TYPE
     return 0;
 }
+#endif
+
 /******************************************************/
 /* OCR-HC Support functions                           */
 /******************************************************/
@@ -266,8 +275,12 @@ static u8 initTaskHcInternal(ocrTaskHc_t *task, ocrPolicyDomain_t * pd,
                              ocrTask_t *curTask, ocrFatGuid_t outputEvent,
                              ocrFatGuid_t parentLatch, u32 properties) {
     task->frontierSlot = 0;
-    task->slotSatisfiedCount = 0;
+#ifndef REG_ASYNC
     task->lock = 0;
+#else
+    task->readyCounter = 0;
+#endif
+    task->slotSatisfiedCount = 0;
     task->unkDbs = NULL;
     task->countUnkDbs = 0;
     task->maxUnkDbs = 0;
@@ -309,13 +322,12 @@ static u8 initTaskHcInternal(ocrTaskHc_t *task, ocrPolicyDomain_t * pd,
 
         if (!(ocrGuidIsNull(parentLatch.guid))) {
             DPRINTF(DEBUG_LVL_INFO, "Checkin "GUIDF" on parent flatch "GUIDF"\n", GUIDA(task->base.guid), GUIDA(parentLatch.guid));
-            // Check in current finish latch
+            // Check in this EDT finish latch with the parent's one and setup the dependence between current latch and parent's one
             getCurrentEnv(NULL, NULL, NULL, &msg);
             RESULT_PROPAGATE(finishLatchCheckin(pd, &msg, edtCheckin, latchFGuid, parentLatch));
         }
 
-        // Check in the new finish scope
-        // This will also link outputEvent to latchFGuid
+        // Check in the current EDT into the new finish scope and link its outputEvent to the current finish latch
         getCurrentEnv(NULL, NULL, NULL, &msg);
         DPRINTF(DEBUG_LVL_INFO, "Checkin "GUIDF" on self flatch "GUIDF"\n", GUIDA(task->base.guid), GUIDA(latchFGuid.guid));
         RESULT_PROPAGATE(finishLatchCheckin(pd, &msg, edtCheckin, outputEvent, latchFGuid));
@@ -372,8 +384,8 @@ static u8 iterateDbFrontier(ocrTask_t *self) {
     regNode_t * depv = rself->signalers;
     u32 i = rself->frontierSlot;
     for (; i < self->depc; ++i) {
-        // Important to do this before we call processMessage
-        // because of the assert checks done in satisfyTaskHc
+        //ACQUIRE can be non-blocking so pre-increment the frontier
+        //slot and adjust by -1 in dependenceResolvedTaskHc
         rself->frontierSlot++;
         if (!(ocrGuidIsNull(depv[i].guid))) {
             // Because the frontier is sorted, we can check for duplicates here
@@ -484,7 +496,7 @@ static u8 taskAllDepvSatisfied(ocrTask_t *self) {
         u32 i = 0;
         while(i < depc) {
             rself->signalers[i].slot = i; // reset the slot info
-            resolvedDeps[i].guid = signalers[i].guid; // DB guids by now
+            resolvedDeps[i].guid = (signalers[i].mode == DB_MODE_NULL) ? NULL_GUID : signalers[i].guid; // DB guids by now
             resolvedDeps[i].ptr = NULL; // resolved by acquire messages
             resolvedDeps[i].mode = signalers[i].mode;
             i++;
@@ -492,10 +504,9 @@ static u8 taskAllDepvSatisfied(ocrTask_t *self) {
         // Sort regnode in guid's ascending order.
         // This is the order in which we acquire the DBs
         sortRegNode(signalers, self->depc);
-        // Start the DB acquisition process
         rself->frontierSlot = 0;
     }
-
+    // Try to start the DB acquisition process if scheduler agreed
     if (scheduleSatisfiedTask(self) != 0 && !iterateDbFrontier(self)) {
         //TODO: Keeping this here for 0.9 compatibility but
         //iterateDbFrontier and related code will eventually
@@ -818,6 +829,9 @@ u8 dependenceResolvedTaskHc(ocrTask_t * self, ocrGuid_t dbGuid, void * localDbPt
         //This is called after the scheduler moves an EDT to the right place,
         //and also decides the right time for the EDT to start acquiring the DBs.
         ASSERT(ocrGuidIsNull(dbGuid) && localDbPtr == NULL);
+        //I believe the signalers are already sorted, this assert should
+        //fail if that's not the case and we can revisit why
+        ASSERT(rself->frontierSlot == 0);
         // Sort regnode in guid's ascending order.
         // This is the order in which we acquire the DBs
         sortRegNode(rself->signalers, self->depc);
@@ -838,6 +852,8 @@ u8 dependenceResolvedTaskHc(ocrTask_t * self, ocrGuid_t dbGuid, void * localDbPt
     }
     return 0;
 }
+
+#ifndef REG_ASYNC
 
 u8 satisfyTaskHc(ocrTask_t * base, ocrFatGuid_t data, u32 slot) {
     // An EDT has a list of signalers, but only registers
@@ -987,14 +1003,14 @@ u8 registerSignalerTaskHc(ocrTask_t * base, ocrFatGuid_t signalerGuid, u32 slot,
     ocrGuidKind signalerKind = OCR_GUID_NONE;
     deguidify(pd, &signalerGuid, &signalerKind);
     regNode_t * node = &(self->signalers[slot]);
+    hal_lock32(&(self->lock));
     node->mode = mode;
     ASSERT_BLOCK_BEGIN(node->slot < base->depc);
     DPRINTF(DEBUG_LVL_WARN, "User-level error detected: add dependence slot is out of bounds: EDT="GUIDF" slot=%"PRIu32" depc=%"PRIu32"\n",
                             GUIDA(base->guid), slot, base->depc);
     ASSERT_BLOCK_END
-    ASSERT(node->slot == slot); // assumption from initialization
     ASSERT(!(ocrGuidIsNull(signalerGuid.guid))); // This should have been caught earlier on
-    hal_lock32(&(self->lock));
+    ASSERT(node->slot == slot); // assumption from initialization
     node->guid = signalerGuid.guid;
     //BUG #162 metadata cloning: Had to introduce new kinds of guids because we don't
     //         have support for cloning metadata around yet
@@ -1028,6 +1044,7 @@ u8 registerSignalerTaskHc(ocrTask_t * base, ocrFatGuid_t signalerGuid, u32 slot,
         // introduce a race between the satisfy here after and another
         // concurrent satisfy advancing the frontier.
         hal_unlock32(&(self->lock));
+
         //Convert to a satisfy now that we've recorded the mode
         //NOTE: Could improve implementation by figuring out how
         //to properly iterate the frontier when adding the DB
@@ -1058,6 +1075,37 @@ u8 registerSignalerTaskHc(ocrTask_t * base, ocrFatGuid_t signalerGuid, u32 slot,
         GUIDA(signalerGuid.guid), GUIDA(base->guid), slot);
     return 0;
 }
+
+#else /* REG_ASYNC */
+
+u8 satisfyTaskHc(ocrTask_t * base, ocrFatGuid_t data, u32 slot) {
+    ocrTaskHc_t * self = (ocrTaskHc_t *) base;
+    self->signalers[slot].guid = data.guid;
+    hal_fence();
+    u32 oldValue = hal_xadd32(&(self->readyCounter), 1);
+    if (oldValue == ((base->depc*2)-1)) {
+        // All dependences known
+        self->slotSatisfiedCount = base->depc;
+        taskAllDepvSatisfied(base);
+    }
+    return 0;
+}
+
+u8 registerSignalerTaskHc(ocrTask_t * base, ocrFatGuid_t signalerGuid, u32 slot,
+                            ocrDbAccessMode_t mode, bool isDepAdd) {
+    ocrTaskHc_t * self = (ocrTaskHc_t *) base;
+    self->signalers[slot].mode = mode;
+    hal_fence();
+    u32 oldValue = hal_xadd32(&(self->readyCounter), 1);
+    if (oldValue == ((base->depc*2)-1)) {
+        // All dependences known
+        self->slotSatisfiedCount = base->depc;
+        taskAllDepvSatisfied(base);
+    }
+    return 0;
+}
+
+#endif /* REG_ASYNC */
 
 u8 unregisterSignalerTaskHc(ocrTask_t * base, ocrFatGuid_t signalerGuid, u32 slot, bool isDepRem) {
     ASSERT(0); // We don't support this at this time...

@@ -852,7 +852,7 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
              * Whenever an EDT needs to be created on a remote node,
              * then a proxy latch is created on the remote node if
              * there is a parent latch to report to on the source node.
-             * So, when an parent EDT creates a child EDT on a remote node,
+             * So, when a parent EDT creates a child EDT on a remote node,
              * the local latch is first incremented on the source node.
              * This latch will eventually be decremented through the proxy
              * latch on the remote node.

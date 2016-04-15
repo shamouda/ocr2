@@ -1267,6 +1267,20 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
                 #undef PD_TYPE
                     //NOTE: Could systematically call DEP_ADD but it's faster to disambiguate
                     //      NULL_GUID here instead of having DEP_ADD find out and do a satisfy.
+#ifdef REG_ASYNC
+                #define PD_MSG (&msgAddDep)
+                #define PD_TYPE PD_MSG_DEP_ADD
+                        msgAddDep.type = PD_MSG_DEP_ADD | PD_MSG_REQUEST;
+                        PD_MSG_FIELD_I(source.guid) = depv[i].guid;
+                        PD_MSG_FIELD_I(source.metaDataPtr) = NULL;
+                        PD_MSG_FIELD_I(dest.guid) = destination;
+                        PD_MSG_FIELD_I(dest.metaDataPtr) = NULL;
+                        PD_MSG_FIELD_I(slot) = i;
+                        PD_MSG_FIELD_IO(properties) = DB_DEFAULT_MODE;
+                        PD_MSG_FIELD_I(currentEdt) = curEdtFatGuid;
+                #undef PD_MSG
+                #undef PD_TYPE
+#else
                     if(!(ocrGuidIsNull(depv[i].guid))) {
                 #define PD_MSG (&msgAddDep)
                 #define PD_TYPE PD_MSG_DEP_ADD
@@ -1297,6 +1311,7 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
                 #undef PD_MSG
                 #undef PD_TYPE
                     }
+#endif
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_WORK_CREATE
                     u8 toReturn __attribute__((unused)) = self->fcts.processMessage(self, &msgAddDep, true);
@@ -1714,6 +1729,31 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             // This is equivalent to an immediate satisfy
             PD_MSG_FIELD_O(returnDetail) = convertDepAddToSatisfy(
                 self, src, dest, slot);
+#ifdef REG_ASYNC
+            if (dstKind == OCR_GUID_EDT) {
+                PD_MSG_STACK(registerMsg);
+                getCurrentEnv(NULL, NULL, NULL, &registerMsg);
+            #undef PD_MSG
+            #undef PD_TYPE
+            #define PD_MSG (&registerMsg)
+            #define PD_TYPE PD_MSG_DEP_REGSIGNALER
+                registerMsg.type = PD_MSG_DEP_REGSIGNALER | PD_MSG_REQUEST;
+                // Registers sourceGuid (signaler) onto destGuid
+                PD_MSG_FIELD_I(signaler) = src;
+                PD_MSG_FIELD_I(dest) = dest;
+                PD_MSG_FIELD_I(slot) = slot;
+                PD_MSG_FIELD_I(mode) = DB_MODE_NULL;
+                PD_MSG_FIELD_I(properties) = true; // Specify context is add-dependence
+                u8 returnCode = self->fcts.processMessage(self, &registerMsg, true);
+                u8 returnDetail = (returnCode == 0) ? PD_MSG_FIELD_O(returnDetail) : returnCode;
+            #undef PD_MSG
+            #undef PD_TYPE
+            #define PD_MSG msg
+            #define PD_TYPE PD_MSG_DEP_ADD
+                PD_MSG_FIELD_O(returnDetail) = returnDetail;
+                RESULT_PROPAGATE(returnCode);
+            }
+#endif
         } else if (srcKind == OCR_GUID_DB) {
             if (dstKind & OCR_GUID_EVENT) {
                 PD_MSG_FIELD_O(returnDetail) = convertDepAddToSatisfy(
@@ -1726,13 +1766,21 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
                     DPRINTF(DEBUG_LVL_WARN, "Attempting to add a DB dependence to dest of kind %"PRIx32" "
                                             "that's neither EDT nor Event\n", dstKind);
                 ASSERT(dstKind == OCR_GUID_EDT);
+#ifdef REG_ASYNC
+            PD_MSG_FIELD_O(returnDetail) = convertDepAddToSatisfy(
+                self, src, dest, slot);
+#endif
                 PD_MSG_STACK(registerMsg);
                 getCurrentEnv(NULL, NULL, NULL, &registerMsg);
             #undef PD_MSG
             #undef PD_TYPE
             #define PD_MSG (&registerMsg)
             #define PD_TYPE PD_MSG_DEP_REGSIGNALER
+#ifdef REG_ASYNC
+                registerMsg.type = PD_MSG_DEP_REGSIGNALER | PD_MSG_REQUEST;
+#else
                 registerMsg.type = PD_MSG_DEP_REGSIGNALER | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
+#endif
                 // Registers sourceGuid (signaler) onto destGuid
                 PD_MSG_FIELD_I(signaler) = src;
                 PD_MSG_FIELD_I(dest) = dest;
@@ -1771,15 +1819,15 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             bool needPushMode = (srcIsNonPersistent || (dstKind & OCR_GUID_EVENT));
             // The registration is always necessary when the destination is an EDT.
             // It allows to record the mode of the dependence as well as the type of
-            // event the EDT should be expecting.
-            bool needPullMode = !!(dstKind & OCR_GUID_EDT);
+            // event the EDT should be expecting
+            bool needPullMode = (dstKind == OCR_GUID_EDT);
             // NOTE: Important to do the signaler registration before the waiter one
             // when the dependence is of the form (non-persistent event, edt)
             // Otherwise there's a race between the once event being destroyed and
             // the edt processing the registerSignaler call (which may read into the
             // destroyed event metadata).
             if(needPullMode) {
-                ASSERT_BLOCK_BEGIN(dstKind & OCR_GUID_EDT);
+                ASSERT_BLOCK_BEGIN(dstKind == OCR_GUID_EDT);
                 DPRINTF(DEBUG_LVL_WARN, "Runtime error expect REGSIGNALER dest to be an EDT GUID\n");
                 ASSERT_BLOCK_END
                 PD_MSG_STACK(registerMsg);
@@ -1787,7 +1835,11 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
                 // 'Pull' registration left with persistent event as source and EDT as destination
             #define PD_MSG (&registerMsg)
             #define PD_TYPE PD_MSG_DEP_REGSIGNALER
+#if defined (REG_ASYNC)
+                registerMsg.type = PD_MSG_DEP_REGSIGNALER | PD_MSG_REQUEST;
+#else
                 registerMsg.type = PD_MSG_DEP_REGSIGNALER | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
+#endif
                 // Registers sourceGuid (signaler) onto destGuid
                 PD_MSG_FIELD_I(signaler) = src;
                 PD_MSG_FIELD_I(dest) = dest;
@@ -1808,7 +1860,9 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             #undef PD_MSG
             #undef PD_TYPE
             }
-
+#if defined (REG_ASYNC)
+            needPushMode = true;
+#endif
             if (needPushMode) {
                 //OK if srcKind is at current location
                 PD_MSG_STACK(registerMsg);
@@ -1817,14 +1871,17 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             #define PD_TYPE PD_MSG_DEP_REGWAITER
                 // Registration with non-persistent events is two-way
                 // to enforce message ordering constraints.
-                registerMsg.type = PD_MSG_DEP_REGWAITER | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
+                registerMsg.type = PD_MSG_DEP_REGWAITER | PD_MSG_REQUEST;
+                if (srcIsNonPersistent) {
+                     registerMsg.type |= PD_MSG_REQ_RESPONSE;
+                }
                 // Registers destGuid (waiter) onto sourceGuid
                 PD_MSG_FIELD_I(waiter) = dest;
                 PD_MSG_FIELD_I(dest) = src;
                 PD_MSG_FIELD_I(slot) = slot;
                 PD_MSG_FIELD_I(properties) = true; // Specify context is add-dependence
                 u8 returnCode = self->fcts.processMessage(self, &registerMsg, true);
-                u8 returnDetail = (returnCode == 0) ? PD_MSG_FIELD_O(returnDetail) : returnCode;
+                u8 returnDetail = ((srcIsNonPersistent) && (returnCode == 0)) ? PD_MSG_FIELD_O(returnDetail) : returnCode;
                 DPRINTF(DEBUG_LVL_INFO,
                         "Dependence added (src: "GUIDF", dest: "GUIDF") -> %"PRIu32"\n", GUIDA(src.guid),
                         GUIDA(dest.guid), returnCode);
@@ -1871,6 +1928,7 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         bool isAddDep = PD_MSG_FIELD_I(properties);
 
         if (dstKind & OCR_GUID_EVENT) {
+            ASSERT(false && "We never register signaler on an event");
             ocrEvent_t *evt = (ocrEvent_t*)(dest.metaDataPtr);
             ASSERT(evt->fctId == self->eventFactories[0]->factoryId);
             PD_MSG_FIELD_O(returnDetail) = self->eventFactories[0]->fcts[evt->kind].registerSignaler(
@@ -1895,7 +1953,9 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
 #undef PD_MSG
 #undef PD_TYPE
         msg->type &= ~PD_MSG_REQUEST;
-        msg->type |= PD_MSG_RESPONSE;
+        if (msg->type & PD_MSG_REQ_RESPONSE) {
+            msg->type |= PD_MSG_RESPONSE;
+        }
         EXIT_PROFILE;
         break;
     }
@@ -1919,9 +1979,9 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             PD_MSG_FIELD_O(returnDetail) = self->eventFactories[0]->fcts[evt->kind].registerWaiter(
                 evt, waiter, PD_MSG_FIELD_I(slot), isAddDep);
         } else {
-            if((dstKind & OCR_GUID_DB) == 0)
+            if (dstKind != OCR_GUID_DB)
                 DPRINTF(DEBUG_LVL_WARN, "Attempting to add a dependence to a GUID of type %"PRIx32", expected DB\n", dstKind);
-            ASSERT(dstKind & OCR_GUID_DB);
+            ASSERT(dstKind == OCR_GUID_DB);
             // When an EDT want to register to a DB, for instance to get EW access.
             ocrDataBlock_t *db = (ocrDataBlock_t*)(dest.metaDataPtr);
             ASSERT(db->fctId == self->dbFactories[0]->factoryId);
@@ -1935,7 +1995,9 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
 #undef PD_MSG
 #undef PD_TYPE
         msg->type &= ~PD_MSG_REQUEST;
-        msg->type |= PD_MSG_RESPONSE;
+        if (msg->type & PD_MSG_REQ_RESPONSE) {
+            msg->type |= PD_MSG_RESPONSE;
+        }
         EXIT_PROFILE;
         break;
     }

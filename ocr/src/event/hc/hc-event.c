@@ -751,6 +751,7 @@ u8 registerWaiterEventHcPersist(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot,
     ocrGuidKind waiterKind = OCR_GUID_NONE;
     RESULT_ASSERT(guidKind(pd, waiter, &waiterKind), ==, 0);
 
+#ifndef REG_ASYNC //TODO check
     if(isDepAdd && waiterKind == OCR_GUID_EDT) {
         ASSERT(false && "Should never happen anymore");
         // If we're adding a dependence and the waiter is an EDT we
@@ -759,6 +760,7 @@ u8 registerWaiterEventHcPersist(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot,
         // frontier reaches this event.
         return 0; //Require registerSignaler invocation
     }
+#endif
     ASSERT(waiterKind == OCR_GUID_EDT || (waiterKind & OCR_GUID_EVENT));
 
     DPRINTF(DEBUG_LVL_INFO, "Register waiter %s: "GUIDF" with waiter "GUIDF" on slot %"PRId32"\n",

@@ -29,6 +29,11 @@ DEFAULT_CONFIG ?= jenkins-common-8w-lockableDB.cfg
 # - Static size for deques used to contain EDTs
 # CFLAGS += -DINIT_DEQUE_CAPACITY=2048
 
+# **** Registration Parameters ****
+
+# Two-steps asynchronous registration
+# CFLAGS += -DREG_ASYNC
+
 # **** Events Parameters ****
 
 # Initialisation size for statically allocated HC event's waiter array
