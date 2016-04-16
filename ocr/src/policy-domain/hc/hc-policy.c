@@ -911,9 +911,15 @@ static u8 createEventHelper(ocrPolicyDomain_t *self, ocrFatGuid_t *guid,
         self->eventFactories[0], guid, type, properties, paramList);
 }
 
-static u8 convertDepAddToSatisfy(ocrPolicyDomain_t *self, ocrFatGuid_t dbGuid,
-                                 ocrFatGuid_t destGuid, u32 slot) {
 
+
+#ifdef REG_ASYNC_SGL
+static u8 convertDepAddToSatisfy(ocrPolicyDomain_t *self, ocrFatGuid_t dbGuid,
+                                 ocrFatGuid_t destGuid, u32 slot, ocrDbAccessMode_t mode, bool sync) {
+#else
+static u8 convertDepAddToSatisfy(ocrPolicyDomain_t *self, ocrFatGuid_t dbGuid,
+                                 ocrFatGuid_t destGuid, u32 slot, bool sync) {
+#endif
     PD_MSG_STACK(msg);
     ocrTask_t *curTask = NULL;
     getCurrentEnv(NULL, NULL, &curTask, &msg);
@@ -922,13 +928,16 @@ static u8 convertDepAddToSatisfy(ocrPolicyDomain_t *self, ocrFatGuid_t dbGuid,
     currentEdt.metaDataPtr = curTask;
 #define PD_MSG (&msg)
 #define PD_TYPE PD_MSG_DEP_SATISFY
-    msg.type = PD_MSG_DEP_SATISFY | PD_MSG_REQUEST;
+    msg.type = PD_MSG_DEP_SATISFY | PD_MSG_REQUEST | ((sync) ? PD_MSG_REQ_RESPONSE : 0);
     PD_MSG_FIELD_I(satisfierGuid.guid) = curTask?curTask->guid:NULL_GUID;
     PD_MSG_FIELD_I(satisfierGuid.metaDataPtr) = curTask;
     PD_MSG_FIELD_I(guid) = destGuid;
     PD_MSG_FIELD_I(payload) = dbGuid;
     PD_MSG_FIELD_I(currentEdt) = currentEdt;
     PD_MSG_FIELD_I(slot) = slot;
+#ifdef REG_ASYNC_SGL
+    PD_MSG_FIELD_I(mode) = mode;
+#endif
     PD_MSG_FIELD_I(properties) = 0;
     RESULT_PROPAGATE(self->fcts.processMessage(self, &msg, false));
 #undef PD_MSG
@@ -1306,6 +1315,9 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
                         PD_MSG_FIELD_I(payload.guid) = NULL_GUID;
                         PD_MSG_FIELD_I(payload.metaDataPtr) = NULL;
                         PD_MSG_FIELD_I(slot) = i;
+#ifdef REG_ASYNC_SGL
+                        PD_MSG_FIELD_I(mode) = DB_DEFAULT_MODE;
+#endif
                         PD_MSG_FIELD_I(properties) = 0;
                         PD_MSG_FIELD_I(currentEdt) = curEdtFatGuid;
                 #undef PD_MSG
@@ -1722,14 +1734,28 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         ocrFatGuid_t dest = PD_MSG_FIELD_I(dest);
         ocrDbAccessMode_t mode = (PD_MSG_FIELD_IO(properties) & DB_ACCESS_MODE_MASK); //lower bits is the mode //BUG 550: not pretty
         u32 slot = PD_MSG_FIELD_I(slot);
-
+#ifdef ENABLE_EXTENSION_CHANNEL_EVT
+#ifdef XP_CHANNEL_EVT_NONFIFO
+            bool sync = false;
+#else
+            // Channel needs to be synchronous to ensure ordering of multiple satisfy issued in a row
+            bool sync = (srcKind == OCR_GUID_EVENT_CHANNEL);
+#endif
+#else
+            bool sync = false;
+#endif
         if (srcKind == OCR_GUID_NONE) {
             //NOTE: Handle 'NULL_GUID' case here to be safe although
             //we've already caught it in ocrAddDependence for performance
             // This is equivalent to an immediate satisfy
+#ifdef REG_ASYNC_SGL
             PD_MSG_FIELD_O(returnDetail) = convertDepAddToSatisfy(
-                self, src, dest, slot);
-#ifdef REG_ASYNC
+                self, src, dest, slot, mode, sync);
+#else
+            PD_MSG_FIELD_O(returnDetail) = convertDepAddToSatisfy(
+                self, src, dest, slot, sync);
+#endif
+#ifdef REG_ASYNC // In addition need to do the signaler registration to get the mode
             if (dstKind == OCR_GUID_EDT) {
                 PD_MSG_STACK(registerMsg);
                 getCurrentEnv(NULL, NULL, NULL, &registerMsg);
@@ -1756,8 +1782,13 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
 #endif
         } else if (srcKind == OCR_GUID_DB) {
             if (dstKind & OCR_GUID_EVENT) {
-                PD_MSG_FIELD_O(returnDetail) = convertDepAddToSatisfy(
-                    self, src, dest, slot);
+#ifdef REG_ASYNC_SGL
+            PD_MSG_FIELD_O(returnDetail) = convertDepAddToSatisfy(
+                self, src, dest, slot, mode, sync);
+#else
+            PD_MSG_FIELD_O(returnDetail) = convertDepAddToSatisfy(
+                self, src, dest, slot, sync);
+#endif
             } else {
                 // NOTE: We could use convertDepAddToSatisfy since adding a DB dependence
                 // is equivalent to satisfy. However, we want to go through the register
@@ -1766,9 +1797,13 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
                     DPRINTF(DEBUG_LVL_WARN, "Attempting to add a DB dependence to dest of kind %"PRIx32" "
                                             "that's neither EDT nor Event\n", dstKind);
                 ASSERT(dstKind == OCR_GUID_EDT);
+#ifdef REG_ASYNC_SGL
+            PD_MSG_FIELD_O(returnDetail) = convertDepAddToSatisfy(
+                self, src, dest, slot, mode, sync);
+#else
 #ifdef REG_ASYNC
             PD_MSG_FIELD_O(returnDetail) = convertDepAddToSatisfy(
-                self, src, dest, slot);
+                self, src, dest, slot, sync);
 #endif
                 PD_MSG_STACK(registerMsg);
                 getCurrentEnv(NULL, NULL, NULL, &registerMsg);
@@ -1797,6 +1832,7 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
                 RESULT_PROPAGATE(returnCode);
             #undef PD_MSG
             #undef PD_TYPE
+#endif
             }
         } else {
             if(!(srcKind & OCR_GUID_EVENT)) {
@@ -1813,14 +1849,24 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             // Are we revealing too much of the underlying implementation here ?
             //
             // We omit counted events here since it won't be destroyed until the addDependence happens.
+#ifdef XP_CHANNEL_EVT_NONFIFO
             bool srcIsNonPersistent = ((srcKind == OCR_GUID_EVENT_ONCE) ||
                                         (srcKind == OCR_GUID_EVENT_LATCH));
-            // 'Push' registration when source is non-persistent and/or destination is another event.
-            bool needPushMode = (srcIsNonPersistent || (dstKind & OCR_GUID_EVENT));
+#else
+            bool srcIsNonPersistent = ((srcKind == OCR_GUID_EVENT_ONCE) ||
+                                        (srcKind == OCR_GUID_EVENT_LATCH) ||
+                                        (srcKind == OCR_GUID_EVENT_CHANNEL));
+#endif
+
+#ifdef REG_ASYNC_SGL
+            bool needPullMode = false;
+#else
             // The registration is always necessary when the destination is an EDT.
             // It allows to record the mode of the dependence as well as the type of
             // event the EDT should be expecting
             bool needPullMode = (dstKind == OCR_GUID_EDT);
+#endif
+
             // NOTE: Important to do the signaler registration before the waiter one
             // when the dependence is of the form (non-persistent event, edt)
             // Otherwise there's a race between the once event being destroyed and
@@ -1833,9 +1879,13 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
                 PD_MSG_STACK(registerMsg);
                 getCurrentEnv(NULL, NULL, NULL, &registerMsg);
                 // 'Pull' registration left with persistent event as source and EDT as destination
+#ifdef REG_ASYNC_SGL
+            #undef PD_MSG
+            #undef PD_TYPE
+#endif
             #define PD_MSG (&registerMsg)
             #define PD_TYPE PD_MSG_DEP_REGSIGNALER
-#if defined (REG_ASYNC)
+#ifdef REG_ASYNC
                 registerMsg.type = PD_MSG_DEP_REGSIGNALER | PD_MSG_REQUEST;
 #else
                 registerMsg.type = PD_MSG_DEP_REGSIGNALER | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
@@ -1860,10 +1910,16 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             #undef PD_MSG
             #undef PD_TYPE
             }
-#if defined (REG_ASYNC)
-            needPushMode = true;
+#if defined (REG_ASYNC) || (REG_ASYNC_SGL) // New registration always does register the edt on the event here (eager instead of lazy through signaler)
+            bool needPushMode = true;
+#else
+            // 'Push' registration when source is non-persistent and/or destination is another event.
+            bool needPushMode = (srcIsNonPersistent || (dstKind & OCR_GUID_EVENT));
 #endif
             if (needPushMode) {
+#ifdef REG_ASYNC_SGL_DEBUG
+                DPRINTF(DEBUG_LVL_WARN, "taskGuid="GUIDF" PD_MSG_DEP_REGWAITER needPushMode\n", GUIDA(dest.guid));
+#endif
                 //OK if srcKind is at current location
                 PD_MSG_STACK(registerMsg);
                 getCurrentEnv(NULL, NULL, NULL, &registerMsg);
@@ -1871,17 +1927,30 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             #define PD_TYPE PD_MSG_DEP_REGWAITER
                 // Registration with non-persistent events is two-way
                 // to enforce message ordering constraints.
+#if defined (REG_ASYNC) || (REG_ASYNC_SGL)
                 registerMsg.type = PD_MSG_DEP_REGWAITER | PD_MSG_REQUEST;
+                // Want the message to be blocking if src is non persistent or it is a channel
+                // event and we want to ensure ordering is repected
                 if (srcIsNonPersistent) {
                      registerMsg.type |= PD_MSG_REQ_RESPONSE;
                 }
+#else
+                registerMsg.type = PD_MSG_DEP_REGWAITER | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
+#endif
                 // Registers destGuid (waiter) onto sourceGuid
                 PD_MSG_FIELD_I(waiter) = dest;
                 PD_MSG_FIELD_I(dest) = src;
+#ifdef REG_ASYNC_SGL
+                PD_MSG_FIELD_I(mode) = mode;
+#endif
                 PD_MSG_FIELD_I(slot) = slot;
                 PD_MSG_FIELD_I(properties) = true; // Specify context is add-dependence
                 u8 returnCode = self->fcts.processMessage(self, &registerMsg, true);
+#if defined (REG_ASYNC) || (REG_ASYNC_SGL)
                 u8 returnDetail = ((srcIsNonPersistent) && (returnCode == 0)) ? PD_MSG_FIELD_O(returnDetail) : returnCode;
+#else
+                u8 returnDetail = (returnCode == 0) ? PD_MSG_FIELD_O(returnDetail) : returnCode;
+#endif
                 DPRINTF(DEBUG_LVL_INFO,
                         "Dependence added (src: "GUIDF", dest: "GUIDF") -> %"PRIu32"\n", GUIDA(src.guid),
                         GUIDA(dest.guid), returnCode);
@@ -1976,8 +2045,13 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             ocrEvent_t *evt = (ocrEvent_t*)(dest.metaDataPtr);
             ASSERT(evt->fctId == self->eventFactories[0]->factoryId);
             // Warning: A counted-event can be destroyed by this call
+#ifdef REG_ASYNC_SGL
+            PD_MSG_FIELD_O(returnDetail) = self->eventFactories[0]->fcts[evt->kind].registerWaiter(
+                evt, waiter, PD_MSG_FIELD_I(slot), isAddDep, PD_MSG_FIELD_I(mode));
+#else
             PD_MSG_FIELD_O(returnDetail) = self->eventFactories[0]->fcts[evt->kind].registerWaiter(
                 evt, waiter, PD_MSG_FIELD_I(slot), isAddDep);
+#endif
         } else {
             if (dstKind != OCR_GUID_DB)
                 DPRINTF(DEBUG_LVL_WARN, "Attempting to add a dependence to a GUID of type %"PRIx32", expected DB\n", dstKind);
@@ -2048,8 +2122,13 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             if(dstKind == OCR_GUID_EDT) {
                 ocrTask_t *edt = (ocrTask_t*)(dst.metaDataPtr);
                 ASSERT(edt->fctId == self->taskFactories[0]->factoryId);
+#ifdef REG_ASYNC_SGL
+                PD_MSG_FIELD_O(returnDetail) = self->taskFactories[0]->fcts.satisfyWithMode(
+                    edt, PD_MSG_FIELD_I(payload), PD_MSG_FIELD_I(slot), PD_MSG_FIELD_I(mode));
+#else
                 PD_MSG_FIELD_O(returnDetail) = self->taskFactories[0]->fcts.satisfy(
                     edt, PD_MSG_FIELD_I(payload), PD_MSG_FIELD_I(slot));
+#endif
 #ifdef ENABLE_EXTENSION_PAUSE
                 rself->pqrFlags.prevDb = PD_MSG_FIELD_I(payload).guid;
 #endif

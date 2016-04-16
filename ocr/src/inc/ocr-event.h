@@ -120,9 +120,13 @@ typedef struct _ocrEventFcts_t {
      *                          we only register waiters on their dependence frontier
      * @return 0 on success and a non-zero code on failure
      */
+#ifdef REG_ASYNC_SGL
+    u8 (*registerWaiter)(struct _ocrEvent_t *self, ocrFatGuid_t waiter, u32 slot,
+                         bool isDepAdd, ocrDbAccessMode_t mode);
+#else
     u8 (*registerWaiter)(struct _ocrEvent_t *self, ocrFatGuid_t waiter, u32 slot,
                          bool isDepAdd);
-
+#endif
     /**
      * @brief Unregisters a "waiter" (aka a dependence) on the event
      *

@@ -282,6 +282,9 @@ static u8 commonSatisfyRegNode(ocrPolicyDomain_t * pd, ocrPolicyMsg_t * msg,
     PD_MSG_FIELD_I(payload) = db;
     PD_MSG_FIELD_I(currentEdt) = currentEdt;
     PD_MSG_FIELD_I(slot) = node->slot;
+#ifdef REG_ASYNC_SGL
+    PD_MSG_FIELD_I(mode) = node->mode;
+#endif
     PD_MSG_FIELD_I(properties) = 0;
     RESULT_PROPAGATE(pd->fcts.processMessage(pd, msg, false));
 #undef PD_MSG
@@ -549,8 +552,13 @@ u8 unregisterSignalerHc(ocrEvent_t *self, ocrFatGuid_t signaler, u32 slot,
     return 0; // We do not do anything for signalers
 }
 
+#ifdef REG_ASYNC_SGL
+static u8 commonEnqueueWaiter(ocrPolicyDomain_t *pd, ocrEvent_t *base, ocrFatGuid_t waiter,
+                              u32 slot, ocrDbAccessMode_t mode, ocrFatGuid_t currentEdt, ocrPolicyMsg_t * msg) {
+#else
 static u8 commonEnqueueWaiter(ocrPolicyDomain_t *pd, ocrEvent_t *base, ocrFatGuid_t waiter,
                               u32 slot, ocrFatGuid_t currentEdt, ocrPolicyMsg_t * msg) {
+#endif
     // Warn: Caller must have acquired the waitersLock
     ocrEventHc_t *event = (ocrEventHc_t*)base;
     u32 waitersCount = event->waitersCount;
@@ -559,6 +567,9 @@ static u8 commonEnqueueWaiter(ocrPolicyDomain_t *pd, ocrEvent_t *base, ocrFatGui
     if (waitersCount < HCEVT_WAITER_STATIC_COUNT) {
         event->waiters[waitersCount].guid = waiter.guid;
         event->waiters[waitersCount].slot = slot;
+#ifdef REG_ASYNC_SGL
+        event->waiters[waitersCount].mode = mode;
+#endif
         ++event->waitersCount;
         // We can release the lock now
         hal_unlock32(&(event->waitersLock));
@@ -646,6 +657,9 @@ static u8 commonEnqueueWaiter(ocrPolicyDomain_t *pd, ocrEvent_t *base, ocrFatGui
 
         waiters[waitersCount].guid = waiter.guid;
         waiters[waitersCount].slot = slot;
+#ifdef REG_ASYNC_SGL
+        waiters[waitersCount].mode = mode;
+#endif
         ++event->waitersCount;
 
         // We can release the lock now
@@ -699,7 +713,11 @@ static u8 commonEnqueueWaiter(ocrPolicyDomain_t *pd, ocrEvent_t *base, ocrFatGui
  * we do contend with multiple registration.
  * By construction, users must ensure a ONCE event is registered before satisfy is called.
  */
+#ifdef REG_ASYNC_SGL
+u8 registerWaiterEventHc(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot, bool isDepAdd, ocrDbAccessMode_t mode) {
+#else
 u8 registerWaiterEventHc(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot, bool isDepAdd) {
+#endif
     // Here we always add the waiter to our list so we ignore isDepAdd
     ocrEventHc_t *event = (ocrEventHc_t*)base;
 
@@ -719,7 +737,11 @@ u8 registerWaiterEventHc(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot, bool i
     }
     ocrFatGuid_t currentEdt = {.guid = curTask!=NULL?curTask->guid:NULL_GUID, .metaDataPtr = curTask};
     hal_lock32(&(event->waitersLock)); // Lock is released by commonEnqueueWaiter
+#ifdef REG_ASYNC_SGL
+    return commonEnqueueWaiter(pd, base, waiter, slot, mode, currentEdt, &msg);
+#else
     return commonEnqueueWaiter(pd, base, waiter, slot, currentEdt, &msg);
+#endif
 }
 
 
@@ -734,7 +756,11 @@ u8 registerWaiterEventHc(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot, bool i
  *
  * Returns non-zero if the registerWaiter requires registerSignaler to be called there-after
  */
+#ifdef REG_ASYNC_SGL
+u8 registerWaiterEventHcPersist(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot, bool isDepAdd, ocrDbAccessMode_t mode) {
+#else
 u8 registerWaiterEventHcPersist(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot, bool isDepAdd) {
+#endif
     ocrEventHcPersist_t *event = (ocrEventHcPersist_t*)base;
 
     ocrPolicyDomain_t *pd = NULL;
@@ -751,7 +777,8 @@ u8 registerWaiterEventHcPersist(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot,
     ocrGuidKind waiterKind = OCR_GUID_NONE;
     RESULT_ASSERT(guidKind(pd, waiter, &waiterKind), ==, 0);
 
-#ifndef REG_ASYNC //TODO check
+#ifndef REG_ASYNC
+#ifndef REG_ASYNC_SGL
     if(isDepAdd && waiterKind == OCR_GUID_EDT) {
         ASSERT(false && "Should never happen anymore");
         // If we're adding a dependence and the waiter is an EDT we
@@ -761,6 +788,7 @@ u8 registerWaiterEventHcPersist(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot,
         return 0; //Require registerSignaler invocation
     }
 #endif
+#endif
     ASSERT(waiterKind == OCR_GUID_EDT || (waiterKind & OCR_GUID_EVENT));
 
     DPRINTF(DEBUG_LVL_INFO, "Register waiter %s: "GUIDF" with waiter "GUIDF" on slot %"PRId32"\n",
@@ -768,29 +796,24 @@ u8 registerWaiterEventHcPersist(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot,
     // Lock to read the event->data
     hal_lock32(&(event->base.waitersLock));
     if (!(ocrGuidIsUninitialized(event->data))) {
-        ocrGuid_t dataGuid = event->data;
+        ocrFatGuid_t dataGuid = {.guid = event->data, .metaDataPtr = NULL};
         hal_unlock32(&(event->base.waitersLock));
+
+#ifdef REG_ASYNC_SGL
+        regNode_t node = {.guid = waiter.guid, .slot = slot, .mode = mode};
+#else
+        regNode_t node = {.guid = waiter.guid, .slot = slot};
+#endif
         // We send a message saying that we satisfy whatever tried to wait on us
-#define PD_MSG (&msg)
-#define PD_TYPE PD_MSG_DEP_SATISFY
-        msg.type = PD_MSG_DEP_SATISFY | PD_MSG_REQUEST;
-        PD_MSG_FIELD_I(satisfierGuid.guid) = base->guid;
-        PD_MSG_FIELD_I(satisfierGuid.metaDataPtr) = base;
-        PD_MSG_FIELD_I(guid) = waiter;
-        PD_MSG_FIELD_I(payload.guid) = dataGuid;
-        PD_MSG_FIELD_I(payload.metaDataPtr) = NULL;
-        PD_MSG_FIELD_I(currentEdt) = currentEdt;
-        PD_MSG_FIELD_I(slot) = slot;
-        PD_MSG_FIELD_I(properties) = 0;
-        //BUG #603 error codes
-        RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, false));
-#undef PD_MSG
-#undef PD_TYPE
-        return 0; //Require registerSignaler invocation
+        return commonSatisfyRegNode(pd, &msg, base->guid, dataGuid, currentEdt, &node);
     }
 
     // Lock is released by commonEnqueueWaiter
+#ifdef REG_ASYNC_SGL
+    return commonEnqueueWaiter(pd, base, waiter, slot, mode, currentEdt, &msg);
+#else
     return commonEnqueueWaiter(pd, base, waiter, slot, currentEdt, &msg);
+#endif
 }
 
 /**
@@ -801,7 +824,11 @@ u8 registerWaiterEventHcPersist(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot,
  * Returns non-zero if the registerWaiter requires registerSignaler to be called there-after
  */
 #ifdef ENABLE_EXTENSION_COUNTED_EVT
+#ifdef REG_ASYNC_SGL
+u8 registerWaiterEventHcCounted(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot, bool isDepAdd, ocrDbAccessMode_t mode) {
+#else
 u8 registerWaiterEventHcCounted(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot, bool isDepAdd) {
+#endif
     ocrEventHcPersist_t *event = (ocrEventHcPersist_t*)base;
 
     ocrPolicyDomain_t *pd = NULL;
@@ -818,6 +845,8 @@ u8 registerWaiterEventHcCounted(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot,
     ocrGuidKind waiterKind = OCR_GUID_NONE;
     RESULT_ASSERT(guidKind(pd, waiter, &waiterKind), ==, 0);
 
+#ifndef REG_ASYNC
+#ifndef REG_ASYNC_SGL
     if(isDepAdd && waiterKind == OCR_GUID_EDT) {
         ASSERT(false && "Should never happen anymore");
         // If we're adding a dependence and the waiter is an EDT we
@@ -826,6 +855,8 @@ u8 registerWaiterEventHcCounted(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot,
         // frontier reaches this event.
         return 0; //Require registerSignaler invocation
     }
+#endif
+#endif
     ASSERT(waiterKind == OCR_GUID_EDT || (waiterKind & OCR_GUID_EVENT));
 
     DPRINTF(DEBUG_LVL_INFO, "Register waiter %s: "GUIDF" with waiter "GUIDF" on slot %"PRId32"\n",
@@ -833,24 +864,15 @@ u8 registerWaiterEventHcCounted(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot,
     // Lock to read the data field
     hal_lock32(&(event->base.waitersLock));
     if(!(ocrGuidIsUninitialized(event->data))) {
-        ocrGuid_t dataGuid = event->data;
+        ocrFatGuid_t dataGuid = {.guid = event->data, .metaDataPtr = NULL};
         hal_unlock32(&(event->base.waitersLock));
+#ifdef REG_ASYNC_SGL
+        regNode_t node = {.guid = waiter.guid, .slot = slot, .mode = mode};
+#else
+        regNode_t node = {.guid = waiter.guid, .slot = slot};
+#endif
         // We send a message saying that we satisfy whatever tried to wait on us
-#define PD_MSG (&msg)
-#define PD_TYPE PD_MSG_DEP_SATISFY
-        msg.type = PD_MSG_DEP_SATISFY | PD_MSG_REQUEST;
-        PD_MSG_FIELD_I(satisfierGuid.guid) = base->guid;
-        PD_MSG_FIELD_I(satisfierGuid.metaDataPtr) = base;
-        PD_MSG_FIELD_I(guid) = waiter;
-        PD_MSG_FIELD_I(payload.guid) = dataGuid;
-        PD_MSG_FIELD_I(payload.metaDataPtr) = NULL;
-        PD_MSG_FIELD_I(currentEdt) = currentEdt;
-        PD_MSG_FIELD_I(slot) = slot;
-        PD_MSG_FIELD_I(properties) = 0;
-        //BUG #603 error codes
-        RESULT_PROPAGATE(pd->fcts.processMessage(pd, &msg, false));
-#undef PD_MSG
-#undef PD_TYPE
+        RESULT_PROPAGATE(commonSatisfyRegNode(pd, &msg, base->guid, dataGuid, currentEdt, &node));
         // Here it is still safe to use the base pointer because the satisfy
         // call cannot trigger the destruction of the event. For counted-events
         // the runtime takes care of it
@@ -872,7 +894,11 @@ u8 registerWaiterEventHcCounted(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot,
     }
 
     // Lock is released by commonEnqueueWaiter
+#ifdef REG_ASYNC_SGL
+    return commonEnqueueWaiter(pd, base, waiter, slot, mode, currentEdt, &msg);
+#else
     return commonEnqueueWaiter(pd, base, waiter, slot, currentEdt, &msg);
+#endif
 }
 #endif
 
@@ -1353,7 +1379,11 @@ static void channelSatisfyResize(ocrEventHcChannel_t * devt) {
     CHANNEL_BUFFER_RESIZE(channelSatisfyCount, satBuffer, satBufSz, headSat, tailSat, ocrGuid_t);
 }
 
+#ifdef REG_ASYNC_SGL
+u8 registerWaiterEventHcChannel(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot, bool isDepAdd, ocrDbAccessMode_t mode) {
+#else
 u8 registerWaiterEventHcChannel(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot, bool isDepAdd) {
+#endif
     ocrEventHc_t * evt = ((ocrEventHc_t*)base);
     ocrEventHcChannel_t * devt = ((ocrEventHcChannel_t*)base);
     hal_lock32(&evt->waitersLock);
@@ -1361,6 +1391,9 @@ u8 registerWaiterEventHcChannel(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot,
     regNode_t regnode;
     regnode.guid = waiter.guid;
     regnode.slot = slot;
+#ifdef REG_ASYNC_SGL
+    regnode.mode = mode;
+#endif
     if (!ocrGuidIsUninitialized(data)) {
         DPRINTF(DEBUG_LVL_CHANNEL, "registerWaiterEventHcChannel "GUIDF" push dep and deque satisfy\n",
                 GUIDA(base->guid));
@@ -1478,8 +1511,23 @@ ocrEventFactory_t * newEventFactoryHc(ocrParamList_t *perType, u32 factoryId) {
         FUNC_ADDR(u8 (*)(ocrEvent_t*, ocrFatGuid_t, u32), satisfyEventHcPersistIdem);
     base->fcts[OCR_EVENT_STICKY_T].satisfy =
         FUNC_ADDR(u8 (*)(ocrEvent_t*, ocrFatGuid_t, u32), satisfyEventHcPersistSticky);
-
+#ifdef REG_ASYNC_SGL
     // Setup registration function pointers
+    base->fcts[OCR_EVENT_ONCE_T].registerWaiter =
+    base->fcts[OCR_EVENT_LATCH_T].registerWaiter =
+         FUNC_ADDR(u8 (*)(ocrEvent_t*, ocrFatGuid_t, u32, bool, ocrDbAccessMode_t), registerWaiterEventHc);
+    base->fcts[OCR_EVENT_IDEM_T].registerWaiter =
+    base->fcts[OCR_EVENT_STICKY_T].registerWaiter =
+        FUNC_ADDR(u8 (*)(ocrEvent_t*, ocrFatGuid_t, u32, bool, ocrDbAccessMode_t), registerWaiterEventHcPersist);
+#ifdef ENABLE_EXTENSION_COUNTED_EVT
+    base->fcts[OCR_EVENT_COUNTED_T].registerWaiter =
+        FUNC_ADDR(u8 (*)(ocrEvent_t*, ocrFatGuid_t, u32, bool, ocrDbAccessMode_t), registerWaiterEventHcCounted);
+#endif
+#ifdef ENABLE_EXTENSION_CHANNEL_EVT
+    base->fcts[OCR_EVENT_CHANNEL_T].registerWaiter =
+        FUNC_ADDR(u8 (*)(ocrEvent_t*, ocrFatGuid_t, u32, bool, ocrDbAccessMode_t), registerWaiterEventHcChannel);
+#endif
+#else
     base->fcts[OCR_EVENT_ONCE_T].registerWaiter =
     base->fcts[OCR_EVENT_LATCH_T].registerWaiter =
          FUNC_ADDR(u8 (*)(ocrEvent_t*, ocrFatGuid_t, u32, bool), registerWaiterEventHc);
@@ -1493,6 +1541,7 @@ ocrEventFactory_t * newEventFactoryHc(ocrParamList_t *perType, u32 factoryId) {
 #ifdef ENABLE_EXTENSION_CHANNEL_EVT
     base->fcts[OCR_EVENT_CHANNEL_T].registerWaiter =
         FUNC_ADDR(u8 (*)(ocrEvent_t*, ocrFatGuid_t, u32, bool), registerWaiterEventHcChannel);
+#endif
 #endif
     base->fcts[OCR_EVENT_ONCE_T].unregisterWaiter =
     base->fcts[OCR_EVENT_LATCH_T].unregisterWaiter =

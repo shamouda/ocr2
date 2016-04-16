@@ -910,6 +910,10 @@ typedef struct _ocrPolicyMsg_t {
                     ocrFatGuid_t waiter;   /**< In: Waiter to register */
                     ocrFatGuid_t dest;     /**< In: Object to register the waiter on */
                     u32 slot;              /**< In: The slot on waiter that will be notified */
+#ifdef REG_ASYNC_SGL
+                    ocrDbAccessMode_t mode; /**< In: Caching the mode the destination should use when
+                                                     it will get satisfied */
+#endif
                     u32 properties;        /**< In: Properties */
                 } in;
                 struct {
@@ -927,6 +931,9 @@ typedef struct _ocrPolicyMsg_t {
                                            * event/task with (a DB usually). */
                     ocrFatGuid_t currentEdt;   /**< In: EDT that is satisfying dep */
                     u32 slot;             /**< In: Slot to satisfy the event/task on */
+#ifdef REG_ASYNC_SGL
+                    ocrDbAccessMode_t mode;
+#endif
                     u32 properties;       /**< In: Properties for the satisfaction */
                 } in;
                 struct {

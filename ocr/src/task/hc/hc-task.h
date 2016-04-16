@@ -48,9 +48,8 @@ ocrTaskTemplateFactory_t * newTaskTemplateFactoryHc(ocrParamList_t* perType, u32
  */
 typedef struct {
     ocrTask_t base;
-#ifdef REG_ASYNC
-    u32 readyCounter; /**< Initialized to nbSignalers * 2 */
-#else
+
+#if !(defined(REG_ASYNC) || defined(REG_ASYNC_SGL))
     u32 lock;
 #endif
     u32 frontierSlot; /**< Slot of the execution frontier

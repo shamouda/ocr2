@@ -162,6 +162,10 @@ typedef struct _ocrTaskFcts_t {
      */
     u8 (*destruct)(struct _ocrTask_t* self);
 
+#ifdef REG_ASYNC_SGL
+    u8 (*satisfyWithMode)(struct _ocrTask_t* self, ocrFatGuid_t db, u32 slot, ocrDbAccessMode_t mode);
+#endif
+
     /**
      * @brief "Satisfy" an input dependence for this EDT
      *

@@ -877,6 +877,9 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
                     PD_MSG_FIELD_I(payload.metaDataPtr) = NULL;
                     PD_MSG_FIELD_I(currentEdt) = currentEdt;
                     PD_MSG_FIELD_I(slot) = OCR_EVENT_LATCH_INCR_SLOT;
+#ifdef REG_ASYNC_SGL
+                    PD_MSG_FIELD_I(mode) = -1; //Doesn't matter for latch
+#endif
                     PD_MSG_FIELD_I(properties) = 0;
                     RESULT_PROPAGATE(self->fcts.processMessage(self, &msg2, true));
 #undef PD_MSG
@@ -975,6 +978,7 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
         RETRIEVE_LOCATION_FROM_GUID_MSG(self, msg->destLocation, I);
         DPRINTF(DEBUG_LVL_VVERB,"DEP_SATISFY: target is %"PRId32"\n", (u32) msg->destLocation);
 #ifdef ENABLE_EXTENSION_CHANNEL_EVT
+#ifndef XP_CHANNEL_EVT_NONFIFO
         if (msg->destLocation != curLoc) {
             ocrGuidKind kind;
             // Check if it's a channel event that needs a blocking satisfy
@@ -986,6 +990,7 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
                 isBlocking = true;
             }
         }
+#endif
 #endif
 #undef PD_MSG
 #undef PD_TYPE

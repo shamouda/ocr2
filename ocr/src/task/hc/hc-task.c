@@ -220,6 +220,9 @@ static u8 finishLatchCheckin(ocrPolicyDomain_t *pd, ocrPolicyMsg_t *msg,
     PD_MSG_FIELD_I(currentEdt.guid) = NULL_GUID;
     PD_MSG_FIELD_I(currentEdt.metaDataPtr) = NULL;
     PD_MSG_FIELD_I(slot) = OCR_EVENT_LATCH_INCR_SLOT;
+#ifdef REG_ASYNC_SGL
+    PD_MSG_FIELD_I(mode) = -1; //Doesn't matter for latch
+#endif
     PD_MSG_FIELD_I(properties) = 0;
     RESULT_PROPAGATE(pd->fcts.processMessage(pd, msg, false));
 #undef PD_TYPE
@@ -248,7 +251,7 @@ static inline bool hasProperty(u32 properties, u32 property) {
     return properties & property;
 }
 
-#ifndef REG_ASYNC
+#if !(defined(REG_ASYNC) || defined(REG_ASYNC_SGL))
 static u8 registerOnFrontier(ocrTaskHc_t *self, ocrPolicyDomain_t *pd,
                              ocrPolicyMsg_t *msg, u32 slot) {
 #define PD_MSG (msg)
@@ -275,10 +278,8 @@ static u8 initTaskHcInternal(ocrTaskHc_t *task, ocrPolicyDomain_t * pd,
                              ocrTask_t *curTask, ocrFatGuid_t outputEvent,
                              ocrFatGuid_t parentLatch, u32 properties) {
     task->frontierSlot = 0;
-#ifndef REG_ASYNC
+#if !(defined(REG_ASYNC) || defined(REG_ASYNC_SGL))
     task->lock = 0;
-#else
-    task->readyCounter = 0;
 #endif
     task->slotSatisfiedCount = 0;
     task->unkDbs = NULL;
@@ -495,6 +496,7 @@ static u8 taskAllDepvSatisfied(ocrTask_t *self) {
         regNode_t * signalers = rself->signalers;
         u32 i = 0;
         while(i < depc) {
+            ASSERT(!ocrGuidIsUninitialized(signalers[i].guid) && !ocrGuidIsError(signalers[i].guid));
             rself->signalers[i].slot = i; // reset the slot info
             resolvedDeps[i].guid = (signalers[i].mode == DB_MODE_NULL) ? NULL_GUID : signalers[i].guid; // DB guids by now
             resolvedDeps[i].ptr = NULL; // resolved by acquire messages
@@ -597,6 +599,9 @@ u8 destructTaskHc(ocrTask_t* base) {
             PD_MSG_FIELD_I(currentEdt.guid) = curEdt ? curEdt->guid : NULL_GUID;
             PD_MSG_FIELD_I(currentEdt.metaDataPtr) = curEdt;
             PD_MSG_FIELD_I(slot) = OCR_EVENT_LATCH_DECR_SLOT;
+#ifdef REG_ASYNC_SGL
+            PD_MSG_FIELD_I(mode) = -1; //Doesn't matter for latch
+#endif
             PD_MSG_FIELD_I(properties) = 0;
             u8 returnCode __attribute__((unused)) = pd->fcts.processMessage(pd, &msg, false);
             ASSERT(returnCode == 0);
@@ -853,6 +858,44 @@ u8 dependenceResolvedTaskHc(ocrTask_t * self, ocrGuid_t dbGuid, void * localDbPt
     return 0;
 }
 
+#ifdef REG_ASYNC_SGL
+u8 satisfyTaskHcWithMode(ocrTask_t * base, ocrFatGuid_t data, u32 slot, ocrDbAccessMode_t mode) {
+    ASSERT (((!ocrGuidIsNull(data.guid)) ? (mode != -1) : 1) && "Mode should alway be provided");
+    ASSERT(!ocrGuidIsUninitialized(data.guid) && !ocrGuidIsError(data.guid));
+    ASSERT((slot >= 0) && (slot < base->depc));
+    ocrTaskHc_t * self = (ocrTaskHc_t *) base;
+    self->signalers[slot].guid = data.guid;
+    self->signalers[slot].mode = mode;
+    hal_fence();
+    u32 oldValue = hal_xadd32(&(self->slotSatisfiedCount), 1);
+    
+#ifdef REG_ASYNC_SGL_DEBUG
+    DPRINTF(DEBUG_LVL_WARN, "Satisfied task oldValue is %d and depc is %d \n", (int) oldValue, (int) base->depc);
+#endif
+    if (oldValue == (base->depc-1)) {
+#ifdef REG_ASYNC_SGL_DEBUG
+        DPRINTF(DEBUG_LVL_WARN, "all deps known from satisfy\n");
+#endif
+        // All dependences known
+        ASSERT(self->slotSatisfiedCount = base->depc);
+        taskAllDepvSatisfied(base);
+    }
+    return 0;
+}
+
+u8 satisfyTaskHc(ocrTask_t * base, ocrFatGuid_t data, u32 slot) {
+    ASSERT(false && "mode required for satisfy in REG_ASYNC_SGL");
+    return 0;
+}
+
+u8 registerSignalerTaskHc(ocrTask_t * base, ocrFatGuid_t signalerGuid, u32 slot,
+                            ocrDbAccessMode_t mode, bool isDepAdd) {
+    ASSERT(false && "no signaler registration in REG_ASYNC_SGL");
+    return 0;
+}
+
+#else
+
 #ifndef REG_ASYNC
 
 u8 satisfyTaskHc(ocrTask_t * base, ocrFatGuid_t data, u32 slot) {
@@ -1015,8 +1058,11 @@ u8 registerSignalerTaskHc(ocrTask_t * base, ocrFatGuid_t signalerGuid, u32 slot,
     //BUG #162 metadata cloning: Had to introduce new kinds of guids because we don't
     //         have support for cloning metadata around yet
     if(signalerKind & OCR_GUID_EVENT) {
-        if((signalerKind == OCR_GUID_EVENT_ONCE) ||
-                (signalerKind == OCR_GUID_EVENT_LATCH)) {
+        bool cond = (signalerKind == OCR_GUID_EVENT_ONCE) || (signalerKind == OCR_GUID_EVENT_LATCH);
+#ifdef ENABLE_EXTENSION_CHANNEL_EVT
+        cond = cond || (signalerKind == OCR_GUID_EVENT_CHANNEL);
+#endif
+        if(cond) {
             node->slot = SLOT_REGISTERED_EPHEMERAL_EVT; // To record this slot is for a once event
             hal_unlock32(&(self->lock));
         } else {
@@ -1082,8 +1128,14 @@ u8 satisfyTaskHc(ocrTask_t * base, ocrFatGuid_t data, u32 slot) {
     ocrTaskHc_t * self = (ocrTaskHc_t *) base;
     self->signalers[slot].guid = data.guid;
     hal_fence();
-    u32 oldValue = hal_xadd32(&(self->readyCounter), 1);
+    u32 oldValue = hal_xadd32(&(self->slotSatisfiedCount), 1);
+#ifdef REG_ASYNC_SGL_DEBUG
+    DPRINTF(DEBUG_LVL_WARN, "Satisfied task oldValue is %d and depc is %d \n", (int) oldValue, (int) base->depc);
+#endif
     if (oldValue == ((base->depc*2)-1)) {
+#ifdef REG_ASYNC_SGL_DEBUG
+        DPRINTF(DEBUG_LVL_WARN, "all deps known from satisfy\n");
+#endif
         // All dependences known
         self->slotSatisfiedCount = base->depc;
         taskAllDepvSatisfied(base);
@@ -1096,8 +1148,14 @@ u8 registerSignalerTaskHc(ocrTask_t * base, ocrFatGuid_t signalerGuid, u32 slot,
     ocrTaskHc_t * self = (ocrTaskHc_t *) base;
     self->signalers[slot].mode = mode;
     hal_fence();
-    u32 oldValue = hal_xadd32(&(self->readyCounter), 1);
+    u32 oldValue = hal_xadd32(&(self->slotSatisfiedCount), 1);
+#ifdef REG_ASYNC_SGL_DEBUG
+    DPRINTF(DEBUG_LVL_WARN, "Registered on task oldValue is %d and depc is %d \n", (int) oldValue, (int) base->depc);
+#endif
     if (oldValue == ((base->depc*2)-1)) {
+#ifdef REG_ASYNC_SGL_DEBUG
+        DPRINTF(DEBUG_LVL_WARN, "all deps known from registerSignaler\n");
+#endif
         // All dependences known
         self->slotSatisfiedCount = base->depc;
         taskAllDepvSatisfied(base);
@@ -1106,6 +1164,8 @@ u8 registerSignalerTaskHc(ocrTask_t * base, ocrFatGuid_t signalerGuid, u32 slot,
 }
 
 #endif /* REG_ASYNC */
+
+#endif /* not REG_ASYNC_SGL */
 
 u8 unregisterSignalerTaskHc(ocrTask_t * base, ocrFatGuid_t signalerGuid, u32 slot, bool isDepRem) {
     ASSERT(0); // We don't support this at this time...
@@ -1383,6 +1443,9 @@ u8 taskExecute(ocrTask_t* base) {
                     PD_MSG_FIELD_I(currentEdt.metaDataPtr) = base;
                     PD_MSG_FIELD_I(slot) = 0; // Always satisfy on slot 0. This will trickle to
                     // the finish latch if needed
+#ifdef REG_ASYNC_SGL
+                PD_MSG_FIELD_I(mode) = -1; //db is a NULL_GUID
+#endif
                     PD_MSG_FIELD_I(properties) = 0;
                     // Ignore failure for now
                     // Bug #615
@@ -1438,7 +1501,11 @@ ocrTaskFactory_t * newTaskFactoryHc(ocrParamList_t* perInstance, u32 factoryId) 
     base->factoryId = factoryId;
 
     base->fcts.destruct = FUNC_ADDR(u8 (*)(ocrTask_t*), destructTaskHc);
+#ifdef REG_ASYNC_SGL
+    base->fcts.satisfyWithMode = FUNC_ADDR(u8 (*)(ocrTask_t*, ocrFatGuid_t, u32, ocrDbAccessMode_t), satisfyTaskHcWithMode);
+#else
     base->fcts.satisfy = FUNC_ADDR(u8 (*)(ocrTask_t*, ocrFatGuid_t, u32), satisfyTaskHc);
+#endif
     base->fcts.registerSignaler = FUNC_ADDR(u8 (*)(ocrTask_t*, ocrFatGuid_t, u32, ocrDbAccessMode_t, bool), registerSignalerTaskHc);
     base->fcts.unregisterSignaler = FUNC_ADDR(u8 (*)(ocrTask_t*, ocrFatGuid_t, u32, bool), unregisterSignalerTaskHc);
     base->fcts.notifyDbAcquire = FUNC_ADDR(u8 (*)(ocrTask_t*, ocrFatGuid_t), notifyDbAcquireTaskHc);

@@ -34,6 +34,9 @@ DEFAULT_CONFIG ?= jenkins-common-8w-lockableDB.cfg
 # Two-steps asynchronous registration
 # CFLAGS += -DREG_ASYNC
 
+# Single-steps asynchronous registration
+# CFLAGS += -DREG_ASYNC_SGL
+
 # **** Events Parameters ****
 
 # Initialisation size for statically allocated HC event's waiter array
@@ -41,6 +44,9 @@ DEFAULT_CONFIG ?= jenkins-common-8w-lockableDB.cfg
 
 # Initialisation size for dynamically allocated HC event's waiter array
 # CFLAGS += -DHCEVT_WAITER_DYNAMIC_COUNT=4
+
+# [Experimental flag] Make all Channel Events non-FIFO
+# CFLAGS += -DXP_CHANNEL_EVT_NONFIFO
 
 # **** GUID-Provider Parameters ****
 
