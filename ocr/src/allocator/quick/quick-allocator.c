@@ -258,10 +258,9 @@ struct bmapOp {
 #define _CACHE_POOL(ID)         (_cache_pool)
 #else
 // x86 or standalone
-//#define PER_AGENT_CACHE
+#define PER_AGENT_CACHE
 #define PER_AGENT_KEYWORD       __thread
-#define CACHE_POOL(ID)          (&_cache_pool)
-#define _CACHE_POOL(ID)         (_cache_pool)
+#define CACHE_POOL(ID)          (cache_pool)
 #endif
 
 #ifdef PER_AGENT_CACHE
@@ -277,13 +276,15 @@ struct bmapOp {
 
 // Each agent (or thread) has pointers to an array of objects it allocates from the central heap.
 // When the allocation requests come, it first checks this per-agent lists for free object before it goes to the central heap.
-PER_AGENT_KEYWORD
 struct per_agent_cache {
     void *slabs[MAX_SLABS];
     s32 count_malloc[MAX_SLABS];
     s32 count_free[MAX_SLABS];
     u32 lock;
-} _CACHE_POOL(MAX_THREAD);
+};
+
+PER_AGENT_KEYWORD
+struct per_agent_cache *CACHE_POOL(ID);
 
 struct slab_header {
     struct slab_header *next, *prev;
@@ -876,6 +877,8 @@ DPRINTF(DEBUG_LVL_WARN, "bmap_count: %"PRId32"\n", dobmap_count_case3);
     }
 }
 
+static blkPayload_t *quickMallocInternal(poolHdr_t *pool,u64 size, struct _ocrPolicyDomain_t *pd);
+
 static void quickInit(poolHdr_t *pool, u64 size)
 {
     u8 *p = (u8 *)pool;
@@ -884,16 +887,6 @@ static void quickInit(poolHdr_t *pool, u64 size)
 
 #ifdef PER_AGENT_CACHE
     ASSERT((sizeof(struct slab_header) & ALIGNMENT_MASK) == 0);
-#ifdef ENABLE_ALLOCATOR_QUICK_STANDALONE
-#elif defined(HAL_FSIM_CE) || defined(HAL_FSIM_XE)
-#else
-/*
-    // x86
-    for(i=0;i<MAX_THREAD;i++) {
-        cache_pool[i] = &_cache_pool[i];
-    }
-*/
-#endif
 #endif
 
     // spinlock value must be 0 or 1. If not, it means it's not properly zero'ed before, or corrupted.
@@ -985,6 +978,17 @@ static void quickInit(poolHdr_t *pool, u64 size)
     VALGRIND_MAKE_MEM_NOACCESS(&(pool->lock), sizeof(pool->lock));
 #else
     hal_unlock32(&(pool->lock));
+#endif
+#ifdef PER_AGENT_CACHE
+    struct per_agent_cache *q = quickMallocInternal(pool, sizeof(struct per_agent_cache), NULL);
+    int i;
+    for(i=0;i<MAX_SLABS;i++) {
+        q->slabs[i] = NULL;
+        q->count_malloc[i] = q->count_free[i] = 0;
+        q->lock = 0;
+    }
+    CACHE_POOL(ID) = q;
+    assert(q);
 #endif
 }
 
