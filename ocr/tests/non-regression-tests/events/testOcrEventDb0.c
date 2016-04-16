@@ -41,7 +41,7 @@ ocrGuid_t mainEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
                 /*location=*/NULL_HINT,
                 NO_ALLOC);
     *k = 42;
-
+    ocrDbRelease(db_guid);
     ocrEventSatisfy(event_guid, db_guid);
     return NULL_GUID;
 }
