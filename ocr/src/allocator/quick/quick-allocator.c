@@ -463,10 +463,6 @@ static u64 quickInitAnnex(poolHdr_t * pPool, u64 size) {
                          sizeof(secondLevel_t) * flBucketCount;                  // space for secondLevel
         sizeRemainingAfterPoolHeader = size - poolHeaderSize - ALLOC_OVERHEAD;
         poolSizeSpannedByFlBuckets <<= 1;
-        if (flBucketCount == 26) {
-            DPRINTF(DEBUG_LVL_WARN, "Too big pool size.\n");
-            ASSERT(0);
-        }
     }
     pPool->flCount = flBucketCount;
     poolHeaderSize = (poolHeaderSize + ALIGNMENT_MASK)&(~ALIGNMENT_MASK);   // ceiling
@@ -484,9 +480,9 @@ static u64 quickInitAnnex(poolHdr_t * pPool, u64 size) {
 
 static void quickFreeInternal(blkPayload_t *p);
 
+#ifdef PER_AGENT_CACHE
 static void quickCleanCache(void)
 {
-#ifdef PER_AGENT_CACHE
     s32 i, allreset=1;
     hal_lock32(&CACHE_POOL(myid)->lock);
     for(i=0;i<MAX_SLABS;i++) {
@@ -508,12 +504,11 @@ static void quickCleanCache(void)
         quickFreeInternal(p);
         DPRINTF(DEBUG_LVL_VERB, "cache %p destroyed\n", p);
     }
-#endif
+
 }
 
 static void quickPrintCache(void)
 {
-#ifdef PER_AGENT_CACHE
     s32 i;
     s32 head_printed = 0;
     hal_lock32(&CACHE_POOL(myid)->lock);
@@ -531,8 +526,8 @@ static void quickPrintCache(void)
     hal_unlock32(&CACHE_POOL(myid)->lock);
     if (head_printed)
         DPRINTF(DEBUG_LVL_INFO, "====== END OF REPORT (cache %p) =======\n", CACHE_POOL(myid));
-#endif
 }
+#endif
 
 // this detects empty slabs and free them. Such empty slabs should have been
 // cleaned-up by quickCleanCache(). If it hasn't for some reason, this function
@@ -906,8 +901,12 @@ static void quickFinish(poolHdr_t *pool, u64 size)
     // spinlock value must be 0 or 1. If not, it means it's not properly zero'ed before, or corrupted.
     ASSERT(pool->lock == 0 || pool->lock == 1);
 
-    quickPrintCache();
-    quickCleanCache();
+#ifdef PER_AGENT_CACHE
+    if (CACHE_POOL(myid) != NULL) {
+        quickPrintCache();
+        quickCleanCache();
+    }
+#endif
 
 /*
 DPRINTF(DEBUG_LVL_WARN, "bmap_arr  : %"PRId32", %"PRId32"(was %"PRId32"), %"PRId32"\n", dobmap_arr[1], dobmap_arr[2]-dobmap_count_case2, dobmap_arr[2], dobmap_arr[3]);
