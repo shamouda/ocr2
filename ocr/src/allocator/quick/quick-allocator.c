@@ -482,26 +482,61 @@ static u64 quickInitAnnex(poolHdr_t * pPool, u64 size) {
     return poolHeaderSize;
 }
 
+static void quickFreeInternal(blkPayload_t *p);
+
+static void quickCleanCache(void)
+{
+#ifdef PER_AGENT_CACHE
+    s32 i, allreset=1;
+    hal_lock32(&CACHE_POOL(myid)->lock);
+    for(i=0;i<MAX_SLABS;i++) {
+        struct slab_header *head = CACHE_POOL(myid)->slabs[i];
+        if (head == NULL)
+            continue;
+        if (head->bitmap == ((1UL << MAX_OBJ_PER_SLAB)-1UL) /* empty slab? */) {
+            CACHE_POOL(myid)->slabs[i] = NULL;
+            quickFreeInternal(head);
+        } else {
+            DPRINTF(DEBUG_LVL_VERB,"slab still in use because of memory leak?\n");
+            allreset = 0;
+        }
+    }
+    hal_unlock32(&CACHE_POOL(myid)->lock);
+    if (allreset) {
+        void *p = CACHE_POOL(myid);
+        CACHE_POOL(myid) = NULL;
+        quickFreeInternal(p);
+        DPRINTF(DEBUG_LVL_VERB, "cache %p destroyed\n", p);
+    }
+#endif
+}
+
 static void quickPrintCache(void)
 {
 #ifdef PER_AGENT_CACHE
     s32 i;
-    DPRINTF(DEBUG_LVL_INFO, "==== MEMORY LEAK REPORT (cache %p) ====\n", CACHE_POOL(myid));
+    s32 head_printed = 0;
     hal_lock32(&CACHE_POOL(myid)->lock);
     for(i=0;i<MAX_SLABS;i++) {
         s32 m = CACHE_POOL(myid)->count_malloc[i];
         s32 f = CACHE_POOL(myid)->count_free[i];
-        if (m || f)
+        if (m != f) {
+            if (!head_printed) {
+                DPRINTF(DEBUG_LVL_INFO, "==== MEMORY LEAK REPORT (cache %p) ====\n", CACHE_POOL(myid));
+                head_printed = 1;
+            }
             DPRINTF(DEBUG_LVL_INFO, "(%"PRId32"~%"PRId32"] : malloc %"PRId32" free %"PRId32"\n", SLAB_MAX_SIZE(i-1), SLAB_MAX_SIZE(i), m, f);
+        }
     }
     hal_unlock32(&CACHE_POOL(myid)->lock);
-    DPRINTF(DEBUG_LVL_INFO, "====== END OF REPORT (cache %p) =======\n", CACHE_POOL(myid));
+    if (head_printed)
+        DPRINTF(DEBUG_LVL_INFO, "====== END OF REPORT (cache %p) =======\n", CACHE_POOL(myid));
 #endif
 }
-static void quickFreeInternal(blkPayload_t *p);
 
-
-// this detects empty slabs and free. So, slab allocator data structures is invalidated
+// this detects empty slabs and free them. Such empty slabs should have been
+// cleaned-up by quickCleanCache(). If it hasn't for some reason, this function
+// will clean up them.
 static void quickCleanPool(poolHdr_t *pool)
 {
 #ifdef PER_AGENT_CACHE
@@ -518,6 +553,19 @@ static void quickCleanPool(poolHdr_t *pool)
                 struct slab_header *head = (struct slab_header *)HEAD_TO_USER(p);
                 ASSERT(head->mark == SLAB_MARK);
                 if (head->bitmap == ((1UL << MAX_OBJ_PER_SLAB)-1UL) /* empty slab? */) {
+                    // it must be only (and first) slab in the slab list
+                    s32 slabsIndex = SIZE_TO_SLABS(head->size);
+                    hal_lock32(&head->per_agent->lock);
+                    struct slab_header *slabs = head->per_agent->slabs[slabsIndex];
+                    if (slabs == head) {
+                        head->per_agent->slabs[slabsIndex] = NULL;
+                    }
+                    hal_unlock32(&head->per_agent->lock);
+                    if (slabs != head) {
+                        DPRINTF(DEBUG_LVL_WARN, "cleanup pool -- empty slab found but it was not the first slab in this slab list?\n");
+                        continue;
+                    }
+
                     quickFreeInternal(head);
                     p = prev;
                     continue;
@@ -535,8 +583,7 @@ static void quickCleanPool(poolHdr_t *pool)
 #endif
 }
 
-
-static void quickWalkPool(poolHdr_t *pool)
+static void quickWalkPool(poolHdr_t *pool, int opt)
 {
     u64 end   = (u64)pool->glebeEnd;
     u64 *p = pool->glebeStart;
@@ -546,7 +593,7 @@ static void quickWalkPool(poolHdr_t *pool)
         flag = GET_FLAG(HEAD(p));
         if (flag != FLAG_FREE) {
             if (flag == FLAG_INUSE) {
-                DPRINTF(DEBUG_LVL_INFO, "[size %"PRId64"]\n", size);
+                DPRINTF(DEBUG_LVL_INFO, "[size %"PRId64"] %p\n", size, p);
             } else if (flag == FLAG_INUSE_SLAB) {
 #ifdef PER_AGENT_CACHE
                 struct slab_header *head = (struct slab_header *)HEAD_TO_USER(p);
@@ -572,7 +619,7 @@ static void quickPrintCounters(poolHdr_t *pool)
     if (pool->count_used) {
         DPRINTF(DEBUG_LVL_INFO, "**** MEMORY LEAK REPORT (pool %p) ****\n", pool);
         DPRINTF(DEBUG_LVL_INFO, "%"PRId32" bytes still in use, malloc %"PRId32" times, free %"PRId32" times\n", pool->count_used, pool->count_malloc, pool->count_free);
-        quickWalkPool(pool);
+        quickWalkPool(pool, 1);
         DPRINTF(DEBUG_LVL_INFO, "****** END OF REPORT (pool %p) *******\n", pool);
     }
 }
@@ -860,6 +907,8 @@ static void quickFinish(poolHdr_t *pool, u64 size)
     ASSERT(pool->lock == 0 || pool->lock == 1);
 
     quickPrintCache();
+    quickCleanCache();
+
 /*
 DPRINTF(DEBUG_LVL_WARN, "bmap_arr  : %"PRId32", %"PRId32"(was %"PRId32"), %"PRId32"\n", dobmap_arr[1], dobmap_arr[2]-dobmap_count_case2, dobmap_arr[2], dobmap_arr[3]);
 DPRINTF(DEBUG_LVL_WARN, "bmap_count: %"PRId32"\n", dobmap_count_case3);
@@ -979,16 +1028,21 @@ static void quickInit(poolHdr_t *pool, u64 size)
 #else
     hal_unlock32(&(pool->lock));
 #endif
+    // TODO probably we need a barrier here to make sure init_count to reach its peak
+}
+
+static void *quickInitCache(poolHdr_t *pool)
+{
 #ifdef PER_AGENT_CACHE
-    struct per_agent_cache *q = quickMallocInternal(pool, sizeof(struct per_agent_cache), NULL);
+    struct per_agent_cache *q = quickMallocInternal(pool, sizeof(struct per_agent_cache), NULL /* TODO PD for TG ??*/);
+    ASSERT(q);
     int i;
     for(i=0;i<MAX_SLABS;i++) {
         q->slabs[i] = NULL;
         q->count_malloc[i] = q->count_free[i] = 0;
         q->lock = 0;
     }
-    CACHE_POOL(ID) = q;
-    assert(q);
+    return q;
 #endif
 }
 
@@ -1572,6 +1626,11 @@ static blkPayload_t *quickMalloc(poolHdr_t *pool,u64 size, struct _ocrPolicyDoma
         return quickMallocInternal(pool, size, pd);
     // s64 myid = (s64)pd;
     // ASSERT(myid >=0 && myid < MAX_THREAD);
+    if (CACHE_POOL(myid) == NULL) {
+        CACHE_POOL(myid) = quickInitCache(pool);
+        DPRINTF(DEBUG_LVL_VERB, "cache %p created\n", CACHE_POOL(myid));
+    }
+
     s32 slabsIndex = SIZE_TO_SLABS(size);
     s32 slabMaxSize = SLAB_MAX_SIZE(slabsIndex);
     hal_lock32(&CACHE_POOL(myid)->lock);
@@ -1580,11 +1639,8 @@ static blkPayload_t *quickMalloc(poolHdr_t *pool,u64 size, struct _ocrPolicyDoma
         struct slab_header *slab = quickNewSlab(pool, slabMaxSize, pd, CACHE_POOL(myid));
         if (slab == NULL) {
             hal_unlock32(&CACHE_POOL(myid)->lock);
-            blkPayload_t *ret = quickMallocInternal(pool, size, pd);
-            if (ret == NULL) {
-                DPRINTF(DEBUG_LVL_VERB, "Even fallback didn't work -- too small heap?\n");
-            }
-            return ret;
+            DPRINTF(DEBUG_LVL_WARN, "slab alloc failed -- too small heap?\n");
+            return NULL;
         }
         if (slabs) {  // list manupulation
             slab->next = slabs;
