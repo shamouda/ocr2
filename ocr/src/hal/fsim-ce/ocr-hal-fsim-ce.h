@@ -226,6 +226,139 @@
 #define hal_radd32(atomic, addValue) hal_xadd32(atomic, addValue)
 
 /**
+ * @brief Atomic swap (16 bit)
+ *
+ * Atomically swap:
+ *
+ * @param atomic        u16*: Pointer to the atomic value (location)
+ * @param newValue      u16: New value to set
+ *
+ * @return Old value of the atomic
+ */
+#define hal_swap16(atomic, newValue)                                    \
+    ({                                                                  \
+        u16 __tmp = tg_xchg16((u16*)atomic, newValue);                  \
+        __tmp;                                                          \
+    })
+
+/**
+ * @brief Compare and swap (16 bit)
+ *
+ * The semantics are as follows (all operations performed atomically):
+ *     - if location is cmpValue, atomically replace with
+ *       newValue and return cmpValue
+ *     - if location is *not* cmpValue, return value at location
+ *
+ * @param atomic        u16*: Pointer to the atomic value (location)
+ * @param cmpValue      u16: Expected value of the atomic
+ * @param newValue      u16: Value to set if the atomic has the expected value
+ *
+ * @return Old value of the atomic
+ */
+#define hal_cmpswap16(atomic, cmpValue, newValue)                       \
+    ({                                                                  \
+        u16 __tmp = tg_cmpxchg16((u16*)atomic, cmpValue, newValue);     \
+        __tmp;                                                          \
+    })
+
+/**
+ * @brief Atomic add (16 bit)
+ *
+ * The semantics are as follows (all operations performed atomically):
+ *     - atomically increment location by addValue
+ *     - return old value (before addition)
+ *
+ * @param atomic    u16*: Pointer to the atomic value (location)
+ * @param addValue  u16: Value to add to location
+ * @return Old value of the location
+ */
+#define hal_xadd16(atomic, addValue)                                    \
+    ({                                                                  \
+        u16 __tmp = tg_xadd16((u16*)atomic, addValue);                  \
+        __tmp;                                                          \
+    })
+
+/**
+ * @brief Remote atomic add (16 bit)
+ *
+ * The semantics are as follows (all operations performed atomically):
+ *     - atomically increment location by addValue
+ *     - no value is returned (the increment will happen "at some
+ *       point")
+ *
+ * @param atomic    u16*: Pointer to the atomic value (location)
+ * @param addValue  u16: Value to add to location
+ */
+#define hal_radd16(atomic, addValue) hal_xadd16(atomic, addValue)
+
+/**
+ * @brief Atomic swap (8 bit)
+ *
+ * Atomically swap:
+ *
+ * @param atomic        u8*: Pointer to the atomic value (location)
+ * @param newValue      u8: New value to set
+ *
+ * @return Old value of the atomic
+ */
+#define hal_swap8(atomic, newValue)                                    \
+    ({                                                                 \
+        u8 __tmp = tg_xchg8((u8*)atomic, newValue);                    \
+        __tmp;                                                         \
+    })
+
+/**
+ * @brief Compare and swap (8 bit)
+ *
+ * The semantics are as follows (all operations performed atomically):
+ *     - if location is cmpValue, atomically replace with
+ *       newValue and return cmpValue
+ *     - if location is *not* cmpValue, return value at location
+ *
+ * @param atomic        u8*: Pointer to the atomic value (location)
+ * @param cmpValue      u8: Expected value of the atomic
+ * @param newValue      u8: Value to set if the atomic has the expected value
+ *
+ * @return Old value of the atomic
+ */
+#define hal_cmpswap8(atomic, cmpValue, newValue)                       \
+    ({                                                                 \
+        u8 __tmp = tg_cmpxchg8((u8*)atomic, cmpValue, newValue);       \
+        __tmp;                                                         \
+    })
+
+/**
+ * @brief Atomic add (8 bit)
+ *
+ * The semantics are as follows (all operations performed atomically):
+ *     - atomically increment location by addValue
+ *     - return old value (before addition)
+ *
+ * @param atomic    u8*: Pointer to the atomic value (location)
+ * @param addValue  u8: Value to add to location
+ * @return Old value of the location
+ */
+#define hal_xadd8(atomic, addValue)                                    \
+    ({                                                                 \
+        u8 __tmp = tg_xadd8((u8*)atomic, addValue);                    \
+        __tmp;                                                         \
+    })
+
+/**
+ * @brief Remote atomic add (8 bit)
+ *
+ * The semantics are as follows (all operations performed atomically):
+ *     - atomically increment location by addValue
+ *     - no value is returned (the increment will happen "at some
+ *       point")
+ *
+ * @param atomic    u8*: Pointer to the atomic value (location)
+ * @param addValue  u8: Value to add to location
+ */
+#define hal_radd8(atomic, addValue) hal_xadd8(atomic, addValue)
+
+
+/**
  * @brief Convenience function that basically implements a simple
  * lock
  *
@@ -259,6 +392,76 @@
  * value if it cannot be acquired
  */
 #define hal_trylock32(lock) tg_cmpxchg32((u32*)lock, 0, 1)
+
+/**
+ * @brief Convenience function that basically implements a simple
+ * lock
+ *
+ * This will usually be a wrapper around cmpswap16. This function
+ * will block until the lock can be acquired
+ *
+ * @param lock      Pointer to a 16 bit value
+ */
+#define hal_lock16(lock)                                         \
+    do {                                                         \
+        while(tg_cmpxchg16((u16*)lock, 0, 1) != 0) ;             \
+    } while(0)
+
+/**
+ * @brief Convenience function to implement a simple
+ * unlock
+ *
+ * @param lock      Pointer to a 16 bit value
+ */
+#define hal_unlock16(lock)                      \
+    ({                                          \
+        *(volatile u16 *)(lock) = 0;            \
+    })
+
+/**
+ * @brief Convenience function to implement a simple
+ * trylock
+ *
+ * @param lock      Pointer to a 16 bit value
+ * @return 0 if the lock has been acquired and a non-zero
+ * value if it cannot be acquired
+ */
+#define hal_trylock16(lock) tg_cmpxchg16((u16*)lock, 0, 1)
+
+/**
+ * @brief Convenience function that basically implements a simple
+ * lock
+ *
+ * This will usually be a wrapper around cmpswap8. This function
+ * will block until the lock can be acquired
+ *
+ * @param lock      Pointer to a 8 bit value
+ */
+#define hal_lock8(lock)                                         \
+    do {                                                         \
+        while(tg_cmpxchg8((u8*)lock, 0, 1) != 0) ;             \
+    } while(0)
+
+/**
+ * @brief Convenience function to implement a simple
+ * unlock
+ *
+ * @param lock      Pointer to a 8 bit value
+ */
+#define hal_unlock8(lock)                      \
+    ({                                          \
+        *(volatile u8 *)(lock) = 0;            \
+    })
+
+/**
+ * @brief Convenience function to implement a simple
+ * trylock
+ *
+ * @param lock      Pointer to a 8 bit value
+ * @return 0 if the lock has been acquired and a non-zero
+ * value if it cannot be acquired
+ */
+#define hal_trylock8(lock) tg_cmpxchg8((u8*)lock, 0, 1)
 
 /**
  * @brief Abort the runtime
