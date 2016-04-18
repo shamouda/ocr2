@@ -58,6 +58,7 @@ u8 simpleCommApiInitHandle(ocrCommApi_t *self, ocrMsgHandle_t *handle) {
 
 u8 sendMessageSimpleCommApi(ocrCommApi_t *self, ocrLocation_t target, ocrPolicyMsg_t *message,
                         ocrMsgHandle_t **handle, u32 properties) {
+    START_PROFILE(commapi_sendMessageSimpleCommApi);
     ocrCommApiSimple_t * commApiSimple = (ocrCommApiSimple_t *) self;
 
     // Debug and check if we should push this in the in/out patch or runlevel
@@ -102,8 +103,7 @@ u8 sendMessageSimpleCommApi(ocrCommApi_t *self, ocrLocation_t target, ocrPolicyM
         // Assert for now since we don't really handle errors in upper-layers
         ASSERT(ret == 0);
     }
-
-    return ret;
+    RETURN_PROFILE(ret);
 }
 
 /*
@@ -111,6 +111,7 @@ u8 sendMessageSimpleCommApi(ocrCommApi_t *self, ocrLocation_t target, ocrPolicyM
  *
  */
 u8 pollMessageSimpleCommApi(ocrCommApi_t *self, ocrMsgHandle_t **handle) {
+    START_PROFILE(commapi_pollMessageSimpleCommApi);
     //BUG #130 Is there a use case to poll for a one-way to complete ?
     //This implementation does not support one-way with ack
     //However it's a little hard to detect here. A handle message
@@ -149,16 +150,17 @@ u8 pollMessageSimpleCommApi(ocrCommApi_t *self, ocrMsgHandle_t **handle) {
             (*handle)->status = HDL_RESPONSE_OK;
         }
     }
-    return ret;
+    RETURN_PROFILE(ret);
 }
 
 u8 waitMessageSimpleCommApi(ocrCommApi_t *self, ocrMsgHandle_t **handle) {
+    START_PROFILE(commapi_waitMessageSimpleCommApi);
     u8 ret = 0;
     do {
         ret = self->fcts.pollMessage(self, handle);
     } while(ret != POLL_MORE_MESSAGE);
 
-    return ret;
+    RETURN_PROFILE(ret);
 }
 
 void simpleCommApiDestruct (ocrCommApi_t * base) {
