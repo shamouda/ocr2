@@ -34,9 +34,9 @@ Script Instructions:
 
 -Application logging output must be redirected to
  to the /ocr/scripts/Visualizer/Flowgraph directory
-    The command would look like: make -f Makefile.x86 run > ~/xstack/ocr/scripts/Visualizer/Flowgraph/<log_ouput_file_name>
+    The command would look like: make -f Makefile.x86 run > <log_ouput_file_name>
 
--Navigate to ~/xstack/ocr/scripts/Visualizer/Flowgraph, and run: python flowgraph.py <log_ouput_file_name>
+-Navigate to /ocr/scripts/Visualizer/Flowgraph, and run: python flowgraph.py <path_to__log_ouput_file_name>
 -The output will be an HTML file called flowgraph.html
 
 -NOTE: flowgraph.py depends on an external package called pygraph which can be

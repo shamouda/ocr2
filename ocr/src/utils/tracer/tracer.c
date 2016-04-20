@@ -167,6 +167,38 @@ static void populateTraceObject(u64 location, bool evtType, ocrTraceType_t objTy
 
         break;
 
+    case OCR_TRACE_TYPE_MESSAGE:
+
+        switch(actionType){
+
+            case OCR_ACTION_END_TO_END:
+            {
+                ocrLocation_t src = va_arg(ap, ocrLocation_t);
+                ocrLocation_t dst = va_arg(ap, ocrLocation_t);
+                u64 usefulSize = va_arg(ap, u64);
+                u64 marshTime = va_arg(ap, u64);
+                u64 sendTime = va_arg(ap, u64);
+                u64 rcvTime = va_arg(ap, u64);
+                u64 unMarshTime = va_arg(ap, u64);
+                u64 type = va_arg(ap, u64);
+
+                TRACE_FIELD(MESSAGE, msgEndToEnd, tr, src) = src;
+                TRACE_FIELD(MESSAGE, msgEndToEnd, tr, dst) = dst;
+                TRACE_FIELD(MESSAGE, msgEndToEnd, tr, usefulSize) = usefulSize;
+                TRACE_FIELD(MESSAGE, msgEndToEnd, tr, marshTime) = marshTime;
+                TRACE_FIELD(MESSAGE, msgEndToEnd, tr, sendTime) = sendTime;
+                TRACE_FIELD(MESSAGE, msgEndToEnd, tr, rcvTime) = rcvTime;
+                TRACE_FIELD(MESSAGE, msgEndToEnd, tr, unMarshTime) = unMarshTime;
+                TRACE_FIELD(MESSAGE, msgEndToEnd, tr, type) = type;
+                break;
+            }
+
+            default:
+                break;
+        }
+
+        break;
+
     case OCR_TRACE_TYPE_DATABLOCK:
 
         switch(actionType){

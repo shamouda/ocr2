@@ -34,7 +34,9 @@
 
 #define DEBUG_TYPE COMM_PLATFORM
 
-
+#ifdef OCR_MONITOR_NETWORK
+#include "ocr-sal.h"
+#endif
 //
 // MPI library Init/Finalize
 //
@@ -135,6 +137,11 @@ static void postRecvAny(ocrCommPlatform_t * self) {
     DPRINTF(DEBUG_LVL_VERB,"[MPI %"PRId32"] posting irecv ANY\n", mpiRankToLocation(self->pd->myLocation));
     int res = MPI_Irecv(buf, count, datatype, src, tag, comm, &(handle->status));
     ASSERT(res == MPI_SUCCESS);
+
+#ifdef OCR_MONITOR_NETWORK
+    buf->rcvTime = salGetTime();
+#endif
+
     mpiComm->incoming->pushFront(mpiComm->incoming, handle);
 }
 #endif
@@ -256,6 +263,11 @@ u8 MPICommSendMessage(ocrCommPlatform_t * self,
             ASSERT(false);
             return res;
         }
+
+#ifdef OCR_MONITOR_NETWORK
+        respMsg->rcvTime = salGetTime();
+#endif
+
         mpiComm->incoming->pushFront(mpiComm->incoming, respHandle);
     #endif
     #if STRATEGY_PROBE_RECV
@@ -284,6 +296,11 @@ u8 MPICommSendMessage(ocrCommPlatform_t * self,
     ASSERT((messageBuffer->srcLocation == self->pd->myLocation) &&
         (messageBuffer->destLocation != self->pd->myLocation) &&
         (targetRank == messageBuffer->destLocation));
+
+#ifdef OCR_MONITOR_NETWORK
+    messageBuffer->sendTime = salGetTime();
+#endif
+
     int res = MPI_Isend(messageBuffer, (int) fullMsgSize, datatype, targetRank, tag, comm, status);
 
     if (res == MPI_SUCCESS) {
@@ -347,6 +364,10 @@ u8 probeIncoming(ocrCommPlatform_t *self, int src, int tag, ocrPolicyMsg_t ** ms
         ASSERT((((*msg)->type & (PD_MSG_REQUEST | PD_MSG_RESPONSE)) != (PD_MSG_REQUEST | PD_MSG_RESPONSE)) &&
            (((*msg)->type & PD_MSG_REQUEST) || ((*msg)->type & PD_MSG_RESPONSE)) &&
            "error: Try to link the MPI library first when compiling your OCR program");
+
+#ifdef OCR_MONITOR_NETWORK
+        (*msg)->rcvTime = salGetTime();
+#endif
 
         // Unmarshall the message. We check to make sure the size is OK
         // This should be true since MPI seems to make sure to send the whole message

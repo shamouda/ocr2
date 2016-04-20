@@ -83,8 +83,15 @@ void workerLoopSystem(ocrWorker_t *worker){
     ASSERT(worker->curState == GET_STATE(RL_USER_OK, (RL_GET_PHASE_COUNT_DOWN(worker->pd, RL_USER_OK))));
 
 #ifdef OCR_TRACE_BINARY
-    //NP open file for binary writing
-    FILE *f = fopen("trace.bin", "a");
+    ocrPolicyDomain_t *pd;
+    getCurrentEnv(&pd, NULL, NULL, NULL);
+    u64 location = pd->myLocation;
+
+    char traceName[32];
+    SNPRINTF(traceName, 31, "trace_%lu.bin", location);
+
+    //open file for binary writing. (One per policy domain)
+    FILE *f = fopen(traceName, "a");
 #endif
 
     u8 continueLoop = true;

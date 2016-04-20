@@ -14,6 +14,10 @@
 // This is to resolve sizeof ocrTaskTemplateHc_t and set the hints pointers.
 #include "task/hc/hc-task.h"
 
+#ifdef OCR_MONITOR_NETWORK
+#include "ocr-sal.h"
+#endif
+
 #define DEBUG_TYPE POLICY
 
 // Everything in the marshalling code will be
@@ -919,6 +923,11 @@ u8 ocrPolicyMsgMarshallMsg(ocrPolicyMsg_t* msg, u64 baseSize, u8* buffer, u32 mo
     }
 
     DPRINTF(DEBUG_LVL_VVERB, "Useful size of message set to %"PRIu64"\n", outputMsg->usefulSize);
+
+#ifdef OCR_MONITOR_NETWORK
+    outputMsg->marshTime = salGetTime();
+#endif
+
     return 0;
 }
 
@@ -1402,6 +1411,14 @@ u8 ocrPolicyMsgUnMarshallMsg(u8* mainBuffer, u8* addlBuffer,
         msg->usefulSize = baseSize;
     }
     DPRINTF(DEBUG_LVL_VVERB, "Done unmarshalling and have size of message %"PRId64"\n", msg->usefulSize);
+
+#ifdef OCR_MONITOR_NETWORK
+    msg->unMarshTime = salGetTime();
+    OCR_TOOL_TRACE(false, OCR_TRACE_TYPE_MESSAGE, OCR_ACTION_END_TO_END, msg->srcLocation, msg->destLocation,
+                    msg->usefulSize, msg->marshTime, msg->sendTime, msg->rcvTime, msg->unMarshTime,
+                    (msg->type & PD_MSG_TYPE_ONLY));
+#endif
+
     return 0;
 }
 

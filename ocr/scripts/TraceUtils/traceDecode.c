@@ -18,13 +18,16 @@ bool fctPtrExists(long lookup, int lineCount, long *fctPtrs);
 
 int main(int argc, char *argv[]){
 
-    if(argc != 3 && argc != 2){
+    if(argc < 2){
+        printf("Error Usage: TODO\n");
         printf("\n-------- Incorrect Input ---------\n");
         printf("Usage: %s <filename>  optional : <application binary>\n\n", argv[0]);
         return 1;
     }
 
     char *fname = argv[1];
+
+    /*TODO bring back processRequestEdt seperation with app binary
     char *binaryPath;
     //If binary path provided, store
     if(argc == 3){
@@ -34,17 +37,13 @@ int main(int argc, char *argv[]){
     }else{
         binaryPath = "";
     }
+    */
 
     ocrTraceObj_t *trace = malloc(sizeof(ocrTraceObj_t));
-    //Attempt to open trace binary
-    FILE *f = fopen(fname, "r");
-    if(f == NULL){
-        printf("Error:  Unable to open provided trace binary\n");
-        return 1;
-    }
-
 
     int lineCount = 0;
+
+    /*TODO bring back processRequestEdt seperation with app binary*
     if(binaryPath != ""){
         char *sysCommand = malloc(SYS_CALL_COMMAND_LENGTH);
         char path[BIN_PATH_LENGTH];
@@ -64,19 +63,32 @@ int main(int argc, char *argv[]){
 
     }
 
+
     long *fctPtrs = NULL;
     //This indicates that an application binary was provided, and we will differentatie processRequestEdts
     if(lineCount > 0){
         fctPtrs = (long *)malloc(lineCount*(sizeof(long)));
         readFctPtrsFromBinary(binaryPath, lineCount, fctPtrs);
     }
+    */
+
+    long *fctPtrs = NULL;
 
     //Read each trace record, and decode
-    while(fread(trace, sizeof(ocrTraceObj_t), 1, f)){
-        translateObject(trace, lineCount, fctPtrs);
-    }
+    int i;
+    for(i=1; i < argc; i++){
+        FILE *f = fopen(argv[i], "r");
+        if(f == NULL){
+            printf("Error:  Unable to open provided trace binary\n");
+            return 1;
+        }
 
-    fclose(f);
+        while(fread(trace, sizeof(ocrTraceObj_t), 1, f)){
+            translateObject(trace, lineCount, fctPtrs);
+        }
+        fclose(f);
+
+    }
     return 0;
 }
 
@@ -91,6 +103,7 @@ void genericPrint(bool evtType, ocrTraceType_t ttype, ocrTraceAction_t action,
         printf("[TRACE] U/R: %s | PD: 0x%lx | WORKER_ID: %lu | TIMESTAMP: %lu | TYPE: %s | ACTION: %s\n",
                 evt_type[evtType], location, workerId, timestamp, obj_type[ttype-IDX_OFFSET], action_type[action]);
     }
+    return;
 }
 
 void translateObject(ocrTraceObj_t *trace, int lineCount, long *fctPtrs){
@@ -182,6 +195,8 @@ void translateObject(ocrTraceObj_t *trace, int lineCount, long *fctPtrs){
                 break;
             }
 
+            default:
+                break;
         }
         break;
 
@@ -214,8 +229,36 @@ void translateObject(ocrTraceObj_t *trace, int lineCount, long *fctPtrs){
                 ocrGuid_t parent = TRACE_FIELD(EVENT, eventDepAdd, trace, parentID);
                 printf("[TRACE] U/R: %s | PD: 0x%lx | WORKER_ID: %lu | TIMESTAMP: %lu | TYPE: EVENT | ACTION: ADD_DEP | DEP_GUID: "GUIDF" | PARENT: "GUIDF"\n",
                         evt_type[evtType], location, workerId, timestamp, GUIDA(dest), GUIDA(parent));
-            }
+
                 break;
+            }
+
+            default:
+                break;
+        }
+        break;
+
+    case OCR_TRACE_TYPE_MESSAGE:
+
+        switch(trace->actionSwitch){
+
+            case OCR_ACTION_END_TO_END:
+            {
+                ocrLocation_t src = TRACE_FIELD(MESSAGE, msgEndToEnd, trace, src);
+                ocrLocation_t dst = TRACE_FIELD(MESSAGE, msgEndToEnd, trace, dst);
+                u64 usefulSize = TRACE_FIELD(MESSAGE, msgEndToEnd, trace, usefulSize);
+                u64 marshTime = TRACE_FIELD(MESSAGE, msgEndToEnd, trace, marshTime);
+                u64 sendTime = TRACE_FIELD(MESSAGE, msgEndToEnd, trace, sendTime);
+                u64 rcvTime = TRACE_FIELD(MESSAGE, msgEndToEnd, trace, rcvTime);
+                u64 unMarshTime = TRACE_FIELD(MESSAGE, msgEndToEnd, trace, unMarshTime);
+                u64 type = TRACE_FIELD(MESSAGE, msgEndToEnd, trace, type);
+
+                printf("[TRACE] U/R: %s | PD: 0x%lx | WORKER_ID: %lu | TIMESTAMP: %lu | TYPE: MESSAGE | ACTION: END_TO_END | SRC: 0x%u | DEST: 0x%u | SIZE: %lu | MARSH: %lu | SEND: %lu | RCV: %lu | UMARSH: %lu | TYPE: 0x%lx\n",
+                        evt_type[evtType], location, workerId, timestamp, src, dst, usefulSize, marshTime, sendTime, rcvTime, unMarshTime, type);
+
+
+                break;
+            }
 
             default:
                 break;

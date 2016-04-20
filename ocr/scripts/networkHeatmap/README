@@ -1,0 +1,67 @@
+##
+# License
+##
+
+This file is subject to the license agreement located in the file
+LICENSE and cannot be distributed without it.  This notice
+cannot be removed or modified.
+
+##
+# Usage Instructions
+##
+
+This visualization tool shows the amount of message traffic between
+each remote source/destination pair of policy domains.  This tool is
+designed for the following platforms:
+    -x86-mpi
+
+-In ocr/build/common.mk:
+    -DOCR_MONITOR_NETWORK must be set.
+    -DOCR_TRACE_BINARY must be set.
+
+Script Instructions:
+
+-Navigate to desired application directory
+
+-When building/running the application a configuration option must be prepended
+ to the make command.
+
+    The command would look like: CONFIG_FLAGS=--sysworker make -f Makefile.x86-mpi run
+
+-When properly configured, one trace binary per policy domain will be created
+ in: <application_direction>/install/x86-mpi
+
+
+-Navigate to /ocr/scripts/TraceUtils and run:
+    -make
+    -./traceDecode <path_to_trace_binaries>/trace_* > <filename>
+
+    -<filename> is a an appropriately formatted file expected by the heatmap script.
+
+
+****NOTE****: This tool uses python to produce a GUI. Added ssh option flags are
+              needed to produce the GUI if running on the foobar cluster.
+
+TO RUN ON FOOBAR:
+    -You must be ssh'd into foobar with the -X option
+        -i.e ssh -X <username>@xstack.exascale-tech.com
+    -You must remain on bar1 to maintain your DISPLAY env. variable
+
+    -Navigate to /ocr/scripts/networkHeatmap/
+    -Execute the python script, command line options are as follows:
+        -i, --i <filename>  : trace file to post process
+        -x, --x <int_value> : GUI window X-dimension (pixels) default: 1920
+        -y, --y <int_value> : GUI window Y-dimension (pixels) default: 720
+        -v, --verbose       : Verbose output showing message type/count breakdown
+
+    -DISCLAIMER: There are added overheads using ssh and X; the GUI may take some time to load.
+
+TO RUN ON A LOCAL MACHINE:
+    -Navigate to /ocr/scripts/networkHeatmap/
+    -Run the following command:
+
+        - pyinstaller --onefile heatmap.py
+
+    -This will create a folder called dist, where a linux executable will be generated.
+    -Copy the executable and the <filename> produced from running the trace decode
+     application to your host machine, and run the executable.

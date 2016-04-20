@@ -397,6 +397,12 @@ typedef struct _ocrPolicyMsg_t {
                                      * (location processing the request) */
     u32 type;                   /**< Type of the message. Also includes if this
                                  * is a request or a response */
+#ifdef OCR_MONITOR_NETWORK
+    u64 marshTime;
+    u64 sendTime;
+    u64 rcvTime;
+    u64 unMarshTime;
+#endif
 
     /* The following rules apply to all fields in the message:
      *     - All ocrFatGuid_t are in/out parameters in the sense

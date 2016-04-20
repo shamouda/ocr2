@@ -10,13 +10,14 @@
 //Strings to identify user/runtime created objects
 const char *evt_type[] = {
     "RUNTIME",
-    "USER",
+    "USER"
 };
 
 //Strings for traced OCR objects
 const char *obj_type[] = {
     "EDT",
     "EVENT",
+    "MESSAGE",
     "DATABLOCK"
 };
 
@@ -29,6 +30,10 @@ const char *action_type[] = {
     "SATISFY",
     "EXECUTE",
     "FINISH",
+    "DATA_ACQUIRE",
+    "DATA_RELEASE",
+    "END_TO_END",
+    "ACTION_MAX"
 };
 
 #endif /* __TRACE_EVENTS_H__ */

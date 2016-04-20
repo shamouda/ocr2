@@ -423,7 +423,8 @@ typedef enum {
 typedef enum {
     OCR_TRACE_TYPE_EDT = 1000,
     OCR_TRACE_TYPE_EVENT = 1001,
-    OCR_TRACE_TYPE_DATABLOCK = 1002
+    OCR_TRACE_TYPE_MESSAGE = 1002,
+    OCR_TRACE_TYPE_DATABLOCK = 1003
 } ocrTraceType_t;
 
 
@@ -443,6 +444,7 @@ typedef enum {
     OCR_ACTION_FINISH,
     OCR_ACTION_DATA_ACQUIRE,
     OCR_ACTION_DATA_RELEASE,
+    OCR_ACTION_END_TO_END,
     OCR_ACTION_MAX
 } ocrTraceAction_t;
 

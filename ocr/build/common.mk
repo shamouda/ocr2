@@ -158,6 +158,10 @@ endif
 # (Primarily for LLNL tools inter-operability)
 # CFLAGS += -DOCR_TRACE_BINARY
 
+# Enable monitoring/logging of message traffic between policy domains
+# Requires Tracing (-DOCR_TRACE_BINARY)
+# CFLAGS += -DOCR_MONITOR_NETWORK -DOCR_TRACE_BINARY
+
 ####################################################
 # Experimental flags
 ####################################################

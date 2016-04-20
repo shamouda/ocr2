@@ -178,6 +178,23 @@ typedef struct {
 
         } TRACE_TYPE_NAME(RUNTIME_MARKER);
 
+        struct{
+            union{
+                struct{
+                    ocrLocation_t src;
+                    ocrLocation_t dst;
+                    u64 usefulSize;
+                    u64 marshTime;
+                    u64 sendTime;
+                    u64 rcvTime;
+                    u64 unMarshTime;
+                    u64 type;
+                }msgEndToEnd;
+
+            }action;
+
+        } TRACE_TYPE_NAME(MESSAGE);
+
 
     }type;
 }ocrTraceObj_t;
