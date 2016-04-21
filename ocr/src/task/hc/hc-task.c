@@ -22,11 +22,6 @@
 #include "utils/ocr-utils.h"
 #include "extensions/ocr-hints.h"
 
-#ifdef OCR_ENABLE_EDT_PROFILING
-extern struct _profileStruct gProfilingTable[] __attribute__((weak));
-extern struct _dbWeightStruct gDbWeights[] __attribute__((weak));
-#endif
-
 #ifdef OCR_ENABLE_STATISTICS
 #include "ocr-statistics.h"
 #include "ocr-statistics-callbacks.h"
@@ -154,31 +149,6 @@ ocrTaskTemplate_t * newTaskTemplateHc(ocrTaskTemplateFactory_t* factory, ocrEdt_
         statsTEMP_CREATE(pd, edtGuid, NULL, base->guid, base);
     }
 #endif /* OCR_ENABLE_STATISTICS */
-#ifdef OCR_ENABLE_EDT_PROFILING
-    base->profileData = NULL;
-    if(gProfilingTable) {
-      int i;
-      for(i = 0; ; i++) {
-        if(gProfilingTable[i].fname == NULL) break;
-            if(!ocrStrcmp((u8*)fctName, gProfilingTable[i].fname)) {
-              base->profileData = &(gProfilingTable[i]);
-              break;
-            }
-          }
-    }
-
-    base->dbWeights = NULL;
-    if(gDbWeights) {
-      int i;
-      for(i = 0; ; i++) {
-        if(gDbWeights[i].fname == NULL) break;
-            if(!ocrStrcmp((u8*)fctName, gDbWeights[i].fname)) {
-              base->dbWeights = &(gDbWeights[i]);
-              break;
-            }
-          }
-    }
-#endif
 
     return base;
 }

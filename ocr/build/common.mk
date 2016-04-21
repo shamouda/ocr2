@@ -149,11 +149,6 @@ endif
 # (optional) Maximum number of scope nesting for runtime profiler
 # CFLAGS += -DMAX_PROFILER_LEVEL=512
 
-# Enables the collection of EDT R/W statistics
-# x86 only
-# Requires OCR_ENABLE_EDT_NAMING
-# CFLAGS += -DOCR_ENABLE_EDT_PROFILING
-
 # Enables data collection for execution timeline visualizer
 # x86 only
 # Requires -DOCR_ENABLE_EDT_NAMING and DEBUG_LVL_INFO
@@ -173,9 +168,6 @@ endif
 # NOTE: The application must also have this flag defined
 # If this is note the case, an ASSERT will happen
 # CFLAGS += -DOCR_ENABLE_EDT_NAMING
-
-# Enable profiling data to be used by runtime. This requires EDT_NAMING
-#CFLAGS += -DOCR_ENABLE_EDT_PROFILING -DOCR_ENABLE_EDT_NAMING
 
 # Flag to test 128-bit guids.
 # CFLAGS += -DOCR_ENABLE_128_BIT_GUID

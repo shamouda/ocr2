@@ -86,11 +86,6 @@ OCRRUNNER=ocrrun_$(OCR_TYPE)
 # nesting for runtime profiler
 # CFLAGS += -DMAX_PROFILER_LEVEL=512
 
-# Enables the collection of EDT R/W statistics
-# x86 only
-# Requires OCR_ENABLE_EDT_NAMING
-# CFLAGS += -DOCR_ENABLE_EDT_PROFILING
-
 # Enables data collection for execution timeline visualizer
 # x86 only
 # Requires -DOCR_ENABLE_EDT_NAMING and DEBUG_LVL_INFO
