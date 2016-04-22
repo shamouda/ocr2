@@ -55,6 +55,11 @@ u64 ocrHintPropTaskHc[] = {
 #endif
 };
 
+// This is to exclude the RT EDTs from the "userCode" classification from the profiler
+#ifdef ENABLE_POLICY_DOMAIN_HC_DIST
+extern ocrGuid_t processRequestEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]);
+#endif
+
 //Make sure OCR_HINT_COUNT_EDT_HC in hc-task.h is equal to the length of array ocrHintPropTaskHc
 ocrStaticAssert((sizeof(ocrHintPropTaskHc)/sizeof(u64)) == OCR_HINT_COUNT_EDT_HC);
 ocrStaticAssert(OCR_HINT_COUNT_EDT_HC < OCR_RUNTIME_HINT_PROP_BITS);
@@ -1170,12 +1175,7 @@ u8 notifyDbReleaseTaskHc(ocrTask_t *base, ocrFatGuid_t db) {
 }
 
 u8 taskExecute(ocrTask_t* base) {
-    base->state = RUNNING_EDTSTATE;
-
-    //TODO Execute can be considered user on x86, but need to differentiate processRequestEdts in x86-mpi
-    DPRINTF(DEBUG_LVL_INFO, "Execute "GUIDF" paramc:%"PRId32" depc:%"PRId32"\n", GUIDA(base->guid), base->paramc, base->depc);
-    OCR_TOOL_TRACE(true, OCR_TRACE_TYPE_EDT, OCR_ACTION_EXECUTE, base->funcPtr);
-
+    START_PROFILE(ta_hc_execute);
     ocrTaskHc_t* derived = (ocrTaskHc_t*)base;
     // In this implementation each time a signaler has been satisfied, its guid
     // has been replaced by the db guid it has been satisfied with.
@@ -1186,24 +1186,34 @@ u8 taskExecute(ocrTask_t* base) {
     ocrWorker_t *curWorker = NULL;
     ocrEdtDep_t * depv = derived->resolvedDeps;
     PD_MSG_STACK(msg);
-    ASSERT(derived->unkDbs == NULL); // Should be no dynamically acquired DBs before running
-    getCurrentEnv(&pd, &curWorker, NULL, NULL);
+
+    {
+        START_PROFILE(ta_hc_executeSetup);
+        base->state = RUNNING_EDTSTATE;
+
+        //TODO Execute can be considered user on x86, but need to differentiate processRequestEdts in x86-mpi
+        DPRINTF(DEBUG_LVL_INFO, "Execute "GUIDF" paramc:%"PRId32" depc:%"PRId32"\n", GUIDA(base->guid), base->paramc, base->depc);
+        OCR_TOOL_TRACE(true, OCR_TRACE_TYPE_EDT, OCR_ACTION_EXECUTE, base->funcPtr);
+
+        ASSERT(derived->unkDbs == NULL); // Should be no dynamically acquired DBs before running
+        getCurrentEnv(&pd, &curWorker, NULL, NULL);
 
 #ifdef OCR_ENABLE_STATISTICS
-    // Bug #225
-    ocrPolicyCtx_t *ctx = getCurrentWorkerContext();
-    ocrWorker_t *curWorker = NULL;
+        // Bug #225
+        ocrPolicyCtx_t *ctx = getCurrentWorkerContext();
+        ocrWorker_t *curWorker = NULL;
 
-    deguidify(pd, ctx->sourceObj, (u64*)&curWorker, NULL);
+        deguidify(pd, ctx->sourceObj, (u64*)&curWorker, NULL);
 
-    // We first have the message of using the EDT Template
-    statsTEMP_USE(pd, base->guid, base, taskTemplate->guid, taskTemplate);
+        // We first have the message of using the EDT Template
+        statsTEMP_USE(pd, base->guid, base, taskTemplate->guid, taskTemplate);
 
-    // We now say that the worker is starting the EDT
-    statsEDT_START(pd, ctx->sourceObj, curWorker, base->guid, base, depc != 0);
+        // We now say that the worker is starting the EDT
+        statsEDT_START(pd, ctx->sourceObj, curWorker, base->guid, base, depc != 0);
 
 #endif /* OCR_ENABLE_STATISTICS */
-
+        EXIT_PROFILE;
+    }
     ocrGuid_t retGuid = NULL_GUID;
     {
 
@@ -1223,9 +1233,19 @@ u8 taskExecute(ocrTask_t* base) {
         TPRINTF("EDT Start: 0x%"PRIx64" 0x%"PRIx64" in %s\n",
                 base->funcPtr, base->guid, location);
 #endif
+#ifdef ENABLE_POLICY_DOMAIN_HC_DIST
+        if(base->funcPtr == &processRequestEdt) {
+            retGuid = base->funcPtr(paramc, paramv, depc, depv);
+        } else {
+            START_PROFILE(userCode);
+            retGuid = base->funcPtr(paramc, paramv, depc, depv);
+            EXIT_PROFILE;
+        }
+#else
         START_PROFILE(userCode);
         retGuid = base->funcPtr(paramc, paramv, depc, depv);
         EXIT_PROFILE;
+#endif /* ENABLE_POLICY_DOMAIN_HC_DIST */
 #ifdef OCR_ENABLE_EDT_NAMING
         TPRINTF("EDT End: %s 0x%"PRIx64" in %s\n",
                 base->name, base->guid, location);
@@ -1240,129 +1260,133 @@ u8 taskExecute(ocrTask_t* base) {
 #endif
     }
 
+    {
+        START_PROFILE(ta_hc_executeCleanup);
 #ifdef OCR_ENABLE_STATISTICS
-    // We now say that the worker is done executing the EDT
-    statsEDT_END(pd, ctx->sourceObj, curWorker, base->guid, base);
+        // We now say that the worker is done executing the EDT
+        statsEDT_END(pd, ctx->sourceObj, curWorker, base->guid, base);
 #endif /* OCR_ENABLE_STATISTICS */
-    DPRINTF(DEBUG_LVL_INFO, "End_Execution "GUIDF"\n", GUIDA(base->guid));
-    OCR_TOOL_TRACE(true, OCR_TRACE_TYPE_EDT, OCR_ACTION_FINISH);
-    // edt user code is done, if any deps, release data-blocks
-    if(depc != 0) {
-        START_PROFILE(ta_hc_dbRel);
-        u32 i;
-        for(i=0; i < depc; ++i) {
-            u32 j = i / 64;
-            if ((!(ocrGuidIsNull(depv[i].guid))) &&
-               ((j >= OCR_MAX_MULTI_SLOT) || (derived->doNotReleaseSlots[j] == 0) ||
-                ((j < OCR_MAX_MULTI_SLOT) && (((1ULL << (i % 64)) & derived->doNotReleaseSlots[j]) == 0)))) {
+        DPRINTF(DEBUG_LVL_INFO, "End_Execution "GUIDF"\n", GUIDA(base->guid));
+        OCR_TOOL_TRACE(true, OCR_TRACE_TYPE_EDT, OCR_ACTION_FINISH);
+        // edt user code is done, if any deps, release data-blocks
+        if(depc != 0) {
+            START_PROFILE(ta_hc_dbRel);
+            u32 i;
+            for(i=0; i < depc; ++i) {
+                u32 j = i / 64;
+                if ((!(ocrGuidIsNull(depv[i].guid))) &&
+                    ((j >= OCR_MAX_MULTI_SLOT) || (derived->doNotReleaseSlots[j] == 0) ||
+                     ((j < OCR_MAX_MULTI_SLOT) && (((1ULL << (i % 64)) & derived->doNotReleaseSlots[j]) == 0)))) {
+                    getCurrentEnv(NULL, NULL, NULL, &msg);
+#define PD_MSG (&msg)
+#define PD_TYPE PD_MSG_DB_RELEASE
+                    msg.type = PD_MSG_DB_RELEASE | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
+                    PD_MSG_FIELD_IO(guid.guid) = depv[i].guid;
+                    PD_MSG_FIELD_IO(guid.metaDataPtr) = NULL;
+                    PD_MSG_FIELD_I(edt.guid) = base->guid;
+                    PD_MSG_FIELD_I(edt.metaDataPtr) = base;
+                    PD_MSG_FIELD_I(ptr) = NULL;
+                    PD_MSG_FIELD_I(size) = 0;
+                    PD_MSG_FIELD_I(properties) = 0;
+                    // Ignore failures at this point
+                    pd->fcts.processMessage(pd, &msg, true);
+#undef PD_MSG
+#undef PD_TYPE
+                }
+            }
+            pd->fcts.pdFree(pd, depv);
+            EXIT_PROFILE;
+        }
+
+        // We now release all other data-blocks that we may potentially
+        // have acquired along the way
+        if(derived->unkDbs != NULL) {
+            ocrGuid_t *extraToFree = derived->unkDbs;
+            u64 count = derived->countUnkDbs;
+            while(count) {
                 getCurrentEnv(NULL, NULL, NULL, &msg);
 #define PD_MSG (&msg)
 #define PD_TYPE PD_MSG_DB_RELEASE
                 msg.type = PD_MSG_DB_RELEASE | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
-                PD_MSG_FIELD_IO(guid.guid) = depv[i].guid;
+                PD_MSG_FIELD_IO(guid.guid) = extraToFree[0];
                 PD_MSG_FIELD_IO(guid.metaDataPtr) = NULL;
                 PD_MSG_FIELD_I(edt.guid) = base->guid;
                 PD_MSG_FIELD_I(edt.metaDataPtr) = base;
                 PD_MSG_FIELD_I(ptr) = NULL;
                 PD_MSG_FIELD_I(size) = 0;
-                PD_MSG_FIELD_I(properties) = 0;
-                // Ignore failures at this point
-                pd->fcts.processMessage(pd, &msg, true);
+                PD_MSG_FIELD_I(properties) = 0; // Not a runtime free xosince it was acquired using DB create
+                if(pd->fcts.processMessage(pd, &msg, true)) {
+                    DPRINTF(DEBUG_LVL_WARN, "EDT (GUID: "GUIDF") could not release dynamically acquired DB (GUID: "GUIDF")\n",
+                            GUIDA(base->guid), GUIDA(extraToFree[0]));
+                    break;
+                }
 #undef PD_MSG
 #undef PD_TYPE
+                --count;
+                ++extraToFree;
             }
+            pd->fcts.pdFree(pd, derived->unkDbs);
         }
-        pd->fcts.pdFree(pd, depv);
+        // If marked to be rescheduled, do not satisfy output
+        // event and do not update the task state to reaping
+        if (base->state == RUNNING_EDTSTATE) {
+            // Now deal with the output event
+            if(!(ocrGuidIsNull(base->outputEvent))) {
+                if(!(ocrGuidIsNull(retGuid))) {
+                    getCurrentEnv(NULL, NULL, NULL, &msg);
+#define PD_MSG (&msg)
+#define PD_TYPE PD_MSG_DEP_ADD
+                    msg.type = PD_MSG_DEP_ADD | PD_MSG_REQUEST;
+                    PD_MSG_FIELD_I(source.guid) = retGuid;
+                    PD_MSG_FIELD_I(source.metaDataPtr) = NULL;
+                    PD_MSG_FIELD_I(dest.guid) = base->outputEvent;
+                    PD_MSG_FIELD_I(dest.metaDataPtr) = NULL;
+                    PD_MSG_FIELD_I(currentEdt.guid) = base->guid;
+                    PD_MSG_FIELD_I(currentEdt.metaDataPtr) = base;
+                    PD_MSG_FIELD_I(slot) = 0; // Always satisfy on slot 0. This will trickle to
+                    // the finish latch if needed
+                    PD_MSG_FIELD_IO(properties) = DB_MODE_CONST;
+                    // Ignore failure for now
+                    // Bug #615
+                    pd->fcts.processMessage(pd, &msg, false);
+#undef PD_MSG
+#undef PD_TYPE
+                } else {
+                    getCurrentEnv(NULL, NULL, NULL, &msg);
+#define PD_MSG (&msg)
+#define PD_TYPE PD_MSG_DEP_SATISFY
+                    msg.type = PD_MSG_DEP_SATISFY | PD_MSG_REQUEST;
+                    PD_MSG_FIELD_I(satisfierGuid.guid) = base->guid;
+                    PD_MSG_FIELD_I(satisfierGuid.metaDataPtr) = base;
+                    PD_MSG_FIELD_I(guid.guid) = base->outputEvent;
+                    PD_MSG_FIELD_I(guid.metaDataPtr) = NULL;
+                    PD_MSG_FIELD_I(payload.guid) = retGuid;
+                    PD_MSG_FIELD_I(payload.metaDataPtr) = NULL;
+                    PD_MSG_FIELD_I(currentEdt.guid) = base->guid;
+                    PD_MSG_FIELD_I(currentEdt.metaDataPtr) = base;
+                    PD_MSG_FIELD_I(slot) = 0; // Always satisfy on slot 0. This will trickle to
+                    // the finish latch if needed
+                    PD_MSG_FIELD_I(properties) = 0;
+                    // Ignore failure for now
+                    // Bug #615
+                    pd->fcts.processMessage(pd, &msg, false);
+#undef PD_MSG
+#undef PD_TYPE
+                }
+                // Because the output event is non-persistent it is deallocated automatically
+                base->outputEvent = NULL_GUID;
+            }
+            base->state = REAPING_EDTSTATE;
+        }
+#ifdef ENABLE_EXTENSION_BLOCKING_SUPPORT
+        else { // else EDT must be rescheduled
+            ASSERT(base->state == RESCHED_EDTSTATE);
+            ASSERT(base->depc == 0); //Limitation
+        }
+#endif
         EXIT_PROFILE;
     }
-
-    // We now release all other data-blocks that we may potentially
-    // have acquired along the way
-    if(derived->unkDbs != NULL) {
-        ocrGuid_t *extraToFree = derived->unkDbs;
-        u64 count = derived->countUnkDbs;
-        while(count) {
-            getCurrentEnv(NULL, NULL, NULL, &msg);
-#define PD_MSG (&msg)
-#define PD_TYPE PD_MSG_DB_RELEASE
-            msg.type = PD_MSG_DB_RELEASE | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
-            PD_MSG_FIELD_IO(guid.guid) = extraToFree[0];
-            PD_MSG_FIELD_IO(guid.metaDataPtr) = NULL;
-            PD_MSG_FIELD_I(edt.guid) = base->guid;
-            PD_MSG_FIELD_I(edt.metaDataPtr) = base;
-            PD_MSG_FIELD_I(ptr) = NULL;
-            PD_MSG_FIELD_I(size) = 0;
-            PD_MSG_FIELD_I(properties) = 0; // Not a runtime free xosince it was acquired using DB create
-            if(pd->fcts.processMessage(pd, &msg, true)) {
-                DPRINTF(DEBUG_LVL_WARN, "EDT (GUID: "GUIDF") could not release dynamically acquired DB (GUID: "GUIDF")\n",
-                        GUIDA(base->guid), GUIDA(extraToFree[0]));
-                break;
-            }
-#undef PD_MSG
-#undef PD_TYPE
-            --count;
-            ++extraToFree;
-        }
-        pd->fcts.pdFree(pd, derived->unkDbs);
-    }
-    // If marked to be rescheduled, do not satisfy output
-    // event and do not update the task state to reaping
-    if (base->state == RUNNING_EDTSTATE) {
-        // Now deal with the output event
-        if(!(ocrGuidIsNull(base->outputEvent))) {
-            if(!(ocrGuidIsNull(retGuid))) {
-                getCurrentEnv(NULL, NULL, NULL, &msg);
-        #define PD_MSG (&msg)
-        #define PD_TYPE PD_MSG_DEP_ADD
-                msg.type = PD_MSG_DEP_ADD | PD_MSG_REQUEST;
-                PD_MSG_FIELD_I(source.guid) = retGuid;
-                PD_MSG_FIELD_I(source.metaDataPtr) = NULL;
-                PD_MSG_FIELD_I(dest.guid) = base->outputEvent;
-                PD_MSG_FIELD_I(dest.metaDataPtr) = NULL;
-                PD_MSG_FIELD_I(currentEdt.guid) = base->guid;
-                PD_MSG_FIELD_I(currentEdt.metaDataPtr) = base;
-                PD_MSG_FIELD_I(slot) = 0; // Always satisfy on slot 0. This will trickle to
-                // the finish latch if needed
-                PD_MSG_FIELD_IO(properties) = DB_MODE_CONST;
-                // Ignore failure for now
-                // Bug #615
-                pd->fcts.processMessage(pd, &msg, false);
-        #undef PD_MSG
-        #undef PD_TYPE
-            } else {
-                getCurrentEnv(NULL, NULL, NULL, &msg);
-        #define PD_MSG (&msg)
-        #define PD_TYPE PD_MSG_DEP_SATISFY
-                msg.type = PD_MSG_DEP_SATISFY | PD_MSG_REQUEST;
-                PD_MSG_FIELD_I(satisfierGuid.guid) = base->guid;
-                PD_MSG_FIELD_I(satisfierGuid.metaDataPtr) = base;
-                PD_MSG_FIELD_I(guid.guid) = base->outputEvent;
-                PD_MSG_FIELD_I(guid.metaDataPtr) = NULL;
-                PD_MSG_FIELD_I(payload.guid) = retGuid;
-                PD_MSG_FIELD_I(payload.metaDataPtr) = NULL;
-                PD_MSG_FIELD_I(currentEdt.guid) = base->guid;
-                PD_MSG_FIELD_I(currentEdt.metaDataPtr) = base;
-                PD_MSG_FIELD_I(slot) = 0; // Always satisfy on slot 0. This will trickle to
-                // the finish latch if needed
-                PD_MSG_FIELD_I(properties) = 0;
-                // Ignore failure for now
-                // Bug #615
-                pd->fcts.processMessage(pd, &msg, false);
-        #undef PD_MSG
-        #undef PD_TYPE
-            }
-            // Because the output event is non-persistent it is deallocated automatically
-            base->outputEvent = NULL_GUID;
-        }
-        base->state = REAPING_EDTSTATE;
-    }
-#ifdef ENABLE_EXTENSION_BLOCKING_SUPPORT
-    else { // else EDT must be rescheduled
-        ASSERT(base->state == RESCHED_EDTSTATE);
-        ASSERT(base->depc == 0); //Limitation
-    }
-#endif
-    return 0;
+    RETURN_PROFILE(0);
 }
 
 u8 setHintTaskHc(ocrTask_t* self, ocrHint_t *hint) {

@@ -35,12 +35,13 @@
 
 #ifdef OCR_RUNTIME_PROFILER
 
-
 #include <stdio.h>
 #include <pthread.h>
 
 // BUG #591: Make this more platform independent
 extern pthread_key_t _profilerThreadData;
+
+// BUG #591: Statics aren't great
 
 /* _profiler functions */
 void _profilerInit(_profiler *self, u32 event, u64 prevTicks) {
@@ -51,11 +52,15 @@ void _profilerInit(_profiler *self, u32 event, u64 prevTicks) {
     self->myEvent = event;
     self->previousLastLevel = 0;
     *(u8*)(&(self->flags)) = 0;
+    self->flags.isRtCall = (_profilerEventIsRt[event/64] & (1ULL<<(event & 0x3F))) != 0ULL;
 
     self->myData = (_profilerData*)pthread_getspecific(_profilerThreadData);
     if(self->myData) {
 #ifdef PROFILER_FOCUS
 
+#ifndef PROFILER_PEEK
+#define PROFILER_PEEK PROFILER_FOCUS
+#endif
         if(self->myData->level > 0) {
 #ifdef PROFILER_COUNT_OTHER
             if(self->myData->stack[self->myData->level-1]->myEvent == EVENT_OTHER) {
@@ -81,17 +86,12 @@ void _profilerInit(_profiler *self, u32 event, u64 prevTicks) {
 #endif /* PROFILER_FOCUS_DEPTH */
 
 #ifdef PROFILER_IGNORE_RT
-            if(event != PROFILER_FOCUS && self->myData->stack[self->myData->level-1]->myEvent != PROFILER_FOCUS &&
-               self->myData->stack[self->myData->level-1]->myEvent <
-#ifdef PROFILER_W_APPS
-               MAX_EVENTS_RT
-#else
-               MAX_EVENTS
-#endif
-               ) {
+            if(event == PROFILER_FOCUS || event == PROFILER_PEEK) {
+                self->flags.isRtCall = 0; // Always consider the focus function to be user code
+            }
+            if(self->flags.isRtCall && (self->myData->stack[self->myData->level-1]->myEvent != PROFILER_PEEK)) {
+                // Call to the runtime and we shouldn't peek into the last function
                 // We already saw a call to the runtime, we return
-                // Make sure we skip the FOCUS function though (which could
-                // be 'userCode' which is < MAX_EVENTS_RT)
                 return;
             }
 #endif /* PROFILER_IGNORE_RT */
@@ -295,6 +295,7 @@ void _profilerPauseInternal(_profiler *self) {
     res = (end.tv_sec-start.tv_sec)*1000000L + (end.tv_nsec - start.tv_nsec)/1000;
 
 /* _profilerData functions */
+
 void _profilerDataInit(_profilerData *self) {
     self->level = 0;
     self->overheadTimer = 0;

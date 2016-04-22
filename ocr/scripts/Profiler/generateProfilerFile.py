@@ -161,6 +161,7 @@ def main(argv=None):
     maxRtEvent_re = re.compile(r"\s*MAX_EVENTS_RT = ([0-9]+)")
     endCStruct_re = re.compile(r"^};$")
     eventOther_re = re.compile(r"^    \"EVENT_OTHER\"")
+    isRt_re = re.compile(r"^(  \| )?\(\(u64\)\(PROFILER_([0-9a-zA-Z_]+)_ISRT\)<<([0-9]{1,2})\)")
 
     for root, subDirs, files in os.walk(rootDir):
         if not quietMode:
@@ -203,9 +204,10 @@ def main(argv=None):
 #ifndef OCR_RUNTIME_PROFILER
 #error "OCR_RUNTIME_PROFILER should be defined if including the auto-generated profile file"
 #endif
+#include "ocr-types.h"
+typedef enum {
 """)
             # Define the enum
-            fileHandle.write('typedef enum {\n')
             counter = 0
             for function in allFunctions:
                 fileHandle.write('%s = %d,\n    ' % (function, counter))
@@ -218,9 +220,12 @@ def main(argv=None):
                     counter += 1
                 fileHandle.write('MAX_EVENTS = %d,\n} profilerEventRT_t;\n' % (counter))
 
-
+            # Define default _ISRT values for all calls
+            for function in allFunctions:
+                fileHandle.write("#ifndef PROFILER_%s_ISRT\n#define PROFILER_%s_ISRT 1\n#endif\n" % (function, function))
             # Define the id to name mapping
             fileHandle.write('extern const char* _profilerEventNames[];\n')
+            fileHandle.write('extern u64 _profilerEventIsRt[];\n')
             fileHandle.write("\n#endif\n")
         # End of with statement writing the .h file
         # If we are compiling this with App support, write a file for the app
@@ -232,6 +237,7 @@ def main(argv=None):
 #ifndef OCR_RUNTIME_PROFILER
 #error "OCR_RUNTIME_PROFILER should be defined if including the auto-generated profile file"
 #endif
+#include "ocr-types.h"
 typedef enum {
 """)
                 if createOtherBucket:
@@ -239,14 +245,21 @@ typedef enum {
                     counter += 1
                 fileHandle.write("""MAX_EVENTS = %d
 } profilerEventApp_t;
-#endif
-                """ % (counter))
+
+""" % (counter))
+                if createOtherBucket:
+                    fileHandle.write("#ifndef PROFILER_EVENT_OTHER_ISRT\n#define PROFILER_EVENT_OTHER_ISRT 0\n#endif\n")
+                fileHandle.write('\n#endif\n')
             # End of with statement writing the .h file
         # end if opMode == MODE_RTAPP
         # Now write the C file
         with open(outFile + '.c', 'w') as fileHandle:
-            fileHandle.write("#ifdef OCR_RUNTIME_PROFILER\n")
-            fileHandle.write('const char* _profilerEventNames[] = {\n')
+            fileHandle.write("""#ifdef OCR_RUNTIME_PROFILER
+#include "%sRT.h"
+#include "%sApp.h"
+#include "ocr-types.h"
+const char* _profilerEventNames[] = {
+""" % (outFile, outFile))
 
             isFirst = True
             for function in allFunctions:
@@ -258,7 +271,31 @@ typedef enum {
             if createOtherBucket:
                 fileHandle.write(',\n    "EVENT_OTHER"')
 
-            fileHandle.write('\n};\n#endif')
+            fileHandle.write('\n};\n')
+
+            # Write the _profilerEventIsRt array
+            fileHandle.write('u64 _profilerEventIsRt[] = {\n')
+            funcIterator = iter(allFunctions)
+            count = 0
+            while True:
+                try:
+                    if count == 64:
+                        fileHandle.write("\n,\n")
+                        count = 0
+                    s = funcIterator.next();
+                    if count != 0:
+                        fileHandle.write("\n  | ")
+                    fileHandle.write("((u64)(PROFILER_%s_ISRT)<<%d)" % (s, count))
+                    count += 1
+                except StopIteration:
+                    if createOtherBucket:
+                        if count != 0:
+                            fileHandle.write("\n  | ")
+                        fileHandle.write("((u64)(PROFILER_EVENT_OTHER_ISRT)<<%d)" % (count))
+                    fileHandle.write('\n};\n')
+                    break
+            # enf of the While True loop
+            fileHandle.write('#endif')
         # End of with statement writing the .c file
         # We make backup copies of the C file so we can reuse them for various applications
         shutil.copy2(outFile + '.c', outFile + '.c.orig')
@@ -290,6 +327,11 @@ typedef enum {
                 destFile.write('EVENT_OTHER = %d,\n    ' % (maxRtCount))
                 maxRtCount += 1
             destFile.write('MAX_EVENTS = %d\n} profilerEventApp_t;\n' % (maxRtCount))
+            # Deal with all the ifdef for the apps
+            for function in allFunctions:
+                destFile.write("#ifndef PROFILER_%s_ISRT\n#define PROFILER_%s_ISRT 0\n#endif\n" % (function, function))
+            if createOtherBucket:
+                destFile.write("#ifndef PROFILER_EVENT_OTHER_ISRT\n#define PROFILER_EVENT_OTHER_ISRT 0\n#endif\n")
             # Close off the file
             destFile.write('extern const char* _profilerEventNames[];\n')
             destFile.write("\n#endif\n")
@@ -298,7 +340,9 @@ typedef enum {
         with open(rtFile + '.c.orig', 'r') as sourceFile, open(rtFile + '.c', 'w') as destFile:
             maxRtCount = 0
             missingComma = False
-            for line in sourceFile:
+            sourceFileLines = iter(sourceFile)
+            while True:
+                line = sourceFileLines.next() # Should never fail because we break before the end
                 matchOb = endCStruct_re.match(line)
                 if matchOb is not None:
                     # We found the last interesting line of the file
@@ -320,12 +364,63 @@ typedef enum {
                 else:
                     destFile.write('    "%s"' % (function))
                 missingComma = True
-            # Close off the file
+            # Close off the name list
             if createOtherBucket:
                 if missingComma:
                     destFile.write(',\n')
                 destFile.write('    "EVENT_OTHER"')
-            destFile.write('\n};\n#endif')
+            destFile.write('\n};\n')
+
+            # Now deal with the _profilerEventIsRt structure
+            destFile.write('u64 _profilerEventIsRt[] = {\n')
+            printLine = False
+            lastIsRtLine = None
+            while True:
+                line = sourceFileLines.next()
+                if printLine is False:
+                    if line == "u64 _profilerEventIsRt[] = {\n":
+                        printLine = True
+                    continue
+                assert(printLine is True)
+                t = lastIsRtLine
+                lastIsRtLine = isRt_re.match(line) or t
+                if lastIsRtLine and lastIsRtLine.group(2) == 'EVENT_OTHER':
+                    # We stop here and don't print this line. We will print it
+                    # in the proper place and insert the rest in between
+                    break
+                else:
+                    # Check for the end of the structure
+                    if endCStruct_re.match(line) is not None:
+                        break
+                    # Otherwise, we just print the line out
+                    destFile.write(line)
+            # At this point, we insert the new functions we have right
+            # after lastIsRtLine
+            count = 0
+            assert(lastIsRtLine is not None)
+            count = int(lastIsRtLine.group(3))
+            if lastIsRtLine.group(2) <> 'EVENT_OTHER':
+                count += 1
+            funcIterator = iter(allFunctions)
+            while True:
+                try:
+                    if count == 64:
+                        destFile.write("\n,\n")
+                        count = 0
+                    s = funcIterator.next();
+                    if count != 0:
+                        destFile.write("\n  | ")
+                    destFile.write("((u64)(PROFILER_%s_ISRT)<<%d)" % (s, count))
+                    count += 1
+                except StopIteration:
+                    if createOtherBucket:
+                        if count != 0:
+                            destFile.write("\n  | ")
+                        destFile.write("((u64)(PROFILER_EVENT_OTHER_ISRT)<<%d)" % (count))
+                    destFile.write('\n};\n')
+                    break
+            # End while
+            destFile.write('#endif')
         # End of open for the c file
     # End of apps mode
 

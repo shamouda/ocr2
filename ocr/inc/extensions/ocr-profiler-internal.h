@@ -43,7 +43,8 @@ typedef struct __profilerFlags {
     u8 isPaused  :1;
     u8 isRecurse :1;
     u8 hasAddLevel :1;
-    u8 _pad      :4;
+    u8 isRtCall  :1;
+    u8 _pad      :3;
 } _profilerFlags;
 
 typedef struct __profiler {
@@ -126,9 +127,8 @@ static inline void _profilerResume(_profiler *self, u8 isFakePause) {
     _gettime(_tempTicks)                                                \
     /*_sync_synchronize();*/                                            \
     _profiler _flightweight;                                            \
-    _profilerInit(&_flightweight, eventId, _tempTicks); \
+    _profilerInit(&_flightweight, eventId, _tempTicks);                 \
     _gettime(_flightweight.startTicks);
-
 
 #define PAUSE_PROFILE                           \
     do { _profilerPause(&_flightweight, 0); } while(0);

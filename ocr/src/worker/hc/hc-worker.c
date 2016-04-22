@@ -38,19 +38,26 @@
 /******************************************************/
 
 static void hcWorkShift(ocrWorker_t * worker) {
+    START_PROFILE(wo_hc_workShift);
     ocrPolicyDomain_t * pd;
     PD_MSG_STACK(msg);
     getCurrentEnv(&pd, NULL, NULL, &msg);
 
     ocrWorkerHc_t *hcWorker = (ocrWorkerHc_t *) worker;
 
+    u8 retCode = 0;
+    {
+        START_PROFILE(wo_hc_getWork);
 #define PD_MSG (&msg)
 #define PD_TYPE PD_MSG_SCHED_GET_WORK
-    msg.type = PD_MSG_SCHED_GET_WORK | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
-    PD_MSG_FIELD_IO(schedArgs).kind = OCR_SCHED_WORK_EDT_USER;
-    PD_MSG_FIELD_IO(schedArgs).OCR_SCHED_ARG_FIELD(OCR_SCHED_WORK_EDT_USER).edt.guid = NULL_GUID;
-    PD_MSG_FIELD_IO(schedArgs).OCR_SCHED_ARG_FIELD(OCR_SCHED_WORK_EDT_USER).edt.metaDataPtr = NULL;
-    if(pd->fcts.processMessage(pd, &msg, true) == 0) {
+        msg.type = PD_MSG_SCHED_GET_WORK | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
+        PD_MSG_FIELD_IO(schedArgs).kind = OCR_SCHED_WORK_EDT_USER;
+        PD_MSG_FIELD_IO(schedArgs).OCR_SCHED_ARG_FIELD(OCR_SCHED_WORK_EDT_USER).edt.guid = NULL_GUID;
+        PD_MSG_FIELD_IO(schedArgs).OCR_SCHED_ARG_FIELD(OCR_SCHED_WORK_EDT_USER).edt.metaDataPtr = NULL;
+        retCode = pd->fcts.processMessage(pd, &msg, true);
+        EXIT_PROFILE;
+    }
+    if(retCode == 0) {
         // We got a response
         ocrFatGuid_t taskGuid = PD_MSG_FIELD_IO(schedArgs).OCR_SCHED_ARG_FIELD(OCR_SCHED_WORK_EDT_USER).edt;
         if(!(ocrGuidIsNull(taskGuid.guid))){
@@ -60,8 +67,10 @@ static void hcWorkShift(ocrWorker_t * worker) {
                 // Illegal to pick up a LONG EDT in that case to avoid creating a deadlock
                 curTask->state = RESCHED_EDTSTATE;
                 hcWorker->stealFirst = true;
-            } else {
+            } else
 #endif
+            {
+                START_PROFILE(wo_hc_executeWork);
                 // Task sanity checks
                 ASSERT(taskGuid.metaDataPtr != NULL);
                 worker->curTask = (ocrTask_t*)taskGuid.metaDataPtr;
@@ -75,17 +84,20 @@ static void hcWorkShift(ocrWorker_t * worker) {
 #ifdef OCR_ENABLE_EDT_NAMING
                 hcWorker->name = worker->curTask->name;
 #endif
+                EXIT_PROFILE;
 #undef PD_TYPE
-#ifdef ENABLE_EXTENSION_BLOCKING_SUPPORT
             }
-#endif
+            {
+                START_PROFILE(wo_hc_wrapupWork);
 #define PD_TYPE PD_MSG_SCHED_NOTIFY
-            getCurrentEnv(NULL, NULL, NULL, &msg);
-            msg.type = PD_MSG_SCHED_NOTIFY | PD_MSG_REQUEST;
-            PD_MSG_FIELD_IO(schedArgs).kind = OCR_SCHED_NOTIFY_EDT_DONE;
-            PD_MSG_FIELD_IO(schedArgs).OCR_SCHED_ARG_FIELD(OCR_SCHED_NOTIFY_EDT_DONE).guid.guid = taskGuid.guid;
-            PD_MSG_FIELD_IO(schedArgs).OCR_SCHED_ARG_FIELD(OCR_SCHED_NOTIFY_EDT_DONE).guid.metaDataPtr = taskGuid.metaDataPtr;
-            RESULT_ASSERT(pd->fcts.processMessage(pd, &msg, false), ==, 0);
+                getCurrentEnv(NULL, NULL, NULL, &msg);
+                msg.type = PD_MSG_SCHED_NOTIFY | PD_MSG_REQUEST;
+                PD_MSG_FIELD_IO(schedArgs).kind = OCR_SCHED_NOTIFY_EDT_DONE;
+                PD_MSG_FIELD_IO(schedArgs).OCR_SCHED_ARG_FIELD(OCR_SCHED_NOTIFY_EDT_DONE).guid.guid = taskGuid.guid;
+                PD_MSG_FIELD_IO(schedArgs).OCR_SCHED_ARG_FIELD(OCR_SCHED_NOTIFY_EDT_DONE).guid.metaDataPtr = taskGuid.metaDataPtr;
+                RESULT_ASSERT(pd->fcts.processMessage(pd, &msg, false), ==, 0);
+                EXIT_PROFILE;
+            }
 
             // Important for this to be the last
             worker->curTask = NULL;
@@ -106,6 +118,7 @@ static void hcWorkShift(ocrWorker_t * worker) {
         hal_xadd32((u32*)&self->pqrFlags.pauseCounter, -1);
     }
 #endif
+    RETURN_PROFILE();
 }
 
 static void workerLoop(ocrWorker_t * worker) {

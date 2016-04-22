@@ -131,6 +131,21 @@ endif
 # focus function into an EVENT_OTHER bucket.
 # CFLAGS += -DPROFILER_COUNT_OTHER
 #
+# The following option is only relevant with PROFILER_FOCUS
+# By default, this is equal to PROFILER_FOCUS. The first level of
+# runtime calls from the PROFILER_PEEK function will be printed.
+# CFLAGS += -DPROFILER_PEEK=userCode
+#
+# The following is only relevant with PROFILER_FOCUS and PROFILER_IGNORE_RT
+# You can override what you consider to be runtime calls (and ignored by
+# PROFILER_IGNORE_RT) and user calls. By default, all runtime calls
+# are considered as runtime calls and user calls as user calls but you can
+# change that by setting PROFILER_NAME_ISRT to either 1 (to consider as
+# a runtime call) or 0 otherwise. NAME should be the name of the call, for
+# example PROFILER_userCode_ISRT. Note that by default, the calls PROFILER_FOCUS
+# and PROFILER_PEEK are always considered as user calls
+# CFLAGS += -DPROFILER_userCode_ISRT=0
+#
 # (optional) Maximum number of scope nesting for runtime profiler
 # CFLAGS += -DMAX_PROFILER_LEVEL=512
 

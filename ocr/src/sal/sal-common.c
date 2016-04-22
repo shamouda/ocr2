@@ -1,6 +1,7 @@
 #include "ocr-config.h"
 #include "ocr-types.h"
 #include "ocr-sal.h"
+#include "utils/profiler/profiler.h"
 
 //
 // Common part of the SAL for all architectures
@@ -500,6 +501,7 @@ badfmt:
 }
 
 u32 SNPRINTF(char * buf, u32 size, const char * fmt, ...) {
+    START_PROFILE(ocr_SNPRINTF);
     u32 tmp;
     __builtin_va_list ap;
 
@@ -509,7 +511,7 @@ u32 SNPRINTF(char * buf, u32 size, const char * fmt, ...) {
 
     __builtin_va_end(ap);
 
-    return tmp;
+    RETURN_PROFILE(tmp);
 }
 
 
@@ -530,6 +532,7 @@ u32 SNPRINTF(char * buf, u32 size, const char * fmt, ...) {
 #endif
 
 u32 PRINTF(const char * fmt, ...) {
+    START_PROFILE(ocr_PRINTF);
     u32 tmp;
     __builtin_va_list ap;
 
@@ -544,5 +547,5 @@ u32 PRINTF(const char * fmt, ...) {
 
     sal_print(printf_buf, tmp+1);
 
-    return tmp;
+    RETURN_PROFILE(tmp);
 }
