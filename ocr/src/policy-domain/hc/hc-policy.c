@@ -726,18 +726,16 @@ static void* allocateDatablock (ocrPolicyDomain_t *self,
                                 u64                prescription,
                                 u64               *allocatorIdx) {
     void* result;
-    u64 hints = 0; // Allocator hint
     u64 idx;  // Index into the allocators array to select the allocator to try.
     ASSERT (self->allocatorCount > 0);
     do {
-        hints = (prescription & 1)?(OCR_ALLOC_HINT_NONE):(OCR_ALLOC_HINT_REDUCE_CONTENTION);
         prescription >>= 1;
         idx = prescription & 7;  // Get the index of the allocator to use.
         prescription >>= 3;
         if ((idx > self->allocatorCount) || (self->allocators[idx] == NULL)) {
             continue;  // Skip this allocator if it doesn't exist.
         }
-        result = self->allocators[idx]->fcts.allocate(self->allocators[idx], size, hints);
+        result = self->allocators[idx]->fcts.allocate(self->allocators[idx], size, 0);
 
         if (result) {
             *allocatorIdx = idx;
@@ -2297,7 +2295,7 @@ void* hcPdMalloc(ocrPolicyDomain_t *self, u64 size) {
 #else
     // Just try in the first allocator
     void* toReturn = NULL;
-    toReturn = self->allocators[0]->fcts.allocate(self->allocators[0], size, 0);
+    toReturn = self->allocators[0]->fcts.allocate(self->allocators[0], size, OCR_ALLOC_HINT_RUNTIME);
     if(toReturn == NULL)
         DPRINTF(DEBUG_LVL_WARN, "Failed PDMalloc for size %"PRIx64"\n", size);
     ASSERT(toReturn != NULL);

@@ -635,8 +635,7 @@ static u8 xeAllocateDb(ocrPolicyDomain_t *self, ocrFatGuid_t *guid, void** ptr, 
     }
 
     s8 allocatorIndex = 0;
-    u64 allocatorHints = 0;
-    *ptr = self->allocators[allocatorIndex]->fcts.allocate(self->allocators[allocatorIndex], size, allocatorHints);
+    *ptr = self->allocators[allocatorIndex]->fcts.allocate(self->allocators[allocatorIndex], size, 0);
     // DPRINTF(DEBUG_LVL_WARN, "xeAllocateDb successfully returning %p\n", result);
 
     if (*ptr) {
@@ -1033,8 +1032,7 @@ void* xePdMalloc(ocrPolicyDomain_t *self, u64 size) {
 
     void* result;
     s8 allocatorIndex = 0;
-    u64 allocatorHints = 0;
-    result = self->allocators[allocatorIndex]->fcts.allocate(self->allocators[allocatorIndex], size, allocatorHints);
+    result = self->allocators[allocatorIndex]->fcts.allocate(self->allocators[allocatorIndex], size, OCR_ALLOC_HINT_RUNTIME);
     if (result) {
         RETURN_PROFILE(result);
     }

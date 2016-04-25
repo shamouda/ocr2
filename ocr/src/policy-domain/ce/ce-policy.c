@@ -2829,7 +2829,7 @@ void* cePdMalloc(ocrPolicyDomain_t *self, u64 size) {
         if ((allocatorIndex < 0) ||
             (allocatorIndex >= self->allocatorCount) ||
             (self->allocators[allocatorIndex] == NULL)) continue;  // Skip this allocator if it doesn't exist.
-        result = self->allocators[allocatorIndex]->fcts.allocate(self->allocators[allocatorIndex], size, allocatorHints);
+        result = self->allocators[allocatorIndex]->fcts.allocate(self->allocators[allocatorIndex], size, allocatorHints | OCR_ALLOC_HINT_RUNTIME);
         if (result) {
             return result;
         }

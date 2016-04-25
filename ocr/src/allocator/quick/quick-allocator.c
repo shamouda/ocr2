@@ -270,7 +270,7 @@ struct bmapOp {
 #define SIZE_TO_SLABS(size)     ( ((size)+SLAB_MASK) >> SLAB_SHIFT )
 #define SLAB_MAX_SIZE(index)    (  (index) << SLAB_SHIFT )
 #define SLAB_OVERHEAD           ( sizeof(u64)*3 )
-#define MAX_SLABS               ( 32 )
+#define MAX_SLABS               ( 36 )
 #define MAX_SIZE_FOR_SLABS      SLAB_MAX_SIZE(MAX_SLABS-1)
 #define MAX_OBJ_PER_SLAB        ( 63 )
 
@@ -1030,9 +1030,9 @@ static void quickInit(poolHdr_t *pool, u64 size)
     // TODO probably we need a barrier here to make sure init_count to reach its peak
 }
 
+#ifdef PER_AGENT_CACHE
 static void *quickInitCache(poolHdr_t *pool)
 {
-#ifdef PER_AGENT_CACHE
     struct per_agent_cache *q = quickMallocInternal(pool, sizeof(struct per_agent_cache), NULL /* TODO PD for TG ??*/);
     ASSERT(q);
     int i;
@@ -1042,8 +1042,8 @@ static void *quickInitCache(poolHdr_t *pool)
         q->lock = 0;
     }
     return q;
-#endif
 }
+#endif
 
 static void quickInsertFree(poolHdr_t *pool,u64 *p, u64 size, u32 flIndex, u32 slIndex)
 {
@@ -1619,15 +1619,18 @@ static struct slab_header *quickNewSlab(poolHdr_t *pool,s32 slabMaxSize, struct 
         return head;
 }
 
-static blkPayload_t *quickMalloc(poolHdr_t *pool,u64 size, struct _ocrPolicyDomain_t *pd)
+static blkPayload_t *quickMallocSlab(poolHdr_t *pool,u64 size, struct _ocrPolicyDomain_t *pd)
 {
-    if (size > MAX_SIZE_FOR_SLABS) // for big objects, go to the central heap
-        return quickMallocInternal(pool, size, pd);
+    if (size > MAX_SIZE_FOR_SLABS) {
+        DPRINTF(DEBUG_LVL_WARN, "size %"PRId64" is too large for slab?\n", size);
+        ASSERT(0);
+    }
+
     // s64 myid = (s64)pd;
     // ASSERT(myid >=0 && myid < MAX_THREAD);
     if (CACHE_POOL(myid) == NULL) {
         CACHE_POOL(myid) = quickInitCache(pool);
-        DPRINTF(DEBUG_LVL_VERB, "cache %p created\n", CACHE_POOL(myid));
+        DPRINTF(DEBUG_LVL_VERB, "cache %p created, handles up to size %"PRId64"\n", CACHE_POOL(myid), (long)MAX_SIZE_FOR_SLABS);
     }
 
     s32 slabsIndex = SIZE_TO_SLABS(size);
@@ -1672,6 +1675,13 @@ static blkPayload_t *quickMalloc(poolHdr_t *pool,u64 size, struct _ocrPolicyDoma
     CACHE_POOL(myid)->count_malloc[slabsIndex]++;
     hal_unlock32(&CACHE_POOL(myid)->lock);
     return ret;
+}
+
+static blkPayload_t *quickMalloc(poolHdr_t *pool,u64 size, struct _ocrPolicyDomain_t *pd)
+{
+    if (size > MAX_SIZE_FOR_SLABS) // for big objects, go to the central heap
+        return quickMallocInternal(pool, size, pd);
+    return quickMallocSlab(pool, size, pd);
 }
 
 static void quickFree(blkPayload_t *p)
@@ -1892,7 +1902,20 @@ void* quickAllocate(
     u64 hints) {            // Allocator-dependent hints
 
     ocrAllocatorQuick_t * rself = (ocrAllocatorQuick_t *) self;
-    void *ret = quickMalloc((poolHdr_t *)rself->poolAddr, size, self->pd);
+
+    void *ret;
+#ifdef PER_AGENT_CACHE
+    if (hints & OCR_ALLOC_HINT_RUNTIME) {
+        // ideally pdMalloc uses fast path only, but sometimes pdMalloc wants quite big size,
+        // e.g. ~256KB for baseDequeInit() so we use quickMalloc() to check just big sizes.
+        // ret = quickMallocSlab((poolHdr_t *)rself->poolAddr, size, self->pd);
+        ret = quickMalloc((poolHdr_t *)rself->poolAddr, size, self->pd);
+    } else {
+        ret = quickMalloc((poolHdr_t *)rself->poolAddr, size, self->pd);
+    }
+#else
+    ret = quickMalloc((poolHdr_t *)rself->poolAddr, size, self->pd);
+#endif
     DPRINTF(DEBUG_LVL_VERB, "quickAllocate called, ret %p from PoolAddr %"PRIx64"\n", ret, rself->poolAddr);
     return ret;
 }
