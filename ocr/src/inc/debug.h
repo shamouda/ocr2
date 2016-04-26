@@ -392,6 +392,25 @@ extern void doTrace(u64 location, u64 wrkr, ocrGuid_t taskGuid, ...);
 #define DO_DEBUG_TYPE(type, level) \
     if(OCR_DEBUG_##type  && level <= DEBUG_LVL_##type) {
 
+
+/* This weird macro allows for placing debug messages
+   in different sections. This is useful when you are constrained
+   in memory
+*/
+#ifdef OCR_DPRINTF_SECTION
+
+#define OCR_DPRINTF_SECT_STR_INT(sect) #sect
+#define OCR_DPRINTF_SECT_STR(sect) OCR_DPRINTF_SECT_STR_INT(sect)
+
+#define DPRINTF_STR(str) (__extension__({                               \
+                static const __attribute__((__section__(OCR_DPRINTF_SECT_STR(OCR_DPRINTF_SECTION)))) char __c[] = (str); \
+                (const char *)&__c;                                     \
+            }))
+
+#else
+#define DPRINTF_STR(str) (str)
+#endif
+
 #ifdef OCR_TRACE_BINARY
 
 #undef OCR_DEBUG_INIPARSING
@@ -418,8 +437,8 @@ extern void doTrace(u64 location, u64 wrkr, ocrGuid_t taskGuid, ...);
         struct _ocrPolicyDomain_t *__pd = NULL;                         \
         getCurrentEnv(&__pd, &__worker, &__task, NULL);                 \
         ocrGuid_t __taskGuid = __task ? __task->guid : NULL_GUID;       \
-        PRINTF(OCR_DEBUG_##type##_STR "(" OCR_DEBUG_##level##_STR       \
-               ") [PD:0x%"PRIx64" W:0x%"PRIx64" EDT:"GUIDF"] " format,  \
+        PRINTF(DPRINTF_STR(OCR_DEBUG_##type##_STR "(" OCR_DEBUG_##level##_STR \
+                           ") [PD:0x%"PRIx64" W:0x%"PRIx64" EDT:"GUIDF"] " format), \
                __pd?(u64)__pd->myLocation:0,                            \
                __worker?(u64)__worker->id:0,                            \
                GUIDA(__taskGuid), ## __VA_ARGS__);                      \

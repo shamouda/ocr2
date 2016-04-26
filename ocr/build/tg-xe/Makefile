@@ -25,6 +25,10 @@ PREFIX  := $(TG_INSTALL)/bin/xstg-linux-elf-
 CC      := $(PREFIX)clang
 CFLAGS  := -fxstg-extensions -fno-builtin -Wno-typedef-redefinition -I $(TG_INSTALL)/include
 
+# Uncomment the following line to move the strings used in DPRINTF to another section
+# which can then be moved to L2 or DRAM
+# CFLAGS  += -DOCR_PRINTF_SECTION=.dprintf_str
+
 RM      := rm
 RMFLAGS := -rf
 
