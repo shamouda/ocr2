@@ -65,12 +65,12 @@ inside \code{ocr.h}:
 \item \code{\#define TRUE 1};
 \item \code{\#define false 0};
 \item \code{\#define FALSE 0};
-\item \code{\#define NULL\_HINT}: A NULL pointer to ocrHint\_t. This value cannot
-  be assumed to be equal to zero.
-\item \code{\#define NULL\_GUID}: A NULL ocrGuid\_t. This value cannot
-  be assumed to be equal to zero.
-\item \code{\#define UNINITIALIZED\_GUID}: An Unitialized GUID (ie: never set);
-\item \code{\#define ERROR\_GUID}: An invalid GUID.
+\item \code{\#define NULL\_HINT}: A NULL pointer to ocrHint\_t.
+\item \code{\#define NULL\_GUID}: A reserved GUID value, used to indicate the absence of an OCR object.
+This value is roughly analogous to a null pointer; however, it cannot be assumed to be equal to zero.
+\item \code{\#define UNINITIALIZED\_GUID}: A reserved GUID value, used as a placeholder to indicate
+that a value is uninitialized.
+\item \code{\#define ERROR\_GUID}: A reserved GUID value, used to indicate that an error has occurred.
 \end{itemize}
 %%
 \paragraph*{OCR error codes}
