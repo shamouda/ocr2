@@ -202,7 +202,7 @@ u8 ocrEventSatisfySlot(ocrGuid_t eventGuid, ocrGuid_t dataGuid, u32 slot);
  * of the function will be used as funcName.
  */
 u8 ocrEdtTemplateCreate_internal(ocrGuid_t *guid, ocrEdt_t funcPtr,
-                                 u32 paramc, u32 depc, char* funcName);
+                                 u32 paramc, u32 depc, const char* funcName);
 
 
 #ifdef OCR_ENABLE_EDT_NAMING
