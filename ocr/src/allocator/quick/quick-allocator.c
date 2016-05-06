@@ -170,23 +170,39 @@ typedef void blkPayload_t; // Strongly type-check the ptr-to-void that comprises
 // |     |     |     |      user-visible     |     |
 // +-----+-----+-----+-----------------------+-----+
 //
-// HEAD and TAIL contains full size including HEAD/INFOs/TAIL in bytes and HEAD also has MARK in its higher 16 bits.
-// HEAD's bit0 is 1 for allocated block, or 0 for free block.
-// i.e.  HEAD == ( MARK | size | bit0 )  , and   TAIL == size
+// HEAD and TAIL contains full size including HEAD/INFOs/TAIL in bytes and HEAD also has MARK in its higher 8 bits.
+// HEAD's bit0 flag is 1 for allocated block, or 0 for free block. see below for details
+// i.e.  HEAD == ( MARK | User flags | size | flags )  , and TAIL == MARK | size
+
 // PEER_LEFT and PEER_RIGHT helps access neightbor blocks.
 // NEXT and PREV is valid for free blocks and forms linked list for free list.
 // INFO1 contains a pointer to the pool header which it belongs to. i.e. poolHdr_t
 // INFO2 contains canonical address for other agent/CE can use to free this block. (useful only on TG)
 
+//        |MSB  |                                                       LSB|
+//        |8bits|                  56 bits                                 |
+//        +-----+----------------------------------------------------------+
+// HEAD   |MARK | User flags  ...              size (low 3 bits are flags) |
+//        +-----+----------------------------------------------------------+
+//
+//        +-----+----------------------------------------------------------+
+// TAIL   |MARK |                              size                        |
+//        +-----+----------------------------------------------------------+
+
 //#define FINE_LOCKING     // WIP, disabled at this moment.
 
 // This mark helps detect invalid ptr or double free.
-#define MARK                    (0xfeef0055U)
-#define HEAD(X)                 (((u32 *)(X))[0])
+#define SHIFT_USER              (48)
+#define SHIFT_MARK              (56)
+#define MARK                    (0x5cUL << SHIFT_MARK)           // arbitrary number, but it's recommended the first bit set to 0 for slab allocator.
+#define MASK_MARK               (0xffUL << SHIFT_MARK)
+#define MASK_USER               (0xffUL << SHIFT_USER)
+#define MASK_FLAG               (0x7UL)
+#define MASK_SIZE               (~(MASK_MARK|MASK_USER|MASK_FLAG))
+
+#define HEAD(X)                 (((u64 *)(X))[0])
 #ifdef FINE_LOCKING
 #define HEAD_LOCK(X)            (((u32 *)(X))[1])
-#else
-#define HEAD_MARK(X)            (((u32 *)(X))[1])
 #endif
 #ifndef FINE_LOCKING
 struct bmapOp {int dummy;};
@@ -198,32 +214,29 @@ struct bmapOp {
 #endif
 
 // first 64bit == HEAD
-// last 64bit == TAIL , and last 32bit == TAIL_SIZE (holds block size)
-#define TAIL_SIZE(X,SIZE)       (*(u32 *)((u8 *)(X)+(SIZE)-sizeof(u64)))
+// last 64bit == TAIL
 #ifdef FINE_LOCKING
 #define TAIL_LOCK(X,SIZE)       (*(u32 *)((u8 *)(X)+(SIZE)-sizeof(u32)))
-#else
-#define TAIL_MARK(X,SIZE)       (*(u32 *)((u8 *)(X)+(SIZE)-sizeof(u32)))
 #endif
 #define TAIL(X,SIZE)            (*(u64 *)((u8 *)(X)+(SIZE)-sizeof(u64)))
 #define PEER_LEFT(X)            ((X)[-( ((s32 *)(X))[-2] >> 3 )])
 #define PEER_LEFT_TAIL_LOCK(X)  (((s32 *)(X))[-1])
 #define PEER_RIGHT(X,SIZE)      (*(u64 *)((u8 *)(X)+(SIZE)))
 
-#define MAX_BLOCK_SIZE          (0x80000000)  // To support per-agent cache
+#define MAX_BLOCK_SIZE          (0x1UL << 48) // this may viewed as a max pool size roughly
 #define FLAG_FREE               (0)
 #define FLAG_INUSE              (1)
 #define FLAG_MERGE              (2) // block locked, and is to be merged
 #define FLAG_INUSE_SLAB         (3)
 #define FLAG_FOR_SLAB           (0x2)  // FLAG_INUSE | FLAG_FOR_SLAB == FLAG_INUSE_SLAB
-#define GET_FLAG(X)             (  3UL & (X))
-#define GET_BIT2(X)             (  4UL & (X)) // BIT2: 0 for user , 1 for runtime
-#define GET_SIZE(X)             ( ~7UL & (X))
+#define GET_FLAG(X)             (MASK_FLAG & (X))
+#define GET_SIZE(X)             (MASK_SIZE & (X))
+#define GET_USER(X)             (MASK_USER & (X))
 #ifdef FINE_LOCKING
 #define GET_MARK(X)             (MARK)        // disable
 #else
 //#define GET_MARK(X)             (TAIL_MARK((X),GET_SIZE(HEAD(X))))
-#define GET_MARK(X)             (HEAD_MARK(X))
+#define GET_MARK(X)             (HEAD(X) & MASK_MARK)
 #endif
 
 // Additional INFOs
@@ -539,6 +552,7 @@ static void quickCleanPool(poolHdr_t *pool)
     u64 *p = pool->glebeStart;
     u64 size, flag;
     u64 *prev = p;
+    u64 count_slab_inuse = 0;
     for(;;) {
         size = GET_SIZE(HEAD(p));
         flag = GET_FLAG(HEAD(p));
@@ -565,7 +579,7 @@ static void quickCleanPool(poolHdr_t *pool)
                     p = prev;
                     continue;
                 } else {
-                    DPRINTF(DEBUG_LVL_INFO, "quickCleanPool: leak? found a slab in use.\n");
+                    count_slab_inuse++;
                 }
             } else {
             }
@@ -575,6 +589,7 @@ static void quickCleanPool(poolHdr_t *pool)
         if ( (u64)p >= end )
             break;
     }
+    DPRINTF(DEBUG_LVL_INFO, "quickCleanPool: leak? found %"PRId64" slabs in use.\n", count_slab_inuse);
 #endif
 }
 
@@ -588,17 +603,17 @@ static void quickWalkPool(poolHdr_t *pool, int opt)
         flag = GET_FLAG(HEAD(p));
         if (flag != FLAG_FREE) {
             if (flag == FLAG_INUSE) {
-                DPRINTF(DEBUG_LVL_INFO, "[size %"PRId64"] %p\n", size, p);
+                DPRINTF(DEBUG_LVL_INFO, "[size %"PRId64" user %"PRIx64"] %p\n", size, GET_USER(HEAD(p))>>SHIFT_USER , p);
             } else if (flag == FLAG_INUSE_SLAB) {
 #ifdef PER_AGENT_CACHE
                 struct slab_header *head = (struct slab_header *)HEAD_TO_USER(p);
                 ASSERT(head->mark == SLAB_MARK);
-                DPRINTF(DEBUG_LVL_INFO, "[size %"PRId64"] slab for %p\n", size, head->per_agent);
+                DPRINTF(DEBUG_LVL_INFO, "[size %"PRId64" user %"PRIx64"] slab for %p\n", size, GET_USER(HEAD(p))>>SHIFT_USER, head->per_agent);
 #else
                 ASSERT(0 && "FLAG_INUSE_SLAB without slab enabled?\n");
 #endif
             } else {
-                DPRINTF(DEBUG_LVL_INFO, "{size %"PRId64"}\n", size);
+                DPRINTF(DEBUG_LVL_INFO, "{size %"PRId64" user %"PRIx64"}\n", size, GET_USER(HEAD(p))>>SHIFT_USER);
             }
             total += size;
         }
@@ -959,18 +974,20 @@ static void quickInit(poolHdr_t *pool, u64 size)
 #endif
         //marks the glebe as a single free block
         size = size - offsetToGlebe;
-        HEAD(q) = size | FLAG_FREE;
+        if (size >= MAX_BLOCK_SIZE) {
+            DPRINTF(DEBUG_LVL_WARN,"Too big pool size! MAX is 0x%lx\n", MAX_BLOCK_SIZE);
+            ASSERT(0);
+        }
+        HEAD(q) = MARK | size | FLAG_FREE;
 
 #ifdef FINE_LOCKING
         HEAD_LOCK(q) = 0;
         TAIL_LOCK(q,size) = 0;
-#else
-        HEAD_MARK(q) = MARK;
-        TAIL_MARK(q,size) = MARK;
 #endif
         NEXT(q) = 0;
         PREV(q) = 0;
-        TAIL_SIZE(q,size) = size;
+//        TAIL_SIZE(q,size) = size;
+        TAIL(q,size) = MARK | size;
         pool->glebeStart = (u64 *)q;
         pool->glebeEnd = (u64 *)(p+size+offsetToGlebe);
         DPRINTF(DEBUG_LVL_VERB, "end of annex:%p , glebeStart:%p\n", &pool->sl[pool->flCount], pool->glebeStart);
@@ -1296,12 +1313,10 @@ retry:
         hal_lock32(&TAIL_LOCK(p, GET_SIZE(HEAD(p))));
 #endif
         // we're already holding lock
-        HEAD(p) = size | FLAG_INUSE;    // in-use mark
-        TAIL_SIZE(p, size) = size;
+        HEAD(p) = MARK | size | FLAG_INUSE;    // in-use mark
+        TAIL(p, size) = MARK | size;
 #ifdef FINE_LOCKING
         TAIL_LOCK(p, size) = 0;
-#else
-        TAIL_MARK(p, size) = MARK;
 #endif
         VALGRIND_CHUNK_CLOSE(p);
 
@@ -1311,14 +1326,12 @@ retry:
 
         VALGRIND_CHUNK_OPEN_INIT(right, remain);
         ASSERT((remain & ALIGNMENT_MASK) == 0);
-        HEAD(right) = remain | FLAG_FREE;
+        HEAD(right) = MARK | remain | FLAG_FREE;
         PREV(right) = NEXT(right) = -1;
 #ifdef FINE_LOCKING
         HEAD_LOCK(right) = 1;  // can this be 0 ?
-#else
-        HEAD_MARK(right) = MARK;
 #endif
-        TAIL_SIZE(right, remain) = remain;
+        TAIL(right, remain) = MARK | remain;
 #ifdef FINE_LOCKING
         hal_unlock32(&TAIL_LOCK(right, remain));
 #endif
@@ -1417,7 +1430,7 @@ static void quickFreeInternal(blkPayload_t *p)
     ASSERT_BLOCK_END
 
     u64 size = GET_SIZE(HEAD(q));
-    ASSERT_BLOCK_BEGIN(TAIL_SIZE(q, size) == size)
+    ASSERT_BLOCK_BEGIN(GET_SIZE(TAIL(q, size)) == size)
     DPRINTF(DEBUG_LVL_WARN, "QuickAlloc : two sizes doesn't match. p=%p\n", p);
     ASSERT_BLOCK_END
 
@@ -1462,14 +1475,14 @@ static void quickFreeInternal(blkPayload_t *p)
         DPRINTF(DEBUG_LVL_WARN, "QuickAlloc : right neighbor's mark not found %p\n", p);
         ASSERT_BLOCK_END
 
-        HEAD(q) = GET_SIZE(HEAD(q)) | FLAG_FREE;   // change flag
+        HEAD(q) = MARK | GET_SIZE(HEAD(q)) | FLAG_FREE;   // change flag
         if (GET_FLAG(HEAD(peer_right)) == FLAG_FREE) {     // right block is free?
             //printf("merge right..\n");
             u64 peer_size = GET_SIZE(HEAD(peer_right));
 #ifdef FINE_LOCKING
             hal_lock32(&TAIL_LOCK(peer_right, peer_size));
 #endif
-            HEAD(peer_right) = peer_size | FLAG_MERGE;
+            HEAD(peer_right) = MARK | peer_size | FLAG_MERGE;
 
             VALGRIND_CHUNK_CLOSE(peer_right);
             quickDeleteFree2(pool, peer_right, &bmap_op);
@@ -1477,9 +1490,9 @@ static void quickFreeInternal(blkPayload_t *p)
 
             // TAIL_MARK( = 0; erase header??
             size += peer_size;
-            TAIL_SIZE(peer_right, peer_size) = size;
+            TAIL(peer_right, peer_size) = MARK | size;
             HEAD(peer_right) = 0;    // erase header
-            HEAD(q) = size | FLAG_FREE;         // clear in-use bit
+            HEAD(q) = MARK | size | FLAG_FREE;         // clear in-use bit
             // peer_right merged.
         } else {
 #ifdef FINE_LOCKING
@@ -1493,7 +1506,7 @@ static void quickFreeInternal(blkPayload_t *p)
         hal_lock32(&HEAD_LOCK(q));
         hal_lock32(&TAIL_LOCK(q, GET_SIZE(HEAD(q))));
 #endif
-        HEAD(q) = GET_SIZE(HEAD(q)) | FLAG_FREE;   // clears in-use bit
+        HEAD(q) = MARK | GET_SIZE(HEAD(q)) | FLAG_FREE;   // clears in-use bit
     }
 
     VALGRIND_CHUNK_OPEN(q);
@@ -1533,7 +1546,7 @@ left_merge_retry:
         if (GET_FLAG(HEAD(peer_left))==FLAG_FREE) {      // left block is free?
             //printf("merge left..\n");
             u64 peer_size = GET_SIZE(HEAD(peer_left));
-            HEAD(peer_left) = peer_size | FLAG_MERGE;
+            HEAD(peer_left) = MARK | peer_size | FLAG_MERGE;
 
             // erase peer_left's mark?
             VALGRIND_CHUNK_CLOSE(peer_left);
@@ -1541,14 +1554,14 @@ left_merge_retry:
             VALGRIND_CHUNK_OPEN(peer_left);
 
             u64 new_size = size + peer_size;
-            TAIL_SIZE(q, size) = new_size;
+            TAIL(q, size) = MARK | new_size;
             size = new_size;
 
             VALGRIND_CHUNK_OPEN(q);
             HEAD(q) = 0;    // erase header
             VALGRIND_CHUNK_CLOSE(q);
             q = peer_left;
-            HEAD(q) = size | FLAG_FREE;    // clear in-use bit
+            HEAD(q) = MARK | size | FLAG_FREE;    // clear in-use bit
         } else {
 #ifdef FINE_LOCKING
             hal_unlock32(&HEAD_LOCK(peer_left));
@@ -1594,6 +1607,15 @@ left_merge_retry:
 #endif
 }
 
+// higher bits in 'user' that doesn't fit will be truncated.
+static void quickSetUserbits(blkPayload_t *p, u64 user)
+{
+    if (p == NULL)
+        return;
+    u64 *q = USER_TO_HEAD(p);
+    ASSERT(GET_USER(HEAD(q)) == 0);
+    HEAD(q) |= ((user<<SHIFT_USER)&MASK_USER);
+}
 
 #ifdef PER_AGENT_CACHE
 static struct slab_header *quickNewSlab(poolHdr_t *pool,s32 slabMaxSize, struct _ocrPolicyDomain_t *pd, struct per_agent_cache *per_agent)
@@ -1656,7 +1678,7 @@ static blkPayload_t *quickMallocSlab(poolHdr_t *pool,u64 size, struct _ocrPolicy
     s32 pos = myffs(slabs->bitmap);
     ASSERT(pos >= 0 && pos < MAX_OBJ_PER_SLAB);
     u64 *p = (u64 *)((u64)slabs + sizeof(struct slab_header)+(SLAB_OVERHEAD+slabMaxSize)*pos);
-    HEAD(p) = (s64)slabs - (s64)p;   // for cached objects, put negative offset in header.
+    HEAD(p) = ((s64)slabs - (s64)p)&(~MASK_USER);   // for cached objects, put negative offset in header, and clear user bits.
 
     // for only TG
     void *ret = HEAD_TO_USER(p);
@@ -1689,13 +1711,18 @@ static void quickFree(blkPayload_t *p)
     if (p == NULL)
         return;
     u64 *q = USER_TO_HEAD(p);
-    u64 size = GET_SIZE(HEAD(q));
-    if (size < MAX_BLOCK_SIZE) {   // in case of cached object, size is negative (offset to slab header)
+
+    // in case of cached objects, the head holds negative offset to slab header
+    // It has no flags, no mark, but it has user-bits. This will truncate higher 32bits,
+    // removing user-bits.
+    s32 neg_off = GET_SIZE(HEAD(q));
+    if (neg_off >= 0) {
         quickFreeInternal(p);
         return;
     }
+    // in case of cached object, it's negative offset to slab header
 
-    struct slab_header *head = (struct slab_header *)((s64)(q) + (s32)HEAD(q));
+    struct slab_header *head = (struct slab_header *)((s64)(q) + neg_off);
     ASSERT(head->mark == SLAB_MARK);
     s64 offset = (s64)q - (s64)head - sizeof(struct slab_header);
     s64 pos = offset / (head->size+SLAB_OVERHEAD);
@@ -1917,6 +1944,7 @@ void* quickAllocate(
     ret = quickMalloc((poolHdr_t *)rself->poolAddr, size, self->pd);
 #endif
     DPRINTF(DEBUG_LVL_VERB, "quickAllocate called, ret %p from PoolAddr %"PRIx64"\n", ret, rself->poolAddr);
+    quickSetUserbits(ret, hints);
     return ret;
 }
 void quickDeallocate(void* address) {
