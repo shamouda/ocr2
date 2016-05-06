@@ -666,7 +666,7 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
         // for a clone the cloning should actually be of an edt template
     }
 
-    bool destroyedMsg = false; // Temporary workaround: See Bug #936
+    bool postProcess = true; // Temporary workaround: See Bug #936
 
     //BUG #604 msg setup: how to double check that: msg->srcLocation has been filled by getCurrentEnv(..., &msg) ?
 
@@ -1945,6 +1945,14 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
         // store any pointers read from the request message
         ret = pdSelfDist->baseProcessMessage(self, msg, isBlocking);
 
+        if (msgInCopy && (ret != OCR_EPEND) && ((msg->type & PD_MSG_TYPE_ONLY) != PD_MSG_DB_ACQUIRE)) {
+            // The original message is now contained in msgInCopy. Since we use the new
+            // message to fulfil the communication we need to do extra work to clean up
+            // the original message. Hence, deallocate copy here unless the calling context
+            // is responsible for it.
+            self->fcts.pdFree(self, msgInCopy);
+        }
+
         // Here, 'msg' content has potentially changed if a response was required
         // If msg's destination is not the current location anymore, it means we were
         // processing an incoming request from another PD. Send the response now.
@@ -1997,19 +2005,17 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
             }
             default: { }
             }
+
+            // Do the post processing BEFORE sending otherwise the msg destruction is concurrent
+            hcDistSchedNotifyPostProcessMessage(self, msg);
+            postProcess = false;
+
             // Send the response message
             self->fcts.sendMessage(self, msg->destLocation, msg, NULL, sendProp);
-
-            if ((msgInCopy != NULL) && (msgInCopy != msg)) {
-                // A copy of the original message had been made to accomodate
-                // the response that was larger. Free the request message.
-                self->fcts.pdFree(self, msgInCopy);
-                destroyedMsg = true;
-            }
         }
     }
 
-    if (!destroyedMsg) { // Temporary workaround: See Bug #936
+    if (postProcess) { // Temporary workaround: See Bug #936
         hcDistSchedNotifyPostProcessMessage(self, msg);
     }
 

@@ -40,6 +40,9 @@ fi
 
 if [[ "${OCRRUN_GDB}" == "yes" ]]; then
     PROGRAM_BIN="gdb --args ${PROGRAM_BIN}"
+    if [[ "${OCR_ASAN}" == "yes" ]]; then
+        export ASAN_OPTIONS=abort_on_error=1
+    fi
 fi
 
 if [[ "${OCRRUN_VALGRIND_OPTS}" != "" ]]; then

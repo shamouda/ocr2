@@ -109,6 +109,9 @@ if [[ "$RES" != "" ]]; then
 
     if [[ "${OCRRUN_GDB}" == "yes" ]]; then
         OCR_MPI_OPTS+=" ${OCRRUN_OPT_GDB}"
+	if [[ "${OCR_ASAN}" == "yes" ]]; then
+	    export ASAN_OPTIONS=abort_on_error=1
+	fi
     fi
 
     if [[ "${OCRRUN_VALGRIND_OPTS}" != "" ]]; then
