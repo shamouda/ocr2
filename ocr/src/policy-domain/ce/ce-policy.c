@@ -2207,6 +2207,7 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
 #define PD_MSG msg
 #define PD_TYPE PD_MSG_SCHED_GET_WORK
         if (msg->type & PD_MSG_REQUEST) {
+            DPRINTF(DEBUG_LVL_VERB, "Processing request for work in msg %p\n", msg);
             u8 retVal = 0;
             ocrSchedulerOpWorkArgs_t *workArgs = &PD_MSG_FIELD_IO(schedArgs);
             workArgs->base.location = msg->srcLocation;
@@ -2214,8 +2215,11 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
                          self->schedulers[0], (ocrSchedulerOpArgs_t*)workArgs, (ocrRuntimeHint_t*)msg);
 
             if (retVal == 0) {
+                DPRINTF(DEBUG_LVL_VERB, "Successfully got work!\n");
                 PD_MSG_FIELD_O(returnDetail) = 0;
                 returnCode = ceProcessResponse(self, msg, 0);
+            } else {
+                DPRINTF(DEBUG_LVL_VERB, "No work found\n");
             }
         } else {
             ASSERT(msg->type & PD_MSG_RESPONSE);
@@ -2224,6 +2228,8 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             workArgs->OCR_SCHED_ARG_FIELD(OCR_SCHED_WORK_EDT_USER).edt.guid = NULL_GUID;
             workArgs->OCR_SCHED_ARG_FIELD(OCR_SCHED_WORK_EDT_USER).edt.metaDataPtr = NULL;
             if (!ocrGuidIsNull(fguid.guid)) {
+                DPRINTF(DEBUG_LVL_VERB, "Got work from 0x%"PRIx64": EDT GUID "GUIDF"\n",
+                        msg->srcLocation, GUIDA(fguid.guid));
                 localDeguidify(self, &fguid, NULL);
                 ocrSchedulerOpNotifyArgs_t notifyArgs;
                 notifyArgs.base.location = msg->srcLocation;
@@ -2232,6 +2238,8 @@ u8 cePolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
                 returnCode = self->schedulers[0]->fcts.op[OCR_SCHEDULER_OP_NOTIFY].invoke(
                         self->schedulers[0], (ocrSchedulerOpArgs_t*)(&notifyArgs), NULL);
             } else {
+                DPRINTF(DEBUG_LVL_VERB, "Got NULL work from 0x%"PRIx64" -- ignoring\n",
+                        msg->srcLocation);
                 // ASSERT(0); //HACK: We are probably in shutdown. Ignore!
             }
         }

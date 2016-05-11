@@ -541,6 +541,89 @@ u8 xePdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
 }
 
 
+// See bug #932
+// THe list of messages here are the ones that can originate from
+// the user but don't have REQ_RESPONSE set
+static void setReturnDetail(ocrPolicyMsg_t * msg, u8 returnDetail) {
+    switch(msg->type & PD_MSG_TYPE_ONLY) {
+    case PD_MSG_EVT_DESTROY:
+    {
+#define PD_MSG (msg)
+#define PD_TYPE PD_MSG_EVT_DESTROY
+        PD_MSG_FIELD_O(returnDetail) = returnDetail;
+#undef PD_MSG
+#undef PD_TYPE
+    break;
+    }
+    case PD_MSG_DEP_SATISFY:
+    {
+#define PD_MSG (msg)
+#define PD_TYPE PD_MSG_DEP_SATISFY
+        PD_MSG_FIELD_O(returnDetail) = returnDetail;
+#undef PD_MSG
+#undef PD_TYPE
+    break;
+    }
+    case PD_MSG_EDTTEMP_DESTROY:
+    {
+#define PD_MSG (msg)
+#define PD_TYPE PD_MSG_EDTTEMP_DESTROY
+        PD_MSG_FIELD_O(returnDetail) = returnDetail;
+#undef PD_MSG
+#undef PD_TYPE
+    break;
+    }
+    case PD_MSG_WORK_CREATE:
+    {
+#define PD_MSG (msg)
+#define PD_TYPE PD_MSG_WORK_CREATE
+        PD_MSG_FIELD_O(returnDetail) = returnDetail;
+#undef PD_MSG
+#undef PD_TYPE
+    break;
+    }
+    case PD_MSG_WORK_DESTROY:
+    {
+#define PD_MSG (msg)
+#define PD_TYPE PD_MSG_WORK_DESTROY
+        PD_MSG_FIELD_O(returnDetail) = returnDetail;
+#undef PD_MSG
+#undef PD_TYPE
+    break;
+    }
+    case PD_MSG_DEP_ADD:
+    {
+#define PD_MSG (msg)
+#define PD_TYPE PD_MSG_DEP_ADD
+        PD_MSG_FIELD_O(returnDetail) = returnDetail;
+#undef PD_MSG
+#undef PD_TYPE
+    break;
+    }
+    case PD_MSG_DEP_DYNADD:
+    {
+#define PD_MSG (msg)
+#define PD_TYPE PD_MSG_DEP_DYNADD
+        PD_MSG_FIELD_O(returnDetail) = returnDetail;
+#undef PD_MSG
+#undef PD_TYPE
+    break;
+    }
+    case PD_MSG_DB_FREE:
+    {
+#define PD_MSG (msg)
+#define PD_TYPE PD_MSG_DB_FREE
+        PD_MSG_FIELD_O(returnDetail) = returnDetail;
+#undef PD_MSG
+#undef PD_TYPE
+    break;
+    }
+    default:
+    ASSERT("Unhandled message type in setReturnDetail");
+    break;
+    }
+}
+
 void xePolicyDomainDestruct(ocrPolicyDomain_t * policy) {
     // Destroying instances
     u64 i = 0;
@@ -713,6 +796,8 @@ static u8 xeProcessCeRequest(ocrPolicyDomain_t *self, ocrPolicyMsg_t **msg) {
         }
     } else {
         returnCode = self->fcts.sendMessage(self, self->parentLocation, (*msg), NULL, 0);
+        // See Bug #932
+        setReturnDetail(*msg, returnCode);
     }
     return returnCode;
 }

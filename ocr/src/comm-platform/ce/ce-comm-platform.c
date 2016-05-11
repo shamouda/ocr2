@@ -140,7 +140,7 @@ static u8 ceCommSendMessageToCE(ocrCommPlatform_t *self, ocrLocation_t target,
     // Figure out where our remote boxes our (where we are sending to)
     rmbox = (u64 *) (SR_L1_BASE(CLUSTER_FROM_ID(target), BLOCK_FROM_ID(target), AGENT_FROM_ID(target))
                      + MSG_CE_ADDR_OFFT);
-
+    u64* usedRmBox __attribute__((unused)) = NULL;
     // Calculate our absolute sendBuf address
     msgAbsAddr = SR_L1_BASE(CLUSTER_FROM_ID(self->location), BLOCK_FROM_ID(self->location),
                             AGENT_FROM_ID(self->location))
@@ -158,9 +158,11 @@ static u8 ceCommSendMessageToCE(ocrCommPlatform_t *self, ocrLocation_t target,
             if(retval == EMPTY_SLOT)
                 break;
         }
+
         if(retval == EMPTY_SLOT) {
-            DPRINTF(DEBUG_LVL_VERB, "Message requires a response, reserved slot %"PRIu32" on local queue for 0x%"PRIx64"\n", i, self->location);
             message->msgId = (self->location << 8) + i;
+            DPRINTF(DEBUG_LVL_VERB, "Message requires a response, reserved slot %"PRIu32" on local queue for 0x%"PRIx64" -- setting message @ %p to ID 0x%"PRIx64"\n",
+                    i, self->location, message, message->msgId);
         } else {
             DPRINTF(DEBUG_LVL_VERB, "Message requires a response but local return queue is busy\n");
             return OCR_EBUSY;
@@ -174,7 +176,7 @@ static u8 ceCommSendMessageToCE(ocrCommPlatform_t *self, ocrLocation_t target,
         message->type &= ~PD_MSG_RESPONSE_OVERRIDE;
 
         // Make sure we are sending back to the right CE
-        if((message->msgId &= ~0xFFULL) != (target << 8)) {
+        if((message->msgId & ~0xFFULL) != (target << 8)) {
             DPRINTF(DEBUG_LVL_WARN, "Expected to send response to 0x%"PRIx64" but read msgId 0x%"PRIx64" (location: 0x%"PRIx64")\n",
                     target, message->msgId, message->msgId >> 8);
             ASSERT(0);
@@ -186,7 +188,14 @@ static u8 ceCommSendMessageToCE(ocrCommPlatform_t *self, ocrLocation_t target,
         // Actually marshall the message
         ocrPolicyMsgMarshallMsg(message, baseSize, (u8 *)sendBuf, MARSHALL_FULL_COPY);
         // And now set the slot propertly (from reserved to the address)
-        RESULT_ASSERT(hal_cmpswap64(&(rmbox[message->msgId & 0xFF]), RESERVED_SLOT, msgAbsAddr), ==, RESERVED_SLOT);
+        u64 t;
+        if((t = hal_cmpswap64(&(rmbox[message->msgId & 0xFF]), RESERVED_SLOT, msgAbsAddr)) != RESERVED_SLOT) {
+            DPRINTF(DEBUG_LVL_WARN, "Attempted to send message %p of type 0x%"PRIx32" (@ %p) to 0x%"PRIx64" using slot %"PRIu64" (msgId: 0x%"PRIx64") failed because rmbox @ %p is at 0x%"PRIx64"; trying to set to 0x%"PRIx64"\n",
+                    message, message->type, &(message->type), target, message->msgId & 0xFF, message->msgId, &(rmbox[message->msgId & 0xFF]), t, msgAbsAddr);
+            ASSERT(0);
+        }
+        //RESULT_ASSERT(hal_cmpswap64(&(rmbox[message->msgId & 0xFF]), RESERVED_SLOT, msgAbsAddr), ==, RESERVED_SLOT);
+        usedRmBox = &(rmbox[message->msgId & 0xFF]);
     } else {
         // We need to find a slot to send to. We first reserve to save on marshalling if unsuccessful
         for(i=0; i<OUTSTANDING_CE_MSGS; ++i) {
@@ -207,10 +216,12 @@ static u8 ceCommSendMessageToCE(ocrCommPlatform_t *self, ocrLocation_t target,
             ocrPolicyMsgMarshallMsg(message, baseSize, (u8 *)sendBuf, MARSHALL_FULL_COPY);
             // And now set the slot propertly (from reserved to the address)
             RESULT_ASSERT(hal_cmpswap64(&(rmbox[i]), RESERVED_SLOT, msgAbsAddr), ==, RESERVED_SLOT);
+            usedRmBox = &(rmbox[i]);
         }
     }
-    DPRINTF(DEBUG_LVL_VERB, "Sent CE->CE message %p ID 0x%"PRIx64" (type 0x%"PRIx32") from 0x%"PRIx64" to 0x%"PRIx64" slot %"PRIu32" using buffer %p\n",
-            message, message->msgId, message->type, self->location, target, i, sendBuf);
+    ASSERT(usedRmBox);
+    DPRINTF(DEBUG_LVL_VERB, "Sent CE->CE message %p ID 0x%"PRIx64" (type 0x%"PRIx32") from 0x%"PRIx64" to 0x%"PRIx64" slot %"PRIu32" using buffer %p at %p\n",
+            message, message->msgId, message->type, self->location, target, i, sendBuf, usedRmBox);
     return 0;
 }
 
@@ -315,10 +326,12 @@ u8 ceCommSwitchRunlevel(ocrCommPlatform_t *self, ocrPolicyDomain_t *PD, ocrRunle
             // Arbitrary first choice for the queue
             cp->pollq = 0;
 
-            // Initialize things
-            for(i = 0; i < OUTSTANDING_CE_MSGS; ++i) {
-                *(u64*)(AR_L1_BASE + MSG_CE_ADDR_OFFT + i*sizeof(u64)) = EMPTY_SLOT;
-            }
+            // REC: We do not initialize at this point because this can
+            // race with another agent using this. We assume that L1 is zeroed out
+            // for now. This will go away with QMA support
+            //for(i = 0; i < OUTSTANDING_CE_MSGS; ++i) {
+            //*(u64*)(AR_L1_BASE + MSG_CE_ADDR_OFFT + i*sizeof(u64)) = EMPTY_SLOT;
+            //}
 
             // Statically check stage area is big enough for 1 policy message + F/E word
             COMPILE_TIME_ASSERT(MSG_QUEUE_SIZE >= (sizeof(u64) + sizeof(ocrPolicyMsg_t)));

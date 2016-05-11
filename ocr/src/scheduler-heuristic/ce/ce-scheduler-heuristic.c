@@ -45,20 +45,6 @@
 /* OCR-CE SCHEDULER_HEURISTIC                         */
 /******************************************************/
 
-//Check if loc is another CE that is a child of this CE
-static bool isChildCe(ocrLocation_t myLocation, ocrLocation_t loc) {
-    if (AGENT_FROM_ID(loc) != ID_AGENT_CE)
-        return false;
-    if (BLOCK_FROM_ID(myLocation) == 0) {                              //If I am the block0 CE, ...
-        if (CLUSTER_FROM_ID(myLocation) == 0) {                        //If I am the cluster0,block0 CE
-            return true;                                                  //then, everyone is my child
-        } else if (CLUSTER_FROM_ID(myLocation) == CLUSTER_FROM_ID(loc)) { //else if, context is a CE in my cluster
-            return true;                                                  //then, this non-block0 CE is my child
-        }
-    }
-    return false;
-}
-
 ocrSchedulerHeuristic_t* newSchedulerHeuristicCe(ocrSchedulerHeuristicFactory_t * factory, ocrParamList_t *perInstance) {
     ocrSchedulerHeuristic_t* self = (ocrSchedulerHeuristic_t*) runtimeChunkAlloc(sizeof(ocrSchedulerHeuristicCe_t), PERSISTENT_CHUNK);
     initializeSchedulerHeuristicOcr(factory, self, perInstance);
@@ -133,11 +119,7 @@ u8 ceSchedulerHeuristicSwitchRunlevel(ocrSchedulerHeuristic_t *self, ocrPolicyDo
                 } else {
                     context->location = PD->neighbors[i - xeCount];
                     ceContext->canAcceptWorkRequest = true;
-                    if (isChildCe(PD->myLocation, context->location)) {
-                        ceContext->isChild = true;
-                    } else {
-                        ceContext->isChild = false;
-                    }
+                    ceContext->isChild = false;
                 }
                 if (ceContext->isChild) {
                     DPRINTF(DEBUG_LVL_VVERB, "Created context %"PRId32" for location: %"PRIx64" (CHILD)\n", i, context->location);
@@ -264,7 +246,14 @@ static u8 ceWorkStealingGet(ocrSchedulerHeuristic_t *self, ocrSchedulerHeuristic
 
 static u8 ceSchedulerHeuristicWorkEdtUserInvoke(ocrSchedulerHeuristic_t *self, ocrSchedulerHeuristicContext_t *context, ocrSchedulerOpArgs_t *opArgs, ocrRuntimeHint_t *hints) {
     ocrSchedulerHeuristicCe_t *derived = (ocrSchedulerHeuristicCe_t*)self;
-    ASSERT(!derived->shutdownMode);
+    // REC: Hack for now because it seems that messages like this still get through
+    // even after a shutdown is noticed. This may be due to messages that are not fully
+    // drained. At any rate, we will, for now, return an error code and print a warning
+    if(derived->shutdownMode) {
+        DPRINTF(DEBUG_LVL_WARN, "Request for work received after shutdown invoked.\n");
+        return 1;
+    }
+    //ASSERT(!derived->shutdownMode);
     ocrSchedulerOpWorkArgs_t *taskArgs = (ocrSchedulerOpWorkArgs_t*)opArgs;
     ocrFatGuid_t *fguid = &(taskArgs->OCR_SCHED_ARG_FIELD(OCR_SCHED_WORK_EDT_USER).edt);
     u8 retVal = ceWorkStealingGet(self, context, fguid);
@@ -324,6 +313,8 @@ static u8 handleEmptyResponse(ocrSchedulerHeuristic_t *self, ocrSchedulerHeurist
 
 static u8 ceSchedulerHeuristicNotifyEdtReadyInvoke(ocrSchedulerHeuristic_t *self, ocrSchedulerHeuristicContext_t *context, ocrSchedulerOpArgs_t *opArgs, ocrRuntimeHint_t *hints) {
     ocrSchedulerHeuristicCe_t *derived = (ocrSchedulerHeuristicCe_t*)self;
+    // We should definitely not have EDTs becoming ready after the shutdown is called
+    // Maybe if the shutdown is not the last EDT but even then...
     ASSERT(!derived->shutdownMode);
     DPRINTF(DEBUG_LVL_VVERB, "GIVE WORK INVOKE from %"PRIx64"\n", opArgs->location);
     ocrSchedulerOpNotifyArgs_t *notifyArgs = (ocrSchedulerOpNotifyArgs_t*)opArgs;
@@ -646,7 +637,7 @@ u8 ceSchedulerHeuristicUpdate(ocrSchedulerHeuristic_t *self, u32 properties) {
             fguid.guid = NULL_GUID;
             fguid.metaDataPtr = NULL;
 
-            //First, ensure shutdown response is sent to all pending children...
+            //Ensure shutdown response is sent to all pending XE children... (they are sitting around doing nothing)
             for (i = 0; i < self->contextCount; i++) {
                 ocrSchedulerHeuristicContext_t *context = self->contexts[i];
                 ocrSchedulerHeuristicContextCe_t *ceContext = (ocrSchedulerHeuristicContextCe_t*)context;
@@ -656,15 +647,7 @@ u8 ceSchedulerHeuristicUpdate(ocrSchedulerHeuristic_t *self, u32 properties) {
                 }
             }
 
-            //Next, try to send shutdown to other pending agents
-            for (i = 0; i < self->contextCount; i++) {
-                ocrSchedulerHeuristicContext_t *context = self->contexts[i];
-                ocrSchedulerHeuristicContextCe_t *ceContext = (ocrSchedulerHeuristicContextCe_t*)context;
-                if (ceContext->inWorkRequestPending) {
-                    //respondShutdown(self, context, false);
-                    respondWorkRequest(self, context, &fguid);
-                }
-            }
+            // No need to inform CEs as the PD takes care of this.
 
 #if 0
             //Finally try to shutdown to non-pending CE children as well
