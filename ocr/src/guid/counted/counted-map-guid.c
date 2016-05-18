@@ -32,7 +32,7 @@
 #define GUID_KIND_SIZE 5 // Warning! check ocrGuidKind struct definition for correct size
 
 #ifdef GUID_PROVIDER_WID_INGUID
-#ifndef GUID_WID_SIZE
+#ifndef GUID_PROVIDER_WID_SIZE
 #define GUID_WID_SIZE 4
 #else
 #define GUID_WID_SIZE GUID_PROVIDER_WID_SIZE
