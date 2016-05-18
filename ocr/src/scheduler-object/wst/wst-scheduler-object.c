@@ -94,15 +94,20 @@ static void wstSchedulerObjectInitialize(ocrSchedulerObjectFactory_t *fact, ocrS
     ocrSchedulerObjectWst_t* wstSchedObj = (ocrSchedulerObjectWst_t*)self;
     wstSchedObj->numDeques = 0;
     wstSchedObj->deques = NULL;
+    wstSchedObj->config = SCHEDULER_OBJECT_WST_CONFIG_REGULAR;
     paramListSchedulerObjectWst_t *paramsWst = (paramListSchedulerObjectWst_t*)perInstance;
-    wstSchedObj->config = paramsWst->config;
-    switch(paramsWst->config) {
-    case SCHEDULER_OBJECT_WST_CONFIG_REGULAR:
-    case SCHEDULER_OBJECT_WST_CONFIG_STATIC:
-        break;
-    default:
-        ASSERT(0);
-        break;
+    // There's no specific initialization for now. Default should be regular and
+    // if there's any init it should be done when paramWst is not null too.
+    if (paramsWst != NULL) {
+        wstSchedObj->config = paramsWst->config;
+        switch(paramsWst->config) {
+        case SCHEDULER_OBJECT_WST_CONFIG_REGULAR:
+        case SCHEDULER_OBJECT_WST_CONFIG_STATIC:
+            break;
+        default:
+            ASSERT(0);
+            break;
+        }
     }
 }
 
