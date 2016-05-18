@@ -44,7 +44,7 @@ typedef struct ocrEventHc_t {
                              * events/EDTs depending on this event */
     volatile u32 waitersCount; /**< Number of waiters in waitersDb */
     u32 waitersMax; /**< Maximum number of waiters in waitersDb */
-    volatile u32 waitersLock;
+    u32 waitersLock;
     ocrRuntimeHint_t hint;
 } ocrEventHc_t;
 
@@ -60,7 +60,7 @@ typedef struct _ocrEventHcCounted_t {
 
 typedef struct _ocrEventHcLatch_t {
     ocrEventHc_t base;
-    volatile s32 counter;
+    s32 counter;
 } ocrEventHcLatch_t;
 
 typedef struct _ocrEventHcChannel_t {

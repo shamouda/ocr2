@@ -77,7 +77,7 @@ typedef struct _ocrBinHeap_t {
 // binHeap with lock
 typedef struct _ocrBinHeapLocked_t {
     binHeap_t base;
-    volatile u32 lock;
+    u32 lock;
 } binHeapLocked_t;
 
 /****************************************************/

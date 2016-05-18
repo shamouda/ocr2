@@ -52,10 +52,10 @@ typedef struct {
     ocrGuid_t* unkDbs;     /**< Contains the list of DBs dynamically acquired (through DB create) */
     u32 countUnkDbs;       /**< Count in unkDbs */
     u32 maxUnkDbs;         /**< Maximum number in unkDbs */
-    volatile u32 frontierSlot; /**< Slot of the execution frontier
+    u32 frontierSlot; /**< Slot of the execution frontier
                                   This excludes once events */
-    volatile u32 slotSatisfiedCount; /**< Number of slots satisfied */
-    volatile u32 lock;
+    u32 slotSatisfiedCount; /**< Number of slots satisfied */
+    u32 lock;
     ocrEdtDep_t * resolvedDeps; /**< List of satisfied dependences */
     u64 doNotReleaseSlots[OCR_MAX_MULTI_SLOT];
     ocrRuntimeHint_t hint;

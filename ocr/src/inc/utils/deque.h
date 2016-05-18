@@ -85,7 +85,7 @@ typedef struct _ocrDeque_t {
 // deque with single lock
 typedef struct _ocrDequeSingleLocked_t {
     deque_t base;
-    volatile u32 lock;
+    u32 lock;
 } dequeSingleLocked_t;
 
 /****************************************************/

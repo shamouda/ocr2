@@ -61,8 +61,8 @@ static void hcWorkShift(ocrWorker_t * worker) {
         // We got a response
         ocrFatGuid_t taskGuid = PD_MSG_FIELD_IO(schedArgs).OCR_SCHED_ARG_FIELD(OCR_SCHED_WORK_EDT_USER).edt;
         if(!(ocrGuidIsNull(taskGuid.guid))){
-#ifdef ENABLE_EXTENSION_BLOCKING_SUPPORT
             ocrTask_t * curTask = (ocrTask_t*)taskGuid.metaDataPtr;
+#ifdef ENABLE_EXTENSION_BLOCKING_SUPPORT
             if (((curTask->flags & OCR_TASK_FLAG_LONG) != 0) && (((ocrWorkerHc_t *) worker)->isHelping)) {
                 // Illegal to pick up a LONG EDT in that case to avoid creating a deadlock
                 curTask->state = RESCHED_EDTSTATE;
@@ -73,16 +73,16 @@ static void hcWorkShift(ocrWorker_t * worker) {
                 START_PROFILE(wo_hc_executeWork);
                 // Task sanity checks
                 ASSERT(taskGuid.metaDataPtr != NULL);
-                worker->curTask = (ocrTask_t*)taskGuid.metaDataPtr;
+                worker->curTask = curTask;
                 DPRINTF(DEBUG_LVL_VERB, "Worker shifting to execute EDT GUID "GUIDF"\n", GUIDA(taskGuid.guid));
                 u32 factoryId = PD_MSG_FIELD_O(factoryId);
-                pd->taskFactories[factoryId]->fcts.execute(worker->curTask);
+                pd->taskFactories[factoryId]->fcts.execute(curTask);
                 //Store state at worker level to report most recent state on pause.
-                hcWorker->templateGuid = worker->curTask->templateGuid;
-                hcWorker->edtGuid = worker->curTask->guid;
-                hcWorker->fctPtr  = worker->curTask->funcPtr;
+                hcWorker->templateGuid = curTask->templateGuid;
+                hcWorker->edtGuid = curTask->guid;
+                hcWorker->fctPtr  = curTask->funcPtr;
 #ifdef OCR_ENABLE_EDT_NAMING
-                hcWorker->name = worker->curTask->name;
+                hcWorker->name = curTask->name;
 #endif
                 EXIT_PROFILE;
 #undef PD_TYPE

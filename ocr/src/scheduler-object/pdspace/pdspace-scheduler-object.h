@@ -26,7 +26,7 @@ typedef struct _ocrSchedulerObjectPdspace_t {
     ocrSchedulerObject_t base;
     ocrSchedulerObject_t *dbMap;    /* Hash table to map a DB guid to the scheduler object in this node */
     ocrSchedulerObject_t *wst;      /* Scheduler object for a workstealing place */
-    volatile u32 lock;
+    u32 lock;
 } ocrSchedulerObjectPdspace_t;
 
 /****************************************************/

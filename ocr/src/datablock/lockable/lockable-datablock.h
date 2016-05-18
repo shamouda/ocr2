@@ -33,12 +33,12 @@ typedef struct {
 
 typedef union {
     struct {
-        volatile u64 flags : 16;
-        volatile u64 numUsers : 15;
-        volatile u64 internalUsers : 15;
-        volatile u64 freeRequested: 1;
-        volatile u64 modeLock : 2;
-        volatile u64 _padding : 1;
+        u64 flags : 16;
+        u64 numUsers : 15;
+        u64 internalUsers : 15;
+        u64 freeRequested: 1;
+        u64 modeLock : 2;
+        u64 _padding : 1;
     };
     u64 data;
 } ocrDataBlockLockableAttr_t;

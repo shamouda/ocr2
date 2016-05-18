@@ -51,7 +51,7 @@ typedef struct _ocrSchedulerHeuristicSt_t {
     ocrSchedulerHeuristic_t base;
     ocrLocation_t schedulerLocation;            // The node location where the scheduling analysis is done on behalf of this node.
     ocrLocation_t locationPlacement;            // Location where last EDT was placed
-    volatile u32 locationLock;                  // Lock to make round-robin decision
+    u32 locationLock;                           // Lock to make round-robin decision
 } ocrSchedulerHeuristicSt_t;
 
 /****************************************************/
