@@ -119,12 +119,12 @@ static u8 placerAffinitySchedHeuristicNotifyProcessMsgInvoke(ocrSchedulerHeurist
     ocrSchedulerOpNotifyArgs_t *notifyArgs = (ocrSchedulerOpNotifyArgs_t*)opArgs;
     ASSERT(notifyArgs->kind == OCR_SCHED_NOTIFY_PRE_PROCESS_MSG);
     ocrPolicyMsg_t * msg = notifyArgs->OCR_SCHED_ARG_FIELD(OCR_SCHED_NOTIFY_PRE_PROCESS_MSG).msg;
-    u64 msgType = (msg->type & PD_MSG_TYPE_ONLY);
     ocrSchedulerHeuristicPlacementAffinity_t * dself = (ocrSchedulerHeuristicPlacementAffinity_t *) self;
     ocrPlatformModelAffinity_t * model = dself->platformModel; // Cached from the PD initialization
-    ocrLocation_t curLoc = dself->myLocation;
-    if ((msg->srcLocation == curLoc) && (msg->destLocation == curLoc) && (model != NULL) && (model->pdLocAffinities != NULL)) {
+    if ((model != NULL) && (msg->srcLocation == msg->destLocation)) {
+        ASSERT(msg->srcLocation == dself->myLocation); // and message was local
         // Check if we need to place the DB/EDTs
+        u64 msgType = (msg->type & PD_MSG_TYPE_ONLY);
         bool doAutoPlace = false;
         switch(msgType) {
             case PD_MSG_WORK_CREATE:
