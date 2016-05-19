@@ -338,6 +338,11 @@ function compile () {
     cd $FOLDER;
     NAME=
     get_name ${FILE}
+    if [[ "${OCR_ASAN}" = "yes" ]]; then
+        ASAN_FLAGS="-g -fsanitize=address -fno-omit-frame-pointer"
+        CFLAGS+=${ASAN_FLAGS}
+        LDFLAGS+=${ASAN_FLAGS}
+    fi
     echo "${CC} ${OCR_CFLAGS} ${CFLAGS} ${INCLUDES} ${FILE} -o ${BIN_GEN_DIR}/${NAME} ${LDFLAGS}"
     ${CC} ${OCR_CFLAGS} ${CFLAGS} ${INCLUDES} ${FILE} -o ${BIN_GEN_DIR}/${NAME} ${LDFLAGS}
     RES=$?
