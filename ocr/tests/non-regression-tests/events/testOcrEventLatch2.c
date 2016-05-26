@@ -31,6 +31,7 @@ ocrGuid_t childEDT(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
 
     // Do some work
     array[idx] = 1;
+    ocrDbRelease(depv[2].guid);
 
     // Checkout of the finish scope
     ocrEventSatisfySlot(latchGuid, NULL_GUID, OCR_EVENT_LATCH_DECR_SLOT);
