@@ -4,12 +4,9 @@
 #include <features.h>
 #include <stdint.h>
 #include <errno.h>
-typedef long _off_t;
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/syscall.h>
-#include <sys/_types.h>
-#include <sys/reent.h>
 #include <sys/time.h>
 #include <sys/stat.h>
 #include <signal.h>
@@ -111,9 +108,6 @@ static int nlflags_to_linux( int nlflags )
 
 ///////////////////////////////////////////////////////////////////////////////
 // System call shim definition
-
-struct _ocr_reent ocrreent;
-struct _reent *_impure_ptr = (struct _reent *)&ocrreent;
 
 static inline int isNull( ocrGuid_t g ) { return ocrGuidIsNull(g); }
 
