@@ -110,9 +110,9 @@ extern void _ocrAssert(bool val, const char* str, const char* file, u32 line);
 #define VERIFY(cond, format, ...)                                       \
     do {                                                                \
         if(!(cond)) {                                                   \
-            PRINTF("FAILURE @ '%s:%"PRId32"' " format, __FILE__, __LINE__, ## __VA_ARGS__); \
+            PRINTF("FAILURE @ '%s:%" PRId32 "' " format, __FILE__, __LINE__, ## __VA_ARGS__); \
         } else {                                                        \
-            PRINTF("PASSED @ '%s:%"PRId32"' " format, __FILE__, __LINE__, ## __VA_ARGS__); \
+            PRINTF("PASSED @ '%s:%" PRId32 "' " format, __FILE__, __LINE__, ## __VA_ARGS__); \
         }                                                               \
     } while(0);
 
