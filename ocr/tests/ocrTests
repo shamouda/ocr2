@@ -364,7 +364,7 @@ function compile () {
     NAME=
     get_name ${FILE}
     if [[ "${OCR_ASAN}" = "yes" ]]; then
-        ASAN_FLAGS="-g -fsanitize=address -fno-omit-frame-pointer"
+        ASAN_FLAGS=" -g -fsanitize=address -fno-omit-frame-pointer"
         CFLAGS+=${ASAN_FLAGS}
         LDFLAGS+=${ASAN_FLAGS}
     fi
@@ -630,6 +630,7 @@ function print_test_status () {
     local RUN=0
     local FAIL=0
     local ERR=0
+    local COLOR=30
 
     if [[ $STATUS -eq $RUN_STATUS ]]; then
         # No pbs
@@ -639,15 +640,17 @@ function print_test_status () {
 
     if [[ $STATUS -eq $FAIL_STATUS ]]; then
         # RAN but didn't verified
+        COLOR=31
         FAIL=1
     fi
 
     if [[ $STATUS -eq $ERR_STATUS ]]; then
         # didn't compiled
+        COLOR=31
         ERR=1
 fi
 
-    echo "Tests run: $RUN, Failures: $FAIL, Errors: $ERR"
+    echo -e "\033[${COLOR}mTests run: $RUN, Failures: $FAIL, Errors: ${ERR}\033[m"
 }
 
 
