@@ -171,6 +171,14 @@ ocrGuid_t ocrWait(ocrGuid_t outputEvent);
 
 u8 ocrLegacyBlockProgress(ocrGuid_t handle, ocrGuid_t *guid, void **result, u64* size,
                           u16 properties);
+
+/**
+ * @brief MPI-Lite support to check if a channel event is ready to fire
+ *
+ * @param[in]  channelGuid    Channel event to check for readiness
+ */
+bool ocrLegacyIsChannelReady(ocrGuid_t channelGuid);
+
 // Temporary flag due to addition of properties.
 // Will be eliminated
 // See BUG #562

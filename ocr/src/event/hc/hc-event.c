@@ -211,6 +211,16 @@ u8 destructEventHcPersist(ocrEvent_t *base) {
     return destructEventHc(base);
 }
 
+#ifdef ENABLE_EXTENSION_CHANNEL_EVT
+static u32 channelSatisfyCount(ocrEventHcChannel_t * devt) {
+    return (devt->tailSat - devt->headSat);
+}
+
+static u32 channelWaiterCount(ocrEventHcChannel_t * devt) {
+    return (devt->tailWaiter - devt->headWaiter);
+}
+#endif
+
 ocrFatGuid_t getEventHc(ocrEvent_t *base) {
     ocrFatGuid_t res = {.guid = NULL_GUID, .metaDataPtr = NULL};
     switch(base->kind) {
@@ -221,11 +231,28 @@ ocrFatGuid_t getEventHc(ocrEvent_t *base) {
 #ifdef ENABLE_EXTENSION_COUNTED_EVT
     case OCR_EVENT_COUNTED_T:
 #endif
-    case OCR_EVENT_IDEM_T: {
+    {
         ocrEventHcPersist_t *event = (ocrEventHcPersist_t*)base;
         res.guid = (ocrGuidIsUninitialized(event->data)) ? ERROR_GUID : event->data;
         break;
     }
+#ifdef ENABLE_EXTENSION_CHANNEL_EVT
+    case OCR_EVENT_CHANNEL_T:
+    {
+        // Warning: Not thread safe and only used for mpi-lite legacy support to
+        // let the caller know if the channel got enough deps/sat to trigger.
+        // If so, it returns the first guid in the satisfy list without consuming it.
+        ocrEventHcChannel_t *devt = (ocrEventHcChannel_t*)base;
+        u32 satCount = channelSatisfyCount(devt);
+        u32 waitCount = channelWaiterCount(devt);
+        if ((satCount >= devt->nbSat) && (waitCount >= devt->nbDeps)) {
+            res.guid = devt->satBuffer[devt->headSat];
+        } else {
+            res.guid = ERROR_GUID;
+        }
+        break;
+    }
+#endif
     default:
         ASSERT(0);
     }
@@ -1033,10 +1060,14 @@ u8 newEventHc(ocrEventFactory_t * factory, ocrFatGuid_t *guid,
         ASSERT((perInstance != NULL) && "error: No parameters specified at Channel-event creation");
         // Expecting ocrEventParams_t as the paramlist
         ocrEventParams_t * params = (ocrEventParams_t *) perInstance;
-        // Allocate extra space to store backing data-structures that are parameter-dependent
-        u32 sizeSat = (sizeof(ocrGuid_t) * params->EVENT_CHANNEL.nbSat * params->EVENT_CHANNEL.maxGen);
-        u32 sizeWaiters = (sizeof(regNode_t) * params->EVENT_CHANNEL.nbDeps * params->EVENT_CHANNEL.maxGen);
-        sizeOfGuid = sizeof(ocrEventHcChannel_t) + sizeSat + sizeWaiters;
+        u32 xtraSpace = 0;
+        if (params->EVENT_CHANNEL.maxGen != EVENT_CHANNEL_UNBOUNDED) {
+            // Allocate extra space to store backing data-structures that are parameter-dependent
+            u32 sizeSat = (sizeof(ocrGuid_t) * params->EVENT_CHANNEL.nbSat * params->EVENT_CHANNEL.maxGen);
+            u32 sizeWaiters = (sizeof(regNode_t) * params->EVENT_CHANNEL.nbDeps * params->EVENT_CHANNEL.maxGen);
+            xtraSpace = (sizeSat + sizeWaiters);
+        }
+        sizeOfGuid = sizeof(ocrEventHcChannel_t) + xtraSpace;
     }
 #endif
     if(eventType == OCR_EVENT_LATCH_T) {
@@ -1173,18 +1204,24 @@ u8 newEventHc(ocrEventFactory_t * factory, ocrFatGuid_t *guid,
         ocrEventParams_t * params = (ocrEventParams_t *) perInstance;
         ASSERT((params->EVENT_CHANNEL.nbSat == 1) && "Channel-event limitation nbSat must be set to 1");
         ASSERT((params->EVENT_CHANNEL.nbDeps == 1) && "Channel-event limitation nbDeps must be set to 1");
-        ASSERT((params->EVENT_CHANNEL.maxGen != EVENT_CHANNEL_UNBOUNDED) && "Channel-event unbounded not implemented");
         ASSERT((params->EVENT_CHANNEL.maxGen != 0) && "Channel-event maxGen=0 invalid value");
+        u32 maxGen = (params->EVENT_CHANNEL.maxGen == EVENT_CHANNEL_UNBOUNDED) ? 1 : params->EVENT_CHANNEL.maxGen;
         devt->maxGen = params->EVENT_CHANNEL.maxGen;
         devt->nbSat = params->EVENT_CHANNEL.nbSat;
-        devt->satBufSz = devt->maxGen * devt->nbSat;
+        devt->satBufSz = maxGen * devt->nbSat;
         devt->nbDeps = params->EVENT_CHANNEL.nbDeps;
-        devt->waitBufSz = devt->maxGen * devt->nbDeps;
-        // Setup backing data-structure pointers
-        u32 baseSize = sizeof(ocrEventHcChannel_t);
-        u32 sizeSat = (sizeof(ocrGuid_t) * devt->satBufSz);
-        devt->satBuffer = (ocrGuid_t *)((u64)base + baseSize);
-        devt->waiters = (regNode_t *)((u64)base + baseSize + sizeSat);
+        devt->waitBufSz = maxGen * devt->nbDeps;
+        if (devt->maxGen == EVENT_CHANNEL_UNBOUNDED) {
+            // Setup backing data-structure pointers
+            devt->satBuffer = (ocrGuid_t *) pd->fcts.pdMalloc(pd, sizeof(ocrGuid_t) * devt->satBufSz);
+            devt->waiters = (regNode_t *) pd->fcts.pdMalloc(pd, sizeof(regNode_t) * devt->waitBufSz);
+        } else {
+            // Setup backing data-structure pointers
+            u32 baseSize = sizeof(ocrEventHcChannel_t);
+            u32 sizeSat = (sizeof(ocrGuid_t) * devt->satBufSz);
+            devt->satBuffer = (ocrGuid_t *)((u64)base + baseSize);
+            devt->waiters = (regNode_t *)((u64)base + baseSize + sizeSat);
+        }
         devt->headSat = 0;
         devt->tailSat = 0;
         devt->headWaiter = 0;
@@ -1275,6 +1312,45 @@ static ocrGuid_t popSatisfy(ocrEventHcChannel_t * devt) {
     }
 }
 
+#define CHANNEL_BUFFER_RESIZE(cntFct, bufName, bufSz, headName, tailName, type) \
+    s32 nbElems = cntFct(devt); \
+    u32 newMaxNbElems = nbElems * 2; \
+    type * oldData = devt->bufName; \
+    devt->bufName = (type *) pd->fcts.pdMalloc(pd, sizeof(type)*newMaxNbElems); \
+    s32 headOffset = devt->headName%nbElems; \
+    s32 tailOffset = devt->tailName%nbElems; \
+    if ((headOffset > tailOffset) || ((headOffset == tailOffset) && (headOffset != 0))) { \
+        s32 nbElemRight = (devt->bufSz - headOffset);  \
+        hal_memCopy(devt->bufName, &oldData[headOffset], sizeof(type)*nbElemRight, false);  \
+        hal_memCopy(&(devt->bufName[nbElemRight]), oldData, sizeof(type)*tailOffset, false);  \
+    } else {  \
+        hal_memCopy(devt->bufName, &oldData[headOffset], sizeof(type)*nbElems, false);  \
+    }  \
+    devt->headName = 0;  \
+    devt->tailName = nbElems;  \
+    pd->fcts.pdFree(pd, oldData);  \
+    devt->bufSz = newMaxNbElems;
+
+static bool isChannelSatisfyFull(ocrEventHcChannel_t * devt) {
+    return (channelSatisfyCount(devt)  == devt->satBufSz);
+}
+
+static bool isChannelWaiterFull(ocrEventHcChannel_t * devt) {
+    return (channelWaiterCount(devt) == devt->waitBufSz);
+}
+
+static void channelWaiterResize(ocrEventHcChannel_t * devt) {
+    ocrPolicyDomain_t * pd;
+    getCurrentEnv(&pd, NULL, NULL, NULL);
+    CHANNEL_BUFFER_RESIZE(channelWaiterCount, waiters, waitBufSz, headWaiter, tailWaiter, regNode_t);
+}
+
+static void channelSatisfyResize(ocrEventHcChannel_t * devt) {
+    ocrPolicyDomain_t * pd;
+    getCurrentEnv(&pd, NULL, NULL, NULL);
+    CHANNEL_BUFFER_RESIZE(channelSatisfyCount, satBuffer, satBufSz, headSat, tailSat, ocrGuid_t);
+}
+
 u8 registerWaiterEventHcChannel(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot, bool isDepAdd) {
     ocrEventHc_t * evt = ((ocrEventHc_t*)base);
     ocrEventHcChannel_t * devt = ((ocrEventHcChannel_t*)base);
@@ -1302,8 +1378,11 @@ u8 registerWaiterEventHcChannel(ocrEvent_t *base, ocrFatGuid_t waiter, u32 slot,
                 GUIDA(data));
         return commonSatisfyRegNode(pd, &msg, base->guid, db, currentEdt, &regnode);
     } else {
-        DPRINTF(DEBUG_LVL_CHANNEL, "registerWaiterEventHcChannel "GUIDF" push dependence\n",
-                GUIDA(base->guid));
+        DPRINTF(DEBUG_LVL_CHANNEL, "registerWaiterEventHcChannel "GUIDF" push dependence curSize=%"PRIu32"\n",
+                GUIDA(base->guid), channelWaiterCount(devt));
+        if ((devt->maxGen == EVENT_CHANNEL_UNBOUNDED) && isChannelWaiterFull(devt)) {
+            channelWaiterResize(devt);
+        }
         pushDependence(devt, &regnode);
         hal_unlock32(&evt->waitersLock);
     }
@@ -1332,8 +1411,11 @@ u8 satisfyEventHcChannel(ocrEvent_t *base, ocrFatGuid_t db, u32 slot) {
                 GUIDA(db.guid));
         return commonSatisfyRegNode(pd, &msg, base->guid, db, currentEdt, &regnode);
     } else {
-        DPRINTF(DEBUG_LVL_CHANNEL, "satisfyEventHcChannel "GUIDF" satisfy enqueued\n",
-                GUIDA(base->guid));
+        DPRINTF(DEBUG_LVL_CHANNEL, "satisfyEventHcChannel "GUIDF" satisfy enqueued curSize=%"PRIu32"\n",
+                GUIDA(base->guid), channelSatisfyCount(devt));
+        if ((devt->maxGen == EVENT_CHANNEL_UNBOUNDED) && isChannelSatisfyFull(devt)) {
+            channelSatisfyResize(devt);
+        }
         pushSatisfy(devt, db.guid);
         hal_unlock32(&evt->waitersLock);
     }

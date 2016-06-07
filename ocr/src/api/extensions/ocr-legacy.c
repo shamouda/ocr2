@@ -122,6 +122,22 @@ ocrGuid_t ocrWait(ocrGuid_t outputEvent) {
     RETURN_PROFILE(ERROR_GUID);
 }
 
+bool ocrLegacyIsChannelReady(ocrGuid_t channelGuid) {
+    ocrPolicyDomain_t *pd = NULL;
+    PD_MSG_STACK(msg);
+    getCurrentEnv(&pd, NULL, NULL, &msg);
+#define PD_MSG (&msg)
+#define PD_TYPE PD_MSG_EVT_GET
+    msg.type = PD_MSG_EVT_GET | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
+    PD_MSG_FIELD_I(guid.guid) = channelGuid;
+    PD_MSG_FIELD_I(guid.metaDataPtr) = NULL;
+    pd->fcts.processMessage(pd, &msg, true);
+    return !ocrGuidIsError(PD_MSG_FIELD_O(data).guid);
+#undef PD_TYPE
+#undef PD_MSG
+
+}
+
 u8 ocrLegacyBlockProgress(ocrGuid_t evtHandle, ocrGuid_t* guid, void** result, u64* size, u16 properties) {
     START_PROFILE(api_ocrLegacyBlockProgress);
     ocrPolicyDomain_t *pd = NULL;
