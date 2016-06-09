@@ -249,7 +249,6 @@ static void workerLoopHcCommInternal(ocrWorker_t * worker, ocrPolicyDomain_t *pd
             ocrPolicyMsg_t * message = (handle->status == HDL_RESPONSE_OK) ? handle->response : handle->msg;
             //To catch misuses, assert src is not self and dst is self
             ASSERT((message->srcLocation != pd->myLocation) && (message->destLocation == pd->myLocation));
-
             // Poll a response to a message we had sent.
             if ((message->type & PD_MSG_RESPONSE) && !(handle->properties & ASYNC_MSG_PROP)) {
                 DPRINTF(DEBUG_LVL_VVERB,"hc-comm-worker: Received message response for msgId: %"PRId64"\n",  message->msgId); // debug

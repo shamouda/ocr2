@@ -261,7 +261,7 @@ static u8 registerRemoteMetaData(ocrPolicyDomain_t * pd, ocrFatGuid_t tplFatGuid
     ocrGuid_t processRequestTemplateGuid;
     ocrEdtTemplateCreate(&processRequestTemplateGuid, &processRequestEdt, 1, 0);
     ProxyTplNode_t * queueHead = (ProxyTplNode_t *) oldValue;
-    DPRINTF(DEBUG_LVL_VVERB,"About to process stored clone requests for template "GUIDF" queueHead=%p)\n", GUIDA(tplFatGuid.guid), queueHead);
+    DPRINTF(DEBUG_LVL_VVERB,"About to process stored clone requests for msg type "GUIDF" queueHead=%p)\n", GUIDA(tplFatGuid.guid), queueHead);
     while (queueHead != ((void*) 0x1)) { // sentinel value
         DPRINTF(DEBUG_LVL_VVERB,"Processing stored clone requests for template "GUIDF")\n", GUIDA(tplFatGuid.guid));
         u64 paramv = (u64) queueHead->msg;
@@ -1967,7 +1967,18 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
             switch(msg->type & PD_MSG_TYPE_ONLY) {
             case PD_MSG_GUID_METADATA_CLONE:
             {
-                sendProp |= ASYNC_MSG_PROP;
+#define PD_MSG (msg)
+#define PD_TYPE PD_MSG_GUID_METADATA_CLONE
+                ocrGuidKind kind;
+                self->guidProviders[0]->fcts.getKind(self->guidProviders[0], PD_MSG_FIELD_IO(guid).guid, &kind);
+                // This is a hack now that we use to differentiate between affinity cloning that's synchronous and
+                // template that's asynchronous. Hence, we need to do the right thing flag-wise. MD cloning support
+                // will fix this issue much more cleanly.
+                if (kind != OCR_GUID_AFFINITY) {
+                    sendProp |= ASYNC_MSG_PROP;
+                }
+#undef PD_MSG
+#undef PD_TYPE
                 break;
             }
             case PD_MSG_DB_ACQUIRE:
