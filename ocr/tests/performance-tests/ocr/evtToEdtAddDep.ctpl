@@ -1,0 +1,201 @@
+#include "perfs.h"
+#include "ocr.h"
+#include "extensions/ocr-affinity.h"
+
+// DESC:
+// TIME: Time calls to ocrAddDependence
+// FREQ: Do NB_ITERS calls
+//
+// VARIABLES
+// - NB_ITERS
+
+#ifndef ADDDEP_MODE
+#define ADDDEP_MODE DB_MODE_RO
+#endif
+
+#ifndef EVENT_TYPE
+#define EVENT_TYPE  OCR_EVENT_STICKY_T
+#endif
+
+#ifndef DEPV_SZ
+#define DEPV_SZ   1000
+#endif
+
+#define THROUGHPUT_METRIC DEPV_SZ
+
+//
+// User Part
+//
+
+typedef struct {
+    //TODO: there should be a sub struct that we extend so that the framework can do the setup
+    ocrGuid_t self;
+    // end common
+    //
+    ocrGuid_t userSetupDoneEvt;
+    // These can either be local or remote depending on the test
+    ocrGuid_t evtGuid;
+    ocrGuid_t edtGuid;
+    ocrGuid_t edtOutGuid;
+} domainSetup_t;
+
+typedef struct {
+    ocrGuid_t self;
+    timestamp_t startTimer;
+    timestamp_t stopTimer;
+} domainKernel_t;
+
+ocrGuid_t workEdt(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
+    return NULL_GUID;
+}
+
+ocrGuid_t remoteDomainSetup(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
+    ocrGuid_t dsetupGuid = depv[0].guid;
+    domainSetup_t * dsetup = (domainSetup_t *) depv[0].ptr;
+
+#ifdef REMOTE_EVT
+    ocrGuid_t evtGuid;
+    ocrEventCreate(&evtGuid, EVENT_TYPE, false);
+    dsetup->evtGuid = evtGuid;
+#endif
+
+#ifdef REMOTE_EDT
+    ocrGuid_t edtTemplGuid;
+    ocrEdtTemplateCreate(&edtTemplGuid, workEdt, 0, DEPV_SZ);
+    ocrGuid_t curAffGuid;
+    ocrAffinityGetCurrent(&curAffGuid);
+    ocrHint_t edtHint;
+    ocrHintInit(&edtHint, OCR_HINT_EDT_T);
+    ocrSetHintValue(&edtHint, OCR_HINT_EDT_AFFINITY, ocrAffinityToHintValue(curAffGuid));
+    ocrGuid_t edtGuid;
+    ocrGuid_t edtOutGuid;
+    ocrEdtCreate(&edtGuid, edtTemplGuid, 0, NULL, DEPV_SZ, NULL, EDT_PROP_NONE, &edtHint, &edtOutGuid);
+    ocrEdtTemplateDestroy(edtTemplGuid);
+    dsetup->edtGuid = edtGuid;
+    dsetup->edtOutGuid = edtOutGuid;
+#endif
+    ocrGuid_t userSetupDoneEvt = dsetup->userSetupDoneEvt;
+    ocrDbRelease(dsetupGuid);
+    // Global setup is done
+    ocrEventSatisfy(userSetupDoneEvt, NULL_GUID);
+    return NULL_GUID;
+}
+
+// Create an event at the current affinity and writes
+// the GUID into the domainSetup data-structure.
+void domainSetup(ocrGuid_t userSetupDoneEvt, domainSetup_t * dsetup) {
+    // This is for the domain kernel to callback and stop the timer
+    ocrGuid_t stopTimerEvt;
+    ocrEventCreate(&stopTimerEvt, OCR_EVENT_ONCE_T, true);
+
+    u8 doRemote = 2;
+
+#ifdef LOCAL_EVT
+    doRemote--;
+    ocrGuid_t evtGuid;
+    ocrEventCreate(&evtGuid, EVENT_TYPE, false);
+    dsetup->evtGuid = evtGuid;
+#endif
+
+#ifdef LOCAL_EDT
+    doRemote--;
+    ocrGuid_t edtTemplGuid;
+    ocrEdtTemplateCreate(&edtTemplGuid, workEdt, 0, DEPV_SZ);
+    ocrGuid_t curAffGuid;
+    ocrAffinityGetCurrent(&curAffGuid);
+    ocrHint_t edtHint;
+    ocrHintInit(&edtHint, OCR_HINT_EDT_T);
+    ocrSetHintValue(&edtHint, OCR_HINT_EDT_AFFINITY, ocrAffinityToHintValue(curAffGuid));
+    ocrGuid_t edtGuid;
+    ocrGuid_t edtOutGuid;
+    ocrEdtCreate(&edtGuid, edtTemplGuid,
+                 0, NULL, DEPV_SZ, NULL, EDT_PROP_NONE, &edtHint, &edtOutGuid);
+    ocrEdtTemplateDestroy(edtTemplGuid);
+    dsetup->edtGuid = edtGuid;
+    dsetup->edtOutGuid = edtOutGuid;
+#endif
+
+    // - userSetupDoneEvt: to be satisfied when setup is done
+    // - stopTimerEvt: to be satisfied when domain kernel is done
+    if (doRemote) {
+        dsetup->userSetupDoneEvt = userSetupDoneEvt;
+        u64 affinityCount;
+        ocrAffinityCount(AFFINITY_PD, &affinityCount);
+        ocrGuid_t remoteAffGuid;
+        ocrAffinityGetAt(AFFINITY_PD, affinityCount-1, &remoteAffGuid);
+        ocrHint_t edtHint;
+        ocrHintInit(&edtHint, OCR_HINT_EDT_T);
+        ocrSetHintValue(&edtHint, OCR_HINT_EDT_AFFINITY, ocrAffinityToHintValue(remoteAffGuid));
+        ocrGuid_t edtTemplGuid;
+        ocrEdtTemplateCreate(&edtTemplGuid, remoteDomainSetup, 0, 1);
+        ocrGuid_t edtGuid;
+        ocrEdtCreate(&edtGuid, edtTemplGuid,
+                     0, NULL, 1, NULL, EDT_PROP_NONE, &edtHint, NULL);
+        // EW addresses the race that the current caller owns the DB and we're
+        // trying to start the remote setup EDT concurrently. Since we do not have
+        // the caller event we can't setup a proper dependence and rely on EW instead.
+        ocrAddDependence(dsetup->self, edtGuid, 0, DB_MODE_EW);
+        ocrEdtTemplateDestroy(edtTemplGuid);
+    } else {
+        ocrEventSatisfy(userSetupDoneEvt, NULL_GUID);
+    }
+}
+
+ocrGuid_t myComb(u32 paramc, u64* paramv, u32 depc, ocrEdtDep_t depv[]) {
+    ocrGuid_t kernelDbGuid = depv[0].guid;
+    ocrGuid_t userKernelDoneEvt = {.guid=paramv[0]};
+    ocrDbRelease(kernelDbGuid);
+    ocrEventSatisfy(userKernelDoneEvt, kernelDbGuid);
+    return NULL_GUID;
+}
+
+// The kernel to invoke
+void domainKernel(ocrGuid_t userKernelDoneEvt, domainSetup_t * setupDbPtr, timestamp_t * timer) {
+    // Setup: DB to use to satisfy the domain kernel's done event
+    ocrGuid_t curAffGuid;
+    ocrAffinityGetCurrent(&curAffGuid);
+    ocrHint_t dbHint;
+    ocrHintInit(&dbHint, OCR_HINT_DB_T);
+    ocrSetHintValue(&dbHint, OCR_HINT_DB_AFFINITY, ocrAffinityToHintValue(curAffGuid));
+    //TODO why is this not created by the caller as for domainSetup ?
+    ocrGuid_t kernelDbGuid;
+    domainKernel_t * kernelDbPtr;
+    ocrDbCreate(&kernelDbGuid, (void**) &kernelDbPtr, sizeof(domainKernel_t), 0, NULL_HINT, NO_ALLOC);
+    kernelDbPtr->self = kernelDbGuid;
+
+    // my combine
+    ocrGuid_t combTemplGuid;
+    ocrEdtTemplateCreate(&combTemplGuid, myComb, 1, 2);
+    ocrHint_t edtHint;
+    ocrHintInit(&edtHint, OCR_HINT_EDT_T);
+    ocrSetHintValue(&edtHint, OCR_HINT_EDT_AFFINITY, ocrAffinityToHintValue(curAffGuid));
+    u64 nparamv = (u64) userKernelDoneEvt.guid;
+    ocrGuid_t combGuid;
+    ocrEdtCreate(&combGuid, combTemplGuid,
+                 1, &nparamv, 2, NULL, EDT_PROP_NONE, &edtHint, NULL);
+    ocrEdtTemplateDestroy(combTemplGuid);
+    ocrAddDependence(setupDbPtr->edtOutGuid, combGuid, 1, DB_MODE_RO);
+
+    // Kernel's core
+    // Start timer
+    ocrGuid_t evtGuid = setupDbPtr->evtGuid;
+    ocrGuid_t edtGuid = setupDbPtr->edtGuid;
+    get_time(&kernelDbPtr->startTimer);
+    u64 i;
+    for(i=0; i<DEPV_SZ; i++) {
+        ocrAddDependence(evtGuid, edtGuid, i, DB_MODE_RO);
+    }
+    get_time(&kernelDbPtr->stopTimer);
+
+    //TODO evtGuid is leaking
+    ocrEventSatisfy(evtGuid, NULL_GUID);
+    // Note: Timer stops when the remote latch event got all the satisfy
+    ocrDbRelease(kernelDbGuid);
+    ocrAddDependence(kernelDbGuid, combGuid, 0, DB_MODE_RO);
+}
+
+void domainKernelCombine(domainSetup_t * setupDbPtr, domainKernel_t * kernelPtr, long * elapsed) {
+    *elapsed = elapsed_usec(&kernelPtr->startTimer, &kernelPtr->stopTimer);
+}
+
+#include "framework.ctpl"

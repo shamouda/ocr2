@@ -12,7 +12,8 @@ function buildOcr() {
     if [[ -z "${OCR_NOCLEAN}" ]]; then
         cd ../..; make squeaky; cd -
     fi
-    cd ../../build/${OCR_TYPE}; make && make install; RES=$?; cd -
+    export MAKE_THREADS=${MAKE_THREADS-1}
+    cd ../../build/${OCR_TYPE}; make -j${MAKE_THREADS} && make -j${MAKE_THREADS} install; RES=$?; cd -
     if [[ $RES -ne 0 ]]; then
         exit 1
     fi

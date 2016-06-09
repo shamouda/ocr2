@@ -43,8 +43,14 @@ BIN_GEN_DIR=build
 endif
 
 INCS=-I./inc
-CFLAGS=-O3 -g -Wp,-w $(INCS) -c
+CFLAGS=-O3 -g -Wp,-w $(INCS)
 OCR_FLAGS=-L${OCR_INSTALL}/lib -I${OCR_INSTALL}/include -locr_${OCR_TYPE} -lpthread -lm ${OCR_LDFLAGS}
+
+ifeq (${OCR_ASAN}, yes)
+  ASAN_FLAGS := -g -fsanitize=address -fno-omit-frame-pointer
+  CFLAGS += $(ASAN_FLAGS)
+  LDFLAGS += $(ASAN_FLAGS)
+endif
 
 OCR_RUN_FLAGS=-ocr:cfg ${OCR_CONFIG}
 
@@ -62,14 +68,14 @@ RUN_FILES=$(subst ocr,run,$(C_FILES))
 RUNBIN_FILES=$(patsubst %.c,%,$(RUN_FILES))
 
 benchmark: $(PROG) $(BIN_GEN_DIR)/$(TYPE).o
-	$(CC) -o $(EXECUTABLE) $(PROG) $(INCS) $(C_DEFINES) $(BIN_GEN_DIR)/$(TYPE).o $(OCR_FLAGS) $(BENCH_FLAGS)
+	$(CC) -o $(EXECUTABLE) $(PROG) $(INCS) $(C_DEFINES) $(BIN_GEN_DIR)/$(TYPE).o $(CFLAGS) $(OCR_FLAGS) $(BENCH_FLAGS)
 
 run: $(EXECUTABLE)
 	LD_LIBRARY_PATH=$(OCR_INSTALL)/lib $(OCR_INSTALL)/bin/ocrrun_${OCR_TYPE} $(PWD)/$(EXECUTABLE) $(OCR_RUN_FLAGS) $(WORKLOAD_ARGS)
 
 $(BIN_GEN_DIR)/$(TYPE).o: $(DEPS)
-	echo "Build $(CC) $(INCS) -g -c $< -o $@"
-	$(CC) $(INCS) -g -c $< -o $@
+	echo "Build $(CC) $(INCS) $(CFLAGS) -g -c $< -o $@"
+	$(CC) $(INCS) $(CFLAGS) -g -c $< -o $@
 
 build: $(BIN_FILES)
 VPATH=ocr/

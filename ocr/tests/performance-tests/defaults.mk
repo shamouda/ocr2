@@ -11,7 +11,7 @@ NB_INSTANCES ?= 1000
 # Nb of paramc each EDT has
 PARAMC_SZ ?= 2
 # Nb of deps each EDT has
-DEPV_SZ ?= 0
+DEPV_SZ ?= 10
 # Fan out of EDTs
 FAN_OUT ?= 100
 
