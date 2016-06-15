@@ -77,6 +77,19 @@ void drainAllDeques(FILE *f){
     }
 }
 
+void drainCurrentDeque(ocrWorker_t *worker, FILE *f, s32 head, s32 tail, deque_t *deq){
+    s32 remaining = tail-head;
+    u32 i;
+    for(i = 0; i < remaining; i++){
+        ocrTraceObj_t *tr = (ocrTraceObj_t *)(deq->popFromHead(deq, 0));
+        ASSERT(tr != NULL);
+#ifdef OCR_TRACE_BINARY
+        processTraceObject(tr, f);
+#endif
+        worker->pd->fcts.pdFree(worker->pd, tr);
+    }
+}
+
 //workLoop for system worker: strictly responsible for querying/processing records in trace queues.
 void workerLoopSystem(ocrWorker_t *worker){
 
@@ -91,7 +104,7 @@ void workerLoopSystem(ocrWorker_t *worker){
     SNPRINTF(traceName, 31, "trace_%lu.bin", location);
 
     //open file for binary writing. (One per policy domain)
-    FILE *f = fopen(traceName, "a");
+    FILE *f = fopen(traceName, "w");
 #endif
 
     u8 continueLoop = true;
@@ -108,12 +121,10 @@ void workerLoopSystem(ocrWorker_t *worker){
                 s32 head = deq->head;
                 s32 tail = deq->tail;
                 if(tail-head > 0){
-                    //Trace record in deque. Pop
-                    ocrTraceObj_t *tr = (ocrTraceObj_t *)(deq->popFromHead(deq, 0));
+                    //Atleast one trace object on deque.  Drain.
 #ifdef OCR_TRACE_BINARY
-                    processTraceObject(tr, f);
+                    drainCurrentDeque(worker, f, head, tail, deq);
 #endif
-                    worker->pd->fcts.pdFree(worker->pd, tr);
                 }
             }
         }
