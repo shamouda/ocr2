@@ -17,6 +17,7 @@
 #include "ocr-worker.h"
 
 #ifdef OCR_TRACE_BINARY
+#include "utils/tracer/trace-callbacks.h"
 extern void doTrace(u64 location, u64 wrkr, ocrGuid_t taskGuid, ...);
 #endif
 

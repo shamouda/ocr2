@@ -1,3 +1,4 @@
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -93,15 +94,15 @@ int main(int argc, char *argv[]){
 }
 
 void genericPrint(bool evtType, ocrTraceType_t ttype, ocrTraceAction_t action,
-                  u64 location, u64 workerId, u64 timestamp, ocrGuid_t parent){
+                  u64 location, u64 workerId, u64 timestamp, ocrGuid_t self, ocrGuid_t parent){
 
     if(!(ocrGuidIsNull(parent))){
-        printf("[TRACE] U/R: %s | PD: 0x%lx | WORKER_ID: %lu | TIMESTAMP: %lu | TYPE: %s | ACTION: %s | PARENT: "GUIDF"\n",
-                evt_type[evtType], location, workerId, timestamp, obj_type[ttype-IDX_OFFSET], action_type[action], GUIDA(parent));
+        printf("[TRACE] U/R: %s | PD: 0x%lx | WORKER_ID: %lu | TIMESTAMP: %lu | TYPE: %s | ACTION: %s | GUID: "GUIDF" | PARENT: "GUIDF"\n",
+                evt_type[evtType], location, workerId, timestamp, obj_type[ttype-IDX_OFFSET], action_type[action], GUIDA(self), GUIDA(parent));
     }else{
 
-        printf("[TRACE] U/R: %s | PD: 0x%lx | WORKER_ID: %lu | TIMESTAMP: %lu | TYPE: %s | ACTION: %s\n",
-                evt_type[evtType], location, workerId, timestamp, obj_type[ttype-IDX_OFFSET], action_type[action]);
+        printf("[TRACE] U/R: %s | PD: 0x%lx | WORKER_ID: %lu | TIMESTAMP: %lu | TYPE: %s | ACTION: %s | GUID: "GUIDF"\n",
+                evt_type[evtType], location, workerId, timestamp, obj_type[ttype-IDX_OFFSET], action_type[action], GUIDA(self));
     }
     return;
 }
@@ -114,7 +115,7 @@ void translateObject(ocrTraceObj_t *trace, int lineCount, long *fctPtrs){
     u64 location = trace->location;
     u64 workerId = trace->workerId;
     bool evtType = trace->eventType;
-
+    ocrGuid_t parent = trace->parent;
     switch(trace->typeSwitch){
 
     case OCR_TRACE_TYPE_EDT:
@@ -123,74 +124,81 @@ void translateObject(ocrTraceObj_t *trace, int lineCount, long *fctPtrs){
 
             case OCR_ACTION_CREATE:
             {
-                ocrGuid_t parent = TRACE_FIELD(TASK, taskCreate, trace, parentID);
-                genericPrint(evtType, ttype, action, location, workerId, timestamp, parent);
+                ocrGuid_t taskGuid = TRACE_FIELD(TASK, taskCreate, trace, taskGuid);
+                genericPrint(evtType, ttype, action, location, workerId, timestamp, taskGuid, parent);
                 break;
             }
             case OCR_ACTION_DESTROY:
-                //No need to grab value from trace object for this trace action yet. Currently only hold no-op placeholders.
-                genericPrint(evtType, ttype, action, location, workerId, timestamp, NULL_GUID);
+            {
+                ocrGuid_t taskGuid = TRACE_FIELD(TASK, taskDestroy, trace, taskGuid);
+                genericPrint(evtType, ttype, action, location, workerId, timestamp, taskGuid, NULL_GUID);
                 break;
+            }
             case OCR_ACTION_RUNNABLE:
-                //No need to grab value from trace object for this trace action yet. Currently only hold no-op placeholders.
-                genericPrint(evtType, ttype, action, location, workerId, timestamp, NULL_GUID);
+            {
+                ocrGuid_t taskGuid = TRACE_FIELD(TASK, taskReadyToRun, trace, taskGuid);
+                genericPrint(evtType, ttype, action, location, workerId, timestamp, taskGuid, NULL_GUID);
                 break;
+            }
             case OCR_ACTION_SATISFY:
             {
-                ocrGuid_t src = TRACE_FIELD(TASK, taskDepSatisfy, trace, depID);
-
-                printf("[TRACE] U/R: %s | PD: 0x%lx | WORKER_ID: %lu | TIMESTAMP: %lu | TYPE: EDT | ACTION: DEP_SATISFY | DEP_GUID: "GUIDF"\n",
-                        evt_type[evtType], location, workerId, timestamp, GUIDA(src));
+                ocrGuid_t taskGuid = TRACE_FIELD(TASK, taskDepSatisfy, trace, taskGuid);
+                ocrGuid_t satisfyee = TRACE_FIELD(TASK, taskDepSatisfy, trace, satisfyee);
+                printf("[TRACE] U/R: %s | PD: 0x%lx | WORKER_ID: %lu | TIMESTAMP: %lu | TYPE: EDT | ACTION: DEP_SATISFY | GUID: "GUIDF" | SATISFYEE_GUID: "GUIDF"\n",
+                        evt_type[evtType], location, workerId, timestamp, GUIDA(taskGuid), GUIDA(satisfyee));
                 break;
             }
             case OCR_ACTION_ADD_DEP:
             {
-                ocrGuid_t dest = TRACE_FIELD(TASK, taskDepReady, trace, depID);
-                printf("[TRACE] U/R: %s | PD: 0x%lx | WORKER_ID: %lu | TIMESTAMP: %lu | TYPE: EDT | ACTION: ADD_DEP | DEP_GUID: "GUIDF"\n",
-                        evt_type[evtType], location, workerId, timestamp, GUIDA(dest));
+                ocrGuid_t src = TRACE_FIELD(TASK, taskDepReady, trace, src);
+                ocrGuid_t dest = TRACE_FIELD(TASK, taskDepReady, trace, dest);
+                printf("[TRACE] U/R: %s | PD: 0x%lx | WORKER_ID: %lu | TIMESTAMP: %lu | TYPE: EDT | ACTION: ADD_DEP | SRC: "GUIDF" | DEST: "GUIDF"\n",
+                        evt_type[evtType], location, workerId, timestamp, GUIDA(src), GUIDA(dest));
                 break;
             }
             case OCR_ACTION_EXECUTE:
             {
+                ocrGuid_t taskGuid = TRACE_FIELD(TASK, taskExeBegin, trace, taskGuid);
                 ocrEdt_t funcPtr = TRACE_FIELD(TASK, taskExeBegin, trace, funcPtr);
 
                 if(fctPtrs != NULL){
 
                     if(!(fctPtrExists((long)funcPtr, lineCount, fctPtrs))){
-                        printf("[TRACE] U/R: %s | PD: 0x%lx | WORKER_ID: %lu | TIMESTAMP: %lu | TYPE: EDT | ACTION: EXECUTE | FUNC_PTR: <processRequestEdt>\n",
-                                evt_type[0], location, workerId, timestamp);
+                        printf("[TRACE] U/R: %s | PD: 0x%lx | WORKER_ID: %lu | TIMESTAMP: %lu | TYPE: EDT | ACTION: EXECUTE | GUID "GUIDF" | FUNC_PTR: <processRequestEdt>\n",
+                                evt_type[0], location, workerId, timestamp, GUIDA(taskGuid));
                         break;
                     }
                 }
 
-                printf("[TRACE] U/R: %s | PD: 0x%lx | WORKER_ID: %lu | TIMESTAMP: %lu | TYPE: EDT | ACTION: EXECUTE | FUNC_PTR: 0x%lx\n",
-                        evt_type[evtType], location, workerId, timestamp, (u64)funcPtr);
+                printf("[TRACE] U/R: %s | PD: 0x%lx | WORKER_ID: %lu | TIMESTAMP: %lu | TYPE: EDT | ACTION: EXECUTE | GUID: "GUIDF" | FUNC_PTR: 0x%lx\n",
+                        evt_type[evtType], location, workerId, timestamp, GUIDA(taskGuid), (u64)funcPtr);
 
                 break;
             }
             case OCR_ACTION_FINISH:
-                //No need to grab value from trace object for this trace action yet. Currently only hold no-op placeholders.
-                genericPrint(evtType, ttype, action, location, workerId, timestamp, NULL_GUID);
+            {
+                ocrGuid_t taskGuid = TRACE_FIELD(TASK, taskExeEnd, trace, taskGuid);
+                genericPrint(evtType, ttype, action, location, workerId, timestamp, taskGuid, NULL_GUID);
                 break;
-
+            }
             case OCR_ACTION_DATA_ACQUIRE:
             {
-                ocrGuid_t edtGuid = TRACE_FIELD(TASK, taskDataAcquire, trace, taskGuid);
+                ocrGuid_t taskGuid = TRACE_FIELD(TASK, taskDataAcquire, trace, taskGuid);
                 ocrGuid_t dbGuid = TRACE_FIELD(TASK, taskDataAcquire, trace, dbGuid);
-                u64 size = TRACE_FIELD(TASK, taskDataAcquire, trace, size);
-                printf("[TRACE] U/R: %s | PD: 0x%lx | WORKER_ID: %lu | TIMESTAMP: %lu | TYPE: EDT | ACTION: DB_ACQUIRE | EDT_GUID: "GUIDF" | DB_GUID: "GUIDF" | DB_SIZE: %lu\n",
-                        evt_type[evtType], location, workerId, timestamp, GUIDA(edtGuid), GUIDA(dbGuid), size);
+                u64 dbSize = TRACE_FIELD(TASK, taskDataAcquire, trace, dbSize);
+                printf("[TRACE] U/R: %s | PD: 0x%lx | WORKER_ID: %lu | TIMESTAMP: %lu | TYPE: EDT | ACTION: DB_ACQUIRE | GUID: "GUIDF" | DB_GUID: "GUIDF" | DB_SIZE: %lu\n",
+                        evt_type[evtType], location, workerId, timestamp, GUIDA(taskGuid), GUIDA(dbGuid), dbSize);
 
                 break;
             }
 
             case OCR_ACTION_DATA_RELEASE:
             {
-                ocrGuid_t edtGuid = TRACE_FIELD(TASK, taskDataRelease, trace, taskGuid);
+                ocrGuid_t taskGuid = TRACE_FIELD(TASK, taskDataRelease, trace, taskGuid);
                 ocrGuid_t dbGuid = TRACE_FIELD(TASK, taskDataRelease, trace, dbGuid);
-                u64 size = TRACE_FIELD(TASK, taskDataRelease, trace, size);
-                printf("[TRACE] U/R: %s | PD: 0x%lx | WORKER_ID: %lu | TIMESTAMP: %lu | TYPE: EDT | ACTION: DB_RELEASE | EDT_GUID: "GUIDF" | DB_GUID: "GUIDF" | DB_SIZE: %lu\n",
-                        evt_type[evtType], location, workerId, timestamp, GUIDA(edtGuid), GUIDA(dbGuid), size);
+                u64 dbSize = TRACE_FIELD(TASK, taskDataRelease, trace, dbSize);
+                printf("[TRACE] U/R: %s | PD: 0x%lx | WORKER_ID: %lu | TIMESTAMP: %lu | TYPE: EDT | ACTION: DB_RELEASE | GUID: "GUIDF" | DB_GUID: "GUIDF" | DB_SIZE: %lu\n",
+                        evt_type[evtType], location, workerId, timestamp, GUIDA(taskGuid), GUIDA(dbGuid), dbSize);
 
                 break;
             }
@@ -206,30 +214,31 @@ void translateObject(ocrTraceObj_t *trace, int lineCount, long *fctPtrs){
 
             case OCR_ACTION_CREATE:
             {
-                ocrGuid_t parent = TRACE_FIELD(EVENT, eventCreate, trace, parentID);
-                genericPrint(evtType, ttype, action, location, workerId, timestamp, parent);
+                ocrGuid_t eventGuid = TRACE_FIELD(EVENT, eventCreate, trace, eventGuid);
+                genericPrint(evtType, ttype, action, location, workerId, timestamp, eventGuid, parent);
                 break;
             }
             case OCR_ACTION_DESTROY:
-                //No need to grab value from trace object for this trace action yet. Currently only hold no-op placeholders.
-                genericPrint(evtType, ttype, action, location, workerId, timestamp, NULL_GUID);
+            {
+                ocrGuid_t eventGuid = TRACE_FIELD(EVENT, eventDestroy, trace, eventGuid);
+                genericPrint(evtType, ttype, action, location, workerId, timestamp, eventGuid, NULL_GUID);
                 break;
-
+            }
             case OCR_ACTION_SATISFY:
             {
-                ocrGuid_t src = TRACE_FIELD(EVENT, eventDepSatisfy, trace, depID);
-                printf("[TRACE] U/R: %s | PD: 0x%lx | WORKER_ID: %lu | TIMESTAMP: %lu | TYPE: EVENT | ACTION: DEP_SATISFY | DEP_GUID: "GUIDF"\n",
-                       evt_type[evtType], location, workerId, timestamp, GUIDA(src));
+                ocrGuid_t eventGuid = TRACE_FIELD(EVENT, eventDepSatisfy, trace, eventGuid);
+                ocrGuid_t satisfyee = TRACE_FIELD(EVENT, eventDepSatisfy, trace, satisfyee);
+                printf("[TRACE] U/R: %s | PD: 0x%lx | WORKER_ID: %lu | TIMESTAMP: %lu | TYPE: EVENT | ACTION: DEP_SATISFY | GUID: "GUIDF" | SATISFYEE_GUID "GUIDF"\n",
+                       evt_type[evtType], location, workerId, timestamp, GUIDA(eventGuid), GUIDA(satisfyee));
                 break;
             }
 
             case OCR_ACTION_ADD_DEP:
             {
-                ocrGuid_t dest = TRACE_FIELD(EVENT, eventDepAdd, trace, depID);
-                ocrGuid_t parent = TRACE_FIELD(EVENT, eventDepAdd, trace, parentID);
-                printf("[TRACE] U/R: %s | PD: 0x%lx | WORKER_ID: %lu | TIMESTAMP: %lu | TYPE: EVENT | ACTION: ADD_DEP | DEP_GUID: "GUIDF" | PARENT: "GUIDF"\n",
-                        evt_type[evtType], location, workerId, timestamp, GUIDA(dest), GUIDA(parent));
-
+                ocrGuid_t src = TRACE_FIELD(EVENT, eventDepAdd, trace, src);
+                ocrGuid_t dest = TRACE_FIELD(EVENT, eventDepAdd, trace, dest);
+                printf("[TRACE] U/R: %s | PD: 0x%lx | WORKER_ID: %lu | TIMESTAMP: %lu | TYPE: EVENT | ACTION: ADD_DEP | SRC: "GUIDF" | DEST: "GUIDF"\n",
+                        evt_type[evtType], location, workerId, timestamp, GUIDA(src), GUIDA(dest));
                 break;
             }
 
@@ -271,17 +280,18 @@ void translateObject(ocrTraceObj_t *trace, int lineCount, long *fctPtrs){
 
             case OCR_ACTION_CREATE:
             {
-                ocrGuid_t parent = TRACE_FIELD(DATA, dataCreate, trace, parentID);
-                u64 size = TRACE_FIELD(DATA, dataCreate, trace, size);
-                printf("[TRACE] U/R: %s | PD: 0x%lx | WORKER_ID: %lu | TIMESTAMP: %lu | TYPE: DATABLOCK | ACTION: CREATE | SIZE: %lu | PARENT: "GUIDF"\n",
-                        evt_type[evtType], location, workerId, timestamp, size, GUIDA(parent));
+                ocrGuid_t dbGuid = TRACE_FIELD(DATA, dataCreate, trace, dbGuid);
+                u64 dbSize = TRACE_FIELD(DATA, dataCreate, trace, dbSize);
+                printf("[TRACE] U/R: %s | PD: 0x%lx | WORKER_ID: %lu | TIMESTAMP: %lu | TYPE: DATABLOCK | ACTION: CREATE | GUID: "GUIDF" | SIZE: %lu | PARENT: "GUIDF"\n",
+                        evt_type[evtType], location, workerId, timestamp, GUIDA(dbGuid), dbSize, GUIDA(parent));
                 break;
             }
             case OCR_ACTION_DESTROY:
-                //No need to grab value from trace object for this trace action yet. Currently only hold no-op placeholders.
-                genericPrint(evtType, ttype, action, location, workerId, timestamp, NULL_GUID);
+            {
+                ocrGuid_t dbGuid = TRACE_FIELD(DATA, dataDestroy, trace, dbGuid);
+                genericPrint(evtType, ttype, action, location, workerId, timestamp, dbGuid, NULL_GUID);
                 break;
-
+            }
             default:
                 break;
         }

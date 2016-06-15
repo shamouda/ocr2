@@ -227,16 +227,13 @@ static avlBinaryNode_t* avlFindMin(avlBinaryNode_t *root) {
     DPRINTF(DEBUG_LVL_VVERB, "Looking for minimum in tree rooted at 0x%"PRIx64"\n",
             (u64)root);
 
-#ifdef OCR_DEBUG
-    avlBinaryNode_t *oldRoot = root;
-#endif
     avlBinaryNode_t *parent = NULL;
     while(root) {
         parent = root;
         root = root->left;
     }
     DPRINTF(DEBUG_LVL_VVERB, "Tree @ 0x%"PRIx64": Found minimum node 0x%"PRIx64" (key: 0x%"PRIx64")\n",
-            (u64)oldRoot, (u64)parent, (u64)(parent?parent->key:0));
+            (u64)root, (u64)parent, (u64)(parent?parent->key:0));
     return parent;
 }
 
@@ -245,16 +242,13 @@ static avlBinaryNode_t* avlFindMax(avlBinaryNode_t *root) {
     DPRINTF(DEBUG_LVL_VVERB, "Looking for maximum in tree rooted at 0x%"PRIx64"\n",
             (u64)root);
 
-#ifdef OCR_DEBUG
-    avlBinaryNode_t *oldRoot = root;
-#endif
     avlBinaryNode_t *parent = NULL;
     while(root) {
         parent = root;
         root = root->right;
     }
     DPRINTF(DEBUG_LVL_VVERB, "Tree @ 0x%"PRIx64": Found maximum node 0x%"PRIx64" (key: 0x%"PRIx64")\n",
-            (u64)oldRoot, (u64)parent, (u64)(parent?parent->key:0));
+            (u64)root, (u64)parent, (u64)(parent?parent->key:0));
     return parent;
 }
 

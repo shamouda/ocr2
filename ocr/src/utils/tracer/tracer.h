@@ -5,75 +5,113 @@
 #include "ocr-runtime-types.h"
 #include "ocr-types.h"
 
+#include "utils/deque.h"
+
 #ifdef ENABLE_WORKER_SYSTEM
 
 #include <stdarg.h>
+
+#define TRACE_TYPE_NAME(ID) _type_##ID
+
+#define _TRACE_FIELD_FULL(ttype, taction, obj, field) obj->type._type_##ttype.action.taction.field
+#define TRACE_FIELD(type, action, traceObj, field) _TRACE_FIELD_FULL(type, action, (traceObj), field)
 
 /*
  * Data structure for trace objects.  Not yet fully populated
  * as not all trace coverage is needed/supported yet.
  *
  */
-#define TRACE_TYPE_NAME(ID) _type_##ID
 
 
-#define _TRACE_FIELD_FULL(ttype, taction, obj, field) obj->type._type_##ttype.action.taction.field
-#define TRACE_FIELD(type, action, traceObj, field) _TRACE_FIELD_FULL(type, action, (traceObj), field)
+bool isDequeFull(deque_t *deq);
+bool isSystem(ocrPolicyDomain_t *pd);
+bool isSupportedTraceType(bool evtType, ocrTraceType_t ttype, ocrTraceAction_t atype);
+void populateTraceObject(u64 location, bool evtType, ocrTraceType_t objType, ocrTraceAction_t actionType,
+                                u64 workerId, u64 timestamp, ocrGuid_t parent, va_list ap);
+
+
+
+#define INIT_TRACE_OBJECT()                                                 \
+                                                                            \
+    ocrPolicyDomain_t *pd = NULL;                                           \
+    ocrWorker_t *worker = NULL;                                             \
+    getCurrentEnv(&pd, &worker, NULL, NULL);                                \
+    ocrTraceObj_t *tr = pd->fcts.pdMalloc(pd, sizeof(ocrTraceObj_t));       \
+                                                                            \
+    tr->typeSwitch = objType;                                               \
+    tr->actionSwitch = actionType;                                          \
+    tr->workerId = workerId;                                                \
+    tr->location = location;                                                \
+    tr->time = timestamp;                                                   \
+    tr->parent = parent;                                                    \
+    tr->eventType = evtType;
+
+#define PUSH_TO_TRACE_DEQUE()                                                                       \
+    while(isDequeFull(((ocrWorkerHc_t*)worker)->sysDeque)){                                         \
+        hal_pause();                                                                                \
+    }                                                                                               \
+                                                                                                    \
+    ((ocrWorkerHc_t *)worker)->sysDeque->pushAtTail(((ocrWorkerHc_t *)worker)->sysDeque, tr, 0);
+
 
 typedef struct {
 
-    ocrTraceType_t  typeSwitch;       //TODO: Should (maybe) be accessed through a macro in the future.
-    ocrTraceAction_t actionSwitch;    //
+    ocrTraceType_t  typeSwitch;
+    ocrTraceAction_t actionSwitch;
 
-    u64 time;               /*Timestamp for event*/
-    u64 workerId;           /*Worker where event occured*/
-    u64 location;           /*PD where event occured*/
-    bool eventType;         /* TODO make this more descriptive than bool*/
-    unsigned char **blob;   /* TODO Carry generic blob*/
+    u64 time;               /* Timestamp for event*/
+    u64 workerId;           /* Worker where event occured*/
+    u64 location;           /* PD where event occured*/
+    ocrGuid_t parent;       /* GUID of parent task where trace action took place*/
+    bool eventType;         /* TODO: make this more descriptive than bool*/
+    unsigned char **blob;   /* TODO: Carry generic blob*/
 
     union{ /*type*/
 
         struct{ /* Task (EDT) */
             union{
                 struct{
-                    ocrGuid_t parentID;             /*GUID of parent creating cur EDT*/
+                    ocrGuid_t taskGuid;             /* GUID of created task*/
                 }taskCreate;
 
                 struct{
-                    ocrGuid_t depID;               /*GUIDs of dependent objects */
-                    u32 parentPermissions;          /*Parent permissions*/
+                    ocrGuid_t src;                  /* Source GUID of dependence being added */
+                    ocrGuid_t dest;                 /* Destination GUID of dependence being added*/
                 }taskDepReady;
 
                 struct{
-                    ocrGuid_t depID;
+                    ocrGuid_t taskGuid;             /* Guid of task being satisfied */
+                    ocrGuid_t satisfyee;            /* Guid of object satisfying the dependecy */
                 }taskDepSatisfy;
 
                 struct{
-                    u32 whyReady;                   /*Last Satisfyee??*/
+                    ocrGuid_t taskGuid;             /* GUID of runnable task */
                 }taskReadyToRun;
+
                 struct{
-                    u32 whyDelay;                   /* future TODO define this... may not be needed/useful*/
-                    ocrEdt_t funcPtr;                   /*Executing function*/
+                    u32 whyDelay;                   /* TODO: define this... may not be needed/useful */
+                    ocrGuid_t taskGuid;             /* GUID of task executing */
+                    ocrEdt_t funcPtr;               /* Function ptr to current function associated with the task */
                 }taskExeBegin;
 
                 struct{
-                    void *placeHolder;              /* future TODO: define useful fields*/
+                    ocrGuid_t taskGuid;             /* GUID of task completing */
                 }taskExeEnd;
 
                 struct{
-                    void *placeHolder;              /* future TODO: define useful fields*/
+                    ocrGuid_t taskGuid;             /* GUID of task being destroyed */
                 }taskDestroy;
 
                 struct{
-                    ocrGuid_t taskGuid;             /* EDT doing the acquire */
-                    ocrGuid_t dbGuid;               /* Datablock being acquired */
-                    u64 size;                       /* Size of Datablock being acquired */
+                    ocrGuid_t taskGuid;             /* GUID of task acquiring the datablock */
+                    ocrGuid_t dbGuid;               /* GUID of datablock being acquired */
+                    u64 dbSize;                     /* Size of Datablock being acquired */
                 }taskDataAcquire;
 
                 struct{
-                    ocrGuid_t taskGuid;             /* EDT doing the release */
-                    ocrGuid_t dbGuid;               /* Datablock being released */
-                    u64 size;                       /* Size of Datablock being released */
+                    ocrGuid_t taskGuid;             /* GUID of task releasing the datablock */
+                    ocrGuid_t dbGuid;               /* GUID of datablock being released */
+                    u64 dbSize;                     /* Size of Datablock being released */
                 }taskDataRelease;
 
             }action;
@@ -83,29 +121,28 @@ typedef struct {
         struct{ /* Data (DB) */
             union{
                 struct{
-                    ocrLocation_t location;         /*Location where created*/
-                    ocrGuid_t parentID;             /*GUID of parent creating cur DB*/
-                    u64 size;                       /*size of DB in bytes*/
+                    ocrGuid_t dbGuid;               /* GUID of datablock being created */
+                    u64 dbSize;                     /* Size of DB in bytes */
                 }dataCreate;
 
                 struct{
-                    void *memID;                    /* future TODO define type for memory ID*/
+                    void *memID;                    /* TODO: define type for memory ID */
                 }dataSize;
 
                 struct{
-                    ocrLocation_t src;              /*Data source location*/
+                    ocrLocation_t src;              /* Data source location */
                 }dataMoveFrom;
 
                 struct{
-                    ocrLocation_t dest;             /*Data destination location*/
+                    ocrLocation_t dest;             /* Data destination location */
                 }dataMoveTo;
 
                 struct{
-                    ocrGuid_t duplicateID;          /*GUID of new DB when copied*/
+                    ocrGuid_t duplicateID;          /* GUID of new DB when copied */
                 }dataReplicate;
 
                 struct{
-                    void* placeHolder;              /* future TODO define this.  may not be needed*/
+                    ocrGuid_t dbGuid;               /* GUID of datablock being destroyed */
                 }dataDestroy;
 
             }action;
@@ -115,24 +152,25 @@ typedef struct {
         struct{ /* Event (OCR module) */
             union{
                 struct{
-                    ocrGuid_t parentID;             /*GUID of parent creating current Event*/
+                    ocrGuid_t eventGuid;            /* GUID of event being created */
                 }eventCreate;
 
                 struct{
-                    ocrGuid_t depID;                /*GUIDs of dependent OCR object*/
-                    ocrGuid_t parentID;             /*GUIDs of parents (needed?)*/
+                    ocrGuid_t src;                  /* Source GUID of dependence being added */
+                    ocrGuid_t dest;                 /* Destination GUID of dependence being added */
                 }eventDepAdd;
 
                 struct{
-                    ocrGuid_t depID;                /*GUID responsible for satisfaction*/
+                    ocrGuid_t eventGuid;            /* GUID of event being satisfied */
+                    ocrGuid_t satisfyee;            /* GUID of object satisfying the dependence */
                 }eventDepSatisfy;
 
                 struct{
-                    void *placeHolder;              /* future TODO Define values.  What trigger?*/
+                    void *placeHolder;              /* TODO: Define values.  What trigger? */
                 }eventTrigger;
 
                 struct{
-                    void *placeHolder;              /* future TODO Define values. may not be needed*/
+                    ocrGuid_t eventGuid;            /* GUID of event being destroyed */
                 }eventDestroy;
 
             }action;
@@ -142,15 +180,15 @@ typedef struct {
         struct{ /* Execution Unit (workers) */
             union{
                 struct{
-                    ocrLocation_t location;         /*Location worker belongs to (PD)*/
+                    ocrLocation_t location;         /* Location worker belongs to (PD) */
                 }exeUnitStart;
 
                 struct{
-                    ocrLocation_t location;         /*Location after work shift*/
+                    ocrLocation_t location;         /* Location after work shift */
                 }exeUnitMigrate;
 
                 struct{
-                    void *placeHolder;              /* future TODO Define values.  May not be needed*/
+                    void *placeHolder;              /* TODO: Define values.  May not be needed */
                 }exeUnitDestroy;
 
             }action;
@@ -160,7 +198,7 @@ typedef struct {
         struct{ /* User-facing custom marker */
             union{
                 struct{
-                    void *placeHolder;              /* future TODO Define user facing options*/
+                    void *placeHolder;              /* TODO: Define user facing options */
                 }userMarkerFlags;
 
             }action;
@@ -171,7 +209,7 @@ typedef struct {
         struct{ /* Runtime facing custom Marker */
             union{
                 struct{
-                    void *placeHolder;              /* future TODO define runtime options*/
+                    void *placeHolder;              /* TODO: Define runtime options */
                 }runtimeMarkerFlags;
 
             }action;

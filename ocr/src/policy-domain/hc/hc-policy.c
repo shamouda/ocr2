@@ -1016,7 +1016,7 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             } else{
                 DPRINTF(DEBUG_LVL_VERB, "Creating a datablock of size %"PRIu64" @ 0x%p (GUID: "GUIDF")\n",
                         db->size, db->ptr, GUIDA(db->guid));
-                OCR_TOOL_TRACE(true, OCR_TRACE_TYPE_DATABLOCK, OCR_ACTION_CREATE, db->size);
+                OCR_TOOL_TRACE(true, OCR_TRACE_TYPE_DATABLOCK, OCR_ACTION_CREATE, traceDataCreate, db->guid, db->size);
             }
             ASSERT(db);
             // We do not acquire a data-block in two cases:
@@ -1093,7 +1093,7 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
                 ASSERT(PD_MSG_FIELD_O(returnDetail) == 0);
                 DPRINTF(DEBUG_LVL_INFO, "DB guid "GUIDF" of size %"PRIu64" acquired by EDT "GUIDF"\n",
                         GUIDA(db->guid), db->size, GUIDA(PD_MSG_FIELD_IO(edt.guid)));
-                OCR_TOOL_TRACE(false, OCR_TRACE_TYPE_EDT, OCR_ACTION_DATA_ACQUIRE, PD_MSG_FIELD_IO(edt.guid),
+                OCR_TOOL_TRACE(false, OCR_TRACE_TYPE_EDT, OCR_ACTION_DATA_ACQUIRE, traceTaskDataAcquire, PD_MSG_FIELD_IO(edt.guid),
                                 db->guid, db->size);
                 msg->type &= ~PD_MSG_REQUEST;
                 msg->type |= PD_MSG_RESPONSE;
@@ -1135,7 +1135,7 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
             db, PD_MSG_FIELD_I(edt), !!(PD_MSG_FIELD_I(properties) & DB_PROP_RT_ACQUIRE));
         DPRINTF(DEBUG_LVL_INFO, "DB guid "GUIDF" of size %"PRIu64" released by EDT "GUIDF"\n",
                 GUIDA(db->guid), db->size, GUIDA(edtGuid));
-        OCR_TOOL_TRACE(false, OCR_TRACE_TYPE_EDT, OCR_ACTION_DATA_RELEASE, edtGuid, db->guid, db->size);
+        OCR_TOOL_TRACE(false, OCR_TRACE_TYPE_EDT, OCR_ACTION_DATA_RELEASE, traceTaskDataRelease, edtGuid, db->guid, db->size);
 
 #undef PD_MSG
 #undef PD_TYPE
@@ -1155,14 +1155,16 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         ocrDataBlock_t *db = (ocrDataBlock_t*)(PD_MSG_FIELD_I(guid.metaDataPtr));
         ASSERT(db->fctId == self->dbFactories[0]->factoryId);
         ASSERT(!(msg->type & PD_MSG_REQ_RESPONSE));
+        //Save a copy of the DB guid for DPRINTF() and tracing before the free call
+        ocrGuid_t dbGuid = PD_MSG_FIELD_I(guid).guid;
         PD_MSG_FIELD_O(returnDetail) = self->dbFactories[0]->fcts.free(
             db, PD_MSG_FIELD_I(edt), PD_MSG_FIELD_I(properties));
         if(PD_MSG_FIELD_O(returnDetail)!=0)
-            DPRINTF(DEBUG_LVL_WARN, "DB Free failed for guid "GUIDF"\n", GUIDA(PD_MSG_FIELD_I(guid.guid)));
+            DPRINTF(DEBUG_LVL_WARN, "DB Free failed for guid "GUIDF"\n", GUIDA(dbGuid));
         else{
             DPRINTF(DEBUG_LVL_INFO,
-                    "DB guid: "GUIDF" Destroyed\n", GUIDA(PD_MSG_FIELD_I(guid).guid));
-            OCR_TOOL_TRACE(false, OCR_TRACE_TYPE_DATABLOCK, OCR_ACTION_DESTROY);
+                    "DB guid: "GUIDF" Destroyed\n", GUIDA(dbGuid));
+            OCR_TOOL_TRACE(false, OCR_TRACE_TYPE_DATABLOCK, OCR_ACTION_DESTROY, traceDataDestroy, dbGuid);
 
         }
 #undef PD_MSG
@@ -1796,7 +1798,7 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
                 u8 returnDetail = (returnCode == 0) ? PD_MSG_FIELD_O(returnDetail) : returnCode;
                 DPRINTF(DEBUG_LVL_INFO,
                         "Dependence added (src: "GUIDF", dest: "GUIDF") -> %"PRIu32"\n", GUIDA(src.guid), GUIDA(dest.guid), returnCode);
-                OCR_TOOL_TRACE(false, OCR_TRACE_TYPE_EDT, OCR_ACTION_ADD_DEP, src.guid);
+                OCR_TOOL_TRACE(false, OCR_TRACE_TYPE_EDT, OCR_ACTION_ADD_DEP, traceTaskAddDependence, src.guid, dest.guid);
             #undef PD_MSG
             #undef PD_TYPE
             #define PD_MSG msg
@@ -1826,7 +1828,7 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
                 DPRINTF(DEBUG_LVL_INFO,
                         "Dependence added (src: "GUIDF", dest: "GUIDF") -> %"PRIu32"\n", GUIDA(src.guid),
                         GUIDA(dest.guid), returnCode);
-                OCR_TOOL_TRACE(false, OCR_TRACE_TYPE_EVENT, OCR_ACTION_ADD_DEP, src.guid);
+                OCR_TOOL_TRACE(false, OCR_TRACE_TYPE_EVENT, OCR_ACTION_ADD_DEP, traceEventAddDependence, src.guid, dest.guid);
             #undef PD_MSG
             #undef PD_TYPE
             #define PD_MSG msg
@@ -1888,7 +1890,7 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         DPRINTF(DEBUG_LVL_INFO,
                 "Dependence added (src: "GUIDF", dest: "GUIDF") -> %"PRIu32"\n", GUIDA(signaler.guid),
                 GUIDA(dest.guid), returnCode);
-        OCR_TOOL_TRACE(false, OCR_TRACE_TYPE_EDT, OCR_ACTION_ADD_DEP, signaler.guid);
+        OCR_TOOL_TRACE(false, OCR_TRACE_TYPE_EDT, OCR_ACTION_ADD_DEP, traceTaskAddDependence, signaler.guid, dest.guid);
 
 #undef PD_MSG
 #undef PD_TYPE

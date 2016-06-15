@@ -468,6 +468,7 @@ static u8 scheduleSatisfiedTask(ocrTask_t *self) {
  */
 static u8 taskAllDepvSatisfied(ocrTask_t *self) {
     DPRINTF(DEBUG_LVL_INFO, "All dependences satisfied for task "GUIDF"\n", GUIDA(self->guid));
+    OCR_TOOL_TRACE(false, OCR_TRACE_TYPE_EDT, OCR_ACTION_RUNNABLE, traceTaskRunnable, self->guid);
     // Now check if there's anything to do before scheduling
     // In this implementation we want to acquire locks for DBs in EW mode
     ocrTaskHc_t * rself = (ocrTaskHc_t *) self;
@@ -521,7 +522,7 @@ static u8 taskAllDepvSatisfied(ocrTask_t *self) {
 u8 destructTaskHc(ocrTask_t* base) {
     DPRINTF(DEBUG_LVL_INFO,
             "Destroy "GUIDF"\n", GUIDA(base->guid));
-    OCR_TOOL_TRACE(false, OCR_TRACE_TYPE_EDT, OCR_ACTION_DESTROY);
+    OCR_TOOL_TRACE(false, OCR_TRACE_TYPE_EDT, OCR_ACTION_DESTROY, traceTaskDestroy, base->guid);
 
 
     ocrPolicyDomain_t *pd = NULL;
@@ -797,12 +798,11 @@ u8 newTaskHc(ocrTaskFactory_t* factory, ocrFatGuid_t * edtGuid, ocrFatGuid_t edt
 
     edtGuid->guid = base->guid;
     edtGuid->metaDataPtr = base;
-
+    OCR_TOOL_TRACE(true, OCR_TRACE_TYPE_EDT, OCR_ACTION_CREATE, traceTaskCreate, edtGuid->guid);
     // Check to see if the EDT can be run
     if(base->depc == edt->slotSatisfiedCount) {
         DPRINTF(DEBUG_LVL_INFO,
                 "Scheduling task "GUIDF" due to initial satisfactions\n", GUIDA(base->guid));
-        OCR_TOOL_TRACE(false, OCR_TRACE_TYPE_EDT, OCR_ACTION_RUNNABLE);
         RESULT_PROPAGATE2(taskAllDepvSatisfied(base), 1);
     }
 
@@ -858,7 +858,7 @@ u8 satisfyTaskHc(ocrTask_t * base, ocrFatGuid_t data, u32 slot) {
     DPRINTF(DEBUG_LVL_INFO,
             "Satisfy on task "GUIDF" slot %"PRId32" with "GUIDF" slotSatisfiedCount=%"PRIu32" frontierSlot=%"PRIu32" depc=%"PRIu32"\n",
             GUIDA(self->base.guid), slot, GUIDA(data.guid), self->slotSatisfiedCount, self->frontierSlot, base->depc);
-    OCR_TOOL_TRACE(false, OCR_TRACE_TYPE_EDT, OCR_ACTION_SATISFY, data.guid);
+    OCR_TOOL_TRACE(false, OCR_TRACE_TYPE_EDT, OCR_ACTION_SATISFY, traceTaskSatisfyDependence, self->base.guid, data.guid);
 
     // Check to see if not already satisfied
     ASSERT_BLOCK_BEGIN(self->signalers[slot].slot != SLOT_SATISFIED_EVT)
@@ -878,7 +878,6 @@ u8 satisfyTaskHc(ocrTask_t * base, ocrFatGuid_t data, u32 slot) {
     if(self->slotSatisfiedCount == base->depc) {
         DPRINTF(DEBUG_LVL_VERB, "Scheduling task "GUIDF", satisfied dependences %"PRId32"/%"PRId32"\n",
                 GUIDA(self->base.guid), self->slotSatisfiedCount , base->depc);
-        OCR_TOOL_TRACE(false, OCR_TRACE_TYPE_EDT, OCR_ACTION_RUNNABLE);
 
         hal_unlock32(&(self->lock));
         // All dependences have been satisfied, schedule the edt
@@ -1163,7 +1162,7 @@ u8 taskExecute(ocrTask_t* base) {
 
         //TODO Execute can be considered user on x86, but need to differentiate processRequestEdts in x86-mpi
         DPRINTF(DEBUG_LVL_INFO, "Execute "GUIDF" paramc:%"PRId32" depc:%"PRId32"\n", GUIDA(base->guid), base->paramc, base->depc);
-        OCR_TOOL_TRACE(true, OCR_TRACE_TYPE_EDT, OCR_ACTION_EXECUTE, base->funcPtr);
+        OCR_TOOL_TRACE(true, OCR_TRACE_TYPE_EDT, OCR_ACTION_EXECUTE, traceTaskExecute, base->guid, base->funcPtr);
 
         ASSERT(derived->unkDbs == NULL); // Should be no dynamically acquired DBs before running
         getCurrentEnv(&pd, &curWorker, NULL, NULL);
@@ -1237,7 +1236,7 @@ u8 taskExecute(ocrTask_t* base) {
         statsEDT_END(pd, ctx->sourceObj, curWorker, base->guid, base);
 #endif /* OCR_ENABLE_STATISTICS */
         DPRINTF(DEBUG_LVL_INFO, "End_Execution "GUIDF"\n", GUIDA(base->guid));
-        OCR_TOOL_TRACE(true, OCR_TRACE_TYPE_EDT, OCR_ACTION_FINISH);
+        OCR_TOOL_TRACE(true, OCR_TRACE_TYPE_EDT, OCR_ACTION_FINISH, traceTaskFinish, base->guid);
         // edt user code is done, if any deps, release data-blocks
         if(depc != 0) {
             START_PROFILE(ta_hc_dbRel);

@@ -53,7 +53,9 @@ u8 ocrEventCreateParams(ocrGuid_t *guid, ocrEventTypes_t eventType, u16 properti
 #undef PD_TYPE
     DPRINTF_COND_LVL(((returnCode != 0) && (returnCode != OCR_EGUIDEXISTS)), DEBUG_LVL_WARN, DEBUG_LVL_INFO,
                      "EXIT ocrEventCreate -> %"PRIu32"; GUID: "GUIDF"\n", returnCode, GUIDA(*guid));
-    OCR_TOOL_TRACE(true, OCR_TRACE_TYPE_EVENT, OCR_ACTION_CREATE);
+    if((returnCode != 0) && (returnCode != OCR_EGUIDEXISTS))
+        OCR_TOOL_TRACE(true, OCR_TRACE_TYPE_EVENT, OCR_ACTION_CREATE, traceEventCreate, guid);
+
     RETURN_PROFILE(returnCode);
 
 }
@@ -113,7 +115,7 @@ u8 ocrEventSatisfySlot(ocrGuid_t eventGuid, ocrGuid_t dataGuid /*= INVALID_GUID*
     u8 returnCode = pd->fcts.processMessage(pd, &msg, false);
     DPRINTF_COND_LVL(returnCode, DEBUG_LVL_WARN, DEBUG_LVL_INFO,
                     "EXIT ocrEventSatisfySlot(evt="GUIDF") -> %"PRIu32"\n", GUIDA(eventGuid), returnCode);
-    OCR_TOOL_TRACE(true, OCR_TRACE_TYPE_EVENT, OCR_ACTION_SATISFY, dataGuid);
+    OCR_TOOL_TRACE(true, OCR_TRACE_TYPE_EVENT, OCR_ACTION_SATISFY, traceEventSatisfyDependence, eventGuid, dataGuid);
     RETURN_PROFILE(returnCode);
 #undef PD_MSG
 #undef PD_TYPE
@@ -207,7 +209,6 @@ u8 ocrEdtCreate(ocrGuid_t* edtGuidPtr, ocrGuid_t templateGuid,
            ", depc=%"PRId32", depv=%p, prop=%"PRIu32", hint=%p, outEvt="GUIDF")\n",
            GUIDA(edtGuid), GUIDA(templateGuid), (s32)paramc, paramv, (s32)depc, depv,
             (u32)properties, hint,  GUIDA(outputEvent?*outputEvent:NULL_GUID));
-    OCR_TOOL_TRACE(true, OCR_TRACE_TYPE_EDT, OCR_ACTION_CREATE);
 
     PD_MSG_STACK(msg);
     ocrPolicyDomain_t * pd = NULL;

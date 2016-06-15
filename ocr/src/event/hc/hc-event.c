@@ -34,7 +34,7 @@
 /* OCR-HC Debug                                       */
 /******************************************************/
 
-#ifdef OCR_DEBUG
+#if defined(OCR_DEBUG) && !defined(OCR_TRACE_BINARY)
 static char * eventTypeToString(ocrEvent_t * base) {
     ocrEventTypes_t type = base->kind;
     if(type == OCR_EVENT_ONCE_T) {
@@ -136,7 +136,7 @@ u8 destructEventHc(ocrEvent_t *base) {
     getCurrentEnv(&pd, NULL, &curTask, &msg);
 
     DPRINTF(DEBUG_LVL_INFO, "Destroy %s: "GUIDF"\n", eventTypeToString(base), GUIDA(base->guid));
-    OCR_TOOL_TRACE(false, OCR_TRACE_TYPE_EVENT, OCR_ACTION_DESTROY);
+    OCR_TOOL_TRACE(false, OCR_TRACE_TYPE_EVENT, OCR_ACTION_DESTROY, traceEventDestroy, base->guid);
 
 #ifdef OCR_ENABLE_STATISTICS
     statsEVT_DESTROY(pd, getCurrentEDT(), NULL, base->guid, base);
