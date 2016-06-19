@@ -10,6 +10,7 @@
 #include "debug.h"
 #include "ocr-config.h"
 #include "ocr-policy-domain.h"
+#include "ocr-worker.h"
 #include "utils/arrayDeque.h"
 
 #ifndef PDEVT_SCRATCH_BYTES
@@ -36,21 +37,20 @@
 #define PDST_ACTION_COUNT 4 /**< Number of actions per arrayDeque chunk */
 #endif
 
+/**< Each strand can determine who should process it next (for example, workers or
+ * communication workers). This can be managed using different strand tables EXCEPT if
+ * the actions on a given strand need to be processed by different entities. For example,
+ * a worker needs to send a message that needs to be processed by a comm worker and the
+ * response needs to be processed by a regular worker. Add other types here. Note that this
+ * adds a u64 value to each pdStrandTableNode_t
+ */
+#define NP_WORK  0
+#define NP_COMM  1
+#define NP_COUNT 2
+
 // We use a 64-bit bitvector to keep track of status so this needs to be properly sized
 COMPILE_ASSERT(PDST_NODE_SIZE <= 64);
 
-
-/**
- * @brief Temporary slab object to be used for allocation/deallocation
- *
- * This will be replaced by Min's slab allocation to track slab and garbage
- * collect if needed
- * @todo Remove this and replace with proper slab object
- * @see BUG #899
- */
-typedef struct _slabObject_t {
-    u32 userCount;
-} slabObject_t;
 
 struct _pdTask_t;
 
@@ -60,16 +60,30 @@ struct _pdTask_t;
 
 /* Values for the property fields for a pdEvent_t:
  * The bit structure is as follows (32 bits):
- * Bit 0-7:  Type of pdEvent_t; this determines the sub-type of event
- * Bit 8-31: Properties/status bits (defined below).
+ * Bit 0-15:  Type of pdEvent_t; this determines the sub-type of event
+ *            Of those bits, the bottom 4 bits encode basic types of
+ *            events and the upper bits encode sub-types
+ * Bit 16-31: Properties/status bits (defined below).
  */
-#define PDEVT_TYPE_MASK    0xFF    /**< Mask to extract the type of evt */
-#define PDEVT_READY        0x100   /**< Bit indicating the event is ready */
-#define PDEVT_WAIT         0x200   /**< Bit indicating the event is not ready. Events
-                                        are created as not ready */
+#define PDEVT_TYPE_MASK    0xFFFF    /**< Mask to extract the type of evt */
+#define PDEVT_BASE_TYPE_MASK 0xF
+#define PDEVT_READY        0x10000   /**< Bit indicating the event is ready. Events are
+                                      * created as not ready */
+#define PDEVT_GC           0x20000   /**< Bit indicating that the event should be
+                                      * garbage collected if it is the curEvent
+                                      * of a strand that is being destroyed */
+#define PDEVT_DESTROY_DEEP 0x40000   /**< Bit indicating that a deep destruction
+                                      * should occur when this event is destroyed.
+                                      * This will, for example, attempt to free
+                                      * any pointed-to structures */
+
 struct _pdStrand_t;
 
-#define PDEVT_TYPE_BASIC 0x01
+/**< Base type indicating a control event */
+#define PDEVT_TYPE_BASE_CONTROL 0x0001
+
+/**< Basic event type that is a purely control event */
+#define PDEVT_TYPE_CONTROL (PDEVT_TYPE_BASE_CONTROL | (1<<4))
 /**
  * @brief Base type for runtime micro-events
  *
@@ -83,25 +97,38 @@ struct _pdStrand_t;
  *     - PDSTT_COMM: in communication strands table
  */
 typedef struct _pdEvent_t {
-    slabObject_t slabObj;     /**< Slab object (used for slab allocation and garbage collection) */
-    u32 properties;           /**< Type and other properties for this event. This includes
-                               * if the event is "ready" or not. */
-    struct _pdStrand_t *strand; /**< Strand that contains us currently */
+    u32 properties;                 /**< Type and other properties for this event. This includes
+                                     * if the event is "ready" or not. */
+    struct _pdStrand_t *strand;     /**< Strand that contains us currently */
 } pdEvent_t;
 
-#define PDEVT_TYPE_MSG 0x02
+#define PDEVT_TYPE_COMMSTATUS (PDEVT_TYPE_BASE_CONTROL | (2<<4))
+typedef struct _pdEventCommStatus_t {
+    pdEvent_t base;
+    u32 properties;     /**< Status encoded by this event, one of COMM_STATUS_* */
+} pdEventCommStatus_t;
+
+/**< Base type indicating the event contains
+ * a message */
+#define PDEVT_TYPE_BASE_MSG 0x0002
+
+/**< Basic event type that contains a policy message */
+#define PDEVT_TYPE_MSG (PDEVT_TYPE_BASE_MSG | (1<<4))
 /**< Basic event containing simply a policy message */
 typedef struct _pdEventMsg_t {
     pdEvent_t base;
-    u8 returnCode;          /**< "return" code when object returned from a function */
-
     ocrPolicyMsg_t *msg;    /**< Payload for the event. These are the
                              * "arguments" when passed to a function. */
     struct _pdTask_t *continuation; /**< Current continuation to execute (cached version
                              * from the strands table) */
+    u32 properties;         /**< Additional properties field (COMM_) */
 } pdEventMsg_t;
 
-#define PDEVT_TYPE_LIST 0x03
+/**< Base type for lists of event */
+#define PDEVT_TYPE_BASE_LIST 0x0003
+
+/**< Basic event type for a list of events */
+#define PDEVT_TYPE_LIST (PDEVT_TYPE_BASE_LIST | (1<<4))
 /**< A collection of events. No statement is made on the readiness of this event
  * with regards to the readiness of its sub-events */
 typedef struct _pdEventList_t {
@@ -111,7 +138,14 @@ typedef struct _pdEventList_t {
     pdEvent_t **others;                 /**< An array of additional events */
 } pdEventList_t;
 
-#define PDEVT_TYPE_MERGE 0x04
+
+/**< Base type for merges of events; a merge is different from
+ * a list as it is only ready when all of its sub-events are ready whereas
+ * a list is always ready */
+#define PDEVT_TYPE_BASE_MERGE 0x0004
+
+/**< Basic event type for a merge of events  */
+#define PDEVT_TYPE_MERGE (PDEVT_TYPE_BASE_MERGE | (1<<4))
 /**< An event that is only ready when all its sub events are */
 typedef struct _pdEventMerge_t {
     pdEvent_t base;
@@ -129,12 +163,22 @@ typedef struct _pdEventMerge_t {
 
 /* Values for the property fields for a pdAction_t:
  * The bit structure is as follows (32 bits):
- * Bit 0-7:  Type of pdAction_t; this determines the sub-type of action
- * Bit 8-31: Properties/status bits (defined below).
+ * Bit 0-15: Type of pdAction_t; this determines the sub-type of action
+ *           Of those bits, the bottom 4 bits encode basic types of actions
+ *           and the upper bits encode sub-types
+ * Bit 16-23: Need-processing type (NP_*)
+ * Bit 24-31: Properties/status bits (defined below).
  */
-#define PDACT_TYPE_MASK    0xFF    /**< Mask to extract the type of action */
+#define PDACT_TYPE_MASK    0xFFFF    /**< Mask to extract the type of action */
+#define PDACT_BASE_TYPE_MASK 0xF
 
-#define PDACT_TYPE_BASIC 0x01
+#define PDACT_NPTYPE_MASK  0xFF0000
+#define PDACT_NPTYPE_SHIFT 16
+
+/**< Base type indicating a control action (no
+ * real action but used internally by the MT system */
+#define PDACT_TYPE_BASE_CONTROL 0x0001
+
 /**
  * @brief Base type for runtime micro-action
  *
@@ -151,11 +195,12 @@ typedef struct _pdEventMerge_t {
  * which encodes a common action (to avoid the cost of memory allocation). This
  * differentiation happens on the bottom 3 bits: for a regular action (a pointer),
  * those three bits are 0. Other special values currently supported:
- * 001:  Calls the processMessageMT call passing the event to it.
+ * 001:  Calls the processEvent call passing the event to it.
  *       This allows the very quick encoding of a mechanism to do a callback or
  *       a deferred call (setup an event, enqueue this simple action and let the micro
- *       task scheduler deal with it at some later point) to processMessageMT
+ *       task scheduler deal with it at some later point) to processEvent
  *       pdEvent_t as an argument and 0 as the PC argument
+ * 010:  Send a message out of the policy domain
  * 111: Extended action, the next 5 bits encode the action type:
  *      - 00001: Satisfy another event:
  *                  - Slot ID is bits 32-63
@@ -171,14 +216,19 @@ typedef struct _pdEventMerge_t {
  *     - PDSTT_EVT : in event strands table
  *     - PDSTT_COMM: in communication strands table
  */
+
+#define PDACT_TYPE_EMPTY (PDACT_TYPE_BASE_CONTROL | (1<<4))
 typedef struct _pdAction_t {
-    slabObject_t slabObj;   /**< Slab object (used for slab allocation and garbage collection) */
     u32 properties;         /**< Type and other properties for this action. This includes
                              the type of the action */
 } pdAction_t;
 
 
-#define PDACT_TYPE_TASK 0x02
+/**< Base type defining that the action to take is the execution of
+ * a function call */
+#define PDACT_TYPE_BASE_TASK 0x0002
+
+#define PDACT_TYPE_CONTINUATION (PDACT_TYPE_BASE_TASK | (1<<4))
 /**< A "continuation" task (or simply a callback) */
 typedef struct _pdTask_t {
     pdAction_t base;
@@ -197,7 +247,7 @@ typedef struct _pdTask_t {
 /***************************************/
 
 
-#define PDST_TYPE_MASK      0xFF        /**< Type of strand */
+#define PDST_TYPE_MASK      0xFF     /**< Type of strand */
 #define PDST_FREE           0x0      /**< Slot is free to use */
 #define PDST_LOCK           0x100    /**< Slot is locked (transitioning to another state) */
 #define PDST_WAIT           0x3000   /**< The strand is not ready */
@@ -209,6 +259,12 @@ typedef struct _pdTask_t {
 #define PDST_HOLD           0x30000  /**< Hold the event in the table */
 #define PDST_UHOLD          0x10000  /**< User has an explicit hold on the slot */
 #define PDST_RHOLD          0x20000  /**< Runtime has a hold on the slot */
+
+#define PDST_MODIFIED       0x40000  /**< Will be true if the strand has had events
+                                          enqueued while being processed. This is used
+                                          to properly resolve events */
+
+#define PDST_EVENT_ENCODE(strand, table) ((((strand)->index)<<3) | (table))
 
 struct _pdStrandTableNode_t;
 
@@ -226,7 +282,9 @@ typedef struct _pdStrand_t {
     struct _pdStrandTableNode_t *parent; /**< Parent of this strand. Note that the slot
                                           number is index & ((1ULL<<6)-1) */
     u64 index;              /**< Index into the table */
-    volatile u32 properties;/**< Properties and status of this slot. See PDST_* */
+    ocrWorker_t* processingWorker;  /**< Worker that is processing this strand
+                                         This has implications on locking among other things */
+    u32 properties;         /**< Properties and status of this slot. See PDST_* */
 } pdStrand_t;
 
 
@@ -241,7 +299,7 @@ typedef struct _pdStrandComm_t {
 
 typedef struct _pdStrandTableNode_t {
     u64 nodeFree;           /**< Bit will be 1 if slot/node contains a free slot */
-    u64 nodeNeedsProcess;   /**< Bit will be 1 if slot/node needs to be processed */
+    u64 nodeNeedsProcess[NP_COUNT];   /**< Bit will be 1 if slot/node needs to be processed */
     u64 nodeReady;          /**< Bit will be 1 if slot/node has ready slot */
     u64 lmIndex;            /**< Bit 0: 1 if leaf node; 0 otherwise. Other bits:
                                index of the left-most strand in this subtree */
@@ -288,7 +346,7 @@ typedef struct _pdStrandTable_t {
  *
  * @param[in] pd                Pointer to this policy domain. Can be NULL
  *                              but the call will have to resolve it using getCurrentEnv
- * @param[out] event            Returns the newly allocated event
+ * @param[out] event            Returns the newly allocated event. The event is initially non-ready
  * @param[in] type              Type of event to create. See PDEVT_TYPE_MASK
  * @param[in] reserveInTable    If non-zero, hold a slot for the event in the
  *                              strands table (sets PDST_UHOLD). This value should
@@ -299,8 +357,39 @@ typedef struct _pdStrandTable_t {
  *    reserveInTable is invalid, an event will still be created and returned. Check
  *    *event to see if it is non-NULL
  *  - OCR_ENOMEM indicates that there was no memory to create the event
+ *
+ *  @todo Do we need another call where events could be created/initialized using a callback
+ *  This would allow for more event extensions and allow users to plug in
+ *  whatever they want in it. I don't have a good use case for it right now
+ *  so leaving that part out
  */
 u8 pdCreateEvent(ocrPolicyDomain_t *pd, pdEvent_t **event, u32 type, u8 reserveInTable);
+
+/**
+ * @brief Destroys and frees an event
+ *
+ * This call will do a deep free if PDEVT_DESTROY_DEEP is set
+ * on the event's property.
+ *
+ * The associated strand for the event is not freed. Care
+ * must be taken to make sure the strand will be properly
+ * removed automatically if the event is destroyed (ie:
+ * that nothing will try to use a destroyed event). A strand
+ * is automatically removed if there are no more associated actions
+ * and there is no HOLD.
+ * This call does do some sanity
+ * check and warns in case something seems wrong
+ *
+ * @param[in] pd        Policy domain to use. Can be NULL but this
+ *                      means getCurrentEnv will be used to resolve
+ *                      the PD.
+ * @param[in] event     Event to destroy and free
+ * @return a status code:
+ *          - 0 if everything was successful
+ *          - OCR_EINVAL if the event was ready but
+ *                       had pending actions (likely race)
+ */
+u8 pdDestroyEvent(ocrPolicyDomain_t *pd, pdEvent_t *event);
 
 /**
  * @brief "Resolves" an event, converting an event-like pointer to an actual event
@@ -310,7 +399,8 @@ u8 pdCreateEvent(ocrPolicyDomain_t *pd, pdEvent_t **event, u32 type, u8 reserveI
  * ready iff the event is ready AND no actions need to be taken on the event (the strands
  * deque is empty). In that case, the event's pointer is returned and 0 is returned.
  *
- * This call can also be used on a regular event pointer in which case OCR_ENOP is returned
+ * This call can also be used on a regular event pointer in which case OCR_ENOP is returned if
+ * the event is ready and OCR_EBUSY is returned if it is not ready
  *
  * @param[in] pd            Policy domain to use. Can be NULL but this means that getCurrentEnv
  *                          will be used to resolve the PD.
@@ -379,18 +469,18 @@ u8 pdMarkWaitEvent(ocrPolicyDomain_t *pd, pdEvent_t *event);
 /**
  * @brief Creates an action that is a simple callback
  *
- * This action will simply execute the function processMessageMT, passing
+ * This action will simply execute the function processEvent, passing
  * it:
  *  - the current policy domain
  *  - the ready event in the strand
  *  - the value 0 signifying the start of the function (if this is a continuable function
  *
-  * @return A pdAction_t pointer encoding the action. This can be used in pdEnqueueAction()
+ * @param[in] workType   Type of worker that can process this message (NP_COMM or NP_WORK)
+ * @return A pdAction_t pointer encoding the action. This can be used in pdEnqueueAction()
  *         to add this action to a strand. Note that the "pointer" returned may not be
  *         a true pointer and should not be used directly
  */
-pdAction_t* pdGetProcessMessageAction(void);
-
+pdAction_t* pdGetProcessMessageAction(u32 workType);
 
 /***************************************/
 /***** pdStrand_t related functions ****/
@@ -545,6 +635,7 @@ u8 pdUnlockStrand(pdStrand_t *strand);
 /***************************************/
 
 #define PDSTT_EMPTYTABLES 0x1
+#define PDSTT_CLEARHOLD   0x2
 
 /**
  * @brief Main entry into the micro-task processor
@@ -554,13 +645,38 @@ u8 pdUnlockStrand(pdStrand_t *strand);
  * will not block.
  *
  * @param[in] pd            Policy domain to use
+ * @param[in] processType   Type of messages we can process (NP_WORK, NP_COMM, etc.)
+ *                          If multiple types can be processed, this call needs
+ *                          to be called multiple times
  * @param[in] properties    Properties (currently just PDSTT_EMPTYTABLES)
  * @return a status code:
  *      - 0: successful
+ *      - OCR_EINVAL: Invalid value for processType or properties
  *      - OCR_EAGAIN: temporary failure, retry later
  *
  */
-u8 pdProcessStrands(ocrPolicyDomain_t *pd, u32 properties);
+u8 pdProcessStrands(ocrPolicyDomain_t *pd, u32 processType, u32 properties);
+
+/**
+ * @brief Entry into the micro-task processor for a fixed number of times
+ *
+ * This function is similar to pdProcessStrands() except that it
+ * processes up-to the number of strands specified (it will stop processing
+ * if there is nothing left for it to do
+ *
+ * @param[in] pd            Policy domain to use
+ * @param[in] processType   Type of messages we can process (NP_WORK, NP_COMM, etc.)
+ *                          If multiple types can be processed, this call needs
+ *                          to be called multiple times
+ * @param[in/out] count     Maximum number of strands to process; on
+ *                          output contains the number of strands actually processed
+ * @param[in] properties    Properties (currently unused)
+ * @return a status code:
+ *      - 0: successful. This does not mean that any strands were processed
+ *      - OCR_EINVAL: Invalid value for processType or properties
+ *      - OCR_EAGAIN: Temporary failure, retry later
+ */
+u8 pdProcessStrandsCount(ocrPolicyDomain_t *pd, u32 processType, u32 *count, u32 properties);
 
 /**
  * @brief Process tasks until the events required are resolved
@@ -571,16 +687,27 @@ u8 pdProcessStrands(ocrPolicyDomain_t *pd, u32 properties);
  * event array will contain the resolved events.
  *
  * @param[in] pd            Policy domain to use
+ * @param[in] processType   Type of message we can process (NP_WORK, NP_COMM, etc.)
+ *                          If multiple types can be processed, this call needs to be
+ *                          called multiple times
  * @param[in] count         Number of events to try to resolve
  * @param[in/out] events    Events to resolve. On successful return, contains the
  *                          resolved events
- * @param[in] properties    Properties
+ * @param[in] properties    Properties; currently just PDSTT_CLEARHOLD if
+ *                          events in events should be resolved and have their runtime
+ *                          hold cleared
  * @return a status code:
  *      - 0: successful
  *      - OCR_EAGAIN: temporary failure, retry later
  * @todo Define properties
+ * @note The events you want resolved don't have to be of the type you can
+ * process. Other workers may process those other events. The only guarantee
+ * of this call is that when it returns, all events in the events array will
+ * have been resolved. It does NOT guarantee that this thread will be the one
+ * resolving them.
  */
-u8 pdProcessResolveEvents(ocrPolicyDomain_t *pd, u32 count, pdEvent_t **events,
-                          u64 properties);
+u8 pdProcessResolveEvents(ocrPolicyDomain_t *pd, u32 processType, u32 count,
+                          pdEvent_t **events, u32 properties);
 
 #endif /* __POLICY_DOMAIN_TASKS_H__ */
+

@@ -1214,10 +1214,8 @@ typedef struct _ocrPolicyDomainFcts_t {
      *
      * This function can be called either by user code (for when the user code
      * requires runtime services) or internally by the runtime (when a message
-     * has been received via CT.pollMessage for example)
+     * has been received from another policy domain for example)
      *
-     * All code executed by processMessageMT until it reaches a sendMessage
-     * is executed synchronously and inside the same address space.
      *
      * @param[in]     self       This policy domain
      * @param[in/out] evt        Input event which contains the message
@@ -1226,8 +1224,8 @@ typedef struct _ocrPolicyDomainFcts_t {
      *                           was interrupted due to a blocking call
      * @return 0 on success and a non-zero value on failure
      */
-    struct _pdEvent_t* (*processMessageMT)(struct _ocrPolicyDomain_t *self,
-                                           struct _pdEvent_t* evt, u32 idx);
+    u8 (*processEvent)(struct _ocrPolicyDomain_t *self,
+                       struct _pdEvent_t** evt, u32 idx);
     /**
      * @brief Send a message outside of the policy domain.
      * This API can be used by any client of the policy domain and

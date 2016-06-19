@@ -355,7 +355,7 @@ u8 hcPdSwitchRunlevel(ocrPolicyDomain_t *policy, ocrRunlevel_t runlevel, u32 pro
             }
             // At the end, we clear out the strand tables and free them.
             DPRINTF(DEBUG_LVL_VERB, "Emptying strand tables\n");
-            RESULT_ASSERT(pdProcessStrands(policy, PDSTT_EMPTYTABLES), ==, 0);
+            RESULT_ASSERT(pdProcessStrands(policy, NP_WORK, PDSTT_EMPTYTABLES), ==, 0);
             // Free the tables
             DPRINTF(DEBUG_LVL_VERB, "Freeing EVT strand table: %p\n", policy->strandTables[PDSTT_EVT-1]);
             policy->fcts.pdFree(policy, policy->strandTables[PDSTT_EVT-1]);
@@ -2262,14 +2262,15 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
     RETURN_PROFILE(returnCode);
 }
 
-pdEvent_t* hcPdProcessMessageMT(ocrPolicyDomain_t* self, pdEvent_t *evt, u32 idx) {
+u8 hcPdProcessEvent(ocrPolicyDomain_t* self, pdEvent_t **evt, u32 idx) {
     // Simple version to test out micro tasks for now. This just executes a blocking
     // call to the regular process message and returns NULL
     ASSERT(idx == 0);
-    ASSERT((evt->properties & PDEVT_TYPE_MASK) == PDEVT_TYPE_MSG);
-    pdEventMsg_t *evtMsg = (pdEventMsg_t*)evt;
+    ASSERT(((*evt)->properties & PDEVT_TYPE_MASK) == PDEVT_TYPE_MSG);
+    pdEventMsg_t *evtMsg = (pdEventMsg_t*)*evt;
     hcPolicyDomainProcessMessage(self, evtMsg->msg, true);
-    return NULL;
+    *evt = NULL;
+    return 0;
 }
 
 u8 hcPdSendMessage(ocrPolicyDomain_t* self, ocrLocation_t target, ocrPolicyMsg_t *message,
@@ -2372,7 +2373,7 @@ ocrPolicyDomainFactory_t * newPolicyDomainFactoryHc(ocrParamList_t *perType) {
     base->policyDomainFcts.destruct = FUNC_ADDR(void(*)(ocrPolicyDomain_t*), hcPolicyDomainDestruct);
     base->policyDomainFcts.switchRunlevel = FUNC_ADDR(u8 (*)(ocrPolicyDomain_t*, ocrRunlevel_t, u32), hcPdSwitchRunlevel);
     base->policyDomainFcts.processMessage = FUNC_ADDR(u8(*)(ocrPolicyDomain_t*,ocrPolicyMsg_t*,u8), hcPolicyDomainProcessMessage);
-    base->policyDomainFcts.processMessageMT = FUNC_ADDR(pdEvent_t* (*)(ocrPolicyDomain_t*, pdEvent_t*, u32), hcPdProcessMessageMT);
+    base->policyDomainFcts.processEvent = FUNC_ADDR(u8 (*)(ocrPolicyDomain_t*, pdEvent_t**, u32), hcPdProcessEvent);
 
     base->policyDomainFcts.sendMessage = FUNC_ADDR(u8 (*)(ocrPolicyDomain_t*, ocrLocation_t, ocrPolicyMsg_t *, ocrMsgHandle_t**, u32),
                                          hcPdSendMessage);
