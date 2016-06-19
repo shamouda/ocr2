@@ -120,6 +120,20 @@ u8 arrayDequePushAtTail(arrayDeque_t* deque, void* entry);
 u8 arrayDequePopFromTail(arrayDeque_t* deque, void** entry);
 
 /**
+ * @brief Peeks at an element from the tail of the deque
+ *
+ * This returns the element at the tail of the deque
+ * but does not modify the deque
+ *
+ * @param[in]  deque Array deque to peek from
+ * @param[out] entry Entry peeked
+ *
+ * @return 0 on success or an error code:
+ *   - OCR_EAGAIN: No element to peek -- try later
+ */
+u8 arrayDequePeekFromTail(arrayDeque_t* deque, void** entry);
+
+/**
  * @brief Push an element at the head of the deque
  *
  * @param[in] deque Array deque to push to
@@ -140,6 +154,20 @@ u8 arrayDequePushAtHead(arrayDeque_t* deque, void* entry);
  *   - OCR_EAGAIN: No element to pop -- try later
  */
 u8 arrayDequePopFromHead(arrayDeque_t* deque, void** entry);
+
+/**
+ * @brief Peeks at an element from the head of the deque
+ *
+ * This returns the element at the head of the deque
+ * but does not modify the deque
+ *
+ * @param[in]  deque Array deque to peek from
+ * @param[out] entry Entry peeked
+ *
+ * @return 0 on success or an error code:
+ *   - OCR_EAGAIN: No element to peek -- try later
+ */
+u8 arrayDequePeekFromHead(arrayDeque_t* deque, void** entry);
 
 /**
  * @brief Hook into the deque API

@@ -191,6 +191,25 @@ u8 arrayDequePopFromTail(arrayDeque_t* deque, void** entry) {
     RETURN_PROFILE(0);
 }
 
+u8 arrayDequePeekFromTail(arrayDeque_t* deque, void** entry) {
+    START_PROFILE(util_arrayDequePeekFromTail);
+    ASSERT(deque);
+    ASSERT(entry);
+
+    DPRINTF(DEBUG_LVL_INFO, "ArrayDeque %p: attempting to peek from tail\n", deque);
+    if(deque->isEmpty) {
+        // Empty deque
+        DPRINTF(DEBUG_LVL_INFO, "ArrayDeque %p: queue is empty\n", deque);
+        RETURN_PROFILE(OCR_EAGAIN);
+    }
+
+    ASSERT(deque->tail);
+    *entry = deque->tail->data[deque->tailIdx & (deque->chunkSize - 1)];
+    DPRINTF(DEBUG_LVL_INFO, "ArrayDeque %p: element %p peeked\n", deque, *entry);
+
+    RETURN_PROFILE(0);
+}
+
 u8 arrayDequePushAtHead(arrayDeque_t* deque, void* entry) {
     START_PROFILE(util_arrayDequePushAtHead);
     ASSERT(deque);
@@ -324,6 +343,25 @@ u8 arrayDequePopFromHead(arrayDeque_t* deque, void** entry) {
                     victimChunk, deque->chunkCount);
         }
     }
+    RETURN_PROFILE(0);
+}
+
+u8 arrayDequePeekFromHead(arrayDeque_t* deque, void** entry) {
+    START_PROFILE(util_arrayDequePopFromHead);
+    ASSERT(deque);
+    ASSERT(entry);
+
+    DPRINTF(DEBUG_LVL_INFO, "ArrayDeque %p: attempting to peek from head\n", deque);
+    if(deque->isEmpty) {
+        // Empty deque
+        DPRINTF(DEBUG_LVL_INFO, "ArrayDeque %p: queue is empty\n", deque);
+        RETURN_PROFILE(OCR_EAGAIN);
+    }
+
+    ASSERT(deque->head);
+    *entry = deque->head->data[deque->headIdx & (deque->chunkSize - 1)];
+    DPRINTF(DEBUG_LVL_INFO, "ArrayDeque %p: element %p peeked\n", deque, *entry);
+
     RETURN_PROFILE(0);
 }
 
