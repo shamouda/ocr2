@@ -14,6 +14,7 @@ import sys
 import os
 import datetime
 import csv
+import re
 
 # Import perftest_baseval dict which contains values
 # against which execution times will be normalized
@@ -29,7 +30,10 @@ def main():
     archiveDir = sys.argv[1]
     oFile = sys.argv[2]
     statFileList = os.listdir(archiveDir)
-    statFileList.sort()
+    #sorting from https://blog.codinghorror.com/sorting-for-humans-natural-sort-order/
+    convert = lambda text: int(text) if text.isdigit() else text
+    alphanum_key = lambda key: [ convert(c) for c in re.split('([0-9]+)', key) ]
+    statFileList.sort(key=alphanum_key)
     testdict = dict()
     for filename in statFileList:
         fd = open(os.path.join(archiveDir,filename), 'r')
