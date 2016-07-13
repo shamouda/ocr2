@@ -72,6 +72,8 @@ u8 numaAllocSwitchRunlevel(ocrMemPlatform_t *self, ocrPolicyDomain_t *PD, ocrRun
             ASSERT(numa_available() != -1);
             // 2. Check if the node number is reasonable
             ASSERT(rself->numa_node <= numa_max_node());
+            // 3. Use strict policy. Strict means the allocation will fail if the memory cannot be allocated on the target node.
+            numa_set_strict(1);
             self->startAddr = (u64)numa_alloc_onnode(self->size, rself->numa_node);
             // Check that the mem-platform size in config file is reasonable
             ASSERT(self->startAddr);
