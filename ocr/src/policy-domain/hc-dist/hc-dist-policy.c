@@ -2068,9 +2068,6 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
             	    msg2.type = PD_MSG_EVT_CREATE | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
             	    //<start> record the event-location mapping
             	    ResEventNode_t * node = (ResEventNode_t *) self->fcts.pdMalloc(self, sizeof(ResEventNode_t));
-            	    node->eventFatGuid = (ocrFatGuid_t *) self->fcts.pdMalloc(self, sizeof(ocrFatGuid_t));
-            	    node->location = srcLoc;
-
             	    hal_lock32(&(pdSelfDist->lockResEvtList));
             	    node->next = pdSelfDist->proxyListHead->next;
             	    pdSelfDist->proxyListHead->next = node;
@@ -2090,12 +2087,14 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
             	        PD_MSG_FIELD_I(params) = &proxyParams;
             	    #endif
 
-            	    PD_MSG_FIELD_I(properties) = EVT_PROP_ULFM_PROXY; //special property
+            	    PD_MSG_FIELD_I(properties) = EVT_PROP_ULFM_PROXY; //special resilience property
             	    PD_MSG_FIELD_I(type) = OCR_EVENT_ONCE_T;
             	    RESULT_PROPAGATE(self->fcts.processMessage(self, &msg2, true));
+
             	    ocrFatGuid_t proxyResEventGuid = PD_MSG_FIELD_IO(guid);
 
                     hal_lock32(&pdSelfDist->lockResEvtList);
+            	    node->location = srcLoc;
             	    node->eventFatGuid = proxyResEventGuid;
             	    hal_unlock32(&pdSelfDist->lockResEvtList);
                     printf("============Adding proxy event pointer  srcLoc[%d]\n", (u32) srcLoc);
