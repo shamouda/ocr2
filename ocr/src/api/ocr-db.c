@@ -109,6 +109,11 @@ u8 ocrDbCreate(ocrGuid_t *db, void** addr, u64 len, u16 flags,
 }
 
 u8 ocrDbDestroy(ocrGuid_t db) {
+    //ULFM Resilience 
+    if (ocrGuidIsFailure(db)) {
+    	DPRINTF(DEBUG_LVL_WARN, "Destroying DB FAILURE_GUID - nothing to be done 0\n");
+    	 return 0;
+    }
 
     START_PROFILE(api_ocrDbDestroy);
     DPRINTF(DEBUG_LVL_INFO, "ENTER ocrDbDestroy(guid="GUIDF")\n", GUIDA(db));

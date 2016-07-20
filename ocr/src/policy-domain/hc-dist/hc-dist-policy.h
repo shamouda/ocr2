@@ -15,6 +15,7 @@
 #include "utils/hashtable.h"
 #include "policy-domain/hc/hc-policy.h"
 
+#include "event/hc/hc-event.h"
 /******************************************************/
 /* OCR-HC DISTRIBUTED POLICY DOMAIN                   */
 /******************************************************/
@@ -28,6 +29,13 @@ typedef struct {
     u32 lockDbLookup;  /**< Lock for querying proxies for remote DB */
     u32 lockTplLookup; /**< Lock for querying proxies for remote template */
     hashtable_t * proxyTplMap;
+
+    //ULFM Resilience
+    ResEventNode_t* proxyListHead;
+    ResEventNode_t* proxyListTail;
+    u32 lockResEvtList; /** Lock for proxy events list **/
+    ocrLocation_t * deadLocations;
+    u32 deadLocationsCount;
 } ocrPolicyDomainHcDist_t;
 
 typedef struct {

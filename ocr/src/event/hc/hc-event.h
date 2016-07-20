@@ -46,7 +46,23 @@ typedef struct ocrEventHc_t {
     u32 waitersMax; /**< Maximum number of waiters in waitersDb */
     u32 waitersLock;
     ocrRuntimeHint_t hint;
+    u16 properties; //ULFM Resilience - properties field added to mark proxy events
 } ocrEventHc_t;
+
+/* used by hc-dist-policy.c */
+typedef struct {
+	ocrLocation_t location;
+	ocrFatGuid_t* eventFatGuid;
+	struct ResEventNode_t* prev;
+	struct ResEventNode_t* next;
+} ResEventNode_t;
+
+/* used by hc-event.c */
+typedef struct _ocrEventHcOnceProxy_t {
+	ocrEventHc_t base;
+	ResEventNode_t* proxyEvtPtr;
+	u32* lockProxyListPtr;
+} ocrEventHcOnceProxy_t;
 
 typedef struct _ocrEventHcPersist_t {
     ocrEventHc_t base;

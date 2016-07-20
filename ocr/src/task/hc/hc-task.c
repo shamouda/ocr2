@@ -388,7 +388,7 @@ static u8 iterateDbFrontier(ocrTask_t *self) {
         //ACQUIRE can be non-blocking so pre-increment the frontier
         //slot and adjust by -1 in dependenceResolvedTaskHc
         rself->frontierSlot++;
-        if (!(ocrGuidIsNull(depv[i].guid))) {
+        if (!(ocrGuidIsNull(depv[i].guid) || ocrGuidIsFailure(depv[i].guid) )) {
             // Because the frontier is sorted, we can check for duplicates here
             // and remember them to avoid double release
             if ((i > 0) && (ocrGuidIsEq(depv[i-1].guid, depv[i].guid))) {
