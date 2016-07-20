@@ -2060,8 +2060,7 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
             guidLocation(self, src, &srcLoc);
 
             if (srcLoc != self->myLocation) {
-            	printf("here[%d] add remote dependence to location %d \n", self->myLocation,(u32)srcLoc);
-            	/*Noni
+            	printf("here[%d] add remote dependence to location %d \n", (u32)self->myLocation,(u32)srcLoc);
             	//create a local event that is fired in place of a lost event at a remote place
             	PD_MSG_STACK(msg2);
             	getCurrentEnv(NULL, NULL, NULL, &msg2);
@@ -2102,6 +2101,7 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
             	#undef PD_TYPE
             	#undef PD_MSG
 
+            	/*Noni
                 PD_MSG_STACK(msg3);
                 getCurrentEnv(NULL, NULL, NULL, &msg3);
         		#define PD_MSG (&msg3)
