@@ -1379,6 +1379,9 @@ u8 taskExecute(ocrTask_t* base) {
         // have acquired along the way
         if(derived->unkDbs != NULL) {
             ocrGuid_t *extraToFree = derived->unkDbs;
+            if (ocrGuidIsFailure(*extraToFree)) { //SARAULFM
+                printf("ocrGuidIsFailure ...\n");
+            }
             u64 count = derived->countUnkDbs;
             while(count) {
                 getCurrentEnv(NULL, NULL, NULL, &msg);
