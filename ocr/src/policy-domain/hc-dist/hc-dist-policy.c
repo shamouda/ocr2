@@ -1256,7 +1256,7 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
                 // Fall-through to local processing
             }
             if ((msg->srcLocation == curLoc) && (msg->destLocation != curLoc)) {
-            	if (self->fcts.isLocationDead(msg->destLocation)) {
+            	if (self->fcts.isLocationDead(self, msg->destLocation)) {
             		printf("Here[%d] Acquire  ... destination[%d]   isDead ...\n", (u32)self->myLocation , (u32)msg->destLocation );
             	}
             	else {
