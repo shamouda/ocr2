@@ -1256,15 +1256,18 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
                 // Fall-through to local processing
             }
             if ((msg->srcLocation == curLoc) && (msg->destLocation != curLoc)) {
+            	prinf("Acquire ....1 \n");
                 if (msg->type & PD_MSG_LOCAL_PROCESS) { //BUG #162 - This is a workaround until metadata cloning
                     DPRINTF(DEBUG_LVL_VVERB,"DB_ACQUIRE local processing: DB GUID "GUIDF"\n", GUIDA(PD_MSG_FIELD_IO(guid.guid)));
                     PROCESS_MESSAGE_WITH_PROXY_DB_AND_RETURN
                 }
+                prinf("Acquire ....2 \n");
                 // Outgoing acquire request
                 ProxyDb_t * proxyDb = getProxyDb(self, PD_MSG_FIELD_IO(guid.guid), true);
                 hal_lock32(&(proxyDb->lock)); // lock the db
                 switch(proxyDb->state) {
                     case PROXY_DB_CREATED:
+                    	prinf("Acquire ....PROXY_DB_CREATED \n");
                         DPRINTF(DEBUG_LVL_VVERB,"DB_ACQUIRE: Outgoing request for DB GUID "GUIDF" with properties=0x%"PRIx32", creation fetch\n",
                                 GUIDA(PD_MSG_FIELD_IO(guid.guid)), PD_MSG_FIELD_IO(properties));
                         // The proxy has just been created, need to fetch the DataBlock
@@ -1272,6 +1275,7 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
                         proxyDb->state = PROXY_DB_FETCH;
                     break;
                     case PROXY_DB_RUN:
+                    	prinf("Acquire ....PROXY_DB_RUN \n");
                         // The DB is already in use locally
                         // Check if the acquire is compatible with the current usage
                         if (isAcquireEligibleForProxy(proxyDb->mode, (PD_MSG_FIELD_IO(properties) & DB_ACCESS_MODE_MASK))) {
@@ -1293,6 +1297,7 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
                         //WARN: fall-through is intentional
                     case PROXY_DB_FETCH:
                     case PROXY_DB_RELINQUISH:
+                    	prinf("Acquire ....PROXY_DB_RELINQUISH \n");
                         //WARN: Do NOT move implementation: 'PROXY_DB_RUN' falls-through here
                         // The proxy is in a state requiring stalling outgoing acquires.
                         // The acquire 'msg' is copied and enqueued.
