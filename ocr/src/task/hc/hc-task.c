@@ -442,7 +442,6 @@ static u8 iterateDbFrontier(ocrTask_t *self) {
  * Note: static function only meant to factorize code.
  */
 static u8 scheduleTask(ocrTask_t *self) {
-	printf("I reached schedule task ...\n");
     DPRINTF(DEBUG_LVL_INFO, "Schedule "GUIDF"\n", GUIDA(self->guid));
     self->state = ALLACQ_EDTSTATE;
     ocrPolicyDomain_t *pd = NULL;
