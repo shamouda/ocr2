@@ -49,6 +49,8 @@
 #define OCR_EPEND           102     /**< Operation is pending */
 #define OCR_ENOP            103     /**< Operation was a no-op */
 #define OCR_ECANCELED       125     /**< Operation canceled */
+#define OCR_ACQ_DEST_DEAD       126     /**< Acquire DB at a dead location  */
+
 /**
  * @}
  * @}

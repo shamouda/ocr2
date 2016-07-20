@@ -1258,6 +1258,7 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
             if ((msg->srcLocation == curLoc) && (msg->destLocation != curLoc)) {
             	if (self->fcts.isLocationDead(self, msg->destLocation)) {
             		printf("Here[%d] Acquire  ... destination[%d]   isDead ...\n", (u32)self->myLocation , (u32)msg->destLocation );
+            		return OCR_ACQ_DEST_DEAD;
             	}
             	else {
             		printf("Here[%d] Acquire  ... destination[%d]   isAlive ...\n", (u32)self->myLocation  , (u32)msg->destLocation );

@@ -419,9 +419,15 @@ static u8 iterateDbFrontier(ocrTask_t *self) {
                 if ((returnCode == OCR_EPEND) || (PD_MSG_FIELD_O(returnDetail) == OCR_EBUSY)) {
                     return true;
                 }
-                // else, acquire took place and was successful, continue iterating
-                ASSERT(msg.type & PD_MSG_RESPONSE); // 2x check
-                rself->resolvedDeps[depv[i].slot].ptr = PD_MSG_FIELD_O(ptr);
+                if (returnCode == OCR_ACQ_DEST_DEAD) {
+                	depv[i].guid = FAILURE_GUID;
+                	printf("depv[%d] dest is dead - replace it with a FAILURE_GUID ...\n", i);
+                }
+                else{
+                	// else, acquire took place and was successful, continue iterating
+                	ASSERT(msg.type & PD_MSG_RESPONSE); // 2x check
+                	rself->resolvedDeps[depv[i].slot].ptr = PD_MSG_FIELD_O(ptr);
+                }
 #undef PD_MSG
 #undef PD_TYPE
             }
