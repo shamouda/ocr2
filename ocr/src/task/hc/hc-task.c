@@ -435,6 +435,7 @@ static u8 iterateDbFrontier(ocrTask_t *self) {
  * Note: static function only meant to factorize code.
  */
 static u8 scheduleTask(ocrTask_t *self) {
+	printf("I reached schedule task ...\n");
     DPRINTF(DEBUG_LVL_INFO, "Schedule "GUIDF"\n", GUIDA(self->guid));
     self->state = ALLACQ_EDTSTATE;
     ocrPolicyDomain_t *pd = NULL;
@@ -508,8 +509,10 @@ static u8 taskAllDepvSatisfied(ocrTask_t *self) {
         sortRegNode(signalers, self->depc);
         rself->frontierSlot = 0;
     }
+    printf("did I reach here?  1  \n");
     // Try to start the DB acquisition process if scheduler agreed
     if (scheduleSatisfiedTask(self) != 0 && !iterateDbFrontier(self)) {
+    	printf("did I reach here?  2  \n");
         //TODO: Keeping this here for 0.9 compatibility but
         //iterateDbFrontier and related code will eventually
         //move to the scheduler.
