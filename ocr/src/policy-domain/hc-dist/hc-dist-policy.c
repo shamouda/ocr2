@@ -307,6 +307,18 @@ typedef struct {
     ProxyTplNode_t * queueHead;
 } ProxyTpl_t;
 
+void printResilientEventsList(ocrPolicyDomainHcDist_t * dself) {
+	hal_lock32(&(dself->lockResEvtList));
+	ResEventNode_t *node = dself->proxyListHead->next;
+	u32 indx = 0;
+	while (node != dself->proxyListTail) {
+		printf("%d- loc[%d] evGuid["GUIDF"] \n", indx, (u32)(node->location), GUIDA(node->eventFatGuid->guid));
+		node = node->next;
+		indx++;
+	}
+	hal_unlock32(&(dself->lockResEvtList));
+}
+
 static u8 registerRemoteMetaData(ocrPolicyDomain_t * pd, ocrFatGuid_t tplFatGuid) {
     ocrPolicyDomainHcDist_t * dself = (ocrPolicyDomainHcDist_t *) pd;
     // The lock allows to not give out reference to the proxy while we work.
