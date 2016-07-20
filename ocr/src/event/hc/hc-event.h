@@ -50,11 +50,11 @@ typedef struct ocrEventHc_t {
 } ocrEventHc_t;
 
 /* used by hc-dist-policy.c */
-typedef struct {
+typedef struct _ResEventNode_t {
 	ocrLocation_t location;
 	ocrFatGuid_t* eventFatGuid;
-	struct ResEventNode_t* prev;
-	struct ResEventNode_t* next;
+	struct _ResEventNode_t* prev;
+	struct _ResEventNode_t* next;
 } ResEventNode_t;
 
 /* used by hc-event.c */
