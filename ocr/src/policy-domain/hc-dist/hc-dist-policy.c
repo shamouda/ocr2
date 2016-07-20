@@ -1257,24 +1257,17 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
             }
             if ((msg->srcLocation == curLoc) && (msg->destLocation != curLoc)) {
             	if (self->fcts.isLocationDead(self, msg->destLocation)) {
-            		printf("Here[%d] Acquire  ... destination[%d]   isDead ...\n", (u32)self->myLocation , (u32)msg->destLocation );
             		return OCR_ACQ_DEST_DEAD;
             	}
-            	else {
-            		printf("Here[%d] Acquire  ... destination[%d]   isAlive ...\n", (u32)self->myLocation  , (u32)msg->destLocation );
-            	}
-            	printf("Acquire ....1 \n");
                 if (msg->type & PD_MSG_LOCAL_PROCESS) { //BUG #162 - This is a workaround until metadata cloning
                     DPRINTF(DEBUG_LVL_VVERB,"DB_ACQUIRE local processing: DB GUID "GUIDF"\n", GUIDA(PD_MSG_FIELD_IO(guid.guid)));
                     PROCESS_MESSAGE_WITH_PROXY_DB_AND_RETURN
                 }
-                printf("Acquire ....2 \n");
                 // Outgoing acquire request
                 ProxyDb_t * proxyDb = getProxyDb(self, PD_MSG_FIELD_IO(guid.guid), true);
                 hal_lock32(&(proxyDb->lock)); // lock the db
                 switch(proxyDb->state) {
                     case PROXY_DB_CREATED:
-                    	printf("Acquire ....PROXY_DB_CREATED \n");
                         DPRINTF(DEBUG_LVL_VVERB,"DB_ACQUIRE: Outgoing request for DB GUID "GUIDF" with properties=0x%"PRIx32", creation fetch\n",
                                 GUIDA(PD_MSG_FIELD_IO(guid.guid)), PD_MSG_FIELD_IO(properties));
                         // The proxy has just been created, need to fetch the DataBlock
@@ -1282,7 +1275,6 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
                         proxyDb->state = PROXY_DB_FETCH;
                     break;
                     case PROXY_DB_RUN:
-                    	printf("Acquire ....PROXY_DB_RUN \n");
                         // The DB is already in use locally
                         // Check if the acquire is compatible with the current usage
                         if (isAcquireEligibleForProxy(proxyDb->mode, (PD_MSG_FIELD_IO(properties) & DB_ACCESS_MODE_MASK))) {
@@ -1304,7 +1296,6 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
                         //WARN: fall-through is intentional
                     case PROXY_DB_FETCH:
                     case PROXY_DB_RELINQUISH:
-                    	printf("Acquire ....PROXY_DB_RELINQUISH \n");
                         //WARN: Do NOT move implementation: 'PROXY_DB_RUN' falls-through here
                         // The proxy is in a state requiring stalling outgoing acquires.
                         // The acquire 'msg' is copied and enqueued.
@@ -1325,10 +1316,8 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
                 }
                 hal_unlock32(&(proxyDb->lock));
                 relProxyDb(self, proxyDb);
-                printf("Acquire end \n");
             }
         } else { // DB_ACQUIRE response
-            printf("Acquire response ...!!!!!! \n");
             ASSERT(msg->type & PD_MSG_RESPONSE);
             if (!ocrGuidIsNull(PD_MSG_FIELD_IO(edt.guid))) {
                 RETRIEVE_LOCATION_FROM_MSG(self, edt, msg->destLocation, IO)
