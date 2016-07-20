@@ -2361,9 +2361,11 @@ void hcDistUpdateDeadLocations(ocrPolicyDomain_t *self,  ocrLocation_t* location
     dself->deadLocations = locations;
     dself->deadLocationsCount = count;
 
-    //hal_lock32(&dself->lockResEvtList);
+    hal_lock32(&dself->lockResEvtList);
     ResEventNode_t *node = dself->proxyListHead->next;
     while (node != dself->proxyListTail) {
+    	printf("Here[%d] check guid  ["GUIDF"]  location [%d] \n", (u32)self->myLocation,
+    			GUIDA(node->eventFatGuid->guid), (u32)(node->location));
         u32 locIndx = 0;
         while (locIndx < count) {
         	if ((u32)(locations[locIndx]) == (u32)(node->location)) {
@@ -2375,7 +2377,7 @@ void hcDistUpdateDeadLocations(ocrPolicyDomain_t *self,  ocrLocation_t* location
                 	msg.type = PD_MSG_DEP_SATISFY | PD_MSG_REQUEST;
                     PD_MSG_FIELD_I(satisfierGuid.guid) = curEdt?curEdt->guid:NULL_GUID;
                     PD_MSG_FIELD_I(satisfierGuid.metaDataPtr) = curEdt;
-                	PD_MSG_FIELD_I(guid) = *node->eventFatGuid;
+                	PD_MSG_FIELD_I(guid) = node->eventFatGuid;
                 	PD_MSG_FIELD_I(payload.guid) = FAILURE_GUID; /*satisfy the event with a failure GUID*/
                 	PD_MSG_FIELD_I(payload.metaDataPtr) = NULL;
                     PD_MSG_FIELD_I(currentEdt.guid) = curEdt ? curEdt->guid : NULL_GUID;
@@ -2383,7 +2385,9 @@ void hcDistUpdateDeadLocations(ocrPolicyDomain_t *self,  ocrLocation_t* location
                 	PD_MSG_FIELD_I(slot) = 0;
                 	PD_MSG_FIELD_I(properties) = 0;
                 	//is this sync or async????
+                	hal_unlock32(&dself->lockResEvtList);
                 	self->fcts.processMessage(self, &msg, false);
+                	hal_lock32(&dself->lockResEvtList);
             	#undef PD_MSG
             	#undef PD_TYPE
 
@@ -2394,7 +2398,7 @@ void hcDistUpdateDeadLocations(ocrPolicyDomain_t *self,  ocrLocation_t* location
         }
         node = node -> next;
     }
-    //hal_unlock32(&dself->lockResEvtList);
+    hal_unlock32(&dself->lockResEvtList);
 }
 
 bool hcDistIsLocationDead(ocrPolicyDomain_t *self,  ocrLocation_t location) {
