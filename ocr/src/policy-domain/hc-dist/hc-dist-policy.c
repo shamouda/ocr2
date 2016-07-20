@@ -1324,8 +1324,10 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
                 }
                 hal_unlock32(&(proxyDb->lock));
                 relProxyDb(self, proxyDb);
+                printf("Acquire end \n");
             }
         } else { // DB_ACQUIRE response
+            printf("Acquire response ...!!!!!! \n");
             ASSERT(msg->type & PD_MSG_RESPONSE);
             if (!ocrGuidIsNull(PD_MSG_FIELD_IO(edt.guid))) {
                 RETRIEVE_LOCATION_FROM_MSG(self, edt, msg->destLocation, IO)
