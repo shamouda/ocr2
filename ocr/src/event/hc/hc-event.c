@@ -1204,6 +1204,15 @@ u8 newEventHc(ocrEventFactory_t * factory, ocrFatGuid_t *guid,
             ((ocrEventHcLatch_t*)event)->counter = 0;
         }
     }
+
+    if(eventType == OCR_EVENT_ONCE_T && properties == EVT_PROP_ULFM_PROXY) {
+#ifdef ENABLE_EXTENSION_PARAMS_EVT
+    	ocrEventParams_t * params = (ocrEventParams_t *) perInstance;
+    	((ocrEventHcOnceProxy_t*)event)->proxyEvtPtr = params->EVENT_PROXY.proxyEvtPtr;
+    	((ocrEventHcOnceProxy_t*)event)->lockProxyListPtr = params->EVENT_PROXY.lockProxyListPtr;
+#endif
+    }
+
 #ifdef ENABLE_EXTENSION_COUNTED_EVT
     if(eventType == OCR_EVENT_IDEM_T || eventType == OCR_EVENT_STICKY_T || eventType == OCR_EVENT_COUNTED_T) {
         ((ocrEventHcPersist_t*)event)->data = UNINITIALIZED_GUID;
