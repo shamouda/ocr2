@@ -2073,9 +2073,9 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
 
             	    hal_lock32(&(pdSelfDist->lockResEvtList));
             	    node->next = pdSelfDist->proxyListHead->next;
+            	    pdSelfDist->proxyListHead->next = node;
             	    node->prev = pdSelfDist->proxyListHead;
             	    node->next->prev = node;
-            	    pdSelfDist->proxyListHead->next = node;
             	    hal_unlock32(&(pdSelfDist->lockResEvtList));
             	    //<end> record the event-location mapping
 
@@ -2094,9 +2094,12 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
             	    PD_MSG_FIELD_I(type) = OCR_EVENT_ONCE_T;
             	    RESULT_PROPAGATE(self->fcts.processMessage(self, &msg2, true));
             	    ocrFatGuid_t proxyResEventGuid = PD_MSG_FIELD_IO(guid);
+
                     hal_lock32(&pdSelfDist->lockResEvtList);
             	    node->eventFatGuid = &proxyResEventGuid;
             	    hal_unlock32(&pdSelfDist->lockResEvtList);
+                    printf("============Adding proxy event pointer  srcLoc[%d]\n", (u32) srcLoc);
+            	    printResilientEventsList(pdSelfDist);
             	#undef PD_TYPE
             	#undef PD_MSG
 
