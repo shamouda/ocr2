@@ -26,12 +26,12 @@ extern "C" {
 
 
 #ifdef ENABLE_EXTENSION_PARAMS_EVT
-
+/*
 typedef struct {
     void* proxyEvtPtr;
     u32* lockProxyListPtr;
 } ocrEventProxyParams_t;
-
+*/
 typedef struct {
     u64 counter;
 } ocrEventLatchParams_t;
