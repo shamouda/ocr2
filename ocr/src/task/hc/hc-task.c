@@ -1379,9 +1379,6 @@ u8 taskExecute(ocrTask_t* base) {
         // have acquired along the way
         if(derived->unkDbs != NULL) {
             ocrGuid_t *extraToFree = derived->unkDbs;
-            if (ocrGuidIsFailure(*extraToFree)) { //SARAULFM
-                printf("ocrGuidIsFailure ...\n");
-            }
             u64 count = derived->countUnkDbs;
             while(count) {
                 getCurrentEnv(NULL, NULL, NULL, &msg);
@@ -1412,7 +1409,7 @@ u8 taskExecute(ocrTask_t* base) {
         if (base->state == RUNNING_EDTSTATE) {
             // Now deal with the output event
             if(!(ocrGuidIsNull(base->outputEvent))) {
-                if(!(ocrGuidIsNull(retGuid))) {
+                if(!(ocrGuidIsNull(retGuid) || ocrGuidIsFailure(retGuid))) { //SARAULFM
                     getCurrentEnv(NULL, NULL, NULL, &msg);
 #define PD_MSG (&msg)
 #define PD_TYPE PD_MSG_DEP_ADD
