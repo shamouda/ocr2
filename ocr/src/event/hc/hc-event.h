@@ -52,7 +52,7 @@ typedef struct ocrEventHc_t {
 // used by hc-dist-policy.c 
 typedef struct _ResEventNode_t {
 	ocrLocation_t location;
-	ocrFatGuid_t* eventFatGuid;
+	ocrFatGuid_t eventFatGuid;
 	struct _ResEventNode_t* prev;
 	struct _ResEventNode_t* next;
 } ResEventNode_t;

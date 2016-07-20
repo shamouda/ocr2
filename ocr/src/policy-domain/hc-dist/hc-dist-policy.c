@@ -312,7 +312,7 @@ void printResilientEventsList(ocrPolicyDomainHcDist_t * dself) {
 	ResEventNode_t *node = dself->proxyListHead->next;
 	u32 indx = 0;
 	while (node != dself->proxyListTail) {
-		printf("%d- loc[%d] evGuid["GUIDF"] \n", indx, (u32)(node->location), GUIDA(node->eventFatGuid->guid));
+		printf("%d- loc[%d] evGuid["GUIDF"] \n", indx, (u32)(node->location), GUIDA(node->eventFatGuid.guid));
 		node = node->next;
 		indx++;
 	}
