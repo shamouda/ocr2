@@ -66,6 +66,17 @@ static inline bool ocrGuidIsError(ocrGuid_t guid){
 
 
 /**
+ * @brief Tests whether a GUID is #FAILURE_GUID
+ *
+ * @param[in] guid  GUID to test
+ * @return true if the GUID is equal to #FAILURE_GUID or
+ * false otherwise
+ */
+static inline bool ocrGuidIsFailure(ocrGuid_t guid){
+    return (guid.guid == -3);
+}
+
+/**
  * @brief Tests whether two GUIDs are equal
  *
  * Note that this is the only way to test equality
