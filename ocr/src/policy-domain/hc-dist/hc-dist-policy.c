@@ -1724,6 +1724,7 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
             // Wait on the response handle for the communication to complete.
             DPRINTF(DEBUG_LVL_VVERB,"Waiting for reply from %"PRId32"\n", (u32)msg->destLocation);
             self->fcts.waitMessage(self, &handle);
+            //FIXME: ULFM Note - what if the source dies???? we should not wait forever here!!!
             DPRINTF(DEBUG_LVL_VVERB,"Received reply from %"PRId32" for original message @ %p\n",
                     (u32)msg->destLocation, originalMsg);
             ASSERT(handle->response != NULL);
@@ -2360,6 +2361,40 @@ void hcDistUpdateDeadLocations(ocrPolicyDomain_t *self,  ocrLocation_t* location
     dself->deadLocations = locations;
     dself->deadLocationsCount = count;
 
+    //hal_lock32(&dself->lockResEvtList);
+    ResEventNode_t *node = dself->proxyListHead->next;
+    while (node != dself->proxyListTail) {
+        u32 locIndx = 0;
+        while (locIndx < count) {
+        	if ((u32)(locations[locIndx]) == (u32)(node->location)) {
+                PD_MSG_STACK(msg);
+                ocrTask_t * curEdt = NULL;
+                getCurrentEnv(NULL, NULL, &curEdt, &msg);
+            	#define PD_MSG (&msg)
+            	#define PD_TYPE PD_MSG_DEP_SATISFY
+                	msg.type = PD_MSG_DEP_SATISFY | PD_MSG_REQUEST;
+                    PD_MSG_FIELD_I(satisfierGuid.guid) = curEdt?curEdt->guid:NULL_GUID;
+                    PD_MSG_FIELD_I(satisfierGuid.metaDataPtr) = curEdt;
+                	PD_MSG_FIELD_I(guid) = *node->eventFatGuid;
+                	PD_MSG_FIELD_I(payload.guid) = FAILURE_GUID; /*satisfy the event with a failure GUID*/
+                	PD_MSG_FIELD_I(payload.metaDataPtr) = NULL;
+                    PD_MSG_FIELD_I(currentEdt.guid) = curEdt ? curEdt->guid : NULL_GUID;
+                    PD_MSG_FIELD_I(currentEdt.metaDataPtr) = curEdt;
+                	PD_MSG_FIELD_I(slot) = 0;
+                	PD_MSG_FIELD_I(properties) = 0;
+                	//is this sync or async????
+                	self->fcts.processMessage(self, &msg, false);
+            	#undef PD_MSG
+            	#undef PD_TYPE
+
+                printf("@@@@satisfy proxy event  ["GUIDF"] \n", GUIDA(node->eventFatGuid->guid));
+                break;
+        	}
+        	locIndx++;
+        }
+        node = node -> next;
+    }
+    //hal_unlock32(&dself->lockResEvtList);
 }
 
 bool hcDistIsLocationDead(ocrPolicyDomain_t *self,  ocrLocation_t location) {
