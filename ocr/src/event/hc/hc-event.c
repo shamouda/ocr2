@@ -396,6 +396,7 @@ u8 satisfyEventHcOnce(ocrEvent_t *base, ocrFatGuid_t db, u32 slot) {
     	//FIXME: dealocate current ....
     	hal_unlock32(&lockVar);
     	
+    	printf("******removing proxy event  ["GUIDF"] \n", GUIDA(node->eventFatGuid.guid));
     }
     // Since this a ONCE event, we need to destroy it as well
     // This is safe to do so at this point as all the messages have been sent
