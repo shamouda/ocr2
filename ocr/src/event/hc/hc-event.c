@@ -385,7 +385,6 @@ u8 satisfyEventHcOnce(ocrEvent_t *base, ocrFatGuid_t db, u32 slot) {
     }
 
     //ULFM resilience //FIXMEULFM: use #ifdef MPI_ULFM
-    /*
     if (event->properties == EVT_PROP_ULFM_PROXY) {
     	u32 lockVar = *(((ocrEventHcOnceProxy_t*)event)->lockProxyListPtr);
     	ResEventNode_t* node = ((ocrEventHcOnceProxy_t*)event)->proxyEvtPtr;
@@ -397,7 +396,6 @@ u8 satisfyEventHcOnce(ocrEvent_t *base, ocrFatGuid_t db, u32 slot) {
     	//FIXME: dealocate current ....
     	hal_unlock32(&lockVar);
     }
-    */
     // Since this a ONCE event, we need to destroy it as well
     // This is safe to do so at this point as all the messages have been sent
     return destructEventHc(base);
