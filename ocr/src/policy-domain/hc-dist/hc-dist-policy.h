@@ -31,11 +31,13 @@ typedef struct {
     hashtable_t * proxyTplMap;
 
     //ULFM Resilience
+    /*
     ResEventNode_t* proxyListHead;
     ResEventNode_t* proxyListTail;
-    u32 lockResEvtList; /** Lock for proxy events list **/
+    u32 lockResEvtList; // Lock for proxy events list 
     ocrLocation_t * deadLocations;
     u32 deadLocationsCount;
+    */
 } ocrPolicyDomainHcDist_t;
 
 typedef struct {
