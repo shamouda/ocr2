@@ -2096,7 +2096,7 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
             	    ocrFatGuid_t proxyResEventGuid = PD_MSG_FIELD_IO(guid);
 
                     hal_lock32(&pdSelfDist->lockResEvtList);
-            	    node->eventFatGuid = &proxyResEventGuid;
+            	    node->eventFatGuid = proxyResEventGuid;
             	    hal_unlock32(&pdSelfDist->lockResEvtList);
                     printf("============Adding proxy event pointer  srcLoc[%d]\n", (u32) srcLoc);
             	    printResilientEventsList(pdSelfDist);
