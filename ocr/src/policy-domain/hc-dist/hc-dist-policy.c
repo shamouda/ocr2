@@ -2231,6 +2231,24 @@ u8 hcDistPdWaitMessage(ocrPolicyDomain_t *self,  ocrMsgHandle_t **handle) {
     return ret;
 }
 
+void hcDistUpdateDeadLocations(ocrPolicyDomain_t *self,  ocrLocation_t* locations, u32 count) {
+
+}
+
+bool hcDistIsLocationDead(ocrPolicyDomain_t *self,  ocrLocation_t location) {
+	ocrPolicyDomainHcDist_t * dself = (ocrPolicyDomainHcDist_t *) self;
+    int i = 0;
+    bool isDead = false;
+    while (i < dself->deadLocationsCount) {
+        if (location == dself->deadLocations[i]) {
+        	isDead = true;
+        	break;
+        }
+    	i++;
+    }
+    return isDead;
+}
+
 ocrPolicyDomain_t * newPolicyDomainHcDist(ocrPolicyDomainFactory_t * factory,
 #ifdef OCR_ENABLE_STATISTICS
                                       ocrStats_t *statsObject,
@@ -2266,6 +2284,9 @@ void initializePolicyDomainHcDist(ocrPolicyDomainFactory_t * factory,
     hcDistPd->lockDbLookup = 0;
     hcDistPd->lockTplLookup = 0;
     hcDistPd->shutdownAckCount = 0;
+
+    //ULFM resilience
+    hcDistPd->lockResEvtList = 0;
 }
 
 static void destructPolicyDomainFactoryHcDist(ocrPolicyDomainFactory_t * factory) {
@@ -2295,6 +2316,10 @@ ocrPolicyDomainFactory_t * newPolicyDomainFactoryHcDist(ocrParamList_t *perType)
                                                    hcDistPdSendMessage);
     derivedBase->policyDomainFcts.pollMessage = FUNC_ADDR(u8 (*)(ocrPolicyDomain_t*, ocrMsgHandle_t**), hcDistPdPollMessage);
     derivedBase->policyDomainFcts.waitMessage = FUNC_ADDR(u8 (*)(ocrPolicyDomain_t*, ocrMsgHandle_t**), hcDistPdWaitMessage);
+
+    //resilience
+    derivedBase->policyDomainFcts.updateDeadLocations = FUNC_ADDR(void (*)(ocrPolicyDomain_t*, ocrLocation_t*, u32), hcDistUpdateDeadLocations);
+    derivedBase->policyDomainFcts.isLocationDead = FUNC_ADDR(bool (*)(ocrPolicyDomain_t*, ocrLocation_t), hcDistIsLocationDead);
 
     baseFactory->destruct(baseFactory);
     return derivedBase;
