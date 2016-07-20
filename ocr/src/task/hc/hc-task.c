@@ -1409,7 +1409,7 @@ u8 taskExecute(ocrTask_t* base) {
         if (base->state == RUNNING_EDTSTATE) {
             // Now deal with the output event
             if(!(ocrGuidIsNull(base->outputEvent))) {
-                if(!(ocrGuidIsNull(retGuid) || ocrGuidIsFailure(retGuid))) { //SARAULFM
+                if(!(ocrGuidIsNull(retGuid) || ocrGuidIsNull(retGuid))) { //SARAULFM
                     getCurrentEnv(NULL, NULL, NULL, &msg);
 #define PD_MSG (&msg)
 #define PD_TYPE PD_MSG_DEP_ADD
