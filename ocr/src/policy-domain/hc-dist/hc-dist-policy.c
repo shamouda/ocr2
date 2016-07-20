@@ -1183,7 +1183,7 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
             u32 oldAckValue = hal_xadd32(&rself->shutdownAckCount, 1);
             ocrPolicyDomainHc_t * bself = (ocrPolicyDomainHc_t *) self;
             DPRINTF(DEBUG_LVL_VVERB,"PD_MSG_MGT_RL_NOTIFY: incoming: old value for shutdownAckCount=%"PRIu32"\n", oldAckValue);
-            if (oldAckValue == (self->neighborCount)) {
+            if (oldAckValue == (self->neighborCount - rself->deadLocationsCount)) {
                 // Got messages from all PDs and self.
                 // Done with distributed shutdown and can continue with the local shutdown.
                 PD_MSG_STACK(msgNotifyRl);
@@ -2153,20 +2153,22 @@ u8 hcDistPdSwitchRunlevel(ocrPolicyDomain_t *self, ocrRunlevel_t runlevel, u32 p
         getCurrentEnv(&self, NULL, NULL, NULL);
         u32 i = 0;
         while(i < self->neighborCount) {
-            DPRINTF(DEBUG_LVL_VVERB,"PD_MSG_MGT_RL_NOTIFY: loop shutdown neighbors[%"PRId32"] is %"PRId32"\n", i, (u32) self->neighbors[i]);
-            PD_MSG_STACK(msgShutdown);
-            getCurrentEnv(NULL, NULL, NULL, &msgShutdown);
-        #define PD_MSG (&msgShutdown)
-        #define PD_TYPE PD_MSG_MGT_RL_NOTIFY
-            msgShutdown.destLocation = self->neighbors[i];
-            msgShutdown.type = PD_MSG_MGT_RL_NOTIFY | PD_MSG_REQUEST;
-            PD_MSG_FIELD_I(runlevel) = RL_COMPUTE_OK;
-            PD_MSG_FIELD_I(properties) = RL_REQUEST | RL_BARRIER | RL_TEAR_DOWN;
-            PD_MSG_FIELD_I(errorCode) = self->shutdownCode;
-            DPRINTF(DEBUG_LVL_VVERB,"PD_MSG_MGT_RL_NOTIFY: send shutdown msg to %"PRId32"\n", (u32) msgShutdown.destLocation);
-            RESULT_ASSERT(self->fcts.processMessage(self, &msgShutdown, true), ==, 0);
-        #undef PD_MSG
-        #undef PD_TYPE
+            if (!self->fcts.isLocationDead(self, self->neighbors[i])){
+                DPRINTF(DEBUG_LVL_VVERB,"PD_MSG_MGT_RL_NOTIFY: loop shutdown neighbors[%"PRId32"] is %"PRId32"\n", i, (u32) self->neighbors[i]);
+                PD_MSG_STACK(msgShutdown);
+                getCurrentEnv(NULL, NULL, NULL, &msgShutdown);
+            #define PD_MSG (&msgShutdown)
+            #define PD_TYPE PD_MSG_MGT_RL_NOTIFY
+                msgShutdown.destLocation = self->neighbors[i];
+                msgShutdown.type = PD_MSG_MGT_RL_NOTIFY | PD_MSG_REQUEST;
+                PD_MSG_FIELD_I(runlevel) = RL_COMPUTE_OK;
+                PD_MSG_FIELD_I(properties) = RL_REQUEST | RL_BARRIER | RL_TEAR_DOWN;
+                PD_MSG_FIELD_I(errorCode) = self->shutdownCode;
+                DPRINTF(DEBUG_LVL_VVERB,"PD_MSG_MGT_RL_NOTIFY: send shutdown msg to %"PRId32"\n", (u32) msgShutdown.destLocation);
+                RESULT_ASSERT(self->fcts.processMessage(self, &msgShutdown, true), ==, 0);
+            #undef PD_MSG
+            #undef PD_TYPE
+            }
             i++;
         }
         // Consider the PD to have reached its local quiescence.
@@ -2175,7 +2177,7 @@ u8 hcDistPdSwitchRunlevel(ocrPolicyDomain_t *self, ocrRunlevel_t runlevel, u32 p
         ocrPolicyDomainHcDist_t * dself = (ocrPolicyDomainHcDist_t *) self;
         // incr the shutdown counter (compete with processMessage PD_MSG_MGT_RL_NOTIFY)
         u32 oldAckValue = hal_xadd32(&dself->shutdownAckCount, 1);
-        if (oldAckValue != (self->neighborCount)) {
+        if (oldAckValue != (self->neighborCount - dself->deadLocationsCount )) {
             DPRINTF(DEBUG_LVL_VVERB,"PD_MSG_MGT_RL_NOTIFY: reached local quiescence. To be resumed when distributed shutdown is done\n");
             // If it is not the last one to increment do not fall-through
             // The switch runlevel will be called whenever we get the last
@@ -2217,6 +2219,17 @@ u8 hcDistPdSwitchRunlevel(ocrPolicyDomain_t *self, ocrRunlevel_t runlevel, u32 p
                 // The template map should be empty. Do not check, because this
                 // data-structure should go away with #536 GUID metadata
                 destructHashtable(dself->proxyTplMap, NULL, NULL);
+
+                //ULFM resilience
+                ResEventNode_t *cur = dself->proxyListHead->next;
+                while (cur != dself->proxyListTail) {
+                	ResEventNode_t *del = cur;
+                	cur = cur->next;
+                	self->fcts.pdFree(self, del);
+                }
+				self->fcts.pdFree(self, dself->proxyListHead);
+				self->fcts.pdFree(self, dself->proxyListTail);
+
             }
 
         }
