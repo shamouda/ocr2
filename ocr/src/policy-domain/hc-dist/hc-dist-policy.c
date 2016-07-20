@@ -2180,6 +2180,15 @@ u8 hcDistPdSwitchRunlevel(ocrPolicyDomain_t *self, ocrRunlevel_t runlevel, u32 p
         if (properties & RL_BRING_UP) {
             if (runlevel == RL_GUID_OK) {
                 dself->proxyTplMap = newHashtableModulo(self, 10);
+
+                //ULFM resilience
+                ResEventNode_t * dummyHead = (ResEventNode_t *) self->fcts.pdMalloc(self, sizeof(ResEventNode_t));
+                ResEventNode_t * dummyTail = (ResEventNode_t *) self->fcts.pdMalloc(self, sizeof(ResEventNode_t));
+                dummyHead->prev = dummyTail->next = NULL;
+                dummyHead->next = dummyTail;
+                dummyTail->prev = dummyHead;
+                dself->proxyListHead = dummyHead;
+				dself->proxyListTail = dummyTail;
             }
             if (runlevel == RL_CONFIG_PARSE) {
                 // In distributed the shutdown protocol requires three phases
