@@ -2072,12 +2072,12 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
             	    node->eventFatGuid = (ocrFatGuid_t *) self->fcts.pdMalloc(self, sizeof(ocrFatGuid_t));
             	    node->location = srcLoc;
 
-            	    hal_lock32(&pdSelfDist->lockResEvtList);
+            	    hal_lock32(&(pdSelfDist->lockResEvtList));
             	    node->next = pdSelfDist->proxyListHead->next;
             	    node->prev = pdSelfDist->proxyListHead;
-            	    ((ResEventNode_t*)(node->next))->prev = (void*)node;
+            	    node->next->prev = node;
             	    pdSelfDist->proxyListHead->next = node;
-            	    hal_unlock32(&pdSelfDist->lockResEvtList);
+            	    hal_unlock32(&(pdSelfDist->lockResEvtList));
             	    //<end> record the event-location mapping
 
             	    PD_MSG_FIELD_IO(guid.guid) = NULL_GUID;
