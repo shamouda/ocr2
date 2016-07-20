@@ -2044,6 +2044,89 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
             }
         }
 
+        //ULFM -> remote dependency detected -> add extra dependency on a proxy event
+        if ((msg->type & PD_MSG_TYPE_ONLY) == PD_MSG_DEP_ADD) {
+			#define PD_MSG msg
+			#define PD_TYPE PD_MSG_DEP_ADD
+            ocrFatGuid_t src = PD_MSG_FIELD_I(source);
+            ocrFatGuid_t dest = PD_MSG_FIELD_I(dest);
+            u32 slot = PD_MSG_FIELD_I(slot);
+            ocrFatGuid_t currentEdt = PD_MSG_FIELD_I(currentEdt);
+            u16 props = PD_MSG_FIELD_IO(properties);
+            #undef PD_MSG
+            #undef PD_TYPE
+
+            ocrLocation_t srcLoc = (ocrLocation_t) (int)0;
+            guidLocation(self, src, &srcLoc);
+
+            if (srcLoc != self->myLocation) {
+            	printf("here[%d] add remote dependence to location %d \n", self->myLocation,(u32)srcLoc);
+            	/*Noni
+            	//create a local event that is fired in place of a lost event at a remote place
+            	PD_MSG_STACK(msg2);
+            	getCurrentEnv(NULL, NULL, NULL, &msg2);
+                #define PD_MSG (&msg2)
+                #define PD_TYPE PD_MSG_EVT_CREATE
+            	    msg2.type = PD_MSG_EVT_CREATE | PD_MSG_REQUEST | PD_MSG_REQ_RESPONSE;
+            	    //<start> record the event-location mapping
+            	    ResEventNode_t * node = (ResEventNode_t *) self->fcts.pdMalloc(self, sizeof(ResEventNode_t));
+            	    node->eventFatGuid = (ocrFatGuid_t *) self->fcts.pdMalloc(self, sizeof(ocrFatGuid_t));
+            	    node->location = srcLoc;
+
+            	    hal_lock32(&pdSelfDist->lockResEvtList);
+            	    node->next = pdSelfDist->proxyListHead->next;
+            	    node->prev = pdSelfDist->proxyListHead;
+            	    ((ResEventNode_t*)(node->next))->prev = (void*)node;
+            	    pdSelfDist->proxyListHead->next = node;
+            	    hal_unlock32(&pdSelfDist->lockResEvtList);
+            	    //<end> record the event-location mapping
+
+            	    PD_MSG_FIELD_IO(guid.guid) = NULL_GUID;
+            	    PD_MSG_FIELD_IO(guid.metaDataPtr) = NULL;
+            	    PD_MSG_FIELD_I(currentEdt) = currentEdt;
+
+            	    #ifdef ENABLE_EXTENSION_PARAMS_EVT
+            	        ocrEventParams_t proxyParams;
+            	        proxyParams.EVENT_PROXY.proxyEvtPtr = node;
+            	        proxyParams.EVENT_PROXY.lockProxyListPtr = &(pdSelfDist->lockResEvtList);
+            	        PD_MSG_FIELD_I(params) = &proxyParams;
+            	    #endif
+
+            	    PD_MSG_FIELD_I(properties) = EVT_PROP_ULFM_PROXY; //special property
+            	    PD_MSG_FIELD_I(type) = OCR_EVENT_ONCE_T;
+            	    RESULT_PROPAGATE(self->fcts.processMessage(self, &msg2, true));
+            	    ocrFatGuid_t proxyResEventGuid = PD_MSG_FIELD_IO(guid);
+                    hal_lock32(&pdSelfDist->lockResEvtList);
+            	    node->eventFatGuid = &proxyResEventGuid;
+            	    hal_unlock32(&pdSelfDist->lockResEvtList);
+            	#undef PD_TYPE
+            	#undef PD_MSG
+
+                PD_MSG_STACK(msg3);
+                getCurrentEnv(NULL, NULL, NULL, &msg3);
+        		#define PD_MSG (&msg3)
+        		#define PD_TYPE PD_MSG_DEP_ADD
+                    msg3.type = PD_MSG_DEP_ADD | PD_MSG_REQUEST;
+                    PD_MSG_FIELD_I(source) = proxyResEventGuid;
+                    PD_MSG_FIELD_I(dest) = dest;
+                    PD_MSG_FIELD_I(slot) = slot;
+                    PD_MSG_FIELD_IO(properties) = props;
+                    PD_MSG_FIELD_I(currentEdt) = currentEdt;
+                    RESULT_PROPAGATE(pdSelfDist->baseProcessMessage(self, &msg3, true));
+                #undef PD_MSG
+                #undef PD_TYPE
+
+                //ULFM update original msg
+                #define PD_MSG msg
+			    #define PD_TYPE PD_MSG_DEP_ADD
+                    PD_MSG_FIELD_I(dest) = proxyResEventGuid;
+                    PD_MSG_FIELD_I(slot) = 0;
+ 			    #undef PD_MSG
+                #undef PD_TYPE
+                */
+            }
+        }
+
         // NOTE: It is important to ensure the base processMessage call doesn't
         // store any pointers read from the request message
         ret = pdSelfDist->baseProcessMessage(self, msg, isBlocking);
