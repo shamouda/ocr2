@@ -419,7 +419,7 @@ static u8 iterateDbFrontier(ocrTask_t *self) {
                     return true;
                 }
                 if (returnCode == OCR_ACQ_DEST_DEAD) {
-                	resolvedDeps[i].guid = FAILURE_GUID;
+                	rself->resolvedDeps[i].guid = FAILURE_GUID;
                 	depv[i].guid = FAILURE_GUID;
                 	printf("depv[%d] dest is dead - replace it with a FAILURE_GUID ...\n", i);
                 }
