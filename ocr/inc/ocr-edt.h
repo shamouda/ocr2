@@ -56,7 +56,7 @@ typedef struct {
 typedef struct {
     union {
         ocrEventLatchParams_t EVENT_LATCH;
-        ocrEventProxyParams_t EVENT_PROXY;
+//        ocrEventProxyParams_t EVENT_PROXY;
 #ifdef ENABLE_EXTENSION_COUNTED_EVT
         ocrEventCounterParams_t EVENT_COUNTED;
 #endif
