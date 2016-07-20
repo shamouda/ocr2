@@ -2101,7 +2101,6 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
             	#undef PD_TYPE
             	#undef PD_MSG
 
-            	/*Noni
                 PD_MSG_STACK(msg3);
                 getCurrentEnv(NULL, NULL, NULL, &msg3);
         		#define PD_MSG (&msg3)
@@ -2123,7 +2122,7 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
                     PD_MSG_FIELD_I(slot) = 0;
  			    #undef PD_MSG
                 #undef PD_TYPE
-                */
+
             }
         }
 
