@@ -831,9 +831,9 @@ void mpiErrorHandler(MPI_Comm * comm, int *errorCode, ...){
         	locations[i] = mpiRankToLocation(comm_ranks[i]);
         }
 
-        //ocrPolicyDomain_t *policy = NULL;
-        //getCurrentEnv(&policy, NULL, NULL, NULL);
-		//policy->fcts.updateDeadLocations(policy, locations, (u32)f_size);
+        ocrPolicyDomain_t *policy = NULL;
+        getCurrentEnv(&policy, NULL, NULL, NULL);
+		policy->fcts.updateDeadLocations(policy, locations, (u32)f_size);
 
         free(failed_ranks);
         MPI_Group_free(&comm_group);
