@@ -1353,6 +1353,28 @@ typedef struct _ocrPolicyDomainFcts_t {
      */
     void (*pdFree)(struct _ocrPolicyDomain_t *self, void* addr);
 
+
+    /**
+     * @brief Updates the list of dead location at the policy domain
+     *
+     *
+     * @param[in] self          This policy-domain
+     * @param[in] locations     Unsorted array of dead locations
+     * @param[in] count      The number of dead locations
+     */
+    void (*updateDeadLocations)(struct _ocrPolicyDomain_t *self, ocrLocation_t* locations, u32 count);
+
+
+
+    /**
+     * @brief Checks if a location is dead
+     *
+     *
+     * @param[in] self          This policy-domain
+     * @param[in] location      The location that is checked for being dead
+     */
+    bool (*isLocationDead)(struct _ocrPolicyDomain_t *self, ocrLocation_t location);
+
 #ifdef OCR_ENABLE_STATISTICS
     ocrStats_t* (*getStats)(struct _ocrPolicyDomain_t *self);
 #endif

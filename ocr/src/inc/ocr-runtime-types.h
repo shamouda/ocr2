@@ -322,6 +322,8 @@ typedef u64 ocrLocation_t;
 #define POLL_NO_MESSAGE            0x1 // first bit indicates no message
 #define POLL_NO_OUTGOING_MESSAGE   0x3 // no outgoing in queue
 #define POLL_NO_INCOMING_MESSAGE   0x5 // no incoming in queue
+#define POLL_PROCESS_FAILED        0x6 // a source process has failed
+
 /**
  * @brief Indicates that a message was returned and available
  * and that more messages are available
