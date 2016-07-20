@@ -49,7 +49,8 @@ typedef struct ocrEventHc_t {
     u16 properties; //ULFM Resilience - properties field added to mark proxy events
 } ocrEventHc_t;
 
-/* used by hc-dist-policy.c */
+/*
+// used by hc-dist-policy.c 
 typedef struct _ResEventNode_t {
 	ocrLocation_t location;
 	ocrFatGuid_t* eventFatGuid;
@@ -57,13 +58,13 @@ typedef struct _ResEventNode_t {
 	struct _ResEventNode_t* next;
 } ResEventNode_t;
 
-/* used by hc-event.c */
+// used by hc-event.c 
 typedef struct _ocrEventHcOnceProxy_t {
 	ocrEventHc_t base;
 	ResEventNode_t* proxyEvtPtr;
 	u32* lockProxyListPtr;
 } ocrEventHcOnceProxy_t;
-
+*/
 typedef struct _ocrEventHcPersist_t {
     ocrEventHc_t base;
     ocrGuid_t data;
