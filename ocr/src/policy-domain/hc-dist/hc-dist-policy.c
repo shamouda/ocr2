@@ -2365,7 +2365,7 @@ void hcDistUpdateDeadLocations(ocrPolicyDomain_t *self,  ocrLocation_t* location
     ResEventNode_t *node = dself->proxyListHead->next;
     while (node != dself->proxyListTail) {
     	printf("Here[%d] check guid  ["GUIDF"]  location [%d] \n", (u32)self->myLocation,
-    			GUIDA(node->eventFatGuid->guid), (u32)(node->location));
+    			GUIDA(node->eventFatGuid.guid), (u32)(node->location));
         u32 locIndx = 0;
         while (locIndx < count) {
         	if ((u32)(locations[locIndx]) == (u32)(node->location)) {
@@ -2391,7 +2391,7 @@ void hcDistUpdateDeadLocations(ocrPolicyDomain_t *self,  ocrLocation_t* location
             	#undef PD_MSG
             	#undef PD_TYPE
 
-                printf("@@@@satisfy proxy event  ["GUIDF"] \n", GUIDA(node->eventFatGuid->guid));
+                printf("@@@@satisfy proxy event  ["GUIDF"] \n", GUIDA(node->eventFatGuid.guid));
                 break;
         	}
         	locIndx++;
