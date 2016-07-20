@@ -395,6 +395,7 @@ u8 satisfyEventHcOnce(ocrEvent_t *base, ocrFatGuid_t db, u32 slot) {
     	next->prev = prev;
     	//FIXME: dealocate current ....
     	hal_unlock32(&lockVar);
+    	
     }
     // Since this a ONCE event, we need to destroy it as well
     // This is safe to do so at this point as all the messages have been sent
@@ -1113,6 +1114,9 @@ u8 newEventHc(ocrEventFactory_t * factory, ocrFatGuid_t *guid,
     if(eventType == OCR_EVENT_LATCH_T) {
         sizeOfGuid = sizeof(ocrEventHcLatch_t);
     }
+    if (eventType == OCR_EVENT_ONCE_T && properties == EVT_PROP_ULFM_PROXY) {
+    	sizeOfGuid = sizeof(ocrEventHcOnceProxy_t);
+    }
     if((eventType == OCR_EVENT_IDEM_T) || (eventType == OCR_EVENT_STICKY_T)) {
         sizeOfGuid = sizeof(ocrEventHcPersist_t);
     }
@@ -1179,7 +1183,8 @@ u8 newEventHc(ocrEventFactory_t * factory, ocrFatGuid_t *guid,
     event->waitersCount = 0;
     event->waitersMax = HCEVT_WAITER_STATIC_COUNT;
     event->waitersLock = 0;
-
+    event->properties = properties;//EVT_PROP_ULFM_PROXY
+ 
     int jj = 0;
     while (jj < HCEVT_WAITER_STATIC_COUNT) {
         event->waiters[jj].guid = NULL_GUID;
