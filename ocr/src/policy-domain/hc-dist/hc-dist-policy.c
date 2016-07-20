@@ -1256,6 +1256,12 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
                 // Fall-through to local processing
             }
             if ((msg->srcLocation == curLoc) && (msg->destLocation != curLoc)) {
+            	if (isLocationDead(msg->destLocation)) {
+            		printf("Acquire  ... destination[%d]   isDead ...\n", (u32)msg->destLocation );
+            	}
+            	else {
+            		printf("Acquire  ... destination[%d]   isAlive ...\n", (u32)msg->destLocation );
+            	}
             	printf("Acquire ....1 \n");
                 if (msg->type & PD_MSG_LOCAL_PROCESS) { //BUG #162 - This is a workaround until metadata cloning
                     DPRINTF(DEBUG_LVL_VVERB,"DB_ACQUIRE local processing: DB GUID "GUIDF"\n", GUIDA(PD_MSG_FIELD_IO(guid.guid)));
