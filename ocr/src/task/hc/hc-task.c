@@ -381,7 +381,6 @@ static u8 initTaskHcInternal(ocrTaskHc_t *task, ocrPolicyDomain_t * pd,
  * Returns false when the end of depv is reached
  */
 static u8 iterateDbFrontier(ocrTask_t *self) {
-	printf("iterateDbFrontier ... \n");
     ocrTaskHc_t * rself = ((ocrTaskHc_t *) self);
     regNode_t * depv = rself->signalers;
     u32 i = rself->frontierSlot;
@@ -420,6 +419,7 @@ static u8 iterateDbFrontier(ocrTask_t *self) {
                     return true;
                 }
                 if (returnCode == OCR_ACQ_DEST_DEAD) {
+                	resolvedDeps[i].guid = FAILURE_GUID;
                 	depv[i].guid = FAILURE_GUID;
                 	printf("depv[%d] dest is dead - replace it with a FAILURE_GUID ...\n", i);
                 }
@@ -432,7 +432,6 @@ static u8 iterateDbFrontier(ocrTask_t *self) {
 #undef PD_TYPE
             }
         }
-        printf("iterateDbFrontier   dep [%d]/[%d] ... \n", i, self->depc);
     }
     return false;
 }
@@ -517,10 +516,8 @@ static u8 taskAllDepvSatisfied(ocrTask_t *self) {
         sortRegNode(signalers, self->depc);
         rself->frontierSlot = 0;
     }
-    printf("did I reach here?  1      scheduleSatisfiedTask(self)=%d \n", scheduleSatisfiedTask(self));
     // Try to start the DB acquisition process if scheduler agreed
     if (scheduleSatisfiedTask(self) != 0 && !iterateDbFrontier(self)) {
-    	printf("did I reach here?  2  \n");
         //TODO: Keeping this here for 0.9 compatibility but
         //iterateDbFrontier and related code will eventually
         //move to the scheduler.
