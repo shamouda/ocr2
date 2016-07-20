@@ -37,6 +37,17 @@
 #ifdef OCR_MONITOR_NETWORK
 #include "ocr-sal.h"
 #endif
+
+// MPI-ULFM integration
+#ifdef MPI_ERR_PROC_FAILED
+#define OPEN_MPI_ULFM true
+#include <mpi-ext.h>
+void mpiErrorHandler(MPI_Comm * comm, int *errorCode, ...);
+static inline int isProcessFailureError(int mpi_error){
+	return mpi_error == MPI_ERR_PROC_FAILED ||
+		mpi_error == MPI_ERR_REVOKED;
+}
+#endif
 //
 // MPI library Init/Finalize
 //
@@ -46,6 +57,13 @@
  */
 void platformInitMPIComm(int * argc, char *** argv) {
     RESULT_ASSERT(MPI_Init(argc, argv), ==, MPI_SUCCESS);
+
+#ifdef OPEN_MPI_ULFM
+    MPI_Errhandler customErrorHandler;
+    MPI_Comm_create_errhandler(mpiErrorHandler, &customErrorHandler);
+    MPI_Comm_set_errhandler(MPI_COMM_WORLD, customErrorHandler);
+#endif
+
 }
 
 /**
@@ -136,7 +154,7 @@ static void postRecvAny(ocrCommPlatform_t * self) {
     MPI_Comm comm = MPI_COMM_WORLD;
     DPRINTF(DEBUG_LVL_VERB,"[MPI %"PRId32"] posting irecv ANY\n", mpiRankToLocation(self->pd->myLocation));
     int res = MPI_Irecv(buf, count, datatype, src, tag, comm, &(handle->status));
-    ASSERT(res == MPI_SUCCESS);
+    ASSERT(res == MPI_SUCCESS); //ULFM Note: no process failure errors are expected from MPI_Irecv
 
 #ifdef OCR_MONITOR_NETWORK
     buf->rcvTime = salGetTime();
@@ -258,7 +276,7 @@ u8 MPICommSendMessage(ocrCommPlatform_t * self,
         //The other end will post a send using msgId as tag
         DPRINTF(DEBUG_LVL_VERB,"[MPI %"PRId32"] posting irecv for msgId %"PRIu64"\n", mpiRankToLocation(self->pd->myLocation), respTag);
         int res = MPI_Irecv(respMsg, respCount, datatype, targetRank, respTag, comm, status);
-        if (res != MPI_SUCCESS) {
+        if (res != MPI_SUCCESS) { //ULFM Note: no process failure errors are expected from MPI_Irecv
             //BUG #603 define error for comm-api
             ASSERT(false);
             return res;
@@ -303,7 +321,7 @@ u8 MPICommSendMessage(ocrCommPlatform_t * self,
 
     int res = MPI_Isend(messageBuffer, (int) fullMsgSize, datatype, targetRank, tag, comm, status);
 
-    if (res == MPI_SUCCESS) {
+    if (res == MPI_SUCCESS) { //ULFM Note: no process failure errors are expected from MPI_Isend
         mpiComm->outgoing->pushFront(mpiComm->outgoing, handle);
         *id = mpiId;
     } else {
@@ -327,10 +345,19 @@ u8 probeIncoming(ocrCommPlatform_t *self, int src, int tag, ocrPolicyMsg_t ** ms
 #endif
 
     int available = 0;
+    int res = MPI_SUCCESS;
 #ifdef MPI_MSG
-    RESULT_ASSERT(MPI_Improbe(src, tag, MPI_COMM_WORLD, &available, &mpiMsg, &status), ==, MPI_SUCCESS);
+    res = MPI_Improbe(src, tag, MPI_COMM_WORLD, &available, &mpiMsg, &status);
 #else
-    RESULT_ASSERT(MPI_Iprobe(src, tag, MPI_COMM_WORLD, &available, &status), ==, MPI_SUCCESS);
+    res = MPI_Iprobe(src, tag, MPI_COMM_WORLD, &available, &status);
+#endif
+#ifndef OPEN_MPI_ULFM
+    RESULT_ASSERT(res, ==, MPI_SUCCESS);
+#else
+    ASSERT (res == MPI_SUCCESS || isProcessFailureError(res));
+    if (isProcessFailureError(res)) {
+        return POLL_PROCESS_FAILED;
+    }
 #endif
     if (available) {
         ASSERT(msg != NULL);
@@ -347,10 +374,20 @@ u8 probeIncoming(ocrCommPlatform_t *self, int src, int tag, ocrPolicyMsg_t ** ms
         }
         ASSERT(*msg != NULL);
         MPI_Comm comm = MPI_COMM_WORLD;
+        int recvResult = MPI_SUCCESS;
 #ifdef MPI_MSG
-        RESULT_ASSERT(MPI_Mrecv(*msg, count, datatype, &mpiMsg, MPI_STATUS_IGNORE), ==, MPI_SUCCESS);
+        recvResult = MPI_Mrecv(*msg, count, datatype, &mpiMsg, MPI_STATUS_IGNORE);
 #else
-        RESULT_ASSERT(MPI_Recv(*msg, count, datatype, src, tag, comm, MPI_STATUS_IGNORE), ==, MPI_SUCCESS);
+        recvResult = MPI_Recv(*msg, count, datatype, src, tag, comm, MPI_STATUS_IGNORE);
+#endif
+
+#ifndef OPEN_MPI_ULFM //ULFM Note: blocking receive can raise process failure errors (54 and 55)
+        RESULT_ASSERT(recvResult, ==, MPI_SUCCESS);
+#else
+        ASSERT (res == MPI_SUCCESS || isProcessFailureError(res));
+        if (isProcessFailureError(recvResult)) {
+            return POLL_PROCESS_FAILED;
+        }
 #endif
         // After recv, the message size must be updated since it has just been overwritten.
         (*msg)->usefulSize = count;
@@ -408,7 +445,19 @@ u8 MPICommPollMessageInternal(ocrCommPlatform_t *self, ocrPolicyMsg_t **msg,
     while (outgoingIt->hasNext(outgoingIt)) {
         mpiCommHandle_t * mpiHandle = (mpiCommHandle_t *) outgoingIt->next(outgoingIt);
         int completed = 0;
-        RESULT_ASSERT(MPI_Test(&(mpiHandle->status), &completed, MPI_STATUS_IGNORE), ==, MPI_SUCCESS);
+        int res = MPI_SUCCESS;
+        res = MPI_Test(&(mpiHandle->status), &completed, MPI_STATUS_IGNORE);
+#ifndef OPEN_MPI_ULFM
+        RESULT_ASSERT(res, ==, MPI_SUCCESS);
+#else
+        ASSERT (res == MPI_SUCCESS || isProcessFailureError(res));
+        if (isProcessFailureError(res)) { // destination is dead; clean up current outgoing request
+        	outgoingIt->removeCurrent(outgoingIt);
+        	pd->fcts.pdFree(pd, mpiHandle->msg);
+        	pd->fcts.pdFree(pd, mpiHandle);
+        	continue;
+        }
+#endif
         if(completed) {
             DPRINTF(DEBUG_LVL_VVERB,"[MPI %"PRId32"] sent msg=%p src=%"PRId32", dst=%"PRId32", msgId=%"PRIu64", type=0x%"PRIx32", usefulSize=%"PRIu64"\n",
                     locationToMpiRank(self->pd->myLocation), mpiHandle->msg,
@@ -448,7 +497,13 @@ u8 MPICommPollMessageInternal(ocrCommPlatform_t *self, ocrPolicyMsg_t **msg,
         ocrPolicyMsg_t * reqMsg = mpiHandle->msg;
         u8 res = probeIncoming(self, mpiHandle->src, (int) mpiHandle->msgId, &mpiHandle->msg, mpiHandle->msg->bufferSize);
         // The message is properly unmarshalled at this point
-        if (res == POLL_MORE_MESSAGE) {
+        if (res == POLL_PROCESS_FAILED) {
+        	pd->fcts.pdFree(pd, mpiHandle);
+            incomingIt->removeCurrent(incomingIt);
+        	//FIXME: do not hide the error here, propagate it up the stack
+    	    return POLL_NO_MESSAGE;
+    	}
+        else if (res == POLL_MORE_MESSAGE) {
 #ifdef OCR_ASSERT
             if (reqMsg != mpiHandle->msg) {
                 // Original request hasn't changed
@@ -479,7 +534,17 @@ u8 MPICommPollMessageInternal(ocrCommPlatform_t *self, ocrPolicyMsg_t **msg,
         debugIts = true;
         int completed = 0;
         int ret = MPI_Test(&(mpiHandle->status), &completed, MPI_STATUS_IGNORE);
-        ASSERT(ret == MPI_SUCCESS);
+        #ifndef OPEN_MPI_ULFM
+            ASSERT(ret == MPI_SUCCESS);
+        #else
+            ASSERT (ret == MPI_SUCCESS || isProcessFailureError(ret));
+            if (isProcessFailureError(ret)) { // destination is dead; clean up current outgoing request
+                pd->fcts.pdFree(pd, mpiHandle);
+                incomingIt->removeCurrent(incomingIt);
+                //ULFM Question: should I call postRecvAny(self); ???
+                continue;
+            }
+        #endif
         if (completed) {
             ocrPolicyMsg_t * receivedMsg = mpiHandle->msg;
             u32 needRecvAny = (receivedMsg->type & PD_MSG_REQUEST);
@@ -521,6 +586,11 @@ u8 MPICommPollMessageInternal(ocrCommPlatform_t *self, ocrPolicyMsg_t **msg,
     if (retCode == POLL_NO_MESSAGE) {
         retCode |= (mpiComm->outgoing->isEmpty(mpiComm->outgoing)) ? POLL_NO_OUTGOING_MESSAGE : 0;
         retCode |= (mpiComm->incoming->isEmpty(mpiComm->incoming)) ? POLL_NO_INCOMING_MESSAGE : 0;
+    }
+
+    if (retCode == POLL_PROCESS_FAILED) {
+        //FIXME: do not hide the error here, propagate it up the stack
+    	retCode = POLL_NO_MESSAGE;
     }
     return retCode;
 }
@@ -613,7 +683,12 @@ u8 MPICommSwitchRunlevel(ocrCommPlatform_t *self, ocrPolicyDomain_t *PD, ocrRunl
             PRINTF("MPI rank %"PRId32" on host %s\n", myRank, hostname);
 #endif
             // Runlevel barrier across policy-domains
-            MPI_Barrier(MPI_COMM_WORLD);
+            MPI_Comm barrierComm = MPI_COMM_WORLD;
+#ifdef OPEN_MPI_ULFM
+            //ULFM Note: shrink is required, because if some processes are dead MPI_Barrier will fail
+            MPIX_Comm_shrink(MPI_COMM_WORLD, &barrierComm);
+#endif
+            MPI_Barrier(barrierComm);
 
 #if STRATEGY_PRE_POST_RECV
             // Post a recv any to start listening to incoming communications
@@ -718,5 +793,55 @@ ocrCommPlatformFactory_t *newCommPlatformFactoryMPI(ocrParamList_t *perType) {
                                                MPICommWaitMessage);
     return base;
 }
+
+// MPI-ULFM integration
+#ifdef OPEN_MPI_ULFM
+void mpiErrorHandler(MPI_Comm * comm, int *errorCode, ...){
+
+	int rank=0;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+	DPRINTF(DEBUG_LVL_WARN,"[MPI %"PRIu64"] Error handler started - errorCode[%"PRId32"]\n",
+	            mpiRankToLocation(rank), (u32)*errorCode);
+
+    MPI_Group failedGroup;
+    MPIX_Comm_failure_ack(*comm);
+    MPIX_Comm_failure_get_acked(*comm, &failedGroup);
+    int f_size;
+    MPI_Group comm_group;
+    int i = 0;
+    int *failed_ranks = NULL;
+    int *comm_ranks   = NULL;
+    ocrLocation_t *locations   = NULL;
+
+    MPI_Group_size(failedGroup, &f_size);
+
+    if( f_size > 0 ) {
+        MPI_Comm_group(MPI_COMM_WORLD, &comm_group);
+
+        failed_ranks = (int *)malloc(f_size * sizeof(int));
+        comm_ranks   = (int *)malloc(f_size * sizeof(int));
+        locations = (ocrLocation_t *)malloc(f_size * sizeof(ocrLocation_t));
+        for(i = 0; i < f_size; ++i) {
+            failed_ranks[i] = i;
+        }
+        MPI_Group_translate_ranks(failedGroup, f_size, failed_ranks, comm_group, comm_ranks);
+
+        //translate ranks to locations
+        for(i = 0; i < f_size; ++i) {
+        	locations[i] = mpiRankToLocation(comm_ranks[i]);
+        }
+
+        //ocrPolicyDomain_t *policy = NULL;
+        //getCurrentEnv(&policy, NULL, NULL, NULL);
+		//policy->fcts.updateDeadLocations(policy, locations, (u32)f_size);
+
+        free(failed_ranks);
+        MPI_Group_free(&comm_group);
+    }
+
+    MPI_Group_free(&failedGroup);
+    return;
+}
+#endif
 
 #endif /* ENABLE_COMM_PLATFORM_MPI */

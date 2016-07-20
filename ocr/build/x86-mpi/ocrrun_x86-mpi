@@ -23,6 +23,10 @@ elif [[ ${OCRRUN_OPT_ENVKIND} == "openmpi" ]]; then
     OCRRUN_OPT_CMD=${OCRRUN_OPT_CMD-"mpirun"}
     OCRRUN_OPT_NUM_NODES=${OCRRUN_OPT_NUM_NODES-"-np"}
     OCRRUN_OPT_NODEFILE=${OCRRUN_OPT_NODEFILE-"-machinefile"}
+elif [[ ${OCRRUN_OPT_ENVKIND} == "openmpiulfm" ]]; then
+    OCRRUN_OPT_CMD=${OCRRUN_OPT_CMD-"mpirun"}
+    OCRRUN_OPT_NUM_NODES=${OCRRUN_OPT_NUM_NODES-"-np"}
+    OCRRUN_OPT_NODEFILE=${OCRRUN_OPT_NODEFILE-"-machinefile"}
 else
     # Default to intel mpi options unless already set in environment
     OCRRUN_OPT_ENVKIND=${OCRRUN_OPT_ENVKIND-"impi"}
@@ -142,6 +146,11 @@ if [[ "$RES" != "" ]]; then
         hpcstruct "${PROGPATH}/${PROGNAME}"
         # The db file should be generated in the folder that contains the executable
         PROGRAM_BIN="hpcrun -t -o ${PROGPATH}/${PROGNAME}_meas ${OCRRUN_HPCTOOLKIT_OPTS} ${PROGRAM_BIN}"
+    fi
+
+    if [[ "${OCRRUN_OPT_ENVKIND}" == "openmpiulfm" ]]; then
+        # For CLE need to tweak the args when it's a local run
+        OCR_MPI_OPTS+=" -am ft-enable-mpi --mca errmgr_rts_hnp_proc_fail_xcast_delay 0"
     fi
 
     ${OCRRUN_OPT_CMD} ${OCR_MPI_OPTS} ${PROGRAM_BIN} -ocr:cfg ${OCR_CONFIG}

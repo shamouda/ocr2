@@ -64,6 +64,9 @@ typedef struct {
 #define ERROR_GUID_INITIALIZER {.guid = -1}
 #define ERROR_GUID ((ocrGuid_t)ERROR_GUID_INITIALIZER)
 
+#define FAILURE_GUID_INITIALIZER {.guid = -3}
+#define FAILURE_GUID ((ocrGuid_t)FAILURE_GUID_INITIALIZER)
+
 /* Defined vals for 128-bit GUIDs */
 #elif GUID_BIT_COUNT == 128
 
@@ -75,6 +78,9 @@ typedef struct {
 
 #define ERROR_GUID_INITIALIZER {.lower = -1, .upper = -1}
 #define ERROR_GUID ((ocrGuid_t)ERROR_GUID_INITIALIZER)
+
+#define FAILURE_GUID_INITIALIZER {.lower = -3, .upper = -3}
+#define FAILURE_GUID ((ocrGuid_t)FAILURE_GUID_INITIALIZER)
 
 #endif
 
@@ -312,6 +318,7 @@ typedef enum {
 
 #define EVT_PROP_NONE      ((u16) 0x0) /**< Property bits indicating a regular event */
 #define EVT_PROP_TAKES_ARG ((u16) 0x1) /**< Property bits indicating that the event takes an argument */
+#define EVT_PROP_ULFM_PROXY ((u16) 0x2) /**< Property bits indicating that the event is a proxy event for a remote event added for resilience */
 
 /**
  * @}
