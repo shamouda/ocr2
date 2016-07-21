@@ -388,6 +388,7 @@ u8 satisfyEventHcOnce(ocrEvent_t *base, ocrFatGuid_t db, u32 slot) {
     if (event->properties == EVT_PROP_ULFM_PROXY) {
     	u32 lockVar = *(((ocrEventHcOnceProxy_t*)event)->lockProxyListPtr);
     	ResEventNode_t* node = ((ocrEventHcOnceProxy_t*)event)->proxyEvtPtr;
+    	printf("***Here[%d] proxy event "GUIDF" satisfied, delete it \n", (u32)pd->myLocation, GUIDA(node->eventFatGuid.guid));
     	hal_lock32(&lockVar);
     	ResEventNode_t* next = node->next;
     	ResEventNode_t* prev = node->prev;
