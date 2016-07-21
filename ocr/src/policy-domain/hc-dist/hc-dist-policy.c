@@ -2061,8 +2061,11 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
             #undef PD_TYPE
 
             ocrLocation_t srcLoc = (ocrLocation_t) (int)0;
+            ocrLocation_t dstLoc = (ocrLocation_t) (int)0;
             guidLocation(self, src, &srcLoc);
+            guidLocation(self, dest, &dstLoc);
 
+            printf("Here[%d] ocrAddDependence  src=%d  dest=%d \n", (u32)self->myLocation , (u32)srcLoc  , (u32)dstLoc );
             if (srcLoc != self->myLocation) {
             	//create a local event that is fired in place of a lost event at a remote place
             	PD_MSG_STACK(msg2);
