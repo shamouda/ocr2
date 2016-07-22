@@ -456,3 +456,36 @@ u8 ocrAddDependence(ocrGuid_t source, ocrGuid_t destination, u32 slot,
                      "EXIT ocrAddDependence(src="GUIDF", dest="GUIDF") -> %"PRIu32"\n", GUIDA(source), GUIDA(destination), returnCode);
     RETURN_PROFILE(returnCode);
 }
+
+
+//TODO: ocrAddEventSatisfier= (no-op) in non-resilient mode
+u8 ocrAddEventSatisfier(ocrGuid_t edtGuid, ocrGuid_t eventGuid) {
+    START_PROFILE(api_ocrAddEventSatisfier);
+    DPRINTF(DEBUG_LVL_INFO, "ENTER ocrAddEventSatisfier(edtGuid="GUIDF", eventGuid="GUIDF")\n",
+            GUIDA(taskGuid), GUIDA(eventGuid));
+    ASSERT(!(ocrGuidIsNull(edtGuid)));
+    PD_MSG_STACK(msg);
+    ocrPolicyDomain_t *pd = NULL;
+    ocrTask_t * curEdt = NULL;
+    getCurrentEnv(&pd, NULL, &curEdt, &msg);
+    u8 returnCode = 0;
+#define PD_MSG (&msg)
+#define PD_TYPE PD_MSG_EVT_SAT_ADD
+	msg.type = PD_MSG_EVT_SAT_ADD | PD_MSG_REQUEST;
+	PD_MSG_FIELD_I(edt.guid) = edtGuid;
+	PD_MSG_FIELD_I(edt.metaDataPtr) = NULL;
+	PD_MSG_FIELD_I(event.guid) = eventGuid;
+	PD_MSG_FIELD_I(event.metaDataPtr) = NULL;
+	PD_MSG_FIELD_I(currentEdt.guid) = curEdt ? curEdt->guid : NULL_GUID;
+	PD_MSG_FIELD_I(currentEdt.metaDataPtr) = curEdt;
+	returnCode = pd->fcts.processMessage(pd, &msg, true);
+	DPRINTF_COND_LVL(returnCode, DEBUG_LVL_WARN, DEBUG_LVL_INFO,
+				 "EXIT ocrAddEventSatisfier through PD_MSG_DEP_ADD(edtGuid="GUIDF", eventGuid="GUIDF") -> %"PRIu32"\n",
+				 GUIDA(taskGuid), GUIDA(eventGuid), returnCode);
+#undef PD_MSG
+#undef PD_TYPE
+    DPRINTF_COND_LVL(returnCode, DEBUG_LVL_WARN, DEBUG_LVL_INFO,
+            "EXIT ocrAddEventSatisfier(edtGuid="GUIDF", eventGuid="GUIDF")\n",
+            GUIDA(taskGuid), GUIDA(eventGuid));
+    RETURN_PROFILE(returnCode);
+}

@@ -1976,6 +1976,11 @@ u8 hcPolicyDomainProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8
         break;
     }
 
+    case PD_MSG_EVT_SAT_ADD: {
+         // Nothing to be done in shared memory mode, all work is done in hc-dist-policy.c
+         break;
+    }
+
     case PD_MSG_DEP_REGSIGNALER: {
         START_PROFILE(pd_hc_RegSignaler);
 #define PD_MSG msg

@@ -225,6 +225,8 @@ typedef struct _paramListPolicyDomainInst_t {
 /**< Removes a potential dynamic dependence */
 #define PD_MSG_DEP_DYNREMOVE    0x00088080
 
+#define PD_MSG_EVT_SAT_ADD      0x00089080
+
 /**< AND with this and if result non-null, low-level OS operation */
 #define PD_MSG_SAL_OP           0x100
 /**< Print operation */
@@ -888,6 +890,19 @@ typedef struct _ocrPolicyMsg_t {
                 } out;
             } inOrOut __attribute__ (( aligned(8) ));
         } PD_MSG_STRUCT_NAME(PD_MSG_DEP_ADD);
+
+        struct {
+			union {
+				struct {
+					ocrFatGuid_t edt;     /**< In: Event satisfier */
+					ocrFatGuid_t event;   /**< In: Event */
+					ocrFatGuid_t currentEdt;  /**< In: EDT that is adding dep */
+				} in;
+				struct {
+					u32 returnDetail;    /**< Out: Success or error code */
+				} out;
+			} inOrOut __attribute__ (( aligned(8) ));
+		} PD_MSG_STRUCT_NAME(PD_MSG_EVT_SAT_ADD);
 
         struct {
             union {

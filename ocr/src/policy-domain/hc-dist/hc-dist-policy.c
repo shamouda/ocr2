@@ -135,6 +135,15 @@ static void setReturnDetail(ocrPolicyMsg_t * msg, u8 returnDetail) {
 #undef PD_TYPE
     break;
     }
+    case PD_MSG_EVT_SAT_ADD:
+    {
+#define PD_MSG (msg)
+#define PD_TYPE PD_MSG_EVT_SAT_ADD
+        PD_MSG_FIELD_O(returnDetail) = returnDetail;
+#undef PD_MSG
+#undef PD_TYPE
+    break;
+    }
     case PD_MSG_DEP_DYNADD:
     {
 #define PD_MSG (msg)
@@ -1672,6 +1681,7 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
     }
     // filter out local messages
     case PD_MSG_DEP_ADD:
+    case PD_MSG_EVT_SAT_ADD:
     case PD_MSG_MEM_OP:
     case PD_MSG_MEM_ALLOC:
     case PD_MSG_MEM_UNALLOC:
@@ -2132,6 +2142,9 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
                 #undef PD_TYPE
 
             }
+        }
+        else if ((msg->type & PD_MSG_TYPE_ONLY) == PD_MSG_EVT_SAT_ADD) {
+             printf("****** going to register a satisfier   *****\n");
         }
 
         // NOTE: It is important to ensure the base processMessage call doesn't
