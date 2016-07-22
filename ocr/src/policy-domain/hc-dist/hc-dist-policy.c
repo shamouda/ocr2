@@ -321,7 +321,7 @@ void printResilientEventsList(ocrPolicyDomainHcDist_t * dself) {
 	ResEventNode_t *node = dself->proxyListHead->next;
 	u32 indx = 0;
 	while (node != dself->proxyListTail) {
-		printf("%d- loc[%d] evGuid["GUIDF"] \n", indx, (u32)(node->location), GUIDA(node->eventFatGuid.guid));
+		printf("%d- loc[%d] evGuid["GUIDF"] type[%d] \n", indx, (u32)(node->location), GUIDA(node->eventFatGuid.guid), node->type);
 		node = node->next;
 		indx++;
 	}
@@ -2111,6 +2111,7 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
             	    ocrFatGuid_t proxyResEventGuid = PD_MSG_FIELD_IO(guid);
 
                     hal_lock32(&pdSelfDist->lockResEvtList);
+                    node->type = 1;
             	    node->location = srcLoc;
             	    node->eventFatGuid = proxyResEventGuid;
             	    hal_unlock32(&pdSelfDist->lockResEvtList);
@@ -2165,6 +2166,7 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
             	pdSelfDist->proxyListHead->next = node;
             	node->prev = pdSelfDist->proxyListHead;
             	node->next->prev = node;
+            	node->type = 0;
             	node->location = edtLoc;
             	node->eventFatGuid = event;
             	hal_unlock32(&(pdSelfDist->lockResEvtList));

@@ -51,6 +51,7 @@ typedef struct ocrEventHc_t {
 
 // used by hc-dist-policy.c 
 typedef struct _ResEventNode_t {
+	u8 type; // 0=normal, 1=proxy
 	ocrLocation_t location;
 	ocrFatGuid_t eventFatGuid;
 	struct _ResEventNode_t* prev;
