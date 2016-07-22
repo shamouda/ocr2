@@ -2159,8 +2159,16 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
 
             printf("Here[%d] ocrAddSatisfier  edt=%d  event=%d \n", (u32)self->myLocation , (u32)edtLoc  , (u32)eventLoc );
             if (eventLoc == self->myLocation && edtLoc != self->myLocation) {
-
-
+            	ResEventNode_t * node = (ResEventNode_t *) self->fcts.pdMalloc(self, sizeof(ResEventNode_t));
+            	hal_lock32(&(pdSelfDist->lockResEvtList));
+            	node->next = pdSelfDist->proxyListHead->next;
+            	pdSelfDist->proxyListHead->next = node;
+            	node->prev = pdSelfDist->proxyListHead;
+            	node->next->prev = node;
+            	node->location = edtLoc;
+            	node->eventFatGuid = event;
+            	hal_unlock32(&(pdSelfDist->lockResEvtList));
+            	//TODO: handle deleting
             }
         }
 
@@ -2427,7 +2435,7 @@ void hcDistUpdateDeadLocations(ocrPolicyDomain_t *self,  ocrLocation_t* location
             	#undef PD_MSG
             	#undef PD_TYPE
 
-                printf("@@@@satisfy proxy event  ["GUIDF"] \n", GUIDA(node->eventFatGuid.guid));
+                printf("@@@@satisfy proxy event  ["GUIDF"] with FAILURE_GUID \n", GUIDA(node->eventFatGuid.guid));
                 break;
         	}
         	locIndx++;
