@@ -2144,7 +2144,25 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
             }
         }
         else if ((msg->type & PD_MSG_TYPE_ONLY) == PD_MSG_EVT_SAT_ADD) {
-             printf("****** going to register a satisfier   *****\n");
+            #define PD_MSG msg
+			#define PD_TYPE PD_MSG_EVT_SAT_ADD
+            ocrFatGuid_t edt = PD_MSG_FIELD_I(edt);
+            ocrFatGuid_t event = PD_MSG_FIELD_I(event);
+            ocrFatGuid_t currentEdt = PD_MSG_FIELD_I(currentEdt);
+            #undef PD_MSG
+            #undef PD_TYPE
+            //is the satisfier remote?
+
+            ocrLocation_t edtLoc = (ocrLocation_t) (int)0;
+            ocrLocation_t eventLoc = (ocrLocation_t) (int)0;
+            guidLocation(self, edt, &edtLoc);
+            guidLocation(self, event, &eventLoc);
+
+            printf("Here[%d] ocrAddSatisfier  edt=%d  event=%d \n", (u32)self->myLocation , (u32)edtLoc  , (u32)eventLoc );
+            if (eventLoc == self->myLocation && edtLoc != self->myLocation) {
+
+
+            }
         }
 
         // NOTE: It is important to ensure the base processMessage call doesn't
