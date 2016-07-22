@@ -2075,7 +2075,7 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
             guidLocation(self, src, &srcLoc);
             guidLocation(self, dest, &dstLoc);
 
-            printf("Here[%d] ocrAddDependence  src=%d  dest=%d \n", (u32)self->myLocation , (u32)srcLoc  , (u32)dstLoc );
+            //printf("Here[%d] ocrAddDependence  src=%d  dest=%d \n", (u32)self->myLocation , (u32)srcLoc  , (u32)dstLoc );
             if (srcLoc != self->myLocation) {
             	//create a local event that is fired in place of a lost event at a remote place
             	PD_MSG_STACK(msg2);
@@ -2115,7 +2115,7 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
             	    node->location = srcLoc;
             	    node->eventFatGuid = proxyResEventGuid;
             	    hal_unlock32(&pdSelfDist->lockResEvtList);
-            	    printf("Here[%d]============Adding proxy event pointer  srcLoc[%d]\n", (u32)self->myLocation, (u32) srcLoc);
+            	    //printf("Here[%d]============Adding proxy event pointer  srcLoc[%d]\n", (u32)self->myLocation, (u32) srcLoc);
             	    printResilientEventsList(pdSelfDist);
             	#undef PD_TYPE
             	#undef PD_MSG
@@ -2158,7 +2158,7 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
             guidLocation(self, edt, &edtLoc);
             guidLocation(self, event, &eventLoc);
 
-            printf("Here[%d] ocrAddSatisfier  edt=%d  event=%d \n", (u32)self->myLocation , (u32)edtLoc  , (u32)eventLoc );
+            //printf("Here[%d] ocrAddSatisfier  edt=%d  event=%d \n", (u32)self->myLocation , (u32)edtLoc  , (u32)eventLoc );
             if (eventLoc == self->myLocation && edtLoc != self->myLocation) {
             	ResEventNode_t * node = (ResEventNode_t *) self->fcts.pdMalloc(self, sizeof(ResEventNode_t));
             	hal_lock32(&(pdSelfDist->lockResEvtList));
