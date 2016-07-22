@@ -2148,7 +2148,6 @@ u8 hcDistProcessMessage(ocrPolicyDomain_t *self, ocrPolicyMsg_t *msg, u8 isBlock
 			#define PD_TYPE PD_MSG_EVT_SAT_ADD
             ocrFatGuid_t edt = PD_MSG_FIELD_I(edt);
             ocrFatGuid_t event = PD_MSG_FIELD_I(event);
-            ocrFatGuid_t currentEdt = PD_MSG_FIELD_I(currentEdt);
             #undef PD_MSG
             #undef PD_TYPE
             //is the satisfier remote?
