@@ -462,7 +462,7 @@ u8 ocrAddDependence(ocrGuid_t source, ocrGuid_t destination, u32 slot,
 u8 ocrAddEventSatisfier(ocrGuid_t edtGuid, ocrGuid_t eventGuid) {
     START_PROFILE(api_ocrAddEventSatisfier);
     DPRINTF(DEBUG_LVL_INFO, "ENTER ocrAddEventSatisfier(edtGuid="GUIDF", eventGuid="GUIDF")\n",
-            GUIDA(taskGuid), GUIDA(eventGuid));
+            GUIDA(edtGuid), GUIDA(eventGuid));
     ASSERT(!(ocrGuidIsNull(edtGuid)));
     PD_MSG_STACK(msg);
     ocrPolicyDomain_t *pd = NULL;
@@ -481,11 +481,11 @@ u8 ocrAddEventSatisfier(ocrGuid_t edtGuid, ocrGuid_t eventGuid) {
 	returnCode = pd->fcts.processMessage(pd, &msg, true);
 	DPRINTF_COND_LVL(returnCode, DEBUG_LVL_WARN, DEBUG_LVL_INFO,
 				 "EXIT ocrAddEventSatisfier through PD_MSG_DEP_ADD(edtGuid="GUIDF", eventGuid="GUIDF") -> %"PRIu32"\n",
-				 GUIDA(taskGuid), GUIDA(eventGuid), returnCode);
+				 GUIDA(edtGuid), GUIDA(eventGuid), returnCode);
 #undef PD_MSG
 #undef PD_TYPE
     DPRINTF_COND_LVL(returnCode, DEBUG_LVL_WARN, DEBUG_LVL_INFO,
             "EXIT ocrAddEventSatisfier(edtGuid="GUIDF", eventGuid="GUIDF")\n",
-            GUIDA(taskGuid), GUIDA(eventGuid));
+            GUIDA(edtGuid), GUIDA(eventGuid));
     RETURN_PROFILE(returnCode);
 }
