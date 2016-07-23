@@ -2397,11 +2397,13 @@ u8 hcDistPdWaitMessage(ocrPolicyDomain_t *self,  ocrMsgHandle_t **handle) {
 
 void hcDistUpdateDeadLocations(ocrPolicyDomain_t *self,  ocrLocation_t* locations, u32 count) {
 	ocrPolicyDomainHcDist_t * dself = (ocrPolicyDomainHcDist_t *) self;
+	/*
 	int m = 0;
 	while (m < count) {
          printf("Here[%d] policy domain notified with dead location (%d) ...\n", (u32)self->myLocation, (u32)locations[m]);
          m++;
 	}
+	*/
     ////printResilientEventsList(dself);
     //FIXMEULFM  -> deallocate deadLocations before writing the new array
     dself->deadLocations = locations;
