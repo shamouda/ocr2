@@ -2402,7 +2402,7 @@ void hcDistUpdateDeadLocations(ocrPolicyDomain_t *self,  ocrLocation_t* location
          printf("Here[%d] policy domain notified with dead location (%d) ...\n", (u32)self->myLocation, (u32)locations[m]);
          m++;
 	}
-    printResilientEventsList(dself);
+    ////printResilientEventsList(dself);
     //FIXMEULFM  -> deallocate deadLocations before writing the new array
     dself->deadLocations = locations;
     dself->deadLocationsCount = count;
